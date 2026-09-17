@@ -695,6 +695,19 @@ export function planBindingProgram(fn, render, context) {
 				selfNs,
 				tag === 'textarea' || opaqueChildren ? null : 0,
 			];
+			if (
+				tag === 'textarea' &&
+				selfNs === 0 &&
+				normalizedChildren.length === 0 &&
+				(node.attributes ?? []).some(
+					(attr) => rawName(attr) === 'value' && native.unbound.has(unwrap(attrValue(attr))),
+				) &&
+				!(node.attributes ?? []).some((attr) => rawName(attr) === 'dangerouslySetInnerHTML')
+			) {
+				// Its SSR text is native value content, not an arbitrary opaque subtree.
+				// The handoff validates the live text-only topology before accepting it.
+				nativeNode.push('value');
+			}
 			if (opaqueChildren)
 				constructionError ??=
 					'This view contains externally owned children that cannot be constructed by a binding program.';
@@ -710,7 +723,7 @@ export function planBindingProgram(fn, render, context) {
 			}
 			const attributes = createTemplateIr();
 			for (const attr of node.attributes ?? []) {
-				if (attr._octaneKnownAttributeSpread) continue;
+				if (attr._octaneKnownAttributeSpread && !attr._octaneKnownAttributeSpread.unbound) continue;
 				if (rawName(attr) === 'ref' || /^on[A-Z]/.test(rawName(attr) ?? '')) continue;
 				if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
 					constructionError ??=

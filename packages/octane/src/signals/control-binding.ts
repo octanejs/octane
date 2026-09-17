@@ -8,18 +8,30 @@ import {
 	registerHydrationControlSignalWriter,
 } from './early-values.js';
 import { isSignalHandle, isWritableSignal } from './handle-protocol.js';
+import {
+	CONTROL_BINDINGS,
+	CONTROL_HANDOFF,
+	type ControlHandoff,
+	type SignalControlBinding,
+} from './control-handoff.js';
 import { captureSignalOwner, currentSignalOwner } from './owner-context.js';
 import {
 	forwardNativeTransitionConsumer,
 	NATIVE_TRANSITION_CONSUMER,
 	type NativeTransitionNotify,
 } from './read-protocol.js';
-import { SIGNAL_BINDING_READ, SIGNAL_BINDING_SUBSCRIBE, type SignalHandle } from './types.js';
+import {
+	SIGNAL_BINDING_IDENTITY,
+	SIGNAL_BINDING_READ,
+	SIGNAL_BINDING_SUBSCRIBE,
+	SIGNAL_OWNER_RESOLVE,
+	type SignalHandle,
+	type SignalOwner,
+} from './types.js';
 import { withoutSignalCandidate } from './transition-state.js';
 
 type SignalControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 type ControlChannel = 'value' | 'checked';
-const CONTROL_BINDINGS = /* @__PURE__ */ new WeakMap<Element, Set<ControlChannel>>();
 const RADIO_WRITERS = /* @__PURE__ */ new WeakMap<Element, (value: unknown) => void>();
 
 // Sampled JSX values use the native renderer's scalar coercion, not the stricter
@@ -77,12 +89,13 @@ export interface BindingControlLease {
 	prepare(value: unknown): BindingControlPrepared;
 	preview(value: unknown): BindingControlPreview;
 	prepareCurrent(): BindingControlPrepared;
+	active(): boolean;
+	composing(): boolean;
 	dispose(): void;
 }
 
 /** @internal Optional compiled-control capability; captures, but never creates, an owner. */
-export function __createBindingControls() {
-	const owner = currentSignalOwner();
+export function __createBindingControls(owner = currentSignalOwner()) {
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
 	return {
 		claim(element: Element, channel: ControlChannel, notify: () => void): BindingControlLease {
@@ -390,38 +403,50 @@ export function __createBindingControls() {
 				prepare,
 				preview: (value) => prepare(value, true) as BindingControlPreview,
 				prepareCurrent: () => prepare(raw),
+				active: () => !disposed,
+				composing: () => composing,
 				dispose,
 			};
 		},
 	};
 }
 
+function controlSignalOwner(owner: SignalOwner | null, document: boolean): object | null {
+	return owner !== null && 'documentOwner' in owner
+		? document
+			? owner.documentOwner
+			: owner.instanceOwner
+		: owner;
+}
+
 /**
  * Bind one native property on externally owned DOM without creating a renderer.
  * Writable signals adopt captured early edits and receive native input; other
- * handles only project. Dispose before transferring the property to another owner.
+ * handles only project. The callable cleanup may be offered to hydrateRoot in
+ * controlLeases; declined or suspended presentation keeps this binding active.
  */
 export function bindSignalControl(
 	control: SignalControl,
 	channel: 'value',
 	handle$: SignalHandle<string | readonly string[]>,
-): () => void;
+): SignalControlBinding;
 export function bindSignalControl(
 	control: HTMLInputElement,
 	channel: 'checked',
 	handle$: SignalHandle<boolean>,
-): () => void;
+): SignalControlBinding;
 export function bindSignalControl(
 	control: SignalControl,
 	channel: ControlChannel,
 	handle$: SignalHandle<unknown>,
-): () => void {
+): SignalControlBinding {
 	if (!isSignalHandle(handle$))
 		throw new TypeError('A signal control requires a native value/checked property and a signal.');
 	let busy = false;
 	let dirty = false;
 	let disposed = false;
 	let lease: BindingControlLease;
+	let handoff: ControlHandoff | undefined;
 	const dispose = (): void => {
 		disposed = true;
 		lease.dispose();
@@ -470,7 +495,35 @@ export function bindSignalControl(
 			};
 		},
 	};
-	lease = __createBindingControls().claim(control, channel, refresh);
+	const owner = currentSignalOwner();
+	lease = __createBindingControls(owner).claim(control, channel, refresh);
 	refresh();
-	return dispose;
+	return Object.assign(dispose, {
+		[CONTROL_HANDOFF](): ControlHandoff {
+			return (handoff ??= {
+				control,
+				channel,
+				active: () => !disposed && lease.active(),
+				matches(handle) {
+					if (disposed || !lease.active() || handle !== handle$) return false;
+					// Concrete handles already carry their owner. A module descriptor
+					// can resolve the same authored key to a different cell in another
+					// document or instance; equal names never grant that authority.
+					if (!(SIGNAL_OWNER_RESOLVE in handle$)) return true;
+					const document = handle$[SIGNAL_BINDING_IDENTITY]().scope === 'document';
+					return (
+						owner !== null &&
+						controlSignalOwner(owner, document) ===
+							controlSignalOwner(currentSignalOwner(), document) &&
+						!disposed &&
+						lease.active()
+					);
+				},
+				composing: lease.composing,
+				// dispose revokes authority before invoking fallible subscription
+				// cleanup; a later call cannot release the renderer's replacement.
+				retire: dispose,
+			});
+		},
+	});
 }

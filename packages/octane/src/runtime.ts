@@ -33,6 +33,12 @@ import {
 	type BindingHandoffCapability,
 } from './dom-binding-handoff.js';
 import { bumpContextEpoch, contextEpochNow } from './context-epoch.js';
+import {
+	CONTROL_HANDOFF,
+	hasSignalControlBinding,
+	type ControlHandoff,
+	type SignalControlBinding,
+} from './signals/control-handoff.js';
 
 import {
 	SUSPENSE_SCRIPT_ATTR,
@@ -3487,6 +3493,7 @@ interface RootRenderOwner {
 	/** Shared document/account data owner; distinct from this root's presentation owner. */
 	signalOwner?: SignalOwner;
 	bindingLeases?: Set<BindingHandoff>;
+	controlLeases?: Map<Element, ControlHandoff | undefined>;
 	preservePresentation?: boolean;
 	bindingContainer?: Node;
 	adopt?: (block: Block) => void;
@@ -18955,10 +18962,19 @@ interface PresentationHydrationFrame {
 	readToken: number;
 	witnessToken: number;
 	witnesses: Map<object, NativeReadWitness | null>;
+	controls?: Map<
+		Element,
+		{
+			valid: (retired?: boolean) => boolean;
+			binding: DirectSignalBinding;
+			lease: ControlHandoff | undefined;
+			stop?: () => void;
+		}
+	>;
 	completed: boolean;
 	lease: BindingHandoff;
 	revision?: number;
-	/** Installed only for structural receipts so ordinary commits do not retain the validator. */
+	/** Installed only for structural/control receipts, not ordinary fixed presentations. */
 	current?: typeof currentPresentation;
 	hydration: HydrationCapability | null;
 }
@@ -18995,7 +19011,7 @@ function isAdoptionControl(error: unknown): boolean {
 /** @internal Preserve the early presentation when an authored preparation throws. */
 export function presentationFailure(error: unknown): never {
 	const frame = PRESENTATION_HYDRATION;
-	if (frame?.revision !== undefined && !isSuspenseException(error) && !isAdoptionControl(error)) {
+	if (frame !== null && !isSuspenseException(error) && !isAdoptionControl(error)) {
 		const failure = new PresentationAdoptionMiss(frame.lease, false);
 		failure.failure = error;
 		throw failure;
@@ -19008,7 +19024,9 @@ function presentationMiss(retry = true): never {
 }
 
 function currentPresentation(frame: PresentationHydrationFrame): boolean {
-	if (frame.revision === undefined) return true;
+	if (frame.controls !== undefined && [...frame.controls.values()].some(({ valid }) => !valid()))
+		return false;
+	if (frame.revision === undefined && frame.controls === undefined) return true;
 	const lease = frame.lease;
 	return (
 		lease.active() &&
@@ -19020,6 +19038,18 @@ function currentPresentation(frame: PresentationHydrationFrame): boolean {
 			(witness) => witness === null || validateNativeReadWitness(witness),
 		)
 	);
+}
+
+function trackPresentationFrame(frame: PresentationHydrationFrame): void {
+	if (frame.current !== undefined) return;
+	frame.current = currentPresentation;
+	(WIP_CAPTURE!.presentations ??= []).push(frame);
+	if (frame.hydration === null) return;
+	frame.hydration.presentation = true;
+	for (let block: Block | null = frame.scope.block; block !== null; block = block.parentBlock) {
+		preserveRootCreatedDom(block);
+		if (block === frame.hydration.rootBlock) break;
+	}
 }
 
 function currentPresentations(capture: OffscreenCapture): boolean {
@@ -19107,7 +19137,7 @@ export function beginPresentationHydration(
 	)
 		throw new PresentationAdoptionMiss(lease, false);
 	const revision = lease.revision?.();
-	if (revision !== undefined && revision >= 0 && lease.valid?.() === false)
+	if ((revision === undefined || revision >= 0) && lease.valid?.() === false)
 		throw new PresentationAdoptionMiss(lease, false);
 	if (revision !== undefined && (!structural || revision < 0))
 		throw new PresentationAdoptionMiss(lease, revision < 0, revision);
@@ -19125,21 +19155,17 @@ export function beginPresentationHydration(
 		readToken: beginNativeReadScope(scope),
 		witnessToken: beginNativeReadWitness(),
 		witnesses: pending?.scope === scope ? new Map(pending.witnesses) : new Map(),
+		...(pending?.scope === scope && pending.controls !== undefined
+			? { controls: new Map(pending.controls) }
+			: {}),
 		completed: false,
 		lease,
-		...(revision === undefined ? {} : { revision, current: currentPresentation }),
+		...(revision === undefined ? {} : { revision }),
 		hydration,
 	};
 	PRESENTATION_HYDRATION = frame;
-	if (revision !== undefined && hydration !== null) {
-		hydration.presentation = true;
-		for (let block: Block | null = scope.block; block !== null; block = block.parentBlock) {
-			preserveRootCreatedDom(block);
-			if (block === hydration.rootBlock) break;
-		}
-	}
+	if (revision !== undefined || frame.controls !== undefined) trackPresentationFrame(frame);
 	PRESENTATION_PREPARATIONS.set(lease, frame);
-	if (revision !== undefined) (WIP_CAPTURE.presentations ??= []).push(frame);
 	(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
 		if (
 			discarded ||
@@ -19150,7 +19176,8 @@ export function beginPresentationHydration(
 		)
 			return;
 		if (!currentPresentation(frame)) {
-			frame.hydration?.retryPresentation?.();
+			if (frame.hydration?.retryPresentation !== undefined) frame.hydration.retryPresentation();
+			else throw new PresentationAdoptionMiss(lease, false);
 			return;
 		}
 		PRESENTATION_PREPARATIONS.delete(lease);
@@ -19158,17 +19185,48 @@ export function beginPresentationHydration(
 		releaseBindingHandoff(lease);
 		// Only prepared native writes publish here, before refs. Retiring early
 		// ownership does not restore old styles/classes or retire shared signals.
+		let publicationStarted = false;
 		let published = false;
 		try {
 			lease.retire(() => {
-				for (const writes of frame.writes.values()) for (const write of writes.values()) write();
+				// The early presentation is already retired on callback entry, even
+				// when a later prepared writer fails before publication completes.
+				publicationStarted = true;
+				try {
+					for (const writes of frame.writes.values()) for (const write of writes.values()) write();
+				} catch (error) {
+					// Publication is irreversible. Revoke every captured successor before
+					// arbitrary unsubscribe or presentation cleanup can dispatch input.
+					for (const [element, control] of frame.controls ?? []) {
+						const binding = control.binding;
+						// An already-released, intact and unclaimed channel needs no new
+						// guard that would mask its data owner's original read failure.
+						if (binding.disposed && control.valid(true)) continue;
+						// Undefined guards a channel without an offered early owner too.
+						(owner.controlLeases ??= new Map()).set(element, control.lease);
+						if (binding.disposed) continue;
+						if (binding.input !== undefined) renderControlledState(element)!.v = UNCONTROLLED;
+						control.stop = binding.unsubscribe;
+						binding.unsubscribe = undefined;
+						disposeDirectSignalBinding(binding);
+					}
+					for (const control of frame.controls?.values() ?? []) {
+						try {
+							control.stop?.();
+						} catch {
+							// Preserve the publication failure, but attempt every cleanup.
+						}
+					}
+					throw error;
+				}
 				published = true;
 			});
 		} catch (error) {
-			if (!published) throw error;
+			if (!publicationStarted) throw error;
 			reportRendererOwnerError(scope, error);
 		} finally {
 			frame.writes.clear();
+			frame.controls?.clear();
 			if (
 				published &&
 				!owner.disposed &&
@@ -19217,26 +19275,36 @@ function preparedPresentationAttribute(
 	return result === '' && BOOLEAN_ATTR_PROPS.has(name.toLowerCase()) ? true : result;
 }
 
-function preparePresentationSignalAttribute(
+function preparePresentationSignalBinding(
 	args: any[],
 	frame: PresentationHydrationFrame,
+	text = false,
 ): unknown {
-	const [scope, previous, element, name, value, site, attributeKind = 'attr'] = args as [
-		Scope,
-		unknown,
-		Element,
-		string,
-		unknown,
-		string,
-		DirectSignalAttributeKind?,
-	];
+	const [scope, previous, element] = args as [Scope, unknown, Element];
+	const name = text ? undefined : (args[3] as string);
+	const value = args[text ? 3 : 4];
+	const site = args[text ? 4 : 5] as string;
+	const attributeKind = text ? undefined : ((args[6] ?? 'attr') as DirectSignalAttributeKind);
+	const kind = text ? (args[5] ? 'textOnlyChild' : 'text') : 'attribute';
 	return runWithBlockSignalOwner(scope, () => {
 		const handle = isSignalHandle(value) ? value : null;
 		// Unlike the ordinary direct-binding read, this read belongs to validation.
 		const current = handle === null ? value : handle.get();
-		const prepared = preparedPresentationAttribute(element, name, current, attributeKind);
+		if (
+			text &&
+			((current !== null && (typeof current === 'object' || typeof current === 'function')) ||
+				typeof args[7] !== 'string')
+		)
+			presentationMiss(false);
+		const prepared = text
+			? bindingText(element, current, args[7])
+			: preparedPresentationAttribute(element, name!, current, attributeKind!);
 		if (handle === null) {
-			preparePresentationOperation(frame, element, name, () =>
+			if (text) {
+				frame.writes.get(element)?.delete('signalText');
+				return prepared;
+			}
+			preparePresentationOperation(frame, element, name!, () =>
 				writeDirectSignalScalar(element, prepared, 'attribute', previous, name, attributeKind),
 			);
 			return value;
@@ -19248,6 +19316,7 @@ function preparePresentationSignalAttribute(
 			prior.unsubscribe === undefined &&
 			prior.handle === handle &&
 			prior.target === element &&
+			prior.kind === kind &&
 			prior.site === site &&
 			prior.name === name &&
 			prior.attributeKind === attributeKind;
@@ -19257,7 +19326,7 @@ function preparePresentationSignalAttribute(
 					[DIRECT_SIGNAL_BINDING]: true,
 					scope,
 					target: element,
-					kind: 'attribute',
+					kind,
 					site,
 					name,
 					attributeKind,
@@ -19265,12 +19334,159 @@ function preparePresentationSignalAttribute(
 					value: current,
 					disposed: false,
 				};
+		if (text) binding.text = prepared as Text;
 		if (!reusable) registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
-		preparePresentationOperation(frame, element, name, () => {
+		// Text insertion/update already has its own operation; activation must not replace it.
+		preparePresentationOperation(frame, element, name ?? 'signalText', () => {
 			if (binding.disposed) return;
-			writeDirectSignalScalar(element, prepared, 'attribute', previous, name, attributeKind);
+			if (!text)
+				writeDirectSignalScalar(element, prepared, 'attribute', previous, name, attributeKind);
 			binding.value = current;
 			runWithBlockSignalOwner(scope, () => activateDirectSignalBinding(binding, undefined));
+		});
+		return binding;
+	});
+}
+
+/** Prepare a native textarea without touching its live early control owner. */
+function preparePresentationSignalValue(args: any[], frame: PresentationHydrationFrame): unknown {
+	const [scope, previous, element, handle, site] = args as [
+		Scope,
+		unknown,
+		HTMLTextAreaElement,
+		unknown,
+		string,
+	];
+	return runWithBlockSignalOwner(scope, () => {
+		if (
+			element.localName !== 'textarea' ||
+			element.namespaceURI !== HTML_NS ||
+			!isWritableSignal(handle)
+		)
+			presentationMiss(false);
+		validateDirectSignalControl(element, site);
+		const value = handle.get();
+		if (typeof value !== 'string') presentationMiss(false);
+		const owner = scope.block.idState.renderOwner!;
+		const lease = owner.controlLeases?.get(element);
+		const valid = (retired = false) =>
+			owner.bindingContainer!.contains(element) &&
+			(!retired || frame.lease.valid?.() !== false) &&
+			(lease !== undefined && !retired
+				? lease.owner === owner &&
+					lease.active() &&
+					runWithBlockSignalOwner(scope, () => lease.matches(handle))
+				: !hasSignalControlBinding(element, 'value') &&
+					!hasHydrationControlSignalWriter(element, 'value'));
+		if (!valid()) presentationMiss(false);
+		const prior = previous as DirectSignalBinding | undefined;
+		const reusable =
+			prior?.[DIRECT_SIGNAL_BINDING] === true &&
+			!prior.disposed &&
+			prior.input === undefined &&
+			prior.handle === handle &&
+			prior.target === element &&
+			prior.kind === 'value' &&
+			prior.site === site;
+		const binding: DirectSignalBinding = reusable
+			? prior
+			: {
+					[DIRECT_SIGNAL_BINDING]: true,
+					scope,
+					target: element,
+					kind: 'value',
+					site,
+					handle,
+					value,
+					disposed: false,
+				};
+		(frame.controls ??= new Map()).set(element, { valid, binding, lease });
+		trackPresentationFrame(frame);
+		if (!reusable) registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
+		if (binding.unsubscribe === undefined) {
+			// Acquire the fallible subscription before either early lease retires.
+			// It cannot write or join a transition until input ownership is installed.
+			const notify = Object.assign(
+				() => {
+					if (binding.controlWriterCleanup !== undefined) updateDirectSignalBinding(binding);
+				},
+				{
+					[NATIVE_TRANSITION_CONSUMER]: {
+						active: () =>
+							binding.controlWriterCleanup !== undefined &&
+							!binding.disposed &&
+							!scope.block.disposed,
+						prepare: () => prepareNativeTransitionBlock(scope.block),
+					},
+				},
+			);
+			const stop = handle[SIGNAL_BINDING_SUBSCRIBE](notify, () =>
+				disposeDirectSignalBinding(binding),
+			);
+			if (typeof stop !== 'function') throw new TypeError(formatClientError(74));
+			if (binding.disposed || scope.block.disposed) {
+				stop();
+				presentationMiss(false);
+			}
+			binding.unsubscribe = stop;
+		}
+		preparePresentationOperation(frame, element, 'value', () => {
+			if (binding.disposed || scope.block.disposed) return;
+			runWithBlockSignalOwner(scope, () => {
+				// An earlier control's retirement can synchronously replace this
+				// captured owner. Never publish a stale writer over its successor.
+				if (!valid()) throw new Error(formatClientError(77));
+				const before = snapshotHydrationControl(element)!;
+				const ctrl = armControlled(element);
+				ctrl.composing = before.composing || lease?.composing() === true;
+				if (ctrl.composing) element.addEventListener('blur', onCtrlCompositionEnd);
+				// Until the successor owns input, delegated restoration must not replay
+				// an old controlled value over a native edit dispatched by cleanup.
+				ctrl.v = UNCONTROLLED;
+				// The old owner is offered explicitly. Revoke it only once the matching
+				// presentation commits, before enabling the successor's input writer.
+				let failed = false;
+				let failure: unknown;
+				if (lease !== undefined) {
+					try {
+						lease.retire();
+					} catch (error) {
+						failed = true;
+						failure = error;
+					} finally {
+						lease.owner = undefined;
+					}
+				}
+				// Retirement is user code: revalidate the captured presentation before
+				// installing its input writer. Keep a revoked offer guarded against
+				// ordinary writes until root cleanup.
+				if (lease !== undefined && !scope.block.disposed && !valid(true))
+					throw failed ? failure : new Error(formatClientError(77));
+				if (lease !== undefined) owner.controlLeases!.delete(element);
+				if (!binding.disposed && !scope.block.disposed) {
+					// User cleanup may dispatch input or end composition. Sample again;
+					// the renderer's composition listeners were armed before cleanup.
+					const snapshot = snapshotHydrationControl(element)!;
+					binding.value = element.value;
+					// The offered owner already published earlier input to the model.
+					// Only a new retirement edit can supersede its final model write.
+					binding.pendingControl =
+						snapshot.editRevision > (lease === undefined ? 0 : before.editRevision);
+					installDirectSignalControl(binding);
+					if (!binding.pendingControl) consumeHydrationControl(element, snapshot.revision);
+					if (binding.pendingControl) queueDirectSignalControlAdoption(binding);
+					else {
+						const current = readSignalBinding(handle);
+						ctrl.sawV = true;
+						// setValue compares against the prepared model: a genuinely
+						// changed value must still win during inherited composition.
+						ctrl.v = value;
+						binding.value = current;
+						writeDirectSignalBinding(binding, current);
+					}
+				}
+				if (failed) reportRendererOwnerError(scope, failure);
+			});
 		});
 		return binding;
 	});
@@ -19331,6 +19547,10 @@ export function presentationWrite<T>(
 ): T {
 	const frame = PRESENTATION_HYDRATION;
 	if (frame === null) return writer(...args);
+	if (kind === 'queueNativeChangeDiagnostic') {
+		preparePresentationOperation(frame, args[0], 'nativeChangeDiagnostic', () => writer(...args));
+		return undefined as T;
+	}
 	if (kind === 'markDangerouslySetInnerHTMLChildren') {
 		const element = args[0] as Element;
 		if (
@@ -19341,21 +19561,14 @@ export function presentationWrite<T>(
 		preparePresentationOperation(frame, element, 'hostChildren', () => writer(element));
 		return undefined as T;
 	}
-	if (kind === 'bindSignalText') {
-		const value = args[3];
-		if (
-			(value !== null && (typeof value === 'object' || typeof value === 'function')) ||
-			typeof args[7] !== 'string'
-		)
-			presentationMiss(false);
-		return bindingText(args[2], value, args[7]) as T;
-	}
+	if (kind === 'bindSignalText') return preparePresentationSignalBinding(args, frame, true) as T;
 	if (kind === 'setText') {
 		const text = coerceText(args[1]);
 		preparePresentationOperation(frame, args[0], 'text', () => writer(args[0], text));
 		return undefined as T;
 	}
-	if (kind === 'bindSignalAttribute') return preparePresentationSignalAttribute(args, frame) as T;
+	if (kind === 'bindSignalAttribute') return preparePresentationSignalBinding(args, frame) as T;
+	if (kind === 'bindSignalValue') return preparePresentationSignalValue(args, frame) as T;
 	if (kind === 'nativeStyleBinding' || kind === 'nativeProjectionBinding') {
 		const [owner, slot, el] = args;
 		const style = kind === 'nativeStyleBinding';
@@ -19776,11 +19989,14 @@ function disposeDirectSignalBinding(binding: DirectSignalBinding): void {
 	if (DEFERRED_LAYOUT_DRIVER?.stageAction(() => disposeDirectSignalBinding(binding)) === true)
 		return;
 	binding.disposed = true;
-	binding.unsubscribe?.();
-	retireNativeTransitionBlock(binding.scope.block);
-	binding.controlWriterCleanup?.();
-	if (binding.input !== undefined) {
-		domNode(binding.target as Element).removeEventListener('input', binding.input);
+	try {
+		binding.unsubscribe?.();
+	} finally {
+		retireNativeTransitionBlock(binding.scope.block);
+		binding.controlWriterCleanup?.();
+		if (binding.input !== undefined) {
+			domNode(binding.target as Element).removeEventListener('input', binding.input);
+		}
 	}
 }
 
@@ -19998,6 +20214,8 @@ function createDirectSignalBinding(
 	attributeKind?: DirectSignalAttributeKind,
 	text?: Text,
 ): DirectSignalBinding {
+	if (kind === 'value' && scope.block.idState.renderOwner?.controlLeases?.has(target as Element))
+		presentationMiss(false);
 	const handle = isSignalHandle(value) ? value : null;
 	const binding: DirectSignalBinding = {
 		[DIRECT_SIGNAL_BINDING]: true,
@@ -23141,6 +23359,8 @@ export function bindSignalHostPropSources(
 		binding.sources = sources;
 	}
 	const valueControl = winningSignalHostControl(sources, 'value');
+	if (valueControl !== null && scope.block.idState.renderOwner?.controlLeases?.has(element))
+		presentationMiss(false);
 	const checkedControl = winningSignalHostControl(sources, 'checked');
 	const controlSnapshot =
 		isWritableSignal(valueControl) || isWritableSignal(checkedControl)
@@ -25941,6 +26161,8 @@ function setNativeChangeDiagnosticMetadata(el: Element, value: unknown): void {
  * output, form.reset() baselines, and differential byte-compares aligned.
  */
 export function setValue(el: Element, value: unknown): void {
+	// An unmatched scalar or spread is not permission to steal an offered control.
+	if (CURRENT_SCOPE?.block.idState.renderOwner?.controlLeases?.has(el)) presentationMiss(false);
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	const ctrl = armControlled(el);
 	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue');
@@ -42330,6 +42552,8 @@ export interface Root {
 export interface RootOptions {
 	/** Adopt fixed native early bindings only when their matching hydration capture commits. */
 	bindingLeases?: readonly BindingHandle[];
+	/** Offer an existing textarea value owner for accepted presentation hydration, never early disposal. */
+	controlLeases?: readonly SignalControlBinding[];
 	/**
 	 * Shared document/account owner for module signals. Roots borrow this owner;
 	 * unmounting a presentation root never retires shared data state.
@@ -43188,6 +43412,11 @@ function makeRoot(
 			}
 			unmounted = true;
 			renderOwner.disposed = true;
+			if (renderOwner.controlLeases !== undefined) {
+				for (const lease of renderOwner.controlLeases.values())
+					if (lease !== undefined) lease.owner = undefined;
+				renderOwner.controlLeases.clear();
+			}
 			if (renderOwner.bindingLeases !== undefined) {
 				for (const lease of renderOwner.bindingLeases) {
 					releaseBindingHandoff(lease);
@@ -43268,7 +43497,8 @@ function createRootWithOutputHandler(
 	outputHandler: OutputHandler | null,
 ): Root {
 	assertValidRootContainer(container);
-	if (options?.bindingLeases !== undefined) throw new Error(formatClientError(76));
+	if (options?.bindingLeases !== undefined || options?.controlLeases !== undefined)
+		throw new Error(formatClientError(76));
 	options = warnCreateRootElementOption(options);
 	const ownerToken = claimRootContainer(container);
 	// Register the container as an event-delegation target up front. Listeners
@@ -43380,6 +43610,25 @@ export function hydrateRoot(
 	});
 	if (bindingLeases !== undefined && new Set(bindingLeases).size !== bindingLeases.length)
 		throw new Error(formatClientError(78));
+	const controlLeases = rootOptions?.controlLeases?.map((handle) => {
+		const lease = handle?.[CONTROL_HANDOFF]?.();
+		if (
+			!bindingLeases?.length ||
+			lease === undefined ||
+			!lease.active() ||
+			lease.owner !== undefined ||
+			lease.channel !== 'value' ||
+			lease.control.localName !== 'textarea' ||
+			!container.contains(lease.control)
+		)
+			throw new Error(formatClientError(77));
+		return lease;
+	});
+	if (
+		controlLeases !== undefined &&
+		new Set(controlLeases.map((lease) => lease.control)).size !== controlLeases.length
+	)
+		throw new Error(formatClientError(78));
 	const nativeSidecar = findHydrateSeedSidecar(container, NATIVE_SIGNAL_SEED_ATTR);
 	const nativeManifest =
 		nativeSidecar === null
@@ -43456,6 +43705,10 @@ export function hydrateRoot(
 		rootOptions,
 	);
 	const owner = idState.renderOwner!;
+	if (controlLeases !== undefined) {
+		owner.controlLeases = new Map(controlLeases.map((lease) => [lease.control, lease]));
+		for (const lease of controlLeases) lease.owner = owner;
+	}
 	if (bindingLeases !== undefined) {
 		owner.bindingLeases = new Set(bindingLeases);
 		owner.bindingContainer = container;
@@ -43491,7 +43744,7 @@ export function hydrateRoot(
 		while (firstNode !== null && (firstNode.nodeType === 10 || isRendererHydrationStyle(firstNode)))
 			firstNode = getNextSibling(firstNode);
 		const hydration = new HydrationCapability(rootBlock, firstNode, seeds);
-		if (bindingLeases?.some((lease) => lease.revision !== undefined)) {
+		if (bindingLeases?.length) {
 			const attempted = rootBlock;
 			hydration.retryPresentation = () => {
 				if (owner.disposed || owner.current !== attempted) return;
@@ -43499,7 +43752,12 @@ export function hydrateRoot(
 				collectVisibleSubtreeRefs(attempted, refs);
 				withRefDetachSuppression(refs, () => unmountBlock(attempted, false));
 				queueMicrotask(() => {
-					if (!owner.disposed && owner.current === attempted) adopt();
+					if (owner.disposed || owner.current !== attempted) return;
+					try {
+						adopt();
+					} catch (error) {
+						if (!reportUncaughtError(rootBlock, error)) throw error;
+					}
 				});
 			};
 		}

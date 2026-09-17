@@ -9163,6 +9163,7 @@ function markKnownAttributeSpreads(ast, contracts) {
 		}
 	}
 	const imports = new Map();
+	const unboundImports = new Set();
 	for (const declaration of ast.body) {
 		if (declaration.type !== 'ImportDeclaration' || declaration.importKind === 'type') continue;
 		for (const specifier of declaration.specifiers) {
@@ -9173,6 +9174,8 @@ function markKnownAttributeSpreads(ast, contracts) {
 					: specifier.type === 'ImportDefaultSpecifier'
 						? 'default'
 						: (specifier.imported.name ?? specifier.imported.value);
+			if (declaration.source.value === 'octane/behavior' && imported === 'unbound')
+				unboundImports.add(specifier.local.name);
 			const matches = contracts.filter(
 				(contract) =>
 					contract.source === declaration.source.value && contract.imported === imported,
@@ -9293,13 +9296,24 @@ function markKnownAttributeSpreads(ast, contracts) {
 			};
 		}
 		if (node.type !== 'JSXSpreadAttribute' && node.type !== 'SpreadAttribute') return null;
-		const call = node.argument;
+		let call = unwrapTsExpr(node.argument);
+		const externalCallee = unwrapTsExpr(call?.callee);
+		const external =
+			call?.type === 'CallExpression' &&
+			!call.optional &&
+			externalCallee?.type === 'Identifier' &&
+			unboundImports.has(externalCallee.name) &&
+			lexical.resolveBinding(lexical.nodeScopes.get(externalCallee), externalCallee.name)?.scope ===
+				lexical.rootScope &&
+			call.arguments.length === 1 &&
+			call.arguments[0].type !== 'SpreadElement';
+		if (external) call = unwrapTsExpr(call.arguments[0]);
 		if (call?.type !== 'CallExpression' || call.optional) return null;
-		let callee = call.callee;
+		let callee = unwrapTsExpr(call.callee);
 		const members = [];
 		while (callee?.type === 'MemberExpression' && !callee.computed && !callee.optional) {
 			members.unshift(callee.property.name);
-			callee = callee.object;
+			callee = unwrapTsExpr(callee.object);
 		}
 		if (callee?.type !== 'Identifier') return null;
 		const matches = imports.get(callee.name);
@@ -9319,7 +9333,11 @@ function markKnownAttributeSpreads(ast, contracts) {
 		return contract
 			? {
 					...node,
-					_octaneKnownAttributeSpread: { fields: [...contract.fields], style: contract.style },
+					_octaneKnownAttributeSpread: {
+						fields: [...contract.fields],
+						style: contract.style,
+						...(external ? { unbound: true } : {}),
+					},
 				}
 			: null;
 	});
@@ -15207,6 +15225,8 @@ function preparePresentationHydration(body, node, ctx) {
 	if (!proof || ctx.mode === 'server' || ctx._universalRuntimeUnit != null) return body;
 	const writers = new Set([
 		'bindSignalAttribute',
+		'bindSignalValue',
+		'queueNativeChangeDiagnostic',
 		'setEventHandler',
 		'setAttribute',
 		'setPlainAttribute',
@@ -15346,7 +15366,10 @@ function preparePresentationHydration(body, node, ctx) {
 	visit(body, false);
 	const frame = b.id(allocCompilerName(ctx, '__presentationHydration'));
 	const completed = b.id(allocCompilerName(ctx, '__presentationComplete'));
-	const failure = proof.structural ? b.id(allocCompilerName(ctx, '__presentationFailure')) : null;
+	const failure =
+		proof.structural || proof.nativeControl
+			? b.id(allocCompilerName(ctx, '__presentationFailure'))
+			: null;
 	const statements = supported ? visit(body, true) : body;
 	let directiveEnd = 0;
 	while (
@@ -25912,11 +25935,13 @@ function propertyIsEnumerableCall(objNode, name) {
 	);
 }
 
-// `(__s.cleanups ??= []).push(<fn>)` — the scope's cleanup array is lazily allocated (most
-// scopes never register one), so the registration site owns creating it.
+// Ref teardown reads the live bag because updates replace refs. An interrupted
+// mount has no committed bag and never attached its refs, so its cleanup is inert.
 function cleanupsPush(fnNode) {
 	const lazyArray = b.assignment('??=', b.member(b.id('__s'), 'cleanups'), b.array([]));
-	return b.stmt(b.call(b.member(lazyArray, 'push'), fnNode));
+	return b.stmt(
+		b.call(b.member(lazyArray, 'push'), b.arrow([], b.logical('&&', b.id('_b'), fnNode.body))),
+	);
 }
 
 /**
@@ -26315,9 +26340,8 @@ function emitBindingMount(bind, elVar, bag) {
 					]),
 				);
 			}
-			// The cleanup closure reads the bag through the captured `_b` — the bag
-			// exists by the time any cleanup runs (committed at mount end), and the
-			// `_host$` field is re-written by updates, so the read must be live.
+			// The `_host$` field is re-written by updates, so cleanup reads the live
+			// bag. cleanupsPush skips that read when mount never committed it.
 			const cleanup = b.arrow(
 				[],
 				b.call(
@@ -26494,9 +26518,8 @@ function emitBindingMount(bind, elVar, bag) {
 			// (queueRefDetach: unmount cleanups run mid-render, and a state-setter
 			// ref firing null synchronously can render before a replacement
 			// element's deferred attach — commit-phase detach batches the two).
-			// The cleanup closure reads the bag through the captured `_b` — the bag
-			// exists by the time any cleanup runs (committed at mount end), and the
-			// `_sp$` field is re-written by updates, so the read must be live.
+			// The `_sp$` field is re-written by updates, so cleanup reads the live
+			// bag. cleanupsPush skips that read when mount never committed it.
 			const flags = bind.skipFormControls
 				? [b.literal(bind.skipDangerouslySetInnerHTML === true), b.literal(true)]
 				: bind.skipDangerouslySetInnerHTML

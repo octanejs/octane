@@ -25,6 +25,7 @@ import * as BindingStyles from '../../src/dom-binding-styles.js';
 import * as BindingSignals from '../../src/dom-binding-signals.js';
 import * as SignalRead from '../../src/signals/read-protocol.js';
 import { createScope } from 'octane/signals';
+import * as Behavior from 'octane/behavior';
 
 const COMPONENT =
 	"import { useState } from 'octane';\n" +
@@ -55,6 +56,146 @@ function emittedHeadKey(code: string | undefined): string | undefined {
 }
 
 describe('bundler-neutral compiler integration', () => {
+	it.each([
+		'(external as typeof external)(stylex.attrs(styles))',
+		'external!(stylex.attrs(styles))',
+		'(external satisfies typeof external)((stylex.attrs(styles) as object))',
+		'external((stylex.attrs as typeof stylex.attrs)(styles))',
+		'external(stylex.attrs!(styles))',
+		'external((stylex as typeof stylex).attrs(styles))',
+		'external(stylex!.attrs(styles))',
+		'external((stylex satisfies typeof stylex).attrs(styles))',
+		'external((((stylex as typeof stylex)!) satisfies typeof stylex).attrs(styles))',
+		'external(((stylex as typeof stylex).nested as typeof stylex.nested).attrs(styles))',
+		'external(((stylex!.nested)! satisfies typeof stylex.nested).attrs(styles))',
+	])('preserves typed unbound provider spreads: %s', (spread) => {
+		const styles = { class: 'styled', style: { color: 'red' } };
+		const runtimeModules = {
+			'@stylexjs/stylex': {
+				attrs: (value: unknown) => value,
+				nested: { attrs: (value: unknown) => value },
+			},
+			'octane/behavior': Behavior,
+		};
+		for (const dev of [false, true]) {
+			for (const extension of ['tsx', 'tsrx']) {
+				const source = `import { unbound as external } from 'octane/behavior';
+import * as stylex from '@stylexjs/stylex';
+export function View({ styles, label }) ${extension === 'tsrx' ? "@{ 'use dom bindings';" : "{ 'use dom bindings'; return ("}
+ <div {...${spread}} aria-label={label} />
+${extension === 'tsrx' ? '}' : '); }'}`;
+				const id = `/project/src/TypedSpread.${extension}`;
+				const compileOptions = {
+					dev,
+					hmr: false,
+					knownAttributeSpreads: [
+						{
+							source: '@stylexjs/stylex',
+							imported: '*',
+							members: spread.includes('.nested') ? ['nested', 'attrs'] : ['attrs'],
+							fields: ['class', 'style'],
+							style: 'object' as const,
+						},
+					],
+				};
+				const server = loadCompiledFixtureSource(source, {
+					id,
+					mode: 'server',
+					compileOptions,
+					runtimeModules,
+				});
+				const html = renderToString(server.View, { styles, label: 'Message' }).html;
+				expect(html).toContain('class="styled"');
+				expect(html).toContain('color:red');
+				expect(html).toContain('aria-label="Message"');
+				for (const moduleId of [id, `${id}?octane-bindings=View`])
+					expect(() =>
+						parseModule(
+							compile(source, moduleId, { ...compileOptions, mode: 'client' }).code,
+							'TypedSpread.js',
+						),
+					).not.toThrow();
+				// External provider fields have the same ownership boundary as an
+				// unbound object, including class/className aliases in either direction.
+				for (const providerClass of ['class', 'className']) {
+					for (const mode of ['client', 'server'] as const) {
+						const options = {
+							...compileOptions,
+							mode,
+							knownAttributeSpreads: [
+								{ ...compileOptions.knownAttributeSpreads[0], fields: [providerClass, 'style'] },
+							],
+						};
+						const withAttribute = (attribute: string) =>
+							source
+								.replace('{ styles, label }', '{ styles, label, owned$ }')
+								.replace('aria-label={label}', `${attribute} aria-label={label}`);
+						for (const name of ['class', 'className', 'style']) {
+							const conflict = withAttribute(
+								name === 'style' ? 'style={{ color: owned$ }}' : `${name}={owned$}`,
+							);
+							for (const moduleId of mode === 'client' ? [id, `${id}?octane-bindings=View`] : [id])
+								expect(() => compile(conflict, moduleId, options)).toThrow(
+									/unbound spreads must not contribute owned attribute/,
+								);
+							for (const value of ['"fixed"', '{external(owned$)}'])
+								expect(() => compile(withAttribute(`${name}=${value}`), id, options)).not.toThrow();
+							expect(() =>
+								compile(conflict, id, {
+									...options,
+									knownAttributeSpreads: [
+										{
+											...options.knownAttributeSpreads[0],
+											fields: name === 'style' ? [providerClass] : ['style'],
+											style: name === 'style' ? undefined : 'object',
+										},
+									],
+								}),
+							).not.toThrow();
+						}
+						const provider = `stylex.${spread.includes('.nested') ? 'nested.' : ''}attrs(styles)`;
+						expect(() => compile(withAttribute(`{...${provider}}`), id, options)).toThrow(
+							/known spread conflicts with attribute/,
+						);
+						expect(() =>
+							compile(
+								source.replace(
+									`{...${spread}} aria-label={label}`,
+									`aria-label={label} {...${spread}}`,
+								),
+								id,
+								options,
+							),
+						).toThrow(/unbound attribute spreads must precede owned binding attributes/);
+					}
+				}
+				// Transparent receiver syntax must retain the fixed-field contract
+				// even without the unbound escape hatch for generic spreads.
+				if (spread.startsWith('external(')) {
+					const owned = source.replace(spread, spread.slice('external('.length, -1));
+					for (const mode of ['client', 'server'] as const)
+						expect(() => compile(owned, id, { ...compileOptions, mode })).not.toThrow();
+				}
+				for (const rejected of [
+					source.replace('{ styles, label }', '{ styles, label, external }'),
+					source.replace('{ styles, label }', '{ styles, label, stylex }'),
+					source.replace(spread, 'external?.(stylex.attrs(styles))'),
+					...[
+						'(stylex as typeof stylex)["attrs"](styles)',
+						'(stylex as typeof stylex)?.attrs(styles)',
+						'(stylex as typeof stylex).attrs?.(styles)',
+						'((stylex as typeof stylex)["nested"]).attrs(styles)',
+						'((stylex as typeof stylex)?.nested).attrs(styles)',
+						'(stylex as typeof stylex).other(styles)',
+					].map((call) => source.replace(spread, call)),
+				])
+					expect(() => compile(rejected, id, { ...compileOptions, mode: 'client' })).toThrow(
+						/explicitly unbound|pure projections|unbound requires/,
+					);
+			}
+		}
+	});
+
 	it('preserves compiler signal capability through client and server runtime-request transforms', () => {
 		const cleanupSource = `import { useLayoutEffect } from 'octane';
 export function Lifecycle(props) @{

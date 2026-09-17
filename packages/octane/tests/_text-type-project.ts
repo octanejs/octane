@@ -1,6 +1,6 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { createTextTypeProject } from 'octane/compiler/typescript';
 
 export type TextTypeProject = ReturnType<typeof createTextTypeProject>;
@@ -28,8 +28,13 @@ export function createTextTypeFixture(
 				'./jsx-runtime': './jsx-runtime.d.ts',
 				'./jsx-dev-runtime': './jsx-runtime.d.ts',
 				'./tsrx-iterable': './tsrx-iterable.d.ts',
+				'./internal/signal-read': './signal-read.d.ts',
 			},
 		}),
+	);
+	write(
+		'node_modules/octane/signal-read.d.ts',
+		`export { readNativeDomValue } from ${JSON.stringify(resolve(import.meta.dirname, '../src/internal/signal-read.js'))};\n`,
 	);
 	write(
 		'node_modules/octane/index.d.ts',

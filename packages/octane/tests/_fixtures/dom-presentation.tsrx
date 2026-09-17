@@ -249,6 +249,125 @@ export function ControlPresentation(props: ControlPresentationProps) @{
 	</section>
 }
 
+export interface NativeControlPresentationProps {
+	draft: SignalHandle<string>;
+	readOnly: SignalHandle<boolean>;
+	disabled: SignalHandle<boolean>;
+	required: SignalHandle<boolean>;
+	placeholder: SignalHandle<string>;
+}
+
+export function NativeControlPresentation({
+	draft: draft$,
+	readOnly,
+	disabled,
+	required,
+	placeholder,
+}: NativeControlPresentationProps) @{
+	'use dom bindings';
+	<textarea
+		value={unbound(draft$)}
+		readOnly={readOnly}
+		disabled={disabled}
+		required={required}
+		placeholder={placeholder}
+	/>
+}
+
+export function NativeControlSiblingPresentation({
+	draft: draft$,
+	readOnly,
+	disabled,
+	required,
+	placeholder,
+}: NativeControlPresentationProps) @{
+	'use dom bindings';
+	<section>
+		<textarea
+			value={unbound(draft$)}
+			readOnly={readOnly}
+			disabled={disabled}
+			required={required}
+			placeholder={placeholder}
+		/>
+		<span />
+	</section>
+}
+
+export function NativeControlPairPresentation({
+	first,
+	second,
+	onReady,
+}: {
+	first: SignalHandle<string>;
+	second: SignalHandle<string>;
+	onReady?: (element: HTMLElement | null) => void;
+}) @{
+	'use dom bindings';
+	<section ref={onReady}>
+		<textarea value={unbound(first)} />
+		<textarea value={unbound(second)} />
+	</section>
+}
+
+export function UnmatchedNativeControl({
+	draft,
+	readOnly,
+	disabled,
+	required,
+	placeholder,
+}: NativeControlPresentationProps) @{
+	<textarea
+		value={draft}
+		readOnly={readOnly}
+		disabled={disabled}
+		required={required}
+		placeholder={placeholder}
+	/>
+}
+
+export function UnmatchedNativeControlSpread({
+	fields,
+	readOnly,
+	disabled,
+	required,
+	placeholder,
+}: NativeControlPresentationProps & { fields: Record<string, unknown> }) @{
+	<textarea
+		{...fields}
+		readOnly={readOnly}
+		disabled={disabled}
+		required={required}
+		placeholder={placeholder}
+	/>
+}
+
+function NativeControlHydrationSuffix(props: {
+	suspend: boolean;
+	promise: Promise<void>;
+}) @{
+	if (props.suspend) use(props.promise);
+	<span>{'Ready'}</span>
+}
+
+export function NativeControlHydration(props: NativeControlPresentationProps & {
+	when: HydrationStrategy;
+	suspend: boolean;
+	promise: Promise<void>;
+	onHydrated(): void;
+}) @{
+	<Hydrate when={props.when} split={false} onHydrated={props.onHydrated}>
+		<NativeControlPresentation
+			draft={props.draft}
+			readOnly={props.readOnly}
+			disabled={props.disabled}
+			required={props.required}
+			placeholder={props.placeholder}
+		/>
+		<NativeControlHydrationSuffix suspend={props.suspend} promise={props.promise} />
+	</Hydrate>
+}
+
 export function SampledControlPresentation(props: {
 	draft: SignalHandle<string>;
 	checked: SignalHandle<boolean>;

@@ -248,7 +248,7 @@ function importedProjectionCall(node, imports, lexical, parameterScope) {
 	const callee = unwrap(node?.callee);
 	let importedRoot = callee;
 	while (importedRoot?.type === 'MemberExpression' && !importedRoot.computed)
-		importedRoot = importedRoot.object;
+		importedRoot = unwrap(importedRoot.object);
 	const namespace =
 		importedRoot !== callee &&
 		importedRoot?.type === 'Identifier' &&
@@ -702,14 +702,15 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 	let addressed = false;
 	const markUnbound = (expression, opaque = false) => {
 		const value = unwrap(expression);
+		const callee = unwrap(value?.callee);
 		const external =
-			value?.type === 'CallExpression' && value.callee.type === 'Identifier'
-				? imports.get(value.callee.name)
+			value?.type === 'CallExpression' && callee?.type === 'Identifier'
+				? imports.get(callee.name)
 				: null;
 		if (
 			external?.source !== 'octane/behavior' ||
 			external.imported !== 'unbound' ||
-			lexical.resolveBinding(lexical.nodeScopes.get(value.callee), value.callee.name)?.scope !==
+			lexical.resolveBinding(lexical.nodeScopes.get(callee), callee.name)?.scope !==
 				lexical.rootScope
 		)
 			return false;
@@ -918,7 +919,9 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		const externalNames = new Set();
 		const knownFields = new Set();
 		for (const attr of element.openingElement?.attributes ?? element.attributes ?? []) {
-			if (attr._octaneKnownAttributeSpread) {
+			// A provider proves normal-renderer fields, not early ownership. External
+			// spreads retain the ordinary unbound checks and are stripped below.
+			if (attr._octaneKnownAttributeSpread && !attr._octaneKnownAttributeSpread.unbound) {
 				const argument = attr.argument ?? attr.value.expression;
 				// The compiler verified the exact imported factory against its
 				// provider contract. Its arguments still need the ordinary proof.
@@ -979,26 +982,31 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 					error(filename, attr, 'binding attribute spreads must be explicitly unbound');
 				if (bindings.some((binding) => binding[0] === index))
 					error(filename, attr, 'unbound attribute spreads must precede owned binding attributes');
+				const addExternalName = (raw, node) => {
+					const name = (
+						raw === 'className' ? 'class' : (ATTRIBUTE_ALIASES.get(raw) ?? raw)
+					).toLowerCase();
+					if (
+						FORBIDDEN_ATTRS.has(name) ||
+						name.startsWith('on') ||
+						name.startsWith('data-octane-class-')
+					)
+						error(
+							filename,
+							node,
+							`unbound spreads cannot supply reserved or structural attribute ${JSON.stringify(raw)}`,
+						);
+					externalNames.add(name);
+				};
 				const external = unwrap(unwrap(attr.argument).arguments[0]);
-				if (external?.type === 'ObjectExpression') {
+				if (attr._octaneKnownAttributeSpread) {
+					for (const raw of attr._octaneKnownAttributeSpread.fields) addExternalName(raw, attr);
+				} else if (external?.type === 'ObjectExpression') {
 					for (const property of external.properties) {
 						if (property.type !== 'Property' || property.computed) continue;
 						const raw = property.key.name ?? property.key.value;
 						if (typeof raw !== 'string') continue;
-						const name = (
-							raw === 'className' ? 'class' : (ATTRIBUTE_ALIASES.get(raw) ?? raw)
-						).toLowerCase();
-						if (
-							FORBIDDEN_ATTRS.has(name) ||
-							name.startsWith('on') ||
-							name.startsWith('data-octane-class-')
-						)
-							error(
-								filename,
-								property,
-								`unbound spreads cannot supply reserved or structural attribute ${JSON.stringify(raw)}`,
-							);
-						externalNames.add(name);
+						addExternalName(raw, property);
 					}
 				}
 				continue;
@@ -1876,12 +1884,13 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 		: new Map();
 	const isUnbound = (expression) => {
 		const value = unwrap(expression);
-		if (value?.type !== 'CallExpression' || value.callee.type !== 'Identifier') return false;
-		const imported = imports.get(value.callee.name);
+		const callee = unwrap(value?.callee);
+		if (value?.type !== 'CallExpression' || callee?.type !== 'Identifier') return false;
+		const imported = imports.get(callee.name);
 		return (
 			imported?.source === 'octane/behavior' &&
 			imported.imported === 'unbound' &&
-			lexical.resolveBinding(lexical.nodeScopes.get(value.callee), value.callee.name)?.scope ===
+			lexical.resolveBinding(lexical.nodeScopes.get(callee), callee.name)?.scope ===
 				lexical.rootScope
 		);
 	};
@@ -2132,6 +2141,9 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			_octanePresentationHydration: {
 				id: plan.id,
 				supported: fixedPresentation || structuralPresentation,
+				...(field('nodes').elements.some((node) => node.elements[5]?.value === 'value')
+					? { nativeControl: true }
+					: {}),
 				...(structuralPresentation || conditionalRest ? { structural: true } : {}),
 				...(conditionalRest ? { conditionalRest: true } : {}),
 			},

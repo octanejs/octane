@@ -491,6 +491,8 @@ HTML produce a diagnostic, not a renderer fallback. Structural programs own
 only their declared regions; fixed programs update properties without replacing
 nodes.
 
+Declare scalar text explicitly when its type is not evident in the template: `<span>{message$ as string}</span>` keeps a string-valued signal directly bound, while `<span>{(status?.message ?? '') as string}</span>` marks an ordinary string projection. The type checker checks the signal's value for this text intent; it does not require an application-side read or a cast through `unknown`. Keep shared control labels in typed label props rather than opaque renderable child slots when the view needs primitive-text handoff.
+
 Binding views may use flat destructured props, including aliases, primitive literal defaults, and a final rest binding: `function Action({ label: text = 'Send', ...props }) @{ ... }`. Destructuring runs once for each prepared snapshot, so projections and event handlers share the same captured values and rest object. Defaults apply only to `undefined`, not `null`. Nested or computed patterns and nonliteral defaults fail extraction. A rendered `children` slot may be aliased or read through rest when it was not excluded; a non-null default for that slot is unsupported. A rest binding does not authorize an arbitrary native JSX spread: the existing spread restrictions still apply.
 
 For a child binding view called with explicit props, the compiler can specialize a native spread of that child's destructured rest parameter to the caller's known prop names. Authors keep normal component imports and JSX; the ordered prop-shape request is compiler-owned. This does not permit arbitrary object spreads, aliases of rest, conflicting native writers, or unsupported property channels. A generic `adoptBindings` call on a rest-spreading component without a proven caller shape still fails clearly. Normal SSR keeps the authored spread and shares its structural and class-group annotation allocation with the extracted view; it does not acquire the extracted artifact's narrower prop API.
@@ -590,8 +592,47 @@ content while takeover is pending causes a clear refusal. A native rest spread
 also requires the same compiler-proven caller prop shape; proof from another
 instance or call site cannot authorize it.
 
-Views with writable controls or unsupported normal-renderer writers do not
-qualify for structural handoff. Neither do entered keyed-list, opaque, or generic
+An externally bound textarea value can transfer alongside a fixed presentation.
+Keep `value={unbound(draft$)}` in the authored view and explicitly offer the
+callable cleanup returned by `bindSignalControl`:
+
+```ts
+const control = bindSignalControl(textarea, 'value', draft$);
+// Later, in the renderer entry, using the same textarea, handle and signal owner:
+const root = hydrateRoot(container, Composer, props, {
+	bindingLeases: [earlyBinding],
+	controlLeases: [control],
+});
+```
+
+Do not call `control()` before hydration. Preparation leaves both early owners
+active; accepted publication retires the offered control and installs its direct
+signal successor before refs. The textarea, draft, selection and active
+composition survive takeover. A later call to the old cleanup cannot dispose the
+successor. Normal controlled-value semantics apply after takeover, including an
+explicit changed model value winning during composition.
+
+The successor's value subscription is prepared before either early owner
+retires. If acquiring it fails, the early presentation and control remain
+usable and hydration reports the error. Retirement cleanup must not dispose
+the shared signal owner: doing so intentionally ends that data's lifetime,
+rather than transferring it to hydration. Cleanup must also leave the textarea
+in its accepted position. If it moves or replaces the node, hydration reports
+the invalid transfer and releases every prepared value successor in that
+presentation, including controls published before the failure. Later renders
+cannot reclaim those revoked channels; independent controls can bind them.
+Retirement has already begun at that point; it does not roll back user cleanup
+or revive the retired early presentation.
+
+This path requires a writable string signal, the same concrete handle and data
+owner, and compiler-proven textarea value content without authored children.
+Disposed, already-claimed, foreign or unoffered control ownership fails closed.
+Known-provider style spreads such as `unbound(stylex.attrs(sx))` can use their
+existing closed-field compiler contract; arbitrary spreads remain unsupported.
+No control lease or renderer is needed for a textarea that stays renderer-free.
+
+Other writable controls and unsupported normal-renderer writers do not
+qualify for handoff. Neither do entered keyed-list, opaque, or generic
 renderable regions.
 Unsupported handoffs fail explicitly while preserving the early presentation;
 they do not silently replace its DOM or load a different renderer path. Keep

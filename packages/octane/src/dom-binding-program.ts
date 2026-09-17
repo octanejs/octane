@@ -56,6 +56,7 @@ export type BindingProgramNode =
 			tag: string,
 			namespace: 0 | 1,
 			children: number | null,
+			nativeControlContent?: 'value',
 	  ]
 	| readonly [parent: number, kind: 'text', text: string]
 	| readonly [parent: number, kind: 'region', site: string];
@@ -1740,16 +1741,54 @@ function bindProgram<Props>(
 				!instance ||
 				descriptor.root.regions.length !== 0 ||
 				descriptor.root.bindings.some((binding) => binding[1] === 'control') ||
-				descriptor.root.nodes.some((node) => node[1] === 'element' && node[4] === null)
+				descriptor.root.nodes.some(
+					(node, index) =>
+						node[1] === 'element' &&
+						node[4] === null &&
+						!(
+							node[2] === 'textarea' &&
+							node[3] === 0 &&
+							node[5] === 'value' &&
+							Array.from(instance!.nodes[index]!.childNodes).every((child) => child.nodeType === 3)
+						),
+				)
 			)
 				throw new Error(
 					'Hydration binding leases require an adopted fixed native view without structural regions or controls.',
 				);
+			const topology =
+				handoff === undefined &&
+				descriptor.root.nodes.some((node) => node[1] === 'element' && node[5] === 'value')
+					? [instance.range.start, ...instance.nodes, instance.range.end].map(
+							(node) => [node, node.parentNode, node.previousSibling, node.nextSibling] as const,
+						)
+					: undefined;
 			return (handoff ??= {
 				id: descriptor.id,
 				root: instance.range.start,
 				anchor: instance.nodes.find((node) => node.nodeType === 1) ?? instance.range.start,
 				active: () => !transaction.disposed,
+				...(topology === undefined
+					? {}
+					: {
+							end: instance.range.end,
+							valid: () =>
+								topology.every(
+									([node, parent, before, after]) =>
+										node.parentNode === parent &&
+										(node === instance!.range.start || node.previousSibling === before) &&
+										(node === instance!.range.end || node.nextSibling === after),
+								) &&
+								descriptor.root.nodes.every(
+									(proof, index) =>
+										proof[1] !== 'element' ||
+										(proof[4] === null
+											? Array.from(instance!.nodes[index]!.childNodes).every(
+													(child) => child.nodeType === 3,
+												)
+											: instance!.nodes[index]!.childNodes.length === proof[4]),
+								),
+						}),
 				retire: (publish) => {
 					transaction.preservePresentation = true;
 					dispose(undefined, publish);

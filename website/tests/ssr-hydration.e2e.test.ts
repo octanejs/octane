@@ -220,9 +220,10 @@ async function loadRoute(
 		if (m.type() === 'error') errors.push(m.text());
 	});
 	page.on('pageerror', (e) => errors.push('pageerror: ' + String(e)));
+	let navigationStatus: number | undefined;
 	try {
 		await options.beforeNavigation?.(page, errors);
-		await page.goto(base + path, { waitUntil: 'load' });
+		navigationStatus = (await page.goto(base + path, { waitUntil: 'load' }))?.status();
 		// The dev server can replace the document AFTER `load`: Vite reloads the
 		// page when a request resolves against a stale optimized-dependency hash,
 		// which is its normal recovery, not something the caller asked about. That
@@ -256,8 +257,26 @@ async function loadRoute(
 			}
 		}
 	} catch (error) {
+		// A readiness timeout alone cannot distinguish a missing route from an
+		// error document or stalled browser. Keep diagnostic collection bounded.
+		let diagnosticTimer: ReturnType<typeof setTimeout> | undefined;
+		const snapshot = await Promise.race([
+			page.evaluate(() => ({
+				readyState: document.readyState,
+				visibilityState: document.visibilityState,
+				mainChildPresent: document.querySelector('main > *') !== null,
+				main: document.querySelector('main')?.outerHTML.slice(0, 4000),
+				bodyText: document.body?.textContent?.slice(0, 2000),
+			})),
+			new Promise<null>((resolve) => {
+				diagnosticTimer = setTimeout(() => resolve(null), 250);
+			}),
+		])
+			.catch(() => null)
+			.finally(() => clearTimeout(diagnosticTimer));
+		const diagnostics = JSON.stringify({ url: page.url(), navigationStatus, errors, snapshot });
 		await page.close().catch(() => {});
-		throw error;
+		throw new Error(`Failed to load ${base + path}: ${diagnostics}`, { cause: error });
 	}
 }
 

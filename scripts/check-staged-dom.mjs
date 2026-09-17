@@ -79,6 +79,10 @@ const NATIVE_OPERATIONS = new Map(
 		// The native `is` attribute describes construction identity. A projected
 		// attribute cannot make an existing custom element safe to adopt.
 		prepareSignalHostPropSources: ['call:hasAttribute'],
+		// Container membership proves the early owner's committed native node.
+		// The blur listener and value resample run only in accepted publication,
+		// around retirement of the offered control owner, never during preparation.
+		preparePresentationSignalValue: ['call:contains', 'call:addEventListener', 'read:value'],
 		retireDetachedBindingLeases: ['call:contains'],
 		'FragmentInstance.dispatchEvent': ['call:dispatchEvent'],
 		'FragmentInstance.scrollIntoView': ['call:scrollIntoView'],

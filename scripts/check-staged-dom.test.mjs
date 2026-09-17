@@ -174,6 +174,14 @@ test('native exceptions are specific operations, not blanket function exemptions
 	 const custom = node.hasAttribute('is');
 	 node.setAttribute('is', 'early');
 	 return custom;
+	}
+	function preparePresentationSignalValue(container: Node, element: HTMLTextAreaElement) {
+	 const owned = container.contains(element);
+	 element.addEventListener('blur', () => {});
+	 const value = element.value;
+	 element.value = 'early';
+	 element.setAttribute('title', 'early');
+	 return [owned, value];
 	}`);
 	assert.deepEqual(
 		findings.map((finding) => finding.operation),
@@ -184,6 +192,8 @@ test('native exceptions are specific operations, not blanket function exemptions
 			'call:removeChild',
 			'write:textContent',
 			'write:data',
+			'call:setAttribute',
+			'write:value',
 			'call:setAttribute',
 		],
 	);

@@ -1,6 +1,7 @@
 /** Stable scoped signals. This entry does not import a renderer. */
 export { createScope } from './engine.js';
 export { bindSignalControl } from './control-binding.js';
+export type { SignalControlBinding } from './control-handoff.js';
 export { enableSignalDocument as __enableSignalDocument } from './document-owner.js';
 export { createResource, query } from './requests.js';
 export { ActionUncertainError, action$, isActionUncertain, optimistic$ } from './actions.js';
