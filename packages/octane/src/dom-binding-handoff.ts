@@ -1,5 +1,6 @@
-/** Renderer-independent capability carried by an adopted, compiler-proven view. */
-export const BINDING_HANDOFF = /* @__PURE__ */ Symbol.for('octane.binding-handoff');
+import { BINDING_HANDOFF } from './signals/control-handoff.js';
+
+export { BINDING_HANDOFF };
 
 /** Current early-owned range, not a license to render a different shape. */
 export interface BindingHandoffRange {

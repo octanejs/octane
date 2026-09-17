@@ -2,11 +2,8 @@ import { normalizeClass } from './class-names.js';
 import { sanitizeURL } from './sanitize-url.js';
 import { STREAM_SCRIPT_ATTR, SUSPENSE_SCRIPT_ATTR } from './stream-protocol.js';
 import { NATIVE_SIGNAL_SEED_ATTR } from './signals/native-read-seeds.js';
-import {
-	BINDING_HANDOFF,
-	type BindingHandoff,
-	type BindingHandoffCapability,
-} from './dom-binding-handoff.js';
+import { BINDING_HANDOFF } from './signals/control-handoff.js';
+import type { BindingHandoff, BindingHandoffCapability } from './dom-binding-handoff.js';
 import type { createBindingClassGroup } from './dom-binding-classes.js';
 import type {
 	__createBindingSignals,
