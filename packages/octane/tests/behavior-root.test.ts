@@ -2676,6 +2676,190 @@ export function RestHydration(props) @{
 					transitions?.restore();
 				}
 			}
+			for (const outcome of [
+				'ready',
+				'empty',
+				'empty resume',
+				'retire',
+				'resume',
+				'abort',
+				'scalar retry',
+				'object',
+				'function',
+				'function handle',
+				'duck',
+				'read-error',
+			]) {
+				const scope = createScope({ scopeKey: `scalar-text-handoff-${dev}-${outcome}` });
+				const value = scope.signal$('value', outcome.startsWith('empty') ? '' : 'server');
+				const pending = deferred<void>();
+				const onReady = vi.fn();
+				const onHydrated = vi.fn();
+				const fixture = authoredPresentation(
+					'ScalarTextPresentation',
+					{ value: value.get() as unknown, onReady },
+					dev,
+					`import { Hydrate, use } from 'octane';
+export function ScalarTextPresentation(props) @{ 'use dom bindings';
+ <p ref={props.onReady}>{props.value as string}</p>
+}
+function TextSuffix(props) @{ if (props.suspend) use(props.promise); <i /> }
+export function ScalarTextHydration(props) @{
+ <Hydrate when={props.when} split={false} onHydrated={props.onHydrated}>
+  <ScalarTextPresentation value={props.value} onReady={props.onReady} />
+  <TextSuffix suspend={props.suspend} promise={props.promise} />
+ </Hydrate>
+}`,
+				);
+				const application = {
+					...fixture.state.getSnapshot(),
+					when: never(),
+					suspend: false,
+					promise: pending.promise,
+					onHydrated,
+				};
+				const refused = ['object', 'function', 'function handle', 'duck', 'read-error'].includes(
+					outcome,
+				);
+				article.innerHTML = refused
+					? fixture.html
+					: renderToString(fixture.server.ScalarTextHydration, application).html;
+				const paragraph = article.querySelector('p')!;
+				fixture.publish({ value }, false);
+				const binding = runWithSignalOwner(scope, () =>
+					fixture.attach(paragraph, {
+						getSnapshot: fixture.state.getSnapshot,
+						subscribe(notify) {
+							const stop = fixture.state.subscribe(notify);
+							return () => {
+								stop();
+								if (outcome === 'retire') value.set('during retirement');
+							};
+						},
+					}),
+				);
+				const client = fixture.loadClient();
+				try {
+					if (!outcome.startsWith('empty')) value.set('before hydration');
+					expect(paragraph.textContent).toBe(value.get());
+					const text = [...paragraph.childNodes].find((node) => node.nodeType === 3);
+					onReady.mockClear();
+					if (refused) {
+						const failure = new Error('scalar signal read failed');
+						const duck = { get: vi.fn(() => 'not a signal') };
+						const invalid =
+							outcome === 'object'
+								? scope.signal$('invalid', { unsupported: true })
+								: outcome === 'function'
+									? () => 'not scalar'
+									: outcome === 'function handle'
+										? scope.signal$('invalid', () => 'not scalar')
+										: outcome === 'duck'
+											? duck
+											: scope.derived$('invalid', () => {
+													throw failure;
+												});
+						expect(() =>
+							hydrateRoot(
+								article,
+								client.ScalarTextPresentation,
+								{ value: invalid, onReady },
+								{ signalOwner: scope, bindingLeases: [binding] },
+							),
+						).toThrow(outcome === 'read-error' ? failure : /binding leases/);
+						expect(duck.get).not.toHaveBeenCalled();
+						expect(onReady).not.toHaveBeenCalled();
+						expect(fixture.cleanup).not.toHaveBeenCalled();
+						value.set('early owner survives refusal');
+						expect(article.querySelector('p')).toBe(paragraph);
+						expect(paragraph.textContent).toBe('early owner survives refusal');
+						continue;
+					}
+					hydratedRoot = hydrateRoot(
+						article,
+						client.ScalarTextHydration,
+						{ ...application, value },
+						{ signalOwner: scope, bindingLeases: [binding] },
+					);
+					const suspended =
+						outcome.endsWith('resume') || outcome === 'abort' || outcome === 'scalar retry';
+					await act(() =>
+						hydratedRoot!.render(client.ScalarTextHydration, {
+							...application,
+							value,
+							when: condition(true),
+							suspend: suspended,
+						}),
+					);
+					if (suspended) {
+						expect(fixture.cleanup).not.toHaveBeenCalled();
+						expect(onHydrated).not.toHaveBeenCalled();
+						expect(onReady).not.toHaveBeenCalled();
+						await act(() => value.set('during suspension'));
+						expect(paragraph.textContent).toBe('during suspension');
+						if (outcome === 'abort')
+							await act(() =>
+								hydratedRoot!.render(client.ScalarTextHydration, { ...application, value }),
+							);
+						if (outcome === 'scalar retry')
+							await act(() =>
+								hydratedRoot!.render(client.ScalarTextHydration, {
+									...application,
+									value: 'scalar retry',
+									when: condition(true),
+									suspend: true,
+								}),
+							);
+						await act(() => pending.resolve());
+					}
+					expect(article.querySelector('p')).toBe(paragraph);
+					if (text) expect([...paragraph.childNodes]).toContain(text);
+					if (outcome === 'abort') {
+						expect(fixture.cleanup).not.toHaveBeenCalled();
+						expect(onHydrated).not.toHaveBeenCalled();
+						value.set('early owner remains active');
+						expect(paragraph.textContent).toBe('early owner remains active');
+						continue;
+					}
+					expect(fixture.cleanup).toHaveBeenCalledOnce();
+					expect(onHydrated).toHaveBeenCalledOnce();
+					expect(paragraph.textContent).toBe(
+						outcome === 'scalar retry' ? 'scalar retry' : value.get(),
+					);
+					value.set('accepted direct update');
+					expect(paragraph.textContent).toBe(
+						outcome === 'scalar retry' ? 'scalar retry' : 'accepted direct update',
+					);
+					await act(() =>
+						hydratedRoot!.render(client.ScalarTextHydration, {
+							...application,
+							when: condition(true),
+							value: 'scalar replacement',
+						}),
+					);
+					value.set('retired original');
+					expect(paragraph.textContent).toBe('scalar replacement');
+					const replacement = scope.signal$('replacement', 'new handle');
+					await act(() =>
+						hydratedRoot!.render(client.ScalarTextHydration, {
+							...application,
+							when: condition(true),
+							value: replacement,
+						}),
+					);
+					replacement.set('new direct update');
+					expect(paragraph.textContent).toBe('new direct update');
+					hydratedRoot.unmount();
+					hydratedRoot = undefined;
+					replacement.set('after unmount');
+					expect(paragraph.textContent).toBe('new direct update');
+				} finally {
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					binding.dispose();
+					scope.dispose();
+				}
+			}
 			const duringPreparation = authoredPresentation(
 				'RefreshDuringPreparation',
 				{ title: 'Early', label: 'Initial', onAction: vi.fn(), onReady: vi.fn() },

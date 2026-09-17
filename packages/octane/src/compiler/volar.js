@@ -112,11 +112,10 @@ const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
 
 // Type-check only the reads that runtime compilation also admits. A StyleX
 // function keeps its ordinary parameter types everywhere outside native `sx`.
-function projectNativeAttributeReads(ast, contracts) {
+function projectNativeDomReads(ast, contracts) {
 	const attributes = new Set(
 		contracts?.flatMap((contract) => (contract.jsxAttribute ? [contract.jsxAttribute] : [])),
 	);
-	if (attributes.size === 0) return ast;
 	const names = new Set();
 	const walk = (node, replace) => {
 		if (!node || typeof node !== 'object') return node;
@@ -141,15 +140,60 @@ function projectNativeAttributeReads(ast, contracts) {
 	let helper = '__octane_nativeAttributeValue';
 	while (names.has(helper)) helper += '_';
 	let used = false;
+	const read = (value) => {
+		used = true;
+		return inheritHookMemoOrigin(b.call(b.id(helper), value), value);
+	};
+	// A text assertion selects the scalar child binding, which unwraps a direct
+	// handle. Preserve the assertion so non-text payloads still get TS errors;
+	// do not unwrap operands inside calls/operators or ordinary JS assertions.
+	const projectText = (node) => {
+		if (!node) return node;
+		if (
+			['TSAsExpression', 'TSTypeAssertion', 'TSSatisfiesExpression'].includes(node.type) &&
+			node.typeAnnotation?.type === 'TSStringKeyword'
+		) {
+			used = true;
+			const expression = projectText(node.expression);
+			return {
+				...node,
+				expression: expression === node.expression ? b.call(b.id(helper), expression) : expression,
+			};
+		}
+		if (
+			[
+				'TSAsExpression',
+				'TSTypeAssertion',
+				'TSNonNullExpression',
+				'TSSatisfiesExpression',
+				'TSInstantiationExpression',
+				'ParenthesizedExpression',
+			].includes(node.type)
+		) {
+			const expression = projectText(node.expression);
+			return expression === node.expression ? node : { ...node, expression };
+		}
+		return node;
+	};
 	const projected = walk(ast, (node) => {
-		if (node.type !== 'JSXOpeningElement' && node.type !== 'Element') return null;
+		if (['JSXElement', 'JSXFragment', 'Element', 'Fragment'].includes(node.type)) {
+			node = {
+				...node,
+				children: node.children.map((child) => {
+					if (child.type !== 'JSXExpressionContainer') return child;
+					const expression = projectText(child.expression);
+					return expression === child.expression ? child : { ...child, expression };
+				}),
+			};
+		}
+		if (node.type !== 'JSXOpeningElement' && node.type !== 'Element') return node;
 		const name = node.type === 'Element' ? node.id : node.name;
 		if (
 			(name?.type !== 'JSXIdentifier' && name?.type !== 'Identifier') ||
 			typeof name.name !== 'string' ||
 			name.name[0] !== name.name[0].toLowerCase()
 		)
-			return null;
+			return node;
 		return {
 			...node,
 			attributes: node.attributes.map((attribute) => {
@@ -158,10 +202,7 @@ function projectNativeAttributeReads(ast, contracts) {
 					attribute.value?.type !== 'JSXExpressionContainer'
 				)
 					return attribute;
-				const result = lowerNativeAttributeReads(attribute.value.expression, (value) => {
-					used = true;
-					return inheritHookMemoOrigin(b.call(b.id(helper), value), value);
-				});
+				const result = lowerNativeAttributeReads(attribute.value.expression, read);
 				return { ...attribute, value: { ...attribute.value, expression: result.expression } };
 			}),
 		};
@@ -523,7 +564,7 @@ export function compileToVolarMappings(source, filename, options) {
 	const transformed = transform(
 		projectServerContextCalls(
 			renderer.target === 'dom'
-				? projectNativeAttributeReads(transformAst, options?.knownAttributeSpreads)
+				? projectNativeDomReads(transformAst, options?.knownAttributeSpreads)
 				: transformAst,
 			filename,
 		),
@@ -770,14 +811,22 @@ export function compileTypesInspection(source, filename, options) {
 		? null
 		: createRendererTypePragma(renderer, ast);
 	const transform = selectOctaneTransform(ast);
-	const transformed = transform(projectServerContextCalls(ast, filename), source, filename, {
-		collect: true,
-		loose: true,
-		typeOnly: true,
-		inspect: true,
-		errors,
-		comments: rendererPragma === null ? comments : [rendererPragma, ...comments],
-	});
+	const transformed = transform(
+		projectServerContextCalls(
+			renderer.target === 'dom' ? projectNativeDomReads(ast) : ast,
+			filename,
+		),
+		source,
+		filename,
+		{
+			collect: true,
+			loose: true,
+			typeOnly: true,
+			inspect: true,
+			errors,
+			comments: rendererPragma === null ? comments : [rendererPragma, ...comments],
+		},
+	);
 	markNativeTemplateBodies(ast);
 	return {
 		code: transformed.code,

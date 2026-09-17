@@ -19275,26 +19275,36 @@ function preparedPresentationAttribute(
 	return result === '' && BOOLEAN_ATTR_PROPS.has(name.toLowerCase()) ? true : result;
 }
 
-function preparePresentationSignalAttribute(
+function preparePresentationSignalBinding(
 	args: any[],
 	frame: PresentationHydrationFrame,
+	text = false,
 ): unknown {
-	const [scope, previous, element, name, value, site, attributeKind = 'attr'] = args as [
-		Scope,
-		unknown,
-		Element,
-		string,
-		unknown,
-		string,
-		DirectSignalAttributeKind?,
-	];
+	const [scope, previous, element] = args as [Scope, unknown, Element];
+	const name = text ? undefined : (args[3] as string);
+	const value = args[text ? 3 : 4];
+	const site = args[text ? 4 : 5] as string;
+	const attributeKind = text ? undefined : ((args[6] ?? 'attr') as DirectSignalAttributeKind);
+	const kind = text ? (args[5] ? 'textOnlyChild' : 'text') : 'attribute';
 	return runWithBlockSignalOwner(scope, () => {
 		const handle = isSignalHandle(value) ? value : null;
 		// Unlike the ordinary direct-binding read, this read belongs to validation.
 		const current = handle === null ? value : handle.get();
-		const prepared = preparedPresentationAttribute(element, name, current, attributeKind);
+		if (
+			text &&
+			((current !== null && (typeof current === 'object' || typeof current === 'function')) ||
+				typeof args[7] !== 'string')
+		)
+			presentationMiss(false);
+		const prepared = text
+			? bindingText(element, current, args[7])
+			: preparedPresentationAttribute(element, name!, current, attributeKind!);
 		if (handle === null) {
-			preparePresentationOperation(frame, element, name, () =>
+			if (text) {
+				frame.writes.get(element)?.delete('signalText');
+				return prepared;
+			}
+			preparePresentationOperation(frame, element, name!, () =>
 				writeDirectSignalScalar(element, prepared, 'attribute', previous, name, attributeKind),
 			);
 			return value;
@@ -19306,6 +19316,7 @@ function preparePresentationSignalAttribute(
 			prior.unsubscribe === undefined &&
 			prior.handle === handle &&
 			prior.target === element &&
+			prior.kind === kind &&
 			prior.site === site &&
 			prior.name === name &&
 			prior.attributeKind === attributeKind;
@@ -19315,7 +19326,7 @@ function preparePresentationSignalAttribute(
 					[DIRECT_SIGNAL_BINDING]: true,
 					scope,
 					target: element,
-					kind: 'attribute',
+					kind,
 					site,
 					name,
 					attributeKind,
@@ -19323,10 +19334,13 @@ function preparePresentationSignalAttribute(
 					value: current,
 					disposed: false,
 				};
+		if (text) binding.text = prepared as Text;
 		if (!reusable) registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
-		preparePresentationOperation(frame, element, name, () => {
+		// Text insertion/update already has its own operation; activation must not replace it.
+		preparePresentationOperation(frame, element, name ?? 'signalText', () => {
 			if (binding.disposed) return;
-			writeDirectSignalScalar(element, prepared, 'attribute', previous, name, attributeKind);
+			if (!text)
+				writeDirectSignalScalar(element, prepared, 'attribute', previous, name, attributeKind);
 			binding.value = current;
 			runWithBlockSignalOwner(scope, () => activateDirectSignalBinding(binding, undefined));
 		});
@@ -19547,21 +19561,13 @@ export function presentationWrite<T>(
 		preparePresentationOperation(frame, element, 'hostChildren', () => writer(element));
 		return undefined as T;
 	}
-	if (kind === 'bindSignalText') {
-		const value = args[3];
-		if (
-			(value !== null && (typeof value === 'object' || typeof value === 'function')) ||
-			typeof args[7] !== 'string'
-		)
-			presentationMiss(false);
-		return bindingText(args[2], value, args[7]) as T;
-	}
+	if (kind === 'bindSignalText') return preparePresentationSignalBinding(args, frame, true) as T;
 	if (kind === 'setText') {
 		const text = coerceText(args[1]);
 		preparePresentationOperation(frame, args[0], 'text', () => writer(args[0], text));
 		return undefined as T;
 	}
-	if (kind === 'bindSignalAttribute') return preparePresentationSignalAttribute(args, frame) as T;
+	if (kind === 'bindSignalAttribute') return preparePresentationSignalBinding(args, frame) as T;
 	if (kind === 'bindSignalValue') return preparePresentationSignalValue(args, frame) as T;
 	if (kind === 'nativeStyleBinding' || kind === 'nativeProjectionBinding') {
 		const [owner, slot, el] = args;

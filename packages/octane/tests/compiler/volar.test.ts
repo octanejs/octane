@@ -1039,6 +1039,27 @@ const invalid: number = knownAttributeSpreads[0].fields[0];
 			const sources: ReadonlyArray<readonly [name: string, source: string]> = [
 				...refSpreadModules(),
 				[
+					'scalar text handles and unions',
+					`import type { SignalHandle, WritableSignal } from 'octane/signals';
+import 'octane/signals';
+function Label({children}: {children: string}) @{ <span>{children}</span> }
+export function Text(props: {
+	readable: SignalHandle<string>;
+	writable: WritableSignal<string>;
+	label: string | number | SignalHandle<string | number>;
+}) @{
+	const __octane_nativeAttributeValue = 'authored';
+	<p title={__octane_nativeAttributeValue}>
+		{props.readable as string}
+		{(props.writable as string)!}
+		{props.readable satisfies string}
+		{((props.writable as string) as string)!}
+		{props.label as string}
+		<Label>{props.readable as string}</Label>
+	</p>
+}`,
+				],
+				[
 					'optional refs in a typed SVG spread',
 					`import type { Octane } from 'octane/jsx-runtime';
 export function Chart({ innerRef, ...rest }: Octane.SVGProps<SVGTextElement> & {
@@ -1087,11 +1108,60 @@ export function Chart<T extends Octane.SVGProps<SVGTextElement>>(props: T) {
 			const files = sources.map(([name, source], index) => {
 				const compiled = compileToVolarMappings(source, `/src/Spread${index}.tsrx`);
 				expect(compiled.errors, name).toEqual([]);
+				if (name === 'scalar text handles and unions') {
+					for (const token of ['props.readable', 'props.writable', 'props.label']) {
+						const offset = source.indexOf(token);
+						expect(
+							compiled.mappings.some((mapping) =>
+								mapping.sourceOffsets.some((start, position) => {
+									if (offset < start || offset >= start + mapping.lengths[position]) return false;
+									const generated = mapping.generatedOffsets[position] + offset - start;
+									return compiled.code.slice(generated, generated + token.length) === token;
+								}),
+							),
+						).toBe(true);
+					}
+					const authored = source.indexOf('props.readable as string');
+					const expressions: string[] = [];
+					const visit = (node: any): void => {
+						if (!node || typeof node !== 'object') return;
+						if (node.type === 'TSAsExpression' && node.start === authored) {
+							expressions.push(node.expression.type);
+						}
+						for (const key of Object.keys(node)) {
+							if (!['metadata', 'loc', 'parent'].includes(key)) visit(node[key]);
+						}
+					};
+					visit(compiled.sourceAst);
+					expect(expressions).toEqual(['MemberExpression']);
+				}
 				const file = join(root, `Spread${index}.tsx`);
 				writeFileSync(file, compiled.code);
 				return { name, file };
 			});
-			const invalidSources: ReadonlyArray<readonly [source: string, errorCode: number]> = [
+			const textSource = sources.find(([name]) => name === 'scalar text handles and unions')![1];
+			const inspectionFile = join(root, 'TextInspection.tsx');
+			writeFileSync(inspectionFile, compileTypesInspection(textSource, 'Text.tsrx').code);
+			files.push({ name: 'inspected scalar text handles', file: inspectionFile });
+			const invalidSources: ReadonlyArray<
+				readonly [source: string, errorCode: number, objectRenderer?: boolean]
+			> = [
+				[
+					`import type { SignalHandle } from 'octane/signals';
+export function Invalid(value: SignalHandle<string>) @{ <p>{value as string}</p> }`,
+					2352,
+					true,
+				],
+				...[
+					`export function Invalid(value: SignalHandle<{ invalid: true }>) @{ <p>{value as string}</p> }`,
+					`export function Invalid(value: { invalid: true }) @{ <p>{value as string}</p> }`,
+					`export function Invalid(value: SignalHandle<string>) { return value as string; }`,
+					`export function Invalid(value: SignalHandle<string>) @{ <p title={value as string} /> }`,
+					`export function Invalid(value: SignalHandle<string>) @{ <p>{String(value as string)}</p> }`,
+				].map(
+					(source) =>
+						[`import type { SignalHandle } from 'octane/signals';\n${source}`, 2352] as const,
+				),
 				[
 					`export function Invalid(props: { ref: (node: SVGSVGElement | null) => void; rest: { id: string } }) {
 	return <input ref={props.ref} {...props.rest} />;
@@ -1135,8 +1205,23 @@ export function Chart<T extends Octane.SVGProps<SVGTextElement>>(props: T) {
 					2322,
 				],
 			];
-			const invalidFiles = invalidSources.map(([source], index) => {
-				const compiled = compileToVolarMappings(source, `/src/Invalid${index}.tsrx`);
+			const invalidResults = invalidSources.map(([source, , objectRenderer], index) => {
+				return compileToVolarMappings(
+					source,
+					`/src/Invalid${index}.tsrx`,
+					objectRenderer
+						? {
+								renderers: {
+									registry: {
+										object: { module: '@fixture/object-renderer', intrinsics: 'octane' },
+									},
+									rules: [{ include: '**/*.tsrx', renderer: 'object' }],
+								},
+							}
+						: undefined,
+				);
+			});
+			const invalidFiles = invalidResults.map((compiled, index) => {
 				expect(compiled.errors).toEqual([]);
 				const file = join(root, `Invalid${index}.tsx`);
 				writeFileSync(file, compiled.code);
@@ -1172,6 +1257,24 @@ export function Chart<T extends Octane.SVGProps<SVGTextElement>>(props: T) {
 					errors.map(({ code }) => code),
 					file,
 				).toContain(invalidSources[index][1]);
+				if (invalidSources[index][1] === 2352) {
+					const source = invalidSources[index][0];
+					const authored = source.lastIndexOf('value as string');
+					const diagnostic = errors.find(({ code }) => code === 2352)!;
+					expect(
+						invalidResults[index].mappings.some((mapping) =>
+							mapping.sourceOffsets.some(
+								(offset, position) =>
+									offset <= authored &&
+									authored < offset + mapping.lengths[position] &&
+									mapping.generatedOffsets[position] <= diagnostic.start! &&
+									diagnostic.start! <
+										mapping.generatedOffsets[position] +
+											(mapping.generatedLengths?.[position] ?? mapping.lengths[position]),
+							),
+						),
+					).toBe(true);
+				}
 			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
