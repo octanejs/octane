@@ -14180,6 +14180,9 @@ function releasePreservedHydrateActivation(state: HydrateSlot): void {
 function pendingHydrateOwner(target: Block): HydrateSlot | null {
 	let owner: HydrateSlot | null = null;
 	for (let block: Block | null = target; block !== null; block = block.parentBlock) {
+		// Lite DOM-context proxies have no hook slots. Keep walking through them
+		// so the enclosing preserved island still owns its descendants' retries.
+		if (block.block !== block) continue;
 		const state = block.slots[0] as HydrateSlot | undefined;
 		if (
 			state?.__kind === 'hydrateBlockSlot' &&

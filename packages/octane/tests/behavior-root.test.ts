@@ -4,6 +4,7 @@ import {
 	act,
 	addTransitionType,
 	attachBehaviorRoot,
+	createRoot,
 	flushSync,
 	hydrateRoot,
 	startTransition,
@@ -721,8 +722,35 @@ export function NativeStylexControlLayout(props: NativeControlPresentationProps 
 					disabled: scope.signal$('disabled', false),
 					required: scope.signal$('required', true),
 				};
-				const fixture = authoredPresentation('NativeControlPresentation', props, dev);
-				const layout = authoredPresentation('NativeControlHost', { className: 'compact' }, dev);
+				const source = `${presentationSource}
+import { useEffect } from 'octane';
+import 'octane/signals';
+type NativeRetryProps = {
+ draft: SignalHandle<string>;
+ label: string;
+ log(entry: string): void;
+};
+function NativeRetryChild(props: NativeRetryProps) @{
+ const value = props.draft.get();
+ useEffect(() => {
+  props.log('setup:' + props.label);
+  return () => props.log('cleanup:' + props.label);
+ }, [123]);
+ <output>{(props.label + ':' + value) as string}</output>
+}
+function NativeRetryBridge(props: NativeRetryProps) @{
+ <section><NativeRetryChild draft={props.draft} label={props.label} log={props.log} /></section>
+}
+export function NativeRetryApp(props: NativeRetryProps) @{
+ <div><NativeRetryBridge draft={props.draft} label={props.label} log={props.log} /></div>
+}`;
+				const fixture = authoredPresentation('NativeControlPresentation', props, dev, source);
+				const layout = authoredPresentation(
+					'NativeControlHost',
+					{ className: 'compact' },
+					dev,
+					source,
+				);
 				const pending = deferred<void>();
 				const onHydrated = vi.fn();
 				const onUncaughtError = vi.fn();
@@ -773,6 +801,36 @@ export function NativeStylexControlLayout(props: NativeControlPresentationProps 
 					expect(onHydrated).not.toHaveBeenCalled();
 					expect(fixture.cleanup).not.toHaveBeenCalled();
 					expect(layout.cleanup).not.toHaveBeenCalled();
+					// A separate native consumer can retry while this island keeps its
+					// early owners. Only the surviving presentation may connect effects.
+					const retryContainer = document.createElement('div');
+					document.body.appendChild(retryContainer);
+					const retryErrors = vi.fn();
+					const retryRoot = createRoot(retryContainer, { onUncaughtError: retryErrors });
+					const retryLog: string[] = [];
+					const retryProps = {
+						draft,
+						label: 'A',
+						log: (entry: string) => retryLog.push(entry),
+					};
+					try {
+						retryRoot.render(client.NativeRetryApp, retryProps);
+						retryRoot.render(client.NativeRetryApp, { ...retryProps, label: 'B' });
+						await act(() => {});
+						expect(retryContainer.textContent).toBe('B:server draft');
+						expect(retryLog).toEqual(['setup:B']);
+						expect(retryErrors).not.toHaveBeenCalled();
+						expect(container.querySelector('textarea')).toBe(textarea);
+						expect(container.querySelector('form')).toBe(form);
+						expect(textarea.value).toBe('server draft');
+						expect(fixture.cleanup).not.toHaveBeenCalled();
+						expect(layout.cleanup).not.toHaveBeenCalled();
+						await act(() => retryRoot.unmount());
+						expect(retryLog).toEqual(['setup:B', 'cleanup:B']);
+					} finally {
+						retryRoot.unmount();
+						retryContainer.remove();
+					}
 					for (let index = 0; index < 4; index++) {
 						await act(() => draft.set('pending model ' + index));
 						expect(textarea.value).toBe('pending model ' + index);
