@@ -373,6 +373,16 @@ describe('website a11y sweep (axe-core, production build)', { concurrent: false 
 					await page.waitForFunction(
 						() => document.querySelectorAll('.demo-terminal-line').length >= 7,
 					);
+					// Log lines can arrive before the terminal follows them. Start
+					// scrolling away from an overflowing terminal at its followed tail.
+					await page.waitForFunction(() => {
+						const body = document.querySelector<HTMLElement>('.demo-terminal-body');
+						return (
+							body !== null &&
+							body.scrollHeight - body.clientHeight > 4 &&
+							body.scrollHeight - body.scrollTop - body.clientHeight <= 1
+						);
+					});
 					await page.evaluate(() => {
 						const body = document.querySelector<HTMLElement>('.demo-terminal-body');
 						if (body) body.scrollTop = 0;
