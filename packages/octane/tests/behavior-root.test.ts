@@ -6199,6 +6199,20 @@ export function ProtocolParent(props) @{ 'use dom bindings';
 		expect(behavior.signal.aborted).toBe(true);
 	});
 
+	it('runs cleanup once when disposal reenters the root lifecycle', async () => {
+		container.innerHTML = '<button data-action>Action</button>';
+		const root = attach();
+		const cleanup = vi.fn(() => root.dispose());
+		const behavior = root.registerBehavior({ target: '[data-action]', adopt: () => cleanup });
+		await behavior.ready;
+
+		root.dispose();
+		behavior.dispose();
+
+		expect(cleanup).toHaveBeenCalledOnce();
+		expect(container.querySelector('[data-action]')).not.toBeNull();
+	});
+
 	for (const dev of [false, true]) {
 		it(`preserves native adapters when hydration enters child views (${dev ? 'dev' : 'prod'})`, () => {
 			for (const showLabel of [true, false]) {
