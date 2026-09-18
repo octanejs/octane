@@ -117,14 +117,14 @@ function TodoApp() {
 										<label onDblClick={() => startEdit(t.id)} textContent={t.title()} />
 										<button class="destroy" onClick={() => destroy(t.id)}></button>
 									</div>
-									<Show when={editing() === t.id}>
+									{editing() === t.id ? (
 										<input
 											class="edit"
 											value={t.title()}
 											onKeyDown={(e) => editKeyDown(t.id, e)}
 											onBlur={(e) => commitEdit(t.id, e)}
 										/>
-									</Show>
+									) : null}
 								</li>
 							)}
 						</For>
