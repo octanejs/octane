@@ -434,7 +434,7 @@
         {
           "path": "packages/base-ui/tests/vitest.browser.config.ts",
           "role": "support",
-          "sha256": "bc7e49dd7e66ee96b9a340ab655acd0165c68eb6e37a82ef470c654374f69700"
+          "sha256": "85efaa605c51c67de96730b839e8ed66e1feb2efb432da5f2b4adfb2cbf4e33f"
         },
         {
           "path": "patches/@vitest__browser@4.1.10.patch",

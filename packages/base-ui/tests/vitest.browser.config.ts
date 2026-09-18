@@ -5,6 +5,9 @@ import base from './vitest.config.ts';
 
 export default defineConfig({
 	...base,
+	// Repeated isolated module loads can lose Chromium's transport with HTTP
+	// caching enabled. Serve the adapted lane's module graph without HTTP caching.
+	server: { headers: { 'Cache-Control': 'no-store' } },
 	optimizeDeps: {
 		exclude: ['@mui/internal-test-utils', '@octanejs/testing-library', '@testing-library/react'],
 		include: [
@@ -32,12 +35,7 @@ export default defineConfig({
 			enabled: true,
 			headless: true,
 			screenshotFailures: false,
-			// Headless shell can drop the orchestrator's WebSockets during long
-			// isolated runs. Use Chromium's new headless mode for the adapted lane.
-			provider: playwright({
-				contextOptions: { timezoneId: 'UTC' },
-				launchOptions: { channel: 'chromium' },
-			}),
+			provider: playwright({ contextOptions: { timezoneId: 'UTC' } }),
 			instances: [{ browser: 'chromium' }],
 		},
 	},
