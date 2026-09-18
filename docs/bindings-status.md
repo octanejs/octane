@@ -437,7 +437,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/drei
 
-[`packages/drei`](../packages/drei) `0.0.20` — ports `@react-three/drei@10.7.7`. Status data: [`packages/drei/status.json`](../packages/drei/status.json).
+[`packages/drei`](../packages/drei) `0.0.21` — ports `@react-three/drei@10.7.7`. Status data: [`packages/drei/status.json`](../packages/drei/status.json).
 
 Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 105 test files.
 
@@ -1053,7 +1053,7 @@ See also: [`docs/radix-migration-plan.md`](radix-migration-plan.md)
 
 ## @octanejs/rainbowkit
 
-[`packages/rainbowkit`](../packages/rainbowkit) `0.0.33` — ports `@rainbow-me/rainbowkit@2.2.11`. Status data: [`packages/rainbowkit/status.json`](../packages/rainbowkit/status.json).
+[`packages/rainbowkit`](../packages/rainbowkit) `0.0.34` — ports `@rainbow-me/rainbowkit@2.2.11`. Status data: [`packages/rainbowkit/status.json`](../packages/rainbowkit/status.json).
 
 Octane-native RainbowKitProvider, ConnectButton and ConnectButton.Custom, WalletButton, connect/account/chain modal hooks, connector selection, account/chain actions, native accessible dialogs, and light/dark/midnight themes.
 
@@ -1333,7 +1333,7 @@ See also: [`docs/shadcn-port-plan.md`](shadcn-port-plan.md)
 
 ## @octanejs/solana-kit
 
-[`packages/solana-kit`](../packages/solana-kit) `0.0.22` — ports `@solana/react@7.0.0`. Status data: [`packages/solana-kit/status.json`](../packages/solana-kit/status.json).
+[`packages/solana-kit`](../packages/solana-kit) `0.0.23` — ports `@solana/react@7.0.0`. Status data: [`packages/solana-kit/status.json`](../packages/solana-kit/status.json).
 
 Octane-native client provider/store hooks, a validated private Wallet Standard adapter, explicit-action transaction orchestration, and a TanStack Query-backed request hook. Applications import framework-neutral operations directly from @solana/kit@7.0.0.
 
@@ -1571,7 +1571,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/tanstack-form
 
-[`packages/tanstack-form`](../packages/tanstack-form) `0.0.48` — ports `@tanstack/react-form@1.33.5`. Status data: [`packages/tanstack-form/status.json`](../packages/tanstack-form/status.json).
+[`packages/tanstack-form`](../packages/tanstack-form) `0.0.49` — ports `@tanstack/react-form@1.33.5`. Status data: [`packages/tanstack-form/status.json`](../packages/tanstack-form/status.json).
 
 Ports the complete @tanstack/react-form 1.33.5 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.5 unchanged and using @octanejs/tanstack-store for subscriptions.
 
@@ -1593,7 +1593,7 @@ Scope/evidence last checked: 2026-08-09.
 
 ## @octanejs/tanstack-hotkeys
 
-[`packages/tanstack-hotkeys`](../packages/tanstack-hotkeys) `0.0.43` — ports `@tanstack/react-hotkeys@0.10.0`. Status data: [`packages/tanstack-hotkeys/status.json`](../packages/tanstack-hotkeys/status.json).
+[`packages/tanstack-hotkeys`](../packages/tanstack-hotkeys) `0.0.44` — ports `@tanstack/react-hotkeys@0.10.0`. Status data: [`packages/tanstack-hotkeys/status.json`](../packages/tanstack-hotkeys/status.json).
 
 Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc.
 
@@ -1610,7 +1610,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/tanstack-pacer
 
-[`packages/tanstack-pacer`](../packages/tanstack-pacer) `0.0.43` — ports `@tanstack/react-pacer@0.23.0`. Status data: [`packages/tanstack-pacer/status.json`](../packages/tanstack-pacer/status.json).
+[`packages/tanstack-pacer`](../packages/tanstack-pacer) `0.0.44` — ports `@tanstack/react-pacer@0.23.0`. Status data: [`packages/tanstack-pacer/status.json`](../packages/tanstack-pacer/status.json).
 
 All 15 runtime/type entrypoints from @tanstack/react-pacer@0.23.0, with framework-neutral @tanstack/pacer@0.22.0 imported directly. Complete source/type structural crosswalk and strict public contracts accompany paired scheduler runtime scenarios, all ten scheduler stores and cleanup, nested providers, and server/hydration adoption. The three async callback helpers preserve Awaited results and possible undefined. Upstream publishes no runtime or dedicated type-assertion suite; independent probes retain that distinction.
 
@@ -1627,7 +1627,7 @@ Scope/evidence last checked: 2026-09-12.
 
 ## @octanejs/tanstack-query
 
-[`packages/tanstack-query`](../packages/tanstack-query) `0.1.52` — ports `@tanstack/react-query@5.102.8`. Status data: [`packages/tanstack-query/status.json`](../packages/tanstack-query/status.json).
+[`packages/tanstack-query`](../packages/tanstack-query) `0.1.53` — ports `@tanstack/react-query@5.102.8`. Status data: [`packages/tanstack-query/status.json`](../packages/tanstack-query/status.json).
 
 Complete published root adapter and neutral core re-exports. Exact runtime export comparison, 213 public value/type probes, 404 pristine and 404 adapted runtime registrations, and 167 pristine/adapted type registrations.
 
@@ -1668,7 +1668,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router-ssr-query
 
-[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.0.44` — ports `@tanstack/react-router-ssr-query@1.167.1`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
+[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.0.45` — ports `@tanstack/react-router-ssr-query@1.167.1`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
 
 Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.
 
@@ -1680,7 +1680,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/tanstack-store
 
-[`packages/tanstack-store`](../packages/tanstack-store) `0.0.48` — ports `@tanstack/react-store@0.11.1`. Status data: [`packages/tanstack-store/status.json`](../packages/tanstack-store/status.json).
+[`packages/tanstack-store`](../packages/tanstack-store) `0.0.49` — ports `@tanstack/react-store@0.11.1`. Status data: [`packages/tanstack-store/status.json`](../packages/tanstack-store/status.json).
 
 Re-exports `@tanstack/store@0.11.1` unchanged and implements the stable React binding surface (`useSelector`, `useAtom`, `useCreateAtom`, `useCreateStore`, `createStoreContext`, and deprecated `useStore`) on Octane hooks.
 
@@ -1699,7 +1699,7 @@ Scope/evidence last checked: 2026-08-09.
 
 ## @octanejs/tanstack-table
 
-[`packages/tanstack-table`](../packages/tanstack-table) `0.1.51` — ports `@tanstack/react-table@9.2.4`. Status data: [`packages/tanstack-table/status.json`](../packages/tanstack-table/status.json).
+[`packages/tanstack-table`](../packages/tanstack-table) `0.1.52` — ports `@tanstack/react-table@9.2.4`. Status data: [`packages/tanstack-table/status.json`](../packages/tanstack-table/status.json).
 
 TanStack Table 9.2.4 adapter using table-core 9.2.4 and the existing Octane Store integration. Covers useTable, Subscribe, FlexRender/flexRender, createTableHook, scoped contexts and the legacy migration hook/markers/types. Root, flex-render, legacy, static-functions, experimental-worker-plugin and package.json imports remain available. Core algorithms and worker helpers are imported directly.
 
@@ -1718,7 +1718,7 @@ Scope/evidence last checked: 2026-09-12.
 
 ## @octanejs/tanstack-virtual
 
-[`packages/tanstack-virtual`](../packages/tanstack-virtual) `0.1.49` — ports `@tanstack/react-virtual@3.14.12`. Status data: [`packages/tanstack-virtual/status.json`](../packages/tanstack-virtual/status.json).
+[`packages/tanstack-virtual`](../packages/tanstack-virtual) `0.1.50` — ports `@tanstack/react-virtual@3.14.12`. Status data: [`packages/tanstack-virtual/status.json`](../packages/tanstack-virtual/status.json).
 
 Complete 3.14.12 hook adapter and direct virtual-core 3.17.10 re-exports, with precise public hook signatures, direct DOM container sizing and end-anchor synchronization. All 26 exports have strict pinned public type probes.
 
@@ -1965,7 +1965,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/wagmi
 
-[`packages/wagmi`](../packages/wagmi) `0.0.33` — ports `wagmi@3.7.4`. Status data: [`packages/wagmi/status.json`](../packages/wagmi/status.json).
+[`packages/wagmi`](../packages/wagmi) `0.0.34` — ports `wagmi@3.7.4`. Status data: [`packages/wagmi/status.json`](../packages/wagmi/status.json).
 
 WagmiProvider and createConfig over @wagmi/core 3.6.4, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks.
 
@@ -2067,7 +2067,7 @@ Scope/evidence last checked: 2026-08-15.
 
 ## @octanejs/xyflow
 
-[`packages/xyflow`](../packages/xyflow) `0.1.5` — ports `@xyflow/react@12.11.2`. Status data: [`packages/xyflow/status.json`](../packages/xyflow/status.json).
+[`packages/xyflow`](../packages/xyflow) `0.1.6` — ports `@xyflow/react@12.11.2`. Status data: [`packages/xyflow/status.json`](../packages/xyflow/status.json).
 
 ReactFlow, ReactFlowProvider, Handle, hooks (useReactFlow, useNodes, useEdges, …), change helpers, and node/edge utilities from @xyflow/react@12.11.2.
 
@@ -2107,7 +2107,7 @@ See also: [`packages/zag/UPSTREAM.md`](../packages/zag/UPSTREAM.md)
 
 ## @octanejs/zustand
 
-[`packages/zustand`](../packages/zustand) `0.1.52` — ports `zustand@5.0.15`. Status data: [`packages/zustand/status.json`](../packages/zustand/status.json).
+[`packages/zustand`](../packages/zustand) `0.1.53` — ports `zustand@5.0.15`. Status data: [`packages/zustand/status.json`](../packages/zustand/status.json).
 
 Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux).
 

@@ -1,5 +1,13 @@
 # @octanejs/rainbowkit
 
+## 0.0.34
+
+### Patch Changes
+
+- Updated dependencies [911ed1d]
+  - @octanejs/tanstack-query@0.1.53
+  - @octanejs/wagmi@0.0.34
+
 ## 0.0.33
 
 ### Patch Changes

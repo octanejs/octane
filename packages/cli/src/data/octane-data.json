@@ -287,7 +287,7 @@
     },
     {
       "name": "@octanejs/drei",
-      "version": "0.0.20",
+      "version": "0.0.21",
       "category": "3D",
       "upstream": { "package": "@react-three/drei", "version": "10.7.7" },
       "surface": "Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 105 test files.",
@@ -812,7 +812,7 @@
     },
     {
       "name": "@octanejs/rainbowkit",
-      "version": "0.0.33",
+      "version": "0.0.34",
       "category": "Web3",
       "upstream": { "package": "@rainbow-me/rainbowkit", "version": "2.2.11" },
       "surface": "Octane-native RainbowKitProvider, ConnectButton and ConnectButton.Custom, WalletButton, connect/account/chain modal hooks, connector selection, account/chain actions, native accessible dialogs, and light/dark/midnight themes.",
@@ -1037,7 +1037,7 @@
     },
     {
       "name": "@octanejs/solana-kit",
-      "version": "0.0.22",
+      "version": "0.0.23",
       "category": "Web3",
       "upstream": {
         "package": "@solana/react",
@@ -1227,7 +1227,7 @@
     },
     {
       "name": "@octanejs/tanstack-form",
-      "version": "0.0.48",
+      "version": "0.0.49",
       "category": "Forms",
       "upstream": { "package": "@tanstack/react-form", "version": "1.33.5" },
       "surface": "Ports the complete @tanstack/react-form 1.33.5 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.5 unchanged and using @octanejs/tanstack-store for subscriptions.",
@@ -1241,7 +1241,7 @@
     },
     {
       "name": "@octanejs/tanstack-hotkeys",
-      "version": "0.0.43",
+      "version": "0.0.44",
       "category": "UI Utilities",
       "upstream": { "package": "@tanstack/react-hotkeys", "version": "0.10.0" },
       "surface": "Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc.",
@@ -1253,7 +1253,7 @@
     },
     {
       "name": "@octanejs/tanstack-pacer",
-      "version": "0.0.43",
+      "version": "0.0.44",
       "category": "UI Utilities",
       "upstream": { "package": "@tanstack/react-pacer", "version": "0.23.0" },
       "surface": "All 15 runtime/type entrypoints from @tanstack/react-pacer@0.23.0, with framework-neutral @tanstack/pacer@0.22.0 imported directly. Complete source/type structural crosswalk and strict public contracts accompany paired scheduler runtime scenarios, all ten scheduler stores and cleanup, nested providers, and server/hydration adoption. The three async callback helpers preserve Awaited results and possible undefined. Upstream publishes no runtime or dedicated type-assertion suite; independent probes retain that distinction.",
@@ -1265,7 +1265,7 @@
     },
     {
       "name": "@octanejs/tanstack-query",
-      "version": "0.1.52",
+      "version": "0.1.53",
       "category": "Data",
       "upstream": { "package": "@tanstack/react-query", "version": "5.102.8" },
       "surface": "Complete published root adapter and neutral core re-exports. Exact runtime export comparison, 213 public value/type probes, 404 pristine and 404 adapted runtime registrations, and 167 pristine/adapted type registrations.",
@@ -1293,7 +1293,7 @@
     },
     {
       "name": "@octanejs/tanstack-router-ssr-query",
-      "version": "0.0.44",
+      "version": "0.0.45",
       "category": "Routing",
       "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.1" },
       "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
@@ -1303,7 +1303,7 @@
     },
     {
       "name": "@octanejs/tanstack-store",
-      "version": "0.0.48",
+      "version": "0.0.49",
       "category": "State Management",
       "upstream": { "package": "@tanstack/react-store", "version": "0.11.1" },
       "surface": "Re-exports `@tanstack/store@0.11.1` unchanged and implements the stable React binding surface (`useSelector`, `useAtom`, `useCreateAtom`, `useCreateStore`, `createStoreContext`, and deprecated `useStore`) on Octane hooks.",
@@ -1315,7 +1315,7 @@
     },
     {
       "name": "@octanejs/tanstack-table",
-      "version": "0.1.51",
+      "version": "0.1.52",
       "category": "Tables",
       "upstream": { "package": "@tanstack/react-table", "version": "9.2.4" },
       "surface": "TanStack Table 9.2.4 adapter using table-core 9.2.4 and the existing Octane Store integration. Covers useTable, Subscribe, FlexRender/flexRender, createTableHook, scoped contexts and the legacy migration hook/markers/types. Root, flex-render, legacy, static-functions, experimental-worker-plugin and package.json imports remain available. Core algorithms and worker helpers are imported directly.",
@@ -1328,7 +1328,7 @@
     },
     {
       "name": "@octanejs/tanstack-virtual",
-      "version": "0.1.49",
+      "version": "0.1.50",
       "category": "Tables",
       "upstream": { "package": "@tanstack/react-virtual", "version": "3.14.12" },
       "surface": "Complete 3.14.12 hook adapter and direct virtual-core 3.17.10 re-exports, with precise public hook signatures, direct DOM container sizing and end-anchor synchronization. All 26 exports have strict pinned public type probes.",
@@ -1532,7 +1532,7 @@
     },
     {
       "name": "@octanejs/wagmi",
-      "version": "0.0.33",
+      "version": "0.0.34",
       "category": "Web3",
       "upstream": { "package": "wagmi", "version": "3.7.4" },
       "surface": "WagmiProvider and createConfig over @wagmi/core 3.6.4, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks.",
@@ -1629,7 +1629,7 @@
     },
     {
       "name": "@octanejs/xyflow",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "category": "Visualization",
       "upstream": { "package": "@xyflow/react", "version": "12.11.2" },
       "surface": "ReactFlow, ReactFlowProvider, Handle, hooks (useReactFlow, useNodes, useEdges, …), change helpers, and node/edge utilities from @xyflow/react@12.11.2.",
@@ -1656,7 +1656,7 @@
     },
     {
       "name": "@octanejs/zustand",
-      "version": "0.1.52",
+      "version": "0.1.53",
       "category": "State Management",
       "upstream": { "package": "zustand", "version": "5.0.15" },
       "surface": "Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux).",
