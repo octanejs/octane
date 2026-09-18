@@ -42,6 +42,13 @@ mixing HTML and client assets from different compiler/site-identity versions is
 not a supported hydration boundary. Deploy and invalidate cached HTML/assets as
 one matching build.
 
+Subtrees can defer activation through [`<Hydrate>`](./deferred-hydration.md),
+including native interaction capture and replay. `independent` boundaries can
+activate without evaluating or hydrating their lexical parent, but their
+activation still uses `hydrateRoot` and the renderer. The generated app bootstrap
+also hydrates the composed root; an islands-only route that omits the shell's
+client graph remains [proposed](./hydration-islands-plan.md).
+
 If another renderer or an independent stream owns part of the server-rendered
 DOM, use a permanent-static `<Hydrate split={false} when={never()}>` boundary to
 preserve that range and `attachBehaviorRoot` from `octane/behavior` to attach
@@ -468,8 +475,11 @@ const cspNonce = async (context, next) => {
 
 These are the known gaps between Octane SSR and a full streaming SSR stack:
 
-- **Selective / progressive hydration**: `hydrateRoot` adopts the whole tree in
-  one synchronous pass (and there is no synthetic event replay, by design).
+- **Islands-only route hydration and shell removal**: deferred and independent
+  [`<Hydrate>` boundaries](./deferred-hydration.md) are implemented, but the
+  generated app entry still loads the route and hydrates the composed root.
+  Automatic shell removal and renderer-free island selection remain
+  [proposed](./hydration-islands-plan.md).
 - **Streamed head hoisting**: head elements and resource hints hoisted from
   INSIDE a streamed Suspense boundary don't ship in the stream (the shell
   already flushed); the client re-creates them on hydration. Float **sheet
@@ -478,8 +488,9 @@ These are the known gaps between Octane SSR and a full streaming SSR stack:
   shell ride the wave chunks as real tags and the inline stream runtime hoists
   them into `document.head` with the client's precedence grouping, so late
   content is styled before hydration and no-JS consumers still get the CSS.
-- **Framework-level data serialization**: only suspense seeds cross the boundary
-  automatically; loader-style data APIs are app code today.
+- **General application-data serialization**: Suspense/signal seeds and supported
+  independent-island captures cross through their defined protocols. Arbitrary
+  route/request state is not automatically serialized.
 - **Error digests**: `onError` and the shell callbacks exist, but there are no
   React-style error digests. Recoverable Suspense errors retain their fallback
   and mark that boundary for client rendering; a fatal post-shell error ends the
