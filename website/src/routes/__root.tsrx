@@ -14,6 +14,7 @@ const BASE_STYLES = `
 	--accent: #ff415a;
 	--accent-hover: #ff5d72;
 	--accent-text: #ff5d72;
+	--accent-fill-hover: #ff5d72;
 	--on-accent: #16181d;
 	--border: rgba(255, 255, 255, 0.1);
 	--border-strong: rgba(255, 255, 255, 0.22);
@@ -52,7 +53,8 @@ const BASE_STYLES = `
 	--accent: #ff415a;
 	--accent-hover: #c81e37;
 	--accent-text: #d81f38;
-	--on-accent: #ffffff;
+	--accent-fill-hover: #ff5d72;
+	--on-accent: #16181d;
 	--border: rgba(0, 0, 0, 0.12);
 	--border-strong: rgba(0, 0, 0, 0.22);
 	--surface-subtle: rgba(0, 0, 0, 0.025);

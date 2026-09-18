@@ -22,7 +22,7 @@ export function Sponsor() @{
 			}
 			.sponsor-kicker {
 				margin: 0 0 0.65rem;
-				color: var(--accent);
+				color: var(--accent-text);
 				font-size: 0.8rem;
 				font-weight: 700;
 				letter-spacing: 0.12em;
