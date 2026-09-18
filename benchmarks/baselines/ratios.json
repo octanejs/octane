@@ -26,6 +26,54 @@
   {
     "suite": "bundle-reachability",
     "op": "raw",
+    "target": "behavior-root-vite",
+    "reference": "behavior-root-vite-budget",
+    "maxRatio": 1,
+    "note": "Behavior-only adoption, external ownership, native interaction, and disposal without a renderer or compiler; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "behavior-root-vite",
+    "reference": "behavior-root-vite-budget",
+    "maxRatio": 1,
+    "note": "Behavior-only adoption, external ownership, native interaction, and disposal without a renderer or compiler; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "behavior-root-vite",
+    "reference": "behavior-root-vite-budget",
+    "maxRatio": 1,
+    "note": "Behavior-only adoption, external ownership, native interaction, and disposal without a renderer or compiler; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "behavior-root-esbuild",
+    "reference": "behavior-root-esbuild-budget",
+    "maxRatio": 1,
+    "note": "Behavior-only adoption, external ownership, native interaction, and disposal without a renderer or compiler; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "behavior-root-esbuild",
+    "reference": "behavior-root-esbuild-budget",
+    "maxRatio": 1,
+    "note": "Behavior-only adoption, external ownership, native interaction, and disposal without a renderer or compiler; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "behavior-root-esbuild",
+    "reference": "behavior-root-esbuild-budget",
+    "maxRatio": 1,
+    "note": "Behavior-only adoption, external ownership, native interaction, and disposal without a renderer or compiler; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
     "target": "cli-spa-starter",
     "reference": "cli-spa-starter-budget",
     "maxRatio": 1,

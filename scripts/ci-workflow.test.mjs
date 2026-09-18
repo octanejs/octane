@@ -159,6 +159,13 @@ describe('CI workflow aggregation', () => {
 		assert.doesNotMatch(shard, /input-otp\/tests\/browser\/\*\*\/\*\.spec\.ts/);
 	});
 
+	test('gates the renderer-free behavior bundle once per full CI run', () => {
+		assert.match(
+			jobSource('test_shard'),
+			/- name: Verify renderer-free behavior bundle\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs behavior-root/,
+		);
+	});
+
 	test('runs and reports tests only on Node 24 while retaining the Node 22 engine baseline', () => {
 		const shard = jobSource('test_shard');
 		assert.match(shard, /name: test shard \(Node 24, \$\{\{ matrix\.shard \}\}\)/);

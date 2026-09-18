@@ -366,10 +366,11 @@ comparison. Ceilings retain at least 32 bytes of headroom and are rounded to
 application or runtime growth. Refresh a ceiling only with a reviewed explanation
 and a production measurement using the pinned CI Node version.
 
-`bundle-reachability` builds twenty-one independent public-entry feature fixtures
-across twenty-eight production builds with the production Octane compiler,
+`bundle-reachability` builds twenty-two independent public-entry feature fixtures
+across thirty production builds with the production Octane compiler,
 disabled HMR/profiling, and normalized esbuild minification. The seven package
-side-effect fixtures each run through both Vite and esbuild. Each measured IIFE
+side-effect fixtures and the behavior-only fixture each run through both Vite
+and esbuild. Each measured IIFE
 executes unchanged in an isolated jsdom realm; its visible DOM, interaction,
 hydration, Suspense, server rendering, store, and cleanup behavior must match its
 feature oracle. Client graphs reject server modules, while server graphs reject
@@ -380,7 +381,10 @@ client runtime, while the hook binding must retain the real vanilla store.
 The isolated server-hook entry also rejects unrelated DOM namespace tables, and
 the component-owned-effects entry verifies that unused sibling styles, delegated
 events, and ViewTransition initialization disappear while retained styles and
-click handlers remain live.
+click handlers remain live. The `octane/behavior` fixture adopts existing DOM,
+registers an externally owned range, handles a native click, and disposes its
+owners and handlers while preserving the original nodes. Both production builds
+reject renderer, compiler, and server modules.
 
 The generated SPA scenario loads the actual CLI entry and complete landing-page
 templates without maintaining duplicate fixture sources; its compiled bundle
@@ -396,9 +400,14 @@ real and must not be disguised as the specialized entry.
 ceilings for every feature. Budgets leave about 3% deterministic headroom, with
 small byte-aligned allowances for tiny isolated entries. Each scenario publishes
 its committed ceiling as a
-same-run `*-budget` reference target, so eighty-four `maxRatio: 1` entries in
+same-run `*-budget` reference target, so ninety `maxRatio: 1` entries in
 `baselines/ratios.json` enforce all three metrics in the existing weekly/manual
-Bench CI workflow. Run the complete executable and byte guard directly with:
+Bench CI workflow. The behavior fixture runner also enforces its ceilings directly.
+Full PR and main CI run both behavior builds once in test shard 1/4, so changes
+that grow this renderer-free closure fail before merge. Run that focused gate
+with `node benchmarks/bundle-size/run-minimal.mjs behavior-root`; an unknown or
+empty scenario name fails instead of skipping the builds. Run the complete
+executable and byte guard directly with:
 
 ```bash
 node benchmarks/bench.mjs --quick --ratios bundle-reachability
