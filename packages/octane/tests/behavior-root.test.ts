@@ -381,11 +381,18 @@ describe('behavior-only roots', () => {
 		it(`preserves native renderer event policy for explicitly unbound lowercase props (${dev ? 'dev' : 'prod'})`, () => {
 			const source = `import { unbound } from 'octane/behavior';
 export function EventHost(props) @{ 'use dom bindings';
- <button class={props.className} onkeydown={unbound(props.lowercaseHandler)} onClick={unbound(props.onClick)}>{unbound(props.children)}</button>
+ <button class={props.className} online={unbound(props.networkState)} onload={unbound(props.inlineText)} onkeydown={unbound(props.lowercaseHandler)} onClick={unbound(props.onClick)}>{unbound(props.children)}</button>
 }`;
 			const onClick = vi.fn();
 			const lowercaseHandler = vi.fn();
-			const props = { className: 'early', onClick, lowercaseHandler, children: 'Action' };
+			const props = {
+				className: 'early',
+				onClick,
+				lowercaseHandler,
+				networkState: 'connected',
+				inlineText: 'throw new Error("inline handler must not run")',
+				children: 'Action',
+			};
 			expect(() =>
 				authoredPresentation(
 					'EventHost',
@@ -396,11 +403,13 @@ export function EventHost(props) @{ 'use dom bindings';
 						'onkeydown={props.lowercaseHandler}',
 					),
 				),
-			).toThrow(/event handlers must be explicitly unbound/);
+			).toThrow(/attribute "onkeydown" is not supported in binding views/);
 			const fixture = authoredPresentation('EventHost', props, dev, source);
 			container.innerHTML = fixture.html;
 			const button = container.querySelector('button')!;
 			const binding = fixture.attach(button, fixture.state);
+			expect(button.hasAttribute('online')).toBe(false);
+			expect(button.hasAttribute('onload')).toBe(false);
 			button.click();
 			expect(onClick).not.toHaveBeenCalled();
 			expect(lowercaseHandler).not.toHaveBeenCalled();
@@ -415,6 +424,8 @@ export function EventHost(props) @{ 'use dom bindings';
 			button.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
 			expect(lowercaseHandler).not.toHaveBeenCalled();
 			expect(button.hasAttribute('onkeydown')).toBe(false);
+			expect(button.hasAttribute('online')).toBe(false);
+			expect(button.hasAttribute('onload')).toBe(false);
 			expect(fixture.cleanup).toHaveBeenCalledOnce();
 			hydratedRoot.unmount();
 			hydratedRoot = undefined;
@@ -3904,8 +3915,8 @@ export function TreeHydration(props) @{
 		container.innerHTML = '<section data-owner="stream"><button>Action</button></section>';
 		const section = container.firstElementChild!;
 		const button = section.firstElementChild!;
-		const cleanup = vi.fn();
 		const root = attach();
+		const cleanup = vi.fn(() => root.dispose());
 		const registration = root.registerBehavior({
 			target: 'button',
 			adopt: () => cleanup,
@@ -6188,19 +6199,8 @@ export function ProtocolParent(props) @{ 'use dom bindings';
 		expect(behavior.signal.aborted).toBe(true);
 	});
 
-	it('runs cleanup once when disposal reenters the root lifecycle', async () => {
-		container.innerHTML = '<button data-action>Action</button>';
-		const root = attach();
-		const cleanup = vi.fn(() => root.dispose());
-		const behavior = root.registerBehavior({ target: '[data-action]', adopt: () => cleanup });
-		await behavior.ready;
-
-		root.dispose();
-		behavior.dispose();
-
-		expect(cleanup).toHaveBeenCalledOnce();
-		expect(container.querySelector('[data-action]')).not.toBeNull();
-		for (const dev of [false, true]) {
+	for (const dev of [false, true]) {
+		it(`preserves native adapters when hydration enters child views (${dev ? 'dev' : 'prod'})`, () => {
 			for (const showLabel of [true, false]) {
 				const onAction = vi.fn();
 				const onReady = vi.fn();
@@ -6261,6 +6261,9 @@ export function EnteredTree(props) @{ 'use dom bindings';
 				expect(onAction).toHaveBeenCalledOnce();
 				expect(entered.cleanup).toHaveBeenCalledOnce();
 			}
+		});
+
+		it(`preserves nested child adapters and range boundaries (${dev ? 'dev' : 'prod'})`, () => {
 			const nestedSource = `function GenericLabel(props) @{
  @if (props.showLabel) { <span>{props.label}</span> }
  @else { <>{props.children}</> }
@@ -6455,7 +6458,9 @@ export function NestedParent(props) @{ 'use dom bindings';
 					}
 				}
 			}
-			const refA = { current: null as HTMLInputElement | null };
+		});
+
+		it(`preserves closed child rest props across placement and ownership changes (${dev ? 'dev' : 'prod'})`, () => {
 			for (const reversed of [false, true]) {
 				for (const imported of [false, true]) {
 					const childSource = `export function ClosedChild({ children, label, active, title: heading = 'Default', ...rest }) @{
@@ -6724,6 +6729,9 @@ export function ClosedParent(props) @{ 'use dom bindings';
 					/generic binding rest annotations cannot combine class attributes and known spreads/,
 				);
 			}
+		});
+
+		it(`preserves native setup callbacks and rejects unsupported projections (${dev ? 'dev' : 'prod'})`, () => {
 			for (const adopt of [false, true]) {
 				const scope = createScope({ scopeKey: `native-setup-${dev}-${adopt}` });
 				const disabled = scope.signal$('disabled', false);
@@ -6911,6 +6919,9 @@ export function Forwarded(props) @{ 'use dom bindings';
 					).toThrow(/Octane DOM bindings/);
 				}
 			}
+		});
+
+		it(`preserves destructured props through getter reentry, abort and recovery (${dev ? 'dev' : 'prod'})`, () => {
 			for (const adopt of [false, true]) {
 				const reads: string[] = [];
 				const events: unknown[] = [];
@@ -7053,6 +7064,9 @@ export function Forwarded(props) @{ 'use dom bindings';
 				expect(events).toEqual([]);
 				recovered.dispose();
 			}
+		});
+
+		it(`preserves child slots, defaults and keyed content (${dev ? 'dev' : 'prod'})`, () => {
 			for (const restChildren of [false, true]) {
 				const slotted = authoredPresentation(
 					'Slotted',
@@ -7148,6 +7162,10 @@ export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
 					),
 				).toThrow(/binding props support only|ordinary props parameter/);
 			}
+		});
+
+		it(`preserves presentation refs through replacement and cleanup failure (${dev ? 'dev' : 'prod'})`, () => {
+			const refA = { current: null as HTMLInputElement | null };
 			const refB = { current: null as HTMLInputElement | null };
 			const order: string[] = [];
 			const callbackA = vi.fn((element: Element | null) => {
@@ -7282,6 +7300,9 @@ export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
 				inlineHandle.dispose();
 			}
 			expect(inlineOrder).toEqual(['attach A', 'detach A', 'attach B', 'detach B']);
+		});
+
+		it(`preserves signal text ownership and replacement (${dev ? 'dev' : 'prod'})`, () => {
 			const scope = createScope({ scopeKey: `presentation-signal-ref-${dev}` });
 			const other = createScope({ scopeKey: `presentation-signal-other-${dev}` });
 			const label = __signalAt('presentation-label', 'initial label');
@@ -7338,6 +7359,9 @@ export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
 				scope.dispose();
 				other.dispose();
 			}
+		});
+
+		it(`preserves keyed signal rows and native edit state (${dev ? 'dev' : 'prod'})`, () => {
 			const rowsOwner = createScope({ scopeKey: `presentation-rows-${dev}` });
 			const foreignOwner = createScope({ scopeKey: `presentation-foreign-${dev}` });
 			const rowLabel = __signalAt('presentation-row-label', 'owned label');
@@ -7413,6 +7437,11 @@ export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
 				rowsOwner.dispose();
 				foreignOwner.dispose();
 			}
+		});
+
+		it(`preserves native controls, style projections and imported capabilities (${dev ? 'dev' : 'prod'})`, async () => {
+			const host = document.createElement('section');
+			container.append(host);
 			const controlScope = createScope({ scopeKey: `authored-controls-${dev}` });
 			const draft = controlScope.signal$('draft', 'server');
 			const checked = controlScope.signal$('checked', false);
@@ -8198,8 +8227,8 @@ export function Invalid(props) @{ 'use dom bindings'; <section style={noticeStyl
 				),
 			).toThrow(/"type" must be static or explicitly unbound/);
 			controlScope.dispose();
-		}
-	});
+		});
+	}
 
 	it('requires explicit root replacement and releases the previous root exactly once', async () => {
 		container.innerHTML = '<button data-action>Action</button>';

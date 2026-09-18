@@ -56,6 +56,31 @@ function emittedHeadKey(code: string | undefined): string | undefined {
 }
 
 describe('bundler-neutral compiler integration', () => {
+	it.each(['online', 'once', 'only', 'onclick', 'onkeydown', 'ONCLICK'])(
+		'diagnoses %s as an unsupported binding attribute, not an event handler',
+		(name) => {
+			for (const dev of [false, true]) {
+				for (const mode of ['client', 'server'] as const) {
+					for (const extension of ['tsx', 'tsrx']) {
+						const source = `export function View(props) ${extension === 'tsrx' ? "@{ 'use dom bindings';" : "{ 'use dom bindings'; return ("}
+ <div ${name}={props.value} />
+${extension === 'tsrx' ? '}' : '); }'}`;
+						const id = `/src/AttributeView.${extension}`;
+						const moduleIds =
+							mode === 'server'
+								? [id]
+								: [id, `${id}?octane-bindings=View`, `${id}?octane-bindings=View&octane-mount=1`];
+						for (const moduleId of moduleIds) {
+							expect(() => compile(source, moduleId, { mode, dev, hmr: false })).toThrow(
+								`attribute ${JSON.stringify(name)} is not supported in binding views`,
+							);
+						}
+					}
+				}
+			}
+		},
+	);
+
 	it.each([
 		'(external as typeof external)(stylex.attrs(styles))',
 		'external!(stylex.attrs(styles))',

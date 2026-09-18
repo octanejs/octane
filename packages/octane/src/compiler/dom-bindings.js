@@ -1066,9 +1066,12 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 				unboundAttributes.add(lower);
 				continue;
 			}
-			// Explicitly unbound handlers remain with the normal renderer.
+			// The program planner recognizes native events from authored onXxx props.
+			// Remaining on* names are attributes, not handlers. Standard hosts exclude
+			// them, so early scalar writers must not introduce inline event attributes.
+			// Explicitly unbound props were stripped above and retain renderer policy.
 			if (lower.startsWith('on'))
-				error(filename, attr, 'event handlers must be explicitly unbound');
+				error(filename, attr, `attribute ${JSON.stringify(raw)} is not supported in binding views`);
 			if (value?.type !== 'Literal' && externalNames.has(lower))
 				error(
 					filename,
