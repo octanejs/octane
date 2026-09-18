@@ -119,8 +119,9 @@ Ordinary member reads inside a conditional branch, after a possible early exit,
 or protected by exception handling track their root receiver instead of reading
 the property during render. For example, `if (item) log(item.name)` tracks `item`
 and `log`, preserving the guard when `item` is absent. This can track a broader
-identity than an unconditional `item.name` read. One-level method calls retain
-their existing null-safe, receiver-aware comparison described below.
+identity than an unconditional `item.name` read. Guarded method calls also track
+the receiver, leaving method getters behind the authored guard. Unguarded
+one-level method calls retain their null-safe, receiver-aware comparison below.
 
 A one-level method call tracks the value that can change between renders. The
 compiled array selects that value on each render, based on where the method

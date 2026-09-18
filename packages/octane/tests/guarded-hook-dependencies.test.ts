@@ -11,6 +11,7 @@ import {
 	GuardedTry,
 	GuardedGetter,
 	GuardedMemo,
+	GuardedMethod,
 } from './_fixtures/guarded-hook-dependencies.tsrx';
 
 describe('guarded inferred dependencies', () => {
@@ -108,6 +109,29 @@ export function Guarded({ item, log }) @{
 			enabled = false;
 			root.update(GuardedGetter, { item, enabled, log });
 			expect(entries).toEqual(['present']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('leaves a guarded method getter unread until its condition allows the call', () => {
+		let enabled = false;
+		const calls: string[] = [];
+		const item = {
+			get run() {
+				if (!enabled) throw new Error('method guard bypassed');
+				return () => calls.push('called');
+			},
+		};
+		const root = mount(GuardedMethod, { item, enabled });
+		try {
+			expect(calls).toEqual([]);
+			enabled = true;
+			root.update(GuardedMethod, { item, enabled });
+			expect(calls).toEqual(['called']);
+			enabled = false;
+			root.update(GuardedMethod, { item, enabled });
+			expect(calls).toEqual(['called']);
 		} finally {
 			root.unmount();
 		}

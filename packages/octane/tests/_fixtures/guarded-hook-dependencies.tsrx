@@ -72,3 +72,10 @@ export function GuardedMemo({ item }) @{
 	const label = useMemo(() => item ? item.name : 'empty');
 	<p>{label as string}</p>
 }
+
+export function GuardedMethod({ item, enabled }) @{
+	useLayoutEffect(() => {
+		if (enabled) item.run();
+	});
+	<p>Ready</p>
+}

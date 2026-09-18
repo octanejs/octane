@@ -1372,7 +1372,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 					callee?.type === 'MemberExpression' || callee?.type === 'ChainExpression'
 						? staticMemberInfo(callee)
 						: null;
-				if (info) addMethodCall(info);
+				if (info && guardedDepth === 0) addMethodCall(info);
 				else walk(node.callee);
 				walk(node.arguments);
 				return;
