@@ -18,6 +18,7 @@ env:
   # Named once: the sharded suite excludes these specs and website_e2e runs
   # them. Splitting the paths means a stale name could silently stop running
   # one, so website_e2e asserts every file exists before it starts.
+  WEBSITE_A11Y_SPEC: website/tests/a11y.e2e.test.ts
   WEBSITE_DOCS_SPEC: website/tests/core-apis-docs.test.ts
   WEBSITE_E2E_SPEC: website/tests/ssr-hydration.e2e.test.ts
   WEBSITE_SSR_SPEC: website/tests/ssr-smoke.test.ts
@@ -438,6 +439,7 @@ jobs:
           pnpm test
           --config vitest.ci-sharded.config.js
           --shard=${{ matrix.shard }}
+          --exclude "$WEBSITE_A11Y_SPEC"
           --exclude "$WEBSITE_E2E_SPEC"
           --exclude "$WEBSITE_SSR_SPEC"
           --exclude "website-mcp/tests/built-handler.e2e.test.ts"
@@ -648,6 +650,7 @@ jobs:
       # fail instead of silently losing its dedicated coverage.
       - name: Verify the excluded specs exist
         run: |
+          test -f "$WEBSITE_A11Y_SPEC"
           test -f "$WEBSITE_DOCS_SPEC"
           test -f "$WEBSITE_SSR_SPEC"
           test -f "$WEBSITE_E2E_SPEC"
@@ -655,6 +658,7 @@ jobs:
       - name: Run the website integration suite
         run: >-
           pnpm vitest run
+          "$WEBSITE_A11Y_SPEC"
           "$WEBSITE_DOCS_SPEC"
           "$WEBSITE_SSR_SPEC"
           "$WEBSITE_E2E_SPEC"

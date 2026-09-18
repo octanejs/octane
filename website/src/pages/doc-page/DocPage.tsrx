@@ -245,6 +245,9 @@ export function DocPage() @{
 				color: var(--text);
 				font-weight: 750;
 			}
+			.prose :global(.doc-callout a) {
+				color: var(--danger-text);
+			}
 			.prose :global(.doc-callout p:last-child) {
 				margin-bottom: 0;
 			}
@@ -278,7 +281,7 @@ export function DocPage() @{
 				font-size: 0.9rem;
 			}
 			.prose :global(.mental-model .mental-model-arrow) {
-				color: var(--accent-text);
+				color: var(--danger-text);
 				font-size: 1.2rem;
 			}
 			.prose :global(.topic-grid) {

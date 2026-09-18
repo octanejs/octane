@@ -24,10 +24,10 @@ const modifiedTsrxGrammar = {
 
 // Dual themes for light/dark mode: shiki emits both token colors as CSS
 // variables (`--shiki-light`/`--shiki-dark`) and the site's CSS picks one per
-// `data-theme` (see BASE_STYLES in __root.tsrx). The dark set stays GitHub's
-// accessible high-contrast token set.
+// `data-theme` (see BASE_STYLES in __root.tsrx). Both sets stay on GitHub's
+// accessible high-contrast token sets.
 export const websiteShikiThemes = {
-	light: 'github-light',
+	light: 'github-light-high-contrast',
 	dark: 'github-dark-high-contrast',
 };
 
