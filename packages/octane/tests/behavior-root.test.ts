@@ -378,6 +378,62 @@ describe('behavior-only roots', () => {
 	});
 
 	for (const dev of [false, true]) {
+		it(`preserves native renderer event policy for explicitly unbound lowercase props (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `import { unbound } from 'octane/behavior';
+export function EventHost(props) @{ 'use dom bindings';
+ <button class={props.className} online={unbound(props.networkState)} onload={unbound(props.inlineText)} onkeydown={unbound(props.lowercaseHandler)} onClick={unbound(props.onClick)}>{unbound(props.children)}</button>
+}`;
+			const onClick = vi.fn();
+			const lowercaseHandler = vi.fn();
+			const props = {
+				className: 'early',
+				onClick,
+				lowercaseHandler,
+				networkState: 'connected',
+				inlineText: 'throw new Error("inline handler must not run")',
+				children: 'Action',
+			};
+			expect(() =>
+				authoredPresentation(
+					'EventHost',
+					props,
+					dev,
+					source.replace(
+						'onkeydown={unbound(props.lowercaseHandler)}',
+						'onkeydown={props.lowercaseHandler}',
+					),
+				),
+			).toThrow(/attribute "onkeydown" is not supported in binding views/);
+			const fixture = authoredPresentation('EventHost', props, dev, source);
+			container.innerHTML = fixture.html;
+			const button = container.querySelector('button')!;
+			const binding = fixture.attach(button, fixture.state);
+			expect(button.hasAttribute('online')).toBe(false);
+			expect(button.hasAttribute('onload')).toBe(false);
+			button.click();
+			expect(onClick).not.toHaveBeenCalled();
+			expect(lowercaseHandler).not.toHaveBeenCalled();
+			hydratedRoot = hydrateRoot(container, fixture.loadClient().EventHost, props, {
+				bindingLeases: [binding],
+			});
+			const event = new MouseEvent('click', { bubbles: true });
+			flushSync(() => button.dispatchEvent(event));
+			expect(container.querySelector('button')).toBe(button);
+			expect(onClick).toHaveBeenCalledOnce();
+			expect(onClick.mock.calls[0][0]).toBe(event);
+			button.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+			expect(lowercaseHandler).not.toHaveBeenCalled();
+			expect(button.hasAttribute('onkeydown')).toBe(false);
+			expect(button.hasAttribute('online')).toBe(false);
+			expect(button.hasAttribute('onload')).toBe(false);
+			expect(fixture.cleanup).toHaveBeenCalledOnce();
+			hydratedRoot.unmount();
+			hydratedRoot = undefined;
+			button.click();
+			expect(onClick).toHaveBeenCalledOnce();
+			expect(lowercaseHandler).not.toHaveBeenCalled();
+		});
+
 		it(`hydrates a native textarea signal value without rendering its handle (${dev ? 'dev' : 'prod'})`, async () => {
 			const scope = createScope({ scopeKey: `native-textarea-${dev}` });
 			const draft = scope.signal$('draft', 'server draft');
@@ -438,6 +494,9 @@ describe('behavior-only roots', () => {
 				const props = {
 					action: '/server-submit',
 					inert: false,
+					layoutMode: 'server-mode',
+					stateLabel: 'server-state',
+					tabIndex: 0,
 					onReady,
 					onKeyDown,
 					draft,
@@ -461,11 +520,15 @@ export function NativeStylexControlPresentation({
 }
 export function NativeStylexControlHost(props: NativeControlHostProps) @{
   'use dom bindings';
-  <form {...stylex.attrs({ $$css: true, layout: props.className })} action={unbound(props.action)} inert={unbound(props.inert)}
+  <form {...stylex.attrs({ $$css: true, layout: props.className })}
+    data-layout-mode={props.layoutMode} aria-label={props.stateLabel} tabIndex={props.tabIndex}
+    action={unbound(props.action)} inert={unbound(props.inert)}
     ref={unbound(props.onReady)} onKeyDown={unbound(props.onKeyDown)}>{unbound(props.children)}</form>
 }
 export function NativeStylexControlLayout(props: NativeControlPresentationProps & NativeControlHostProps & { styles: stylex.CompiledStyles }) @{
-  <NativeStylexControlHost className={props.className} action={props.action} inert={props.inert}
+  <NativeStylexControlHost className={props.className}
+    layoutMode={props.layoutMode} stateLabel={props.stateLabel} tabIndex={props.tabIndex}
+    action={props.action} inert={props.inert}
     onReady={props.onReady} onKeyDown={props.onKeyDown}>
     <NativeStylexControlPresentation draft={props.draft} readOnly={props.readOnly}
       disabled={props.disabled} required={props.required} placeholder={props.placeholder} styles={props.styles} />
@@ -491,6 +554,9 @@ export function NativeStylexControlLayout(props: NativeControlPresentationProps 
 								styled ? 'NativeStylexControlHost' : 'NativeControlHost',
 								{
 									className: 'compact',
+									layoutMode: 'early-mode',
+									stateLabel: 'early-state',
+									tabIndex: -1,
 									action: '/ignored-early',
 									inert: true,
 									onReady: earlyReady,
@@ -517,8 +583,18 @@ export function NativeStylexControlLayout(props: NativeControlPresentationProps 
 				try {
 					if (layout) {
 						layoutBinding = layout.attach(form!, layout.state);
-						layout.publish({ className: 'expanded has-status' });
+						layout.publish({
+							className: 'expanded has-status',
+							layoutMode: 'expanded-mode',
+							stateLabel: 'expanded-state',
+							tabIndex: -1,
+						});
 						expect(form!.className).toBe('expanded has-status');
+						expect([
+							form!.getAttribute('data-layout-mode'),
+							form!.getAttribute('aria-label'),
+							form!.tabIndex,
+						]).toEqual(['expanded-mode', 'expanded-state', -1]);
 						expect(form!.querySelector('textarea')).toBe(textarea);
 						expect(form!.querySelector('p')).toBe(description);
 						expect(form!.getAttribute('action')).toBe('/server-submit');
@@ -561,7 +637,14 @@ export function NativeStylexControlLayout(props: NativeControlPresentationProps 
 						container,
 						client[layout ? layoutView : view],
 						layout
-							? { ...props, className: 'expanded has-status', action: '/accepted-submit' }
+							? {
+									...props,
+									className: 'expanded has-status',
+									layoutMode: 'accepted-mode',
+									stateLabel: null,
+									tabIndex: 0,
+									action: '/accepted-submit',
+								}
 							: props,
 						options,
 					);
@@ -570,6 +653,11 @@ export function NativeStylexControlLayout(props: NativeControlPresentationProps 
 						expect(container.querySelector('form')).toBe(form);
 						expect(form!.querySelector('p')).toBe(description);
 						expect(form!.className).toBe('expanded has-status');
+						expect([
+							form!.getAttribute('data-layout-mode'),
+							form!.getAttribute('aria-label'),
+							form!.tabIndex,
+						]).toEqual(['accepted-mode', null, 0]);
 						expect(layout.cleanup).toHaveBeenCalledOnce();
 						expect(form!.getAttribute('action')).toBe('/accepted-submit');
 						expect(form!.hasAttribute('inert')).toBe(false);
@@ -579,9 +667,19 @@ export function NativeStylexControlLayout(props: NativeControlPresentationProps 
 						expect(onKeyDown.mock.calls[0][0]).toBeInstanceOf(KeyboardEvent);
 						expect(earlyReady).not.toHaveBeenCalled();
 						expect(earlyKeyDown).not.toHaveBeenCalled();
-						layout.publish({ className: 'stale early layout' });
+						layout.publish({
+							className: 'stale early layout',
+							layoutMode: 'stale-mode',
+							stateLabel: 'stale-state',
+							tabIndex: -1,
+						});
 						layoutBinding!.refresh();
 						expect(form!.className).toBe('expanded has-status');
+						expect([
+							form!.getAttribute('data-layout-mode'),
+							form!.getAttribute('aria-label'),
+							form!.tabIndex,
+						]).toEqual(['accepted-mode', null, 0]);
 					}
 					expect(container.querySelector('textarea')).toBe(textarea);
 					expect(document.activeElement).toBe(textarea);
@@ -635,11 +733,20 @@ export function NativeStylexControlLayout(props: NativeControlPresentationProps 
 							hydratedRoot!.render(client[layoutView], {
 								...props,
 								className: 'renderer compact',
+								layoutMode: null,
+								stateLabel: 'renderer-state',
+								tabIndex: undefined,
 								action: '/renderer-submit',
 							}),
 						);
 						expect(container.querySelector('form')).toBe(form);
 						expect(form!.className).toBe('renderer compact');
+						expect([
+							form!.getAttribute('data-layout-mode'),
+							form!.getAttribute('aria-label'),
+							form!.tabIndex,
+						]).toEqual([null, 'renderer-state', -1]);
+						expect(form!.hasAttribute('tabindex')).toBe(false);
 						expect(form!.getAttribute('action')).toBe('/renderer-submit');
 						form!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 						expect(onKeyDown).toHaveBeenCalledTimes(2);
@@ -650,6 +757,21 @@ export function NativeStylexControlLayout(props: NativeControlPresentationProps 
 						layout.publish({ className: 'stale again' });
 						layoutBinding!.refresh();
 						expect(form!.className).toBe('renderer compact');
+						expect([
+							form!.getAttribute('data-layout-mode'),
+							form!.getAttribute('aria-label'),
+							form!.tabIndex,
+						]).toEqual([null, 'renderer-state', -1]);
+						expect(form!.hasAttribute('tabindex')).toBe(false);
+					}
+					hydratedRoot.unmount();
+					hydratedRoot = undefined;
+					expect(fixture.cleanup).toHaveBeenCalledOnce();
+					if (layout) {
+						expect(layout.cleanup).toHaveBeenCalledOnce();
+						expect(onReady).toHaveBeenCalledTimes(2);
+						expect(onReady).toHaveBeenLastCalledWith(null);
+						expect(earlyReady).not.toHaveBeenCalled();
 					}
 				} finally {
 					hydratedRoot?.unmount();
@@ -3793,8 +3915,8 @@ export function TreeHydration(props) @{
 		container.innerHTML = '<section data-owner="stream"><button>Action</button></section>';
 		const section = container.firstElementChild!;
 		const button = section.firstElementChild!;
-		const cleanup = vi.fn();
 		const root = attach();
+		const cleanup = vi.fn(() => root.dispose());
 		const registration = root.registerBehavior({
 			target: 'button',
 			adopt: () => cleanup,
@@ -5070,6 +5192,39 @@ export function TreeHydration(props) @{
 			layoutScope.dispose();
 		}
 
+		for (const dev of [false, true]) {
+			for (const field of ['data-octane-hydrate-id', 'data-octane-native-signals']) {
+				const protocol = authoredPresentation(
+					'ProtocolParent',
+					{ className: 'early', marker: 'owned elsewhere' },
+					dev,
+					`import { unbound } from 'octane/behavior';
+export function ProtocolParent(props) @{ 'use dom bindings';
+ <form class={props.className} ${field}={props.marker}>{unbound(props.children)}</form>
+}`,
+				);
+				range.innerHTML = protocol.html;
+				const host = range.firstElementChild!;
+				const binding = protocol.attach(host, protocol.state);
+				try {
+					const markup = range.innerHTML;
+					expect(() =>
+						hydrateRoot(range, protocol.loadClient().ProtocolParent, protocol.state.getSnapshot(), {
+							bindingLeases: [binding],
+						}),
+					).toThrow(/active fixed native views|Minified Octane error #77;/);
+					expect(range.innerHTML).toBe(markup);
+					expect(range.firstElementChild).toBe(host);
+					expect(protocol.cleanup).not.toHaveBeenCalled();
+					protocol.publish({ className: 'still early' });
+					expect(host.className).toBe('still early');
+				} finally {
+					binding.dispose();
+				}
+				expect(protocol.cleanup).toHaveBeenCalledOnce();
+			}
+		}
+
 		for (const failureKind of ['duplicate', 'projection']) {
 			const items: AttachmentPresentationProps['items'] = [
 				{ id: 'a', name: 'First', preview: null, state: 'ready', error: '' },
@@ -5684,12 +5839,61 @@ export function TreeHydration(props) @{
 		container.append(mountHost);
 		const mounted = fresh.mount({ parent: mountHost }, fresh.state);
 		expect(mountHost.querySelector('figure')!.getAttribute('data-file')).toBe('accepted');
-		expect(mountHost.querySelector('input')!.value).toBe('Accepted snapshot');
+		const mountedInput = mountHost.querySelector('input')!;
+		expect(mountedInput.value).toBe('Accepted snapshot');
+		expect(mountedInput.defaultValue).toBe('Accepted snapshot');
 		expect(mountHost.textContent).not.toContain('Discarded snapshot');
+		expect(mountedRefs).toHaveBeenCalledOnce();
+		mountedInput.value = 'User edit';
+		fresh.publish({ items: [{ ...acceptedItem, name: 'Later snapshot' }] });
+		expect(mountHost.querySelector('input')).toBe(mountedInput);
+		expect(mountedInput.value).toBe('User edit');
+		expect(mountedInput.defaultValue).toBe('Accepted snapshot');
+		expect(mountHost.querySelector('figcaption')!.textContent).toBe('Later snapshot');
 		expect(mountedRefs).toHaveBeenCalledOnce();
 		mounted.dispose({ preserveDOM: false });
 		expect(mountedRefs.mock.results[0]!.value).toHaveBeenCalledOnce();
 		expect(fresh.cleanup).toHaveBeenCalledOnce();
+		expect(mountHost.childNodes).toHaveLength(0);
+
+		// Older mount entries supply the full capability as an override rather
+		// than selected descriptor fields. Keep their native initialization live.
+		const legacy = authoredPresentation<AttachmentPresentationProps>(
+			'AttachmentPresentation',
+			{ items: [acceptedItem], locked: false, onRemove() {}, onRetry() {} },
+			false,
+			presentationSource,
+			{
+				'octane/dom-binding-program': {
+					...DomBindingPrograms,
+					__mountLeanBindingProgram(
+						target: DomBindingPrograms.BindingMountTarget,
+						descriptor: DomBindingPrograms.CompiledBindingProgram<AttachmentPresentationProps>,
+						source: DomBindings.BindingSource<AttachmentPresentationProps>,
+						options?: DomBindings.BindingOptions,
+					) {
+						return DomBindingPrograms.__mountBindingProgram(
+							target,
+							{ ...descriptor, initialOperations: undefined, hostOperations: undefined },
+							source,
+							options,
+						);
+					},
+				},
+			},
+		);
+		const legacyMount = legacy.mount({ parent: mountHost }, legacy.state);
+		const legacyInput = mountHost.querySelector('input')!;
+		expect(legacyInput.value).toBe('Accepted snapshot');
+		expect(legacyInput.defaultValue).toBe('Accepted snapshot');
+		legacyInput.value = 'Legacy user edit';
+		legacy.publish({ items: [{ ...acceptedItem, name: 'Later legacy snapshot' }] });
+		expect(mountHost.querySelector('input')).toBe(legacyInput);
+		expect(legacyInput.value).toBe('Legacy user edit');
+		expect(legacyInput.defaultValue).toBe('Accepted snapshot');
+		expect(mountHost.querySelector('figcaption')!.textContent).toBe('Later legacy snapshot');
+		legacyMount.dispose({ preserveDOM: false });
+		expect(legacy.cleanup).toHaveBeenCalledOnce();
 		expect(mountHost.childNodes).toHaveLength(0);
 	});
 
@@ -6007,7 +6211,10 @@ export function TreeHydration(props) @{
 
 		expect(cleanup).toHaveBeenCalledOnce();
 		expect(container.querySelector('[data-action]')).not.toBeNull();
-		for (const dev of [false, true]) {
+	});
+
+	for (const dev of [false, true]) {
+		it(`preserves native adapters when hydration enters child views (${dev ? 'dev' : 'prod'})`, () => {
 			for (const showLabel of [true, false]) {
 				const onAction = vi.fn();
 				const onReady = vi.fn();
@@ -6068,6 +6275,9 @@ export function EnteredTree(props) @{ 'use dom bindings';
 				expect(onAction).toHaveBeenCalledOnce();
 				expect(entered.cleanup).toHaveBeenCalledOnce();
 			}
+		});
+
+		it(`preserves nested child adapters and range boundaries (${dev ? 'dev' : 'prod'})`, () => {
 			const nestedSource = `function GenericLabel(props) @{
  @if (props.showLabel) { <span>{props.label}</span> }
  @else { <>{props.children}</> }
@@ -6262,7 +6472,9 @@ export function NestedParent(props) @{ 'use dom bindings';
 					}
 				}
 			}
-			const refA = { current: null as HTMLInputElement | null };
+		});
+
+		it(`preserves closed child rest props across placement and ownership changes (${dev ? 'dev' : 'prod'})`, () => {
 			for (const reversed of [false, true]) {
 				for (const imported of [false, true]) {
 					const childSource = `export function ClosedChild({ children, label, active, title: heading = 'Default', ...rest }) @{
@@ -6531,6 +6743,9 @@ export function ClosedParent(props) @{ 'use dom bindings';
 					/generic binding rest annotations cannot combine class attributes and known spreads/,
 				);
 			}
+		});
+
+		it(`preserves native setup callbacks and rejects unsupported projections (${dev ? 'dev' : 'prod'})`, () => {
 			for (const adopt of [false, true]) {
 				const scope = createScope({ scopeKey: `native-setup-${dev}-${adopt}` });
 				const disabled = scope.signal$('disabled', false);
@@ -6718,6 +6933,9 @@ export function Forwarded(props) @{ 'use dom bindings';
 					).toThrow(/Octane DOM bindings/);
 				}
 			}
+		});
+
+		it(`preserves destructured props through getter reentry, abort and recovery (${dev ? 'dev' : 'prod'})`, () => {
 			for (const adopt of [false, true]) {
 				const reads: string[] = [];
 				const events: unknown[] = [];
@@ -6860,6 +7078,9 @@ export function Forwarded(props) @{ 'use dom bindings';
 				expect(events).toEqual([]);
 				recovered.dispose();
 			}
+		});
+
+		it(`preserves child slots, defaults and keyed content (${dev ? 'dev' : 'prod'})`, () => {
 			for (const restChildren of [false, true]) {
 				const slotted = authoredPresentation(
 					'Slotted',
@@ -6955,6 +7176,10 @@ export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
 					),
 				).toThrow(/binding props support only|ordinary props parameter/);
 			}
+		});
+
+		it(`preserves presentation refs through replacement and cleanup failure (${dev ? 'dev' : 'prod'})`, () => {
+			const refA = { current: null as HTMLInputElement | null };
 			const refB = { current: null as HTMLInputElement | null };
 			const order: string[] = [];
 			const callbackA = vi.fn((element: Element | null) => {
@@ -7089,6 +7314,9 @@ export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
 				inlineHandle.dispose();
 			}
 			expect(inlineOrder).toEqual(['attach A', 'detach A', 'attach B', 'detach B']);
+		});
+
+		it(`preserves signal text ownership and replacement (${dev ? 'dev' : 'prod'})`, () => {
 			const scope = createScope({ scopeKey: `presentation-signal-ref-${dev}` });
 			const other = createScope({ scopeKey: `presentation-signal-other-${dev}` });
 			const label = __signalAt('presentation-label', 'initial label');
@@ -7145,6 +7373,9 @@ export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
 				scope.dispose();
 				other.dispose();
 			}
+		});
+
+		it(`preserves keyed signal rows and native edit state (${dev ? 'dev' : 'prod'})`, () => {
 			const rowsOwner = createScope({ scopeKey: `presentation-rows-${dev}` });
 			const foreignOwner = createScope({ scopeKey: `presentation-foreign-${dev}` });
 			const rowLabel = __signalAt('presentation-row-label', 'owned label');
@@ -7220,6 +7451,11 @@ export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
 				rowsOwner.dispose();
 				foreignOwner.dispose();
 			}
+		});
+
+		it(`preserves native controls, style projections and imported capabilities (${dev ? 'dev' : 'prod'})`, async () => {
+			const host = document.createElement('section');
+			container.append(host);
 			const controlScope = createScope({ scopeKey: `authored-controls-${dev}` });
 			const draft = controlScope.signal$('draft', 'server');
 			const checked = controlScope.signal$('checked', false);
@@ -8005,8 +8241,8 @@ export function Invalid(props) @{ 'use dom bindings'; <section style={noticeStyl
 				),
 			).toThrow(/"type" must be static or explicitly unbound/);
 			controlScope.dispose();
-		}
-	});
+		});
+	}
 
 	it('requires explicit root replacement and releases the previous root exactly once', async () => {
 		container.innerHTML = '<button data-action>Action</button>';

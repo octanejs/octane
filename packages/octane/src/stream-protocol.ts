@@ -64,6 +64,55 @@ export function rendererRangeClose(open: Node | null): Comment | null {
 	return null;
 }
 
+/** Existing physical list boundary and marker values for an owned SSR host. */
+export interface HydrationListRange {
+	readonly start: Comment;
+	readonly end: Comment;
+	readonly emptyMarker: string;
+	readonly itemsMarker: string;
+}
+
+/** Resolve a leading list without searching later content or granting ownership. */
+export function getLeadingHydrationListRange(host: Element): HydrationListRange | null {
+	let start = host.firstChild;
+	let enclosingEnd: Comment | null = null;
+	while (start !== null && start.nodeType === 8) {
+		const data = (start as Comment).data;
+		const list =
+			data === '[f0' ||
+			data === '[f1' ||
+			((data.startsWith('[f0;b;') || data.startsWith('[f1;b;')) && isBindingOpenComment(data));
+		const wrapperMultiplicity =
+			data === '['
+				? 1
+				: data.charCodeAt(1) >= 49 && data.charCodeAt(1) <= 57
+					? hydrationMarkerMultiplicity(data, true)
+					: 0;
+		if (!list && wrapperMultiplicity === 0) return null;
+		const end = rendererRangeClose(start);
+		// All ranges are direct host children; an inner close must precede its wrapper's close.
+		if (
+			end === null ||
+			(enclosingEnd !== null && (end.compareDocumentPosition(enclosingEnd) & 4) === 0)
+		)
+			return null;
+		if (hydrationMarkerMultiplicity(end.data, false) !== (list ? 1 : wrapperMultiplicity))
+			return null;
+		if (list) {
+			const suffix = data.slice(3);
+			return {
+				start: start as Comment,
+				end,
+				emptyMarker: '[f0' + suffix,
+				itemsMarker: '[f1' + suffix,
+			};
+		}
+		enclosingEnd = end;
+		start = start.nextSibling;
+	}
+	return null;
+}
+
 /** True for the opaque per-render token minted by the server streamer. */
 export function isRendererStreamToken(token: string | null): token is string {
 	return token !== null && /^os[a-zA-Z0-9_-]+-[0-9a-z]+$/.test(token);

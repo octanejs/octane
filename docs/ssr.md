@@ -55,6 +55,22 @@ renderer through [compiled DOM bindings](./deferred-hydration.md#compiled-presen
 This updates declared properties on matching existing SSR nodes; structural
 rendering and application event ownership remain separate.
 
+### Leading list ranges on an owned SSR host
+
+`getLeadingHydrationListRange(host)` from `octane/hydration` returns the first
+list's existing `start` and `end` comments, plus `emptyMarker` and `itemsMarker`
+strings that preserve its binding receipt. It follows only consecutive leading
+plain or counted wrapper ranges, without skipping content or searching later
+lists or descendants. Incomplete, malformed or typed wrapper ownership boundaries
+return `null`.
+
+Use this only on the exact fully parsed host whose SSR range your application
+already owns and has accepted. It discovers a boundary, not an ownership lease
+or a general DOM insertion API. Preserve compiler-authored item receipts and
+use the returned marker values when an owned recovery row changes an empty
+list to items or is cleared before hydration. Hydrate with the corresponding
+accepted rows so the renderer can adopt those same nodes.
+
 ### Run an SSG script directly
 
 When a server or SSG entry runs outside Vite, preload Octane's compiler before
