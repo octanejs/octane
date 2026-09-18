@@ -189,11 +189,16 @@ import { createNativeReadRetry, type NativeReadRetry } from './signals/native-re
 import {
 	activeCandidate,
 	createSignalActionFrame,
+	createSignalTransitionCoordinator,
 	swapActiveSignalCandidate,
 	withoutSignalCandidate,
 } from './signals/transition-state.js';
 import { installNativeSignalActionExtension } from './signals/transition-candidate.js';
 import type { SignalActionFrame } from './signals/transition-action.js';
+import type {
+	NativeTransitionAttempt,
+	SignalTransitionCoordinator,
+} from './signals/transition-coordinator.js';
 import {
 	NativeAdoptionMiss,
 	NATIVE_TRANSITION_CONSUMER,
@@ -202,7 +207,6 @@ import {
 	runNativeBatch,
 	setNativeCandidateResolver,
 	setNativeAdoptionResolver,
-	type NativeTransitionPresentation,
 } from './signals/read-protocol.js';
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
 import {
@@ -2111,301 +2115,46 @@ interface TransitionActionBatch {
 	nativeBoundaries?: Map<TrySlot, TrackedThenable<any>>;
 }
 
-interface NativeTransitionAttempt {
-	blocks: Set<Block>;
-	transactions: Set<RootRenderTransaction>;
-	attempts: TransitionAttempt[];
-	presentations: NativeTransitionPresentation[];
-	suspensions: Map<TrySlot, TrackedThenable<any>>;
-	errorBlock?: Block;
+type NativeTransitionUpdate =
+	TransitionActionBatch['updates'] extends Map<object, infer U> ? U : never;
+
+/** Associate neutral coordinator ports with the renderer's actual object types. */
+interface NativeTransitionTypes {
+	Block: Block;
+	Owner: RootRenderOwner;
+	Transaction: RootRenderTransaction;
+	Attempt: TransitionAttempt;
+	Update: NativeTransitionUpdate;
+	Hook: TransitionHookSlot;
+	Batch: TransitionActionBatch;
+	Boundary: TrySlot;
+	Thenable: TrackedThenable;
+	Suspense: SuspenseException;
+	Capture: OffscreenCapture;
+	RootFrame: RootRenderFrame;
+	MemoSwap: TransitionMemoSwap;
+	Value: NativeTransitionUpdate['slot']['value'];
 }
 
-let NATIVE_TRANSITION_QUEUE: Set<TransitionActionBatch> | null = null;
-let NATIVE_TRANSITION_ATTEMPT: NativeTransitionAttempt | null = null;
+let NATIVE_TRANSITION_DRIVER: SignalTransitionCoordinator<NativeTransitionTypes> | null = null;
+let NATIVE_TRANSITION_ATTEMPT: NativeTransitionAttempt<NativeTransitionTypes> | null = null;
 
 function queueNativeTransition(batch: TransitionActionBatch): void {
-	(NATIVE_TRANSITION_QUEUE ??= new Set()).add(batch);
-	if (!scheduled && !syncFlush) {
-		scheduled = true;
-		queueMicrotask(flush);
-	}
+	NATIVE_TRANSITION_DRIVER!.queue(batch);
 }
 
-/** The graph calls only tagged presentation readers, never subscriber callbacks. */
 function prepareNativeTransitionBlock(block: Block): void {
-	const admission = NATIVE_TRANSITION_ATTEMPT!;
-	if (block.disposed || admission.blocks.has(block)) return;
-	const hidden = SCHEDULED_VISIBILITY_DRIVER?.find(block, false);
-	if (hidden?.nativeTransition !== undefined && hidden.tryBlock !== null) block = hidden.tryBlock;
-	if (admission.blocks.has(block)) return;
-	const owner = block.idState.renderOwner;
-	if (owner === undefined || owner.disposed) return;
-	const retired = owner.transaction?.retired;
-	if (retired !== undefined && retired !== null)
-		for (let current: Block | null = block; current !== null; current = current.parentBlock)
-			if (retired.has(current)) return;
-	admission.blocks.add(block);
-	const root = beginRootRender(owner);
-	admission.transactions.add(owner.transaction!);
-	const mode = block.pendingMode;
-	block.pendingMode = 'transition';
-	const attempt = beginTransitionAttempt(block);
-	if (attempt !== null) admission.attempts.push(attempt);
-	try {
-		invalidateRender(block, block);
-		if (hidden?.nativeTransition !== undefined) {
-			journalObjectOnce(hidden);
-			journalRootProperty(block, 'inactive', block.inactive);
-			SCHEDULED_VISIBILITY_DRIVER!.reveal(hidden, 'transition');
-		} else renderBlock(block);
-	} catch (error) {
-		if (isSuspenseException(error)) {
-			// Independent consumers enter below their boundary's render catch.
-			// Route only to the real boundary to retain its configured timeout.
-			for (let owner: Block | null = block; owner !== null; owner = owner.parentBlock) {
-				const handler = (owner as any).__suspenseHandler;
-				if (handler) {
-					try {
-						handler(error.thenable, block);
-					} catch (suspension) {
-						if (!isSuspenseException(suspension)) throw suspension;
-					}
-					break;
-				}
-			}
-			throw error.thenable;
-		}
-		admission.errorBlock ??= block;
-		throw error;
-	} finally {
-		endTransitionAttempt(attempt);
-		block.pendingMode = mode;
-		endRootRender(root);
-	}
-}
-
-function finishNativeTransition(batch: TransitionActionBatch): void {
-	batch.nativeWake?.();
-	batch.nativeWake = undefined;
-	batch.native = undefined;
-	for (const block of batch.nativeBlocks ?? [])
-		block.idState.renderOwner?.nativeTransitions?.delete(batch);
-	batch.nativeBlocks = undefined;
-	for (const state of batch.nativeBoundaries?.keys() ?? []) {
-		if (state.nativeTransition !== batch) continue;
-		state.nativeTransition = undefined;
-		if (state.transitionTimeoutId !== null) {
-			clearTimeout(state.transitionTimeoutId);
-			state.transitionTimeoutId = null;
-		}
-	}
-	batch.nativeBoundaries = undefined;
-	NATIVE_TRANSITION_QUEUE?.delete(batch);
-	if (NATIVE_TRANSITION_QUEUE?.size === 0) NATIVE_TRANSITION_QUEUE = null;
-	releaseTransitionHookHolder(batch);
+	NATIVE_TRANSITION_DRIVER!.prepare(block);
 }
 
 function retireNativeTransitionBlock(block: Block): void {
-	if (ROOT_RENDER_ROLLBACK) return;
-	for (const batch of block.idState.renderOwner?.nativeTransitions ?? []) {
-		if (!batch.nativeBlocks?.has(block)) continue;
-		// Retiring demand revokes that presentation, not the model write. The
-		// next preparation discovers only the surviving subscriber frontier.
-		queueNativeTransition(batch);
-	}
+	NATIVE_TRANSITION_DRIVER?.retire(block);
 }
 
-function prepareNativeTransitionUpdates(batch: TransitionActionBatch): void {
-	for (const update of batch.updates.values()) {
-		const { block, slot, state, reducer } = update;
-		const owner = block.idState.renderOwner;
-		if (block.disposed || owner === undefined || owner.disposed) continue;
-		const frame = beginRootRender(owner);
-		NATIVE_TRANSITION_ATTEMPT!.transactions.add(owner.transaction!);
-		try {
-			journalObjectOnce(slot);
-			if (state !== undefined) {
-				state.renderTransition = update;
-				state.updates = undefined;
-			} else if (reducer !== undefined) {
-				reducer.renderTransition = update;
-				reducer.renderPhaseActions = undefined;
-			} else slot.value = rebaseTransitionActionUpdate(update);
-			if (slot.pendingActionBatch === batch) {
-				slot.pendingActionBatch = undefined;
-				slot.pendingActionValue = undefined;
-			}
-		} finally {
-			endRootRender(frame);
-		}
-	}
-}
-
-function prepareNativeTransitionHook(batch: TransitionActionBatch, hook: TransitionHookSlot): void {
-	const owner = hook.block.idState.renderOwner;
-	if (hook.block.disposed || owner === undefined || owner.disposed) return;
-	const frame = beginRootRender(owner);
-	NATIVE_TRANSITION_ATTEMPT!.transactions.add(owner.transaction!);
-	try {
-		if (batch.hooksPending && hook.pendingBatches === 1) {
-			journalObjectOnce(hook);
-			hook.isPending = false;
-		}
-	} finally {
-		endRootRender(frame);
-	}
-	prepareNativeTransitionBlock(hook.block);
-}
-
-/** Native candidates share the existing root journals and scheduler commit wave. */
-function flushNativeTransitions(): void {
-	const queue = NATIVE_TRANSITION_QUEUE;
-	if (queue === null) return;
-	NATIVE_TRANSITION_QUEUE = null;
-	for (const batch of queue) {
-		const candidate = batch.native;
-		if (candidate === undefined) continue;
-		batch.nativeWake?.();
-		batch.nativeWake = undefined;
-		try {
-			if (!candidate.validate()) candidate.rebase();
-		} catch {
-			candidate.discard();
-			finishNativeTransition(batch);
-			flushTransitionActionBatch(batch);
-			continue;
-		}
-		if (!candidate.hasWrites()) {
-			candidate.discard();
-			finishNativeTransition(batch);
-			flushTransitionActionBatch(batch);
-			continue;
-		}
-		const admission: NativeTransitionAttempt = {
-			blocks: new Set(),
-			transactions: new Set(),
-			attempts: [],
-			presentations: [],
-			suspensions: new Map(),
-		};
-		NATIVE_TRANSITION_ATTEMPT = admission;
-		let outcome;
-		try {
-			outcome = candidate.prepare([
-				() => prepareNativeTransitionUpdates(batch),
-				...(batch.hook === null ? [] : [() => prepareNativeTransitionHook(batch, batch.hook!)]),
-				...(batch.hooks ?? []).map((hook) => () => prepareNativeTransitionHook(batch, hook)),
-				...[...batch.updates.values()].map(
-					(update) => () => prepareNativeTransitionBlock(update.block),
-				),
-				...candidate
-					.consumers()
-					.filter((consumer) => consumer.active())
-					.map((consumer) => () => {
-						const presentation = consumer.prepare();
-						if (presentation !== undefined) admission.presentations.push(presentation);
-					}),
-			]);
-		} finally {
-			NATIVE_TRANSITION_ATTEMPT = null;
-		}
-		for (const block of batch.nativeBlocks ?? [])
-			block.idState.renderOwner?.nativeTransitions?.delete(batch);
-		batch.nativeBlocks = admission.blocks;
-		for (const transaction of admission.transactions)
-			(transaction.owner.nativeTransitions ??= new Set()).add(batch);
-		const valid =
-			outcome.status === 'ready' &&
-			admission.presentations.every((presentation) => presentation.validate()) &&
-			[...admission.transactions].every(
-				(transaction) =>
-					!transaction.aborted &&
-					!transaction.owner.disposed &&
-					currentPresentations(transaction.capture) &&
-					(NATIVE_READ_DRIVER === null || NATIVE_READ_DRIVER.validateCapture(transaction.capture)),
-			);
-		if (
-			valid &&
-			outcome.status === 'ready' &&
-			outcome.receipt.publish(() => {
-				// All accepted subscriptions transfer before a public subscriber runs.
-				for (const transaction of admission.transactions) {
-					transaction.nativeAdmitted = true;
-					acceptNativeCapture(transaction.capture, transaction.owner, true);
-				}
-				batch.flushed = true;
-				batch.updates.clear();
-				finishNativeTransition(batch);
-				for (const presentation of admission.presentations) presentation.commit();
-				commitRootRenders();
-			})
-		) {
-			continue;
-		}
-		for (const transaction of admission.transactions) rollbackRootRender(transaction);
-		for (const presentation of admission.presentations) presentation.discard();
-		for (let i = admission.attempts.length - 1; i >= 0; i--) {
-			const swaps = admission.attempts[i].memoSwaps;
-			if (swaps !== null)
-				for (let j = swaps.length - 1; j >= 0; j--) applyTransitionMemoSwap(swaps[j], false);
-		}
-		commitRootRenders();
-		if (outcome.status === 'pending') {
-			for (const state of batch.nativeBoundaries?.keys() ?? []) {
-				if (admission.suspensions.has(state)) continue;
-				if (state.nativeTransition === batch) state.nativeTransition = undefined;
-				if (state.transitionTimeoutId !== null) {
-					clearTimeout(state.transitionTimeoutId);
-					state.transitionTimeoutId = null;
-				}
-			}
-			for (const [state, thenable] of admission.suspensions) {
-				state.nativeTransition = batch;
-				if (
-					state.hasResolved &&
-					state.branch === 1 &&
-					state.pendingBody !== null &&
-					TRANSITION_FALLBACK_TIMEOUT_MS !== Infinity &&
-					TRANSITION_FALLBACK_TIMEOUT_MS >= 0 &&
-					(state.transitionTimeoutId === null || batch.nativeBoundaries?.get(state) !== thenable)
-				) {
-					if (state.transitionTimeoutId !== null) clearTimeout(state.transitionTimeoutId);
-					state.transitionTimeoutId = setTimeout(() => {
-						state.transitionTimeoutId = null;
-						if (
-							state.nativeTransition === batch &&
-							!state.parentBlock.disposed &&
-							state.branch === 1
-						)
-							SCHEDULED_VISIBILITY_DRIVER!.hidePending(state);
-					}, TRANSITION_FALLBACK_TIMEOUT_MS);
-				}
-			}
-			batch.nativeBoundaries = admission.suspensions;
-			batch.nativeWake = candidate.watchPreparation(outcome, () => queueNativeTransition(batch));
-		} else if (
-			outcome.status === 'ready' ||
-			(outcome.status === 'invalid' && outcome.reason === 'stale')
-		) {
-			queueNativeTransition(batch);
-		} else {
-			candidate.discard();
-			finishNativeTransition(batch);
-			for (const update of batch.updates.values()) {
-				if (update.slot.pendingActionBatch === batch) {
-					update.slot.pendingActionBatch = undefined;
-					update.slot.pendingActionValue = undefined;
-				}
-			}
-			batch.updates.clear();
-			batch.flushed = true;
-			if (outcome.status === 'error') {
-				if (admission.errorBlock !== undefined && !admission.errorBlock.disposed)
-					handleResumeError(admission.errorBlock, outcome.error);
-				else reportTransitionError(outcome.error, batch.hook ?? undefined);
-			} else if (outcome.status === 'invalid')
-				reportTransitionError(new TypeError(formatClientError(79)), batch.hook ?? undefined);
-		}
+function scheduleNativeTransitionFlush(): void {
+	if (!scheduled && !syncFlush) {
+		scheduled = true;
+		queueMicrotask(flush);
 	}
 }
 
@@ -2436,7 +2185,52 @@ function nativeCandidateForAction(batch: TransitionActionBatch): SignalActionFra
 			candidate = undefined;
 		}
 	}
-	return candidate ?? (batch.native = createSignalActionFrame?.());
+	candidate ??= batch.native = createSignalActionFrame?.();
+	if (candidate !== undefined && NATIVE_TRANSITION_DRIVER === null) {
+		// Signals can first load after this Action awaited. Both capabilities are
+		// live registrations, so initialize only when its first frame is acquired.
+		NATIVE_TRANSITION_DRIVER = createSignalTransitionCoordinator!<NativeTransitionTypes>({
+			get attempt() {
+				return NATIVE_TRANSITION_ATTEMPT;
+			},
+			set attempt(admission) {
+				NATIVE_TRANSITION_ATTEMPT = admission;
+			},
+			get visibility() {
+				return SCHEDULED_VISIBILITY_DRIVER;
+			},
+			get rollback() {
+				return ROOT_RENDER_ROLLBACK;
+			},
+			get fallbackTimeout() {
+				return TRANSITION_FALLBACK_TIMEOUT_MS;
+			},
+			schedule: scheduleNativeTransitionFlush,
+			beginRoot: beginRootRender,
+			endRoot: endRootRender,
+			beginAttempt: beginTransitionAttempt,
+			endAttempt: endTransitionAttempt,
+			invalidate: invalidateRender,
+			render: renderBlock,
+			journal: journalObjectOnce,
+			journalProperty: journalRootProperty,
+			isSuspense: isSuspenseException,
+			releaseHookHolder: releaseTransitionHookHolder,
+			rebaseUpdate: rebaseTransitionActionUpdate,
+			flushBatch: flushTransitionActionBatch,
+			currentPresentations,
+			validateCapture: (capture) =>
+				NATIVE_READ_DRIVER === null || NATIVE_READ_DRIVER.validateCapture(capture),
+			acceptCapture: acceptNativeCapture,
+			commitRoots: commitRootRenders,
+			rollbackRoot: rollbackRootRender,
+			applyMemoSwap: applyTransitionMemoSwap,
+			handleError: handleResumeError,
+			reportError: reportTransitionError,
+			unsupportedError: () => new TypeError(formatClientError(79)),
+		});
+	}
+	return candidate;
 }
 
 /** Setters, not reads, consult the same post-await batch as ordinary hooks. */
@@ -7040,7 +6834,7 @@ function drainQueue(): { err: any } | null {
 		for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide(activity);
 	}
 	commitRootRenders();
-	flushNativeTransitions();
+	NATIVE_TRANSITION_DRIVER?.flush();
 	return pendingError;
 }
 
@@ -9555,7 +9349,7 @@ export function hasPendingWork(): boolean {
 	return (
 		QUEUE.length > 0 ||
 		ROOT_RENDER_TRANSACTIONS.length > 0 ||
-		NATIVE_TRANSITION_QUEUE !== null ||
+		NATIVE_TRANSITION_DRIVER?.hasWork() === true ||
 		effectEventQueue.length > 0 ||
 		effectEventCommitActions.length > 0 ||
 		effectQueues[INSERTION].length > 0 ||

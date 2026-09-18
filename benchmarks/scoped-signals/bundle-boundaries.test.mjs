@@ -197,7 +197,11 @@ test('ordinary entries allow protocol seams but reject both scoped and raw engin
 test('ordinary client roots tree-shake native transitions and require emitted-byte evidence', () => {
 	const ordinary = [source('runtime.ts'), source('signals/read-protocol.ts')];
 	verifyTransitionBoundary(scenario('ordinary-client'), ordinary);
-	for (const name of ['signals/transition-candidate.ts', 'signals/transition-action.ts']) {
+	for (const name of [
+		'signals/transition-candidate.ts',
+		'signals/transition-action.ts',
+		'signals/transition-coordinator.ts',
+	]) {
 		verifyTransitionBoundary(scenario('ordinary-client'), [
 			...ordinary,
 			{ ...source(name), bytesInOutput: 0 },
@@ -291,6 +295,13 @@ export function mount(parent) { const root = createRoot(parent); root.render(Vie
 				input.path.endsWith('/src/signals/transition-candidate.ts') && input.bytesInOutput > 0,
 		),
 		'The compiled native-read control must retain the concrete transition implementation.',
+	);
+	assert.ok(
+		native.inputs.some(
+			(input) =>
+				input.path.endsWith('/src/signals/transition-coordinator.ts') && input.bytesInOutput > 0,
+		),
+		'The compiled signal Action control must retain its transition coordinator.',
 	);
 	const window = new Window();
 	const globals = new Map();
