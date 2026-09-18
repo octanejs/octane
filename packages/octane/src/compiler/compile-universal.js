@@ -926,7 +926,7 @@ export function createLexicalAnalysis(ast) {
 	};
 }
 
-function isIdentifierReference(node, parent, key, lexicalAnalysis) {
+export function isIdentifierReference(node, parent, key, lexicalAnalysis) {
 	const { bindingNodes, nonReferenceNodes } = lexicalAnalysis;
 	if (bindingNodes.has(node) || nonReferenceNodes.has(node)) return false;
 	if (

@@ -69,6 +69,8 @@ import {
 import {
 	compileUniversal,
 	createLexicalAnalysis,
+	forEachRuntimeAstChild,
+	isIdentifierReference,
 	UNIVERSAL_COMPILER_RUNTIME_IMPORTS,
 	UNIVERSAL_THREAD_RUNTIME_IMPORTS,
 } from './compile-universal.js';
@@ -16606,37 +16608,49 @@ function depPathKey(node) {
 // Dep extraction for a memoized creation: one-level member paths for free
 // identifiers used as `obj.prop` or `obj['prop']` (→ `props.id`, so a fresh
 // props OBJECT with unchanged fields doesn't refetch), bare identifiers
-// otherwise. Scope-aware: identifiers bound inside nested functions don't
-// become deps.
+// otherwise. Only outer runtime references become deps; locally declared
+// bindings and erased syntax do not.
 function collectDepPaths(expr) {
 	const deps = [];
 	const seen = new Set();
+	const lexical = createLexicalAnalysis(expr);
+	const isFree = (node, parent, key) =>
+		isIdentifierReference(node, parent, key, lexical) &&
+		!lexical.isBound(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name);
 	const push = (node, key) => {
 		if (seen.has(key)) return;
 		seen.add(key);
 		deps.push(node);
 	};
-	walk(expr, new Set());
+	walk(expr, null, null);
 	return deps;
 
-	function walk(n, bound) {
+	function walk(n, parent, key) {
 		if (!n || typeof n !== 'object') return;
-		if (Array.isArray(n)) {
-			for (const x of n) walk(x, bound);
-			return;
-		}
 		switch (n.type) {
 			case 'MetaProperty':
 				// `import.meta` and `new.target` contain syntax tokens, not free
 				// bindings. Visiting their Identifier children creates invalid deps.
 				return;
 			case 'Identifier':
-				if (!bound.has(n.name)) push(b.id(n.name), n.name);
+				if (isFree(n, parent, key)) push(b.id(n.name), depPathKey(n));
 				return;
+			case 'UnaryExpression': {
+				const argument = unwrapTsExpr(n.argument);
+				if (n.operator === 'typeof' && argument?.type === 'Identifier') {
+					// A guarded global may not exist. Reading its bare identifier as a
+					// dependency defeats typeof's protection; its type is the witness.
+					if (isFree(argument, n, 'argument')) {
+						push(b.unary('typeof', b.id(argument.name)), `typeof:${argument.name}`);
+					}
+					return;
+				}
+				break;
+			}
 			case 'MemberExpression': {
 				const propertyName = staticDepMemberName(n);
 				if (n.object.type === 'Identifier' && propertyName !== null) {
-					if (!bound.has(n.object.name)) {
+					if (isFree(n.object, n, 'object')) {
 						const member = b.member(
 							b.id(n.object.name),
 							n.computed
@@ -16653,30 +16667,10 @@ function collectDepPaths(expr) {
 					}
 					return;
 				}
-				walk(n.object, bound);
-				if (n.computed) walk(n.property, bound);
-				return;
+				break;
 			}
-			case 'FunctionExpression':
-			case 'ArrowFunctionExpression': {
-				const inner = new Set(bound);
-				for (const p of n.params || []) collectPatternNames(p, inner);
-				walk(n.body, inner);
-				return;
-			}
-			case 'Property':
-				if (n.computed) walk(n.key, bound);
-				walk(n.value, bound);
-				return;
-			case 'VariableDeclarator':
-				walk(n.init, bound);
-				return;
-			default:
-				for (const k in n) {
-					if (k === 'loc' || k === 'start' || k === 'end' || k === 'metadata') continue;
-					walk(n[k], bound);
-				}
 		}
+		forEachRuntimeAstChild(n, (child, childKey) => walk(child, n, childKey));
 	}
 }
 
