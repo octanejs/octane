@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-query-pristine",
+  "roots": ["packages/tanstack-query/tests"],
+  "files": ["packages/tanstack-query/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:4dcf68fb8767f157",
+      "file": "packages/tanstack-query/tests/upstream-original.test.ts",
+      "fullName": "runs all 404 pinned Query runtime registrations unchanged"
+    }
+  ],
+  "snapshots": 0
+}

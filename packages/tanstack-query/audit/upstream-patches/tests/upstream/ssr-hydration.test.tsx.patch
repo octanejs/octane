@@ -1,0 +1,257 @@
+diff --git a/tests/upstream/ssr-hydration.test.tsx b/tests/upstream/ssr-hydration.test.tsx
+--- a/tests/upstream/ssr-hydration.test.tsx
++++ b/tests/upstream/ssr-hydration.test.tsx
+@@ -1,7 +1,8 @@
+ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+ import { hydrateRoot } from 'octane'
+ import { act } from 'octane'
+-import * as ReactDOMServer from 'octane/server'
++import { executeHydrationFixture } from '../../../octane/tests/_hydration-ssr'
++import { HydrationApp } from '../_fixtures/upstream-hydration.tsrx'
+ import { queryKey } from '@tanstack/query-test-utils'
+ import {
+   QueryCache,
+@@ -28,10 +29,6 @@ async function fetchData<TData>(value: TData, ms?: number): Promise<TData> {
+   return value
+ }
+ 
+-function PrintStateComponent({ componentName, result }: any): any {
+-  return `${componentName} - status:${result.status} fetching:${result.isFetching} data:${result.data}`
+-}
+-
+ describe('Server side rendering with de/rehydration', () => {
+   let previousIsReactActEnvironment: unknown
+   beforeAll(() => {
+@@ -53,16 +50,6 @@ describe('Server side rendering with de/rehydration', () => {
+     const fetchDataSuccess = vi.fn<typeof fetchData>(fetchData)
+     const key = queryKey()
+ 
+-    // -- Shared part --
+-    function SuccessComponent() {
+-      const result = useQuery({
+-        queryKey: key,
+-        queryFn: () => fetchDataSuccess('success!'),
+-      })
+-      return (
+-        <PrintStateComponent componentName="SuccessComponent" result={result} />
+-      )
+-    }
+ 
+     // -- Server part --
+     setIsServer(true)
+@@ -81,10 +68,13 @@ describe('Server side rendering with de/rehydration', () => {
+       queryCache: renderCache,
+     })
+     hydrate(renderClient, dehydratedStateServer)
+-    const markup = ReactDOMServer.renderToString(
+-      <QueryClientProvider client={renderClient}>
+-        <SuccessComponent />
+-      </QueryClientProvider>,
++    // OCTANE DIVERGENCE[native-query-test-harness]: compile a real server tree before hydrating its client twin.
++    const options = { queryKey: key, queryFn: () => fetchDataSuccess('success!') }
++    const markup = await executeHydrationFixture<string>(
++      'tanstack-query',
++      'packages/tanstack-query/tests/_fixtures/upstream-hydration.tsrx',
++      'renderHydrationState',
++      { client: renderClient, componentName: 'SuccessComponent', options },
+     )
+     const stringifiedState = JSON.stringify(dehydratedStateServer)
+     renderClient.clear()
+@@ -93,21 +83,24 @@ describe('Server side rendering with de/rehydration', () => {
+     const expectedMarkup =
+       'SuccessComponent - status:success fetching:true data:success'
+ 
+-    expect(markup).toBe(expectedMarkup)
++    // OCTANE DIVERGENCE[native-query-test-harness]: renderer-owned hydration markers are not user-visible text.
++    const template = document.createElement('template')
++    template.innerHTML = markup
++    expect(template.content.textContent).toBe(expectedMarkup)
+     expect(fetchDataSuccess).toHaveBeenCalledTimes(1)
+ 
+     // -- Client part --
+     const el = document.createElement('div')
+     el.innerHTML = markup
++    const serverText = Array.from(el.childNodes).find(node => node.nodeType === Node.TEXT_NODE)
++    expect(serverText).toBeDefined()
+ 
+     const queryCache = new QueryCache()
+     const queryClient = new QueryClient({ queryCache })
+     hydrate(queryClient, JSON.parse(stringifiedState))
+ 
+     const unmount = ReactHydrate(
+-      <QueryClientProvider client={queryClient}>
+-        <SuccessComponent />
+-      </QueryClientProvider>,
++      <HydrationApp client={queryClient} componentName="SuccessComponent" options={options} />,
+       el,
+     )
+ 
+@@ -115,8 +108,9 @@ describe('Server side rendering with de/rehydration', () => {
+     expect(consoleMock).toHaveBeenCalledTimes(0)
+ 
+     expect(fetchDataSuccess).toHaveBeenCalledTimes(2)
+-    expect(el.innerHTML).toBe(expectedMarkup)
++    expect(el.textContent).toBe(expectedMarkup)
+ 
++    expect(el.contains(serverText!)).toBe(true)
+     unmount()
+     queryClient.clear()
+     consoleMock.mockRestore()
+@@ -131,17 +125,6 @@ describe('Server side rendering with de/rehydration', () => {
+     })
+     const key = queryKey()
+ 
+-    // -- Shared part --
+-    function ErrorComponent() {
+-      const result = useQuery({
+-        queryKey: key,
+-        queryFn: () => fetchDataError(),
+-        retry: false,
+-      })
+-      return (
+-        <PrintStateComponent componentName="ErrorComponent" result={result} />
+-      )
+-    }
+ 
+     // -- Server part --
+     setIsServer(true)
+@@ -159,10 +142,13 @@ describe('Server side rendering with de/rehydration', () => {
+       queryCache: renderCache,
+     })
+     hydrate(renderClient, dehydratedStateServer)
+-    const markup = ReactDOMServer.renderToString(
+-      <QueryClientProvider client={renderClient}>
+-        <ErrorComponent />
+-      </QueryClientProvider>,
++    // OCTANE DIVERGENCE[native-query-test-harness]: compile a real server tree before hydrating its client twin.
++    const options = { queryKey: key, queryFn: () => fetchDataError(), retry: false }
++    const markup = await executeHydrationFixture<string>(
++      'tanstack-query',
++      'packages/tanstack-query/tests/_fixtures/upstream-hydration.tsrx',
++      'renderHydrationState',
++      { client: renderClient, componentName: 'ErrorComponent', options },
+     )
+     const stringifiedState = JSON.stringify(dehydratedStateServer)
+     renderClient.clear()
+@@ -171,32 +157,36 @@ describe('Server side rendering with de/rehydration', () => {
+     const expectedMarkup =
+       'ErrorComponent - status:pending fetching:true data:undefined'
+ 
+-    expect(markup).toBe(expectedMarkup)
++    // OCTANE DIVERGENCE[native-query-test-harness]: renderer-owned hydration markers are not user-visible text.
++    const template = document.createElement('template')
++    template.innerHTML = markup
++    expect(template.content.textContent).toBe(expectedMarkup)
+ 
+     // -- Client part --
+     const el = document.createElement('div')
+     el.innerHTML = markup
++    const serverText = Array.from(el.childNodes).find(node => node.nodeType === Node.TEXT_NODE)
++    expect(serverText).toBeDefined()
+ 
+     const queryCache = new QueryCache()
+     const queryClient = new QueryClient({ queryCache })
+     hydrate(queryClient, JSON.parse(stringifiedState))
+ 
+     const unmount = ReactHydrate(
+-      <QueryClientProvider client={queryClient}>
+-        <ErrorComponent />
+-      </QueryClientProvider>,
++      <HydrationApp client={queryClient} componentName="ErrorComponent" options={options} />,
+       el,
+     )
+ 
+     expect(consoleMock).toHaveBeenCalledTimes(0)
+     expect(fetchDataError).toHaveBeenCalledTimes(2)
+-    expect(el.innerHTML).toBe(expectedMarkup)
++    expect(el.textContent).toBe(expectedMarkup)
+     await vi.advanceTimersByTimeAsync(50)
+     expect(fetchDataError).toHaveBeenCalledTimes(2)
+-    expect(el.innerHTML).toBe(
++    expect(el.textContent).toBe(
+       'ErrorComponent - status:error fetching:false data:undefined',
+     )
+ 
++    expect(el.contains(serverText!)).toBe(true)
+     unmount()
+     queryClient.clear()
+     consoleMock.mockRestore()
+@@ -209,16 +199,6 @@ describe('Server side rendering with de/rehydration', () => {
+     const fetchDataSuccess = vi.fn<typeof fetchData>(fetchData)
+     const key = queryKey()
+ 
+-    // -- Shared part --
+-    function SuccessComponent() {
+-      const result = useQuery({
+-        queryKey: key,
+-        queryFn: () => fetchDataSuccess('success!'),
+-      })
+-      return (
+-        <PrintStateComponent componentName="SuccessComponent" result={result} />
+-      )
+-    }
+ 
+     // -- Server part --
+     setIsServer(true)
+@@ -227,10 +207,13 @@ describe('Server side rendering with de/rehydration', () => {
+     const dehydratedStateServer = dehydrate(prefetchClient)
+     const renderClient = new QueryClient()
+     hydrate(renderClient, dehydratedStateServer)
+-    const markup = ReactDOMServer.renderToString(
+-      <QueryClientProvider client={renderClient}>
+-        <SuccessComponent />
+-      </QueryClientProvider>,
++    // OCTANE DIVERGENCE[native-query-test-harness]: compile a real server tree before hydrating its client twin.
++    const options = { queryKey: key, queryFn: () => fetchDataSuccess('success!') }
++    const markup = await executeHydrationFixture<string>(
++      'tanstack-query',
++      'packages/tanstack-query/tests/_fixtures/upstream-hydration.tsrx',
++      'renderHydrationState',
++      { client: renderClient, componentName: 'SuccessComponent', options },
+     )
+     const stringifiedState = JSON.stringify(dehydratedStateServer)
+     renderClient.clear()
+@@ -239,33 +222,37 @@ describe('Server side rendering with de/rehydration', () => {
+     const expectedMarkup =
+       'SuccessComponent - status:pending fetching:true data:undefined'
+ 
+-    expect(markup).toBe(expectedMarkup)
++    // OCTANE DIVERGENCE[native-query-test-harness]: renderer-owned hydration markers are not user-visible text.
++    const template = document.createElement('template')
++    template.innerHTML = markup
++    expect(template.content.textContent).toBe(expectedMarkup)
+ 
+     // -- Client part --
+     const el = document.createElement('div')
+     el.innerHTML = markup
++    const serverText = Array.from(el.childNodes).find(node => node.nodeType === Node.TEXT_NODE)
++    expect(serverText).toBeDefined()
+ 
+     const queryCache = new QueryCache()
+     const queryClient = new QueryClient({ queryCache })
+     hydrate(queryClient, JSON.parse(stringifiedState))
+ 
+     const unmount = ReactHydrate(
+-      <QueryClientProvider client={queryClient}>
+-        <SuccessComponent />
+-      </QueryClientProvider>,
++      <HydrationApp client={queryClient} componentName="SuccessComponent" options={options} />,
+       el,
+     )
+ 
+     // Check that we have no React hydration mismatches
+     expect(consoleMock).toHaveBeenCalledTimes(0)
+     expect(fetchDataSuccess).toHaveBeenCalledTimes(1)
+-    expect(el.innerHTML).toBe(expectedMarkup)
++    expect(el.textContent).toBe(expectedMarkup)
+     await vi.advanceTimersByTimeAsync(50)
+     expect(fetchDataSuccess).toHaveBeenCalledTimes(1)
+-    expect(el.innerHTML).toBe(
++    expect(el.textContent).toBe(
+       'SuccessComponent - status:success fetching:false data:success!',
+     )
+ 
++    expect(el.contains(serverText!)).toBe(true)
+     unmount()
+     queryClient.clear()
+     consoleMock.mockRestore()

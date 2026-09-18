@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false,
+    "verbatimModuleSyntax": false,
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "paths": {
+      "@octanejs/tanstack-virtual": ["../../src/index.ts"],
+      "@tanstack/react-virtual": ["../../upstream/src/index.tsx"]
+    },
+    "types": ["node", "react", "react-dom"]
+  },
+  "include": ["./*.test-d.ts", "../../upstream/src/**/*"],
+  "exclude": ["node_modules"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "publicMode": "pinned",
+    "upstreamRegistrations": []
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-table-adapted-ssr",
+  "roots": ["packages/tanstack-table/tests/upstream"],
+  "files": ["packages/tanstack-table/tests/upstream/ssr.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:b6cd7c54b4b62831",
+      "file": "packages/tanstack-table/tests/upstream/ssr.test.tsx",
+      "fullName": "React server rendering flexRender handles function, memo, forwardRef, node, and empty renderables"
+    },
+    {
+      "id": "runtime:764e3ef437d97dd0",
+      "file": "packages/tanstack-table/tests/upstream/ssr.test.tsx",
+      "fullName": "React server rendering renders useTable state and FlexRender output without a DOM"
+    },
+    {
+      "id": "runtime:fb46ac117ec9d307",
+      "file": "packages/tanstack-table/tests/upstream/ssr.test.tsx",
+      "fullName": "React server rendering selects aggregate content and suppresses placeholder cells"
+    }
+  ],
+  "snapshots": 0
+}

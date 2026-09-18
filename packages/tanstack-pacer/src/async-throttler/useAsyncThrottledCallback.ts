@@ -15,10 +15,7 @@ import type { AnyAsyncFunction } from '@tanstack/pacer/types';
 export function useAsyncThrottledCallback<TFn extends AnyAsyncFunction>(
 	fn: TFn,
 	options: ReactAsyncThrottlerOptions<TFn, {}>,
-): (...args: Parameters<TFn>) => Promise<ReturnType<TFn>> {
+): (...args: Parameters<TFn>) => Promise<Awaited<ReturnType<TFn>> | undefined> {
 	const asyncThrottledFn = useAsyncThrottler(fn, options).maybeExecute;
-	return useCallback(
-		(...args) => asyncThrottledFn(...args) as Promise<ReturnType<TFn>>,
-		[asyncThrottledFn],
-	);
+	return useCallback((...args) => asyncThrottledFn(...args), [asyncThrottledFn]);
 }

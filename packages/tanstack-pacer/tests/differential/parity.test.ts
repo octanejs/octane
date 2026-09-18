@@ -161,3 +161,39 @@ describe('differential: @octanejs/tanstack-pacer vs @tanstack/react-pacer', () =
 		differential.unmount();
 	});
 });
+
+describe('async callback return contracts', () => {
+	// @parity-case differential:tanstack-pacer-async-callback-results
+	it('matches executed and disabled async callback results', async () => {
+		const differential = await mountDifferential(fixture, 'AsyncCallbackParity', {}, cache);
+		try {
+			await differential.step('execute async callbacks', async (octane, react) => {
+				for (const root of [octane, react]) {
+					await root.click('#async-debounce');
+					await root.click('#async-limit');
+					await root.click('#async-throttle');
+				}
+				await advanceWait(40);
+				await flushBothRuntimes();
+				expect(octane.find('#async-results').textContent).toBe('limit:6,throttle:8,debounce:4');
+				expect(react.find('#async-results').textContent).toBe('limit:6,throttle:8,debounce:4');
+			});
+			await differential.step('disabled callbacks resolve undefined', async (octane, react) => {
+				for (const root of [octane, react]) await root.click('#async-disable');
+				await flushBothRuntimes();
+				for (const root of [octane, react]) {
+					await root.click('#async-debounce');
+					await root.click('#async-limit');
+					await root.click('#async-throttle');
+				}
+				await flushBothRuntimes();
+				const expected =
+					'limit:6,throttle:8,debounce:4,debounce:undefined,limit:undefined,throttle:undefined';
+				expect(octane.find('#async-results').textContent).toBe(expected);
+				expect(react.find('#async-results').textContent).toBe(expected);
+			});
+		} finally {
+			differential.unmount();
+		}
+	});
+});

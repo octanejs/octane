@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/query-test-utils/src/index.ts",
+      "sha256": "45f7b2a5adcbf5c0d0f0eb8757b01105c35a4c46cd9f9108f71c3ac21af42882"
+    },
+    {
+      "path": "upstream-artifact/query-test-utils/src/sleep.ts",
+      "sha256": "2106c4de2d5c100bfa9a4ed4027290285eb2e2def3f54cf788b3866af788cdb8"
+    },
+    {
+      "path": "upstream-artifact/query-test-utils/src/queryKey.ts",
+      "sha256": "7335c9dbfee8add21364c824c08f5b723c872be0f52cb570aaa70044e4bddffb"
+    },
+    {
+      "path": "upstream-artifact/query-test-utils/src/mockVisibilityState.ts",
+      "sha256": "187a8f90d5e1d09f1a2aee916fe19e26f90632b78d55f1ec2d1e24602d2a5680"
+    },
+    {
+      "path": "upstream-artifact/query-test-utils/package.json",
+      "sha256": "71b5b25ae8f92015891414a12f6564b557391b2aaf37523b441d04d3207339b5"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7"
+    },
+    {
+      "path": "upstream-artifact/tanstack-react-query-5.102.8.tgz",
+      "sha256": "885a94ab724af465ce463c2100669d5229b0a4227c306fe2a9e9e7314fc9a587"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json"],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@tanstack/react-query",
+    "version": "5.102.8",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"]
+}

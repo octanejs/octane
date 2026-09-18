@@ -456,11 +456,21 @@ export function inspectPublicExports(packageDirectory) {
 	return { status: 'passed', package: manifest.name, targets };
 }
 
-export function concretePublicSpecifiers(packageDirectory, packageName) {
+export function concretePublicSpecifiers(
+	packageDirectory,
+	packageName,
+	{ excludePackageMetadata = false } = {},
+) {
 	return [
 		...new Set(
 			inspectPublicExports(packageDirectory)
-				.targets.map(({ concreteSubpath, subpath }) => concreteSubpath ?? subpath)
+				.targets.filter(
+					({ subpath, concreteSubpath, target }) =>
+						!excludePackageMetadata ||
+						(concreteSubpath ?? subpath) !== './package.json' ||
+						target !== './package.json',
+				)
+				.map(({ concreteSubpath, subpath }) => concreteSubpath ?? subpath)
 				.filter((subpath) => subpath && !subpath.includes('*'))
 				.map((subpath) => (subpath === '.' ? packageName : `${packageName}/${subpath.slice(2)}`)),
 		),

@@ -1,0 +1,6 @@
+/tests/upstream/
+/upstream/.octane-materialize.json
+/.upstream-vitest-cache/
+/.browser-results/
+/.browser-dist/
+/tests/_baseline/

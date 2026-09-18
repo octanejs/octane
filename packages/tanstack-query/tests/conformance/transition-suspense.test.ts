@@ -33,6 +33,7 @@ function deferred<T>() {
 }
 
 describe('useSuspenseQuery — transition keeps prior content, no fallback flash (React parity)', () => {
+	// @parity-case conformance:c1e0561f0da086ba
 	it('value=1 committed; transition to value=2 holds value=1 until value=2 resolves', async () => {
 		// Per-value controlled promises. value=1 resolves immediately so the first
 		// query commits content; value=2 stays pending until we resolve it.
@@ -95,6 +96,7 @@ describe('useSuspenseQuery — transition keeps prior content, no fallback flash
 		r.unmount();
 	});
 
+	// @parity-case conformance:6592b3cc7d15f45c
 	it('an urgent key change supersedes a held transition and reveals fallback', async () => {
 		// Unlike a transition update, an explicit urgent key change must interrupt
 		// the held screen. This is also the negative control for transition holds.

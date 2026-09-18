@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-virtual-pristine",
+  "roots": ["packages/tanstack-virtual/tests"],
+  "files": ["packages/tanstack-virtual/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:9c23124f41d14b76",
+      "file": "packages/tanstack-virtual/tests/upstream-original.test.ts",
+      "fullName": "runs all seven pinned Virtual unit registrations unchanged"
+    }
+  ],
+  "snapshots": 0
+}

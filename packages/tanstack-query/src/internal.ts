@@ -43,7 +43,7 @@ export function ensurePreventErrorBoundaryRetry(
 		query?.state.error && typeof options.throwOnError === 'function'
 			? shouldThrowError(options.throwOnError, [query.state.error, query])
 			: options.throwOnError;
-	if (options.suspense || options.experimental_prefetchInRender || throwOnError) {
+	if (options.suspense || throwOnError) {
 		if (!errorResetBoundary.isReset()) {
 			options.retryOnMount = false;
 		}
@@ -52,10 +52,6 @@ export function ensurePreventErrorBoundaryRetry(
 
 export const shouldSuspend = (defaultedOptions: any, result: any): boolean =>
 	defaultedOptions?.suspense && result.isPending;
-
-// A pending result that will actually fetch (not blocked by persistence restore).
-export const willFetch = (result: any, isRestoring: boolean): boolean =>
-	result.isLoading && result.isFetching && !isRestoring;
 
 // react-query's suspense fetch: kick the optimistic fetch and — CRUCIALLY — clear
 // the reset boundary on error. Without the clearReset, a boundary reset→retry

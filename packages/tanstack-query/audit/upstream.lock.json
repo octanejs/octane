@@ -1,0 +1,469 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@tanstack/react-query",
+    "version": "5.102.8",
+    "repository": {
+      "owner": "TanStack",
+      "repo": "query",
+      "subdirectory": "packages/react-query"
+    },
+    "commit": "2969edf32f7e0c48e2a108d84712d6e01edfde21",
+    "integrity": "sha512-TYBea4OuXWD7MhaSHq069TWbFe7rcwWN6kzT7JF0OKi1K6c1gTv2IzD6A6ExJsCMozdkqBWeuIUZmu4KQg0O5A=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "CHANGELOG.md",
+    "README.md",
+    "eslint.config.js",
+    "package.json",
+    "src",
+    "test-setup.ts",
+    "tsconfig.json",
+    "tsconfig.legacy.json",
+    "tsconfig.prod.json",
+    "tsdown.config.ts",
+    "vite.config.ts"
+  ],
+  "adaptedMappings": [
+    {
+      "fromRoot": "src/__tests__",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "'react'",
+      "replace": "'octane'"
+    },
+    {
+      "find": "'@testing-library/react'",
+      "replace": "'@octanejs/testing-library'"
+    },
+    {
+      "find": "'react-dom/client'",
+      "replace": "'octane'"
+    },
+    {
+      "find": "'react-dom/server'",
+      "replace": "'octane/server'"
+    },
+    {
+      "find": "'react-error-boundary'",
+      "replace": "'@octanejs/react-error-boundary'"
+    },
+    {
+      "find": "'../infiniteQueryOptions'",
+      "replace": "'../../src/infiniteQueryOptions'"
+    },
+    {
+      "find": "'../mutationOptions'",
+      "replace": "'../../src/mutationOptions'"
+    },
+    {
+      "find": "'../queryOptions'",
+      "replace": "'../../src/queryOptions'"
+    },
+    {
+      "find": "'../types'",
+      "replace": "'../../src/types'"
+    },
+    {
+      "find": "'../useInfiniteQuery'",
+      "replace": "'../../src/useInfiniteQuery'"
+    },
+    {
+      "find": "'../useMutation'",
+      "replace": "'../../src/useMutation'"
+    },
+    {
+      "find": "'../useMutationState'",
+      "replace": "'../../src/useMutationState'"
+    },
+    {
+      "find": "'../useQueries'",
+      "replace": "'../../src/useQueries'"
+    },
+    {
+      "find": "'../useQuery'",
+      "replace": "'../../src/useQuery'"
+    },
+    {
+      "find": "'../useSuspenseQuery'",
+      "replace": "'../../src/useSuspenseQuery'"
+    },
+    {
+      "find": "'../useSuspenseInfiniteQuery'",
+      "replace": "'../../src/useSuspenseQuery'"
+    },
+    {
+      "find": "'..'",
+      "replace": "'../../src'"
+    },
+    {
+      "find": "React.ReactNode",
+      "replace": "React.OctaneNode"
+    },
+    {
+      "find": "React.ReactElement",
+      "replace": "React.OctaneNode"
+    }
+  ],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "9daac645a724adf5da960ae185c4f95473264814",
+      "size": 16022
+    },
+    {
+      "path": "eslint.config.js",
+      "gitBlob": "edacda99388a1134cf608917e5641d518a1934ec",
+      "size": 833
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "a926f752c0bba5e06b4793b19542bfc428cba2f1",
+      "size": 2921
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "fa10577496cd2b470244ec7a0ec93ae02f1a6e50",
+      "size": 3842
+    },
+    {
+      "path": "src/__tests__/fine-grained-persister.test.tsx",
+      "gitBlob": "4c028bd6525d49197cf2aa1821bd06d507006154",
+      "size": 5093
+    },
+    {
+      "path": "src/__tests__/HydrationBoundary.test.tsx",
+      "gitBlob": "25f481a22d060636d7aaae4bb5c478d31e21d1a0",
+      "size": 16455
+    },
+    {
+      "path": "src/__tests__/infiniteQueryOptions.test-d.tsx",
+      "gitBlob": "b0d233703af95f89806de6a773e7b95af8507b31",
+      "size": 11669
+    },
+    {
+      "path": "src/__tests__/infiniteQueryOptions.test.tsx",
+      "gitBlob": "d48fd504378608c267819faf4be069ce5f5f917a",
+      "size": 603
+    },
+    {
+      "path": "src/__tests__/mutationOptions.test-d.tsx",
+      "gitBlob": "43391f2bd854b5c7f2d07d5c86561a2a3fae9b57",
+      "size": 6474
+    },
+    {
+      "path": "src/__tests__/mutationOptions.test.tsx",
+      "gitBlob": "7d0b034812c46c8c64ee5e6caecd031b314d2e94",
+      "size": 16773
+    },
+    {
+      "path": "src/__tests__/QueryClientProvider.test.tsx",
+      "gitBlob": "9488d356a7c2ac1bcebd55935194ee238686607e",
+      "size": 4000
+    },
+    {
+      "path": "src/__tests__/queryOptions.test-d.tsx",
+      "gitBlob": "fb67f06906135daa8e256c9f5c2763a5423286b5",
+      "size": 11506
+    },
+    {
+      "path": "src/__tests__/queryOptions.test.tsx",
+      "gitBlob": "b23b1a0109d0e01e918b395702ee113dd6be50bc",
+      "size": 441
+    },
+    {
+      "path": "src/__tests__/QueryResetErrorBoundary.test.tsx",
+      "gitBlob": "21d594129fbb26a272d50924a7d53262142f6571",
+      "size": 26616
+    },
+    {
+      "path": "src/__tests__/ssr-hydration.test.tsx",
+      "gitBlob": "587726b362364fdcd6b202b84a16152e3c223bdf",
+      "size": 8071
+    },
+    {
+      "path": "src/__tests__/ssr.test.tsx",
+      "gitBlob": "92a9a13391d89d760425aa60e22c5fe4790d38c7",
+      "size": 6835
+    },
+    {
+      "path": "src/__tests__/suspense.test.tsx",
+      "gitBlob": "edae5e6031cea0b12db58b7efd25d4daec1746c2",
+      "size": 6758
+    },
+    {
+      "path": "src/__tests__/transition.test.tsx",
+      "gitBlob": "14289f526ab5cf95eea320a91c81f5b187b1748a",
+      "size": 3095
+    },
+    {
+      "path": "src/__tests__/useInfiniteQuery.test-d.tsx",
+      "gitBlob": "977cc53d76e1af861e353d7d78ce980d04b7641c",
+      "size": 5580
+    },
+    {
+      "path": "src/__tests__/useInfiniteQuery.test.tsx",
+      "gitBlob": "a40705d189bbf9446094f93452ecebceb14266d4",
+      "size": 53120
+    },
+    {
+      "path": "src/__tests__/useIsFetching.test.tsx",
+      "gitBlob": "99793d45961e02b4a6b718908b662e43bb3ba753",
+      "size": 6269
+    },
+    {
+      "path": "src/__tests__/useMutation.test-d.tsx",
+      "gitBlob": "cba067db9dba72c17d18a58638a59f99796d0e1d",
+      "size": 4488
+    },
+    {
+      "path": "src/__tests__/useMutation.test.tsx",
+      "gitBlob": "c23b75bf3a4b464f670d6bda1c08d60a1afc5f15",
+      "size": 65875
+    },
+    {
+      "path": "src/__tests__/useMutationState.test-d.tsx",
+      "gitBlob": "a24b8763a6bb35d97d0c911eb7325cf9ecec60b1",
+      "size": 1249
+    },
+    {
+      "path": "src/__tests__/useMutationState.test.tsx",
+      "gitBlob": "69bd972090490a1dec8791b7778a057bcba2d0d5",
+      "size": 6206
+    },
+    {
+      "path": "src/__tests__/usePrefetchInfiniteQuery.test-d.tsx",
+      "gitBlob": "ace4904a3e00589fa85801dd43471de961531ad2",
+      "size": 2165
+    },
+    {
+      "path": "src/__tests__/usePrefetchInfiniteQuery.test.tsx",
+      "gitBlob": "7e3df99f010bd4b2bb01f2a4e03afabe382eb44d",
+      "size": 6308
+    },
+    {
+      "path": "src/__tests__/usePrefetchQuery.test-d.tsx",
+      "gitBlob": "08e878d1d4e2b8eb1a693308f3f36253589a9373",
+      "size": 1824
+    },
+    {
+      "path": "src/__tests__/usePrefetchQuery.test.tsx",
+      "gitBlob": "9b597d4d2839bbaf6105c76921155e5da5f6bfe8",
+      "size": 9165
+    },
+    {
+      "path": "src/__tests__/useQueries.test-d.tsx",
+      "gitBlob": "e4bd6497668faa628afa4861815080e3784264d8",
+      "size": 33558
+    },
+    {
+      "path": "src/__tests__/useQueries.test.tsx",
+      "gitBlob": "4dceb12c211344d85f3cb380a7645b1fcebba7b8",
+      "size": 36829
+    },
+    {
+      "path": "src/__tests__/useQuery.test-d.tsx",
+      "gitBlob": "ed37ad714683712ac9b86ba66bc4d2932813bf50",
+      "size": 12133
+    },
+    {
+      "path": "src/__tests__/useQuery.test.tsx",
+      "gitBlob": "520e80fc67347fdfb95535d31216587c4d3a1e29",
+      "size": 188139
+    },
+    {
+      "path": "src/__tests__/useSuspenseInfiniteQuery.test-d.tsx",
+      "gitBlob": "c906369206811d5da5f50746d699c880cadc978d",
+      "size": 3074
+    },
+    {
+      "path": "src/__tests__/useSuspenseInfiniteQuery.test.tsx",
+      "gitBlob": "f2116377fc4194358b87291864dd6f21c5745891",
+      "size": 6365
+    },
+    {
+      "path": "src/__tests__/useSuspenseQueries.test-d.tsx",
+      "gitBlob": "d9230bdf940ef6532df329a47bc2316da04aa7ac",
+      "size": 12582
+    },
+    {
+      "path": "src/__tests__/useSuspenseQueries.test.tsx",
+      "gitBlob": "f8bbb63a98cd65b4af93c7ad1e028736a1b3d58b",
+      "size": 36299
+    },
+    {
+      "path": "src/__tests__/useSuspenseQuery.test-d.tsx",
+      "gitBlob": "6e0fb5534bc8d54754b14adb3f64e889bceda618",
+      "size": 2290
+    },
+    {
+      "path": "src/__tests__/useSuspenseQuery.test.tsx",
+      "gitBlob": "3c33abd925500452848ae752c66b0d9b81ae60a1",
+      "size": 31475
+    },
+    {
+      "path": "src/__tests__/utils.tsx",
+      "gitBlob": "ae8e2fb23f4114b741d475df00735b04eb422d4b",
+      "size": 1638
+    },
+    {
+      "path": "src/errorBoundaryUtils.ts",
+      "gitBlob": "a27036f9a2cf65b7b2579cf38462b34560774fe9",
+      "size": 1994
+    },
+    {
+      "path": "src/HydrationBoundary.tsx",
+      "gitBlob": "901c8e9686cc6d813603ae1b616b5f257818458a",
+      "size": 3977
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "6f7197941facca0d034aae3820ae0f1db7d0155a",
+      "size": 2054
+    },
+    {
+      "path": "src/infiniteQueryOptions.ts",
+      "gitBlob": "bccc9699da398bda97a393f07118592442135735",
+      "size": 3179
+    },
+    {
+      "path": "src/IsRestoringProvider.ts",
+      "gitBlob": "7d59c72507524014f208c30f06441aecf42c29c3",
+      "size": 236
+    },
+    {
+      "path": "src/mutationOptions.ts",
+      "gitBlob": "1ee3110b19bc0fb5b49360d31c58dc90434cb18b",
+      "size": 1092
+    },
+    {
+      "path": "src/QueryClientProvider.tsx",
+      "gitBlob": "7fa1df9798beab02db77e1f7bd63e55a11d5f09f",
+      "size": 919
+    },
+    {
+      "path": "src/QueryErrorResetBoundary.tsx",
+      "gitBlob": "910215bcb6d68a9a9e495c94522ce255867a08a5",
+      "size": 1380
+    },
+    {
+      "path": "src/queryOptions.ts",
+      "gitBlob": "852a6c3b61cd87689bb8744ea461ff29c5623388",
+      "size": 2470
+    },
+    {
+      "path": "src/suspense.ts",
+      "gitBlob": "b49e242ef55eda75e670d07de8233c0c78d41141",
+      "size": 2131
+    },
+    {
+      "path": "src/types.ts",
+      "gitBlob": "bf72c8fc7237da81cd6b32a15d864e47d1d0466a",
+      "size": 6396
+    },
+    {
+      "path": "src/useBaseQuery.ts",
+      "gitBlob": "30beffc14b6f9e03ccdcf84a1cdf40bbb651358d",
+      "size": 4182
+    },
+    {
+      "path": "src/useInfiniteQuery.ts",
+      "gitBlob": "32ebfb7673e2ef716b909ebc4593f6ec12fde055",
+      "size": 1814
+    },
+    {
+      "path": "src/useIsFetching.ts",
+      "gitBlob": "a6252912f22e0504e3212bd1aee683b4930db771",
+      "size": 677
+    },
+    {
+      "path": "src/useMutation.ts",
+      "gitBlob": "240c6f70d889cc408da8ca793acd820344f8f964",
+      "size": 1756
+    },
+    {
+      "path": "src/useMutationState.ts",
+      "gitBlob": "ce21870527b30a1dcc3dda4e916eb0dc54d3fb08",
+      "size": 2568
+    },
+    {
+      "path": "src/usePrefetchInfiniteQuery.tsx",
+      "gitBlob": "1cd5a3dff2e7836f4b98ff71151ff0f5b89b476e",
+      "size": 777
+    },
+    {
+      "path": "src/usePrefetchQuery.tsx",
+      "gitBlob": "1b0d5268cace92adb4b1c7c3131e07e7ba828009",
+      "size": 713
+    },
+    {
+      "path": "src/useQueries.ts",
+      "gitBlob": "5b0a84f436d400fc46153296ee2f3eba32f3d89d",
+      "size": 11538
+    },
+    {
+      "path": "src/useQuery.ts",
+      "gitBlob": "962ef4da66b553e8de0889455f00831bac089c8c",
+      "size": 1382
+    },
+    {
+      "path": "src/useSuspenseInfiniteQuery.ts",
+      "gitBlob": "20b7fc7111784e86bcec1c871290b0eb1feb8891",
+      "size": 1312
+    },
+    {
+      "path": "src/useSuspenseQueries.ts",
+      "gitBlob": "aa10abfb3d18997874085a942e34413deb7d7927",
+      "size": 8162
+    },
+    {
+      "path": "src/useSuspenseQuery.ts",
+      "gitBlob": "7dfdb0647782e0b63f42322893bf7a251f0dae8d",
+      "size": 1065
+    },
+    {
+      "path": "test-setup.ts",
+      "gitBlob": "1103a58b527c66b697ada1a4f5a42419cea45da5",
+      "size": 535
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "4ad3357ad95e6d0f13d5c1f4ce28c4d056f9497f",
+      "size": 246
+    },
+    {
+      "path": "tsconfig.legacy.json",
+      "gitBlob": "9c49fb85677b724bdd93fb1c525b534d5c6bf61b",
+      "size": 236
+    },
+    {
+      "path": "tsconfig.prod.json",
+      "gitBlob": "2bb29fdf02a5abb3875ace4be7c9182c0e74ea9b",
+      "size": 191
+    },
+    {
+      "path": "tsdown.config.ts",
+      "gitBlob": "0b5fe78c512c666ba44d0eac5f9dd27ab217af5e",
+      "size": 249
+    },
+    {
+      "path": "vite.config.ts",
+      "gitBlob": "84dd64e02cb70d6cfec353b6faff4a526dab5352",
+      "size": 839
+    }
+  ],
+  "fingerprint": "3c00830328488ebf0f611a9478fb17cb3e127c29b780f806cf028d2f9b66219d"
+}

@@ -24,7 +24,7 @@
     {
       "path": "packages/zustand/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Runs identical selection, action, reset, and multi-store scenarios against zustand@5.0.14 and Octane."
+      "oracle": "Runs identical selection, action, reset, and multi-store scenarios against zustand@5.0.15 and Octane."
     },
     {
       "path": "packages/zustand/tests/differential/setup.test.ts",

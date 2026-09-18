@@ -11,7 +11,7 @@
   },
   {
     "path": "async-batcher/useAsyncBatcher.ts",
-    "sha256": "8a4c6cdb7f5d52ec8c3cc326d7db118d698a92867eb656bf8c1ca3511ba1266c",
+    "sha256": "89b4aeac1c83622677a8f59e86a9a24766940b0254388ebd7d80c47dcdb08295",
     "assertionGroups": []
   },
   {
@@ -21,12 +21,12 @@
   },
   {
     "path": "async-debouncer/useAsyncDebouncedCallback.ts",
-    "sha256": "081f0da936a7298934b876b53ac2b7cf825f9e55151cefe321ecd2b2c6b63db7",
+    "sha256": "4b8e8f2caa8602c48250f51f47db8d20eb672809cfafd6ea64989b7fc525eea5",
     "assertionGroups": []
   },
   {
     "path": "async-debouncer/useAsyncDebouncer.ts",
-    "sha256": "84c9373341d0a9874bc0900fb1a7dc0abcfab4aef9371fde3e62797f7e135247",
+    "sha256": "9f7a8ed2e4af78553817ec2f90a6067ad27030a9f746e15bf112e644ddb69f6c",
     "assertionGroups": []
   },
   {
@@ -41,7 +41,7 @@
   },
   {
     "path": "async-queuer/useAsyncQueuer.ts",
-    "sha256": "3d2ff002245904eed85e7e21d73cd00e9bc888477f91e760a806652b480718fa",
+    "sha256": "133135b22ac7021e1fad6e68728085e2189638668f1ea7b7688a3d635bf55484",
     "assertionGroups": []
   },
   {
@@ -51,12 +51,12 @@
   },
   {
     "path": "async-rate-limiter/useAsyncRateLimitedCallback.ts",
-    "sha256": "01a6420ea2c7bc411da92030fc0aa841fadda0f87e309c15002915ee009d8788",
+    "sha256": "946c97ce9b954a0912ca6d37e9fe312bda9bcdc9cf45c38cde8d635e1b75d9cb",
     "assertionGroups": []
   },
   {
     "path": "async-rate-limiter/useAsyncRateLimiter.ts",
-    "sha256": "8644377c4950cdf42899403cca90cd13e45f33cfb205ce2e56515946ca909aa3",
+    "sha256": "d170d445ca392c299b7a915e27c4585e5d9a59bf7818a30fd720c8b4ec7bfaef",
     "assertionGroups": []
   },
   {
@@ -71,12 +71,12 @@
   },
   {
     "path": "async-throttler/useAsyncThrottledCallback.ts",
-    "sha256": "2aa60df1a1eb3f89c71aa9acd14f48cbb649f31c8c6bd31c3d61fed7f2390545",
+    "sha256": "a3f990adc406ce79d90e223e4847c7c5ac0dbdb594bf45ce12c4dc434bd821be",
     "assertionGroups": []
   },
   {
     "path": "async-throttler/useAsyncThrottler.ts",
-    "sha256": "2e1aea85452d06241f7a846fae7937295e3a9c6fcacc4687ab5d81f6ecf1f70e",
+    "sha256": "ebbe35cd3f42703bf0a76c45828d2cedba144e40770d1f6d20e2bb44ee86ae93",
     "assertionGroups": []
   },
   {
@@ -91,7 +91,7 @@
   },
   {
     "path": "batcher/useBatcher.ts",
-    "sha256": "c933dad17af7a42c74bf791adab52887f32bda01eb4f460833cfd315a969460f",
+    "sha256": "de4a0be62ab4cc747d2003306368eb351617324cb5d159a86f3e721c40ed3419",
     "assertionGroups": []
   },
   {
@@ -116,12 +116,12 @@
   },
   {
     "path": "debouncer/useDebouncer.ts",
-    "sha256": "a2a9c66064f266c2b3c586402a941333bac634557f035df6b5b8244a0d070e0f",
+    "sha256": "a52e35517023fa30d1b082bfcf19d7cf1c8a1d43dd194c08c3c531d764719219",
     "assertionGroups": []
   },
   {
     "path": "index.ts",
-    "sha256": "2fe7b127f22603c53610e78f4e7ca8a0c881959db0c7781881333ba9df9454fe",
+    "sha256": "87910122406c5a87598573fb2ccbfa2033d11298cb620411a4f5091d79635ab4",
     "assertionGroups": []
   },
   {
@@ -161,7 +161,7 @@
   },
   {
     "path": "queuer/useQueuer.ts",
-    "sha256": "53e6e3bd3891340891de65cc78ea92f6e41e0363e06ce39750f7e935b9e819e4",
+    "sha256": "cd533c67b1d6ab34ee4a392fed810821a412c73a42cd6c3c9a40122413084942",
     "assertionGroups": []
   },
   {
@@ -186,7 +186,7 @@
   },
   {
     "path": "rate-limiter/useRateLimiter.ts",
-    "sha256": "9c0acdd71a2ab90d2313f5fccf59738dfcf94c407017f566fb8afe5e64e1d79e",
+    "sha256": "6ef2276b1011ad7686550792c490b89aff8430df19c7b2963cf342a66aed4c12",
     "assertionGroups": []
   },
   {
@@ -211,7 +211,7 @@
   },
   {
     "path": "throttler/useThrottler.ts",
-    "sha256": "9ab944ad649df4bebc0dd45965aa9aff688a482433a6159baa6c23a7510cb085",
+    "sha256": "35aca2c2fa4ba4999e34141704f65662c090fe44db18b2128685f5e14904d45e",
     "assertionGroups": []
   },
   {

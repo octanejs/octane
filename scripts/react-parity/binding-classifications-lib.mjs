@@ -31,7 +31,11 @@ export function verifyPortTestClassifications(root, binding = 'hook-form') {
 	const configPath = `packages/${binding}/audit/test-classifications.json`;
 	const manifestPath = `packages/${binding}/audit/react-parity.json`;
 	const discovered = [
-		...discoverPortAuthoredFiles(root, `packages/${binding}/tests`, /\.test\.(?:ts|tsx|tsrx)$/),
+		...discoverPortAuthoredFiles(
+			root,
+			`packages/${binding}/tests`,
+			/\.test(?:-d)?\.(?:ts|tsx|tsrx)$/,
+		),
 		...discoverPortAuthoredFiles(
 			root,
 			`packages/${binding}/typetests`,

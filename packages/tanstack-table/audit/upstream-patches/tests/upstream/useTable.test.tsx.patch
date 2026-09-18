@@ -1,0 +1,15 @@
+diff --git a/tests/upstream/useTable.test.tsx b/tests/upstream/useTable.test.tsx
+--- a/tests/upstream/useTable.test.tsx
++++ b/tests/upstream/useTable.test.tsx
+@@ -466,7 +466,10 @@ describe('useTable state subscriptions', () => {
+     subscription.unsubscribe()
+ 
+     expect(committedBasePageIndex).toBe(0)
+-    expect(storeNotifications).toEqual([])
++    // OCTANE DIVERGENCE[native-table-renderer]: Octane restores the committed owner to publish the first transition-hold
++    // cue (runtime endTransitionAttempt). That accepted render publishes 0;
++    // the suspended page-1 attempt must never publish or mutate base state.
++    expect(storeNotifications).toEqual([0])
+   })
+ 
+   it('keeps imperative table.setOptions eager outside render', () => {

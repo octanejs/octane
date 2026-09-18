@@ -4,10 +4,18 @@ import { useSyncExternalStore, useCallback, useRef, useEffect } from 'octane';
 import { resolveClient } from './context';
 import { splitSlot, subSlot } from './internal';
 
-// Per upstream useMutationState.ts (kept module-private there too).
-type MutationStateOptions<TResult = MutationState> = {
+type MutationTypeFromResult<TResult> = [TResult] extends [
+	MutationState<infer TData, infer TError, infer TVariables, infer TOnMutateResult>,
+]
+	? Mutation<TData, TError, TVariables, TOnMutateResult>
+	: Mutation;
+
+type MutationStateOptions<
+	TResult = MutationState,
+	TMutation extends Mutation<any, any, any, any> = MutationTypeFromResult<TResult>,
+> = {
 	filters?: MutationFilters;
-	select?: (mutation: Mutation) => TResult;
+	select?: (mutation: TMutation) => TResult;
 };
 
 function getResult(mutationCache: any, options: any): any[] {
@@ -17,10 +25,10 @@ function getResult(mutationCache: any, options: any): any[] {
 }
 
 // Signatures match @tanstack/react-query's useMutationState.ts.
-export function useMutationState<TResult = MutationState>(
-	options?: MutationStateOptions<TResult>,
-	queryClient?: QueryClient,
-): Array<TResult>;
+export function useMutationState<
+	TResult = MutationState,
+	TMutation extends Mutation<any, any, any, any> = MutationTypeFromResult<TResult>,
+>(options?: MutationStateOptions<TResult, TMutation>, queryClient?: QueryClient): Array<TResult>;
 
 export function useMutationState(...args: any[]): any[] {
 	const [user, slot] = splitSlot(args);

@@ -1,54 +1,8 @@
-// `@octanejs/tanstack-store` re-exports all of `@tanstack/store`, so the core
-// primitives come through the octane binding. Importing them from
-// `@tanstack/store` directly would add a second path to the same package and
-// risk resolving a second copy — atoms compare by identity, so a duplicate
-// would silently break every subscription.
 import { batch, createAtom } from '@octanejs/tanstack-store';
-import type { AtomOptions } from '@octanejs/tanstack-store';
-import type { TableAtomOptions, TableReactivityBindings } from '@tanstack/table-core/reactivity';
+import { renderPhaseReactivity } from '@tanstack/table-core/reactivity';
+import type { RenderPhaseReactivityBindings } from '@tanstack/table-core/reactivity';
 
-/**
- * table-core supplies a comparator for some atoms and nothing for the rest, and
- * carries a `debugName` that `createAtom` has no use for. `AtomOptions.compare`
- * is optional without `undefined`, so building the object unconditionally makes
- * the call a type error under `exactOptionalPropertyTypes`, which is the
- * consumer's flag because this package publishes source. The object therefore
- * exists only when there is a comparator to put in it.
- */
-function atomOptions<T>(options?: TableAtomOptions<T>): AtomOptions<T> | undefined {
-	const compare = options?.compare;
-	return compare === undefined ? undefined : { compare };
-}
-
-/**
- * Creates the table-core reactivity bindings used by the octane adapter.
- *
- * Table state lives in TanStack Store atoms; options stay plain resolved data
- * (`createOptionsStore: false`) because `useTable` synchronizes options during
- * render, exactly like the upstream React adapter.
- *
- * `schedule` uses `queueMicrotask` rather than an octane-specific scheduler:
- * table-core only uses it to defer work past the current call stack, and octane
- * already batches the resulting atom notifications through its own renderer.
- */
-export function octaneReactivity(): TableReactivityBindings {
-	return {
-		createOptionsStore: false,
-		wrapExternalAtoms: false,
-		addSubscription: () => {
-			throw new Error('Feature not supported in current reactivity implementation');
-		},
-		unmount: () => {
-			throw new Error('Feature not supported in current reactivity implementation');
-		},
-		schedule: (fn) => queueMicrotask(fn),
-		batch,
-		untrack: (fn) => fn(),
-		createReadonlyAtom: <T>(fn: () => T, options?: TableAtomOptions<T>) => {
-			return createAtom(() => fn(), atomOptions<T>(options));
-		},
-		createWritableAtom: <T>(value: T, options?: TableAtomOptions<T>) => {
-			return createAtom(value, atomOptions<T>(options));
-		},
-	};
+// Use the same store primitives as external atoms supplied by consumers.
+export function octaneReactivity(): RenderPhaseReactivityBindings {
+	return renderPhaseReactivity({ createAtom, batch });
 }

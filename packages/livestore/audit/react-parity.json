@@ -10,7 +10,10 @@
     "integrity": "sha256:d018c617a63e616aeba211b73ca6b4c126795ebc4f5d873f2296765b60b5e44f",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/livestore/src"],
@@ -41,7 +44,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "09cb7d7dacdb9e70ad12c31cddfed6997c077eac621e1f1f59f8c4c15ffe3a1f"
+      "lockfileSha256": "46ccc50c86721771f63e6d6ae28e4df740a1a64d8aa20c956e080303790572f0"
     }
   },
   "lanes": [
@@ -81,7 +84,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "ff2202a9e829641b6e53b9965588c1bcfc4afd2ce53ec89caf2c4ef3467fb9c5"
+          "sha256": "ce5c2fc3c13e7f405456323a94fe67dcabeabf2fe8f48f5526d915d196cec501"
         },
         {
           "path": "packages/livestore/tests/upstream-vitest.config.ts",

@@ -1,0 +1,29 @@
+diff --git a/tests/upstream/createTableHook.test.tsx b/tests/upstream/createTableHook.test.tsx
+--- a/tests/upstream/createTableHook.test.tsx
++++ b/tests/upstream/createTableHook.test.tsx
+@@ -138,6 +138,7 @@ describe('createTableHook runtime', () => {
+   })
+ 
+   test('keeps App wrappers mounted while their contexts receive new table objects', () => {
++    // OCTANE DIVERGENCE[native-table-renderer]: Native input events retain the controlled draft and mounted wrappers.
+     const mountCaptor = vi.fn()
+     const unmountCaptor = vi.fn()
+ 
+@@ -156,7 +157,7 @@ describe('createTableHook runtime', () => {
+           <input
+             id="stateful-cell-input"
+             value={draft}
+-            onChange={(event) => setDraft(event.target.value)}
++            onInput={(event) => setDraft(event.target.value)}
+           />
+           <output aria-label="Latest cell value">{cell.getValue()}</output>
+         </>
+@@ -199,7 +200,7 @@ describe('createTableHook runtime', () => {
+     render(<TableHarness />)
+ 
+     const input = screen.getByRole('textbox', { name: 'Cell draft' })
+-    fireEvent.change(input, { target: { value: 'edited' } })
++    fireEvent.input(input, { target: { value: 'edited' } })
+ 
+     expect(text('Latest cell value')).toBe('Ada')
+     expect(mountCaptor).toHaveBeenCalledOnce()

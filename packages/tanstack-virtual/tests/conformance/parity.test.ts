@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import * as binding from '@octanejs/tanstack-virtual';
 
 describe('export surface', () => {
+	// @parity-case conformance:2a092f067b89d860
 	it('provides every runtime export of real @tanstack/react-virtual', async () => {
 		const real = await import('@tanstack/react-virtual');
 		const upstream = Object.keys(real).sort();
@@ -15,6 +16,7 @@ describe('export surface', () => {
 		expect(missing).toEqual([]);
 	});
 
+	// @parity-case conformance:ce6f858c51ca95e3
 	it('re-exports the same @tanstack/virtual-core module instance', async () => {
 		const core = await import('@tanstack/virtual-core');
 		expect(binding.Virtualizer).toBe(core.Virtualizer);

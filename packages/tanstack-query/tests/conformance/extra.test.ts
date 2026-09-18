@@ -24,6 +24,7 @@ async function flush() {
 }
 
 describe('query-key change', () => {
+	// @parity-case conformance:96547de4a6f815d5
 	it('swaps the query and refetches when the key changes', async () => {
 		const r = mount(KeyedApp, { client, k: 1 });
 		await flush();
@@ -36,6 +37,7 @@ describe('query-key change', () => {
 });
 
 describe('unmount unsubscribes the observer', () => {
+	// @parity-case conformance:e5a7fffe1c1b839f
 	it('drops the query observer on unmount (no leak)', async () => {
 		let resolveFn: (v: string) => void = () => {};
 		const queryFn = () => new Promise<string>((res) => (resolveFn = res));
@@ -52,6 +54,7 @@ describe('unmount unsubscribes the observer', () => {
 });
 
 describe('explicit client (no provider)', () => {
+	// @parity-case conformance:4d71125b12c26935
 	it('useQuery(options, client) resolves the passed client', async () => {
 		let resolveFn: (v: string) => void = () => {};
 		const queryFn = () => new Promise<string>((res) => (resolveFn = res));
@@ -66,6 +69,7 @@ describe('explicit client (no provider)', () => {
 });
 
 describe('QueryClientProvider mounts/unmounts the client', () => {
+	// @parity-case conformance:8e7b1a61f425f8ec
 	it('calls client.mount() on mount and client.unmount() on unmount', async () => {
 		const c = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 		let mounts = 0;

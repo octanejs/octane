@@ -3,6 +3,7 @@ import * as query from '@octanejs/tanstack-query';
 import * as reactQuery from '@tanstack/react-query';
 
 describe('@octanejs/tanstack-query export surface', () => {
+	// @parity-case conformance:ed65a673b703c4d5
 	it('provides EVERY runtime export of real @tanstack/react-query', () => {
 		// The gold-standard parity lock: diff the whole runtime surface against
 		// the actual react-query module. Anything upstream ships that the port
@@ -13,6 +14,7 @@ describe('@octanejs/tanstack-query export surface', () => {
 		expect(missing).toEqual([]);
 	});
 
+	// @parity-case conformance:faebadce5e76e931
 	it('exports nothing upstream keeps private (no accidental superset)', () => {
 		const upstream = new Set(Object.keys(reactQuery));
 		const extras = Object.keys(query)
@@ -24,6 +26,7 @@ describe('@octanejs/tanstack-query export surface', () => {
 		expect(extras).toEqual([]);
 	});
 
+	// @parity-case conformance:bf462b644232c67a
 	it('option helper exports are identity helpers like @tanstack/react-query', () => {
 		const q = { queryKey: ['x'], queryFn: async () => 'x' };
 		const inf = { queryKey: ['i'], queryFn: async () => ['i'], initialPageParam: 0 };

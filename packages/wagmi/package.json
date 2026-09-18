@@ -42,7 +42,8 @@
     "@octanejs/tanstack-query": "workspace:*",
     "@wagmi/connectors": "catalog:default",
     "@wagmi/core": "catalog:default",
-    "viem": "catalog:default"
+    "viem": "catalog:default",
+    "@tanstack/query-core": "catalog:default"
   },
   "peerDependencies": {
     "octane": "workspace:^0.1.51 || ^0.2.0"

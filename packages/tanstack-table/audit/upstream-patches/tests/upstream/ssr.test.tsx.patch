@@ -1,0 +1,54 @@
+diff --git a/tests/upstream/ssr.test.tsx b/tests/upstream/ssr.test.tsx
+--- a/tests/upstream/ssr.test.tsx
++++ b/tests/upstream/ssr.test.tsx
+@@ -1,3 +1,4 @@
++// OCTANE DIVERGENCE[native-table-renderer]: Use native ref props and server RenderResult.html; strip only hydration boundary comments for string comparisons.
+ // @vitest-environment node
+ 
+ import * as React from 'octane'
+@@ -71,7 +72,7 @@ describe('React server rendering', () => {
+ 
+     expect(typeof document).toBe('undefined')
+ 
+-    const markup = renderToString(<ServerTable />)
++    const markup = renderToString(<ServerTable />).html.replace(/<!--(?:\[|\])-->/g, '')
+ 
+     expect(markup).toContain('data-page-size="25"')
+     expect(markup).toContain('<span>Header name</span>')
+@@ -109,7 +110,7 @@ describe('React server rendering', () => {
+       )
+     }
+ 
+-    expect(renderToStaticMarkup(<CellModes />)).toBe(
++    expect(renderToStaticMarkup(<CellModes />).html).toBe(
+       '<div data-mode="aggregate"><em>Aggregate Ada</em></div>' +
+         '<div data-mode="placeholder"></div>',
+     )
+@@ -128,16 +129,13 @@ describe('React server rendering', () => {
+       return <span data-kind="memo">{value}</span>
+     })
+     // eslint-disable-next-line @eslint-react/no-forward-ref -- Covers the React 18 exotic-component shape supported by FlexRender.
+-    const ForwardRefRenderable = React.forwardRef<
+-      HTMLSpanElement,
+-      { value: string }
+-    >(function ForwardRefRenderable({ value }, ref) {
++    function ForwardRefRenderable({ value, ref }: { value: string; ref?: React.Ref<HTMLSpanElement> }) {
+       return (
+         <span ref={ref} data-kind="forward-ref">
+           {value}
+         </span>
+       )
+-    })
++    }
+ 
+     const markup = renderToStaticMarkup(
+       <>
+@@ -149,7 +147,7 @@ describe('React server rendering', () => {
+         })}
+         {flexRender(0, { value: 'ignored' })}
+       </>,
+-    )
++    ).html
+ 
+     expect(markup).toBe(
+       '<span data-kind="function">function value</span>' +

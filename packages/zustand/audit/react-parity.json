@@ -11,14 +11,21 @@
     "integrity": "sha256:c1fad9e123a79d12f56b4ef8aece6abd6036df164b01d7ffb52d40b08956e96b",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/zustand/src"],
       "include": ["\\.ts$"],
       "exclude": ["\\.d\\.ts$"]
     },
-    "tests": { "roots": ["packages/zustand/tests"], "include": ["\\.test\\.ts$"], "exclude": [] }
+    "tests": {
+      "roots": ["packages/zustand/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
   },
   "adaptedRuntimeSummary": {
     "inventoryEntries": 0,
@@ -33,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "09cb7d7dacdb9e70ad12c31cddfed6997c077eac621e1f1f59f8c4c15ffe3a1f"
+      "lockfileSha256": "46ccc50c86721771f63e6d6ae28e4df740a1a64d8aa20c956e080303790572f0"
     }
   },
   "lanes": [
@@ -44,7 +51,7 @@
       "environment": "workspace-node",
       "project": "zustand-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs exact selection, derived-state, action, reset, and multiple-store scenarios against zustand@5.0.14.",
+      "notes": "Runs exact selection, derived-state, action, reset, and multiple-store scenarios against zustand@5.0.15.",
       "files": [
         {
           "path": "packages/zustand/tests/differential/parity.test.ts",

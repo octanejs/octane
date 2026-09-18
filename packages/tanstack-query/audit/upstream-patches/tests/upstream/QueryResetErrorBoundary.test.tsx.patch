@@ -1,0 +1,22 @@
+diff --git a/tests/upstream/QueryResetErrorBoundary.test.tsx b/tests/upstream/QueryResetErrorBoundary.test.tsx
+--- a/tests/upstream/QueryResetErrorBoundary.test.tsx
++++ b/tests/upstream/QueryResetErrorBoundary.test.tsx
+@@ -768,7 +768,8 @@ describe('QueryErrorResetBoundary', () => {
+ 
+       const rendered = renderWithClient(
+         queryClient,
+-        <React.StrictMode>
++        // OCTANE DIVERGENCE[native-query-test-harness]: Octane has no StrictMode double invocation.
++        <>
+           <QueryErrorResetBoundary>
+             {({ reset }) => (
+               <ErrorBoundary
+@@ -784,7 +785,7 @@ describe('QueryErrorResetBoundary', () => {
+               </ErrorBoundary>
+             )}
+           </QueryErrorResetBoundary>
+-        </React.StrictMode>,
++        </>,
+       )
+ 
+       // 1. First mount -> fetching -> Success

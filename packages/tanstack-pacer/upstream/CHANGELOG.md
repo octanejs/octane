@@ -1,5 +1,18 @@
 # @tanstack/react-pacer
 
+## 0.23.0
+
+### Minor Changes
+
+- Update package dependencies and migrate the devtools theme integration to the latest API. ([#245](https://github.com/TanStack/pacer/pull/245))
+
+### Patch Changes
+
+- fix: async utility return types no longer double-wrap promises. `maybeExecute`, `flush`, `lastResult` state, and `onSuccess` callbacks on AsyncDebouncer, AsyncThrottler, and AsyncRateLimiter (and the `asyncDebounce`/`asyncThrottle`/`asyncRateLimit` helpers) now use `Awaited<ReturnType<TFn>>` instead of `ReturnType<TFn>`. The `useAsyncDebouncedCallback`, `useAsyncThrottledCallback`, and `useAsyncRateLimitedCallback` hooks in react-pacer and preact-pacer now return `Promise<Awaited<ReturnType<TFn>> | undefined>`, matching the angular adapter and the actual runtime behavior (fixes [#156](https://github.com/TanStack/pacer/issues/156)) ([#246](https://github.com/TanStack/pacer/pull/246))
+
+- Updated dependencies [[`dc47121`](https://github.com/TanStack/pacer/commit/dc47121ffbeb2353e43cd0fe350ef4916aa75b9f), [`dc47121`](https://github.com/TanStack/pacer/commit/dc47121ffbeb2353e43cd0fe350ef4916aa75b9f), [`dc47121`](https://github.com/TanStack/pacer/commit/dc47121ffbeb2353e43cd0fe350ef4916aa75b9f), [`bd96217`](https://github.com/TanStack/pacer/commit/bd9621752367c1446430af9146b72e04ed991798), [`dc47121`](https://github.com/TanStack/pacer/commit/dc47121ffbeb2353e43cd0fe350ef4916aa75b9f)]:
+  - @tanstack/pacer@0.22.0
+
 ## 0.22.1
 
 ### Patch Changes

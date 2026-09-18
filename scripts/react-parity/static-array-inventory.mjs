@@ -64,6 +64,38 @@ export function staticArrayInventory(source) {
 			node = node.expression;
 		return node;
 	};
+	// combinate 1.1.11 builds a Cartesian product of nonempty array dimensions.
+	// Resolve its import lexically; a similarly named user function is unknown.
+	const combinateDimensions = (call) => {
+		if (!ts.isCallExpression(call) || !ts.isIdentifier(call.expression)) return null;
+		const declarations = symbolAt(call.expression)?.declarations;
+		if (declarations?.length !== 1 || !ts.isImportClause(declarations[0])) return null;
+		const declaration = declarations[0];
+		if (
+			declaration.name?.text !== call.expression.text ||
+			declaration.isTypeOnly ||
+			declaration.parent.moduleSpecifier.text !== 'combinate' ||
+			call.arguments.length !== 1
+		)
+			return null;
+		const object = unwrap(call.arguments[0]);
+		if (!object || !ts.isObjectLiteralExpression(object)) return null;
+		const keys = new Set();
+		for (const property of object.properties) {
+			if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property))
+				return null;
+			if (
+				!ts.isIdentifier(property.name) &&
+				!ts.isStringLiteral(property.name) &&
+				!ts.isNumericLiteral(property.name)
+			)
+				return null;
+			const key = property.name.text;
+			if (key === '__proto__' || keys.has(key)) return null;
+			keys.add(key);
+		}
+		return object;
+	};
 	const safeReference = (identifier) => {
 		let node = identifier;
 		while (node.parent && unwrap(node.parent) === identifier) node = node.parent;
@@ -72,7 +104,17 @@ export function staticArrayInventory(source) {
 		if (ts.isBindingElement(parent) && parent.name === node) return true;
 		if (ts.isParameter(parent) && parent.name === node) return true;
 		if (ts.isArrayLiteralExpression(parent)) return true;
+		if (ts.isForOfStatement(parent) && parent.expression === node) return true;
 		if (ts.isVariableDeclaration(parent) && ts.isArrayBindingPattern(parent.name)) return true;
+		if (
+			((ts.isPropertyAssignment(parent) && parent.initializer === node) ||
+				(ts.isShorthandPropertyAssignment(parent) && parent.name === node)) &&
+			ts.isObjectLiteralExpression(parent.parent)
+		) {
+			let object = parent.parent;
+			while (object.parent && unwrap(object.parent) === parent.parent) object = object.parent;
+			if (combinateDimensions(object.parent) === parent.parent) return true;
+		}
 		if (
 			ts.isPropertyAccessExpression(parent) &&
 			parent.expression === node &&
@@ -141,6 +183,19 @@ export function staticArrayInventory(source) {
 					return items ? merge(items) : null;
 				}
 			}
+			const dimensions = combinateDimensions(node);
+			if (dimensions) {
+				let size = dimensions.properties.length ? 1 : 0;
+				for (const property of dimensions.properties) {
+					const values = inner(
+						ts.isShorthandPropertyAssignment(property) ? property.name : property.initializer,
+					);
+					// Empty dimensions reset combinate's accumulator; keep that shape unknown.
+					if (!values?.length || size * values.length > 10000) return null;
+					size *= values.length;
+				}
+				return Array(size).fill(null);
+			}
 			if (
 				ts.isCallExpression(node) &&
 				ts.isPropertyAccessExpression(node.expression) &&
@@ -161,7 +216,22 @@ export function staticArrayInventory(source) {
 		}
 	};
 	const counts = new Map();
+	const exitsIteration = (node) => {
+		if (ts.isFunctionLike(node)) return false;
+		if (
+			ts.isBreakStatement(node) ||
+			ts.isContinueStatement(node) ||
+			ts.isReturnStatement(node) ||
+			ts.isThrowStatement(node)
+		)
+			return true;
+		return ts.forEachChild(node, exitsIteration) ?? false;
+	};
 	const collect = (node) => {
+		if (ts.isForOfStatement(node) && !node.awaitModifier && !exitsIteration(node.statement)) {
+			const value = evaluate(node.expression);
+			if (value) counts.set(node.getStart(sourceFile), value.length);
+		}
 		if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
 			const method = node.expression.name.text;
 			if (['forEach', 'each', 'for'].includes(method)) {

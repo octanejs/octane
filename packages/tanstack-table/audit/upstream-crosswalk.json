@@ -1,0 +1,5420 @@
+[
+  {
+    "entry": ".",
+    "name": "AppCellComponent",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppCellContext",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppCellPropsWithSelector",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppCellPropsWithoutSelector",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppColumnDefBase",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppColumnDefTemplate",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppColumnHelper",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppDisplayColumnDef",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppGroupColumnDef",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppHeaderComponent",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppHeaderContext",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppHeaderPropsWithSelector",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppHeaderPropsWithoutSelector",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppReactTable",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppTableComponent",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppTablePropsWithSelector",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AppTablePropsWithoutSelector",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CreateTableHookOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CreateTableHookResult",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "FlexRender",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "FlexRenderProps",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ReactTable",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Renderable",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Subscribe",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscribeProps",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscribePropsWithSource",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscribePropsWithSourceIdentity",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscribePropsWithSourceWithSelector",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscribePropsWithStore",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscribeSource",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableHookContexts",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createTableHook",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createTableHookContexts",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "flexRender",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "useTable",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "API",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "APIObject",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AccessorColumnDef",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AccessorFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AccessorFnColumnDef",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AccessorFnColumnDefBase",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AccessorKeyColumnDef",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AccessorKeyColumnDefBase",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationContext",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationFnDef",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationFnDescriptor",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationFnListItem",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationFnOption",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationFnRef",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationFns",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationMergeContext",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationResultOf",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationValueContext",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationValueOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregationValueResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Atoms",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Atoms_All",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BaseAtoms",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BaseAtoms_All",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BuiltInAggregationFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BuiltInFilterFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BuiltInSortFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CachedRowModel_All",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CachedRowModel_Core",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CachedRowModel_Expanded",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CachedRowModel_Faceted",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CachedRowModel_Filtered",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CachedRowModel_Grouped",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CachedRowModel_Paginated",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CachedRowModel_Sorted",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CachedRowModels",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CachedRowModels_FeatureMap",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Cell",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CellContext",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CellData",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CellSelectionBounds",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CellSelectionDirection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CellSelectionEdges",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CellSelectionRange",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CellSelectionRangeMode",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CellSelectionRangeOperation",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CellSelectionState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CellSpanIndex",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Cell_Cell",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Cell_CellSelection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Cell_CellSpanning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Cell_ColumnGrouping",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Cell_Core",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Cell_CoreProperties",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Cell_FeatureMap",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Cell_RowAggregation",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColSpanContext",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnAggregationValue",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDefBase",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDefBase_All",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDefResolved",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDefTemplate",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef_CellSelection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef_CellSpanning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef_ColumnFiltering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef_ColumnGrouping",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef_ColumnPinning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef_ColumnResizing",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef_ColumnSizing",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef_ColumnVisibility",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef_FeatureMap",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef_GlobalFiltering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef_RowAggregation",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDef_RowSorting",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnDefaultOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnFilter",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnFilterAutoRemoveTestFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnFiltersState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnHelper",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnIndexes",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnMeta",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnOffsets",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnOffsetsByPosition",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnOrderDefaultOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnOrderState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnPinningDefaultOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnPinningPosition",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnPinningState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnResizeDirection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnResizeMode",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnResizingDefaultOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnSizingDefaultOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnSizingState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnSort",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ColumnVisibilityState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_Column",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_ColumnFaceting",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_ColumnFiltering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_ColumnGrouping",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_ColumnOrdering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_ColumnPinning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_ColumnResizing",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_ColumnSizing",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_ColumnVisibility",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_Core",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_CoreProperties",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_FeatureMap",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_GlobalFiltering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_RowAggregation",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Column_RowSorting",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CoreFeatures",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CreatedFilterFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CreatedSortFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CustomAggregationFns",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CustomFilterFns",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CustomSortFns",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DebugOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DeepKeys",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DeepValue",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DisplayColumnDef",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ExpandedState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ExpandedStateList",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ExternalAtoms",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ExternalAtoms_All",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ExtractAggregationFnKeys",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ExtractColumnMeta",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ExtractFeatureMapTypes",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ExtractFilterFnKeys",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ExtractFilterMeta",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ExtractSortFnKeys",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ExtractTableMeta",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "FeatureSlotPrereqs",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "FilterFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "FilterFnDef",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "FilterFnOption",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "FilterFns",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "FilterMeta",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Getter",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "GroupColumnDef",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "GroupingColumnMode",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "GroupingState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Header",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "HeaderContext",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "HeaderGroup",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "HeaderGroup_Core",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "HeaderGroup_Header",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Header_ColumnResizing",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Header_ColumnSizing",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Header_Core",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Header_CoreProperties",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Header_FeatureMap",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Header_Header",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "IdIdentifier",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "IdentifiedColumnDef",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "IsAny",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NoInfer",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NonFeatureKeys",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "OnChangeFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "PaginationDefaultOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "PaginationState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "PartialKeys",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Plugins",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Prettify",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "PrototypeAPI",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "PrototypeAPIObject",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RequiredKeys",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ResolvedAggregationFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ResolvedColumnFilter",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowData",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowModel",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowModelFns",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowModelFns_All",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowModelFns_ColumnFiltering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowModelFns_Core",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowModelFns_FeatureMap",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowModelFns_RowAggregation",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowModelFns_RowSorting",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowPinningDefaultOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowPinningPosition",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowPinningState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowSelectionState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RowSpanContext",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row_ColumnFiltering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row_ColumnGrouping",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row_ColumnPinning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row_ColumnVisibility",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row_Core",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row_CoreProperties",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row_FeatureMap",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row_Row",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row_RowAggregation",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row_RowExpanding",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row_RowPinning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row_RowSelection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SelectCellRangeOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SortDirection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SortFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SortFnDef",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SortFnOption",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SortFns",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SortingState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "StateSliceEqualityFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "StockFeatures",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "StringHeaderIdentifier",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "StringOrTemplateHeader",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableFeature",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableFeatures",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableMeta",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_All",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_Cell",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_CellSelection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_CellSpanning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_ColumnFiltering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_ColumnGrouping",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_ColumnOrdering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_ColumnPinning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_ColumnResizing",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_ColumnSizing",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_ColumnVisibility",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_Columns",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_Core",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_FeatureMap",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_GlobalFiltering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_RowAggregation",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_RowExpanding",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_RowPagination",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_RowPinning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_RowSelection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_RowSorting",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_Rows",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableOptions_Table",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_All",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_CellSelection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_ColumnFiltering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_ColumnGrouping",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_ColumnOrdering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_ColumnPinning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_ColumnResizing",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_ColumnSizing",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_ColumnVisibility",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_FeatureMap",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_GlobalFiltering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_RowExpanding",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_RowPagination",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_RowPinning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_RowSelection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TableState_RowSorting",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_CellSelection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_CellSpanning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_ColumnFaceting",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_ColumnFiltering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_ColumnGrouping",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_ColumnOrdering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_ColumnPinning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_ColumnResizing",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_ColumnSizing",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_ColumnVisibility",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_Columns",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_Core",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_CoreProperties",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_FeatureMap",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_GlobalFiltering",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_Headers",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowExpanding",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowModels",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowModels_Core",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowModels_Expanded",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowModels_Faceted",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowModels_Filtered",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowModels_Grouped",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowModels_Paginated",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowModels_Sorted",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowPagination",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowPinning",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowSelection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_RowSorting",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_Rows",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Table_Table",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ToggleSelectedOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TransformDataValueFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TransformFilterValueFn",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnionToIntersection",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Updater",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ValidateFeatureSlots",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "VisibilityDefaultOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "aggregationFn_count",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "aggregationFn_extent",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "aggregationFn_first",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "aggregationFn_last",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "aggregationFn_max",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "aggregationFn_mean",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "aggregationFn_median",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "aggregationFn_min",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "aggregationFn_sum",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "aggregationFn_unique",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "aggregationFn_uniqueCount",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "aggregationFns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "assignPrototypeAPIs",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "assignTableAPIs",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "buildHeaderGroups",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "callMemoOrStaticFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "cellSelectionFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "cellSpanningFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "cloneState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "columnFacetingFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "columnFilteringFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "columnGroupingFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "columnOrderingFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "columnPinningFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "columnResizingFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "columnResizingState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "columnSizingFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "columnVisibilityFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "constructAggregationFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "constructCell",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "constructColumn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "constructFilterFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "constructHeader",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "constructRow",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "constructSortFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "constructTable",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "copyInstancePropertiesWithoutMemos",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "coreCellsFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "coreColumnsFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "coreFeatures",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "coreHeadersFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "coreRowModelsFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "coreRowsFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "coreTablesFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createColumnHelper",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createCoreRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createExpandedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createFacetedMinMaxValues",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createFacetedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createFacetedUniqueValues",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createFilteredRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createGroupedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createPaginatedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createSortedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "expandRows",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_arrHas",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_arrIncludes",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_arrIncludesAll",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_arrIncludesSome",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_between",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_betweenInclusive",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_empty",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_endsWith",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_equals",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_equalsString",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_equalsStringSensitive",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_greaterThan",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_greaterThanOrEqualTo",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_inDateRange",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_inNumberRange",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_includesString",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_includesStringSensitive",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_lessThan",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_lessThanOrEqualTo",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_notEmpty",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_startsWith",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFn_weakEquals",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "filterFns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "flattenBy",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "functionalUpdate",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getFunctionNameInfo",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getInitialTableState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "globalFilteringFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "hasOwn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "isFunction",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "makeObjectMap",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "makeStateUpdater",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "memo",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "metaHelper",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "reSplitAlphaNumeric",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "rowAggregationFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "rowExpandingFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "rowPaginationFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "rowPinningFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "rowSelectionFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "rowSortingFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "setStateSlice",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "skipFirstRun",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "sortFn_alphanumeric",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "sortFn_alphanumericCaseSensitive",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "sortFn_basic",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "sortFn_datetime",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "sortFn_text",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "sortFn_textCaseSensitive",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "sortFns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "stateSlicesEqual",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "stockFeatures",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "tableFeatures",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "tableMemo",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "tableOptions",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/flex-render",
+    "name": "FlexRender",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/flex-render",
+    "name": "FlexRenderProps",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/flex-render",
+    "name": "Renderable",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/flex-render",
+    "name": "flexRender",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "FacetedMinMaxValuesFactory",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "FacetedRowModelFactory",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "FacetedUniqueValuesFactory",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "LegacyCell",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "LegacyColumn",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "LegacyColumnDef",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "LegacyFeatures",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "LegacyHeader",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "LegacyHeaderGroup",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "LegacyReactTable",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "LegacyRow",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "LegacyRowModelOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "LegacyTable",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "LegacyTableOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "RowModelFactory",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "getCoreRowModel",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "getExpandedRowModel",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "getFacetedMinMaxValues",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "getFacetedRowModel",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "getFacetedUniqueValues",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "getFilteredRowModel",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "getGroupedRowModel",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "getPaginationRowModel",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "getSortedRowModel",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "legacyCreateColumnHelper",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/legacy",
+    "name": "useLegacyTable",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "aggregateColumnValue",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getCanSelect",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getColSpan",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getContext",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getIsAggregated",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getIsCovered",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getIsFocused",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getIsGrouped",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getIsPlaceholder",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getIsSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getRowSpan",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getSelectionEdges",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getSelectionExtendHandler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getSelectionStartHandler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getTabIndex",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_getValue",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "cell_renderValue",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_clearSorting",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getAfter",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getAggregationFns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getAggregationValue",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getAutoAggregationFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getAutoFilterFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getAutoSortDir",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getAutoSortFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getCanFilter",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getCanGlobalFilter",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getCanGroup",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getCanHide",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getCanMultiSort",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getCanPin",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getCanResize",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getCanSort",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getCanSpan",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getFacetedMinMaxValues",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getFacetedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getFacetedUniqueValues",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getFilterFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getFilterIndex",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getFilterValue",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getFirstSortDir",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getFlatColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getGroupedIndex",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getIndex",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getIsFiltered",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getIsFirstColumn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getIsGrouped",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getIsLastColumn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getIsPinned",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getIsResizing",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getIsSorted",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getIsVisible",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getLeafColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getNextSortingOrder",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getPinnedIndex",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getSize",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getSortFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getSortIndex",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getStart",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getToggleGroupingHandler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getToggleSortingHandler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_getToggleVisibilityHandler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_pin",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_resetSize",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_setFilterValue",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_toggleGrouping",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_toggleSorting",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "column_toggleVisibility",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "formatAggregatedCellValue",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultCellSelectionState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultColumnFiltersState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultColumnOrderState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultColumnPinningState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultColumnResizingState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultColumnSizingColumnDef",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultColumnSizingState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultColumnVisibilityState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultExpandedState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultGroupingState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultPaginationState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultRowPinningState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultRowSelectionState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "getDefaultSortingState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "header_getContext",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "header_getLeafHeaders",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "header_getResizeHandler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "header_getSize",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "header_getStart",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "isRowSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "isSubRowSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "isTouchStartEvent",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "normalizeAggregationRows",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "normalizeUniqueAggregationRows",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "orderColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "passiveEventSupported",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getAllCells",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getAllCellsByColumnId",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getCanExpand",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getCanMultiSelect",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getCanPin",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getCanSelect",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getCanSelectSubRows",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getCenterVisibleCells",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getDisplayIndex",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getEndVisibleCells",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getGroupingValue",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getIsAllParentsExpanded",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getIsAllSubRowsSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getIsExpanded",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getIsGrouped",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getIsPinned",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getIsSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getIsSomeSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getLeafRows",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getParentRow",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getParentRows",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getPinnedIndex",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getStartVisibleCells",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getToggleExpandedHandler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getToggleSelectedHandler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getUniqueValues",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getValue",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getVisibleCells",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_getVisibleCellsByColumnId",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_pin",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_renderValue",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_toggleExpanded",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "row_toggleSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "selectRowsFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "shouldAutoRemoveFilter",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_autoResetCellSelection",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_autoResetExpanded",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_autoResetPageIndex",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_autoResetSorting",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_extendCellSelection",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_firstPage",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getAllColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getAllFlatColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getAllFlatColumnsById",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getAllLeafColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getAllLeafColumnsById",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getBottomRows",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCanLastPage",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCanNextPage",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCanPreviousPage",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCanSomeRowsExpand",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCellSelectionBounds",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCellSelectionColumnIds",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCellSelectionColumnIndexes",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCellSelectionMergeBounds",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCellSelectionRowIds",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCellSpanIndex",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCenterFlatHeaders",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCenterFooterGroups",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCenterHeaderGroups",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCenterLeafColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCenterLeafHeaders",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCenterRows",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCenterTotalSize",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCenterVisibleLeafColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getColumn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getColumnIndexes",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getColumnOffsets",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getCoreRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getDefaultColumnDef",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getEndFlatHeaders",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getEndFooterGroups",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getEndHeaderGroups",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getEndLeafColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getEndLeafHeaders",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getEndTotalSize",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getEndVisibleLeafColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getExpandedDepth",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getExpandedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getFilteredRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getFilteredSelectedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getFlatHeaders",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getFocusedCell",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getFooterGroups",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getGlobalAutoFilterFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getGlobalFacetedMinMaxValues",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getGlobalFacetedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getGlobalFacetedUniqueValues",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getGlobalFilterFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getGroupedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getGroupedSelectedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getHeaderGroups",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getIsAllColumnsVisible",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getIsAllPageRowsSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getIsAllRowsExpanded",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getIsAllRowsSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getIsSomeColumnsPinned",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getIsSomeColumnsVisible",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getIsSomePageRowsSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getIsSomeRowsExpanded",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getIsSomeRowsPinned",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getIsSomeRowsSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getLeafHeaders",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getMaxSubRowDepth",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getOrderColumnsFn",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getPageCount",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getPageOptions",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getPaginatedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getPinnedLeafColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getPinnedVisibleLeafColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getPreExpandedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getPreFilteredRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getPreGroupedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getPrePaginatedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getPreSelectedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getPreSortedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getRow",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getRowCount",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getRowId",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getRowsInDisplayOrder",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getSelectedCellCount",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getSelectedCellIds",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getSelectedCellRangesData",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getSelectedRowIds",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getSelectedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getSortedRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getStartFlatHeaders",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getStartFooterGroups",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getStartHeaderGroups",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getStartLeafColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getStartLeafHeaders",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getStartTotalSize",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getStartVisibleLeafColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getToggleAllColumnsVisibilityHandler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getToggleAllPageRowsSelectedHandler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getToggleAllRowsExpandedHandler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getToggleAllRowsSelectedHandler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getTopRows",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getTotalSize",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getVisibleFlatColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_getVisibleLeafColumns",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_lastPage",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_mergeOptions",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_moveCellSelection",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_nextPage",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_previousPage",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_publishExternalState",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_reset",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetCellSelection",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetColumnFilters",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetColumnOrder",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetColumnPinning",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetColumnSizing",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetColumnVisibility",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetExpanded",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetGlobalFilter",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetGrouping",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetHeaderSizeInfo",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetPageIndex",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetPageSize",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetPagination",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetRowPinning",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetRowSelection",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_resetSorting",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_selectAllCells",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_selectCellRange",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setCellSelection",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setColumnFilters",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setColumnOrder",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setColumnPinning",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setColumnResizing",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setColumnSizing",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setColumnVisibility",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setExpanded",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setFocusedCell",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setGlobalFilter",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setGrouping",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setOptions",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setPageIndex",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setPageSize",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setPagination",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setRowPinning",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setRowSelection",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_setSorting",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_syncExternalStateToBaseAtoms",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_toggleAllColumnsVisible",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_toggleAllPageRowsSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_toggleAllRowsExpanded",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/static-functions",
+    "name": "table_toggleAllRowsSelected",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableState_WorkerRowModels",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorker",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorkerBridge",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorkerConfig",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorkerDataNode",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorkerFilterData",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorkerGroupNode",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorkerOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorkerRequest",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorkerResponse",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorkerResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorkerRowNode",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorkerStage",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "TableWorkerStagePayload",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "createTableWorker",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "createWorkerRowModel",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "getTableWorkerBridge",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "initTableWorker",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "syncTableWorker",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "tableWorkerPipeline",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "tableWorkerStageStateDeps",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "entry": "/experimental-worker-plugin",
+    "name": "workerRowModelsFeature",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  }
+]

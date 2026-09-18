@@ -9,12 +9,13 @@ const DISPOSITIONS = new Set([
 	'octane-only-framework-contract',
 	'pristine-types',
 	'adapted-types',
+	'unmodified-upstream-suite-wrapper',
 ]);
 
 const DISCOVERY_ROOTS = [
 	{
 		root: 'packages/tanstack-table/tests',
-		match: /\.test\.(?:ts|tsx|tsrx)$/,
+		match: /\.test(?:-d)?\.(?:ts|tsx|tsrx)$/,
 		exclude: /\/tests\/upstream\//,
 	},
 	{

@@ -1,0 +1,80 @@
+diff --git a/tests/upstream/useInfiniteQuery.test.tsx b/tests/upstream/useInfiniteQuery.test.tsx
+--- a/tests/upstream/useInfiniteQuery.test.tsx
++++ b/tests/upstream/useInfiniteQuery.test.tsx
+@@ -1,7 +1,6 @@
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+-import { fireEvent, render } from '@octanejs/testing-library'
++import { fireEvent, render, waitFor } from '@octanejs/testing-library'
+ import * as React from 'octane'
+-import { createRenderStream } from '@testing-library/react-render-stream'
+ import { queryKey, sleep } from '@tanstack/query-test-utils'
+ import {
+   QueryCache,
+@@ -1208,8 +1207,13 @@ describe('useInfiniteQuery', () => {
+ 
+     const key = queryKey()
+ 
+-    const renderStream =
+-      createRenderStream<UseInfiniteQueryResult<InfiniteData<number>>>()
++    // OCTANE DIVERGENCE[native-query-test-harness]: observe the same four public query states through
++    // native rendering; the React-only render-stream harness owns no binding behavior.
++    const states: Array<UseInfiniteQueryResult<InfiniteData<number>>> = []
++    async function takeSnapshot() {
++      await waitFor(() => expect(states.length).toBeGreaterThan(0))
++      return states.shift()!
++    }
+ 
+     function Page() {
+       const state = useInfiniteQuery({
+@@ -1221,21 +1225,21 @@ describe('useInfiniteQuery', () => {
+         notifyOnChangeProps: 'all',
+       })
+ 
+-      renderStream.replaceSnapshot(state)
++      states.push(state)
+ 
+       return (
+         <button onClick={() => state.fetchNextPage()}>fetchNextPage</button>
+       )
+     }
+ 
+-    const rendered = await renderStream.render(
++    const rendered = render(
+       <QueryClientProvider client={queryClient}>
+         <Page />
+       </QueryClientProvider>,
+     )
+ 
+     {
+-      const { snapshot } = await renderStream.takeRender()
++      const snapshot = await takeSnapshot()
+       expect(snapshot).toMatchObject({
+         data: { pages: [1] },
+         hasNextPage: true,
+@@ -1246,7 +1250,7 @@ describe('useInfiniteQuery', () => {
+     }
+ 
+     {
+-      const { snapshot } = await renderStream.takeRender()
++      const snapshot = await takeSnapshot()
+       expect(snapshot).toMatchObject({
+         data: { pages: [1] },
+         hasNextPage: true,
+@@ -1259,7 +1263,7 @@ describe('useInfiniteQuery', () => {
+     fireEvent.click(rendered.getByText('fetchNextPage'))
+ 
+     {
+-      const { snapshot } = await renderStream.takeRender()
++      const snapshot = await takeSnapshot()
+       expect(snapshot).toMatchObject({
+         data: { pages: [1] },
+         hasNextPage: true,
+@@ -1269,7 +1273,7 @@ describe('useInfiniteQuery', () => {
+       })
+     }
+     {
+-      const { snapshot } = await renderStream.takeRender()
++      const snapshot = await takeSnapshot()
+       expect(snapshot).toMatchObject({
+         data: { pages: [1, 2] },
+         hasNextPage: true,

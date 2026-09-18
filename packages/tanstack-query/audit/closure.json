@@ -1,0 +1,160 @@
+{
+  "runtimeDependencies": ["@tanstack/query-core", "octane"],
+  "adaptedSources": [
+    {
+      "packageName": "@tanstack/react-query",
+      "paths": [
+        "src/HydrationBoundary.tsrx",
+        "src/QueryClientProvider.tsrx",
+        "src/QueryErrorResetBoundary.tsrx",
+        "src/context.ts",
+        "src/errorResetBoundary.ts",
+        "src/index.ts",
+        "src/infiniteQueryOptions.ts",
+        "src/internal.ts",
+        "src/isRestoring.ts",
+        "src/mutationOptions.ts",
+        "src/queryOptions.ts",
+        "src/useBaseQuery.ts",
+        "src/useInfiniteQuery.ts",
+        "src/useIsFetching.ts",
+        "src/useMutation.ts",
+        "src/useMutationState.ts",
+        "src/usePrefetch.ts",
+        "src/useQueries.ts",
+        "src/useQuery.ts",
+        "src/useSuspenseQueries.ts",
+        "src/useSuspenseQuery.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/HydrationBoundary.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "76a62b91d2733fc26e451ce4c9a164a8765be354affb560ee901d09e0e7aa954"
+    },
+    {
+      "path": "src/QueryClientProvider.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "d566f84bdf04d37fa1a7e92272355521223e89cac88348a552b3248037bd7d78"
+    },
+    {
+      "path": "src/QueryErrorResetBoundary.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "faacc4c10aaeae5f3f31139593a28b73e456c4dfbd4a5db0820801aa93e9bee2"
+    },
+    {
+      "path": "src/context.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "27ca3c7069dbb641086c476c31865328d58e8c01ef5b9769e30dc3c19f3354a2"
+    },
+    {
+      "path": "src/errorResetBoundary.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "b243a180c456420ef374e710c3da291dc65370f589616a0f2e2864442cafcda2"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "f1e57f1073107882419006054620f6968461d3c55d400398072d1daa23b32615"
+    },
+    {
+      "path": "src/infiniteQueryOptions.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "713d69bcf376e989b630ce26fdedc1a219c3adbbf653ad47026c6e8171928275"
+    },
+    {
+      "path": "src/internal.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "06dc36d35fe1ba435ca0722a021d3b6ba809b82ea3bc0afd467ec921500d3009"
+    },
+    {
+      "path": "src/isRestoring.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "c273616a284d16b5f7a326c92e1fff3f4eea089eb13099d7470501c8ea84d01e"
+    },
+    {
+      "path": "src/mutationOptions.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "454a6437b2e517a64928fcf60c97dcea03018ff944e9d6fa426c949110944da3"
+    },
+    {
+      "path": "src/queryOptions.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "abe022a8b5cd24f36b85346c78156e988d65ecaf1f4dc9be020a8b66f16baeee"
+    },
+    {
+      "path": "src/useBaseQuery.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "51b9098e8465185735daa6c7fb3f506440eb867ad08dfc34b4eea24e801aa00f"
+    },
+    {
+      "path": "src/useInfiniteQuery.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "53dca4d160f0091f656eb47ebeefce7cd1d51f2dcaaf835865c42ffb495c8f52"
+    },
+    {
+      "path": "src/useIsFetching.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "68f7443f7d5644ea863259d0d51362e748f089d5fbbe654fcaa99331ed02c632"
+    },
+    {
+      "path": "src/useMutation.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "6650617355e15aa2818758fcf319dc96121ad8e544fba0a40ef884e317716973"
+    },
+    {
+      "path": "src/useMutationState.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "db17e8f67cfd233f60c23dc73a046b4639df1ad8b3a340d68822b32eef56dc21"
+    },
+    {
+      "path": "src/usePrefetch.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "9e5aa0e99918076cf1843015098ee88d0d305c39154723b7f48955e45e62faa9"
+    },
+    {
+      "path": "src/useQueries.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "e4270cf1245843aae40e571c370e11a201b50c4e8c3e917acc2865efbd68e2f5"
+    },
+    {
+      "path": "src/useQuery.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "6685e7a1e26cdbf737dcd4fa1a196081234f432cb56417a9382e19928d4db4ca"
+    },
+    {
+      "path": "src/useSuspenseQueries.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "5a572bd47a6ccc3bceaaa4d070ec9604ba6e09b77191864af6448b60c76d438f"
+    },
+    {
+      "path": "src/useSuspenseQuery.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "5c10d38437c392e7ecaf65d66b2afe7bd2df9b3815cc47ff334e0ae5dcd6b05b"
+    }
+  ],
+  "reimplementedDependencies": []
+}

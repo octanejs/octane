@@ -107,7 +107,7 @@ describe('CI workflow aggregation', () => {
 	test('runs only required-check reporters for draft pull requests', () => {
 		assert.match(
 			workflow,
-			/^  pull_request:\n    branches: \[main\]\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft, closed\]$/m,
+			/^  pull_request:\n    branches: \[main, "jon\/update-bindings-\*"\]\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft, closed\]$/m,
 		);
 
 		const draftGuard =

@@ -49,7 +49,7 @@
     {
       "path": "packages/tanstack-query/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Runs exact cached-query, async-query, and mutation scenarios against @tanstack/react-query@5.101.3."
+      "oracle": "Runs exact cached-query, async-query, and mutation scenarios against @tanstack/react-query@5.102.8."
     },
     {
       "path": "packages/tanstack-query/tests/ssr/server.test.ts",
@@ -60,6 +60,17 @@
       "path": "packages/tanstack-query/typetests/public-api.test-d.ts",
       "disposition": "octane-only-type-conformance",
       "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
+    },
+    {
+      "path": "packages/tanstack-query/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "reason": "Runs all 404 exact pinned upstream runtime registrations unchanged against React and verifies their identities and passed results.",
+      "oracle": "https://github.com/TanStack/query/tree/2969edf32f7e0c48e2a108d84712d6e01edfde21/packages/react-query"
+    },
+    {
+      "path": "packages/tanstack-query/tests/types/public-contracts.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Strict binding public-type contracts with pinned upstream witnesses and independent negative controls."
     }
   ]
 }

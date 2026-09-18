@@ -18,6 +18,8 @@
 
 Vendored evidence is development-only and excluded from package `files`.
 
+`status.json.surfaces` declares the root as imported and `./react` as copied. `audit/source-ledger.json` records the corresponding source hashes. The copied hook keeps its provenance and parity obligations; this ownership declaration does not establish additional runtime or type compatibility, and no upstream evidence has been removed.
+
 ## Export crosswalk
 
 | Upstream export | Octane status | Evidence / divergence |
@@ -25,16 +27,16 @@ Vendored evidence is development-only and excluded from package `files`.
 | `autoAnimate` (`.`) | Reused verbatim from `@formkit/auto-animate` | `src/index.ts`; `tests/auto-animate.test.ts` |
 | default export | Reused verbatim | `src/index.ts` |
 | `getTransitionSizes` | Reused verbatim | `src/index.ts` |
-| `vAutoAnimate` | Gap | Vue directive on the root package; Octane has no Vue renderer |
+| `vAutoAnimate` | Inapplicable | Vue directive on the root package; Octane has no Vue renderer |
 | `AutoAnimateOptions` / `AutoAnimationPlugin` / `AnimationController` | Reused types | `src/index.ts` |
 | `./react` `useAutoAnimate` | Ported | `src/react/index.tsrx`; `tests/auto-animate.test.ts` |
-| `./vue` | Gap | Other-framework adapter; Octane has no Vue renderer |
-| `./preact` | Gap | Other-framework adapter |
-| `./solid` | Gap | Other-framework adapter |
-| `./angular` | Gap | Other-framework adapter |
-| `./nuxt` | Gap | Nuxt module |
-| `./marko` | Gap | Marko tag |
-| `./qwik` (source only) | Gap | Not a published npm export at this pin; source exists in `upstream/src/qwik` |
+| `./vue` | Inapplicable | Requires the Vue renderer |
+| `./preact` | Inapplicable | Requires the Preact renderer |
+| `./solid` | Inapplicable | Requires the Solid renderer |
+| `./angular` | Inapplicable | Requires the Angular renderer |
+| `./nuxt` | Inapplicable | Requires Nuxt |
+| `./marko` | Inapplicable | Requires the Marko renderer |
+| `./qwik` (source only) | Inapplicable | Requires Qwik; not a published npm export at this pin |
 
 ## Upstream test disposition
 

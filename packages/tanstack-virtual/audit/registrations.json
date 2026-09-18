@@ -1,0 +1,548 @@
+[
+  {
+    "id": "react-case-v1:9426f5a2194d84a3d77d",
+    "declarationId": "react-case-v1:9426f5a2194d84a3d77d",
+    "source": "packages/react-virtual/e2e/app/test/cached-measurements.spec.ts:3:1",
+    "kind": "test",
+    "title": "preserves item sizes when list is hidden with useCachedMeasurements",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:c73c01d4383311c095e7",
+    "declarationId": "react-case-v1:c73c01d4383311c095e7",
+    "source": "packages/react-virtual/e2e/app/test/chat.spec.ts:73:1",
+    "kind": "test",
+    "title": "chat mode keeps visible messages stable when history is prepended",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:c9bfce284ae7e64bc925",
+    "declarationId": "react-case-v1:c9bfce284ae7e64bc925",
+    "source": "packages/react-virtual/e2e/app/test/chat.spec.ts:108:1",
+    "kind": "test",
+    "title": "chat mode does not follow appended messages while reading history",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:07576f924ec77589220a",
+    "declarationId": "react-case-v1:07576f924ec77589220a",
+    "source": "packages/react-virtual/e2e/app/test/chat.spec.ts:140:1",
+    "kind": "test",
+    "title": "chat mode follows appended messages from the end",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:6692e4862a105fc2b668",
+    "declarationId": "react-case-v1:6692e4862a105fc2b668",
+    "source": "packages/react-virtual/e2e/app/test/chat.spec.ts:150:1",
+    "kind": "test",
+    "title": "chat mode keeps streaming bottom message pinned as it grows",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:fe7eb0cf2ee1577f49e4",
+    "declarationId": "react-case-v1:fe7eb0cf2ee1577f49e4",
+    "source": "packages/react-virtual/e2e/app/test/chat.spec.ts:162:1",
+    "kind": "test",
+    "title": "chat mode keeps streaming bottom message pinned as it grows with paddingEnd",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:9db957bf5545ed60fd6e",
+    "declarationId": "react-case-v1:9db957bf5545ed60fd6e",
+    "source": "packages/react-virtual/e2e/app/test/chat.spec.ts:178:1",
+    "kind": "test",
+    "title": "direct DOM chat stays pinned when a previous message grows without a re-render",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:864983deb49c93b77971",
+    "declarationId": "react-case-v1:c0d84da1562ddbe7ede6",
+    "source": "packages/react-virtual/e2e/app/test/direct-dom-updates.spec.ts:8:5:registration:0",
+    "kind": "test",
+    "title": "sets container size and positions items via direct DOM updates",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:a14a91ce580a51bc5598",
+    "declarationId": "react-case-v1:c0d84da1562ddbe7ede6",
+    "source": "packages/react-virtual/e2e/app/test/direct-dom-updates.spec.ts:8:5:registration:1",
+    "kind": "test",
+    "title": "sets container size and positions items via direct DOM updates",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:d63900eb3b92951e7f51",
+    "declarationId": "react-case-v1:98dbb15016eec8def92f",
+    "source": "packages/react-virtual/e2e/app/test/direct-dom-updates.spec.ts:35:5:registration:0",
+    "kind": "test",
+    "title": "scrolling moves items via direct DOM without per-pixel React re-renders",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:5c718a6bc642327da8d4",
+    "declarationId": "react-case-v1:98dbb15016eec8def92f",
+    "source": "packages/react-virtual/e2e/app/test/direct-dom-updates.spec.ts:35:5:registration:1",
+    "kind": "test",
+    "title": "scrolling moves items via direct DOM without per-pixel React re-renders",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:2fb5aa64edbb0ca0d69d",
+    "declarationId": "react-case-v1:ee7081487fa3f48c5dfb",
+    "source": "packages/react-virtual/e2e/app/test/direct-dom-updates.spec.ts:65:5:registration:0",
+    "kind": "test",
+    "title": "large scroll triggers a re-render and items still position correctly",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:67f20627f937c6f331cc",
+    "declarationId": "react-case-v1:ee7081487fa3f48c5dfb",
+    "source": "packages/react-virtual/e2e/app/test/direct-dom-updates.spec.ts:65:5:registration:1",
+    "kind": "test",
+    "title": "large scroll triggers a re-render and items still position correctly",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:e2ed3fc2f272b65f9643",
+    "declarationId": "react-case-v1:8b153d28013afd45eb39",
+    "source": "packages/react-virtual/e2e/app/test/direct-dom-updates.spec.ts:93:5:registration:0",
+    "kind": "test",
+    "title": "without containerRef the virtualizer makes no direct DOM writes but still skips re-renders",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:1f0e750e6783c83c2dcb",
+    "declarationId": "react-case-v1:8b153d28013afd45eb39",
+    "source": "packages/react-virtual/e2e/app/test/direct-dom-updates.spec.ts:93:5:registration:1",
+    "kind": "test",
+    "title": "without containerRef the virtualizer makes no direct DOM writes but still skips re-renders",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:3735724f27725f37642c",
+    "declarationId": "react-case-v1:3735724f27725f37642c",
+    "source": "packages/react-virtual/e2e/app/test/measure-element.spec.ts:3:1",
+    "kind": "test",
+    "title": "positions items correctly after expand → collapse → delete → expand",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:60d52c06611863cfc4c4",
+    "declarationId": "react-case-v1:5d19a2c3e30c8161c112",
+    "source": "packages/react-virtual/e2e/app/test/react-compiler.spec.ts:7:5:registration:0",
+    "kind": "test",
+    "title": "renders items on initial load",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:1123cf1a3071e94550fb",
+    "declarationId": "react-case-v1:5d19a2c3e30c8161c112",
+    "source": "packages/react-virtual/e2e/app/test/react-compiler.spec.ts:7:5:registration:1",
+    "kind": "test",
+    "title": "renders items on initial load",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:946a58490a5fced5d01d",
+    "declarationId": "react-case-v1:f625dc8e89d4e2d64b53",
+    "source": "packages/react-virtual/e2e/app/test/react-compiler.spec.ts:28:5:registration:0",
+    "kind": "test",
+    "title": "items update correctly after scrolling",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:914adb0a4d11e592009b",
+    "declarationId": "react-case-v1:f625dc8e89d4e2d64b53",
+    "source": "packages/react-virtual/e2e/app/test/react-compiler.spec.ts:28:5:registration:1",
+    "kind": "test",
+    "title": "items update correctly after scrolling",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:dbe14bbeaf50dbc489e0",
+    "declarationId": "react-case-v1:77a8f0a7a00afa58eef3",
+    "source": "packages/react-virtual/e2e/app/test/react-compiler.spec.ts:53:5:registration:0",
+    "kind": "test",
+    "title": "incremental scroll positions items without full re-render",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:5f8598dca94b2b344c55",
+    "declarationId": "react-case-v1:77a8f0a7a00afa58eef3",
+    "source": "packages/react-virtual/e2e/app/test/react-compiler.spec.ts:53:5:registration:1",
+    "kind": "test",
+    "title": "incremental scroll positions items without full re-render",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const mode of ['position', 'transform'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:bbe7298947b306eb6ddb",
+    "declarationId": "react-case-v1:bbe7298947b306eb6ddb",
+    "source": "packages/react-virtual/e2e/app/test/scroll-anchor.spec.ts:71:1",
+    "kind": "test",
+    "title": "anchored item stays stable when scrolling up into unmeasured items",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:49335efa7effc65fa064",
+    "declarationId": "react-case-v1:49335efa7effc65fa064",
+    "source": "packages/react-virtual/e2e/app/test/scroll.spec.ts:21:1",
+    "kind": "test",
+    "title": "scrolls to index 1000",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:95785da16fcae1b9cd41",
+    "declarationId": "react-case-v1:95785da16fcae1b9cd41",
+    "source": "packages/react-virtual/e2e/app/test/scroll.spec.ts:34:1",
+    "kind": "test",
+    "title": "scrolls to last item",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:e7194757fdbb07c7fc57",
+    "declarationId": "react-case-v1:e7194757fdbb07c7fc57",
+    "source": "packages/react-virtual/e2e/app/test/scroll.spec.ts:54:1",
+    "kind": "test",
+    "title": "renders correctly with initialOffset and user scroll up",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:4118af0d638271128623",
+    "declarationId": "react-case-v1:4118af0d638271128623",
+    "source": "packages/react-virtual/e2e/app/test/scroll.spec.ts:114:1",
+    "kind": "test",
+    "title": "scrolls to index 0",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:6f64e7ecc4c9cae613a8",
+    "declarationId": "react-case-v1:6f64e7ecc4c9cae613a8",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:3:1",
+    "kind": "test",
+    "title": "smooth scrolls to index 1000",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:b298b6a9bb0ff3e91037",
+    "declarationId": "react-case-v1:b298b6a9bb0ff3e91037",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:28:1",
+    "kind": "test",
+    "title": "smooth scrolls to index 100",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:92b21313101bf8ae8db0",
+    "declarationId": "react-case-v1:92b21313101bf8ae8db0",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:37:1",
+    "kind": "test",
+    "title": "smooth scrolls to index 0 after scrolling away",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:df83d3b1c3536fbca148",
+    "declarationId": "react-case-v1:df83d3b1c3536fbca148",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:58:1",
+    "kind": "test",
+    "title": "smooth scrolls to index 500 with start alignment",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:c6cd2ab68f202e73e871",
+    "declarationId": "react-case-v1:c6cd2ab68f202e73e871",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:83:1",
+    "kind": "test",
+    "title": "smooth scrolls to index 500 with center alignment",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:8f98d73ebd1d031b85fe",
+    "declarationId": "react-case-v1:8f98d73ebd1d031b85fe",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:108:1",
+    "kind": "test",
+    "title": "smooth scrolls sequentially to multiple targets",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:ebdf2687ccf3a3e36e8b",
+    "declarationId": "react-case-v1:ebdf2687ccf3a3e36e8b",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:127:1",
+    "kind": "test",
+    "title": "interrupting smooth scroll with another smooth scroll",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:d044867485662535fc18",
+    "declarationId": "react-case-v1:d044867485662535fc18",
+    "source": "packages/react-virtual/e2e/app/test/stale-index.spec.ts:3:1",
+    "kind": "test",
+    "title": "does not call getItemKey with stale index after removing items",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:71b70a3ef4c1645fee52",
+    "declarationId": "react-case-v1:71b70a3ef4c1645fee52",
+    "source": "packages/react-virtual/tests/index.test.tsx:113:1",
+    "kind": "test",
+    "title": "should render",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:cb02e7e91b8c4c842340",
+    "declarationId": "react-case-v1:cb02e7e91b8c4c842340",
+    "source": "packages/react-virtual/tests/index.test.tsx:123:1",
+    "kind": "test",
+    "title": "should render with overscan",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:b0eaaef9100083ceb4e3",
+    "declarationId": "react-case-v1:b0eaaef9100083ceb4e3",
+    "source": "packages/react-virtual/tests/index.test.tsx:133:1",
+    "kind": "test",
+    "title": "should render given dynamic size",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:86ececdd9e957cd57a31",
+    "declarationId": "react-case-v1:86ececdd9e957cd57a31",
+    "source": "packages/react-virtual/tests/index.test.tsx:144:1",
+    "kind": "test",
+    "title": "should use rangeExtractor",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:87905758ffa95441b427",
+    "declarationId": "react-case-v1:87905758ffa95441b427",
+    "source": "packages/react-virtual/tests/index.test.tsx:152:1",
+    "kind": "test",
+    "title": "should handle count change",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:c5022ae30902abeba7de",
+    "declarationId": "react-case-v1:c5022ae30902abeba7de",
+    "source": "packages/react-virtual/tests/index.test.tsx:166:1",
+    "kind": "test",
+    "title": "should handle gap change",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:3148a808c3add2f926ae",
+    "declarationId": "react-case-v1:3148a808c3add2f926ae",
+    "source": "packages/react-virtual/tests/index.test.tsx:183:1",
+    "kind": "test",
+    "title": "should handle handle height change",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  }
+]

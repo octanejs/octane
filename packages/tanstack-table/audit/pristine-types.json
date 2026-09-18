@@ -1,5 +1,15 @@
 [
   {
+    "path": "public-contracts.test-d.ts",
+    "sha256": "7ddd86682030bda8a6e2975b86c31d785c07c5205284962cad21fb8bddd16938",
+    "assertionGroups": [
+      "27f8ea05fb8b251c372a01c4b6b76f0591b5866480346a8973030c70f05fc6a5",
+      "084c8527a885678f9250eb01c8c398c83891a83f7cbb0b75834322c137662ef1",
+      "e9c036aa700119704b70783da5f4ccabbfdfd666382502cd60f2ddca62692fda",
+      "561aac3f539e2bba6439b343cb7734b406aa960f02716887ad2e44d55c8096f6"
+    ]
+  },
+  {
     "path": "types.test-d.ts",
     "sha256": "c293e132f44058c8247be40904783a5cfbef93047b1cf389b3d33ce184c48ffc",
     "assertionGroups": [

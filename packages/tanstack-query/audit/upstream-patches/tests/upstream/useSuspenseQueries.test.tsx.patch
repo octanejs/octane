@@ -1,0 +1,59 @@
+diff --git a/tests/upstream/useSuspenseQueries.test.tsx b/tests/upstream/useSuspenseQueries.test.tsx
+--- a/tests/upstream/useSuspenseQueries.test.tsx
++++ b/tests/upstream/useSuspenseQueries.test.tsx
+@@ -275,6 +275,9 @@ describe('useSuspenseQueries', () => {
+   })
+ 
+   it('should not call combine while reset queries are pending again', async () => {
++    // OCTANE DIVERGENCE[native-query-test-harness]: assert the caught error through the public boundary callback;
++    // React's console argument layout is not an Octane error contract.
++    const caughtErrors: unknown[] = []
+     const consoleMock = vi
+       .spyOn(console, 'error')
+       .mockImplementation(() => undefined)
+@@ -314,7 +317,7 @@ describe('useSuspenseQueries', () => {
+ 
+     const rendered = renderWithClient(
+       queryClient,
+-      <ErrorBoundary fallbackRender={() => <div>error boundary</div>}>
++      <ErrorBoundary onError={(error) => caughtErrors.push(error)} fallbackRender={() => <div>error boundary</div>}>
+         <React.Suspense fallback="loading">
+           <Page />
+         </React.Suspense>
+@@ -335,7 +338,7 @@ describe('useSuspenseQueries', () => {
+     await act(() => vi.advanceTimersByTimeAsync(10))
+     expect(rendered.getByText('error boundary')).toBeInTheDocument()
+ 
+-    expect(consoleMock.mock.calls[0]?.[1]).toStrictEqual(
++    expect(caughtErrors[0]).toStrictEqual(
+       new Error('Suspense Error Bingo'),
+     )
+ 
+@@ -614,6 +617,9 @@ describe('useSuspenseQueries', () => {
+   })
+ 
+   it('should throw error when queryKey changes and new query fails', async () => {
++    // OCTANE DIVERGENCE[native-query-test-harness]: assert the caught error through the public boundary callback;
++    // React's console argument layout is not an Octane error contract.
++    const caughtErrors: unknown[] = []
+     const consoleMock = vi
+       .spyOn(console, 'error')
+       .mockImplementation(() => undefined)
+@@ -641,7 +647,7 @@ describe('useSuspenseQueries', () => {
+ 
+     const rendered = renderWithClient(
+       queryClient,
+-      <ErrorBoundary fallbackRender={() => <div>error boundary</div>}>
++      <ErrorBoundary onError={(error) => caughtErrors.push(error)} fallbackRender={() => <div>error boundary</div>}>
+         <React.Suspense fallback="loading">
+           <Page />
+         </React.Suspense>
+@@ -657,7 +663,7 @@ describe('useSuspenseQueries', () => {
+     await act(() => vi.advanceTimersByTimeAsync(10))
+     expect(rendered.getByText('error boundary')).toBeInTheDocument()
+ 
+-    expect(consoleMock.mock.calls[0]?.[1]).toStrictEqual(
++    expect(caughtErrors[0]).toStrictEqual(
+       new Error('Suspense Error Bingo'),
+     )
+ 

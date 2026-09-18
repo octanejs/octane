@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "9fe9970f409e5b1d2067c0107ac0201761d5fddc53e9b20b66619fb0d2b4122f"
+    },
+    {
+      "path": "upstream-artifact/tanstack-react-pacer-0.23.0.tgz",
+      "sha256": "9662c2a241e21e2f3c8f534195516ce5060b4d13b1997fca96daea797be9f3a1"
+    }
+  ],
+  "requiredFiles": [
+    "audit/upstream.lock.json",
+    "audit/registrations.json",
+    "audit/crosswalk.json",
+    "audit/upstream-crosswalk.json",
+    "typetests/expected-contracts.d.ts",
+    "tests/types/public-contracts.test-d.ts"
+  ],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@tanstack/react-pacer",
+    "version": "0.23.0",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"]
+}

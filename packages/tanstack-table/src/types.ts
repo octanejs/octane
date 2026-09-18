@@ -29,7 +29,7 @@ import type {
 	TableOptions,
 	TableState,
 } from '@tanstack/table-core';
-import type { ComponentBody, Context, ElementDescriptor, OctaneNode } from 'octane';
+import type { ComponentBody, ComponentType, Context, ElementDescriptor, OctaneNode } from 'octane';
 
 // =============================================================================
 // Renderables
@@ -49,7 +49,7 @@ export type Renderable<TProps> =
  * Structural on purpose (octane components are plain functions), so registries
  * accept components declared in `.tsrx`, `.tsx`, or plain `.ts` alike.
  */
-export type TableComponentType<TProps = any> = (props: TProps) => OctaneNode;
+export type TableComponentType<TProps = any> = ComponentType<TProps>;
 
 // =============================================================================
 // FlexRender
