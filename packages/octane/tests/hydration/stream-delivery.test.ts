@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { act, hydrateRoot } from '../../src/index.js';
 import {
 	installStreamedRendererGlobal,
 	readStreamedRendererResponse,
@@ -26,6 +27,12 @@ import type {
 	StreamFrameIdentity,
 	StreamedRegionPlacementFrame,
 } from '../../src/streamed-signals-protocol.js';
+import { loadServerFixture } from '../_server-fixture.js';
+import * as client from '../_fixtures/signals-hydration.tsrx';
+
+const server = loadServerFixture<typeof client>(
+	'packages/octane/tests/_fixtures/signals-hydration.tsrx',
+);
 
 function setup(value: unknown = 'server') {
 	const documentOwner = { scopeKey: 'document:stream-delivery' };
@@ -648,16 +655,58 @@ describe('streamed renderer delivery', () => {
 
 	it('emits the bounded mailbox before a streamed result injection', async () => {
 		const state = setup();
-		const injection = createStreamedSignalInjection(state.identity, 'ready');
-		const stream = await renderToReadableStream(() => '', {}, { injection });
+		const injection = createStreamedSignalInjection(state.identity, 'ready', {
+			announceSelection: true,
+		});
+		const stream = await renderToReadableStream(server.StreamedSignalShell, {}, { injection });
 		const html = await new Response(stream).text();
 		expect(html.indexOf('version:1,frames:q')).toBeGreaterThanOrEqual(0);
 		expect(html.indexOf('version:1,frames:q')).toBeLessThan(
 			html.indexOf('globalThis.__octaneStreamedRenderer.receive'),
 		);
-		state.detach();
-		state.receiver.dispose();
-		retireSignalOwnerIdentity(state.documentOwner);
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		document.body.append(container);
+		const paragraph = container.querySelector('p');
+		const authored = container.querySelector('#authored-data');
+		const input = container.querySelector('input')!;
+		input.value = 'typed before hydration';
+		input.focus();
+		input.setSelectionRange(2, 7);
+		const onInput = vi.fn();
+		const onRecoverableError = vi.fn();
+		const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			// Browsers retain executed wire scripts. Adoption must consume those
+			// sidecars without mistaking them for component output.
+			await act(() => {
+				root = hydrateRoot(
+					container,
+					client.StreamedSignalShell,
+					{ onInput },
+					{ onRecoverableError },
+				);
+			});
+			expect(onRecoverableError).not.toHaveBeenCalled();
+			expect(warning).not.toHaveBeenCalled();
+			expect(container.querySelector('p')).toBe(paragraph);
+			expect(container.querySelector('#authored-data')).toBe(authored);
+			expect(authored?.textContent).toBe('{"source":"authored"}');
+			expect(container.querySelector('input')).toBe(input);
+			expect(input.value).toBe('typed before hydration');
+			expect(document.activeElement).toBe(input);
+			expect([input.selectionStart, input.selectionEnd]).toEqual([2, 7]);
+			input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+			expect(onInput).toHaveBeenCalledOnce();
+		} finally {
+			root?.unmount();
+			warning.mockRestore();
+			container.remove();
+			state.detach();
+			state.receiver.dispose();
+			retireSignalOwnerIdentity(state.documentOwner);
+		}
 	});
 
 	it('enforces serialized inline-frame budgets before publishing oversized data', async () => {

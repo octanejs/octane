@@ -586,6 +586,41 @@ The renderer validates that proof again before publishing, including after a
 suspended or staged attempt. A stale attempt cannot overwrite a newer early
 presentation.
 
+An opted-in component with one native host can transfer only its declared class
+and known-provider style bindings while leaving its children outside that lease:
+
+```tsrx
+import type { OctaneNode } from 'octane';
+import { unbound } from 'octane/behavior';
+
+export function ComposerFrame(props: { recovery: boolean; children: OctaneNode }) @{
+	'use dom bindings';
+	<form class={props.recovery ? 'recovery' : 'ready'}>
+		{unbound(props.children)}
+	</form>
+}
+```
+
+Adopt the existing form with `adoptBindings` and offer that returned handle in
+`bindingLeases`. The early artifact neither evaluates nor owns these children.
+Normal hydration still renders them in the same application tree; independently
+bound textarea controls and deferred children keep their own ownership. Other
+host properties can remain outside this lease through `unbound`.
+
+The compiler must prove the single host and its owned presentation fields.
+Hydration checks that exact host and source before publishing, and closes the
+host's preparation before entering its children. A child update alone does not
+invalidate a host lease. Moving or replacing the host, conflicting ownership,
+or a stale source cannot authorize takeover. Suspension or refusal leaves the
+early layout live; accepted transfer preserves its current classes and styles
+until the normal host bindings publish before refs.
+
+If retirement cleanup invalidates the host after acceptance, its successor
+writers and pending host refs are revoked. This does not roll back cleanup or
+retire independently owned children. A later explicit root render against that
+invalid host refuses before writing or attaching its ref, then follows the
+renderer’s normal error handling and root teardown.
+
 An unused generic-content branch does not
 prevent takeover of a supported slot branch, but switching into unsupported
 content while takeover is pending causes a clear refusal. A native rest spread
@@ -632,8 +667,9 @@ existing closed-field compiler contract; arbitrary spreads remain unsupported.
 No control lease or renderer is needed for a textarea that stays renderer-free.
 
 Other writable controls and unsupported normal-renderer writers do not
-qualify for handoff. Neither do entered keyed-list, opaque, or generic
-renderable regions.
+qualify for handoff. Ownership of entered keyed-list, opaque, or generic
+renderable regions also remains outside the handoff contract; a host-only lease
+does not authorize transfer of its descendants.
 Unsupported handoffs fail explicitly while preserving the early presentation;
 they do not silently replace its DOM or load a different renderer path. Keep
 richer renderer-free programs under their existing owner until an explicit

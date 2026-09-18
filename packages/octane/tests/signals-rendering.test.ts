@@ -767,7 +767,7 @@ describe('native signal rendering', () => {
 			const state = createCounter$('native-stable-publication-' + kind, 1);
 			const container = document.createElement('div');
 			document.body.appendChild(container);
-			const root = createRoot(container);
+			let root = createRoot(container);
 			const log: string[] = [];
 			const refs: string[] = [];
 			let current: HTMLSpanElement | null = null;
@@ -805,6 +805,24 @@ describe('native signal rendering', () => {
 				flushSync(() => root.render(NativeStablePublication, { ...props, label: 'C' }));
 				expect(container.querySelector('.stable-ref')).toBe(host);
 				expect(current).toBe(host);
+				expect(refs).toEqual(['attach']);
+				expect(log).toEqual(['setup:B']);
+				root.unmount();
+				expect(current).toBeNull();
+				expect(refs).toEqual(['attach', 'detach']);
+				expect(log).toEqual(['setup:B', 'cleanup:B']);
+
+				root = createRoot(container);
+				log.length = 0;
+				refs.length = 0;
+				const immediateProps = { ...props, replace: () => {} };
+				root.render(NativeStablePublication, immediateProps);
+				expect(log).toEqual([]);
+				root.render(NativeStablePublication, { ...immediateProps, label: 'B' });
+				flushSync(() => {});
+				const immediateHost = container.querySelector('.stable-ref');
+				expect(container.textContent).toBe('B:1B:1');
+				expect(current).toBe(immediateHost);
 				expect(refs).toEqual(['attach']);
 				expect(log).toEqual(['setup:B']);
 				root.unmount();

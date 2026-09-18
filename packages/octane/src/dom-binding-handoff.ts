@@ -1,5 +1,6 @@
-/** Renderer-independent capability carried by an adopted, compiler-proven view. */
-export const BINDING_HANDOFF = /* @__PURE__ */ Symbol.for('octane.binding-handoff');
+import { BINDING_HANDOFF } from './signals/control-handoff.js';
+
+export { BINDING_HANDOFF };
 
 /** Current early-owned range, not a license to render a different shape. */
 export interface BindingHandoffRange {
@@ -28,13 +29,15 @@ export interface BindingHandoff {
 	readonly root: Node;
 	readonly anchor: Node;
 	readonly end?: Node;
-	/** Allocated only for a claimed structural presentation. -1 means publication is in progress. */
+	/** A scalar host's declared native channels; descendants belong to other owners. */
+	readonly host?: ReadonlySet<string>;
+	/** Revisioned presentations return -1 while publication is in progress. */
 	revision?(): number;
 	ranges?(): ReadonlyMap<Node, BindingHandoffRange>;
 	view?(root: Node): BindingHandoffView | undefined;
 	rest?(element: Element, site: number): BindingHandoffRest | undefined;
 	valid?(): boolean;
-	/** One deferred retry; only structural leases allocate publication listeners. */
+	/** One deferred retry; listener storage is allocated only when requested. */
 	afterPublication?(callback: () => void): () => void;
 	active(): boolean;
 	retire(publish?: () => void): void;

@@ -28,9 +28,13 @@ for (const prematureClose of [false, true]) {
 		async (t) => {
 			const directory = temporary(t);
 			const server = createServer();
-			server.on('upgrade', (_request, socket) =>
-				socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'),
-			);
+			server.on('upgrade', (_request, socket) => {
+				// Deliberately closing the page can reset this rejected WebSocket connection.
+				socket.on('error', (error) => {
+					if (error.code !== 'ECONNRESET') throw error;
+				});
+				socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+			});
 			await new Promise((resolveListen) => server.listen(0, '127.0.0.1', resolveListen));
 			t.after(() => new Promise((resolveClose) => server.close(resolveClose)));
 			const socketUrl = `ws://127.0.0.1:${server.address().port}/socket?token=private-smoke-secret`;

@@ -160,10 +160,11 @@ test('native exceptions are specific operations, not blanket function exemptions
 	 container.removeChild(anchor);
 	 return retained;
 	}
-	function currentPresentation(node: Node) {
+	function currentPresentation(node: Node, container: Node) {
 	 const parent = node.parentNode;
+	 const owned = container.contains(node);
 	 node.textContent = 'early';
-	 return parent;
+	 return [parent, owned];
 	}
 	function presentationRange(node: Comment) {
 	 const marker = node.data;

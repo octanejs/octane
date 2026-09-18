@@ -8,6 +8,12 @@ import { isBindingOpenComment } from './dom-binding-protocol.js';
 /** Sentinel <template> attribute marking a pending streamed boundary. */
 export const STREAM_BOUNDARY_ATTR = 'data-oct-b';
 
+/** Renderer-owned JSON script carrying resolved SSR Suspense values. */
+export const SUSPENSE_SCRIPT_ATTR = 'data-octane-suspense';
+
+/** Renderer-owned executable/data scripts emitted by the streaming protocol. */
+export const STREAM_SCRIPT_ATTR = 'data-octane-stream';
+
 /** Render-unique token stamped on deferred-hydration owners in a streamed shell. */
 export const HYDRATE_STREAM_TOKEN_ATTR = 'data-octane-stream-token';
 

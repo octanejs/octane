@@ -15220,7 +15220,7 @@ function compileComponent(node, ctx, options) {
 }
 
 /** Gate explicitly eligible presentation views; ordinary codegen stays direct. */
-function preparePresentationHydration(body, node, ctx) {
+function preparePresentationHydration(body, node, ctx, hostEnd) {
 	const proof = node._octanePresentationHydration;
 	if (!proof || ctx.mode === 'server' || ctx._universalRuntimeUnit != null) return body;
 	const writers = new Set([
@@ -15292,6 +15292,7 @@ function preparePresentationHydration(body, node, ctx) {
 	const visit = (value, rewrite) => {
 		if (!value || typeof value !== 'object') return value;
 		if (Array.isArray(value)) return value.map((item) => visit(item, rewrite));
+		if (proof.host && value._octanePresentationUnbound) return value;
 		if (!value.type || /Function/.test(value.type)) return value;
 		if (value.type === 'ReturnStatement' && !value._octanePendingOutputGuard) supported = false;
 		const helper =
@@ -15363,14 +15364,15 @@ function preparePresentationHydration(body, node, ctx) {
 				)
 			: result;
 	};
-	visit(body, false);
+	const captured = proof.host ? body.slice(0, hostEnd) : body;
+	visit(captured, false);
 	const frame = b.id(allocCompilerName(ctx, '__presentationHydration'));
 	const completed = b.id(allocCompilerName(ctx, '__presentationComplete'));
 	const failure =
-		proof.structural || proof.nativeControl
+		proof.structural || proof.nativeControl || proof.host
 			? b.id(allocCompilerName(ctx, '__presentationFailure'))
 			: null;
-	const statements = supported ? visit(body, true) : body;
+	const statements = supported ? visit(captured, true) : captured;
 	let directiveEnd = 0;
 	while (
 		statements[directiveEnd]?.type === 'ExpressionStatement' &&
@@ -15382,21 +15384,33 @@ function preparePresentationHydration(body, node, ctx) {
 		b.id('__s'),
 		b.literal(proof.id),
 		b.literal(supported),
-		...(proof.structural ? [b.literal(true)] : []),
-		...(proof.conditionalRest ? [b.literal(true)] : []),
+		...(proof.structural || proof.host ? [b.literal(proof.structural === true)] : []),
+		...(proof.conditionalRest || proof.host ? [b.literal(proof.conditionalRest === true)] : []),
+		...(proof.host ? [b.literal(true)] : []),
 	);
 	// A new, unsupported writer can still render normally, but must reject an
 	// attempted lease before publishing anything. It never opens a frame.
 	if (!supported)
-		return [...statements.slice(0, directiveEnd), b.stmt(begin), ...statements.slice(directiveEnd)];
+		return [...body.slice(0, directiveEnd), b.stmt(begin), ...body.slice(directiveEnd)];
 	return [
 		...statements.slice(0, directiveEnd),
-		b.const(frame, begin),
+		proof.host ? b.let(frame, begin) : b.const(frame, begin),
 		b.let(completed, b.literal(false)),
 		b.try(
 			b.block([
 				...statements.slice(directiveEnd),
 				b.stmt(b.assignment('=', completed, b.literal(true))),
+				...(proof.host
+					? [
+							// Descendants hydrate under their own receipts. The completed
+							// host frame remains pending in this root's commit capture.
+							b.stmt(
+								b.call(requireRuntimeForContext(ctx, 'endPresentationHydration'), frame, completed),
+							),
+							b.stmt(b.assignment('=', frame, b.literal(null))),
+							...body.slice(hostEnd),
+						]
+					: []),
 			]),
 			failure === null
 				? null
@@ -15980,6 +15994,8 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		);
 		bodyStatements.push(...plan.everyRender);
 	}
+	// Native host presentation ends before any child slot can execute.
+	let presentationHostEnd = bodyStatements.length;
 	if (plan?.after) bodyStatements.push(...plan.after);
 	// Hoisted `<title>`/`<meta>`/`<link>` → headBlock into document.head
 	// (out-of-band; re-applied each render for reactivity, removed on unmount).
@@ -16008,6 +16024,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		bodyStatements.unshift(
 			inheritOriginLoc(b.const('__block', b.member(b.id('__s'), 'block')), node),
 		);
+		presentationHostEnd++;
 	}
 	// PROPS-FIRST convention: `(…userProps, __s, __extra)`. The scope is the 2nd arg
 	// (a placeholder leads when there are no user params), so a plain function
@@ -16024,7 +16041,12 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx.currentMapTemps = prevMapTemps;
 	// ONE FunctionDeclaration node — the caller prints it (once, with the full
 	// esrap map for top-level components) or embeds it in an enclosing body.
-	const presentationBody = preparePresentationHydration(bodyStatements, node, ctx);
+	const presentationBody = preparePresentationHydration(
+		bodyStatements,
+		node,
+		ctx,
+		presentationHostEnd,
+	);
 	ctx.presentationHydration = previousPresentationHydration;
 	const emittedFunction = b.function_declaration(
 		b.id(name, node.id ?? node),
@@ -24367,6 +24389,17 @@ function planJsx(
 		}
 	}
 	for (const b of elementBindings) {
+		if (ctx.presentationHydration?.host && b.path.length === 0) {
+			const name =
+				b.kind === 'ref'
+					? 'ref'
+					: b.kind === 'event' || b.kind === 'event-bundle'
+						? b.slotKeyOrigin?.name
+						: b.name;
+			b.presentationUnbound =
+				typeof name === 'string' &&
+				ctx.presentationHydration.unboundAttributes.has(name.toLowerCase());
+		}
 		const sharesSpreadHost = spreadPaths.has(b.path.join(','));
 		const sharesEventSlot =
 			(b.kind === 'event' || b.kind === 'event-bundle') &&
@@ -26132,7 +26165,10 @@ function emitBindingMount(bind, elVar, bag) {
 	if (knownExpression !== bind.expr) bind = { ...bind, expr: knownExpression };
 	if (bind.deferred) return emitDeferredMount(bind, elVar, bag);
 	const org = bindingOrigin(bind);
-	const st = (node) => inheritOriginLoc(node, org);
+	const st = (node) => {
+		const emitted = inheritOriginLoc(node, org);
+		return bind.presentationUnbound ? { ...emitted, _octanePresentationUnbound: true } : emitted;
+	};
 	const el = () => hostVarNode(elVar);
 	const local = (key) => b.id(bag.local(key));
 	const hostKey = `_el$${bind.id}`;
@@ -26655,7 +26691,10 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 	if (knownExpression !== bind.expr) bind = { ...bind, expr: knownExpression };
 	if (bind.mountOnly) return null;
 	const org = bindingOrigin(bind);
-	const st = (node) => inheritOriginLoc(node, org);
+	const st = (node) => {
+		const emitted = inheritOriginLoc(node, org);
+		return bind.presentationUnbound ? { ...emitted, _octanePresentationUnbound: true } : emitted;
+	};
 	const V = () => b.id('_v');
 	// 1-char bag field names (see makeBag) — resolved from the same registry the
 	// mount pass registered them in; an unmounted field throws at compile time.

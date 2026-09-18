@@ -1,4 +1,5 @@
 import { encodeSignalValue } from '../data-encoding.js';
+import { STREAM_SCRIPT_ATTR } from '../stream-protocol.js';
 import {
 	encodeStreamedRendererFrameForScript,
 	isStreamFrameIdentity,
@@ -223,7 +224,7 @@ function escapeAttribute(value: string): string {
 /** Serialize one validated frame for an already-installed pre-module receiver. */
 export function streamedRendererFrameScript(frame: StreamedRendererFrame, nonce?: string): string {
 	const encoded = encodeStreamedRendererFrameForScript(frame);
-	return `<script${nonce === undefined ? '' : ` nonce="${escapeAttribute(nonce)}"`}>globalThis.__octaneStreamedRenderer.receive(${encoded});</script>`;
+	return `<script ${STREAM_SCRIPT_ATTR}${nonce === undefined ? '' : ` nonce="${escapeAttribute(nonce)}"`}>globalThis.__octaneStreamedRenderer.receive(${encoded});</script>`;
 }
 
 function streamedSignalSelectionScript(identity: StreamFrameIdentity, nonce?: string): string {
@@ -234,7 +235,7 @@ function streamedSignalSelectionScript(identity: StreamFrameIdentity, nonce?: st
 		.replace(/>/g, '\\u003e')
 		.replace(/\u2028/g, '\\u2028')
 		.replace(/\u2029/g, '\\u2029');
-	return `<script${nonce === undefined ? '' : ` nonce="${escapeAttribute(nonce)}"`}>(function(g){var k="__octaneStreamedRenderer",e=g[k];if(!e){var q=[];g[k]={version:1,frames:q,receive:function(f){if(q.length>=512){this.overflow=true;return;}q.push(f);}};}var z="__octaneStreamedSignalSelections",v=g[z];if(!v){var a=[];v=g[z]={version:1,identities:a,register:function(i){if(a.length>=256){this.overflow=true;return;}a.push(i);}};}v.register(${encoded});})(globalThis);</script>`;
+	return `<script ${STREAM_SCRIPT_ATTR}${nonce === undefined ? '' : ` nonce="${escapeAttribute(nonce)}"`}>(function(g){var k="__octaneStreamedRenderer",e=g[k];if(!e){var q=[];g[k]={version:1,frames:q,receive:function(f){if(q.length>=512){this.overflow=true;return;}q.push(f);}};}var z="__octaneStreamedSignalSelections",v=g[z];if(!v){var a=[];v=g[z]={version:1,identities:a,register:function(i){if(a.length>=256){this.overflow=true;return;}a.push(i);}};}v.register(${encoded});})(globalThis);</script>`;
 }
 
 /**
