@@ -1,0 +1,1838 @@
+{
+  "schemaVersion": 2,
+  "project": "grab",
+  "roots": ["packages/grab/tests/upstream"],
+  "files": [
+    "packages/grab/tests/upstream/auto-scroll.test.ts",
+    "packages/grab/tests/upstream/classify-source-path.test.ts",
+    "packages/grab/tests/upstream/context.test.ts",
+    "packages/grab/tests/upstream/convert-top-window-position-to-client.test.ts",
+    "packages/grab/tests/upstream/copy-content.test.ts",
+    "packages/grab/tests/upstream/copy-flow.test.ts",
+    "packages/grab/tests/upstream/copy-payload.test.ts",
+    "packages/grab/tests/upstream/create-element-selector.test.ts",
+    "packages/grab/tests/upstream/create-fiber-revision.test.ts",
+    "packages/grab/tests/upstream/create-nearest-semantic-element-selector-details.test.ts",
+    "packages/grab/tests/upstream/create-toolbar-drag.test.ts",
+    "packages/grab/tests/upstream/create-variants.test.ts",
+    "packages/grab/tests/upstream/delete-cache-entry-if-current.test.ts",
+    "packages/grab/tests/upstream/escape-html-attribute.test.ts",
+    "packages/grab/tests/upstream/escape-html-text.test.ts",
+    "packages/grab/tests/upstream/execute-context-menu-action.test.ts",
+    "packages/grab/tests/upstream/format-list-item-key.test.ts",
+    "packages/grab/tests/upstream/freeze-renderers.test.ts",
+    "packages/grab/tests/upstream/get-element-at-position.test.ts",
+    "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+    "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+    "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+    "packages/grab/tests/upstream/global-plugin-registry.test.ts",
+    "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+    "packages/grab/tests/upstream/is-generated-bundle-source-path.test.ts",
+    "packages/grab/tests/upstream/is-next-project-runtime.test.ts",
+    "packages/grab/tests/upstream/is-shared-ui-source-path.test.ts",
+    "packages/grab/tests/upstream/is-stable-element-id.test.ts",
+    "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+    "packages/grab/tests/upstream/label-controller.test.ts",
+    "packages/grab/tests/upstream/next-server-frames.test.ts",
+    "packages/grab/tests/upstream/notify-toolbar-state-change-subscribers.test.ts",
+    "packages/grab/tests/upstream/open-file-action.test.ts",
+    "packages/grab/tests/upstream/open-file.test.ts",
+    "packages/grab/tests/upstream/parse-activation-key.test.ts",
+    "packages/grab/tests/upstream/parse-package-name.test.ts",
+    "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+    "packages/grab/tests/upstream/plugin-registry.test.ts",
+    "packages/grab/tests/upstream/primitives-freeze.test.ts",
+    "packages/grab/tests/upstream/primitives-hit-testing.test.ts",
+    "packages/grab/tests/upstream/race-promise-with-abort.test.ts",
+    "packages/grab/tests/upstream/resolve-current-revision-value.test.ts",
+    "packages/grab/tests/upstream/resolve-max-context-lines.test.ts",
+    "packages/grab/tests/upstream/runtime-mode.test.ts",
+    "packages/grab/tests/upstream/should-include-element-selector.test.ts",
+    "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+    "packages/grab/tests/upstream/three-selection.test.ts",
+    "packages/grab/tests/upstream/truncate-escaped-html.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:eeaf9cc84f308d04",
+      "file": "packages/grab/tests/upstream/auto-scroll.test.ts",
+      "fullName": "createAutoScroller keeps scheduling while the page scrolls"
+    },
+    {
+      "id": "runtime:83114855090af434",
+      "file": "packages/grab/tests/upstream/auto-scroll.test.ts",
+      "fullName": "createAutoScroller stops scheduling frames at the scroll boundary"
+    },
+    {
+      "id": "runtime:2b433ae3211129ce",
+      "file": "packages/grab/tests/upstream/classify-source-path.test.ts",
+      "fullName": "classifySourcePath classifies application source paths"
+    },
+    {
+      "id": "runtime:8630202ece777c05",
+      "file": "packages/grab/tests/upstream/classify-source-path.test.ts",
+      "fullName": "classifySourcePath classifies design-system wrapper paths as app source"
+    },
+    {
+      "id": "runtime:28c904428882c261",
+      "file": "packages/grab/tests/upstream/classify-source-path.test.ts",
+      "fullName": "classifySourcePath classifies monorepo workspace paths as app source"
+    },
+    {
+      "id": "runtime:0d2309fede571e28",
+      "file": "packages/grab/tests/upstream/classify-source-path.test.ts",
+      "fullName": "classifySourcePath classifies package source paths"
+    },
+    {
+      "id": "runtime:971957050e1a5483",
+      "file": "packages/grab/tests/upstream/classify-source-path.test.ts",
+      "fullName": "classifySourcePath detects scoped packages with or without a relative prefix"
+    },
+    {
+      "id": "runtime:23018973771bc95e",
+      "file": "packages/grab/tests/upstream/classify-source-path.test.ts",
+      "fullName": "classifySourcePath does not treat bundler alias paths as packages"
+    },
+    {
+      "id": "runtime:fc82e6383b3b7b49",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext collapses consecutive duplicate trace lines"
+    },
+    {
+      "id": "runtime:0ea2180185c9357d",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext collects rendered component names for downstream deduplication"
+    },
+    {
+      "id": "runtime:766f34419a1175d2",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext digs past low-signal package frames to surface a deeper app source"
+    },
+    {
+      "id": "runtime:75c76a6b455aaa02",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext does not let shared-UI wrapper frames spend the compact line budget"
+    },
+    {
+      "id": "runtime:38d7cff5afeca1f1",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext does not request a selector hint for a trusted app leading source"
+    },
+    {
+      "id": "runtime:e36c9f918b8c762b",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext does not trust a generated bundle leading source"
+    },
+    {
+      "id": "runtime:e48741a4c549dd03",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext does not trust a generated client bundle without editable source"
+    },
+    {
+      "id": "runtime:dd3a919373d9051d",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext does not trust a shared-UI leading source without a feature owner"
+    },
+    {
+      "id": "runtime:96bbde78ffdc02c3",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext extends the line budget by one per low-signal package line"
+    },
+    {
+      "id": "runtime:82f7dbe5d6ba74e5",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext falls back to the default budget when maxLines is NaN"
+    },
+    {
+      "id": "runtime:ee79035dcceb91a4",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext honors a raised maxLines to surface more feature source"
+    },
+    {
+      "id": "runtime:f5dc2dc94fdc1089",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext keeps low-signal frames after the source budget is full"
+    },
+    {
+      "id": "runtime:f1f9ef3c303c0b66",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext keeps non-consecutive repeats of the same line"
+    },
+    {
+      "id": "runtime:dbeb839215c46b7a",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext keeps only the leading source when the line budget is zero"
+    },
+    {
+      "id": "runtime:a2482a9f4fba5033",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext keeps the hard cap when maxLines is non-finite"
+    },
+    {
+      "id": "runtime:2d69d7107572f868",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext preserves React owner order instead of reordering by component name"
+    },
+    {
+      "id": "runtime:2898eb08cdd3a15f",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext reports no remaining capacity when low-signal frames fill the hard cap"
+    },
+    {
+      "id": "runtime:d7f3c1e64252e12b",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext reports when no high-signal stack frame was rendered"
+    },
+    {
+      "id": "runtime:f3cc51e1c82c5fe2",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext requests a selector hint for package and shared-UI production frames"
+    },
+    {
+      "id": "runtime:89f29fc0823daad7",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext requests a selector hint when only shared-UI owner frames survive"
+    },
+    {
+      "id": "runtime:a7b76135df5f67e4",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext surfaces deeper feature source past a wrapper chain without a selector hint"
+    },
+    {
+      "id": "runtime:158c3cd9355df9a6",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext surfaces design-system wrapper frames with their file path"
+    },
+    {
+      "id": "runtime:705d8733d03900a3",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "formatStackContext trusts a minified feature frame when its app source path survives"
+    },
+    {
+      "id": "runtime:4fd94cb84b3fa3e9",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource falls back to a package frame as the last resort"
+    },
+    {
+      "id": "runtime:bfdca4b9601d8056",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource keeps a generated bundle source when no editable source survives"
+    },
+    {
+      "id": "runtime:8b7078a0889a82a3",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource keeps a shared-UI fiber source when no feature owner frame exists"
+    },
+    {
+      "id": "runtime:08fec69a6e26e0b6",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource keeps authored provider and context frame names"
+    },
+    {
+      "id": "runtime:4d9c2cd62de755a3",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource keeps common authored component names outside Next.js"
+    },
+    {
+      "id": "runtime:455287fafdbf57c6",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource keeps the nearest source frame even when a deeper frame has a component name"
+    },
+    {
+      "id": "runtime:a40b1f9ab8050523",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource keeps the nearest source location while filtering its internal component name"
+    },
+    {
+      "id": "runtime:f0a93e667e97828e",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource prefers a feature owner frame over a shared-UI fiber source"
+    },
+    {
+      "id": "runtime:dc6cfc0667022c46",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource prefers a package-source fiber over package frames"
+    },
+    {
+      "id": "runtime:1b25e9ceef367f44",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource prefers an app-source frame over a package fiber source"
+    },
+    {
+      "id": "runtime:8d84260aa3dc831a",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource prefers an editable shared-UI owner over a generated bundle"
+    },
+    {
+      "id": "runtime:90c1ea4a76318e2e",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource prefers editable source over a generated client bundle"
+    },
+    {
+      "id": "runtime:d90d2281bcfbc37f",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource prefers the fiber source when it is app-source"
+    },
+    {
+      "id": "runtime:3a8da9a12d55cb63",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource returns null when no fiber source or frames resolve"
+    },
+    {
+      "id": "runtime:a69045804716bf72",
+      "file": "packages/grab/tests/upstream/context.test.ts",
+      "fullName": "selectResolvedSource skips shared-UI owner frames when a deeper feature owner is available"
+    },
+    {
+      "id": "runtime:bb14bbfe0aba8c94",
+      "file": "packages/grab/tests/upstream/convert-top-window-position-to-client.test.ts",
+      "fullName": "convertTopWindowPositionToClient converts from the outermost frame into nested iframe coordinates"
+    },
+    {
+      "id": "runtime:255834d639146fe1",
+      "file": "packages/grab/tests/upstream/convert-top-window-position-to-client.test.ts",
+      "fullName": "convertTopWindowPositionToClient leaves top-window coordinates unchanged"
+    },
+    {
+      "id": "runtime:57083f495c488c9c",
+      "file": "packages/grab/tests/upstream/copy-content.test.ts",
+      "fullName": "copyContent removes the copy listener when textarea setup fails"
+    },
+    {
+      "id": "runtime:c6d492a061fcc086",
+      "file": "packages/grab/tests/upstream/copy-flow.test.ts",
+      "fullName": "runCopyFlow does not copy content removed by a transform"
+    },
+    {
+      "id": "runtime:5a1b9387092dff6e",
+      "file": "packages/grab/tests/upstream/copy-flow.test.ts",
+      "fullName": "runCopyFlow stops after content resolves when the copy was cancelled"
+    },
+    {
+      "id": "runtime:7d15c1a0e06b2bff",
+      "file": "packages/grab/tests/upstream/copy-flow.test.ts",
+      "fullName": "runCopyFlow stops before writing when a transform resolves after cancellation"
+    },
+    {
+      "id": "runtime:0e65d39f9b86734a",
+      "file": "packages/grab/tests/upstream/copy-flow.test.ts",
+      "fullName": "runCopyFlow treats empty content as cancelled when abort wins before continuation"
+    },
+    {
+      "id": "runtime:a4b1e8737b46c853",
+      "file": "packages/grab/tests/upstream/copy-payload.test.ts",
+      "fullName": "copy payload uses one reference context resolution and keeps its independent component label"
+    },
+    {
+      "id": "runtime:5a3f0b6e383f64af",
+      "file": "packages/grab/tests/upstream/create-element-selector.test.ts",
+      "fullName": "createSemanticElementSelectorDetails does not treat a weak role as a semantic selector"
+    },
+    {
+      "id": "runtime:cd9781714cb64c84",
+      "file": "packages/grab/tests/upstream/create-element-selector.test.ts",
+      "fullName": "createSemanticElementSelectorDetails keeps actionable roles as semantic selectors"
+    },
+    {
+      "id": "runtime:4415cb042d084f08",
+      "file": "packages/grab/tests/upstream/create-fiber-revision.test.ts",
+      "fullName": "createFiberRevision invalidates a replacement fiber with unchanged source metadata"
+    },
+    {
+      "id": "runtime:1eb91b73332ca215",
+      "file": "packages/grab/tests/upstream/create-fiber-revision.test.ts",
+      "fullName": "createFiberRevision invalidates when React changes the debug owner on a preserved fiber"
+    },
+    {
+      "id": "runtime:ed8e293f89d6cbe2",
+      "file": "packages/grab/tests/upstream/create-fiber-revision.test.ts",
+      "fullName": "createFiberRevision invalidates when React refreshes source metadata on a preserved fiber"
+    },
+    {
+      "id": "runtime:85d8f4d19614a975",
+      "file": "packages/grab/tests/upstream/create-fiber-revision.test.ts",
+      "fullName": "createFiberRevision matches alternate fibers and render times when source metadata is unchanged"
+    },
+    {
+      "id": "runtime:48ab1ad3085538be",
+      "file": "packages/grab/tests/upstream/create-fiber-revision.test.ts",
+      "fullName": "createFiberRevision matches an alternate created after the revision"
+    },
+    {
+      "id": "runtime:2cc7598513b022cf",
+      "file": "packages/grab/tests/upstream/create-fiber-revision.test.ts",
+      "fullName": "createFiberRevision matches an unchanged fiber revision"
+    },
+    {
+      "id": "runtime:4e46dda0a829e422",
+      "file": "packages/grab/tests/upstream/create-nearest-semantic-element-selector-details.test.ts",
+      "fullName": "createNearestSemanticElementSelectorDetails continues through an intermediate generic control to a semantic ancestor"
+    },
+    {
+      "id": "runtime:e092a04cbe750d34",
+      "file": "packages/grab/tests/upstream/create-nearest-semantic-element-selector-details.test.ts",
+      "fullName": "createNearestSemanticElementSelectorDetails continues to a unique semantic ancestor after a non-unique candidate"
+    },
+    {
+      "id": "runtime:f9a94cfd175054f6",
+      "file": "packages/grab/tests/upstream/create-nearest-semantic-element-selector-details.test.ts",
+      "fullName": "createNearestSemanticElementSelectorDetails does not replace a generic control with a semantic ancestor"
+    },
+    {
+      "id": "runtime:46295c380924a458",
+      "file": "packages/grab/tests/upstream/create-nearest-semantic-element-selector-details.test.ts",
+      "fullName": "createNearestSemanticElementSelectorDetails does not replace a selected descendant with a broad semantic ancestor"
+    },
+    {
+      "id": "runtime:cb9c1680ce98cc1a",
+      "file": "packages/grab/tests/upstream/create-nearest-semantic-element-selector-details.test.ts",
+      "fullName": "createNearestSemanticElementSelectorDetails does not replace the selected element with a semantic boundary host"
+    },
+    {
+      "id": "runtime:f9e8d280d51eede8",
+      "file": "packages/grab/tests/upstream/create-nearest-semantic-element-selector-details.test.ts",
+      "fullName": "createNearestSemanticElementSelectorDetails evaluates preferred alt selector candidates"
+    },
+    {
+      "id": "runtime:2ad7143dbcffb272",
+      "file": "packages/grab/tests/upstream/create-nearest-semantic-element-selector-details.test.ts",
+      "fullName": "createNearestSemanticElementSelectorDetails skips a non-interactive role in favor of an actionable semantic ancestor"
+    },
+    {
+      "id": "runtime:5cf9b06308695504",
+      "file": "packages/grab/tests/upstream/create-nearest-semantic-element-selector-details.test.ts",
+      "fullName": "createNearestSemanticElementSelectorDetails uses an adapter selector from the selected element"
+    },
+    {
+      "id": "runtime:b83f2a6ad680d868",
+      "file": "packages/grab/tests/upstream/create-toolbar-drag.test.ts",
+      "fullName": "createToolbarDrag cancels disposed snap frames and ignores pointerdown while snapping"
+    },
+    {
+      "id": "runtime:308505fd18f7737d",
+      "file": "packages/grab/tests/upstream/create-variants.test.ts",
+      "fullName": "createVariants applies the default variant when none is selected"
+    },
+    {
+      "id": "runtime:c4e4a6e3ea04e77e",
+      "file": "packages/grab/tests/upstream/create-variants.test.ts",
+      "fullName": "createVariants applies the selected variant over the default"
+    },
+    {
+      "id": "runtime:2ce7e60c914da85a",
+      "file": "packages/grab/tests/upstream/create-variants.test.ts",
+      "fullName": "createVariants combines multiple variant groups"
+    },
+    {
+      "id": "runtime:285c3360d6d00a3a",
+      "file": "packages/grab/tests/upstream/create-variants.test.ts",
+      "fullName": "createVariants omits groups without a default or selection"
+    },
+    {
+      "id": "runtime:373746655e4bec93",
+      "file": "packages/grab/tests/upstream/create-variants.test.ts",
+      "fullName": "createVariants returns just the base when no variants are configured"
+    },
+    {
+      "id": "runtime:ae3daa0e09bf310a",
+      "file": "packages/grab/tests/upstream/delete-cache-entry-if-current.test.ts",
+      "fullName": "deleteCacheEntryIfCurrent deletes the current cache entry"
+    },
+    {
+      "id": "runtime:b59670b4acdfc332",
+      "file": "packages/grab/tests/upstream/delete-cache-entry-if-current.test.ts",
+      "fullName": "deleteCacheEntryIfCurrent preserves a newer cache entry when an older request completes"
+    },
+    {
+      "id": "runtime:6d3e671ff4699729",
+      "file": "packages/grab/tests/upstream/escape-html-attribute.test.ts",
+      "fullName": "escapeHtmlAttribute encodes HTML delimiters and line-breaking whitespace"
+    },
+    {
+      "id": "runtime:d2a9ba806f08cad1",
+      "file": "packages/grab/tests/upstream/escape-html-text.test.ts",
+      "fullName": "escapeHtmlText encodes HTML structural characters without changing text-only quotes or whitespace"
+    },
+    {
+      "id": "runtime:a69f4d0fda9abf4b",
+      "file": "packages/grab/tests/upstream/execute-context-menu-action.test.ts",
+      "fullName": "executeContextMenuAction contains asynchronous action failures"
+    },
+    {
+      "id": "runtime:55027a62dc5f3319",
+      "file": "packages/grab/tests/upstream/execute-context-menu-action.test.ts",
+      "fullName": "executeContextMenuAction contains enabled predicate failures and skips the action"
+    },
+    {
+      "id": "runtime:0352eba44f57c19c",
+      "file": "packages/grab/tests/upstream/execute-context-menu-action.test.ts",
+      "fullName": "executeContextMenuAction contains synchronous action failures after accepting the action"
+    },
+    {
+      "id": "runtime:6d77dcacab1df582",
+      "file": "packages/grab/tests/upstream/format-list-item-key.test.ts",
+      "fullName": "formatListItemKey bounds long keys"
+    },
+    {
+      "id": "runtime:5585621a659938f6",
+      "file": "packages/grab/tests/upstream/format-list-item-key.test.ts",
+      "fullName": "formatListItemKey escapes quotes and line breaks"
+    },
+    {
+      "id": "runtime:4bb7276cb20ae1cb",
+      "file": "packages/grab/tests/upstream/freeze-renderers.test.ts",
+      "fullName": "renderer freezing can freeze again after a renderer fails to unfreeze"
+    },
+    {
+      "id": "runtime:c05ef67a7542d61c",
+      "file": "packages/grab/tests/upstream/freeze-renderers.test.ts",
+      "fullName": "renderer freezing freezes a renderer registered during an active freeze"
+    },
+    {
+      "id": "runtime:9c6ad0be2d5b20e8",
+      "file": "packages/grab/tests/upstream/freeze-renderers.test.ts",
+      "fullName": "renderer freezing freezes connected renderers and restores them in reverse order"
+    },
+    {
+      "id": "runtime:cf64b7cb6c7d0488",
+      "file": "packages/grab/tests/upstream/freeze-renderers.test.ts",
+      "fullName": "renderer freezing skips disconnected renderers"
+    },
+    {
+      "id": "runtime:fce2d254cb495c4e",
+      "file": "packages/grab/tests/upstream/freeze-renderers.test.ts",
+      "fullName": "renderer freezing unregisters an R3F canvas when its root state becomes unreadable"
+    },
+    {
+      "id": "runtime:d0176d7d1ef77b03",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition does not refine cached HTML hits without a local content match"
+    },
+    {
+      "id": "runtime:205a14dc6c692a4b",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition falls back to the native hit when refined local content is invalid"
+    },
+    {
+      "id": "runtime:82476592aad7c956",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition falls back to the native hit when refined local content is out of scope"
+    },
+    {
+      "id": "runtime:dd90549931002b90",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition falls through cached text when local content is outside its painted fragment"
+    },
+    {
+      "id": "runtime:d1e614a96cf16711",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition invalidates an iframe cache when the frame becomes accessible"
+    },
+    {
+      "id": "runtime:939c8f3407953e8d",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition keeps a cached native text hit when refined local content is unpainted"
+    },
+    {
+      "id": "runtime:caa3c953ad871683",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition keeps a text layer when the point is inside its painted fragment"
+    },
+    {
+      "id": "runtime:155ae0198d180f60",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition leaves painted text when a cached pointer crosses into its empty width"
+    },
+    {
+      "id": "runtime:170834ae767049eb",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition preserves a cached deep fallback when the native SVG hit is invalid"
+    },
+    {
+      "id": "runtime:0adbf45d8081f9be",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition re-enters painted text from cached empty width"
+    },
+    {
+      "id": "runtime:36f65329d83e70ee",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition refines cached SVG hits when the pointer enters a text label"
+    },
+    {
+      "id": "runtime:2008ac01df16e377",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition refreshes a nearby hit after the cache throttle expires"
+    },
+    {
+      "id": "runtime:642b646dfaf550a3",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition refreshes the hit target after a fast pointer jump"
+    },
+    {
+      "id": "runtime:317655bb51846148",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition rejects non-finite coordinates without hit testing"
+    },
+    {
+      "id": "runtime:859a1f3aeb64efd7",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition restores pointer-event freezing after a failed deep hit test"
+    },
+    {
+      "id": "runtime:1f7efa35ace94d82",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition restores the cached native SVG hit when the pointer leaves a text label"
+    },
+    {
+      "id": "runtime:63234b050be51e76",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition restores the deep fallback after leaving refined SVG text"
+    },
+    {
+      "id": "runtime:be7eaf748b5f1a85",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition reuses an inaccessible iframe only while the point remains inside fresh bounds"
+    },
+    {
+      "id": "runtime:4da9aed49d83c0d1",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition uses the deep fallback when the top paint layer is invalid"
+    },
+    {
+      "id": "runtime:9cc43b398aca0135",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementAtPosition uses the lower layer in empty width beside painted text"
+    },
+    {
+      "id": "runtime:b5e583179dadc683",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementsAtPoint does not repeat an inserted ancestor that is also in the native stack"
+    },
+    {
+      "id": "runtime:a2f4059b358d55da",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementsAtPoint filters out-of-scope stack layers before local refinement"
+    },
+    {
+      "id": "runtime:ff9a3a1b318789dc",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementsAtPoint inserts pointer-disabled ancestors before the native layer"
+    },
+    {
+      "id": "runtime:17a94a5be2b235f9",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementsAtPoint keeps text-flow layers where the point is inside painted text"
+    },
+    {
+      "id": "runtime:4f91e4535012afab",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementsAtPoint preserves the native layer when local content is invalid"
+    },
+    {
+      "id": "runtime:5ffe219d29ea9e42",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementsAtPoint replaces lower native layers with the refined hierarchy"
+    },
+    {
+      "id": "runtime:83eac50452ae3dab",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementsAtPoint schedules freeze restoration when deep stack collection throws"
+    },
+    {
+      "id": "runtime:fbd81c8b7ed61826",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementsAtPoint skips a native SVG sibling behind refined text"
+    },
+    {
+      "id": "runtime:ba850de1bc768211",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementsAtPoint skips text-flow layers where the point is outside painted text"
+    },
+    {
+      "id": "runtime:5a4b6b7f55a3297e",
+      "file": "packages/grab/tests/upstream/get-element-at-position.test.ts",
+      "fullName": "getElementsAtPoint stops the refined hierarchy at the scope boundary"
+    },
+    {
+      "id": "runtime:e9d1bd27a31dddd6",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds bounds queued descendants before traversing nested inline content"
+    },
+    {
+      "id": "runtime:a5901480cc01394d",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds bounds text-flow traversal work"
+    },
+    {
+      "id": "runtime:df681575b8ac97b1",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds converts iframe fragments to top-window coordinates once per element"
+    },
+    {
+      "id": "runtime:cbd5f75900d17ec3",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds falls back instead of partially measuring too many wrapped fragments"
+    },
+    {
+      "id": "runtime:e38e90761ce510c7",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds falls back to the element box when the container has block content"
+    },
+    {
+      "id": "runtime:0edb5344fb282519",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds falls back when range measurement fails"
+    },
+    {
+      "id": "runtime:5a71af3e296525b1",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds keeps A geometry on its element box"
+    },
+    {
+      "id": "runtime:8470c120c0158456",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds keeps BUTTON geometry on its element box"
+    },
+    {
+      "id": "runtime:4734ee0ab2da9a0d",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds keeps CANVAS geometry on its element box"
+    },
+    {
+      "id": "runtime:b8d3d4c0a78983ce",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds keeps INPUT geometry on its element box"
+    },
+    {
+      "id": "runtime:ba534dddf9deefa0",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds keeps SVG geometry on its element box"
+    },
+    {
+      "id": "runtime:f60c08a15e45a7e4",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds keeps a painted text container on its element box"
+    },
+    {
+      "id": "runtime:216a0fec78778f78",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds keeps interactive roles on their element box"
+    },
+    {
+      "id": "runtime:0a6da617f3b32312",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds keeps wrapped fragments separate through inline formatting"
+    },
+    {
+      "id": "runtime:0f2e3ac68a4fbada",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds measures the painted fragment instead of the DIV container box"
+    },
+    {
+      "id": "runtime:276cfbcb00a9aa6d",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds measures the painted fragment instead of the P container box"
+    },
+    {
+      "id": "runtime:8613dbb49f1f27e0",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds measures the painted fragment instead of the SPAN container box"
+    },
+    {
+      "id": "runtime:cfa4ae4d323edf79",
+      "file": "packages/grab/tests/upstream/get-element-text-bounds.test.ts",
+      "fullName": "getElementTextBounds reuses text geometry within the bounds cache window"
+    },
+    {
+      "id": "runtime:d2e421841303b57b",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag bounds candidate neighborhood inspections on dense containers"
+    },
+    {
+      "id": "runtime:2a2024567bd70bae",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag bounds sampling work for enormous drag rectangles"
+    },
+    {
+      "id": "runtime:fd71ece9b8ea030d",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag does not hit test an empty drag rectangle"
+    },
+    {
+      "id": "runtime:cc926aed929e6865",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag does not promote small text behind a covered foreground target"
+    },
+    {
+      "id": "runtime:ccca68534a394934",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag does not promote wide text that is exposed at one sample but covered at another"
+    },
+    {
+      "id": "runtime:3778d638bb46fbcc",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag does not scan children from an unbounded local collection"
+    },
+    {
+      "id": "runtime:d90cb9c22998b336",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag does not select empty space inside a wide text element"
+    },
+    {
+      "id": "runtime:ca86204d27514354",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag does not treat every candidate as viewport-covering while the viewport is zero-sized"
+    },
+    {
+      "id": "runtime:c8d5b8e3f722823d",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag excludes a candidate that only touches the drag edge"
+    },
+    {
+      "id": "runtime:96bba9b7eae5063f",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag fills unsampled table rows around a sampled cell"
+    },
+    {
+      "id": "runtime:5388dcbed4e39c23",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag filters roots, out-of-scope layers, and invalid overlays before fallback ranking"
+    },
+    {
+      "id": "runtime:9fedab29c0d2186d",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag ignores viewport-covering candidates"
+    },
+    {
+      "id": "runtime:8f61072e55d76a93",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag ignores viewport-covering candidates that meet the coverage threshold"
+    },
+    {
+      "id": "runtime:b1be4a36ce1f8b12",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag includes a candidate at the exact coverage threshold"
+    },
+    {
+      "id": "runtime:a523c5faac19799c",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag includes local pointer-none content at the drag endpoint"
+    },
+    {
+      "id": "runtime:738bbf44db48d95f",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag keeps an inaccessible iframe as a selectable fallback"
+    },
+    {
+      "id": "runtime:b74b6bbde7eaf856",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag keeps an ordinary canvas when it has no Three.js targets"
+    },
+    {
+      "id": "runtime:790033c6aa0a8cea",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag keeps the ancestor when ordinary nested candidates both qualify"
+    },
+    {
+      "id": "runtime:eec776e7a35e4e46",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag keeps the canvas when Three.js endpoint resolution fails"
+    },
+    {
+      "id": "runtime:d94c6bee663819b1",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag keeps the inner candidate instead of its open shadow host"
+    },
+    {
+      "id": "runtime:c6e680b81c50b426",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag keeps viewport-sized candidates that are mostly offscreen"
+    },
+    {
+      "id": "runtime:db5e1c9e468483e4",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag keeps wrapped text line gaps out of drag geometry"
+    },
+    {
+      "id": "runtime:845b8d971f79b8d9",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag looks through invalid stack layers for local content at the endpoint"
+    },
+    {
+      "id": "runtime:3161817d3bc3de79",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag only refines local content at the drag endpoint"
+    },
+    {
+      "id": "runtime:e00b0cac625b1407",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag passes the endpoint instance into Three.js drag enumeration"
+    },
+    {
+      "id": "runtime:e78cd6d4ed9576ae",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag prefers a text child over its text-flow parent for a partial drag"
+    },
+    {
+      "id": "runtime:a866806e7319069c",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag prefers covered candidates over a nearer fallback"
+    },
+    {
+      "id": "runtime:fc979e8334003d47",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag prefers the candidate under the drag endpoint over one with a closer center"
+    },
+    {
+      "id": "runtime:86fd1aac0a49aad8",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag prefers the smaller candidate when overlapping candidates contain the endpoint"
+    },
+    {
+      "id": "runtime:95743789f641e2a1",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag prefers the topmost candidate when multiple candidates contain the drag endpoint"
+    },
+    {
+      "id": "runtime:35357285642aec77",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag restores pointer-event freezing when a sampled hit test throws"
+    },
+    {
+      "id": "runtime:0c6daf735e7e173f",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag returns all covered candidates in document order"
+    },
+    {
+      "id": "runtime:97fabb4d06378f94",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag selects a wide text element when the drag covers its painted text"
+    },
+    {
+      "id": "runtime:ad6ea18f8b26409c",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag selects painted text from multiple exposed wide elements"
+    },
+    {
+      "id": "runtime:7744a3fe12de1420",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag selects projected Three.js objects instead of their shared canvas"
+    },
+    {
+      "id": "runtime:e4e2bc13b5292a67",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag selects the nearest candidate even when another candidate has more coverage"
+    },
+    {
+      "id": "runtime:970f260d8622bde3",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag skips accessible iframe shells while keeping their deep content"
+    },
+    {
+      "id": "runtime:30b3cf41fd9a121e",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag skips candidates with non-finite geometry"
+    },
+    {
+      "id": "runtime:0f4950a899f83291",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag stops local refinement at the first valid paint layer"
+    },
+    {
+      "id": "runtime:f95f5e951e35daf4",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag uses drag direction to resolve otherwise equal fallback candidates"
+    },
+    {
+      "id": "runtime:16f8328662c005f2",
+      "file": "packages/grab/tests/upstream/get-elements-in-drag.test.ts",
+      "fullName": "getElementsInDrag validates a sampled candidate once across the drag"
+    },
+    {
+      "id": "runtime:07922c639430b62f",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint accepts a caret API element node directly"
+    },
+    {
+      "id": "runtime:2080a76a8973aeee",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint allows SVG text elsewhere in the same SVG render island"
+    },
+    {
+      "id": "runtime:dcc0c0550ac0e708",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint does not compute pointer events for SVG content"
+    },
+    {
+      "id": "runtime:5efbd2019a24b88b",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint does not leave a nested SVG root"
+    },
+    {
+      "id": "runtime:c67bde6b2f5f90ed",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint does not leave a nested SVG root when the native hit is its descendant"
+    },
+    {
+      "id": "runtime:cd4db42dfc9cac6f",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint does not refine an orphaned caret text node"
+    },
+    {
+      "id": "runtime:217e4d5806d91125",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint does not refine to unrelated content outside the local hit"
+    },
+    {
+      "id": "runtime:f38af0de7a578e71",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint does not refine when the caret resolves to the native hit itself"
+    },
+    {
+      "id": "runtime:e8107400c0c3b406",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint does not replace an HTML hit with interactive nested text"
+    },
+    {
+      "id": "runtime:d99db15474fa99c6",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint does not use document roots as unbounded refinement islands"
+    },
+    {
+      "id": "runtime:12eca4e3b5012cb7",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint falls back to WebKit caret ranges"
+    },
+    {
+      "id": "runtime:82d7a16470fb429d",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint falls through to a caret range when a caret position misses"
+    },
+    {
+      "id": "runtime:cdc8a1d236c20bb0",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint passes the local shadow root to the standard caret API"
+    },
+    {
+      "id": "runtime:89f1aeff7277d186",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint refines a native container hit to its text-bearing descendant"
+    },
+    {
+      "id": "runtime:cc11c4e8f8a83487",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint returns no refinement when neither caret API is available"
+    },
+    {
+      "id": "runtime:0046123e46e78b85",
+      "file": "packages/grab/tests/upstream/get-local-content-element-at-point.test.ts",
+      "fullName": "getLocalContentElementAtPoint returns no refinement when the owner document has no window"
+    },
+    {
+      "id": "runtime:5345e5dbeab36a56",
+      "file": "packages/grab/tests/upstream/global-plugin-registry.test.ts",
+      "fullName": "global plugin registration flushes queued plugins when an API is attached"
+    },
+    {
+      "id": "runtime:945b54b3f17e58d1",
+      "file": "packages/grab/tests/upstream/global-plugin-registry.test.ts",
+      "fullName": "global plugin registration fully removes a queued plugin by name"
+    },
+    {
+      "id": "runtime:c3fa24aa264b3326",
+      "file": "packages/grab/tests/upstream/global-plugin-registry.test.ts",
+      "fullName": "global plugin registration only clears the API that owns the global reference"
+    },
+    {
+      "id": "runtime:4a787fe0f4cf84a4",
+      "file": "packages/grab/tests/upstream/global-plugin-registry.test.ts",
+      "fullName": "global plugin registration queues only the latest plugin with each name"
+    },
+    {
+      "id": "runtime:2c8d12f4400fa1fa",
+      "file": "packages/grab/tests/upstream/global-plugin-registry.test.ts",
+      "fullName": "global plugin registration reports a queued setup failure and continues flushing"
+    },
+    {
+      "id": "runtime:79ed373ff4111330",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint does not expand a background clipped to glyphs"
+    },
+    {
+      "id": "runtime:8fb1d948b45176ac",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint treats a color(display-p3 1 0 0 / 0%) background as unpainted"
+    },
+    {
+      "id": "runtime:9908e86847e865bb",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint treats a oklch(62% 0.2 20 / 0) background as unpainted"
+    },
+    {
+      "id": "runtime:3cd7c0eba138b60a",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint treats a rgb(255 0 0 / 0) background as unpainted"
+    },
+    {
+      "id": "runtime:31d024a6b733a1b0",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint treats a rgba(0, 0, 0, 0) background as unpainted"
+    },
+    {
+      "id": "runtime:ef3ce9bef8eed5ee",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint treats a rgba(255, 0, 0, 0.000) background as unpainted"
+    },
+    {
+      "id": "runtime:cad119ec6bcee9f4",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint treats a transparent background as unpainted"
+    },
+    {
+      "id": "runtime:05f88c3612166f9a",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint treats box paint as full-box geometry"
+    },
+    {
+      "id": "runtime:05f88c3612166f9a:2",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint treats box paint as full-box geometry"
+    },
+    {
+      "id": "runtime:05f88c3612166f9a:3",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint treats box paint as full-box geometry"
+    },
+    {
+      "id": "runtime:05f88c3612166f9a:4",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint treats box paint as full-box geometry"
+    },
+    {
+      "id": "runtime:05f88c3612166f9a:5",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint treats box paint as full-box geometry"
+    },
+    {
+      "id": "runtime:05f88c3612166f9a:6",
+      "file": "packages/grab/tests/upstream/has-element-box-paint.test.ts",
+      "fullName": "hasElementBoxPaint treats box paint as full-box geometry"
+    },
+    {
+      "id": "runtime:3f5944822ddcbbf3",
+      "file": "packages/grab/tests/upstream/is-generated-bundle-source-path.test.ts",
+      "fullName": "isGeneratedBundleSourcePath detects framework chunk directories"
+    },
+    {
+      "id": "runtime:6bafc0db1cb1d764",
+      "file": "packages/grab/tests/upstream/is-generated-bundle-source-path.test.ts",
+      "fullName": "isGeneratedBundleSourcePath detects hashed Vite assets"
+    },
+    {
+      "id": "runtime:f287259d8655f416",
+      "file": "packages/grab/tests/upstream/is-generated-bundle-source-path.test.ts",
+      "fullName": "isGeneratedBundleSourcePath keeps authored asset directories trusted"
+    },
+    {
+      "id": "runtime:c32621d9fd0a0b01",
+      "file": "packages/grab/tests/upstream/is-next-project-runtime.test.ts",
+      "fullName": "isNextProjectRuntime detects App Router flight data when assets use a CDN"
+    },
+    {
+      "id": "runtime:a1db3c48fa59cc50",
+      "file": "packages/grab/tests/upstream/is-next-project-runtime.test.ts",
+      "fullName": "isNextProjectRuntime detects a same-origin App Router production asset"
+    },
+    {
+      "id": "runtime:fd7a11725ccfd3ed",
+      "file": "packages/grab/tests/upstream/is-next-project-runtime.test.ts",
+      "fullName": "isNextProjectRuntime detects the Next development portal"
+    },
+    {
+      "id": "runtime:269763799674f6e0",
+      "file": "packages/grab/tests/upstream/is-next-project-runtime.test.ts",
+      "fullName": "isNextProjectRuntime detects the Pages Router marker"
+    },
+    {
+      "id": "runtime:f6b9c9cc8e336f46",
+      "file": "packages/grab/tests/upstream/is-next-project-runtime.test.ts",
+      "fullName": "isNextProjectRuntime ignores malformed script URLs"
+    },
+    {
+      "id": "runtime:ec500a360601b232",
+      "file": "packages/grab/tests/upstream/is-next-project-runtime.test.ts",
+      "fullName": "isNextProjectRuntime rejects documents without Next markers"
+    },
+    {
+      "id": "runtime:cf85b57eb96b4393",
+      "file": "packages/grab/tests/upstream/is-next-project-runtime.test.ts",
+      "fullName": "isNextProjectRuntime rejects flight bootstrap text without a Next asset"
+    },
+    {
+      "id": "runtime:128ea75a8dd68399",
+      "file": "packages/grab/tests/upstream/is-next-project-runtime.test.ts",
+      "fullName": "isNextProjectRuntime rejects unrelated and cross-origin script paths containing _next"
+    },
+    {
+      "id": "runtime:d11fb5b83d2070ea",
+      "file": "packages/grab/tests/upstream/is-shared-ui-source-path.test.ts",
+      "fullName": "isSharedUiSourcePath does not match Next's app/ui feature convention"
+    },
+    {
+      "id": "runtime:bf0065ea2ca11227",
+      "file": "packages/grab/tests/upstream/is-shared-ui-source-path.test.ts",
+      "fullName": "isSharedUiSourcePath does not match a filename that merely starts with ui"
+    },
+    {
+      "id": "runtime:66ca032c9e76627c",
+      "file": "packages/grab/tests/upstream/is-shared-ui-source-path.test.ts",
+      "fullName": "isSharedUiSourcePath does not match feature source paths"
+    },
+    {
+      "id": "runtime:e5fe725eafbd7b12",
+      "file": "packages/grab/tests/upstream/is-shared-ui-source-path.test.ts",
+      "fullName": "isSharedUiSourcePath handles empty input"
+    },
+    {
+      "id": "runtime:8bcf4909ac42eb87",
+      "file": "packages/grab/tests/upstream/is-shared-ui-source-path.test.ts",
+      "fullName": "isSharedUiSourcePath is case-insensitive"
+    },
+    {
+      "id": "runtime:f0e9280223bf07ca",
+      "file": "packages/grab/tests/upstream/is-shared-ui-source-path.test.ts",
+      "fullName": "isSharedUiSourcePath matches monorepo design-system packages and headless primitives"
+    },
+    {
+      "id": "runtime:e1926a384c8ba755",
+      "file": "packages/grab/tests/upstream/is-shared-ui-source-path.test.ts",
+      "fullName": "isSharedUiSourcePath matches shadcn-style components/ui paths"
+    },
+    {
+      "id": "runtime:1a2aa79b757838f1",
+      "file": "packages/grab/tests/upstream/is-stable-element-id.test.ts",
+      "fullName": "isStableElementId accepts authored identifiers"
+    },
+    {
+      "id": "runtime:617f2eb6b453a897",
+      "file": "packages/grab/tests/upstream/is-stable-element-id.test.ts",
+      "fullName": "isStableElementId rejects React-generated identifiers"
+    },
+    {
+      "id": "runtime:7e0c9e0823f96a36",
+      "file": "packages/grab/tests/upstream/is-stable-element-id.test.ts",
+      "fullName": "isStableElementId rejects UUID, numeric, and oversized identifiers"
+    },
+    {
+      "id": "runtime:3db57eba419af506",
+      "file": "packages/grab/tests/upstream/is-stable-element-id.test.ts",
+      "fullName": "isStableElementId rejects framework-generated identifiers"
+    },
+    {
+      "id": "runtime:51b706502ebbc20e",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters generated context providers with a duplicated Provider suffix"
+    },
+    {
+      "id": "runtime:c0ba9a98e312d21a",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the Next.js internal component name ErrorBoundary in a Next.js project"
+    },
+    {
+      "id": "runtime:e1d4f12305016a93",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the Next.js internal component name Head in a Next.js project"
+    },
+    {
+      "id": "runtime:4337e649005c16bf",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the Next.js internal component name LinkComponent in a Next.js project"
+    },
+    {
+      "id": "runtime:cb287427cde7d61f",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the Next.js internal component name LoadingBoundary in a Next.js project"
+    },
+    {
+      "id": "runtime:fdb1d54191a7a04b",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the Next.js internal component name Router in a Next.js project"
+    },
+    {
+      "id": "runtime:7652013cc899d9c6",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the React context wrapper Theme.Context"
+    },
+    {
+      "id": "runtime:baebfb7456ad6eaf",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the React context wrapper ThemeContext.Consumer"
+    },
+    {
+      "id": "runtime:c15f55a56bd7dd98",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the React context wrapper ThemeContext.Provider"
+    },
+    {
+      "id": "runtime:0f157a80b017618e",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the placeholder component name <anonymous>"
+    },
+    {
+      "id": "runtime:1cbf0ab29f6c6f37",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the placeholder component name <unknown>"
+    },
+    {
+      "id": "runtime:76de9d11e4a13984",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the placeholder component name Anonymous"
+    },
+    {
+      "id": "runtime:5a8d51e0549f9229",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the placeholder component name Unknown"
+    },
+    {
+      "id": "runtime:9cc8eb776b812e9a",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the slot wrapper CollectionSlot.Slot"
+    },
+    {
+      "id": "runtime:d96cf4e34d1089e5",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the slot wrapper CollectionSlot.SlotClone"
+    },
+    {
+      "id": "runtime:64f94dfe3c8f3eeb",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the slot wrapper Slot"
+    },
+    {
+      "id": "runtime:0eba6671ec3bf560",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the slot wrapper SlotClone"
+    },
+    {
+      "id": "runtime:6fb66453d8255ea7",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName filters the slot wrapper TooltipContent.Slottable"
+    },
+    {
+      "id": "runtime:8ccb355730dbc90c",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName keeps the authored component name AnonymousForm"
+    },
+    {
+      "id": "runtime:58ed8b5283e981ee",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName keeps the authored component name ErrorBoundary outside Next.js"
+    },
+    {
+      "id": "runtime:5068039a1129440e",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName keeps the authored component name Head outside Next.js"
+    },
+    {
+      "id": "runtime:9baceec2df101a9a",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName keeps the authored component name LinkComponent outside Next.js"
+    },
+    {
+      "id": "runtime:5047b3bf6d612e0c",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName keeps the authored component name LoadingBoundary outside Next.js"
+    },
+    {
+      "id": "runtime:9bdfae92b9b46906",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName keeps the authored component name Router outside Next.js"
+    },
+    {
+      "id": "runtime:dff4b96bd1095583",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName keeps the authored component name SlotMachine"
+    },
+    {
+      "id": "runtime:5aeb7f333dec65bd",
+      "file": "packages/grab/tests/upstream/is-useful-component-name.test.ts",
+      "fullName": "isUsefulComponentName keeps the authored component name TooltipProvider"
+    },
+    {
+      "id": "runtime:3a14c22dab7f46a6",
+      "file": "packages/grab/tests/upstream/label-controller.test.ts",
+      "fullName": "createLabelController restores a fading copied label while it is hovered"
+    },
+    {
+      "id": "runtime:0b5da5e02e88fc49",
+      "file": "packages/grab/tests/upstream/next-server-frames.test.ts",
+      "fullName": "symbolicateServerFrames aborts the in-flight POST when the external signal fires (no orphaned request)"
+    },
+    {
+      "id": "runtime:99b1526edf270802",
+      "file": "packages/grab/tests/upstream/next-server-frames.test.ts",
+      "fullName": "symbolicateServerFrames degrades immediately when the external signal is already aborted"
+    },
+    {
+      "id": "runtime:500218781e0754d4",
+      "file": "packages/grab/tests/upstream/next-server-frames.test.ts",
+      "fullName": "symbolicateServerFrames issues no request and returns the frames untouched when none are server frames"
+    },
+    {
+      "id": "runtime:b953f6af9e4f7353",
+      "file": "packages/grab/tests/upstream/next-server-frames.test.ts",
+      "fullName": "symbolicateServerFrames returns the original frames when the endpoint responds with an error"
+    },
+    {
+      "id": "runtime:5b1df97803b1e616",
+      "file": "packages/grab/tests/upstream/next-server-frames.test.ts",
+      "fullName": "symbolicateServerFrames — success path devirtualizes about://React URLs and URLs without a query suffix"
+    },
+    {
+      "id": "runtime:d28b6052fd48fad5",
+      "file": "packages/grab/tests/upstream/next-server-frames.test.ts",
+      "fullName": "symbolicateServerFrames — success path leaves a frame un-symbolicated when its result is rejected, ignored, or missing a file"
+    },
+    {
+      "id": "runtime:01d0fda4f44d3104",
+      "file": "packages/grab/tests/upstream/next-server-frames.test.ts",
+      "fullName": "symbolicateServerFrames — success path maps symbolicated locations back onto the original frame indices, leaving others intact"
+    },
+    {
+      "id": "runtime:a23718afb4678604",
+      "file": "packages/grab/tests/upstream/next-server-frames.test.ts",
+      "fullName": "symbolicateServerFrames — success path requests only the server frames, devirtualized, with the Next app-dir flags"
+    },
+    {
+      "id": "runtime:9deb294e61b8010a",
+      "file": "packages/grab/tests/upstream/notify-toolbar-state-change-subscribers.test.ts",
+      "fullName": "notifyToolbarStateChangeSubscribers reports a throwing subscriber and continues notifying"
+    },
+    {
+      "id": "runtime:e8e5b4a19d6f3940",
+      "file": "packages/grab/tests/upstream/notify-toolbar-state-change-subscribers.test.ts",
+      "fullName": "notifyToolbarStateChangeSubscribers reports an asynchronously rejected subscriber"
+    },
+    {
+      "id": "runtime:d7e239c72c98e0c4",
+      "file": "packages/grab/tests/upstream/open-file-action.test.ts",
+      "fullName": "executeOpenFileAction does not fall back when a plugin handles the file"
+    },
+    {
+      "id": "runtime:0c2f3298119045bc",
+      "file": "packages/grab/tests/upstream/open-file-action.test.ts",
+      "fullName": "executeOpenFileAction opens unhandled files with the plugin URL transform"
+    },
+    {
+      "id": "runtime:5ca6f33d0bd243ec",
+      "file": "packages/grab/tests/upstream/open-file-action.test.ts",
+      "fullName": "executeOpenFileAction reports rejected UI opens once with source context"
+    },
+    {
+      "id": "runtime:421bd374dcefdd57",
+      "file": "packages/grab/tests/upstream/open-file.test.ts",
+      "fullName": "requestOpenFile throws a typed error when the fallback opener fails"
+    },
+    {
+      "id": "runtime:c145027715857ac4",
+      "file": "packages/grab/tests/upstream/parse-activation-key.test.ts",
+      "fullName": "parseActivationKey preserves custom matcher results"
+    },
+    {
+      "id": "runtime:15af130e1c9424d7",
+      "file": "packages/grab/tests/upstream/parse-activation-key.test.ts",
+      "fullName": "parseActivationKey treats exceptions from custom matchers as non-matches"
+    },
+    {
+      "id": "runtime:4508ac64b124818b",
+      "file": "packages/grab/tests/upstream/parse-package-name.test.ts",
+      "fullName": "parsePackageName does not treat app paths or aliases as packages"
+    },
+    {
+      "id": "runtime:f664c8a6e3c0280b",
+      "file": "packages/grab/tests/upstream/parse-package-name.test.ts",
+      "fullName": "parsePackageName reads packages from Vite optimized dependency paths"
+    },
+    {
+      "id": "runtime:82ea1b029d590530",
+      "file": "packages/grab/tests/upstream/parse-package-name.test.ts",
+      "fullName": "parsePackageName reads packages from node_modules paths"
+    },
+    {
+      "id": "runtime:1d40c910840d0f40",
+      "file": "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+      "fullName": "perf instrumentation aggregates selector costs and advanced paint snapshots"
+    },
+    {
+      "id": "runtime:41be60b00e5dc5cd",
+      "file": "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+      "fullName": "perf instrumentation attributes browser process CPU across process types and transient processes"
+    },
+    {
+      "id": "runtime:677233c55a24c96b",
+      "file": "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+      "fullName": "perf instrumentation averages even-sized GPU sample medians"
+    },
+    {
+      "id": "runtime:0e5f78dff0804bb3",
+      "file": "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+      "fullName": "perf instrumentation averages the middle values for even-sized medians"
+    },
+    {
+      "id": "runtime:ab84b532372e922d",
+      "file": "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+      "fullName": "perf instrumentation clears the deadline timer when work finishes first"
+    },
+    {
+      "id": "runtime:b4b270650bc00c99",
+      "file": "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+      "fullName": "perf instrumentation combines browser GPU busy shares across Chromium processes"
+    },
+    {
+      "id": "runtime:ccf941ee8f8a3557",
+      "file": "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+      "fullName": "perf instrumentation does not count main-frame work as compositor work"
+    },
+    {
+      "id": "runtime:03490114730067fd",
+      "file": "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+      "fullName": "perf instrumentation does not misclassify no-damage scheduler frames as visual drops"
+    },
+    {
+      "id": "runtime:ab4ec37337156706",
+      "file": "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+      "fullName": "perf instrumentation includes DRM engines that appear during the sample window"
+    },
+    {
+      "id": "runtime:09ca7fd3100fe4dc",
+      "file": "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+      "fullName": "perf instrumentation limits rendering attribution to the marked scenario window"
+    },
+    {
+      "id": "runtime:f39453ae0b1f103d",
+      "file": "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+      "fullName": "perf instrumentation observes a GPU sampler that exited before teardown"
+    },
+    {
+      "id": "runtime:bb168b77607f9226",
+      "file": "packages/grab/tests/upstream/perf-instrumentation.test.ts",
+      "fullName": "perf instrumentation rejects CPU samples without a measurement delta"
+    },
+    {
+      "id": "runtime:08feecd6dcf5f907",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry aggregates every asynchronous element selection result"
+    },
+    {
+      "id": "runtime:3675417ad1b6cc2e",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry cleans every plugin when its Solid owner is disposed"
+    },
+    {
+      "id": "runtime:de805a8f7d9aa89c",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry does not let thrown element selection hooks block defaults"
+    },
+    {
+      "id": "runtime:b5636a8127d030d7",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry does not revisit a plugin that replaces itself during dispatch"
+    },
+    {
+      "id": "runtime:bb396ece4099442e",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry isolates asynchronous notification hook failures between plugins"
+    },
+    {
+      "id": "runtime:e973f6d365410b97",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry isolates notification hook failures between plugins"
+    },
+    {
+      "id": "runtime:1b114e9bc7012fd4",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry keeps the current plugin when its replacement setup fails"
+    },
+    {
+      "id": "runtime:d18a971d4d877518",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry keeps the current plugin when replacement store preparation fails"
+    },
+    {
+      "id": "runtime:918144ebd26a79c3",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry merges frozen setup config without mutating it"
+    },
+    {
+      "id": "runtime:0ae1692449148fba",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry observes asynchronous notification hook failures"
+    },
+    {
+      "id": "runtime:cdb07c82b9ff3c2a",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry observes invalid asynchronous cleanup failures"
+    },
+    {
+      "id": "runtime:b21e40f598b23101",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry preserves non-enumerable setup cleanup"
+    },
+    {
+      "id": "runtime:832b9a4b171cf444",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry preserves plugin precedence when replacing by name"
+    },
+    {
+      "id": "runtime:f22b9c49a6a38adf",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry preserves transformation results after plugin failures"
+    },
+    {
+      "id": "runtime:10f3778b3255aa1d",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry removes a plugin even when its cleanup throws"
+    },
+    {
+      "id": "runtime:01f5b4dfa61a0445",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry turns rejected element selection hooks into failed results"
+    },
+    {
+      "id": "runtime:4720453f6e3599b9",
+      "file": "packages/grab/tests/upstream/plugin-registry.test.ts",
+      "fullName": "createPluginRegistry uses one plugin snapshot for each hook dispatch"
+    },
+    {
+      "id": "runtime:dc02d7e4171c156b",
+      "file": "packages/grab/tests/upstream/primitives-freeze.test.ts",
+      "fullName": "freeze attempts every cleanup and retries failures"
+    },
+    {
+      "id": "runtime:9b54f9065c3cc165",
+      "file": "packages/grab/tests/upstream/primitives-freeze.test.ts",
+      "fullName": "freeze commits after setup and cleans up in reverse order"
+    },
+    {
+      "id": "runtime:b60125d77d24e7ba",
+      "file": "packages/grab/tests/upstream/primitives-freeze.test.ts",
+      "fullName": "freeze does not reenter a cleanup"
+    },
+    {
+      "id": "runtime:861449ebfe1b0a63",
+      "file": "packages/grab/tests/upstream/primitives-freeze.test.ts",
+      "fullName": "freeze honors unfreeze requested during setup"
+    },
+    {
+      "id": "runtime:a90cbd1dc46a86d6",
+      "file": "packages/grab/tests/upstream/primitives-freeze.test.ts",
+      "fullName": "freeze keeps an active freeze as one idempotent session"
+    },
+    {
+      "id": "runtime:1e4f86b6afb7713f",
+      "file": "packages/grab/tests/upstream/primitives-freeze.test.ts",
+      "fullName": "freeze rolls back acquired layers when setup fails"
+    },
+    {
+      "id": "runtime:eedc59681e0b7b1a",
+      "file": "packages/grab/tests/upstream/primitives-hit-testing.test.ts",
+      "fullName": "element inspection primitives creates a selector for the nearest useful selector target"
+    },
+    {
+      "id": "runtime:7c8665ebc7321558",
+      "file": "packages/grab/tests/upstream/primitives-hit-testing.test.ts",
+      "fullName": "element inspection primitives exposes the shared grabbability predicate"
+    },
+    {
+      "id": "runtime:4f8a2f43571be67a",
+      "file": "packages/grab/tests/upstream/primitives-hit-testing.test.ts",
+      "fullName": "element inspection primitives omits the selector when the resolved snippet omits it"
+    },
+    {
+      "id": "runtime:1434ade234a96595",
+      "file": "packages/grab/tests/upstream/primitives-hit-testing.test.ts",
+      "fullName": "element inspection primitives returns isolated top-window element bounds"
+    },
+    {
+      "id": "runtime:7b9672f7a02451c6",
+      "file": "packages/grab/tests/upstream/primitives-hit-testing.test.ts",
+      "fullName": "element inspection primitives returns the selector included in the resolved snippet"
+    },
+    {
+      "id": "runtime:21c97ce06c47bebd",
+      "file": "packages/grab/tests/upstream/primitives-hit-testing.test.ts",
+      "fullName": "point hit testing primitives always restores the pointer-events freeze after a failed hit test"
+    },
+    {
+      "id": "runtime:1d5d244d294253ac",
+      "file": "packages/grab/tests/upstream/primitives-hit-testing.test.ts",
+      "fullName": "point hit testing primitives confines results to a composed subtree"
+    },
+    {
+      "id": "runtime:610dc89d4649d960",
+      "file": "packages/grab/tests/upstream/primitives-hit-testing.test.ts",
+      "fullName": "point hit testing primitives preserves the raw legacy element-stack behavior"
+    },
+    {
+      "id": "runtime:8b74412bf71f551c",
+      "file": "packages/grab/tests/upstream/primitives-hit-testing.test.ts",
+      "fullName": "point hit testing primitives rejects non-finite coordinates without touching the document"
+    },
+    {
+      "id": "runtime:f5a8ac6934a9fbbd",
+      "file": "packages/grab/tests/upstream/primitives-hit-testing.test.ts",
+      "fullName": "point hit testing primitives returns all matching elements without changing paint order"
+    },
+    {
+      "id": "runtime:1115b912485f8a4d",
+      "file": "packages/grab/tests/upstream/primitives-hit-testing.test.ts",
+      "fullName": "point hit testing primitives returns the first grabbable element from the deep paint-order stack"
+    },
+    {
+      "id": "runtime:7746a2b221c1b2cb",
+      "file": "packages/grab/tests/upstream/race-promise-with-abort.test.ts",
+      "fullName": "racePromiseWithAbort returns a completed result"
+    },
+    {
+      "id": "runtime:24d7b8e9d4ef4d3a",
+      "file": "packages/grab/tests/upstream/race-promise-with-abort.test.ts",
+      "fullName": "racePromiseWithAbort stops waiting when aborted"
+    },
+    {
+      "id": "runtime:0b101f0289a5cf43",
+      "file": "packages/grab/tests/upstream/resolve-current-revision-value.test.ts",
+      "fullName": "resolveCurrentRevisionValue creates the fallback after a stale revision disappears"
+    },
+    {
+      "id": "runtime:6abe39d292ac21db",
+      "file": "packages/grab/tests/upstream/resolve-current-revision-value.test.ts",
+      "fullName": "resolveCurrentRevisionValue retries when the revision changes during resolution"
+    },
+    {
+      "id": "runtime:d2e2337430ea38f1",
+      "file": "packages/grab/tests/upstream/resolve-current-revision-value.test.ts",
+      "fullName": "resolveCurrentRevisionValue returns the fallback when no revision is available"
+    },
+    {
+      "id": "runtime:b113c9a53b822076",
+      "file": "packages/grab/tests/upstream/resolve-current-revision-value.test.ts",
+      "fullName": "resolveCurrentRevisionValue returns the first value when its revision remains current"
+    },
+    {
+      "id": "runtime:eef08aa0ac5ad3ed",
+      "file": "packages/grab/tests/upstream/resolve-current-revision-value.test.ts",
+      "fullName": "resolveCurrentRevisionValue returns the latest coherent value when revisions keep changing"
+    },
+    {
+      "id": "runtime:8e2ed6595666ae6f",
+      "file": "packages/grab/tests/upstream/resolve-max-context-lines.test.ts",
+      "fullName": "resolveMaxContextLines clamps negatives to zero and floors fractions"
+    },
+    {
+      "id": "runtime:2d4c3b6a414f93f9",
+      "file": "packages/grab/tests/upstream/resolve-max-context-lines.test.ts",
+      "fullName": "resolveMaxContextLines falls back to the default for undefined or non-finite values"
+    },
+    {
+      "id": "runtime:07c08b8b2e73c246",
+      "file": "packages/grab/tests/upstream/resolve-max-context-lines.test.ts",
+      "fullName": "resolveMaxContextLines passes through valid non-negative integers"
+    },
+    {
+      "id": "runtime:97721f7e62be1739",
+      "file": "packages/grab/tests/upstream/runtime-mode.test.ts",
+      "fullName": "runtime scope uses an adapted element's host when checking scope"
+    },
+    {
+      "id": "runtime:dec0140c5104d3b0",
+      "file": "packages/grab/tests/upstream/should-include-element-selector.test.ts",
+      "fullName": "shouldIncludeElementSelector includes semantic selectors alongside trusted source context"
+    },
+    {
+      "id": "runtime:015013407f881110",
+      "file": "packages/grab/tests/upstream/should-include-element-selector.test.ts",
+      "fullName": "shouldIncludeElementSelector includes structural selectors when source context needs a fallback"
+    },
+    {
+      "id": "runtime:218e2bf8a0cbe1db",
+      "file": "packages/grab/tests/upstream/should-include-element-selector.test.ts",
+      "fullName": "shouldIncludeElementSelector omits structural selectors when trusted source context is available"
+    },
+    {
+      "id": "runtime:969bfc4e3ba384db",
+      "file": "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+      "fullName": "runQueuedSourceFetch aborts superseded in-flight work and releases its slot"
+    },
+    {
+      "id": "runtime:14b89b95aed7543d",
+      "file": "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+      "fullName": "runQueuedSourceFetch aborts the task's signal when the timeout fires"
+    },
+    {
+      "id": "runtime:9ca562c0cc634de2",
+      "file": "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+      "fullName": "runQueuedSourceFetch admits queued tasks in FIFO order as slots free"
+    },
+    {
+      "id": "runtime:8fc9713d224a3a9c",
+      "file": "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+      "fullName": "runQueuedSourceFetch does not abort the signal when the task settles before the timeout"
+    },
+    {
+      "id": "runtime:8a2735af7d705b68",
+      "file": "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+      "fullName": "runQueuedSourceFetch does not surface a late rejection from a fetch that already timed out"
+    },
+    {
+      "id": "runtime:4694f81cb22a24bb",
+      "file": "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+      "fullName": "runQueuedSourceFetch frees the timed-out fetch's slot so later fetches still run"
+    },
+    {
+      "id": "runtime:810fc537cb1460e3",
+      "file": "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+      "fullName": "runQueuedSourceFetch releases a slot when a task rejects, so the queue does not deadlock"
+    },
+    {
+      "id": "runtime:b361563cd1a83e1f",
+      "file": "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+      "fullName": "runQueuedSourceFetch releases a slot when a task throws synchronously"
+    },
+    {
+      "id": "runtime:a5e3d4117bff39b7",
+      "file": "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+      "fullName": "runQueuedSourceFetch removes superseded work while it is waiting for a slot"
+    },
+    {
+      "id": "runtime:be7ed7124ba3fcf8",
+      "file": "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+      "fullName": "runQueuedSourceFetch returns the fallback when a fetch outlives the timeout, without hanging"
+    },
+    {
+      "id": "runtime:3e06cc447c0d02b3",
+      "file": "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+      "fullName": "runQueuedSourceFetch returns the task's resolved value (not the fallback) when it settles in time"
+    },
+    {
+      "id": "runtime:86f9fdc7aba33bb3",
+      "file": "packages/grab/tests/upstream/source-fetch-queue.test.ts",
+      "fullName": "runQueuedSourceFetch runs at most three fetches concurrently and admits the next as one settles"
+    },
+    {
+      "id": "runtime:10fb2cdc59490500",
+      "file": "packages/grab/tests/upstream/three-selection.test.ts",
+      "fullName": "Three.js drag selection replaces a large instanced mesh aggregate with the endpoint instance"
+    },
+    {
+      "id": "runtime:9f0917bdbcbd21dc",
+      "file": "packages/grab/tests/upstream/truncate-escaped-html.test.ts",
+      "fullName": "truncateEscapedHtml keeps escaped output within the encoded length budget"
+    },
+    {
+      "id": "runtime:afaa74a1b56b4146",
+      "file": "packages/grab/tests/upstream/truncate-escaped-html.test.ts",
+      "fullName": "truncateEscapedHtml preserves escaped output that fits the budget"
+    }
+  ],
+  "skippedTests": []
+}

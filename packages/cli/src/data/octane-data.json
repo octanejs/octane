@@ -405,6 +405,19 @@
       "verified": "2026-07-30"
     },
     {
+      "name": "@octanejs/grab",
+      "version": "0.0.1",
+      "category": "Developer Tools",
+      "upstream": { "package": "react-grab", "version": "0.2.0" },
+      "surface": "react-grab 0.2.0 element-grab overlay ported to Octane: init lifecycle, shadow-DOM overlay, selection/copy flow, context menu, plugins, global API, and the complete option/state/theme type surface.",
+      "divergences": [
+        "Component ancestry resolves through Octane scopes instead of React fibers; src/bippy/ is a clean-room reimplementation over Octane instrumentation.",
+        "options.freezeReactUpdates freezes Octane renderer updates; the option name is retained for API parity."
+      ],
+      "ssr": "Server rendering is covered by tests/ssr/isomorphic-import.test.ts: the package imports isomorphically and init stays inert without a DOM.",
+      "verified": "2026-09-16"
+    },
+    {
       "name": "@octanejs/gsap",
       "version": "0.0.21",
       "category": "Animation",
@@ -1795,6 +1808,7 @@
     "react-dropzone": "@octanejs/dropzone",
     "react-email": "@octanejs/email",
     "react-error-boundary": "@octanejs/react-error-boundary",
+    "react-grab": "@octanejs/grab",
     "react-hook-form": "@octanejs/hook-form",
     "react-i18next": "@octanejs/i18next",
     "react-image-crop": "@octanejs/image-crop",

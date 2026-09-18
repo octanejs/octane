@@ -236,4 +236,35 @@ describe('devtools hook registry', () => {
 		__devtoolsClearBoundary(slotA);
 		expect(hook.getTransitionState().boundaries).toEqual([]);
 	});
+
+	it('exposes live roots and merged child records for element tooling', () => {
+		const leaf = scope({ body: { name: 'Leaf' } });
+		const dynamic = scope({ body: { name: 'Dynamic' } });
+		const root = scope({
+			kind: 'root',
+			body: { name: 'Root' },
+			children: [{ key: 3, scope: leaf }],
+		});
+		__devtoolsSetChildWalker((candidate, visit) => {
+			if (candidate === root) {
+				visit(leaf); // already keyed — must not duplicate
+				visit(dynamic);
+			}
+		});
+		__devtoolsRegisterRoot(root);
+		try {
+			const hook = globalThis.__OCTANE_DEVTOOLS__!;
+			expect(hook.version).toBe(DEVTOOLS_HOOK_VERSION);
+			expect(hook.getRoots()).toEqual([root]);
+			const kids = hook.childrenOf(root);
+			expect(kids.map((entry) => entry.scope)).toEqual([leaf, dynamic]);
+			expect(kids[0].key).toBe(3);
+			expect(kids[1].key).toBeUndefined();
+			expect(hook.childrenOf(leaf)).toEqual([]);
+			__devtoolsUnregisterRoot(root);
+			expect(hook.getRoots()).toEqual([]);
+		} finally {
+			__devtoolsUnregisterRoot(root);
+		}
+	});
 });

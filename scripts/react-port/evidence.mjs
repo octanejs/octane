@@ -1484,11 +1484,21 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 		if (!expectedImport) {
 			throw new Error(`Type project for ${gateId} has no graph-planned package import`);
 		}
+		// With materialized provenance, the pinned upstream declarations are the
+		// opacity authority for both upstream lanes: a pristine import resolves
+		// to the upstream package itself, so each export is witnessed by the
+		// declaration that defines it, and an adapted import may carry any or
+		// unknown only where the pinned contract already declares it. Packages
+		// without pinned artifacts keep the direct opacity scan.
+		const pinnedEntries = existsSync(path.join(packageDirectory, 'upstream-artifact'))
+			? pinnedPublicEntries(packageDirectory, node)
+			: undefined;
 		const analysis = analyzeTypeEvidence(
 			programFiles,
 			parsed,
 			[expectedImport],
 			canonicalPath(path.join(workspaceRoot, 'scripts/react-port/type-assertions.d.ts')),
+			pinnedEntries,
 		);
 		if (!analysis.hasPositiveAssertion || !analysis.hasNegativeControl) {
 			throw new Error(

@@ -292,6 +292,39 @@ describe('extractTestCases', () => {
 		assert.match(cases[0].manualReviewReason, /inside a loop/);
 	});
 
+	test('does not extend a brace-less for body over the following suite', () => {
+		const cases = extractTestCases(`
+			afterEach(() => {
+				for (const unregister of unregisterCallbacks.splice(0).reverse()) unregister();
+			});
+			describe('suite', () => {
+				it('first', () => {});
+				it('second', () => {});
+			});
+		`);
+
+		assert.deepEqual(
+			cases.map((testCase) => testCase.title),
+			['first', 'second'],
+		);
+		for (const testCase of cases) {
+			assert.equal(testCase.estimatedRegistrations, 1);
+			assert.equal(testCase.dynamicExpansion, null);
+			assert.equal(testCase.manualReviewReason, null);
+		}
+	});
+
+	test('keeps registrar calls in a brace-less for body inside the loop', () => {
+		const cases = extractTestCases(`
+			const cases = [1, 2, 3];
+			for (const entry of cases) it('case', () => entry);
+		`);
+
+		assert.equal(cases.length, 1);
+		assert.equal(cases[0].estimatedRegistrations, 3);
+		assert.equal(cases[0].dynamicExpansion?.kind, 'loop');
+	});
+
 	test('counts nested literal forEach registration matrices', () => {
 		const cases = extractTestCases(`
 			[true, false].forEach(native => {

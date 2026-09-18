@@ -58,6 +58,19 @@ describe('scanSource', () => {
 		expect(renderer.verdict).toBe('needs-rework');
 	});
 
+	it('ignores API names inside string literals and comments', () => {
+		const report = bridgeReportFromSource(`
+			const TAG_NAMES = { 18: 'Suspense', 19: 'SuspenseList', 30: 'ViewTransition' };
+			const KNOWN = new Set(['Suspense', 'Fragment', 'StrictMode', 'Profiler', 'SuspenseList']);
+			// SuspenseList and Profiler tags map to labels; they are never rendered.
+			const fiberName = tag => TAG_NAMES[tag] ?? \`Unknown\`;
+			export const describe = fiber => KNOWN.has(fiberName(fiber.tag)) ? fiberName(fiber.tag) : 'Anonymous';
+		`);
+		expect(report.apis.find((row) => row.name === 'SuspenseList')).toBeUndefined();
+		expect(report.apis.find((row) => row.name === 'Profiler')).toBeUndefined();
+		expect(report.verdict).toBe('bridgeable');
+	});
+
 	it('targets only React-style text-host onChange wiring', () => {
 		const source = `
 			function Demo(props) {

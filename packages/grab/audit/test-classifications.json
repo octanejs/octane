@@ -1,0 +1,39 @@
+{
+  "tests": [
+    {
+      "path": "packages/grab/tests/browser/overlay.browser.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Boots the real package in headless Chromium and drives activation, selection, copy, and dispose with real input; it has no React oracle and is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/grab/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs identical scenarios against pinned react-grab and @octanejs/grab (disabled init, mount/activate/deactivate/dispose lifecycle, DEFAULT_THEME, error classes, formatElementInfo output) and asserts byte-identical observable results."
+    },
+    {
+      "path": "packages/grab/tests/env-check.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the binding's environment-detection guards under jsdom; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/grab/tests/reactive-bridge.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Covers src/reactive.ts, the Octane-authored store/reactivity bridge that has no upstream counterpart; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/grab/tests/renderer-mount.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Mounts the compiled .tsrx overlay into a shadow root through the Octane plugin; it verifies binding integration, not a React parity claim."
+    },
+    {
+      "path": "packages/grab/tests/shim.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Covers the Octane-side shims the adapted upstream suite relies on; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/grab/tests/ssr/isomorphic-import.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Verifies isomorphic import and inert init without a DOM; it is not counted as React parity evidence."
+    }
+  ]
+}

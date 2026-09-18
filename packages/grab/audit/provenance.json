@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "3cb91aec78b7a54136b60a81055a3e1e5bac3c2d47d06dc866948129e4cd4f45"
+    },
+    {
+      "path": "upstream-artifact/react-grab-0.2.0.tgz",
+      "sha256": "33d3f5a8363c0282cda04decc81cfa3a634d81c661ad42db6dc3e30087321d45"
+    }
+  ],
+  "requiredFiles": [
+    "audit/upstream.lock.json",
+    "audit/registrations.json",
+    "audit/crosswalk.json",
+    "audit/closure.json",
+    "audit/react-parity.json",
+    "audit/pristine-runtime.json",
+    "audit/adapted-runtime.json",
+    "audit/differential-runtime.json",
+    "audit/browser-runtime.json",
+    "tests/types/public.ts",
+    "tests/types/published-contract.ts",
+    "tests/types/tsconfig.json",
+    "typetests/pristine/tsconfig.json",
+    "typetests/adapted/tsconfig.json"
+  ],
+  "filesEqual": [
+    { "path": "LICENSE.upstream", "equalsPath": "upstream/packages/react-grab/LICENSE" }
+  ],
+  "packageIdentity": {
+    "path": "upstream/packages/react-grab/package.json",
+    "name": "react-grab",
+    "version": "0.2.0",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact", "scripts"]
+}

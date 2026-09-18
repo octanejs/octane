@@ -3149,6 +3149,102 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/grab/tests/upstream/**/*.test.{ts,tsx,tsrx}'],
+				},
+				test: {
+					name: 'grab',
+					include: ['packages/grab/tests/**/*.test.{ts,tsx,tsrx}'],
+					exclude: [
+						'packages/grab/tests/browser/**',
+						'packages/grab/tests/differential/**',
+						'packages/grab/tests/ssr/**',
+					],
+					environment: 'jsdom',
+					setupFiles: ['packages/grab/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				// Byte-exact pinned upstream unit suite. vite-plus/test is the
+				// upstream runner's vitest-compatible entry; aliasing it to vitest
+				// keeps the committed pristine tree unmodified.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/grab/upstream/packages/react-grab/tests/**/*.test.ts'],
+				},
+				test: {
+					name: 'grab-pristine',
+					include: ['packages/grab/upstream/packages/react-grab/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				define: {
+					'process.env.VERSION': JSON.stringify('0.2.0'),
+					'process.env.IS_DEMO': JSON.stringify(''),
+					'process.env.REACT_GRAB_SOURCE_LOCATIONS': JSON.stringify(''),
+				},
+				resolve: {
+					alias: [{ find: /^vite-plus\/test$/, replacement: 'vitest' }],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'grab-differential',
+					include: ['packages/grab/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					setupFiles: ['packages/grab/tests/_setup.ts'],
+					globals: false,
+					// The beforeAll imports react-grab's dist and the .tsrx source entry;
+					// both compile under multi-project transform load.
+					hookTimeout: 30_000,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/grab$/,
+							replacement: resolve(import.meta.dirname, 'packages/grab/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'grab-ssr',
+					include: ['packages/grab/tests/ssr/**/*.test.{ts,tsx,tsrx}'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/grab$/,
+							replacement: resolve(import.meta.dirname, 'packages/grab/src/index.ts'),
+						},
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'grab-browser',
+					include: ['packages/grab/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 90_000,
+				},
+			},
+			{
 				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'formisch-pristine-core',

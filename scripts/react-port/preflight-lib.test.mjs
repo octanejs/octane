@@ -606,7 +606,7 @@ describe('resolved evidence', () => {
 			},
 			gitHead: commit,
 			dependencies: { 'react-helper': '^1.0.0' },
-			scripts: { test: 'vitest --config configs/quality.mjs' },
+			scripts: { test: 'vitest --config configs/quality.mjs && node scripts/report.mjs' },
 		};
 		const tarball = gzipSync(
 			makeTar({
@@ -646,6 +646,9 @@ describe('resolved evidence', () => {
 			"export default { resolve: { alias: { source: 'src/' } }, test: { include: ['quality/**/*.ts'], includeSource: ['src/**/*.ts'], exclude: ['src/**/*.ts'], setupFiles: ['index.ts'] } };\n",
 		);
 		const sourceTestBytes = Buffer.from("test('renders', () => {});\n");
+		// Referenced only as a `node <script>` argument in the test command, so it
+		// must be inventoried as a non-test module rather than fail the run.
+		const reportScriptBytes = Buffer.from("console.log('report');\n");
 		const ordinarySourceBytes = Buffer.from('export const widgetSource = true;\n');
 		const inlineTestSourceBytes = Buffer.from(
 			"export const inline = true; if (import.meta.vitest) { test('works inline', () => {}); }\n",
@@ -698,6 +701,14 @@ describe('resolved evidence', () => {
 				size: inlineTestSourceBytes.length,
 				sha: gitBlobSha(inlineTestSourceBytes),
 				url: 'https://api.github.com/repos/example/widgets/git/blobs/inline-source',
+			},
+			{
+				path: 'packages/react-widget/scripts/report.mjs',
+				mode: '100644',
+				type: 'blob',
+				size: reportScriptBytes.length,
+				sha: gitBlobSha(reportScriptBytes),
+				url: 'https://api.github.com/repos/example/widgets/git/blobs/report-script',
 			},
 			{
 				path: 'packages/react-widget/current',
@@ -784,6 +795,14 @@ describe('resolved evidence', () => {
 					encoding: 'base64',
 					content: inlineTestSourceBytes.toString('base64'),
 					size: inlineTestSourceBytes.length,
+				}),
+			],
+			[
+				'https://api.github.com/repos/example/widgets/git/blobs/report-script',
+				Response.json({
+					encoding: 'base64',
+					content: reportScriptBytes.toString('base64'),
+					size: reportScriptBytes.length,
 				}),
 			],
 		]);

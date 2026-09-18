@@ -569,6 +569,50 @@ describe('package and closure completion', () => {
 		assert.equal(result.status, 'passed', result.issues.join('\n'));
 	});
 
+	test('follows `.js` specifiers to their authored `.ts` sources in the shipped closure', async () => {
+		const packageDirectory = await mkdtemp(path.join(tmpdir(), 'react-port-js-specifier-closure-'));
+		await mkdir(path.join(packageDirectory, 'src'));
+		await writeFile(
+			path.join(packageDirectory, 'package.json'),
+			JSON.stringify({
+				name: '@octanejs/widget',
+				exports: { '.': './src/index.ts' },
+			}),
+		);
+		const indexSource = "import { helper } from './helper.js';\nexport const widget = helper;\n";
+		const helperSource = 'export const helper = true;\n';
+		await writeFile(path.join(packageDirectory, 'src/index.ts'), indexSource);
+		await writeFile(path.join(packageDirectory, 'src/helper.ts'), helperSource);
+
+		const missingLedger = auditShippedClosure({
+			nodeId: 'pkg:widget',
+			graphNodes: {
+				'pkg:widget': { packageName: 'widget', dependsOn: [] },
+			},
+			packageDirectory,
+			runtimeDependencies: [],
+			adaptedSources: [],
+			sourceLedger: [{ path: 'src/index.ts', origin: 'authored', sha256: sha256(indexSource) }],
+		});
+		assert.equal(missingLedger.status, 'blocked');
+		assert.match(missingLedger.issues.join('\n'), /helper\.ts/);
+
+		const result = auditShippedClosure({
+			nodeId: 'pkg:widget',
+			graphNodes: {
+				'pkg:widget': { packageName: 'widget', dependsOn: [] },
+			},
+			packageDirectory,
+			runtimeDependencies: [],
+			adaptedSources: [],
+			sourceLedger: [
+				{ path: 'src/index.ts', origin: 'authored', sha256: sha256(indexSource) },
+				{ path: 'src/helper.ts', origin: 'authored', sha256: sha256(helperSource) },
+			],
+		});
+		assert.equal(result.status, 'passed', result.issues.join('\n'));
+	});
+
 	test('requires React-coupled dependency edges to use their planned binding', () => {
 		const result = auditShippedClosure({
 			nodeId: 'pkg:widget',

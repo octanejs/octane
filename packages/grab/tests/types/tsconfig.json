@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": ["./public.ts", "./published-contract.ts", "../../src/custom.d.ts"],
+  "exclude": ["node_modules", "dist"],
+  "reactPortEvidence": {
+    "gate": "public-types",
+    "publicMode": "pinned"
+  }
+}

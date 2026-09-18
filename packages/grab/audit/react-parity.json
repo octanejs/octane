@@ -1,0 +1,246 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/aidenybai/react-grab.git",
+    "version": "0.2.0",
+    "commit": "23bce0e56f2808902f1126ad581f6d8c3b5f639e",
+    "sourceRoot": "packages/react-grab/src",
+    "testRoot": "packages/react-grab/tests; packages/react-grab/e2e",
+    "license": "MIT",
+    "integrity": "sha256:33d3f5a8363c0282cda04decc81cfa3a634d81c661ad42db6dc3e30087321d45",
+    "verification": "verified"
+  },
+  "materializedTests": "packages/grab",
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/grab/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/grab/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|tsx|tsrx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 356,
+    "uniqueIdentities": 351,
+    "duplicateEntriesWithinLanes": 5,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "0707bd97d6588d87733568b7d79c17f974585ace1ca97759aff98d4a6dec1116"
+    }
+  },
+  "lanes": [
+    {
+      "id": "grab-pristine",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "grab-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 356 byte-exact pinned upstream unit cases (vite-plus/test aliased to vitest) against the materialized react-grab source.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/grab/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/grab/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "6a070033ed30ab1b58be766f1cdf0254c44a55b624316acbb8289b5719c2e1c3"
+        },
+        {
+          "path": "packages/grab/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "6c0461e6fe79422ef4dd058ae2d44d7b745aa1a3f636a9a071c21f648809cf75"
+        },
+        {
+          "path": "packages/grab/scripts/build-runtime-inventories.mjs",
+          "role": "support",
+          "sha256": "636a15d280a6f78063261534e77a6b1cefe2aaf0de4e7a081b35cf0a4a792977"
+        }
+      ]
+    },
+    {
+      "id": "grab-adapted",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "grab",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the materialized upstream unit suite (356 cases under mechanical import rewrites) against the Octane binding source.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/grab/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/grab/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "6e9384158ad58dd0fc58f89df48d90692374937ae629f6c3caf0d823098bfc88"
+        },
+        {
+          "path": "packages/grab/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "6c0461e6fe79422ef4dd058ae2d44d7b745aa1a3f636a9a071c21f648809cf75"
+        },
+        {
+          "path": "packages/grab/tests/_setup.ts",
+          "role": "support",
+          "sha256": "0866d053419d97162b11a7073c15a78e5275523da3f3aa0359591204234fd09a"
+        },
+        {
+          "path": "packages/grab/scripts/build-runtime-inventories.mjs",
+          "role": "support",
+          "sha256": "636a15d280a6f78063261534e77a6b1cefe2aaf0de4e7a081b35cf0a4a792977"
+        }
+      ]
+    },
+    {
+      "id": "grab-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "grab-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Drives pinned react-grab and @octanejs/grab through the same scenarios (disabled init, lifecycle, DEFAULT_THEME, error classes, element-info formatting) and asserts identical observable results.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/grab/audit/differential-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/grab/audit/differential-runtime.json",
+          "role": "support",
+          "sha256": "79d28c51be1a5d97ecdfaeb23f35e65ff6578d658b6dc6e4baed99d94257be5a"
+        },
+        {
+          "path": "packages/grab/tests/differential/parity.test.ts",
+          "role": "support",
+          "sha256": "004526f60436c2a8bd65a0936b166ea364dcd9436562327820d076bd3807ea88"
+        },
+        {
+          "path": "packages/grab/tests/_setup.ts",
+          "role": "support",
+          "sha256": "0866d053419d97162b11a7073c15a78e5275523da3f3aa0359591204234fd09a"
+        }
+      ]
+    },
+    {
+      "id": "grab-browser",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "grab-browser",
+      "notes": "Boots the real package (compiled .tsrx through the Octane Vite plugin) in headless Chromium and drives activation, selection, copy, and dispose with real input.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/grab/audit/browser-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/grab/audit/browser-runtime.json",
+          "role": "support",
+          "sha256": "e90cc250722a0cf6da7fbc26f9cd1ae80eff5e3faf8138e6588b740ef13e5ca6"
+        },
+        {
+          "path": "packages/grab/tests/browser/overlay.browser.test.ts",
+          "role": "support",
+          "sha256": "eb632c328c80313d0979067f179632fcd54f85508354a93fa0b125cb7106c269"
+        },
+        {
+          "path": "packages/grab/tests/browser/harness/index.html",
+          "role": "support",
+          "sha256": "f194046249139ae19a5a5bea473a9bd8138724513632066369b3de12c3b80b8d"
+        },
+        {
+          "path": "packages/grab/tests/browser/harness/main.ts",
+          "role": "support",
+          "sha256": "db46ff725ce378cb01b2d512b29df481e88162ad3b4f65a124aa98dea9373521"
+        }
+      ]
+    },
+    {
+      "id": "grab-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "grab-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles the pinned upstream type surface through the repo-authored contract (upstream has no type test suite; upstreamSuites.types is absent).",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/grab/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/grab/typetests/pristine/pristine.ts",
+          "role": "test",
+          "sha256": "5ff00e14598ed8ffebbafaf77a0114412a0bcbf55322a1e637b6ec16ab564125",
+          "cases": [
+            {
+              "id": "types:pristine",
+              "testName": "pinned upstream type contract",
+              "fullName": "pinned upstream type contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/grab/typetests/pristine/upstream-contract.ts",
+          "role": "support",
+          "sha256": "582af4ffcc4480ca18cc044a1095bd620c0e24395cf3a004bdec19cf55dc2bde"
+        },
+        {
+          "path": "packages/grab/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "27893c34eb5ac78e57c671d3448d8cb16e810cb87c51de8f664d51b6668a63d7"
+        }
+      ]
+    },
+    {
+      "id": "grab-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "grab-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles the Octane binding against the repo-authored upstream contract under tsrx-tsc.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/grab/typetests/adapted/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/grab/typetests/adapted/adapted.ts",
+          "role": "test",
+          "sha256": "2a790e169165aaebe186cff71e26143f579afa3eb5e29834d2b7ada71bfecf8c",
+          "cases": [
+            {
+              "id": "types:adapted",
+              "testName": "adapted binding type contract",
+              "fullName": "adapted binding type contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/grab/typetests/adapted/tsconfig.json",
+          "role": "support",
+          "sha256": "2ec07e3329e5d43c175409a2d8abce97cfb21ad0c400e2dd047fb1a51b4880dd"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

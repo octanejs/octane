@@ -11,7 +11,7 @@ import type {
 	NativeReadObservation,
 } from './signals/native-read-inspection.js';
 
-export const DEVTOOLS_HOOK_VERSION = 3;
+export const DEVTOOLS_HOOK_VERSION = 4;
 
 /** The subset of a runtime Scope/Block the walker reads. */
 export interface DevtoolsScopeLike {
@@ -23,6 +23,17 @@ export interface DevtoolsScopeLike {
 	children: Array<{ key: symbol | string | number; scope: DevtoolsScopeLike }> | null;
 	$$ctxValues?: Map<any, any> | null;
 	disposed?: boolean;
+	// Introspection surface for element→scope tooling (a DevTools element picker,
+	// @octanejs/grab). These fields exist on runtime Scope/Block objects; the hook
+	// only reads them — nothing here is written back.
+	parent?: DevtoolsScopeLike | null;
+	parentBlock?: DevtoolsScopeLike | null;
+	parentNode?: Node | null;
+	startMarker?: Node | null;
+	endMarker?: Node | null;
+	props?: unknown;
+	locs?: Record<number, [number, number]>;
+	locFile?: string;
 }
 
 export interface DevtoolsTreeNode {
@@ -81,6 +92,19 @@ export interface OctaneDevtoolsHook {
 	inspect(id: number): DevtoolsNodeDetail | null;
 	subscribe(listener: () => void): () => void;
 	getTransitionState(): DevtoolsTransitionState;
+	/**
+	 * Live registered root scopes (structural refs, not copies). Element→scope
+	 * tooling uses these plus `childrenOf` to walk the real scope graph; nothing
+	 * read through this surface is owned by the consumer.
+	 */
+	getRoots(): readonly DevtoolsScopeLike[];
+	/**
+	 * A scope's child records: keyed `children` entries first, then any
+	 * dynamic/deopt children exposed by the runtime child walker (key undefined).
+	 */
+	childrenOf(
+		scope: DevtoolsScopeLike,
+	): ReadonlyArray<{ key: symbol | string | number | undefined; scope: DevtoolsScopeLike }>;
 }
 
 const roots = new Set<DevtoolsScopeLike>();
@@ -277,6 +301,26 @@ const hook: OctaneDevtoolsHook = {
 			pendingCount: transitionPendingCount,
 			boundaries: [...boundaries.values()],
 		};
+	},
+	getRoots() {
+		return [...roots];
+	},
+	childrenOf(scope) {
+		const out: { key: symbol | string | number | undefined; scope: DevtoolsScopeLike }[] = [];
+		const seen = new Set<DevtoolsScopeLike>();
+		if (scope.children !== null) {
+			for (const child of scope.children) {
+				if (seen.has(child.scope)) continue;
+				seen.add(child.scope);
+				out.push({ key: child.key, scope: child.scope });
+			}
+		}
+		childWalker?.(scope, (child) => {
+			if (seen.has(child)) return;
+			seen.add(child);
+			out.push({ key: undefined, scope: child });
+		});
+		return out;
 	},
 };
 

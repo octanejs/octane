@@ -88,6 +88,7 @@ export function staticArrayInventory(source) {
 			['each', 'for'].includes(parent.expression.name.text)
 		)
 			return true;
+		if (ts.isForInOrOfStatement(parent) && parent.expression === node) return true;
 		return false;
 	};
 	const merge = (values) => {
@@ -161,6 +162,7 @@ export function staticArrayInventory(source) {
 		}
 	};
 	const counts = new Map();
+	const loops = [];
 	const collect = (node) => {
 		if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
 			const method = node.expression.name.text;
@@ -171,8 +173,22 @@ export function staticArrayInventory(source) {
 				if (value) counts.set(node.expression.name.getStart(sourceFile), value.length);
 			}
 		}
+		if (ts.isForStatement(node) || ts.isForInOrOfStatement(node)) {
+			const body = node.statement;
+			const iterable = ts.isForInOrOfStatement(node) ? evaluate(node.expression) : null;
+			loops.push({
+				kind: 'for',
+				rowCount: iterable ? iterable.length : null,
+				start: body.getStart(sourceFile) - (ts.isBlock(body) ? 0 : 1),
+				end: body.getEnd(),
+				source: `${source
+					.slice(node.getStart(sourceFile), body.getStart(sourceFile))
+					.replace(/\s+/g, ' ')
+					.trim()}${ts.isBlock(body) ? '{' : ' …'}`,
+			});
+		}
 		ts.forEachChild(node, collect);
 	};
 	collect(sourceFile);
-	return counts;
+	return { counts, loops };
 }

@@ -1,0 +1,19 @@
+{
+  "upstream": {
+    "package": "react-grab",
+    "version": "0.2.0"
+  },
+  "surface": "react-grab 0.2.0 element-grab overlay ported to Octane: init lifecycle, shadow-DOM overlay, selection/copy flow, context menu, plugins, global API, and the complete option/state/theme type surface.",
+  "divergences": [
+    "Component ancestry resolves through Octane scopes instead of React fibers; src/bippy/ is a clean-room reimplementation over Octane instrumentation.",
+    "options.freezeReactUpdates freezes Octane renderer updates; the option name is retained for API parity."
+  ],
+  "ssr": "Server rendering is covered by tests/ssr/isomorphic-import.test.ts: the package imports isomorphically and init stays inert without a DOM.",
+  "provenance": {
+    "source": "https://github.com/aidenybai/react-grab/tree/23bce0e56f2808902f1126ad581f6d8c3b5f639e",
+    "license": "MIT",
+    "commit": "23bce0e56f2808902f1126ad581f6d8c3b5f639e",
+    "verification": "verified"
+  },
+  "verified": "2026-09-16"
+}

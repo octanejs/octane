@@ -668,6 +668,12 @@
         "tags": ["elements", "introspection", "compatibility"]
       },
       {
+        "packageName": "@octanejs/grab",
+        "title": "React Grab",
+        "searchTerms": ["react-grab"],
+        "tags": ["devtools", "context", "clipboard"]
+      },
+      {
         "packageName": "@octanejs/tanstack-devtools",
         "title": "TanStack Devtools",
         "tags": ["devtools", "debugging"]

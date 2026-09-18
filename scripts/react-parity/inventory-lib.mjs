@@ -28,6 +28,7 @@ export const DEFAULT_HELPER_EXPANSIONS = Object.freeze({
 
 const DIRECT_REGISTRARS = new Set(['it', 'test', 'fit', 'xit']);
 const NAMESPACED_DIRECT_REGISTRARS = new Set(['scopedLive']);
+const QUALIFIED_NAMESPACED_REGISTRARS = new Map([['test', new Set(['Expect'])]]);
 const GATED_REGISTRARS = new Set(['_test_gate', '_test_gate_focus']);
 const CURRIED_CONDITIONAL_MODIFIERS = new Set(['skipIf', 'runIf']);
 const OPEN_TO_CLOSE = new Map([
@@ -447,36 +448,57 @@ function describeEachContexts(source, tokens, pairs, staticCounts) {
 	return contexts;
 }
 
-function loopContexts(source, tokens, pairs, staticCounts) {
-	const contexts = [];
+function loopContexts(source, tokens, pairs, staticCounts, staticLoops) {
+	const contexts = [...staticLoops];
 
 	const addBody = (kind, labelStart, searchStart, searchEnd, rowCount = null) => {
-		for (let index = searchStart; index < searchEnd; index++) {
-			if (tokens[index]?.value !== '{') continue;
-			const close = pairs.get(index);
-			if (close === undefined || close > searchEnd) continue;
+		const pushRange = (stop) => {
+			if (stop <= searchStart) return;
 			contexts.push({
 				kind,
 				rowCount,
-				start: tokens[index].end,
+				start: tokens[searchStart - 1].end,
+				end: tokens[stop].start,
+				source: `${source
+					.slice(tokens[labelStart].start, tokens[stop].start)
+					.replace(/\s+/g, ' ')
+					.trim()} …`,
+			});
+		};
+		const pushBlock = (open) => {
+			const close = pairs.get(open);
+			if (close === undefined || close > searchEnd) return pushRange(searchEnd);
+			contexts.push({
+				kind,
+				rowCount,
+				start: tokens[open].end,
 				end: tokens[close].start,
 				source: source
-					.slice(tokens[labelStart].start, tokens[index].end)
+					.slice(tokens[labelStart].start, tokens[open].end)
 					.replace(/\s+/g, ' ')
 					.trim(),
 			});
-			break;
+		};
+		for (let index = searchStart; index < searchEnd; index++) {
+			const value = tokens[index]?.value;
+			if (value === '(' || value === '[') {
+				const close = pairs.get(index);
+				if (close === undefined || close >= searchEnd) break;
+				index = close;
+				continue;
+			}
+			if (value === '{') {
+				if (index === searchStart) return pushBlock(index);
+				const close = pairs.get(index);
+				if (close === undefined || close >= searchEnd) break;
+				index = close;
+				continue;
+			}
+			if (value === ',') return pushRange(index);
 		}
+		pushRange(searchEnd);
 	};
 	for (let index = 0; index < tokens.length; index++) {
-		if (
-			tokens[index].value === 'for' &&
-			tokens[index - 1]?.value !== '.' &&
-			tokens[index + 1]?.value === '('
-		) {
-			const headerEnd = pairs.get(index + 1);
-			if (headerEnd !== undefined) addBody('for', index, headerEnd + 1, tokens.length);
-		}
 		if (
 			tokens[index].value === 'forEach' &&
 			tokens[index - 1]?.value === '.' &&
@@ -484,10 +506,20 @@ function loopContexts(source, tokens, pairs, staticCounts) {
 		) {
 			const invocationEnd = pairs.get(index + 1);
 			if (invocationEnd === undefined) continue;
-			const arrow = tokens.findIndex(
-				(token, tokenIndex) =>
-					tokenIndex > index + 1 && tokenIndex < invocationEnd && token.value === '=>',
-			);
+			let arrow = -1;
+			for (let cursor = index + 2; cursor < invocationEnd; cursor++) {
+				const value = tokens[cursor]?.value;
+				if (value === '(' || value === '[' || value === '{') {
+					const close = pairs.get(cursor);
+					if (close === undefined || close >= invocationEnd) break;
+					cursor = close;
+					continue;
+				}
+				if (value === '=>') {
+					arrow = cursor;
+					break;
+				}
+			}
 			const rowCount = staticCounts.get(tokens[index].start) ?? null;
 			addBody('forEach', index, arrow === -1 ? index + 2 : arrow + 1, invocationEnd, rowCount);
 		}
@@ -676,9 +708,9 @@ export function extractTestCases(
 	if (file.endsWith('.coffee')) return extractCoffeeScriptTestCases(source, file);
 	const { tokens, comments } = tokenizeJavaScript(source);
 	const pairs = buildPairMap(tokens);
-	const staticCounts = staticArrayInventory(source, file);
+	const { counts: staticCounts, loops: staticLoops } = staticArrayInventory(source, file);
 	const describeContexts = describeEachContexts(source, tokens, pairs, staticCounts);
-	const loops = loopContexts(source, tokens, pairs, staticCounts);
+	const loops = loopContexts(source, tokens, pairs, staticCounts, staticLoops);
 	const nodeSubtestOffsets = nodeSubtestRegistrarOffsets(source, file);
 	const aliases = directRegistrarAliases(source);
 	const cases = [];
@@ -687,7 +719,9 @@ export function extractTestCases(
 		const token = tokens[index];
 		const name = token.value;
 		const isNamespacedDirect =
-			(NAMESPACED_DIRECT_REGISTRARS.has(name) || nodeSubtestOffsets.has(token.start)) &&
+			(NAMESPACED_DIRECT_REGISTRARS.has(name) ||
+				QUALIFIED_NAMESPACED_REGISTRARS.get(name)?.has(tokens[index - 2]?.value) === true ||
+				nodeSubtestOffsets.has(token.start)) &&
 			tokens[index - 1]?.value === '.' &&
 			tokens[index - 2]?.type === 'identifier';
 		const isDirect = DIRECT_REGISTRARS.has(name) || isNamespacedDirect || aliases.has(name);

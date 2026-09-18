@@ -241,9 +241,13 @@ function pinnedFixture(run, versioned = false, opaqueMember = false, options = {
 test('uses published declarations only after source, tarball, and installed bytes agree', () =>
 	pinnedFixture(({ directory, node }) => {
 		const entries = pinnedPublicEntries(directory, node);
-		assert.deepEqual([...entries.keys()], ['@octanejs/widget']);
+		assert.deepEqual([...entries.keys()], ['@octanejs/widget', 'mit-widget']);
 		assert.equal(
 			entries.get('@octanejs/widget'),
+			path.join(directory, 'node_modules/mit-widget/index.d.mts'),
+		);
+		assert.equal(
+			entries.get('mit-widget'),
 			path.join(directory, 'node_modules/mit-widget/index.d.mts'),
 		);
 		assert.deepEqual([...entries.internalMembers], [`${directory}/src/index.ts#Widget.hidden`]);

@@ -1,0 +1,31 @@
+let cachedIsMac: boolean | null = null;
+
+const getPlatformFromUserAgentData = (): string | null => {
+	if (typeof navigator === 'undefined') return null;
+	if (!('userAgentData' in navigator)) return null;
+
+	const userAgentData = navigator.userAgentData;
+	if (typeof userAgentData !== 'object' || userAgentData === null) return null;
+	if (!('platform' in userAgentData)) return null;
+
+	const platform = userAgentData.platform;
+	if (typeof platform !== 'string') return null;
+	return platform;
+};
+
+export const isMac = (): boolean => {
+	if (cachedIsMac === null) {
+		if (typeof navigator === 'undefined') {
+			cachedIsMac = false;
+			return cachedIsMac;
+		}
+
+		// We check navigator.platform before userAgentData because headless
+		// Chromium reports userAgentData.platform as "Windows" regardless of the
+		// actual OS, which broke 17 e2e tests on macOS CI.
+		// @see https://github.com/aidenybai/react-grab/pull/236
+		const platform = navigator.platform ?? getPlatformFromUserAgentData() ?? navigator.userAgent;
+		cachedIsMac = /Mac|iPhone|iPad|iPod/i.test(platform);
+	}
+	return cachedIsMac;
+};

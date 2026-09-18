@@ -766,8 +766,14 @@ function staticModuleSpecifiers(filePath) {
 
 function resolveRelativeSource(fromFile, specifier) {
 	const base = path.resolve(path.dirname(fromFile), specifier);
+	// Mirror TypeScript's `.js`-to-source mapping: a `./foo.js` specifier resolves
+	// to `foo.ts`/`foo.tsx`/`foo.tsrx` when no literal `foo.js` file exists.
+	const stripped = base.replace(/\.(js|jsx|mjs|cjs)$/, '');
 	const candidates = [
 		base,
+		...(stripped === base
+			? []
+			: SHIPPED_SOURCE_EXTENSIONS.map((extension) => `${stripped}${extension}`)),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => `${base}${extension}`),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => path.join(base, `index${extension}`)),
 	];

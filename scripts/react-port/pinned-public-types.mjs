@@ -95,7 +95,11 @@ export function pinnedPublicEntries(packageDirectory, node) {
 		if (!published.files.has(`package/${file}`))
 			throw new Error(`Public export points outside the pinned declarations: ${file}`);
 		const specifier = subpath === '.' ? node.binding : node.binding + subpath.slice(1);
-		entries.set(specifier, path.resolve(installedRoot, file));
+		const resolvedPath = path.resolve(installedRoot, file);
+		entries.set(specifier, resolvedPath);
+		// A pristine upstream lane imports the package by its own name; its own
+		// pinned declarations are the authority for its exported types.
+		entries.set(upstreamSpecifier, resolvedPath);
 	}
 	for (const [specifier, file] of publicCompatibilityDeclarations(node.binding)) {
 		if (!published.files.has(`package/${file}`))

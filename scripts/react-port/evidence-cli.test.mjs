@@ -22,7 +22,11 @@ import { EVIDENCE_MATRIX_SCHEMA_VERSION, recordEvidence } from './evidence-lib.m
 import { assertApprovedGateCommand } from './evidence.mjs';
 import { createBatchManifest } from './state-lib.mjs';
 import { buildUpstreamLock, gitBlobSha1 } from './materialize-lib.mjs';
-import { fixtureIdentity, fixtureTreeEntries } from './__fixtures__/materialize-fixtures.mjs';
+import {
+	buildTarGz,
+	fixtureIdentity,
+	fixtureTreeEntries,
+} from './__fixtures__/materialize-fixtures.mjs';
 
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const MIT_TEXT =
@@ -996,6 +1000,136 @@ describe('evidence CLI', () => {
 				node,
 				validation,
 			),
+		);
+	});
+
+	test('witnesses upstream type lanes against the pinned declarations when artifacts exist', () => {
+		const { workspaceRoot } = createReadyBatch();
+		const packageDirectory = createCompletePackage(workspaceRoot);
+		const put = (file, contents) => {
+			mkdirSync(path.dirname(path.join(packageDirectory, file)), { recursive: true });
+			writeFileSync(path.join(packageDirectory, file), contents);
+		};
+		// The pinned upstream package publishes an opaque leaf: `metadata: unknown`.
+		const declaration =
+			'export declare class Widget {\n\tmetadata: unknown;\n\tvalue: string;\n}\n';
+		const published = JSON.stringify({
+			name: 'mit-widget',
+			version: '1.0.0',
+			exports: {
+				'.': { types: './index.d.ts', default: './index.js' },
+				'./package.json': './package.json',
+			},
+		});
+		const upstreamSource =
+			"export class Widget {\n\tmetadata: unknown;\n\tvalue: string = '';\n}\n";
+		const artifact = buildTarGz([
+			['package/package.json', published],
+			['package/index.d.ts', declaration],
+		]);
+		const identity = fixtureIdentity({
+			packageName: 'mit-widget',
+			integrity: `sha512-${createHash('sha512').update(artifact).digest('base64')}`,
+		});
+		const lock = buildUpstreamLock({
+			identity,
+			license: { spdx: 'MIT' },
+			treeEntries: fixtureTreeEntries(
+				new Map([
+					['package.json', published],
+					['src/index.ts', upstreamSource],
+				]),
+			),
+		});
+		put('audit/upstream.lock.json', JSON.stringify(lock));
+		put('upstream/src/index.ts', upstreamSource);
+		put('upstream/package.json', published);
+		put('upstream-artifact/widget.tgz', artifact);
+		put('node_modules/mit-widget/package.json', published);
+		put('node_modules/mit-widget/index.d.ts', declaration);
+		put('src/index.ts', "export class Widget {\n\tmetadata: unknown = 0;\n\tvalue = '';\n}\n");
+		const node = {
+			binding: '@octanejs/widget',
+			bindingDirectory: 'packages/widget',
+			packageName: 'mit-widget',
+			identity,
+			upstreamTestInventory: [],
+		};
+		for (const name of ['pristine', 'adapted']) {
+			const specifier = name === 'pristine' ? 'mit-widget' : '@octanejs/widget';
+			put(
+				`typetests/${name}.ts`,
+				[
+					`import * as Upstream from '${specifier}';`,
+					'Upstream.Widget satisfies new () => { value: string };',
+					'// @ts-expect-error widget values reject extra members',
+					"const invalid: InstanceType<typeof Upstream.Widget> = { value: 'x', extra: true };",
+					'void invalid;',
+				].join('\n'),
+			);
+			put(
+				`typetests/tsconfig.${name}.json`,
+				JSON.stringify({
+					compilerOptions: {
+						strict: true,
+						skipLibCheck: false,
+						noEmit: true,
+						module: 'ESNext',
+						moduleResolution: 'Bundler',
+						baseUrl: '.',
+						paths: { '@octanejs/widget': ['../src/index.ts'] },
+					},
+					files: [`${name}.ts`],
+					reactPortEvidence: {
+						gate: `upstream-types-${name}`,
+						upstreamRegistrations: [],
+					},
+				}),
+			);
+		}
+		for (const [gate, compiler] of [
+			['upstream-types-pristine', 'tsc'],
+			['upstream-types-adapted', 'tsrx-tsc'],
+		]) {
+			assert.doesNotThrow(
+				() =>
+					assertApprovedGateCommand(
+						[gate],
+						[
+							'pnpm',
+							'exec',
+							compiler,
+							'--noEmit',
+							'-p',
+							`packages/widget/typetests/tsconfig.${gate.endsWith('pristine') ? 'pristine' : 'adapted'}.json`,
+						],
+						node,
+						{ workspaceRoot },
+					),
+				gate,
+			);
+		}
+		// New erasure beyond the pinned contract still fails the adapted lane.
+		put(
+			'src/index.ts',
+			"export class Widget {\n\tmetadata: unknown = 0;\n\tvalue = '';\n\textra: any = true;\n}\n",
+		);
+		assert.throws(
+			() =>
+				assertApprovedGateCommand(
+					['upstream-types-adapted'],
+					[
+						'pnpm',
+						'exec',
+						'tsrx-tsc',
+						'--noEmit',
+						'-p',
+						'packages/widget/typetests/tsconfig.adapted.json',
+					],
+					node,
+					{ workspaceRoot },
+				),
+			/any or unknown/i,
 		);
 	});
 

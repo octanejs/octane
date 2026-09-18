@@ -1041,20 +1041,19 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		JSON.stringify(manifestRunnerConfiguration),
 		'package-runner-config.json',
 	);
-	const configurationPatterns = new Set([
-		...commandPathPatterns(testScripts),
-		...manifestSelections.testFiles,
-	]);
+	const commandPatterns = new Set(commandPathPatterns(testScripts));
+	const declaredPatterns = new Set(manifestSelections.testFiles);
 	const inlineSourcePatterns = new Set(manifestSelections.inlineSources);
 	for (const entry of configurationEntries) {
 		const source = (await fetchGitHubBlob(entry, options)).toString('utf8');
 		const selections = configurationPathSelections(source, entry.path);
 		for (const pattern of selections.testFiles) {
-			configurationPatterns.add(pattern);
+			declaredPatterns.add(pattern);
 		}
 		for (const pattern of selections.inlineSources) inlineSourcePatterns.add(pattern);
 	}
-	const configuredTestPatterns = [...configurationPatterns];
+	const configuredTestPatterns = [...commandPatterns, ...declaredPatterns];
+	const configuredDeclaredPatterns = [...declaredPatterns];
 	const configuredInlineSourcePatterns = [...inlineSourcePatterns];
 	const configurationEntryPaths = new Set(configurationEntries.map((entry) => entry.path));
 	const runner = ['vitest', 'jest'].find(
@@ -1073,13 +1072,17 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		// module beneath a test/ support directory. Explicit include patterns
 		// still admit nonstandard names, and compile-only specs remain inventoried.
 		const conventional = conventionalTestPath(relativePath, { runner });
+		const declared =
+			conventional || referencedByTestConfiguration(relativePath, configuredDeclaredPatterns);
 		const directTest =
-			conventional || referencedByTestConfiguration(relativePath, configuredTestPatterns);
+			declared || referencedByTestConfiguration(relativePath, configuredTestPatterns);
 		const inlineSource = referencedByTestConfiguration(
 			relativePath,
 			configuredInlineSourcePatterns,
 		);
-		return directTest || inlineSource ? [{ directTest, entry, inlineSource, relativePath }] : [];
+		return directTest || inlineSource
+			? [{ declared, directTest, entry, inlineSource, relativePath }]
+			: [];
 	});
 	if (candidateEntries.length > MAX_UPSTREAM_TEST_FILES) {
 		throw new Error('Immutable upstream test inventory exceeds the file limit');
@@ -1101,7 +1104,7 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		candidates.push(candidate);
 	}
 	const inventory = [];
-	for (const { entry, relativePath } of candidates.sort((left, right) =>
+	for (const { declared, entry, inlineSource, relativePath } of candidates.sort((left, right) =>
 		left.entry.path.localeCompare(right.entry.path),
 	)) {
 		const source =
@@ -1122,7 +1125,15 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 			runtimeCases.length === 0 ? extractTypeAssertionGroups(source, entry.path) : [];
 		const testCases = runtimeCases.length > 0 ? runtimeCases : typeCases;
 		if (testCases.length === 0) {
-			throw new Error(`Immutable upstream test ${entry.path} has no countable registrations`);
+			// Script-argument harvesting admits non-test modules chained behind a
+			// test command (`node scripts/report.mjs`); only paths declared as
+			// tests by name/location, include/testMatch configuration, or a
+			// verified import.meta.vitest marker fail closed, because their own
+			// declaration promises registrations.
+			if (declared || inlineSource) {
+				throw new Error(`Immutable upstream test ${entry.path} has no countable registrations`);
+			}
+			continue;
 		}
 		const registrations = testCases.flatMap((testCase) => {
 			if (

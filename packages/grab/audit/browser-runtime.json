@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "project": "grab-browser",
+  "roots": ["packages/grab/tests/browser"],
+  "files": ["packages/grab/tests/browser/overlay.browser.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:e4fcef31793a4694",
+      "file": "packages/grab/tests/browser/overlay.browser.test.ts",
+      "fullName": "dispose dispose() unmounts the renderer and clears the global api"
+    },
+    {
+      "id": "runtime:765302d3fe00c19e",
+      "file": "packages/grab/tests/browser/overlay.browser.test.ts",
+      "fullName": "keyboard activation activate()/deactivate() drive the same state programmatically"
+    },
+    {
+      "id": "runtime:1b8d3be71064dd9c",
+      "file": "packages/grab/tests/browser/overlay.browser.test.ts",
+      "fullName": "keyboard activation activates on chord release and deactivates on modifier release"
+    },
+    {
+      "id": "runtime:b93b3fb29d95f737",
+      "file": "packages/grab/tests/browser/overlay.browser.test.ts",
+      "fullName": "overlay mount lifecycle mounts the overlay host on init"
+    },
+    {
+      "id": "runtime:6c4a0ff3630039e5",
+      "file": "packages/grab/tests/browser/overlay.browser.test.ts",
+      "fullName": "overlay mount lifecycle reports an inactive, enabled initial state"
+    },
+    {
+      "id": "runtime:739b782534f404d9",
+      "file": "packages/grab/tests/browser/overlay.browser.test.ts",
+      "fullName": "selection interaction copies the hovered element and reports label instances"
+    },
+    {
+      "id": "runtime:15a0a915cabe06f4",
+      "file": "packages/grab/tests/browser/overlay.browser.test.ts",
+      "fullName": "selection interaction suppresses activation while disabled"
+    }
+  ],
+  "skippedTests": []
+}

@@ -1,0 +1,60 @@
+{
+  "name": "@octanejs/grab",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "Octane port of react-grab 0.2.0.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/grab"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "status.json",
+    "LICENSE",
+    "LICENSE.upstream"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./core": "./src/core/index.ts",
+    "./primitives": "./src/primitives.ts",
+    "./styles.css": null,
+    "./package.json": null
+  },
+  "scripts": {
+    "test": "pnpm upstream:materialize && vitest run --root ../.. --project grab",
+    "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs && node audit/verify-provenance.mjs",
+    "upstream:verify:negative-controls": "node audit/verify-provenance.mjs --negative-controls",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsc --noEmit -p typetests/pristine/tsconfig.json && tsrx-tsc --noEmit -p typetests/adapted/tsconfig.json && tsrx-tsc --noEmit -p tests/types/tsconfig.json"
+  },
+  "peerDependencies": {
+    "octane": "workspace:^0.1.51 || ^0.2.0"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@types/react": "catalog:default",
+    "bippy": "0.6.1",
+    "happy-dom": "catalog:default",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "catalog:default",
+    "react-grab": "0.2.0",
+    "solid-js": "1.9.15",
+    "typescript": "catalog:default",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

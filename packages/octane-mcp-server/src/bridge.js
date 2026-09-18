@@ -177,6 +177,7 @@ export const KNOWN_BINDINGS = {
 	'dexie-react-hooks': '@octanejs/dexie',
 	'@livestore/react': '@octanejs/livestore',
 	wouter: '@octanejs/wouter',
+	'react-grab': '@octanejs/grab',
 };
 
 // Octane-specific ecosystem packages that have no React import to rewrite.
@@ -475,6 +476,12 @@ export async function collectSourceFiles(root, out = [], depth = 0) {
 	return out;
 }
 
+// Strings, comments, and regex literals are not call/tag sites. A `/` begins a
+// regex when the previous token cannot end an operand (identifier, `)`, `]`,
+// `}`) or is a keyword that takes an expression operand.
+const NON_CODE_PATTERN =
+	/\/\/[^\n]*|\/\*[\s\S]*?\*\/|(?:(?<![\w$)\]}]\s*)|(?<=\b(?:return|case|throw|typeof|instanceof|in|of|void|delete|yield|await|do|else|new)\s))\/(?:\\[\s\S]|\[(?:\\[\s\S]|[^\]\\])*\]|[^/\\\n])+\/[a-z]*|'(?:\\[\s\S]|[^'\\\n])*'|"(?:\\[\s\S]|[^"\\\n])*"|`(?:\\[\s\S]|[^`\\])*`/g;
+
 export function scanSource(source) {
 	const apis = new Map();
 	const symbolExports = new Map();
@@ -491,9 +498,12 @@ export function scanSource(source) {
 	)) {
 		if (symbols.has(match[2])) symbolExports.set(match[1], (symbolExports.get(match[1]) ?? 0) + 1);
 	}
+	// Names inside strings or comments are display labels (fiber-tag tables,
+	// error text), not call/tag sites.
+	const code = source.replace(NON_CODE_PATTERN, ' ');
 	for (const name of Object.keys(REACT_API_MAP)) {
 		if (name === 'onChange') continue;
-		const matches = source.match(new RegExp(`\\b${name}\\b`, 'g'));
+		const matches = code.match(new RegExp(`\\b${name}\\b`, 'g'));
 		if (matches) apis.set(name, matches.length);
 	}
 	const textChanges = countReactStyleTextChanges(source);

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 2,
+  "project": "grab-differential",
+  "roots": ["packages/grab/tests/differential"],
+  "files": ["packages/grab/tests/differential/parity.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:c6a51e0e2c735b9e",
+      "file": "packages/grab/tests/differential/parity.test.ts",
+      "fullName": "disabled init parity init({ enabled: false }) returns an inert API on both"
+    },
+    {
+      "id": "runtime:504955d57bc36e84",
+      "file": "packages/grab/tests/differential/parity.test.ts",
+      "fullName": "element info parity formatElementInfo produces identical output for the same DOM"
+    },
+    {
+      "id": "runtime:6a75ad9b45fc43e6",
+      "file": "packages/grab/tests/differential/parity.test.ts",
+      "fullName": "lifecycle parity observes the same mount/activate/deactivate/dispose contract"
+    },
+    {
+      "id": "runtime:8c03ed9fd8936490",
+      "file": "packages/grab/tests/differential/parity.test.ts",
+      "fullName": "pure surface parity DEFAULT_THEME is identical"
+    },
+    {
+      "id": "runtime:98f13344d179770d",
+      "file": "packages/grab/tests/differential/parity.test.ts",
+      "fullName": "pure surface parity error classes produce identical messages and names"
+    },
+    {
+      "id": "runtime:93113c94661b4deb",
+      "file": "packages/grab/tests/differential/parity.test.ts",
+      "fullName": "pure surface parity isInstrumentationActive agrees without a devtools hook"
+    }
+  ],
+  "skippedTests": []
+}

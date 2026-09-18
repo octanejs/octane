@@ -1,0 +1,244 @@
+@import 'tailwindcss' source('.');
+
+@theme {
+	--font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+	--ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+	--ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+:host {
+	all: initial;
+	direction: ltr;
+}
+
+/* Theme tokens — light values are duplicated across the @media fallback and
+   the explicit [data-rg-theme="light"] block because CSS has no mixin
+   mechanism that works across :host() and @media. Keep both in sync. */
+:host,
+[data-rg-theme='dark'] {
+	--rg-panel-bg: #161616;
+	--rg-text-primary: #ffffff;
+	--rg-text-secondary: #a7a7a7;
+	--rg-surface-hover: rgba(255, 255, 255, 0.1);
+	--rg-surface-active: rgba(255, 255, 255, 0.15);
+	--rg-border-subtle: rgba(255, 255, 255, 0.1);
+	--rg-border-button: rgba(255, 255, 255, 0.2);
+	--rg-submit-bg: #ffffff;
+	--rg-submit-fg: #161616;
+	--rg-error-text: #f87171;
+	--rg-error-bg: #3d1515;
+	--rg-error-bg-hover: #4d1f1f;
+	--rg-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	--rg-drop-shadow: drop-shadow(0px 2px 8px rgba(0, 0, 0, 0.08));
+	--rg-shimmer-from: #a1a1aa;
+	--rg-shimmer-to: #d4d4d8;
+	--rg-text-primary-85: rgba(255, 255, 255, 0.85);
+}
+
+/* Opposite-of-system fallback: dark system → app likely dark → react-grab light.
+   JS detection overrides this via data-rg-theme once it resolves. */
+@media (prefers-color-scheme: dark) {
+	:host:not([data-rg-theme]) {
+		--rg-panel-bg: #ffffff;
+		--rg-text-primary: #171717;
+		--rg-text-secondary: #737373;
+		--rg-surface-hover: rgba(0, 0, 0, 0.05);
+		--rg-surface-active: rgba(0, 0, 0, 0.08);
+		--rg-border-subtle: rgba(0, 0, 0, 0.08);
+		--rg-border-button: rgba(0, 0, 0, 0.15);
+		--rg-submit-bg: #171717;
+		--rg-submit-fg: #ffffff;
+		--rg-error-text: #dc2626;
+		--rg-error-bg: #fee2e2;
+		--rg-error-bg-hover: #fecaca;
+		--rg-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+		--rg-drop-shadow: drop-shadow(0px 2px 12px rgba(0, 0, 0, 0.1));
+		--rg-shimmer-from: #71717a;
+		--rg-shimmer-to: #a1a1aa;
+		--rg-text-primary-85: rgba(23, 23, 23, 0.85);
+	}
+}
+
+:host([data-rg-theme='light']),
+[data-rg-theme='light'] {
+	--rg-panel-bg: #ffffff;
+	--rg-text-primary: #171717;
+	--rg-text-secondary: #737373;
+	--rg-surface-hover: rgba(0, 0, 0, 0.05);
+	--rg-surface-active: rgba(0, 0, 0, 0.08);
+	--rg-border-subtle: rgba(0, 0, 0, 0.08);
+	--rg-border-button: rgba(0, 0, 0, 0.15);
+	--rg-submit-bg: #171717;
+	--rg-submit-fg: #ffffff;
+	--rg-error-text: #dc2626;
+	--rg-error-bg: #fee2e2;
+	--rg-error-bg-hover: #fecaca;
+	--rg-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+	--rg-drop-shadow: drop-shadow(0px 2px 12px rgba(0, 0, 0, 0.1));
+	--rg-shimmer-from: #71717a;
+	--rg-shimmer-to: #a1a1aa;
+	--rg-text-primary-85: rgba(23, 23, 23, 0.85);
+}
+
+/* Reduce motion: respect the OS-level preference for users with vestibular
+   disorders (WCAG 2.3.3). Blanket-disable animation/transition inside the
+   shadow root so any animation added later inherits the override. */
+@media (prefers-reduced-motion: reduce) {
+	:host,
+	:host *,
+	:host *::before,
+	:host *::after {
+		animation: none !important;
+		transition: none !important;
+		scroll-behavior: auto !important;
+	}
+}
+
+:host *:focus {
+	outline: none !important;
+	box-shadow: none !important;
+}
+
+@keyframes shake {
+	0%,
+	100% {
+		translate: 0 0;
+	}
+	15%,
+	45% {
+		translate: calc(-3px * var(--rg-shake-x, 1)) calc(-3px * var(--rg-shake-y, 0));
+	}
+	30%,
+	60% {
+		translate: calc(3px * var(--rg-shake-x, 1)) calc(3px * var(--rg-shake-y, 0));
+	}
+	75% {
+		translate: calc(-2px * var(--rg-shake-x, 1)) calc(-2px * var(--rg-shake-y, 0));
+	}
+	90% {
+		translate: calc(2px * var(--rg-shake-x, 1)) calc(2px * var(--rg-shake-y, 0));
+	}
+}
+
+@keyframes icon-loader-spin {
+	0% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.5;
+	}
+	100% {
+		opacity: 0.2;
+	}
+}
+
+.icon-loader-bar {
+	animation: icon-loader-spin 0.5s linear infinite;
+}
+
+@keyframes shimmer {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
+}
+
+.shimmer-text {
+	background: linear-gradient(
+		90deg,
+		var(--rg-shimmer-from) 0%,
+		var(--rg-shimmer-to) 25%,
+		var(--rg-shimmer-from) 50%,
+		var(--rg-shimmer-to) 75%,
+		var(--rg-shimmer-from) 100%
+	);
+	background-size: 200% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	animation: shimmer 2.5s linear infinite;
+}
+
+.animate-shake,
+.animate-shake-vertical {
+	animation: shake 0.3s ease-out;
+	will-change: translate;
+}
+
+@keyframes tooltip-fade-in {
+	from {
+		opacity: 0;
+		transform: scale(0.97);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+.animate-tooltip-fade-in {
+	animation: tooltip-fade-in 100ms ease-out;
+	will-change: transform, opacity;
+}
+
+.animate-shake-vertical {
+	--rg-shake-x: 0;
+	--rg-shake-y: 1;
+}
+
+@utility press-scale {
+	transition: transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+	&:active {
+		transform: scale(0.97);
+		transition: transform 60ms cubic-bezier(0, 0, 0.2, 1);
+	}
+}
+
+@utility interactive-scale {
+	transition: transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+	@media (hover: hover) and (pointer: fine) {
+		&:hover {
+			transform: scale(1.05);
+		}
+	}
+
+	&:active {
+		transform: scale(0.96);
+		transition: transform 60ms cubic-bezier(0, 0, 0.2, 1);
+	}
+}
+
+/* Minimum 24x24 hit area for small icon buttons (WCAG 2.5.8). pointer-events
+   on the pseudo-element is set explicitly so clicks landing outside the
+   visual button bounds still reach the host element (pseudo-elements inherit
+   pointer-events from their originating element, but stating it removes
+   ambiguity in environments where an ancestor sets pointer-events:none). */
+@utility a11y-hitbox {
+	position: relative;
+
+	&::before {
+		content: '';
+		position: absolute;
+		display: block;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		width: 100%;
+		height: 100%;
+		min-height: 24px;
+		min-width: 24px;
+		pointer-events: auto;
+	}
+}
+
+/* iOS Safari auto-zooms on focused inputs with font-size < 16px.
+ * @supports (-webkit-touch-callout) is iOS/iPadOS-only; other browsers ignore. */
+@supports (-webkit-touch-callout: none) {
+	textarea[data-react-grab-input] {
+		font-size: 16px;
+	}
+}
