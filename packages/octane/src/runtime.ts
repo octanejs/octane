@@ -30804,7 +30804,10 @@ function flattenDeoptChildren(out: any[], v: any): void {
 // (the old compact-then-match-in-order behavior morphed them: inputs swapped
 // values, a clicked button could morph into a submit button MID-DISPATCH and
 // fire a phantom form submission). Nested arrays key within their slot;
-// explicit keys ride inside the same scheme.
+// explicit keys ride inside the same scheme. Nested keys start with ':<index>'
+// and end in distinct 'i' (index) and 'k' (explicit key) namespaces, so user keys
+// cannot impersonate deeper wrappers. Top-level string keys starting with ':'
+// escape it as '::'; ordinary flat keys keep their allocation-free path.
 function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefix: string): void {
 	if (v == null || v === false || v === true || v === '') return;
 	if (Array.isArray(v)) {
@@ -30812,20 +30815,26 @@ function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefi
 		for (let i = 0; i < v.length; i++) {
 			const item = v[i];
 			if (Array.isArray(item)) {
-				flattenDeoptChildrenKeyed(outVals, outKeys, item, prefix + i + ':');
+				flattenDeoptChildrenKeyed(outVals, outKeys, item, prefix + ':' + i);
 			} else if (item == null || item === false || item === true || item === '') {
 				// empty — consumes its position, emits nothing
 			} else {
 				outVals.push(item);
 				const k = keyForItem(item, i);
-				outKeys.push(prefix === '' ? k : prefix + String(k));
+				if (prefix === '') {
+					outKeys.push(typeof k === 'string' && k[0] === ':' ? ':' + k : k);
+				} else {
+					const explicit = item?.$$kind === ELEMENT_TAG && item.key != null;
+					outKeys.push(prefix + ':' + (explicit ? 'k' : 'i') + String(k));
+				}
 			}
 		}
 		return;
 	}
 	outVals.push(v);
+	const k = v?.$$kind === ELEMENT_TAG && v.key != null ? v.key : 0;
 	outKeys.push(
-		prefix === '' ? (v?.$$kind === ELEMENT_TAG && v.key != null ? v.key : 0) : prefix + '0',
+		prefix === '' ? (typeof k === 'string' && k[0] === ':' ? ':' + k : k) : prefix + ':i0',
 	);
 }
 

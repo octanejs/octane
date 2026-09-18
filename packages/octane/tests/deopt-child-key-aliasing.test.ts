@@ -244,6 +244,138 @@ describe('scalar host children', () => {
 	});
 });
 
+describe('nested host child identity', () => {
+	it.each(['client mount', 'server hydration'] as const)(
+		'keeps a keyed input separate from an implicit position after %s',
+		(mode) => {
+			const input = (id: string, key?: string) =>
+				createElement('input', { key, 'data-input': id, defaultValue: id });
+			const rows = (reverse: boolean) =>
+				createElement('li', null, [
+					reverse ? [input('keyed', '0'), input('plain')] : [input('plain'), input('keyed', '0')],
+				]);
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			if (mode === 'server hydration') {
+				container.innerHTML = renderToString(server.RowsHole, { rows: rows(false) }).html;
+			}
+			const serverInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input'));
+			for (const input of serverInputs) input.value = `typed:${input.dataset.input}`;
+			const errors: unknown[] = [];
+			const root =
+				mode === 'server hydration'
+					? hydrateRoot(
+							container,
+							RowsHole,
+							{ rows: rows(false) },
+							{ onRecoverableError: (error) => errors.push(error) },
+						)
+					: createRoot(container);
+			try {
+				if (mode === 'client mount') root.render(RowsHole, { rows: rows(false) });
+				flushSync(() => {});
+				const plain = container.querySelector<HTMLInputElement>('[data-input="plain"]')!;
+				const keyed = container.querySelector<HTMLInputElement>('[data-input="keyed"]')!;
+				if (mode === 'server hydration') {
+					expect([plain, keyed]).toEqual(serverInputs);
+					expect(plain.value).toBe('typed:plain');
+					expect(keyed.value).toBe('typed:keyed');
+				}
+				plain.value = 'typed:plain';
+				keyed.value = 'typed:keyed';
+				flushSync(() => root.render(RowsHole, { rows: rows(false) }));
+				expect(container.querySelector('[data-input="plain"]')).toBe(plain);
+				expect(container.querySelector('[data-input="keyed"]')).toBe(keyed);
+
+				for (const reverse of [true, false, true]) {
+					flushSync(() => root.render(RowsHole, { rows: rows(reverse) }));
+					expect(
+						Array.from(container.querySelectorAll('input'), (node) =>
+							node.getAttribute('data-input'),
+						),
+					).toEqual(reverse ? ['keyed', 'plain'] : ['plain', 'keyed']);
+					expect(container.querySelector('[data-input="keyed"]')).toBe(keyed);
+					expect(keyed.value).toBe('typed:keyed');
+					const fresh = container.querySelector<HTMLInputElement>('[data-input="plain"]')!;
+					expect(fresh).not.toBe(plain);
+					expect(fresh).not.toBe(keyed);
+					expect(fresh.value).toBe('plain');
+				}
+				expect(plain.isConnected).toBe(false);
+				expect(errors).toEqual([]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it('keeps path-like user keys separate from deeper children and other wrappers', () => {
+		const input = (id: string, key?: string) =>
+			createElement('input', { key, 'data-input': id, defaultValue: id });
+		const rows = (reverse: boolean) =>
+			createElement('li', null, [
+				reverse
+					? [input('plain'), input('other', 'other'), null, [input('deep')], input('path', '3:0')]
+					: [input('plain'), input('path', '3:0'), input('other', 'other'), [input('deep')]],
+				[input('duplicate-across-wrapper', '3:0')],
+				input('outside', '0:3:0'),
+				input('reserved', ':0:3:i0'),
+				input('escaped', '::0:3:i0'),
+			]);
+		const view = mount(RowsHole, { rows: rows(false) });
+		try {
+			const inputs = new Map(
+				(view.findAll('input') as HTMLInputElement[]).map((input) => [input.dataset.input!, input]),
+			);
+			for (const [id, input] of inputs) input.value = `typed:${id}`;
+			for (const reverse of [true, false, true]) {
+				view.update(RowsHole, { rows: rows(reverse) });
+				expect(view.findAll('input').map((node) => node.getAttribute('data-input'))).toEqual([
+					'plain',
+					...(reverse ? ['other', 'deep', 'path'] : ['path', 'other', 'deep']),
+					'duplicate-across-wrapper',
+					'outside',
+					'reserved',
+					'escaped',
+				]);
+				for (const [id, input] of inputs) {
+					expect(view.find(`[data-input="${id}"]`)).toBe(input);
+					expect(input.value).toBe(`typed:${id}`);
+				}
+			}
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('keeps an unrelated unique key when duplicate-key children are removed and restored', () => {
+		const rows = (ids: string[]) =>
+			createElement('li', null, [
+				ids.map((id) =>
+					createElement('input', { key: 'duplicate', 'data-input': id, defaultValue: id }),
+				),
+				createElement('input', { key: 'unique', 'data-input': 'unique' }),
+			]);
+		const view = mount(RowsHole, { rows: rows(['first', 'second']) });
+		try {
+			const unique = view.find('[data-input="unique"]') as HTMLInputElement;
+			unique.value = 'unique edit';
+			for (const ids of [['second', 'first'], ['first'], [], ['first', 'second']]) {
+				view.update(RowsHole, { rows: rows(ids) });
+				expect(view.findAll('input').map((node) => node.getAttribute('data-input'))).toEqual([
+					...ids,
+					'unique',
+				]);
+				expect(view.find('[data-input="unique"]')).toBe(unique);
+				expect(unique.value).toBe('unique edit');
+			}
+		} finally {
+			view.unmount();
+		}
+	});
+});
+
 describe('de-opt child keys — an explicit key never aliases a positional index', () => {
 	it('keeps an unkeyed child and a child keyed "0" in separate slots', () => {
 		// Both children live in one list: the unkeyed <input> is at index 0 while
