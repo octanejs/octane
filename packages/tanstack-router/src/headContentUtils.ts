@@ -3,7 +3,6 @@ import {
 	deepEqual,
 	escapeHtml,
 	getAssetCrossOrigin,
-	getScriptPreloadAttrs,
 	resolveManifestCssLink,
 } from '@tanstack/router-core';
 import { isServer } from '@tanstack/router-core/isServer';
@@ -80,7 +79,6 @@ function buildTagsFromMatches(
 		.map((link) => ({ tag: 'link', attrs: { ...link, nonce } }) satisfies RouterManagedTag);
 
 	const manifestTags: Array<RouterManagedTag> = [];
-	const preloadTags: Array<RouterManagedTag> = [];
 	const manifest = router.ssr?.manifest;
 	if (manifest) {
 		for (const match of matches) {
@@ -93,15 +91,6 @@ function buildTagsFromMatches(
 						...resolvedLink,
 						crossOrigin:
 							getAssetCrossOrigin(assetCrossOrigin, 'stylesheet') ?? resolvedLink.crossOrigin,
-						nonce,
-					},
-				});
-			}
-			for (const preload of manifest.routes[match.routeId]?.preloads ?? []) {
-				preloadTags.push({
-					tag: 'link',
-					attrs: {
-						...getScriptPreloadAttrs(manifest, preload, assetCrossOrigin),
 						nonce,
 					},
 				});
@@ -144,7 +133,6 @@ function buildTagsFromMatches(
 
 	const tags: Array<RouterManagedTag> = [];
 	appendUniqueUserTags(tags, resultMeta);
-	tags.push(...preloadTags);
 	appendUniqueUserTags(tags, links);
 	tags.push(...manifestTags);
 	appendUniqueUserTags(tags, styles);
