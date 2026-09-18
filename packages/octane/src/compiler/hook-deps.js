@@ -1266,6 +1266,30 @@ function collectDependencies(expression, callbackScope, analysis) {
 	// array would evaluate getters in a context where they may be illegal
 	// (TypeGPU's `.$`) and at a time the program never reads them.
 	let opaqueDepth = 0;
+	// A property read in a branch, after a possible exit, or inside try/catch
+	// cannot be moved into render without bypassing its authored protection.
+	// Track receiver identities in those regions; the callback retains the read.
+	let guardedDepth = 0;
+
+	function walkGuarded(node) {
+		guardedDepth++;
+		const completion = walk(node);
+		guardedDepth--;
+		return completion || 0;
+	}
+
+	// Completion bits distinguish exits from this callback (return/throw) from
+	// exits consumed by an enclosing loop or switch (break/continue).
+	function walkStatements(statements) {
+		const depth = guardedDepth;
+		let completion = 0;
+		for (const statement of statements || []) {
+			completion |= walk(statement) || 0;
+			if (completion) guardedDepth = depth + 1;
+		}
+		guardedDepth = depth;
+		return completion;
+	}
 
 	function walk(node) {
 		if (!node || typeof node !== 'object') return;
@@ -1279,6 +1303,55 @@ function collectDependencies(expression, callbackScope, analysis) {
 		}
 		if (node.type?.startsWith('TS')) return;
 		switch (node.type) {
+			case 'BlockStatement':
+				return walkStatements(node.body);
+			case 'IfStatement': {
+				walk(node.test);
+				return walkGuarded(node.consequent) | walkGuarded(node.alternate);
+			}
+			case 'ConditionalExpression':
+				walk(node.test);
+				walkGuarded(node.consequent);
+				walkGuarded(node.alternate);
+				return;
+			case 'LogicalExpression':
+				walk(node.left);
+				walkGuarded(node.right);
+				return;
+			case 'SwitchStatement': {
+				walk(node.discriminant);
+				let completion = 0;
+				for (const branch of node.cases || []) completion |= walkGuarded(branch);
+				return completion & 1;
+			}
+			case 'SwitchCase':
+				walk(node.test);
+				return walkStatements(node.consequent);
+			case 'ForStatement':
+				walk(node.init);
+				walk(node.test);
+				walkGuarded(node.update);
+				return walkGuarded(node.body) & 1;
+			case 'ForInStatement':
+			case 'ForOfStatement':
+				walkGuarded(node.left);
+				walk(node.right);
+				return walkGuarded(node.body) & 1;
+			case 'WhileStatement':
+				walk(node.test);
+				return walkGuarded(node.body) & 1;
+			case 'DoWhileStatement':
+				walkGuarded(node.test);
+				return walkGuarded(node.body) & 1;
+			case 'TryStatement':
+				return walkGuarded(node.block) | walkGuarded(node.handler) | walkGuarded(node.finalizer);
+			case 'CatchClause':
+				walkPatternExpression(node.param);
+				return walk(node.body);
+			case 'ReturnStatement':
+			case 'ThrowStatement':
+				walk(node.argument);
+				return 1;
 			case 'Identifier':
 				addIdentifier(node);
 				return;
@@ -1305,7 +1378,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 				return;
 			}
 			case 'ChainExpression': {
-				if (opaqueDepth > 0) {
+				if (opaqueDepth > 0 || guardedDepth > 0) {
 					walk(node.expression);
 					return;
 				}
@@ -1315,7 +1388,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 				return;
 			}
 			case 'MemberExpression': {
-				if (opaqueDepth > 0) {
+				if (opaqueDepth > 0 || guardedDepth > 0) {
 					walk(node.object);
 					if (node.computed) walk(node.property);
 					return;
@@ -1366,11 +1439,10 @@ function collectDependencies(expression, callbackScope, analysis) {
 			case 'Super':
 				return;
 			case 'LabeledStatement':
-				walk(node.body);
-				return;
+				return walk(node.body);
 			case 'BreakStatement':
 			case 'ContinueStatement':
-				return;
+				return 2;
 			case 'JSXElement':
 			case 'Element':
 				walkJsxElement(node);
