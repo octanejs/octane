@@ -1,6 +1,6 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { AllStackGroups, StackGroup, StackSeries } from '../../../util/stacks/stackTypes';
-import { MaybeStackedGraphicalItem } from '../../types/StackedGraphicalItem';
+import type { AllStackGroups, StackGroup, StackSeries } from '../../../util/stacks/stackTypes';
+import type { MaybeStackedGraphicalItem } from '../../types/StackedGraphicalItem';
 import { getStackSeriesIdentifier } from '../../../util/stacks/getStackSeriesIdentifier';
 
 export const combineStackedData = (

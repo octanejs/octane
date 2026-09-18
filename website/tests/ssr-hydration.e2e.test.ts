@@ -1990,16 +1990,25 @@ describe(
 					},
 				});
 				try {
-					await page.locator('section.lynx').scrollIntoViewIfNeeded();
-					await page.waitForFunction(
-						() => {
-							const pending = (window as Window & { pendingLynxMetadata?: () => number })
-								.pendingLynxMetadata;
-							return pending !== undefined && pending() > 0;
-						},
-						null,
-						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-					);
+					// Hydration may still be in flight after `load`: when it finishes,
+					// the router's scroll restoration snaps the page back to top and
+					// undoes a scroll that landed too early, leaving the lazy boundary
+					// outside its observer margin forever. Keep the section in view
+					// until the boundary mounts and starts its held metadata fetch.
+					await expect
+						.poll(
+							async () => {
+								await page.locator('section.lynx').scrollIntoViewIfNeeded();
+								return page.evaluate(
+									() =>
+										(
+											window as Window & { pendingLynxMetadata?: () => number }
+										).pendingLynxMetadata?.() ?? 0,
+								);
+							},
+							{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+						)
+						.toBeGreaterThan(0);
 					navigating = true;
 					await page.click('a.nav-link[href="/benchmarks"]');
 					await page.waitForFunction(() => location.pathname === '/benchmarks', null, {

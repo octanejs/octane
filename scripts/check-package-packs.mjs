@@ -462,6 +462,7 @@ async function validatePackedConsumer(tempRoot, archives) {
 					'@octanejs/apollo-client': `file:${requireArchive(archives, '@octanejs/apollo-client')}`,
 					'@octanejs/hook-form': `file:${requireArchive(archives, '@octanejs/hook-form')}`,
 					'@octanejs/dropzone': `file:${requireArchive(archives, '@octanejs/dropzone')}`,
+					'@octanejs/recharts': `file:${requireArchive(archives, '@octanejs/recharts')}`,
 					'@octanejs/syntax-highlighter': `file:${requireArchive(archives, '@octanejs/syntax-highlighter')}`,
 					'@octanejs/three': `file:${requireArchive(archives, '@octanejs/three')}`,
 					'@octanejs/window': `file:${requireArchive(archives, '@octanejs/window')}`,
@@ -489,6 +490,7 @@ async function validatePackedConsumer(tempRoot, archives) {
 import { ApolloProvider, useApolloClient } from '@octanejs/apollo-client/react';
 import { createComputed, createSignal, useSignalValue } from '@octanejs/alien-signals';
 import { useForm } from '@octanejs/hook-form';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from '@octanejs/recharts';
 import { useDropzone } from '@octanejs/dropzone';
 import { Light, Prism, PrismAsync } from '@octanejs/syntax-highlighter';
 import javascript from '@octanejs/syntax-highlighter/dist/esm/languages/hljs/javascript';
@@ -566,6 +568,12 @@ export function App() @{
 			rowCount={100}
 			rowHeight={20}
 		/>
+		<BarChart width={400} height={200} data={[{ name: 'a', v: 1 }]}>
+			<CartesianGrid />
+			<XAxis dataKey="name" />
+			<YAxis />
+			<Bar dataKey="v" />
+		</BarChart>
 		<Canvas frameloop="never" style={{ width: 64, height: 64 }}>
 			<ThreeScene />
 		</Canvas>
@@ -1095,7 +1103,7 @@ process.stdout.write(output, () => process.exit(0));
 	}
 
 	console.log(
-		'installed packed octane + Alien Signals + Hook Form + react-window + Apollo Client + Syntax Highlighter + Three without React; typecheck, Vite client/server builds, subpaths, and executed binding SSR passed',
+		'installed packed octane + Alien Signals + Hook Form + Recharts + react-window + Apollo Client + Syntax Highlighter + Three without React; typecheck, Vite client/server builds, subpaths, and executed binding SSR passed',
 	);
 }
 

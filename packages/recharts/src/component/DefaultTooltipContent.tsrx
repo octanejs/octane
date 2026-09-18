@@ -8,8 +8,8 @@ import * as React from 'octane';
 import sortBy from 'es-toolkit/compat/sortBy';
 import { clsx } from 'clsx';
 import { isNullish, isNumOrStr } from '../util/DataUtils';
-import { DataKey } from '../util/types';
-import { TooltipPayload, TooltipPayloadEntry } from '../state/tooltipSlice';
+import type { DataKey } from '../util/types';
+import type { TooltipPayload, TooltipPayloadEntry } from '../state/tooltipSlice';
 
 function defaultFormatter(value: ValueType | undefined): OctaneNode {
 	return Array.isArray(value) && isNumOrStr(value[0]) && isNumOrStr(value[1])

@@ -2,7 +2,7 @@
 import { createSelector } from 'reselect';
 
 import { selectLegendSettings, selectLegendSize } from './legendSelectors';
-import {
+import type {
 	CartesianViewBoxRequired,
 	ChartOffsetInternal,
 	Margin,
@@ -10,13 +10,13 @@ import {
 	OffsetVertical,
 	Size,
 } from '../../util/types';
-import { XAxisSettings, YAxisSettings } from '../cartesianAxisSlice';
-import { LegendSettings } from '../legendSlice';
+import type { XAxisSettings, YAxisSettings } from '../cartesianAxisSlice';
+import type { LegendSettings } from '../legendSlice';
 import { appendOffsetOfLegend } from '../../util/ChartUtils';
 import { selectChartHeight, selectChartWidth, selectMargin } from './containerSelectors';
 import { selectAllXAxes, selectAllYAxes } from './selectAllAxes';
 import { DEFAULT_Y_AXIS_WIDTH } from '../../util/Constants';
-import { RechartsRootState } from '../store';
+import type { RechartsRootState } from '../store';
 
 export const selectBrushHeight = (state: RechartsRootState) => state.brush.height;
 

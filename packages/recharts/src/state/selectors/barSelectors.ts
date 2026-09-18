@@ -2,10 +2,10 @@
 import type { RegisteredCell } from '../../context/CellsContext';
 import { createSelector } from 'reselect';
 
-import { Series } from 'victory-vendor/d3-shape';
-import { RechartsRootState } from '../store';
+import type { Series } from 'victory-vendor/d3-shape';
+import type { RechartsRootState } from '../store';
 import {
-	BaseAxisWithScale,
+	type BaseAxisWithScale,
 	selectAxisWithScale,
 	selectCartesianAxisSize,
 	selectStackGroups,
@@ -13,17 +13,17 @@ import {
 	selectUnfilteredCartesianItems,
 } from './axisSelectors';
 import { isNullish } from '../../util/DataUtils';
-import { BarPositionPosition, getBandSizeOfAxis, StackId } from '../../util/ChartUtils';
-import {
+import { type BarPositionPosition, getBandSizeOfAxis, type StackId } from '../../util/ChartUtils';
+import type {
 	CartesianViewBoxRequired,
 	ChartOffsetInternal,
 	DataKey,
 	LayoutType,
 	TickItem,
 } from '../../util/types';
-import { BarRectangleItem, computeBarRectangles } from '../../cartesian/Bar.tsrx';
+import { type BarRectangleItem, computeBarRectangles } from '../../cartesian/Bar.tsrx';
 import { selectChartLayout } from '../../context/chartLayoutContext';
-import { ChartData } from '../chartDataSlice';
+import type { ChartData } from '../chartDataSlice';
 import { selectChartDataWithIndexesIfNotInPanoramaPosition3 } from './dataSelectors';
 import { selectAxisViewBox, selectChartOffsetInternal } from './selectChartOffsetInternal';
 import {
@@ -32,14 +32,14 @@ import {
 	selectRootBarSize,
 	selectRootMaxBarSize,
 } from './rootPropsSelectors';
-import {
+import type {
 	AllStackGroups,
 	StackDataPoint,
 	StackSeriesIdentifier,
 } from '../../util/stacks/stackTypes';
-import { BarSettings } from '../types/BarSettings';
-import { GraphicalItemId } from '../graphicalItemsSlice';
-import { BarCategory, combineBarSizeList } from './combiners/combineBarSizeList';
+import type { BarSettings } from '../types/BarSettings';
+import type { GraphicalItemId } from '../graphicalItemsSlice';
+import { type BarCategory, combineBarSizeList } from './combiners/combineBarSizeList';
 import { combineAllBarPositions } from './combiners/combineAllBarPositions';
 import { combineStackedData } from './combiners/combineStackedData';
 import {

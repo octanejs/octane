@@ -1,8 +1,8 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import { createSelector } from 'reselect';
-import { RechartsRootState } from '../store';
+import type { RechartsRootState } from '../store';
 import {
-	AxisRange,
+	type AxisRange,
 	combineAllAppliedValues,
 	combineAreasDomain,
 	combineAxisDomain,
@@ -24,7 +24,7 @@ import {
 	getDomainDefinition,
 	itemAxisPredicate,
 	mergeDomains,
-	RenderableAxisSettings,
+	type RenderableAxisSettings,
 	selectAllErrorBarSettings,
 	selectAxisRange,
 	selectHasBar,
@@ -35,8 +35,8 @@ import {
 	selectTooltipAxisDataKey,
 } from './axisSelectors';
 import { selectChartLayout } from '../../context/chartLayoutContext';
-import { isCategoricalAxis, StackId } from '../../util/ChartUtils';
-import {
+import { isCategoricalAxis, type StackId } from '../../util/ChartUtils';
+import type {
 	AxisDomain,
 	CategoricalDomain,
 	CategoricalDomainItem,
@@ -48,14 +48,14 @@ import {
 	TickItem,
 	TooltipEventType,
 } from '../../util/types';
-import { AppliedChartData, ChartData } from '../chartDataSlice';
+import type { AppliedChartData, ChartData } from '../chartDataSlice';
 import { selectChartDataWithIndexes, selectChartDataSliceWithIndexes } from './dataSelectors';
-import {
+import type {
 	CartesianGraphicalItemSettings,
 	GraphicalItemSettings,
 	PolarGraphicalItemSettings,
 } from '../graphicalItemsSlice';
-import {
+import type {
 	ReferenceAreaSettings,
 	ReferenceDotSettings,
 	ReferenceLineSettings,
@@ -67,7 +67,7 @@ import {
 } from './rootPropsSelectors';
 import { isNotNil, mathSign } from '../../util/DataUtils';
 import { combineAxisRangeWithReverse } from './combiners/combineAxisRangeWithReverse';
-import {
+import type {
 	TooltipIndex,
 	TooltipInteractionState,
 	TooltipPayload,
@@ -94,23 +94,23 @@ import { selectTooltipPayloadSearcher } from './selectTooltipPayloadSearcher';
 import { selectTooltipState } from './selectTooltipState';
 
 import { combineTooltipPayload } from './combiners/combineTooltipPayload';
-import { StackGroup } from '../../util/stacks/stackTypes';
+import type { StackGroup } from '../../util/stacks/stackTypes';
 import { selectTooltipAxisId } from './selectTooltipAxisId';
-import { RenderableAxisType, selectTooltipAxisType } from './selectTooltipAxisType';
+import { type RenderableAxisType, selectTooltipAxisType } from './selectTooltipAxisType';
 import {
 	combineDisplayedStackedData,
-	DisplayedStackedData,
+	type DisplayedStackedData,
 } from './combiners/combineDisplayedStackedData';
-import { DefinitelyStackedGraphicalItem, isStacked } from '../types/StackedGraphicalItem';
+import { type DefinitelyStackedGraphicalItem, isStacked } from '../types/StackedGraphicalItem';
 import { numericalDomainSpecifiedWithoutRequiringData } from '../../util/isDomainSpecifiedByUser';
 import { numberDomainEqualityCheck } from './numberDomainEqualityCheck';
 import { emptyArraysAreEqualCheck } from './arrayEqualityCheck';
-import { ActiveLabel } from '../../synchronisation/types';
-import { RechartsScale, rechartsScaleFactory } from '../../util/scale/RechartsScale';
+import type { ActiveLabel } from '../../synchronisation/types';
+import { type RechartsScale, rechartsScaleFactory } from '../../util/scale/RechartsScale';
 import { isWellBehavedNumber } from '../../util/isWellBehavedNumber';
 import { combineRealScaleType } from './combiners/combineRealScaleType';
 import { combineConfiguredScale } from './combiners/combineConfiguredScale';
-import { CustomScaleDefinition } from '../../util/scale/CustomScaleDefinition';
+import type { CustomScaleDefinition } from '../../util/scale/CustomScaleDefinition';
 
 export const selectTooltipAxisRealScaleType: (
 	state: RechartsRootState,

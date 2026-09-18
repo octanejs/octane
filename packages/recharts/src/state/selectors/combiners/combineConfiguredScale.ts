@@ -1,15 +1,15 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import * as d3Scales from 'victory-vendor/d3-scale';
-import { BaseCartesianAxis } from '../../cartesianAxisSlice';
-import {
+import type { BaseCartesianAxis } from '../../cartesianAxisSlice';
+import type {
 	CategoricalDomain,
 	CategoricalDomainItem,
 	D3ScaleType,
 	NumberDomain,
 	RechartsScaleType,
 } from '../../../util/types';
-import { CustomScaleDefinition } from '../../../util/scale/CustomScaleDefinition';
-import { AxisRange } from '../axisSelectors';
+import type { CustomScaleDefinition } from '../../../util/scale/CustomScaleDefinition';
+import type { AxisRange } from '../axisSelectors';
 import { upperFirst } from '../../../util/DataUtils';
 
 function getD3ScaleFromType<Domain extends CategoricalDomainItem = CategoricalDomainItem>(

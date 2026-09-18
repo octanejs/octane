@@ -3,12 +3,12 @@ import * as React from 'octane';
 import { cloneElement, createElement, isValidElement } from 'octane';
 import { clsx } from 'clsx';
 import {
-	ChartOffsetInternal,
-	Coordinate,
+	type ChartOffsetInternal,
+	type Coordinate,
 	isPolarCoordinate,
-	LayoutType,
-	PolarCoordinate,
-	TooltipEventType,
+	type LayoutType,
+	type PolarCoordinate,
+	type TooltipEventType,
 } from '../util/types';
 import { Curve } from '../shape/Curve.tsrx';
 import { Cross } from '../shape/Cross.tsrx';
@@ -20,9 +20,9 @@ import { getCursorPoints } from '../util/cursor/getCursorPoints';
 import { useChartLayout, useOffsetInternal } from '../context/chartLayoutContext';
 import { useTooltipAxisBandSize } from '../context/useTooltipAxis';
 import { useChartName } from '../state/selectors/selectors';
-import { TooltipIndex, TooltipPayload } from '../state/tooltipSlice';
+import type { TooltipIndex, TooltipPayload } from '../state/tooltipSlice';
 import { svgPropertiesNoEventsFromUnknown } from '../util/svgPropertiesNoEvents';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
+import { type ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 
 /**

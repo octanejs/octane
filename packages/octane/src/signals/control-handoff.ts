@@ -1,5 +1,8 @@
 import type { SignalHandle } from './types.js';
 
+/** Renderer-independent capability shared by early views and later presentation. */
+export const BINDING_HANDOFF = /* @__PURE__ */ Symbol.for('octane.binding-handoff');
+
 /** Explicit, renderer-independent ownership of one standalone native control. */
 export const CONTROL_HANDOFF = /* @__PURE__ */ Symbol.for('octane.control-handoff');
 

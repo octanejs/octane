@@ -1,8 +1,8 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import EventEmitter from 'eventemitter3';
-import { PayloadAction } from '@reduxjs/toolkit';
-import { TooltipSyncState } from '../state/tooltipSlice';
-import { BrushStartEndIndex } from '../context/brushUpdateContext';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import type { TooltipSyncState } from '../state/tooltipSlice';
+import type { BrushStartEndIndex } from '../context/brushUpdateContext';
 
 const eventCenter: EventEmitter<EventTypes> = new EventEmitter();
 

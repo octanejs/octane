@@ -1,13 +1,13 @@
 import { polarToCartesian } from '../PolarUtils';
 import {
-	Coordinate,
-	ChartOffsetInternal,
-	PolarCoordinate,
+	type Coordinate,
+	type ChartOffsetInternal,
+	type PolarCoordinate,
 	isPolarCoordinate,
-	CartesianLayout,
-	PolarLayout,
+	type CartesianLayout,
+	type PolarLayout,
 } from '../types';
-import { RadialCursorPoints, getRadialCursorPoints } from './getRadialCursorPoints';
+import { type RadialCursorPoints, getRadialCursorPoints } from './getRadialCursorPoints';
 
 export function getCursorPoints(
 	layout: CartesianLayout | PolarLayout,

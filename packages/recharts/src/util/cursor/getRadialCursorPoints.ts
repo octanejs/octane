@@ -1,5 +1,5 @@
 import { polarToCartesian } from '../PolarUtils';
-import { Coordinate, PolarCoordinate } from '../types';
+import type { Coordinate, PolarCoordinate } from '../types';
 
 export type RadialCursorPoints = {
 	points: [startPoint: Coordinate, endPoint: Coordinate];

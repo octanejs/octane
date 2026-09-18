@@ -65,7 +65,8 @@ const NATIVE_OPERATIONS = new Map(
 		// not the renderer's projected tree. A stale candidate cannot authorize
 		// restoring or publishing over newer early DOM.
 		journalRootRange: ['read:parentNode', 'read:nextSibling'],
-		currentPresentation: ['read:parentNode'],
+		// A single-host lease also proves membership in its live owner's container.
+		currentPresentation: ['read:parentNode', 'call:contains'],
 		presentationRange: ['read:data', 'read:parentNode'],
 		// Allocates detached text during preparation; insertion and nodeValue
 		// writes run only through accepted preparePresentationOperation callbacks.

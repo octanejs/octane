@@ -1,10 +1,10 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { ChartDataState } from '../../chartDataSlice';
-import { BaseCartesianAxis } from '../../cartesianAxisSlice';
+import type { ChartDataState } from '../../chartDataSlice';
+import type { BaseCartesianAxis } from '../../cartesianAxisSlice';
 import { getStackSeriesIdentifier } from '../../../util/stacks/getStackSeriesIdentifier';
 import { getValueByDataKey } from '../../../util/ChartUtils';
-import { StackSeriesIdentifier } from '../../../util/stacks/stackTypes';
-import { DefinitelyStackedGraphicalItem } from '../../types/StackedGraphicalItem';
+import type { StackSeriesIdentifier } from '../../../util/stacks/stackTypes';
+import type { DefinitelyStackedGraphicalItem } from '../../types/StackedGraphicalItem';
 
 /**
  * In a stacked chart, each graphical item has its own data. That data could be either:

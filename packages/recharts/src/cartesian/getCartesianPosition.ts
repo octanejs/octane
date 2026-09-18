@@ -1,7 +1,7 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import { getPercentValue, isNumber, isPercent } from '../util/DataUtils';
-import { CartesianViewBoxRequired, TrapezoidViewBox } from '../util/types';
-import { TextAnchor, TextVerticalAnchor } from '../component/Text.tsrx';
+import type { CartesianViewBoxRequired, TrapezoidViewBox } from '../util/types';
+import type { TextAnchor, TextVerticalAnchor } from '../component/Text.tsrx';
 import { cartesianViewBoxToTrapezoid } from '../context/chartLayoutContext';
 
 export type CartesianLabelPosition =

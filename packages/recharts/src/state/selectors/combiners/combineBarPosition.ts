@@ -1,7 +1,7 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { MaybeStackedGraphicalItem } from '../../types/StackedGraphicalItem';
-import { BarPositionPosition } from '../../../util/ChartUtils';
-import { BarWithPosition } from '../barSelectors';
+import type { MaybeStackedGraphicalItem } from '../../types/StackedGraphicalItem';
+import type { BarPositionPosition } from '../../../util/ChartUtils';
+import type { BarWithPosition } from '../barSelectors';
 
 export const combineBarPosition = (
 	allBarPositions: ReadonlyArray<BarWithPosition> | undefined,

@@ -9,14 +9,14 @@ import { Layer } from '../container/Layer.tsrx';
 import {
 	CartesianLabelContextProvider,
 	CartesianLabelFromLabelProp,
-	ImplicitLabelType,
+	type ImplicitLabelType,
 } from '../component/Label.tsrx';
 import type { IfOverflow, Overflowable } from '../util/IfOverflow';
 import { isNumOrStr } from '../util/DataUtils';
 import { rectWithCoords } from '../util/CartesianUtils';
-import { CartesianViewBoxRequired, Coordinate } from '../util/types';
+import type { CartesianViewBoxRequired, Coordinate } from '../util/types';
 import { useViewBox } from '../context/chartLayoutContext';
-import { addLine, ReferenceLineSettings, removeLine } from '../state/referenceElementsSlice';
+import { addLine, type ReferenceLineSettings, removeLine } from '../state/referenceElementsSlice';
 import { useAppDispatch, useAppSelector } from '../state/hooks';
 import {
 	selectAxisScale,
@@ -27,12 +27,15 @@ import { useIsPanorama } from '../context/PanoramaContext';
 
 import { useClipPathId } from '../container/ClipPathProvider.tsrx';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents';
-import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
+import { type RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import { type ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { isWellBehavedNumber } from '../util/isWellBehavedNumber';
-import { BandPosition, RechartsScale } from '../util/scale/RechartsScale';
-import { CartesianScaleHelper, CartesianScaleHelperImpl } from '../util/scale/CartesianScaleHelper';
+import type { BandPosition, RechartsScale } from '../util/scale/RechartsScale';
+import {
+	type CartesianScaleHelper,
+	CartesianScaleHelperImpl,
+} from '../util/scale/CartesianScaleHelper';
 
 /**
  * Single point that defines one end of a segment.

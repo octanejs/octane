@@ -1,8 +1,8 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { Series } from 'victory-vendor/d3-shape';
-import { StackId } from '../ChartUtils';
-import { GraphicalItemId } from '../../state/graphicalItemsSlice';
-import { MaybeStackedGraphicalItem } from '../../state/types/StackedGraphicalItem';
+import type { Series } from 'victory-vendor/d3-shape';
+import type { StackId } from '../ChartUtils';
+import type { GraphicalItemId } from '../../state/graphicalItemsSlice';
+import type { MaybeStackedGraphicalItem } from '../../state/types/StackedGraphicalItem';
 
 /*
  * So chart stacks come in layers:

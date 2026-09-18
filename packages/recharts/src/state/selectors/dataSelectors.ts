@@ -1,7 +1,7 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import { createSelector } from 'reselect';
-import { RechartsRootState } from '../store';
-import { ChartData, ChartDataState } from '../chartDataSlice';
+import type { RechartsRootState } from '../store';
+import type { ChartData, ChartDataState } from '../chartDataSlice';
 
 /**
  * This selector always returns the data with the indexes set by a Brush.

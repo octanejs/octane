@@ -1,8 +1,8 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { TooltipIndex, TooltipInteractionState } from '../../tooltipSlice';
-import { ChartData } from '../../chartDataSlice';
+import type { TooltipIndex, TooltipInteractionState } from '../../tooltipSlice';
+import type { ChartData } from '../../chartDataSlice';
 import { isWellBehavedNumber } from '../../../util/isWellBehavedNumber';
-import { DataKey, CategoricalDomain, NumberDomain } from '../../../util/types';
+import type { DataKey, CategoricalDomain, NumberDomain } from '../../../util/types';
 import { getValueByDataKey } from '../../../util/ChartUtils';
 import { isWellFormedNumberDomain } from '../../../util/isDomainSpecifiedByUser';
 
