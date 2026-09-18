@@ -1,6 +1,6 @@
 import { createSelector } from 'reselect';
-import { RechartsRootState } from '../store';
-import { AxisId } from '../cartesianAxisSlice';
+import type { RechartsRootState } from '../store';
+import type { AxisId } from '../cartesianAxisSlice';
 import {
 	combineAxisTicks,
 	combineCategoricalDomain,
@@ -15,7 +15,7 @@ import {
 	selectRadiusAxis,
 	selectRadiusAxisRangeWithReversed,
 } from './polarAxisSelectors';
-import { CartesianTickItem } from '../../util/types';
+import type { CartesianTickItem } from '../../util/types';
 import { selectChartLayout } from '../../context/chartLayoutContext';
 import {
 	selectPolarAppliedValues,
@@ -23,7 +23,7 @@ import {
 	selectPolarNiceTicks,
 } from './polarSelectors';
 import { pickAxisType } from './pickAxisType';
-import { RechartsScale, rechartsScaleFactory } from '../../util/scale/RechartsScale';
+import { type RechartsScale, rechartsScaleFactory } from '../../util/scale/RechartsScale';
 import type { CustomScaleDefinition } from '../../util/scale/CustomScaleDefinition';
 import { combineConfiguredScale } from './combiners/combineConfiguredScale';
 

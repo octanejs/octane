@@ -17,12 +17,12 @@ import { Polygon } from '../shape/Polygon.tsrx';
 import { Layer } from '../container/Layer.tsrx';
 import {
 	CartesianLabelListContextProvider,
-	CartesianLabelListEntry,
-	ImplicitLabelListType,
+	type CartesianLabelListEntry,
+	type ImplicitLabelListType,
 	LabelListFromLabelProp,
 } from '../component/LabelList.tsrx';
 import { Dots } from '../component/Dots.tsrx';
-import {
+import type {
 	ActiveDotType,
 	AnimationDuration,
 	DataConsumer,
@@ -36,7 +36,7 @@ import {
 } from '../util/types';
 import type { LegendPayload } from '../component/DefaultLegendContent.tsrx';
 import { ActivePoints } from '../component/ActivePoints.tsrx';
-import { TooltipPayloadConfiguration } from '../state/tooltipSlice';
+import type { TooltipPayloadConfiguration } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
 import { selectRadarPoints } from '../state/selectors/radarSelectors';
 import { useAppSelector } from '../state/hooks';
@@ -47,17 +47,17 @@ import { SetPolarGraphicalItem } from '../state/SetGraphicalItem';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
 import {
 	AnimatedItems,
-	AnimationInterpolateFn,
+	type AnimationInterpolateFn,
 	useAnimationCallbacks,
 } from '../animation/AnimatedItems.tsrx';
-import { AnimationMatchByProp, matchAnimationItems, matchByIndex } from '../animation/matchBy';
+import { type AnimationMatchByProp, matchAnimationItems, matchByIndex } from '../animation/matchBy';
 import { useAnimationStartSnapshot } from '../animation/useAnimationStartSnapshot';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents';
-import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
-import { WithIdRequired } from '../util/useUniqueId';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
+import { type RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import type { WithIdRequired } from '../util/useUniqueId';
+import { type ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
-import { RechartsScale } from '../util/scale/RechartsScale';
+import type { RechartsScale } from '../util/scale/RechartsScale';
 import { usePolarChartLayout } from '../context/chartLayoutContext';
 
 export interface RadarPoint {

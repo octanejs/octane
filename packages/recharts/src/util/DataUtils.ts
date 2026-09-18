@@ -1,6 +1,6 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import { get } from 'es-toolkit/compat';
-import { NonEmptyArray, Percent } from './types';
+import type { NonEmptyArray, Percent } from './types';
 import { round } from './round';
 
 export const mathSign = (value: number) => {

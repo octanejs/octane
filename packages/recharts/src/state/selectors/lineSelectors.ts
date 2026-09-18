@@ -1,8 +1,8 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import { createSelector } from 'reselect';
-import { computeLinePoints, LinePointItem } from '../../cartesian/Line.tsrx';
-import { RechartsRootState } from '../store';
-import { AxisId } from '../cartesianAxisSlice';
+import { computeLinePoints, type LinePointItem } from '../../cartesian/Line.tsrx';
+import type { RechartsRootState } from '../store';
+import type { AxisId } from '../cartesianAxisSlice';
 import { selectChartDataWithIndexesIfNotInPanoramaPosition4 } from './dataSelectors';
 import { selectChartLayout } from '../../context/chartLayoutContext';
 import {
@@ -11,9 +11,9 @@ import {
 	selectUnfilteredCartesianItems,
 } from './axisSelectors';
 import { getBandSizeOfAxis, isCategoricalAxis } from '../../util/ChartUtils';
-import { ChartData } from '../chartDataSlice';
-import { CartesianGraphicalItemSettings, GraphicalItemId } from '../graphicalItemsSlice';
-import { LineSettings } from '../types/LineSettings';
+import type { ChartData } from '../chartDataSlice';
+import type { CartesianGraphicalItemSettings, GraphicalItemId } from '../graphicalItemsSlice';
+import type { LineSettings } from '../types/LineSettings';
 
 const selectXAxisWithScale = (
 	state: RechartsRootState,

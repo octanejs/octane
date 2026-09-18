@@ -2,7 +2,7 @@ import type { CSSProperties } from '../OctaneTypes';
 import { clsx } from 'clsx';
 
 import { isNumber } from '../DataUtils';
-import { Coordinate, CartesianViewBox, AllowInDimension } from '../types';
+import type { Coordinate, CartesianViewBox, AllowInDimension } from '../types';
 
 export type Dimension2D = 'x' | 'y';
 

@@ -3,12 +3,12 @@ import type { NativeEvent } from '../util/OctaneTypes';
 import {
 	createAction,
 	createListenerMiddleware,
-	ListenerEffectAPI,
-	PayloadAction,
+	type ListenerEffectAPI,
+	type PayloadAction,
 } from '@reduxjs/toolkit';
 
-import { CategoricalChartFunc } from '../chart/types';
-import { MouseHandlerDataParam } from '../synchronisation/types';
+import type { CategoricalChartFunc } from '../chart/types';
+import type { MouseHandlerDataParam } from '../synchronisation/types';
 import {
 	selectActiveLabel,
 	selectActiveTooltipCoordinate,
@@ -16,7 +16,7 @@ import {
 	selectActiveTooltipIndex,
 	selectIsTooltipActive,
 } from './selectors/tooltipSelectors';
-import { AppDispatch, RechartsRootState } from './store';
+import type { AppDispatch, RechartsRootState } from './store';
 import { createEventProxy } from '../util/createEventProxy';
 
 type ExternalEventActionPayload<E = NativeEvent> = {

@@ -1,6 +1,6 @@
 import { useAppSelector } from '../state/hooks';
 import { getBandSizeOfAxis } from '../util/ChartUtils';
-import { RenderableAxisSettings, selectTooltipAxis } from '../state/selectors/axisSelectors';
+import { type RenderableAxisSettings, selectTooltipAxis } from '../state/selectors/axisSelectors';
 import {
 	selectTooltipAxisScale,
 	selectTooltipAxisTicks,

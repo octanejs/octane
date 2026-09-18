@@ -1,5 +1,5 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { Props } from './PolarAngleAxis.tsrx';
+import type { Props } from './PolarAngleAxis.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 
 export const defaultPolarAngleAxisProps = {

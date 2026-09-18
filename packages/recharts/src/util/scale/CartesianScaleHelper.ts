@@ -1,5 +1,5 @@
-import { BandPosition, RechartsScale } from './RechartsScale';
-import { CategoricalDomainItem, Coordinate, NullableCoordinate } from '../types';
+import type { BandPosition, RechartsScale } from './RechartsScale';
+import type { CategoricalDomainItem, Coordinate, NullableCoordinate } from '../types';
 
 export interface CartesianScaleHelper<
 	XDomain extends CategoricalDomainItem = CategoricalDomainItem,

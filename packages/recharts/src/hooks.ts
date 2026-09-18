@@ -1,7 +1,7 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { AxisId, defaultAxisId } from './state/cartesianAxisSlice';
+import { type AxisId, defaultAxisId } from './state/cartesianAxisSlice';
 import {
-	BaseAxisWithScale,
+	type BaseAxisWithScale,
 	selectAxisDomain,
 	selectAxisInverseScale,
 	selectAxisInverseDataSnapScale,
@@ -18,12 +18,12 @@ import {
 	selectActiveTooltipDataPoints,
 	selectIsTooltipActive,
 } from './state/selectors/tooltipSelectors';
-import { ChartOffset, PlotArea } from './types';
+import type { ChartOffset, PlotArea } from './types';
 import { selectChartOffset } from './state/selectors/selectChartOffset';
 import { selectPlotArea } from './state/selectors/selectPlotArea';
-import { CategoricalDomain, Coordinate, NumberDomain, TickItem } from './util/types';
-import { ActiveLabel } from './synchronisation/types';
-import { BandPosition } from './util/scale/RechartsScale';
+import type { CategoricalDomain, Coordinate, NumberDomain, TickItem } from './util/types';
+import type { ActiveLabel } from './synchronisation/types';
+import type { BandPosition } from './util/scale/RechartsScale';
 
 export const useXAxis = (xAxisId: AxisId): BaseAxisWithScale | undefined => {
 	const isPanorama = useIsPanorama();

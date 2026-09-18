@@ -1,10 +1,10 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import { createSelector } from 'reselect';
 import { sortBy } from 'es-toolkit/compat';
-import { RechartsRootState } from '../store';
-import { LegendSettings } from '../legendSlice';
-import { LegendPayload } from '../../component/DefaultLegendContent.tsrx';
-import { Size } from '../../util/types';
+import type { RechartsRootState } from '../store';
+import type { LegendSettings } from '../legendSlice';
+import type { LegendPayload } from '../../component/DefaultLegendContent.tsrx';
+import type { Size } from '../../util/types';
 
 export const selectLegendSettings = (state: RechartsRootState): LegendSettings =>
 	state.legend.settings;

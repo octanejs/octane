@@ -4,19 +4,19 @@ import { useLayoutEffect } from 'octane';
 import { createPortal } from 'octane';
 import { useLegendPortal } from '../context/legendPortalContext';
 import {
-	ContentType,
+	type ContentType,
 	DefaultLegendContent,
-	LegendPayload,
-	Props as DefaultLegendContentProps,
-	VerticalAlignmentType,
+	type LegendPayload,
+	type Props as DefaultLegendContentProps,
+	type VerticalAlignmentType,
 } from './DefaultLegendContent.tsrx';
 
-import { LayoutType, Margin, Size } from '../util/types';
-import { getUniqPayload, UniqueOption } from '../util/payload/getUniqPayload';
+import type { LayoutType, Margin, Size } from '../util/types';
+import { getUniqPayload, type UniqueOption } from '../util/payload/getUniqPayload';
 import { useLegendPayload } from '../context/legendPayloadContext.tsrx';
-import { ElementOffset, useElementOffset } from '../util/useElementOffset';
+import { type ElementOffset, useElementOffset } from '../util/useElementOffset';
 import { useChartHeight, useChartWidth, useMargin } from '../context/chartLayoutContext';
-import { LegendSettings, setLegendSettings, setLegendSize } from '../state/legendSlice';
+import { type LegendSettings, setLegendSettings, setLegendSize } from '../state/legendSlice';
 import { useAppDispatch } from '../state/hooks';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { propsAreEqual } from '../util/propsAreEqual';

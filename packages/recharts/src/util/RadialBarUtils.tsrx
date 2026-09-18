@@ -1,7 +1,7 @@
 import * as React from 'octane';
-import { RadialBarDataItem, RadialBarProps } from '../polar/RadialBar.tsrx';
+import type { RadialBarDataItem, RadialBarProps } from '../polar/RadialBar.tsrx';
 import { Sector } from '../shape/Sector.tsrx';
-import { ShapeAnimationProps } from './types';
+import type { ShapeAnimationProps } from './types';
 import { Shape } from './ActiveShapeUtils.tsrx';
 
 export const defaultRadialBarShape = Sector;

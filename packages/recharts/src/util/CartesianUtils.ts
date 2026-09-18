@@ -1,5 +1,5 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { Coordinate, RectangleCoordinate, RectanglePosition, Size } from './types';
+import type { Coordinate, RectangleCoordinate, RectanglePosition, Size } from './types';
 
 export const rectWithPoints = (
 	{ x: x1, y: y1 }: Coordinate,

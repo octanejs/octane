@@ -1,13 +1,13 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import type { NativeMouseEvent } from '../util/OctaneTypes';
 
-import { Coordinate, DataKey } from '../util/types';
+import type { Coordinate, DataKey } from '../util/types';
 import { useAppDispatch } from '../state/hooks';
 import {
 	mouseLeaveItem,
 	setActiveClickItemIndex,
 	setActiveMouseOverItemIndex,
-	TooltipPayload,
+	type TooltipPayload,
 } from '../state/tooltipSlice';
 
 /**

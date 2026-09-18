@@ -1,8 +1,8 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { createSlice, current, PayloadAction, prepareAutoBatched } from '@reduxjs/toolkit';
+import { createSlice, current, type PayloadAction, prepareAutoBatched } from '@reduxjs/toolkit';
 import { castDraft } from 'immer';
-import { LayoutType, Size } from '../util/types';
-import {
+import type { LayoutType, Size } from '../util/types';
+import type {
 	HorizontalAlignmentType,
 	LegendPayload,
 	VerticalAlignmentType,

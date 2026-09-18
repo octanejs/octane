@@ -1,12 +1,12 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import {
 	noInteraction,
-	TooltipIndex,
-	TooltipInteractionState,
-	TooltipState,
+	type TooltipIndex,
+	type TooltipInteractionState,
+	type TooltipState,
 } from '../../tooltipSlice';
-import { TooltipEventType } from '../../../util/types';
-import { TooltipTrigger } from '../../../chart/types';
+import type { TooltipEventType } from '../../../util/types';
+import type { TooltipTrigger } from '../../../chart/types';
 
 function chooseAppropriateMouseInteraction(
 	tooltipState: TooltipState,

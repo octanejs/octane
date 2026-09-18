@@ -1,7 +1,7 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { InverseScaleFunction } from '../../../hooks';
+import type { InverseScaleFunction } from '../../../hooks';
 import { createCategoricalInverse } from '../../../util/scale/createCategoricalInverse';
-import { CustomScaleDefinition } from '../../../util/scale/CustomScaleDefinition';
+import type { CustomScaleDefinition } from '../../../util/scale/CustomScaleDefinition';
 
 export function combineInverseScaleFunction(
 	configuredScale: CustomScaleDefinition | undefined,

@@ -1,8 +1,8 @@
 import { createSelector } from 'reselect';
-import { RechartsRootState } from '../store';
-import { AxisId } from '../cartesianAxisSlice';
+import type { RechartsRootState } from '../store';
+import type { AxisId } from '../cartesianAxisSlice';
 import { selectPolarAxisTicks } from './polarScaleSelectors';
-import { CartesianTickItem } from '../../util/types';
+import type { CartesianTickItem } from '../../util/types';
 
 export type PolarAngles = Array<number>;
 

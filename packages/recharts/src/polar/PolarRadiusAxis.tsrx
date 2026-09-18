@@ -17,21 +17,21 @@ import { Layer } from '../container/Layer.tsrx';
 import { polarToCartesian } from '../util/PolarUtils';
 import {
 	adaptEventsOfChild,
-	RenderableAxisProps,
-	Coordinate,
-	PolarViewBoxRequired,
-	PresentationAttributesAdaptChildEvent,
-	TickItem,
-	AxisDomain,
-	ScaleType,
-	AxisDomainTypeInput,
-	EvaluatedAxisDomainType,
-	TickProp,
-	PolarTickContentProps,
-	AxisTick,
+	type RenderableAxisProps,
+	type Coordinate,
+	type PolarViewBoxRequired,
+	type PresentationAttributesAdaptChildEvent,
+	type TickItem,
+	type AxisDomain,
+	type ScaleType,
+	type AxisDomainTypeInput,
+	type EvaluatedAxisDomainType,
+	type TickProp,
+	type PolarTickContentProps,
+	type AxisTick,
 } from '../util/types';
-import { addRadiusAxis, RadiusAxisSettings, removeRadiusAxis } from '../state/polarAxisSlice';
-import { NiceTicksAlgorithm } from '../state/cartesianAxisSlice';
+import { addRadiusAxis, type RadiusAxisSettings, removeRadiusAxis } from '../state/polarAxisSlice';
+import type { NiceTicksAlgorithm } from '../state/cartesianAxisSlice';
 import { useAppDispatch, useAppSelector } from '../state/hooks';
 import { selectPolarAxisScale, selectPolarAxisTicks } from '../state/selectors/polarScaleSelectors';
 import { selectPolarViewBox } from '../state/selectors/polarAxisSelectors';
@@ -40,9 +40,9 @@ import {
 	svgPropertiesNoEvents,
 	svgPropertiesNoEventsFromUnknown,
 } from '../util/svgPropertiesNoEvents';
-import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
-import { RechartsScale } from '../util/scale/RechartsScale';
+import { type RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import { type ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
+import type { RechartsScale } from '../util/scale/RechartsScale';
 import type { CustomScaleDefinition } from '../util/scale/CustomScaleDefinition';
 import { usePolarChartLayout } from '../context/chartLayoutContext';
 import { noop } from '../util/DataUtils';

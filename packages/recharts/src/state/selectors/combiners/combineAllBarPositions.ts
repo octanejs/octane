@@ -1,9 +1,9 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import { getPercentValue, isNullish } from '../../../util/DataUtils';
-import { BarWithPosition, SizeList } from '../barSelectors';
+import type { BarWithPosition, SizeList } from '../barSelectors';
 import { isWellBehavedNumber } from '../../../util/isWellBehavedNumber';
-import { BarPositionPosition } from '../../../util/ChartUtils';
-import { BarCategory } from './combineBarSizeList';
+import type { BarPositionPosition } from '../../../util/ChartUtils';
+import type { BarCategory } from './combineBarSizeList';
 
 function getBarPositions(
 	barGap: string | number,

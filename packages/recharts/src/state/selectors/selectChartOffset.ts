@@ -1,8 +1,8 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import { createSelector } from 'reselect';
 import { selectChartOffsetInternal } from './selectChartOffsetInternal';
-import { ChartOffsetInternal } from '../../util/types';
-import { ChartOffset } from '../../types';
+import type { ChartOffsetInternal } from '../../util/types';
+import type { ChartOffset } from '../../types';
 
 export const selectChartOffset = createSelector(
 	[selectChartOffsetInternal],

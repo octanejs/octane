@@ -1,5 +1,5 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import {
+import type {
 	AxisType,
 	CartesianLayout,
 	ChartOffsetInternal,
@@ -11,7 +11,7 @@ import {
 	TickItem,
 } from './types';
 import { polarToCartesian } from './PolarUtils';
-import { AxisRange } from '../state/selectors/axisSelectors';
+import type { AxisRange } from '../state/selectors/axisSelectors';
 import { mathSign } from './DataUtils';
 
 export const getActiveCartesianCoordinate = (

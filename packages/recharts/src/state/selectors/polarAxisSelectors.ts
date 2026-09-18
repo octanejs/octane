@@ -1,14 +1,14 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import { createSelector } from 'reselect';
-import { RechartsRootState } from '../store';
-import { AxisId } from '../cartesianAxisSlice';
-import { AngleAxisSettings, RadiusAxisSettings } from '../polarAxisSlice';
-import { PolarChartOptions } from '../polarOptionsSlice';
+import type { RechartsRootState } from '../store';
+import type { AxisId } from '../cartesianAxisSlice';
+import type { AngleAxisSettings, RadiusAxisSettings } from '../polarAxisSlice';
+import type { PolarChartOptions } from '../polarOptionsSlice';
 import { selectChartHeight, selectChartWidth } from './containerSelectors';
 import { selectChartOffsetInternal } from './selectChartOffsetInternal';
 import { getMaxRadius } from '../../util/PolarUtils';
 import { getPercentValue } from '../../util/DataUtils';
-import {
+import type {
 	AxisDomainTypeInput,
 	LayoutType,
 	PolarLayout,
@@ -16,7 +16,7 @@ import {
 } from '../../util/types';
 import { defaultPolarAngleAxisProps } from '../../polar/defaultPolarAngleAxisProps';
 import { defaultPolarRadiusAxisProps } from '../../polar/defaultPolarRadiusAxisProps';
-import { AxisRange } from './axisSelectors';
+import type { AxisRange } from './axisSelectors';
 import { combineAxisRangeWithReverse } from './combiners/combineAxisRangeWithReverse';
 import { selectChartLayout, selectPolarChartLayout } from '../../context/chartLayoutContext';
 import { getAxisTypeBasedOnLayout } from '../../util/getAxisTypeBasedOnLayout';

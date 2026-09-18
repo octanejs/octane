@@ -1,12 +1,12 @@
-import { ChartOptions } from '../state/optionsSlice';
+import type { ChartOptions } from '../state/optionsSlice';
 import { RechartsStoreProvider } from '../state/RechartsStoreProvider.tsrx';
 import { ChartDataContextProvider } from '../context/chartDataContext';
 import { ReportMainChartProps } from '../state/ReportMainChartProps';
 import { ReportChartProps } from '../state/ReportChartProps';
 import { ReportEventSettings } from '../state/ReportEventSettings';
 import { ReportPolarOptions } from '../state/ReportPolarOptions.tsrx';
-import { Margin, PolarChartProps, TooltipEventType } from '../util/types';
-import { TooltipPayloadSearcher } from '../state/tooltipSlice';
+import type { Margin, PolarChartProps, TooltipEventType } from '../util/types';
+import type { TooltipPayloadSearcher } from '../state/tooltipSlice';
 import { CategoricalChart } from './CategoricalChart.tsrx';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { initialEventSettingsState } from '../state/eventSettingsSlice';

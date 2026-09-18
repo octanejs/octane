@@ -1,7 +1,7 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import { getAngledRectangleWidth } from './CartesianUtils';
 import { getEveryNth } from './getEveryNth';
-import { Size, CartesianTickItem, CartesianViewBoxRequired } from './types';
+import type { Size, CartesianTickItem, CartesianViewBoxRequired } from './types';
 
 export function getAngledTickWidth(contentSize: Size, unitSize: Size, angle: number | undefined) {
 	const size = {

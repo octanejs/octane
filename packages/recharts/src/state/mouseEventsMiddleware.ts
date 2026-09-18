@@ -2,16 +2,16 @@
 import {
 	createAction,
 	createListenerMiddleware,
-	ListenerEffectAPI,
-	PayloadAction,
+	type ListenerEffectAPI,
+	type PayloadAction,
 } from '@reduxjs/toolkit';
-import { AppDispatch, RechartsRootState } from './store';
+import type { AppDispatch, RechartsRootState } from './store';
 import { mouseLeaveChart, setMouseClickAxisIndex, setMouseOverAxisIndex } from './tooltipSlice';
 import { selectActivePropsFromChartPointer } from './selectors/selectActivePropsFromChartPointer';
 import { selectTooltipEventType } from './selectors/selectTooltipEventType';
 
 import { getRelativeCoordinate } from '../util/getRelativeCoordinate';
-import { RelativePointer, HTMLMousePointer } from '../util/types';
+import type { RelativePointer, HTMLMousePointer } from '../util/types';
 
 export const mouseClickAction = createAction<HTMLMousePointer>('mouseClick');
 

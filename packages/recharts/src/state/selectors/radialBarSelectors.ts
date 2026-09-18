@@ -1,28 +1,28 @@
 import type { RegisteredCell } from '../../context/CellsContext';
 import { createSelector } from 'reselect';
 
-import { Series } from 'victory-vendor/d3-shape';
-import { computeRadialBarDataItems, RadialBarDataItem } from '../../polar/RadialBar.tsrx';
+import type { Series } from 'victory-vendor/d3-shape';
+import { computeRadialBarDataItems, type RadialBarDataItem } from '../../polar/RadialBar.tsrx';
 import { selectChartDataAndAlwaysIgnoreIndexes, selectChartDataWithIndexes } from './dataSelectors';
-import { RechartsRootState } from '../store';
-import { ChartDataState } from '../chartDataSlice';
-import { AxisId } from '../cartesianAxisSlice';
-import { LayoutType, LegendType, PolarViewBoxRequired, TickItem } from '../../util/types';
+import type { RechartsRootState } from '../store';
+import type { ChartDataState } from '../chartDataSlice';
+import type { AxisId } from '../cartesianAxisSlice';
+import type { LayoutType, LegendType, PolarViewBoxRequired, TickItem } from '../../util/types';
 import {
 	selectPolarAxisScale,
 	selectPolarAxisTicks,
 	selectPolarGraphicalItemAxisTicks,
 } from './polarScaleSelectors';
-import { BaseAxisWithScale, combineStackGroups, selectTooltipAxis } from './axisSelectors';
+import { type BaseAxisWithScale, combineStackGroups, selectTooltipAxis } from './axisSelectors';
 import { selectAngleAxis, selectPolarViewBox, selectRadiusAxis } from './polarAxisSelectors';
 import { selectChartLayout } from '../../context/chartLayoutContext';
 import {
-	BarPositionPosition,
+	type BarPositionPosition,
 	getBandSizeOfAxis,
 	getBaseValueOfBar,
 	isCategoricalAxis,
 } from '../../util/ChartUtils';
-import { BarWithPosition, SizeList } from './barSelectors';
+import type { BarWithPosition, SizeList } from './barSelectors';
 import {
 	selectBarCategoryGap,
 	selectBarGap,
@@ -31,14 +31,14 @@ import {
 	selectRootMaxBarSize,
 	selectStackOffsetType,
 } from './rootPropsSelectors';
-import { PolarGraphicalItemSettings } from '../graphicalItemsSlice';
+import type { PolarGraphicalItemSettings } from '../graphicalItemsSlice';
 import {
-	PolarAxisType,
+	type PolarAxisType,
 	selectPolarItemsSettings,
 	selectUnfilteredPolarItems,
 } from './polarSelectors';
-import { AngleAxisSettings, RadiusAxisSettings } from '../polarAxisSlice';
-import { LegendPayload } from '../../component/DefaultLegendContent.tsrx';
+import type { AngleAxisSettings, RadiusAxisSettings } from '../polarAxisSlice';
+import type { LegendPayload } from '../../component/DefaultLegendContent.tsrx';
 import { isNullish } from '../../util/DataUtils';
 
 import type {
@@ -49,14 +49,14 @@ import type {
 } from '../../util/stacks/stackTypes';
 import {
 	combineDisplayedStackedData,
-	DisplayedStackedData,
+	type DisplayedStackedData,
 } from './combiners/combineDisplayedStackedData';
 import type { RadialBarSettings } from '../types/RadialBarSettings';
-import { DefinitelyStackedGraphicalItem, isStacked } from '../types/StackedGraphicalItem';
+import { type DefinitelyStackedGraphicalItem, isStacked } from '../types/StackedGraphicalItem';
 import { combineBarSizeList } from './combiners/combineBarSizeList';
 import { combineAllBarPositions } from './combiners/combineAllBarPositions';
 import { combineStackedData } from './combiners/combineStackedData';
-import { RechartsScale } from '../../util/scale/RechartsScale';
+import type { RechartsScale } from '../../util/scale/RechartsScale';
 import { combineBarPosition } from './combiners/combineBarPosition';
 
 const selectRadiusAxisForRadialBar = (

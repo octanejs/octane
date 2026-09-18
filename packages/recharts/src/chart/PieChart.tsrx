@@ -2,7 +2,7 @@ import type { Ref } from '../util/OctaneTypes.ts';
 
 import { arrayTooltipSearcher } from '../state/optionsSlice';
 import { defaultPolarChartProps, PolarChart } from './PolarChart.tsrx';
-import { PolarChartProps, TooltipEventType } from '../util/types';
+import type { PolarChartProps, TooltipEventType } from '../util/types';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 
 const allowedTooltipTypes: ReadonlyArray<TooltipEventType> = ['item'];

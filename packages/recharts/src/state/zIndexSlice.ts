@@ -3,7 +3,7 @@
  * This slice contains a registry of z-index values for various components.
  * The state is a map from z-index numbers to element references.
  */
-import { createSlice, PayloadAction, prepareAutoBatched } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction, prepareAutoBatched } from '@reduxjs/toolkit';
 import { castDraft } from 'immer';
 
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';

@@ -1,7 +1,7 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { castDraft } from 'immer';
-import { AxisId, BaseCartesianAxis, TicksSettings } from './cartesianAxisSlice';
+import type { AxisId, BaseCartesianAxis, TicksSettings } from './cartesianAxisSlice';
 
 export type RadiusAxisSettings = BaseCartesianAxis & TicksSettings;
 

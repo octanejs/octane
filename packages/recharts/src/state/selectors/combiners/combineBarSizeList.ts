@@ -1,13 +1,13 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import {
-	DefinitelyStackedGraphicalItem,
+	type DefinitelyStackedGraphicalItem,
 	isStacked,
-	MaybeStackedGraphicalItem,
+	type MaybeStackedGraphicalItem,
 } from '../../types/StackedGraphicalItem';
-import { StackId } from '../../../util/ChartUtils';
-import { SizeList } from '../barSelectors';
+import type { StackId } from '../../../util/ChartUtils';
+import type { SizeList } from '../barSelectors';
 import { getPercentValue, isNullish } from '../../../util/DataUtils';
-import { DataKey } from '../../../util/types';
+import type { DataKey } from '../../../util/types';
 
 const getBarSize = (
 	globalSize: string | number | undefined,

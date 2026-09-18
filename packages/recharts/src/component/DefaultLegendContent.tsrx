@@ -10,13 +10,13 @@ import { clsx } from 'clsx';
 import { Surface } from '../container/Surface.tsrx';
 import { Symbols } from '../shape/Symbols.tsrx';
 import {
-	DataKey,
-	LegendType,
+	type DataKey,
+	type LegendType,
 	adaptEventsOfChild,
-	PresentationAttributesAdaptChildEvent,
-	CartesianLayout,
+	type PresentationAttributesAdaptChildEvent,
+	type CartesianLayout,
 } from '../util/types';
-import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import { type RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 
 const SIZE = 32;
 export type ContentType = OctaneElement | ((props: Props) => OctaneNode);

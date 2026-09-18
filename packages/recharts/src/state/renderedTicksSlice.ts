@@ -8,10 +8,10 @@
  *
  * This renderedTickSlice stores those actually rendered ticks so that we can return them from a hook later.
  */
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { castDraft, WritableDraft } from 'immer';
-import { TickItem } from '../util/types';
-import { AxisId } from './cartesianAxisSlice';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { castDraft, type WritableDraft } from 'immer';
+import type { TickItem } from '../util/types';
+import type { AxisId } from './cartesianAxisSlice';
 
 type RenderedTicksAxisState = {
 	[axisId: AxisId]: ReadonlyArray<TickItem>;

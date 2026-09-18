@@ -1,15 +1,15 @@
 import * as React from 'octane';
 import { useLayoutEffect, useRef } from 'octane';
-import { AxisDomain, BaseAxisProps, ScaleType } from '../util/types';
+import type { AxisDomain, BaseAxisProps, ScaleType } from '../util/types';
 import {
 	addZAxis,
-	AxisId,
+	type AxisId,
 	removeZAxis,
 	replaceZAxis,
-	ZAxisSettings,
+	type ZAxisSettings,
 } from '../state/cartesianAxisSlice';
 import { useAppDispatch } from '../state/hooks';
-import { AxisRange, implicitZAxis } from '../state/selectors/axisSelectors';
+import { type AxisRange, implicitZAxis } from '../state/selectors/axisSelectors';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import type { CustomScaleDefinition } from '../util/scale/CustomScaleDefinition';
 

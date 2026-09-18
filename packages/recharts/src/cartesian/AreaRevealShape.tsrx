@@ -1,8 +1,8 @@
 import type { OctaneElement } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
 import { isNumber } from '../util/DataUtils';
-import { Curve, BaseLineType, Props as CurveProps } from '../shape/Curve.tsrx';
-import { CartesianLayout, LayoutType, ShapeAnimationProps } from '../util/types';
+import { Curve, type BaseLineType, type Props as CurveProps } from '../shape/Curve.tsrx';
+import type { CartesianLayout, LayoutType, ShapeAnimationProps } from '../util/types';
 import { isWellBehavedNumber } from '../util/isWellBehavedNumber';
 import { Layer } from '../container/Layer.tsrx';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';

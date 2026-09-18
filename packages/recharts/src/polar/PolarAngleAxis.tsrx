@@ -12,23 +12,23 @@ import { clsx } from 'clsx';
 import { Layer } from '../container/Layer.tsrx';
 import { Dot } from '../shape/Dot.tsrx';
 import { Polygon } from '../shape/Polygon.tsrx';
-import { Text, TextAnchor, TextVerticalAnchor } from '../component/Text.tsrx';
+import { Text, type TextAnchor, type TextVerticalAnchor } from '../component/Text.tsrx';
 import {
 	adaptEventsOfChild,
-	AxisDomain,
-	AxisTick,
-	AxisDomainTypeInput,
-	PolarTickContentProps,
-	EvaluatedAxisDomainType,
-	PresentationAttributesAdaptChildEvent,
-	RenderableAxisProps,
-	ScaleType,
-	TickItem,
-	TickProp,
+	type AxisDomain,
+	type AxisTick,
+	type AxisDomainTypeInput,
+	type PolarTickContentProps,
+	type EvaluatedAxisDomainType,
+	type PresentationAttributesAdaptChildEvent,
+	type RenderableAxisProps,
+	type ScaleType,
+	type TickItem,
+	type TickProp,
 } from '../util/types';
 import { degreeToRadian, polarToCartesian } from '../util/PolarUtils';
-import { addAngleAxis, AngleAxisSettings, removeAngleAxis } from '../state/polarAxisSlice';
-import { NiceTicksAlgorithm } from '../state/cartesianAxisSlice';
+import { addAngleAxis, type AngleAxisSettings, removeAngleAxis } from '../state/polarAxisSlice';
+import type { NiceTicksAlgorithm } from '../state/cartesianAxisSlice';
 import { useAppDispatch, useAppSelector } from '../state/hooks';
 import {
 	selectPolarAngleAxisTicks,
@@ -41,9 +41,9 @@ import {
 	svgPropertiesNoEvents,
 	svgPropertiesNoEventsFromUnknown,
 } from '../util/svgPropertiesNoEvents';
-import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
-import { RechartsScale } from '../util/scale/RechartsScale';
+import { type RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import { type ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
+import type { RechartsScale } from '../util/scale/RechartsScale';
 import type { CustomScaleDefinition } from '../util/scale/CustomScaleDefinition';
 import { usePolarChartLayout } from '../context/chartLayoutContext';
 import { noop } from '../util/DataUtils';

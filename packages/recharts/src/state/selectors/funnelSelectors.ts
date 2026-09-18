@@ -1,13 +1,13 @@
 import type { RegisteredCell } from '../../context/CellsContext';
 import { createSelector } from 'reselect';
 
-import { computeFunnelTrapezoids, FunnelTrapezoidItem } from '../../cartesian/Funnel.tsrx';
-import { ChartData } from '../chartDataSlice';
-import { RechartsRootState } from '../store';
+import { computeFunnelTrapezoids, type FunnelTrapezoidItem } from '../../cartesian/Funnel.tsrx';
+import type { ChartData } from '../chartDataSlice';
+import type { RechartsRootState } from '../store';
 import { selectChartOffsetInternal } from './selectChartOffsetInternal';
 import { selectChartDataAndAlwaysIgnoreIndexes } from './dataSelectors';
-import { ChartOffsetInternal, DataKey, TooltipType } from '../../util/types';
-import { GraphicalItemId } from '../graphicalItemsSlice';
+import type { ChartOffsetInternal, DataKey, TooltipType } from '../../util/types';
+import type { GraphicalItemId } from '../graphicalItemsSlice';
 
 export type ResolvedFunnelSettings = {
 	dataKey: DataKey<any>;

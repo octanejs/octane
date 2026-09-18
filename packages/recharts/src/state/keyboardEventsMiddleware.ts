@@ -1,7 +1,7 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { createAction, createListenerMiddleware, ListenerEffectAPI } from '@reduxjs/toolkit';
-import { setKeyboardInteraction, TooltipInteractionState } from './tooltipSlice';
-import { AppDispatch, RechartsRootState } from './store';
+import { createAction, createListenerMiddleware, type ListenerEffectAPI } from '@reduxjs/toolkit';
+import { setKeyboardInteraction, type TooltipInteractionState } from './tooltipSlice';
+import type { AppDispatch, RechartsRootState } from './store';
 import {
 	selectTooltipAxisDomain,
 	selectTooltipAxisTicks,

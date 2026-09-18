@@ -1,7 +1,7 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { PayloadAction, createSlice } from '@reduxjs/toolkit';
+import { type PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { castDraft } from 'immer';
-import { BrushStartEndIndex } from '../context/brushUpdateContext';
+import type { BrushStartEndIndex } from '../context/brushUpdateContext';
 
 /**
  * This is the data that's coming through main chart `data` prop

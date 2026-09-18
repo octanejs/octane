@@ -1,9 +1,9 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { createSlice, current, PayloadAction } from '@reduxjs/toolkit';
-import { castDraft, WritableDraft } from 'immer';
-import { AxisId } from './cartesianAxisSlice';
-import { IfOverflow } from '../util/IfOverflow';
-import { ReferenceLineSegment } from '../cartesian/ReferenceLine.tsrx';
+import { createSlice, current, type PayloadAction } from '@reduxjs/toolkit';
+import { castDraft, type WritableDraft } from 'immer';
+import type { AxisId } from './cartesianAxisSlice';
+import type { IfOverflow } from '../util/IfOverflow';
+import type { ReferenceLineSegment } from '../cartesian/ReferenceLine.tsrx';
 
 export type ReferenceElementSettings = {
 	yAxisId: AxisId;

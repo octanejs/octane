@@ -1,5 +1,5 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import {
+import type {
 	TooltipEntrySettings,
 	TooltipIndex,
 	TooltipPayload,
@@ -7,12 +7,12 @@ import {
 	TooltipPayloadEntry,
 	TooltipPayloadSearcher,
 } from '../../tooltipSlice';
-import { ChartData, ChartDataState } from '../../chartDataSlice';
-import { DataKey, TooltipEventType } from '../../../util/types';
+import type { ChartData, ChartDataState } from '../../chartDataSlice';
+import type { DataKey, TooltipEventType } from '../../../util/types';
 import { findEntryInArray } from '../../../util/DataUtils';
 import { getTooltipEntry, getValueByDataKey } from '../../../util/ChartUtils';
 import { getSliced } from '../../../util/getSliced';
-import { ActiveLabel } from '../../../synchronisation/types';
+import type { ActiveLabel } from '../../../synchronisation/types';
 
 type TooltipPayloadItemLike = {
 	name: TooltipEntrySettings['name'];

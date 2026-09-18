@@ -7,9 +7,9 @@ import {
 	getStackedData,
 	getValueByDataKey,
 	isCategoricalAxis,
-	StackId,
+	type StackId,
 } from '../../util/ChartUtils';
-import {
+import type {
 	AxisDomain,
 	AxisTick,
 	AxisType,
@@ -26,7 +26,7 @@ import {
 	StackOffsetType,
 	TickItem,
 } from '../../util/types';
-import {
+import type {
 	AxisId,
 	BaseCartesianAxis,
 	CartesianAxisSettings,
@@ -36,7 +36,7 @@ import {
 	YAxisSettings,
 	ZAxisSettings,
 } from '../cartesianAxisSlice';
-import { RechartsRootState } from '../store';
+import type { RechartsRootState } from '../store';
 import {
 	selectChartDataWithIndexes,
 	selectChartDataWithIndexesIfNotInPanoramaPosition4,
@@ -47,7 +47,7 @@ import {
 	numericalDomainSpecifiedWithoutRequiringData,
 	parseNumericalUserDomain,
 } from '../../util/isDomainSpecifiedByUser';
-import { AppliedChartData, ChartData, ChartDataState } from '../chartDataSlice';
+import type { AppliedChartData, ChartData, ChartDataState } from '../chartDataSlice';
 import {
 	getPercentValue,
 	hasDuplicate,
@@ -56,7 +56,7 @@ import {
 	isNumOrStr,
 	mathSign,
 } from '../../util/DataUtils';
-import {
+import type {
 	BaseCartesianGraphicalItemSettings,
 	BasePolarGraphicalItemSettings,
 	CartesianGraphicalItemSettings,
@@ -64,7 +64,7 @@ import {
 } from '../graphicalItemsSlice';
 import { isWellBehavedNumber } from '../../util/isWellBehavedNumber';
 import { getNiceTickValues, getTickValuesFixedDomain } from '../../util/scale';
-import {
+import type {
 	ReferenceAreaSettings,
 	ReferenceDotSettings,
 	ReferenceElementSettings,
@@ -73,8 +73,8 @@ import {
 import { selectChartHeight, selectChartWidth } from './containerSelectors';
 import { selectAllXAxes, selectAllYAxes } from './selectAllAxes';
 import { selectChartOffsetInternal } from './selectChartOffsetInternal';
-import { AxisPropsForCartesianGridTicksGeneration } from '../../cartesian/CartesianGrid.tsrx';
-import { BrushDimensions, selectBrushDimensions, selectBrushSettings } from './brushSelectors';
+import type { AxisPropsForCartesianGridTicksGeneration } from '../../cartesian/CartesianGrid.tsrx';
+import { type BrushDimensions, selectBrushDimensions, selectBrushSettings } from './brushSelectors';
 import {
 	selectBarCategoryGap,
 	selectChartName,
@@ -87,29 +87,33 @@ import {
 	selectRadiusAxis,
 	selectRadiusAxisRange,
 } from './polarAxisSelectors';
-import { AngleAxisSettings, RadiusAxisSettings } from '../polarAxisSlice';
+import type { AngleAxisSettings, RadiusAxisSettings } from '../polarAxisSlice';
 import { pickAxisType } from './pickAxisType';
 import { pickAxisId } from './pickAxisId';
 import { combineAxisRangeWithReverse } from './combiners/combineAxisRangeWithReverse';
 import { DEFAULT_Y_AXIS_WIDTH } from '../../util/Constants';
 import { getStackSeriesIdentifier } from '../../util/stacks/getStackSeriesIdentifier';
-import { AllStackGroups, StackGroup } from '../../util/stacks/stackTypes';
+import type { AllStackGroups, StackGroup } from '../../util/stacks/stackTypes';
 import {
 	combineDisplayedStackedData,
-	DisplayedStackedData,
+	type DisplayedStackedData,
 } from './combiners/combineDisplayedStackedData';
-import { DefinitelyStackedGraphicalItem, isStacked } from '../types/StackedGraphicalItem';
-import { ErrorBarsSettings, ErrorBarsState } from '../errorBarSlice';
+import { type DefinitelyStackedGraphicalItem, isStacked } from '../types/StackedGraphicalItem';
+import type { ErrorBarsSettings, ErrorBarsState } from '../errorBarSlice';
 import { numberDomainEqualityCheck } from './numberDomainEqualityCheck';
 import { emptyArraysAreEqualCheck } from './arrayEqualityCheck';
-import { AllAxisTypes, RenderableAxisType, selectTooltipAxisType } from './selectTooltipAxisType';
+import {
+	type AllAxisTypes,
+	type RenderableAxisType,
+	selectTooltipAxisType,
+} from './selectTooltipAxisType';
 import { selectTooltipAxisId } from './selectTooltipAxisId';
-import { RechartsScale, rechartsScaleFactory } from '../../util/scale/RechartsScale';
+import { type RechartsScale, rechartsScaleFactory } from '../../util/scale/RechartsScale';
 import { combineCheckedDomain } from './combiners/combineCheckedDomain';
-import { CustomScaleDefinition } from '../../util/scale/CustomScaleDefinition';
+import type { CustomScaleDefinition } from '../../util/scale/CustomScaleDefinition';
 import { combineConfiguredScale } from './combiners/combineConfiguredScale';
 import { combineRealScaleType } from './combiners/combineRealScaleType';
-import { InverseScaleFunction } from '../../hooks';
+import type { InverseScaleFunction } from '../../hooks';
 import { createCategoricalInverse } from '../../util/scale/createCategoricalInverse';
 import { combineInverseScaleFunction } from './combiners/combineInverseScaleFunction';
 

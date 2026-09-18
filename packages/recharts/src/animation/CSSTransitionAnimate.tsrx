@@ -10,7 +10,7 @@ import { Global } from '../util/Global';
 import { usePrefersReducedMotion } from '../util/usePrefersReducedMotion';
 import { CSSTransitionAnimation } from './AnimationHandle';
 import { RequestAnimationFrameTimeoutController } from './timeoutController';
-import { EasingInput, NamedBezier } from './easing';
+import type { EasingInput, NamedBezier } from './easing';
 import type { AnimationController } from './AnimationController';
 
 type CSSTransitionAnimateProps = {

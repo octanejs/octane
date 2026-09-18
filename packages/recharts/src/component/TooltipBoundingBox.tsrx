@@ -1,7 +1,7 @@
 import type { CSSProperties, OctaneNode } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
 
-import {
+import type {
 	AllowInDimension,
 	AnimationDuration,
 	EasingInput,
@@ -9,7 +9,7 @@ import {
 	Coordinate,
 	PolarCoordinate,
 } from '../util/types';
-import { ElementOffset, SetElementOffset } from '../util/useElementOffset';
+import type { ElementOffset, SetElementOffset } from '../util/useElementOffset';
 import { getTooltipTranslate } from '../util/tooltip/translate';
 import { usePrefersReducedMotion } from '../util/usePrefersReducedMotion';
 

@@ -1,11 +1,11 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import type { SVGProps } from '../../util/OctaneTypes';
 
-import { BasePolarGraphicalItemSettings } from '../graphicalItemsSlice';
-import { DataKey, LegendType } from '../../util/types';
-import { TooltipType } from '../../component/DefaultTooltipContent.tsrx';
-import { SVGPropsNoEvents } from '../../util/svgPropertiesNoEvents';
-import { WithoutId } from '../../util/useUniqueId';
+import type { BasePolarGraphicalItemSettings } from '../graphicalItemsSlice';
+import type { DataKey, LegendType } from '../../util/types';
+import type { TooltipType } from '../../component/DefaultTooltipContent.tsrx';
+import type { SVGPropsNoEvents } from '../../util/svgPropertiesNoEvents';
+import type { WithoutId } from '../../util/useUniqueId';
 
 export type PiePresentationProps = SVGPropsNoEvents<WithoutId<SVGProps<SVGPathElement>>>;
 

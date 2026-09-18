@@ -1,6 +1,6 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { ChartOffsetInternal, Coordinate, LayoutType, TickItem } from '../../../util/types';
-import { TooltipIndex, TooltipPayloadConfiguration } from '../../tooltipSlice';
+import type { ChartOffsetInternal, Coordinate, LayoutType, TickItem } from '../../../util/types';
+import type { TooltipIndex, TooltipPayloadConfiguration } from '../../tooltipSlice';
 
 export const combineCoordinateForDefaultIndex = (
 	width: number,

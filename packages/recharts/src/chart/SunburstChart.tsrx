@@ -7,7 +7,7 @@ import get from 'es-toolkit/compat/get';
 import { Surface } from '../container/Surface.tsrx';
 import { Layer } from '../container/Layer.tsrx';
 import { Sector } from '../shape/Sector.tsrx';
-import { Text, Props as TextProps } from '../component/Text.tsrx';
+import { Text, type Props as TextProps } from '../component/Text.tsrx';
 import { polarToCartesian } from '../util/PolarUtils';
 import {
 	ReportChartMargin,
@@ -21,19 +21,25 @@ import {
 	mouseLeaveItem,
 	setActiveClickItemIndex,
 	setActiveMouseOverItemIndex,
-	TooltipIndex,
-	TooltipPayloadConfiguration,
-	TooltipPayloadSearcher,
+	type TooltipIndex,
+	type TooltipPayloadConfiguration,
+	type TooltipPayloadSearcher,
 } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
 import { RechartsStoreProvider } from '../state/RechartsStoreProvider.tsrx';
 import { ReportEventSettings } from '../state/ReportEventSettings';
-import { ChartCoordinate, DataKey, EventThrottlingProps, Margin, Percent } from '../util/types';
+import type {
+	ChartCoordinate,
+	DataKey,
+	EventThrottlingProps,
+	Margin,
+	Percent,
+} from '../util/types';
 import { useAppDispatch } from '../state/hooks';
-import { RechartsRootState } from '../state/store';
+import type { RechartsRootState } from '../state/store';
 import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
-import { WithIdRequired } from '../util/useUniqueId';
-import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import type { WithIdRequired } from '../util/useUniqueId';
+import { type RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 import { initialEventSettingsState } from '../state/eventSettingsSlice';
 
 export interface SunburstData {

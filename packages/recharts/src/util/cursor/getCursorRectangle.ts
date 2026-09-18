@@ -1,4 +1,4 @@
-import { ChartCoordinate, ChartOffsetInternal, LayoutType } from '../types';
+import type { ChartCoordinate, ChartOffsetInternal, LayoutType } from '../types';
 
 export type CursorRectangle = {
 	stroke: string;

@@ -2,7 +2,7 @@ import type { Ref } from '../util/OctaneTypes.ts';
 
 import { arrayTooltipSearcher } from '../state/optionsSlice';
 import { CartesianChart } from './CartesianChart.tsrx';
-import { CartesianChartProps, TooltipEventType } from '../util/types';
+import type { CartesianChartProps, TooltipEventType } from '../util/types';
 
 const allowedTooltipTypes: ReadonlyArray<TooltipEventType> = ['item'];
 

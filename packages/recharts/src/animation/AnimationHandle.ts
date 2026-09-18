@@ -1,7 +1,7 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 // eslint-disable-next-line max-classes-per-file
 import { interpolate } from '../util/DataUtils';
-import { EasingFunction, NamedBezier } from './easing';
+import type { EasingFunction, NamedBezier } from './easing';
 
 const INIT = 'init' as const;
 const PENDING = 'pending' as const;

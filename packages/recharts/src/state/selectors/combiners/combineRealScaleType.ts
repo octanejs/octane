@@ -1,7 +1,7 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import * as d3Scales from 'victory-vendor/d3-scale';
-import { D3ScaleType, RechartsScaleType } from '../../../util/types';
-import { BaseCartesianAxis } from '../../cartesianAxisSlice';
+import type { D3ScaleType, RechartsScaleType } from '../../../util/types';
+import type { BaseCartesianAxis } from '../../cartesianAxisSlice';
 import { upperFirst } from '../../../util/DataUtils';
 
 function getD3ScaleName(name: string): D3ScaleType {

@@ -1,10 +1,10 @@
 import * as React from 'octane';
-import { ActiveShape, ShapeAnimationProps, SymbolType } from './types';
-import { ScatterPointItem } from '../cartesian/Scatter.tsrx';
-import { InnerSymbolsProp, Symbols } from '../shape/Symbols.tsrx';
+import type { ActiveShape, ShapeAnimationProps, SymbolType } from './types';
+import type { ScatterPointItem } from '../cartesian/Scatter.tsrx';
+import { type InnerSymbolsProp, Symbols } from '../shape/Symbols.tsrx';
 import { Shape } from './ActiveShapeUtils.tsrx';
 import { DATA_ITEM_GRAPHICAL_ITEM_ID_ATTRIBUTE_NAME } from './Constants';
-import { GraphicalItemId } from '../state/graphicalItemsSlice';
+import type { GraphicalItemId } from '../state/graphicalItemsSlice';
 
 export type ScatterShapeProps =
 	ScatterPointItem & ShapeAnimationProps & {

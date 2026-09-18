@@ -3,26 +3,26 @@ import * as React from 'octane';
 
 import { warn } from '../util/LogUtils';
 import { isNumber } from '../util/DataUtils';
-import { ChartOffsetInternal } from '../util/types';
+import type { ChartOffsetInternal } from '../util/types';
 
 import {
-	AxisPropsNeededForTicksGenerator,
+	type AxisPropsNeededForTicksGenerator,
 	getCoordinatesOfGrid,
 	getTicksOfAxis,
 } from '../util/ChartUtils';
-import { getTicks, GetTicksInput } from './getTicks';
+import { getTicks, type GetTicksInput } from './getTicks';
 import { defaultCartesianAxisProps } from './CartesianAxis.tsrx';
 import { useChartHeight, useChartWidth, useOffsetInternal } from '../context/chartLayoutContext';
-import { AxisId } from '../state/cartesianAxisSlice';
+import type { AxisId } from '../state/cartesianAxisSlice';
 import {
 	selectAxisPropsNeededForCartesianGridTicksGenerator,
 } from '../state/selectors/axisSelectors';
 import { useAppSelector } from '../state/hooks';
 import { useIsPanorama } from '../context/PanoramaContext';
-import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import { type RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
 import { isPositiveNumber } from '../util/isWellBehavedNumber';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
+import { type ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 
 /**

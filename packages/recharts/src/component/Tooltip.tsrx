@@ -4,20 +4,20 @@ import { useEffect } from 'octane';
 import { createPortal } from 'octane';
 import {
 	DefaultTooltipContent,
-	NameType,
-	Payload,
-	Props as DefaultTooltipContentProps,
-	TooltipItemSorter,
-	ValueType,
+	type NameType,
+	type Payload,
+	type Props as DefaultTooltipContentProps,
+	type TooltipItemSorter,
+	type ValueType,
 } from './DefaultTooltipContent.tsrx';
 import { TooltipBoundingBox } from './TooltipBoundingBox.tsrx';
 
-import { getUniqPayload, UniqueOption } from '../util/payload/getUniqPayload';
-import { AllowInDimension, AnimationDuration, EasingInput, Coordinate } from '../util/types';
+import { getUniqPayload, type UniqueOption } from '../util/payload/getUniqPayload';
+import type { AllowInDimension, AnimationDuration, EasingInput, Coordinate } from '../util/types';
 import { useViewBox } from '../context/chartLayoutContext';
 import { useAccessibilityLayer } from '../context/accessibilityContext';
 import { useElementOffset } from '../util/useElementOffset';
-import { Cursor, CursorDefinition } from './Cursor.tsrx';
+import { Cursor, type CursorDefinition } from './Cursor.tsrx';
 import {
 	selectActiveCoordinate,
 	selectActiveLabel,
@@ -29,11 +29,11 @@ import type { TooltipTrigger } from '../chart/types';
 import { useAppDispatch, useAppSelector } from '../state/hooks';
 import {
 	setTooltipSettingsState,
-	TooltipIndex,
-	TooltipPayload,
-	TooltipPayloadEntry,
+	type TooltipIndex,
+	type TooltipPayload,
+	type TooltipPayloadEntry,
 } from '../state/tooltipSlice';
-import { AxisId } from '../state/cartesianAxisSlice';
+import type { AxisId } from '../state/cartesianAxisSlice';
 import { useTooltipChartSynchronisation } from '../synchronisation/useChartSynchronisation.tsrx';
 import { useTooltipEventType } from '../state/selectors/selectTooltipEventType';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
