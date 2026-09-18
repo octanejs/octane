@@ -64,7 +64,7 @@ export function InspectAndProvide(props: { count$: SignalHandle<number> }) {
 	const view = makeContextualView(props.count$);
 	const inspected = (Children.only(view) as ElementDescriptor<{ title: string }>).props.title;
 	return <section data-inspected={inspected}>
-		<LabelContext.Provider value="inner">{view}</LabelContext.Provider>
+		<LabelContext value="inner">{view}</LabelContext>
 	</section>;
 }
 

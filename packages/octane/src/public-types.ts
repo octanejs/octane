@@ -111,7 +111,7 @@ export type ComponentRef<T extends ElementType> =
 	ComponentProps<T> extends { ref?: Ref<infer Instance> } ? Instance : never;
 export type ElementRef<T extends ElementType> = ComponentRef<T>;
 export type ContextType<C extends Context<any>> = C extends Context<infer T> ? T : never;
-export type Provider<T> = Context<T>['Provider'];
+export type Provider<T> = Context<T>;
 export interface ProviderProps<T> {
 	value: T;
 	children?: OctaneNode;

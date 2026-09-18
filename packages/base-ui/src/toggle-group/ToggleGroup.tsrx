@@ -106,7 +106,7 @@ export const ToggleGroup = function ToggleGroup<Value extends string>(
 	});
 
 	return (
-		<ToggleGroupContext.Provider value={contextValue}>
+		<ToggleGroupContext value={contextValue}>
 			{toolbarContext ? (
 				element
 			) : (
@@ -122,7 +122,7 @@ export const ToggleGroup = function ToggleGroup<Value extends string>(
 					orientation={orientation}
 				/>
 			)}
-		</ToggleGroupContext.Provider>
+		</ToggleGroupContext>
 	);
 };
 

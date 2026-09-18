@@ -352,6 +352,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'withSlot',
 	],
 	'./internal/signal-read': ['readNativeDomValue'],
+	'./internal/context': ['isContext', 'registerContext'],
 	'./internal/client': [
 		'queueOwnRefDetach',
 		'replaceRef',

@@ -32,10 +32,10 @@ export const MenuPortal = function MenuPortal(
 	const portalOwnerRole = parent.type === 'menu' || parent.type === 'menubar' ? 'group' : undefined;
 
 	return (
-		<MenuPortalContext.Provider value={keepMounted}>
+		<MenuPortalContext value={keepMounted}>
 			{/* The hidden `aria-owns` owner needs `group` only under role-constrained parents. */}
 			<FloatingPortal ref={forwardedRef} {...portalProps} portalOwnerRole={portalOwnerRole} />
-		</MenuPortalContext.Provider>
+		</MenuPortalContext>
 	);
 };
 

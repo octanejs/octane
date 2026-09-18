@@ -97,7 +97,7 @@ export function BlockNoteDefaultUI(props: BlockNoteDefaultUIProps) {
 	const editor = useBlockNoteEditor();
 
 	if (!editor) {
-		throw new Error('BlockNoteDefaultUI must be used within a BlockNoteContext.Provider');
+		throw new Error('BlockNoteDefaultUI must be used within a BlockNoteContext');
 	}
 
 	const map = props.portalElements;

@@ -1049,7 +1049,7 @@ describe('parallel use() — independent asynchronous keyed-list children', () =
 			}
 
 			export function App(props) @{
-				<Theme.Provider value={props.theme}>
+				<Theme value={props.theme}>
 					@try {
 						<Dashboard
 							load={props.load}
@@ -1060,7 +1060,7 @@ describe('parallel use() — independent asynchronous keyed-list children', () =
 					} @pending {
 						<span class="context-keyed-pending">loading</span>
 					}
-				</Theme.Provider>
+				</Theme>
 			}
 		`;
 		const client = loadCompiledFixtureSource(source, {

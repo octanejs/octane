@@ -27,9 +27,9 @@ export const PopoverPortal = function PopoverPortal(
 	}
 
 	return (
-		<PopoverPortalContext.Provider value={keepMounted}>
+		<PopoverPortalContext value={keepMounted}>
 			<FloatingPortal ref={forwardedRef} {...portalProps} />
-		</PopoverPortalContext.Provider>
+		</PopoverPortalContext>
 	);
 };
 

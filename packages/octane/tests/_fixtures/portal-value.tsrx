@@ -43,9 +43,9 @@ export function FragmentPortal(props) @{
 
 // 4. Context flows through a value-position portal.
 export function ThemedReturnPortal(props) @{
-	<Theme.Provider value="dark">
+	<Theme value="dark">
 		<ReturnThemed target={props.target} />
-	</Theme.Provider>
+	</Theme>
 }
 
 function ReturnThemed(props) {
@@ -100,9 +100,9 @@ export function MemoPortalApp(props) @{
 	const [theme, setTheme] = useState('light');
 	<div class="root">
 		<button class="b-dark" onClick={() => setTheme('dark')}>{'dark'}</button>
-		<Theme.Provider value={theme}>
+		<Theme value={theme}>
 			<PortalIndirection target={props.target} />
-		</Theme.Provider>
+		</Theme>
 	</div>
 }
 

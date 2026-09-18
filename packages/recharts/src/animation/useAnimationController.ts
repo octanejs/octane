@@ -12,7 +12,7 @@ const AnimationControllerContext = createContext(animationControllerImpl);
  * internally to drive animations.
  * @since 3.9
  */
-export const AnimationControllerProvider = AnimationControllerContext.Provider;
+export const AnimationControllerProvider = AnimationControllerContext;
 
 export function useAnimationController(
 	animationControllerFromProps?: AnimationController,

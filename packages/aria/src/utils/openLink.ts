@@ -65,7 +65,7 @@ export function RouterProvider(props: RouterProviderProps): any {
 		S('RouterProvider:ctx'),
 	);
 
-	return createElement(RouterContext.Provider, { value: ctx, children });
+	return createElement(RouterContext, { value: ctx, children });
 }
 
 export function useRouter(): Router {

@@ -180,6 +180,7 @@ import {
 	rendererRangeClose,
 } from './stream-protocol.js';
 import { isRendererContext, registerClientRendererBridge } from './renderer-bridge.js';
+import { registerContext } from './context-identity.js';
 import { createNativeReadDriver, type NativeReadDriver } from './signals/native-read-client.js';
 import {
 	validateNativeReadWitness,
@@ -13627,7 +13628,6 @@ export interface Context<T> {
 	(props: { value: T; children?: any }, scope: Scope, extra?: unknown): void;
 	$$kind: typeof CONTEXT_TAG;
 	defaultValue: T;
-	Provider: ComponentBody<{ value: T; children?: any }>;
 	/**
 	 * Monotonic version bumped whenever a Provider for this context commits a
 	 * changed value. Consumers record the version they read at; the memo bailout
@@ -13648,16 +13648,14 @@ export interface Context<T> {
  */
 /* @__NO_SIDE_EFFECTS__ */
 export function createContext<T>(defaultValue: T): Context<T> {
-	// React 19 lets the Context itself serve as its Provider. Make the callable
-	// provider the context object, then retain `.Provider` as an identity alias
-	// for existing code and React 18-shaped libraries.
+	// The Context itself is the provider component.
 	const ctx = function ProviderBody(props, scope) {
 		return renderClientContextProvider(ctx, props, scope);
 	} as Context<T>;
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
 	ctx.$$version = 0;
-	ctx.Provider = ctx;
+	registerContext(ctx);
 	if (process.env.NODE_ENV !== 'production') {
 		// Octane deliberately has no render-prop Consumer (slot-keyed hooks make
 		// use()/useContext legal behind any condition — the pattern Consumer
@@ -13704,7 +13702,7 @@ export function renderClientContextProvider<T>(
 	// Children between the Provider tags reach us in one of two shapes:
 	//   - a compiled render-body FUNCTION — the `.tsrx` `{props.children}` lowering;
 	//   - an element descriptor / renderable — a React-style `.tsx` parent, where
-	//     `<Ctx.Provider>…</Ctx.Provider>` lowers to `createElement(Ctx.Provider,
+	//     `<Ctx>…</Ctx>` lowers to `createElement(Ctx,
 	//     { value }, …children)` and `createElement` mirrors the positional children
 	//     into `props.children` (a descriptor, an array, or text — never a function).
 	// `childrenAsBody` normalizes either shape to a callable body, so both dialects
@@ -13786,7 +13784,7 @@ function invalidateSharedBodyMemoRegion(region: CompilerMemoRegion): void {
 
 /**
  * Programmatically provide a context value for a scope's descendants — the same
- * stamping `<Context.Provider value={…}>` performs, exposed for plain-TS
+ * stamping `<Context value={…}>` performs, exposed for plain-TS
  * (non-template) components that render children and want to provide context to
  * them without authoring a `.tsrx` Provider wrapper. Call it during the component's
  * render, before rendering `children` into the same `scope`. (Used by runtime
@@ -28721,7 +28719,7 @@ export const Children = {
 };
 
 // ---------------------------------------------------------------------------
-// Component slot — JSX `<Foo>` / `<ctx.Provider>` invocation as a Block
+// Component slot — JSX `<Foo>` / `<Context>` invocation as a Block
 // ---------------------------------------------------------------------------
 
 interface CompSlot {
@@ -35403,7 +35401,7 @@ export function tryBlock(
 		// slot; mountTry brackets the content and the seeded use() values let the try
 		// body render its success arm synchronously. `resolveHydrationOpen` also covers
 		// the SOLE-hole case (a @try that is the only thing a component/arm renders —
-		// the router `Match` shape `<ctx.Provider> @try {…}`), where the anchor is the
+		// the router `Match` shape `<Context> @try {…}`), where the anchor is the
 		// enclosing scope's end marker and the cursor is parked on the @try's open.
 		const open = passthrough ? null : (hydration?.resolveOpen(anchor ?? null, domParent) ?? null);
 		if (passthrough) {

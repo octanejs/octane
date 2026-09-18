@@ -530,7 +530,7 @@ function ListBoxSectionInner<T>(
 	return createElement(dom.section, {
 		...mergeProps(DOMProps, renderProps, groupProps),
 		ref,
-		children: createElement(HeaderContext.Provider, {
+		children: createElement(HeaderContext, {
 			value: { ...headingProps, ref: headingRef },
 			children: createElement(CollectionBranch, {
 				collection: state.collection,

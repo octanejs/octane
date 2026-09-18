@@ -1,4 +1,5 @@
-import { useState, createContext, use, createPortal } from 'octane';
+import { useState, createContext, use, useContext, createPortal } from 'octane';
+import { ImportedTheme, WithheldChildren } from './imported-context.ts';
 
 // Multiple distinct contexts in one tree.
 export const ThemeCtx = createContext('light');
@@ -44,9 +45,9 @@ export function DynamicProvider() @{
 	const [v, setV] = useState('init');
 	<div>
 		<button id="swap" onClick={() => setV(v === 'init' ? 'changed' : 'init')}>{'swap'}</button>
-		<ThemeCtx.Provider value={v}>
+		<ThemeCtx value={v}>
 			<ThemeReader />
-		</ThemeCtx.Provider>
+		</ThemeCtx>
 	</div>
 }
 
@@ -58,11 +59,11 @@ export function CombinedDynamic() @{
 	const [theme, setTheme] = useState('t0');
 	<div>
 		<button id="bump" onClick={() => setTheme(theme === 't0' ? 't1' : 't0')}>{'bump'}</button>
-		<ThemeCtx.Provider value={theme}>
-			<UserCtx.Provider value="alice">
+		<ThemeCtx value={theme}>
+			<UserCtx value="alice">
 				<CombinedReader />
-			</UserCtx.Provider>
-		</ThemeCtx.Provider>
+			</UserCtx>
+		</ThemeCtx>
 	</div>
 }
 
@@ -79,7 +80,7 @@ function StableShell(props) @{
 	const [v, setV] = useState('init');
 	<div>
 		<button id="swap" onClick={() => setV(v === 'init' ? 'changed' : 'init')}>{'swap'}</button>
-		<ThemeCtx.Provider value={v}>{props.children}</ThemeCtx.Provider>
+		<ThemeCtx value={v}>{props.children}</ThemeCtx>
 	</div>
 }
 
@@ -97,9 +98,9 @@ export function StableChildren() @{
 // a remount never yields a stale context read.
 export function RemountingProvider(props) @{
 	@if (props.show) {
-		<CountCtx.Provider value={props.value}>
+		<CountCtx value={props.value}>
 			<CountReader />
-		</CountCtx.Provider>
+		</CountCtx>
 	} @else {
 		<span class="off">{'off'}</span>
 	}
@@ -107,7 +108,7 @@ export function RemountingProvider(props) @{
 
 // Multiple sibling consumers all see the same value.
 export function Siblings() @{
-	<ThemeCtx.Provider value="dark">
+	<ThemeCtx value="dark">
 		<div>
 			<div class="one">
 				<ThemeReader />
@@ -119,25 +120,25 @@ export function Siblings() @{
 				<ThemeReader />
 			</div>
 		</div>
-	</ThemeCtx.Provider>
+	</ThemeCtx>
 }
 
 // Distinct contexts — each consumer reads its own; no leak.
 export function TwoContexts() @{
-	<ThemeCtx.Provider value="dark">
-		<UserCtx.Provider value="alice">
+	<ThemeCtx value="dark">
+		<UserCtx value="alice">
 			<div>
 				<ThemeReader />
 				<UserReader />
 				<CombinedReader />
 			</div>
-		</UserCtx.Provider>
-	</ThemeCtx.Provider>
+		</UserCtx>
+	</ThemeCtx>
 }
 
 // use() inside an if-branch — the read happens only when the branch mounts.
 export function ConditionalUse(props) @{
-	<ThemeCtx.Provider value="dark">
+	<ThemeCtx value="dark">
 		<div>
 			@if (props.show) {
 				<ThemeReader />
@@ -145,12 +146,12 @@ export function ConditionalUse(props) @{
 				<span class="hidden">{'hidden'}</span>
 			}
 		</div>
-	</ThemeCtx.Provider>
+	</ThemeCtx>
 }
 
 // use() inside for-of items — each item reads the same context independently.
 export function ListConsumers(props) @{
-	<CountCtx.Provider value={props.value}>
+	<CountCtx value={props.value}>
 		<ul>
 			@for (const x of props.items; key x) {
 				<li>
@@ -159,13 +160,13 @@ export function ListConsumers(props) @{
 				</li>
 			}
 		</ul>
-	</CountCtx.Provider>
+	</CountCtx>
 }
 
 // Context flows through a portal — consumer in the portal target reads
 // the Provider that wraps the portal call site.
 export function PortalledContext(props) @{
-	<ThemeCtx.Provider value="from-portal-parent">
+	<ThemeCtx value="from-portal-parent">
 		<div>{createPortal(
 			() => @{
 				<div class="portal-content">
@@ -174,13 +175,13 @@ export function PortalledContext(props) @{
 			},
 			props.target,
 		)}</div>
-	</ThemeCtx.Provider>
+	</ThemeCtx>
 }
 
 // Context updates inside a for-of body — changing the value re-renders all rows.
 export function LiveCount(props) @{
 	const [n, setN] = useState(0);
-	<CountCtx.Provider value={n}>
+	<CountCtx value={n}>
 		<div>
 			<button id="inc" onClick={() => setN(n + 1)}>{n as string}</button>
 			<ul>
@@ -192,7 +193,7 @@ export function LiveCount(props) @{
 				}
 			</ul>
 		</div>
-	</CountCtx.Provider>
+	</CountCtx>
 }
 
 function useProfileLabel() {
@@ -222,11 +223,11 @@ export function ContextOnlyHost() @{
 			onClick={() => setUser(user === 'alice' ? 'bob' : 'alice')}
 		>{'user'}</button>
 		<button id="change-selection" onClick={() => setPickTheme(!pickTheme)}>{'selection'}</button>
-		<ThemeCtx.Provider value={theme}>
-			<UserCtx.Provider value={user}>
+		<ThemeCtx value={theme}>
+			<UserCtx value={user}>
 				<ContextOnlyReader selected={pickTheme ? ThemeCtx : UserCtx} />
-			</UserCtx.Provider>
-		</ThemeCtx.Provider>
+			</UserCtx>
+		</ThemeCtx>
 	</div>
 }
 
@@ -252,7 +253,7 @@ export function MixedContextPromiseHost(props: { load: (key: string) => Promise<
 			id="change-pending-theme"
 			onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
 		>{'theme'}</button>
-		<ThemeCtx.Provider value={theme}>
+		<ThemeCtx value={theme}>
 			<>
 				@try {
 					<MixedContextPromiseReader load={props.load} />
@@ -260,7 +261,7 @@ export function MixedContextPromiseHost(props: { load: (key: string) => Promise<
 					<p class="mixed-context-pending">{'loading'}</p>
 				}
 			</>
-		</ThemeCtx.Provider>
+		</ThemeCtx>
 	</div>
 }
 
@@ -284,7 +285,7 @@ function ContextOnlyAsyncSiblings(props: { load: (key: string) => Promise<string
 
 export function ContextOnlyAsyncHost(props: { load: (key: string) => Promise<string> }) @{
 	const selectedLoad = props.load;
-	<ThemeCtx.Provider value="dark">
+	<ThemeCtx value="dark">
 		<>
 			@try {
 				<ContextOnlyAsyncSiblings load={selectedLoad} />
@@ -292,7 +293,7 @@ export function ContextOnlyAsyncHost(props: { load: (key: string) => Promise<str
 				<p class="context-async-pending">{'loading'}</p>
 			}
 		</>
-	</ThemeCtx.Provider>
+	</ThemeCtx>
 }
 
 function ShadowedContextPromiseLeaf(props: { load: () => Promise<string> }) @{
@@ -304,7 +305,7 @@ export function ShadowedContextPromiseHost(props: {
 	gate: Promise<string>;
 	load: () => Promise<string>;
 }) @{
-	<ThemeCtx.Provider value="dark">
+	<ThemeCtx value="dark">
 		<>
 			@try {
 				const theme = use(ThemeCtx);
@@ -318,5 +319,64 @@ export function ShadowedContextPromiseHost(props: {
 				<span class="shadowed-context-pending">{'loading'}</span>
 			}
 		</>
-	</ThemeCtx.Provider>
+	</ThemeCtx>
+}
+
+function ImportedThemeReader() @{
+	const theme = useContext(ImportedTheme);
+	<output class="imported-context-value">{theme as string}</output>
+}
+
+export function ImportedContextHost() @{
+	const [value, setValue] = useState('dark');
+	<ImportedTheme value={value}>
+		<div>
+			<button class="imported-context-toggle" onClick={() => setValue('light')}>{'theme'}</button>
+			<ImportedThemeReader />
+		</div>
+	</ImportedTheme>
+}
+
+function ImportedContextPromiseLeaf(props: { load: () => Promise<string> }) @{
+	const detail = use(props.load());
+	<span class="imported-context-detail">{detail as string}</span>
+}
+
+export function ImportedContextPromiseHost(props: {
+	gate: Promise<string>;
+	load: () => Promise<string>;
+}) @{
+	const _$isContext = 'authored';
+	<ImportedTheme value="dark">
+		<>
+			@try {
+				const theme = useContext(ImportedTheme);
+				const value = use(props.gate);
+				<section>
+					<span class="imported-context-result">{theme + ':' + value as string}</span>
+					<span class="imported-context-authored">{_$isContext as string}</span>
+					<ImportedContextPromiseLeaf load={props.load} />
+				</section>
+			} @pending {
+				<span class="imported-context-pending">{'loading'}</span>
+			}
+		</>
+	</ImportedTheme>
+}
+
+export function WithheldImportedChildHost(props: {
+	gate: Promise<string>;
+	load: () => Promise<string>;
+}) @{
+	@try {
+		const value = use(props.gate);
+		<>
+			<span class="withheld-imported-result">{value as string}</span>
+			<WithheldChildren value="ignored">
+				<ImportedContextPromiseLeaf load={props.load} />
+			</WithheldChildren>
+		</>
+	} @pending {
+		<span class="withheld-imported-pending">{'loading'}</span>
+	}
 }

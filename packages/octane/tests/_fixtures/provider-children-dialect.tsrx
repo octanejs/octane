@@ -15,7 +15,7 @@ function Passthrough(props) {
 // between the compiled children-block FUNCTION its `.tsrx` consumer passed and an element
 // DESCRIPTOR — the two dialects a Provider must accept.
 function DialectRoot(props) {
-	return createElement(Ctx.Provider, {
+	return createElement(Ctx, {
 		value: props.value,
 		children: props.wrapped
 			? createElement(Passthrough, { children: props.children })

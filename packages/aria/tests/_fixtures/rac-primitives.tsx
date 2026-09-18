@@ -99,13 +99,13 @@ export function FieldErrorScenario() {
 			<button id="make-invalid" onClick={() => setInvalid(true)}>
 				invalidate
 			</button>
-			<FieldErrorContext.Provider value={invalid ? invalidValidation : validValidation}>
+			<FieldErrorContext value={invalid ? invalidValidation : validValidation}>
 				<FieldError data-testid="error" />
 				<FieldError
 					data-testid="error-fn"
 					children={(v: any) => 'errors:' + (v.validationErrors as string[]).join('+')}
 				/>
-			</FieldErrorContext.Provider>
+			</FieldErrorContext>
 		</div>
 	);
 }

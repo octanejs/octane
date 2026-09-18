@@ -614,7 +614,7 @@ function FunnelImpl(props: WithIdRequired<RequiresDefaultProps<Props, typeof def
 	}, [fill, hide, legendType, props.dataKey, trapezoids]);
 
 	if (hide || !trapezoids || !trapezoids.length || !plotArea) {
-		return <CellsContext.Provider value={cellRegistry}>
+		return <CellsContext value={cellRegistry}>
 			<SetLegendPayload legendPayload={legendPayload} />
 			<SetFunnelTooltipEntrySettings
 				dataKey={props.dataKey}
@@ -631,13 +631,13 @@ function FunnelImpl(props: WithIdRequired<RequiresDefaultProps<Props, typeof def
 				id={id}
 			/>
 			{props.children}
-		</CellsContext.Provider>;
+		</CellsContext>;
 	}
 	const { height, width } = plotArea;
 
 	const layerClass = clsx('recharts-trapezoids', props.className);
 
-	return <CellsContext.Provider value={cellRegistry}>
+	return <CellsContext value={cellRegistry}>
 		<SetLegendPayload legendPayload={legendPayload} />
 		<SetFunnelTooltipEntrySettings
 			dataKey={props.dataKey}
@@ -672,7 +672,7 @@ function FunnelImpl(props: WithIdRequired<RequiresDefaultProps<Props, typeof def
 				trapezoids={trapezoids}
 			/>
 		</Layer>
-	</CellsContext.Provider>;
+	</CellsContext>;
 }
 
 function normalizeFunnelValue(value: unknown): {

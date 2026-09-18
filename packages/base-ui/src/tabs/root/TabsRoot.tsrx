@@ -345,9 +345,9 @@ export const TabsRoot = function TabsRoot(
 	});
 
 	return (
-		<TabsRootContext.Provider value={tabsContextValue}>
+		<TabsRootContext value={tabsContextValue}>
 			<CompositeList<TabsPanel.Metadata> elementsRef={tabPanelRefs}>{element}</CompositeList>
-		</TabsRootContext.Provider>
+		</TabsRootContext>
 	);
 };
 

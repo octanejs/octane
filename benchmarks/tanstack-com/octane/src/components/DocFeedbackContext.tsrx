@@ -33,4 +33,4 @@ export function useDocFeedbackRequired() {
 	return context;
 }
 
-export const DocFeedbackContextProvider = DocFeedbackContext.Provider;
+export const DocFeedbackContextProvider = DocFeedbackContext;

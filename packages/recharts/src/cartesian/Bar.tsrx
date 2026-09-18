@@ -750,7 +750,7 @@ function BarImpl(props: BarImplProps) {
 		dataPointFormatter={errorBarDataPointFormatter}
 		errorBarOffset={errorBarOffset}
 	>
-		<CellsContext.Provider value={cellRegistry}>
+		<CellsContext value={cellRegistry}>
 			<BarWithState
 				{...props}
 				layout={layout}
@@ -767,7 +767,7 @@ function BarImpl(props: BarImplProps) {
 				animationEasing={animationEasing}
 				isAnimationActive={isAnimationActive}
 			/>
-		</CellsContext.Provider>
+		</CellsContext>
 	</SetErrorBarContext>;
 }
 

@@ -127,11 +127,11 @@ export function StickToBottom({
 		}
 	}, []);
 
-	return <StickToBottomContext.Provider value={context}>
+	return <StickToBottomContext value={context}>
 		<div {...props}>
 			{typeof children === 'function' && !isChildrenBlock(children) ? children(context) : children}
 		</div>
-	</StickToBottomContext.Provider>;
+	</StickToBottomContext>;
 }
 
 export interface StickToBottomContentProps extends Omit<DivProps, 'children'> {

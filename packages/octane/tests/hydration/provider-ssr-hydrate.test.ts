@@ -14,7 +14,7 @@ import { App } from '../_fixtures/ssr-provider.tsx';
 import { ProviderApp } from '../_fixtures/jsx-context-children.tsx';
 import { hydrationMarkerSummary } from './_marker-summary.js';
 
-// Round-trip SSR→hydrate for `.tsx` `<Ctx.Provider>` with descriptor children.
+// Round-trip SSR→hydrate for `.tsx` `<Ctx>` with descriptor children.
 // Regression for two server bugs:
 //   1. ProviderBody only rendered children when they were a render FUNCTION, so a
 //      `.tsx` `createElement(Provider, {}, <child/>)` (descriptor children) SSR'd empty.
@@ -32,7 +32,7 @@ function serverModule(file: string): Record<string, any> {
 }
 const server = serverModule('packages/octane/tests/_fixtures/ssr-provider.tsx');
 
-describe('hydration — .tsx <Context.Provider> descriptor children', () => {
+describe('hydration — .tsx <Context> descriptor children', () => {
 	let container: HTMLElement;
 	beforeEach(() => {
 		container = document.createElement('div');
@@ -68,7 +68,7 @@ describe('hydration — .tsx <Context.Provider> descriptor children', () => {
 			);
 		const ServerProvider = () =>
 			ServerRT.createElement(
-				Theme.Provider as any,
+				Theme as any,
 				{ value: 'server-provided' },
 				ServerRT.createElement(ServerReader as any, null),
 			);
@@ -84,11 +84,7 @@ describe('hydration — .tsx <Context.Provider> descriptor children', () => {
 				useClientContext(Theme as any),
 			);
 		const ClientProvider = () =>
-			createElement(
-				Theme.Provider as any,
-				{ value: 'server-provided' },
-				createElement(ClientReader, null),
-			);
+			createElement(Theme as any, { value: 'server-provided' }, createElement(ClientReader, null));
 		const root = hydrateRoot(container, ClientProvider as any);
 		try {
 			flushSync(() => {});

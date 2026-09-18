@@ -16,7 +16,5 @@ export function QueryErrorResetBoundary(props: QueryErrorResetBoundaryProps) @{
 		typeof props.children === 'function' && !isChildrenBlock(props.children)
 			? props.children(value)
 			: props.children;
-	<QueryErrorResetBoundaryContext.Provider
-		value={value}
-	>{resolved}</QueryErrorResetBoundaryContext.Provider>
+	<QueryErrorResetBoundaryContext value={value}>{resolved}</QueryErrorResetBoundaryContext>
 }

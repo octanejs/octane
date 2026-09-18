@@ -77,7 +77,7 @@ export const IconProvider = ({
 
 	const value = prevValueRef.current;
 
-	return <IconContext.Provider value={value}>{children}</IconContext.Provider>;
+	return <IconContext value={value}>{children}</IconContext>;
 };
 
 export const useIcons = () => useContext(IconContext);

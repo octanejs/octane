@@ -452,7 +452,7 @@ function Reader() @{
   const value = compute(() => useContext(Ctx));
   <span>{value as string}</span>
 }
-export function App(props) @{ <Ctx.Provider value={props.value}><Reader /></Ctx.Provider> }`,
+export function App(props) @{ <Ctx value={props.value}><Reader /></Ctx> }`,
 			{
 				id: '/src/CallbackHook.tsrx',
 				mode: 'client',

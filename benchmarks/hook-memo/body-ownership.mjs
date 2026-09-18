@@ -151,11 +151,11 @@ function exercise(app) {
 		const first = app['First' + kind],
 			second = app['Second' + kind];
 		globalThis.__ownershipWork = 0;
-		const v = view(Context.Provider, { value: 0, children: first });
+		const v = view(Context, { value: 0, children: first });
 		const mountWork = globalThis.__ownershipWork;
 		globalThis.__ownershipWork = 0;
 		for (let tick = 1; tick <= repeats; tick++) {
-			v.update(Context.Provider, { value: tick, children: first });
+			v.update(Context, { value: tick, children: first });
 			label(v, 'first');
 		}
 		ops[kind.toLowerCase() + '_memo_hits'] = globalThis.__ownershipWork;
@@ -166,7 +166,7 @@ function exercise(app) {
 			[second, 'second'],
 			[first, 'first'],
 		]) {
-			v.update(Context.Provider, { value: text, children });
+			v.update(Context, { value: text, children });
 			label(v, text);
 		}
 		ops[kind.toLowerCase() + '_body_computations'] = mountWork + globalThis.__ownershipWork;
@@ -214,15 +214,14 @@ function exercise(app) {
 	const Counter = () => app.createElement('button', null, 'counter');
 	const children = [nested, app.createElement(Counter)];
 	const shared = app.createScopedElement('section', null, () => children);
-	const v = view(Mode.Provider, { value: false, children: shared });
+	const v = view(Mode, { value: false, children: shared });
 	globalThis.__ownershipWork = 0;
-	for (let tick = 0; tick < repeats; tick++)
-		v.update(Mode.Provider, { value: false, children: shared });
+	for (let tick = 0; tick < repeats; tick++) v.update(Mode, { value: false, children: shared });
 	ops.context_unchanged_resolutions = globalThis.__ownershipWork;
 	globalThis.__ownershipWork = 0;
 	for (let tick = 0; tick < repeats; tick++) {
 		const active = tick % 2 === 0;
-		v.update(Mode.Provider, { value: active, children: shared });
+		v.update(Mode, { value: active, children: shared });
 		const actual = v.container.querySelector(active ? 'strong' : 'span')?.textContent;
 		const expected = active ? 'next' : 'first';
 		stale += Number(actual !== expected);

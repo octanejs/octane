@@ -499,12 +499,10 @@ export function SelectRoot<Value, Multiple extends boolean | undefined = false>(
 	}, [multiple, value, form, name, itemToStringValue, disabled]);
 
 	return (
-		<SelectRootContext.Provider value={store}>
-			<SelectRootPropsContext.Provider value={rootPropsContextValue}>
-				<SelectFloatingContext.Provider value={floatingContext}>
-					{children}
-				</SelectFloatingContext.Provider>
-			</SelectRootPropsContext.Provider>
+		<SelectRootContext value={store}>
+			<SelectRootPropsContext value={rootPropsContextValue}>
+				<SelectFloatingContext value={floatingContext}>{children}</SelectFloatingContext>
+			</SelectRootPropsContext>
 			<input
 				{...validation.getValidationProps(disabled, {
 					onFocus() {
@@ -574,7 +572,7 @@ export function SelectRoot<Value, Multiple extends boolean | undefined = false>(
 				suppressHydrationWarning
 			/>
 			{hiddenInputs}
-		</SelectRootContext.Provider>
+		</SelectRootContext>
 	);
 }
 
