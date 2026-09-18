@@ -1187,10 +1187,10 @@ function assignedBindingsOutsideBoundary(ast, boundary, lexical) {
 	return assigned;
 }
 
-function unsupportedIndependentInitializer(node, lexical, initializers, memo) {
+function unsupportedIndependentInitializer(node, lexical, initializers, assigned, memo) {
 	if (Array.isArray(node)) {
 		return node.some((value) =>
-			unsupportedIndependentInitializer(value, lexical, initializers, memo),
+			unsupportedIndependentInitializer(value, lexical, initializers, assigned, memo),
 		);
 	}
 	const value = unwrapExpression(node);
@@ -1198,7 +1198,7 @@ function unsupportedIndependentInitializer(node, lexical, initializers, memo) {
 	const cached = memo.get(value);
 	if (cached !== undefined) return cached;
 	// A cyclic alias cannot establish a standalone data initializer. The memo
-	// also avoids repeatedly walking shared alias chains across widgets.
+	// also avoids repeatedly walking shared alias chains within this widget.
 	memo.set(value, true);
 	const visit = (node, parent = null, key = null) => {
 		if (!node || typeof node !== 'object') return false;
@@ -1213,17 +1213,20 @@ function unsupportedIndependentInitializer(node, lexical, initializers, memo) {
 			// Wrapping that result in an alias or object does not erase its owner.
 			return true;
 		}
-		if (
-			node.type === 'Identifier' &&
-			isIdentifierReference(node, parent, key, lexical) &&
-			unsupportedIndependentInitializer(
-				initializers.get(captureBindingScope(lexical, node, node.name))?.get(node.name),
-				lexical,
-				initializers,
-				memo,
-			)
-		) {
-			return true;
+		if (node.type === 'Identifier' && isIdentifierReference(node, parent, key, lexical)) {
+			const scope = captureBindingScope(lexical, node, node.name);
+			if (
+				assigned.get(scope)?.has(node.name) ||
+				unsupportedIndependentInitializer(
+					initializers.get(scope)?.get(node.name),
+					lexical,
+					initializers,
+					assigned,
+					memo,
+				)
+			) {
+				return true;
+			}
 		}
 		let unsupported = false;
 		forEachRuntimeAstChild(node, (child, childKey) => {
@@ -1275,7 +1278,6 @@ function independentWidgetMetadata(analysis, filename, moduleMovePlan) {
 	if (!analysis.boundaries.some((boundary) => boundary.independent)) return [];
 	const lexical = createLexicalAnalysis(analysis.ast);
 	const initializers = bindingInitializers(analysis.ast, lexical);
-	const initializerMemo = new WeakMap();
 	const widgets = [];
 	for (const boundary of analysis.boundaries) {
 		if (!boundary.independent) continue;
@@ -1297,12 +1299,20 @@ function independentWidgetMetadata(analysis, filename, moduleMovePlan) {
 			moduleBindings.size === 0 ? null : moduleBindings,
 		);
 		const assigned = assignedBindingsOutsideBoundary(analysis.ast, boundary, lexical);
+		// Each widget excludes its own writes, so alias admission is boundary-specific.
+		const initializerMemo = new WeakMap();
 		for (const capture of captures) {
 			const scope = captureBindingScope(lexical, boundary.node, capture);
 			const initializer = initializers.get(scope)?.get(capture);
 			if (
 				assigned.get(scope)?.has(capture) ||
-				unsupportedIndependentInitializer(initializer, lexical, initializers, initializerMemo)
+				unsupportedIndependentInitializer(
+					initializer,
+					lexical,
+					initializers,
+					assigned,
+					initializerMemo,
+				)
 			) {
 				throw extractionError(
 					'OCTANE_HYDRATE_INDEPENDENT_OWNER_CAPTURE',
