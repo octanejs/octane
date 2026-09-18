@@ -188,10 +188,12 @@ import {
 import { createNativeReadRetry, type NativeReadRetry } from './signals/native-read-retry.js';
 import {
 	activeCandidate,
+	createSignalActionFrame,
 	swapActiveSignalCandidate,
 	withoutSignalCandidate,
 } from './signals/transition-state.js';
-import { SignalCandidateFrame } from './signals/transition-candidate.js';
+import { installNativeSignalActionExtension } from './signals/transition-candidate.js';
+import type { SignalActionFrame } from './signals/transition-action.js';
 import {
 	NativeAdoptionMiss,
 	NATIVE_TRANSITION_CONSUMER,
@@ -1131,6 +1133,7 @@ function scheduleNativeRead(target: Block): void {
 
 function ensureNativeReadDriver(): NativeReadDriver {
 	if (NATIVE_READ_DRIVER !== null) return NATIVE_READ_DRIVER;
+	installNativeSignalActionExtension();
 	NATIVE_READ_DRIVER = createNativeReadDriver({
 		capture: () => WIP_CAPTURE,
 		cleanup: registerHookCleanup,
@@ -2102,7 +2105,7 @@ interface TransitionActionBatch {
 	pendingHolds?: number;
 	workComplete?: boolean;
 	/** Allocated only by a native write inside this Action. */
-	native?: SignalCandidateFrame;
+	native?: SignalActionFrame;
 	nativeWake?: () => void;
 	nativeBlocks?: Set<Block>;
 	nativeBoundaries?: Map<TrySlot, TrackedThenable<any>>;
@@ -2424,7 +2427,7 @@ let ACTIVE_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
 let IN_FLIGHT_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
 let nativeActionResolverInstalled = false;
 
-function nativeCandidateForAction(batch: TransitionActionBatch): SignalCandidateFrame {
+function nativeCandidateForAction(batch: TransitionActionBatch): SignalActionFrame | undefined {
 	let candidate = batch.native;
 	if (candidate !== undefined && !candidate.validate()) {
 		if (candidate.hasWrites()) candidate.rebase();
@@ -2433,7 +2436,7 @@ function nativeCandidateForAction(batch: TransitionActionBatch): SignalCandidate
 			candidate = undefined;
 		}
 	}
-	return candidate ?? (batch.native = new SignalCandidateFrame());
+	return candidate ?? (batch.native = createSignalActionFrame?.());
 }
 
 /** Setters, not reads, consult the same post-await batch as ordinary hooks. */

@@ -21,6 +21,102 @@ import {
 	verifyTransitionBoundary,
 } from './bundle-boundaries.mjs';
 
+test('opaque scalar rows do not activate signal owner allocations', async (t) => {
+	const directory = path.resolve('packages/octane');
+	const app = `import {createRoot, flushSync} from 'octane';
+function Row(props) @{
+ <article data-row={props.item.id}><span title={props.item.label}>{props.item.label as string}</span><input /></article>
+}
+function List(props) @{
+ <main>@for (const item of props.items; key item.id) { <Row item={item} /> }</main>
+}
+export function mount(parent, items) {
+ const root = createRoot(parent); root.render(List, {items});
+ return {update(items) { flushSync(() => root.render(List, {items})); }, dispose() {root.unmount();}};
+}`;
+	const contents = compile(app, path.join(directory, 'SignalFreeOwners.tsrx'), {
+		mode: 'client',
+		dev: false,
+		hmr: false,
+	}).code;
+	const bundle = await build({
+		stdin: { contents, resolveDir: directory },
+		bundle: true,
+		write: false,
+		minify: true,
+		format: 'esm',
+		platform: 'browser',
+		target: 'es2022',
+		legalComments: 'none',
+		tsconfigRaw: { compilerOptions: {} },
+		define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+	});
+	const window = new Window();
+	const globals = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+	const api = await import(
+		'data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64')
+	);
+	const host = window.document.createElement('div');
+	window.document.body.append(host);
+	const items = Array.from({ length: 100 }, (_, i) => ({ id: String(i), label: 'Row ' + i }));
+	const stringify = JSON.stringify;
+	const freeze = Object.freeze;
+	let serializedIdentities = 0;
+	let frozenOwners = 0;
+	// Count the public renderer-owner shape without changing framework source.
+	// Serialization is observed only during this compiled scalar view's work.
+	JSON.stringify = function (...args) {
+		serializedIdentities++;
+		return Reflect.apply(stringify, this, args);
+	};
+	Object.freeze = function (value) {
+		if (value && typeof value === 'object' && 'documentOwner' in value && 'instanceKey' in value)
+			frozenOwners++;
+		return freeze(value);
+	};
+	let root;
+	try {
+		root = api.mount(host, items);
+		assert.equal(host.querySelectorAll('article').length, items.length);
+		const first = host.querySelector('article[data-row="0"]');
+		const input = first.querySelector('input');
+		input.value = 'typed before reorder';
+		for (let i = 0; i < 4; i++) {
+			const updated = items.map((item) => ({ ...item, label: 'Update ' + i + ' ' + item.id }));
+			root.update(i % 2 === 0 ? updated.toReversed() : updated);
+			assert.equal(host.querySelector('article[data-row="0"]'), first);
+			assert.equal(first.querySelector('input'), input);
+			assert.equal(input.value, 'typed before reorder');
+			assert.equal(first.querySelector('span').title, 'Update ' + i + ' 0');
+			assert.equal(first.querySelector('span').textContent, 'Update ' + i + ' 0');
+		}
+		root.dispose();
+		root = undefined;
+		assert.equal(host.childNodes.length, 0);
+	} finally {
+		JSON.stringify = stringify;
+		Object.freeze = freeze;
+		root?.dispose();
+		host.remove();
+	}
+	assert.equal(frozenOwners, 0, 'Scalar values must not allocate renderer signal owners.');
+	assert.equal(serializedIdentities, 0, 'Scalar values must not serialize signal instance paths.');
+});
+
 const scenario = (id) => BUNDLE_CASES.find((entry) => entry.id === id);
 const source = (name) => ({ path: `packages/octane/src/${name}` });
 const alien = (version = '3.2.0') => ({
@@ -96,6 +192,142 @@ test('ordinary entries allow protocol seams but reject both scoped and raw engin
 			verifyBundleInputs(scenario('ordinary-client'), [...ordinary, source('signals/engine.ts')]),
 		/ordinary imports reached the scoped engine/,
 	);
+});
+
+test('ordinary client roots tree-shake native transitions and require emitted-byte evidence', () => {
+	const ordinary = [source('runtime.ts'), source('signals/read-protocol.ts')];
+	verifyTransitionBoundary(scenario('ordinary-client'), ordinary);
+	for (const name of ['signals/transition-candidate.ts', 'signals/transition-action.ts']) {
+		verifyTransitionBoundary(scenario('ordinary-client'), [
+			...ordinary,
+			{ ...source(name), bytesInOutput: 0 },
+		]);
+		assert.throws(
+			() =>
+				verifyTransitionBoundary(scenario('ordinary-client'), [
+					...ordinary,
+					{ ...source(name), bytesInOutput: 1 },
+				]),
+			/ordinary client retained transition orchestration/,
+		);
+		assert.throws(
+			() => verifyTransitionBoundary(scenario('ordinary-client'), [...ordinary, source(name)]),
+			/missing emitted-byte evidence/,
+		);
+	}
+});
+
+test('production public roots omit concrete native transitions while native reads retain them', async (t) => {
+	const bundle = async (id) => {
+		const entry = scenario(id);
+		const directory = path.resolve('packages/octane');
+		const native = `import {createRoot, startTransition} from 'octane';
+import {useSignal$} from 'octane/signals/client';
+function View() @{
+ const count$ = useSignal$(0);
+ <button onClick={() => startTransition(() => count$.set(count$.get() + 1))}>
+  {String(count$.get()) as string}
+ </button>
+}
+export function mount(parent) { const root = createRoot(parent); root.render(View); return root; }`;
+		const contents =
+			id === 'native-client'
+				? compile(native, path.join(directory, 'NativeTransitionControl.tsrx'), {
+						mode: 'client',
+						dev: false,
+						hmr: false,
+						nativeReads: true,
+					}).code
+				: entrySource(entry);
+		const result = await build({
+			stdin: { contents, resolveDir: directory },
+			bundle: true,
+			write: false,
+			minify: true,
+			metafile: true,
+			format: 'esm',
+			platform: 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+		});
+		const outputs = Object.values(result.metafile.outputs);
+		assert.equal(outputs.length, 1, `${id}: expected one production bundle`);
+		const inputs = Object.keys(result.metafile.inputs).map((name) => ({
+			path: path.resolve(name),
+			bytesInOutput: outputs[0].inputs[name]?.bytesInOutput ?? 0,
+			package: /\/node_modules\/alien-signals\//.test(name)
+				? { name: 'alien-signals' }
+				: /\/node_modules\/react(?:-dom)?\//.test(name)
+					? { name: 'react' }
+					: undefined,
+		}));
+		return { inputs, code: result.outputFiles[0].text };
+	};
+	const [ordinary, engine, native] = await Promise.all([
+		bundle('ordinary-client'),
+		bundle('engine'),
+		bundle('native-client'),
+	]);
+	assert.ok(
+		ordinary.inputs.some(
+			(input) => input.path.endsWith('/src/runtime.ts') && input.bytesInOutput > 0,
+		),
+		'The public createRoot control must retain its actual renderer.',
+	);
+	assert.match(ordinary.code, /createRoot/);
+	verifyBundleInputs(scenario('ordinary-client'), ordinary.inputs);
+	assert.ok(
+		engine.inputs.some(
+			(input) => input.path.endsWith('/src/signals/graph.ts') && input.bytesInOutput > 0,
+		),
+		'The independent engine control must retain its actual graph.',
+	);
+	verifyTransitionBoundary(scenario('engine'), engine.inputs);
+	assert.ok(
+		native.inputs.some(
+			(input) =>
+				input.path.endsWith('/src/signals/transition-candidate.ts') && input.bytesInOutput > 0,
+		),
+		'The compiled native-read control must retain the concrete transition implementation.',
+	);
+	const window = new Window();
+	const globals = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+	const api = await import(
+		'data:text/javascript;base64,' + Buffer.from(native.code).toString('base64')
+	);
+	const host = window.document.createElement('div');
+	window.document.body.append(host);
+	const root = api.mount(host);
+	try {
+		const button = host.querySelector('button');
+		assert.equal(button.textContent, '0');
+		button.click();
+		const deadline = performance.now() + 2_000;
+		while (button.textContent !== '1' && performance.now() < deadline)
+			await new Promise((resolve) => setTimeout(resolve, 1));
+		assert.equal(host.querySelector('button'), button);
+		assert.equal(button.textContent, '1');
+	} finally {
+		root.unmount();
+		host.remove();
+	}
+	verifyTransitionBoundary(scenario('ordinary-client'), ordinary.inputs);
 });
 
 for (const id of ['ordinary-client', 'ordinary-server']) {
@@ -1344,4 +1576,69 @@ export function mount(parent, source) { return mountBindings({parent}, SharedRec
 		const results = lanes.map((lane) => lane.update(props));
 		for (const result of results.slice(1)) assert.deepEqual(result, results[0]);
 	}
+});
+
+test('extracted primitive values omit signal binding work without trusting casts or opaque results', (t) => {
+	const cases = [
+		{ expression: 'String(props.value)', primitive: true },
+		{ expression: 'Number(props.value)', primitive: true },
+		{ expression: 'BigInt(props.value)', primitive: true },
+		{ expression: 'Date()', primitive: true },
+		{ expression: '`value:${props.value}`', primitive: true },
+		{ expression: 'typeof props.value', primitive: true },
+		{ expression: 'props.value + 1', primitive: true },
+		{ expression: '!props.value', primitive: true },
+		{ expression: 'props.value++', primitive: true },
+		{ expression: 'props.active ? String(props.value) : "fallback"', primitive: true },
+		{ expression: 'String(props.left) || String(props.right)', primitive: true },
+		{ expression: '(props.touch(), typeof props.value)', primitive: true },
+		{ expression: 'props.value = String(props.other)', primitive: true },
+		{ expression: 'props.value += props.other', primitive: true },
+		{ expression: 'props.value as string', primitive: false },
+		{ expression: 'props.value!', primitive: false },
+		{ expression: 'props.value', primitive: false },
+		{ expression: 'props.read()', primitive: false },
+		{ expression: 'props.api.get()', primitive: false },
+		{ expression: 'props.active ? String(props.value) : props.other', primitive: false },
+		{ expression: 'String(props.left) || props.right', primitive: false },
+		{ expression: 'props.value ||= props.other', primitive: false },
+		{
+			prefix: 'function String(value) { return value; }',
+			expression: 'String(props.value)',
+			primitive: false,
+		},
+		{
+			prefix: 'globalThis.String = (value) => value;',
+			expression: 'String(props.value)',
+			primitive: false,
+		},
+		{
+			prefix: "import { passThrough } from './value-barrel';",
+			expression: 'passThrough(props.value)',
+			primitive: false,
+		},
+	];
+	let checked = 0;
+	for (const extension of ['tsx', 'tsrx'])
+		for (const dev of [false, true])
+			for (const { expression, prefix = '', primitive } of cases) {
+				const source = `${prefix}
+export function App(props) {
+					return <span title={${expression}}>{${expression} as string}</span>;
+				}`;
+				const { code } = compile(source, `/project/primitive-binding.${extension}`, {
+					mode: 'client',
+					dev,
+					hmr: false,
+				});
+				// This is a compiler-cost guard: behavior is covered by public hydration
+				// and late writable-prop tests. Count the emitted runtime capabilities,
+				// rather than treating smaller fixture bytes as a speed measurement.
+				const bindings = [...code.matchAll(/\bbindSignal\w*\s+as\b/g)];
+				const description = `${extension}, ${dev ? 'dev' : 'prod'}: ${prefix} ${expression}`;
+				if (primitive) assert.equal(bindings.length, 0, description);
+				else assert.ok(bindings.length > 0, description);
+				checked++;
+			}
+	t.diagnostic(`${checked} fixed-source primitive and opaque compiler controls`);
 });

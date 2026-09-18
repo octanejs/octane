@@ -34,6 +34,144 @@ import {
 } from '../../src/signals/index.js';
 import type { SignalOwner } from '../../src/signals/types.js';
 
+describe('signal-valued props from ordinary modules', () => {
+	it.each(
+		[false, true].flatMap((dev) =>
+			['tsrx', 'tsx'].flatMap((ext) => [false, true].map((hydrate) => ({ dev, ext, hydrate }))),
+		),
+	)(
+		'preserves extracted primitive evaluations ($ext, dev=$dev, hydrate=$hydrate)',
+		async ({ dev, ext, hydrate }) => {
+			const source = `export function App(props) {
+				return <section title={String(props.label)}><p>{String(props.value)}</p><input value={props.count + 1} data-type={typeof props.count} /></section>;
+			}`;
+			const options = {
+				id: `/src/primitive-values.${ext}`,
+				compileOptions: { dev, hmr: false },
+			};
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const reads: string[] = [];
+			const props = (label: string, value: string, count: number) => ({
+				label: { [Symbol.toPrimitive]: () => (reads.push('label'), label) },
+				value: { [Symbol.toPrimitive]: () => (reads.push('value'), value) },
+				count,
+			});
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: Root | undefined;
+			try {
+				const initial = props('initial title', 'initial text', 1);
+				let serverHosts: Element[] | undefined;
+				if (hydrate) {
+					const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+					container.innerHTML = renderToString(server.App, initial).html;
+					expect(reads).toEqual(['label', 'value']);
+					reads.length = 0;
+					serverHosts = [...container.querySelectorAll('section,p,input')];
+					await act(() => {
+						root = hydrateRoot(container, client.App, initial);
+					});
+				} else {
+					root = createRoot(container);
+					root.render(client.App, initial);
+				}
+				expect(reads).toEqual(['label', 'value']);
+				const hosts = [...container.querySelectorAll('section,p,input')];
+				if (serverHosts) expect(hosts).toEqual(serverHosts);
+				const [section, paragraph, input] = hosts as [HTMLElement, HTMLElement, HTMLInputElement];
+				expect(section.title).toBe('initial title');
+				expect(paragraph.textContent).toBe('initial text');
+				expect(input.value).toBe('2');
+				expect(input.getAttribute('data-type')).toBe('number');
+				reads.length = 0;
+				await act(() => root!.render(client.App, props('changed title', 'changed text', 9)));
+				expect(reads).toEqual(['label', 'value']);
+				expect([...container.querySelectorAll('section,p,input')]).toEqual(hosts);
+				expect(section.title).toBe('changed title');
+				expect(paragraph.textContent).toBe('changed text');
+				expect(input.value).toBe('10');
+			} finally {
+				root?.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it.each(
+		[false, true].flatMap((dev) =>
+			['tsrx', 'tsx'].flatMap((ext) => [false, true].map((hydrate) => ({ dev, ext, hydrate }))),
+		),
+	)(
+		'preserves imported pass-through bindings ($ext, dev=$dev, hydrate=$hydrate)',
+		async (entry) => {
+			const { dev, ext, hydrate } = entry;
+			const markup = `<section title={passThrough(props.value)}><p>{passThrough(props.value) as string}</p><input value={passThrough(props.value)} /></section>`;
+			const source = `import { passThrough } from './value-barrel';
+export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'return ' : ''}${markup}${ext === 'tsx' ? ';' : ''} }`;
+			const options = {
+				id: `/src/pass-through-value.${ext}`,
+				compileOptions: { dev, hmr: false },
+				runtimeModules: { './value-barrel': { passThrough: (value: unknown) => value } },
+			};
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const owner = createScope({ scopeKey: `pass-through-${dev}-${ext}-${hydrate}` });
+			const value = owner.signal$('value', 'server');
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: Root | undefined;
+			try {
+				if (hydrate) {
+					const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+					container.innerHTML = renderToString(server.App, { value }, { signalOwner: owner }).html;
+					const input = container.querySelector('input')!;
+					input.value = 'entered before hydration';
+					input.focus();
+					input.setSelectionRange(2, 6);
+					owner.set(value, input.value);
+					await act(() => {
+						root = hydrateRoot(container, client.App, { value }, { signalOwner: owner });
+					});
+					expect(container.querySelector('input')).toBe(input);
+					expect(input.value).toBe('entered before hydration');
+					expect(document.activeElement).toBe(input);
+					expect([input.selectionStart, input.selectionEnd]).toEqual([2, 6]);
+				} else {
+					root = createRoot(container);
+					root.render(client.App, { value: 'primitive' });
+					expect(container.querySelector('p')?.textContent).toBe('primitive');
+					await act(() => root!.render(client.App, { value }));
+				}
+				const section = container.querySelector('section')!;
+				const paragraph = container.querySelector('p')!;
+				const input = container.querySelector('input')!;
+				await act(() => owner.set(value, 'live'));
+				expect(section.title).toBe('live');
+				expect(paragraph.textContent).toBe('live');
+				expect(input.value).toBe('live');
+				await act(() => {
+					input.value = 'entered after activation';
+					input.dispatchEvent(new Event('input', { bubbles: true }));
+				});
+				expect(owner.get(value)).toBe('entered after activation');
+				expect(paragraph.textContent).toBe('entered after activation');
+				expect(section.title).toBe('entered after activation');
+				await act(() => root!.render(client.App, { value: 'primitive again' }));
+				await act(() => owner.set(value, 'detached'));
+				expect(container.querySelector('section')).toBe(section);
+				expect(container.querySelector('p')).toBe(paragraph);
+				expect(container.querySelector('input')).toBe(input);
+				expect(paragraph.textContent).toBe('primitive again');
+				expect(section.title).toBe('primitive again');
+				expect(input.value).toBe('primitive again');
+			} finally {
+				root?.unmount();
+				owner.dispose();
+				container.remove();
+			}
+		},
+	);
+});
+
 describe('direct signal child bindings', () => {
 	let root: Root | undefined;
 
