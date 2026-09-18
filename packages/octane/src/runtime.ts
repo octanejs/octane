@@ -20203,7 +20203,12 @@ function writeDirectSignalBinding(binding: DirectSignalBinding, value: unknown):
 	} else if (binding.kind === 'value') {
 		const element = binding.target as Element;
 		if (element.localName === 'select') setSelectValue(element, value);
-		else setValue(element, value);
+		else
+			setValue(
+				element,
+				value,
+				element.localName === 'textarea' && isWritableSignal(binding.handle),
+			);
 	} else {
 		setChecked(binding.target as Element, value);
 	}
@@ -23005,6 +23010,7 @@ export function setHostPropSources(
 	hasNestedChildren = false,
 	readStyle?: (value: unknown) => unknown,
 	deferControl = false,
+	writableTextareaValue = false,
 ): Record<string, unknown> {
 	const props = new Map<string, HostPropWriter>();
 	const resolved = resolveHostPropSources(el, sources, props, readStyle);
@@ -23024,6 +23030,7 @@ export function setHostPropSources(
 			props.get('checked')?.value,
 			props.get('defaultChecked')?.value,
 			props.get('multiple')?.value,
+			writableTextareaValue,
 		);
 	return resolved;
 }
@@ -23073,17 +23080,21 @@ function resolveSignalHostPropSources(
 	sources: readonly HostPropSource[],
 	readStyle?: (value: unknown) => unknown,
 	read: (handle: SignalHandle<unknown>) => unknown = readSignalBinding,
+	textarea = false,
 ): {
 	sources: readonly HostPropSource[];
 	handles: Set<SignalHandle<unknown>>;
+	writableTextareaValue?: boolean;
 } {
 	// Children keep their handle for the separate child binding; resolving them
 	// here would subscribe only the host props and strand later child updates.
 	const handles = new Set<SignalHandle<unknown>>();
 	let rows: HostPropSource[] | undefined;
+	let writableTextareaValue = false;
 	for (let i = 0; i < sources.length; i++) {
 		const source = sources[i];
 		if (!source[0]) {
+			if (textarea && source[1] === 'value') writableTextareaValue = isWritableSignal(source[2]);
 			const value =
 				source[1] === 'children' || (source[1] === 'style' && readStyle !== undefined)
 					? source[2]
@@ -23103,6 +23114,7 @@ function resolveSignalHostPropSources(
 		let copy: Record<string, unknown> | undefined;
 		for (const name of Object.keys(spread)) {
 			const current = (spread as Record<string, unknown>)[name];
+			if (textarea && name === 'value') writableTextareaValue = isWritableSignal(current);
 			const value =
 				name === 'children' || (name === 'style' && readStyle !== undefined)
 					? current
@@ -23121,7 +23133,9 @@ function resolveSignalHostPropSources(
 			rows[i] = [true, copy];
 		}
 	}
-	return { sources: rows ?? sources, handles };
+	return textarea
+		? { sources: rows ?? sources, handles, writableTextareaValue }
+		: { sources: rows ?? sources, handles };
 }
 
 function winningSignalHostControl(
@@ -23150,7 +23164,12 @@ function updateSignalHostPropSources(binding: SignalHostPropSourcesBinding): voi
 	if (binding.disposed || binding.pendingControl || binding.scope.block.disposed) return;
 	try {
 		runWithBlockSignalOwner(binding.scope, () => {
-			const next = resolveSignalHostPropSources(binding.sources, binding.readStyle);
+			const next = resolveSignalHostPropSources(
+				binding.sources,
+				binding.readStyle,
+				undefined,
+				binding.element.localName === 'textarea',
+			);
 			binding.resolved = setHostPropSources(
 				binding.element,
 				next.sources,
@@ -23158,6 +23177,8 @@ function updateSignalHostPropSources(binding: SignalHostPropSourcesBinding): voi
 				binding.scope,
 				binding.hasNestedChildren,
 				binding.readStyle,
+				false,
+				next.writableTextareaValue,
 			);
 			if (process.env.NODE_ENV !== 'production' && STAGED_DOM === null)
 				drainDevFormDiagnostics(binding.element);
@@ -23521,7 +23542,12 @@ export function bindSignalHostPropSources(
 		validateDirectSignalControl(element, site);
 		binding.pendingControl ||= activeHydration() !== null && controlSnapshot.editRevision > 0;
 	}
-	const next = resolveSignalHostPropSources(sources, readStyle);
+	const next = resolveSignalHostPropSources(
+		sources,
+		readStyle,
+		undefined,
+		element.localName === 'textarea',
+	);
 	binding.resolved = setHostPropSources(
 		element,
 		next.sources,
@@ -23530,6 +23556,7 @@ export function bindSignalHostPropSources(
 		hasNestedChildren,
 		readStyle,
 		binding.pendingControl,
+		next.writableTextareaValue,
 	);
 	if (STAGED_COMMIT_CAPTURE !== null) {
 		DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
@@ -26311,7 +26338,7 @@ function setNativeChangeDiagnosticMetadata(el: Element, value: unknown): void {
  * attribute write never clobbers what the user typed, and it keeps SSR
  * output, form.reset() baselines, and differential byte-compares aligned.
  */
-export function setValue(el: Element, value: unknown): void {
+export function setValue(el: Element, value: unknown, writableTextareaEcho = false): void {
 	// An unmatched scalar or spread is not permission to steal an offered control.
 	if (CURRENT_SCOPE?.block.idState.renderOwner?.controlLeases?.has(el)) presentationMiss(false);
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
@@ -26363,9 +26390,16 @@ export function setValue(el: Element, value: unknown): void {
 	// the reset button's default action, i.e. any script-dispatched click.
 	// IME: an UNCHANGED rendered value must not cancel an active composition;
 	// a genuinely changed one still wins (React: setState during composition).
-	if (!(ctrl.composing && Object.is(prev, value)) && valueNeedsWrite(input, value))
+	// A writable textarea's native input already published this exact value. An
+	// echo must retain the browser's edit transaction: changing its text-content
+	// reset baseline splits native Undo into individual keystrokes. Scalar and
+	// read-only values keep the ordinary attribute mirroring contract.
+	const needsWrite = writableTextareaEcho
+		? (STAGED_DOM?.view(input) ?? input).value !== s
+		: undefined;
+	if (!(ctrl.composing && Object.is(prev, value)) && (needsWrite ?? valueNeedsWrite(input, value)))
 		(STAGED_DOM?.view(input) ?? input).value = s;
-	if ((STAGED_DOM?.view(input) ?? input).defaultValue !== s)
+	if (needsWrite !== false && (STAGED_DOM?.view(input) ?? input).defaultValue !== s)
 		(STAGED_DOM?.view(input) ?? input).defaultValue = s;
 }
 
@@ -26801,6 +26835,7 @@ function applyFormControlValues(
 	checked: unknown,
 	defaultChecked: unknown,
 	multiple: unknown,
+	writableTextareaValue = false,
 ): void {
 	const ctrl = armControlled(el);
 	const first = !ctrl.formSeen;
@@ -26843,7 +26878,7 @@ function applyFormControlValues(
 
 	if (tag === 'textarea') {
 		const textarea = el as HTMLTextAreaElement;
-		setValue(textarea, value);
+		setValue(textarea, value, writableTextareaValue);
 		if (value == null) {
 			if (defaultValue != null) setDefaultValue(textarea, defaultValue, first);
 			else if (!first && (STAGED_DOM?.view(textarea) ?? textarea).defaultValue !== '')
