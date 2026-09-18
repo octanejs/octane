@@ -24,7 +24,7 @@ import tsrxGrammar from '../assets/tsrx.tmLanguage.json';
 // rules in __root.tsrx's BASE_STYLES) — no re-tokenize on theme flip. The
 // TSRX grammar is registered with embedded JSX/TS/CSS islands as 'tsrx'.
 export const PLAYGROUND_SHIKI_THEMES = {
-	light: 'github-light',
+	light: 'github-light-high-contrast',
 	dark: 'github-dark-high-contrast',
 } as const;
 

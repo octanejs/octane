@@ -145,11 +145,14 @@ export function HeroDemo() @{
 				padding: 0.1rem 0.4rem;
 				border-radius: 0.35rem;
 				background: rgba(255, 65, 90, 0.16);
-				color: var(--accent-text);
+				color: var(--danger-text);
 				font-size: 0.65rem;
 				font-weight: 700;
 				letter-spacing: 0.06em;
 				text-transform: uppercase;
+			}
+			:global(:root[data-theme='light']) .demo-badge {
+				color: #a81130;
 			}
 			.demo-toggle {
 				display: inline-flex;
@@ -178,7 +181,7 @@ export function HeroDemo() @{
 				border-bottom: 1px solid rgba(255, 255, 255, 0.055);
 			}
 			.demo-terminal-title {
-				color: var(--text-secondary);
+				color: #d6deeb;
 				font-size: 0.6rem;
 				font-weight: 700;
 				letter-spacing: 0.08em;
@@ -189,7 +192,7 @@ export function HeroDemo() @{
 				align-items: center;
 				gap: 0.3rem;
 				margin-left: auto;
-				color: var(--text-secondary);
+				color: #d6deeb;
 				font-size: 0.62rem;
 				font-weight: 600;
 				letter-spacing: 0.04em;
@@ -210,22 +213,22 @@ export function HeroDemo() @{
 			.demo-terminal-jump {
 				height: 1.25rem;
 				padding: 0 0.42rem;
-				border: 1px solid var(--border);
+				border: 1px solid rgba(255, 255, 255, 0.22);
 				border-radius: 9999px;
-				background: var(--surface);
-				color: var(--text-secondary);
+				background: rgba(255, 255, 255, 0.08);
+				color: #d6deeb;
 				font: inherit;
 				font-size: 0.62rem;
 				line-height: 1;
 				cursor: pointer;
 			}
 			.demo-terminal-jump:hover {
-				color: var(--text);
+				color: #ffffff;
 				border-color: var(--accent);
 			}
 			.demo-terminal-jump:focus-visible,
 			.demo-terminal-body:focus-visible {
-				outline: 2px solid var(--accent-hover);
+				outline: 2px solid #ff8797;
 				outline-offset: -2px;
 			}
 			.demo-terminal-body {
@@ -264,20 +267,17 @@ export function HeroDemo() @{
 				animation: terminal-line-in 0.14s ease-out;
 			}
 			.demo-terminal-prompt {
-				color: var(--accent-text);
+				color: #d6deeb;
 				font-weight: 700;
 			}
 			.demo-terminal-empty {
-				color: var(--text-secondary);
-				opacity: 0.65;
+				color: #b6c2d4;
 			}
 			@keyframes terminal-line-in {
 				from {
-					opacity: 0;
 					transform: translateY(0.2rem);
 				}
 				to {
-					opacity: 1;
 					transform: translateY(0);
 				}
 			}

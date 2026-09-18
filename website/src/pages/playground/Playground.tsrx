@@ -344,7 +344,6 @@ export function Playground() @{
 					backgroundColor: 'var(--code-bg)',
 					color: 'var(--text-secondary)',
 					border: 'none',
-					opacity: '0.7',
 				},
 				'.cm-activeLine, .cm-activeLineGutter': {
 					backgroundColor: 'var(--surface)',
@@ -1296,7 +1295,7 @@ export function Playground() @{
 				color: var(--text);
 			}
 			.pg-seg-btn.active {
-				color: var(--accent-text);
+				color: var(--danger-text);
 				background: rgba(255, 65, 90, 0.14);
 			}
 			.pg-seg-btn:disabled {

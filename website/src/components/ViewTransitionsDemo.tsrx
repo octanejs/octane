@@ -52,7 +52,7 @@ export function ViewTransitionsDemo() @{
 				cursor: pointer;
 			}
 			.vtdemo-btn:hover {
-				background: var(--accent-hover);
+				background: var(--accent-fill-hover);
 			}
 			.vtdemo-stage {
 				margin-top: 1rem;
@@ -78,6 +78,7 @@ export function ViewTransitionsDemo() @{
 				height: 96px;
 				border-radius: 16px;
 				background: linear-gradient(135deg, #ff415a, #c98500);
+				color: #16181d;
 				display: flex;
 				align-items: center;
 				justify-content: center;

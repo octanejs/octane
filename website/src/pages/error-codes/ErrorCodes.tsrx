@@ -34,7 +34,7 @@ export function ErrorCodesLayout() @{
 			.errors-layout :global(.errors-lede) {
 				max-width: 43rem;
 				margin: 1rem 0 2rem;
-				color: #d5d9e0;
+				color: var(--text-body);
 				font-size: 1.08rem;
 			}
 			.errors-layout :global(.errors-search) {
@@ -86,12 +86,12 @@ export function ErrorCodesLayout() @{
 				text-decoration: none;
 			}
 			.errors-layout :global(.error-card-code) {
-				color: var(--accent-text);
+				color: var(--danger-text);
 				font-weight: 800;
 			}
 			.errors-layout :global(.error-card-message) {
 				min-width: 0;
-				color: #d5d9e0;
+				color: var(--text-body);
 				overflow-wrap: anywhere;
 			}
 			.errors-layout :global(.error-card-status) {
@@ -139,7 +139,7 @@ export function ErrorCodesLayout() @{
 			.errors-layout :global(.error-extra-args) {
 				margin: 0 0 1.5rem;
 				padding-left: 1.5rem;
-				color: #d5d9e0;
+				color: var(--text-body);
 			}
 			.errors-layout :global(.error-extra-args code) {
 				overflow-wrap: anywhere;

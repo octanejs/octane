@@ -15,6 +15,7 @@
 // mousemove never re-renders the 100-cell grid.
 import { useMemo, useRef, useState } from 'octane';
 import type { BenchCard } from '../content/benchmarks.ts';
+import { inkOnFill, type FillInk } from '../lib/contrast.ts';
 
 // ×-vs-Octane ratios: 12.3 → "12×", 2.64 → "2.6×", 1 → "1×", 0.9 → "0.90×".
 function fmtX(v: number | null | undefined): string {
@@ -55,6 +56,7 @@ interface BarItem {
 	label: string;
 	value: number;
 	color: string;
+	ink: FillInk;
 }
 
 export function BenchmarkExplorer(props: { card: BenchCard }) @{
@@ -94,6 +96,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				label: s.label,
 				value,
 				color: s.color,
+				ink: inkOnFill(s.color),
 			});
 			else missing.push({ key: s.key, label: s.label });
 		}
@@ -413,8 +416,6 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 			.bx-val-in {
 				transform: translate(-100%, -50%);
 				padding-right: 0.45rem;
-				color: #fff;
-				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 			}
 			.bx-row:hover .bx-fill {
 				filter: brightness(1.12);
@@ -761,7 +762,10 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 											'bx-val',
 											item.value / bars.scaleMax > 0.62 ? 'bx-val-in' : 'bx-val-out',
 										]}
-										style={'left:' + (item.value / bars.scaleMax) * 100 + '%'}
+										style={'left:' + (item.value / bars.scaleMax) * 100 + '%' +
+											(item.value / bars.scaleMax > 0.62
+												? ';color:' + item.ink.color + ';text-shadow:' + item.ink.shadow
+												: '')}
 									>{fmtX(item.value) as string}</span>
 								</div>
 							</div>

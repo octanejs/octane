@@ -46,7 +46,7 @@ export function Hero() @{
 					border-color 0.15s;
 			}
 			.hero-version:hover {
-				color: var(--accent);
+				color: var(--danger-text);
 				border-color: var(--accent);
 				text-decoration: none;
 			}
@@ -87,7 +87,7 @@ export function Hero() @{
 				transition: background 0.15s;
 			}
 			.hero-actions :global(a.btn-primary:hover) {
-				background: var(--accent-hover);
+				background: var(--accent-fill-hover);
 				text-decoration: none;
 			}
 			.hero-actions :global(a.btn-ghost) {

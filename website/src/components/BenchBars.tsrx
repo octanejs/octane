@@ -11,6 +11,7 @@
 // hydration adopts the real chart instead of replacing a chart shell.
 import { useMemo, useState } from 'octane';
 import type { BenchCard } from '../content/benchmarks.ts';
+import { inkOnFill, type FillInk } from '../lib/contrast.ts';
 
 function fmt(value: unknown): string {
 	const n =
@@ -70,6 +71,7 @@ interface BarItem {
 	label: string;
 	value: number;
 	color: string;
+	ink: FillInk;
 }
 
 interface BarView {
@@ -124,6 +126,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 					label: row.op as string,
 					value,
 					color: only.color,
+					ink: inkOnFill(only.color),
 				});
 			}
 			return barView(present, []);
@@ -148,6 +151,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 					label: shortLabel(s.label),
 					value: Math.exp(ratios.reduce((sum, r) => sum + Math.log(r), 0) / ratios.length),
 					color: s.color,
+					ink: inkOnFill(s.color),
 				});
 				else missing.push({ key: s.key, label: shortLabel(s.label) });
 			}
@@ -161,6 +165,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 				label: shortLabel(s.label),
 				value,
 				color: s.color,
+				ink: inkOnFill(s.color),
 			});
 			else missing.push({ key: s.key, label: shortLabel(s.label) });
 		}
@@ -287,8 +292,6 @@ export function BenchBars(props: { card: BenchCard }) @{
 			.bench-val-in {
 				transform: translate(-100%, -50%);
 				padding-right: 0.45rem;
-				color: #fff;
-				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 			}
 			.bench-row:hover .bench-fill {
 				filter: brightness(1.12);
@@ -393,7 +396,10 @@ export function BenchBars(props: { card: BenchCard }) @{
 									'bench-val',
 									item.value / bars.scaleMax > 0.62 ? 'bench-val-in' : 'bench-val-out',
 								]}
-								style={'left:' + (item.value / bars.scaleMax) * 100 + '%'}
+								style={'left:' + (item.value / bars.scaleMax) * 100 + '%' +
+									(item.value / bars.scaleMax > 0.62
+										? ';color:' + item.ink.color + ';text-shadow:' + item.ink.shadow
+										: '')}
 							>{valueFormat(item.value) as string}</span>
 						</div>
 					</div>

@@ -5629,6 +5629,7 @@ export default defineConfig({
 					exclude: [
 						'website/tests/ssr-smoke.test.ts',
 						'website/tests/ssr-hydration.e2e.test.ts',
+						'website/tests/a11y.e2e.test.ts',
 						...(process.env.OCTANE_EXCLUDE_WEBSITE_DOCS === '1'
 							? ['website/tests/core-apis-docs.test.ts']
 							: []),
@@ -5648,7 +5649,11 @@ export default defineConfig({
 			{
 				test: {
 					name: 'website-integration',
-					include: ['website/tests/ssr-smoke.test.ts', 'website/tests/ssr-hydration.e2e.test.ts'],
+					include: [
+						'website/tests/ssr-smoke.test.ts',
+						'website/tests/ssr-hydration.e2e.test.ts',
+						'website/tests/a11y.e2e.test.ts',
+					],
 					// One production build and one preview server for both specs; see
 					// the file header for why they no longer build for themselves.
 					globalSetup: ['./website/tests/setup/production-server.ts'],

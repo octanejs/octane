@@ -33,7 +33,7 @@ export function NotFound() @{
 				border-radius: 9999px;
 			}
 			.notfound :global(a.notfound-home:hover) {
-				background: var(--accent-hover);
+				background: var(--accent-fill-hover);
 				text-decoration: none;
 			}
 		</style>
