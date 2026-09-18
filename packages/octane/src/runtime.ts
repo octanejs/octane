@@ -20,6 +20,7 @@
 declare const process: { env: { NODE_ENV?: string } };
 
 import { resolveHookPath } from './hook-slot-cache.js';
+import { domBindingClaims } from './dom-binding-claims.js';
 import { DOMStage } from './dom-stage.js';
 import { __normalizeBindingStyle } from './dom-binding-styles.js';
 import type { BindingHandle } from './dom-bindings.js';
@@ -18389,6 +18390,7 @@ class HydrationCapability {
 			const server = (STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue;
 			if (
 				server !== text &&
+				domBindingClaims.get(el as Element)?.get('#text') !== server &&
 				!isTextParserNormalizedMatch(server, text) &&
 				!isHydrationSuppressed(el)
 			) {
@@ -18494,6 +18496,7 @@ class HydrationCapability {
 		// Adoption already owns the desired value, including an absent attribute.
 		// Keep the ordinary setter from repeating a same-value DOM mutation.
 		if (server === next) return false;
+		if (domBindingClaims.get(el)?.get(name) === server) return false;
 		if (next !== null && isAttributeParserNormalizedMatch(server, next)) return false;
 		const mode = hydrationMismatchMode(el);
 		if (mode === 0) return true;
@@ -18505,10 +18508,11 @@ class HydrationCapability {
 
 	allowClass(el: Element, next: string | null, absentIsEmpty = false): boolean {
 		const mode = hydrationMismatchMode(el);
-		if (mode === 0) return true;
 		const rawServer = (STAGED_DOM?.view(el) ?? el).getAttribute('class');
 		const server = absentIsEmpty && rawServer === null ? '' : rawServer;
 		if (server === next) return true;
+		if (domBindingClaims.get(el)?.get('class') === rawServer) return false;
+		if (mode === 0) return true;
 		if (mode === 1) return false;
 		if (process.env.NODE_ENV !== 'production')
 			warnHydrationValueMismatch((el as any).__oct_loc, 'attribute `class`', server, next);
@@ -18578,6 +18582,20 @@ class HydrationCapability {
 				const entry = entries[i + 1];
 				if (entry != null && typeof entry !== 'boolean')
 					applyStyleProperty(el, expectedStyle, entries[i] as string, entry);
+			}
+		}
+		// Preserve only the actual last publication of a live scalar binding.
+		// External mutations still follow normal hydration diagnostics and repair.
+		const claims = domBindingClaims.get(el);
+		if (claims !== undefined) {
+			for (const [channel, published] of claims) {
+				if (!channel.startsWith('style:')) continue;
+				const property = channel.slice(6);
+				const value = style.getPropertyValue(property);
+				const priority = style.getPropertyPriority(property);
+				if ((value === '' ? null : value + (priority ? ' !important' : '')) !== published) continue;
+				if (value === '') expectedStyle.removeProperty(property);
+				else expectedStyle.setProperty(property, value, priority);
 			}
 		}
 		const expected = expectedStyle.cssText;

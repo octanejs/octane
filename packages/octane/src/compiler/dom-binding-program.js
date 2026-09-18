@@ -62,7 +62,18 @@ export function needsBindingProgram(node, isUnbound) {
 	)
 		return true;
 	if (tagOf(node) === 'textarea') return false;
-	return (node.children ?? []).some((child) => needsBindingProgram(child, isUnbound));
+	const children = (node.children ?? []).filter(significant);
+	const child = children.length === 1 ? children[0] : null;
+	const expression = child?.type === 'JSXExpressionContainer' ? child.expression : null;
+	if (
+		child?.type === 'JSXText' ||
+		(expression?.type === 'Literal' && typeof expression.value === 'string') ||
+		(expression?.type === 'TSAsExpression' &&
+			(expression.typeAnnotation.type === 'TSStringKeyword' ||
+				expression.typeAnnotation.type === 'TSNumberKeyword'))
+	)
+		return false;
+	return children.some((child) => needsBindingProgram(child, isUnbound));
 }
 
 function data(value) {
