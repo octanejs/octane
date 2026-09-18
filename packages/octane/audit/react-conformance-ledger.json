@@ -2950,19 +2950,19 @@
     },
     {
       "caseId": "react-case-v1:08a1e898b87592733912",
-      "status": "covered",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMServerIntegrationNewContext-test.js",
       "title": "should treat Context as Context.Provider",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Server integration matrix",
-      "rationale": "React Consumer/class scaffolding is expressed with modern function components and useContext; executable evidence preserves the public provider-scope outcome across client, SSR, streaming, hydration recovery, and production compilation.",
+      "rationale": "Direct Context providers preserve the nested rendered-value outcome across client rendering, buffered and streaming SSR, matching and mismatching hydration, and production compilation. Octane intentionally removes the Context.Provider property, so React's Context.Provider === Context alias identity assertion is a documented divergence.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/server-integration-matrix.test.ts",
-          "testName": "supports the React 19 context provider shorthand",
+          "testName": "provides values through the context itself",
           "modes": [
             "client",
             "server-string",
