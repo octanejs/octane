@@ -8,6 +8,11 @@
  * intentionally instantiated afresh for every resource query.
  */
 import { builders as b, parseModule, strongHash } from '@tsrx/core';
+import {
+	createLexicalAnalysis,
+	forEachRuntimeAstChild,
+	isIdentifierReference,
+} from './compile-universal.js';
 
 export const HYDRATE_QUERY_PARAM = 'octane-hydrate';
 
@@ -1115,8 +1120,15 @@ function collectCaptures(
 	return [...captures];
 }
 
-function bindingInitializers(ast) {
-	const initializers = new Map();
+function captureBindingScope(lexical, node, name) {
+	return (
+		lexical.resolveBinding(lexical.nodeScopes.get(node) ?? lexical.rootScope, name)?.scope ??
+		lexical.rootScope
+	);
+}
+
+function bindingInitializers(ast, lexical) {
+	const initializers = new WeakMap();
 	const seen = new WeakSet();
 	const visit = (node) => {
 		if (!node || typeof node !== 'object' || seen.has(node)) return;
@@ -1128,7 +1140,14 @@ function bindingInitializers(ast) {
 		if (node.type === 'VariableDeclarator') {
 			const names = new Set();
 			collectBindingNames(node.id, names);
-			for (const name of names) initializers.set(name, node.init ?? null);
+			for (const name of names) {
+				const scope = captureBindingScope(lexical, node, name);
+				let bindings = initializers.get(scope);
+				if (bindings === undefined) initializers.set(scope, (bindings = new Map()));
+				let values = bindings.get(name);
+				if (values === undefined) bindings.set(name, (values = []));
+				values.push(node.init ?? null);
+			}
 		}
 		for (const [key, child] of Object.entries(node)) {
 			if (!SKIP_KEYS.has(key)) visit(child);
@@ -1138,8 +1157,8 @@ function bindingInitializers(ast) {
 	return initializers;
 }
 
-function assignedNamesOutsideBoundary(ast, boundary) {
-	const assigned = new Set();
+function assignedBindingsOutsideBoundary(ast, boundary, lexical) {
+	const assigned = new WeakMap();
 	const inside = new WeakSet();
 	collectSubtreeNodes(boundary.node.children, inside);
 	const seen = new WeakSet();
@@ -1153,7 +1172,12 @@ function assignedNamesOutsideBoundary(ast, boundary) {
 		if (node.type === 'AssignmentExpression' || node.type === 'UpdateExpression') {
 			const names = new Set();
 			collectBindingNames(node.type === 'AssignmentExpression' ? node.left : node.argument, names);
-			for (const name of names) assigned.add(name);
+			for (const name of names) {
+				const scope = captureBindingScope(lexical, node, name);
+				let bindings = assigned.get(scope);
+				if (bindings === undefined) assigned.set(scope, (bindings = new Set()));
+				bindings.add(name);
+			}
 		}
 		for (const [key, child] of Object.entries(node)) {
 			if (!SKIP_KEYS.has(key)) visit(child);
@@ -1163,18 +1187,53 @@ function assignedNamesOutsideBoundary(ast, boundary) {
 	return assigned;
 }
 
-function unsupportedIndependentInitializer(node, hookNames) {
+function unsupportedIndependentInitializer(node, lexical, initializers, memo) {
+	if (Array.isArray(node)) {
+		return node.some((value) =>
+			unsupportedIndependentInitializer(value, lexical, initializers, memo),
+		);
+	}
 	const value = unwrapExpression(node);
 	if (value == null) return false;
-	if (isFunction(value) || value.type === 'ClassExpression' || value.type === 'NewExpression') {
-		return true;
-	}
-	if (value.type !== 'CallExpression' && value.type !== 'OptionalCallExpression') return false;
-	if (isHookCall(value, hookNames)) return true;
-	// Calls can create request, DOM, class, store, or closure identity. A future
-	// proof may admit a pure JSON constructor; strict independent activation
-	// must not serialize the result merely because the local has a friendly name.
-	return true;
+	const cached = memo.get(value);
+	if (cached !== undefined) return cached;
+	// A cyclic alias cannot establish a standalone data initializer. The memo
+	// also avoids repeatedly walking shared alias chains across widgets.
+	memo.set(value, true);
+	const visit = (node, parent = null, key = null) => {
+		if (!node || typeof node !== 'object') return false;
+		if (
+			isFunction(node) ||
+			node.type === 'ClassExpression' ||
+			node.type === 'NewExpression' ||
+			node.type === 'CallExpression' ||
+			node.type === 'OptionalCallExpression'
+		) {
+			// Calls can create request, DOM, class, store, or closure identity.
+			// Wrapping that result in an alias or object does not erase its owner.
+			return true;
+		}
+		if (
+			node.type === 'Identifier' &&
+			isIdentifierReference(node, parent, key, lexical) &&
+			unsupportedIndependentInitializer(
+				initializers.get(captureBindingScope(lexical, node, node.name))?.get(node.name),
+				lexical,
+				initializers,
+				memo,
+			)
+		) {
+			return true;
+		}
+		let unsupported = false;
+		forEachRuntimeAstChild(node, (child, childKey) => {
+			if (!unsupported) unsupported = visit(child, node, childKey);
+		});
+		return unsupported;
+	};
+	const unsupported = visit(value);
+	memo.set(value, unsupported);
+	return unsupported;
 }
 
 function signalSitesInBoundary(boundary) {
@@ -1213,7 +1272,10 @@ function signalSitesInBoundary(boundary) {
 }
 
 function independentWidgetMetadata(analysis, filename, moduleMovePlan) {
-	const initializers = bindingInitializers(analysis.ast);
+	if (!analysis.boundaries.some((boundary) => boundary.independent)) return [];
+	const lexical = createLexicalAnalysis(analysis.ast);
+	const initializers = bindingInitializers(analysis.ast, lexical);
+	const initializerMemo = new WeakMap();
 	const widgets = [];
 	for (const boundary of analysis.boundaries) {
 		if (!boundary.independent) continue;
@@ -1234,12 +1296,13 @@ function independentWidgetMetadata(analysis, filename, moduleMovePlan) {
 			boundary.shadowedImports,
 			moduleBindings.size === 0 ? null : moduleBindings,
 		);
-		const assigned = assignedNamesOutsideBoundary(analysis.ast, boundary);
+		const assigned = assignedBindingsOutsideBoundary(analysis.ast, boundary, lexical);
 		for (const capture of captures) {
-			const initializer = initializers.get(capture);
+			const scope = captureBindingScope(lexical, boundary.node, capture);
+			const initializer = initializers.get(scope)?.get(capture);
 			if (
-				assigned.has(capture) ||
-				unsupportedIndependentInitializer(initializer, analysis.imports.hookNames)
+				assigned.get(scope)?.has(capture) ||
+				unsupportedIndependentInitializer(initializer, lexical, initializers, initializerMemo)
 			) {
 				throw extractionError(
 					'OCTANE_HYDRATE_INDEPENDENT_OWNER_CAPTURE',
@@ -1789,6 +1852,8 @@ function moduleReferencesForBoundary(analysis, boundary, request, moduleBindings
 		nestedAnalysis,
 		request,
 		moduleBindingsByPath,
+		[],
+		true,
 	);
 	return collectModuleReferences(fragment.body);
 }
