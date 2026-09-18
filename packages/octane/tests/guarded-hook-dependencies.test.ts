@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from './_helpers';
+import { loadCompiledFixtureSource } from './_server-fixture';
 import {
 	GuardedIf,
 	GuardedEarlyReturn,
@@ -13,6 +14,45 @@ import {
 } from './_fixtures/guarded-hook-dependencies.tsrx';
 
 describe('guarded inferred dependencies', () => {
+	it.each([
+		['switch', `switch (item?.kind) { case undefined: break outer; default: break; }`],
+		['loop', `while (!item) { break outer; }`],
+	] as const)('preserves an escaping labeled %s exit', (kind, statement) => {
+		// Source bytes exercise valid labeled control flow without relying on
+		// fixture formatters to support LabeledStatement printing.
+		const source = `
+import { useLayoutEffect } from 'octane';
+export function Guarded({ item, log }) @{
+  useLayoutEffect(() => {
+    outer: {
+      ${statement}
+      log(item.name);
+    }
+  });
+  <p>Ready</p>
+}`;
+		for (const dev of [true, false]) {
+			const body = loadCompiledFixtureSource(source, {
+				id: `guarded-labeled-${kind}.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev },
+			}).Guarded;
+			const entries: string[] = [];
+			const log = (value: string) => entries.push(value);
+			const root = mount(body, { item: undefined, log });
+			try {
+				expect(entries).toEqual([]);
+				root.update(body, { item: { name: 'first', kind: 'value' }, log });
+				root.update(body, { item: { name: 'second', kind: 'value' }, log });
+				root.update(body, { item: undefined, log });
+				expect(entries).toEqual(['first', 'second']);
+				expect(root.container.textContent).toBe('Ready');
+			} finally {
+				root.unmount();
+			}
+		}
+	});
+
 	it.each([
 		['if', GuardedIf],
 		['early return', GuardedEarlyReturn],

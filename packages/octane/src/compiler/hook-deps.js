@@ -1278,8 +1278,8 @@ function collectDependencies(expression, callbackScope, analysis) {
 		return completion || 0;
 	}
 
-	// Completion bits distinguish exits from this callback (return/throw) from
-	// exits consumed by an enclosing loop or switch (break/continue).
+	// Completion bits distinguish callback exits (1), local break/continue (2),
+	// and labeled exits (4), which can escape an enclosing loop or switch.
 	function walkStatements(statements) {
 		const depth = guardedDepth;
 		let completion = 0;
@@ -1322,7 +1322,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 				walk(node.discriminant);
 				let completion = 0;
 				for (const branch of node.cases || []) completion |= walkGuarded(branch);
-				return completion & 1;
+				return completion & 5;
 			}
 			case 'SwitchCase':
 				walk(node.test);
@@ -1331,18 +1331,18 @@ function collectDependencies(expression, callbackScope, analysis) {
 				walk(node.init);
 				walk(node.test);
 				walkGuarded(node.update);
-				return walkGuarded(node.body) & 1;
+				return walkGuarded(node.body) & 5;
 			case 'ForInStatement':
 			case 'ForOfStatement':
 				walkGuarded(node.left);
 				walk(node.right);
-				return walkGuarded(node.body) & 1;
+				return walkGuarded(node.body) & 5;
 			case 'WhileStatement':
 				walk(node.test);
-				return walkGuarded(node.body) & 1;
+				return walkGuarded(node.body) & 5;
 			case 'DoWhileStatement':
 				walkGuarded(node.test);
-				return walkGuarded(node.body) & 1;
+				return walkGuarded(node.body) & 5;
 			case 'TryStatement':
 				return walkGuarded(node.block) | walkGuarded(node.handler) | walkGuarded(node.finalizer);
 			case 'CatchClause':
@@ -1442,7 +1442,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 				return walk(node.body);
 			case 'BreakStatement':
 			case 'ContinueStatement':
-				return 2;
+				return node.label ? 4 : 2;
 			case 'JSXElement':
 			case 'Element':
 				walkJsxElement(node);
