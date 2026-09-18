@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from './_helpers';
-import { loadCompiledFixtureSource } from './_server-fixture';
+import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture';
 import {
 	GuardedIf,
 	GuardedEarlyReturn,
@@ -15,6 +15,127 @@ import {
 } from './_fixtures/guarded-hook-dependencies.tsrx';
 
 describe('guarded inferred dependencies', () => {
+	it.each([false, true])(
+		'keeps guarded own data dependencies precise (plain hook: %s)',
+		(plain) => {
+			const entries: string[] = [];
+			const setup = `import { useLayoutEffect } from 'octane';
+import { observe } from './probe';
+export function useRead(props) {
+  useLayoutEffect(() => { if (props.enabled) observe(props.label); });
+}`;
+			for (const dev of [true, false]) {
+				entries.length = 0;
+				const runtimeModules = { './probe': { observe: (label: string) => entries.push(label) } };
+				const hook = plain
+					? loadPlainHookFixtureSource(setup, {
+							id: '/src/GuardedData.ts',
+							inlineHookMemo: true,
+							hmr: dev,
+							runtimeModules,
+						})
+					: null;
+				const { App } = loadCompiledFixtureSource(
+					`${plain ? "import { useRead } from './hook';" : setup}
+export function App(props) @{ useRead(props); <p>{props.noise as string}</p> }`,
+					{
+						id: '/src/GuardedData.tsrx',
+						mode: 'client',
+						compileOptions: { hmr: false, dev },
+						runtimeModules: { ...runtimeModules, ...(hook ? { './hook': hook } : {}) },
+					},
+				);
+				const root = mount(App, { enabled: true, label: 'first', noise: 'one' });
+				try {
+					root.update(App, { enabled: true, label: 'first', noise: 'two' });
+					expect(root.container.textContent).toBe('two');
+					expect(entries).toEqual(['first']);
+					root.update(App, { enabled: true, label: 'second', noise: 'two' });
+					expect(entries).toEqual(['first', 'second']);
+				} finally {
+					root.unmount();
+				}
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'leaves guarded getter exceptions in plain and compiled hooks (%s)',
+		(plain) => {
+			for (const dev of [true, false]) {
+				const entries: string[] = [];
+				let enabled = false;
+				let reads = 0;
+				const item = {
+					get name() {
+						reads++;
+						if (!enabled) throw new Error('getter guard bypassed');
+						return 'present';
+					},
+				};
+				const setup = `import { useLayoutEffect } from 'octane';
+import { observe } from './probe';
+export function useRead({ item, enabled }) {
+  useLayoutEffect(() => { if (enabled) observe(item.name); });
+}`;
+				const runtimeModules = { './probe': { observe: (label: string) => entries.push(label) } };
+				const hook = plain
+					? loadPlainHookFixtureSource(setup, {
+							id: '/src/GuardedAccessor.ts',
+							inlineHookMemo: true,
+							hmr: dev,
+							runtimeModules,
+						})
+					: null;
+				const { App } = loadCompiledFixtureSource(
+					`${plain ? "import { useRead } from './hook';" : setup}
+export function App(props) @{ useRead(props); <p>Ready</p> }`,
+					{
+						id: '/src/GuardedAccessor.tsrx',
+						mode: 'client',
+						compileOptions: { hmr: false, dev },
+						runtimeModules: { ...runtimeModules, ...(hook ? { './hook': hook } : {}) },
+					},
+				);
+				const root = mount(App, { item, enabled });
+				try {
+					expect(reads).toBe(0);
+					enabled = true;
+					root.update(App, { item, enabled });
+					expect(entries).toEqual(['present']);
+					expect(reads).toBe(1);
+					enabled = false;
+					root.update(App, { item, enabled });
+					expect(reads).toBe(1);
+				} finally {
+					root.unmount();
+				}
+			}
+		},
+	);
+
+	it('keeps a failed descriptor probe inside the authored exception handler', () => {
+		const item = new Proxy(
+			{},
+			{
+				getOwnPropertyDescriptor() {
+					throw new Error('reflection unavailable');
+				},
+				get() {
+					throw new Error('read unavailable');
+				},
+			},
+		);
+		const entries: string[] = [];
+		const root = mount(GuardedTry, { item, log: (value: string) => entries.push(value) });
+		try {
+			expect(root.container.textContent).toBe('Ready');
+			expect(entries).toEqual(['missing']);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it.each([
 		['switch', `switch (item?.kind) { case undefined: break outer; default: break; }`],
 		['loop', `while (!item) { break outer; }`],

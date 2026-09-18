@@ -31,14 +31,26 @@
  * properties and the guard avoids boxing them. `null`/`undefined` receivers
  * (the optional call spellings `root?.m(...)` / `root.m?.(...)`) also fall
  * through to the receiver branch instead of throwing. Compiled dependency
- * arrays evaluate this helper on every render, so every branch must stay
- * allocation-free.
+ * arrays evaluate this helper on every render. The ordinary method-call path
+ * stays allocation-free. Guarded reads instead inspect an own descriptor so
+ * data properties retain precise dependencies without invoking accessors.
+ * Accessors and inherited properties track the receiver. A failed reflection
+ * probe also falls back to the receiver, leaving exceptions in authored code.
  */
 import { hasOwnProp } from './has-own.js';
 
-export function __methodDep(receiver: unknown, name: string): unknown {
+export function __methodDep(receiver: unknown, name: string, guarded = false): unknown {
 	if ((typeof receiver !== 'object' || receiver === null) && typeof receiver !== 'function') {
 		return receiver;
+	}
+	if (guarded) {
+		try {
+			const descriptor = Object.getOwnPropertyDescriptor(receiver, name);
+			if (descriptor) return 'value' in descriptor ? descriptor.value : receiver;
+			return name in receiver ? receiver : undefined;
+		} catch {
+			return receiver;
+		}
 	}
 	if (hasOwnProp.call(receiver, name)) return (receiver as Record<string, unknown>)[name];
 	return name in (receiver as object) ? receiver : undefined;

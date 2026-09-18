@@ -115,13 +115,17 @@ omitted. Mutating such an object in place is therefore not witnessed by a
 dependency array; state that should drive rendering belongs in state, context,
 or a store rather than a module singleton.
 
-Ordinary member reads inside a conditional branch, after a possible early exit,
-or protected by exception handling track their root receiver instead of reading
-the property during render. For example, `if (item) log(item.name)` tracks `item`
-and `log`, preserving the guard when `item` is absent. This can track a broader
-identity than an unconditional `item.name` read. Guarded method calls also track
-the receiver, leaving method getters behind the authored guard. Unguarded
-one-level method calls retain their null-safe, receiver-aware comparison below.
+Member reads inside a conditional branch, after a possible early exit, or
+protected by exception handling preserve that protection. For one-level reads,
+the inferred array inspects an own property descriptor: a data property tracks
+its value, while an accessor or inherited property tracks its receiver without
+invoking a getter. An absent property tracks `undefined`, and a nullish receiver
+tracks itself. Failed reflection probes also track the receiver, leaving the
+authored callback responsible for the read and its exception handling. Thus a
+guarded `props.onChange(...)` still tracks a stable own callback when the props
+container changes, while method getters stay behind their authored guard.
+These guarded probes allocate a property descriptor; ordinary unguarded
+one-level method calls retain the allocation-free comparison below.
 
 A one-level method call tracks the value that can change between renders. The
 compiled array selects that value on each render, based on where the method

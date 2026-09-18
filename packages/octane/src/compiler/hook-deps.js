@@ -1176,6 +1176,7 @@ function methodDepNode(dependency) {
 		b.id(`_$${METHOD_DEP_IMPORT}`, dependency.node),
 		{ ...dependency.method.root },
 		b.literal(dependency.method.name, JSON.stringify(dependency.method.name), dependency.node),
+		...(dependency.method.guarded ? [b.literal(true, 'true', dependency.node)] : []),
 	);
 	return {
 		...call,
@@ -1188,6 +1189,9 @@ function methodDepNode(dependency) {
 function collectDependencies(expression, callbackScope, analysis) {
 	const dependencies = [];
 	const seen = new Set();
+	// Only mixed guarded/unconditional captures need promotion. Keep the
+	// ordinary duplicate-read path free of dependency-array scans.
+	let guardedKeys;
 
 	function addIdentifier(node) {
 		const scope = analysis.nodeScopes.get(node);
@@ -1207,7 +1211,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 		}
 	}
 
-	function addStaticMember(info) {
+	function addStaticMember(info, guarded = false) {
 		const scope = analysis.nodeScopes.get(info.root);
 		const binding = scope ? resolveBinding(scope, info.root.name) : null;
 		if (
@@ -1221,7 +1225,14 @@ function collectDependencies(expression, callbackScope, analysis) {
 		const key = `b${binding.id}${info.path}`;
 		if (!seen.has(key)) {
 			seen.add(key);
-			dependencies.push({ node: info.node, key, binding });
+			const dependency = { node: info.node, key, binding };
+			if (guarded) {
+				dependency.method = { root: info.root, name: info.name, guarded: true };
+				(guardedKeys ??= new Set()).add(key);
+			}
+			dependencies.push(dependency);
+		} else if (!guarded && guardedKeys?.delete(key)) {
+			delete dependencies.find((dependency) => dependency.key === key).method;
 		}
 	}
 
@@ -1234,7 +1245,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 	// runtime. Deeper callees (`a.b.c(...)`) never reach here: their receiver
 	// path is recorded by the ordinary member walk, which cannot capture the
 	// method itself, so they were never exposed to the stale-method hazard.
-	function addMethodCall(info) {
+	function addMethodCall(info, guarded = false) {
 		const scope = analysis.nodeScopes.get(info.root);
 		const binding = scope ? resolveBinding(scope, info.root.name) : null;
 		if (
@@ -1254,8 +1265,11 @@ function collectDependencies(expression, callbackScope, analysis) {
 				node: info.node,
 				key,
 				binding,
-				method: { root: info.root, name: info.name },
+				method: { root: info.root, name: info.name, guarded },
 			});
+			if (guarded) (guardedKeys ??= new Set()).add(key);
+		} else if (!guarded && guardedKeys?.delete(key)) {
+			dependencies.find((dependency) => dependency.key === key).method.guarded = false;
 		}
 	}
 
@@ -1268,7 +1282,8 @@ function collectDependencies(expression, callbackScope, analysis) {
 	let opaqueDepth = 0;
 	// A property read in a branch, after a possible exit, or inside try/catch
 	// cannot be moved into render without bypassing its authored protection.
-	// Track receiver identities in those regions; the callback retains the read.
+	// Own data fields retain their values through a descriptor probe; getters
+	// and inherited fields track receivers while the callback retains the read.
 	let guardedDepth = 0;
 
 	function walkGuarded(node) {
@@ -1377,29 +1392,29 @@ function collectDependencies(expression, callbackScope, analysis) {
 					callee?.type === 'MemberExpression' || callee?.type === 'ChainExpression'
 						? staticMemberInfo(callee)
 						: null;
-				if (info && guardedDepth === 0) addMethodCall(info);
+				if (info) addMethodCall(info, guardedDepth > 0);
 				else walk(node.callee);
 				walk(node.arguments);
 				return;
 			}
 			case 'ChainExpression': {
-				if (opaqueDepth > 0 || guardedDepth > 0) {
+				if (opaqueDepth > 0) {
 					walk(node.expression);
 					return;
 				}
 				const info = staticMemberInfo(node);
-				if (info) addStaticMember(info);
+				if (info) addStaticMember(info, guardedDepth > 0);
 				else walk(node.expression);
 				return;
 			}
 			case 'MemberExpression': {
-				if (opaqueDepth > 0 || guardedDepth > 0) {
+				if (opaqueDepth > 0) {
 					walk(node.object);
 					if (node.computed) walk(node.property);
 					return;
 				}
 				const info = staticMemberInfo(node);
-				if (info) addStaticMember(info);
+				if (info) addStaticMember(info, guardedDepth > 0);
 				else {
 					walk(node.object);
 					if (node.computed) walk(node.property);
