@@ -210,6 +210,7 @@ const SUITES = [
 			{ filter: 'octane-tsrx-uibench-bench', port: 5315 },
 			{ filter: 'react-uibench-bench', port: 5316 },
 			{ filter: 'solid-uibench-bench', port: 5317 },
+			{ filter: 'solid-signal-uibench-bench', port: 5340 },
 			{ filter: 'preact-uibench-bench', port: 5318 },
 			{ filter: 'vue-vapor-uibench-bench', port: 5319 },
 			{ filter: 'ripple-uibench-bench', port: 5322 },
