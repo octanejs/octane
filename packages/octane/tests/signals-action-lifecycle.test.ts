@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { act, createRoot, flushSync, startTransition } from 'octane';
 
 function deferred<T>() {
@@ -16,6 +16,8 @@ async function pendingAction() {
 		scope: import('octane/signals').Scope;
 		count: import('octane/signals').WritableSignal<number>;
 		notifications: number[];
+		synchronousCount: number;
+		synchronousDoubled: number;
 		stop(): void;
 	}>();
 	const release = deferred<void>();
@@ -32,12 +34,14 @@ async function pendingAction() {
 				const doubled = scope.derived$('doubled', () => count.get() * 2);
 				const notifications: number[] = [];
 				stop = count.subscribe(() => notifications.push(count.get()));
+				let synchronousCount!: number;
+				let synchronousDoubled!: number;
 				startTransition(() => {
 					count.set(2);
-					expect(count.get()).toBe(2);
-					expect(doubled.get()).toBe(4);
+					synchronousCount = count.get();
+					synchronousDoubled = doubled.get();
 				});
-				ready.resolve({ scope, count, notifications, stop });
+				ready.resolve({ scope, count, notifications, synchronousCount, synchronousDoubled, stop });
 				await release.promise;
 			} catch (error) {
 				stop?.();
@@ -71,24 +75,37 @@ async function pendingAction() {
 }
 
 describe('native signal Action lifetimes', () => {
-	it('admits signals loaded after an Action awaits and publishes only when it settles', async () => {
-		const state = await pendingAction();
-		try {
-			expect(state.count.get()).toBe(0);
-			expect(state.notifications).toEqual([]);
-			await state.finish();
-			expect(state.count.get()).toBe(2);
-			expect(state.notifications).toEqual([2]);
-		} finally {
-			await state.finish();
-			state.stop();
-			state.scope.dispose();
-		}
+	describe('signals imported during a pending Action', () => {
+		let state: Awaited<ReturnType<typeof pendingAction>> | undefined;
+		beforeAll(async () => {
+			state = await pendingAction();
+		});
+		afterAll(async () => {
+			if (state === undefined) return;
+			try {
+				await state.finish();
+			} finally {
+				state.stop();
+				state.scope.dispose();
+			}
+		});
+		it('admits signals loaded after an Action awaits and publishes only when it settles', async () => {
+			const action = state!;
+			expect(action.synchronousCount).toBe(2);
+			expect(action.synchronousDoubled).toBe(4);
+			expect(action.count.get()).toBe(0);
+			expect(action.notifications).toEqual([]);
+			await action.finish();
+			expect(action.count.get()).toBe(2);
+			expect(action.notifications).toEqual([2]);
+		});
 	});
 
 	it('keeps an urgent replacement when the earlier Action finishes', async () => {
 		const state = await pendingAction();
 		try {
+			expect(state.synchronousCount).toBe(2);
+			expect(state.synchronousDoubled).toBe(4);
 			flushSync(() => state.count.set(7));
 			expect(state.count.get()).toBe(7);
 			expect(state.notifications).toEqual([7]);
@@ -105,6 +122,8 @@ describe('native signal Action lifetimes', () => {
 	it('preserves chronological functional edits across an urgent update', async () => {
 		const state = await pendingAction();
 		try {
+			expect(state.synchronousCount).toBe(2);
+			expect(state.synchronousDoubled).toBe(4);
 			flushSync(() => state.count.set((value) => value + 3));
 			expect(state.count.get()).toBe(3);
 			expect(state.notifications).toEqual([3]);
@@ -120,14 +139,17 @@ describe('native signal Action lifetimes', () => {
 
 	it('retires pending owner work without publishing after disposal', async () => {
 		const state = await pendingAction();
-		state.scope.dispose();
 		try {
+			expect(state.synchronousCount).toBe(2);
+			expect(state.synchronousDoubled).toBe(4);
+			state.scope.dispose();
 			await state.finish();
 			expect(state.notifications).toEqual([]);
 			expect(() => state.count.get()).toThrow(/disposed/i);
 		} finally {
 			await state.finish();
 			state.stop();
+			state.scope.dispose();
 		}
 	});
 
