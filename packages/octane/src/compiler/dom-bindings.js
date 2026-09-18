@@ -1057,7 +1057,6 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 			}
 			if (
 				!/^[A-Za-z_][A-Za-z0-9_.:-]*$/.test(name) ||
-				lower.startsWith('on') ||
 				FORBIDDEN_ATTRS.has(lower) ||
 				lower.startsWith('data-octane-class-')
 			) {
@@ -1067,6 +1066,9 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 				unboundAttributes.add(lower);
 				continue;
 			}
+			// Explicitly unbound handlers remain with the normal renderer.
+			if (lower.startsWith('on'))
+				error(filename, attr, 'event handlers must be explicitly unbound');
 			if (value?.type !== 'Literal' && externalNames.has(lower))
 				error(
 					filename,
@@ -1188,6 +1190,10 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 			(binding, index) =>
 				binding[0] === 0 &&
 				(['class', 'styleProperty', 'styleAttribute', 'styleObject'].includes(binding[1]) ||
+					(binding[1] === 'aria' &&
+						((binding[2].startsWith('data-') && !binding[2].startsWith('data-octane-')) ||
+							binding[2].startsWith('aria-'))) ||
+					(binding[1] === 'attr' && binding[2] === 'tabindex') ||
 					providerBindings.has(index)),
 		) &&
 		[...(render.openingElement?.attributes ?? render.attributes ?? [])].every(
@@ -1468,6 +1474,7 @@ function projectProgram(ast, plan, filename, lexical) {
 		const styleFactory = plan.styles ? allocate('_bindingStyles') : null;
 		const controlFactory = plan.controls ? allocate('_bindingControls') : null;
 		const hostCapability = plan.hostOperations ? allocate('_bindingHostOperations') : null;
+		const initialCapability = plan.initialOperations ? allocate('_bindingInitialOperations') : null;
 		const listCapability = plan.lists ? allocate('_bindingList') : null;
 		const projectionFactory = plan.projectionsEnabled ? allocate('_bindingProjections') : null;
 		// Imported child artifacts carry their optional capabilities. Forward a
@@ -1477,13 +1484,23 @@ function projectProgram(ast, plan, filename, lexical) {
 				? b.id(local)
 				: [...plan.childPrograms]
 						.map((child) =>
-							name === 'list' || name === 'hostOperations'
+							name === 'initialOperations'
 								? b.logical(
 										'??',
 										b.member(b.id(child), name),
-										b.member(b.member(b.id(child), 'adopt'), name),
+										b.logical(
+											'??',
+											b.member(b.id(child), 'hostOperations'),
+											b.member(b.member(b.id(child), 'adopt'), 'hostOperations'),
+										),
 									)
-								: b.member(b.id(child), name),
+								: name === 'list' || name === 'hostOperations'
+									? b.logical(
+											'??',
+											b.member(b.id(child), name),
+											b.member(b.member(b.id(child), 'adopt'), name),
+										)
+									: b.member(b.id(child), name),
 						)
 						.reduce((left, right) => (left ? b.logical('||', left, right) : right), null);
 			return value ? [b.prop('init', b.id(name), value)] : [];
@@ -1565,6 +1582,7 @@ function projectProgram(ast, plan, filename, lexical) {
 							['__mountLeanBindingProgram', mount],
 							...(listCapability ? [['__bindingList', listCapability]] : []),
 							...(hostCapability ? [['__bindingProgramHostOperations', hostCapability]] : []),
+							...(initialCapability ? [['__bindingProgramInitializers', initialCapability]] : []),
 						],
 						'octane/dom-binding-program',
 					),
@@ -1597,6 +1615,7 @@ function projectProgram(ast, plan, filename, lexical) {
 							...capability('createControls', controlFactory),
 							...capability('list', listCapability),
 							...capability('hostOperations', hostCapability),
+							...capability('initialOperations', initialCapability),
 							...(signalFactory
 								? [b.prop('init', b.id('connectSignal'), b.id(signalFactory))]
 								: []),

@@ -1,4 +1,5 @@
 export { condition } from './condition.js';
+export { getLeadingHydrationListRange, type HydrationListRange } from '../stream-protocol.js';
 export { decodeSignalValue } from '../data-encoding.js';
 export type { HydrationCondition } from './condition.js';
 export {
