@@ -35,6 +35,16 @@ const existingScenarios = [
 	['binding-vanilla', 'ts'],
 	['binding-hooks', 'tsrx'],
 ];
+const signalFreeClientScenarios = new Set([
+	'cli-spa-starter',
+	'root-static-specialized',
+	'root-static',
+	'hooks-state',
+	'context',
+	'hydrate-root',
+	'deferred-hydration',
+	'suspense-transition',
+]);
 const bindingScenarios = [
 	{
 		id: 'binding-base-ui',
@@ -228,14 +238,13 @@ export function run(container) {
 	const page = container.querySelector('main.page');
 	const title = page?.querySelector('h1');
 	const quickStart = container.querySelector('a[href="https://octanejs.dev/docs/quick-start"]');
-	const scopedStyle = document.head.querySelector('style[data-octane]');
 	return {
 		page: page !== null,
 		title: title?.textContent,
 		quickStart: quickStart?.querySelector('.link-title')?.textContent,
 		quickStartHref: quickStart?.getAttribute('href'),
 		links: container.querySelectorAll('a').length,
-		styled: scopedStyle?.textContent?.includes('.page') ?? false,
+		styled: page !== null && getComputedStyle(page).display === 'flex',
 	};
 }
 `;
@@ -339,10 +348,14 @@ async function buildScenario(scenario, entry) {
 	const modules = Object.entries(chunk.modules)
 		.filter(([, module]) => !scenario.package || module.renderedLength > 0)
 		.map(([id]) => id);
+	const emittedModules = Object.entries(chunk.modules)
+		.filter(([, module]) => module.renderedLength > 0)
+		.map(([id]) => id);
 	const runtimeModule = modules.find((id) => id.endsWith('/packages/octane/src/runtime.ts'));
 	return {
 		code: chunk.code,
 		modules,
+		emittedModules,
 		runtimeExports: runtimeModule ? chunk.modules[runtimeModule].renderedExports : [],
 	};
 }
@@ -352,11 +365,25 @@ try {
 		const { id, name } = scenario;
 		const serverScenario = id.startsWith('server-');
 		const entry = path.join(fixtures, `${id}.${scenario.extension}`);
-		const { code, modules, runtimeExports } = await buildScenario(scenario, entry);
+		const {
+			code,
+			modules,
+			emittedModules = modules,
+			runtimeExports,
+		} = await buildScenario(scenario, entry);
 		for (const [label, pattern] of forbidden) {
 			if (serverScenario && label === 'server runtime') continue;
 			const leaked = modules.find((id) => pattern.test(id));
 			assert.equal(leaked, undefined, `${name}: ${label} reached the production bundle: ${leaked}`);
+		}
+		if (signalFreeClientScenarios.has(id)) {
+			assert.deepEqual(
+				emittedModules.filter((module) =>
+					/\/packages\/octane\/src\/signals\/transition-(?:candidate|action)\.[jt]s$/.test(module),
+				),
+				[],
+				`${name}: signal-free client retained the concrete native transition implementation`,
+			);
 		}
 		const hasRuntime = modules.some((module) => module.endsWith('/packages/octane/src/runtime.ts'));
 		const hasServerRuntime = modules.some((module) =>

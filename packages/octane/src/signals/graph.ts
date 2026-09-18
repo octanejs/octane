@@ -4,8 +4,10 @@ import {
 	deferCandidateInvalidation,
 	recordCandidateUrgentWrite,
 	registerCandidateGraph,
+	registerSignalActionFrameFactory,
 	withoutSignalCandidate,
 } from './transition-state.js';
+import { SignalActionFrame } from './transition-action.js';
 import type { SignalCandidateFrame } from './transition-candidate.js';
 import {
 	createReactiveSystem,
@@ -964,3 +966,5 @@ registerCandidateGraph({
 	createNativeSource,
 	attachObserver,
 });
+
+registerSignalActionFrameFactory(() => new SignalActionFrame());

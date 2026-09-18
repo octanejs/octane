@@ -532,7 +532,12 @@ function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
 }
 
 function canCarryDirectSignalHandle(node) {
-	if (!node || node.metadata?.octane_string_child || node.metadata?.octane_primitive_text_child) {
+	if (
+		!node ||
+		node.metadata?.octane_string_child ||
+		node.metadata?.octane_primitive_text_child ||
+		node.metadata?.octane_primitive_value
+	) {
 		return false;
 	}
 	if (
@@ -626,7 +631,7 @@ function componentInvocationSite(ctx, node) {
 function markDirectSignalBinding(binding, ctx, origin, kind) {
 	if (!canCarryDirectSignalHandle(binding.expr)) return binding;
 	ctx.signalBindingsUsed = true;
-	if (binding.kind !== 'text' && binding.kind !== 'textOnlyChild') ctx.signalBindingsEager = true;
+	if (isDirectSignalHandleExpression(binding.expr)) ctx.signalBindingsEager = true;
 	return {
 		...binding,
 		signalDirect: true,
@@ -19864,7 +19869,70 @@ function memberProps(hn, src) {
 		// node so the extracted fragment keeps it (dev hydration LOC / DevTools). Without
 		// this, fragment extraction would silently drop the upstream position.
 		loc: src && src.loc,
+		// The extracted prop carries the already-evaluated source value. Preserve
+		// primitive value proofs separately from the renderer's text assertions:
+		// an authored `as string` still permits a signal handle at runtime.
+		...(isPrimitiveValueExpression(src)
+			? { metadata: { ...src?.metadata, octane_primitive_value: true } }
+			: null),
 	};
+}
+
+function isPrimitiveValueExpression(node) {
+	if (!node || typeof node !== 'object') return false;
+	if (
+		node.type === 'TSAsExpression' ||
+		node.type === 'TSTypeAssertion' ||
+		node.type === 'TSSatisfiesExpression' ||
+		node.type === 'TSNonNullExpression' ||
+		node.type === 'TSInstantiationExpression' ||
+		node.type === 'ParenthesizedExpression' ||
+		node.type === 'ChainExpression'
+	) {
+		return isPrimitiveValueExpression(node.expression);
+	}
+	if (
+		node.metadata?.octane_string_child ||
+		node.metadata?.octane_primitive_text_child ||
+		node.metadata?.octane_primitive_value
+	) {
+		return true;
+	}
+	if (node.type === 'Literal') {
+		return (
+			node.regex == null &&
+			(node.value == null || (typeof node.value !== 'object' && typeof node.value !== 'function'))
+		);
+	}
+	if (
+		node.type === 'StringLiteral' ||
+		node.type === 'NumericLiteral' ||
+		node.type === 'BigIntLiteral' ||
+		node.type === 'BooleanLiteral' ||
+		node.type === 'NullLiteral' ||
+		node.type === 'TemplateLiteral' ||
+		node.type === 'UnaryExpression' ||
+		node.type === 'BinaryExpression' ||
+		node.type === 'UpdateExpression'
+	) {
+		return true;
+	}
+	if (node.type === 'ConditionalExpression') {
+		return (
+			isPrimitiveValueExpression(node.consequent) && isPrimitiveValueExpression(node.alternate)
+		);
+	}
+	if (node.type === 'LogicalExpression') {
+		return isPrimitiveValueExpression(node.left) && isPrimitiveValueExpression(node.right);
+	}
+	if (node.type === 'SequenceExpression') {
+		return isPrimitiveValueExpression(node.expressions.at(-1));
+	}
+	if (node.type === 'AssignmentExpression') {
+		if (node.operator === '=') return isPrimitiveValueExpression(node.right);
+		return node.operator === '+=' || NUMERIC_TEXT_OPERATORS.has(node.operator.slice(0, -1));
+	}
+	return false;
 }
 function objectProp(hn, valNode) {
 	return b.prop('init', b.id(hn), valNode);
@@ -25270,7 +25338,7 @@ function planJsx(
 			}
 			if (!noTemplate && cc.signalSite != null && (ctx.signalBindingsUsed || ctx.nativeReads)) {
 				ctx.signalBindingsUsed = true;
-				ctx.signalBindingsEager = true;
+				if (isDirectSignalHandleExpression(cc.valueExpr)) ctx.signalBindingsEager = true;
 				ctx.runtimeNeeded.add('bindSignalChild');
 				const tokenKey = `_sigch$${cc.id}`;
 				bag.constField(tokenKey, b.literal(null));
@@ -27813,7 +27881,7 @@ function emitElementHtml(
 		const site = directSignalSite(ctx, node, 'input');
 		ensureDirectControlSite(site);
 		ctx.signalBindingsUsed = true;
-		ctx.signalBindingsEager = true;
+		if (isDirectSignalHandleExpression(expression)) ctx.signalBindingsEager = true;
 		return { ...binding, signalDirect: true, signalSite: site };
 	};
 	const hostSignalSite = directSignalSite(ctx, node, 'binding');
@@ -28582,7 +28650,15 @@ function emitElementHtml(
 			);
 		if (signalHostSources) {
 			ctx.signalBindingsUsed = true;
-			ctx.signalBindingsEager = true;
+			if (
+				hasDirectSignalStyle ||
+				hostClientSources.some((source) =>
+					source.spread
+						? spreadContainsDirectSignalHandle(source.binding.expr)
+						: isDirectSignalHandleExpression(source.binding.expr),
+				)
+			)
+				ctx.signalBindingsEager = true;
 		}
 		hostCommitClientBinding = {
 			id: bindings.length,
