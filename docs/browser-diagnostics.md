@@ -53,16 +53,28 @@ and HMR tracing did not observe a reload request before the disconnect.
 
 The adapted Base UI browser test server now sends `Cache-Control: no-store`. Three
 consecutive complete 315-file loading probes passed with this setting on the
-original Playwright 1.61.1 / Chromium 149 toolchain. Two consecutive full adapted
+original Playwright 1.61.1 / Chromium 149 toolchain. Four consecutive full adapted
 runs also passed all 8,709 tests each. Both lanes retain the default
 headless-shell configuration and UTC timezone. These controls implicate the
 cached module-loading path; they do not establish the browser-internal cause.
 Test inventories, assertions, isolation, timeouts and retry policies are unchanged.
 
-The React oracle retains its original test-server settings. Applying the same
-header there also exposed the nested context-menu `act()` warning. That change
-was removed; the untouched oracle passed all 8,726 tests. Console-error checks
-remain enabled in both lanes.
+The React oracle retains its original test-server settings. The nested
+context-menu `act()` warning occurred both with the no-store experiment and in an
+untouched reference repeat (8,725 passes, one failure), after an untouched run
+passed all 8,726 tests. It is an independent intermittent baseline failure, not
+evidence that the header caused it. Console-error checks remain enabled.
+
+## Intersection Observer cold dependency reload
+
+A separate cold-start failure aborted the adapted Intersection Observer browser
+test import: Vite discovered `devalue` during the import, rebuilt its optimized
+dependencies, and reloaded the running test. This lane now preloads
+`octane > devalue`, the nested dependency used by Octane's RPC client.
+The browser-tooling regression runs the existing two behavior tests from a fresh
+cache and rejects Vitest's unexpected-reload warning. It fails with the original
+configuration and passes with the preload; five additional cold starts also
+passed without the warning. No test cases or assertions were removed.
 
 ## Observer constraints
 

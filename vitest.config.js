@@ -6237,6 +6237,9 @@ export default defineConfig({
 						instances: [{ browser: 'chromium' }],
 					},
 				},
+				// Discovering this nested runtime dependency after the test starts
+				// reloads the browser and can abort the test module import.
+				optimizeDeps: { include: ['octane > devalue'] },
 				plugins: [octane()],
 				resolve: {
 					alias: [
