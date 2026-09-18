@@ -115,6 +115,21 @@ omitted. Mutating such an object in place is therefore not witnessed by a
 dependency array; state that should drive rendering belongs in state, context,
 or a store rather than a module singleton.
 
+Member reads inside a conditional branch, after a possible early exit, or
+protected by exception handling preserve that protection. For one-level reads,
+the inferred array inspects an own property descriptor: a data property tracks
+its value, while an accessor or inherited property tracks its receiver without
+invoking a getter. An absent property tracks `undefined`. Failed reflection
+probes track the receiver, leaving the
+authored callback responsible for the read and its exception handling. Thus a
+guarded `props.onChange(...)` still tracks a stable own callback when the props
+container changes, while method getters stay behind their authored guard.
+Null and undefined receivers use separate module-local markers, so a failed receiver
+read does not compare equal to a successful own-data read of null or undefined.
+These markers are created once per module, rather than once per probe.
+These guarded probes allocate a property descriptor; ordinary unguarded
+one-level method calls retain the allocation-free comparison below.
+
 A one-level method call tracks the value that can change between renders. The
 compiled array selects that value on each render, based on where the method
 lives:

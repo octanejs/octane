@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { bootstrapIndependentHydration } from '../../src/hydration/independent-island.js';
+import { compile } from 'octane/compiler';
+import {
+	bootstrapIndependentHydration,
+	type IndependentHydrateActivationContext,
+} from '../../src/hydration/independent-island.js';
+import { renderToString } from '../../src/runtime.server.js';
+import { evaluateCompiledFixtureCode } from '../_server-fixture.js';
 import {
 	createIndependentHydrateManifest,
 	serializeIndependentHydrateManifest,
@@ -44,6 +50,229 @@ async function settle(): Promise<void> {
 }
 
 describe('independent hydration bootstrap', () => {
+	it.each(
+		[false, true].flatMap((dev) =>
+			['template', 'tsx', 'return-tsrx'].map((authoring) => ({ dev, authoring })),
+		),
+	)(
+		'activates a load widget without running its parent or loading an interaction sibling (%j)',
+		async ({ dev, authoring }) => {
+			const children = `<main>
+  <Hydrate independent when={load()} children={renderChildren()}>
+    <input data-draft defaultValue="server" />
+    <button type="button" data-load onClick={() => choose('load')}>{readLabel(__octaneIndependentProps) as string}</button>
+    <Hydrate independent when={interaction({ events: 'click' })}>
+      <input data-nested-draft defaultValue="nested server" />
+      <button type="button" data-nested onClick={() => choose('nested')}>Nested widget</button>
+    </Hydrate>
+  </Hydrate>
+  <Hydrate independent when={interaction({ events: 'click' })}>
+    <button type="button" data-interaction onClick={() => choose('interaction')}>Dormant widget</button>
+  </Hydrate>
+</main>`;
+			const source = `import { Hydrate } from 'octane';
+import { interaction, load } from 'octane/hydration';
+import { choose, readLabel, renderChildren, renderShell } from './actions';
+${authoring === 'template' ? `export function App() @{ renderShell(); const __octaneIndependentProps = 'Loaded widget'; ${children} }` : `export function App() { renderShell(); const __octaneIndependentProps = 'Loaded widget'; return ${children}; }`}`;
+			const file = `/project/src/LoadWidget.${authoring === 'tsx' ? 'tsx' : 'tsrx'}`;
+			const observations: string[] = [];
+			const server = evaluateCompiledFixtureCode(
+				compile(source, file, { mode: 'server', dev }).code,
+				file,
+				'server',
+				{
+					'./actions': {
+						choose() {},
+						renderShell() {
+							observations.push('shell');
+						},
+						renderChildren() {
+							observations.push('overwritten children');
+							return null;
+						},
+						readLabel(label: string) {
+							observations.push(label);
+							return label;
+						},
+					},
+				},
+			);
+			const choose = vi.fn();
+			const compileWidget = (path: string) =>
+				evaluateCompiledFixtureCode(
+					compile(source, file + '?octane-hydrate=' + path, { mode: 'client', dev }).code,
+					file,
+					'client',
+					{
+						'./actions': {
+							choose,
+							readLabel: (label: string) => label,
+							renderShell() {
+								throw new Error('The widget must not run its lexical parent.');
+							},
+						},
+					},
+				);
+			const widget = compileWidget('0');
+			const nestedWidget = compileWidget('0.0');
+			const host = document.createElement('div');
+			host.innerHTML = renderToString(server.App, undefined, {
+				independentHydration: {
+					buildId: 'load-widget-test',
+					resolve: (boundaryId) => ({
+						moduleId: boundaryId,
+						styles: [],
+					}),
+				},
+			}).html;
+			expect(observations).toEqual(['shell', 'overwritten children', 'Loaded widget']);
+			document.body.append(host);
+			const button = host.querySelector<HTMLButtonElement>('[data-load]')!;
+			const input = host.querySelector<HTMLInputElement>('[data-draft]')!;
+			input.value = 'edited before activation';
+			const nestedButton = host.querySelector<HTMLButtonElement>('[data-nested]')!;
+			const nestedInput = host.querySelector<HTMLInputElement>('[data-nested-draft]')!;
+			nestedInput.value = 'nested edit before activation';
+			const sibling = host.querySelector<HTMLButtonElement>('[data-interaction]')!;
+			const loadManifest = JSON.parse(
+				button.parentElement!.querySelector(':scope > script[data-octane-independent]')!
+					.textContent!,
+			);
+			const nestedManifest = JSON.parse(
+				nestedButton.parentElement!.querySelector('script[data-octane-independent]')!.textContent!,
+			);
+			const errors: unknown[] = [];
+			let active = false;
+			let nestedActive = false;
+			const modules: string[] = [];
+			const cleanup = bootstrapIndependentHydration(host, {
+				buildId: 'load-widget-test',
+				loadStyles() {},
+				async loadModule(moduleId) {
+					modules.push(moduleId);
+					return {
+						default(context: IndependentHydrateActivationContext) {
+							const nested = moduleId === nestedManifest.moduleId;
+							const root = (nested ? nestedWidget : widget).default(context);
+							if (nested) nestedActive = true;
+							else active = true;
+							return root;
+						},
+					};
+				},
+				onError: (error) => errors.push(error),
+			});
+			try {
+				await vi.waitFor(() => expect(active).toBe(true));
+				expect(host.querySelector('[data-load]')).toBe(button);
+				expect(host.querySelector('[data-draft]')).toBe(input);
+				expect(input.value).toBe('edited before activation');
+				expect(button.textContent).toBe('Loaded widget');
+				expect(host.querySelector('[data-nested]')).toBe(nestedButton);
+				expect(host.querySelector('[data-nested-draft]')).toBe(nestedInput);
+				expect(nestedInput.value).toBe('nested edit before activation');
+				expect(host.querySelector('[data-interaction]')).toBe(sibling);
+				expect(modules).toEqual([loadManifest.moduleId]);
+				button.click();
+				expect(choose.mock.calls).toEqual([['load']]);
+				nestedButton.click();
+				await vi.waitFor(() => expect(nestedActive).toBe(true));
+				expect(modules).toEqual([loadManifest.moduleId, nestedManifest.moduleId]);
+				expect(choose.mock.calls).toEqual([['load'], ['nested']]);
+				expect(host.querySelector('[data-nested]')).toBe(nestedButton);
+				expect(host.querySelector('[data-nested-draft]')).toBe(nestedInput);
+				expect(nestedInput.value).toBe('nested edit before activation');
+				expect(errors).toEqual([]);
+			} finally {
+				cleanup();
+				host.remove();
+			}
+		},
+	);
+
+	it('resumes an automatically loading widget after pausing its pending stylesheet', async () => {
+		const host = document.createElement('main');
+		const widget = island('widget', 'paused-load', 'widget.js', 'Waiting');
+		widget.setAttribute('data-octane-hydrate-when', 'load');
+		host.append(widget);
+		document.body.append(host);
+		let release!: () => void;
+		const styles = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		let stylesStarted = false;
+		const modules: string[] = [];
+		const cleanup = bootstrapIndependentHydration(host, {
+			loadStyles() {
+				stylesStarted = true;
+				return styles;
+			},
+			async loadModule(moduleId) {
+				modules.push(moduleId);
+				return {
+					default() {
+						widget.querySelector('button')!.textContent = 'Ready';
+					},
+				};
+			},
+		});
+		try {
+			await vi.waitFor(() => expect(stylesStarted).toBe(true));
+			cleanup.pause();
+			release();
+			await settle();
+			expect(modules).toEqual([]);
+			expect(widget.querySelector('button')!.textContent).toBe('Waiting');
+			cleanup.resume();
+			await vi.waitFor(() => expect(widget.querySelector('button')!.textContent).toBe('Ready'));
+			expect(modules).toEqual(['widget.js']);
+		} finally {
+			release();
+			cleanup();
+			host.remove();
+		}
+	});
+
+	it.each(['removed', 'disposed'])(
+		'does not import an automatically loading widget retired while styles are pending (%s)',
+		async (retirement) => {
+			const host = document.createElement('main');
+			const widget = island('widget', `retired-load-${retirement}`, 'widget.js', 'Waiting');
+			widget.setAttribute('data-octane-hydrate-when', 'load');
+			host.append(widget);
+			document.body.append(host);
+			let release!: () => void;
+			const styles = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			let stylesStarted = false;
+			const modules: string[] = [];
+			const cleanup = bootstrapIndependentHydration(host, {
+				loadStyles() {
+					stylesStarted = true;
+					return styles;
+				},
+				async loadModule(moduleId) {
+					modules.push(moduleId);
+					return { default() {} };
+				},
+			});
+			try {
+				await vi.waitFor(() => expect(stylesStarted).toBe(true));
+				if (retirement === 'removed') widget.remove();
+				else cleanup();
+				await settle();
+				release();
+				await settle();
+				expect(modules).toEqual([]);
+			} finally {
+				release();
+				cleanup();
+				host.remove();
+			}
+		},
+	);
+
 	it('rejects a different build before loading styles or activating its HTML', async () => {
 		const host = document.createElement('main');
 		const widget = island('widget', 'foreign-build', 'widget.js', 'Original');
