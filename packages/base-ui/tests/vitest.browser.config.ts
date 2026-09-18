@@ -32,7 +32,12 @@ export default defineConfig({
 			enabled: true,
 			headless: true,
 			screenshotFailures: false,
-			provider: playwright({ contextOptions: { timezoneId: 'UTC' } }),
+			// Headless shell can drop the orchestrator's WebSockets during long
+			// isolated runs. Use Chromium's new headless mode for the adapted lane.
+			provider: playwright({
+				contextOptions: { timezoneId: 'UTC' },
+				launchOptions: { channel: 'chromium' },
+			}),
 			instances: [{ browser: 'chromium' }],
 		},
 	},

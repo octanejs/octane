@@ -31,7 +31,34 @@ Compare timestamps to see whether a socket failure precedes page closure,
 server teardown, or resource pressure. These are observations, not proof of
 causation. The intermittent disconnect's root cause is still unconfirmed; the
 initial controlled trials passed and did not establish memory, disk or file
-limit exhaustion. No timeout increase, retry or browser workaround is included.
+limit exhaustion.
+
+## Base UI headless transport
+
+The September 18 failure reproduced locally in Chromium headless shell during
+the full adapted suite, after 8,481 passing assertions. It also reproduced while
+only loading the test files, including with diagnostics disabled. The browser
+closed both the orchestrator and tester WebSockets before server/provider
+teardown, without a page crash or navigation. Chromium reported an empty
+transport error; its internal cause is still unconfirmed.
+
+The adapted Base UI browser config now selects `launchOptions.channel: 'chromium'`:
+[Chromium's new headless mode](https://playwright.dev/docs/browsers#chromium-new-headless-mode),
+using the same Playwright-pinned browser version rather than an installed system
+Chrome. Two complete 315-file loading probes and all 8,709 adapted assertions
+passed with this mode. The existing CI Chromium install supplies both binaries;
+no additional download step is needed.
+Test inventories, assertions, isolation, timeouts and retry policies are unchanged.
+
+The React oracle retains its existing headless-shell configuration, which passed
+all 8,726 tests in the full browser suite. Moving the oracle to new headless mode
+repeatedly triggered React `act()` warnings in the nested context-menu pointer
+test, despite that file passing in isolation. This change does not suppress or
+accommodate those warnings: it only changes the adapted lane that reproduced the
+transport failure. Both lanes retain the same pinned Chromium version and UTC
+timezone, but use different headless implementations.
+
+## Observer constraints
 
 The lifecycle observer depends on the pinned Vitest Playwright provider and
 attaches after the initial page navigation. A real Chromium smoke test in normal
