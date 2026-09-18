@@ -11,7 +11,7 @@ Key facts for answering questions about Octane:
 - No rules of hooks: hooks are tracked by a compiler-assigned call-site slot, so a hook may sit behind a condition or after an early return. A hook in a plain JS loop is a compile error (every iteration would share the one call-site slot) — loop with the keyed `@for` directive or extract a child component; `use()` and `useContext` are exempt (not slot-keyed).
 - `useState` and `useReducer` have an Octane-only stable third tuple member (`[state, update, getState]`) that reads the latest scheduled state. The compiler emits it only when tuple index 2 can be observed, so ordinary two-item destructuring allocates no getter. Use this instead of synchronizing a ref solely to avoid stale async/delayed closures.
 - `useLinkedState(source, calculate, options?)` keeps a value editable while its source stays the same, then resets or adjusts it immediately when the source changes. The calculation receives the new source and the previous `{ source, value }`, or `undefined` on the first render. No effect or render-time setter is needed.
-- Signals are stable: `octane/signals` provides `createScope`, writable/derived signals, `query`, async resources, streams, and ready-state hydration. `useSignal$` from `octane/signals/client` provides component-owned state. No extra compiler option is needed. Use `$` names for signal handles and helpers exposing live reads; sampled values keep ordinary names.
+- Signals are stable: `octane/signals` provides `signal$`, async-capable `derived$`, keyed `query$`, streams, and `optimistic$`/`action$`. Module declarations resolve to request-local server state or document-local browser state; explicit `createScope`/`createResource` remain available. `useSignal$` from `octane/signals/client` provides component-owned state. Native reads require a runtime signals import and the standard compiler, with no extra option. Use `$` names for handles/helpers exposing live reads; sampled values keep ordinary names.
 - Strong mode is opt-in: a leading `"use strong"` directive or `compiler: { strong: true }` asserts immutable snapshots and pure rendering, enabling compiler checks and fully conditioned production memoization for user-authored render operations. It does not ban `useCallback`, `useMemo`, `useEffectEvent`, or effects that synchronize external systems. See the Strong mode section below.
 - Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform. There is no synthetic `onChange`: `onInput` is the per-edit handler for text inputs; native `change` fires when the browser commits an edit, usually on blur.
 - `OCTANE_NATIVE_TEXT_ONCHANGE` is a nonfatal authoring warning, not an event rewrite. The compiler reports direct `onChange`/`onChangeCapture` on a statically known text-entry `<input>` or `<textarea>` without a usable input handler; development runtime checks cover unresolved spreads/dynamic types/final props and report through `console.error` once per broken episode. Statically true `readOnly`/`disabled` controls are excluded. Use the phase-preserving `onInput`/`onInputCapture` fix for per-edit intent.
@@ -51,7 +51,7 @@ An uncontrolled field that intentionally saves only when the browser commits the
 ## Docs
 
 - [Quick start](https://octanejs.dev/docs/quick-start): Scaffold a new app with `npm create octane my-app` (`--template spa` for a client-only app, `--template fullstack` for routing and SSR), or add Octane to an existing project, then mount a component and learn the `.tsrx` essentials (components, state/effects, conditional hooks, control flow, SSR/hydrate).
-- [Signals](https://octanejs.dev/docs/signals): Stable native signals, local and shared ownership, async queries, retained values, streams, hook dependencies, SSR, and hydration.
+- [Signals](https://octanejs.dev/docs/signals): Writable and async derived declarations, keyed queries, pending UI, streams, optimistic actions, transitions, request/document ownership, and streamed adoption before hydration.
 - [Build tools](https://octanejs.dev/docs/build-tools): Configure the recommended Vite integration or the matching Rspack and Rsbuild plugins, including routing, SSR, hydration, production, and preview.
 - [CLI](https://octanejs.dev/docs/cli): The `octane` command line — `create` scaffolds a new app into an empty directory (this is what `npm create octane my-app` runs, so the two are the same command reached two ways); `doctor` diagnoses the misconfigurations that fail quietly (a duplicated runtime, a missing `jsxImportSource`, plain `tsc` over `.tsrx`, a wildcard `declare module '*.tsrx'`) and `--fix` repairs the mechanical ones; `analyze` compiles every `.tsrx` through the project's own octane and reports the compiler diagnostics; `init` wires Octane into an existing project; `add` installs a binding by the React package it ports; `explain` decodes a minified production error; `mcp add` registers the MCP server with Claude Code, Codex, Cursor, or VS Code. Every command emits `--json` and uses fixed exit codes (`3` = doctor found problems).
 - [Profiling](https://octanejs.dev/docs/profiling): Enable `profile: true` with Vite, Rspack, or Rsbuild to inspect component render/DOM time, self time, render counts, causes, bails, scheduling delay, and Chrome trace data.
@@ -250,7 +250,84 @@ See the [behavior-only roots guide](https://octanejs.dev/docs/core-apis#behavior
 
 ## Signals
 
-Signals are a stable API and work with the standard Octane compiler and its Vite, Rspack, and Rsbuild integrations. No `nativeReads` option is required. Import `createScope` and `query` from `octane/signals`; import `useSignal$` from `octane/signals/client` for local state. Server compilation selects `octane/signals/server` automatically.
+Signals are a stable API and work with the standard Octane compiler and its Vite, Rspack, and Rsbuild integrations. No `nativeReads` option is required. Import `signal$`, `derived$`, `query$`, `skip`, `optimistic$`, and `action$` from `octane/signals`; import `useSignal$` from `octane/signals/client` for component-local state. Server compilation selects `octane/signals/server` for the local hook automatically.
+
+### Declarations, async derivations, and queries
+
+`signal$(initial)` is writable; `derived$(compute)` is read-only and accepts an immediate value, Promise, async iterable, or Promise of an async iterable. Synchronous calculations remain immediate. Module declarations resolve to request-local cells on the server and document-local cells in the browser. Stable compiler-identified feature instances own their instance declarations. Browser modules need no renderer root; server reads/writes require a request owner. Unmounting one root does not dispose document-global state.
+
+The compiler supplies declaration identities. Optional trailing `{ key }` options provide explicit identity: `signal$('', { key: 'draft' })`, `derived$(compute, { key: 'label' })`, and `query$(select, load, { key: 'user' })`. Uncompiled declarations require nonempty explicit keys. `signal$('draft')` stores a string, not a positional key. Function initial values are data; setters retain updater semantics, so `handler$.set(() => nextHandler)` stores a function.
+
+```ts
+// user-data.ts — compile with Octane.
+import { derived$, query$, signal$, skip } from 'octane/signals';
+
+export type User = { id: number; name: string; revision: number };
+export const selectedId$ = signal$<number | null>(1);
+export const user$ = query$<number, User>(
+  () => selectedId$.get() ?? skip,
+  async (id, { signal }) => {
+    const response = await fetch(`/api/users/${id}`, { signal });
+    if (!response.ok) throw new Error(`User request failed: ${response.status}`);
+    return response.json() as Promise<User>;
+  },
+);
+export const locale$ = signal$('en');
+export const greeting$ = derived$(async ({ read, signal }) => {
+  const user = await read(user$);
+  const locale = await read(locale$); // Dependency tracked after await.
+  const response = await fetch(`/api/greeting/${user.id}?locale=${encodeURIComponent(locale)}`, {
+    signal,
+  });
+  if (!response.ok) throw new Error(`Greeting request failed: ${response.status}`);
+  return response.text();
+});
+```
+
+- `query$(select, load)` tracks its synchronous selector; the loader is untracked and starts only after selection succeeds. Canonically equal selected arguments deduplicate within the owner. `skip` means no request and an `idle` snapshot; `undefined` is a valid argument. Strict idle reads throw `SignalIdleError`.
+- `user$.refetch()` retains a usable same-selection value with `refreshing: true`; `user$.reset()` makes strict reads pending. Loaders receive `{ signal, previous }`, with an optional prior ready value. Changed selection, refetch/reset, or disposal revokes obsolete publication even when cancellation is ignored.
+- Async `derived$` uses its attempt-bound `read(handle$)` to await and track dependencies, including after `await`. Dependency changes abort the attempt and invalidate obsolete resolutions, errors, yields, and completion. The compiler supports proven async native reads; opaque helpers use explicit `read`. There is no ambient dependency context across arbitrary async code.
+- For streams, use `query$(select, load, { kind: 'stream' })` or return an async iterable from `derived$` (no `kind` option needed there). Before first yield the source is pending/connecting; yields are ready/open; completion retains the last value with closed/complete. Completing without a yield is an error. Cancellation requests abort and iterator closure. Promises of iterables are unwrapped before publishing.
+
+For example, given an application `watchNotifications(id, signal)` returning `AsyncIterable<Notification>`:
+
+```ts
+import { query$, skip } from 'octane/signals';
+import { selectedId$ } from './user-data';
+import { watchNotifications } from './api';
+
+type Notification = { text: string };
+export const notification$ = query$<number, Notification>(
+  () => selectedId$.get() ?? skip,
+  (id, { signal }) => watchNotifications(id, signal),
+  { kind: 'stream' },
+);
+```
+
+Every module consuming native reads needs a runtime import from a signals entry; a type-only import or `$` name alone is insufficient. For imported handles, a side-effect import enables compilation. Handle idle separately, then use a pending/error boundary:
+
+```tsrx
+import 'octane/signals';
+import { user$ } from './user-data';
+
+export function UserCard() @{
+  <section>
+    @if (user$.snapshot().status === 'idle') {
+      <p>Choose a user.</p>
+    } @else {
+      @try {
+        <p>{user$.get().name as string}</p>
+      } @pending {
+        <p>Loading user…</p>
+      } @catch (error) {
+        <p role="alert">{String(error)}</p>
+      }
+    }
+  </section>
+}
+```
+
+### Local state and explicit scopes
 
 ```tsrx
 import { useSignal$ } from 'octane/signals/client';
@@ -265,7 +342,7 @@ Native reads during rendering subscribe the render scope. The compiler recognize
 
 `useSignal$(initial)` accepts a value or lazy initializer and returns a stable writable handle. Its compiler-assigned hook slot owns it; unmounting disposes it. Conditional hooks work; use keyed `@for` or a child component for loops. Local derived and async hooks are not available.
 
-For shared state, create a scope at the data owner's lifetime boundary, pass handles through props/context, and dispose it when that owner ends:
+For manually managed shared state, create a scope at the data owner's lifetime boundary, pass handles through props/context, and dispose it when that owner ends:
 
 ```ts
 import { createResource, createScope, query } from 'octane/signals';
@@ -282,7 +359,7 @@ const user$ = createResource(account, 'user', () => fetchUser(userId$.get()));
 ```
 
 - `scope.signal$(key, initial)` creates writable state; `.set(value)` or `.set(updater)` uses `Object.is` equality. Replace objects/arrays; deep mutation is not tracked.
-- `scope.derived$(key, compute)` tracks synchronous reads. Async derived callbacks are unsupported. A computation may read another scope's handles without owning them.
+- `scope.derived$(key, compute)` tracks synchronous reads and requires a synchronous callback; use the declaration `derived$` for async computation. A computation may read another scope's handles without owning them.
 - Keys are nonempty strings unique within a scope. Equal textual `scopeKey` values do not share live state. `scope.get(handle$)` and `scope.set(handle$, value)` require the handle to belong to that scope.
 - Writes are immediately readable. `scope.batch(fn)` delays notifications until the outer synchronous batch ends. `scope.action(fn)` wraps a function with that batching rule and preserves `this`, arguments, and the result. Neither rolls back writes or batches across `await`. Writes during rendering, derived evaluation, updater callbacks, and historical adoption are rejected.
 - `handle$.subscribe(notify)` returns an unsubscribe function and does not notify initially. `scope.dispose()` is idempotent, cancels requests/streams, and releases subscriptions and retained state. Escaped handles then throw `ScopeDisposedError`. Unmounting one consumer does not dispose an explicit shared scope.
@@ -294,22 +371,95 @@ Availability is explicit:
 
 | Read | Contract |
 | --- | --- |
-| `handle$.get()` | Ready value, pending thenable, or thrown error. Use `@try`/`@pending`/`@catch` or `Suspense`/`ErrorBoundary` in UI. |
+| `handle$.get()` | Ready value, pending thenable, or thrown idle/source error. Handle idle explicitly; use `@try`/`@pending`/`@catch` or `Suspense`/`ErrorBoundary` for pending/error UI. |
 | `handle$.latest(fallback)` | Whole last successful calculation, or fallback; omitted fallback means `undefined`. Never hides disposed owners or invalid adoption frames. |
-| `handle$.snapshot()` | Immutable `ready`/`pending`/`error` record; ready has `value`, error has `error`. Also includes `refreshing`, `connection`, `complete`, and optional `requestKey`. |
+| `handle$.snapshot()` | Immutable `idle`/`ready`/`pending`/`error` record; ready has `value`, error has `error`. Also includes `refreshing`, `connection`, `complete`, and optional `requestKey`. |
 | `scope.isPending(read)` | Whether that expression suspends; ordinary errors still throw. A successful `latest(fallback)` is not pending even while a strict read would suspend. |
 
 `undefined`, `null`, `false`, and empty strings are usable values. A retained result need not have appeared in committed UI. Keep its identity, values, and commands in the same derived result; do not combine an old user's retained card with a new user's delete command. Retained results remain valid only while their contributing owners are alive.
 
 Inferred `useMemo(() => count$.get())` tracks native reads and preserves subscriptions across cache hits. Explicit arrays are never rewritten: `[count$]` sees only the stable handle. Sample during render (`const count = count$.get()`) and use `[count]` for explicit memos/effects. Known live reads hidden in a memo with fixed dependencies are diagnosed; `null` keeps its every-render meaning. Compile custom hooks through Octane as well.
 
-For SSR, create request-local scopes and match scope/signal keys between server and client. Distinct owners in one presented graph need distinct scope keys. Native completed reads serialize ready values, retained `latest` values, and ready snapshots. Hydration adopts historical values without rewinding live state. A matching completed resource seed avoids a duplicate client load; an incomplete ready resource starts a quiet client attempt. Server-local `useSignal$` state lasts one render pass and is not shared-state seed data.
+### Optimistic actions and transitions
+
+`optimistic$(source$)` layers operation-owned tentative state over a writable or query source. Write inside `action$`. This example uses the `User` query above and application-provided `updateUser` (returning a server-revisioned `User`) and `mayHaveReachedServer` (classifying ambiguous transport failures):
+
+```ts
+import { action$, optimistic$ } from 'octane/signals';
+import { user$ } from './user-data';
+import { mayHaveReachedServer, updateUser } from './api';
+
+export const visibleUser$ = optimistic$(user$, {
+  compareAuthority: (incoming, current) => incoming.revision - current.revision,
+});
+export const saveUser = action$('user.save', async (operation, name: string) => {
+  const id = user$.get().id;
+  visibleUser$.set((user) => ({ ...user, name }));
+  try {
+    const saved = await updateUser({ id, name, operationId: operation.id });
+    operation.adopt(saved);
+  } catch (error) {
+    if (mayHaveReachedServer(error)) return operation.uncertain();
+    throw error;
+  }
+});
+```
+
+Render `visibleUser$.get()` and invoke `saveUser(name)` from an event/form action, handling its result or error. The first write pins the owner and exact query selection generation. Late adoption cannot overwrite a different selection, including A→B→A. Definitive rejection removes only its own overlay. `compareAuthority` must be pure and finite; positive means newer, while zero/negative settles without replacing authority. Receipts for revisions 2 then 1 retain revision 2. This policy governs action receipts, not independently fetched/streamed updates.
+
+The synchronous action prefix is batched. Opaque code after `await` uses `operation.set(visibleUser$, update)`, because ambient operation state is synchronous. `operation.uncertain()` retains the overlay and returns an uncertain receipt; an `OCTANE_RPC_UNCERTAIN` error becomes `ActionUncertainError`. `isActionUncertain` recognizes either form. No mutation retry, durable idempotency, or receipt storage is automatic. Retain the operation for reconciliation; after an authorized receipt lookup, call `adopt(value)` or `reject()`. Deferred handlers must receive inputs captured when the command occurred, not reread a newer draft.
+
+Native setters inside an explicit renderer `startTransition`/`useTransition` Action stage a private candidate: committed reads, public subscriptions, and affected DOM bindings keep old values until presentation can accept the candidate. For example, in a client event handler: `startTransition(() => selectedId$.set(2))` (import from `octane`). Urgent edits stay live and superseded work cannot publish. This supports local writable/derived/query producers and local streams after first value; receiver-owned server streams and historical adoption frames currently reject transition participation. `scope.action` alone only batches synchronous writes.
+
+### SSR, streamed results, and early controls
+
+Module declarations use the server request owner; explicit scopes must be created per request. Match scope/signal identities between server and client. Distinct owners in one presented graph need distinct scope keys. Native completed reads serialize ready values, retained `latest` values, and ready snapshots. Hydration adopts historical values without rewinding live state. A matching completed resource seed avoids a duplicate client load; an incomplete ready resource in seed-only transport starts a quiet client attempt. Server-local `useSignal$` state lasts one render pass and is not shared-state seed data.
 
 `scope.serialize()` returns a `ScopeSeed`. For explicit embedding, `scope.beginAdoption(seed)` returns a frame with synchronous `run(read)`, `retain()` for another lease, and `release()` for cleanup. Query arguments and serialized values accept undefined, null, booleans, finite numbers, strings, dense arrays, and acyclic plain objects with enumerable string data properties. Arguments are copied/frozen and object keys canonicalized. Cycles, sparse arrays, accessors, symbols, custom prototypes, and nonfinite numbers are rejected.
 
-Pending producers and error objects are not transported. Completed server output directly sampling a pending/error snapshot or displaying an `isPending` result is unsupported by ready-state transport and diagnosed; use a boundary or a serializable `latest` projection. Native reads support DOM client/server, not non-DOM renderers. Deep stores, local derived/async hooks, async derived callbacks, and cross-root atomic reveal are outside the API.
+Ready-state seeds do not transport pending producers or error objects. Completed server output directly sampling a pending/error snapshot or displaying an `isPending` result is unsupported by ready-state transport and diagnosed; use a boundary or a serializable `latest` projection. Pending/catch arms without seedable data render fresh within their owned hydration range.
 
-`scope.inspect()` reports metadata without evaluating dormant computations or exposing values/callbacks. `createScope({ scopeKey, debug: { traceLimit: 256 } })` enables bounded tracing; profiling builds expose native reads in DevTools. Public errors are `ScopeDisposedError`, `SignalCycleError`, `SignalFrameError`, `SignalSerializationError`, and `SignalWriteError`. The separate `@octanejs/alien-signals` binding keeps its existing API. See the [guide](https://octanejs.dev/docs/signals) and [full reference](https://github.com/octanejs/octane/blob/main/docs/signals.md).
+Streamed-result delivery is a separate channel: accepted results may arrive before the query module loads. Matching document/instance/selection/attempt identities attach to the later query without a duplicate browser request; changed selections or retired owners reject obsolete channels. For custom hosts, bootstrap before importing modules that read document signals:
+
+```ts
+import { bindSignalControl } from 'octane/signals';
+import {
+  bootstrapStreamedSignalResults,
+  type NativeSignalManifest,
+} from 'octane/hydration/streamed-signals';
+
+export async function attachEditor(bootstrap: {
+  buildId: string;
+  documentId: string;
+  initialSignals: NativeSignalManifest;
+}) {
+  const page = bootstrapStreamedSignalResults(bootstrap);
+  try {
+    const { draft$ } = await import('./draft-state');
+    const textarea = document.querySelector<HTMLTextAreaElement>('#draft')!;
+    const stop = bindSignalControl(textarea, 'value', draft$);
+    return {
+      signalOwner: page.signalOwner,
+      releaseControl: stop, // Before transferring this node to an island.
+      dispose() { // Only when the document owner ends.
+        stop();
+        page.dispose();
+      },
+    };
+  } catch (error) {
+    page.dispose();
+    throw error;
+  }
+}
+```
+
+The host supplies matching build/document identities and the initial response's native manifest, installs it once before live reads, and uses the same bundled signal engine for early/later consumers. Early edits win; late/duplicate initial installation throws. Server hosts emit `earlySignalBootstrapScript({ nonce })` from `octane/server` before controls/results and use `earlySignalBootstrap: 'external'` on fragment renderers. Capture itself needs no module; live derivations need the signal engine. Keep cached HTML and client/server compiler output from matching builds.
+
+`bootstrapStreamedSignalResults` accepts results without DOM placement. Choose `bootstrapStreamedSignalHydration` instead when using `receiver.registerRegion` to place streamed HTML; use one bootstrap per document. Later roots join the returned `signalOwner`; custom owners require explicit `runWithSignalOwner` around behavior callbacks. `bindSignalControl` projects `value` on text inputs/textareas/selects or `checked` on checkboxes/radios; writable handles adopt captured edits and receive native writeback, while readonly handles only project (without setting HTML `readOnly`). It creates no renderer root and does not reconcile or replace nodes. In the example, `./draft-state` exports a compiled `signal$('')`. Call `releaseControl()` before replacing the node or handing it to an island; call `dispose()` only when the document owner ends. See the [integration reference](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md#compiled-presentation-on-existing-dom) for compiled bindings and lifecycle details.
+
+Native rendering supports DOM client/server. Deep stores, local derived/async hooks, cross-root atomic reveal, and native reads in non-DOM renderers remain outside the API. Declaration `derived$` supports async callbacks; explicit `scope.derived$` does not.
+
+`scope.inspect()` reports metadata without evaluating dormant computations or exposing values/callbacks. `createScope({ scopeKey, debug: { traceLimit: 256 } })` enables bounded tracing; profiling builds expose native reads in DevTools. Public errors include `ScopeDisposedError`, `SignalCycleError`, `SignalFrameError`, `SignalIdleError`, `SignalSerializationError`, `SignalStreamError`, `SignalWriteError`, and `ActionUncertainError`. The separate `@octanejs/alien-signals` binding keeps its existing API. See the [guide](https://octanejs.dev/docs/signals) and [full reference](https://github.com/octanejs/octane/blob/main/docs/signals.md).
 
 ## Strong mode
 
