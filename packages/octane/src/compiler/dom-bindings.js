@@ -901,6 +901,18 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 			const expression = child.type === 'JSXExpressionContainer' ? child.expression : null;
 			return expression === null || !markUnbound(expression, true);
 		});
+		// A scalar leaf has one stable Text node (or no node for empty SSR).
+		// Structural or opaque children retain their existing compiler contract.
+		const child = children.length === 1 ? children[0] : null;
+		const expression = child?.type === 'JSXExpressionContainer' ? child.expression : null;
+		const text =
+			tag !== 'textarea' &&
+			authoredChildren.length === children.length &&
+			(child?.type === 'JSXText' ||
+				(expression?.type === 'Literal' && typeof expression.value === 'string') ||
+				(expression?.type === 'TSAsExpression' &&
+					(expression.typeAnnotation.type === 'TSStringKeyword' ||
+						expression.typeAnnotation.type === 'TSNumberKeyword')));
 		const opaqueChildren = authoredChildren.length !== children.length;
 		const openChildren = tag !== 'textarea' && opaqueChildren && children.length > 0;
 		if (tag === 'textarea' && children.some((child) => child.type !== 'JSXText'))
@@ -913,8 +925,8 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 			parent,
 			tag,
 			ns,
-			(opaqueChildren && !openChildren) || tag === 'textarea' ? null : children.length,
-			...(openChildren ? [true] : []),
+			(opaqueChildren && !openChildren) || tag === 'textarea' ? null : text ? 0 : children.length,
+			...(text ? [null, 1] : openChildren ? [true] : []),
 		]);
 		elements.push(element);
 		const owned = new Set();
@@ -1157,7 +1169,9 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 				add(index, kind, name, value, attr);
 			}
 		}
-		if (tag !== 'textarea') {
+		if (text) {
+			if (expression) add(index, 'text', '#text', expression, child);
+		} else if (tag !== 'textarea') {
 			for (const child of children) visit(child, index, ns, [...ancestors, tag]);
 		}
 	};
@@ -1264,6 +1278,8 @@ function projectionDependencies(plan, lexical) {
 			}
 		});
 	collect(plan.expressions ?? plan.values);
+	collect(plan.scalar?.values);
+	collect(plan.scalar?.projections?.map((declaration) => declaration.declarations[0].init));
 	collect(plan.projections?.map((declaration) => declaration.declarations[0].init));
 	return needed;
 }
@@ -1478,7 +1494,15 @@ function projectProgram(ast, plan, filename, lexical) {
 			b.object(
 				scalarProperties(
 					plan.scalar,
-					b.arrow(plan.fn.params, b.call(b.member(root, 'project'), b.array(plan.fn.params))),
+					inheritHookMemoOrigin(
+						b.arrow(
+							plan.fn.params,
+							plan.scalar.projections.length > 0
+								? b.block([...plan.scalar.projections, b.return(b.array(plan.scalar.values))])
+								: b.array(plan.scalar.values),
+						),
+						plan.fn,
+					),
 					plan.scalar.bindings.some((binding) => binding[1] === 'classGroup')
 						? b.member(root, 'createClassGroup')
 						: null,

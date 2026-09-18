@@ -1,4 +1,5 @@
 import { normalizeClass } from './class-names.js';
+import { domBindingClaims } from './dom-binding-claims.js';
 import { sanitizeURL } from './sanitize-url.js';
 import { STREAM_SCRIPT_ATTR, SUSPENSE_SCRIPT_ATTR } from './stream-protocol.js';
 import { NATIVE_SIGNAL_SEED_ATTR } from './signals/native-read-seeds.js';
@@ -106,7 +107,8 @@ export type BindingNode = readonly [
 	tag: string,
 	namespace: 0 | 1,
 	children: number | null,
-	openChildren?: true,
+	openChildren?: true | null,
+	text?: 1,
 ];
 
 /** @internal Names and numeric CSS units are resolved by the compiler. */
@@ -123,7 +125,8 @@ export type BindingOperation = readonly [
 		| 'styleAttribute'
 		| 'styleObject'
 		| 'control'
-		| 'url',
+		| 'url'
+		| 'text',
 	name: string,
 	unitlessOrGroup?: boolean | number,
 ];
@@ -202,6 +205,11 @@ export function __releaseBinding(node: Element, name: string): void {
 	const channels = claims.get(node)!;
 	channels.delete(name);
 	if (channels.size === 0) claims.delete(node);
+	const published = domBindingClaims.get(node);
+	if (published) {
+		published.delete(name);
+		if (published.size === 0) domBindingClaims.delete(node);
+	}
 }
 
 function resolveNodes(root: Element, descriptor: CompiledBindings<unknown>): Element[] {
@@ -216,7 +224,7 @@ function resolveNodes(root: Element, descriptor: CompiledBindings<unknown>): Ele
 	const nodes: Element[] = [];
 	const childIndices: number[] = [];
 	for (let i = 0; i < descriptor.nodes.length; i++) {
-		const [parent, tag, namespace, children] = descriptor.nodes[i]!;
+		const [parent, tag, namespace, children, , text] = descriptor.nodes[i]!;
 		const node =
 			i === 0
 				? parent === -1
@@ -230,8 +238,10 @@ function resolveNodes(root: Element, descriptor: CompiledBindings<unknown>): Ele
 			descriptor.nodes[i]![4] === true ||
 			node.localName !== tag ||
 			node.namespaceURI !== namespaces[namespace] ||
-			(children !== null &&
-				(node.childNodes.length !== children || node.children.length !== children))
+			(text
+				? node.childNodes.length > 1 || (node.firstChild !== null && node.firstChild.nodeType !== 3)
+				: children !== null &&
+					(node.childNodes.length !== children || node.children.length !== children))
 		) {
 			throw new Error('DOM bindings cannot adopt a mismatched static element topology.');
 		}
@@ -282,7 +292,7 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 	}
 	const childCounts = new Array<number>(descriptor.nodes.length).fill(0);
 	for (let i = 0; i < descriptor.nodes.length; i++) {
-		const [parent, tag, namespace, children, openChildren] = descriptor.nodes[i]!;
+		const [parent, tag, namespace, children, openChildren, text] = descriptor.nodes[i]!;
 		const node = nodes[i];
 		if (
 			node === undefined ||
@@ -297,9 +307,11 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 					(descriptor.nodes[parent]![4] !== true &&
 						nodes[parent]!.children[childCounts[parent]!] !== node)) ||
 			(openChildren && children === null) ||
-			(children !== null &&
-				!openChildren &&
-				(node.childNodes.length !== children || node.children.length !== children))
+			(text
+				? node.childNodes.length > 1 || (node.firstChild !== null && node.firstChild.nodeType !== 3)
+				: children !== null &&
+					!openChildren &&
+					(node.childNodes.length !== children || node.children.length !== children))
 		) {
 			throw new Error('DOM bindings cannot adopt a mismatched addressed element topology.');
 		}
@@ -316,6 +328,11 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 function normalize(binding: BindingOperation, value: unknown): BindingValue {
 	const type = typeof value;
 	switch (binding[1]) {
+		case 'text':
+			if (value == null || value === false) return '';
+			if (type !== 'string' && type !== 'number' && type !== 'bigint' && type !== 'boolean')
+				throw new TypeError('DOM binding text must be a synchronous scalar.');
+			return String(value);
 		case 'styleObject':
 			return value as BindingValue;
 		case 'class':
@@ -355,7 +372,11 @@ function normalize(binding: BindingOperation, value: unknown): BindingValue {
 
 function write(node: Element, binding: BindingOperation, value: string | null): void {
 	const name = binding[2];
-	if (binding[1] === 'classToken') {
+	if (binding[1] === 'text') {
+		const text = node.firstChild;
+		if (text === null) node.appendChild(node.ownerDocument.createTextNode(value!));
+		else if (text.nodeValue !== value) text.nodeValue = value;
+	} else if (binding[1] === 'classToken') {
 		node.classList.toggle(name, value !== null);
 	} else if (binding[1] === 'url') {
 		if (value === '' && !(name === 'href' && node.localName === 'a')) value = null;
@@ -633,7 +654,33 @@ export function __adoptBindings<Props>(
 					styles.set(i, (style = __createBindingStyleRestoration(nodes[binding[0]]!, binding)));
 				style.write(next[i] as string | null);
 			} else write(nodes[binding[0]]!, binding, next[i] as string | null);
-			if (!disposed) previous[i] = next[i]!;
+			if (!disposed) {
+				previous[i] = next[i]!;
+				// Only fixed scalar channels participate in this legacy handoff.
+				// New grouped/style/control channels keep the native lease protocol.
+				if (
+					binding[1] === 'attr' ||
+					binding[1] === 'boolean' ||
+					binding[1] === 'aria' ||
+					binding[1] === 'class' ||
+					binding[1] === 'styleProperty' ||
+					binding[1] === 'text'
+				) {
+					const [node, name] = owned[i]!;
+					let published = next[i] as string | null;
+					if (binding[1] === 'styleProperty') {
+						const style = (node as HTMLElement | SVGElement).style;
+						const value = style.getPropertyValue(binding[2]);
+						published =
+							value === ''
+								? null
+								: value + (style.getPropertyPriority(binding[2]) ? ' !important' : '');
+					}
+					let claims = domBindingClaims.get(node);
+					if (claims === undefined) domBindingClaims.set(node, (claims = new Map()));
+					claims.set(name, published);
+				}
+			}
 		}
 	};
 	const drain = (preview = false): void | NativeTransitionPresentation => {
