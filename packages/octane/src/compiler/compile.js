@@ -16610,24 +16610,142 @@ function depPathKey(node) {
 // props OBJECT with unchanged fields doesn't refetch), bare identifiers
 // otherwise. Only outer runtime references become deps; locally declared
 // bindings and erased syntax do not.
-function collectDepPaths(expr) {
+function collectDepPaths(expr, coarsenDepRoots = null) {
 	const deps = [];
 	const seen = new Set();
 	const lexical = createLexicalAnalysis(expr);
+	let guards = null;
+	let nextGuard = 0;
 	const isFree = (node, parent, key) =>
 		isIdentifierReference(node, parent, key, lexical) &&
 		!lexical.isBound(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name);
 	const push = (node, key) => {
+		if (coarsenDepRoots !== null) {
+			const member = depPathMember(node);
+			if (member?.object.type === 'Identifier' && coarsenDepRoots.has(member.object.name)) {
+				node = b.id(member.object.name);
+				key = depPathKey(node);
+			}
+		}
+		if (guards !== null) key += `:guard:${guards.id}`;
 		if (seen.has(key)) return;
 		seen.add(key);
+		if (guards !== null) {
+			for (let guard = guards; guard !== null; guard = guard.parent) {
+				node = b.conditional(guard.test, node, b.void0);
+			}
+		}
 		deps.push(node);
 	};
 	walk(expr, null, null);
 	return deps;
 
+	// Only repeat guards whose evaluation is a free typeof probe, not a call,
+	// accessor, or callback-local reference. Keeping the entire predicate also
+	// leaves member reads disabled for other types, not just absent globals.
+	function isTypeofGuard(node) {
+		node = unwrapTsExpr(node);
+		if (node?.type === 'UnaryExpression') {
+			if (node.operator === '!') return isTypeofGuard(node.argument);
+			const argument = unwrapTsExpr(node.argument);
+			return (
+				node.operator === 'typeof' &&
+				argument?.type === 'Identifier' &&
+				isFree(argument, node, 'argument')
+			);
+		}
+		if (node?.type === 'LogicalExpression' && (node.operator === '&&' || node.operator === '||')) {
+			return isTypeofGuard(node.left) && isTypeofGuard(node.right);
+		}
+		if (
+			node?.type === 'BinaryExpression' &&
+			(node.operator === '===' ||
+				node.operator === '!==' ||
+				node.operator === '==' ||
+				node.operator === '!=')
+		) {
+			const left = unwrapTsExpr(node.left);
+			const right = unwrapTsExpr(node.right);
+			return (
+				(left?.type === 'Literal' && typeof left.value === 'string' && isTypeofGuard(right)) ||
+				(right?.type === 'Literal' && typeof right.value === 'string' && isTypeofGuard(left))
+			);
+		}
+		return false;
+	}
+
+	function necessaryTypeofGuard(node, truthy) {
+		node = unwrapTsExpr(node);
+		if (isTypeofGuard(node)) return truthy ? node : b.unary('!', node);
+		if (node?.type === 'UnaryExpression' && node.operator === '!') {
+			return necessaryTypeofGuard(node.argument, !truthy);
+		}
+		// A true conjunction requires both operands; a false disjunction
+		// requires neither. Unknown operands contribute no proof and are never
+		// replayed: getters and calls remain in the authored predicate.
+		if (node?.type === 'LogicalExpression' && node.operator === (truthy ? '&&' : '||')) {
+			const left = necessaryTypeofGuard(node.left, truthy);
+			const right = necessaryTypeofGuard(node.right, truthy);
+			return left === null ? right : right === null ? left : b.logical('&&', left, right);
+		}
+		return null;
+	}
+
+	function walkGuarded(node, test, truthy) {
+		const guard = necessaryTypeofGuard(test, truthy);
+		if (guard === null) {
+			walk(node, null, null);
+			return;
+		}
+		const previous = guards;
+		guards = { test: guard, parent: guards, id: nextGuard++ };
+		walk(node, null, null);
+		guards = previous;
+	}
+
+	function exits(node) {
+		if (node?.type === 'ReturnStatement' || node?.type === 'ThrowStatement') return true;
+		if (node?.type === 'BlockStatement') return node.body.some(exits);
+		return node?.type === 'IfStatement' && exits(node.consequent) && exits(node.alternate);
+	}
+
 	function walk(n, parent, key) {
 		if (!n || typeof n !== 'object') return;
 		switch (n.type) {
+			case 'BlockStatement': {
+				const previous = guards;
+				for (const statement of n.body) {
+					walk(statement, n, 'body');
+					if (statement.type !== 'IfStatement') continue;
+					const consequentExit = exits(statement.consequent);
+					const alternateExit = exits(statement.alternate);
+					if (consequentExit !== alternateExit) {
+						const guard = necessaryTypeofGuard(statement.test, !consequentExit);
+						if (guard === null) continue;
+						guards = {
+							test: guard,
+							parent: guards,
+							id: nextGuard++,
+						};
+					}
+				}
+				guards = previous;
+				return;
+			}
+			case 'IfStatement':
+			case 'ConditionalExpression':
+				walk(n.test, n, 'test');
+				walkGuarded(n.consequent, n.test, true);
+				walkGuarded(n.alternate, n.test, false);
+				return;
+			case 'LogicalExpression':
+				walk(n.left, n, 'left');
+				if (n.operator === '&&' || n.operator === '||') {
+					walkGuarded(n.right, n.left, n.operator === '&&');
+				} else {
+					walk(n.right, n, 'right');
+				}
+				return;
 			case 'MetaProperty':
 				// `import.meta` and `new.target` contain syntax tokens, not free
 				// bindings. Visiting their Identifier children creates invalid deps.
@@ -16903,29 +17021,13 @@ function makeCreationMemoCall(
 		// composable Symbol for every warmable creation site.
 		true,
 	);
-	let deps = collectDepPaths(expr);
 	// Chain-local roots must dep on the LOCAL'S identity, not a one-level
 	// member path: `userPromise.then(…)` would otherwise dep on
 	// `userPromise.then` — Promise.prototype.then, identical across every
 	// promise — and the derived creation would never refresh when its upstream
 	// promise does. Coarsen member deps rooted at render-created locals to the
 	// bare identifier (dedup follows).
-	if (coarsenDepRoots !== null) {
-		const seen = new Set();
-		const coarsened = [];
-		for (const dep of deps) {
-			const member = depPathMember(dep);
-			const next =
-				member?.object.type === 'Identifier' && coarsenDepRoots.has(member.object.name)
-					? b.id(member.object.name)
-					: dep;
-			const key = depPathKey(next);
-			if (key !== null && seen.has(key)) continue;
-			if (key !== null) seen.add(key);
-			coarsened.push(next);
-		}
-		deps = coarsened;
-	}
+	const deps = collectDepPaths(expr, coarsenDepRoots);
 	// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
 	// SSRScope per pass makes client useMemo semantics useless there).
 	const memoHelper = ctx.nativeReads
