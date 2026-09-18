@@ -10791,6 +10791,9 @@ importers:
       '@types/three':
         specifier: catalog:default
         version: 0.172.0
+      axe-core:
+        specifier: 4.12.1
+        version: 4.12.1
       es-module-lexer:
         specifier: catalog:default
         version: 1.7.0
@@ -41447,7 +41450,7 @@ snapshots:
       detect-libc: 2.1.2
       is-glob: 4.0.3
       node-addon-api: 7.1.1
-      picomatch: 4.0.5
+      picomatch: 4.0.7
     optionalDependencies:
       '@parcel/watcher-android-arm64': 2.6.0
       '@parcel/watcher-darwin-arm64': 2.6.0
@@ -57343,7 +57346,7 @@ snapshots:
       chalk: 4.1.2
       graceful-fs: 4.2.11
       jest-util: 30.4.1
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       pretty-format: 30.4.1
       slash: 3.0.0
       stack-utils: 2.0.6
@@ -60932,7 +60935,7 @@ snapshots:
       ox: 0.9.17(typescript@5.9.3)(zod@4.4.3)
       viem: 2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
       zod: 4.4.3
-      zustand: 5.0.14(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.4.0(react@19.2.7))
+      zustand: 5.0.15(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.4.0(react@19.2.7))
     optionalDependencies:
       '@tanstack/react-query': 5.102.8(react@19.2.7)
       react: 19.2.7
@@ -60952,7 +60955,7 @@ snapshots:
       ox: 0.9.17(typescript@5.9.3)(zod@4.4.3)
       viem: 2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
       zod: 4.4.3
-      zustand: 5.0.14(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.4.0(react@19.2.7))
+      zustand: 5.0.15(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.4.0(react@19.2.7))
     optionalDependencies:
       '@tanstack/react-query': 5.102.8(react@19.2.7)
       react: 19.2.7
@@ -60973,7 +60976,7 @@ snapshots:
       ox: 0.9.17(typescript@5.9.3)(zod@4.4.3)
       viem: 2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
       zod: 4.4.3
-      zustand: 5.0.14(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
+      zustand: 5.0.15(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
     optionalDependencies:
       '@tanstack/react-query': 5.102.8(react@19.2.7)
       react: 19.2.7
@@ -60994,7 +60997,7 @@ snapshots:
       ox: 0.9.17(typescript@5.9.3)(zod@4.4.3)
       viem: 2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
       zod: 4.4.3
-      zustand: 5.0.14(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
+      zustand: 5.0.15(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
     optionalDependencies:
       '@tanstack/react-query': 5.102.8(react@19.2.7)
       react: 19.2.7
@@ -61015,7 +61018,7 @@ snapshots:
       ox: 0.9.17(typescript@5.9.3)(zod@4.4.3)
       viem: 2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
       zod: 4.4.3
-      zustand: 5.0.14(@types/react@19.2.18)(immer@11.1.15)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
+      zustand: 5.0.15(@types/react@19.2.18)(immer@11.1.15)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     optionalDependencies:
       '@tanstack/react-query': 5.102.8(react@19.2.8)
       react: 19.2.8
@@ -67413,13 +67416,6 @@ snapshots:
       react: 19.2.3
       use-sync-external-store: 1.6.0(react@19.2.3)
 
-  zustand@5.0.14(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.4.0(react@19.2.7)):
-    optionalDependencies:
-      '@types/react': 19.2.18
-      immer: 11.1.15
-      react: 19.2.7
-      use-sync-external-store: 1.4.0(react@19.2.7)
-
   zustand@5.0.14(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7)):
     optionalDependencies:
       '@types/react': 19.2.18
@@ -67427,13 +67423,12 @@ snapshots:
       react: 19.2.7
       use-sync-external-store: 1.6.0(react@19.2.7)
 
-  zustand@5.0.14(@types/react@19.2.18)(immer@11.1.15)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8)):
+  zustand@5.0.15(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.4.0(react@19.2.7)):
     optionalDependencies:
       '@types/react': 19.2.18
       immer: 11.1.15
-      react: 19.2.8
-      use-sync-external-store: 1.6.0(react@19.2.8)
-    optional: true
+      react: 19.2.7
+      use-sync-external-store: 1.4.0(react@19.2.7)
 
   zustand@5.0.15(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7)):
     optionalDependencies:
@@ -67441,6 +67436,14 @@ snapshots:
       immer: 11.1.15
       react: 19.2.7
       use-sync-external-store: 1.6.0(react@19.2.7)
+
+  zustand@5.0.15(@types/react@19.2.18)(immer@11.1.15)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8)):
+    optionalDependencies:
+      '@types/react': 19.2.18
+      immer: 11.1.15
+      react: 19.2.8
+      use-sync-external-store: 1.6.0(react@19.2.8)
+    optional: true
 
   zustand@5.0.3(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.4.0(react@19.2.7)):
     optionalDependencies:
