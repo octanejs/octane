@@ -1280,6 +1280,11 @@ function collectDependencies(expression, callbackScope, analysis) {
 
 	// Completion bits distinguish callback exits (1), local break/continue (2),
 	// and labeled exits (4), which can escape an enclosing loop or switch.
+	// Label identities are analysis-only and allocated only for labeled flow.
+	/** @type {Map<string, object> | undefined} */
+	let labelTargets;
+	/** @type {Set<object> | undefined} */
+	let escapingLabelTargets;
 	function walkStatements(statements) {
 		const depth = guardedDepth;
 		let completion = 0;
@@ -1438,11 +1443,25 @@ function collectDependencies(expression, callbackScope, analysis) {
 			case 'ThisExpression':
 			case 'Super':
 				return;
-			case 'LabeledStatement':
-				return walk(node.body);
+			case 'LabeledStatement': {
+				labelTargets ??= new Map();
+				const name = node.label.name;
+				const previous = labelTargets.get(name);
+				const target = {};
+				labelTargets.set(name, target);
+				const completion = walk(node.body) || 0;
+				if (previous === undefined) labelTargets.delete(name);
+				else labelTargets.set(name, previous);
+				escapingLabelTargets?.delete(target);
+				return (completion & ~4) | (completion & 4 && escapingLabelTargets?.size ? 4 : 0);
+			}
 			case 'BreakStatement':
-			case 'ContinueStatement':
-				return node.label ? 4 : 2;
+			case 'ContinueStatement': {
+				if (!node.label) return 2;
+				const target = labelTargets?.get(node.label.name);
+				if (target) (escapingLabelTargets ??= new Set()).add(target);
+				return 4;
+			}
 			case 'JSXElement':
 			case 'Element':
 				walkJsxElement(node);

@@ -18,6 +18,7 @@ describe('guarded inferred dependencies', () => {
 	it.each([
 		['switch', `switch (item?.kind) { case undefined: break outer; default: break; }`],
 		['loop', `while (!item) { break outer; }`],
+		['nested loop', `inner: while (!item) { break outer; }`],
 	] as const)('preserves an escaping labeled %s exit', (kind, statement) => {
 		// Source bytes exercise valid labeled control flow without relying on
 		// fixture formatters to support LabeledStatement printing.
@@ -48,6 +49,37 @@ export function Guarded({ item, log }) @{
 				root.update(body, { item: undefined, log });
 				expect(entries).toEqual(['first', 'second']);
 				expect(root.container.textContent).toBe('Ready');
+			} finally {
+				root.unmount();
+			}
+		}
+	});
+
+	it.each([
+		['break', 'local: while (true) { break local; }'],
+		['continue', 'local: for (let index = 0; index < 1; index++) { continue local; }'],
+		['switch break', 'local: switch (true) { case true: break local; }'],
+	] as const)('retains precise reads after a self-targeting labeled %s', (kind, statement) => {
+		const source = `
+import { useLayoutEffect } from 'octane';
+export function Read({ item, log }) @{
+  useLayoutEffect(() => { ${statement} log(item.name); });
+  <p>Ready</p>
+}`;
+		for (const dev of [true, false]) {
+			const body = loadCompiledFixtureSource(source, {
+				id: `precise-after-labeled-${kind}.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev },
+			}).Read;
+			const item = { name: 'first' };
+			const entries: string[] = [];
+			const log = (value: string) => entries.push(value);
+			const root = mount(body, { item, log });
+			try {
+				item.name = 'second';
+				root.update(body, { item, log });
+				expect(entries).toEqual(['first', 'second']);
 			} finally {
 				root.unmount();
 			}
