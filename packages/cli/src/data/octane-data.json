@@ -857,7 +857,7 @@
     },
     {
       "name": "@octanejs/recharts",
-      "version": "0.1.51",
+      "version": "0.1.52",
       "category": "Visualization",
       "upstream": { "package": "recharts", "version": "3.9.2" },
       "surface": "Broad runtime support across cartesian, polar, hierarchical, tooltip, legend, responsive-container, shape, and chart-state surfaces. `Brush` and `Treemap` remain intentionally unsupported.",
@@ -1277,7 +1277,7 @@
     },
     {
       "name": "@octanejs/tanstack-router",
-      "version": "0.1.53",
+      "version": "0.1.54",
       "category": "Routing",
       "upstream": { "package": "@tanstack/react-router", "version": "1.170.18" },
       "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
@@ -1291,7 +1291,7 @@
     },
     {
       "name": "@octanejs/tanstack-router-ssr-query",
-      "version": "0.0.43",
+      "version": "0.0.44",
       "category": "Routing",
       "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.1" },
       "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
