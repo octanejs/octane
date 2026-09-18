@@ -1,5 +1,13 @@
 # @octanejs/drei
 
+## 0.0.21
+
+### Patch Changes
+
+- Updated dependencies [911ed1d]
+  - @octanejs/zustand@0.1.53
+  - @octanejs/three@0.1.46
+
 ## 0.0.20
 
 ### Patch Changes

@@ -1,5 +1,15 @@
 # @octanejs/tanstack-pacer
 
+## 0.0.44
+
+### Patch Changes
+
+- 911ed1d: Update the Pacer adapter to 0.23.0 and the shared scheduler core to 0.22.0. Async debounce, rate-limit and throttle callbacks now preserve awaited result types and suppressed `undefined` results. Retain all entrypoints and verify scheduler ownership, provider isolation and hydration against the updated dependencies.
+
+  Render compiled template children safely in Subscribe while preserving function-as-child callbacks.
+- Updated dependencies [911ed1d]
+  - @octanejs/tanstack-store@0.0.49
+
 ## 0.0.43
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @octanejs/tanstack-store
 
+## 0.0.49
+
+### Patch Changes
+
+- 911ed1d: Update the unchanged adapters to Zustand 5.0.15, TanStack Form 1.33.5, and TanStack Store 0.11.1. Clearing persisted Zustand storage now prevents pending hydration from restoring cleared state, and deleting a form field preserves siblings whose names share its prefix.
+
 ## 0.0.48
 
 ### Patch Changes
