@@ -1,5 +1,29 @@
 # octane
 
+## 0.2.14
+
+### Patch Changes
+
+- 44bd89f: Allow a compiler-proven native host to transfer its class and known-provider style bindings to normal hydration while its opaque children retain their own rendering and control ownership. Keep the early layout active during suspension or refusal, preserve the current presentation during accepted transfer, and validate the host and its source before publishing the successor.
+
+  Keep the early scalar adapter's handoff symbol in the existing control registry so accessing the capability does not make cold renderer and event-lease helpers an eager dependency.
+
+  Retry skipped native effects through the existing native-read scheduler when their surviving render has already completed, without weakening stale-publication checks or reviving disposed owners. Preserve suspended-island ownership and held-transition priority.
+
+  Traverse lightweight DOM-context ancestors without treating them as hook-bearing blocks when locating a preserved hydration owner, so native effect retries remain safe while another island is suspended.
+- de270e3: Support explicit handoff of a standalone textarea signal value alongside an adopted native presentation. Hydration preserves live input and selection, transfers control ownership only at accepted publication, and keeps early bindings active when takeover is declined or suspended. Known-provider unbound style spreads retain direct compiled property bindings.
+
+  Keep early ownership intact when preparing a successor subscription fails, and avoid masking interrupted mounts with a secondary ref-cleanup error.
+
+  Release all prepared value successors when a later control invalidates presentation publication, preserving the original error and preventing stale input or model writers from being reclaimed by that root.
+
+  Reject competing presentation bindings for fields supplied by an unbound known-provider spread, including `class`/`className` aliases.
+
+  Type-check explicit scalar text intent against a signal handle's value in DOM templates, preserving direct bindings without application-side reads or unsafe casts.
+
+  Transfer direct scalar text signals through presentation hydration using the existing prepared binding lifecycle, including initially empty text ranges and live updates after acceptance.
+- 44bd89f: Mark streamed signal selection and result scripts as renderer-owned transport so hydration can adopt the server HTML without reporting leftover protocol scripts as mismatched component output.
+
 ## 0.2.13
 
 ### Patch Changes
