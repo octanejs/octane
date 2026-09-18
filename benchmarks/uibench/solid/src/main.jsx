@@ -9,7 +9,6 @@ const target = document.getElementById('main');
 if (!target) throw new Error('missing #main root');
 
 let dispose = null;
-let preparedCase = null;
 
 window.__mount = () => {
 	dispose = render(() => <App />, target);
@@ -19,26 +18,19 @@ window.__mount = () => {
 window.__reset = () => {
 	if (dispose !== null) dispose();
 	dispose = null;
-	preparedCase = null;
 	clearSetter();
 	while (target.firstChild) target.removeChild(target.firstChild);
 };
 
+// No store, no reconcile: the snapshots are read, never adopted or mutated,
+// so the shared workload objects are committed as-is — exactly as the Vue
+// Vapor and Octane fixtures do.
 window.__prepare = (name) => {
-	const entry = caseByName(name);
-	// Solid's reconcile owns its input; prepare private endpoints outside the timer.
-	preparedCase = {
-		name,
-		after: structuredClone(entry.after),
-	};
-	commit(structuredClone(entry.before));
+	commit(caseByName(name).before);
 	flush();
 };
 window.__run = (name) => {
-	const after =
-		preparedCase?.name === name ? preparedCase.after : structuredClone(caseByName(name).after);
-	preparedCase = null;
-	commit(after);
+	commit(caseByName(name).after);
 	flush();
 };
 window.__ready = true;

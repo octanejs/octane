@@ -1,24 +1,31 @@
-import { For, createStore, reconcile } from 'solid-js';
+import { For, createSignal } from 'solid-js';
 import { bindSetter } from '../../shared/bridge.js';
 import { INITIAL_SNAPSHOT } from '../../shared/workloads.js';
 
-// Authored in the canonical Solid 2.0 shape (the same one Solid's own UIbench
-// entry uses): one keyed `reconcile` of the whole snapshot into a store each
-// commit, `<For>` over the store arrays (row/box/node proxies are stable across
-// a reconcile, so the list is keyed by reference), `textContent` for text
-// leaves, and a plain `.map` for a row's cells — the cells of a row never
-// change independently in this matrix, so a keyed list per row would only add
-// per-row list machinery.
+// The Vue Vapor / Octane shape, in Solid: ONE signal holding the raw immutable
+// snapshot (no store, no reconcile — the data is never diffed or copied),
+// keyed `<For keyed={by id}>` over the plain arrays, and row bodies that read
+// through the row ACCESSOR so a surviving row whose object was replaced
+// (`{...row, active: true}`) re-runs its own bindings and writes only what
+// changed. The list diff is the only diff. This is the idiomatic Solid 2.0
+// authoring for immutable snapshots handed to the view (ruled 2026-09-17);
+// ../solid-reconcile keeps the Solid 1-era store + reconcile shape for the
+// record — it pays a walk over every row per commit for stable proxies and
+// per-leaf notifications this workload never uses (2.6x vs 1.2x of Octane).
+
+const byId = (item) => item.id;
 
 function TableView(props) {
 	return (
 		<table class="uibench-table" data-kind="table">
 			<tbody>
-				<For each={props.rows}>
+				<For each={props.rows} keyed={byId}>
 					{(row) => (
-						<tr data-id={row.id} class={row.active ? 'active' : 'inactive'}>
-							<th textContent={row.label} />
-							{row.cells.map((cell) => <td textContent={cell.text} />)}
+						<tr data-id={row().id} class={row().active ? 'active' : 'inactive'}>
+							<th textContent={row().label} />
+							<For each={row().cells} keyed={byId}>
+								{(cell) => <td textContent={cell().text} />}
+							</For>
 						</tr>
 					)}
 				</For>
@@ -30,20 +37,25 @@ function TableView(props) {
 function AnimView(props) {
 	return (
 		<div class="uibench-anim" data-kind="anim">
-			<For each={props.boxes}>
-				{(box) => <div class="box" data-id={box.id} style={{ transform: box.transform }} />}
+			<For each={props.boxes} keyed={byId}>
+				{(box) => (
+					<div class="box" data-id={box().id} style={{ transform: box().transform }} />
+				)}
 			</For>
 		</div>
 	);
 }
 
 function TreeItem(props) {
+	const node = props.node; // the row accessor from the parent <For>
 	return (
-		<li data-id={props.node.id} class={props.node.children.length === 0 ? 'leaf' : 'container'}>
-			<span textContent={props.node.label} />
-			{props.node.children.length > 0 ? (
+		<li data-id={node().id} class={node().children.length === 0 ? 'leaf' : 'container'}>
+			<span textContent={node().label} />
+			{node().children.length > 0 ? (
 				<ul>
-					<For each={props.node.children}>{(child) => <TreeItem node={child} />}</For>
+					<For each={node().children} keyed={byId}>
+						{(child) => <TreeItem node={child} />}
+					</For>
 				</ul>
 			) : null}
 		</li>
@@ -53,28 +65,25 @@ function TreeItem(props) {
 function TreeView(props) {
 	return (
 		<ul class="uibench-tree" data-kind="tree">
-			<For each={props.nodes}>{(node) => <TreeItem node={node} />}</For>
+			<For each={props.nodes} keyed={byId}>
+				{(node) => <TreeItem node={node} />}
+			</For>
 		</ul>
 	);
 }
 
 export default function App() {
-	// A private copy: the store owns its backing, and the shared snapshot is
-	// the other fixtures' too.
-	const [snapshot, setSnapshot] = createStore(structuredClone(INITIAL_SNAPSHOT));
-	// Each commit is a fresh immutable snapshot; `reconcile(_, 'id')` diffs it
-	// into the store by key so surviving rows/boxes/nodes keep their proxies
-	// (and their DOM) and only changed leaves notify.
-	bindSetter((next) => setSnapshot(reconcile(next, 'id')));
+	const [snapshot, setSnapshot] = createSignal(INITIAL_SNAPSHOT);
+	bindSetter(setSnapshot);
 
 	return (
 		<>
-			{snapshot.kind === 'table' ? (
-				<TableView rows={snapshot.rows} />
-			) : snapshot.kind === 'anim' ? (
-				<AnimView boxes={snapshot.boxes} />
+			{snapshot().kind === 'table' ? (
+				<TableView rows={snapshot().rows} />
+			) : snapshot().kind === 'anim' ? (
+				<AnimView boxes={snapshot().boxes} />
 			) : (
-				<TreeView nodes={snapshot.nodes} />
+				<TreeView nodes={snapshot().nodes} />
 			)}
 		</>
 	);

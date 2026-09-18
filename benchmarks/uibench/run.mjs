@@ -53,7 +53,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'octane-tsrx', url: 'http://localhost:5315/' },
 			{ name: 'react', url: 'http://localhost:5316/' },
 			{ name: 'solid', url: 'http://localhost:5317/' },
-			{ name: 'solid-signal', url: 'http://localhost:5340/' },
+			{ name: 'solid-reconcile', url: 'http://localhost:5340/' },
 			{ name: 'preact', url: 'http://localhost:5318/' },
 			{ name: 'vue-vapor', url: 'http://localhost:5319/' },
 			{ name: 'ripple', url: 'http://localhost:5322/' },
