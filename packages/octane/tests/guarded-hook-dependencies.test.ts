@@ -16,6 +16,63 @@ import {
 
 describe('guarded inferred dependencies', () => {
 	it.each([false, true])(
+		'distinguishes missing receivers from undefined and null data (plain hook: %s)',
+		(plain) => {
+			for (const dev of [true, false]) {
+				for (const missing of [undefined, null]) {
+					for (const item of [{}, { name: undefined }, { name: null }]) {
+						const entries: string[] = [];
+						const setup = `import { useMemo } from 'octane';
+import { observe } from './probe';
+export function useRead({ item }) {
+  return useMemo(() => {
+    observe('run');
+    try { return 'read:' + String(item.name); } catch { return 'caught'; }
+  });
+}`;
+						const runtimeModules = {
+							'./probe': { observe: (entry: string) => entries.push(entry) },
+						};
+						const hook = plain
+							? loadPlainHookFixtureSource(setup, {
+									id: '/src/GuardedMissing.ts',
+									inlineHookMemo: true,
+									hmr: dev,
+									runtimeModules,
+								})
+							: null;
+						const { App } = loadCompiledFixtureSource(
+							`${plain ? "import { useRead } from './hook';" : setup}
+export function App(props) @{ const value = useRead(props); <p>{value as string}</p> }`,
+							{
+								id: '/src/GuardedMissing.tsrx',
+								mode: 'client',
+								compileOptions: { hmr: false, dev },
+								runtimeModules: { ...runtimeModules, ...(hook ? { './hook': hook } : {}) },
+							},
+						);
+						const root = mount(App, { item: missing });
+						try {
+							expect(root.container.textContent).toBe('caught');
+							root.update(App, { item });
+							expect(root.container.textContent).toBe(
+								'read:' + String('name' in item ? item.name : undefined),
+							);
+							root.update(App, { item: { ...item } });
+							expect(entries).toEqual(['run', 'run']);
+							root.update(App, { item: missing });
+							expect(root.container.textContent).toBe('caught');
+							expect(entries).toEqual(['run', 'run', 'run']);
+						} finally {
+							root.unmount();
+						}
+					}
+				}
+			}
+		},
+	);
+
+	it.each([false, true])(
 		'keeps guarded own data dependencies precise (plain hook: %s)',
 		(plain) => {
 			const entries: string[] = [];

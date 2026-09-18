@@ -36,10 +36,18 @@
  * data properties retain precise dependencies without invoking accessors.
  * Accessors and inherited properties track the receiver. A failed reflection
  * probe also falls back to the receiver, leaving exceptions in authored code.
+ * Module-local nullish markers distinguish a failed receiver read from a
+ * successful read whose own data value is null or undefined.
  */
 import { hasOwnProp } from './has-own.js';
 
+const guardedNullReceiver = Symbol();
+const guardedUndefinedReceiver = Symbol();
+
 export function __methodDep(receiver: unknown, name: string, guarded = false): unknown {
+	if (guarded && receiver == null) {
+		return receiver === null ? guardedNullReceiver : guardedUndefinedReceiver;
+	}
 	if ((typeof receiver !== 'object' || receiver === null) && typeof receiver !== 'function') {
 		return receiver;
 	}
