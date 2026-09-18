@@ -119,6 +119,7 @@ function inferredDependencyArray(inferred, state, origin) {
 							requireHelper(state, METHOD_DEP_IMPORT, 'octane'),
 							cloneAstNode(dependency.method.root),
 							b.literal(dependency.method.name),
+							...(dependency.method.guarded ? [b.literal(true)] : []),
 						)
 					: cloneAstNode(dependency.node),
 			),

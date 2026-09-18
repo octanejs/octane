@@ -1125,7 +1125,7 @@ function emitInferredDependencies(dependencies, st) {
 	return dependencies
 		.map((dependency) =>
 			dependency.method
-				? `${requireParallelHelper(st, METHOD_DEP_IMPORT)}(${dependency.method.root.name}, ${JSON.stringify(dependency.method.name)})`
+				? `${requireParallelHelper(st, METHOD_DEP_IMPORT)}(${dependency.method.root.name}, ${JSON.stringify(dependency.method.name)}${dependency.method.guarded ? ', true' : ''})`
 				: st.source.slice(dependency.node.start, dependency.node.end),
 		)
 		.join(', ');
