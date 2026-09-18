@@ -216,6 +216,13 @@ eligible after compiler lifting.
 Ordinary `<Hydrate>` boundaries, including the default split form, retain the
 existing parent-first activation behavior.
 
+An independent widget with `when={load()}` activates when the document bootstrap
+registers its SSR sidecar, without waiting for interaction or evaluating its
+lexical parent. Its styles load before its activation module. A paused document
+resumes an unfinished load activation when it becomes active again.
+Activation adopts the matching server DOM in template and JSX-returning
+components, preserving edits made to uncontrolled inputs before activation.
+
 #### Replaceable selections versus commands
 
 Independent widgets normally preserve every captured interaction in order. A
