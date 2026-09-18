@@ -142,6 +142,7 @@ export function planBindingProgram(fn, render, context) {
 	let signals = false;
 	let controls = false;
 	let hostOperations = false;
+	let initialOperations = false;
 	let lists = false;
 	let styles = false;
 	let projectionsEnabled = false;
@@ -502,6 +503,7 @@ export function planBindingProgram(fn, render, context) {
 					signals ||= child.signals;
 					controls ||= child.controls;
 					hostOperations ||= child.hostOperations;
+					initialOperations ||= child.initialOperations;
 					styles ||= child.styles;
 					projectionsEnabled ||= child.projectionsEnabled;
 					for (const program of child.childPrograms) childPrograms.add(program);
@@ -877,9 +879,9 @@ export function planBindingProgram(fn, render, context) {
 			...(projectionGroups.length ? { projectionGroups: data(projectionGroups) } : {}),
 		};
 		hostOperations ||=
-			initializers.length > 0 ||
 			projectionGroups.length > 0 ||
 			bindings.some((binding) => binding[1] === 'control' || binding[1] === 'classGroup');
+		initialOperations ||= initializers.length > 0;
 		if (initializers.length > 0) {
 			properties.initializers = data(initializers);
 			properties.initialize = project(names, b.array(initialValues));
@@ -953,6 +955,7 @@ export function planBindingProgram(fn, render, context) {
 		signals,
 		controls,
 		hostOperations,
+		initialOperations,
 		lists,
 		styles,
 		projectionsEnabled,

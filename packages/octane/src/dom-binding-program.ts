@@ -363,6 +363,7 @@ export interface CompiledBindingProgram<Props> {
 	readonly createControls?: typeof __createBindingControls;
 	readonly list?: BindingListCapability;
 	readonly hostOperations?: BindingProgramHostOperations;
+	readonly initialOperations?: BindingProgramInitializers;
 	readonly adopt: typeof __adoptLeanBindingProgram<Props> & {
 		readonly list?: BindingListCapability;
 		readonly hostOperations?: BindingProgramHostOperations;
@@ -442,6 +443,7 @@ interface Transaction {
 	projections?: ReturnType<typeof __createBindingProjections>;
 	controls?: ReturnType<typeof __createBindingControls>;
 	hostOperations?: BindingProgramHostOperations;
+	initialOperations?: BindingProgramInitializers;
 	list?: BindingListCapability;
 	notifySignal?(prepare: () => () => void): void;
 	preparing?: boolean;
@@ -1055,7 +1057,7 @@ function prepareFragment(
 		instance,
 		environment,
 		values: projectValues(definition.project(environment), instance, transaction, controls),
-		initial: transaction.hostOperations?.initial(instance, environment) ?? null,
+		initial: transaction.initialOperations?.initial(instance, environment) ?? null,
 		regions: [],
 		groups: new Map(),
 		controls,
@@ -1357,7 +1359,7 @@ function commitFragment(plan: FragmentPlan, transaction: Transaction): void {
 	instance.signalPlan = undefined;
 	instance.environment = plan.environment;
 	instance.updateAdapters = plan.adapters;
-	transaction.hostOperations?.initialize(plan, false, transaction);
+	transaction.initialOperations?.initialize(plan, false, transaction);
 	for (let index = 0; index < plan.values.length && !transaction.disposed; index++) {
 		if (instance.definition.bindings[index]![1] === 'control') continue;
 		writeOperation(instance, index, plan.values[index]!, plan.groups.get(index), transaction);
@@ -1366,7 +1368,7 @@ function commitFragment(plan: FragmentPlan, transaction: Transaction): void {
 		if (transaction.disposed) return;
 		commitRegion(region, instance.id, transaction);
 	}
-	transaction.hostOperations?.initialize(plan, true, transaction);
+	transaction.initialOperations?.initialize(plan, true, transaction);
 	for (const control of plan.controls?.values() ?? []) {
 		if (transaction.disposed) return;
 		control.commit();
@@ -1449,6 +1451,7 @@ function bindProgram<Props>(
 		controls: descriptor.createControls?.(),
 		list,
 		hostOperations,
+		initialOperations: descriptor.initialOperations ?? hostOperations,
 		frame: 0,
 	};
 	const signalUpdates =
@@ -1904,6 +1907,13 @@ export const __bindingProgramHostOperations = {
 	releaseProjections: releaseHostProjections,
 };
 type BindingProgramHostOperations = typeof __bindingProgramHostOperations;
+
+/** @internal Fresh native values do not require control or projection ownership. */
+export const __bindingProgramInitializers = {
+	initial: initialValues,
+	initialize: initializeProperties,
+};
+type BindingProgramInitializers = typeof __bindingProgramInitializers;
 
 // Older query artifacts only carry their adopter, not selected capabilities.
 // Keeping this metadata on that legacy callable lets a new parent forward an

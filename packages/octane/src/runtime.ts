@@ -19680,7 +19680,8 @@ export function presentationWrite<T>(
 						];
 		if (
 			element !== frame.lease.root ||
-			keys.some((key: string) => !channels.has(key)) ||
+			// Preserve authored names for diagnostics; receipts use native field names.
+			keys.some((key: string) => !channels.has(ATTRIBUTE_ALIASES.get(key) ?? key)) ||
 			kind === 'bindSignalValue' ||
 			kind === 'setEventHandler' ||
 			kind === 'bindSignalText' ||
