@@ -73,7 +73,12 @@ describe('independent hydration bootstrap', () => {
 			const source = `import { Hydrate } from 'octane';
 import { interaction, load } from 'octane/hydration';
 import { choose, readLabel, renderChildren, renderShell } from './actions';
-${authoring === 'template' ? `export function App() @{ renderShell(); const __octaneIndependentProps = 'Loaded widget'; ${children} }` : `export function App() { renderShell(); const __octaneIndependentProps = 'Loaded widget'; return ${children}; }`}`;
+${authoring === 'template' ? `export function App() @{ renderShell(); const __octaneIndependentProps = 'Loaded widget'; ${children} }` : `export function App() { renderShell(); const __octaneIndependentProps = 'Loaded widget'; return ${children}; }`}
+function Unrelated() {
+  let __octaneIndependentProps = readLabel('unrelated');
+  __octaneIndependentProps = 'unused';
+  return null;
+}`;
 			const file = `/project/src/LoadWidget.${authoring === 'tsx' ? 'tsx' : 'tsrx'}`;
 			const observations: string[] = [];
 			const server = evaluateCompiledFixtureCode(
