@@ -11,7 +11,7 @@ import {
 } from '../src/index.js';
 import { mount, act } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
-import { WithheldChildren } from './_fixtures/imported-context.ts';
+import { WithheldChildren } from './_fixtures/imported-context';
 import {
 	DynamicProvider,
 	CombinedDynamic,
@@ -325,7 +325,7 @@ describe('context — use() alongside other reads', () => {
 	it('hydrates context-only reads and keeps provider updates live', async () => {
 		const server = loadServerFixture('packages/octane/tests/_fixtures/context.tsrx', {
 			runtimeModules: {
-				'./imported-context.ts': {
+				'./imported-context': {
 					ImportedTheme: createServerContext('default'),
 					WithheldChildren,
 				},

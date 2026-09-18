@@ -1,5 +1,5 @@
 import { useState, createContext, use, useContext, createPortal } from 'octane';
-import { ImportedTheme, WithheldChildren } from './imported-context.ts';
+import { ImportedTheme, WithheldChildren } from './imported-context';
 
 // Multiple distinct contexts in one tree.
 export const ThemeCtx = createContext('light');
