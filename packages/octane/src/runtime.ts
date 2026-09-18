@@ -20202,13 +20202,9 @@ function writeDirectSignalBinding(binding: DirectSignalBinding, value: unknown):
 		}
 	} else if (binding.kind === 'value') {
 		const element = binding.target as Element;
-		if (element.localName === 'select') setSelectValue(element, value);
-		else
-			setValue(
-				element,
-				value,
-				element.localName === 'textarea' && isWritableSignal(binding.handle),
-			);
+		const tag = element.localName;
+		if (tag === 'select') setSelectValue(element, value);
+		else setValue(element, value, tag === 'textarea' && isWritableSignal(binding.handle));
 	} else {
 		setChecked(binding.target as Element, value);
 	}
@@ -26394,12 +26390,16 @@ export function setValue(el: Element, value: unknown, writableTextareaEcho = fal
 	// echo must retain the browser's edit transaction: changing its text-content
 	// reset baseline splits native Undo into individual keystrokes. Scalar and
 	// read-only values keep the ordinary attribute mirroring contract.
-	const needsWrite = writableTextareaEcho
-		? (STAGED_DOM?.view(input) ?? input).value !== s
-		: undefined;
-	if (!(ctrl.composing && Object.is(prev, value)) && (needsWrite ?? valueNeedsWrite(input, value)))
+	if (writableTextareaEcho) {
+		if ((STAGED_DOM?.view(input) ?? input).value === s) return;
+		if (!(ctrl.composing && Object.is(prev, value))) (STAGED_DOM?.view(input) ?? input).value = s;
+		if ((STAGED_DOM?.view(input) ?? input).defaultValue !== s)
+			(STAGED_DOM?.view(input) ?? input).defaultValue = s;
+		return;
+	}
+	if (!(ctrl.composing && Object.is(prev, value)) && valueNeedsWrite(input, value))
 		(STAGED_DOM?.view(input) ?? input).value = s;
-	if (needsWrite !== false && (STAGED_DOM?.view(input) ?? input).defaultValue !== s)
+	if ((STAGED_DOM?.view(input) ?? input).defaultValue !== s)
 		(STAGED_DOM?.view(input) ?? input).defaultValue = s;
 }
 
