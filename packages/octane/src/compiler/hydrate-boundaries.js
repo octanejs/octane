@@ -2290,9 +2290,25 @@ export function prepareServerHydrateBoundaries(source, filename, parsedAst = nul
 						opening,
 					),
 				);
+				// Extraction always compiles an independent widget as a template body.
+				// Keep its server children on that same path even in return-JSX parents,
+				// whose descriptor children would add a range the widget cannot adopt.
+				attributes.push(
+					jsxExpressionAttribute(
+						'children',
+						b.arrow([b.id(uniqueGeneratedName(source, '__octaneIndependentProps'))], {
+							type: 'JSXCodeBlock',
+							body: [],
+							render: b.jsx_fragment(node.children ?? []),
+							metadata: { path: [] },
+						}),
+						node,
+					),
+				);
 			}
 			return {
 				...node,
+				children: elementUpdate.independent !== null ? [] : node.children,
 				openingElement: {
 					...opening,
 					attributes,

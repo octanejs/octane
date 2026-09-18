@@ -21054,6 +21054,8 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 		if (isFunctionNode(n) && n.body?.type === 'JSXCodeBlock') {
 			const name = n.id?.name ?? allocCompilerName(ctx, '__template');
 			const previousLocals = ctx.currentComponentLocals;
+			// A nested body must not replace the enclosing component's warm plan.
+			const previousWarm = ctx._pendingWarm;
 			ctx.currentComponentLocals = collectComponentLocals(n);
 			try {
 				const compiled =
@@ -21063,6 +21065,7 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 				return functionExpressionFromDeclaration({ ...compiled, id: n.id ?? null }, n);
 			} finally {
 				ctx.currentComponentLocals = previousLocals;
+				ctx._pendingWarm = previousWarm;
 			}
 		}
 		if (
