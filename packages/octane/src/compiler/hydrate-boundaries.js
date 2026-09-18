@@ -22,32 +22,42 @@ const TRANSPARENT_TS_EXPRESSIONS = new Set([
 ]);
 
 function inheritGeneratedOrigin(root, origin) {
-	const seen = new WeakSet();
+	const seen = new WeakMap();
 	const visit = (value) => {
-		if (!value || typeof value !== 'object' || seen.has(value)) return;
-		seen.add(value);
+		if (!value || typeof value !== 'object') return value;
+		// Stylesheet descendants use offsets into their own CSS source and do
+		// not carry JavaScript locations. Keep that adopted grammar intact.
+		if (value.type === 'StyleSheet') return value;
+		if (seen.has(value)) return seen.get(value);
+		seen.set(value, value);
 		if (Array.isArray(value)) {
-			for (const item of value) visit(item);
-			return;
+			let output = null;
+			for (let index = 0; index < value.length; index++) {
+				const mapped = visit(value[index]);
+				if (output === null && mapped !== value[index]) output = value.slice(0, index);
+				if (output !== null) output.push(mapped);
+			}
+			const result = output ?? value;
+			seen.set(value, result);
+			return result;
 		}
-		// Adopted parser nodes (including StyleSheet subtrees) may be frozen
-		// and already carry CSS-relative positions; only stamp generated nodes.
-		if (
-			typeof value.type === 'string' &&
-			value.loc == null &&
-			origin?.loc != null &&
-			!Object.isFrozen(value)
-		) {
-			value.start = origin.start;
-			value.end = origin.end;
-			value.loc = origin.loc;
+		let output = null;
+		if (typeof value.type === 'string' && value.loc == null && origin?.loc != null) {
+			output = { ...value, start: origin.start, end: origin.end, loc: origin.loc };
 		}
 		for (const [key, child] of Object.entries(value)) {
-			if (!SKIP_KEYS.has(key)) visit(child);
+			if (SKIP_KEYS.has(key)) continue;
+			const mapped = visit(child);
+			if (mapped !== child) {
+				if (output === null) output = { ...value };
+				output[key] = mapped;
+			}
 		}
+		const result = output ?? value;
+		seen.set(value, result);
+		return result;
 	};
-	visit(root);
-	return root;
+	return visit(root);
 }
 
 function mapAstCow(value, replace) {
