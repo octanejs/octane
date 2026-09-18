@@ -63,11 +63,13 @@ const OCTANE_025_CONSUMERS = new Set([
 	'@octanejs/testing-library',
 ]);
 
-// These packages consume compiler/server APIs from the coordinated core
+// These packages consume compiler/runtime/server APIs from the coordinated core
 // release. pnpm publishes workspace:^ as ^<the released sibling version>,
 // while source installs keep resolving the current workspace before versioning.
 const OCTANE_CURRENT_CORE_CONSUMERS = new Set([
 	'@octanejs/app-core',
+	'@octanejs/drei',
+	'@octanejs/ink',
 	'@octanejs/lynx',
 	'@octanejs/octane-is',
 	'@octanejs/rspack-plugin',

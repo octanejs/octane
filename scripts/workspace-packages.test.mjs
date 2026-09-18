@@ -142,6 +142,8 @@ test('rejects an Octane peer range that can recreate major dependent releases', 
 
 for (const name of [
 	'app-core',
+	'drei',
+	'ink',
 	'lynx',
 	'octane-is',
 	'vite-plugin-octane',

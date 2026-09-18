@@ -123,7 +123,10 @@ export function createContextSourceFacts(ast) {
 			entry.kind = kind;
 			return kind;
 		}
-		if (value?.type === 'CallExpression' && kindOf(value.callee) === 'factory') {
+		if (
+			(value?.type === 'CallExpression' || value?.type === 'OptionalCallExpression') &&
+			kindOf(value.callee) === 'factory'
+		) {
 			return 'context';
 		}
 		if (

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { createRequire } from 'node:module';
 import { compile } from 'octane/compiler';
 import { slotHooks } from '../../src/compiler/slot-hooks.js';
+import { assertNoLegacyContextProviders } from '../../src/compiler/context-provider.js';
+
+const parseSync = createRequire(import.meta.url)('@babel/core').parseSync as (
+	source: string,
+	options: { babelrc: false; configFile: false },
+) => { program: unknown } | null;
 
 const targets = [
 	{ mode: 'client', dev: true },
@@ -58,6 +65,33 @@ export function App() { return <Theme value="dark"><div /></Theme>; }`;
 				'App.tsx',
 			),
 		).toThrow(/Context\.Provider.*<Context value=/);
+	});
+
+	it.each([
+		`import * as Octane from 'octane'; const Theme = Octane?.createContext?.('light');`,
+		`import { createContext as makeContext } from 'octane'; const Theme = makeContext?.('light');`,
+		`import { createContext } from 'octane'; const factory = createContext; const Theme = factory?.('light');`,
+	])('rejects optional context factories in Babel parser output: %s', (setup) => {
+		const source = `${setup}\nexport const Legacy = Theme.Provider;`;
+		const ast = parseSync(source, { babelrc: false, configFile: false })!.program;
+		expect(() => assertNoLegacyContextProviders(ast, source, 'contexts.ts')).toThrow(
+			/Context\.Provider.*<Context value=/,
+		);
+	});
+
+	it.each([
+		`import { createContext as octaneFactory } from 'octane';
+import { createContext } from 'other-framework';
+const Theme = createContext?.('light');
+export const Legacy = Theme.Provider;`,
+		`import * as Octane from 'octane';
+export function read(Octane) {
+  const Theme = Octane?.createContext?.('light');
+  return Theme.Provider;
+}`,
+	])('preserves unrelated optional factories in Babel parser output: %s', (source) => {
+		const ast = parseSync(source, { babelrc: false, configFile: false })!.program;
+		expect(() => assertNoLegacyContextProviders(ast, source, 'contexts.ts')).not.toThrow();
 	});
 
 	it.each([
