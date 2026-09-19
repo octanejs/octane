@@ -20458,6 +20458,14 @@ export function bindSignalAttribute(
 	site: string,
 	attributeKind: DirectSignalAttributeKind = 'attr',
 ): unknown {
+	// Defined scalar equality needs no binding token/handle probe. Undefined
+	// still reconciles hydration; stable objects/functions can reveal handles.
+	if (
+		previous === value &&
+		value !== undefined &&
+		(value === null || (typeof value !== 'object' && typeof value !== 'function'))
+	)
+		return previous;
 	return bindDirectSignal(
 		scope,
 		previous,

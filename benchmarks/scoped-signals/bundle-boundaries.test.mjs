@@ -18,6 +18,7 @@ import {
 import { knownAttributeSpreads } from '../../packages/stylex/src/compiler-contract.js';
 import { verifyScenario } from '../bundle-size/verify-reachability.mjs';
 import { generateStylexCSS, transformStylex } from '../../packages/stylex/src/transform.js';
+import { measureOpaqueAttributes } from './opaque-attributes.mjs';
 import {
 	BUNDLE_CASES,
 	baselineUnavailableReason,
@@ -2274,4 +2275,37 @@ test('root optimization fails closed on unscoped runtime AST references', async 
 	t.diagnostic(
 		'2 frozen COW AST positive/negative pairs; future-proof admission, not a reproduced supported runtime bug',
 	);
+});
+
+test('repeated opaque primitive attributes omit policy probes without hiding handles or controls', async (t) => {
+	for (const dev of [false, true]) {
+		for (const extension of ['tsrx', 'tsx']) {
+			for (const attributeCount of [1, 100]) {
+				const result = await measureOpaqueAttributes({ dev, extension, attributeCount });
+				const { snapshot, ...metrics } = result;
+				t.diagnostic(JSON.stringify(metrics));
+				assert.deepEqual(
+					result.steady,
+					{ helperEntries: 100 * attributeCount, policyEntries: 0 },
+					'The shared helper remains; equal defined scalars omit policy/handle probes.',
+				);
+				for (const [phase, count] of [
+					['changed', 1],
+					['nan', 2],
+					['undefinedCalls', 2],
+					['objects', 2],
+					['functions', 2],
+				]) {
+					assert.deepEqual(
+						result[phase],
+						{ helperEntries: count * attributeCount, policyEntries: count * attributeCount },
+						`${phase}: the binding path remains available.`,
+					);
+				}
+				assert.equal(result.handles.helperEntries, 2 * attributeCount);
+				// The first real handle can re-enter once to establish stamped ownership.
+				assert.ok(result.handles.policyEntries >= 2 * attributeCount);
+			}
+		}
+	}
 });

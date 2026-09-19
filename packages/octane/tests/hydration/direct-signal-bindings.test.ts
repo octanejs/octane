@@ -34,6 +34,211 @@ import {
 } from '../../src/signals/index.js';
 import type { SignalOwner } from '../../src/signals/types.js';
 
+describe('opaque host attribute updates', () => {
+	it.each(
+		[false, true].flatMap((dev) =>
+			['tsrx', 'tsx'].flatMap((ext) =>
+				[false, true].flatMap((strong) =>
+					[false, true].map((hydrate) => ({ dev, ext, strong, hydrate })),
+				),
+			),
+		),
+	)(
+		'preserves evaluated attributes, controlled edits, and abandoned updates (%j)',
+		async ({ dev, ext, strong, hydrate }) => {
+			const markup = `<section title={props.read()} data-count={props.count}><input value={props.value}/><input type="checkbox" checked={props.checked}/><p>{String(props.tick)}</p><footer>{props.finish?.() as string}</footer></section>`;
+			const source = `export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'return ' : ''}${markup}${ext === 'tsx' ? ';' : ''} }`;
+			const options = {
+				id: `/src/opaque-attributes.${ext}`,
+				compileOptions: { dev, hmr: false, strong },
+			};
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: Root | undefined;
+			let owner: ReturnType<typeof createScope> | undefined;
+			let reads = 0;
+			let tick = 0;
+			const props = (label: unknown, count: unknown = 1, finish?: () => string) => ({
+				read: () => (reads++, label),
+				count,
+				tick: tick++,
+				value: 'fixed',
+				checked: true,
+				finish,
+			});
+			try {
+				const initial = props('initial');
+				let adopted: Element[] | undefined;
+				if (hydrate) {
+					const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+					container.innerHTML = renderToString(server.App, initial).html;
+					reads = 0;
+					adopted = [...container.querySelectorAll('section,input,p,footer')];
+					await act(() => {
+						root = hydrateRoot(container, client.App, initial);
+					});
+				} else {
+					root = createRoot(container);
+					root.render(client.App, initial);
+				}
+				expect(reads).toBe(1);
+				const hosts = [...container.querySelectorAll('section,input,p,footer')];
+				if (adopted) expect(hosts).toEqual(adopted);
+				const [section, input, checkbox] = hosts as [
+					HTMLElement,
+					HTMLInputElement,
+					HTMLInputElement,
+				];
+				for (let i = 0; i < 3; i++) {
+					input.value = 'edited';
+					checkbox.checked = false;
+					reads = 0;
+					await act(() => root!.render(client.App, props('initial')));
+					expect(reads).toBe(1);
+					expect(section.title).toBe('initial');
+					expect(input.value).toBe('fixed');
+					expect(checkbox.checked).toBe(true);
+				}
+				await act(() => root!.render(client.App, props('changed', 0)));
+				expect(section.title).toBe('changed');
+				expect(section.getAttribute('data-count')).toBe('0');
+				await act(() => root!.render(client.App, props(null, null)));
+				expect(section.hasAttribute('title')).toBe(false);
+				expect(section.hasAttribute('data-count')).toBe(false);
+				await act(() => root!.render(client.App, props(undefined, undefined)));
+				await act(() => root!.render(client.App, props(undefined, undefined)));
+				expect(section.hasAttribute('title')).toBe(false);
+				owner = createScope({ scopeKey: options.id });
+				const label = owner.signal$('label', 'first handle');
+				await act(() => root!.render(client.App, props(label)));
+				await act(() => owner!.set(label, 'live handle'));
+				expect(section.title).toBe('live handle');
+				await act(() => root!.render(client.App, props(label)));
+				expect(section.title).toBe('live handle');
+				await act(() => root!.render(client.App, props('detached')));
+				await act(() => owner!.set(label, 'obsolete'));
+				expect(section.title).toBe('detached');
+				const pending = new Promise<never>(() => {});
+				flushSync(() =>
+					root!.render(
+						client.App,
+						props('abandoned', 1, () => {
+							throw pending;
+						}),
+					),
+				);
+				expect(section.title).toBe('detached');
+				flushSync(() => root!.render(client.App, props('abandoned')));
+				expect(section.title).toBe('abandoned');
+				expect([...container.querySelectorAll('section,input,p,footer')]).toEqual(hosts);
+				root!.unmount();
+				root = undefined;
+				await act(() => owner!.set(label, 'after disposal'));
+				expect(container.childNodes.length).toBe(0);
+				expect(section.title).toBe('abandoned');
+			} finally {
+				root?.unmount();
+				owner?.dispose();
+				container.remove();
+			}
+		},
+	);
+
+	it.each([false, true].flatMap((dev) => ['tsrx', 'tsx'].map((ext) => ({ dev, ext }))))(
+		'reconciles an absent client attribute when adopting server output (%j)',
+		async ({ dev, ext }) => {
+			const source = `export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'return ' : ''}<section title={props.value}><input defaultValue="draft"/></section>${ext === 'tsx' ? ';' : ''} }`;
+			const options = { id: `/src/absent-attribute.${ext}`, compileOptions: { dev, hmr: false } };
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const container = document.createElement('div');
+			container.innerHTML = renderToString(server.App, { value: 'server' }).html;
+			document.body.append(container);
+			const section = container.querySelector('section')!;
+			const input = container.querySelector('input')!;
+			input.value = 'typed before hydration';
+			const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
+			let root: Root | undefined;
+			try {
+				await act(() => {
+					root = hydrateRoot(
+						container,
+						client.App,
+						{ value: undefined },
+						{ onRecoverableError() {} },
+					);
+				});
+				expect(container.querySelector('section')).toBe(section);
+				expect(section.hasAttribute('title')).toBe(false);
+				expect(container.querySelector('input')).toBe(input);
+				expect(input.value).toBe('typed before hydration');
+				await act(() => root!.render(client.App, { value: undefined }));
+				expect(section.hasAttribute('title')).toBe(false);
+			} finally {
+				root?.unmount();
+				diagnostic.mockRestore();
+				container.remove();
+			}
+		},
+	);
+
+	it.each([false, true].flatMap((dev) => [false, true].map((callable) => ({ dev, callable }))))(
+		'observes capability revealed by a stable object or callable (%j)',
+		async ({ dev, callable }) => {
+			const source = `export function App(props) @{ <section title={props.value}><p>{String(props.tick)}</p></section> }`;
+			const client = loadCompiledFixtureSource(source, {
+				id: '/src/revealed-attribute.tsrx',
+				mode: 'client',
+				compileOptions: { dev, hmr: false },
+			});
+			const owner = createScope({ scopeKey: `revealed-attribute-${dev}-${callable}` });
+			const label = owner.signal$('label', 'revealed');
+			const value = callable ? () => {} : { toString: () => 'ordinary object' };
+			let active = false;
+			Object.assign(value, {
+				key: label.key,
+				kind: label.kind,
+				get: label.get.bind(label),
+				latest: label.latest.bind(label),
+				snapshot: label.snapshot.bind(label),
+				subscribe: label.subscribe.bind(label),
+			});
+			Object.defineProperties(value, {
+				[Signals.SIGNAL_HANDLE]: { get: () => active },
+				[Signals.SIGNAL_BINDING_READ]: { value: label[Signals.SIGNAL_BINDING_READ].bind(label) },
+				[Signals.SIGNAL_BINDING_SUBSCRIBE]: {
+					value: label[Signals.SIGNAL_BINDING_SUBSCRIBE].bind(label),
+				},
+				[Signals.SIGNAL_BINDING_IDENTITY]: {
+					value: label[Signals.SIGNAL_BINDING_IDENTITY].bind(label),
+				},
+			});
+			const container = document.createElement('div');
+			document.body.append(container);
+			const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
+			let root: Root | undefined;
+			try {
+				root = createRoot(container);
+				root.render(client.App, { value, tick: 0 });
+				const section = container.querySelector('section')!;
+				expect(section.getAttribute('title')).toBe(callable ? null : 'ordinary object');
+				active = true;
+				await act(() => root!.render(client.App, { value, tick: 1 }));
+				expect(section.title).toBe('revealed');
+				await act(() => owner.set(label, 'live'));
+				expect(section.title).toBe('live');
+				expect(container.querySelector('section')).toBe(section);
+			} finally {
+				root?.unmount();
+				owner.dispose();
+				diagnostic.mockRestore();
+				container.remove();
+			}
+		},
+	);
+});
+
 describe('signal-valued props from ordinary modules', () => {
 	it.each(
 		[false, true].flatMap((dev) =>

@@ -311,6 +311,22 @@ of replacing the earlier measurement. The first recorded comparison is in
 `results/2026-08-27/bundles-preliminary.json` with its interpretation in the
 adjacent `bundles-preliminary.md`.
 
+The opaque-attribute work guard compiles the same consumer with one or 100
+attributes in TSX/TSRX and development/production modes. An observed build counts
+attribute helper and policy entries after compilation; its output, evaluation
+counts, host identity, input restoration, handle updates, and teardown must agree
+with an unobserved build. Repeated strictly equal defined scalar attributes retain
+the shared helper call and omit deeper policy/handle probes. Changed values,
+undefined, objects, functions, and handles exercise the binding path. NaN also
+re-enters conservatively. Bundle bytes use only the unobserved build. This guard
+measures deterministic work, not CPU time or browser layout, and its used-signal
+fixture does not establish a reduction in generic runtime bundle size.
+
+```bash
+node --test --test-name-pattern='repeated opaque primitive attributes' \
+  benchmarks/scoped-signals/bundle-boundaries.test.mjs
+```
+
 ## Retained asynchronous producers
 
 The separate async retention diagnostic keeps unresolved producer promises
