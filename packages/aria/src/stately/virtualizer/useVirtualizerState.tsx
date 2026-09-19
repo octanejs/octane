@@ -12,8 +12,8 @@
  * governing permissions and limitations under the License.
  */
 
-import { Collection, Key } from '@react-types/shared';
-import { InvalidationContext } from './types';
+import type { Collection, Key } from '@react-types/shared';
+import type { InvalidationContext } from './types';
 import { Layout } from './Layout';
 import React, { useCallback, useMemo, useRef, useState } from '../../compat/react';
 import { Rect } from './Rect';

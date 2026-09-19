@@ -14,9 +14,9 @@
 
 import {
 	TableLayout as BaseTableLayout,
-	TableLayoutProps,
+	type TableLayoutProps,
 } from '../upstream-exports/react-stately/useVirtualizerState';
-import { LayoutOptionsDelegate } from './Virtualizer';
+import type { LayoutOptionsDelegate } from './Virtualizer';
 import { TableColumnResizeStateContext } from './Table';
 import { useContext, useMemo } from '../compat/react';
 

@@ -12,21 +12,26 @@
  * governing permissions and limitations under the License.
  */
 
-import {
+import type {
 	AriaLabelingProps,
 	DOMAttributes,
 	DOMProps,
 	InputDOMProps,
 	RefObject,
 } from '@react-types/shared';
-import {
+import type {
 	ColorWheelProps,
 	ColorWheelState,
 } from '../upstream-exports/react-stately/useColorWheelState';
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { mergeProps } from '../utils/mergeProps';
-import React, { ChangeEvent, InputHTMLAttributes, useCallback, useRef } from '../compat/react';
+import React, {
+	type ChangeEvent,
+	type InputHTMLAttributes,
+	useCallback,
+	useRef,
+} from '../compat/react';
 import { useFormReset } from '../utils/useFormReset';
 import { useGlobalListeners } from '../utils/useGlobalListeners';
 import { useKeyboard } from '../interactions/useKeyboard';

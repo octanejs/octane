@@ -14,18 +14,18 @@
 
 import { alignCenter, constrainValue, isInvalid, previousAvailableDate } from './utils';
 import {
-	Calendar,
+	type Calendar,
 	CalendarDate,
-	CalendarIdentifier,
-	DateDuration,
+	type CalendarIdentifier,
+	type DateDuration,
 	GregorianCalendar,
 	maxDate,
 	minDate,
 	toCalendar,
 	toCalendarDate,
 } from '@internationalized/date';
-import { CalendarPropsBase, DateValue, MappedDateValue, RangeCalendarState } from './types';
-import { RangeValue, ValidationState, ValueBase } from '@react-types/shared';
+import type { CalendarPropsBase, DateValue, MappedDateValue, RangeCalendarState } from './types';
+import type { RangeValue, ValidationState, ValueBase } from '@react-types/shared';
 import { useCalendarState } from './useCalendarState';
 import { useCallback, useMemo, useState } from '../../compat/react';
 import { useControlledState } from '../utils/useControlledState';

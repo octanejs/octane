@@ -13,9 +13,9 @@
  */
 
 import { announce } from '../live-announcer/LiveAnnouncer';
-import { AriaButtonProps } from '../button/useButton';
-import { AriaLabelingProps, DOMAttributes, DOMProps } from '@react-types/shared';
-import {
+import type { AriaButtonProps } from '../button/useButton';
+import type { AriaLabelingProps, DOMAttributes, DOMProps } from '@react-types/shared';
+import type {
 	CalendarPropsBase,
 	CalendarSelectionMode,
 	CalendarState,
@@ -24,7 +24,7 @@ import { filterDOMProps } from '../utils/filterDOMProps';
 import { hookData, useSelectedDateDescription, useVisibleRangeDescription } from './utils';
 import intlMessages from '../intl/calendar/index';
 import { mergeProps } from '../utils/mergeProps';
-import { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
+import type { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
 import { useLabels } from '../utils/useLabels';
 import { useLocalizedStringFormatter } from '../i18n/useLocalizedStringFormatter';
 import { useSlotId } from '../utils/useId';
