@@ -145,10 +145,13 @@ test('native exceptions are specific operations, not blanket function exemptions
 	 img.setAttribute('src', 'early');
 	 return complete;
 	}
-	function hydrateRoot(container: Node, anchor: Node) {
+	function hydrateRootWithOutputHandler(container: Node, anchor: Node) {
 	 const owned = container.contains(anchor);
 	 container.appendChild(anchor);
 	 return owned;
+	}
+	function hydrateRoot(container: Node, anchor: Node) {
+	 return container.contains(anchor);
 	}
 	function beginPresentationHydration(marker: Node) {
 	 const sibling = marker.nextSibling;
@@ -189,6 +192,7 @@ test('native exceptions are specific operations, not blanket function exemptions
 		[
 			'call:setAttribute',
 			'call:appendChild',
+			'call:contains',
 			'write:textContent',
 			'call:removeChild',
 			'write:textContent',
@@ -212,9 +216,16 @@ test('nested declarations cannot reuse a reviewed native-operation exemption', (
 	  animate() { return el.animate({ opacity: [0, 1] }); }
 	 }
 	 return vtFlush();
-	};`);
+	};
+	function renderHydratedHost(container: Node, anchor: Node) {
+	 function hydrateRootWithOutputHandler() {
+	  container.contains(anchor);
+	  container.appendChild(anchor);
+	 }
+	 return hydrateRootWithOutputHandler();
+	}`);
 	assert.deepEqual(
 		findings.map((finding) => finding.operation),
-		['call:getAttribute', 'call:getAttribute', 'call:animate'],
+		['call:getAttribute', 'call:getAttribute', 'call:animate', 'call:contains', 'call:appendChild'],
 	);
 });

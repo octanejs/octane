@@ -59,7 +59,7 @@ const NATIVE_OPERATIONS = new Map(
 		// Explicit early-binding leases refer to committed native nodes: validate
 		// container ownership before hydration, match the existing SSR marker, and
 		// retire detached anchors only after a root replacement has been accepted.
-		hydrateRoot: ['call:contains'],
+		hydrateRootWithOutputHandler: ['call:contains'],
 		beginPresentationHydration: ['read:nextSibling'],
 		// These proofs and rollback guards compare the early owner's live range,
 		// not the renderer's projected tree. A stale candidate cannot authorize

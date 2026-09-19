@@ -43764,6 +43764,32 @@ export function hydrateRoot(
 	propsOrOptions?: any,
 	rootOptions?: RootOptions,
 ): Root {
+	return hydrateRootWithOutputHandler(
+		container,
+		bodyOrElement,
+		propsOrOptions,
+		rootOptions,
+		renderReturnedValue,
+	);
+}
+
+/** Compiler-only hydration for a statically proven void `@{}` entry component. */
+export function __hydrateVoidRoot(
+	container: RootContainer,
+	body: ComponentBody,
+	props?: any,
+	options?: RootOptions,
+): Root {
+	return hydrateRootWithOutputHandler(container, body, props, options, null);
+}
+
+function hydrateRootWithOutputHandler(
+	container: RootContainer,
+	bodyOrElement: ComponentBody | ElementDescriptor,
+	propsOrOptions: any,
+	rootOptions: RootOptions | undefined,
+	outputHandler: OutputHandler | null,
+): Root {
 	assertValidRootContainer(container);
 	let body: ComponentBody;
 	let props: any;
@@ -43847,7 +43873,7 @@ export function hydrateRoot(
 		body,
 		props,
 		undefined,
-		renderReturnedValue,
+		outputHandler,
 	);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(rootBlock, body);
@@ -43897,7 +43923,7 @@ export function hydrateRoot(
 		body,
 		rootKey,
 		idState,
-		renderReturnedValue,
+		outputHandler,
 		ownerToken,
 		rootOptions?.signalOwner ??
 			(signalDocumentEnabled ? documentSignalOwner(container) : undefined),
@@ -43925,7 +43951,7 @@ export function hydrateRoot(
 				body,
 				props,
 				undefined,
-				renderReturnedValue,
+				outputHandler,
 			);
 			rootBlock.idState = idState;
 			registerRootErrorHandlers(rootBlock, rootOptions);
