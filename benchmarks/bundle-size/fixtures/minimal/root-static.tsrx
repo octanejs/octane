@@ -4,10 +4,16 @@ function StaticRoot() @{
 	<main id="minimal-root">{'Octane'}</main>
 }
 
+export function createReusableRoot(container: HTMLElement) {
+	return createRoot(container);
+}
+
 export function run(container: HTMLElement) {
-	const root = createRoot(container);
+	const root = createReusableRoot(container);
+	root.render(() => 'generic');
+	const returnedText = container.textContent;
 	root.render(StaticRoot);
 	const text = container.textContent;
 	root.unmount();
-	return { text, cleaned: container.childNodes.length === 0 };
+	return { returnedText, text, cleaned: container.childNodes.length === 0 };
 }

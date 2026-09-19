@@ -166,6 +166,17 @@ describe('CI workflow aggregation', () => {
 		);
 	});
 
+	test('enforces recovered signal-free application budgets once per full CI run', () => {
+		assert.match(
+			jobSource('test_shard'),
+			/- name: Verify signal-free application bundle budgets\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs --budgets root-static-local hooks-state context/,
+		);
+		assert.match(
+			packageJson.scripts['ci:workflow:test'],
+			/benchmarks\/bundle-size\/minimal-gates\.test\.mjs/,
+		);
+	});
+
 	test('runs and reports tests only on Node 24 while retaining the Node 22 engine baseline', () => {
 		const shard = jobSource('test_shard');
 		assert.match(shard, /name: test shard \(Node 24, \$\{\{ matrix\.shard \}\}\)/);

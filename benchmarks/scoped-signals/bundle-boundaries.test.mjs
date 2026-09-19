@@ -2156,7 +2156,7 @@ test('local void root specialization needs every lexical use and the loaded expo
 });
 
 test('same-file void roots remove returned-value machinery while preserving stock consumers', async (t) => {
-	for (const id of ['root-static', 'hooks-state', 'hydrate-root']) {
+	for (const id of ['root-static-local', 'hooks-state', 'hydrate-root']) {
 		const filename = path.resolve(`benchmarks/bundle-size/fixtures/minimal/${id}.tsrx`);
 		const authored = await readFile(filename, 'utf8');
 		const sizes = [];
