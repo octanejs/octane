@@ -238,6 +238,10 @@ test('actual TypeScript constructor-alias and call proofs preserve live values a
 		['wrapped optional call', '', '(String?.call)?.(null,props.value$)'],
 		['static apply', '', 'String.apply(null,[props.value$])'],
 		['qualified constructor', '', 'globalThis.String(props.value$)'],
+		['computed asserted constructor', '', "globalThis[('String' as 'String')](props.value$)"],
+		['computed asserted call', '', "String[('call' as 'call')](null,props.value$)"],
+		['computed satisfies apply', '', "String[('apply' satisfies 'apply')](null,[props.value$])"],
+		['computed non-null constructor', '', "globalThis[('String'!)](props.value$)"],
 	];
 	const sources = variants.map(([label, setup, hole], index) => {
 		const filename = path.join(directory, `${index}.tsrx`);

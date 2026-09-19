@@ -146,6 +146,30 @@
   {
     "suite": "bundle-reachability",
     "op": "raw",
+    "target": "root-static-local",
+    "reference": "root-static-local-budget",
+    "maxRatio": 1,
+    "note": "Same-file compiled static rendering and cleanup, preserving the existing static-root ceiling; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "root-static-local",
+    "reference": "root-static-local-budget",
+    "maxRatio": 1,
+    "note": "Same-file compiled static rendering and cleanup, preserving the existing static-root ceiling; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "root-static-local",
+    "reference": "root-static-local-budget",
+    "maxRatio": 1,
+    "note": "Same-file compiled static rendering and cleanup, preserving the existing static-root ceiling; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
     "target": "hooks-state",
     "reference": "hooks-state-budget",
     "maxRatio": 1,

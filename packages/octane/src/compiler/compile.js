@@ -84,6 +84,7 @@ import {
 } from './compile-renderer-boundaries.js';
 import {
 	compiledSplitHydrateTagsForAst,
+	privateCompiledContextsForHydrateAst,
 	hydrateBoundaryPathFromId,
 	prepareHydrateBoundaries,
 	prepareServerHydrateBoundaries,
@@ -9927,6 +9928,9 @@ function compileInternal(
 	const privateCompiledContexts = localVoidRootsEnabled
 		? findPrivateCompiledContexts(ast)
 		: new Map();
+	const splitPrivateContexts = localVoidRootsEnabled
+		? privateCompiledContextsForHydrateAst(parsedAst)
+		: null;
 	if (
 		localVoidRootsEnabled &&
 		ast.body.some(
@@ -10074,6 +10078,7 @@ function compileInternal(
 		profile: profileEnabled,
 		compiledHydrateTemplates: localVoidRootsEnabled,
 		compiledSplitHydrateTags: compiledSplitHydrateTagsForAst(parsedAst),
+		privateSplitContextProviders: splitPrivateContexts?.providers,
 		autoMemo: autoMemoEnabled,
 		strongMemo: strongMemoEnabled,
 		nativeReads: options?.nativeReads === true,
@@ -10458,12 +10463,15 @@ function compileInternal(
 			);
 		}
 	}
-	if (privateCompiledContexts.size > 0) {
+	if (privateCompiledContexts.size > 0 || splitPrivateContexts?.callees.size > 0) {
 		const helper = '__createCompiledContext';
 		const alias = allocCompilerName(ctx, rtAlias(helper));
 		(ctx.privateRuntimeAliases ??= new Map()).set(helper, alias);
 		ctx.runtimeNeeded.add(helper);
-		const callees = new Set(privateCompiledContexts.values());
+		const callees = new Set([
+			...privateCompiledContexts.values(),
+			...(splitPrivateContexts?.callees ?? []),
+		]);
 		ast = mapAst(ast, (node) => (callees.has(node) ? { ...node, name: alias } : null));
 		ctx.privateCompiledContexts = new Set(privateCompiledContexts.keys());
 	}
@@ -23542,6 +23550,16 @@ function applyStringChildProofs(ast, source, filename, facts) {
 			const scope = lexical.resolveBinding(lexical.nodeScopes.get(node), node.name)?.scope;
 			return scope === undefined ? undefined : aliases.get(scope)?.get(node.name);
 		};
+		const intrinsicMemberName = (node) => {
+			const property = node.computed ? unwrapTsExpr(node.property) : node.property;
+			return node.computed
+				? property?.type === 'Literal' && typeof property.value === 'string'
+					? property.value
+					: null
+				: property?.type === 'Identifier'
+					? property.name
+					: null;
+		};
 		const globalOrigin = (expression, seen = new Set(), constructors = false) => {
 			const node = unwrapTsExpr(expression);
 			if (!node || seen.has(node)) return null;
@@ -23559,7 +23577,7 @@ function applyStringChildProofs(ast, source, filename, facts) {
 			}
 			if (node.type === 'ChainExpression') return globalOrigin(node.expression, seen, constructors);
 			if (node.type === 'MemberExpression') {
-				const name = node.computed ? node.property?.value : node.property?.name;
+				const name = intrinsicMemberName(node);
 				if (name !== 'Object' && name !== 'Reflect' && !(constructors && TEXT_INTRINSICS.has(name)))
 					return null;
 				const origin = globalOrigin(node.object, seen);
@@ -23637,7 +23655,7 @@ function applyStringChildProofs(ast, source, filename, facts) {
 					let callee = unwrapTsExpr(node.callee);
 					while (callee?.type === 'ChainExpression') callee = unwrapTsExpr(callee.expression);
 					if (callee?.type === 'MemberExpression') {
-						const method = callee.computed ? callee.property?.value : callee.property?.name;
+						const method = intrinsicMemberName(callee);
 						if (method === 'call' || method === 'apply') callee = callee.object;
 					}
 					// Supplied facts may describe a saved constructor or its Function
@@ -30512,6 +30530,20 @@ function requireCompiledHydrateAlias(ctx) {
 	return alias;
 }
 
+function isPrivateSplitContextProvider(node, ctx) {
+	const tag = node.openingElement?.name ?? node.id;
+	const binding = ctx.privateSplitContextProviders?.get(tag);
+	if (binding === undefined || tag.type !== 'JSXIdentifier' || tag.name !== binding.name)
+		return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	if (!lexical.bindingNodes.has(binding)) return false;
+	const owner = lexical.resolveBinding(lexical.nodeScopes.get(binding), binding.name);
+	return (
+		owner !== null &&
+		lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name)?.scope === owner.scope
+	);
+}
+
 function isCompiledHydrateTemplate(node, ctx, attrs) {
 	if (!ctx.compiledHydrateTemplates || ctx._universalRuntimeUnit != null) return false;
 	const tag = node.openingElement?.name ?? node.id;
@@ -30877,7 +30909,11 @@ function makeCompCall(
 			maybeSingleRoot = callSiteOk;
 		}
 		const importedBinding = ctx.importedComponentBindings?.get(compName);
-		if (!voidComponent && ctx.privateCompiledContexts?.has(compName)) voidComponent = true;
+		if (
+			!voidComponent &&
+			(ctx.privateCompiledContexts?.has(compName) || isPrivateSplitContextProvider(node, ctx))
+		)
+			voidComponent = true;
 		if (
 			!voidComponent &&
 			!ctx.hmr &&
