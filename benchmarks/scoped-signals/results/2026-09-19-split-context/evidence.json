@@ -1,0 +1,978 @@
+{
+  "base": "068ead53d23feeaae0a6d8b2bf3bb3fad5eb4499",
+  "baseDescription": "Main after #1155 split-Hydrate and #1157 fixed-style journaling squashes; Context-only compiler diff",
+  "node": "v24.19.0",
+  "toolchain": {
+    "pnpm": "11.15.1",
+    "esbuild": "0.28.1",
+    "vite": "8.1.5",
+    "vitest": "4.1.10",
+    "chromium": "149.0.7827.55"
+  },
+  "lockSHA": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+  "runnerSHA": "949ebc4f9a1e473a1aadbf137d1b171743a376e6e7f7a8e2ec7f1f828dc58930",
+  "fixture": "benchmarks/scoped-signals/split-context-consumer.tsrx",
+  "fixtureSHA": "63b635b23ca6a967c1726e0cb654a0c4be2c755e76a75d3913f137630680ffd9",
+  "selectedFrameworkSources": {
+    "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+    "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+    "compiler/compile.js": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+    "compiler/hydrate-boundaries.js": "d219a3c1bbb715a8621ce122e9df39c728494eb4046188b200bdc10d4368c8d9",
+    "compiler/private-context.js": "543f5e4b76f57305646e684f362201a50131b8fa13de4f20bce60d05599c5fdf"
+  },
+  "immutableSourceManifestSHA": "4a4d8638428d408b71756e0cf6d7db083b11e0c6b87b3e991ab16df5f91b2a09",
+  "sourceCount": 204,
+  "baseline204GitBlobPins": true,
+  "runtimeAndPublicABI": "Unchanged; no runtime/index edits",
+  "materialConsumer": [
+    {
+      "label": "baseline",
+      "root": "/private/tmp/octane-private-context-full-baseline-main068ead",
+      "sourceHashes": {
+        "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+        "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+        "compiler/compile.js": "b11fbb09999f2c471cc5faaa87297dcdf2bca99b43203ff1e42fe2e34d9257ea",
+        "compiler/hydrate-boundaries.js": "72316ede0163f8391d3b2d18b9bfd1520e85bbd4318cb0692eee39ceb9125d5f",
+        "compiler/private-context.js": "d1d2be19a1ed8d9cf93d0d68957cbffc8c11b1a7d22f15c8caad8463b1bfd7f4"
+      },
+      "fixtureSHA": "63b635b23ca6a967c1726e0cb654a0c4be2c755e76a75d3913f137630680ffd9",
+      "semantic": {
+        "initial": "outerfirst",
+        "updated": "outersecond",
+        "identity": true,
+        "effects": ["mount", "cleanup"],
+        "cleaned": true
+      },
+      "raw": 287226,
+      "gzip": 92428,
+      "brotli": 78885,
+      "bundleSHA": "7f83e5dd5d19cc23f94e09a5dd508e5ea3a50893e9cad2163d0965ac035cf54c",
+      "outputImports": []
+    },
+    {
+      "label": "candidate",
+      "root": "/private/tmp/octane-private-context-split-final-source-main068ead",
+      "sourceHashes": {
+        "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+        "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+        "compiler/compile.js": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "compiler/hydrate-boundaries.js": "d219a3c1bbb715a8621ce122e9df39c728494eb4046188b200bdc10d4368c8d9",
+        "compiler/private-context.js": "543f5e4b76f57305646e684f362201a50131b8fa13de4f20bce60d05599c5fdf"
+      },
+      "fixtureSHA": "63b635b23ca6a967c1726e0cb654a0c4be2c755e76a75d3913f137630680ffd9",
+      "semantic": {
+        "initial": "outerfirst",
+        "updated": "outersecond",
+        "identity": true,
+        "effects": ["mount", "cleanup"],
+        "cleaned": true
+      },
+      "raw": 200455,
+      "gzip": 65715,
+      "brotli": 56784,
+      "bundleSHA": "5068999dfc1189bb103dec8ebbd0bffed16396a364fd383021375ad928b65853",
+      "outputImports": []
+    }
+  ],
+  "historicalSameConsumerBefore1155": {
+    "base": "9291944a2091cdfc3f5a7a5223c8f7fdef50cc48",
+    "contextOnOldMainIsIndependentOfHydrate": true,
+    "rows": [
+      {
+        "label": "baseline",
+        "root": "/private/tmp/octane-private-context-full-baseline-9291944",
+        "fixtureSHA": "63b635b23ca6a967c1726e0cb654a0c4be2c755e76a75d3913f137630680ffd9",
+        "sourceHashes": {
+          "runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+          "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+          "compiler/compile.js": "4d3cded752dfbd16539bb996a02edd009e246fc98850f897c0711670c61ecb92",
+          "compiler/hydrate-boundaries.js": "9699d764766dd5a957484c1d67648101e334c0d3547636c28ae3c0638c1e3e36",
+          "compiler/private-context.js": "d1d2be19a1ed8d9cf93d0d68957cbffc8c11b1a7d22f15c8caad8463b1bfd7f4"
+        },
+        "semantic": {
+          "initial": "outerfirst",
+          "updated": "outersecond",
+          "identity": true,
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "raw": 287291,
+        "gzip": 92434,
+        "brotli": 78877,
+        "bundleSHA": "d4deb5cb5e07dde5d73c7ac01e956d49b5c9147c735120b29f7f741313b8a044",
+        "outputImports": []
+      },
+      {
+        "label": "candidate",
+        "root": "/private/tmp/octane-private-context-split-final-source-v2",
+        "fixtureSHA": "63b635b23ca6a967c1726e0cb654a0c4be2c755e76a75d3913f137630680ffd9",
+        "sourceHashes": {
+          "runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+          "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+          "compiler/compile.js": "7d5d45bc96b3b66f11ce22d1c9cc33c0395f652ac94dbdfaa3885a2a376259df",
+          "compiler/hydrate-boundaries.js": "7fc727c8f24705080c455737292862fa34deef12f9a2faf04a84150802d6829d",
+          "compiler/private-context.js": "543f5e4b76f57305646e684f362201a50131b8fa13de4f20bce60d05599c5fdf"
+        },
+        "semantic": {
+          "initial": "outerfirst",
+          "updated": "outersecond",
+          "identity": true,
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "raw": 287221,
+        "gzip": 92404,
+        "brotli": 78910,
+        "bundleSHA": "fa793f8e1dffe60d29caf16840da515a2d5b9b096958eb840597cf01bd71cb1d",
+        "outputImports": []
+      }
+    ]
+  },
+  "readerGraphControl": {
+    "authoredTransform": "Insert shared Reader as an additional child of captured Theme, before button",
+    "queryFacts": {
+      "calls": [
+        {
+          "helper": "componentSlot",
+          "target": "Reader"
+        },
+        {
+          "helper": "componentSlotVoid",
+          "target": "Theme"
+        }
+      ],
+      "imports": [
+        {
+          "from": "octane",
+          "names": [
+            "_$bag6",
+            "_$child",
+            "_$clone",
+            "_$componentSlot",
+            "_$componentSlotVoid",
+            "_$delegateEvents",
+            "_$drainFrag",
+            "_$evt1",
+            "_$evt1u",
+            "_$htext",
+            "_$markChildrenBlock",
+            "_$sibling",
+            "_$template"
+          ]
+        },
+        {
+          "from": "octane/internal/client",
+          "names": ["_$bindSignalText", "_$enableSignalBindings"]
+        }
+      ]
+    },
+    "rows": [
+      {
+        "label": "baseline",
+        "root": "/private/tmp/octane-private-context-full-baseline-0b48d5d07",
+        "fixtureSHA": "b58ea719d275311bec8bbd2b555bc79f6a74ddd596a2cdcbedb7efb6349705b7",
+        "sourceHashes": {
+          "runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+          "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+          "compiler/compile.js": "b11fbb09999f2c471cc5faaa87297dcdf2bca99b43203ff1e42fe2e34d9257ea",
+          "compiler/hydrate-boundaries.js": "72316ede0163f8391d3b2d18b9bfd1520e85bbd4318cb0692eee39ceb9125d5f",
+          "compiler/private-context.js": "d1d2be19a1ed8d9cf93d0d68957cbffc8c11b1a7d22f15c8caad8463b1bfd7f4"
+        },
+        "semantic": {
+          "initial": "outerfirstfirst",
+          "updated": "outersecondsecond",
+          "identity": true,
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "raw": 287809,
+        "gzip": 92577,
+        "brotli": 78985,
+        "bundleSHA": "52580e6398dd69d197f3e8133b93e97491f679daa6d9dd6a0cf46db1484b418e",
+        "outputImports": []
+      },
+      {
+        "label": "candidate",
+        "root": "/private/tmp/octane-private-context-split-final-source-main0b48",
+        "fixtureSHA": "b58ea719d275311bec8bbd2b555bc79f6a74ddd596a2cdcbedb7efb6349705b7",
+        "sourceHashes": {
+          "runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+          "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+          "compiler/compile.js": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+          "compiler/hydrate-boundaries.js": "d219a3c1bbb715a8621ce122e9df39c728494eb4046188b200bdc10d4368c8d9",
+          "compiler/private-context.js": "543f5e4b76f57305646e684f362201a50131b8fa13de4f20bce60d05599c5fdf"
+        },
+        "semantic": {
+          "initial": "outerfirstfirst",
+          "updated": "outersecondsecond",
+          "identity": true,
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "raw": 287638,
+        "gzip": 92515,
+        "brotli": 79020,
+        "bundleSHA": "c7b2854a8309e2cb208380cc580b3bbba73b9b8690ccaa8ac3f28ed19d0ab5b1",
+        "outputImports": []
+      }
+    ],
+    "limit": "This direct-esbuild imported-component control retains generic returned-value rendering independently of Context provenance; no claim that this patch certifies imported components.",
+    "base": "0b48d5d0723b669eee1a903fcefe99f2a88de4f9",
+    "historicalQualification": "Historical main0b matched control; not rerun on main068. The Context compiler blobs are identical, but its byte delta is not claimed as a current-base measurement."
+  },
+  "controls": {
+    "stock": {
+      "rows": [
+        {
+          "id": "root-static",
+          "raw": 73618,
+          "gzip": 24574,
+          "brotli": 21990,
+          "sha256": "cd02fa80f356aaf660eac5ad3f76cef23eb28fd02da6d817844a1bfff994e394"
+        },
+        {
+          "id": "hooks-state",
+          "raw": 85594,
+          "gzip": 28579,
+          "brotli": 25503,
+          "sha256": "a78e20d0887d44ce186abca1535abaaf64df025db0aaf6ef51f01f664fd99cc7"
+        },
+        {
+          "id": "context",
+          "raw": 106690,
+          "gzip": 35477,
+          "brotli": 31443,
+          "sha256": "d38f3d85ee05d6593a8fa5c100fad2c494025ecbfd89672b0eb34322bb20be8b"
+        },
+        {
+          "id": "hydrate-root",
+          "raw": 143194,
+          "gzip": 46396,
+          "brotli": 40590,
+          "sha256": "714ce8a9187c2aea0a16abdb4394043f72dd6ac1af660b0411cc39801570a4f1"
+        },
+        {
+          "id": "suspense-transition",
+          "raw": 157184,
+          "gzip": 50805,
+          "brotli": 44378,
+          "sha256": "473e4ba9a5cc85a826195fb96aea2b290456896e910689b4d4d7529055b69bd1"
+        },
+        {
+          "id": "deferred-hydration",
+          "raw": 202135,
+          "gzip": 64913,
+          "brotli": 56114,
+          "sha256": "a4decd80e63d1320a91bddb8a9e5809afa18b366c4ee25164ae2717e16a7b8e8"
+        },
+        {
+          "id": "createRoot-export",
+          "raw": 189578,
+          "gzip": 60742,
+          "brotli": 52588,
+          "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+        }
+      ],
+      "exactOutputEquality": true,
+      "runnerSHA": "934dd4fa81f1900b84867b38c9b1511fd0f79c1a14f3db42bde77f277a5b54ea",
+      "node": "v24.19.0",
+      "fixtureHashes": {
+        "root-static": "11de23976d8dd67593331ae6e18aee9a4bc65f5975c85bc0542d21de3d625f52",
+        "hooks-state": "6ea5c5984e655be2202a2ff68b916f60bff39f48038f44984e0c429afce27aff",
+        "context": "2114d2581836c6dea70b1b0f586c85685dd26f76d6fbf562cfc6d268da0ee36e",
+        "hydrate-root": "c1c3389646de012ea363e9db0c99a9a7b684ff2494f0ea30e58008dab1c3637f",
+        "suspense-transition": "e10714ae7abadbf13c532b6db72296d8eff932628cfe2b152469fb07eae439d3",
+        "deferred-hydration": "d989278c273166b281729a60a5863f27423cca9c72158d2527d32ccaaacee256"
+      },
+      "baselineReport": "/private/tmp/octane-signal-free-audit-context-split-baseline068/report.json",
+      "candidateReport": "/private/tmp/octane-signal-free-audit-context-split-final068/report.json",
+      "frameworkSourceDrift": "passed",
+      "boundariesAndPublicSmoke": "passed",
+      "base": "068ead53d23feeaae0a6d8b2bf3bb3fad5eb4499",
+      "reportSHA256": {
+        "baseline": "88da85e6a6326878b254670905af3cea1fc46586810b7c1c3ea4d17da9111fdb",
+        "candidate": "236be6deef7185ead57bc99e9a9de4ca55d2668e03948425dc440ee19b82e9d0"
+      }
+    },
+    "public": {
+      "rows": [
+        {
+          "id": "ordinary-client",
+          "raw": 189578,
+          "gzip": 60742,
+          "brotli": 52588,
+          "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+        },
+        {
+          "id": "ordinary-server",
+          "raw": 50662,
+          "gzip": 17837,
+          "brotli": 16071,
+          "sha256": "6e810c24ae503bdabb4c699e5cb39bbba036f4a191fcf2fb3168cd28ac549e34"
+        },
+        {
+          "id": "binding-scalar",
+          "raw": 13823,
+          "gzip": 5251,
+          "brotli": 4748,
+          "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+        },
+        {
+          "id": "binding-structural",
+          "raw": 31292,
+          "gzip": 10455,
+          "brotli": 9553,
+          "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+        },
+        {
+          "id": "binding-controls",
+          "raw": 9046,
+          "gzip": 3525,
+          "brotli": 3190,
+          "sha256": "bec148cacddac1583607ce39ca584e9c6aaad70687a0651b59f9f7823c37a843"
+        },
+        {
+          "id": "binding-whole-style",
+          "raw": 6199,
+          "gzip": 2630,
+          "brotli": 2360,
+          "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+        },
+        {
+          "id": "binding-scalar-controls-style",
+          "raw": 27473,
+          "gzip": 9954,
+          "brotli": 9044,
+          "sha256": "80f8610c76cc1f8e22f5d9fe9be9f4f83d6bbb2d972a4de38fd0dd56b1555932"
+        },
+        {
+          "id": "engine",
+          "raw": 47423,
+          "gzip": 14480,
+          "brotli": 13123,
+          "sha256": "cc3549d21079c1eda52036e6f6749532a604ec402f21f73391e37f57eef07ca6"
+        },
+        {
+          "id": "native-client",
+          "raw": 50263,
+          "gzip": 15894,
+          "brotli": 14356,
+          "sha256": "325d1412e91f483fa8b686c922b83212af6731cde5f2df2b43be92e8cd81e065"
+        },
+        {
+          "id": "native-server",
+          "raw": 50131,
+          "gzip": 15801,
+          "brotli": 14281,
+          "sha256": "ee81533ad689d1912ed30441a339a688cd85de4647e4527c2ea4ab6d48540cf8"
+        },
+        {
+          "id": "compiled-plain-signals",
+          "raw": 70005,
+          "gzip": 20599,
+          "brotli": 18584,
+          "sha256": "2b2b74757bdd78e809320fdf146e8c325513e5cf58ab4dba67f3aa1eebefc14e"
+        },
+        {
+          "id": "streamed-signals-bootstrap",
+          "raw": 75913,
+          "gzip": 23519,
+          "brotli": 21071,
+          "sha256": "6ef5ebb8d92dd6a5c370f3bbc4bfc21178adc13918cac3d491a540d2ca88536f"
+        },
+        {
+          "id": "streamed-signal-results-bootstrap",
+          "raw": 69894,
+          "gzip": 21531,
+          "brotli": 19332,
+          "sha256": "f251b2cf7bc0202e32a90be70fafb141391dd4b06bf3e26a89a74bfb9c11fb15"
+        },
+        {
+          "id": "used-native-app",
+          "raw": 248643,
+          "gzip": 78987,
+          "brotli": 68592,
+          "sha256": "1d4c7e7e8ae4edfec209cd1209742379a463b091b3893b49fbcb23f2655087a3"
+        },
+        {
+          "id": "used-native-ssr",
+          "raw": 102558,
+          "gzip": 33559,
+          "brotli": 30271,
+          "sha256": "1da7687f35e87fee1ffb28910de154261259774d86e4ca32030b9b0fd1d6a045"
+        }
+      ],
+      "exactOutputEquality": true,
+      "runnerSHA": "b829eb3f4ca01a6e9373e80b6b08579cec29dc872d1b0ed25c6ca8310631a554",
+      "node": "v24.19.0",
+      "fixtureHashes": null,
+      "baselineReport": "/private/tmp/octane-signal-free-driver-public-context-split-baseline068-complete/report.json",
+      "candidateReport": "/private/tmp/octane-signal-free-driver-public-context-split-final068-complete/report.json",
+      "frameworkSourceDrift": "passed",
+      "boundariesAndPublicSmoke": "passed",
+      "base": "068ead53d23feeaae0a6d8b2bf3bb3fad5eb4499",
+      "reportSHA256": {
+        "baseline": "d0765b8438fbd868a61fbe8b6799328c15a5d573d3701a30b4c5b0a5f3057a71",
+        "candidate": "a2e015ca2716a7a4fcad9b912e303d863836b2d8d813b01281c26106d490dad4"
+      }
+    }
+  },
+  "native": {
+    "runnerSHA": "d55c054ba3759c3b422c867d4e51f51a0e59260a642db94813e34bb7cd31ff99",
+    "fixtureSHA": "59c58bbcf61e04958f3efea34211a9291137a5871962eff6216e0c9497fe84cb",
+    "productionVite": true,
+    "frozenASTAndLocationAssertions": true,
+    "consoleCapture": "Before navigation through deferred activation/update/unmount",
+    "executions": [
+      {
+        "label": "baseline",
+        "kind": "adopt",
+        "semanticPass": true,
+        "snapshots": [
+          {
+            "text": "defaultouterfirst0",
+            "hydrated": 0,
+            "effects": [],
+            "pendingRead": false,
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "spanSame": true,
+            "value": "server draft",
+            "focused": false,
+            "caret": [0, 0],
+            "provider": "first",
+            "title": "first",
+            "children": 1,
+            "eager": ["default", "outer"]
+          },
+          {
+            "text": "defaultouterlatest1",
+            "hydrated": 1,
+            "effects": ["mount"],
+            "pendingRead": false,
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "spanSame": true,
+            "value": "native draft",
+            "focused": true,
+            "caret": [2, 7],
+            "provider": "latest",
+            "title": "latest",
+            "children": 1,
+            "eager": ["default", "outer"]
+          },
+          {
+            "text": "",
+            "hydrated": 1,
+            "effects": ["mount", "cleanup"],
+            "pendingRead": false,
+            "editorSame": false,
+            "buttonSame": false,
+            "inputSame": false,
+            "spanSame": false,
+            "focused": false,
+            "caret": null,
+            "children": 0,
+            "eager": []
+          }
+        ],
+        "errors": [],
+        "browserVersion": "149.0.7827.55",
+        "sourceHashes": {
+          "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+          "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+          "compiler/compile.js": "b11fbb09999f2c471cc5faaa87297dcdf2bca99b43203ff1e42fe2e34d9257ea",
+          "compiler/hydrate-boundaries.js": "72316ede0163f8391d3b2d18b9bfd1520e85bbd4318cb0692eee39ceb9125d5f",
+          "compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+          "compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587",
+          "compiler/private-context.js": "d1d2be19a1ed8d9cf93d0d68957cbffc8c11b1a7d22f15c8caad8463b1bfd7f4"
+        },
+        "ssrSHA": "ef3839368e59fe7778f03520899d65a60ee55a287c16d5e001677fbf1db21e13",
+        "selectedPrivate": false
+      },
+      {
+        "label": "baseline",
+        "kind": "pending",
+        "semanticPass": true,
+        "snapshots": [
+          {
+            "text": "",
+            "hydrated": 0,
+            "effects": [],
+            "pendingRead": true,
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "spanSame": true,
+            "focused": false,
+            "caret": null,
+            "children": 9,
+            "eager": []
+          },
+          {
+            "text": "",
+            "hydrated": 0,
+            "effects": [],
+            "pendingRead": true,
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "spanSame": true,
+            "focused": false,
+            "caret": null,
+            "children": 0,
+            "eager": []
+          }
+        ],
+        "errors": [],
+        "browserVersion": "149.0.7827.55",
+        "sourceHashes": {
+          "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+          "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+          "compiler/compile.js": "b11fbb09999f2c471cc5faaa87297dcdf2bca99b43203ff1e42fe2e34d9257ea",
+          "compiler/hydrate-boundaries.js": "72316ede0163f8391d3b2d18b9bfd1520e85bbd4318cb0692eee39ceb9125d5f",
+          "compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+          "compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587",
+          "compiler/private-context.js": "d1d2be19a1ed8d9cf93d0d68957cbffc8c11b1a7d22f15c8caad8463b1bfd7f4"
+        },
+        "ssrSHA": "ef3839368e59fe7778f03520899d65a60ee55a287c16d5e001677fbf1db21e13",
+        "selectedPrivate": false
+      },
+      {
+        "label": "baseline",
+        "kind": "opaque",
+        "semanticPass": true,
+        "snapshots": [
+          {
+            "first": "first",
+            "text": "second",
+            "title": "second",
+            "identity": true,
+            "value": "native opaque draft",
+            "focused": true,
+            "caret": [2, 7],
+            "retired": "second",
+            "descriptor": "provided",
+            "returned": "ordinary text",
+            "cleaned": true,
+            "effects": ["mount", "cleanup"]
+          }
+        ],
+        "errors": [],
+        "browserVersion": "149.0.7827.55",
+        "sourceHashes": {
+          "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+          "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+          "compiler/compile.js": "b11fbb09999f2c471cc5faaa87297dcdf2bca99b43203ff1e42fe2e34d9257ea",
+          "compiler/hydrate-boundaries.js": "72316ede0163f8391d3b2d18b9bfd1520e85bbd4318cb0692eee39ceb9125d5f",
+          "compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+          "compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587",
+          "compiler/private-context.js": "d1d2be19a1ed8d9cf93d0d68957cbffc8c11b1a7d22f15c8caad8463b1bfd7f4"
+        },
+        "ssrSHA": "ef3839368e59fe7778f03520899d65a60ee55a287c16d5e001677fbf1db21e13",
+        "selectedPrivate": false
+      },
+      {
+        "label": "candidate",
+        "kind": "adopt",
+        "semanticPass": true,
+        "snapshots": [
+          {
+            "text": "defaultouterfirst0",
+            "hydrated": 0,
+            "effects": [],
+            "pendingRead": false,
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "spanSame": true,
+            "value": "server draft",
+            "focused": false,
+            "caret": [0, 0],
+            "provider": "first",
+            "title": "first",
+            "children": 1,
+            "eager": ["default", "outer"]
+          },
+          {
+            "text": "defaultouterlatest1",
+            "hydrated": 1,
+            "effects": ["mount"],
+            "pendingRead": false,
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "spanSame": true,
+            "value": "native draft",
+            "focused": true,
+            "caret": [2, 7],
+            "provider": "latest",
+            "title": "latest",
+            "children": 1,
+            "eager": ["default", "outer"]
+          },
+          {
+            "text": "",
+            "hydrated": 1,
+            "effects": ["mount", "cleanup"],
+            "pendingRead": false,
+            "editorSame": false,
+            "buttonSame": false,
+            "inputSame": false,
+            "spanSame": false,
+            "focused": false,
+            "caret": null,
+            "children": 0,
+            "eager": []
+          }
+        ],
+        "errors": [],
+        "browserVersion": "149.0.7827.55",
+        "sourceHashes": {
+          "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+          "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+          "compiler/compile.js": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+          "compiler/hydrate-boundaries.js": "d219a3c1bbb715a8621ce122e9df39c728494eb4046188b200bdc10d4368c8d9",
+          "compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+          "compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587",
+          "compiler/private-context.js": "543f5e4b76f57305646e684f362201a50131b8fa13de4f20bce60d05599c5fdf"
+        },
+        "ssrSHA": "ef3839368e59fe7778f03520899d65a60ee55a287c16d5e001677fbf1db21e13",
+        "selectedPrivate": true
+      },
+      {
+        "label": "candidate",
+        "kind": "pending",
+        "semanticPass": true,
+        "snapshots": [
+          {
+            "text": "",
+            "hydrated": 0,
+            "effects": [],
+            "pendingRead": true,
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "spanSame": true,
+            "focused": false,
+            "caret": null,
+            "children": 9,
+            "eager": []
+          },
+          {
+            "text": "",
+            "hydrated": 0,
+            "effects": [],
+            "pendingRead": true,
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "spanSame": true,
+            "focused": false,
+            "caret": null,
+            "children": 0,
+            "eager": []
+          }
+        ],
+        "errors": [],
+        "browserVersion": "149.0.7827.55",
+        "sourceHashes": {
+          "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+          "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+          "compiler/compile.js": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+          "compiler/hydrate-boundaries.js": "d219a3c1bbb715a8621ce122e9df39c728494eb4046188b200bdc10d4368c8d9",
+          "compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+          "compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587",
+          "compiler/private-context.js": "543f5e4b76f57305646e684f362201a50131b8fa13de4f20bce60d05599c5fdf"
+        },
+        "ssrSHA": "ef3839368e59fe7778f03520899d65a60ee55a287c16d5e001677fbf1db21e13",
+        "selectedPrivate": true
+      },
+      {
+        "label": "candidate",
+        "kind": "opaque",
+        "semanticPass": true,
+        "snapshots": [
+          {
+            "first": "first",
+            "text": "second",
+            "title": "second",
+            "identity": true,
+            "value": "native opaque draft",
+            "focused": true,
+            "caret": [2, 7],
+            "retired": "second",
+            "descriptor": "provided",
+            "returned": "ordinary text",
+            "cleaned": true,
+            "effects": ["mount", "cleanup"]
+          }
+        ],
+        "errors": [],
+        "browserVersion": "149.0.7827.55",
+        "sourceHashes": {
+          "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+          "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+          "compiler/compile.js": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+          "compiler/hydrate-boundaries.js": "d219a3c1bbb715a8621ce122e9df39c728494eb4046188b200bdc10d4368c8d9",
+          "compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+          "compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587",
+          "compiler/private-context.js": "543f5e4b76f57305646e684f362201a50131b8fa13de4f20bce60d05599c5fdf"
+        },
+        "ssrSHA": "ef3839368e59fe7778f03520899d65a60ee55a287c16d5e001677fbf1db21e13",
+        "selectedPrivate": true
+      }
+    ],
+    "limit": "Six bounded native executions; not broad SSR/browser or combined CI qualification",
+    "base": "068ead53d23feeaae0a6d8b2bf3bb3fad5eb4499",
+    "report": "/private/tmp/octane-private-context-split-native-final-main068-report.json",
+    "reportSHA256": "44c1cde316ddb1369f2f23ac1744d1174e190e655bfc9192900cfd04ea163aed",
+    "runnerProvenance": {
+      "original": "/private/tmp/octane-private-context-split-native-final.mjs",
+      "originalSHA256": "a744ceb06be57dd874259ee4184d521c6676eaff03e47d4409e5099b32fcc8f4",
+      "copied": "/private/tmp/octane-private-context-split-native-final-main068.mjs",
+      "copiedSHA256": "d55c054ba3759c3b422c867d4e51f51a0e59260a642db94813e34bb7cd31ff99",
+      "difference": "Two exact output-report filename literals only; all six browser consumers/assertions/tooling/selected-source behavior unchanged"
+    }
+  },
+  "compilerCost": {
+    "node": "v24.19.0",
+    "runnerSHA": "c7bfa7eaf5891426a7285e1c05176882d4533b6334205e6dc5c357f5a911c033",
+    "base": "0b48d5d0723b669eee1a903fcefe99f2a88de4f9",
+    "roots": {
+      "baseline": "/private/tmp/octane-private-context-full-baseline-0b48d5d07",
+      "candidate": "/private/tmp/octane-private-context-split-final-source-main0b48"
+    },
+    "sourceHashes": {
+      "baseline": {
+        "compiler/compile.js": "b11fbb09999f2c471cc5faaa87297dcdf2bca99b43203ff1e42fe2e34d9257ea",
+        "compiler/hydrate-boundaries.js": "72316ede0163f8391d3b2d18b9bfd1520e85bbd4318cb0692eee39ceb9125d5f",
+        "compiler/private-context.js": "d1d2be19a1ed8d9cf93d0d68957cbffc8c11b1a7d22f15c8caad8463b1bfd7f4",
+        "runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+        "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a"
+      },
+      "candidate": {
+        "compiler/compile.js": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "compiler/hydrate-boundaries.js": "d219a3c1bbb715a8621ce122e9df39c728494eb4046188b200bdc10d4368c8d9",
+        "compiler/private-context.js": "543f5e4b76f57305646e684f362201a50131b8fa13de4f20bce60d05599c5fdf",
+        "runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+        "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a"
+      }
+    },
+    "lockSHA": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+    "options": {
+      "dev": false,
+      "hmr": false
+    },
+    "batch": 10,
+    "warmupPairs": 3,
+    "measuredPairs": 12,
+    "alternatingOrder": true,
+    "gcOutsideSample": true,
+    "debugFrozenAst": false,
+    "debugAssertLoc": false,
+    "rows": [
+      {
+        "file": "benchmarks/scoped-signals/split-context-consumer.tsrx",
+        "authoredSHA": "63b635b23ca6a967c1726e0cb654a0c4be2c755e76a75d3913f137630680ffd9",
+        "sourceBytes": 1202,
+        "unit": "One parent plus query0 transform",
+        "baseline": {
+          "medianMs": 9.091864599999997,
+          "iqrMs": [8.804279200000005, 10.545325025],
+          "samplesMs": [
+            8.790404200000001, 9.046983299999988, 10.716987500000005, 10.157820800000014,
+            8.979954199999998, 8.181124999999998, 9.136745900000005, 8.808904200000006,
+            11.102937500000007, 11.276875000000018, 10.488104199999999, 8.252916700000014
+          ],
+          "outputSHA": [
+            "31b18696200450bd55b792ebcb6fcccae49335c8df9412ec09e7ce7c97c449ff",
+            "ea38ef049bda4a66f79b3ebfde891988a28466bf21f371a3f392ab1db4eadb25"
+          ]
+        },
+        "candidate": {
+          "medianMs": 10.298316699999987,
+          "iqrMs": [9.637847950000014, 11.116196875000014],
+          "samplesMs": [
+            11.090650000000005, 9.604716700000017, 11.499975000000017, 10.1253833,
+            11.427154199999995, 8.543237500000009, 9.648891700000013, 10.20688339999997,
+            10.389750000000003, 10.730987500000037, 11.192837500000042, 8.061366599999975
+          ],
+          "outputSHA": [
+            "46ff4327cbcb4aa1a2d56b023ec6994b42db6d692c65ffa09337bf9fcf5067b8",
+            "7af193168b3f1ea944def5d5c0e75a5148a0c422e2f91836eb98080c63e895b9"
+          ]
+        },
+        "pairedRatio": {
+          "median": 1.0588509818419738,
+          "iqr": [0.9918024887320649, 1.0944704806684515]
+        }
+      },
+      {
+        "file": "packages/octane/tests/hydration/_fixtures/private-split-context.tsrx",
+        "authoredSHA": "59c58bbcf61e04958f3efea34211a9291137a5871962eff6216e0c9497fe84cb",
+        "sourceBytes": 2216,
+        "unit": "One parent plus query0 transform",
+        "baseline": {
+          "medianMs": 13.755712499999982,
+          "iqrMs": [12.917936424999994, 15.066712499999971],
+          "samplesMs": [
+            12.808533399999941, 12.95440410000001, 12.67250409999997, 13.602974999999969,
+            15.142574999999942, 15.04142499999998, 13.788966699999946, 14.59237920000005,
+            12.665029100000083, 13.722458300000017, 17.669474999999967, 18.664445799999974
+          ],
+          "outputSHA": [
+            "40d3671a82068426cc18eb9badd324f31b6d9c66b947de5ccbadebe6a99e34b2",
+            "10c478e2dccac5e22e8a2e8f8cf183b6626a717b625dec54fc3c8d34f055534f"
+          ]
+        },
+        "candidate": {
+          "medianMs": 14.806335450000006,
+          "iqrMs": [13.302258349999965, 15.935184375000016],
+          "samplesMs": [
+            12.886912500000017, 13.341529199999968, 13.184445799999958, 15.537837500000023,
+            14.745595899999989, 15.035425000000032, 14.867075000000023, 14.250845800000025,
+            13.115750000000025, 19.30953329999993, 17.127225, 20.44460829999998
+          ],
+          "outputSHA": [
+            "9597cb97475eb94035caa941aa9e560a6af85a80422f210799f5cfd955926c2b",
+            "eae79e19db99e3528c172cb47a375daedc0148bc89560d2c6c7b521dc82d189d"
+          ]
+        },
+        "pairedRatio": {
+          "median": 1.0327357484644064,
+          "iqr": [0.9938495973795822, 1.082484024630895]
+        }
+      }
+    ],
+    "limitations": "Bounded compiler-only sample, two actual private Context corpora; no browser/SSR/runtime speed claim. Parent and query each rederive original source.",
+    "historicalQualification": "Historical main0b compiler-only sample; not rerun on main068/docs-only95. The three Context compiler blobs are unchanged. No current-base or runtime CPU claim."
+  },
+  "mutants": [
+    {
+      "label": "lost-certificate",
+      "exitCode": 1,
+      "log": "/private/tmp/octane-private-context-main0b48-mutant-lost-certificate.log",
+      "ownerSourceSHA": "d219a3c1bbb715a8621ce122e9df39c728494eb4046188b200bdc10d4368c8d9",
+      "pattern": "closed split Context consumer deletes",
+      "restoredExact": true,
+      "base": "0b48d5d0723b669eee1a903fcefe99f2a88de4f9",
+      "historicalQualification": "RED and exact restoration observed before main068 refresh; not rerun. Same three compiler patch blobs; intervening runtime edit affects only setStyleProperty."
+    },
+    {
+      "label": "capture-ordinal",
+      "exitCode": 1,
+      "log": "/private/tmp/octane-private-context-main0b48-mutant-capture-ordinal.log",
+      "ownerSourceSHA": "d219a3c1bbb715a8621ce122e9df39c728494eb4046188b200bdc10d4368c8d9",
+      "pattern": "closed split Context consumer deletes",
+      "restoredExact": true,
+      "base": "0b48d5d0723b669eee1a903fcefe99f2a88de4f9",
+      "historicalQualification": "RED and exact restoration observed before main068 refresh; not rerun. Same three compiler patch blobs; intervening runtime edit affects only setStyleProperty."
+    },
+    {
+      "label": "provider-publication",
+      "exitCode": 1,
+      "log": "/private/tmp/octane-private-context-main0b48-mutant-provider-publication.log",
+      "ownerSourceSHA": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+      "pattern": "source-selected",
+      "restoredExact": true,
+      "base": "0b48d5d0723b669eee1a903fcefe99f2a88de4f9",
+      "historicalQualification": "RED and exact restoration observed before main068 refresh; not rerun. Same three compiler patch blobs; intervening runtime edit affects only setStyleProperty."
+    },
+    {
+      "label": "escaped-lifetime",
+      "exitCode": 1,
+      "log": "/private/tmp/octane-private-context-main0b48-mutant-escaped-lifetime.log",
+      "ownerSourceSHA": "543f5e4b76f57305646e684f362201a50131b8fa13de4f20bce60d05599c5fdf",
+      "pattern": "source-selected",
+      "restoredExact": true,
+      "base": "0b48d5d0723b669eee1a903fcefe99f2a88de4f9",
+      "historicalQualification": "RED and exact restoration observed before main068 refresh; not rerun. Same three compiler patch blobs; intervening runtime edit affects only setStyleProperty."
+    }
+  ],
+  "localValidation": {
+    "owningAndNearbyVitestResults": 136,
+    "vitestFiles": 13,
+    "newPublicResultsAcrossNormalAndProductionProjects": 12,
+    "nodeOptimizationAndSourceSelectedConsumerGuards": 4,
+    "actualCIWorkflowNodeResults": 218,
+    "scopedTypes": "passed (three compiler files and three public test/fixture files)",
+    "benchmarkTsrxTypes": "passed",
+    "scopedFormat": "passed for all 15 paths",
+    "sync": "passed on docs-only main95; exact original 15-path scope, no unrelated/generated changes",
+    "repoWideTestTypecheckAndFormat": "Not run locally",
+    "remoteCI": "Not run; unpublished reviewed patch",
+    "measurementBase": "068ead53d23feeaae0a6d8b2bf3bb3fad5eb4499",
+    "branchBase": "95e6674e2d1d2c485e7a80bb16ff3126e6e92aa5",
+    "vitestLog": "/private/tmp/octane-private-context-main095-nearby-final.log",
+    "workflowLog": "/private/tmp/octane-private-context-main068-workflow.log",
+    "scopedTypeLogs": [
+      "/private/tmp/octane-private-context-main068-scoped-types.log",
+      "/private/tmp/octane-private-context-main068-benchmark-types.log"
+    ],
+    "loadedNestedProviderObservation": {
+      "initialFullRun": {
+        "passed": 135,
+        "failed": 1,
+        "log": "/private/tmp/octane-private-context-main068-nearby.log",
+        "failure": "Dev nested-provider update expected ['updated','inner','updated','sibling'], received ['updated','updated','sibling']; initial four values had passed."
+      },
+      "isolatedUnchangedCase": {
+        "passed": 2,
+        "skipped": 10,
+        "log": "/private/tmp/octane-private-context-main068-nested-isolated.log"
+      },
+      "unchangedFullRerun": {
+        "passed": 136,
+        "failed": 0,
+        "files": 13,
+        "log": "/private/tmp/octane-private-context-main095-nearby-final.log"
+      },
+      "noChanges": "No framework/test/assertion/deadline edits between these runs; only docs-only main95 was incorporated before the final full rerun.",
+      "devCodeParity": "/private/tmp/octane-private-context-main068-dev-code-parity.json",
+      "scope": "Public dev/HMR object-registry parent plus all five sidecars are byte-identical between base and candidate, and runtime hashes match. This does not establish the cause of the initial loaded-run assertion failure."
+    },
+    "syncLog": "/private/tmp/octane-private-context-main095-final-sync.log",
+    "formatLog": "/private/tmp/octane-private-context-main095-final-format.log"
+  },
+  "observationBoundaries": {
+    "ordinaryVitestScalarToOpaqueIdentity": "Same identity assertion fails on unchanged main929; final tests assert correct scalar/handle output, stable notification identity and cleanup. Source-selected bundled and native pairs preserve scalar-to-handle identity. No runtime workaround.",
+    "ordinaryVitestNestedIdentity": "Same settled nested identity assertion fails on unchanged main0b48 (old inner DOM hidden/replaced); final public test asserts settled distinct outer/inner/sibling values and cleanup. Native adoption/simple provider identity controls are independent.",
+    "excludedMutant": "An earlier stamp-removal mutant on ordinary generic/HMR-deopt Vitest passed; excluded from preservation evidence. Final source-selected stamp-removal mutant fails public nearest values.",
+    "claims": "No CPU speedup, SSR speedup, global zero-transfer, full unused-signals recovery or budget increase."
+  },
+  "incorporatedDocsOnlyBase": {
+    "head": "95e6674e2d1d2c485e7a80bb16ff3126e6e92aa5",
+    "sourceTreeEqualsMeasurementBase": true,
+    "packageAndLockEqualMeasurementBase": true,
+    "changedPaths": [
+      "docs/async-signals-implementation.md",
+      "docs/async-signals-streaming-ssr.md",
+      "docs/signals.md",
+      "docs/ssr.md",
+      "website/src/content/docs-meta.ts",
+      "website/src/content/docs/signals.mdx"
+    ],
+    "qualification": "Current branch incorporates docs-only #1159; all 204 Octane source files, package.json and lock match the measured main068 baseline."
+  },
+  "immutableSourceManifest": "/private/tmp/octane-private-context-split-final-source-main068ead/source-manifest.json",
+  "sourceProvenance": "/private/tmp/octane-private-context-main068-source-provenance.json",
+  "historicalMain0bQualification": {
+    "base": "0b48d5d0723b669eee1a903fcefe99f2a88de4f9",
+    "evidenceSHA256": "5bc84a141c2fb2d8c8363b867dfe3cfe10c1d6e3877e4e074f812aafd61ac0ac",
+    "compilerSourceHashesEqualCurrent": {
+      "compiler/compile.js": true,
+      "compiler/hydrate-boundaries.js": true,
+      "compiler/private-context.js": true
+    },
+    "runtimeChangeToMeasurementBase": "Only setStyleProperty checkpoint-aware snapshot reuse from #1157; Context runtime/publication and index unchanged.",
+    "notRepeated": [
+      "Four historical RED mutants",
+      "Compiler-cost sample",
+      "Imported Reader graph control"
+    ]
+  },
+  "materialConsumerReport": "/private/tmp/octane-private-context-material-final-main068.json"
+}

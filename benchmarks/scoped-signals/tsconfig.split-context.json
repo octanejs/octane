@@ -1,0 +1,8 @@
+{
+  "extends": "../../packages/octane/tsconfig.json",
+  "include": ["split-context-consumer.tsrx", "split-context-opaque-consumer.tsrx"],
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane"
+  }
+}
