@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import {
+import type {
 	AriaLabelingProps,
 	AriaValidationProps,
 	DOMAttributes,
@@ -21,14 +21,14 @@ import {
 	TextInputDOMProps,
 	ValidationResult,
 } from '@react-types/shared';
-import {
+import type {
 	ColorFieldProps,
 	ColorFieldState,
 } from '../upstream-exports/react-stately/useColorFieldState';
 import {
-	InputHTMLAttributes,
-	LabelHTMLAttributes,
-	RefObject,
+	type InputHTMLAttributes,
+	type LabelHTMLAttributes,
+	type RefObject,
 	useCallback,
 	useState,
 } from '../compat/react';

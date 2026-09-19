@@ -5,7 +5,7 @@ import { createStore } from '../../store';
 import { BatchProvider } from '../BatchProvider/index.tsrx';
 import { HandleConfigProvider } from '../../contexts/HandleConfigContext.tsrx';
 import type { Node, Edge, FitViewOptions } from '../../types';
-import { CoordinateExtent, NodeOrigin, ZIndexMode } from '@xyflow/system';
+import type { CoordinateExtent, NodeOrigin, ZIndexMode } from '@xyflow/system';
 
 export type ReactFlowProviderProps = {
 	/** These nodes are used to initialize the flow. They are not dynamic. */

@@ -13,16 +13,16 @@ type DOMAttributes = Record<string, any>;
  * governing permissions and limitations under the License.
  */
 
-import { ChangeEvent, useCallback, useEffect, useRef, useState } from '../compat/react';
-import { ColumnSize } from '../upstream-exports/react-stately/useTableState';
-import { FocusableElement, Key, RefObject } from '@react-types/shared';
+import { type ChangeEvent, useCallback, useEffect, useRef, useState } from '../compat/react';
+import type { ColumnSize } from '../upstream-exports/react-stately/useTableState';
+import type { FocusableElement, Key, RefObject } from '@react-types/shared';
 import { focusSafely } from '../interactions/focusSafely';
 import { getActiveElement, getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { getColumnHeaderId } from './utils';
-import { GridNode } from '../upstream-exports/react-stately/private/grid/GridCollection';
+import type { GridNode } from '../upstream-exports/react-stately/private/grid/GridCollection';
 import intlMessages from '../intl/table/index';
 import { mergeProps } from '../utils/mergeProps';
-import { TableColumnResizeState } from '../upstream-exports/react-stately/useTableState';
+import type { TableColumnResizeState } from '../upstream-exports/react-stately/useTableState';
 import { withSlot } from 'octane';
 import { useDescription } from '../utils/useDescription';
 import { useEffectEvent } from '../utils/useEffectEvent';

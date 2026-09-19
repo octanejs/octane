@@ -14,11 +14,11 @@ import type { FocusableProps } from '../interactions/useFocusable';
  */
 
 import { announce } from '../live-announcer/LiveAnnouncer';
-import { AriaLabelingProps, DOMAttributes } from '@react-types/shared';
+import type { AriaLabelingProps, DOMAttributes } from '@react-types/shared';
 import {
-	ClipboardEventHandler,
-	HTMLAttributes,
-	RefObject,
+	type ClipboardEventHandler,
+	type HTMLAttributes,
+	type RefObject,
 	useCallback,
 	useMemo,
 	useRef,
@@ -28,10 +28,10 @@ import { getOwnerDocument } from '../utils/domHelpers';
 import { isMac } from '../utils/platform';
 import { mergeProps } from '../utils/mergeProps';
 import {
-	Position,
-	TokenFieldProps,
-	TokenFieldSegment,
-	TokenFieldState,
+	type Position,
+	type TokenFieldProps,
+	type TokenFieldSegment,
+	type TokenFieldState,
 	TokenFieldValue,
 } from '../upstream-exports/react-stately/useTokenFieldState';
 import { setInteractionModality } from '../interactions/useFocusVisible';
