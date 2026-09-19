@@ -3272,6 +3272,7 @@ const JOURNAL_RENDER = 5;
 const JOURNAL_UNDO = 6;
 const JOURNAL_RETIRED = 7;
 const JOURNAL_INPUTS = 8;
+const JOURNAL_EVENT_OWNER = 9;
 /** Flat undo log, four slots per entry: kind, target, a, b. */
 let TRANSITION_JOURNAL: any[] | null = null;
 /** Bags already captured in the open window, so each is snapshotted once. */
@@ -3733,6 +3734,13 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 					undoCreatedInRootRender(transaction.log[i + 1], transaction.log[i + 2]);
 				else if (transaction.log[i] === JOURNAL_RETIRED)
 					transaction.log[i + 1].delete(transaction.log[i + 2]);
+				else if (transaction.log[i] === JOURNAL_EVENT_OWNER) {
+					const owners = transaction.log[i + 1];
+					const el = transaction.log[i + 2];
+					const previous = transaction.log[i + 3];
+					if (previous === undefined) owners.delete(el);
+					else owners.set(el, previous);
+				}
 			}
 			transaction.log.length = 0;
 		}
@@ -4609,6 +4617,10 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 					break;
 				case JOURNAL_UNDO:
 					target();
+					break;
+				case JOURNAL_EVENT_OWNER:
+					if (b === undefined) target.delete(a);
+					else target.set(a, b);
 					break;
 				default:
 					// Spread snapshots include enumerable symbols as well as strings.
@@ -24038,6 +24050,8 @@ interface HandlerBundle {
 	args: any[] | 1 | 2 | -1 | -2;
 	a0?: any;
 	a1?: any;
+	// Live compiled bundles retain their host; queued dispatch snapshots do not update.
+	el?: Element;
 }
 
 interface InvalidEventListenerSlot {
@@ -24116,30 +24130,43 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 // Project bundles only during an active staged capture, which initializes the
 // driver before publishing its capture. The driver remains installed afterward;
 // a direct guard avoids an idle projection call or an ordinary self-assignment.
+// A live scope token already captures unchanged authority. Explicit/environment
+// and document owners still refresh it; staged updates must publish in order
+// even when the committed map matches, because an earlier owner write may be pending.
 // ---------------------------------------------------------------------------
 
 const EMPTY_ARGS: any[] = [];
 let SIGNAL_EVENT_OWNERS: WeakMap<Element, SignalOwner | ScopeImpl | BlockImpl> | null = null;
 
-/** Publish a native delegated handler with the same rollback ownership as its bindings. */
-export function setEventHandler(el: Element, key: string, handler: any): void {
-	if (TRANSITION_JOURNAL !== null) {
-		TRANSITION_JOURNAL.push(
-			JOURNAL_PROP,
-			el,
-			key,
-			(STAGED_DOM?.view(el as any) ?? (el as any))[key],
-		);
-		journalBag();
+/** Publish a native handler; compiled bundle updates omit the key to refresh only authority. */
+export function setEventHandler(el: Element, key?: string, handler?: any): void {
+	if (key !== undefined) {
+		if (TRANSITION_JOURNAL !== null) {
+			TRANSITION_JOURNAL.push(
+				JOURNAL_PROP,
+				el,
+				key,
+				(STAGED_DOM?.view(el as any) ?? (el as any))[key],
+			);
+			journalBag();
+		}
+		(STAGED_DOM?.view(el as any) ?? (el as any))[key] = handler;
 	}
-	(STAGED_DOM?.view(el as any) ?? (el as any))[key] = handler;
-	if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
+	// Explicit authority also applies to handlers in modules with no signal bindings.
+	const explicitOwner =
+		activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
+			? currentExplicitSignalOwner()
+			: null;
+	if (
+		SIGNAL_BINDINGS_ENABLED ||
+		signalDocumentEnabled ||
+		explicitOwner !== null ||
+		SIGNAL_EVENT_OWNERS !== null
+	) {
 		// Retain the precise invocation for an event-only reader whose signal
 		// module may arrive later. No owner or wrapper is allocated speculatively.
 		const owner =
-			(activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
-				? currentExplicitSignalOwner()
-				: null) ??
+			explicitOwner ??
 			(signalDocumentEnabled || CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined
 				? CURRENT_SCOPE === null
 					? currentSignalOwner()
@@ -24155,17 +24182,25 @@ export function setEventHandler(el: Element, key: string, handler: any): void {
 				SCOPE_SIGNAL_OWNERS.get(owner) === undefined
 			)
 				SCOPE_SIGNAL_OWNERS.set(owner, false);
+			// Later writers must replace explicit authority with the usual scope
+			// token, including when both writers are still waiting for publication.
+			const owners = (SIGNAL_EVENT_OWNERS ??= new WeakMap());
 			if (STAGED_COMMIT_CAPTURE !== null)
-				DEFERRED_LAYOUT_DRIVER!.stageAction(() =>
-					(SIGNAL_EVENT_OWNERS ??= new WeakMap()).set(el, owner),
-				);
-			else (SIGNAL_EVENT_OWNERS ??= new WeakMap()).set(el, owner);
+				DEFERRED_LAYOUT_DRIVER!.stageAction(() => owners.set(el, owner));
+			else {
+				if (TRANSITION_JOURNAL !== null) {
+					const previous = owners.get(el);
+					if (previous !== owner)
+						TRANSITION_JOURNAL.push(JOURNAL_EVENT_OWNER, owners, el, previous);
+				}
+				owners.set(el, owner);
+			}
 		}
 	}
 }
 
 export function evt0(el: Element, key: string, fn: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: EMPTY_ARGS, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args: EMPTY_ARGS, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -24174,9 +24209,23 @@ export function evt0u(d: HandlerBundle, fn: any): void {
 	if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
 	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 	d.fn = fn;
+	if (
+		(SIGNAL_BINDINGS_ENABLED ||
+			signalDocumentEnabled ||
+			activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			SIGNAL_EVENT_OWNERS !== null) &&
+		(activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			STAGED_COMMIT_CAPTURE !== null ||
+			signalDocumentEnabled ||
+			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
+			SIGNAL_EVENT_OWNERS?.get(d.el!) !== CURRENT_SCOPE)
+	)
+		setEventHandler(d.el!);
 }
 export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: 1, a0, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args: 1, a0, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -24186,9 +24235,23 @@ export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
 	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 	d.fn = fn;
 	d.a0 = a0;
+	if (
+		(SIGNAL_BINDINGS_ENABLED ||
+			signalDocumentEnabled ||
+			activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			SIGNAL_EVENT_OWNERS !== null) &&
+		(activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			STAGED_COMMIT_CAPTURE !== null ||
+			signalDocumentEnabled ||
+			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
+			SIGNAL_EVENT_OWNERS?.get(d.el!) !== CURRENT_SCOPE)
+	)
+		setEventHandler(d.el!);
 }
 export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: 2, a0, a1, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args: 2, a0, a1, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -24199,22 +24262,36 @@ export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
 	d.fn = fn;
 	d.a0 = a0;
 	d.a1 = a1;
+	if (
+		(SIGNAL_BINDINGS_ENABLED ||
+			signalDocumentEnabled ||
+			activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			SIGNAL_EVENT_OWNERS !== null) &&
+		(activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			STAGED_COMMIT_CAPTURE !== null ||
+			signalDocumentEnabled ||
+			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
+			SIGNAL_EVENT_OWNERS?.get(d.el!) !== CURRENT_SCOPE)
+	)
+		setEventHandler(d.el!);
 }
 // Lifted block arrows receive the native event before their lexical captures.
 // Negative arities preserve the ordinary bundle's exact authored argument list
 // and reuse its field layout, update helpers, journal, and dispatch snapshot.
 export function evt1e(el: Element, key: string, fn: any, a0: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: -1, a0, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args: -1, a0, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
 export function evt2e(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: -2, a0, a1, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args: -2, a0, a1, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
 export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBundle {
-	const d: HandlerBundle = { fn, args, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -24224,6 +24301,20 @@ export function evtNu(d: HandlerBundle, fn: any, args: any[]): void {
 	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 	d.fn = fn;
 	d.args = args;
+	if (
+		(SIGNAL_BINDINGS_ENABLED ||
+			signalDocumentEnabled ||
+			activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			SIGNAL_EVENT_OWNERS !== null) &&
+		(activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			STAGED_COMMIT_CAPTURE !== null ||
+			signalDocumentEnabled ||
+			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
+			SIGNAL_EVENT_OWNERS?.get(d.el!) !== CURRENT_SCOPE)
+	)
+		setEventHandler(d.el!);
 }
 
 // Delegated event names registered by compiled modules' `delegateEvents([...])`
@@ -24815,6 +24906,9 @@ const CAPTURE_PATH: any[] = [];
 // Snapshot each native phase before user code runs. Re-entrant dispatch borrows a
 // separate frame, and clearing the frame releases all node/handler references.
 const CAPTURE_SLOTS: EventSlot[] = [];
+// Authority is a phase snapshot too: an earlier callback may publish a new
+// handler/owner before a queued ancestor runs. Allocate only after ownership exists.
+let CAPTURE_OWNERS: (SignalOwner | ScopeImpl | BlockImpl | undefined)[] | null = null;
 
 function snapshotDelegatedSlots(base: number, type: DelegatedEventType, capture: boolean): void {
 	const key = capture ? type.captureKey : type.bubbleKey;
@@ -24834,6 +24928,8 @@ function snapshotDelegatedSlots(base: number, type: DelegatedEventType, capture:
 				node.localName === 'textarea')
 				? null
 				: slot;
+		if (SIGNAL_EVENT_OWNERS !== null && CAPTURE_SLOTS[index] != null)
+			(CAPTURE_OWNERS ??= [])[index] = SIGNAL_EVENT_OWNERS.get(node);
 	}
 }
 
@@ -25084,7 +25180,11 @@ function buildDelegatedPath(event: Event, listener: Node, path = event.composedP
 // receive the event, exactly as separate native listeners would. `reportError`
 // surfaces through the global error event (window.onerror) like an uncaught
 // listener exception; console.error is the non-browser fallback.
-function fireEventSlot(slot: EventSlot, event: Event, currentTarget: Element): void {
+function fireEventSlot(
+	slot: EventSlot,
+	event: Event,
+	recorded: SignalOwner | ScopeImpl | BlockImpl | undefined,
+): void {
 	// DOM writes can synchronously dispatch native events (for example blur when
 	// disabling a focused input). Their handlers are outside component rendering,
 	// even when the compiled DOM patch is still on the render stack. Restore that
@@ -25133,7 +25233,6 @@ function fireEventSlot(slot: EventSlot, event: Event, currentTarget: Element): v
 		invokeInvalidEventListener(`${event.type} event`, slot, event);
 	};
 	try {
-		const recorded = SIGNAL_EVENT_OWNERS?.get(currentTarget);
 		const owner =
 			recorded instanceof ScopeImpl || recorded instanceof BlockImpl
 				? scopeSignalOwner(recorded)
@@ -25314,7 +25413,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 			const slot = CAPTURE_SLOTS[i];
 			if (slot != null && !consumeBindingEvent(event, current, false)) {
 				setCurrentTarget(event, current, frame);
-				fireEventSlot(slot, event, current);
+				fireEventSlot(slot, event, CAPTURE_OWNERS?.[i]);
 				if ((frame.flags & 1) !== 0) break;
 			}
 			if (targetOnly) break;
@@ -25332,6 +25431,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 	} finally {
 		CAPTURE_PATH.length = pathBase;
 		CAPTURE_SLOTS.length = pathBase;
+		if (CAPTURE_OWNERS !== null) CAPTURE_OWNERS.length = pathBase;
 		if (propagationStarted) endDelegatedPropagation(event, stop, null);
 		if (submitRec !== null) {
 			ACTIVE_SUBMIT_DISPATCH = prevSubmitRec;
@@ -25382,7 +25482,7 @@ function dispatchDelegatedCapture(
 			const slot = CAPTURE_SLOTS[i];
 			if (slot != null && !consumeBindingEvent(event, CAPTURE_PATH[i], true)) {
 				setCurrentTarget(event, CAPTURE_PATH[i], frame);
-				fireEventSlot(slot, event, CAPTURE_PATH[i]);
+				fireEventSlot(slot, event, CAPTURE_OWNERS?.[i]);
 				if ((frame.flags & 1) !== 0) break;
 			}
 		}
@@ -25390,6 +25490,7 @@ function dispatchDelegatedCapture(
 		stopped = frame?.flags !== 0 || (!wasCancelled && event.cancelBubble);
 		CAPTURE_PATH.length = pathBase;
 		CAPTURE_SLOTS.length = pathBase;
+		if (CAPTURE_OWNERS !== null) CAPTURE_OWNERS.length = pathBase;
 		endDelegatedPropagation(event, stop, immediate);
 		clearCurrentTarget(event);
 		try {

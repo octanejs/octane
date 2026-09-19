@@ -23,6 +23,7 @@ import {
 	isVoidJsxCodeBlockFunction,
 } from './compile.js';
 import { validateRendererModuleSource } from './compile-universal.js';
+import { collectReassignedBindings } from './hook-deps.js';
 import { HYDRATE_QUERY_PARAM, hydrateBoundaryPathFromId } from './hydrate-boundaries.js';
 import { parseDomBindingRequest, formatDomBindingRequest } from './dom-binding-request.js';
 import {
@@ -254,6 +255,10 @@ export function findVoidComponentExports(source, id) {
 			return [];
 		}
 	}
+	// A live function export can change its return ABI through an authored write
+	// or direct eval even without HMR. Share the lexical write proof used by memo
+	// inference instead of treating a declaration's initial body as permanent.
+	const reassigned = collectReassignedBindings(ast);
 	const memoLocals = new Set();
 	const declarations = [];
 	for (const node of ast.body || []) {
@@ -287,7 +292,9 @@ export function findVoidComponentExports(source, id) {
 		hasLowerableJsxReturnBranches(node);
 	for (const declaration of declarations) {
 		if (declaration.type === 'FunctionDeclaration' && declaration.id?.name) {
-			if (isVoidFunction(declaration)) voidBindings.add(declaration.id.name);
+			if (!reassigned.has(declaration.id) && isVoidFunction(declaration)) {
+				voidBindings.add(declaration.id.name);
+			}
 			continue;
 		}
 		if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
@@ -299,6 +306,7 @@ export function findVoidComponentExports(source, id) {
 			const init = item.init;
 			if (
 				item.id?.type === 'Identifier' &&
+				!reassigned.has(item.id) &&
 				(init?.type === 'FunctionExpression' || init?.type === 'ArrowFunctionExpression') &&
 				isVoidFunction(init)
 			) {
@@ -306,6 +314,7 @@ export function findVoidComponentExports(source, id) {
 			}
 			if (
 				item.id?.type !== 'Identifier' ||
+				reassigned.has(item.id) ||
 				init?.type !== 'CallExpression' ||
 				init.callee?.type !== 'Identifier' ||
 				!memoLocals.has(init.callee.name) ||
@@ -336,6 +345,7 @@ export function findVoidComponentExports(source, id) {
 				(declaration?.type === 'FunctionDeclaration' ||
 					declaration?.type === 'FunctionExpression' ||
 					declaration?.type === 'ArrowFunctionExpression') &&
+				(declaration.id == null || !reassigned.has(declaration.id)) &&
 				isVoidFunction(declaration)
 			) {
 				exports.push('default');

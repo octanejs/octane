@@ -11,6 +11,10 @@ import { build } from 'esbuild';
 import { Window } from 'happy-dom';
 import { compile } from '../../packages/octane/src/compiler/compile.js';
 import { slotHooks } from '../../packages/octane/src/compiler/slot-hooks.js';
+import {
+	createOctaneCompiler,
+	findVoidRootImports,
+} from '../../packages/octane/src/compiler/bundler.js';
 import { knownAttributeSpreads } from '../../packages/stylex/src/compiler-contract.js';
 import { verifyScenario } from '../bundle-size/verify-reachability.mjs';
 import { generateStylexCSS, transformStylex } from '../../packages/stylex/src/transform.js';
@@ -1770,6 +1774,298 @@ export function mount(parent) {
 		host.remove();
 	}
 	assert.equal(host.childNodes.length, 0);
+});
+
+test('local void root specialization needs every lexical use and the loaded export contract', async (t) => {
+	const directory = path.resolve('packages/octane');
+	const id = path.join(directory, 'LocalRoot.ts');
+	const compiler = createOctaneCompiler({ root: directory, dev: false, hmr: false });
+	const component = compiler.transform(
+		'export default function View() @{ <main>Octane</main> }',
+		path.join(directory, 'LocalView.tsrx'),
+		{ collectVoidComponentExports: true },
+	);
+	assert.ok(component);
+	assert.deepEqual(component.voidComponentExports, ['default']);
+	const imports =
+		"import {createRoot} from 'octane'; import View from './LocalView.tsrx'; import Other from './Other.tsrx';\n";
+	const proves = (request, imported) =>
+		request === './LocalView.tsrx' && component.voidComponentExports.includes(imported);
+	const sources = [
+		[
+			'local',
+			'export function run(el) { const root=createRoot(el); root.render(View); root.unmount(); }',
+			true,
+		],
+		[
+			'repeated void render',
+			'export function run(el) { const root=createRoot(el); root.render(View); root.render(View, {}); root.unmount(); }',
+			true,
+		],
+		[
+			'unrelated root shadow',
+			'export function run(el) { const root=createRoot(el); root.render(View); root.unmount(); } function unrelated(root) { root.render(Other); }',
+			true,
+		],
+		[
+			'function expression',
+			'export const run=function(el) { const root=createRoot(el); root.render(View); root.unmount(); };',
+			true,
+		],
+		[
+			'block arrow',
+			'export const run=el=>{ const root=createRoot(el); root.render(View); root.unmount(); };',
+			true,
+		],
+		[
+			'concise arrow with private function',
+			'export const run=el=>(()=>{ const root=createRoot(el); root.render(View); root.unmount(); })();',
+			true,
+		],
+		[
+			'namespace exported root',
+			'namespace N { export const root=createRoot(document.body); root.render(View); } export function run() { N.root.render("ordinary"); }',
+			false,
+		],
+		[
+			'merged namespace exported root',
+			'namespace N { export const root=createRoot(document.body); root.render(View); } namespace N { export function replace() { N.root.render("ordinary"); } }',
+			false,
+		],
+		[
+			'namespace private function',
+			'namespace N { export function run(el) { const root=createRoot(el); root.render(View); root.unmount(); } }',
+			true,
+		],
+		[
+			'module static block',
+			'class N { static { const root=createRoot(document.body); root.render(View); root.unmount(); } }',
+			false,
+		],
+		[
+			'function static block',
+			'export function run(el) { class N { static { const root=createRoot(el); root.render(View); root.unmount(); } } }',
+			false,
+		],
+		['exported root', 'export const root=createRoot(document.body); root.render(View);', false],
+		[
+			'returned root',
+			'export function run(el) { const root=createRoot(el); root.render(View); return root; }',
+			false,
+		],
+		[
+			'alias',
+			'export function run(el) { const root=createRoot(el); root.render(View); const alias=root; }',
+			false,
+		],
+		[
+			'object escape',
+			'export function run(el) { const root=createRoot(el); root.render(View); return {root}; }',
+			false,
+		],
+		[
+			'callback escape',
+			'export function run(el) { const root=createRoot(el); root.render(View); return () => root.render(View); }',
+			false,
+		],
+		[
+			'argument escape',
+			'export function run(el) { const root=createRoot(el); root.render(View); consume(root); }',
+			false,
+		],
+		[
+			'method extraction',
+			'export function run(el) { const root=createRoot(el); root.render(View); return root.render; }',
+			false,
+		],
+		[
+			'computed render',
+			'export function run(el) { const root=createRoot(el); root["render"](View); }',
+			false,
+		],
+		[
+			'optional render',
+			'export function run(el) { const root=createRoot(el); root.render?.(View); }',
+			false,
+		],
+		[
+			'unknown render target',
+			'export function run(el) { const root=createRoot(el); root.render(View); root.render(Other); }',
+			false,
+		],
+		[
+			'dynamic render target',
+			'export function run(el, Component) { const root=createRoot(el); root.render(View); root.render(Component); }',
+			false,
+		],
+		[
+			'renderable text',
+			'export function run(el) { const root=createRoot(el); root.render(View); root.render("text"); }',
+			false,
+		],
+		[
+			'factory shadow',
+			'export function run(el, createRoot) { const root=createRoot(el); root.render(View); }',
+			false,
+		],
+		[
+			'component shadow',
+			'export function run(el, View) { const root=createRoot(el); root.render(View); }',
+			false,
+		],
+		[
+			'hoisted factory shadow',
+			'export function run(el) { const root=createRoot(el); root.render(View); var createRoot; }',
+			false,
+		],
+		[
+			'TDZ component shadow',
+			'export function run(el) { const root=createRoot(el); root.render(View); let View; }',
+			false,
+		],
+		[
+			'block escape',
+			'export function run(el) { const root=createRoot(el); root.render(View); { consume(root); } }',
+			false,
+		],
+		[
+			'catch escape',
+			'export function run(el) { const root=createRoot(el); root.render(View); try {} catch (error) { consume(root); } }',
+			false,
+		],
+		[
+			'class field escape',
+			'export function run(el) { const root=createRoot(el); root.render(View); return class { field = root; }; }',
+			false,
+		],
+		[
+			'direct eval',
+			'export function run(el) { const root=createRoot(el); root.render(View); eval("root.render(\\\"text\\\")"); }',
+			false,
+		],
+		[
+			'typed direct eval',
+			'export function run(el) { const root=createRoot(el); root.render(View); (eval as Function)("root.render(\\\"text\\\")"); }',
+			false,
+		],
+	];
+	let checked = 0;
+	for (const extension of ['ts', 'js'])
+		for (const [label, body, eligible] of sources) {
+			if (extension === 'js' && label.includes('namespace')) continue;
+			const source = imports + body;
+			const output = slotHooks(source, id.replace(/ts$/, extension), {
+				dev: false,
+				hmr: false,
+				isVoidComponentImport: proves,
+			});
+			assert.equal(
+				output?.code.includes('__createVoidRoot') === true,
+				eligible,
+				`${extension}: ${label}`,
+			);
+			if (eligible)
+				assert.deepEqual(findVoidRootImports(source, id), [
+					{ request: './LocalView.tsrx', imported: 'default' },
+				]);
+			for (const options of [
+				{ hmr: 'vite' },
+				{ hmr: 'webpack' },
+				{ profile: true },
+				{ dev: true },
+			]) {
+				const transformed = compiler.transform(source, id, {
+					isVoidComponentImport: proves,
+					...options,
+				});
+				assert.equal(
+					transformed?.code.includes('__createVoidRoot') === true,
+					false,
+					`${label}: ${JSON.stringify(options)}`,
+				);
+			}
+			checked++;
+		}
+
+	// JSX entries use the full compiler, so they remain a generic-root control.
+	for (const [label, body] of sources) {
+		const transformed = compiler.transform(imports + body, id.replace(/ts$/, 'tsx'), {
+			isVoidComponentImport: proves,
+		});
+		assert.equal(
+			transformed?.code.includes('__createVoidRoot') === true,
+			false,
+			`full JSX compiler: ${label}`,
+		);
+		checked++;
+	}
+
+	const entry =
+		imports +
+		`export function run(host) { const root=createRoot(host); root.render(View); const text=host.textContent; root.unmount(); return {text,cleaned:host.childNodes.length===0}; }`;
+	const window = new Window();
+	const previous = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		previous.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of previous)
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		window.close();
+	});
+	const bytes = [];
+	for (const specialize of [false, true]) {
+		const transformed = compiler.transform(entry, id, {
+			isVoidComponentImport: specialize ? proves : () => false,
+		});
+		const bundled = await build({
+			stdin: { contents: transformed.code, resolveDir: directory },
+			bundle: true,
+			write: false,
+			minify: true,
+			format: 'esm',
+			platform: 'browser',
+			target: 'esnext',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			plugins: [
+				{
+					name: 'loaded-compiled-contract',
+					setup(plugin) {
+						plugin.onResolve({ filter: /^\.\/(?:LocalView|Other)\.tsrx$/ }, () => ({
+							path: 'view',
+							namespace: 'local-void-view',
+						}));
+						plugin.onLoad({ filter: /.*/, namespace: 'local-void-view' }, () => ({
+							contents: component.code,
+							loader: 'js',
+							resolveDir: directory,
+						}));
+					},
+				},
+			],
+		});
+		const code = bundled.outputFiles[0].text;
+		const api = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+		const host = window.document.createElement('div');
+		window.document.body.append(host);
+		assert.deepEqual(api.run(host), { text: 'Octane', cleaned: true });
+		host.remove();
+		bytes.push(gzipSync(code, { level: 9 }).length);
+	}
+	assert.ok(
+		bytes[1] <= bytes[0] * 0.6,
+		`Loaded local void root must delete the generic return graph: ${bytes.join(' -> ')} gzip`,
+	);
+	t.diagnostic(
+		`${checked} lexical/escape controls; actual compiled contract generic ${bytes[0]} -> local ${bytes[1]} gzip with matching text and cleanup`,
+	);
 });
 
 test('same-file void roots remove returned-value machinery while preserving stock consumers', async (t) => {
