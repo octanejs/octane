@@ -10,4 +10,4 @@ export function useIsRestoring(): boolean {
 }
 
 // `<IsRestoringProvider value={true}>…` — octane's built-in context Provider.
-export const IsRestoringProvider = IsRestoringContext.Provider;
+export const IsRestoringProvider = IsRestoringContext;

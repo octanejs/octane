@@ -1,5 +1,5 @@
 // Ported from styled-components 6.4.3 (MIT), adapted for octane: contexts are
-// provided through `createElement(Ctx.Provider, …)` descriptors (works on both
+// provided through `createElement(Ctx, …)` descriptors (works on both
 // the client and server runtimes), and the Consumer components are hand-built
 // because octane's React-19-shaped contexts have no `.Consumer`.
 import { createContext, createElement, isChildrenBlock, useContext, useMemo } from 'octane';
@@ -117,7 +117,7 @@ export default function ThemeProvider(props: Props): unknown {
 		return null;
 	}
 
-	return createElement(ThemeContext.Provider as any, {
+	return createElement(ThemeContext as any, {
 		value: themeContext,
 		children: props.children,
 	});

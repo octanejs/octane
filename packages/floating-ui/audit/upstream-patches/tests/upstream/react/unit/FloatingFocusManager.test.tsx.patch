@@ -74,7 +74,7 @@ diff --git a/tests/upstream/react/unit/FloatingFocusManager.test.tsx b/tests/ups
      render(<Navigation />);
      await userEvent.hover(screen.getByText('Product'));
      await userEvent.click(screen.getByTestId('subnavigation'));
-@@ -1688,7 +1691,8 @@ describe('Navigation', () => {
+@@ -1688,11 +1691,12 @@ describe('Navigation', () => {
  });
  
  describe('Drawer', () => {
@@ -82,26 +82,44 @@ diff --git a/tests/upstream/react/unit/FloatingFocusManager.test.tsx b/tests/ups
 +  // OCTANE DIVERGENCE[floating-ui-react-context-fixture]: Drawer composes a React-only third-party context component.
 +  test.fails('does not close when clicking another button outside', async () => {
      render(
-       <ResponsiveContext.Provider value={{width: 1600}}>
+-      <ResponsiveContext.Provider value={{width: 1600}}>
++      <ResponsiveContext value={{width: 1600}}>
          <Drawer />
-@@ -1701,7 +1705,7 @@ describe('Drawer', () => {
+-      </ResponsiveContext.Provider>,
++      </ResponsiveContext>,
+     );
+     await userEvent.click(screen.getByText('My button'));
+     expect(screen.queryByText('Close')).toBeInTheDocument();
+@@ -1701,11 +1705,11 @@ describe('Drawer', () => {
      expect(screen.queryByText('Close')).toBeInTheDocument();
    });
  
 -  test('closeOnFocusOut=false - does not close when tabbing out', async () => {
 +  test.fails('closeOnFocusOut=false - does not close when tabbing out', async () => {
      render(
-       <ResponsiveContext.Provider value={{width: 1600}}>
+-      <ResponsiveContext.Provider value={{width: 1600}}>
++      <ResponsiveContext value={{width: 1600}}>
          <Drawer />
-@@ -1715,7 +1719,7 @@ describe('Drawer', () => {
+-      </ResponsiveContext.Provider>,
++      </ResponsiveContext>,
+     );
+     await userEvent.click(screen.getByText('My button'));
+     expect(screen.queryByText('Close')).toBeInTheDocument();
+@@ -1715,11 +1719,11 @@ describe('Drawer', () => {
      expect(screen.queryByText('Close')).toBeInTheDocument();
    });
  
 -  test('returns focus when tabbing out then back to close button', async () => {
 +  test.fails('returns focus when tabbing out then back to close button', async () => {
      render(
-       <ResponsiveContext.Provider value={{width: 1600}}>
+-      <ResponsiveContext.Provider value={{width: 1600}}>
++      <ResponsiveContext value={{width: 1600}}>
          <Drawer />
+-      </ResponsiveContext.Provider>,
++      </ResponsiveContext>,
+     );
+     await userEvent.click(screen.getByText('My button'));
+     expect(screen.queryByText('Close')).toBeInTheDocument();
 @@ -2189,7 +2193,8 @@ test('uses aria-hidden instead of inert on outside nodes if opened with hover an
    expect(screen.getByText('outside')).toHaveAttribute('aria-hidden', 'true');
  });

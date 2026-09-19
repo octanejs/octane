@@ -23,7 +23,7 @@ export function ReactNodeViewContentProvider({
 	children,
 	content,
 }: ReactNodeViewContentProviderProps): unknown {
-	return createElement(ReactNodeViewContext.Provider, {
+	return createElement(ReactNodeViewContext, {
 		value: { nodeViewContentChildren: content },
 		children,
 	});

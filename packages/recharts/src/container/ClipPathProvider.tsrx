@@ -18,14 +18,14 @@ export function ClipPathProvider(props: {
 		return null;
 	}
 	const { x, y, width, height } = plotArea;
-	<ClipPathIdContext.Provider value={clipPathId}>
+	<ClipPathIdContext value={clipPathId}>
 		<defs>
 			<clipPath id={clipPathId}>
 				<rect x={x} y={y} height={height} width={width} />
 			</clipPath>
 		</defs>
 		{children}
-	</ClipPathIdContext.Provider>
+	</ClipPathIdContext>
 }
 
 export const useClipPathId = () => {

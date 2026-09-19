@@ -1516,7 +1516,7 @@ export function Sankey(outsideProps: Props) {
 			onTouchMove={undefined}
 			onTouchEnd={undefined}
 		>
-			<TooltipPortalContext.Provider value={tooltipPortal}>
+			<TooltipPortalContext value={tooltipPortal}>
 				<RegisterGraphicalItemId id={externalId} type="sankey">
 					{(id) => <>
 						<SetSankeyTooltipEntrySettings
@@ -1532,7 +1532,7 @@ export function Sankey(outsideProps: Props) {
 						<SankeyImpl {...props} id={id} />
 					</>}
 				</RegisterGraphicalItemId>
-			</TooltipPortalContext.Provider>
+			</TooltipPortalContext>
 		</RechartsWrapper>
 	</RechartsStoreProvider>;
 }

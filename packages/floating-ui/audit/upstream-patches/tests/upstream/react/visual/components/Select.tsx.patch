@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/react/visual/components/Select.tsx b/tests/upstream/react/visual/components/Select.tsx
+--- a/tests/upstream/react/visual/components/Select.tsx
++++ b/tests/upstream/react/visual/components/Select.tsx
+@@ -146,7 +146,7 @@ function Select({
+           </Button>
+         </div>
+         <FloatingList elementsRef={elementsRef} labelsRef={labelsRef}>
+-          <SelectContext.Provider
++          <SelectContext
+             value={{
+               getItemProps,
+               activeIndex,
+@@ -174,7 +174,7 @@ function Select({
+             ) : (
+               <div hidden>{children}</div>
+             )}
+-          </SelectContext.Provider>
++          </SelectContext>
+         </FloatingList>
+       </div>
+     </>

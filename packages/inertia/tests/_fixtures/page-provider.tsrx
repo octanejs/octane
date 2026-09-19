@@ -9,5 +9,5 @@ export function setFixturePage(page: Page): void {
 }
 
 export function PageProvider(props: { children: OctaneNode }) @{
-	<PageContext.Provider value={currentPage}>{props.children}</PageContext.Provider>
+	<PageContext value={currentPage}>{props.children}</PageContext>
 }

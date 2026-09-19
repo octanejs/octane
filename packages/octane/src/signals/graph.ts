@@ -5,9 +5,11 @@ import {
 	recordCandidateUrgentWrite,
 	registerCandidateGraph,
 	registerSignalActionFrameFactory,
+	registerSignalTransitionCoordinatorFactory,
 	withoutSignalCandidate,
 } from './transition-state.js';
 import { SignalActionFrame } from './transition-action.js';
+import { createSignalTransitionCoordinator } from './transition-coordinator.js';
 import type { SignalCandidateFrame } from './transition-candidate.js';
 import {
 	createReactiveSystem,
@@ -968,3 +970,4 @@ registerCandidateGraph({
 });
 
 registerSignalActionFrameFactory(() => new SignalActionFrame());
+registerSignalTransitionCoordinatorFactory(createSignalTransitionCoordinator);

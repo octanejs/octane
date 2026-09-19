@@ -18,9 +18,9 @@ export function MenuSubmenuRoot(props: MenuSubmenuRoot.Props) {
 	const contextValue = React.useMemo(() => ({ parentMenu }), [parentMenu]);
 
 	return (
-		<MenuSubmenuRootContext.Provider value={contextValue}>
+		<MenuSubmenuRootContext value={contextValue}>
 			<MenuRoot {...props} />
-		</MenuSubmenuRootContext.Provider>
+		</MenuSubmenuRootContext>
 	);
 }
 

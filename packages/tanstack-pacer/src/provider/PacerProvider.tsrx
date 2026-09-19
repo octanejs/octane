@@ -21,5 +21,5 @@ export function PacerProvider({ children, defaultOptions = DEFAULT_OPTIONS }: Pa
 		[defaultOptions],
 	);
 
-	<PacerContext.Provider value={contextValue}>{children}</PacerContext.Provider>
+	<PacerContext value={contextValue}>{children}</PacerContext>
 }

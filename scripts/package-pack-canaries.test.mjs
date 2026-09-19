@@ -6,6 +6,7 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
 	createPackedJavascriptConsumerManifest,
+	createPackedRuntimeConsumerDependencies,
 	assertPackedTsrxConsumerSucceeded,
 	createPackedExampleManifest,
 	createPackedTsrxConsumerConfig,
@@ -35,6 +36,54 @@ import {
 } from './package-pack-canaries.mjs';
 
 const repositoryRequire = createRequire(import.meta.url);
+
+describe('packed runtime consumer dependencies', () => {
+	const manifests = new Map([
+		['@octanejs/recharts', { dependencies: { '@octanejs/redux': '0.1.50' } }],
+		['@octanejs/redux', { peerDependencies: { octane: '^0.2.0', redux: '^5.0.0' } }],
+		['octane', {}],
+		['@octanejs/unrelated', {}],
+	]);
+	const archiveSpecs = Object.fromEntries(
+		[
+			'@octanejs/alien-signals',
+			'@octanejs/apollo-client',
+			'@octanejs/dropzone',
+			'@octanejs/hook-form',
+			'@octanejs/recharts',
+			'@octanejs/redux',
+			'@octanejs/syntax-highlighter',
+			'@octanejs/three',
+			'@octanejs/window',
+			'@octanejs/unrelated',
+			'octane',
+		].map((packageName) => [
+			packageName,
+			`file:/tmp/${packageName.slice(packageName.lastIndexOf('/') + 1)}.tgz`,
+		]),
+	);
+
+	test('installs the current Redux archive through Recharts without enrolling unrelated packages', () => {
+		const dependencies = createPackedRuntimeConsumerDependencies(manifests, archiveSpecs);
+		assert.equal(dependencies['@octanejs/redux'], 'file:/tmp/redux.tgz');
+		assert.equal(dependencies.octane, 'file:/tmp/octane.tgz');
+		assert.equal(Object.keys(dependencies).length, 10);
+		assert.equal(Object.hasOwn(dependencies, '@octanejs/unrelated'), false);
+		assert.equal(Object.hasOwn(dependencies, 'redux'), false);
+		assert.match(
+			renderPackedExampleWorkspace(dependencies),
+			/"@octanejs\/redux": "file:\/tmp\/redux\.tgz"/,
+		);
+	});
+
+	test('rejects an absent transitive archive instead of falling back to the released Redux binding', () => {
+		const { '@octanejs/redux': _missingRedux, ...incompleteArchives } = archiveSpecs;
+		assert.throws(
+			() => createPackedRuntimeConsumerDependencies(manifests, incompleteArchives),
+			/no packed archive was provided for @octanejs\/redux/,
+		);
+	});
+});
 
 describe('packed JavaScript consumers', () => {
 	const archiveSpecs = {

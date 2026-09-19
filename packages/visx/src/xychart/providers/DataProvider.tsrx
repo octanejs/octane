@@ -137,5 +137,5 @@ export default function DataProvider<XScaleConfig extends ScaleConfig<AxisScaleO
 		],
 	);
 
-	return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+	return <DataContext value={value}>{children}</DataContext>;
 }

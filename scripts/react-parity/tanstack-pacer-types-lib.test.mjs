@@ -7,6 +7,7 @@ import test from 'node:test';
 import {
 	buildTypeInventory,
 	readTypeParityConfig,
+	structuralSource,
 	verifyTanstackPacerTypes,
 } from './tanstack-pacer-types-lib.mjs';
 
@@ -95,6 +96,69 @@ async function fixture() {
 	);
 	await writeFile(join(root, 'type-parity.json'), `${JSON.stringify(localConfig, null, '\t')}\n`);
 	return { root, config: localConfig };
+}
+
+test('permits direct context JSX while preserving ordinary provider members', () => {
+	const upstream = `import { createContext as makeContext } from 'react';
+const Theme = makeContext(null);
+const Components = { Provider: () => null };
+export function App() {
+  return <Theme.Provider value={null}><Components.Provider /></Theme.Provider>;
+}`;
+	const adapted = upstream
+		.replace("from 'react'", "from 'octane'")
+		.replace(/Theme\.Provider/g, 'Theme');
+	assert.equal(
+		structuralSource(upstream, 'provider/PacerProvider.tsx', { mergeProviderContext: true }),
+		structuralSource(adapted, 'provider/PacerProvider.tsrx', { mergeProviderContext: true }),
+	);
+});
+
+for (const control of [
+	{
+		name: 'an ordinary component namespace',
+		tag: 'Components',
+		source: `const Components = { Provider: () => null };
+export function OrdinaryProvider() { return <Components.Provider value="ignored" />; }`,
+	},
+	{
+		name: 'a parameter shadowing the context',
+		tag: 'PacerContext',
+		source: `export function OrdinaryProvider(PacerContext) {
+  return <PacerContext.Provider value="ignored" />;
+}`,
+	},
+	{
+		name: 'a parameter shadowing the context factory',
+		tag: 'Other',
+		source: `export function OrdinaryProvider(createContext) {
+  const Other = createContext(null);
+  return <Other.Provider value="ignored" />;
+}`,
+	},
+	{
+		name: 'a factory from another framework',
+		tag: 'Other',
+		source: `import { createContext as otherFactory } from 'another-ui';
+const Other = otherFactory(null);
+export function OrdinaryProvider() { return <Other.Provider value="ignored" />; }`,
+	},
+]) {
+	test(`rejects erasing Provider from ${control.name}`, async (t) => {
+		const value = await fixture();
+		t.after(() => rm(value.root, { recursive: true, force: true }));
+		const upstreamFile = join(value.root, 'upstream/provider/PacerProvider.tsx');
+		const adaptedFile = join(value.root, 'adapted/provider/PacerProvider.tsrx');
+		await writeFile(upstreamFile, `${await readFile(upstreamFile, 'utf8')}\n${control.source}\n`);
+		const adaptedSource = `${await readFile(adaptedFile, 'utf8')}\n${control.source}\n`;
+		await writeFile(adaptedFile, adaptedSource);
+		assert.doesNotThrow(() => buildTypeInventory(value.root, value.config));
+		await writeFile(adaptedFile, adaptedSource.replace(`${control.tag}.Provider`, control.tag));
+		assert.throws(
+			() => buildTypeInventory(value.root, value.config),
+			/outside the permitted transformations/,
+		);
+	});
 }
 
 test('rejects a skipped adapted source file', async (t) => {

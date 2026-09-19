@@ -50,14 +50,14 @@ describe('<ApolloProvider /> Component', () => {
 		};
 		expect(function renderWithoutClient() {
 			// Before testing `ApolloProvider`, we first fully reset the
-			// existing context using `ApolloContext.Provider` directly.
+			// existing context using ApolloContext directly.
 			const ApolloContext = getApolloContext();
 			render(
-				<ApolloContext.Provider value={{}}>
+				<ApolloContext value={{}}>
 					<ApolloProvider client={undefined as any}>
 						<div className="unique" />
 					</ApolloProvider>
-				</ApolloContext.Provider>,
+				</ApolloContext>,
 			);
 		}).toThrow(
 			'ApolloProvider was not passed a client instance. Make ' +

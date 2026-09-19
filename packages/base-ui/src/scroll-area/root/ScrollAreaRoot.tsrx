@@ -343,10 +343,10 @@ export const ScrollAreaRoot = function ScrollAreaRoot(
 	);
 
 	return (
-		<ScrollAreaRootContext.Provider value={contextValue}>
+		<ScrollAreaRootContext value={contextValue}>
 			{!disableStyleElements && styleDisableScrollbar.getElement(nonce)}
 			{element}
-		</ScrollAreaRootContext.Provider>
+		</ScrollAreaRootContext>
 	);
 };
 

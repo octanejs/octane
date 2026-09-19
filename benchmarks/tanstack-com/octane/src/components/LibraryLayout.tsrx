@@ -1230,8 +1230,8 @@ export function LibraryLayout({
 		</div>
 	</div>;
 
-	return <WidthToggleContext.Provider value={{ isFullWidth, setIsFullWidth }}>
-		<DocNavigationContext.Provider
+	return <WidthToggleContext value={{ isFullWidth, setIsFullWidth }}>
+		<DocNavigationContext
 			value={{
 				libraryId,
 				version,
@@ -1281,6 +1281,6 @@ export function LibraryLayout({
 						</RightRail>}
 				</div>
 			</div>
-		</DocNavigationContext.Provider>
-	</WidthToggleContext.Provider>;
+		</DocNavigationContext>
+	</WidthToggleContext>;
 }

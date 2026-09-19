@@ -164,10 +164,10 @@ export function Map(props: MapProps) @{
 	// `Marker` and `Popup` already reach their library-owned elements this way.
 	<div id={props.id} ref={containerRef} style={style}>
 		@if (mapInstance) {
-			<MapContext.Provider value={contextValue}>{createPortal(
+			<MapContext value={contextValue}>{createPortal(
 				props.children,
 				childContainerRef.current!,
-			)}</MapContext.Provider>
+			)}</MapContext>
 		}
 	</div>
 }

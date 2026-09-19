@@ -34,8 +34,21 @@ diff --git a/tests/upstream/react/visual/components/Menu.tsx b/tests/upstream/re
    const [isOpen, setIsOpen] = React.useState(false);
    const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
    const [allowHover, setAllowHover] = React.useState(false);
-@@ -302,17 +298,20 @@ export const MenuComponent = React.forwardRef<
-       </MenuContext.Provider>
+@@ -247,7 +243,7 @@ export const MenuComponent = React.forwardRef<
+           </span>
+         )}
+       </button>
+-      <MenuContext.Provider
++      <MenuContext
+         value={{
+           activeIndex,
+           setActiveIndex,
+@@ -299,20 +295,23 @@ export const MenuComponent = React.forwardRef<
+             </FloatingPortal>
+           )}
+         </FloatingList>
+-      </MenuContext.Provider>
++      </MenuContext>
      </FloatingNode>
    );
 -});

@@ -19,7 +19,7 @@ export const FrameProvider: FC<{ children: React.OctaneNode }> = ({ children }) 
 		[],
 	);
 
-	return <FrameContext.Provider value={value}>{children}</FrameContext.Provider>;
+	return <FrameContext value={value}>{children}</FrameContext>;
 };
 
 export const useCanvasFrame = (): FrameContextType => {

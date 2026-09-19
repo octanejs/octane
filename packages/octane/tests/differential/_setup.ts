@@ -17,7 +17,7 @@
 import { compile as compileToReact } from '@tsrx/react';
 import { transformSync as esbuildTransformSync } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname, basename } from 'node:path';
+import { join, dirname, basename, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,11 +31,20 @@ function hashString(s: string): string {
 	return Math.abs(h).toString(36);
 }
 
-function compileOne(srcPath: string): void {
+function cacheFile(srcPath: string): string {
+	const slug = basename(srcPath).replace(/\.(?:tsrx|tsx?|js)$/, '');
+	return `${slug}-${hashString(srcPath)}.js`;
+}
+
+function compileOne(srcPath: string, visited: Set<string>): void {
+	if (visited.has(srcPath)) return;
+	visited.add(srcPath);
 	const source = readFileSync(srcPath, 'utf8');
 	let compiled;
 	try {
-		compiled = compileToReact(source, srcPath);
+		compiled = srcPath.endsWith('.tsrx')
+			? compileToReact(source, srcPath)
+			: { code: source, errors: [] };
 	} catch {
 		// Some fixtures use octane features that @tsrx/react rejects
 		// (multi-ref, @switch, Dynamic shapes). Skip silently — a differential
@@ -91,8 +100,22 @@ ${rewritten}`;
 	// Only applies to the React-side cache; the octane fixture stays
 	// authored as `xlink:href` in the source.
 	rewritten = rewritten.replace(/"xlink:href":/g, 'xlinkHref:');
-	const slug = basename(srcPath).replace(/\.tsrx$/, '');
-	const outFile = join(CACHE_DIR, `${slug}-${hashString(srcPath)}.js`);
+	// Imported fixture companions must use the same React hooks and context
+	// factories as the root fixture. Transpile their real source into the cache
+	// rather than resolving an Octane module from the React side of the test.
+	rewritten = rewritten.replace(/from\s+["'](\.[^"']*)["']/g, (match, specifier) => {
+		const base = resolve(dirname(srcPath), specifier);
+		const companion = [base, `${base}.tsrx`, `${base}.ts`, `${base}.tsx`, `${base}.js`].find(
+			(candidate) =>
+				!relative(FIXTURE_DIR, candidate).startsWith('..') &&
+				/\.(?:tsrx|tsx?|js)$/.test(candidate) &&
+				existsSync(candidate),
+		);
+		if (!companion) return match;
+		compileOne(companion, visited);
+		return `from "./${cacheFile(companion)}"`;
+	});
+	const outFile = join(CACHE_DIR, cacheFile(srcPath));
 	writeFileSync(outFile, rewritten);
 }
 
@@ -111,7 +134,8 @@ export async function setup(): Promise<void> {
 		}
 		return out;
 	};
-	for (const file of walk(FIXTURE_DIR)) compileOne(file);
+	const visited = new Set<string>();
+	for (const file of walk(FIXTURE_DIR)) compileOne(file, visited);
 }
 
 export async function teardown(): Promise<void> {

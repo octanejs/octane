@@ -200,14 +200,14 @@ export function SearchProvider({ children }: { children?: any }) {
 		};
 	}, [isOpen, openSearch, requestNewChat]);
 
-	return <SearchContext.Provider value={value}>
+	return <SearchContext value={value}>
 		{children}
 		{hasLoadedSearch
 			? <Suspense fallback={null}>
 					<LazySearchModal />
 				</Suspense>
 			: null}
-	</SearchContext.Provider>;
+	</SearchContext>;
 }
 
 export function useSearchContext() {

@@ -109,7 +109,7 @@ export const TabsList = function TabsList(
 	);
 
 	return (
-		<TabsListContext.Provider value={tabsListContextValue}>
+		<TabsListContext value={tabsListContextValue}>
 			<CompositeRoot
 				render={render}
 				className={className}
@@ -126,7 +126,7 @@ export const TabsList = function TabsList(
 				onMapChange={setTabMap}
 				disabledIndices={EMPTY_ARRAY}
 			/>
-		</TabsListContext.Provider>
+		</TabsListContext>
 	);
 };
 

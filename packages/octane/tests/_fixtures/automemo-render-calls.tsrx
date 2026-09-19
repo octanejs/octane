@@ -274,7 +274,7 @@ export function CtxUnderRegion() @{
 	const [value, setValue] = useState('c0');
 	<div>
 		<button id="cur-bump" onClick={() => setValue('c1')}>{'bump'}</button>
-		<LabelCtx.Provider value={value}>
+		<LabelCtx value={value}>
 			<ul>
 				@for (const row of rows; key row.id) {
 					<li class="cur-row">
@@ -282,7 +282,7 @@ export function CtxUnderRegion() @{
 					</li>
 				}
 			</ul>
-		</LabelCtx.Provider>
+		</LabelCtx>
 	</div>
 }
 

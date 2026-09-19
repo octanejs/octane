@@ -94,8 +94,8 @@ export function Router(props: RouterProps) @{
 	@if (locationContext == null) {
 		<></>
 	} @else {
-		<NavigationContext.Provider value={navigationContext}>
-			<LocationContext.Provider value={locationContext}>{children}</LocationContext.Provider>
-		</NavigationContext.Provider>
+		<NavigationContext value={navigationContext}>
+			<LocationContext value={locationContext}>{children}</LocationContext>
+		</NavigationContext>
 	}
 }

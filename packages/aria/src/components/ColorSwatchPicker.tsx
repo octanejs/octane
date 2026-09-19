@@ -96,7 +96,7 @@ export const ColorSwatchPicker = forwardRef(function ColorSwatchPicker(
 			}}
 			disallowEmptySelection
 		>
-			<ColorMapContext.Provider value={colorMap}>{props.children}</ColorMapContext.Provider>
+			<ColorMapContext value={colorMap}>{props.children}</ColorMapContext>
 		</ListBox>
 	);
 });
@@ -169,7 +169,7 @@ export const ColorSwatchPickerItem = forwardRef(function ColorSwatchPickerItem(
 			style={wrap(props.style)}
 		>
 			{composeRenderProps(wrap(props.children), (children) => (
-				<ColorSwatchContext.Provider value={{ color }}>{children}</ColorSwatchContext.Provider>
+				<ColorSwatchContext value={{ color }}>{children}</ColorSwatchContext>
 			))}
 		</ListBoxItem>
 	);

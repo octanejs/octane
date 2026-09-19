@@ -48,7 +48,7 @@
     "upstream:verify": "node scripts/verify-upstream.mjs"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0",
+    "octane": "workspace:^0.1.51 || ^0.2.0 || ^0.3.0",
     "xstate": "^5.28.0"
   },
   "peerDependenciesMeta": {

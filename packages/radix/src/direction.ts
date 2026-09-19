@@ -8,7 +8,7 @@ const DirectionContext = createContext<Direction | undefined>(undefined);
 
 export function DirectionProvider(props: { dir: Direction; children?: any }): any {
 	const { dir, children } = props;
-	return createElement(DirectionContext.Provider, { value: dir, children });
+	return createElement(DirectionContext, { value: dir, children });
 }
 
 export function useDirection(localDir?: Direction): Direction {

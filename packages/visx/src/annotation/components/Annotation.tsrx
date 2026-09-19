@@ -10,5 +10,5 @@ export type AnnotationProps = Pick<AnnotationContextType, 'x' | 'y' | 'dx' | 'dy
 
 export default function Annotation({ x, y, dx, dy, children }: AnnotationProps) {
 	const value = useMemo(() => ({ x, y, dx, dy }), [x, y, dx, dy]);
-	return <AnnotationContext.Provider value={value}>{children}</AnnotationContext.Provider>;
+	return <AnnotationContext value={value}>{children}</AnnotationContext>;
 }

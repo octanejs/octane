@@ -11,5 +11,5 @@ export const ApolloProvider = ({ client, children }) => {
 		};
 	}, [parentContext, client]);
 	invariant(context.client, 38);
-	return React.createElement(ApolloContext.Provider, { value: context }, children);
+	return React.createElement(ApolloContext, { value: context }, children);
 };

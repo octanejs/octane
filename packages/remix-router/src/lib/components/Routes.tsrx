@@ -52,9 +52,7 @@ function BlockRoutes(props: RoutesProps) @{
 	const routes = useMemo(() => collectorRef.current!.collect(), [version]);
 
 	<>
-		<RoutesCollectorContext.Provider
-			value={collectorRef.current}
-		>{props.children}</RoutesCollectorContext.Provider>
+		<RoutesCollectorContext value={collectorRef.current}>{props.children}</RoutesCollectorContext>
 		@if (version > 0) {
 			<CollectedRoutes routes={routes} location={props.location} />
 		}

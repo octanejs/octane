@@ -648,9 +648,7 @@ export function DrawerVirtualKeyboardProvider(props: DrawerVirtualKeyboardProvid
 	);
 
 	return (
-		<DrawerVirtualKeyboardContext.Provider value={contextValue}>
-			{children}
-		</DrawerVirtualKeyboardContext.Provider>
+		<DrawerVirtualKeyboardContext value={contextValue}>{children}</DrawerVirtualKeyboardContext>
 	);
 }
 
