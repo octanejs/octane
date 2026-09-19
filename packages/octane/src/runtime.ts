@@ -24205,6 +24205,9 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 // even when the committed map matches, because an earlier owner write may be pending.
 // ---------------------------------------------------------------------------
 
+// Data equality skips dispatch/journal snapshots, never authority publication:
+// a stable callback can move to another owner without changing its captures.
+// Compare staged fields first and keep array-reference semantics for arity N.
 const EMPTY_ARGS: any[] = [];
 let SIGNAL_EVENT_OWNERS: WeakMap<Element, SignalOwner | ScopeImpl | BlockImpl> | null = null;
 
@@ -24276,9 +24279,11 @@ export function evt0(el: Element, key: string, fn: any): HandlerBundle {
 }
 export function evt0u(d: HandlerBundle, fn: any): void {
 	if (STAGED_COMMIT_CAPTURE !== null) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
-	if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
-	d.fn = fn;
+	if (d.fn !== fn) {
+		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
+		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
+		d.fn = fn;
+	}
 	if (
 		(SIGNAL_BINDINGS_ENABLED ||
 			signalDocumentEnabled ||
@@ -24301,10 +24306,12 @@ export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle 
 }
 export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
 	if (STAGED_COMMIT_CAPTURE !== null) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
-	if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
-	d.fn = fn;
-	d.a0 = a0;
+	if (d.fn !== fn || !Object.is(d.a0, a0)) {
+		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
+		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
+		d.fn = fn;
+		d.a0 = a0;
+	}
 	if (
 		(SIGNAL_BINDINGS_ENABLED ||
 			signalDocumentEnabled ||
@@ -24327,11 +24334,13 @@ export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): Handl
 }
 export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
 	if (STAGED_COMMIT_CAPTURE !== null) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
-	if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
-	d.fn = fn;
-	d.a0 = a0;
-	d.a1 = a1;
+	if (d.fn !== fn || !Object.is(d.a0, a0) || !Object.is(d.a1, a1)) {
+		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
+		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
+		d.fn = fn;
+		d.a0 = a0;
+		d.a1 = a1;
+	}
 	if (
 		(SIGNAL_BINDINGS_ENABLED ||
 			signalDocumentEnabled ||
@@ -24367,10 +24376,12 @@ export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBun
 }
 export function evtNu(d: HandlerBundle, fn: any, args: any[]): void {
 	if (STAGED_COMMIT_CAPTURE !== null) d = DEFERRED_LAYOUT_DRIVER!.projectEventBundle(d);
-	if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
-	d.fn = fn;
-	d.args = args;
+	if (d.fn !== fn || d.args !== args) {
+		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
+		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
+		d.fn = fn;
+		d.args = args;
+	}
 	if (
 		(SIGNAL_BINDINGS_ENABLED ||
 			signalDocumentEnabled ||
