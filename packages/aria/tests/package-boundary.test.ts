@@ -2,9 +2,10 @@
 
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
+import { extname, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { build as buildEsbuild } from 'esbuild';
+import { build as buildEsbuild, transformSync } from 'esbuild';
+import { createOctaneCompiler } from 'octane/compiler/bundler';
 import { octane } from 'octane/compiler/vite';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -21,19 +22,24 @@ const { JSDOM } = packageRequire('jsdom') as {
 	) => { window: Window & typeof globalThis };
 };
 
-type ProductionBundler = 'esbuild' | 'vite';
+type ProductionBundler = 'esbuild' | 'compiled-esbuild' | 'vite';
 
 interface ProductionBundle {
 	code: string;
 	modules: Array<string>;
 }
 
-const productionBundlers = ['esbuild', 'vite'] as const;
+const productionBundlers = ['esbuild', 'compiled-esbuild', 'vite'] as const;
 const productionBundles = new Map<ProductionBundler, ProductionBundle>();
 const productionBuildTimeout = 60_000;
 
-async function buildConsumer(bundler: ProductionBundler): Promise<ProductionBundle> {
-	if (bundler === 'esbuild') {
+async function buildConsumer(
+	bundler: ProductionBundler,
+	entry = consumerEntry,
+	minify = true,
+): Promise<ProductionBundle> {
+	if (bundler === 'esbuild' || bundler === 'compiled-esbuild') {
+		const compiler = createOctaneCompiler({ root: repositoryRoot });
 		const result = await buildEsbuild({
 			absWorkingDir: repositoryRoot,
 			bundle: true,
@@ -41,13 +47,47 @@ async function buildConsumer(bundler: ProductionBundler): Promise<ProductionBund
 				__OCTANE_PROFILE_ENABLED__: 'false',
 				'process.env.NODE_ENV': JSON.stringify('production'),
 			},
-			entryPoints: [consumerEntry],
+			entryPoints: [entry],
 			format: 'iife',
 			globalName: consumerGlobal,
 			logLevel: 'silent',
 			metafile: true,
-			minify: true,
+			minify,
 			platform: 'browser',
+			plugins:
+				bundler === 'compiled-esbuild'
+					? [
+							{
+								name: 'octane-authored-source',
+								setup(build) {
+									build.onLoad({ filter: /\.(?:tsrx|[jt]sx?)$/ }, ({ path: filename }) => {
+										const result = compiler.transform(readFileSync(filename, 'utf8'), filename, {
+											environment: 'client',
+											hmr: false,
+											dev: false,
+											profile: false,
+										});
+										if (result === null || result.kind === 'none') return null;
+										// Consume retained TypeScript syntax while preserving authored
+										// value imports for the downstream JavaScript bundler.
+										return {
+											contents:
+												result.kind === 'compile'
+													? transformSync(result.code, {
+															loader: 'tsx',
+															tsconfigRaw: { compilerOptions: { verbatimModuleSyntax: true } },
+														}).code
+													: result.code,
+											loader:
+												result.kind === 'compile'
+													? 'js'
+													: (extname(filename).slice(1) as 'ts' | 'tsx' | 'js'),
+										};
+									});
+								},
+							},
+						]
+					: [],
 			target: 'esnext',
 			treeShaking: true,
 			write: false,
@@ -76,7 +116,7 @@ async function buildConsumer(bundler: ProductionBundler): Promise<ProductionBund
 			minify: 'esbuild',
 			target: 'esnext',
 			lib: {
-				entry: consumerEntry,
+				entry,
 				formats: ['iife'],
 				name: consumerGlobal,
 			},
@@ -107,6 +147,26 @@ function consumerBundle(bundler: ProductionBundler): ProductionBundle {
 }
 
 describe('@octanejs/aria package boundary', () => {
+	it(
+		'preserves all authored runtime entries in a compiled production esbuild bundle',
+		async () => {
+			const bundle = await buildConsumer(
+				'compiled-esbuild',
+				resolve(packageDirectory, 'tests/_fixtures/package-entries-consumer.ts'),
+				false,
+			);
+			const context: Record<string, any> = {};
+			runInNewContext(bundle.code, context);
+			const { aria, stately, components } = context[consumerGlobal];
+			for (const hook of ['useButton', 'useSeparator']) expect(typeof aria[hook]).toBe('function');
+			expect(typeof stately.useListState).toBe('function');
+			for (const component of ['Button', 'ComboBox', 'TokenField']) {
+				expect(typeof components[component]).toBe('function');
+			}
+		},
+		productionBuildTimeout,
+	);
+
 	it.each(productionBundlers)(
 		'preserves public separator behavior and browser bootstrap in a production %s bundle',
 		async (bundler) => {

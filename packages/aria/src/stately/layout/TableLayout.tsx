@@ -12,16 +12,16 @@
  * governing permissions and limitations under the License.
  */
 
-import { DropTarget, ItemDropTarget, Key } from '@react-types/shared';
+import type { DropTarget, ItemDropTarget, Key } from '@react-types/shared';
 import { getChildNodes } from '../collections/getChildNodes';
-import { GridNode } from '../grid/GridCollection';
-import { InvalidationContext } from '../virtualizer/types';
+import type { GridNode } from '../grid/GridCollection';
+import type { InvalidationContext } from '../virtualizer/types';
 import { LayoutInfo } from '../virtualizer/LayoutInfo';
-import { LayoutNode, ListLayout, ListLayoutOptions } from './ListLayout';
+import { type LayoutNode, ListLayout, type ListLayoutOptions } from './ListLayout';
 import { Point } from '../virtualizer/Point';
 import { Rect } from '../virtualizer/Rect';
 import { Size } from '../virtualizer/Size';
-import { ITableCollection as TableCollection } from '../table/TableCollection';
+import type { ITableCollection as TableCollection } from '../table/TableCollection';
 import { TableColumnLayout } from '../table/TableColumnLayout';
 
 export interface TableLayoutProps extends Omit<

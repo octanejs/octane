@@ -12,11 +12,17 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaMenuItemProps } from './useMenuItem';
+import type { AriaMenuItemProps } from './useMenuItem';
 import { withSlot } from 'octane';
-import { AriaMenuOptions } from './useMenu';
+import type { AriaMenuOptions } from './useMenu';
 import type { AriaPopoverProps } from '../overlays/usePopover';
-import { FocusableElement, FocusStrategy, Node, PressEvent, RefObject } from '@react-types/shared';
+import type {
+	FocusableElement,
+	FocusStrategy,
+	Node,
+	PressEvent,
+	RefObject,
+} from '@react-types/shared';
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import {
 	getActiveElement,

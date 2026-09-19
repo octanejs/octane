@@ -12,12 +12,12 @@
  * governing permissions and limitations under the License.
  */
 
-import {
+import type {
 	CalendarSelectionMode,
 	CalendarState,
 } from '../upstream-exports/react-stately/useCalendarState';
-import { DateDuration } from '@internationalized/date';
-import { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
+import type { DateDuration } from '@internationalized/date';
+import type { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
 import { useDateFormatter } from '../i18n/useDateFormatter';
 import { useMemo } from '../compat/react';
 
