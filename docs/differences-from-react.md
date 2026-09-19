@@ -1004,6 +1004,14 @@ will not be added: Octane's slot-keyed hooks make `use(MyContext)`/`useContext`
 legal behind any condition, which is the pattern Consumer existed to work around.
 Read the context in the child (or an inline component) instead.
 
+Production DOM compilation can omit generic descriptor-child rendering for a
+private context when its complete usage is proven to be compiled template
+providers and canonical `use`/`useContext` reads. Exported or escaped contexts,
+aliases, reflection, and opaque children retain generic rendering. This changes
+bundle reachability while preserving context identity, hook state, hydration
+adoption, and uncontrolled edits across provider value updates. Development,
+HMR, profiling, server, and custom-renderer compilation keep the generic path.
+
 In development, accessing `.Consumer` logs a one-time migration diagnostic and
 still returns `undefined`, so feature probes (`MyContext.Consumer || fallback`)
 behave exactly as in production. The upstream Consumer test scenarios that

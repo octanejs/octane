@@ -125,6 +125,7 @@ import { assertNoLegacyContextProviders } from './context-provider.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 import { findLocalVoidRootCallees } from './local-void-roots.js';
+import { findPrivateCompiledContexts } from './private-context.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
 // static bakes and dynamic writes MUST agree on which attributes render, under
@@ -1401,6 +1402,7 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeCreateScopedElement',
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
+	'__createCompiledContext',
 	'isContext',
 	'bindPresentationView',
 	'beginPresentationHydration',
@@ -9921,6 +9923,9 @@ function compileInternal(
 		options?.rendererBoundaries == null &&
 		options?.rendererRegistry == null;
 	const authoredVoidRootIds = new Set();
+	const privateCompiledContexts = localVoidRootsEnabled
+		? findPrivateCompiledContexts(ast)
+		: new Map();
 	if (
 		localVoidRootsEnabled &&
 		ast.body.some(
@@ -10449,6 +10454,15 @@ function compileInternal(
 				callees.has(node) ? { ...node, name: aliases.get(callees.get(node)) } : null,
 			);
 		}
+	}
+	if (privateCompiledContexts.size > 0) {
+		const helper = '__createCompiledContext';
+		const alias = allocCompilerName(ctx, rtAlias(helper));
+		(ctx.privateRuntimeAliases ??= new Map()).set(helper, alias);
+		ctx.runtimeNeeded.add(helper);
+		const callees = new Set(privateCompiledContexts.values());
+		ast = mapAst(ast, (node) => (callees.has(node) ? { ...node, name: alias } : null));
+		ctx.privateCompiledContexts = new Set(privateCompiledContexts.keys());
 	}
 	// Return-based JSX functions never attach fetch-tree warm plans, and a sole
 	// same-module component already rejects a self-only warm edge below. Avoid a
@@ -30638,6 +30652,7 @@ function makeCompCall(
 			maybeSingleRoot = callSiteOk;
 		}
 		const importedBinding = ctx.importedComponentBindings?.get(compName);
+		if (!voidComponent && ctx.privateCompiledContexts?.has(compName)) voidComponent = true;
 		if (
 			!voidComponent &&
 			!ctx.hmr &&

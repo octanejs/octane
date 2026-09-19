@@ -1,0 +1,806 @@
+{
+  "baseline": "481819ec22873f1c7d0c2b445987e946a18f77f2",
+  "candidateSource": {
+    "packages/octane/src/compiler/compile.js": "f284206203914e76c1b07f8674122efb6d6e13378547e0f80cb2a4f713faa90d",
+    "packages/octane/src/compiler/private-context.js": "d1d2be19a1ed8d9cf93d0d68957cbffc8c11b1a7d22f15c8caad8463b1bfd7f4",
+    "packages/octane/src/runtime.ts": "31bf2ed442806a7a39cb770ecd8a35a6c1b52d1220efdc5e1f1ad62b1b65e937",
+    "base": "481819ec22873f1c7d0c2b445987e946a18f77f2",
+    "source": "/private/tmp/octane-private-context-review-source-20260919"
+  },
+  "lockSha256": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+  "node": "v24.19.0",
+  "platform": "darwin/arm64",
+  "toolingVersions": {
+    "esbuild": "0.28.1",
+    "vite": "8.1.5",
+    "alien-signals": "3.2.0",
+    "devalue": "5.8.2",
+    "@tsrx/core": "0.2.0",
+    "@tsrx/oxc/tsrx-core-compat": "0.13.0",
+    "esrap": "2.3.2",
+    "entities": "7.0.1",
+    "es-module-lexer": "1.7.0"
+  },
+  "fixtureHashes": {
+    "root-static": "11de23976d8dd67593331ae6e18aee9a4bc65f5975c85bc0542d21de3d625f52",
+    "hooks-state": "6ea5c5984e655be2202a2ff68b916f60bff39f48038f44984e0c429afce27aff",
+    "context": "2114d2581836c6dea70b1b0f586c85685dd26f76d6fbf562cfc6d268da0ee36e",
+    "hydrate-root": "c1c3389646de012ea363e9db0c99a9a7b684ff2494f0ea30e58008dab1c3637f",
+    "suspense-transition": "e10714ae7abadbf13c532b6db72296d8eff932628cfe2b152469fb07eae439d3",
+    "deferred-hydration": "d989278c273166b281729a60a5863f27423cca9c72158d2527d32ccaaacee256"
+  },
+  "stockRunnerSha256": "934dd4fa81f1900b84867b38c9b1511fd0f79c1a14f3db42bde77f277a5b54ea",
+  "publicRunnerSha256": "b829eb3f4ca01a6e9373e80b6b08579cec29dc872d1b0ed25c6ca8310631a554",
+  "stockRows": [
+    {
+      "id": "root-static",
+      "baseline": {
+        "raw": 73618,
+        "gzip": 24574,
+        "brotli": 21990,
+        "sha256": "cd02fa80f356aaf660eac5ad3f76cef23eb28fd02da6d817844a1bfff994e394"
+      },
+      "candidate": {
+        "raw": 73618,
+        "gzip": 24574,
+        "brotli": 21990,
+        "sha256": "cd02fa80f356aaf660eac5ad3f76cef23eb28fd02da6d817844a1bfff994e394"
+      },
+      "gzipDelta": 0,
+      "semantic": {
+        "text": "Octane",
+        "cleaned": true
+      },
+      "boundaries": null,
+      "exportLoadSmoke": null
+    },
+    {
+      "id": "hooks-state",
+      "baseline": {
+        "raw": 85594,
+        "gzip": 28579,
+        "brotli": 25503,
+        "sha256": "a78e20d0887d44ce186abca1535abaaf64df025db0aaf6ef51f01f664fd99cc7"
+      },
+      "candidate": {
+        "raw": 85594,
+        "gzip": 28579,
+        "brotli": 25503,
+        "sha256": "a78e20d0887d44ce186abca1535abaaf64df025db0aaf6ef51f01f664fd99cc7"
+      },
+      "gzipDelta": 0,
+      "semantic": {
+        "before": "0",
+        "after": "1",
+        "clicks": 1,
+        "effects": 1,
+        "cleanups": 1,
+        "cleaned": true
+      },
+      "boundaries": null,
+      "exportLoadSmoke": null
+    },
+    {
+      "id": "context",
+      "baseline": {
+        "raw": 208040,
+        "gzip": 66315,
+        "brotli": 57344,
+        "sha256": "bd2be66355095b1991d5d1b39c79ded436284c70d55988ef58a5e62e46d432c8"
+      },
+      "candidate": {
+        "raw": 106690,
+        "gzip": 35477,
+        "brotli": 31443,
+        "sha256": "d38f3d85ee05d6593a8fa5c100fad2c494025ecbfd89672b0eb34322bb20be8b"
+      },
+      "gzipDelta": -30838,
+      "semantic": {
+        "before": "light",
+        "after": "dark",
+        "cleaned": true
+      },
+      "boundaries": null,
+      "exportLoadSmoke": null
+    },
+    {
+      "id": "hydrate-root",
+      "baseline": {
+        "raw": 143194,
+        "gzip": 46396,
+        "brotli": 40590,
+        "sha256": "714ce8a9187c2aea0a16abdb4394043f72dd6ac1af660b0411cc39801570a4f1"
+      },
+      "candidate": {
+        "raw": 143194,
+        "gzip": 46396,
+        "brotli": 40590,
+        "sha256": "714ce8a9187c2aea0a16abdb4394043f72dd6ac1af660b0411cc39801570a4f1"
+      },
+      "gzipDelta": 0,
+      "semantic": {
+        "adopted": true,
+        "before": "server",
+        "after": "client",
+        "cleaned": true
+      },
+      "boundaries": null,
+      "exportLoadSmoke": null
+    },
+    {
+      "id": "suspense-transition",
+      "baseline": {
+        "raw": 157184,
+        "gzip": 50805,
+        "brotli": 44378,
+        "sha256": "473e4ba9a5cc85a826195fb96aea2b290456896e910689b4d4d7529055b69bd1"
+      },
+      "candidate": {
+        "raw": 157184,
+        "gzip": 50805,
+        "brotli": 44378,
+        "sha256": "473e4ba9a5cc85a826195fb96aea2b290456896e910689b4d4d7529055b69bd1"
+      },
+      "gzipDelta": 0,
+      "semantic": {
+        "pending": "loading",
+        "resolved": "ready",
+        "transition": "next",
+        "cleaned": true
+      },
+      "boundaries": null,
+      "exportLoadSmoke": null
+    },
+    {
+      "id": "deferred-hydration",
+      "baseline": {
+        "raw": 289809,
+        "gzip": 91463,
+        "brotli": 78115,
+        "sha256": "10abd48382b91386b96c7969772aa4a1c581fd2a1cae4b16078596d4a8b1f4a1"
+      },
+      "candidate": {
+        "raw": 289809,
+        "gzip": 91463,
+        "brotli": 78115,
+        "sha256": "10abd48382b91386b96c7969772aa4a1c581fd2a1cae4b16078596d4a8b1f4a1"
+      },
+      "gzipDelta": 0,
+      "semantic": {
+        "before": "dormant",
+        "after": "active",
+        "clicks": 1,
+        "cleaned": true
+      },
+      "boundaries": null,
+      "exportLoadSmoke": null
+    },
+    {
+      "id": "createRoot-export",
+      "baseline": {
+        "raw": 189578,
+        "gzip": 60742,
+        "brotli": 52588,
+        "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+      },
+      "candidate": {
+        "raw": 189578,
+        "gzip": 60742,
+        "brotli": 52588,
+        "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": null,
+      "exportLoadSmoke": null
+    }
+  ],
+  "publicClosures": [
+    {
+      "id": "ordinary-client",
+      "baseline": {
+        "raw": 189578,
+        "gzip": 60742,
+        "brotli": 52588,
+        "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+      },
+      "candidate": {
+        "raw": 189578,
+        "gzip": 60742,
+        "brotli": 52588,
+        "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "ordinary-server",
+      "baseline": {
+        "raw": 50366,
+        "gzip": 17728,
+        "brotli": 15990,
+        "sha256": "62940952060a7e32918f66495e0ebd908710945035092908e0c66708569e5ebc"
+      },
+      "candidate": {
+        "raw": 50366,
+        "gzip": 17728,
+        "brotli": 15990,
+        "sha256": "62940952060a7e32918f66495e0ebd908710945035092908e0c66708569e5ebc"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-scalar",
+      "baseline": {
+        "raw": 13823,
+        "gzip": 5251,
+        "brotli": 4748,
+        "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+      },
+      "candidate": {
+        "raw": 13823,
+        "gzip": 5251,
+        "brotli": 4748,
+        "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-structural",
+      "baseline": {
+        "raw": 31292,
+        "gzip": 10455,
+        "brotli": 9553,
+        "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+      },
+      "candidate": {
+        "raw": 31292,
+        "gzip": 10455,
+        "brotli": 9553,
+        "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-controls",
+      "baseline": {
+        "raw": 9046,
+        "gzip": 3525,
+        "brotli": 3190,
+        "sha256": "bec148cacddac1583607ce39ca584e9c6aaad70687a0651b59f9f7823c37a843"
+      },
+      "candidate": {
+        "raw": 9046,
+        "gzip": 3525,
+        "brotli": 3190,
+        "sha256": "bec148cacddac1583607ce39ca584e9c6aaad70687a0651b59f9f7823c37a843"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-whole-style",
+      "baseline": {
+        "raw": 6199,
+        "gzip": 2630,
+        "brotli": 2360,
+        "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+      },
+      "candidate": {
+        "raw": 6199,
+        "gzip": 2630,
+        "brotli": 2360,
+        "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-scalar-controls-style",
+      "baseline": {
+        "raw": 27473,
+        "gzip": 9954,
+        "brotli": 9044,
+        "sha256": "80f8610c76cc1f8e22f5d9fe9be9f4f83d6bbb2d972a4de38fd0dd56b1555932"
+      },
+      "candidate": {
+        "raw": 27473,
+        "gzip": 9954,
+        "brotli": 9044,
+        "sha256": "80f8610c76cc1f8e22f5d9fe9be9f4f83d6bbb2d972a4de38fd0dd56b1555932"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "engine",
+      "baseline": {
+        "raw": 47423,
+        "gzip": 14480,
+        "brotli": 13123,
+        "sha256": "cc3549d21079c1eda52036e6f6749532a604ec402f21f73391e37f57eef07ca6"
+      },
+      "candidate": {
+        "raw": 47423,
+        "gzip": 14480,
+        "brotli": 13123,
+        "sha256": "cc3549d21079c1eda52036e6f6749532a604ec402f21f73391e37f57eef07ca6"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "native-client",
+      "baseline": {
+        "raw": 50263,
+        "gzip": 15894,
+        "brotli": 14356,
+        "sha256": "325d1412e91f483fa8b686c922b83212af6731cde5f2df2b43be92e8cd81e065"
+      },
+      "candidate": {
+        "raw": 50263,
+        "gzip": 15894,
+        "brotli": 14356,
+        "sha256": "325d1412e91f483fa8b686c922b83212af6731cde5f2df2b43be92e8cd81e065"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "native-server",
+      "baseline": {
+        "raw": 50131,
+        "gzip": 15801,
+        "brotli": 14282,
+        "sha256": "643fd75915d887b3408ed7e65bd376b20c86329a5de87e8a08dddef88a143756"
+      },
+      "candidate": {
+        "raw": 50131,
+        "gzip": 15801,
+        "brotli": 14282,
+        "sha256": "643fd75915d887b3408ed7e65bd376b20c86329a5de87e8a08dddef88a143756"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "compiled-plain-signals",
+      "baseline": {
+        "raw": 70005,
+        "gzip": 20599,
+        "brotli": 18584,
+        "sha256": "2b2b74757bdd78e809320fdf146e8c325513e5cf58ab4dba67f3aa1eebefc14e"
+      },
+      "candidate": {
+        "raw": 70005,
+        "gzip": 20599,
+        "brotli": 18584,
+        "sha256": "2b2b74757bdd78e809320fdf146e8c325513e5cf58ab4dba67f3aa1eebefc14e"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "streamed-signals-bootstrap",
+      "baseline": {
+        "raw": 75913,
+        "gzip": 23519,
+        "brotli": 21071,
+        "sha256": "6ef5ebb8d92dd6a5c370f3bbc4bfc21178adc13918cac3d491a540d2ca88536f"
+      },
+      "candidate": {
+        "raw": 75913,
+        "gzip": 23519,
+        "brotli": 21071,
+        "sha256": "6ef5ebb8d92dd6a5c370f3bbc4bfc21178adc13918cac3d491a540d2ca88536f"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "streamed-signal-results-bootstrap",
+      "baseline": {
+        "raw": 69894,
+        "gzip": 21531,
+        "brotli": 19332,
+        "sha256": "f251b2cf7bc0202e32a90be70fafb141391dd4b06bf3e26a89a74bfb9c11fb15"
+      },
+      "candidate": {
+        "raw": 69894,
+        "gzip": 21531,
+        "brotli": 19332,
+        "sha256": "f251b2cf7bc0202e32a90be70fafb141391dd4b06bf3e26a89a74bfb9c11fb15"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "used-native-app",
+      "baseline": {
+        "raw": 248643,
+        "gzip": 78987,
+        "brotli": 68601,
+        "sha256": "43bc2c47c583141c6333af670bef3ba87c9ba04f3168a483daff1fd94d9d6afe"
+      },
+      "candidate": {
+        "raw": 248643,
+        "gzip": 78987,
+        "brotli": 68601,
+        "sha256": "43bc2c47c583141c6333af670bef3ba87c9ba04f3168a483daff1fd94d9d6afe"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": null,
+      "exportLoadSmoke": null
+    },
+    {
+      "id": "used-native-ssr",
+      "baseline": {
+        "raw": 102262,
+        "gzip": 33472,
+        "brotli": 30182,
+        "sha256": "56b9b02e01af69b5b75e514914258c451b45a29efc1e13a5195d7c18bf8477dd"
+      },
+      "candidate": {
+        "raw": 102262,
+        "gzip": 33472,
+        "brotli": 30182,
+        "sha256": "56b9b02e01af69b5b75e514914258c451b45a29efc1e13a5195d7c18bf8477dd"
+      },
+      "gzipDelta": 0,
+      "semantic": null,
+      "boundaries": null,
+      "exportLoadSmoke": null
+    }
+  ],
+  "selection": {
+    "sourceRoot": "/private/tmp/octane-private-context-review-source-20260919",
+    "node": "v24.19.0",
+    "rows": [
+      {
+        "options": {
+          "dev": false,
+          "autoMemo": false
+        },
+        "privateFactory": true,
+        "sourceSha256": "625d98febda6f86bf8b53029e05320f6cb0b2cec95e3c8696af2411525286a00",
+        "compiledSha256": "a4f5459135f1b30df765125e9626cb96940f39c9cb4a49017a5823a8ed5f9615"
+      },
+      {
+        "options": {
+          "dev": false,
+          "autoMemo": true
+        },
+        "privateFactory": true,
+        "sourceSha256": "625d98febda6f86bf8b53029e05320f6cb0b2cec95e3c8696af2411525286a00",
+        "compiledSha256": "10f7a362cf3c20c52f93a6c837bd7f0fc50b1dee9d4300345de055827b3fa313"
+      },
+      {
+        "options": {
+          "dev": true,
+          "autoMemo": false
+        },
+        "privateFactory": false,
+        "sourceSha256": "625d98febda6f86bf8b53029e05320f6cb0b2cec95e3c8696af2411525286a00",
+        "compiledSha256": "e3e90714070ae845cc402ca3743b303ef2ebfa3d695c1b8f3c739cb8fdb46302"
+      },
+      {
+        "options": {
+          "dev": true,
+          "autoMemo": true
+        },
+        "privateFactory": false,
+        "sourceSha256": "625d98febda6f86bf8b53029e05320f6cb0b2cec95e3c8696af2411525286a00",
+        "compiledSha256": "e3e90714070ae845cc402ca3743b303ef2ebfa3d695c1b8f3c739cb8fdb46302"
+      },
+      {
+        "options": {
+          "dev": false,
+          "strong": true
+        },
+        "privateFactory": true,
+        "sourceSha256": "625d98febda6f86bf8b53029e05320f6cb0b2cec95e3c8696af2411525286a00",
+        "compiledSha256": "10f7a362cf3c20c52f93a6c837bd7f0fc50b1dee9d4300345de055827b3fa313"
+      },
+      {
+        "options": {
+          "dev": false,
+          "mode": "server"
+        },
+        "privateFactory": false,
+        "sourceSha256": "625d98febda6f86bf8b53029e05320f6cb0b2cec95e3c8696af2411525286a00",
+        "compiledSha256": "cb9b4670012a43470aa49985679438eba3096d2b3b8b70a15da1a95b8b3ca05d"
+      }
+    ]
+  },
+  "nativeProof": {
+    "runnerSha256": "a6635d210f0d35392018287d9981f04a06c46da26cbcdf4207b983c61fa51aa3",
+    "browserVersion": "149.0.7827.55",
+    "frozenAst": true,
+    "assertLoc": true,
+    "sourceDrift": "passed",
+    "rows": [
+      {
+        "label": "baseline",
+        "id": "private-compiled",
+        "authoredSha256": "bf65c52d122bf1bc9725719d0c5c469d2d2a80a6a93f693c120dc8606bce60ca",
+        "compiledSha256": "d19cdd3d01dd3f9d39ef7992e52ef6fed0b24cca3393db6fd83d1a7d6306c7ec",
+        "clientBundleSha256": "c3e6d0e837fbbc6078f0f670b3aaa030c0b95af333c1bfcd39f12d3ecf15a161",
+        "serverBundleSha256": "4b02dd8a10075e02bcdae2fdf32e9d1a4828c5c1afa4a044a50a60fcc1b6a694",
+        "ssrHtmlSha256": "198310a415b5dc52b7215709affcdf4866670ff2cc3122bae6d922aca55c1f2b",
+        "privateCompiledFactory": false,
+        "result": {
+          "adopted": {
+            "same": true,
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8],
+            "text": "server:0",
+            "title": "server:0"
+          },
+          "updated": {
+            "same": true,
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8],
+            "text": "server:1",
+            "title": "server:1",
+            "trusted": [true]
+          },
+          "rendered": {
+            "same": true,
+            "text": "updated:1",
+            "title": "updated:1",
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8]
+          },
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "semanticPass": true,
+        "diagnostics": []
+      },
+      {
+        "label": "baseline",
+        "id": "generic-escaped",
+        "authoredSha256": "1386d7691a67991373f98c7915cbff335cf0b6e08a1e75e84b09241f6566114c",
+        "compiledSha256": "390cd1ddab93564b7cc8cf75c5fa542b3da0f5b3238fc9ec6ff1b558d8b49db9",
+        "clientBundleSha256": "3df46cbd45acf6aee603474864c078b9457ec4118fe1ce0679aabd6d7cecd606",
+        "serverBundleSha256": "5dc6b80b68d9ccf43580d166958582f1ce11c916055dd42748a0820938c45776",
+        "ssrHtmlSha256": "198310a415b5dc52b7215709affcdf4866670ff2cc3122bae6d922aca55c1f2b",
+        "privateCompiledFactory": false,
+        "result": {
+          "adopted": {
+            "same": true,
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8],
+            "text": "server:0",
+            "title": "server:0"
+          },
+          "updated": {
+            "same": true,
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8],
+            "text": "server:1",
+            "title": "server:1",
+            "trusted": [true]
+          },
+          "rendered": {
+            "same": true,
+            "text": "updated:1",
+            "title": "updated:1",
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8]
+          },
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "semanticPass": true,
+        "diagnostics": []
+      },
+      {
+        "label": "baseline",
+        "id": "generic-opaque",
+        "authoredSha256": "5a16b23a16f6f6e5a33370b88197ccd7c69349e8d0f0eab267f4c3d51e8dedf6",
+        "compiledSha256": "e110b30ca51448b984c4e798770230add0e5353f739291d043297fe44acf855c",
+        "clientBundleSha256": "b2662455733a90642cbe146ef8cb42030f7d85f306328af7d0a1a41a0acd168e",
+        "serverBundleSha256": "5c50d5ac96b08f98c94be621d77310a0a2af41e19b45467d4f81911d721f570b",
+        "ssrHtmlSha256": "198310a415b5dc52b7215709affcdf4866670ff2cc3122bae6d922aca55c1f2b",
+        "privateCompiledFactory": false,
+        "result": {
+          "adopted": {
+            "same": true,
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8],
+            "text": "server:0",
+            "title": "server:0"
+          },
+          "updated": {
+            "same": true,
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8],
+            "text": "server:1",
+            "title": "server:1",
+            "trusted": [true]
+          },
+          "rendered": {
+            "same": true,
+            "text": "updated:1",
+            "title": "updated:1",
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8]
+          },
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "semanticPass": true,
+        "diagnostics": []
+      },
+      {
+        "label": "candidate",
+        "id": "private-compiled",
+        "authoredSha256": "bf65c52d122bf1bc9725719d0c5c469d2d2a80a6a93f693c120dc8606bce60ca",
+        "compiledSha256": "6c08b9b6d4a02f6a2fc81dd2df6571607e5d35eabf01b659592c498d8e784ebc",
+        "clientBundleSha256": "ab9184b0db04eae95cc67dc8e36ec37435437cee06a8a707c487568c82fd3f37",
+        "serverBundleSha256": "81a70a7638a66bbf1c3bd88824be441be94e4d040b313bbd22b9b38f28cd8f5d",
+        "ssrHtmlSha256": "198310a415b5dc52b7215709affcdf4866670ff2cc3122bae6d922aca55c1f2b",
+        "privateCompiledFactory": true,
+        "result": {
+          "adopted": {
+            "same": true,
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8],
+            "text": "server:0",
+            "title": "server:0"
+          },
+          "updated": {
+            "same": true,
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8],
+            "text": "server:1",
+            "title": "server:1",
+            "trusted": [true]
+          },
+          "rendered": {
+            "same": true,
+            "text": "updated:1",
+            "title": "updated:1",
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8]
+          },
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "semanticPass": true,
+        "diagnostics": []
+      },
+      {
+        "label": "candidate",
+        "id": "generic-escaped",
+        "authoredSha256": "1386d7691a67991373f98c7915cbff335cf0b6e08a1e75e84b09241f6566114c",
+        "compiledSha256": "390cd1ddab93564b7cc8cf75c5fa542b3da0f5b3238fc9ec6ff1b558d8b49db9",
+        "clientBundleSha256": "ae52aac7fc7c583b5d120260dd0cda14ca1594df77dfda938cc5bc3058fc1f2d",
+        "serverBundleSha256": "88ffce11c22255f06c28d3bade9080912da1f1c9dcd8fdcbfc0dd56bd000f379",
+        "ssrHtmlSha256": "198310a415b5dc52b7215709affcdf4866670ff2cc3122bae6d922aca55c1f2b",
+        "privateCompiledFactory": false,
+        "result": {
+          "adopted": {
+            "same": true,
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8],
+            "text": "server:0",
+            "title": "server:0"
+          },
+          "updated": {
+            "same": true,
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8],
+            "text": "server:1",
+            "title": "server:1",
+            "trusted": [true]
+          },
+          "rendered": {
+            "same": true,
+            "text": "updated:1",
+            "title": "updated:1",
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8]
+          },
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "semanticPass": true,
+        "diagnostics": []
+      },
+      {
+        "label": "candidate",
+        "id": "generic-opaque",
+        "authoredSha256": "5a16b23a16f6f6e5a33370b88197ccd7c69349e8d0f0eab267f4c3d51e8dedf6",
+        "compiledSha256": "e110b30ca51448b984c4e798770230add0e5353f739291d043297fe44acf855c",
+        "clientBundleSha256": "7e9c2dce3729df2695b76d78c8165d5920348694e201b06e9c509f38a01ed503",
+        "serverBundleSha256": "741035c7e49e6bd4517228144258a704ec11f5fb768599b6fdbd9480c10d6f78",
+        "ssrHtmlSha256": "198310a415b5dc52b7215709affcdf4866670ff2cc3122bae6d922aca55c1f2b",
+        "privateCompiledFactory": false,
+        "result": {
+          "adopted": {
+            "same": true,
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8],
+            "text": "server:0",
+            "title": "server:0"
+          },
+          "updated": {
+            "same": true,
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8],
+            "text": "server:1",
+            "title": "server:1",
+            "trusted": [true]
+          },
+          "rendered": {
+            "same": true,
+            "text": "updated:1",
+            "title": "updated:1",
+            "value": "typed before hydration",
+            "focus": true,
+            "selection": [2, 8]
+          },
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "semanticPass": true,
+        "diagnostics": []
+      }
+    ]
+  },
+  "limitations": [
+    "Private immutable canonical octane contexts only; opaque/exported/aliased/reflected contexts retain generic returned rendering.",
+    "Production DOM client only; server/dev/HMR/profile/custom-renderer/universal remain generic.",
+    "No CPU/SSR throughput/heap/layout/paint/full-regression-recovery claim; browser identity and cleanup are semantic controls.",
+    "Historical archived context fixture used removed Context.Provider API; these rows use unchanged committed481819 direct-context inputs."
+  ]
+}
