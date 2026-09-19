@@ -38,9 +38,10 @@ filename; source drift during a run fails instead of publishing mixed evidence.
 
 ## Signal-valued DOM styles
 
-`run-dom-bindings.mjs` compiles and bundles two production components through the
-public entries. Both update two CSS properties and preserve a child node. One
-passes signal handles directly; the control samples them with `.get()` in setup.
+`run-dom-bindings.mjs` compiles and bundles three production components through the
+public entries. All update two CSS properties and preserve a child node. One
+passes signal handles directly; another samples them with `.get()` in setup.
+The plain-props lane uses numeric expressions in the same signal-capable module.
 Every sample checks the resulting CSS, host and child identity, and teardown.
 
 ```bash
@@ -49,9 +50,14 @@ BENCH_JSON=/private/tmp/signal-dom-bindings.json node benchmarks/scoped-signals/
 node benchmarks/scoped-signals/run-dom-bindings.mjs --quick --fault-component-read
 ```
 
-The ratio guard requires zero component-setup calls for direct signal updates;
+The ratio guards require zero component-setup calls for direct signal updates;
 the sampled control must execute setup for every update. The fault command
-deliberately adds component reads and must fail that guard. JSON records source,
+deliberately adds component reads and must fail. Plain fixed-property styles must
+allocate no native presentation blocks or run native style update bodies. A
+separate observed production bundle counts those sites after compilation; the
+direct-handle lane must exercise both observers. Its CSS and text must match the
+clean bundle, and both retain host/child identity and detach on unmount. Observed
+bundles do not contribute to bytes or timing. JSON records source,
 compiler-output, bundle and input hashes. Synchronous happy-dom timings are
 supplemental: they exclude browser layout/paint and have no hard speed threshold.
 

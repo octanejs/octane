@@ -533,7 +533,7 @@ function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
 	}
 }
 
-function canCarryDirectSignalHandle(node) {
+function canCarryDirectSignalHandle(node, conservativeResult = false) {
 	if (
 		!node ||
 		node.metadata?.octane_string_child ||
@@ -549,20 +549,25 @@ function canCarryDirectSignalHandle(node) {
 		node.type === 'ParenthesizedExpression' ||
 		node.type === 'ChainExpression'
 	) {
-		return canCarryDirectSignalHandle(node.expression);
+		return canCarryDirectSignalHandle(node.expression, conservativeResult);
 	}
 	if (node.type === 'ConditionalExpression') {
 		return (
-			canCarryDirectSignalHandle(node.consequent) || canCarryDirectSignalHandle(node.alternate)
+			canCarryDirectSignalHandle(node.consequent, conservativeResult) ||
+			canCarryDirectSignalHandle(node.alternate, conservativeResult)
 		);
 	}
 	if (node.type === 'LogicalExpression') {
-		return canCarryDirectSignalHandle(node.left) || canCarryDirectSignalHandle(node.right);
+		return (
+			canCarryDirectSignalHandle(node.left, conservativeResult) ||
+			canCarryDirectSignalHandle(node.right, conservativeResult)
+		);
 	}
 	if (node.type === 'SequenceExpression') {
-		return canCarryDirectSignalHandle(node.expressions.at(-1));
+		return canCarryDirectSignalHandle(node.expressions.at(-1), conservativeResult);
 	}
 	if (
+		!conservativeResult &&
 		(node.type === 'CallExpression' || node.type === 'OptionalCallExpression') &&
 		(node.callee?.type === 'MemberExpression' ||
 			node.callee?.type === 'OptionalMemberExpression') &&
@@ -571,6 +576,20 @@ function canCarryDirectSignalHandle(node) {
 			: node.callee.property?.name === 'get')
 	) {
 		return false;
+	}
+	if (conservativeResult) {
+		// Style values must be genuinely scalar: structured values can inherit
+		// the native value protocol, and even an opaque .get() can return a handle.
+		return (
+			(node.type === 'Literal' && node.regex !== undefined) ||
+			![
+				'Literal',
+				'TemplateLiteral',
+				'UnaryExpression',
+				'BinaryExpression',
+				'UpdateExpression',
+			].includes(node.type)
+		);
 	}
 	return ![
 		'Literal',
@@ -651,8 +670,8 @@ function ssrSignalValue(node, ctx, origin, capability = false) {
 }
 
 function ssrSignalStyleObject(node, ctx, origin) {
-	// Non-native compilation only: preserve targeted binding reads without
-	// opting an otherwise ordinary module into a native renderer read frame.
+	// Preserve targeted binding reads when the style has no implicit native
+	// reads, without adding a separate native style snapshot.
 	if (node?.type !== 'ObjectExpression') return node;
 	let changed = false;
 	const properties = (node.properties ?? []).map((property) => {
@@ -2356,6 +2375,23 @@ function objectExprIsStaticLiteral(obj) {
 			return false;
 	}
 	return true;
+}
+
+function styleObjectNeedsNativeBinding(node) {
+	if (node?.type !== 'ObjectExpression') return true;
+	return (node.properties ?? []).some((property) => {
+		if (
+			(property.type !== 'Property' && property.type !== 'ObjectProperty') ||
+			property.computed ||
+			property.method ||
+			(property.kind !== undefined && property.kind !== 'init') ||
+			(property.key?.name ?? property.key?.value) === '__proto__'
+		)
+			return true;
+		// Structured or opaque values may implement the native value protocol.
+		// Only primitive operations or existing value proofs rule that out.
+		return canCarryDirectSignalHandle(property.value, true);
+	});
 }
 
 // DEV must send invalid literal declarations through the same style helpers as
@@ -13199,7 +13235,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			ctx.runtimeNeeded.add('ssrStyle');
 			registerAttrLoweringOrigin(ctx, attr.name, 'ssrStyle', null);
 			inner = tsrxExprNode(inner, ctx, name, inlinedSubs);
-			if (ctx.nativeReads)
+			if (ctx.nativeReads && styleObjectNeedsNativeBinding(inner))
 				inner = b.call(requireRuntimeForContext(ctx, 'readNativeDomStyle'), inner);
 			else inner = ssrSignalStyleObject(inner, ctx, attr);
 			parts.push(ssrCall('ssrStyle', [bindAttributeEvaluation(inner)], attr));
@@ -28394,10 +28430,10 @@ function emitElementHtml(
 				appendBakedAttribute(attrTemplate, chunk, attrName, attr.name, inner, ctx.inspect);
 				continue;
 			}
-			if (
-				ctx.nativeReads &&
-				(inner.type !== 'ObjectExpression' || !objectExprIsStaticLiteral(inner))
-			) {
+			// Scalar value evaluation stays inside the enclosing native read frame.
+			// Only implicit handle/accessor reads need a separate style owner; plain
+			// fixed declarations can retain their baked prefix and ordinary writers.
+			if (ctx.nativeReads && styleObjectNeedsNativeBinding(inner)) {
 				bindings.push({
 					id: bindings.length,
 					kind: 'nativeStyle',
