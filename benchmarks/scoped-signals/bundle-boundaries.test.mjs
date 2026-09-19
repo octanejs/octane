@@ -130,6 +130,91 @@ const alien = (version = '3.2.0') => ({
 	package: { name: 'alien-signals', version },
 });
 
+test('ordinary server lists defer key serialization until a real handle is read', async (t) => {
+	const directory = path.resolve('packages/octane');
+	const app = `function Row(props) @{
+ const value = props.produce(props.item.label);
+ <section><output>{value as string}</output><input value={value}/></section>
+}
+function List(props) @{
+ <main>@for (const item of props.items; key item.key) { <Row item={item} produce={props.produce}/> }</main>
+}
+export function render(items, produce) { return renderToString(List, {items, produce}); }
+import {renderToString} from 'octane/server';`;
+	const contents = compile(app, path.join(directory, 'KeyedServerOutput.tsrx'), {
+		mode: 'server',
+		dev: false,
+		hmr: false,
+	}).code;
+	const bundle = await build({
+		stdin: {
+			contents: contents + '\nexport {__signalAt} from "octane/signals";',
+			resolveDir: directory,
+		},
+		bundle: true,
+		write: false,
+		minify: true,
+		format: 'esm',
+		platform: 'node',
+		target: 'es2022',
+		legalComments: 'none',
+		tsconfigRaw: { compilerOptions: {} },
+		define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+	});
+	const api = await import(
+		'data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64')
+	);
+	let coercions = 0;
+	const items = Array.from({ length: 100 }, (_, index) => ({
+		label: 'Row ' + index,
+		key: {
+			[Symbol.toPrimitive]() {
+				coercions++;
+				return 'key ' + index;
+			},
+		},
+	}));
+	const window = new Window();
+	t.after(() => window.close());
+	const fragment = window.document.createElement('template');
+	for (const rows of [items, items.toReversed()]) {
+		const scalar = api.render(rows, (label) => label);
+		fragment.innerHTML = scalar.html;
+		assert.deepEqual(
+			[...fragment.content.querySelectorAll('output')].map((node) => node.textContent),
+			rows.map((item) => item.label),
+		);
+		assert.deepEqual(
+			[...fragment.content.querySelectorAll('input')].map((node) => node.value),
+			rows.map((item) => item.label),
+		);
+		assert.equal(scalar.signals, undefined);
+	}
+	assert.equal(coercions, 0, 'Ordinary rows must not serialize optional signal list identities.');
+	let previousIdentities;
+	for (const rows of [items, items.toReversed()]) {
+		const used = api.render(rows, (label) => api.__signalAt('i:keyed-server-output', label));
+		fragment.innerHTML = used.html;
+		const controls = [...fragment.content.querySelectorAll('input')];
+		assert.deepEqual(
+			controls.map((node) => node.value),
+			rows.map((item) => item.label),
+		);
+		const identities = controls.map((node) => node.getAttribute('data-octane-signal-control'));
+		assert.ok(identities.every((identity) => identity !== null));
+		assert.equal(new Set(identities).size, items.length);
+		const byLabel = Object.fromEntries(
+			controls.map((node, index) => [node.value, identities[index]]),
+		);
+		if (previousIdentities) assert.deepEqual(byLabel, previousIdentities);
+		previousIdentities = byLabel;
+	}
+	assert.ok(coercions > 0, 'The actual-handle control must exercise identity serialization.');
+	t.diagnostic(
+		JSON.stringify({ scalarRows: 200, scalarKeyCoercions: 0, usedKeyCoercions: coercions }),
+	);
+});
+
 test('entry fixtures retain precisely the named public functions', () => {
 	assert.equal(entrySource(scenario('ordinary-client')), 'export { createRoot } from "octane";\n');
 	assert.equal(

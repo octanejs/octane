@@ -1,5 +1,23 @@
 # Scoped signal graph experiment
 
+## Optional server list identity work
+
+The server-list case in `bundle-boundaries.test.mjs` compiles an opaque text and
+control consumer through the production SSR compiler. Across two orders of a
+100-row object-keyed list, ordinary scalar output must serialize no optional
+signal keys. Its actual-handle control must preserve distinct serialized control
+identities across both orders and exercise key serialization. Both lanes check
+the resulting text and input values.
+
+```bash
+node --test --test-name-pattern='ordinary server lists defer' benchmarks/scoped-signals/bundle-boundaries.test.mjs
+```
+
+This is a deterministic work guard, not a timing or heap claim. Potential list
+arms still allocate a persistent raw-key recipe; actual handles resolve and cache
+the original wire keys. The owning hydration regression also checks nested
+directive and mapped lists, adopted native controls, native edits and cleanup.
+
 ## Compiled native presentation channels
 
 `run-native-presentation.mjs` compiles the authored `native-presentation/View.tsrx`
