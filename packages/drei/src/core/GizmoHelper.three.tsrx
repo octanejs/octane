@@ -107,9 +107,9 @@ export function GizmoHelper({
 	const x = alignment.endsWith('-center') ? 0 : alignment.endsWith('-left') ? -size.width / 2 + marginX : size.width / 2 - marginX;
 	const y = alignment.startsWith('center-') ? 0 : alignment.startsWith('top-') ? size.height / 2 - marginY : -size.height / 2 + marginY;
 	<Hud renderPriority={renderPriority}>
-		<GizmoContext.Provider value={context}>
+		<GizmoContext value={context}>
 			<OrthographicCamera makeDefault ref={virtualCamera} position={[0, 0, 200]} />
 			<group ref={gizmo} position={[x, y, 0]}>{children}</group>
-		</GizmoContext.Provider>
+		</GizmoContext>
 	</Hud>
 }

@@ -46,7 +46,7 @@ export function Group(props: GroupProps) @{
 			<div ref={headingRef} cmdk-group-heading="" aria-hidden={true} id={headingId}>{heading}</div>
 		}
 		<div cmdk-group-items="" role="group" aria-labelledby={heading ? headingId : undefined}>
-			<GroupContext.Provider value={contextValue}>{children}</GroupContext.Provider>
+			<GroupContext value={contextValue}>{children}</GroupContext>
 		</div>
 	</div>
 }

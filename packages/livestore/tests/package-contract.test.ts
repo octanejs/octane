@@ -40,7 +40,7 @@ describe('published package contract', () => {
 			'@opentelemetry/api',
 		]);
 		expect(manifest.peerDependencies).toEqual({
-			octane: 'workspace:^0.1.51 || ^0.2.0',
+			octane: 'workspace:^0.1.51 || ^0.2.0 || ^0.3.0',
 		});
 		expect(manifest.dependencies).not.toHaveProperty('react');
 		expect(manifest.devDependencies.react).toBe('catalog:livestore-react-oracle');

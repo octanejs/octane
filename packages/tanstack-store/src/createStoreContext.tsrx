@@ -48,7 +48,7 @@ export function createStoreContext<TValue extends object>(): {
 	(Context as typeof Context & { displayName?: string }).displayName = 'StoreContext';
 
 	function StoreProvider({ children, value }: { value: TValue; children?: any }) {
-		return <Context.Provider value={value}>{children}</Context.Provider>;
+		return <Context value={value}>{children}</Context>;
 	}
 
 	function useStoreContext() {

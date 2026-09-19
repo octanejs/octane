@@ -98,7 +98,7 @@ export function ToggleButtonGroup(props: ToggleButtonGroupProps): any {
 		slot: props.slot || undefined,
 		'data-orientation': props.orientation || 'horizontal',
 		'data-disabled': props.isDisabled || undefined,
-		children: createElement(ToggleGroupStateContext.Provider, {
+		children: createElement(ToggleGroupStateContext, {
 			value: state,
 			children: createElement(SharedElementTransition, { children: renderProps.children }),
 		}),

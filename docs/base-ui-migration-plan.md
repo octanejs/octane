@@ -664,7 +664,7 @@ work around it in the binding.**
 > net-new `src/utils/useBaseUiId.ts` = octane `useId` + `base-ui-` prefix; a layout effect
 > feeds `legendId` back to the Root as `aria-labelledby`). Base UI uses a PLAIN React
 > context (not the scoped factory) → ported as a plain `createContext` + `Provider`
-> (`createElement(Ctx.Provider, …)`) + throwing consumer.
+> (`createElement(Ctx, …)`) + throwing consumer.
 >
 > **octane bug #1 — fixed in octane (compiler), not worked around.** A component root that
 > PRECEDES a static host root in a multi-root fragment body rendered in REVERSED order.

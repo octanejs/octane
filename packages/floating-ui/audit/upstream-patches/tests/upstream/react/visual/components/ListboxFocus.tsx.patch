@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/react/visual/components/ListboxFocus.tsx b/tests/upstream/react/visual/components/ListboxFocus.tsx
+--- a/tests/upstream/react/visual/components/ListboxFocus.tsx
++++ b/tests/upstream/react/visual/components/ListboxFocus.tsx
+@@ -72,7 +72,7 @@ function Listbox({children}: {children: React.ReactNode}) {
+ 
+   return (
+     <>
+-      <SelectContext.Provider value={selectContext}>
++      <SelectContext value={selectContext}>
+         <button onClick={() => setSelectedIndex(1)} data-testid="reference">
+           Select
+         </button>
+@@ -81,7 +81,7 @@ function Listbox({children}: {children: React.ReactNode}) {
+             {children}
+           </FloatingList>
+         </div>
+-      </SelectContext.Provider>
++      </SelectContext>
+     </>
+   );
+ }

@@ -33,7 +33,7 @@ function toCellArray(map: Map<object, CellProps>): RegisteredCell[] | undefined 
 
 /**
  * Owns the collected cells state. Returns `[cells, registry]`; provide the
- * registry via `<CellsContext.Provider value={registry}>` around the item's
+ * registry via `<CellsContext value={registry}>` around the item's
  * children, and pass `cells` wherever upstream passed findAllByType's result.
  * `cells` is `undefined` until the first Cell registers — matching upstream,
  * where a childless item passes an empty find result whose `cells[index]`

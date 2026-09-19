@@ -29,9 +29,9 @@ export const ComboboxPortal = function ComboboxPortal(
 	}
 
 	return (
-		<ComboboxPortalContext.Provider value={keepMounted}>
+		<ComboboxPortalContext value={keepMounted}>
 			<FloatingPortal ref={forwardedRef} {...portalProps} />
-		</ComboboxPortalContext.Provider>
+		</ComboboxPortalContext>
 	);
 };
 

@@ -79,7 +79,7 @@ export function KeyboardControls({ map, children, onChange, domElement }: Keyboa
 			source.removeEventListener('keyup', upHandler as EventListener);
 		};
 	}, [domElement, key]);
-	<KeyboardContext.Provider value={api}>{children}</KeyboardContext.Provider>
+	<KeyboardContext value={api}>{children}</KeyboardContext>
 }
 
 type Selector<T extends string = string> = (state: KeyboardControlsState<T>) => boolean;

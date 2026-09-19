@@ -166,7 +166,7 @@ export function verifyTransitionBoundary(scenario, inputs) {
 		return;
 	if (scenario.id === 'ordinary-client') {
 		for (const input of inputs.filter((input) =>
-			/\/src\/signals\/transition-(?:candidate|action)\.[jt]s$/.test(
+			/\/src\/signals\/transition-(?:candidate|action|coordinator)\.[jt]s$/.test(
 				input.path.replaceAll('\\', '/'),
 			),
 		)) {

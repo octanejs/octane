@@ -312,7 +312,7 @@
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/FloatingFocusManager.test.tsx.patch",
           "role": "support",
-          "sha256": "a1a4a0c36ed40159ac4f6d1f24383bcb5c65b836d07542bc9b13f69a93a3fcd9"
+          "sha256": "e07c042816362682f9eeb0ad6d45a4e222c6280ac60968fe2ef813cc12a11201"
         },
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/NextFloatingDelayGroup.test.tsx.patch",
@@ -342,17 +342,17 @@
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/Menu.tsx.patch",
           "role": "support",
-          "sha256": "3c2fcd5dee7f2c38fb9c523f93caacf191d7f6211aee76cb17213e6a207a1c16"
+          "sha256": "32807451729ae47fdb29bcdaba24f4e5556b6e95cd4ecc34cbeeeb5c30e7e195"
         },
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/MenuOrientation.tsx.patch",
           "role": "support",
-          "sha256": "e80b6a437e6871a37dcff02523418b93acfbcbc49e6058f0d1194372a97a3eaf"
+          "sha256": "e40b69a102f73d21556cabae12b5334fd1162029f7fe78a47b7c0f800a2d499f"
         },
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/MenuVirtual.tsx.patch",
           "role": "support",
-          "sha256": "54d6e10052c83c732c0279436c96a4ef17543b2aff55066edb310af880792ad2"
+          "sha256": "bfb5272927a744b34c1fc2d1eaa7bf9e633462ddcf5c2d19c0c73ebd7ae8275c"
         },
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/Navigation.tsx.patch",

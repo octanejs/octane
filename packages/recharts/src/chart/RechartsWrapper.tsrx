@@ -299,8 +299,8 @@ export function RechartsWrapper(props: RechartsWrapperProps) {
 		dispatch(externalEventAction({ handler: onTouchEnd, reactEvent: e }));
 	}, [dispatch, onTouchEnd]);
 	const WrapperDiv = responsive ? ResponsiveDiv : NonResponsiveDiv;
-	return <TooltipPortalContext.Provider value={tooltipPortal}>
-		<LegendPortalContext.Provider value={legendPortal}>
+	return <TooltipPortalContext value={tooltipPortal}>
+		<LegendPortalContext value={legendPortal}>
 			<WrapperDiv
 				width={width ?? style?.width}
 				height={height ?? style?.height}
@@ -325,6 +325,6 @@ export function RechartsWrapper(props: RechartsWrapperProps) {
 				<EventSynchronizer />
 				{children}
 			</WrapperDiv>
-		</LegendPortalContext.Provider>
-	</TooltipPortalContext.Provider>;
+		</LegendPortalContext>
+	</TooltipPortalContext>;
 }

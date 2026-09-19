@@ -248,7 +248,7 @@ export const RadioRoot = function RadioRoot<Value>(
 	});
 
 	return (
-		<RadioRootContext.Provider value={contextValue}>
+		<RadioRootContext value={contextValue}>
 			{isRadioGroup ? (
 				<CompositeItem
 					tag="span"
@@ -264,7 +264,7 @@ export const RadioRoot = function RadioRoot<Value>(
 				element
 			)}
 			<input {...inputProps} suppressHydrationWarning />
-		</RadioRootContext.Provider>
+		</RadioRootContext>
 	);
 };
 

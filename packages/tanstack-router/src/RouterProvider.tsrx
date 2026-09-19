@@ -7,7 +7,7 @@
 import { hasKeys } from '@tanstack/router-core';
 import type { AnyRouter } from '@tanstack/router-core';
 import type { OctaneNode } from 'octane';
-import { routerContext } from './context.ts';
+import { routerContext as RouterContext } from './context.ts';
 import { Matches } from './Matches.tsrx';
 import { SafeFragment } from './SafeFragment.tsrx';
 
@@ -35,7 +35,7 @@ export function RouterContextProvider(props: RouterProps & { children?: OctaneNo
 	const Wrap = router.options.Wrap ?? SafeFragment;
 
 	<Wrap>
-		<routerContext.Provider value={router}>{children}</routerContext.Provider>
+		<RouterContext value={router}>{children}</RouterContext>
 	</Wrap>
 }
 

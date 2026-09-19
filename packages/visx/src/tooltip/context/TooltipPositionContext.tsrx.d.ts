@@ -4,10 +4,7 @@ export type TooltipPositionContextType = {
     isFlippedVertically: boolean;
     isFlippedHorizontally: boolean;
 };
-export declare const TooltipPositionProvider: import("octane").ComponentBody<{
-    value: TooltipPositionContextType;
-    children?: any;
-}, any>;
+export declare const TooltipPositionProvider: import("octane").Context<TooltipPositionContextType>;
 /**
  * Octane deliberately has no render-prop `Context.Consumer` (see
  * docs/differences-from-react.md); reading `.Consumer` returns `undefined` and

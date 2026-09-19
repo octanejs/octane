@@ -11,6 +11,7 @@
     "selector-slots: useSelector -> useSelectorSlot with Symbol.for call-site slots",
     "renderable types: ReactNode/FunctionComponent -> OctaneNode in Subscribe signatures",
     "provider split: context helpers extracted to adapted-only provider/context.ts",
+    "JSX provider tags: Context.Provider -> Context only for module const values initialized by React/Octane's named createContext import; binding shadows and unrelated Provider members stay unchanged",
     "adapted-only modules: internal.ts and provider/context.ts",
     "Subscribe guard: callable compiled children blocks render directly; only render-prop functions are invoked"
   ],

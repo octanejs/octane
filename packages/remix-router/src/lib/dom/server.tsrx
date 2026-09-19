@@ -105,10 +105,10 @@ export function StaticRouterProvider(props: StaticRouterProviderProps) @{
 	const { state } = dataRouterContext.router;
 
 	<>
-		<DataRouterContext.Provider value={dataRouterContext}>
-			<DataRouterStateContext.Provider value={state}>
-				<FetchersContext.Provider value={fetchersContext}>
-					<ViewTransitionContext.Provider value={{ isTransitioning: false }}>
+		<DataRouterContext value={dataRouterContext}>
+			<DataRouterStateContext value={state}>
+				<FetchersContext value={fetchersContext}>
+					<ViewTransitionContext value={{ isTransitioning: false }}>
 						<Router
 							basename={dataRouterContext.basename}
 							location={state.location}
@@ -125,10 +125,10 @@ export function StaticRouterProvider(props: StaticRouterProviderProps) @{
 								isStatic={true}
 							/>
 						</Router>
-					</ViewTransitionContext.Provider>
-				</FetchersContext.Provider>
-			</DataRouterStateContext.Provider>
-		</DataRouterContext.Provider>
+					</ViewTransitionContext>
+				</FetchersContext>
+			</DataRouterStateContext>
+		</DataRouterContext>
 		@if (hydrateScript !== '') {
 			<script
 				suppressHydrationWarning

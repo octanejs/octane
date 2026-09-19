@@ -10,7 +10,7 @@ import {
 	useRef,
 	useState,
 } from 'octane';
-import type { OctaneNode } from 'octane';
+import type { Context as OctaneContext, OctaneNode } from 'octane';
 import type { Octane } from 'octane/jsx-runtime';
 
 export {
@@ -44,7 +44,7 @@ export type FC<P = Record<string, unknown>> = (props: P) => OctaneNode;
 export type ComponentType<P = Record<string, unknown>> = FC<P>;
 
 export type Reducer<S, A> = (state: S, action: A) => S;
-export type Context<T> = { Provider: FC<{ value: T; children?: OctaneNode }> };
+export type Context<T> = OctaneContext<T>;
 
 export type Dispatch<A> = (value: A) => void;
 export type SetStateAction<S> = S | ((previous: S) => S);

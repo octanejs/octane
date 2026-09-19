@@ -2,7 +2,7 @@
 // verbatim. Octane adaptations: "use client" dropped, lucide-react →
 // @octanejs/lucide, radix-ui Slot → @octanejs/radix; the provider/Sheet/tooltip
 // trees compose with createElement where a child must be a real element
-// descriptor (Context.Provider, Portal subtrees, `asChild` slot targets), and
+// descriptor (Context, Portal subtrees, `asChild` slot targets), and
 // CSS custom properties in `style` are cast (they sit outside CSSProperties).
 import {
 	createContext,
@@ -128,7 +128,7 @@ export function SidebarProvider(props: Props & {
 	);
 
 	return createElement(
-		SidebarContext.Provider,
+		SidebarContext,
 		{ value: contextValue },
 		createElement(
 			'div',

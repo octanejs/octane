@@ -491,7 +491,7 @@ export const NumberFieldRoot = function NumberFieldRoot(
 	});
 
 	return (
-		<NumberFieldRootContext.Provider value={contextValue}>
+		<NumberFieldRootContext value={contextValue}>
 			{element}
 			<input
 				{...validation.getValidationProps(disabled, {
@@ -534,7 +534,7 @@ export const NumberFieldRoot = function NumberFieldRoot(
 				style={name ? visuallyHiddenInput : visuallyHidden}
 				suppressHydrationWarning
 			/>
-		</NumberFieldRootContext.Provider>
+		</NumberFieldRootContext>
 	);
 };
 

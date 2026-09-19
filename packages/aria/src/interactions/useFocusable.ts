@@ -90,7 +90,7 @@ export function FocusableProvider(
 		ref: objRef,
 	};
 
-	return createElement(FocusableContext.Provider, { value: context, children });
+	return createElement(FocusableContext, { value: context, children });
 }
 
 export interface FocusableAria {
