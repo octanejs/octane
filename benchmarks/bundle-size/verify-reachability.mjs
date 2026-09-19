@@ -25,6 +25,15 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		styled: true,
 	},
 	'root-static': {
+		returnedText: 'generic',
+		text: 'Octane',
+		cleaned: true,
+	},
+	'root-static-local': {
+		text: 'Octane',
+		cleaned: true,
+	},
+	'root-descriptor': {
 		text: 'Octane',
 		cleaned: true,
 	},

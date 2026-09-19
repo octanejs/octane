@@ -29,6 +29,11 @@
     "gzip": 36480,
     "brotli": 32096
   },
+  "root-static-local": {
+    "raw": 111952,
+    "gzip": 36480,
+    "brotli": 32096
+  },
   "hooks-state": {
     "raw": 115248,
     "gzip": 37712,

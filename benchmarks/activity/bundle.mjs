@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { brotliCompressSync, constants as zlib, gzipSync } from 'node:zlib';
 import { verifyScenario } from '../bundle-size/verify-reachability.mjs';
+import { bundleScenarios } from './bundle-scenarios.mjs';
 import {
 	countStat,
 	hashOctaneSources,
@@ -45,13 +46,6 @@ const outputRoot = path.join(
 	'dist/bundle-controls',
 	options.revision ? source.revision : 'working',
 );
-const scenarios = [
-	['root-static-specialized', '../bundle-size/fixtures/minimal/root-static-specialized.ts'],
-	['root-static', '../bundle-size/fixtures/minimal/root-static.tsrx'],
-	['hooks-state', '../bundle-size/fixtures/minimal/hooks-state.tsrx'],
-	['component-owned-effects', '../bundle-size/fixtures/minimal/component-owned-effects.ts'],
-	['root-descriptor', './root-descriptor.ts', 'root-static'],
-];
 const targets = [];
 let failure;
 
@@ -95,7 +89,7 @@ async function buildEntry(entry, minify) {
 }
 
 try {
-	for (const [name, relative, oracle = name] of scenarios) {
+	for (const [name, relative, oracle = name] of bundleScenarios) {
 		const entry = path.resolve(HERE, relative);
 		const chunk = await buildEntry(entry, 'esbuild');
 		const snapshot = await verifyScenario(oracle, chunk.code);

@@ -428,6 +428,10 @@ jobs:
         if: matrix.shard == '1/4'
         run: node benchmarks/bundle-size/run-minimal.mjs behavior-root
 
+      - name: Verify signal-free application bundle budgets
+        if: matrix.shard == '1/4'
+        run: node benchmarks/bundle-size/run-minimal.mjs --budgets root-static-local hooks-state context
+
       - name: Run tests
         # WEBSITE_DOCS_SPEC is excluded through the environment, not `--exclude`:
         # it lives in the `website-unit` project, and a project that declares its
