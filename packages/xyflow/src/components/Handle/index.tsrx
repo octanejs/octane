@@ -17,10 +17,10 @@ import {
 	type Connection,
 	type HandleType,
 	ConnectionMode,
-	OnConnect,
-	ConnectionState,
-	FinalConnectionState,
-	Optional,
+	type OnConnect,
+	type ConnectionState,
+	type FinalConnectionState,
+	type Optional,
 } from '@xyflow/system';
 
 import { useStore, useStoreApi } from '../../hooks/useStore';

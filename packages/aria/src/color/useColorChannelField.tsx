@@ -12,12 +12,12 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaLabelingProps, RefObject } from '@react-types/shared';
-import {
+import type { AriaLabelingProps, RefObject } from '@react-types/shared';
+import type {
 	ColorChannelFieldProps,
 	ColorChannelFieldState,
 } from '../upstream-exports/react-stately/useColorFieldState';
-import { NumberFieldAria, useNumberField } from '../numberfield/useNumberField';
+import { type NumberFieldAria, useNumberField } from '../numberfield/useNumberField';
 import { useLocale } from '../i18n/I18nProvider';
 
 export interface AriaColorChannelFieldProps extends ColorChannelFieldProps, AriaLabelingProps {}

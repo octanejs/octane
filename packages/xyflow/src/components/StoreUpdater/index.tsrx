@@ -9,7 +9,7 @@ import {
 	infiniteExtent,
 	type CoordinateExtent,
 	mergeAriaLabelConfig,
-	AriaLabelConfig,
+	type AriaLabelConfig,
 } from '@xyflow/system';
 
 import { useStore, useStoreApi } from '../../hooks/useStore';

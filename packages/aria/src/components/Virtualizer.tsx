@@ -13,20 +13,26 @@
  */
 
 import {
-	CollectionBranchProps,
-	CollectionRenderer,
+	type CollectionBranchProps,
+	type CollectionRenderer,
 	CollectionRendererContext,
-	CollectionRootProps,
+	type CollectionRootProps,
 	renderAfterDropIndicators,
 } from './Collection';
-import { DropTargetDelegate, ItemDropTarget, Node } from '@react-types/shared';
+import type { DropTargetDelegate, ItemDropTarget, Node } from '@react-types/shared';
 import {
 	Layout,
 	ReusableView,
 	useVirtualizerState,
-	VirtualizerState,
+	type VirtualizerState,
 } from '../upstream-exports/react-stately/useVirtualizerState';
-import React, { createContext, JSX, ReactNode, useContext, useMemo } from '../compat/react';
+import React, {
+	createContext,
+	type JSX,
+	type ReactNode,
+	useContext,
+	useMemo,
+} from '../compat/react';
 import { useScrollView } from '../upstream-exports/react-aria/private/virtualizer/ScrollView';
 import { VirtualizerItem } from '../upstream-exports/react-aria/private/virtualizer/VirtualizerItem';
 
