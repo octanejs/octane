@@ -1,0 +1,726 @@
+{
+  "base": "481819ec22873f1c7d0c2b445987e946a18f77f2",
+  "historicalRef": "330bb0878b42dbc445659c5ea40494067c4ef296",
+  "candidateSourceManifestSha256": "fa594024cd37e5c8fd7a782052e23cc11021f73570051852ee802ae539290ca2",
+  "candidateSourceSha256": {
+    "packages/octane/src/runtime.ts": "db08f199fd8244286983c61cde35b1ed24b38f8d321840167a1dab2c22a8aa6e",
+    "packages/octane/src/index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+    "packages/octane/src/compiler/compile.js": "de8c369d9b97642745ae9338d540008c70dde18d87ac821a48d2da246bb3fa3a"
+  },
+  "node": "v24.19.0",
+  "platform": "darwin/arm64",
+  "tooling": {
+    "esbuild": {
+      "version": "0.28.1",
+      "entrySha256": "8331fe1d8b3a07381f33cc425fcfaa94776e263113653f80ec3ba433e9657e73",
+      "manifestSha256": "d55d1d19fcc5b6079e4a71dd4111340c79c682bc36835ac7058a0c364c7db58a"
+    },
+    "vite": {
+      "version": "8.1.5",
+      "entrySha256": "c7ea52906f843318d7971209ce62bd24bab60590275e8f415c5564fa35cb82dc",
+      "manifestSha256": "2f482c846a1c5b9e5883b458b3e54a171a320c2e8d9b924c7383c4baef607b09"
+    },
+    "alien-signals": {
+      "version": "3.2.0",
+      "entrySha256": "4176a9035b7898debb4601fd0ba8076e279befc470816336260847bd44720299",
+      "manifestSha256": "246a6dc2e0b031c5a274df8fdd6f84d7880aa11d8d945a3579a6214a1afe8831"
+    },
+    "devalue": {
+      "version": "5.8.2",
+      "entrySha256": "0e7da1121acb03d39b45ab700e950e6174d5f6393f7da4c95fd78b4e18680d22",
+      "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+    },
+    "@tsrx/core": {
+      "version": "0.2.0",
+      "entrySha256": "5220ae1bb76b19a8cee85ee20f784a0f13559bf1525c67e8c02328ec52a063bd",
+      "manifestSha256": "e9ff90dc24b69ef397f415911564845fd00607edd15f2e1d7839a6056477dee0"
+    },
+    "@tsrx/oxc/tsrx-core-compat": {
+      "version": "0.13.0",
+      "entrySha256": "b19aaa027ce33226f5d2ff782bd0340cbc564b963339a6115ddf3144b0ea8d09",
+      "manifestSha256": "4d918232648d8b650ad40b32a8a56cf0dcedacfbe23b6dde74615b1fe90a0cb2"
+    },
+    "esrap": {
+      "version": "2.3.2",
+      "entrySha256": "068b1a13c0860d8e5a230b59024e7da95ad25507209d388ccfe7348309811b6a",
+      "manifestSha256": "b48eec3fd9649a3f30d68d9d2c74476c56cd37dbd94c165b04bbc4d5b3686f0f"
+    },
+    "entities": {
+      "version": "7.0.1",
+      "entrySha256": "d060ec5833fe555e66ce01b4f82dbb73cb1ce695ed4a4222e68da334ac057e40",
+      "manifestSha256": "b33b5d3fd4a8e196d3245c10ebb8feb2e076fc8d392f99a1050377d6e2b8b641"
+    },
+    "es-module-lexer": {
+      "version": "1.7.0",
+      "entrySha256": "4e55aa9233ffc5f051b44808b5e2f9c747fe9b1fa91b5de19c6134ebc4837cbd",
+      "manifestSha256": "de68b22f72517f94d53290ecdbaf975f5e79ca26d8757768b07c5b466749c494"
+    }
+  },
+  "lockSha256": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+  "runners": {
+    "stockAuditSha256": "934dd4fa81f1900b84867b38c9b1511fd0f79c1a14f3db42bde77f277a5b54ea",
+    "publicClosureAuditSha256": "b829eb3f4ca01a6e9373e80b6b08579cec29dc872d1b0ed25c6ca8310631a554",
+    "nativeAuditSha256": "6dd88544f402c3e3311d32684947a60c02ce65573e56f037eea379d2b7efec58"
+  },
+  "method": {
+    "stock": "Vite production library IIFE; configFile false, hmr false, target esnext, minify esbuild; matched explicit selected-source resolver and fixture paths. createRoot-export uses esbuild ESM.",
+    "publicControls": "esbuild 0.28.1 whole emitted closures, selected authored package exports, same frozen main330 consumer sources and fresh4818 runtime/compiler versus candidate.",
+    "compression": "gzip level9; Brotli quality11; whole output only; no module gzip totals.",
+    "sourceDrift": "All runners assert read source hashes before/after. Baseline runtime SHA matches Git4818; candidate entire authored src SHA map equals frozen manifest."
+  },
+  "stockRows": [
+    {
+      "id": "root-static",
+      "bundler": "vite",
+      "fixtureSha256": "11de23976d8dd67593331ae6e18aee9a4bc65f5975c85bc0542d21de3d625f52",
+      "baseline": {
+        "raw": 73618,
+        "gzip": 24574,
+        "brotli": 21990,
+        "sha256": "cd02fa80f356aaf660eac5ad3f76cef23eb28fd02da6d817844a1bfff994e394"
+      },
+      "candidate": {
+        "raw": 73618,
+        "gzip": 24574,
+        "brotli": 21990,
+        "sha256": "cd02fa80f356aaf660eac5ad3f76cef23eb28fd02da6d817844a1bfff994e394"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "semantic": {
+        "text": "Octane",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "hooks-state",
+      "bundler": "vite",
+      "fixtureSha256": "6ea5c5984e655be2202a2ff68b916f60bff39f48038f44984e0c429afce27aff",
+      "baseline": {
+        "raw": 85594,
+        "gzip": 28579,
+        "brotli": 25503,
+        "sha256": "a78e20d0887d44ce186abca1535abaaf64df025db0aaf6ef51f01f664fd99cc7"
+      },
+      "candidate": {
+        "raw": 85594,
+        "gzip": 28579,
+        "brotli": 25503,
+        "sha256": "a78e20d0887d44ce186abca1535abaaf64df025db0aaf6ef51f01f664fd99cc7"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "semantic": {
+        "before": "0",
+        "after": "1",
+        "clicks": 1,
+        "effects": 1,
+        "cleanups": 1,
+        "cleaned": true
+      }
+    },
+    {
+      "id": "context",
+      "bundler": "vite",
+      "fixtureSha256": "2114d2581836c6dea70b1b0f586c85685dd26f76d6fbf562cfc6d268da0ee36e",
+      "baseline": {
+        "raw": 208040,
+        "gzip": 66315,
+        "brotli": 57344,
+        "sha256": "bd2be66355095b1991d5d1b39c79ded436284c70d55988ef58a5e62e46d432c8"
+      },
+      "candidate": {
+        "raw": 208040,
+        "gzip": 66315,
+        "brotli": 57344,
+        "sha256": "bd2be66355095b1991d5d1b39c79ded436284c70d55988ef58a5e62e46d432c8"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "semantic": {
+        "before": "light",
+        "after": "dark",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "hydrate-root",
+      "bundler": "vite",
+      "fixtureSha256": "c1c3389646de012ea363e9db0c99a9a7b684ff2494f0ea30e58008dab1c3637f",
+      "baseline": {
+        "raw": 143194,
+        "gzip": 46396,
+        "brotli": 40590,
+        "sha256": "714ce8a9187c2aea0a16abdb4394043f72dd6ac1af660b0411cc39801570a4f1"
+      },
+      "candidate": {
+        "raw": 143194,
+        "gzip": 46396,
+        "brotli": 40590,
+        "sha256": "714ce8a9187c2aea0a16abdb4394043f72dd6ac1af660b0411cc39801570a4f1"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "semantic": {
+        "adopted": true,
+        "before": "server",
+        "after": "client",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "suspense-transition",
+      "bundler": "vite",
+      "fixtureSha256": "e10714ae7abadbf13c532b6db72296d8eff932628cfe2b152469fb07eae439d3",
+      "baseline": {
+        "raw": 157184,
+        "gzip": 50805,
+        "brotli": 44378,
+        "sha256": "473e4ba9a5cc85a826195fb96aea2b290456896e910689b4d4d7529055b69bd1"
+      },
+      "candidate": {
+        "raw": 157184,
+        "gzip": 50805,
+        "brotli": 44378,
+        "sha256": "473e4ba9a5cc85a826195fb96aea2b290456896e910689b4d4d7529055b69bd1"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "semantic": {
+        "pending": "loading",
+        "resolved": "ready",
+        "transition": "next",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "deferred-hydration",
+      "bundler": "vite",
+      "fixtureSha256": "d989278c273166b281729a60a5863f27423cca9c72158d2527d32ccaaacee256",
+      "baseline": {
+        "raw": 289809,
+        "gzip": 91463,
+        "brotli": 78115,
+        "sha256": "10abd48382b91386b96c7969772aa4a1c581fd2a1cae4b16078596d4a8b1f4a1"
+      },
+      "candidate": {
+        "raw": 202135,
+        "gzip": 64913,
+        "brotli": 56114,
+        "sha256": "a4decd80e63d1320a91bddb8a9e5809afa18b366c4ee25164ae2717e16a7b8e8"
+      },
+      "delta": {
+        "raw": -87674,
+        "gzip": -26550,
+        "brotli": -22001
+      },
+      "semantic": {
+        "before": "dormant",
+        "after": "active",
+        "clicks": 1,
+        "cleaned": true
+      }
+    },
+    {
+      "id": "createRoot-export",
+      "bundler": "esbuild",
+      "fixtureSha256": null,
+      "baseline": {
+        "raw": 189578,
+        "gzip": 60742,
+        "brotli": 52588,
+        "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+      },
+      "candidate": {
+        "raw": 189578,
+        "gzip": 60742,
+        "brotli": 52588,
+        "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "semantic": null
+    }
+  ],
+  "sameAuthoredHistoricalDeferred": {
+    "id": "deferred-hydration",
+    "bundler": "vite",
+    "raw": 296675,
+    "gzip": 93135,
+    "brotli": 79639,
+    "sha256": "e818553bddd6260d5cd591439e441a05e79f9f997172d228a0d712e2fe43d209",
+    "semantic": {
+      "before": "dormant",
+      "after": "active",
+      "clicks": 1,
+      "cleaned": true
+    }
+  },
+  "publicClosureControls": [
+    {
+      "id": "ordinary-client",
+      "authored": "export { createRoot } from \"octane\";\n",
+      "baseline": {
+        "raw": 189578,
+        "gzip": 60742,
+        "brotli": 52588,
+        "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+      },
+      "candidate": {
+        "raw": 189578,
+        "gzip": 60742,
+        "brotli": 52588,
+        "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "ordinary-server",
+      "authored": "export { renderToString } from \"octane/server\";\n",
+      "baseline": {
+        "raw": 50366,
+        "gzip": 17728,
+        "brotli": 15990,
+        "sha256": "62940952060a7e32918f66495e0ebd908710945035092908e0c66708569e5ebc"
+      },
+      "candidate": {
+        "raw": 50366,
+        "gzip": 17728,
+        "brotli": 15990,
+        "sha256": "62940952060a7e32918f66495e0ebd908710945035092908e0c66708569e5ebc"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-scalar",
+      "authored": "export { __adoptBindings } from \"octane/dom-bindings\";\n",
+      "baseline": {
+        "raw": 13823,
+        "gzip": 5251,
+        "brotli": 4748,
+        "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+      },
+      "candidate": {
+        "raw": 13823,
+        "gzip": 5251,
+        "brotli": 4748,
+        "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-structural",
+      "authored": "export { __adoptBindingProgram, __mountBindingProgram } from \"octane/dom-binding-program\";\n",
+      "baseline": {
+        "raw": 31292,
+        "gzip": 10455,
+        "brotli": 9553,
+        "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+      },
+      "candidate": {
+        "raw": 31292,
+        "gzip": 10455,
+        "brotli": 9553,
+        "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-controls",
+      "authored": "export { __createBindingControls } from \"octane/dom-binding-controls\";\n",
+      "baseline": {
+        "raw": 9046,
+        "gzip": 3525,
+        "brotli": 3190,
+        "sha256": "bec148cacddac1583607ce39ca584e9c6aaad70687a0651b59f9f7823c37a843"
+      },
+      "candidate": {
+        "raw": 9046,
+        "gzip": 3525,
+        "brotli": 3190,
+        "sha256": "bec148cacddac1583607ce39ca584e9c6aaad70687a0651b59f9f7823c37a843"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-whole-style",
+      "authored": "export { __createBindingStyles } from \"octane/dom-binding-styles\";\n",
+      "baseline": {
+        "raw": 6199,
+        "gzip": 2630,
+        "brotli": 2360,
+        "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+      },
+      "candidate": {
+        "raw": 6199,
+        "gzip": 2630,
+        "brotli": 2360,
+        "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-scalar-controls-style",
+      "authored": "export { __adoptBindings } from \"octane/dom-bindings\";\nexport { __createBindingControls } from \"octane/dom-binding-controls\";\nexport { __createBindingStyles } from \"octane/dom-binding-styles\";\n",
+      "baseline": {
+        "raw": 27473,
+        "gzip": 9954,
+        "brotli": 9044,
+        "sha256": "80f8610c76cc1f8e22f5d9fe9be9f4f83d6bbb2d972a4de38fd0dd56b1555932"
+      },
+      "candidate": {
+        "raw": 27473,
+        "gzip": 9954,
+        "brotli": 9044,
+        "sha256": "80f8610c76cc1f8e22f5d9fe9be9f4f83d6bbb2d972a4de38fd0dd56b1555932"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "engine",
+      "authored": "export { createScope, query } from \"octane/signals\";\n",
+      "baseline": {
+        "raw": 47423,
+        "gzip": 14480,
+        "brotli": 13123,
+        "sha256": "cc3549d21079c1eda52036e6f6749532a604ec402f21f73391e37f57eef07ca6"
+      },
+      "candidate": {
+        "raw": 47423,
+        "gzip": 14480,
+        "brotli": 13123,
+        "sha256": "cc3549d21079c1eda52036e6f6749532a604ec402f21f73391e37f57eef07ca6"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "native-client",
+      "authored": "export { useSignal$ } from \"octane/signals/client\";\n",
+      "baseline": {
+        "raw": 50263,
+        "gzip": 15894,
+        "brotli": 14356,
+        "sha256": "325d1412e91f483fa8b686c922b83212af6731cde5f2df2b43be92e8cd81e065"
+      },
+      "candidate": {
+        "raw": 50263,
+        "gzip": 15894,
+        "brotli": 14356,
+        "sha256": "325d1412e91f483fa8b686c922b83212af6731cde5f2df2b43be92e8cd81e065"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "native-server",
+      "authored": "export { useSignal$ } from \"octane/signals/server\";\n",
+      "baseline": {
+        "raw": 50131,
+        "gzip": 15801,
+        "brotli": 14282,
+        "sha256": "643fd75915d887b3408ed7e65bd376b20c86329a5de87e8a08dddef88a143756"
+      },
+      "candidate": {
+        "raw": 50131,
+        "gzip": 15801,
+        "brotli": 14282,
+        "sha256": "643fd75915d887b3408ed7e65bd376b20c86329a5de87e8a08dddef88a143756"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "compiled-plain-signals",
+      "authored": "import { signal$, derived$, query$, runWithSignalOwner, retireSignalOwnerIdentity } from 'octane/signals';\nconst count$ = signal$(1);\nconst double$ = derived$(() => count$.get() * 2);\nconst result$ = query$(() => count$.get(), async (value) => value * 3);\n// An unused declaration must not retain its general async implementation.\nconst unused$ = derived$(async () => count$.get());\nexport async function exercise() {\n  const owner = { scopeKey: 'compiled-plain-bundle' };\n  const read = (callback) => runWithSignalOwner(owner, callback);\n  try {\n    const initial = read(() => double$.get());\n    read(() => count$.set(2));\n    const updated = read(() => double$.get());\n    try { read(() => result$.get()); } catch (pending) {\n      if (typeof pending?.then !== 'function') throw pending;\n      await pending;\n    }\n    return { initial, updated, result: read(() => result$.get()) };\n  } finally { retireSignalOwnerIdentity(owner); }\n}\n",
+      "baseline": {
+        "raw": 70005,
+        "gzip": 20599,
+        "brotli": 18584,
+        "sha256": "2b2b74757bdd78e809320fdf146e8c325513e5cf58ab4dba67f3aa1eebefc14e"
+      },
+      "candidate": {
+        "raw": 70005,
+        "gzip": 20599,
+        "brotli": 18584,
+        "sha256": "2b2b74757bdd78e809320fdf146e8c325513e5cf58ab4dba67f3aa1eebefc14e"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "streamed-signals-bootstrap",
+      "authored": "export { bootstrapStreamedSignalHydration, installSignalDocumentLifecycle } from \"octane/hydration/streamed-signals\";\n",
+      "baseline": {
+        "raw": 75913,
+        "gzip": 23519,
+        "brotli": 21071,
+        "sha256": "6ef5ebb8d92dd6a5c370f3bbc4bfc21178adc13918cac3d491a540d2ca88536f"
+      },
+      "candidate": {
+        "raw": 75913,
+        "gzip": 23519,
+        "brotli": 21071,
+        "sha256": "6ef5ebb8d92dd6a5c370f3bbc4bfc21178adc13918cac3d491a540d2ca88536f"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "streamed-signal-results-bootstrap",
+      "authored": "export { bootstrapStreamedSignalResults, installSignalDocumentLifecycle } from \"octane/hydration/streamed-signals\";\n",
+      "baseline": {
+        "raw": 69894,
+        "gzip": 21531,
+        "brotli": 19332,
+        "sha256": "f251b2cf7bc0202e32a90be70fafb141391dd4b06bf3e26a89a74bfb9c11fb15"
+      },
+      "candidate": {
+        "raw": 69894,
+        "gzip": 21531,
+        "brotli": 19332,
+        "sha256": "f251b2cf7bc0202e32a90be70fafb141391dd4b06bf3e26a89a74bfb9c11fb15"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "used-native-app",
+      "authored": "import {createRoot,startTransition} from 'octane';\nimport {createScope} from 'octane/signals';\nimport {DirectStyles} from \"/private/tmp/octane-signal-free-driver-baseline-330bb087/benchmarks/scoped-signals/dom-bindings.tsrx\";\nexport function mount(container) {const scope=createScope({scopeKey:'used-native-app'});const left=scope.signal$('left',1);const right=scope.signal$('right',2);const root=createRoot(container);root.render(DirectStyles,{left$:left,right$:right,record(){}});startTransition(()=>{scope.set(left,3);scope.set(right,4);});return()=>{root.unmount();scope.dispose();};}\n",
+      "baseline": {
+        "raw": 248639,
+        "gzip": 78989,
+        "brotli": 68528,
+        "sha256": "0ba8713149bd3b2ddad759d6bd33bd9b2ba2fa87c0d671af75cdf1eb03e9a817"
+      },
+      "candidate": {
+        "raw": 248639,
+        "gzip": 78989,
+        "brotli": 68523,
+        "sha256": "e7d9bca033617d538195f28ed0f07dcb7685b8a32d5fd903df687af9b9d37071"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": -5
+      },
+      "boundaries": null,
+      "exportLoadSmoke": null
+    },
+    {
+      "id": "used-native-ssr",
+      "authored": "import {renderToString} from 'octane/server';\nimport {createScope} from 'octane/signals';\nimport {DirectStyles} from \"/private/tmp/octane-signal-free-driver-baseline-330bb087/benchmarks/scoped-signals/dom-bindings.tsrx\";\nexport function render() {const scope=createScope({scopeKey:'used-native-ssr'});try{return renderToString(DirectStyles,{left$:scope.signal$('left',1),right$:scope.signal$('right',2),record(){}});}finally{scope.dispose();}}\n",
+      "baseline": {
+        "raw": 102262,
+        "gzip": 33468,
+        "brotli": 30149,
+        "sha256": "0ea97d11268b0c0f08f8f4903e3f44a30a99db10f2e94df9bade03eeff54041d"
+      },
+      "candidate": {
+        "raw": 102262,
+        "gzip": 33468,
+        "brotli": 30149,
+        "sha256": "0ea97d11268b0c0f08f8f4903e3f44a30a99db10f2e94df9bade03eeff54041d"
+      },
+      "delta": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "boundaries": null,
+      "exportLoadSmoke": null
+    }
+  ],
+  "native": {
+    "browser": "149.0.7827.55",
+    "cases": [
+      {
+        "label": "baseline",
+        "id": "trusted-dormant-adoption-and-update",
+        "semanticPass": true,
+        "compiledTemplatePolicy": false,
+        "diagnostics": []
+      },
+      {
+        "label": "baseline",
+        "id": "generic-fallback-and-descriptor",
+        "semanticPass": true,
+        "compiledTemplatePolicy": false,
+        "diagnostics": []
+      },
+      {
+        "label": "baseline",
+        "id": "parked-adoption-and-obsolete-completion",
+        "semanticPass": true,
+        "compiledTemplatePolicy": false,
+        "diagnostics": []
+      },
+      {
+        "label": "candidate",
+        "id": "trusted-dormant-adoption-and-update",
+        "semanticPass": true,
+        "compiledTemplatePolicy": true,
+        "diagnostics": []
+      },
+      {
+        "label": "candidate",
+        "id": "generic-fallback-and-descriptor",
+        "semanticPass": true,
+        "compiledTemplatePolicy": true,
+        "diagnostics": []
+      },
+      {
+        "label": "candidate",
+        "id": "parked-adoption-and-obsolete-completion",
+        "semanticPass": true,
+        "compiledTemplatePolicy": true,
+        "diagnostics": []
+      }
+    ],
+    "sourceDrift": "passed",
+    "frozenAst": true,
+    "assertLoc": true,
+    "limitations": [
+      "Six production executions of three parent/candidate consumers in native headless Chromium only; no broad browser, full SSR, performance or CI claim.",
+      "Initial HTML comes from corresponding selected-source server compiler and public renderToString.",
+      "Console capture starts before navigation; keyboard event comes from Playwright native input."
+    ]
+  },
+  "mutants": [
+    {
+      "name": "null-pending",
+      "exitCode": 1,
+      "expectedRed": true
+    },
+    {
+      "name": "admit-fallback",
+      "exitCode": 1,
+      "expectedRed": true
+    },
+    {
+      "name": "ignore-lexical-owner",
+      "exitCode": 1,
+      "expectedRed": true
+    },
+    {
+      "name": "disable-specialization",
+      "exitCode": 1,
+      "expectedRed": true
+    }
+  ],
+  "limitations": [
+    "Only compiler-generated direct template children without authored fallback/configuration overrides in production DOM compilation are specialized. Default split loaders, descriptors, spreads and dev/HMR/profile/universal modes retain generic Hydrate.",
+    "The historical Context fixture uses removed Context.Provider; only unchanged deferred authored SHA is compared across historical330/fresh4818/candidate.",
+    "No CPU speed, full issue1118 recovery, broad browser qualification or current-head CI claim. Existing budgets unchanged."
+  ],
+  "localValidation": {
+    "newPublicResults": 22,
+    "newPublicProjects": ["octane", "octane-prod"],
+    "newExplicitConsumerDefinitions": 3,
+    "explicitConsumerModes": ["production", "development"],
+    "adjacentDeferredResults": 156,
+    "nearbyCompilerFrozenEmitSignalsResults": 467,
+    "nodeCiWorkflowResults": 204,
+    "nodeCiWorkflowFixtureEnvironment": {
+      "GIT_CONFIG_COUNT": "1",
+      "GIT_CONFIG_KEY_0": "commit.gpgsign",
+      "GIT_CONFIG_VALUE_0": "false"
+    },
+    "scopeNotes": [
+      "The16 new directly-imported fixture results cover public/native-like adoption, drafts, IDs, retry, cleanup, and generic default-split behavior under the root renderer registry.",
+      "The6 new explicit compiled-consumer results run3 definitions in both root projects; each definition internally compiles actual production and development consumers.",
+      "Adjacent deferred contract suite includes committed transition remove/cancel resource lifetime, partial adoption rollback, retry, and abort tests for the shared factory.",
+      "Process-scoped Git configuration affects only disposable test-fixture commits in ci:workflow:test; no task commit, Git configuration or hook changes."
+    ]
+  }
+}
