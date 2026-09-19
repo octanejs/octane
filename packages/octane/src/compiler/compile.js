@@ -9889,7 +9889,9 @@ function compileInternal(
 				node.specifiers.some(
 					(specifier) =>
 						specifier.type === 'ImportSpecifier' &&
-						(specifier.imported.name ?? specifier.imported.value) === 'createRoot',
+						['createRoot', 'hydrateRoot'].includes(
+							specifier.imported.name ?? specifier.imported.value,
+						),
 				),
 		)
 	) {
@@ -10393,12 +10395,18 @@ function compileInternal(
 				.map((info) => info.node.id),
 		);
 		const components = new Set([...ctx.componentInfo.values()].map((info) => info.node));
-		const callees = new Set(findLocalVoidRootCallees(ast, definitions, components));
+		const callees = findLocalVoidRootCallees(ast, definitions, components);
 		if (callees.size > 0) {
-			const alias = allocCompilerName(ctx, rtAlias('__createVoidRoot'));
-			(ctx.privateRuntimeAliases ??= new Map()).set('__createVoidRoot', alias);
-			ctx.runtimeNeeded.add('__createVoidRoot');
-			ast = mapAst(ast, (node) => (callees.has(node) ? { ...node, name: alias } : null));
+			const aliases = new Map();
+			for (const helper of new Set(callees.values())) {
+				const alias = allocCompilerName(ctx, rtAlias(helper));
+				(ctx.privateRuntimeAliases ??= new Map()).set(helper, alias);
+				ctx.runtimeNeeded.add(helper);
+				aliases.set(helper, alias);
+			}
+			ast = mapAst(ast, (node) =>
+				callees.has(node) ? { ...node, name: aliases.get(callees.get(node)) } : null,
+			);
 		}
 	}
 	// Return-based JSX functions never attach fetch-tree warm plans, and a sole

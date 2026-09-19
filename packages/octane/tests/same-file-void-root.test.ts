@@ -5,7 +5,7 @@ import { Window } from 'happy-dom';
 import { describe, expect, it } from 'vitest';
 import { compile } from '../src/compiler/compile.js';
 
-async function consume(source: string, dev = false, strong = false) {
+async function consume(source: string, dev = false, strong = false, target = 'esnext') {
 	const window = new Window({
 		url: 'https://octane.test/',
 		settings: { enableJavaScriptEvaluation: true },
@@ -23,7 +23,7 @@ async function consume(source: string, dev = false, strong = false) {
 			format: 'iife',
 			globalName: 'consumer',
 			platform: 'browser',
-			target: 'esnext',
+			target,
 			logLevel: 'silent',
 			define: {
 				'process.env.NODE_ENV': JSON.stringify(dev ? 'development' : 'production'),
@@ -167,5 +167,202 @@ export function run() { const host=document.querySelector('#host'),root=createRo
  const text=host.textContent; root.unmount(); return {text,cleaned:host.childNodes.length===0}; }`;
 		for (const dev of [false, true])
 			expect(await consume(source, dev)).toEqual({ text: 'ordinary', cleaned: true });
+	});
+});
+
+describe('same-file production hydration roots', () => {
+	it.each([false, true])(
+		'adopts nodes while preserving state, drafts and body/options evaluation (Strong: %s)',
+		async (strong) => {
+			const source = `import {hydrateRoot as adopt,useId,useState,useLayoutEffect} from 'octane';
+let evaluations=[],cleanups=0;
+function View(props) @{ const id=useId(); const [count,update]=useState(0); useLayoutEffect(()=>()=>{cleanups++});
+ <main><button id={id} onClick={()=>update(count+1)}>{props.label + ':' + count as string}</button><input defaultValue="initial" /></main> }
+export async function run(){const host=document.querySelector('#host');
+ host.innerHTML='<main><button id=":adopt-in-3:">server:0</button><input value="initial"></main>';
+ const main=host.firstElementChild,button=host.querySelector('button'),input=host.querySelector('input');input.value='typed';input.focus();input.setSelectionRange(1,3);
+ const target=()=>{evaluations.push('target');return host};const props=()=>{evaluations.push('props');return {label:'server'}};
+ const options=()=>{evaluations.push('options');return {identifierPrefix:'adopt-',identifierSeed:3}};
+ const root=adopt(target(),View,props(),options());const adopted=main===host.firstElementChild;
+ button.click();await Promise.resolve();const clicked=button.textContent;
+ root.render(View,{label:'client'});await Promise.resolve();
+ const result={adopted,clicked,updated:button.textContent,same:button===host.querySelector('button')&&input===host.querySelector('input'),value:input.value,
+ focused:document.activeElement===input,selection:[input.selectionStart,input.selectionEnd],id:button.id,evaluations};
+ root.unmount();return {...result,cleanups,cleaned:host.childNodes.length===0};}`;
+			for (const dev of [false, true])
+				expect(await consume(source, dev, strong)).toEqual({
+					adopted: true,
+					clicked: 'server:1',
+					updated: 'client:1',
+					same: true,
+					value: 'typed',
+					focused: true,
+					selection: [1, 3],
+					id: ':adopt-in-3:',
+					evaluations: ['target', 'props', 'options'],
+					cleanups: 1,
+					cleaned: true,
+				});
+		},
+	);
+
+	it('discovers late opaque handles on adopted text and controls without replacing drafts', async () => {
+		const source = `import {hydrateRoot,flushSync} from 'octane';
+function View(props) @{ <main><span>{props.value as string}</span><input value={props.value}/><textarea /></main> }
+export async function run(){const host=document.querySelector('#host');host.innerHTML='<main><span>ordinary</span><input value="ordinary"><textarea></textarea></main>';
+ const span=host.querySelector('span'),input=host.querySelector('input'),spare=host.querySelector('textarea');spare.value='draft';
+ const root=hydrateRoot(host,View,{value:'ordinary'});const adopted=span===host.querySelector('span');
+ const {createScope}=await import('octane/signals');const scope=createScope({scopeKey:'late-hydrated-root'}),value=scope.signal$('value','first');
+ root.render(View,{value});await Promise.resolve();const before=span.textContent;flushSync(()=>value.set('second'));
+ const result={adopted,before,after:span.textContent,inputValue:input.value,same:input===host.querySelector('input'),draft:spare.value};
+ root.unmount();value.set('disposed');scope.dispose();return {...result,cleaned:host.childNodes.length===0};}`;
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				adopted: true,
+				before: 'first',
+				after: 'second',
+				inputValue: 'second',
+				same: true,
+				draft: 'draft',
+				cleaned: true,
+			});
+	});
+
+	it.each(['retry', 'replace', 'unmount'])(
+		'preserves initial suspension adoption and cleanup across %s',
+		async (operation) => {
+			const source = `import {hydrateRoot,createRoot,flushSync,useId,useLayoutEffect} from 'octane';
+let effects=0,cleanups=0,refs=[];
+function View(props) @{ useLayoutEffect(()=>{effects++;return()=>{cleanups++}},[]);if(!props.ready.value)throw props.gate;const id=useId();
+ <main><button id={id} ref={node=>refs.push(node?'attach':'detach')}>{props.label as string}</button><input defaultValue="initial" /></main> }
+export async function run(){const host=document.querySelector('#host');host.innerHTML='<main><button id=":pending-in-2:">server</button><input value="initial"></main>';
+ const main=host.firstElementChild,input=host.querySelector('input');input.value='typed';let release;const gate=new Promise(resolve=>release=resolve),ready={value:false};
+ const root=hydrateRoot(host,View,{ready,gate,label:'server'},{identifierPrefix:'pending-',identifierSeed:2});
+ const pending={text:host.textContent,same:main===host.firstElementChild,effects,refs:[...refs]};
+ ${operation === 'replace' ? "root.render(View,{ready:{value:true},gate:null,label:'replacement'});flushSync(()=>{});" : operation === 'unmount' ? 'root.unmount();' : ''}
+ ready.value=true;release();await Promise.resolve();await Promise.resolve();flushSync(()=>{});
+ const result={pending,text:host.textContent,adopted:main===host.firstElementChild,value:host.querySelector('input')?.value??null,id:host.querySelector('button')?.id??null,effects,refs:[...refs]};
+ ${operation === 'unmount' ? "const next=createRoot(host);next.render(()=>'new root');const reclaimed=host.textContent;next.unmount();return {...result,reclaimed,cleanups,cleaned:host.childNodes.length===0};" : 'root.unmount();return {...result,cleanups,finalRefs:refs,cleaned:host.childNodes.length===0};'} }`;
+			for (const dev of [false, true]) {
+				const pending = { text: 'server', same: true, effects: 0, refs: [] };
+				expect(await consume(source, dev)).toEqual(
+					operation === 'unmount'
+						? {
+								pending,
+								text: '',
+								adopted: false,
+								value: null,
+								id: null,
+								effects: 0,
+								refs: [],
+								reclaimed: 'new root',
+								cleanups: 0,
+								cleaned: true,
+							}
+						: {
+								pending,
+								text: operation === 'replace' ? 'replacement' : 'server',
+								adopted: operation === 'retry',
+								value: operation === 'retry' ? 'typed' : 'initial',
+								id: ':pending-in-2:',
+								effects: 1,
+								refs: ['attach'],
+								cleanups: 1,
+								finalRefs: ['attach', 'detach'],
+								cleaned: true,
+							},
+				);
+			}
+		},
+	);
+
+	it('recovers mismatched hosts and reports the error while leaving native events live', async () => {
+		const source = `import {hydrateRoot,useState} from 'octane';
+function View() @{ const [count,update]=useState(0); <main><button onClick={()=>update(count+1)}>{String(count) as string}</button></main> }
+export async function run(){const host=document.querySelector('#host');host.innerHTML='<aside><b>stale</b></aside>';const stale=host.firstElementChild;let errors=0;
+ const root=hydrateRoot(host,View,undefined,{onRecoverableError(){errors++}});await Promise.resolve();
+ host.querySelector('button').click();await Promise.resolve();const result={text:host.textContent,replaced:stale!==host.firstElementChild,errors};root.unmount();return {...result,cleaned:host.childNodes.length===0};}`;
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				text: '1',
+				replaced: true,
+				errors: 1,
+				cleaned: true,
+			});
+	});
+
+	it('retains generic returned output during initial suspended adoption retries', async () => {
+		const source = `import {hydrateRoot,flushSync} from 'octane';
+let ready=false,release;const gate=new Promise(resolve=>release=resolve);
+function Returned(){if(!ready)throw gate;return 'returned';}
+export async function run(){const host=document.querySelector('#host');host.textContent='server';const root=hydrateRoot(host,Returned);
+ const pending=host.textContent;ready=true;release();await Promise.resolve();await Promise.resolve();flushSync(()=>{});const text=host.textContent;root.unmount();return {pending,text,cleaned:host.childNodes.length===0};}`;
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				pending: 'server',
+				text: 'returned',
+				cleaned: true,
+			});
+	});
+
+	it.each([
+		`const root=hydrateRoot(host,()=> 'ordinary');const initial=host.textContent;root.render(View,{label:'later'});`,
+		`const root=hydrateRoot(host,<View label="server" key="one"/>,{identifierPrefix:'descriptor-'});root.render(()=>'ordinary');`,
+		`const root=hydrateRoot(host,View,{label:'server'});root.render(()=>'ordinary');`,
+		`const root=hydrateRoot(host,View,{label:'server'});const alias=root;alias.render(()=>'ordinary');`,
+	])('retains the generic ABI for initial or later unproved output', async (body) => {
+		const source = `import {hydrateRoot,flushSync} from 'octane';
+function View(props) @{<main>{props.label as string}</main>}
+export function run(){const host=document.querySelector('#host');host.innerHTML='<main>server</main>';${body}flushSync(()=>{});const text=host.textContent;root.unmount();return {text,${body.includes('const initial') ? 'initial,' : ''}cleaned:host.childNodes.length===0};}`;
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				...(body.includes('const initial') ? { initial: 'ordinary' } : {}),
+				text: body.includes("label:'later'") ? 'later' : 'ordinary',
+				cleaned: true,
+			});
+	});
+});
+
+describe('void-root proof boundaries shared by create and hydrate', () => {
+	it.each(['createRoot(host)', 'hydrateRoot(host,View,{label:"server"})'])(
+		'preserves roots escaped through a supported class decorator: %s',
+		async (factory) => {
+			const source = `import {createRoot,hydrateRoot,flushSync} from 'octane';let saved;
+function capture(root){saved=root;return value=>value;}function View(props) @{<main>{props?.label??'server' as string}</main>}
+export function run(){const host=document.querySelector('#host');host.innerHTML='<main>server</main>';const root=${factory};${factory.startsWith('create') ? 'root.render(View,{label:"server"});' : ''}
+ @capture(root) class Holder{} saved.render(()=>'ordinary');flushSync(()=>{});const text=host.textContent;root.unmount();return {text,cleaned:host.childNodes.length===0};}`;
+			for (const dev of [false, true])
+				expect(await consume(source, dev, false, 'es2022')).toEqual({
+					text: 'ordinary',
+					cleaned: true,
+				});
+		},
+	);
+	it('keeps descriptor keys and options in their public argument positions', async () => {
+		const source = `import {hydrateRoot,flushSync,useId,useState} from 'octane';let evaluations=[];
+function View(props) @{const id=useId();const [count,update]=useState(0);<main><button id={id} onClick={()=>update(count+1)}>{props.label+':'+count as string}</button><input /></main>}
+export function run(){const host=document.querySelector('#host');host.innerHTML='<main><button id=":descriptor-in-4:">server:0</button><input></main>';
+ const first=host.firstElementChild,input=host.querySelector('input');input.value='typed';
+ const descriptor=()=>{evaluations.push('descriptor');return <View label="server" key="one"/>};
+ const options=()=>{evaluations.push('options');return {get identifierPrefix(){evaluations.push('prefix');return 'descriptor-';},identifierSeed:4}};
+ const root=hydrateRoot(host,descriptor(),options());const adopted=first===host.firstElementChild,id=host.querySelector('button').id;flushSync(()=>host.querySelector('button').click());
+ root.render(<View label="updated" key="one"/>);flushSync(()=>{});const before={text:host.textContent,same:first===host.firstElementChild,draft:host.querySelector('input').value};
+ root.render(<View label="replacement" key="two"/>);flushSync(()=>{});const after={text:host.textContent,replaced:first!==host.firstElementChild,draft:host.querySelector('input').value};
+ root.unmount();return {adopted,id,evaluations,before,after,cleaned:host.childNodes.length===0};}`;
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				adopted: true,
+				id: ':descriptor-in-4:',
+				evaluations: ['descriptor', 'options', 'prefix', 'prefix'],
+				before: { text: 'updated:1', same: true, draft: 'typed' },
+				after: { text: 'replacement:0', replaced: true, draft: '' },
+				cleaned: true,
+			});
+	});
+	it('preserves an authored hydration-helper-like binding', async () => {
+		const source = `import {hydrateRoot} from 'octane';const _$__hydrateVoidRoot='authored';function View(props) @{<main>{props.label as string}</main>}
+export function run(){const host=document.querySelector('#host');host.innerHTML='<main>authored</main>';const root=hydrateRoot(host,View,{label:_$__hydrateVoidRoot});const text=host.textContent;root.unmount();return {text,cleaned:host.childNodes.length===0};}`;
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({ text: 'authored', cleaned: true });
 	});
 });

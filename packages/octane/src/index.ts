@@ -119,6 +119,7 @@ export {
 	__useLinkedStateWithGetter,
 	__useReducerWithGetter,
 	__createVoidRoot,
+	__hydrateVoidRoot,
 	bindRendererRegionOwner,
 	EXTERNAL_HYDRATION_PROMISE,
 	HYDRATION_RANGE_BOUNDARY,

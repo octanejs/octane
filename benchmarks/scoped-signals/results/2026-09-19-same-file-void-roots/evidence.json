@@ -2,13 +2,14 @@
   "baseline": "330bb0878b42dbc445659c5ea40494067c4ef296",
   "historical": "1ed5d2ab9c6291b734a70a102c78b25c8bcdb3d1",
   "historicalMethod": "Same authored330 fixtures, historical source reconstructed with current330 lock/tooling; signals already existed at this checkpoint.",
-  "candidateSourceTreeSha256": "68bc437046578e8a5e929c8bee97bf6f0724b2c81d8563003485cede1e3789f9",
+  "candidateSourceTreeSha256": "4dcbc6aa9a6ed404c2480e2dee3b4e8e71a51e9d1c97707675681bb75b57fc59",
   "sourceSha256": {
     "packages/octane/src/compiler/bundler.js": "77599ba3ddb26c16f3cd05eb01297409f74e60884fe57fe88fa2a27f6487bd0b",
-    "packages/octane/src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
-    "packages/octane/src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46",
+    "packages/octane/src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+    "packages/octane/src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b",
     "packages/octane/src/compiler/slot-hooks.js": "2f6e8091e5dab19c6bf126d0cf94a30f30454f9fe95b8731833e7e3d7ade1102",
-    "packages/octane/src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674"
+    "packages/octane/src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+    "packages/octane/src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4"
   },
   "lockSha256": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
   "node": "v24.19.0",
@@ -85,7 +86,10 @@
     "public": "entrySource(BUNDLE_CASES) from benchmarks/scoped-signals/bundle-boundaries.mjs; same definitions, selected source exports, target esnext, ESM, platform from each case, esbuild production minification; public exports/engine/SSR smoke and retained input checks.",
     "stockSourceDrift": false,
     "publicSourceDrift": false,
-    "finalNullComparedToPrototypeBundleHashes": "All7 stock rows and15 public controls SHA256/raw/gzip/Brotli identical, measured on final null-safe source."
+    "finalImmutableSource": "Exact final source manifest recorded above; selected package exports and compiler, frozen own lock/tooling, pre/post retained-source drift checks clean.",
+    "fourteenPublicClosuresByteIdentical": true,
+    "usedNativeAppIdentifierCompressionDrift": true,
+    "wholeBundleDiagnosticsVersusCreationOnlyParent": "Hydrate -85510 raw/-25949 gzip/-21534 Brotli; deferred +44 raw/+20 gzip/-62 Brotli; other five stock rows byte-identical."
   },
   "stock": [
     {
@@ -119,6 +123,19 @@
       "semantic": {
         "text": "Octane",
         "cleaned": true
+      },
+      "creationOnlyParent": {
+        "id": "root-static",
+        "bundler": "vite",
+        "raw": 83633,
+        "gzip": 27583,
+        "brotli": 24583,
+        "sha256": "4e5137830ce11041e8f6b3df6d841ba2c359edce084650aeec385b83545e8b19"
+      },
+      "deltaFromCreationOnlyParent": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
       }
     },
     {
@@ -156,6 +173,19 @@
         "effects": 1,
         "cleanups": 1,
         "cleaned": true
+      },
+      "creationOnlyParent": {
+        "id": "hooks-state",
+        "bundler": "vite",
+        "raw": 95051,
+        "gzip": 31403,
+        "brotli": 27938,
+        "sha256": "5662209cfdaccdc07553239a298fdaebc53e60aa04d89092c6a09c55837fe5b9"
+      },
+      "deltaFromCreationOnlyParent": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
       }
     },
     {
@@ -190,6 +220,19 @@
         "before": "light",
         "after": "dark",
         "cleaned": true
+      },
+      "creationOnlyParent": {
+        "id": "context",
+        "bundler": "vite",
+        "raw": 216897,
+        "gzip": 68607,
+        "brotli": 59307,
+        "sha256": "b3fca6d03fcf0b7b97937d8b95a6ecc5c2e8b69e91be6ad9719e08a2a9231ae7"
+      },
+      "deltaFromCreationOnlyParent": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
       }
     },
     {
@@ -205,10 +248,10 @@
       "candidate": {
         "id": "hydrate-root",
         "bundler": "vite",
-        "raw": 259659,
-        "gzip": 81503,
-        "brotli": 69834,
-        "sha256": "550e489f422d5d7551ffe0122c14b8151657a10fdaadc3e71c067b9890282cef"
+        "raw": 174149,
+        "gzip": 55554,
+        "brotli": 48300,
+        "sha256": "e35ea4f3834880eff6adad3a5674ab04b92067849d5d2d41ae4b0a9cd065785c"
       },
       "historicalCurrentLock": {
         "id": "hydrate-root",
@@ -218,13 +261,26 @@
         "brotli": 59989,
         "sha256": "22679f9ff00d96c972dc89321987722384367df2fc0f6c1c35d1155e78235db7"
       },
-      "deltaGzip": 0,
-      "deltaFromHistoricalGzip": 11864,
+      "deltaGzip": -25949,
+      "deltaFromHistoricalGzip": -14085,
       "semantic": {
         "adopted": true,
         "before": "server",
         "after": "client",
         "cleaned": true
+      },
+      "creationOnlyParent": {
+        "id": "hydrate-root",
+        "bundler": "vite",
+        "raw": 259659,
+        "gzip": 81503,
+        "brotli": 69834,
+        "sha256": "550e489f422d5d7551ffe0122c14b8151657a10fdaadc3e71c067b9890282cef"
+      },
+      "deltaFromCreationOnlyParent": {
+        "raw": -85510,
+        "gzip": -25949,
+        "brotli": -21534
       }
     },
     {
@@ -260,6 +316,19 @@
         "resolved": "ready",
         "transition": "next",
         "cleaned": true
+      },
+      "creationOnlyParent": {
+        "id": "suspense-transition",
+        "bundler": "vite",
+        "raw": 182476,
+        "gzip": 58104,
+        "brotli": 50594,
+        "sha256": "34c35566930422429d1bb3f950fab600c03cee37bc16cbb187974b762a24d771"
+      },
+      "deltaFromCreationOnlyParent": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
       }
     },
     {
@@ -275,10 +344,10 @@
       "candidate": {
         "id": "deferred-hydration",
         "bundler": "vite",
-        "raw": 296675,
-        "gzip": 93135,
-        "brotli": 79639,
-        "sha256": "e818553bddd6260d5cd591439e441a05e79f9f997172d228a0d712e2fe43d209"
+        "raw": 296719,
+        "gzip": 93155,
+        "brotli": 79577,
+        "sha256": "f2b7e6f4b4788b93a180dcb9ea656ac71afec78143c7257a7185d3fa363830a0"
       },
       "historicalCurrentLock": {
         "id": "deferred-hydration",
@@ -288,13 +357,26 @@
         "brotli": 68805,
         "sha256": "e973fd8598273576021c3d1117340eacdf92546c6f6e5ddfe7d05766b6b1d606"
       },
-      "deltaGzip": 0,
-      "deltaFromHistoricalGzip": 12929,
+      "deltaGzip": 20,
+      "deltaFromHistoricalGzip": 12949,
       "semantic": {
         "before": "dormant",
         "after": "active",
         "clicks": 1,
         "cleaned": true
+      },
+      "creationOnlyParent": {
+        "id": "deferred-hydration",
+        "bundler": "vite",
+        "raw": 296675,
+        "gzip": 93135,
+        "brotli": 79639,
+        "sha256": "e818553bddd6260d5cd591439e441a05e79f9f997172d228a0d712e2fe43d209"
+      },
+      "deltaFromCreationOnlyParent": {
+        "raw": 44,
+        "gzip": 20,
+        "brotli": -62
       }
     },
     {
@@ -325,142 +407,44 @@
       },
       "deltaGzip": 0,
       "deltaFromHistoricalGzip": 8270,
-      "semantic": null
-    }
-  ],
-  "unchangedPublicClosures": [
-    {
-      "id": "ordinary-client",
-      "bundler": "esbuild",
-      "raw": 193173,
-      "gzip": 61565,
-      "brotli": 53439,
-      "sha256": "d706dba033132ab7e68586a2e7e2ade1b95045919b00684cf844a3ac1c9bcdf5"
-    },
-    {
-      "id": "ordinary-server",
-      "bundler": "esbuild",
-      "raw": 50366,
-      "gzip": 17728,
-      "brotli": 15990,
-      "sha256": "62940952060a7e32918f66495e0ebd908710945035092908e0c66708569e5ebc"
-    },
-    {
-      "id": "binding-scalar",
-      "bundler": "esbuild",
-      "raw": 13823,
-      "gzip": 5251,
-      "brotli": 4748,
-      "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
-    },
-    {
-      "id": "binding-structural",
-      "bundler": "esbuild",
-      "raw": 31292,
-      "gzip": 10455,
-      "brotli": 9553,
-      "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
-    },
-    {
-      "id": "binding-controls",
-      "bundler": "esbuild",
-      "raw": 9046,
-      "gzip": 3525,
-      "brotli": 3190,
-      "sha256": "f9d9f7ca38bd4591295e188a20aa78de7a84aabbd5e1b78935f1619cdee18e3d"
-    },
-    {
-      "id": "binding-whole-style",
-      "bundler": "esbuild",
-      "raw": 6199,
-      "gzip": 2630,
-      "brotli": 2360,
-      "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
-    },
-    {
-      "id": "binding-scalar-controls-style",
-      "bundler": "esbuild",
-      "raw": 27473,
-      "gzip": 9954,
-      "brotli": 9029,
-      "sha256": "f26ff87b831d27584d84a74ebeacc8787600cb2eb7e0523c5a49ea0d5c3aed80"
-    },
-    {
-      "id": "engine",
-      "bundler": "esbuild",
-      "raw": 42253,
-      "gzip": 12889,
-      "brotli": 11672,
-      "sha256": "3264d5ac64941955c4e9edadb70c17385d67b03ebd611f54dbdd96c5e6478a43"
-    },
-    {
-      "id": "native-client",
-      "bundler": "esbuild",
-      "raw": 45094,
-      "gzip": 14297,
-      "brotli": 12931,
-      "sha256": "46037b83c2f05c341757c96be73b7fb6b5ba61bce3de8f4a6de4b8cd1efc7e62"
-    },
-    {
-      "id": "native-server",
-      "bundler": "esbuild",
-      "raw": 44962,
-      "gzip": 14215,
-      "brotli": 12841,
-      "sha256": "4b0c2329255b4cdcba1bbe57fe009860e85e0725b09320ff7b36122ec3a1d9b3"
-    },
-    {
-      "id": "compiled-plain-signals",
-      "bundler": "esbuild",
-      "raw": 64833,
-      "gzip": 19026,
-      "brotli": 17176,
-      "sha256": "817525035dacdc1cb59e77176e9b7271740271fd41abf791c18689da74da8b73"
-    },
-    {
-      "id": "streamed-signals-bootstrap",
-      "bundler": "esbuild",
-      "raw": 70744,
-      "gzip": 21933,
-      "brotli": 19640,
-      "sha256": "cc7c410ff2a691465cab4708aac58d2f0f48ddfacf9e5e70ba108ea1841bc5e3"
-    },
-    {
-      "id": "streamed-signal-results-bootstrap",
-      "bundler": "esbuild",
-      "raw": 64725,
-      "gzip": 19935,
-      "brotli": 17902,
-      "sha256": "6f04f8d035089562dcebed5de4ade9b524eddc667ed1bc5770bb0a37eb3554e5"
-    },
-    {
-      "id": "used-native-app",
-      "bundler": "esbuild",
-      "raw": 247072,
-      "gzip": 78310,
-      "brotli": 68002,
-      "sha256": "cb62bf7aa6146e0fe0079b5eb13e67f8446d988279262310d65c75f279dad524"
-    },
-    {
-      "id": "used-native-ssr",
-      "bundler": "esbuild",
-      "raw": 97093,
-      "gzip": 31888,
-      "brotli": 28769,
-      "sha256": "919d86a76c9637c84e47210d979095de8a3540c3bbe893a486b9923e27415934"
+      "semantic": null,
+      "creationOnlyParent": {
+        "id": "createRoot-export",
+        "bundler": "esbuild",
+        "raw": 193173,
+        "gzip": 61565,
+        "brotli": 53439,
+        "sha256": "d706dba033132ab7e68586a2e7e2ade1b95045919b00684cf844a3ac1c9bcdf5"
+      },
+      "deltaFromCreationOnlyParent": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      }
     }
   ],
   "compileTime": {
-    "runnerSha256": "c08f615d9bbbc6921aaba630231a1d3799c2a33161b789d52697646436f26318",
+    "esbuildVersion": "0.28.1",
+    "completeSourceManifestSha256": {
+      "baseline": "1ffd736331cafde24bf5481ccc67362238b4a1b0f768f4d8360440f6a457320a",
+      "candidate": "fe34b5273d24e863b022ec4a570f0696bc64f1afb50fa0099e3fdc50ab6666d4"
+    },
+    "node": "v24.19.0",
+    "platform": "darwin/arm64",
+    "runnerSha256": "df4745b2fe5244a478235a25b2232e19e62e74effc39618340b45923d0304497",
     "sourceHashes": {
       "baseline": {
         "pnpm-lock.yaml": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
-        "packages/octane/src/compiler/compile.js": "11da48eaf3e3881b99c091539c5f0f50327405e1663db98272f5e7c20bcd4869"
+        "packages/octane/src/compiler/compile.js": "11da48eaf3e3881b99c091539c5f0f50327405e1663db98272f5e7c20bcd4869",
+        "packages/octane/src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+        "packages/octane/src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674"
       },
       "candidate": {
         "pnpm-lock.yaml": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
-        "packages/octane/src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
-        "packages/octane/src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        "packages/octane/src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+        "packages/octane/src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b",
+        "packages/octane/src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+        "packages/octane/src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5"
       }
     },
     "options": {
@@ -478,33 +462,84 @@
         "sourceBytes": 336,
         "samplesMs": {
           "baseline": [
-            0.5211792000000003, 0.43141669999999976, 0.4115958999999975, 0.4852041999999983,
-            0.41550409999999827, 0.5098917000000028, 0.435533300000003, 0.46794170000000007,
-            0.5248125000000016, 0.41864170000000056, 0.36084579999999844, 0.4998124999999959
+            0.46195000000000164, 0.5141500000000008, 0.4795291999999961, 0.4154958000000022,
+            0.4927667000000042, 0.6049249999999973, 0.5780417000000057, 0.520737500000007,
+            0.49268749999999956, 0.5742666999999984, 0.46129589999999326, 0.5860708000000046
           ],
           "candidate": [
-            0.5656583000000012, 0.5161209000000042, 0.5677083000000038, 0.4248292000000049,
-            0.9192999999999983, 0.4397958000000017, 0.5381249999999966, 0.5533999999999992,
-            0.6270749999999964, 0.42218330000000037, 0.5505832999999996, 0.4529874999999947
+            0.6742957999999988, 0.4522666000000015, 0.5753708000000017, 0.4943290999999988,
+            0.6141916999999978, 0.7134500000000003, 0.495087500000011, 0.6479124999999953,
+            0.504991700000005, 0.4753417000000013, 0.5332417000000078, 0.5798415999999975
           ]
         },
         "baseline": {
-          "median": 0.46794170000000007,
-          "mean": 0.4568649416666663,
-          "p25": 0.41864170000000056,
-          "p75": 0.5098917000000028
+          "score": 0.5151597333333342,
+          "scoreKind": "mean",
+          "scoreMedian": 0.5141500000000008,
+          "scoreRme": 7.297333116293048,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 0.5141500000000008,
+          "min": 0.4154958000000022,
+          "p95": 0.6049249999999973,
+          "p99": 0.6049249999999973,
+          "mean": 0.5151597333333342,
+          "sd": 0.059166606634491845,
+          "stddev": 0.059166606634491845,
+          "variance": 0.0035006873406406946,
+          "sem": 0.01707992813373028,
+          "moe": 0.03759292182234035,
+          "rme": 7.297333116293048,
+          "samples": 12,
+          "p25": 0.4795291999999961,
+          "p75": 0.5780417000000057
         },
         "candidate": {
-          "median": 0.5505832999999996,
-          "mean": 0.5481472166666667,
-          "p25": 0.4529874999999947,
-          "p75": 0.5677083000000038
+          "score": 0.5633600583333347,
+          "scoreKind": "mean",
+          "scoreMedian": 0.5753708000000017,
+          "scoreRme": 9.546477512190604,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 0.5753708000000017,
+          "min": 0.4522666000000015,
+          "p95": 0.7134500000000003,
+          "p99": 0.7134500000000003,
+          "mean": 0.5633600583333347,
+          "sd": 0.0846447033016269,
+          "stddev": 0.0846447033016269,
+          "variance": 0.00716472579702045,
+          "sem": 0.02443482111833515,
+          "moe": 0.053781041281455666,
+          "rme": 9.546477512190604,
+          "samples": 12,
+          "p25": 0.495087500000011,
+          "p75": 0.6479124999999953
         },
         "pairedRatio": {
-          "median": 1.1948553054662274,
-          "mean": 1.2220983908625886,
-          "p25": 1.0084597401548863,
-          "p75": 1.3792856051287372
+          "score": 1.1044572147153224,
+          "scoreKind": "mean",
+          "scoreMedian": 1.1794024052568557,
+          "scoreRme": 10.952011408539429,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 1.1794024052568557,
+          "min": 0.8277368337742771,
+          "p95": 1.4596726918497596,
+          "p99": 1.4596726918497596,
+          "mean": 1.1044572147153224,
+          "sd": 0.1903765115234199,
+          "stddev": 0.1903765115234199,
+          "variance": 0.036243216139826825,
+          "sem": 0.05495696508771419,
+          "moe": 0.12096028015805893,
+          "rme": 10.952011408539429,
+          "samples": 12,
+          "p25": 0.9893712500264353,
+          "p75": 1.2442209366523185
         },
         "emittedSha256": {
           "baseline": "ac850c8bc9906efe836f10226b3ebcbed2fa0f03a27abb93c258b4b6958711d3",
@@ -517,33 +552,84 @@
         "sourceBytes": 887,
         "samplesMs": {
           "baseline": [
-            1.042954099999997, 1.0793000000000006, 0.9753417000000013, 1.1185917000000019,
-            1.1976457999999979, 1.133062499999994, 1.030845899999997, 1.1779540999999996,
-            1.0292707999999948, 1.0822416999999973, 0.9608166000000097, 0.9980957999999986
+            1.199645799999996, 1.2244750000000066, 1.1203792000000021, 1.1253291999999988,
+            1.2948666000000002, 1.1325457999999913, 1.0104625000000056, 1.1226291999999944,
+            0.9851084000000014, 1.0500499999999988, 1.2043457999999987, 1.105083300000001
           ],
           "candidate": [
-            1.3505999999999971, 1.2665124999999988, 1.3962457999999969, 1.220895900000005,
-            1.1759458999999992, 1.1109540999999923, 1.1422415999999997, 1.060091699999998,
-            1.158462499999996, 1.2445666000000073, 1.0499666000000047, 1.2993082999999956
+            1.2213334000000031, 1.221345800000006, 1.2015040999999997, 1.2540457999999943,
+            1.303108300000008, 1.3339917000000014, 1.315808299999992, 1.1375583000000007,
+            1.2669540999999982, 1.132675000000006, 1.1474040999999944, 1.1296040999999946
           ]
         },
         "baseline": {
-          "median": 1.0793000000000006,
-          "mean": 1.0688433916666658,
-          "p25": 1.0292707999999948,
-          "p75": 1.133062499999994
+          "score": 1.1312433999999996,
+          "scoreKind": "mean",
+          "scoreMedian": 1.1253291999999988,
+          "scoreRme": 5.0503018876961026,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 1.1253291999999988,
+          "min": 0.9851084000000014,
+          "p95": 1.2948666000000002,
+          "p99": 1.2948666000000002,
+          "mean": 1.1312433999999996,
+          "sd": 0.0899174492037401,
+          "stddev": 0.0899174492037401,
+          "variance": 0.00808514767130718,
+          "sem": 0.025956931751311925,
+          "moe": 0.057131206784637546,
+          "rme": 5.0503018876961026,
+          "samples": 12,
+          "p25": 1.105083300000001,
+          "p75": 1.2043457999999987
         },
         "candidate": {
-          "median": 1.220895900000005,
-          "mean": 1.2063159583333325,
-          "p25": 1.1422415999999997,
-          "p75": 1.2993082999999956
+          "score": 1.222111083333333,
+          "scoreKind": "mean",
+          "scoreMedian": 1.221345800000006,
+          "scoreRme": 3.8588639357577406,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 1.221345800000006,
+          "min": 1.1296040999999946,
+          "p95": 1.3339917000000014,
+          "p99": 1.3339917000000014,
+          "mean": 1.222111083333333,
+          "sd": 0.07422338022027397,
+          "stddev": 0.07422338022027397,
+          "variance": 0.005509110171323357,
+          "sem": 0.021426444275169564,
+          "moe": 0.047159603849648214,
+          "rme": 3.8588639357577406,
+          "samples": 12,
+          "p25": 1.1474040999999944,
+          "p75": 1.303108300000008
         },
         "pairedRatio": {
-          "median": 1.1255176966061815,
-          "mean": 1.1359909031377786,
-          "p25": 1.0914580360286985,
-          "p75": 1.2949754931688757
+          "score": 1.0868109866579105,
+          "scoreKind": "mean",
+          "scoreMedian": 1.072408431002644,
+          "scoreRme": 6.646398887618677,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 1.072408431002644,
+          "min": 0.9527198085466779,
+          "p95": 1.3021841978301865,
+          "p99": 1.3021841978301865,
+          "mean": 1.0868109866579105,
+          "sd": 0.1136870514012639,
+          "stddev": 0.1136870514012639,
+          "variance": 0.012924745656313618,
+          "sem": 0.032818624864947264,
+          "moe": 0.07223379332774893,
+          "rme": 6.646398887618677,
+          "samples": 12,
+          "p25": 1.013298335728312,
+          "p75": 1.1778699810639108
         },
         "emittedSha256": {
           "baseline": "fc1b94751c86cd6f7d3750c27a449d71696b471905343d431cb4086d6a19fae9",
@@ -556,37 +642,178 @@
         "sourceBytes": 996,
         "samplesMs": {
           "baseline": [
-            1.3604041999999936, 1.3493791999999984, 1.4455791999999974, 1.5115792000000057,
-            1.3579750000000104, 1.3484666999999946, 1.2529332999999951, 1.340541700000017,
-            1.4933541999999989, 1.5436583000000155, 1.2993332999999894, 1.3751500000000079
+            1.5253540999999813, 1.493249999999989, 1.3554292000000032, 1.3385667000000012,
+            1.2445040999999946, 1.472912499999984, 1.4677791999999954, 1.66106249999998,
+            1.2689541999999847, 1.8194041999999855, 1.5837332999999945, 1.5462582999999994
           ],
           "candidate": [
-            1.601354200000003, 1.3259916999999972, 1.507974999999999, 1.429933399999993,
-            1.4996417000000064, 1.6083250000000135, 1.5985875000000078, 1.4199792000000115,
-            1.5381583000000092, 1.3866208000000142, 1.3830416000000014, 1.5501541999999973
+            1.450583299999994, 1.4329541999999946, 1.5308667000000014, 1.776537499999995,
+            1.5482666999999992, 1.4618332999999892, 1.6130916999999954, 1.8510125000000017,
+            1.4971916999999848, 1.8571040999999924, 1.6460209000000077, 1.3868333000000121
           ]
         },
         "baseline": {
-          "median": 1.3604041999999936,
-          "mean": 1.3898628583333352,
-          "p25": 1.3484666999999946,
-          "p75": 1.4933541999999989
+          "score": 1.4814340249999909,
+          "scoreKind": "mean",
+          "scoreMedian": 1.493249999999989,
+          "scoreRme": 7.095370955785557,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 1.493249999999989,
+          "min": 1.2445040999999946,
+          "p95": 1.8194041999999855,
+          "p99": 1.8194041999999855,
+          "mean": 1.4814340249999909,
+          "sd": 0.16543523074026464,
+          "stddev": 0.16543523074026464,
+          "variance": 0.027368815570084606,
+          "sem": 0.04775703750066983,
+          "moe": 0.10511323953897429,
+          "rme": 7.095370955785557,
+          "samples": 12,
+          "p25": 1.3554292000000032,
+          "p75": 1.5837332999999945
         },
         "candidate": {
-          "median": 1.507974999999999,
-          "mean": 1.487480216666671,
-          "p25": 1.4199792000000115,
-          "p75": 1.5985875000000078
+          "score": 1.5876913249999973,
+          "scoreKind": "mean",
+          "scoreMedian": 1.5482666999999992,
+          "scoreRme": 6.537239865410233,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 1.5482666999999992,
+          "min": 1.3868333000000121,
+          "p95": 1.8571040999999924,
+          "p99": 1.8571040999999924,
+          "mean": 1.5876913249999973,
+          "sd": 0.16335448875011388,
+          "stddev": 0.16335448875011388,
+          "variance": 0.026684688994811082,
+          "sem": 0.04715637902660597,
+          "moe": 0.10379119023755976,
+          "rme": 6.537239865410233,
+          "samples": 12,
+          "p25": 1.4618332999999892,
+          "p75": 1.776537499999995
         },
         "pairedRatio": {
-          "median": 1.0644240396209446,
-          "mean": 1.0750878191122888,
-          "p25": 1.0300023263067868,
-          "p75": 1.1771164775880658
+          "score": 1.0794963696833326,
+          "scoreKind": "mean",
+          "scoreMedian": 1.0990016073262248,
+          "scoreRme": 7.518191584264493,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 1.0990016073262248,
+          "min": 0.8968962688834153,
+          "p95": 1.3271938559356014,
+          "p99": 1.3271938559356014,
+          "mean": 1.0794963696833326,
+          "sd": 0.1277336008259463,
+          "stddev": 0.1277336008259463,
+          "variance": 0.016315872779962187,
+          "sem": 0.03687351441071015,
+          "moe": 0.08115860521797304,
+          "rme": 7.518191584264493,
+          "samples": 12,
+          "p25": 0.9924780324696851,
+          "p75": 1.1798626774709464
         },
         "emittedSha256": {
           "baseline": "ce72ed3cee57db3a065c8b839cc7011551e8fa0ec5550c745c87540ffbf0eede",
           "candidate": "c64a06e7a0e154cf56b9978414ce2e36e570b515609b1f59f59d23b15d8ffb41"
+        }
+      },
+      {
+        "id": "hydrate-root",
+        "sourceSha256": "c1c3389646de012ea363e9db0c99a9a7b684ff2494f0ea30e58008dab1c3637f",
+        "sourceBytes": 717,
+        "samplesMs": {
+          "baseline": [
+            0.8203834000000143, 0.844337500000006, 0.937704100000019, 0.7661625000000185,
+            0.7212166000000024, 0.7255249999999933, 0.6831416999999874, 0.7567459000000099,
+            0.6622125000000096, 0.8167417000000115, 0.6786000000000059, 0.6847708000000011
+          ],
+          "candidate": [
+            0.7233707999999979, 0.795920799999999, 0.8246374999999944, 0.7450040999999828,
+            0.957079200000021, 0.7551791999999977, 0.7941124999999829, 0.7994791999999962,
+            0.7887833000000001, 0.7628999999999906, 0.789283300000011, 0.7231167000000142
+          ]
+        },
+        "baseline": {
+          "score": 0.7581284750000066,
+          "scoreKind": "mean",
+          "scoreMedian": 0.7567459000000099,
+          "scoreRme": 6.966746664677752,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 0.7567459000000099,
+          "min": 0.6622125000000096,
+          "p95": 0.937704100000019,
+          "p99": 0.937704100000019,
+          "mean": 0.7581284750000066,
+          "sd": 0.08312724889043355,
+          "stddev": 0.08312724889043355,
+          "variance": 0.006910139508092086,
+          "sem": 0.023996769761942417,
+          "moe": 0.05281689024603526,
+          "rme": 6.966746664677752,
+          "samples": 12,
+          "p25": 0.6847708000000011,
+          "p75": 0.8203834000000143
+        },
+        "candidate": {
+          "score": 0.7882388833333324,
+          "scoreKind": "mean",
+          "scoreMedian": 0.789283300000011,
+          "scoreRme": 4.9871001852293855,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 0.789283300000011,
+          "min": 0.7231167000000142,
+          "p95": 0.957079200000021,
+          "p99": 0.957079200000021,
+          "mean": 0.7882388833333324,
+          "sd": 0.06186948882065715,
+          "stddev": 0.06186948882065715,
+          "variance": 0.0038278336469294194,
+          "sem": 0.017860183012615473,
+          "moe": 0.039310262810766654,
+          "rme": 4.9871001852293855,
+          "samples": 12,
+          "p25": 0.7551791999999977,
+          "p75": 0.7994791999999962
+        },
+        "pairedRatio": {
+          "score": 1.050611928632781,
+          "scoreKind": "mean",
+          "scoreMedian": 1.055998152958644,
+          "scoreRme": 8.368958147656112,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 1.055998152958644,
+          "min": 0.8794218773278027,
+          "p95": 1.3270343472405068,
+          "p99": 1.3270343472405068,
+          "mean": 1.050611928632781,
+          "sd": 0.13838349787846063,
+          "stddev": 0.13838349787846063,
+          "variance": 0.01914999248507792,
+          "sem": 0.03994787487576563,
+          "moe": 0.08792527260156015,
+          "rme": 8.368958147656112,
+          "samples": 12,
+          "p25": 0.9426571720431621,
+          "p75": 1.1631053639846805
+        },
+        "emittedSha256": {
+          "baseline": "f7206035040846ecf2fe7e3f9550d4bd600b70ebb57141bdeb1e0ddd53ad2e3b",
+          "candidate": "ce16ff3bd4e14b14f2569b020baffa7f5d05d99c3741f568e4160ceda70d16c3"
         }
       },
       {
@@ -595,33 +822,84 @@
         "sourceBytes": 5940,
         "samplesMs": {
           "baseline": [
-            16.67092499999999, 17.682024999999975, 16.335112500000015, 18.388675000000013,
-            16.21605840000002, 17.981766700000026, 16.32183329999998, 18.050787500000023,
-            16.214216599999965, 18.047312500000043, 16.74284579999994, 17.09711669999997
+            18.375366600000007, 17.761675000000015, 17.11556250000003, 18.51342500000005,
+            16.961250000000017, 18.164308299999995, 16.64058329999998, 17.838916600000083,
+            16.536883399999986, 18.126516699999957, 16.5172458, 18.195712499999992
           ],
           "candidate": [
-            17.177879200000007, 17.609616600000027, 18.017000000000007, 17.81701670000002,
-            17.207654200000025, 17.36422910000001, 17.932329200000005, 16.902900000000045,
-            18.081516699999973, 16.23187910000006, 17.893091699999967, 16.280633299999955
+            18.28631660000001, 17.016100000000005, 18.385745799999995, 16.56293340000002,
+            18.220466699999996, 16.681570900000043, 18.669095800000015, 16.61028749999996,
+            18.111925000000063, 17.76659159999999, 16.930691599999953, 18.19890829999995
           ]
         },
         "baseline": {
-          "median": 17.09711669999997,
-          "mean": 17.14572291666666,
-          "p25": 16.335112500000015,
-          "p75": 18.047312500000043
+          "score": 17.562287141666676,
+          "scoreKind": "mean",
+          "scoreMedian": 17.838916600000083,
+          "scoreRme": 2.7418302736842106,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 17.838916600000083,
+          "min": 16.5172458,
+          "p95": 18.51342500000005,
+          "p99": 18.51342500000005,
+          "mean": 17.562287141666676,
+          "sd": 0.7578656466826938,
+          "stddev": 0.7578656466826938,
+          "variance": 0.5743603384217777,
+          "sem": 0.21877696756091156,
+          "moe": 0.48152810560156634,
+          "rme": 2.7418302736842106,
+          "samples": 12,
+          "p25": 16.961250000000017,
+          "p75": 18.195712499999992
         },
         "candidate": {
-          "median": 17.609616600000027,
-          "mean": 17.376312150000008,
-          "p25": 17.177879200000007,
-          "p75": 17.932329200000005
+          "score": 17.62005276666667,
+          "scoreKind": "mean",
+          "scoreMedian": 18.111925000000063,
+          "scoreRme": 2.8657664020466997,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 18.111925000000063,
+          "min": 16.56293340000002,
+          "p95": 18.669095800000015,
+          "p99": 18.669095800000015,
+          "mean": 17.62005276666667,
+          "sd": 0.7947281051221547,
+          "stddev": 0.7947281051221547,
+          "variance": 0.6315927610710507,
+          "sem": 0.22941824271241865,
+          "moe": 0.5049495522100335,
+          "rme": 2.8657664020466997,
+          "samples": 12,
+          "p25": 16.930691599999953,
+          "p75": 18.28631660000001
         },
         "pairedRatio": {
-          "median": 1.0304094823772536,
-          "mean": 1.0162992203444494,
-          "p25": 0.9656575680074853,
-          "p75": 1.098671262620972
+          "score": 1.0056890158434284,
+          "scoreKind": "mean",
+          "scoreMedian": 1.0001756347820927,
+          "scoreRme": 4.6611496330437046,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 1.0001756347820927,
+          "min": 0.8946444755630022,
+          "p95": 1.121901526132202,
+          "p99": 1.121901526132202,
+          "mean": 1.0056890158434284,
+          "sd": 0.07377807715325062,
+          "stddev": 0.07377807715325062,
+          "variance": 0.005443204668431,
+          "sem": 0.021297896352361113,
+          "moe": 0.04687666987154681,
+          "rme": 4.6611496330437046,
+          "samples": 12,
+          "p25": 0.9580233846188488,
+          "p75": 1.0742407959319022
         },
         "emittedSha256": {
           "baseline": "e95d5e5634537fe3fac30c8bc9afb3f914c25821e43ceed927d152213be6976f",
@@ -634,53 +912,774 @@
         "sourceBytes": 8494,
         "samplesMs": {
           "baseline": [
-            14.698237500000051, 15.4311917, 14.001808400000026, 14.881079099999988,
-            14.566420899999866, 13.941337500000008, 15.420349999999962, 13.843070799999987,
-            14.812425000000076, 14.679275000000052, 13.838970899999913, 15.818729200000053
+            14.542416599999978, 16.819095800000106, 14.092033400000037, 15.914912499999991,
+            14.280637500000012, 15.051637500000107, 14.68001660000009, 14.643466700000136,
+            15.413241700000071, 16.175495800000135, 13.931070900000122, 16.071316599999953
           ],
           "candidate": [
-            15.310624999999982, 15.064754200000062, 17.14682500000008, 15.343816599999991,
-            17.579891700000008, 15.361337500000081, 17.718629099999998, 15.078383300000132,
-            17.009483300000102, 15.246429100000023, 17.527700000000003, 15.50721250000006
+            16.668254199999957, 15.879095899999992, 15.309095800000069, 16.328108399999838,
+            16.615958300000056, 15.18809999999994, 18.427379199999997, 16.498012500000005,
+            18.847204200000125, 15.42863750000015, 15.352654100000109, 17.220216699999945
           ]
         },
         "baseline": {
-          "median": 14.698237500000051,
-          "mean": 14.661074666666664,
-          "p25": 14.001808400000026,
-          "p75": 15.420349999999962
+          "score": 15.13461180000006,
+          "scoreKind": "mean",
+          "scoreMedian": 15.051637500000107,
+          "scoreRme": 3.9127172101628056,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 15.051637500000107,
+          "min": 13.931070900000122,
+          "p95": 16.819095800000106,
+          "p99": 16.819095800000106,
+          "mean": 15.13461180000006,
+          "sd": 0.9320094737769548,
+          "stddev": 0.9320094737769548,
+          "variance": 0.868641659209996,
+          "sem": 0.26904796028620315,
+          "moe": 0.5921745605899331,
+          "rme": 3.9127172101628056,
+          "samples": 12,
+          "p25": 14.542416599999978,
+          "p75": 16.071316599999953
         },
         "candidate": {
-          "median": 15.50721250000006,
-          "mean": 16.157923941666713,
-          "p25": 15.310624999999982,
-          "p75": 17.527700000000003
+          "score": 16.480226400000017,
+          "scoreKind": "mean",
+          "scoreMedian": 16.498012500000005,
+          "scoreRme": 4.620390404994175,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 16.498012500000005,
+          "min": 15.18809999999994,
+          "p95": 18.847204200000125,
+          "p99": 18.847204200000125,
+          "mean": 16.480226400000017,
+          "sd": 1.1984293247283178,
+          "stddev": 1.1984293247283178,
+          "variance": 1.4362328463687717,
+          "sem": 0.3459567466183179,
+          "moe": 0.7614507993069177,
+          "rme": 4.620390404994175,
+          "samples": 12,
+          "p25": 15.42863750000015,
+          "p75": 17.220216699999945
         },
         "pairedRatio": {
-          "median": 1.1018553635904784,
-          "mean": 1.1045379697014392,
-          "p25": 1.0386363836088615,
-          "p75": 1.206877916043204
+          "score": 1.092273895125164,
+          "scoreKind": "mean",
+          "scoreMedian": 1.102044071859542,
+          "scoreRme": 5.704057498230419,
+          "scoreStart": 0,
+          "scoreSamples": 12,
+          "warmupRatio": 1,
+          "median": 1.102044071859542,
+          "min": 0.9441111513259762,
+          "p95": 1.2552696432236925,
+          "p99": 1.2552696432236925,
+          "mean": 1.092273895125164,
+          "sd": 0.0980586769933233,
+          "stddev": 0.0980586769933233,
+          "variance": 0.00961550413368091,
+          "sem": 0.028307101779236885,
+          "moe": 0.062303931016100385,
+          "rme": 5.704057498230419,
+          "samples": 12,
+          "p25": 1.0259628131791392,
+          "p75": 1.163530570676557
         },
         "emittedSha256": {
           "baseline": "ab49d064dbd687577fc4ecacc4c6aeca29cffa4c1be9193aba16ca4f8206a714",
           "candidate": "077aae6186357496f079e8f8b0bb91ccb0cc522c0648588a5e8ed154864c2467"
         }
       }
-    ]
+    ],
+    "completeSourceManifestHashMethod": "SHA256 over compact JSON of locale-sorted repository-relative paths and file hashes, distinct serialization from candidateSourceTreeSha256; full maps checked before/after.",
+    "comparison": "Final combined creation/hydration compiler proof versus main330; does not isolate hydration extension. Same authored corpus/toolchain/process, twelve alternating paired batches after three warmups, ten compiles per batch. Nonempty executable emitted output hash stable and source/lock drift checks clean; no runtime speed claim."
   },
   "validation": {
-    "compilerProofControls": 24,
-    "owningTotal": 52,
-    "nearbyMatrixActualRun": 195,
-    "nodeBoundarySuite": 19,
-    "independentPublicPairedConsumers": 20,
+    "owningPublicTestResults": 60,
+    "publicCompilerArtifactTests": 2,
+    "finalOwningActualRun": 62,
+    "existingHydrationIntegrationTestResults": 266,
+    "nearbyMatrixActualPreRelocationRun": 380,
+    "nearbyMatrixComposition": "266 existing integration results plus 114 owning results before optimization assertions moved to Node benchmark. Corrected final owning run is 62: 60 public behavior and 2 mapped compiler artifacts. Source identical across both runs.",
+    "nodeBoundarySuite": 21,
+    "fixedSourceOptimizationControls": 52,
+    "frozenAdoptedAstPositiveNegativePairs": 2,
+    "observationBoundary": "Private activation/helper/Map-count assertions are only deterministic benchmark optimization guards. Ordinary compiler file contains two source-map/frozen-AST public artifact tests; runtime tests assert public behavior.",
     "scopedTypes": "pass",
+    "scopedFormat": "pass",
+    "changesetCheck": "pass",
+    "pnpmSync": "pass",
     "restoredSourceSha256": {
-      "packages/octane/src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46",
-      "packages/octane/src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf"
+      "packages/octane/src/compiler/bundler.js": "77599ba3ddb26c16f3cd05eb01297409f74e60884fe57fe88fa2a27f6487bd0b",
+      "packages/octane/src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+      "packages/octane/src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b",
+      "packages/octane/src/compiler/slot-hooks.js": "2f6e8091e5dab19c6bf126d0cf94a30f30454f9fe95b8731833e7e3d7ade1102",
+      "packages/octane/src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+      "packages/octane/src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4"
     },
-    "owningPublicTestResults": 28,
+    "fourFinalMutants": [
+      {
+        "name": "initial-target",
+        "exit": 1,
+        "restoredSourceSha256": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+      },
+      {
+        "name": "generic-retry-output",
+        "exit": 1,
+        "restoredSourceSha256": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5"
+      },
+      {
+        "name": "specialization-disabled",
+        "exit": 1,
+        "restoredSourceSha256": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+      },
+      {
+        "name": "unscoped-reference",
+        "exit": 1,
+        "restoredSourceSha256": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+      }
+    ],
+    "mutantSemantics": "Initial target proof lost ordinary initial text; generic disposed-retry null handler lost returned text; unscoped-reference omission admitted synthetic adopted AST escape; disabled specialization preserved semantics but failed 81,369==81,369 gzip improvement guard. All source restored exactly to final manifest.",
+    "unscopedReferenceScope": "Conservative adopted-AST hardening. Synthesized function-decorator runtime-walker reference is unscoped; authored function/arrow decorators unsupported. Supported class/method/field escapes already generic; no supported runtime bug claimed. Runtime enum/namespace conservative writes invalidation preserved.",
+    "matchedClosureGuards": [
+      {
+        "id": "root-static",
+        "provenGzip": 27767,
+        "genericGzip": 62601,
+        "maximumRatio": 0.6
+      },
+      {
+        "id": "hooks-state",
+        "provenGzip": 31548,
+        "genericGzip": 65356,
+        "maximumRatio": 0.6
+      },
+      {
+        "id": "hydrate-root",
+        "provenGzip": 55597,
+        "genericGzip": 81369,
+        "maximumRatio": 0.75
+      }
+    ],
+    "creationOnlyParentHydrationGuardRed": {
+      "node": "v24.19.0",
+      "sourceHashes": {
+        "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+        "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+        "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+        "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+      },
+      "authoredSha256": "c1c3389646de012ea363e9db0c99a9a7b684ff2494f0ea30e58008dab1c3637f",
+      "rows": [
+        {
+          "generic": false,
+          "gzip": 81358,
+          "compiledSha256": "24ff3dee03d36c3970ba2818ffbc7f5dd33f40eb3092bed612f4849e3a407b24",
+          "bundleSha256": "1540532d8b7fbda2f6a9a5b527e5d3666d31e3f3139441a9839e5afd233862d2",
+          "semantic": {
+            "adopted": true,
+            "before": "server",
+            "after": "client",
+            "cleaned": true
+          }
+        },
+        {
+          "generic": true,
+          "gzip": 81358,
+          "compiledSha256": "21fdf867154b4430e54aef8959344bcfd9ace14db8937909f3099d518d371f20",
+          "bundleSha256": "1540532d8b7fbda2f6a9a5b527e5d3666d31e3f3139441a9839e5afd233862d2",
+          "semantic": {
+            "adopted": true,
+            "before": "server",
+            "after": "client",
+            "cleaned": true
+          }
+        }
+      ]
+    }
+  },
+  "limits": [
+    "Only production ordinary DOM function-local const roots; exact authored top-module @{} FunctionDeclarations whose IDs remain certified after lowering.",
+    "All root references remain in declaration lexical scope; bare hydration initial body and every later render resolve to a stable same-module compiled-void binding.",
+    "Module-level roots, imported/wrapped/arrow/return-JSX targets, aliases, escapes, closures, unknown targets, writable definitions and direct eval decline proof. Runtime enum/namespace syntax conservatively invalidates binding-write facts.",
+    "Hydration descriptors, host/string/null/missing/wrapped/mutable targets, spread and optional calls stay generic regardless of proven later renders.",
+    "Development, HMR, profiling, server, explicit renderer/universal/boundary modes remain generic.",
+    "Common hydration refactor adds private compiler ABI and cold wrapper call/existing closure parameter capture; no public opt-in, per-node/per-update callback or map added.",
+    "Four stock consumer reductions; context, deferred and generic closures retain residual historical regressions. Deferred +20 gzip and used native client Brotli +165 compressed identifier drift disclosed. 14 public closures byte-identical, used native SSR/standalone engine unchanged; no added retained-code policy transfer observed.",
+    "Compiler proof has measured overhead; no runtime CPU, SSR speed, native browser, full CI or universal unused-signals recovery claim. Budget caps unchanged."
+  ],
+  "candidateSourceTreeHashMethod": "SHA256 of Python json.dumps(sorted repository-relative path-to-fileSHA256 mapping, sort_keys=True).encode(), using default separators.",
+  "creationOnlyParent": "a160dd4999f660a9cad59f2f45e4360efdffe155",
+  "publicClosureControls": [
+    {
+      "id": "ordinary-client",
+      "baseline330": {
+        "id": "ordinary-client",
+        "bundler": "esbuild",
+        "raw": 193173,
+        "gzip": 61565,
+        "brotli": 53439,
+        "sha256": "d706dba033132ab7e68586a2e7e2ade1b95045919b00684cf844a3ac1c9bcdf5"
+      },
+      "creationOnlyParent": {
+        "id": "ordinary-client",
+        "bundler": "esbuild",
+        "raw": 193173,
+        "gzip": 61565,
+        "brotli": 53439,
+        "sha256": "d706dba033132ab7e68586a2e7e2ade1b95045919b00684cf844a3ac1c9bcdf5"
+      },
+      "candidate": {
+        "id": "ordinary-client",
+        "bundler": "esbuild",
+        "raw": 193173,
+        "gzip": 61565,
+        "brotli": 53439,
+        "sha256": "d706dba033132ab7e68586a2e7e2ade1b95045919b00684cf844a3ac1c9bcdf5"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "ordinary-server",
+      "baseline330": {
+        "id": "ordinary-server",
+        "bundler": "esbuild",
+        "raw": 50366,
+        "gzip": 17728,
+        "brotli": 15990,
+        "sha256": "62940952060a7e32918f66495e0ebd908710945035092908e0c66708569e5ebc"
+      },
+      "creationOnlyParent": {
+        "id": "ordinary-server",
+        "bundler": "esbuild",
+        "raw": 50366,
+        "gzip": 17728,
+        "brotli": 15990,
+        "sha256": "62940952060a7e32918f66495e0ebd908710945035092908e0c66708569e5ebc"
+      },
+      "candidate": {
+        "id": "ordinary-server",
+        "bundler": "esbuild",
+        "raw": 50366,
+        "gzip": 17728,
+        "brotli": 15990,
+        "sha256": "62940952060a7e32918f66495e0ebd908710945035092908e0c66708569e5ebc"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-scalar",
+      "baseline330": {
+        "id": "binding-scalar",
+        "bundler": "esbuild",
+        "raw": 13823,
+        "gzip": 5251,
+        "brotli": 4748,
+        "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+      },
+      "creationOnlyParent": {
+        "id": "binding-scalar",
+        "bundler": "esbuild",
+        "raw": 13823,
+        "gzip": 5251,
+        "brotli": 4748,
+        "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+      },
+      "candidate": {
+        "id": "binding-scalar",
+        "bundler": "esbuild",
+        "raw": 13823,
+        "gzip": 5251,
+        "brotli": 4748,
+        "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-structural",
+      "baseline330": {
+        "id": "binding-structural",
+        "bundler": "esbuild",
+        "raw": 31292,
+        "gzip": 10455,
+        "brotli": 9553,
+        "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+      },
+      "creationOnlyParent": {
+        "id": "binding-structural",
+        "bundler": "esbuild",
+        "raw": 31292,
+        "gzip": 10455,
+        "brotli": 9553,
+        "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+      },
+      "candidate": {
+        "id": "binding-structural",
+        "bundler": "esbuild",
+        "raw": 31292,
+        "gzip": 10455,
+        "brotli": 9553,
+        "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-controls",
+      "baseline330": {
+        "id": "binding-controls",
+        "bundler": "esbuild",
+        "raw": 9046,
+        "gzip": 3525,
+        "brotli": 3190,
+        "sha256": "f9d9f7ca38bd4591295e188a20aa78de7a84aabbd5e1b78935f1619cdee18e3d"
+      },
+      "creationOnlyParent": {
+        "id": "binding-controls",
+        "bundler": "esbuild",
+        "raw": 9046,
+        "gzip": 3525,
+        "brotli": 3190,
+        "sha256": "f9d9f7ca38bd4591295e188a20aa78de7a84aabbd5e1b78935f1619cdee18e3d"
+      },
+      "candidate": {
+        "id": "binding-controls",
+        "bundler": "esbuild",
+        "raw": 9046,
+        "gzip": 3525,
+        "brotli": 3190,
+        "sha256": "f9d9f7ca38bd4591295e188a20aa78de7a84aabbd5e1b78935f1619cdee18e3d"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-whole-style",
+      "baseline330": {
+        "id": "binding-whole-style",
+        "bundler": "esbuild",
+        "raw": 6199,
+        "gzip": 2630,
+        "brotli": 2360,
+        "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+      },
+      "creationOnlyParent": {
+        "id": "binding-whole-style",
+        "bundler": "esbuild",
+        "raw": 6199,
+        "gzip": 2630,
+        "brotli": 2360,
+        "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+      },
+      "candidate": {
+        "id": "binding-whole-style",
+        "bundler": "esbuild",
+        "raw": 6199,
+        "gzip": 2630,
+        "brotli": 2360,
+        "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-scalar-controls-style",
+      "baseline330": {
+        "id": "binding-scalar-controls-style",
+        "bundler": "esbuild",
+        "raw": 27473,
+        "gzip": 9954,
+        "brotli": 9029,
+        "sha256": "f26ff87b831d27584d84a74ebeacc8787600cb2eb7e0523c5a49ea0d5c3aed80"
+      },
+      "creationOnlyParent": {
+        "id": "binding-scalar-controls-style",
+        "bundler": "esbuild",
+        "raw": 27473,
+        "gzip": 9954,
+        "brotli": 9029,
+        "sha256": "f26ff87b831d27584d84a74ebeacc8787600cb2eb7e0523c5a49ea0d5c3aed80"
+      },
+      "candidate": {
+        "id": "binding-scalar-controls-style",
+        "bundler": "esbuild",
+        "raw": 27473,
+        "gzip": 9954,
+        "brotli": 9029,
+        "sha256": "f26ff87b831d27584d84a74ebeacc8787600cb2eb7e0523c5a49ea0d5c3aed80"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "engine",
+      "baseline330": {
+        "id": "engine",
+        "bundler": "esbuild",
+        "raw": 42253,
+        "gzip": 12889,
+        "brotli": 11672,
+        "sha256": "3264d5ac64941955c4e9edadb70c17385d67b03ebd611f54dbdd96c5e6478a43"
+      },
+      "creationOnlyParent": {
+        "id": "engine",
+        "bundler": "esbuild",
+        "raw": 42253,
+        "gzip": 12889,
+        "brotli": 11672,
+        "sha256": "3264d5ac64941955c4e9edadb70c17385d67b03ebd611f54dbdd96c5e6478a43"
+      },
+      "candidate": {
+        "id": "engine",
+        "bundler": "esbuild",
+        "raw": 42253,
+        "gzip": 12889,
+        "brotli": 11672,
+        "sha256": "3264d5ac64941955c4e9edadb70c17385d67b03ebd611f54dbdd96c5e6478a43"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "native-client",
+      "baseline330": {
+        "id": "native-client",
+        "bundler": "esbuild",
+        "raw": 45094,
+        "gzip": 14297,
+        "brotli": 12931,
+        "sha256": "46037b83c2f05c341757c96be73b7fb6b5ba61bce3de8f4a6de4b8cd1efc7e62"
+      },
+      "creationOnlyParent": {
+        "id": "native-client",
+        "bundler": "esbuild",
+        "raw": 45094,
+        "gzip": 14297,
+        "brotli": 12931,
+        "sha256": "46037b83c2f05c341757c96be73b7fb6b5ba61bce3de8f4a6de4b8cd1efc7e62"
+      },
+      "candidate": {
+        "id": "native-client",
+        "bundler": "esbuild",
+        "raw": 45094,
+        "gzip": 14297,
+        "brotli": 12931,
+        "sha256": "46037b83c2f05c341757c96be73b7fb6b5ba61bce3de8f4a6de4b8cd1efc7e62"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "native-server",
+      "baseline330": {
+        "id": "native-server",
+        "bundler": "esbuild",
+        "raw": 44962,
+        "gzip": 14215,
+        "brotli": 12841,
+        "sha256": "4b0c2329255b4cdcba1bbe57fe009860e85e0725b09320ff7b36122ec3a1d9b3"
+      },
+      "creationOnlyParent": {
+        "id": "native-server",
+        "bundler": "esbuild",
+        "raw": 44962,
+        "gzip": 14215,
+        "brotli": 12841,
+        "sha256": "4b0c2329255b4cdcba1bbe57fe009860e85e0725b09320ff7b36122ec3a1d9b3"
+      },
+      "candidate": {
+        "id": "native-server",
+        "bundler": "esbuild",
+        "raw": 44962,
+        "gzip": 14215,
+        "brotli": 12841,
+        "sha256": "4b0c2329255b4cdcba1bbe57fe009860e85e0725b09320ff7b36122ec3a1d9b3"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "compiled-plain-signals",
+      "baseline330": {
+        "id": "compiled-plain-signals",
+        "bundler": "esbuild",
+        "raw": 64833,
+        "gzip": 19026,
+        "brotli": 17176,
+        "sha256": "817525035dacdc1cb59e77176e9b7271740271fd41abf791c18689da74da8b73"
+      },
+      "creationOnlyParent": {
+        "id": "compiled-plain-signals",
+        "bundler": "esbuild",
+        "raw": 64833,
+        "gzip": 19026,
+        "brotli": 17176,
+        "sha256": "817525035dacdc1cb59e77176e9b7271740271fd41abf791c18689da74da8b73"
+      },
+      "candidate": {
+        "id": "compiled-plain-signals",
+        "bundler": "esbuild",
+        "raw": 64833,
+        "gzip": 19026,
+        "brotli": 17176,
+        "sha256": "817525035dacdc1cb59e77176e9b7271740271fd41abf791c18689da74da8b73"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "streamed-signals-bootstrap",
+      "baseline330": {
+        "id": "streamed-signals-bootstrap",
+        "bundler": "esbuild",
+        "raw": 70744,
+        "gzip": 21933,
+        "brotli": 19640,
+        "sha256": "cc7c410ff2a691465cab4708aac58d2f0f48ddfacf9e5e70ba108ea1841bc5e3"
+      },
+      "creationOnlyParent": {
+        "id": "streamed-signals-bootstrap",
+        "bundler": "esbuild",
+        "raw": 70744,
+        "gzip": 21933,
+        "brotli": 19640,
+        "sha256": "cc7c410ff2a691465cab4708aac58d2f0f48ddfacf9e5e70ba108ea1841bc5e3"
+      },
+      "candidate": {
+        "id": "streamed-signals-bootstrap",
+        "bundler": "esbuild",
+        "raw": 70744,
+        "gzip": 21933,
+        "brotli": 19640,
+        "sha256": "cc7c410ff2a691465cab4708aac58d2f0f48ddfacf9e5e70ba108ea1841bc5e3"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "streamed-signal-results-bootstrap",
+      "baseline330": {
+        "id": "streamed-signal-results-bootstrap",
+        "bundler": "esbuild",
+        "raw": 64725,
+        "gzip": 19935,
+        "brotli": 17902,
+        "sha256": "6f04f8d035089562dcebed5de4ade9b524eddc667ed1bc5770bb0a37eb3554e5"
+      },
+      "creationOnlyParent": {
+        "id": "streamed-signal-results-bootstrap",
+        "bundler": "esbuild",
+        "raw": 64725,
+        "gzip": 19935,
+        "brotli": 17902,
+        "sha256": "6f04f8d035089562dcebed5de4ade9b524eddc667ed1bc5770bb0a37eb3554e5"
+      },
+      "candidate": {
+        "id": "streamed-signal-results-bootstrap",
+        "bundler": "esbuild",
+        "raw": 64725,
+        "gzip": 19935,
+        "brotli": 17902,
+        "sha256": "6f04f8d035089562dcebed5de4ade9b524eddc667ed1bc5770bb0a37eb3554e5"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "used-native-app",
+      "baseline330": {
+        "id": "used-native-app",
+        "bundler": "esbuild",
+        "raw": 247072,
+        "gzip": 78310,
+        "brotli": 68002,
+        "sha256": "cb62bf7aa6146e0fe0079b5eb13e67f8446d988279262310d65c75f279dad524"
+      },
+      "creationOnlyParent": {
+        "id": "used-native-app",
+        "bundler": "esbuild",
+        "raw": 247072,
+        "gzip": 78310,
+        "brotli": 68002,
+        "sha256": "cb62bf7aa6146e0fe0079b5eb13e67f8446d988279262310d65c75f279dad524"
+      },
+      "candidate": {
+        "id": "used-native-app",
+        "bundler": "esbuild",
+        "raw": 247072,
+        "gzip": 78309,
+        "brotli": 68167,
+        "sha256": "124a247634a51a51c728d845d74c309dfc2aa64c05fb70ed4b5d94a3eb9358ae"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": -1,
+        "brotli": 165
+      },
+      "byteIdenticalToBaseline330": false,
+      "byteIdenticalToCreationOnlyParent": false
+    },
+    {
+      "id": "used-native-ssr",
+      "baseline330": {
+        "id": "used-native-ssr",
+        "bundler": "esbuild",
+        "raw": 97093,
+        "gzip": 31888,
+        "brotli": 28769,
+        "sha256": "919d86a76c9637c84e47210d979095de8a3540c3bbe893a486b9923e27415934"
+      },
+      "creationOnlyParent": {
+        "id": "used-native-ssr",
+        "bundler": "esbuild",
+        "raw": 97093,
+        "gzip": 31888,
+        "brotli": 28769,
+        "sha256": "919d86a76c9637c84e47210d979095de8a3540c3bbe893a486b9923e27415934"
+      },
+      "candidate": {
+        "id": "used-native-ssr",
+        "bundler": "esbuild",
+        "raw": 97093,
+        "gzip": 31888,
+        "brotli": 28769,
+        "sha256": "919d86a76c9637c84e47210d979095de8a3540c3bbe893a486b9923e27415934"
+      },
+      "deltaFromBaseline330": {
+        "raw": 0,
+        "gzip": 0,
+        "brotli": 0
+      },
+      "byteIdenticalToBaseline330": true,
+      "byteIdenticalToCreationOnlyParent": true,
+      "ssrSmoke": {
+        "html": "<div style=\"color:red;left:1px;right:2px;\"><span>stable</span></div><script type=\"application/json\" data-octane-native-signals>{\"version\":1,\"scopes\":[{\"version\":1,\"scopeKey\":\"used-native-ssr\",\"entries\":[{\"key\":\"left\",\"kind\":\"signal\",\"value\":[\"number\",1],\"complete\":true,\"refreshing\":false,\"connection\":\"none\"},{\"key\":\"right\",\"kind\":\"signal\",\"value\":[\"number\",2],\"complete\":true,\"refreshing\":false,\"connection\":\"none\"}]}]}</script>",
+        "css": ""
+      }
+    }
+  ],
+  "usedNativeAppIdentifierDrift": {
+    "bytes": 247072,
+    "differingCharacters": [
+      {
+        "zeroBasedOffset": 246841,
+        "parent": "C",
+        "candidate": "O"
+      },
+      {
+        "zeroBasedOffset": 247058,
+        "parent": "C",
+        "candidate": "O"
+      }
+    ],
+    "description": "Only two characters differ across the entire retained bundle: minified local bootstrap identifier CT becomes OT at declaration and export. Raw length and retained source graph unchanged; gzip -1/Brotli +165 are compression drift."
+  },
+  "priorCreationOnlyValidation": {
+    "publicTestResults": 28,
+    "compilerProofControlsThenInOrdinaryTests": 24,
+    "nearbyActualRun": 195,
+    "nodeBoundarySuite": 19,
+    "independentPublicConsumerExecutions": 20,
     "fiveMutants": [
       {
         "name": "binding-writes",
@@ -705,13 +1704,1408 @@
     ],
     "mutantProvenance": "First4 proof/deletion mutants ran on the pre-null-guard prototype;5th null-admission mutant ran on final source. Each modified source was restored exactly; final28 public-test results/24 proof controls/195 nearby tests/19 boundaries passed after restoration."
   },
-  "limits": [
-    "Only production ordinary DOM function-local const roots; exact authored top-module @{} FunctionDeclarations whose IDs remain certified after lowering.",
-    "All root references remain in their declaration lexical scope and every render target resolves to a stable same-module compiled-void binding.",
-    "Module-level const roots, imported/wrapped/arrow/return-JSX targets, aliases, escapes, closures, unknown targets, writable definitions and direct eval decline this proof. Runtime namespace/enum syntax conservatively invalidates visible binding-write facts.",
-    "Development, HMR, profiling, server, explicit renderer/universal/renderer-boundary modes remain generic.",
-    "No runtime ABI/source changes, no SSR or standalone model cost transfer in the15 unchanged public closure controls.",
-    "Compiler proof has measured overhead; no runtime CPU, SSR speed, universal unused-signals recovery or combined PR/CI claim. Budget caps unchanged."
-  ],
-  "candidateSourceTreeHashMethod": "SHA256 of sorted path-to-fileSHA256 canonical JSON, compact separators"
+  "independentPublicHydrationAudit": {
+    "runnerSha256": "995b4a996cda79e8e92d222b41ccb4a60ce8cff57a31ed961213fa074dd94d2f",
+    "node": "v24.19.0",
+    "esbuildVersion": "0.28.1",
+    "scope": "Happy DOM public consumer observations; no native browser, broad SSR, CI, or timing qualification",
+    "cases": [
+      {
+        "id": "matched-state-props-draft-events-cleanup",
+        "producer": "import {hydrateRoot,flushSync,useState,useLayoutEffect} from 'octane';let cleans=0;\nexport function View({label}) @{const [n,set]=useState(0);useLayoutEffect(()=>()=>{cleans++},[]);<main><button onClick={()=>set(v=>v+1)}>{label as string}:{n as string}</button><input defaultValue=\"initial\"/></main>}",
+        "props": {
+          "label": "server"
+        },
+        "run": "export function run(host,html){host.innerHTML=html;const main=host.firstElementChild,button=host.querySelector('button'),input=host.querySelector('input');input.value='typed';const root=hydrateRoot(host,View,{label:'server'});flushSync(()=>{});const adopted=host.firstElementChild===main;button.click();flushSync(()=>{});root.render(View,{label:'updated'});flushSync(()=>{});const result={adopted,sameButton:host.querySelector('button')===button,sameInput:host.querySelector('input')===input,value:input.value,text:button.textContent};root.unmount();return{...result,cleans,empty:host.childNodes.length===0};}",
+        "expected": {
+          "adopted": true,
+          "sameButton": true,
+          "sameInput": true,
+          "value": "typed",
+          "text": "updated:1",
+          "cleans": 1,
+          "empty": true
+        },
+        "specialized": true
+      },
+      {
+        "id": "body-props3-options4-getter-order-prefix",
+        "producer": "import {hydrateRoot as adoptRoot,flushSync,useId} from 'octane';export function View({label}) @{const id=useId();<main><label for={id}>{label as string}</label><input id={id}/></main>}",
+        "props": {
+          "label": "server"
+        },
+        "serverOptions": {
+          "identifierPrefix": "abi-",
+          "identifierSeed": 3
+        },
+        "run": "export function run(host,html){host.innerHTML=html;const input=host.querySelector('input'),log=[];const target=()=>{log.push('target');return host};const props=()=>{log.push('props');return{label:'server'}};const options=()=>{log.push('options');return{get identifierPrefix(){log.push('prefix');return'abi-'},identifierSeed:3}};const root=adoptRoot(target(),View,props(),options());flushSync(()=>{});root.render(View,{label:'updated'});flushSync(()=>{});const result={firstCalls:log.slice(0,3),prefixReads:log.filter(x=>x==='prefix').length,prefix:input.id.includes('abi-'),same:input===host.querySelector('input'),text:host.querySelector('label').textContent};root.unmount();return{...result,empty:host.childNodes.length===0};}",
+        "expectedPartial": {
+          "firstCalls": ["target", "props", "options"],
+          "prefix": true,
+          "same": true,
+          "text": "updated",
+          "empty": true
+        },
+        "specialized": true
+      },
+      {
+        "id": "initial-wakeable-retry",
+        "producer": "import {hydrateRoot,flushSync,useId,useLayoutEffect} from 'octane';\nlet effects=0,cleanups=0;\nexport function View(p) @{useLayoutEffect(()=>{effects++;return()=>{cleanups++}},[]);if(!p.ready.value)throw p.gate;const id=useId();<main><button id={id}>{p.label as string}</button><input defaultValue=\"initial\"/></main>}",
+        "props": {
+          "ready": {
+            "value": true
+          },
+          "gate": null,
+          "label": "server"
+        },
+        "serverOptions": {
+          "identifierPrefix": "pending-",
+          "identifierSeed": 2
+        },
+        "run": "async function settle(){await Promise.resolve();await Promise.resolve();await new Promise(r=>setTimeout(r,0));flushSync(()=>{});}\nexport async function run(host,html){host.innerHTML=html;const main=host.firstElementChild,input=host.querySelector('input');input.value='typed';let release;const gate=new Promise(r=>release=r),ready={value:false};const root=hydrateRoot(host,View,{ready,gate,label:'server'},{identifierPrefix:'pending-',identifierSeed:2});const before={same:main===host.firstElementChild,value:input.value,effects};ready.value=true;release();await settle();const after={same:main===host.firstElementChild,value:host.querySelector('input').value,text:host.textContent,effects};root.unmount();return{before,after,cleanups,empty:host.childNodes.length===0};}",
+        "expected": {
+          "before": {
+            "same": true,
+            "value": "typed",
+            "effects": 0
+          },
+          "after": {
+            "same": true,
+            "value": "typed",
+            "text": "server",
+            "effects": 1
+          },
+          "cleanups": 1,
+          "empty": true
+        },
+        "specialized": true
+      },
+      {
+        "id": "pending-props-update-before-obsolete-gate",
+        "producer": "import {hydrateRoot,flushSync,useId,useLayoutEffect} from 'octane';\nlet effects=0,cleanups=0;\nexport function View(p) @{useLayoutEffect(()=>{effects++;return()=>{cleanups++}},[]);if(!p.ready.value)throw p.gate;const id=useId();<main><button id={id}>{p.label as string}</button><input defaultValue=\"initial\"/></main>}",
+        "props": {
+          "ready": {
+            "value": true
+          },
+          "gate": null,
+          "label": "server"
+        },
+        "serverOptions": {
+          "identifierPrefix": "pending-",
+          "identifierSeed": 2
+        },
+        "run": "async function settle(){await Promise.resolve();await Promise.resolve();await new Promise(r=>setTimeout(r,0));flushSync(()=>{});}\nexport async function run(host,html){host.innerHTML=html;const main=host.firstElementChild,input=host.querySelector('input');input.value='typed';let release;const gate=new Promise(r=>release=r),ready={value:false};const root=hydrateRoot(host,View,{ready,gate,label:'server'},{identifierPrefix:'pending-',identifierSeed:2});root.render(View,{ready:{value:true},gate:null,label:'replacement'});flushSync(()=>{});ready.value=true;release();await settle();const result={text:host.textContent,adopted:main===host.firstElementChild,value:host.querySelector('input').value,effects};root.unmount();return{...result,cleanups,empty:host.childNodes.length===0};}",
+        "expected": {
+          "text": "replacement",
+          "adopted": false,
+          "value": "initial",
+          "effects": 1,
+          "cleanups": 1,
+          "empty": true
+        },
+        "specialized": true
+      },
+      {
+        "id": "pending-unmount-before-wakeable",
+        "producer": "import {hydrateRoot,flushSync,useId,useLayoutEffect} from 'octane';\nlet effects=0,cleanups=0;\nexport function View(p) @{useLayoutEffect(()=>{effects++;return()=>{cleanups++}},[]);if(!p.ready.value)throw p.gate;const id=useId();<main><button id={id}>{p.label as string}</button><input defaultValue=\"initial\"/></main>}",
+        "props": {
+          "ready": {
+            "value": true
+          },
+          "gate": null,
+          "label": "server"
+        },
+        "serverOptions": {
+          "identifierPrefix": "pending-",
+          "identifierSeed": 2
+        },
+        "run": "async function settle(){await Promise.resolve();await Promise.resolve();await new Promise(r=>setTimeout(r,0));flushSync(()=>{});}\nexport async function run(host,html){host.innerHTML=html;const main=host.firstElementChild;let release;const gate=new Promise(r=>release=r),ready={value:false};const root=hydrateRoot(host,View,{ready,gate,label:'server'},{identifierPrefix:'pending-',identifierSeed:2});const retained=main===host.firstElementChild;root.unmount();ready.value=true;release();await settle();return{retained,effects,cleanups,empty:host.childNodes.length===0};}",
+        "expected": {
+          "retained": true,
+          "effects": 0,
+          "cleanups": 0,
+          "empty": true
+        },
+        "specialized": true
+      },
+      {
+        "id": "descriptor-options3-generic",
+        "producer": "import {hydrateRoot,flushSync,createElement,useId} from 'octane';export function View({label}) @{const id=useId();<main><button id={id}>{label as string}</button></main>}",
+        "props": {
+          "label": "server"
+        },
+        "serverOptions": {
+          "identifierPrefix": "descriptor-",
+          "identifierSeed": 2
+        },
+        "run": "export function run(host,html){host.innerHTML=html;const button=host.querySelector('button');const root=hydrateRoot(host,createElement(View,{label:'server'}),{identifierPrefix:'descriptor-',identifierSeed:2});flushSync(()=>{});root.render(View,{label:'updated'});flushSync(()=>{});const result={same:button===host.querySelector('button'),prefix:button.id.includes('descriptor-'),text:button.textContent};root.unmount();return{...result,empty:host.childNodes.length===0};}",
+        "expected": {
+          "same": true,
+          "prefix": true,
+          "text": "updated",
+          "empty": true
+        },
+        "specialized": false
+      },
+      {
+        "id": "unknown-initial-returned-function-and-host",
+        "producer": "import {hydrateRoot,flushSync,createElement} from 'octane';\nexport function View({label='template'}={}) @{<main><p>{label as string}</p></main>}",
+        "props": {},
+        "run": "export function run(host,html,hostHtml){host.innerHTML='ordinary';const root=hydrateRoot(host,()=> 'ordinary');const first=host.textContent;root.render(View,{label:'template'});flushSync(()=>{});const after=host.textContent;root.unmount();host.innerHTML=hostHtml;const hostNode=host.firstElementChild;const hostRoot=hydrateRoot(host,createElement('p',{children:'host initial'}));const hostFirst=host.textContent,hostSame=hostNode===host.firstElementChild;hostRoot.render(View,{label:'template'});flushSync(()=>{});const hostAfter=host.textContent;hostRoot.unmount();return{first,after,hostFirst,hostSame,hostAfter,empty:host.childNodes.length===0};}",
+        "expected": {
+          "first": "ordinary",
+          "after": "template",
+          "hostFirst": "host initial",
+          "hostSame": true,
+          "hostAfter": "template",
+          "empty": true
+        },
+        "specialized": false
+      },
+      {
+        "id": "mutable-and-shadowed-initial-bindings",
+        "producer": "import {hydrateRoot,flushSync} from 'octane';const initial=View;export function View() @{<p>template</p>}",
+        "props": {},
+        "run": "function shadow(host,View=()=> 'shadowed'){host.innerHTML='shadowed';const root=hydrateRoot(host,View);const text=host.textContent;root.unmount();return text;}export function run(host){View=()=> 'mutated';host.innerHTML='mutated';const root=hydrateRoot(host,View);const text=host.textContent;root.unmount();const shadowed=shadow(host);return{text,shadowed,changed:View!==initial,empty:host.childNodes.length===0};}",
+        "expected": {
+          "text": "mutated",
+          "shadowed": "shadowed",
+          "changed": true,
+          "empty": true
+        },
+        "specialized": false
+      },
+      {
+        "id": "escaped-root-later-ordinary-output",
+        "producer": "import {hydrateRoot,flushSync,createElement} from 'octane';\nexport function View({label='template'}={}) @{<main><p>{label as string}</p></main>}",
+        "props": {
+          "label": "server"
+        },
+        "run": "const roots=new Map();export function run(host,html){host.innerHTML=html;const root=hydrateRoot(host,View,{label:'server'});const before=host.textContent;roots.set('view',root);roots.get('view').render(()=> 'escaped ordinary');flushSync(()=>{});const after=host.textContent;root.unmount();roots.delete('view');return{before,after,empty:host.childNodes.length===0};}",
+        "expected": {
+          "before": "server",
+          "after": "escaped ordinary",
+          "empty": true
+        },
+        "specialized": false
+      },
+      {
+        "id": "late-unknown-render-target",
+        "producer": "import {hydrateRoot,flushSync,createElement} from 'octane';\nexport function View({label='template'}={}) @{<main><p>{label as string}</p></main>}",
+        "props": {
+          "label": "server"
+        },
+        "run": "function Returned(){return'late ordinary'}export function run(host,html){host.innerHTML=html;const root=hydrateRoot(host,View,{label:'server'});const before=host.textContent;root.render(Returned);flushSync(()=>{});const after=host.textContent;root.unmount();return{before,after,empty:host.childNodes.length===0};}",
+        "expected": {
+          "before": "server",
+          "after": "late ordinary",
+          "empty": true
+        },
+        "specialized": false
+      }
+    ],
+    "baseline": "a160dd4999f660a9cad59f2f45e4360efdffe155",
+    "candidateSourceTreeSha256": "4dcbc6aa9a6ed404c2480e2dee3b4e8e71a51e9d1c97707675681bb75b57fc59",
+    "consumerExecutions": 40,
+    "snapshotsIdenticalAcrossParentCandidate": true,
+    "variants": [
+      {
+        "label": "baseline",
+        "id": "matched-state-props-draft-events-cleanup",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "0fb66712579e2c1b50617a7b2df437d4c81d8e2aed2e6dabe4895042f19920f1",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "9732fc7b48d3e6e531f2b6d09ed763d5d7c9e255aadc82794f656ef39283a383",
+        "serverCompiledSha256": "968388aca14dfeb9761a964f1626ccb9c940ff3741d0631387481c32ae3efc35",
+        "ssrHtmlSha256": "55eaa286e6e941a76e2aec0dda1aecc42ae0ec4f059c3ab9e6b501c30b8cb186",
+        "result": {
+          "adopted": true,
+          "sameButton": true,
+          "sameInput": true,
+          "value": "typed",
+          "text": "updated:1",
+          "cleans": 1,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "98accd6dd49fb1ca7c081292c5c59c2605c0414493c3f2753e5f630ce23ad1b4",
+        "serverBundleSha256": "0e158ae72d7505736e944f40adccd6e0e38aae648cc87628dcd535ef63fa1a61"
+      },
+      {
+        "label": "baseline",
+        "id": "body-props3-options4-getter-order-prefix",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "61b4f750b0530ce38b767c63df4e128268296b635bc1f05c853ac916b3e9a8dc",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "bd8a1759c7b29f1bd368b844bc527ac5cd7537215e5bb66fe0b90998437b4c42",
+        "serverCompiledSha256": "d9aa2c8504f1e689999d9bcd4c96ce3e49d26bffb9f0efe57aaac7d2437bc777",
+        "ssrHtmlSha256": "97a72abef569d6845c0df8842674dcfa4d26815ae7e028e2dd9caffab913d04b",
+        "result": {
+          "firstCalls": ["target", "props", "options"],
+          "prefixReads": 2,
+          "prefix": true,
+          "same": true,
+          "text": "updated",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "cdca01b9e649ab217bfa8cf5f6c96686cc961e8a22c86a960222d29c3d01b0bc",
+        "serverBundleSha256": "32813c704a74e1c93958be09a18f8f551d81939b77715fa27ed0a04b7f627246"
+      },
+      {
+        "label": "baseline",
+        "id": "initial-wakeable-retry",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "1938b02bf40adad33c40876da1a32918a8d458f04910efa798462be7bd83aa4d",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "99445ca097852b43cc6f2b4baa143112c65d4ef1543d54d4402002281dde3888",
+        "serverCompiledSha256": "6b5fadf0b0f89e8c47c719cd522600fd5bd100d51704af5898afcbc7e1f848a4",
+        "ssrHtmlSha256": "caa596cfa294fe72207da057676a14e7c71bfde9a13318e6f4552e4556155133",
+        "result": {
+          "before": {
+            "same": true,
+            "value": "typed",
+            "effects": 0
+          },
+          "after": {
+            "same": true,
+            "value": "typed",
+            "text": "server",
+            "effects": 1
+          },
+          "cleanups": 1,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "6e351bfdef271635eb31d86a33ec6368ec3f1f3470ce8c171d52bae8b82108c3",
+        "serverBundleSha256": "5942549c5555b0f449157458f5094ebf19053c06615e1758fdb185da53ed53b0"
+      },
+      {
+        "label": "baseline",
+        "id": "pending-props-update-before-obsolete-gate",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "fc367cbcaffc825050fa61a7d5cd04bfdeca0fb4d6c5103c0b384e4d33f87356",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "e0fe735d45821b9a752d970638964ca4191f213f82b2603e364a049397bd2159",
+        "serverCompiledSha256": "6b5fadf0b0f89e8c47c719cd522600fd5bd100d51704af5898afcbc7e1f848a4",
+        "ssrHtmlSha256": "caa596cfa294fe72207da057676a14e7c71bfde9a13318e6f4552e4556155133",
+        "result": {
+          "text": "replacement",
+          "adopted": false,
+          "value": "initial",
+          "effects": 1,
+          "cleanups": 1,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "334805d1022d372b5c9995f0289295d3d336610c811312fd514a724cad27be80",
+        "serverBundleSha256": "cb5549450d855e397e2b18f6611263668b5f0681bb0f74f0c2b57f08ccc164b4"
+      },
+      {
+        "label": "baseline",
+        "id": "pending-unmount-before-wakeable",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "dab96c50f4479d2fc540e61609ac34de99929f71b09b05dfb0be34d49b1ca017",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "2b83e0306ac6334490340a6bed9086fa9a5b149aeeb2480ccb0ded81b81b2755",
+        "serverCompiledSha256": "6b5fadf0b0f89e8c47c719cd522600fd5bd100d51704af5898afcbc7e1f848a4",
+        "ssrHtmlSha256": "caa596cfa294fe72207da057676a14e7c71bfde9a13318e6f4552e4556155133",
+        "result": {
+          "retained": true,
+          "effects": 0,
+          "cleanups": 0,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "81480138d14b2effcbdafccd3e8947fe39fd7d2311f15db15885ffbcf15fc185",
+        "serverBundleSha256": "c21f1bd21fac7a9e58cf63e42920389cde1b280bcf214d7f32618b91acad429c"
+      },
+      {
+        "label": "baseline",
+        "id": "descriptor-options3-generic",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "766aa893425861e8f91cb0385ec39b073361d27cfd6fcaec2d3941a647d3e424",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "b5b19d42bc57f6e0513c9928348fdc44317d57e135e1e855fe6efc522a670195",
+        "serverCompiledSha256": "046ee846d57e90d6e9ff69feed885bcc20692d37fe69ce8bf1a4abbcb3a44e71",
+        "ssrHtmlSha256": "ddc5268deb09274f88643c350e04f96121c6b06d5b70f03aaf31bdb07b1cd0a2",
+        "result": {
+          "same": true,
+          "prefix": true,
+          "text": "updated",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "1791a8d0c17889ff100e2ac8f5124ff09ae5d153da696d618ce8a2cbe207c21d",
+        "serverBundleSha256": "e6b2041168f18a59e556bde238aea4ff7b1ff058e26822f4651d390b6cc891f8"
+      },
+      {
+        "label": "baseline",
+        "id": "unknown-initial-returned-function-and-host",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "e2522702188e99a7332d519f9c631c38812b1aa7f5fa20cfc0e93dccf5890dd6",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "d8b65dbba0408fb635ffc5e639d213040a33629a47c36689e8dec757cce38cf8",
+        "serverCompiledSha256": "93670fb36d696626269b9c4e97d31355b384d449db10364d84bc6e47be9b6cee",
+        "ssrHtmlSha256": "f2e134783033574f03b328fc96c060c1d13cd66282449e10b7f6221bdf9b8760",
+        "result": {
+          "first": "ordinary",
+          "after": "template",
+          "hostFirst": "host initial",
+          "hostSame": true,
+          "hostAfter": "template",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "6847ae4ce607c4b646f72e628138135e5d2e31fa4e8936925bcc82cf0dff5f0a",
+        "serverBundleSha256": "a73869fd24af7d049a1cd796ddbff6120b36c333e672a81fed1e9b6e2668c8ee"
+      },
+      {
+        "label": "baseline",
+        "id": "mutable-and-shadowed-initial-bindings",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "69f9a501a8dd21e369638964380338f6c208934e99a875c690ecaffcd1834413",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "decc2d4f2719e493d43602ea9ce08ce575b5568e617b49ff4405c5125439f2bd",
+        "serverCompiledSha256": "286662cc862179f4526f76cf0240093aa2c920c952d112619c8bd8d1c1dd2f7a",
+        "ssrHtmlSha256": "58109608dc56f4cdbb8d0ab3863605bf4f6f1d6865350fb92a186ed90061db10",
+        "result": {
+          "text": "mutated",
+          "shadowed": "shadowed",
+          "changed": true,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "76c80b7022f11d965c89c8c2572736c212aa853e099c649d7fad59b9a4a1d9eb",
+        "serverBundleSha256": "7bb4bb4f5b17244b766ac4e82f8702449cf35c5d94b867b0efdd1ce1f945c214"
+      },
+      {
+        "label": "baseline",
+        "id": "escaped-root-later-ordinary-output",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "f25de0c1d58db1a79234fb561956b00100c7460bb0e72543ed42f764d35e14d0",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "ac6c057840a8a0d2ddb964e418f88c4675ab1cabdd75fe270a02e2d71dceff94",
+        "serverCompiledSha256": "93670fb36d696626269b9c4e97d31355b384d449db10364d84bc6e47be9b6cee",
+        "ssrHtmlSha256": "93fb3affe3475488e390f9cf7b1db8a8bc23f413ddb7c3b24e43d2b1749ce48e",
+        "result": {
+          "before": "server",
+          "after": "escaped ordinary",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "56ad82353881a5a8b29214935fa844d8a4858f8142cabb7e32860a08862665c7",
+        "serverBundleSha256": "8d143d0a311ebfef1acd7f46ed4c23ae99341019f3a9cba94665b6ae0c3e2b6b"
+      },
+      {
+        "label": "baseline",
+        "id": "late-unknown-render-target",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "7aa6bfeba1b9f36cb4a51af9a79fa7b8700feb03b3ac6ac4c9276dbb33568c66",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "336d58abc8a779f2bd3277164d3feac7fa613dd23757804cb70a11be5e14d4da",
+        "serverCompiledSha256": "93670fb36d696626269b9c4e97d31355b384d449db10364d84bc6e47be9b6cee",
+        "ssrHtmlSha256": "93fb3affe3475488e390f9cf7b1db8a8bc23f413ddb7c3b24e43d2b1749ce48e",
+        "result": {
+          "before": "server",
+          "after": "late ordinary",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "28957b761f2cc76e8e19b9994904c184d8e269d3851b4d8b744090769e063f08",
+        "serverBundleSha256": "15f2a2750cfc7c7236d8a4e447248a229da046693c0bc94541120690e35b3727"
+      },
+      {
+        "label": "baseline",
+        "id": "matched-state-props-draft-events-cleanup",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "0fb66712579e2c1b50617a7b2df437d4c81d8e2aed2e6dabe4895042f19920f1",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "e165c8d902024d1761315c652eeb6c3155f260cb1723723fc991fde8dd339c12",
+        "serverCompiledSha256": "968388aca14dfeb9761a964f1626ccb9c940ff3741d0631387481c32ae3efc35",
+        "ssrHtmlSha256": "55eaa286e6e941a76e2aec0dda1aecc42ae0ec4f059c3ab9e6b501c30b8cb186",
+        "result": {
+          "adopted": true,
+          "sameButton": true,
+          "sameInput": true,
+          "value": "typed",
+          "text": "updated:1",
+          "cleans": 1,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "0e2414bed2783aa65aaee2b5ddd610dc3275e76711ff7ea27134fa606add6fa8",
+        "serverBundleSha256": "0e158ae72d7505736e944f40adccd6e0e38aae648cc87628dcd535ef63fa1a61"
+      },
+      {
+        "label": "baseline",
+        "id": "body-props3-options4-getter-order-prefix",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "61b4f750b0530ce38b767c63df4e128268296b635bc1f05c853ac916b3e9a8dc",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "2a56b70b1dfcf71aa596e2833e370acbde10e48bd7a76d6b9ab2d0a8ce204c6b",
+        "serverCompiledSha256": "d9aa2c8504f1e689999d9bcd4c96ce3e49d26bffb9f0efe57aaac7d2437bc777",
+        "ssrHtmlSha256": "97a72abef569d6845c0df8842674dcfa4d26815ae7e028e2dd9caffab913d04b",
+        "result": {
+          "firstCalls": ["target", "props", "options"],
+          "prefixReads": 2,
+          "prefix": true,
+          "same": true,
+          "text": "updated",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "30c9602249a4ce2fea411f7f4fe9602a4dbe824d283e6336da73055a86f24cb2",
+        "serverBundleSha256": "32813c704a74e1c93958be09a18f8f551d81939b77715fa27ed0a04b7f627246"
+      },
+      {
+        "label": "baseline",
+        "id": "initial-wakeable-retry",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "1938b02bf40adad33c40876da1a32918a8d458f04910efa798462be7bd83aa4d",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "84364919d25c069e623c4ed5de3e069676c6dc325be9615cc791e4169cd85c42",
+        "serverCompiledSha256": "6b5fadf0b0f89e8c47c719cd522600fd5bd100d51704af5898afcbc7e1f848a4",
+        "ssrHtmlSha256": "caa596cfa294fe72207da057676a14e7c71bfde9a13318e6f4552e4556155133",
+        "result": {
+          "before": {
+            "same": true,
+            "value": "typed",
+            "effects": 0
+          },
+          "after": {
+            "same": true,
+            "value": "typed",
+            "text": "server",
+            "effects": 1
+          },
+          "cleanups": 1,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "62384725a6c8adda22928784cc867aca0ef336c4f9df0e67d77831a7a0859b35",
+        "serverBundleSha256": "5942549c5555b0f449157458f5094ebf19053c06615e1758fdb185da53ed53b0"
+      },
+      {
+        "label": "baseline",
+        "id": "pending-props-update-before-obsolete-gate",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "fc367cbcaffc825050fa61a7d5cd04bfdeca0fb4d6c5103c0b384e4d33f87356",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "e4d4fce77d2dcd84759193848317b4459b6ca37cf1f81a7e9adf046baed4d6d5",
+        "serverCompiledSha256": "6b5fadf0b0f89e8c47c719cd522600fd5bd100d51704af5898afcbc7e1f848a4",
+        "ssrHtmlSha256": "caa596cfa294fe72207da057676a14e7c71bfde9a13318e6f4552e4556155133",
+        "result": {
+          "text": "replacement",
+          "adopted": false,
+          "value": "initial",
+          "effects": 1,
+          "cleanups": 1,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "07d4ed731f542ba0e9a25dc5b1b56e72a82a591e35b8d65f0769cd2892bb66fc",
+        "serverBundleSha256": "cb5549450d855e397e2b18f6611263668b5f0681bb0f74f0c2b57f08ccc164b4"
+      },
+      {
+        "label": "baseline",
+        "id": "pending-unmount-before-wakeable",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "dab96c50f4479d2fc540e61609ac34de99929f71b09b05dfb0be34d49b1ca017",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "0ee83482953f54e4378953d37a7e07407790ffb2c231a301c362391230320197",
+        "serverCompiledSha256": "6b5fadf0b0f89e8c47c719cd522600fd5bd100d51704af5898afcbc7e1f848a4",
+        "ssrHtmlSha256": "caa596cfa294fe72207da057676a14e7c71bfde9a13318e6f4552e4556155133",
+        "result": {
+          "retained": true,
+          "effects": 0,
+          "cleanups": 0,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "6e21dac99fa81dbe2d66e406aec24e171a1b8c0cf0dac6c8e6ac5a01e5b87d84",
+        "serverBundleSha256": "c21f1bd21fac7a9e58cf63e42920389cde1b280bcf214d7f32618b91acad429c"
+      },
+      {
+        "label": "baseline",
+        "id": "descriptor-options3-generic",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "766aa893425861e8f91cb0385ec39b073361d27cfd6fcaec2d3941a647d3e424",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "94e48cf53adf259f2bbb5ebe7cd66130181ad09a52aa044c9e9a631fc60be8a4",
+        "serverCompiledSha256": "046ee846d57e90d6e9ff69feed885bcc20692d37fe69ce8bf1a4abbcb3a44e71",
+        "ssrHtmlSha256": "ddc5268deb09274f88643c350e04f96121c6b06d5b70f03aaf31bdb07b1cd0a2",
+        "result": {
+          "same": true,
+          "prefix": true,
+          "text": "updated",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "4866310df166081630434e95e867d71f122376309ee76a182d235f86e454aca9",
+        "serverBundleSha256": "e6b2041168f18a59e556bde238aea4ff7b1ff058e26822f4651d390b6cc891f8"
+      },
+      {
+        "label": "baseline",
+        "id": "unknown-initial-returned-function-and-host",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "e2522702188e99a7332d519f9c631c38812b1aa7f5fa20cfc0e93dccf5890dd6",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "d941f3aba7e24c76f2adaa8fa59a079c1dbde61666a32462cd5c647511560449",
+        "serverCompiledSha256": "93670fb36d696626269b9c4e97d31355b384d449db10364d84bc6e47be9b6cee",
+        "ssrHtmlSha256": "f2e134783033574f03b328fc96c060c1d13cd66282449e10b7f6221bdf9b8760",
+        "result": {
+          "first": "ordinary",
+          "after": "template",
+          "hostFirst": "host initial",
+          "hostSame": true,
+          "hostAfter": "template",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "f129ff2117af1f863d0af258cea05bf595bb504dc0a964cee98241dc2a230355",
+        "serverBundleSha256": "a73869fd24af7d049a1cd796ddbff6120b36c333e672a81fed1e9b6e2668c8ee"
+      },
+      {
+        "label": "baseline",
+        "id": "mutable-and-shadowed-initial-bindings",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "69f9a501a8dd21e369638964380338f6c208934e99a875c690ecaffcd1834413",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "1d1bdbf1a29469b5f1bf04a1c0197427f3da12dd8b36257de1fb787d03720dbc",
+        "serverCompiledSha256": "286662cc862179f4526f76cf0240093aa2c920c952d112619c8bd8d1c1dd2f7a",
+        "ssrHtmlSha256": "58109608dc56f4cdbb8d0ab3863605bf4f6f1d6865350fb92a186ed90061db10",
+        "result": {
+          "text": "mutated",
+          "shadowed": "shadowed",
+          "changed": true,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "f164402ca696befee49f12fa62cb42883ec04f7e6ba29cf5c59157f10c709175",
+        "serverBundleSha256": "7bb4bb4f5b17244b766ac4e82f8702449cf35c5d94b867b0efdd1ce1f945c214"
+      },
+      {
+        "label": "baseline",
+        "id": "escaped-root-later-ordinary-output",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "f25de0c1d58db1a79234fb561956b00100c7460bb0e72543ed42f764d35e14d0",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "48ddcdd8ffbcc0df4a31f5e811cdcfbe5c99743805bc021ded996ab1e755d159",
+        "serverCompiledSha256": "93670fb36d696626269b9c4e97d31355b384d449db10364d84bc6e47be9b6cee",
+        "ssrHtmlSha256": "93fb3affe3475488e390f9cf7b1db8a8bc23f413ddb7c3b24e43d2b1749ce48e",
+        "result": {
+          "before": "server",
+          "after": "escaped ordinary",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "3afd96e8513bcfc0e5430abb8c69678d4a806cac842dbc1ddd5e5e82ad971e64",
+        "serverBundleSha256": "8d143d0a311ebfef1acd7f46ed4c23ae99341019f3a9cba94665b6ae0c3e2b6b"
+      },
+      {
+        "label": "baseline",
+        "id": "late-unknown-render-target",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "f63ade4bc800944a79c091270fee05c100decef81eeb60f37bf899cfcae7053e",
+          "src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+          "src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+        },
+        "authoredSha256": "7aa6bfeba1b9f36cb4a51af9a79fa7b8700feb03b3ac6ac4c9276dbb33568c66",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "dd1dc7d53275f347f912cb1d885331c81f5f6bb940e593f3200ff7e5cb79c2f9",
+        "serverCompiledSha256": "93670fb36d696626269b9c4e97d31355b384d449db10364d84bc6e47be9b6cee",
+        "ssrHtmlSha256": "93fb3affe3475488e390f9cf7b1db8a8bc23f413ddb7c3b24e43d2b1749ce48e",
+        "result": {
+          "before": "server",
+          "after": "late ordinary",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "8f8bf2e68bef658b8597d2299822c5200c6b7ccb48ccb57ded44a82a2332e7c7",
+        "serverBundleSha256": "15f2a2750cfc7c7236d8a4e447248a229da046693c0bc94541120690e35b3727"
+      },
+      {
+        "label": "candidate",
+        "id": "matched-state-props-draft-events-cleanup",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "0fb66712579e2c1b50617a7b2df437d4c81d8e2aed2e6dabe4895042f19920f1",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": true,
+        "compiledSha256": "a051aea07910efa4b3b5097075e5cc188c84397e389734ccb0790d78fceb9346",
+        "serverCompiledSha256": "968388aca14dfeb9761a964f1626ccb9c940ff3741d0631387481c32ae3efc35",
+        "ssrHtmlSha256": "55eaa286e6e941a76e2aec0dda1aecc42ae0ec4f059c3ab9e6b501c30b8cb186",
+        "result": {
+          "adopted": true,
+          "sameButton": true,
+          "sameInput": true,
+          "value": "typed",
+          "text": "updated:1",
+          "cleans": 1,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "a2854fa80006a972baa921b4f5d260e1fe380fd5d06d04fbed78f8b35fb412f8",
+        "serverBundleSha256": "41c01f758a86c763d8000381d292f3ff74a05c17cbe70536a5459f63bb0fa752"
+      },
+      {
+        "label": "candidate",
+        "id": "body-props3-options4-getter-order-prefix",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "61b4f750b0530ce38b767c63df4e128268296b635bc1f05c853ac916b3e9a8dc",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": true,
+        "compiledSha256": "3715589fa4e8bb95f7a0854a02a805d194de8e06c2b2dd1e6ec5dc686eb01309",
+        "serverCompiledSha256": "d9aa2c8504f1e689999d9bcd4c96ce3e49d26bffb9f0efe57aaac7d2437bc777",
+        "ssrHtmlSha256": "97a72abef569d6845c0df8842674dcfa4d26815ae7e028e2dd9caffab913d04b",
+        "result": {
+          "firstCalls": ["target", "props", "options"],
+          "prefixReads": 2,
+          "prefix": true,
+          "same": true,
+          "text": "updated",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "caed48dad1d6af7177e2c5b722cbae059a2531727dba16c51585298b44b0c588",
+        "serverBundleSha256": "c0d5cd5d01e07619d82637ff9242b5df0825132ba456d4ba9734c61381302ce0"
+      },
+      {
+        "label": "candidate",
+        "id": "initial-wakeable-retry",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "1938b02bf40adad33c40876da1a32918a8d458f04910efa798462be7bd83aa4d",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": true,
+        "compiledSha256": "a15891cdb5a79aeed994f78bd8ea13b51aaa0123b51132ab29db5fe21527efe3",
+        "serverCompiledSha256": "6b5fadf0b0f89e8c47c719cd522600fd5bd100d51704af5898afcbc7e1f848a4",
+        "ssrHtmlSha256": "caa596cfa294fe72207da057676a14e7c71bfde9a13318e6f4552e4556155133",
+        "result": {
+          "before": {
+            "same": true,
+            "value": "typed",
+            "effects": 0
+          },
+          "after": {
+            "same": true,
+            "value": "typed",
+            "text": "server",
+            "effects": 1
+          },
+          "cleanups": 1,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "50c8e474c96755ec2643039e4150ee1626ccb5170f32fd5fa752d1f9fe01637d",
+        "serverBundleSha256": "434c852669fac9c61e3e26a47042cb78f128dff3572bceb767b3cd69365c15fd"
+      },
+      {
+        "label": "candidate",
+        "id": "pending-props-update-before-obsolete-gate",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "fc367cbcaffc825050fa61a7d5cd04bfdeca0fb4d6c5103c0b384e4d33f87356",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": true,
+        "compiledSha256": "e0e7e80cc242912f6fa180e289edc8fa46c3d09fd802644891cdf1ee629119a0",
+        "serverCompiledSha256": "6b5fadf0b0f89e8c47c719cd522600fd5bd100d51704af5898afcbc7e1f848a4",
+        "ssrHtmlSha256": "caa596cfa294fe72207da057676a14e7c71bfde9a13318e6f4552e4556155133",
+        "result": {
+          "text": "replacement",
+          "adopted": false,
+          "value": "initial",
+          "effects": 1,
+          "cleanups": 1,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "9b229ac571b6c198daa0a2312967dfbdeeaf14816046bd99d70273b260c93290",
+        "serverBundleSha256": "55310df168aa5ddc20aa583b84584dc37db7282908710655f4dd6bb8f3d32a55"
+      },
+      {
+        "label": "candidate",
+        "id": "pending-unmount-before-wakeable",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "dab96c50f4479d2fc540e61609ac34de99929f71b09b05dfb0be34d49b1ca017",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": true,
+        "compiledSha256": "856fc3008bc4427c4563408d265aaf62b5744422402d76715a5cf5428dd3e2c1",
+        "serverCompiledSha256": "6b5fadf0b0f89e8c47c719cd522600fd5bd100d51704af5898afcbc7e1f848a4",
+        "ssrHtmlSha256": "caa596cfa294fe72207da057676a14e7c71bfde9a13318e6f4552e4556155133",
+        "result": {
+          "retained": true,
+          "effects": 0,
+          "cleanups": 0,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "8f62f51ebdf61bb4ef2c4a059ecb209934a59802229d7072c647a64aeedad970",
+        "serverBundleSha256": "69e926f0b6c2dc996482f021fa1a9b899416ad71be8f37639a288cefaebafe73"
+      },
+      {
+        "label": "candidate",
+        "id": "descriptor-options3-generic",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "766aa893425861e8f91cb0385ec39b073361d27cfd6fcaec2d3941a647d3e424",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "b5b19d42bc57f6e0513c9928348fdc44317d57e135e1e855fe6efc522a670195",
+        "serverCompiledSha256": "046ee846d57e90d6e9ff69feed885bcc20692d37fe69ce8bf1a4abbcb3a44e71",
+        "ssrHtmlSha256": "ddc5268deb09274f88643c350e04f96121c6b06d5b70f03aaf31bdb07b1cd0a2",
+        "result": {
+          "same": true,
+          "prefix": true,
+          "text": "updated",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "0c4adaf460904f2b74d817f33771c7d9640431b38618878ffb491bcdeaa2d3ce",
+        "serverBundleSha256": "bb9ee4d4b096043a99ff1b77bac8f90ad2511faa8b10fe3d8ef81db7603f39fb"
+      },
+      {
+        "label": "candidate",
+        "id": "unknown-initial-returned-function-and-host",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "e2522702188e99a7332d519f9c631c38812b1aa7f5fa20cfc0e93dccf5890dd6",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "d8b65dbba0408fb635ffc5e639d213040a33629a47c36689e8dec757cce38cf8",
+        "serverCompiledSha256": "93670fb36d696626269b9c4e97d31355b384d449db10364d84bc6e47be9b6cee",
+        "ssrHtmlSha256": "f2e134783033574f03b328fc96c060c1d13cd66282449e10b7f6221bdf9b8760",
+        "result": {
+          "first": "ordinary",
+          "after": "template",
+          "hostFirst": "host initial",
+          "hostSame": true,
+          "hostAfter": "template",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "31aacf5bc6ec96388170f6716d36db26f14769fd1e9e984e899c2523e22b7b87",
+        "serverBundleSha256": "ad917167714f3d029136435134cb3930a8df5907236b0b6adf375e6233d79f95"
+      },
+      {
+        "label": "candidate",
+        "id": "mutable-and-shadowed-initial-bindings",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "69f9a501a8dd21e369638964380338f6c208934e99a875c690ecaffcd1834413",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "decc2d4f2719e493d43602ea9ce08ce575b5568e617b49ff4405c5125439f2bd",
+        "serverCompiledSha256": "286662cc862179f4526f76cf0240093aa2c920c952d112619c8bd8d1c1dd2f7a",
+        "ssrHtmlSha256": "58109608dc56f4cdbb8d0ab3863605bf4f6f1d6865350fb92a186ed90061db10",
+        "result": {
+          "text": "mutated",
+          "shadowed": "shadowed",
+          "changed": true,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "60718d7431d3a24279e65e6d63f5af9f25fd505016de01c6ca874d8276e64bea",
+        "serverBundleSha256": "b87d7fd80822c5b8af5b25dec7d1e2efc28569887516a6a72f9a344213ce633c"
+      },
+      {
+        "label": "candidate",
+        "id": "escaped-root-later-ordinary-output",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "f25de0c1d58db1a79234fb561956b00100c7460bb0e72543ed42f764d35e14d0",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "ac6c057840a8a0d2ddb964e418f88c4675ab1cabdd75fe270a02e2d71dceff94",
+        "serverCompiledSha256": "93670fb36d696626269b9c4e97d31355b384d449db10364d84bc6e47be9b6cee",
+        "ssrHtmlSha256": "93fb3affe3475488e390f9cf7b1db8a8bc23f413ddb7c3b24e43d2b1749ce48e",
+        "result": {
+          "before": "server",
+          "after": "escaped ordinary",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "300501aab1cf67c633f8e7324076372d9d2fc12c50e92f5e3554bb41c9c3400a",
+        "serverBundleSha256": "1813c125c1c7a46835dfa9cf44aa56b43ce2cd02cc3b5efea8fc30c901b5a124"
+      },
+      {
+        "label": "candidate",
+        "id": "late-unknown-render-target",
+        "dev": false,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "7aa6bfeba1b9f36cb4a51af9a79fa7b8700feb03b3ac6ac4c9276dbb33568c66",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "336d58abc8a779f2bd3277164d3feac7fa613dd23757804cb70a11be5e14d4da",
+        "serverCompiledSha256": "93670fb36d696626269b9c4e97d31355b384d449db10364d84bc6e47be9b6cee",
+        "ssrHtmlSha256": "93fb3affe3475488e390f9cf7b1db8a8bc23f413ddb7c3b24e43d2b1749ce48e",
+        "result": {
+          "before": "server",
+          "after": "late ordinary",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "5e253cf19842618019fca9ecbbcae6772ecec5e36b4adc8c96399d1823b1e85e",
+        "serverBundleSha256": "d59d41953b4a12c5d0267c3ad697201efad17750bb4d915178989ce132841ad9"
+      },
+      {
+        "label": "candidate",
+        "id": "matched-state-props-draft-events-cleanup",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "0fb66712579e2c1b50617a7b2df437d4c81d8e2aed2e6dabe4895042f19920f1",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "e165c8d902024d1761315c652eeb6c3155f260cb1723723fc991fde8dd339c12",
+        "serverCompiledSha256": "968388aca14dfeb9761a964f1626ccb9c940ff3741d0631387481c32ae3efc35",
+        "ssrHtmlSha256": "55eaa286e6e941a76e2aec0dda1aecc42ae0ec4f059c3ab9e6b501c30b8cb186",
+        "result": {
+          "adopted": true,
+          "sameButton": true,
+          "sameInput": true,
+          "value": "typed",
+          "text": "updated:1",
+          "cleans": 1,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "f16d867cd1e78d5e9715ef4e148cc7a0e7f7db4187055bea82c3b6299e27fa2a",
+        "serverBundleSha256": "41c01f758a86c763d8000381d292f3ff74a05c17cbe70536a5459f63bb0fa752"
+      },
+      {
+        "label": "candidate",
+        "id": "body-props3-options4-getter-order-prefix",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "61b4f750b0530ce38b767c63df4e128268296b635bc1f05c853ac916b3e9a8dc",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "2a56b70b1dfcf71aa596e2833e370acbde10e48bd7a76d6b9ab2d0a8ce204c6b",
+        "serverCompiledSha256": "d9aa2c8504f1e689999d9bcd4c96ce3e49d26bffb9f0efe57aaac7d2437bc777",
+        "ssrHtmlSha256": "97a72abef569d6845c0df8842674dcfa4d26815ae7e028e2dd9caffab913d04b",
+        "result": {
+          "firstCalls": ["target", "props", "options"],
+          "prefixReads": 2,
+          "prefix": true,
+          "same": true,
+          "text": "updated",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "ffd9ec489b66cb1fbd9709d97fa9d48d67cbacfea2846ae3ce8f5892ae3ef778",
+        "serverBundleSha256": "c0d5cd5d01e07619d82637ff9242b5df0825132ba456d4ba9734c61381302ce0"
+      },
+      {
+        "label": "candidate",
+        "id": "initial-wakeable-retry",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "1938b02bf40adad33c40876da1a32918a8d458f04910efa798462be7bd83aa4d",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "84364919d25c069e623c4ed5de3e069676c6dc325be9615cc791e4169cd85c42",
+        "serverCompiledSha256": "6b5fadf0b0f89e8c47c719cd522600fd5bd100d51704af5898afcbc7e1f848a4",
+        "ssrHtmlSha256": "caa596cfa294fe72207da057676a14e7c71bfde9a13318e6f4552e4556155133",
+        "result": {
+          "before": {
+            "same": true,
+            "value": "typed",
+            "effects": 0
+          },
+          "after": {
+            "same": true,
+            "value": "typed",
+            "text": "server",
+            "effects": 1
+          },
+          "cleanups": 1,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "b87c49433cbe8d3a8a78041bd01f1f926f0dc1857cb88db19bd032744b11a7e1",
+        "serverBundleSha256": "434c852669fac9c61e3e26a47042cb78f128dff3572bceb767b3cd69365c15fd"
+      },
+      {
+        "label": "candidate",
+        "id": "pending-props-update-before-obsolete-gate",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "fc367cbcaffc825050fa61a7d5cd04bfdeca0fb4d6c5103c0b384e4d33f87356",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "e4d4fce77d2dcd84759193848317b4459b6ca37cf1f81a7e9adf046baed4d6d5",
+        "serverCompiledSha256": "6b5fadf0b0f89e8c47c719cd522600fd5bd100d51704af5898afcbc7e1f848a4",
+        "ssrHtmlSha256": "caa596cfa294fe72207da057676a14e7c71bfde9a13318e6f4552e4556155133",
+        "result": {
+          "text": "replacement",
+          "adopted": false,
+          "value": "initial",
+          "effects": 1,
+          "cleanups": 1,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "8a15f4203a0eba451319003dd535c50ab0a4046ee9130a35d84175896a3b5a07",
+        "serverBundleSha256": "55310df168aa5ddc20aa583b84584dc37db7282908710655f4dd6bb8f3d32a55"
+      },
+      {
+        "label": "candidate",
+        "id": "pending-unmount-before-wakeable",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "dab96c50f4479d2fc540e61609ac34de99929f71b09b05dfb0be34d49b1ca017",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "0ee83482953f54e4378953d37a7e07407790ffb2c231a301c362391230320197",
+        "serverCompiledSha256": "6b5fadf0b0f89e8c47c719cd522600fd5bd100d51704af5898afcbc7e1f848a4",
+        "ssrHtmlSha256": "caa596cfa294fe72207da057676a14e7c71bfde9a13318e6f4552e4556155133",
+        "result": {
+          "retained": true,
+          "effects": 0,
+          "cleanups": 0,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "b173a40705e3b10ddb5c3ba9a836bd3ca4321f6d5d6d04032b8fb1b14a26b1a1",
+        "serverBundleSha256": "69e926f0b6c2dc996482f021fa1a9b899416ad71be8f37639a288cefaebafe73"
+      },
+      {
+        "label": "candidate",
+        "id": "descriptor-options3-generic",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "766aa893425861e8f91cb0385ec39b073361d27cfd6fcaec2d3941a647d3e424",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "94e48cf53adf259f2bbb5ebe7cd66130181ad09a52aa044c9e9a631fc60be8a4",
+        "serverCompiledSha256": "046ee846d57e90d6e9ff69feed885bcc20692d37fe69ce8bf1a4abbcb3a44e71",
+        "ssrHtmlSha256": "ddc5268deb09274f88643c350e04f96121c6b06d5b70f03aaf31bdb07b1cd0a2",
+        "result": {
+          "same": true,
+          "prefix": true,
+          "text": "updated",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "27da6ff4eb1d71e0635f54b16164cdb5ecf597ce6a5f72bc4e79e4cd43f4e589",
+        "serverBundleSha256": "bb9ee4d4b096043a99ff1b77bac8f90ad2511faa8b10fe3d8ef81db7603f39fb"
+      },
+      {
+        "label": "candidate",
+        "id": "unknown-initial-returned-function-and-host",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "e2522702188e99a7332d519f9c631c38812b1aa7f5fa20cfc0e93dccf5890dd6",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "d941f3aba7e24c76f2adaa8fa59a079c1dbde61666a32462cd5c647511560449",
+        "serverCompiledSha256": "93670fb36d696626269b9c4e97d31355b384d449db10364d84bc6e47be9b6cee",
+        "ssrHtmlSha256": "f2e134783033574f03b328fc96c060c1d13cd66282449e10b7f6221bdf9b8760",
+        "result": {
+          "first": "ordinary",
+          "after": "template",
+          "hostFirst": "host initial",
+          "hostSame": true,
+          "hostAfter": "template",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "dbb0b43778991afee8494eeac6ce19333aaca1ee17ffd744a0ab4a87be7f1d73",
+        "serverBundleSha256": "ad917167714f3d029136435134cb3930a8df5907236b0b6adf375e6233d79f95"
+      },
+      {
+        "label": "candidate",
+        "id": "mutable-and-shadowed-initial-bindings",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "69f9a501a8dd21e369638964380338f6c208934e99a875c690ecaffcd1834413",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "1d1bdbf1a29469b5f1bf04a1c0197427f3da12dd8b36257de1fb787d03720dbc",
+        "serverCompiledSha256": "286662cc862179f4526f76cf0240093aa2c920c952d112619c8bd8d1c1dd2f7a",
+        "ssrHtmlSha256": "58109608dc56f4cdbb8d0ab3863605bf4f6f1d6865350fb92a186ed90061db10",
+        "result": {
+          "text": "mutated",
+          "shadowed": "shadowed",
+          "changed": true,
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "19c7bc07fefda4fe2a358e084e47dc87068a28e09d8b6a8a4739157ccd2d2747",
+        "serverBundleSha256": "b87d7fd80822c5b8af5b25dec7d1e2efc28569887516a6a72f9a344213ce633c"
+      },
+      {
+        "label": "candidate",
+        "id": "escaped-root-later-ordinary-output",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "f25de0c1d58db1a79234fb561956b00100c7460bb0e72543ed42f764d35e14d0",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "48ddcdd8ffbcc0df4a31f5e811cdcfbe5c99743805bc021ded996ab1e755d159",
+        "serverCompiledSha256": "93670fb36d696626269b9c4e97d31355b384d449db10364d84bc6e47be9b6cee",
+        "ssrHtmlSha256": "93fb3affe3475488e390f9cf7b1db8a8bc23f413ddb7c3b24e43d2b1749ce48e",
+        "result": {
+          "before": "server",
+          "after": "escaped ordinary",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "23c5fdc231123d4addef25d8962c5ee011e170eed534d6e08d543057bdded52e",
+        "serverBundleSha256": "1813c125c1c7a46835dfa9cf44aa56b43ce2cd02cc3b5efea8fc30c901b5a124"
+      },
+      {
+        "label": "candidate",
+        "id": "late-unknown-render-target",
+        "dev": true,
+        "sourceHashes": {
+          "src/index.ts": "d005053e13a62408f61eccf1c7789cee03bd81c94bf442b630a7c0ac9cbd95a4",
+          "src/runtime.ts": "b6c15109b05ddd162888f48d29161c79c3be62890340a098c0915081388e82c5",
+          "src/runtime.server.ts": "68829ba5ec1000b2b1b6eaa413f6ca9cda982cbbefe990a596431e6384189853",
+          "src/compiler/compile.js": "34be9127a1f33209a9556eb19d7765ee67875eca6059094c7519ddf677e696fc",
+          "src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b"
+        },
+        "authoredSha256": "7aa6bfeba1b9f36cb4a51af9a79fa7b8700feb03b3ac6ac4c9276dbb33568c66",
+        "frozenAst": true,
+        "assertLoc": true,
+        "specialized": false,
+        "compiledSha256": "dd1dc7d53275f347f912cb1d885331c81f5f6bb940e593f3200ff7e5cb79c2f9",
+        "serverCompiledSha256": "93670fb36d696626269b9c4e97d31355b384d449db10364d84bc6e47be9b6cee",
+        "ssrHtmlSha256": "93fb3affe3475488e390f9cf7b1db8a8bc23f413ddb7c3b24e43d2b1749ce48e",
+        "result": {
+          "before": "server",
+          "after": "late ordinary",
+          "empty": true
+        },
+        "semanticPass": true,
+        "clientBundleSha256": "b41f40a5b8b50b6b730f88f1f990fe902bc24c9384ea8e9301778be7394f77b9",
+        "serverBundleSha256": "d59d41953b4a12c5d0267c3ad697201efad17750bb4d915178989ce132841ad9"
+      }
+    ]
+  },
+  "runtimeCost": {
+    "wrapperSourceCall": "One cold wrapper-to-common-body source call per hydrateRoot invocation unless minifier inlines it.",
+    "existingAdoptionClosureCapture": "outputHandler parameter newly captured by existing adoption closure.",
+    "newPerNodeOrPerUpdateCallbacksOrMaps": false,
+    "zeroHeapCostClaim": false,
+    "runtimeOrSsrCpuGainClaim": false,
+    "handlerEdges": [
+      "initial root block",
+      "root output handler",
+      "disposed root block recreation during adoption"
+    ],
+    "normalization": "Public generic descriptor/body overload normalization unchanged: descriptors options3; bare body props3/options4. Compiler proof admits only bare certified initial body."
+  }
 }
