@@ -1,0 +1,370 @@
+{
+  "baselineRef": "330bb0878b42dbc445659c5ea40494067c4ef296",
+  "baselineArchiveSha256": "a7bb338a40a882808d3b38da651b04f26717afc7ccdd16ec988980a1275fc2b3",
+  "node": "v24.19.0",
+  "tooling": {
+    "esbuild": "0.28.1",
+    "vite": "8.1.5",
+    "@tsrx/core": "0.2.0",
+    "@tsrx/oxc/tsrx-core-compat": "0.13.0",
+    "alien-signals": "3.2.0",
+    "devalue": "5.8.2",
+    "jsdom": "30.0.1"
+  },
+  "lockSHA": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+  "runnerSHA": "f8fd05b24d29500cdc975ee38ea599ea4466002bc6e5872b78b923383119c682",
+  "sourceHashes": {
+    "packages/octane/src/compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+    "packages/octane/src/compiler/slot-hooks.js": "f36731dc0cd46ad4b5df5d47c1f9261dbd360c212ab9070065044c398e557937",
+    "packages/octane/src/compiler/compile.js": "11da48eaf3e3881b99c091539c5f0f50327405e1663db98272f5e7c20bcd4869",
+    "packages/octane/src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674"
+  },
+  "separateEntryBaseline": [
+    {
+      "id": "root-static",
+      "fixtureSHA": "11de23976d8dd67593331ae6e18aee9a4bc65f5975c85bc0542d21de3d625f52",
+      "entrySHA": "f77cc9ae391bee74d15efc931b57c5832c4d50195f304b0dda0e32ca03e7ef7c",
+      "viewSHA": "8a061345df9867bc12c673843386e4870cae125a96752893ca0fa0a056de2820",
+      "raw": 197931,
+      "gzip": 62583,
+      "brotli": 54294,
+      "sha256": "c42a8832776417f94fc44ae3e9cad58cd1d44fce5fecb87f649bdff27db56c28",
+      "observations": {
+        "text": "Octane",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "hooks-state",
+      "fixtureSHA": "6ea5c5984e655be2202a2ff68b916f60bff39f48038f44984e0c429afce27aff",
+      "entrySHA": "633edfa69aa035e5c511075c29df29d5750a13e00d7ed7bd3221924c00e16c8e",
+      "viewSHA": "6978c7167fe8f6fded7651a405e71f5ac402e49a8060b13bd38e31d792dc35fe",
+      "raw": 205942,
+      "gzip": 65394,
+      "brotli": 56643,
+      "sha256": "80721dd32d4cfd2cb2f992e140ccff11577adabecf9537b3ffc6556c2aedb43f",
+      "observations": {
+        "before": "0",
+        "after": "1",
+        "clicks": 1,
+        "effects": 1,
+        "cleanups": 1,
+        "cleaned": true
+      }
+    },
+    {
+      "id": "context",
+      "fixtureSHA": "03b2265c546f182af9be5a6c5d0eb21c206e0d0e53af0667597122809a0e7e19",
+      "entrySHA": "dfa69439a43452630984502a6bdd75b0980e29ef1de0fd2ec035bdf88d960bdc",
+      "viewSHA": "47a2ce5b5a38a6363409680f0c8f5ab3cf41340e0cac101cd1f65f08ecf5b64f",
+      "raw": 216895,
+      "gzip": 68608,
+      "brotli": 59319,
+      "sha256": "c4918cd046b180f1b21f074b58f691e56d6217a8cf706a9f68bf3b9a058f2df7",
+      "observations": {
+        "before": "light",
+        "after": "dark",
+        "cleaned": true
+      }
+    }
+  ],
+  "separateEntryCandidate": [
+    {
+      "id": "root-static",
+      "fixtureSHA": "11de23976d8dd67593331ae6e18aee9a4bc65f5975c85bc0542d21de3d625f52",
+      "entrySHA": "f77cc9ae391bee74d15efc931b57c5832c4d50195f304b0dda0e32ca03e7ef7c",
+      "viewSHA": "8a061345df9867bc12c673843386e4870cae125a96752893ca0fa0a056de2820",
+      "raw": 83633,
+      "gzip": 27583,
+      "brotli": 24583,
+      "sha256": "4e5137830ce11041e8f6b3df6d841ba2c359edce084650aeec385b83545e8b19",
+      "observations": {
+        "text": "Octane",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "hooks-state",
+      "fixtureSHA": "6ea5c5984e655be2202a2ff68b916f60bff39f48038f44984e0c429afce27aff",
+      "entrySHA": "633edfa69aa035e5c511075c29df29d5750a13e00d7ed7bd3221924c00e16c8e",
+      "viewSHA": "6978c7167fe8f6fded7651a405e71f5ac402e49a8060b13bd38e31d792dc35fe",
+      "raw": 95051,
+      "gzip": 31403,
+      "brotli": 27938,
+      "sha256": "5662209cfdaccdc07553239a298fdaebc53e60aa04d89092c6a09c55837fe5b9",
+      "observations": {
+        "before": "0",
+        "after": "1",
+        "clicks": 1,
+        "effects": 1,
+        "cleanups": 1,
+        "cleaned": true
+      }
+    },
+    {
+      "id": "context",
+      "fixtureSHA": "03b2265c546f182af9be5a6c5d0eb21c206e0d0e53af0667597122809a0e7e19",
+      "entrySHA": "dfa69439a43452630984502a6bdd75b0980e29ef1de0fd2ec035bdf88d960bdc",
+      "viewSHA": "47a2ce5b5a38a6363409680f0c8f5ab3cf41340e0cac101cd1f65f08ecf5b64f",
+      "raw": 216897,
+      "gzip": 68609,
+      "brotli": 59308,
+      "sha256": "35566cd57a10a3deeed3d07b3b846ede983c2d64573a2b1ea713cc670780a984",
+      "observations": {
+        "before": "light",
+        "after": "dark",
+        "cleaned": true
+      }
+    }
+  ],
+  "published1139Control": {
+    "ref": "cc21ab461429f0f6d60e3b0c7d8ae4ab2552dadf",
+    "runnerSHA": "c3903ca14baef42bb47f31349ff1581f598e31dc67a65fbc468042fee70641b8",
+    "rows": [
+      {
+        "id": "root-static",
+        "raw": 193904,
+        "gzip": 61598,
+        "brotli": 53440,
+        "sha256": "8be53450fdc444d38349147e43faec80272ab5fd3a094f8c867dc8d11ce1a7ec",
+        "observations": {
+          "text": "Octane",
+          "cleaned": true
+        }
+      },
+      {
+        "id": "hooks-state",
+        "raw": 201915,
+        "gzip": 64402,
+        "brotli": 55827,
+        "sha256": "dc21325c29bffc5f3ec1a0785f487101e0e2c71568bfd80ccf4edb07f4fdbb3d",
+        "observations": {
+          "before": "0",
+          "after": "1",
+          "clicks": 1,
+          "effects": 1,
+          "cleanups": 1,
+          "cleaned": true
+        }
+      },
+      {
+        "id": "context",
+        "raw": 212868,
+        "gzip": 67586,
+        "brotli": 58447,
+        "sha256": "f58385d0eb14e819ad347a2256a674001ed7ae30235d86f2eb179aee085cde7e",
+        "observations": {
+          "before": "light",
+          "after": "dark",
+          "cleaned": true
+        }
+      }
+    ]
+  },
+  "historicalControl": {
+    "ref": "1ed5d2ab9c6291b734a70a102c78b25c8bcdb3d1",
+    "currentLockReconstruction": true,
+    "runnerSHA": "c3903ca14baef42bb47f31349ff1581f598e31dc67a65fbc468042fee70641b8",
+    "rows": [
+      {
+        "id": "root-static",
+        "raw": 172092,
+        "gzip": 54306,
+        "brotli": 47312,
+        "sha256": "03b16ce32c494d397dcc2ac7c81faccf65d0b3a1a317bfd8624267f0229b2043",
+        "observations": {
+          "text": "Octane",
+          "cleaned": true
+        }
+      },
+      {
+        "id": "hooks-state",
+        "raw": 180364,
+        "gzip": 57211,
+        "brotli": 49785,
+        "sha256": "1f6ed130a98c33cc88505592e3ac79395b3798578bd324894a64b9f33272589b",
+        "observations": {
+          "before": "0",
+          "after": "1",
+          "clicks": 1,
+          "effects": 1,
+          "cleanups": 1,
+          "cleaned": true
+        }
+      },
+      {
+        "id": "context",
+        "raw": 181363,
+        "gzip": 57492,
+        "brotli": 50110,
+        "sha256": "35043432a2b3cabba0296ce6eaaa2e8d6f4868e5a09379d62c7b638139da9f33",
+        "observations": {
+          "before": "light",
+          "after": "dark",
+          "cleaned": true
+        }
+      }
+    ]
+  },
+  "publicControls": {
+    "runnerSha256": "b829eb3f4ca01a6e9373e80b6b08579cec29dc872d1b0ed25c6ca8310631a554",
+    "lockfileSha256": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+    "wholeBundleEquality": true,
+    "rows": [
+      {
+        "id": "ordinary-client",
+        "environment": "client",
+        "bundler": "esbuild",
+        "raw": 193173,
+        "gzip": 61565,
+        "brotli": 53439,
+        "sha256": "d706dba033132ab7e68586a2e7e2ade1b95045919b00684cf844a3ac1c9bcdf5"
+      },
+      {
+        "id": "ordinary-server",
+        "environment": "server",
+        "bundler": "esbuild",
+        "raw": 50366,
+        "gzip": 17728,
+        "brotli": 15990,
+        "sha256": "62940952060a7e32918f66495e0ebd908710945035092908e0c66708569e5ebc"
+      },
+      {
+        "id": "binding-scalar",
+        "environment": "client",
+        "bundler": "esbuild",
+        "raw": 13823,
+        "gzip": 5251,
+        "brotli": 4748,
+        "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+      },
+      {
+        "id": "binding-structural",
+        "environment": "client",
+        "bundler": "esbuild",
+        "raw": 31292,
+        "gzip": 10455,
+        "brotli": 9553,
+        "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+      },
+      {
+        "id": "binding-controls",
+        "environment": "client",
+        "bundler": "esbuild",
+        "raw": 9046,
+        "gzip": 3525,
+        "brotli": 3190,
+        "sha256": "f9d9f7ca38bd4591295e188a20aa78de7a84aabbd5e1b78935f1619cdee18e3d"
+      },
+      {
+        "id": "binding-whole-style",
+        "environment": "client",
+        "bundler": "esbuild",
+        "raw": 6199,
+        "gzip": 2630,
+        "brotli": 2360,
+        "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+      },
+      {
+        "id": "binding-scalar-controls-style",
+        "environment": "client",
+        "bundler": "esbuild",
+        "raw": 27473,
+        "gzip": 9954,
+        "brotli": 9029,
+        "sha256": "f26ff87b831d27584d84a74ebeacc8787600cb2eb7e0523c5a49ea0d5c3aed80"
+      },
+      {
+        "id": "engine",
+        "environment": "client",
+        "bundler": "esbuild",
+        "raw": 42253,
+        "gzip": 12889,
+        "brotli": 11672,
+        "sha256": "3264d5ac64941955c4e9edadb70c17385d67b03ebd611f54dbdd96c5e6478a43"
+      },
+      {
+        "id": "native-client",
+        "environment": "client",
+        "bundler": "esbuild",
+        "raw": 45094,
+        "gzip": 14297,
+        "brotli": 12931,
+        "sha256": "46037b83c2f05c341757c96be73b7fb6b5ba61bce3de8f4a6de4b8cd1efc7e62"
+      },
+      {
+        "id": "native-server",
+        "environment": "server",
+        "bundler": "esbuild",
+        "raw": 44962,
+        "gzip": 14215,
+        "brotli": 12841,
+        "sha256": "4b0c2329255b4cdcba1bbe57fe009860e85e0725b09320ff7b36122ec3a1d9b3"
+      },
+      {
+        "id": "compiled-plain-signals",
+        "environment": "client",
+        "bundler": "esbuild",
+        "raw": 64833,
+        "gzip": 19026,
+        "brotli": 17176,
+        "sha256": "817525035dacdc1cb59e77176e9b7271740271fd41abf791c18689da74da8b73"
+      },
+      {
+        "id": "streamed-signals-bootstrap",
+        "environment": "client",
+        "bundler": "esbuild",
+        "raw": 70744,
+        "gzip": 21933,
+        "brotli": 19640,
+        "sha256": "cc7c410ff2a691465cab4708aac58d2f0f48ddfacf9e5e70ba108ea1841bc5e3"
+      },
+      {
+        "id": "streamed-signal-results-bootstrap",
+        "environment": "client",
+        "bundler": "esbuild",
+        "raw": 64725,
+        "gzip": 19935,
+        "brotli": 17902,
+        "sha256": "6f04f8d035089562dcebed5de4ade9b524eddc667ed1bc5770bb0a37eb3554e5"
+      },
+      {
+        "id": "used-native-app",
+        "environment": "client",
+        "bundler": "esbuild",
+        "raw": 247072,
+        "gzip": 78310,
+        "brotli": 68002,
+        "sha256": "cb62bf7aa6146e0fe0079b5eb13e67f8446d988279262310d65c75f279dad524"
+      },
+      {
+        "id": "used-native-ssr",
+        "environment": "server",
+        "bundler": "esbuild",
+        "raw": 97093,
+        "gzip": 31888,
+        "brotli": 28769,
+        "sha256": "919d86a76c9637c84e47210d979095de8a3540c3bbe893a486b9923e27415934"
+      }
+    ]
+  },
+  "semantics": {
+    "automaticViteWritableExport": {
+      "baselineText": "",
+      "candidateText": "replacement",
+      "compiledProducerSHA": "1627e3386ddda7610a96e420385bcadaa296c825c4bcd8db83f0852ef4017df0"
+    },
+    "mutantsRejected": [
+      "reassigned export certified void",
+      "escaped/dynamic local root certified void",
+      "local specialization removed",
+      "generic return graph retained in void root"
+    ]
+  },
+  "limitations": [
+    "Only production plain TS/JS function-local const roots with references in their original lexical scope are newly admitted.",
+    "Module-level, exported, escaped, nested-scope, unknown-target, full TSX/TSRX, dev, HMR and profile cases retain generic roots.",
+    "Separate-entry savings remove the generic returned-value graph and are not attributable solely to signals.",
+    "No CPU, compiler-time, browser latency, SSR speed or complete unused-signals regression recovery claim."
+  ]
+}

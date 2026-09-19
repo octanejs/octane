@@ -15,6 +15,11 @@
 
 import { parseModule, builders as b } from '@tsrx/core';
 import { parseModule as parseFallbackModule } from '#octane/compiler-parser';
+import {
+	createLexicalAnalysis,
+	forEachRuntimeAstChild,
+	isIdentifierReference,
+} from './compile-universal.js';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
 import { NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 import { METHOD_DEP_IMPORT, annotateHookCalls, analyzeStrongMemoCandidates } from './hook-deps.js';
@@ -107,18 +112,19 @@ function octaneHookLocals(ast, nativeReads = false, explicitlyOwned = false) {
 	};
 }
 
-// Find only the disposable top-level root shape used by production entries:
-// `createRoot(target).render(ImportedComponent[, props]);`. Keeping the matcher
-// this narrow means the specialized root can never escape and receive a later
-// unknown render. The bundler adapter resolves and loads each returned import;
-// this pass never guesses what a request points at from the importer's path.
+// A disposable expression or nonescaping local const root can omit return-value
+// reconciliation only when every render calls an imported compiled void body.
+// The adapter resolves each export's actual ABI; lexical binding identity keeps
+// shadows, aliases, closure captures and unknown future renders on the generic path.
 function collectVoidRootCandidates(ast) {
 	const createRootLocals = new Set();
 	const componentImports = new Map();
 	for (const node of ast.body || []) {
 		if (node.type !== 'ImportDeclaration' || typeof node.source?.value !== 'string') continue;
+		if (node.importKind === 'type') continue;
 		const request = node.source.value;
 		for (const sp of node.specifiers || []) {
+			if (sp.importKind === 'type') continue;
 			if (request === 'octane' && sp.type === 'ImportSpecifier') {
 				const imported = sp.imported?.name ?? sp.imported?.value;
 				if (imported === 'createRoot' && sp.local?.name) createRootLocals.add(sp.local.name);
@@ -137,7 +143,93 @@ function collectVoidRootCandidates(ast) {
 	}
 	if (createRootLocals.size === 0 || componentImports.size === 0) return [];
 
+	const analysis = createLexicalAnalysis(ast);
+	const importedBinding = (node, imports) =>
+		node?.type === 'Identifier' &&
+		imports.has(node.name) &&
+		analysis.resolveBinding(analysis.nodeScopes.get(node), node.name)?.scope === analysis.rootScope;
 	const candidates = [];
+	const localRoots = new Map();
+	let opaqueLexicalAccess = false;
+	const walk = (node, parent, key) => {
+		if (node === null || typeof node !== 'object') return;
+		if (
+			node.type === 'WithStatement' ||
+			(node.type === 'Identifier' &&
+				node.name === 'eval' &&
+				isIdentifierReference(node, parent, key, analysis) &&
+				analysis.resolveBinding(analysis.nodeScopes.get(node), 'eval') === null)
+		)
+			opaqueLexicalAccess = true;
+		if (
+			node.type === 'VariableDeclarator' &&
+			parent?.type === 'VariableDeclaration' &&
+			parent.kind === 'const' &&
+			node.id?.type === 'Identifier' &&
+			node.init?.type === 'CallExpression' &&
+			node.init.optional !== true &&
+			importedBinding(node.init.callee, createRootLocals)
+		) {
+			const scope = analysis.resolveBinding(analysis.nodeScopes.get(node.id), node.id.name)?.scope;
+			if (scope && scope.functionScope !== analysis.rootScope.functionScope) {
+				let names = localRoots.get(scope);
+				if (names === undefined) localRoots.set(scope, (names = new Map()));
+				names.set(node.id.name, {
+					valid: true,
+					components: [],
+					scope,
+					start: node.init.callee.start,
+					end: node.init.callee.end,
+				});
+			}
+		}
+		forEachRuntimeAstChild(node, (child, childKey) => walk(child, node, childKey));
+	};
+	walk(ast);
+	if (!opaqueLexicalAccess && localRoots.size > 0) {
+		const inspect = (node, parent, key, grandparent) => {
+			if (node === null || typeof node !== 'object') return;
+			if (node.type === 'Identifier' && isIdentifierReference(node, parent, key, analysis)) {
+				const scope = analysis.resolveBinding(analysis.nodeScopes.get(node), node.name)?.scope;
+				const root = localRoots.get(scope)?.get(node.name);
+				if (root !== undefined) {
+					const member = parent;
+					const call = grandparent;
+					const directMethod =
+						analysis.nodeScopes.get(node) === root.scope &&
+						member?.type === 'MemberExpression' &&
+						key === 'object' &&
+						member.computed !== true &&
+						member.optional !== true &&
+						member.property?.type === 'Identifier' &&
+						call?.type === 'CallExpression' &&
+						call.callee === member &&
+						call.optional !== true;
+					if (directMethod && member.property.name === 'unmount' && call.arguments.length === 0) {
+						// unmount never changes the root's component-return contract.
+					} else if (
+						directMethod &&
+						member.property.name === 'render' &&
+						call.arguments.length >= 1 &&
+						call.arguments.length <= 2 &&
+						!call.arguments.some((argument) => argument.type === 'SpreadElement') &&
+						importedBinding(call.arguments[0], componentImports)
+					) {
+						root.components.push(componentImports.get(call.arguments[0].name));
+					} else root.valid = false;
+				}
+			}
+			forEachRuntimeAstChild(node, (child, childKey) => inspect(child, node, childKey, parent));
+		};
+		inspect(ast);
+		for (const names of localRoots.values())
+			for (const root of names.values()) {
+				if (!root.valid || root.components.length === 0) continue;
+				for (const component of root.components)
+					candidates.push({ ...component, start: root.start, end: root.end });
+			}
+	}
+
 	for (const statement of ast.body || []) {
 		if (statement.type !== 'ExpressionStatement') continue;
 		const renderCall = statement.expression;
@@ -162,13 +254,13 @@ function collectVoidRootCandidates(ast) {
 			rootCall?.type !== 'CallExpression' ||
 			rootCall.optional === true ||
 			rootCall.callee?.type !== 'Identifier' ||
-			!createRootLocals.has(rootCall.callee.name)
+			!importedBinding(rootCall.callee, createRootLocals)
 		)
 			continue;
 		const component = renderCall.arguments[0];
 		if (component?.type !== 'Identifier') continue;
+		if (!importedBinding(component, componentImports)) continue;
 		const imported = componentImports.get(component.name);
-		if (imported === undefined) continue;
 		candidates.push({
 			...imported,
 			start: rootCall.callee.start,
@@ -282,8 +374,16 @@ export function findVoidComponentImports(source, id) {
 
 function collectVoidRootEdits(ast, st, isVoidComponentImport) {
 	if (typeof isVoidComponentImport !== 'function') return;
+	const groups = new Map();
 	for (const candidate of collectVoidRootCandidates(ast)) {
-		if (!isVoidComponentImport(candidate.request, candidate.imported)) continue;
+		let group = groups.get(candidate.start);
+		if (group === undefined) groups.set(candidate.start, (group = []));
+		group.push(candidate);
+	}
+	for (const group of groups.values()) {
+		if (!group.every((candidate) => isVoidComponentImport(candidate.request, candidate.imported)))
+			continue;
+		const candidate = group[0];
 		if (st.voidRootName === null) st.voidRootName = allocSlotName(st, '_$createVoidRoot');
 		st.edits.push({
 			pos: candidate.start,
