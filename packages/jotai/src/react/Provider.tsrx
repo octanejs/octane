@@ -15,7 +15,5 @@ export function Provider(props: { children?: OctaneNode; store?: Store }) {
 		storeRef.current = createStore();
 	}
 
-	return <StoreContext.Provider
-		value={store || storeRef.current!}
-	>{children}</StoreContext.Provider>;
+	return <StoreContext value={store || storeRef.current!}>{children}</StoreContext>;
 }

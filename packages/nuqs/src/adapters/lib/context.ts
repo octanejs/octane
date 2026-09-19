@@ -70,7 +70,7 @@ export type AdapterProvider = (
 export function createAdapterProvider(useAdapter: UseAdapterHook): AdapterProvider {
 	return ({ children, defaultOptions, processUrlSearchParams, ...props }) =>
 		createElement(
-			context.Provider,
+			context,
 			{
 				...props,
 				value: { useAdapter, defaultOptions, processUrlSearchParams },

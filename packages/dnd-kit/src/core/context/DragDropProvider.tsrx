@@ -98,7 +98,7 @@ export function DragDropProvider<
 	useOnValueChange(modifiers, () => (manager.modifiers = modifiers), ...changeOptions);
 
 	return createElement(
-		DragDropContext.Provider,
+		DragDropContext,
 		{ value: manager as unknown as DragDropManager },
 		createElement(Renderer, { ref: rendererRef }, children),
 		children,

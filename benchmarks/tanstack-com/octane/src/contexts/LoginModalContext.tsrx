@@ -75,8 +75,8 @@ export function LoginModalProvider({ children }: LoginModalProviderProps) {
 		closeLoginModal,
 	]);
 
-	return <LoginModalContext.Provider value={value}>
+	return <LoginModalContext value={value}>
 		{children}
 		<LoginModal open={isOpen} onOpenChange={setIsOpen} />
-	</LoginModalContext.Provider>;
+	</LoginModalContext>;
 }

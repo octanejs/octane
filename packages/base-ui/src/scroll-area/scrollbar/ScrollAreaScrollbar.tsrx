@@ -231,11 +231,7 @@ export const ScrollAreaScrollbar = function ScrollAreaScrollbar(
 		return null;
 	}
 
-	return (
-		<ScrollAreaScrollbarContext.Provider value={orientation}>
-			{element}
-		</ScrollAreaScrollbarContext.Provider>
-	);
+	return <ScrollAreaScrollbarContext value={orientation}>{element}</ScrollAreaScrollbarContext>;
 };
 
 export interface ScrollAreaScrollbarState extends ScrollAreaRootState {

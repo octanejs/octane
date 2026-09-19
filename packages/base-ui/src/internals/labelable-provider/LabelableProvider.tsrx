@@ -103,9 +103,7 @@ export const LabelableProvider: React.FC<LabelableProvider.Props> = function Lab
 		],
 	);
 
-	return (
-		<LabelableContext.Provider value={contextValue}>{props.children}</LabelableContext.Provider>
-	);
+	return <LabelableContext value={contextValue}>{props.children}</LabelableContext>;
 };
 
 export interface LabelableProviderState {}

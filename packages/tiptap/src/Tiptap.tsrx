@@ -86,9 +86,9 @@ export function TiptapWrapper({ children, ...props }: TiptapWrapperProps) @{
 	const tiptapContextValue = useMemo(() => ({ editor: resolvedEditor }), [resolvedEditor]);
 	const legacyContextValue = useMemo(() => ({ editor: resolvedEditor }), [resolvedEditor]);
 
-	<EditorContext.Provider value={legacyContextValue}>
-		<TiptapContext.Provider value={tiptapContextValue}>{children}</TiptapContext.Provider>
-	</EditorContext.Provider>
+	<EditorContext value={legacyContextValue}>
+		<TiptapContext value={tiptapContextValue}>{children}</TiptapContext>
+	</EditorContext>
 }
 
 TiptapWrapper.displayName = 'Tiptap';

@@ -11,7 +11,7 @@ const TooltipPositionContext = createContext<TooltipPositionContextType>({
 	isFlippedHorizontally: false,
 });
 
-export const TooltipPositionProvider = TooltipPositionContext.Provider;
+export const TooltipPositionProvider = TooltipPositionContext;
 
 /**
  * Octane deliberately has no render-prop `Context.Consumer` (see

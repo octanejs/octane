@@ -217,9 +217,9 @@ function ServerField() {
 // the user commits a change.
 export function FormValidationServer() {
 	return (
-		<FormValidationContext.Provider value={{ username: 'Username taken' }}>
+		<FormValidationContext value={{ username: 'Username taken' }}>
 			<ServerField />
-		</FormValidationContext.Provider>
+		</FormValidationContext>
 	);
 }
 

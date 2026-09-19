@@ -71,7 +71,7 @@ export function ModalProvider(props: ModalProviderProps): any {
 		subSlot(slot, 'context'),
 	);
 
-	return createElement(Context.Provider, { value: context, children });
+	return createElement(Context, { value: context, children });
 }
 
 export interface ModalProviderAria {

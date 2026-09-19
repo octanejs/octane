@@ -608,9 +608,9 @@ const theme = {
 
 function Page() {
   const content = (
-    <Theme.Provider value="inner">
+    <Theme value="inner">
       <span data-theme={theme.current}>{theme.current}</span>
-    </Theme.Provider>
+    </Theme>
   );
 
   return <main>{content}</main>; // data-theme="inner" and text "inner".
@@ -991,15 +991,26 @@ The compiler reports these as compile errors, each carrying its code:
 - `CSS_GLOBAL_PLACEMENT` — `:global(...)` in the middle of a selector sequence
   or nested inside a pseudo-class.
 
-## Context: callable provider object, no Consumer
+## Context: direct provider component, no Provider or Consumer
 
 `createContext` returns a context that is itself the provider component —
-React 19's `<MyContext value={…}>` form is the native shape, and
-`MyContext.Provider` is retained as an identity alias for React-18-shaped
-libraries. The render-prop `<MyContext.Consumer>` does not exist and will not
-be added: Octane's slot-keyed hooks make `use(MyContext)`/`useContext` legal
-behind any condition, which is the pattern Consumer existed to work around.
+React 19's `<MyContext value={…}>` form is the supported shape.
+`MyContext.Provider` does not exist; known legacy `.Provider` access reports
+the `OCTANE_CONTEXT_PROVIDER` compiler error. Replace
+`<MyContext.Provider value={value}>` with `<MyContext value={value}>`, and pass
+`MyContext` directly to `createElement`
+or `root.render`. The render-prop `<MyContext.Consumer>` does not exist and
+will not be added: Octane's slot-keyed hooks make `use(MyContext)`/`useContext`
+legal behind any condition, which is the pattern Consumer existed to work around.
 Read the context in the child (or an inline component) instead.
+
+Production DOM compilation can omit generic descriptor-child rendering for a
+private context when its complete usage is proven to be compiled template
+providers and canonical `use`/`useContext` reads. Exported or escaped contexts,
+aliases, reflection, and opaque children retain generic rendering. This changes
+bundle reachability while preserving context identity, hook state, hydration
+adoption, and uncontrolled edits across provider value updates. Development,
+HMR, profiling, server, and custom-renderer compilation keep the generic path.
 
 In development, accessing `.Consumer` logs a one-time migration diagnostic and
 still returns `undefined`, so feature probes (`MyContext.Consumer || fallback`)

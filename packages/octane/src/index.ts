@@ -84,6 +84,7 @@ export {
 	Suspense,
 	ErrorBoundary,
 	Hydrate,
+	__HydrateCompiled,
 	Activity,
 	// React shipped Activity as unstable_Activity before 19.2 — alias it so
 	// experimental-channel ports compile unchanged (mirrors unstable_ViewTransition).
@@ -119,6 +120,7 @@ export {
 	__useLinkedStateWithGetter,
 	__useReducerWithGetter,
 	__createVoidRoot,
+	__hydrateVoidRoot,
 	bindRendererRegionOwner,
 	EXTERNAL_HYDRATION_PROMISE,
 	HYDRATION_RANGE_BOUNDARY,

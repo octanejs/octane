@@ -104,7 +104,7 @@ export function FloatingList(props: FloatingListProps): OctaneNode {
 		[register, unregister, map, elementsRef, labelsRef],
 		S('FloatingList:value'),
 	);
-	return createElement(FloatingListContext.Provider, { value, children });
+	return createElement(FloatingListContext, { value, children });
 }
 
 export interface UseListItemProps {

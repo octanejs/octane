@@ -9,7 +9,7 @@ export function DOMRegionScene(props) @{
 		props.captureEffectToken,
 		setEffectToken,
 	]);
-	<DOMRegionTheme.Provider value={props.theme}>
+	<DOMRegionTheme value={props.theme}>
 		<group name={'dom-effect-' + domEffectCount}>
 			@for (const item of props.order; key item) {
 				@switch (item) {
@@ -40,5 +40,5 @@ export function DOMRegionScene(props) @{
 				<primitive object={props.rejectedObject} attach="missing-path" />
 			}
 		</group>
-	</DOMRegionTheme.Provider>
+	</DOMRegionTheme>
 }

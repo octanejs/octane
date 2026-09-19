@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/drei",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "description": "Octane port of @react-three/drei",
   "type": "module",
   "sideEffects": false,
@@ -55,7 +55,7 @@
   "peerDependencies": {
     "@octanejs/three": "workspace:*",
     "@types/three": ">=0.159",
-    "octane": "workspace:^0.1.51 || ^0.2.0",
+    "octane": "workspace:^",
     "three": ">=0.159"
   },
   "peerDependenciesMeta": {

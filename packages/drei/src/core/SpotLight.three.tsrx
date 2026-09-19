@@ -343,8 +343,8 @@ export function SpotLight({
 				/>
 			}
 		</spotLight>
-		<SpotLightShadowContext.Provider value={{ spotlightRef: spotlight, debug }}>
+		<SpotLightShadowContext value={{ spotlightRef: spotlight, debug }}>
 			{children}
-		</SpotLightShadowContext.Provider>
+		</SpotLightShadowContext>
 	</group>
 }

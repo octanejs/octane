@@ -23,13 +23,13 @@ import {
 } from './universal-core.js';
 import { registerRendererContext, renderRendererContextProvider } from './renderer-bridge.js';
 import { CONTEXT_TAG } from './runtime-tags.js';
+import { registerContext } from './context-identity.js';
 
 export interface NativeUniversalContext<T> extends UniversalContext<T> {
 	(props: {
 		value: T;
 		children?: UniversalRenderable | (() => UniversalRenderable);
 	}): UniversalContextValue;
-	readonly Provider: NativeUniversalContext<T>;
 }
 
 /** Create a context whose Provider can be lowered without a DOM Scope. */
@@ -48,9 +48,9 @@ export function createContext<T>(defaultValue: T): NativeUniversalContext<T> {
 	Object.defineProperties(context, {
 		$$kind: { value: CONTEXT_TAG, enumerable: true },
 		defaultValue: { value: defaultValue, enumerable: true },
-		Provider: { value: context, enumerable: true },
 		$$version: { value: 0, enumerable: true, writable: true },
 	});
 	registerRendererContext(context);
+	registerContext(context);
 	return context;
 }

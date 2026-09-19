@@ -31,7 +31,7 @@ describe('context epoch', () => {
 			return createElement('output', { className: 'v' }, String(use(Ctx)));
 		});
 		const App = (props: { value: number }) =>
-			createElement(Ctx.Provider, { value: props.value }, createElement(Reader));
+			createElement(Ctx, { value: props.value }, createElement(Reader));
 		const r = mount(App, { value: 1 });
 		expect(reads).toBe(1);
 		// Bare version write — no provideContext, no bumpContextEpoch. The

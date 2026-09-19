@@ -24,5 +24,5 @@ export function HotkeysProvider({
 		[defaultOptions],
 	);
 
-	<HotkeysContext.Provider value={contextValue}>{children}</HotkeysContext.Provider>
+	<HotkeysContext value={contextValue}>{children}</HotkeysContext>
 }

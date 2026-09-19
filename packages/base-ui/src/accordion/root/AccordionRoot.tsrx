@@ -127,9 +127,9 @@ export const AccordionRoot = function AccordionRoot<Value = any>(
 	});
 
 	return (
-		<AccordionRootContext.Provider value={contextValue}>
+		<AccordionRootContext value={contextValue}>
 			<CompositeList elementsRef={accordionItemRefs}>{element}</CompositeList>
-		</AccordionRootContext.Provider>
+		</AccordionRootContext>
 	);
 };
 

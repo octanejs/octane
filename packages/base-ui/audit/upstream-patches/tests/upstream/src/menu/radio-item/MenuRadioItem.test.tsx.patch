@@ -1,6 +1,18 @@
 diff --git a/tests/upstream/src/menu/radio-item/MenuRadioItem.test.tsx b/tests/upstream/src/menu/radio-item/MenuRadioItem.test.tsx
 --- a/tests/upstream/src/menu/radio-item/MenuRadioItem.test.tsx
 +++ b/tests/upstream/src/menu/radio-item/MenuRadioItem.test.tsx
+@@ -25,9 +25,9 @@ describe('<Menu.RadioItem />', () => {
+     render: (node) => {
+       return render(
+         <Menu.Root open>
+-          <MenuRadioGroupContext.Provider value={testRadioGroupContext}>
++          <MenuRadioGroupContext value={testRadioGroupContext}>
+             {node}
+-          </MenuRadioGroupContext.Provider>
++          </MenuRadioGroupContext>
+         </Menu.Root>,
+       );
+     },
 @@ -62,10 +62,10 @@ describe('<Menu.RadioItem />', () => {
      const renderItem3Spy = vi.fn();
      const renderItem4Spy = vi.fn();

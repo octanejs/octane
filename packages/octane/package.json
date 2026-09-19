@@ -1,6 +1,6 @@
 {
   "name": "octane",
-  "version": "0.2.16",
+  "version": "0.3.0",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
@@ -57,6 +57,7 @@
     "./signals/server": "./src/signals/server.ts",
     "./internal/client": "./src/internal/client.ts",
     "./internal/server": "./src/internal/server.ts",
+    "./internal/context": "./src/internal/context.ts",
     "./internal/signal-read": "./src/internal/signal-read.ts",
     "./static": "./src/static/index.ts",
     "./testing": "./src/testing.ts",
@@ -202,6 +203,12 @@
         "import": "./dist/internal/server.js",
         "require": "./dist/cjs/internal/server.cjs",
         "default": "./dist/internal/server.js"
+      },
+      "./internal/context": {
+        "types": "./dist/internal/context.d.ts",
+        "import": "./dist/internal/context.js",
+        "require": "./dist/cjs/internal/context.cjs",
+        "default": "./dist/internal/context.js"
       },
       "./static": {
         "types": "./dist/static/index.d.ts",

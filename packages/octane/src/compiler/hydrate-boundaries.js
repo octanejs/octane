@@ -14,7 +14,109 @@ import {
 	isIdentifierReference,
 } from './compile-universal.js';
 
+import { findPrivateCompiledContextProofs } from './private-context.js';
+
 export const HYDRATE_QUERY_PARAM = 'octane-hydrate';
+
+// Only this extraction pass can certify the loader/child ABI. Keep provenance
+// off authored attributes and parser metadata; COW rewrites preserve tag nodes.
+const compiledSplitHydrateTags = new WeakMap();
+
+export function compiledSplitHydrateTagsForAst(ast) {
+	return compiledSplitHydrateTags.get(ast);
+}
+
+function isCompiledSplitHydrateBoundary(boundary) {
+	if (boundary.disabled || boundary.independent || boundary.permanentStatic) return false;
+	const opening = boundary.node.openingElement;
+	if (opening.name?.type !== 'JSXIdentifier') return false;
+	if (
+		(opening.attributes ?? []).some((attribute) => {
+			const name = attribute.name?.name;
+			return (
+				attribute.type !== 'JSXAttribute' ||
+				attribute.name?.type !== 'JSXIdentifier' ||
+				typeof name !== 'string' ||
+				name === 'children' ||
+				name === 'fallback' ||
+				name.startsWith('__')
+			);
+		})
+	)
+		return false;
+	return !(boundary.node.children ?? []).some((child) => {
+		const expression = unwrapExpression(
+			child.type === 'JSXExpressionContainer' ? child.expression : null,
+		);
+		return ['ArrowFunctionExpression', 'FunctionExpression'].includes(expression?.type);
+	});
+}
+
+// Generated captures preserve a proven private Context identity, not an authored
+// escape. Certificates belong only to this prepared AST and exact parser tags.
+const privateSplitContexts = new WeakMap();
+export function privateCompiledContextsForHydrateAst(ast) {
+	return privateSplitContexts.get(ast);
+}
+
+function privateContextCaptureBoundary(boundary) {
+	if (boundary.disabled || boundary.independent || boundary.permanentStatic) return false;
+	const opening = boundary.node.openingElement;
+	if (opening?.name?.type !== 'JSXIdentifier') return false;
+	return (opening.attributes ?? []).every((attribute) => {
+		const name = attribute.name?.name;
+		return (
+			attribute.type === 'JSXAttribute' &&
+			attribute.name?.type === 'JSXIdentifier' &&
+			typeof name === 'string' &&
+			name !== 'children' &&
+			!name.startsWith('__')
+		);
+	});
+}
+
+function originalSplitContextProofs(analysis, moduleMovePlan) {
+	const contexts = findPrivateCompiledContextProofs(analysis.ast);
+	if (contexts.size === 0) return contexts;
+	const captured = new Set();
+	for (const boundary of analysis.boundaries) {
+		if (boundary.disabled || hasPermanentStaticAncestor(boundary)) continue;
+		const moduleBindings = moduleMovePlan.bindingsByPath.get(boundary.path) ?? new Set();
+		const names = collectCaptures(
+			boundary.node.children,
+			analysis.imports.importBindings,
+			boundary.shadowedImports,
+			moduleBindings.size === 0 ? null : moduleBindings,
+		);
+		for (const name of names) {
+			if (!contexts.has(name)) continue;
+			if (!privateContextCaptureBoundary(boundary)) contexts.delete(name);
+			else captured.add(name);
+		}
+	}
+	return new Map([...contexts].filter(([name]) => captured.has(name)));
+}
+
+function certifySplitContexts(ast, contexts, captureBindings) {
+	if (contexts.size === 0) return;
+	const byId = new Map(),
+		byTag = new Map(),
+		present = new WeakSet();
+	for (const [name, context] of contexts) {
+		byId.set(context.id, context.callee);
+		for (const tag of context.providerTags) byTag.set(tag, captureBindings.get(name) ?? context.id);
+	}
+	const callees = new Set(),
+		providers = new Map();
+	mapAstCow(ast, (node) => {
+		present.add(node);
+		if (byId.has(node)) callees.add(byId.get(node));
+		if (byTag.has(node)) providers.set(node, byTag.get(node));
+		return undefined;
+	});
+	for (const [tag, binding] of providers) if (!present.has(binding)) providers.delete(tag);
+	if (callees.size > 0 || providers.size > 0) privateSplitContexts.set(ast, { callees, providers });
+}
 
 const SKIP_KEYS = new Set(['type', 'loc', 'start', 'end', 'range', 'metadata', 'parent']);
 const TRANSPARENT_TS_EXPRESSIONS = new Set([
@@ -1755,6 +1857,7 @@ function extractedModuleAst(
 	request,
 	moduleBindingsByPath = new Map(),
 	moduleDeclarationsByPath = new Map(),
+	captureBindings = new Map(),
 ) {
 	if (boundary.disabled) {
 		throw extractionError(
@@ -1803,6 +1906,11 @@ function extractedModuleAst(
 						boundary.node,
 					),
 				];
+	if (setup.length > 0) {
+		const pattern = setup[0].declarations[0].id;
+		for (let index = 0; index < captures.length; index++)
+			captureBindings.set(captures[index], pattern.elements[index]);
+	}
 	const codeBlock = inheritGeneratedOrigin(
 		{
 			type: 'JSXCodeBlock',
@@ -2139,6 +2247,8 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null, 
 	}
 	const request = sameSourceRequest(filename);
 	const moduleMovePlan = createModuleMovePlanAst(analysis, request);
+	const contexts = originalSplitContextProofs(analysis, moduleMovePlan);
+	const captureBindings = new Map();
 	const independentWidgets = independentWidgetMetadata(analysis, filename, moduleMovePlan);
 	let independentIndex = 0;
 	for (const boundary of analysis.boundaries) {
@@ -2174,8 +2284,16 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null, 
 			request,
 			moduleMovePlan.bindingsByPath,
 			moduleMovePlan.declarationsByPath,
+			captureBindings,
 		);
 	}
+	const templateTags = new Set(
+		analysis.boundaries
+			.filter(isCompiledSplitHydrateBoundary)
+			.map((boundary) => boundary.node.openingElement.name),
+	);
+	if (templateTags.size > 0) compiledSplitHydrateTags.set(ast, templateTags);
+	certifySplitContexts(ast, contexts, captureBindings);
 	return {
 		ast,
 		boundaryPath,

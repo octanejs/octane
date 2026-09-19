@@ -2,6 +2,7 @@ import { decodeSignalValue } from '../data-encoding.js';
 import type { SignalOwner } from '../signals/types.js';
 import {
 	HYDRATE_ID_ATTR,
+	HYDRATE_WHEN_ATTR,
 	HYDRATE_INDEPENDENT_ATTR,
 	INDEPENDENT_HYDRATE_MANIFEST_ATTR,
 } from '../hydration-markers.js';
@@ -140,8 +141,7 @@ export function registerIndependentHydrationIsland(
 		return status;
 	};
 	registerHydrationIntentBoundary(element, boundary);
-	if (intents.length !== 0 || element.getAttribute('data-octane-hydrate-when') === 'load')
-		activate();
+	if (intents.length !== 0 || element.getAttribute(HYDRATE_WHEN_ATTR) === 'load') activate();
 	return Object.assign(
 		() => {
 			if (disposed) return;
@@ -164,8 +164,7 @@ export function registerIndependentHydrationIsland(
 			resume() {
 				if (disposed || !paused) return;
 				paused = false;
-				if (intents.length || element.getAttribute('data-octane-hydrate-when') === 'load')
-					activate();
+				if (intents.length || element.getAttribute(HYDRATE_WHEN_ATTR) === 'load') activate();
 			},
 		},
 	);

@@ -9,13 +9,13 @@
     "path": "src/QueryClientProvider.tsrx",
     "origin": "adapted",
     "packageName": "@tanstack/react-query",
-    "sha256": "d566f84bdf04d37fa1a7e92272355521223e89cac88348a552b3248037bd7d78"
+    "sha256": "b4a0fa915f7b01e1d7017e09f709658c47fd5d8ca6033a611a37ee28dc2aa363"
   },
   {
     "path": "src/QueryErrorResetBoundary.tsrx",
     "origin": "adapted",
     "packageName": "@tanstack/react-query",
-    "sha256": "faacc4c10aaeae5f3f31139593a28b73e456c4dfbd4a5db0820801aa93e9bee2"
+    "sha256": "ebd5efff071ee82a86def4e6dd852190f7d0ac3a024f5e5ccc6afb3e4ce2f725"
   },
   {
     "path": "src/context.ts",
@@ -51,7 +51,7 @@
     "path": "src/isRestoring.ts",
     "origin": "adapted",
     "packageName": "@tanstack/react-query",
-    "sha256": "c273616a284d16b5f7a326c92e1fff3f4eea089eb13099d7470501c8ea84d01e"
+    "sha256": "789270d5137fbea83b7fa74e73249b7488adf67ab367bb032243e4b5808daba9"
   },
   {
     "path": "src/mutationOptions.ts",

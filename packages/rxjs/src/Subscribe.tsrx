@@ -70,18 +70,14 @@ export function Subscribe(props: Props) @{
 	);
 
 	@if (props.fallback === undefined) {
-		<SubscriptionContext.Provider
-			value={owner.current.add}
-		>{props.children}</SubscriptionContext.Provider>
+		<SubscriptionContext value={owner.current.add}>{props.children}</SubscriptionContext>
 	} @else {
 		<Suspense fallback={props.fallback}>
-			<SubscriptionContext.Provider
-				value={owner.current.add}
-			>{props.children}</SubscriptionContext.Provider>
+			<SubscriptionContext value={owner.current.add}>{props.children}</SubscriptionContext>
 		</Suspense>
 	}
 }
 
 export function RemoveSubscribe(props: { children?: OctaneNode }) @{
-	<SubscriptionContext.Provider value={null}>{props.children}</SubscriptionContext.Provider>
+	<SubscriptionContext value={null}>{props.children}</SubscriptionContext>
 }

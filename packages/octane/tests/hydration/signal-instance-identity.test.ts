@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { componentSlot, createRoot, enableSignalBindings, type Scope } from '../../src/runtime.js';
 import {
@@ -25,6 +25,156 @@ function currentInstanceKey(): string {
 }
 
 describe('signal component instance identity', () => {
+	beforeAll(async () => {
+		// Compile-tooling setup is separate from the behavior checks. Each cold
+		// scenario still executes a fresh runtime graph after resetModules().
+		await import('../_server-fixture.js');
+	});
+
+	it.each([false, true])(
+		'renders an ordinary object-keyed list without stringifying its keys (development: %s)',
+		async (dev) => {
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const { collectPipeableStream, collectReadableStream } = await import('../_server-stream.js');
+			const source = `function Row(props) @{ <p>{props.label as string}</p> }
+export function App(props) @{
+ <main>@for (const item of props.items; key item.key) { <Row label={item.label} /> }</main>
+}`;
+			const { App } = loadCompiledFixtureSource(source, {
+				id: '/src/keyed-server-output.tsrx',
+				mode: 'server',
+				compileOptions: { dev, hmr: false },
+			});
+			const items = ['first', 'second'].map((label) => ({
+				label,
+				key: {
+					[Symbol.toPrimitive]() {
+						throw new Error('A reconciliation key is not rendered text.');
+					},
+				},
+			}));
+			const outputs: { html: string; signals?: unknown }[] = [
+				server.renderToString(App, { items }),
+				server.renderToStaticMarkup(App, { items }),
+				await server.prerender(App, { items }),
+			];
+			for (const collect of [collectPipeableStream, collectReadableStream]) {
+				const output = await collect(App, { items });
+				expect(output.errors).toEqual([]);
+				outputs.push(output);
+			}
+			for (const output of outputs) {
+				const container = document.createElement('div');
+				container.innerHTML = output.html;
+				expect([...container.querySelectorAll('p')].map((node) => node.textContent)).toEqual([
+					'first',
+					'second',
+				]);
+				expect(output.signals).toBeUndefined();
+			}
+		},
+	);
+
+	it.each(
+		[false, true].flatMap((dev) =>
+			[false, true].flatMap((mapped) => [false, true].map((framed) => ({ dev, mapped, framed }))),
+		),
+	)(
+		'keeps late handle values separate in nested keyed lists through hydration and reorder (%j)',
+		async ({ dev, mapped, framed }) => {
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const client = await import('../../src/runtime.js');
+			const signals = await import('../../src/signals/index.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const rows = mapped
+				? '{props.group.items.map(item => <Row key={item.id} label={props.group.id + item.label} produce={props.produce} pending={props.pending}/>)}'
+				: '@for (const item of props.group.items; key item.id) { <Row label={props.group.id + item.label} produce={props.produce} pending={props.pending}/> }';
+			const groupBody = framed ? `function Group(props) @{ <article>${rows}</article> }` : '';
+			const group = framed
+				? '<Group group={group} produce={props.produce} pending={props.pending}/>'
+				: `<article>${rows.replaceAll('props.group', 'group')}</article>`;
+			const source = `import {use} from 'octane';
+function Row(props) @{
+ if (props.pending) use(props.pending);
+ const value = props.produce(props.label);
+ <section><output>{value as string}</output><input value={value}/></section>
+}
+${groupBody}
+export function App(props) @{
+ <main>@for (const group of props.groups; key group.id) { ${group} }</main>
+}`;
+			const options = {
+				id: '/src/nested-keyed-server-output.tsrx',
+				compileOptions: { dev, hmr: false },
+			};
+			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const groups = ['left|', '右:'].map((id) => ({
+				id,
+				items: [
+					{ id: 'same|', label: 'red' },
+					{ id: 'same:', label: 'blue' },
+				],
+			}));
+			const scalar = (label: string) => label;
+			expect(
+				server.renderToString(serverModule.App, { groups, produce: scalar }).signals,
+			).toBeUndefined();
+			const produce = (label: string) => signals.__signalAt('i:nested-keyed-output', label);
+			let resolve!: () => void;
+			const pending = new Promise<void>((complete) => {
+				resolve = complete;
+			});
+			// The first pass leaves its keyed frames parked before any handle read.
+			// Discovery then resumes those frames outside their original list arms.
+			const rendering = server.prerender(serverModule.App, { groups, produce, pending });
+			resolve();
+			const output = await rendering;
+			const container = document.createElement('div');
+			container.innerHTML = output.html;
+			document.body.append(container);
+			const controls = [...container.querySelectorAll('input')];
+			const expected = ['left|red', 'left|blue', '右:red', '右:blue'];
+			expect(controls.map((node) => node.value)).toEqual(expected);
+			const errors: unknown[] = [];
+			const root = client.hydrateRoot(
+				container,
+				clientModule.App,
+				{ groups, produce },
+				{
+					onRecoverableError: (error) => errors.push(error),
+				},
+			);
+			try {
+				expect([...container.querySelectorAll('input')]).toEqual(controls);
+				expect(controls.map((node) => node.value)).toEqual(expected);
+				expect(errors).toEqual([]);
+				controls[0]!.value = 'edited first';
+				client.flushSync(() => controls[0]!.dispatchEvent(new Event('input', { bubbles: true })));
+				expect([...container.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
+					'edited first',
+					...expected.slice(1),
+				]);
+				const reordered = groups
+					.toReversed()
+					.map((group) => ({ ...group, items: group.items.toReversed() }));
+				client.flushSync(() => root.render(clientModule.App, { groups: reordered, produce }));
+				expect([...container.querySelectorAll('input')]).toEqual(controls.toReversed());
+				expect([...container.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
+					...expected.slice(1).toReversed(),
+					'edited first',
+				]);
+			} finally {
+				root.unmount();
+				expect(container.childNodes).toHaveLength(0);
+				container.remove();
+			}
+		},
+	);
+
 	it.each([false, true].flatMap((carrier) => [false, true].map((throws) => ({ carrier, throws }))))(
 		'restores nested server ownership after a child returns or throws (%j)',
 		({ carrier, throws }) => {

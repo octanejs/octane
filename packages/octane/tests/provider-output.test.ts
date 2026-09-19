@@ -21,7 +21,7 @@ describe('retained Provider output', () => {
 				document.body.appendChild(container);
 				const root = createRoot(container);
 				try {
-					root.render(Context.Provider, { value: 'initial', children: First });
+					root.render(Context, { value: 'initial', children: First });
 					const input = container.querySelector('input')!;
 					const button = container.querySelector('button')!;
 					const label = container.querySelector('span')!;
@@ -35,7 +35,7 @@ describe('retained Provider output', () => {
 						[Second, 'second'],
 						[First, 'first'],
 					] as const) {
-						flushSync(() => root.render(Context.Provider, { value: text, children: body }));
+						flushSync(() => root.render(Context, { value: text, children: body }));
 						expect(container.querySelector('input')).toBe(input);
 						expect(container.querySelector('button')).toBe(button);
 						expect(input.value).toBe('typed');
@@ -70,14 +70,14 @@ describe('retained Provider output', () => {
 				},
 			);
 			const Context = createContext('default');
-			const view = mount(Context.Provider, { value: 'value', children: first.First });
+			const view = mount(Context, { value: 'value', children: first.First });
 			try {
 				for (const [children, text] of [
 					[second.First, 'second'],
 					[first.First, 'first'],
 					[second.First, 'second'],
 				] as const) {
-					view.update(Context.Provider, { value: text, children });
+					view.update(Context, { value: text, children });
 					expect(view.find('span').textContent).toBe(text);
 				}
 			} finally {
@@ -104,14 +104,14 @@ describe('retained Provider output', () => {
 			const first = bodies[Number(optimizedFirst)];
 			const second = bodies[Number(!optimizedFirst)];
 			const Context = createContext('default');
-			const view = mount(Context.Provider, { value: 'value', children: first.First });
+			const view = mount(Context, { value: 'value', children: first.First });
 			try {
 				for (const [children, text] of [
 					[second.Second, 'second'],
 					[first.First, 'first'],
 					[second.Second, 'second'],
 				] as const) {
-					view.update(Context.Provider, { value: text, children });
+					view.update(Context, { value: text, children });
 					expect(view.find('span').textContent).toBe(text);
 					view.click('button');
 					expect(view.find('button').textContent).toBe('1');
@@ -140,23 +140,23 @@ describe('retained Provider output', () => {
 				compileOptions,
 			});
 			const Context = createContext('default');
-			const view = mount(Context.Provider, { value: 'value', children: first.Content });
+			const view = mount(Context, { value: 'value', children: first.Content });
 			try {
 				const input = view.find('input') as HTMLInputElement;
 				input.value = 'typed across bodies';
 				view.click('button');
 				expect(view.find('button').textContent).toBe('1');
-				view.update(Context.Provider, { value: 'value', children: second.Content });
+				view.update(Context, { value: 'value', children: second.Content });
 				expect(view.find('span').textContent).toBe('second');
 				expect(view.find('p').textContent).toBe('second');
 				expect(view.find('button').textContent).toBe('0');
 				view.click('button');
 				view.click('button');
-				view.update(Context.Provider, { value: 'value', children: first.Content });
+				view.update(Context, { value: 'value', children: first.Content });
 				expect(view.find('span').textContent).toBe('first');
 				expect(view.find('p').textContent).toBe('first');
 				expect(view.find('button').textContent).toBe('1');
-				view.update(Context.Provider, { value: 'value', children: second.Content });
+				view.update(Context, { value: 'value', children: second.Content });
 				expect(view.find('button').textContent).toBe('2');
 				expect(view.find('input')).toBe(input);
 				expect(input.value).toBe('typed across bodies');
@@ -191,13 +191,13 @@ describe('retained Provider output', () => {
 			runtimeModules,
 		});
 		const Context = createContext('default');
-		const view = mount(Context.Provider, { value: 'value', children: first.First });
+		const view = mount(Context, { value: 'value', children: first.First });
 		try {
 			const input = view.find('input') as HTMLInputElement;
 			input.value = 'retained';
-			view.update(Context.Provider, { value: 'other', children: second.Second });
+			view.update(Context, { value: 'other', children: second.Second });
 			expect(view.find('span').textContent).toBe('second');
-			view.update(Context.Provider, { value: 'return', children: first.First });
+			view.update(Context, { value: 'return', children: first.First });
 			expect(view.find('span').textContent).toBe('first');
 			expect(view.find('input')).toBe(input);
 			expect(input.value).toBe('retained');
@@ -399,7 +399,7 @@ describe('retained Provider output', () => {
 			const serverContext = ServerRuntime.createContext('default');
 			const Context = createContext('default');
 			const container = document.createElement('div');
-			container.innerHTML = ServerRuntime.renderToString(serverContext.Provider, {
+			container.innerHTML = ServerRuntime.renderToString(serverContext, {
 				value: 'server',
 				children: server.First,
 			}).html;
@@ -407,7 +407,7 @@ describe('retained Provider output', () => {
 			const input = container.querySelector('input')!;
 			const label = container.querySelector('span')!;
 			input.value = 'typed before hydration';
-			const root = hydrateRoot(container, Context.Provider, {
+			const root = hydrateRoot(container, Context, {
 				value: 'server',
 				children: first.First,
 			});
@@ -417,7 +417,7 @@ describe('retained Provider output', () => {
 					[second.Second, 'second'],
 					[first.First, 'first'],
 				] as const) {
-					flushSync(() => root.render(Context.Provider, { value: text, children }));
+					flushSync(() => root.render(Context, { value: text, children }));
 					expect(container.querySelector('span')!.textContent).toBe(text);
 					expect(container.querySelector('input')).toBe(input);
 					expect(input.value).toBe('typed before hydration');
@@ -517,7 +517,7 @@ describe('retained Provider output', () => {
 		const serverContext = ServerRuntime.createContext('default');
 		const Context = createContext('default');
 		const container = document.createElement('div');
-		container.innerHTML = ServerRuntime.renderToString(serverContext.Provider, {
+		container.innerHTML = ServerRuntime.renderToString(serverContext, {
 			value: 'server',
 			children: server.First,
 		}).html;
@@ -525,7 +525,7 @@ describe('retained Provider output', () => {
 		const input = container.querySelector('input')!;
 		const label = container.querySelector('span')!;
 		input.value = 'before hydration';
-		const root = hydrateRoot(container, Context.Provider, {
+		const root = hydrateRoot(container, Context, {
 			value: 'server',
 			children: client.First,
 		});
@@ -536,7 +536,7 @@ describe('retained Provider output', () => {
 				[client.Second, 'second'],
 				[client.First, 'first'],
 			] as const) {
-				flushSync(() => root.render(Context.Provider, { value: text, children }));
+				flushSync(() => root.render(Context, { value: text, children }));
 				expect(container.querySelector('span')).toBe(label);
 				expect(label.textContent).toBe(text);
 				expect(container.querySelector('input')).toBe(input);

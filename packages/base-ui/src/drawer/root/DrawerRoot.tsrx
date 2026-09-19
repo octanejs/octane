@@ -247,7 +247,7 @@ export function DrawerRoot<Payload = unknown>(props: DrawerRoot.Props<Payload>) 
 		children: resolvedChildren,
 	});
 
-	return <DrawerRootContext.Provider value={contextValue}>{dialog}</DrawerRootContext.Provider>;
+	return <DrawerRootContext value={contextValue}>{dialog}</DrawerRootContext>;
 }
 
 export interface DrawerRootState {}

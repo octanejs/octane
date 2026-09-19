@@ -49,7 +49,7 @@ export interface Props extends Omit<
 const initialDimension = defaultResponsiveContainerProps.initialDimension;
 const ResponsiveContainerContext = createContext<ResponsiveContainerDimensions>(initialDimension);
 
-export const ResponsiveContainerContextProviderInternal = ResponsiveContainerContext.Provider;
+export const ResponsiveContainerContextProviderInternal = ResponsiveContainerContext;
 export const useResponsiveContainerContext = () => useContext(ResponsiveContainerContext);
 export { initialDimension as defaultResponsiveContainerDimension };
 

@@ -492,7 +492,7 @@ function createCompletePackage(root) {
 			files: ['src', 'README.md', 'UPSTREAM.md', 'LICENSE'],
 			exports: { '.': './src/index.ts' },
 			scripts: { test: 'vitest run' },
-			peerDependencies: { octane: 'workspace:^0.1.51 || ^0.2.0' },
+			peerDependencies: { octane: 'workspace:^0.1.51 || ^0.2.0 || ^0.3.0' },
 			devDependencies: { octane: 'workspace:*' },
 		}),
 	);

@@ -31,7 +31,12 @@ import { SidebarSection } from '../SidebarSection';
 
 import { PuckAction } from '../../reducer';
 import getClassNameFactory from '../../lib/get-class-name-factory';
-import { createAppStore, defaultAppState, useAppStore, appStoreContext } from '../../store';
+import {
+	createAppStore,
+	defaultAppState,
+	useAppStore,
+	appStoreContext as AppStoreContext,
+} from '../../store';
 import styles from './styles.module.css';
 import { Fields } from './components/Fields';
 import { Components } from './components/Components';
@@ -109,13 +114,13 @@ type PuckProps<
 	metadata?: Metadata;
 };
 
-const propsContext = createContext<Partial<PuckProps>>({});
+const PropsContext = createContext<Partial<PuckProps>>({});
 
 function PropsProvider<UserConfig extends Config = Config>(props: PuckProps<UserConfig>) {
-	return <propsContext.Provider value={props as PuckProps}>{props.children}</propsContext.Provider>;
+	return <PropsContext value={props as PuckProps}>{props.children}</PropsContext>;
 }
 
-export const usePropsContext = () => useContext<PuckProps>(propsContext as Context<PuckProps>);
+export const usePropsContext = () => useContext<PuckProps>(PropsContext as Context<PuckProps>);
 
 function PuckProvider<
 	UserConfig extends Config = Config,
@@ -348,9 +353,9 @@ function PuckProvider<
 		resolveAndCommitData();
 	}, []);
 
-	return <appStoreContext.Provider value={appStore}>
-		<UsePuckStoreContext.Provider value={uPuckStore}>{children}</UsePuckStoreContext.Provider>
-	</appStoreContext.Provider>;
+	return <AppStoreContext value={appStore}>
+		<UsePuckStoreContext value={uPuckStore}>{children}</UsePuckStoreContext>
+	</AppStoreContext>;
 }
 
 function PuckLayout<

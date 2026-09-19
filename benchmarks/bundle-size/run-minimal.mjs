@@ -13,6 +13,7 @@ import { octane } from 'octane/compiler/vite';
 import { build as buildVite } from 'vite';
 import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
+import { selectMinimalScenarios, verifyByteBudget } from './minimal-gates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(directory, '../..');
@@ -24,6 +25,7 @@ const existingScenarios = [
 	['cli-spa-starter', 'ts'],
 	['root-static-specialized', 'ts'],
 	['root-static', 'tsrx'],
+	['root-static-local', 'tsrx'],
 	['hooks-state', 'tsrx'],
 	['context', 'tsrx'],
 	['hydrate-root', 'tsrx'],
@@ -39,6 +41,7 @@ const signalFreeClientScenarios = new Set([
 	'cli-spa-starter',
 	'root-static-specialized',
 	'root-static',
+	'root-static-local',
 	'hooks-state',
 	'context',
 	'hydrate-root',
@@ -203,20 +206,10 @@ assert.deepEqual(
 	'minimal-import budgets must cover every scenario exactly once',
 );
 
-const requestedScenarios = process.argv.slice(2);
-for (const requested of requestedScenarios) {
-	assert.equal(
-		scenarios.some(({ id, name }) => requested === id || requested === name),
-		true,
-		`Unknown minimal-import scenario: ${requested}`,
-	);
-}
-const selectedScenarios = requestedScenarios.length
-	? scenarios.filter(
-			({ id, name }) => requestedScenarios.includes(id) || requestedScenarios.includes(name),
-		)
-	: scenarios;
-assert.notEqual(selectedScenarios.length, 0, 'At least one minimal-import scenario must run');
+const { selectedScenarios, enforceBudgets } = selectMinimalScenarios(
+	process.argv.slice(2),
+	scenarios,
+);
 
 const payload = { suite: 'bundle-reachability', iterations: 1, targets: [] };
 
@@ -379,7 +372,9 @@ try {
 		if (signalFreeClientScenarios.has(id)) {
 			assert.deepEqual(
 				emittedModules.filter((module) =>
-					/\/packages\/octane\/src\/signals\/transition-(?:candidate|action)\.[jt]s$/.test(module),
+					/\/packages\/octane\/src\/signals\/transition-(?:candidate|action|coordinator)\.[jt]s$/.test(
+						module,
+					),
 				),
 				[],
 				`${name}: signal-free client retained the concrete native transition implementation`,
@@ -417,11 +412,15 @@ try {
 				`${name}: compiler reached the behavior-only production bundle`,
 			);
 		}
-		if (id === 'root-static-specialized' || id === 'cli-spa-starter') {
+		if (
+			id === 'root-static-specialized' ||
+			id === 'root-static-local' ||
+			id === 'cli-spa-starter'
+		) {
 			assert.equal(
 				runtimeExports.includes('__createVoidRoot'),
 				true,
-				`${name}: the disposable application root lost compiler specialization`,
+				`${name}: the compiled application root lost compiler specialization`,
 			);
 			assert.equal(
 				runtimeExports.includes('createRoot'),
@@ -465,26 +464,15 @@ try {
 			}).length,
 		};
 		const budget = budgets[name];
-		for (const metric of ['raw', 'gzip', 'brotli']) {
-			assert.equal(
-				Number.isSafeInteger(budget[metric]) && budget[metric] > 0,
-				true,
-				`${name}: invalid committed ${metric} byte budget`,
-			);
-			if (id === 'behavior-root') {
-				assert.equal(
-					measured[metric] <= budget[metric],
-					true,
-					`${name}: production ${metric} bytes ${measured[metric]} exceed committed budget ${budget[metric]}`,
-				);
-			}
-		}
+		const budgetEnforced = enforceBudgets || id === 'behavior-root';
+		verifyByteBudget(name, measured, budget, budgetEnforced);
 		payload.targets.push({
 			name,
 			ops: Object.fromEntries(
 				Object.entries(measured).map(([metric, value]) => [metric, stat(value)]),
 			),
 			meta: {
+				budgetEnforced,
 				modules: modules.map((id) =>
 					id.startsWith(repository + path.sep) ? path.relative(repository, id) : id,
 				),

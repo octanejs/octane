@@ -488,12 +488,11 @@ matrix.itRenders('unwinds deeply nested context providers to each enclosing valu
 });
 
 // Per ReactDOMServerIntegrationNewContext-test.js:297, "should treat Context as Context.Provider".
-matrix.itRenders('supports the React 19 context provider shorthand', {
+// OCTANE DIVERGENCE: Context itself is the only supported provider spelling.
+matrix.itRenders('provides values through the context itself', {
 	component: 'ContextProviderShorthand',
 	mismatch: structuralMismatch,
 	assertCommon({ root }) {
-		expect(client.contextProviderIdentity).toBe(true);
-		expect(server.contextProviderIdentity).toBe(true);
 		expect(root.querySelector('#context-provider-shorthand')?.textContent).toBe('dark');
 	},
 });

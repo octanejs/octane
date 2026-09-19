@@ -1,6 +1,6 @@
 // Ported from react-aria (source: .react-spectrum/packages/react-aria/src/interactions/context.ts).
 // octane adaptations: React.createContext → octane createContext (octane's Context is
-// callable-as-Provider, `.Provider` stays as an identity alias, so consumers are unchanged);
+// is itself the provider component);
 // React's MutableRefObject type → a local structural alias; `displayName` is stamped through
 // a cast (octane's Context type doesn't declare it, but the runtime reads it for diagnostics).
 import type { FocusableElement } from '@react-types/shared';

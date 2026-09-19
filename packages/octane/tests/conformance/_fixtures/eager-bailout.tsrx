@@ -56,9 +56,9 @@ function ThemedValue(props) @{
 export function ContextDefeatsBailout(props) @{
 	const [theme, setTheme] = useState('light');
 	_setTheme = setTheme;
-	<Theme.Provider value={theme}>
+	<Theme value={theme}>
 		<ThemedValue log={props.log} />
-	</Theme.Provider>
+	</Theme>
 }
 
 // Per ReactHooksWithNoopRenderer-test.js: a dispatch that is a no-op on its

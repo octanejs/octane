@@ -32,11 +32,7 @@ export const NavigationMenuItem = function NavigationMenuItem(
 
 	const contextValue: NavigationMenuItemContextValue = React.useMemo(() => ({ value }), [value]);
 
-	return (
-		<NavigationMenuItemContext.Provider value={contextValue}>
-			{element}
-		</NavigationMenuItemContext.Provider>
-	);
+	return <NavigationMenuItemContext value={contextValue}>{element}</NavigationMenuItemContext>;
 };
 
 export interface NavigationMenuItemState {}

@@ -99,7 +99,7 @@ export function DisclosureGroup(props: DisclosureGroupProps): any {
 		...renderProps,
 		ref,
 		'data-disabled': props.isDisabled || undefined,
-		children: createElement(DisclosureGroupStateContext.Provider, {
+		children: createElement(DisclosureGroupStateContext, {
 			value: state,
 			children: renderProps.children,
 		}),

@@ -15,9 +15,7 @@ export const DirectionProvider: React.FC<DirectionProvider.Props> = function Dir
 ) {
 	const { direction = 'ltr' } = props;
 	const contextValue = React.useMemo(() => ({ direction }), [direction]);
-	return (
-		<DirectionContext.Provider value={contextValue}>{props.children}</DirectionContext.Provider>
-	);
+	return <DirectionContext value={contextValue}>{props.children}</DirectionContext>;
 };
 
 export interface DirectionProviderState {}
