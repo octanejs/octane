@@ -98,7 +98,10 @@ export function renderStatic(items,produce){return renderToStaticMarkup(List,{it
 			target: 'es2022',
 			legalComments: 'none',
 			tsconfigRaw: { compilerOptions: {} },
-			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			define: {
+				'process.env.NODE_ENV': JSON.stringify(dev ? 'development' : 'production'),
+				__OCTANE_PROFILE_ENABLED__: 'false',
+			},
 			plugins: [
 				{
 					name: 'selected-server-source',
