@@ -272,15 +272,65 @@ const bundleModules = [false, true].map((strong) =>
 	),
 );
 const [bundles, strongBundles] = bundleModules;
+const [serverBundles, strongServerBundles] = [false, true].map((strong) =>
+	loadCompiledFixtureSource<typeof import('./_fixtures/event-signal-owner.tsrx')>(
+		(strong ? "'use strong';\n" : '') + bundleSource,
+		{
+			id: `event-signal-owner-bundles-${strong ? 'strong' : 'normal'}.tsrx`,
+			mode: 'server',
+			compileOptions: { dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod', hmr: false },
+		},
+	),
+);
 const bundleCases = [
-	{ kind: 'zero', Button: bundles.BundleOwner0, args: [] },
-	{ kind: 'one', Button: bundles.BundleOwner1, args: ['value'] },
-	{ kind: 'two', Button: bundles.BundleOwner2, args: ['value', 'other'] },
-	{ kind: 'many', Button: bundles.BundleOwnerN, args: ['value', 'other', 'last'] },
-	{ kind: 'event-one', Button: bundles.BundleOwner1e, args: ['click'] },
-	{ kind: 'event-two', Button: bundles.BundleOwner2e, args: ['click', 'value'] },
-	{ kind: 'strong-zero', Button: strongBundles.BundleOwner0, args: [] },
-	{ kind: 'strong-event-two', Button: strongBundles.BundleOwner2e, args: ['click', 'value'] },
+	{
+		kind: 'zero',
+		Button: bundles.BundleOwner0,
+		ServerButton: serverBundles.BundleOwner0,
+		args: [],
+	},
+	{
+		kind: 'one',
+		Button: bundles.BundleOwner1,
+		ServerButton: serverBundles.BundleOwner1,
+		args: ['value'],
+	},
+	{
+		kind: 'two',
+		Button: bundles.BundleOwner2,
+		ServerButton: serverBundles.BundleOwner2,
+		args: ['value', 'other'],
+	},
+	{
+		kind: 'many',
+		Button: bundles.BundleOwnerN,
+		ServerButton: serverBundles.BundleOwnerN,
+		args: ['value', 'other', 'last'],
+	},
+	{
+		kind: 'event-one',
+		Button: bundles.BundleOwner1e,
+		ServerButton: serverBundles.BundleOwner1e,
+		args: ['click'],
+	},
+	{
+		kind: 'event-two',
+		Button: bundles.BundleOwner2e,
+		ServerButton: serverBundles.BundleOwner2e,
+		args: ['click', 'value'],
+	},
+	{
+		kind: 'strong-zero',
+		Button: strongBundles.BundleOwner0,
+		ServerButton: strongServerBundles.BundleOwner0,
+		args: [],
+	},
+	{
+		kind: 'strong-event-two',
+		Button: strongBundles.BundleOwner2e,
+		ServerButton: strongServerBundles.BundleOwner2e,
+		args: ['click', 'value'],
+	},
 ];
 
 function bundleProps(invoke: (...values: unknown[]) => void, wait = () => {}) {
@@ -288,6 +338,55 @@ function bundleProps(invoke: (...values: unknown[]) => void, wait = () => {}) {
 }
 
 describe('explicit ownership of compiler-lifted native handlers', () => {
+	it.each(bundleCases.flatMap((entry) => [false, true].map((hydrate) => ({ ...entry, hydrate }))))(
+		'refreshes ownership even when callback and captures are unchanged ($kind, hydrate=$hydrate)',
+		({ Button, ServerButton, args, hydrate }) => {
+			const owner = createScope({ scopeKey: 'unchanged-first-owner' });
+			const otherOwner = createScope({ scopeKey: 'unchanged-other-owner' });
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: Root | undefined;
+			const seen: { owner: SignalOwner | null; values: unknown[] }[] = [];
+			const invoke = (...values: unknown[]) => seen.push({ owner: currentSignalOwner(), values });
+			const props = bundleProps(invoke);
+			try {
+				let adopted: Element | null = null;
+				if (hydrate) {
+					container.innerHTML = renderToString(ServerButton, props).html;
+					adopted = container.querySelector('button');
+				}
+				runWithSignalOwner(owner, () => {
+					if (hydrate) root = hydrateRoot(container, Button, props);
+					else {
+						root = createRoot(container);
+						root!.render(Button, props);
+					}
+				});
+				if (hydrate) expect(container.querySelector('button')).toBe(adopted);
+				const button = container.querySelector('button')!;
+				button.click();
+				runWithSignalOwner(otherOwner, () =>
+					flushSync(() => root!.render(Button, { ...props, wait: () => {} })),
+				);
+				expect(container.querySelector('button')).toBe(button);
+				button.click();
+				flushSync(() => root!.render(Button, { ...props, wait: () => {} }));
+				button.click();
+				expect(seen).toEqual([
+					{ owner, values: args },
+					{ owner: otherOwner, values: args },
+					{ owner: null, values: args },
+				]);
+				expect(currentSignalOwner()).toBeNull();
+			} finally {
+				root?.unmount();
+				expect(container.childNodes.length).toBe(0);
+				owner.dispose();
+				otherOwner.dispose();
+				container.remove();
+			}
+		},
+	);
 	it.each(
 		bundleCases.flatMap((entry) =>
 			[false, true].map((initialOwner) => ({ ...entry, initialOwner })),
@@ -474,9 +573,11 @@ describe('explicit ownership of compiler-lifted native handlers', () => {
 });
 
 describe('staged compiler-lifted event ownership', () => {
-	it.each(bundleCases)(
-		'publishes a projected bundle and authority together at the native update ($kind)',
-		async ({ Button, args }) => {
+	it.each(
+		bundleCases.flatMap((entry) => [false, true].map((unchanged) => ({ ...entry, unchanged }))),
+	)(
+		'publishes a projected bundle and authority together at the native update ($kind, unchanged=$unchanged)',
+		async ({ Button, args, unchanged }) => {
 			const restoreCarrier = installCarrier(true)!;
 			const mocks = installViewTransitionMocks();
 			const owner = createScope({ scopeKey: 'staged-bundle-owner' });
@@ -498,6 +599,8 @@ describe('staged compiler-lifted event ownership', () => {
 				update = input.update;
 				return { ready: done, finished: done, skipTransition() {} };
 			};
+			const stableCallback = (...values: unknown[]) =>
+				seen.push({ callback: 'committed', owner: currentSignalOwner(), values });
 			const view = (phase: string, callback: string) =>
 				createElement(ViewTransition, {
 					name: 'event-owner',
@@ -506,8 +609,10 @@ describe('staged compiler-lifted event ownership', () => {
 						null,
 						createElement(
 							Button,
-							bundleProps((...values) =>
-								seen.push({ callback, owner: currentSignalOwner(), values }),
+							bundleProps(
+								unchanged
+									? stableCallback
+									: (...values) => seen.push({ callback, owner: currentSignalOwner(), values }),
 							),
 						),
 						createElement('span', null, phase),
@@ -529,7 +634,7 @@ describe('staged compiler-lifted event ownership', () => {
 				button.click();
 				expect(seen).toEqual([
 					{ callback: 'committed', owner, values: args },
-					{ callback: 'published', owner: otherOwner, values: args },
+					{ callback: unchanged ? 'committed' : 'published', owner: otherOwner, values: args },
 				]);
 				release();
 				await act(() => done);
