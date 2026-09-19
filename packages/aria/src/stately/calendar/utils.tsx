@@ -13,7 +13,7 @@
  */
 import {
 	CalendarDate,
-	DateDuration,
+	type DateDuration,
 	maxDate,
 	minDate,
 	startOfMonth,
@@ -21,7 +21,7 @@ import {
 	startOfYear,
 	toCalendarDate,
 } from '@internationalized/date';
-import { DateValue } from './types';
+import type { DateValue } from './types';
 
 export function isInvalid(
 	date: DateValue,

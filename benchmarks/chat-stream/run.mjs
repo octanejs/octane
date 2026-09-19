@@ -193,6 +193,7 @@ async function timeOp(page, op) {
 	return await page.evaluate(`(async () => {
 		${HELPERS}
 		(window.gc || (() => {}))();
+		void document.body?.offsetHeight;
 		const t0 = performance.now();
 		${op.body}
 		const dt = performance.now() - t0;

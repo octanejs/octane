@@ -14,18 +14,18 @@ type KeyboardEvent = BaseEvent<globalThis.KeyboardEvent>;
  * governing permissions and limitations under the License.
  */
 
-import { AriaButtonProps } from '../button/useButton';
+import type { AriaButtonProps } from '../button/useButton';
 import { withSlot } from 'octane';
-import { AriaMenuOptions } from './useMenu';
-import { FocusableElement, FocusStrategy, RefObject } from '@react-types/shared';
+import type { AriaMenuOptions } from './useMenu';
+import type { FocusableElement, FocusStrategy, RefObject } from '@react-types/shared';
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import intlMessages from '../intl/menu/index';
-import {
+import type {
 	MenuTriggerState,
 	MenuTriggerType,
 } from '../upstream-exports/react-stately/useMenuTriggerState';
-import { PressProps } from '../interactions/usePress';
+import type { PressProps } from '../interactions/usePress';
 import { useContextMenu } from '../interactions/useContextMenu';
 import { useEffect } from '../compat/react';
 import { useId } from '../utils/useId';

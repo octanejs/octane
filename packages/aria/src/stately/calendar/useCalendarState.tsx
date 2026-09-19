@@ -23,10 +23,10 @@ import {
 	previousAvailableDate,
 } from './utils';
 import {
-	Calendar,
+	type Calendar,
 	CalendarDate,
-	CalendarIdentifier,
-	DateDuration,
+	type CalendarIdentifier,
+	type DateDuration,
 	DateFormatter,
 	endOfMonth,
 	endOfWeek,
@@ -41,7 +41,7 @@ import {
 	toCalendarDate,
 	today,
 } from '@internationalized/date';
-import {
+import type {
 	CalendarPropsBase,
 	CalendarSelectionMode,
 	CalendarState,
@@ -51,7 +51,7 @@ import {
 } from './types';
 import { useControlledState } from '../utils/useControlledState';
 import { useMemo, useState } from '../../compat/react';
-import { ValidationState, ValueBase } from '@react-types/shared';
+import type { ValidationState, ValueBase } from '@react-types/shared';
 
 export interface CalendarProps<T extends DateValue, M extends CalendarSelectionMode = 'single'>
 	extends

@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import { Collection, Key, RefObject } from '@react-types/shared';
+import type { Collection, Key, RefObject } from '@react-types/shared';
 import {
 	Layout,
 	Rect,
@@ -21,10 +21,10 @@ import {
 } from '../upstream-exports/react-stately/useVirtualizerState';
 import { mergeProps } from '../utils/mergeProps';
 import React, {
-	ForwardedRef,
-	HTMLAttributes,
-	ReactElement,
-	ReactNode,
+	type ForwardedRef,
+	type HTMLAttributes,
+	type ReactElement,
+	type ReactNode,
 	useCallback,
 } from '../compat/react';
 import { ScrollView } from './ScrollView';

@@ -12,19 +12,19 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaLabelingProps, DOMAttributes, DOMProps, RefObject } from '@react-types/shared';
-import {
+import type { AriaLabelingProps, DOMAttributes, DOMProps, RefObject } from '@react-types/shared';
+import type {
 	ColorAreaProps,
 	ColorAreaState,
 } from '../upstream-exports/react-stately/useColorAreaState';
-import { ColorChannel } from '../upstream-exports/react-stately/Color';
+import type { ColorChannel } from '../upstream-exports/react-stately/Color';
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import intlMessages from '../intl/color/index';
 import { isAndroid, isIOS } from '../utils/platform';
 import { mergeProps } from '../utils/mergeProps';
 import React, {
-	ChangeEvent,
-	InputHTMLAttributes,
+	type ChangeEvent,
+	type InputHTMLAttributes,
 	useCallback,
 	useRef,
 	useState,

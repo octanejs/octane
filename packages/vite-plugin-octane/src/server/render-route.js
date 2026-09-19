@@ -9,6 +9,7 @@ import {
 	injectHydrationEntry,
 	nonceAttribute,
 	prepareStreamingHydrationTemplate,
+	serializeRouteData,
 	splitSsrTemplate,
 } from './html-template.js';
 import {
@@ -146,8 +147,7 @@ export async function handleRenderRoute(
 		// params, the request url, and the optional preHydrate module the client
 		// entry awaits before hydrateRoot. routeIndex stays for debugging /
 		// Phase-2 static maps.
-		const routeData = JSON.stringify({
-			...(clientBuild === undefined ? {} : { clientBuild, streamedSignals }),
+		const routeData = serializeRouteData({
 			entry: entryPath,
 			exportName: get_route_entry_export_name(route.entry) ?? null,
 			layout: route.layout ?? null,
@@ -159,8 +159,10 @@ export async function handleRenderRoute(
 				pending: serializeComponentEntry(pendingEntry),
 				catch: serializeComponentEntry(catchEntry),
 			},
+			clientBuild,
+			streamedSignals,
 		});
-		const headContent = `<script id="__octane_data" type="application/json"${nonceAttribute(nonce)}>${escapeScript(routeData)}</script>`;
+		const headContent = `<script id="__octane_data" type="application/json"${nonceAttribute(nonce)}>${routeData}</script>`;
 
 		// Load and process index.html template.
 		const templatePath = join(vite.config.root, 'index.html');
@@ -275,15 +277,6 @@ function getRenderRouteIndex(config, route) {
 	const renderRoutes = config.router.routes.filter((r) => r.type === 'render');
 	const index = renderRoutes.indexOf(route);
 	return index === -1 ? undefined : index;
-}
-
-/**
- * Escape script content to prevent XSS in the inline JSON data block.
- * @param {string} str
- * @returns {string}
- */
-function escapeScript(str) {
-	return str.replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
 }
 
 /**

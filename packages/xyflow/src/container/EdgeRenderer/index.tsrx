@@ -1,10 +1,10 @@
-import { memo, OctaneNode } from 'octane';
+import { memo, type OctaneNode } from 'octane';
 import { shallow } from '@octanejs/zustand/shallow';
 
 import { useStore } from '../../hooks/useStore';
 import { useVisibleEdgeIds } from '../../hooks/useVisibleEdgeIds';
 import MarkerDefinitions from './MarkerDefinitions.tsrx';
-import { GraphViewProps } from '../GraphView/index.tsrx';
+import type { GraphViewProps } from '../GraphView/index.tsrx';
 import EdgeWrapper from '../../components/EdgeWrapper/index.tsrx';
 import type { Edge, ReactFlowState, Node } from '../../types';
 

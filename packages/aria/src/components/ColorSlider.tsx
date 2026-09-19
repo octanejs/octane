@@ -2,30 +2,30 @@
 // Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria-components/src/ColorSlider.tsx).
 import { useRef } from 'octane';
 import {
-	AriaColorSliderProps,
+	type AriaColorSliderProps,
 	useColorSlider,
 } from '../upstream-exports/react-aria/useColorSlider';
 import {
-	ClassNameOrFunction,
-	ContextValue,
+	type ClassNameOrFunction,
+	type ContextValue,
 	dom,
 	Provider,
-	RenderProps,
-	SlotProps,
+	type RenderProps,
+	type SlotProps,
 	useContextProps,
 	useRenderProps,
 	useSlot,
 } from './utils';
 import {
-	ColorSliderState,
+	type ColorSliderState,
 	useColorSliderState,
 } from '../upstream-exports/react-stately/useColorSliderState';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
-import { GlobalDOMAttributes } from '@react-types/shared';
+import type { GlobalDOMAttributes } from '@react-types/shared';
 import { InternalColorThumbContext } from './ColorThumb';
 import { LabelContext } from './Label';
-import { Orientation } from '@react-types/shared';
-import React, { createContext, ForwardedRef, forwardRef } from '../compat/react';
+import type { Orientation } from '@react-types/shared';
+import React, { createContext, type ForwardedRef, forwardRef } from '../compat/react';
 import { SliderOutputContext, SliderStateContext, SliderTrackContext } from './Slider';
 import { useLocale } from '../upstream-exports/react-aria/I18nProvider';
 

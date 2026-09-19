@@ -12,11 +12,16 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaButtonProps } from '../button/useButton';
-import { AriaLabelingProps, DOMAttributes, FocusableElement, RefObject } from '@react-types/shared';
+import type { AriaButtonProps } from '../button/useButton';
+import type {
+	AriaLabelingProps,
+	DOMAttributes,
+	FocusableElement,
+	RefObject,
+} from '@react-types/shared';
 import { filterDOMProps } from '../utils/filterDOMProps';
 import intlMessages from '../intl/toast/index';
-import { QueuedToast, ToastState } from '../upstream-exports/react-stately/useToastState';
+import type { QueuedToast, ToastState } from '../upstream-exports/react-stately/useToastState';
 import { useEffect, useState } from '../compat/react';
 import { useId, useSlotId } from '../utils/useId';
 import { useLayoutEffect } from '../utils/useLayoutEffect';

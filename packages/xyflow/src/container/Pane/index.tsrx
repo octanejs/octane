@@ -16,7 +16,7 @@ import {
 	calcAutoPan,
 	pointToRendererPoint,
 	rendererPointToPoint,
-	XYPosition,
+	type XYPosition,
 } from '@xyflow/system';
 
 import { UserSelection } from '../../components/UserSelection/index.tsrx';
