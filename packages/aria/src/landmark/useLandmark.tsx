@@ -12,7 +12,12 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaLabelingProps, DOMAttributes, FocusableElement, RefObject } from '@react-types/shared';
+import type {
+	AriaLabelingProps,
+	DOMAttributes,
+	FocusableElement,
+	RefObject,
+} from '@react-types/shared';
 import { getEventTarget, nodeContains } from '../utils/shadowdom/DOMFunctions';
 import { useCallback, useEffect, useState } from '../compat/react';
 import { useLayoutEffect } from '../utils/useLayoutEffect';

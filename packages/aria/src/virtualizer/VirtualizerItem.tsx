@@ -12,11 +12,11 @@
  * governing permissions and limitations under the License.
  */
 
-import { Direction } from '@react-types/shared';
+import type { Direction } from '@react-types/shared';
 import { LayoutInfo } from '../upstream-exports/react-stately/useVirtualizerState';
-import React, { CSSProperties, JSX, ReactNode, useRef } from '../compat/react';
+import React, { type CSSProperties, type JSX, type ReactNode, useRef } from '../compat/react';
 import { useLocale } from '../i18n/I18nProvider';
-import { useVirtualizerItem, VirtualizerItemOptions } from './useVirtualizerItem';
+import { useVirtualizerItem, type VirtualizerItemOptions } from './useVirtualizerItem';
 
 interface VirtualizerItemProps extends Omit<VirtualizerItemOptions, 'ref'> {
 	layoutInfo: LayoutInfo;

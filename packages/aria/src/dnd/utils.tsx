@@ -13,7 +13,7 @@
  */
 
 import { CUSTOM_DRAG_TYPE, DROP_OPERATION, GENERIC_TYPE, NATIVE_DRAG_TYPES } from './constants';
-import {
+import type {
 	DirectoryDropItem,
 	DragItem,
 	DragType,
@@ -24,7 +24,7 @@ import {
 	RefObject,
 	TextDropItem,
 } from '@react-types/shared';
-import { DroppableCollectionState } from '../upstream-exports/react-stately/useDroppableCollectionState';
+import type { DroppableCollectionState } from '../upstream-exports/react-stately/useDroppableCollectionState';
 import { getInteractionModality, useInteractionModality } from '../interactions/useFocusVisible';
 
 interface DroppableCollectionMap {
