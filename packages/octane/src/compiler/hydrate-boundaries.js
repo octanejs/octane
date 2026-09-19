@@ -16,6 +16,40 @@ import {
 
 export const HYDRATE_QUERY_PARAM = 'octane-hydrate';
 
+// Only this extraction pass can certify the loader/child ABI. Keep provenance
+// off authored attributes and parser metadata; COW rewrites preserve tag nodes.
+const compiledSplitHydrateTags = new WeakMap();
+
+export function compiledSplitHydrateTagsForAst(ast) {
+	return compiledSplitHydrateTags.get(ast);
+}
+
+function isCompiledSplitHydrateBoundary(boundary) {
+	if (boundary.disabled || boundary.independent || boundary.permanentStatic) return false;
+	const opening = boundary.node.openingElement;
+	if (opening.name?.type !== 'JSXIdentifier') return false;
+	if (
+		(opening.attributes ?? []).some((attribute) => {
+			const name = attribute.name?.name;
+			return (
+				attribute.type !== 'JSXAttribute' ||
+				attribute.name?.type !== 'JSXIdentifier' ||
+				typeof name !== 'string' ||
+				name === 'children' ||
+				name === 'fallback' ||
+				name.startsWith('__')
+			);
+		})
+	)
+		return false;
+	return !(boundary.node.children ?? []).some((child) => {
+		const expression = unwrapExpression(
+			child.type === 'JSXExpressionContainer' ? child.expression : null,
+		);
+		return ['ArrowFunctionExpression', 'FunctionExpression'].includes(expression?.type);
+	});
+}
+
 const SKIP_KEYS = new Set(['type', 'loc', 'start', 'end', 'range', 'metadata', 'parent']);
 const TRANSPARENT_TS_EXPRESSIONS = new Set([
 	'ParenthesizedExpression',
@@ -2176,6 +2210,12 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null, 
 			moduleMovePlan.declarationsByPath,
 		);
 	}
+	const templateTags = new Set(
+		analysis.boundaries
+			.filter(isCompiledSplitHydrateBoundary)
+			.map((boundary) => boundary.node.openingElement.name),
+	);
+	if (templateTags.size > 0) compiledSplitHydrateTags.set(ast, templateTags);
 	return {
 		ast,
 		boundaryPath,
