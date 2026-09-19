@@ -11,10 +11,7 @@
     "integrity": "sha256:9662c2a241e21e2f3c8f534195516ce5060b4d13b1997fca96daea797be9f3a1",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "absent",
-    "types": "insufficient"
-  },
+  "upstreamSuites": { "runtime": "absent", "types": "insufficient" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-pacer/src"],
@@ -176,12 +173,12 @@
         {
           "path": "packages/tanstack-pacer/audit/type-parity.json",
           "role": "support",
-          "sha256": "334436ac034b0642b4c10c53a72e308adec33203f0d1dbe7b6c9861eaa2214a7"
+          "sha256": "0e1b15f2a5d54f65e023aa7eace7fd49b1a80d78ce6b6bb45abd3cce1c7cf7b9"
         },
         {
           "path": "packages/tanstack-pacer/typetests/assertions.md",
           "role": "support",
-          "sha256": "d7464ba40277141a126a49340b773392a050430a9a6b562afd198bec9611b48a"
+          "sha256": "ec72b2580ea9da5dc0f086c126171d9b4536c0d4217aac38d643eb774e292c9c"
         },
         {
           "path": "packages/tanstack-pacer/typetests/pristine/public-contracts.test-d.ts",
@@ -217,7 +214,7 @@
         {
           "path": "packages/tanstack-pacer/audit/adapted-types.json",
           "role": "test",
-          "sha256": "5cb4f720be1671701b9a63cadfa08f765ca839de7977562d63b988819d60efc3",
+          "sha256": "5ea593169d42c387efe029b6d02553d2ef02757b1e9a2fe988ffbb1affc20fef",
           "cases": [
             {
               "id": "types:adapted-octane",
@@ -234,12 +231,12 @@
         {
           "path": "packages/tanstack-pacer/audit/type-parity.json",
           "role": "support",
-          "sha256": "334436ac034b0642b4c10c53a72e308adec33203f0d1dbe7b6c9861eaa2214a7"
+          "sha256": "0e1b15f2a5d54f65e023aa7eace7fd49b1a80d78ce6b6bb45abd3cce1c7cf7b9"
         },
         {
           "path": "packages/tanstack-pacer/typetests/assertions.md",
           "role": "support",
-          "sha256": "d7464ba40277141a126a49340b773392a050430a9a6b562afd198bec9611b48a"
+          "sha256": "ec72b2580ea9da5dc0f086c126171d9b4536c0d4217aac38d643eb774e292c9c"
         },
         {
           "path": "packages/tanstack-pacer/typetests/adapted/public-contracts.test-d.ts",

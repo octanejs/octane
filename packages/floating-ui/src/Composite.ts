@@ -285,7 +285,7 @@ export function Composite(
 		},
 	};
 
-	return createElement(CompositeContext.Provider, {
+	return createElement(CompositeContext, {
 		value: contextValue,
 		children: createElement(FloatingList, {
 			elementsRef,

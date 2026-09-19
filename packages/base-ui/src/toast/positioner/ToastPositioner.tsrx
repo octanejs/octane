@@ -108,9 +108,7 @@ export const ToastPositioner = function ToastPositioner(
 		refs: [forwardedRef, setPositionerElement],
 	});
 
-	return (
-		<ToastPositionerContext.Provider value={positioning}>{element}</ToastPositionerContext.Provider>
-	);
+	return <ToastPositionerContext value={positioning}>{element}</ToastPositionerContext>;
 };
 
 export interface ToastPositionerState {

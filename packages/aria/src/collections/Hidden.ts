@@ -35,7 +35,7 @@ export function Hidden(props: { children: any; target?: Element | null }): any {
 		return props.children;
 	}
 
-	let children = createElement(HiddenContext.Provider, {
+	let children = createElement(HiddenContext, {
 		value: true,
 		children: props.children,
 	});

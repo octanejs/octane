@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -15,6 +16,7 @@ import {
 	findVoidRootImports,
 } from '../../packages/octane/src/compiler/bundler.js';
 import { knownAttributeSpreads } from '../../packages/stylex/src/compiler-contract.js';
+import { verifyScenario } from '../bundle-size/verify-reachability.mjs';
 import { generateStylexCSS, transformStylex } from '../../packages/stylex/src/transform.js';
 import {
 	BUNDLE_CASES,
@@ -201,7 +203,11 @@ test('ordinary entries allow protocol seams but reject both scoped and raw engin
 test('ordinary client roots tree-shake native transitions and require emitted-byte evidence', () => {
 	const ordinary = [source('runtime.ts'), source('signals/read-protocol.ts')];
 	verifyTransitionBoundary(scenario('ordinary-client'), ordinary);
-	for (const name of ['signals/transition-candidate.ts', 'signals/transition-action.ts']) {
+	for (const name of [
+		'signals/transition-candidate.ts',
+		'signals/transition-action.ts',
+		'signals/transition-coordinator.ts',
+	]) {
 		verifyTransitionBoundary(scenario('ordinary-client'), [
 			...ordinary,
 			{ ...source(name), bytesInOutput: 0 },
@@ -295,6 +301,13 @@ export function mount(parent) { const root = createRoot(parent); root.render(Vie
 				input.path.endsWith('/src/signals/transition-candidate.ts') && input.bytesInOutput > 0,
 		),
 		'The compiled native-read control must retain the concrete transition implementation.',
+	);
+	assert.ok(
+		native.inputs.some(
+			(input) =>
+				input.path.endsWith('/src/signals/transition-coordinator.ts') && input.bytesInOutput > 0,
+		),
+		'The compiled signal Action control must retain its transition coordinator.',
 	);
 	const window = new Window();
 	const globals = new Map();
@@ -1936,5 +1949,213 @@ test('local void root specialization needs every lexical use and the loaded expo
 	);
 	t.diagnostic(
 		`${checked} lexical/escape controls; actual compiled contract generic ${bytes[0]} -> local ${bytes[1]} gzip with matching text and cleanup`,
+	);
+});
+
+test('same-file void roots remove returned-value machinery while preserving stock consumers', async (t) => {
+	for (const id of ['root-static', 'hooks-state', 'hydrate-root']) {
+		const filename = path.resolve(`benchmarks/bundle-size/fixtures/minimal/${id}.tsrx`);
+		const authored = await readFile(filename, 'utf8');
+		const sizes = [];
+		for (const opaque of [false, true]) {
+			// The sequence expression intentionally declines exact-factory proof.
+			// Both programs execute the same public createRoot/render/unmount ABI.
+			const source = opaque
+				? id === 'hydrate-root'
+					? authored.replace('hydrateRoot(container,', '(0, hydrateRoot)(container,')
+					: authored.replace('createRoot(container)', '(0, createRoot)(container)')
+				: authored;
+			assert.notEqual(source, opaque ? authored : '', `${id}: matched generic control`);
+			const compiled = compile(source, filename, { mode: 'client', dev: false, hmr: false }).code;
+			const result = await build({
+				stdin: { contents: compiled, resolveDir: path.resolve('packages/octane'), loader: 'js' },
+				bundle: true,
+				write: false,
+				minify: true,
+				format: 'iife',
+				globalName: '__OCTANE_REACHABILITY__',
+				platform: 'browser',
+				target: 'esnext',
+				legalComments: 'none',
+				tsconfigRaw: { compilerOptions: {} },
+				define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			});
+			const code = result.outputFiles[0].text;
+			await verifyScenario(id, code);
+			sizes.push(gzipSync(code, { level: 9 }).length);
+		}
+		assert.ok(
+			sizes[0] < sizes[1] * (id === 'hydrate-root' ? 0.75 : 0.6),
+			`${id}: proven root ${sizes[0]} gzip; generic control ${sizes[1]} gzip`,
+		);
+		t.diagnostic(
+			`${id}: proven ${sizes[0]}, generic ${sizes[1]} gzip bytes; both stock semantic controls pass`,
+		);
+	}
+});
+
+test('same-file root optimization proves complete lifetimes across bindings and modes', (t) => {
+	const previous = process.env.OCTANE_COMPILE_FROZEN_AST;
+	process.env.OCTANE_COMPILE_FROZEN_AST = '1';
+	let checked = 0;
+	const check = (source, helper, selected, options = {}) => {
+		const code = compile(source, 'root-proof.tsrx', { hmr: false, dev: false, ...options }).code;
+		assert.equal(code.includes(helper + ' as'), selected, source + JSON.stringify(options));
+		checked++;
+	};
+	const createPrefix =
+		"import {createRoot} from 'octane';\nfunction View() @{ <main>first</main> }\n";
+	const createBody =
+		'export function mount(el) { const root=createRoot(el); root.render(View); root.unmount(); }';
+	const hydratePrefix =
+		"import {hydrateRoot} from 'octane';\nfunction View() @{ <main>first</main> }\n";
+	const hydrateBody =
+		'export function mount(el) { const root=hydrateRoot(el,View); root.unmount(); }';
+	try {
+		check(createPrefix + createBody, '__createVoidRoot', true);
+		check(hydratePrefix + hydrateBody, '__hydrateVoidRoot', true);
+		for (const body of [
+			'const root=createRoot(el); root.render(View); root.unmount();',
+			'namespace N { export const root=createRoot(el); root.render(View); root.unmount(); }',
+			'class C { static { const root=createRoot(el); root.render(View); root.unmount(); } }',
+			'export function mount(el) { const root=createRoot(el); root.render(View); return root; }',
+			'export function mount(el, unknown) { const root=createRoot(el); root.render(View); root.render(unknown); }',
+			'export function mount(el) { const root=createRoot(el); root.render(View); return () => root.unmount(); }',
+			'export function mount(el) { const root=createRoot(el); root["render"](View); root.unmount(); }',
+			'export function mount(el) { const root=createRoot(el); root.render(View); eval("root.render(1)"); }',
+			'function Outer() { function mount(el) { const root=createRoot(el); root.render(View); root.unmount(); } return <section/>; }',
+			'namespace N { function mount(el) {const root=createRoot(el);root.render(View);root.unmount();} }',
+		])
+			check(createPrefix + body, '__createVoidRoot', false);
+		for (const definition of [
+			'const View=()=> @{ <main>first</main> };',
+			'let View=()=> @{ <main>first</main> };',
+			'function View() { return <main>first</main>; }',
+			'function View() @{ return "ordinary"; <main>first</main> }',
+			'function View(props) @{ if(!props.ready) return null; <main>first</main> }',
+		])
+			check(
+				"import {createRoot} from 'octane';\n" + definition + '\n' + createBody,
+				'__createVoidRoot',
+				false,
+			);
+		for (const args of [
+			'el,<View/>',
+			'el,"returned"',
+			'el,null',
+			'el',
+			'el,unknown',
+			'el,(0,View)',
+			'el,views.View',
+			'el,View,...props',
+		]) {
+			check(
+				hydratePrefix +
+					`export function mount(el,unknown,props,views){const root=hydrateRoot(${args});root.render(View);root.unmount();}`,
+				'__hydrateVoidRoot',
+				false,
+			);
+		}
+		for (const body of [
+			'const root=hydrateRoot(el,View);root.render(unknown);root.unmount();',
+			'const root=hydrateRoot(el,View);return root;',
+			'const root=hydrateRoot(el,View);return()=>root.unmount();',
+			'const root=hydrateRoot(el,View);root["render"](View);',
+			'const root=hydrateRoot(el,View);root.render?.(View);',
+			'const root=hydrateRoot(el,View);const alias=root;alias.render(View);',
+			'const root=hydrateRoot(el,View);const other=hydrateRoot(el,unknown,eval("View=()=>1"));root.unmount();',
+		])
+			check(
+				hydratePrefix + `export function mount(el,unknown){${body}}`,
+				'__hydrateVoidRoot',
+				false,
+			);
+		for (const body of [
+			'export function mount(el,View){const root=hydrateRoot(el,View);root.unmount();}',
+			'export function mount(el,hydrateRoot){const root=hydrateRoot(el,View);root.unmount();}',
+			'function replace(){View=()=>1;}export function mount(el){const root=hydrateRoot(el,View);root.unmount();}',
+			'namespace N {export const root=hydrateRoot(el,View);root.unmount();}',
+			'class C {static{const root=hydrateRoot(el,View);root.unmount();}}',
+		])
+			check(hydratePrefix + body, '__hydrateVoidRoot', false);
+		for (const options of [
+			{ dev: true },
+			{ hmr: 'vite' },
+			{ hmr: 'webpack' },
+			{ profile: true },
+			{ mode: 'server' },
+			{ renderer: { id: 'dom', module: 'octane', target: 'dom' } },
+			{ rendererBoundaries: { rules: [] } },
+		]) {
+			check(createPrefix + createBody, '__createVoidRoot', false, options);
+			check(hydratePrefix + hydrateBody, '__hydrateVoidRoot', false, options);
+		}
+		check(
+			createPrefix + 'function unrelated(View){View=()=>1;}\n' + createBody,
+			'__createVoidRoot',
+			true,
+		);
+	} finally {
+		if (previous === undefined) delete process.env.OCTANE_COMPILE_FROZEN_AST;
+		else process.env.OCTANE_COMPILE_FROZEN_AST = previous;
+	}
+	t.diagnostic(
+		`${checked} fixed-source activation controls; public semantics covered by same-file root tests and matched stock bundle controls`,
+	);
+});
+
+test('root optimization fails closed on unscoped runtime AST references', async (t) => {
+	const { parseModule, builders: b } = createRequire(
+		new URL('../../packages/octane/package.json', import.meta.url),
+	)('@tsrx/core');
+	const { findLocalVoidRootCallees } =
+		await import('../../packages/octane/src/compiler/local-void-roots.js');
+	for (const factory of ['createRoot(el)', 'hydrateRoot(el,View)']) {
+		const ast = parseModule(
+			`import {createRoot,hydrateRoot} from 'octane';function View() @{<main>server</main>}function mount(el){const root=${factory};root.render(View);function decorated(){}root.unmount();}`,
+			'unscoped-root.tsrx',
+		);
+		const view = ast.body[1],
+			mount = ast.body[2];
+		// Synthesized AST proof control, not supported authored function-decorator
+		// syntax: runtime traversal visits this reference, lexical analysis does not.
+		const decorated = {
+			...mount,
+			body: {
+				...mount.body,
+				body: mount.body.body.map((node) =>
+					node.type === 'FunctionDeclaration'
+						? {
+								...node,
+								decorators: [
+									{ type: 'Decorator', expression: b.call(b.id('publish'), [b.id('root')]) },
+								],
+							}
+						: node,
+				),
+			},
+		};
+		const supplied = { ...ast, body: [ast.body[0], view, decorated] };
+		const freeze = (node) => {
+			if (node && typeof node === 'object' && !Object.isFrozen(node)) {
+				Object.freeze(node);
+				for (const child of Object.values(node)) freeze(child);
+			}
+		};
+		freeze(supplied);
+		freeze(ast);
+		assert.equal(
+			findLocalVoidRootCallees(ast, new Set([view.id]), new Set([view])).size,
+			1,
+			factory + ' positive control',
+		);
+		assert.equal(
+			findLocalVoidRootCallees(supplied, new Set([view.id]), new Set([view])).size,
+			0,
+			factory + ' unscoped reference',
+		);
+	}
+	t.diagnostic(
+		'2 frozen COW AST positive/negative pairs; future-proof admission, not a reproduced supported runtime bug',
 	);
 });

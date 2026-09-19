@@ -296,9 +296,7 @@ export function OTPInput(props: OTPInputProps) {
 	if (render) {
 		renderedChildren = render(contextValue);
 	} else {
-		renderedChildren = <OTPInputContext.Provider
-			value={contextValue}
-		>{children}</OTPInputContext.Provider>;
+		renderedChildren = <OTPInputContext value={contextValue}>{children}</OTPInputContext>;
 	}
 	const noScriptStyle =
 		noScriptCSSFallback === null ? null : createElement('style', null, noScriptCSSFallback);

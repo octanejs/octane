@@ -546,6 +546,9 @@ export function createFormHook<
 	TComponents,
 	TFormComponents
 > {
+	const FieldContextProvider = fieldContext;
+	const FormContextProvider = formContext;
+
 	function useAppForm<
 		TFormData,
 		TOnMount extends undefined | FormValidateOrFn<TFormData>,
@@ -595,7 +598,7 @@ export function createFormHook<
 		// Keep children optional in the renderer-facing component props.
 		const AppForm = useMemo<HookComponentType<HookPropsWithChildren<{}>>>(() => {
 			return ({ children }) => {
-				return <formContext.Provider value={form}>{children}</formContext.Provider>;
+				return <FormContextProvider value={form}>{children}</FormContextProvider>;
 			};
 		}, [form]);
 
@@ -604,9 +607,9 @@ export function createFormHook<
 				return (
 					<form.Field {...props}>
 						{(field) => (
-							<fieldContext.Provider value={field}>
+							<FieldContextProvider value={field}>
 								{children(Object.assign(field, fieldComponents))}
-							</fieldContext.Provider>
+							</FieldContextProvider>
 						)}
 					</form.Field>
 				);

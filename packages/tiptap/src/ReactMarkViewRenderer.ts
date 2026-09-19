@@ -71,7 +71,7 @@ export class ReactMarkView extends MarkView<
 			},
 		};
 		const providerBody: ComponentBody<MarkViewProps> = (providerProps) =>
-			createElement(ReactMarkViewContext.Provider, {
+			createElement(ReactMarkViewContext, {
 				value: context,
 				children: createElement(component, providerProps),
 			});

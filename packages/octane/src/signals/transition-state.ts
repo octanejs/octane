@@ -1,6 +1,7 @@
 import type { createReactiveSystem } from 'alien-signals/system';
 import type { GraphOwner, ScopedNode, NodeState, SignalReadMode } from './graph.js';
 import type { SignalActionFrame } from './transition-action.js';
+import type { SignalTransitionCoordinatorFactory } from './transition-coordinator.js';
 import { setNativeCandidateResolver, type NativeReadSource } from './read-protocol.js';
 
 /** Shared state keeps model registration separate from optional native presentation. */
@@ -38,6 +39,14 @@ export function registerCandidateGraph(graph: CandidateGraph): void {
 export let createSignalActionFrame: (() => SignalActionFrame) | undefined;
 export function registerSignalActionFrameFactory(factory: () => SignalActionFrame): void {
 	createSignalActionFrame = factory;
+}
+
+/** The renderer consults this live capability when its first native write occurs. */
+export let createSignalTransitionCoordinator: SignalTransitionCoordinatorFactory | undefined;
+export function registerSignalTransitionCoordinatorFactory(
+	factory: SignalTransitionCoordinatorFactory,
+): void {
+	createSignalTransitionCoordinator = factory;
 }
 
 export function withoutSignalCandidate<T>(callback: () => T): T {

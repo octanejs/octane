@@ -156,7 +156,7 @@ function PointsInstances({
 			<bufferAttribute attach="attributes-color" args={[colors, 3]} usage={THREE.DynamicDrawUsage} />
 			<bufferAttribute attach="attributes-size" args={[sizes, 1]} usage={THREE.DynamicDrawUsage} />
 		</bufferGeometry>
-		<PointsContext.Provider value={api}>{children}</PointsContext.Provider>
+		<PointsContext value={api}>{children}</PointsContext>
 	</points>
 }
 

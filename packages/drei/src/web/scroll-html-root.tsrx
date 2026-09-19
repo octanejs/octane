@@ -4,7 +4,7 @@ import type { ScrollControlsState } from './ScrollControls.three.tsrx';
 
 // The Three context is registered with Octane's renderer bridge, so this DOM-owned
 // root must expose that same provider through the DOM Context call signature.
-const DomThreeContextProvider = threeContext.Provider as unknown as Context<RootStore | null>['Provider'];
+const DomThreeContextProvider = threeContext as unknown as Context<RootStore | null>;
 
 function ScrollHtmlContent({ state, fiberState, children }: {
 	state: ScrollControlsState;

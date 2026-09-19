@@ -48,9 +48,7 @@ export const ToolbarGroup = function ToolbarGroup(
 		props: [{ role: 'group' }, elementProps],
 	});
 
-	return (
-		<ToolbarGroupContext.Provider value={contextValue}>{element}</ToolbarGroupContext.Provider>
-	);
+	return <ToolbarGroupContext value={contextValue}>{element}</ToolbarGroupContext>;
 };
 
 export interface ToolbarGroupState extends ToolbarRootState {}

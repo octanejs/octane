@@ -106,10 +106,10 @@ function BarStackImpl(props: BarStackProps) @{
 		resolvedStackId,
 		radius,
 	]);
-	<BarStackContext.Provider value={context}>
+	<BarStackContext value={context}>
 		<BarStackClipPath stackId={resolvedStackId} radius={radius} />
 		{children}
-	</BarStackContext.Provider>
+	</BarStackContext>
 }
 
 /**

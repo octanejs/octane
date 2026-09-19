@@ -52,6 +52,7 @@ type SoftShadowMaterial = THREE.ShaderMaterial & {
 };
 
 export const accumulativeContext = createContext<AccumulativeContext>(null!);
+const AccumulativeContextProvider = accumulativeContext;
 
 const SoftShadowMaterialImpl = shaderMaterial(
 	{ color: new THREE.Color(), blend: 2, alphaTest: 0.75, opacity: 0, map: null },
@@ -234,7 +235,7 @@ export function AccumulativeShadows({
 	});
 	<group {...props}>
 		<group {...({ traverse: () => null } as any)} ref={lights}>
-			<accumulativeContext.Provider value={api}>{children}</accumulativeContext.Provider>
+			<AccumulativeContextProvider value={api}>{children}</AccumulativeContextProvider>
 		</group>
 		<mesh receiveShadow ref={plane as any} scale={scale} rotation={[-Math.PI / 2, 0, 0]}>
 			<planeGeometry />

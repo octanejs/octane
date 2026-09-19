@@ -93,7 +93,7 @@ export const MenuRoot = fastComponent(function MenuRoot<Payload>(props: MenuRoot
 
 		// Ensure this is not a Menu nested inside ContextMenu.Trigger.
 		// ContextMenu parentContext is always undefined as ContextMenu.Root is instantiated with
-		// <MenuRootContext.Provider value={undefined}>
+		// <MenuRootContext value={undefined}>
 		if (contextMenuContext && !parentMenuRootContext) {
 			return {
 				type: 'context-menu',
@@ -632,12 +632,12 @@ export const MenuRoot = fastComponent(function MenuRoot<Payload>(props: MenuRoot
 	);
 
 	const content = (
-		<MenuRootContext.Provider value={context as MenuRootContext}>
+		<MenuRootContext value={context as MenuRootContext}>
 			{handle && <PopupHandleAttachment handle={handle} store={store} />}
 			{typeof children === 'function' && !React.isChildrenBlock(children)
 				? children({ payload })
 				: children}
-		</MenuRootContext.Provider>
+		</MenuRootContext>
 	);
 
 	if (parent.type === undefined || parent.type === 'context-menu') {

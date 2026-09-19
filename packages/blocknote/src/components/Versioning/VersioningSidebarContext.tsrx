@@ -101,9 +101,7 @@ export const VersioningSidebarProvider = (props: {
 		[comparisonEnabled, comparisonMode, effectiveTab, showTabs],
 	);
 
-	return <VersioningSidebarContext.Provider
-		value={value}
-	>{props.children}</VersioningSidebarContext.Provider>;
+	return <VersioningSidebarContext value={value}>{props.children}</VersioningSidebarContext>;
 };
 
 export const useVersioningSidebar = (): VersioningSidebarContextValue => {

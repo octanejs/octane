@@ -16,11 +16,7 @@ export function GroupCollectionProvider(props: GroupCollectionProvider.Props) {
 
 	const contextValue = React.useMemo(() => ({ items }), [items]);
 
-	return (
-		<GroupCollectionContext.Provider value={contextValue}>
-			{children}
-		</GroupCollectionContext.Provider>
-	);
+	return <GroupCollectionContext value={contextValue}>{children}</GroupCollectionContext>;
 }
 
 namespace GroupCollectionProvider {

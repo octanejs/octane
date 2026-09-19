@@ -31,6 +31,7 @@ import { nativeReadActivationIndex } from './native-read-codegen.js';
 import { findManualHookProviders, manualHookWrapperParameters } from './manual-hooks.js';
 import { findLeadingJsxImportSourcePragma } from './pragma.js';
 import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
+import { assertNoLegacyContextProviders } from './context-provider.js';
 import { signalDeclarationSourceEdits } from './signal-declarations.js';
 import {
 	hookMethodName,
@@ -1465,6 +1466,7 @@ export function slotHooks(source, id, options) {
 	} catch {
 		return null; // let the normal pipeline surface the parse error
 	}
+	assertNoLegacyContextProviders(ast, source, id);
 	options = nativeReadOptions(ast, options);
 	const strongAnalysis = assertStrongMode(ast, source, id, { ...options, onlyImported: true });
 	const strongHints = strongAnalysis?.diagnostics.length

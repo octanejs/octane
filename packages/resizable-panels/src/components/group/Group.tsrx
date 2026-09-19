@@ -219,7 +219,7 @@ export function Group(props: GroupProps) @{
 		group.mutableState.disableCursor = !!disableCursor;
 	}, [defaultLayout, disableCursor]);
 
-	return <GroupContext.Provider value={context}>
+	return <GroupContext value={context}>
 		<div
 			{...rest}
 			className={className}
@@ -238,7 +238,7 @@ export function Group(props: GroupProps) @{
 				touchAction: orientation === 'horizontal' ? 'pan-y' : 'pan-x',
 			}}
 		>{children}</div>
-	</GroupContext.Provider>;
+	</GroupContext>;
 }
 
 (Group as { displayName?: string }).displayName = 'Group';

@@ -145,7 +145,7 @@ export function SidebarProvider(props: Props & {
 	);
 
 	return createElement(
-		SidebarContext.Provider,
+		SidebarContext,
 		{ value: contextValue },
 		createElement(
 			'div',

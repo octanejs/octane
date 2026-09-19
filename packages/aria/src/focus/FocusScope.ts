@@ -238,7 +238,7 @@ export function FocusScope(props: FocusScopeProps): any {
 	);
 
 	return createElement(
-		FocusContext.Provider,
+		FocusContext,
 		{ value },
 		createElement('span', { 'data-focus-scope-start': true, hidden: true, ref: startRef }),
 		children,
