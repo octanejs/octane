@@ -196,7 +196,7 @@
       "oracle": "required",
       "available": true,
       "environment": "workspace-node",
-      "project": "inertia",
+      "project": "inertia-package-consumption",
       "notes": "Repo-authored regression that compiles the complete authored public entry with the production Octane Vite plugin and verifies public hooks and unchanged core singleton identities.",
       "files": [
         {

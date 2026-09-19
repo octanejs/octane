@@ -196,7 +196,7 @@
       "oracle": "required",
       "available": true,
       "environment": "workspace-node",
-      "project": "xyflow",
+      "project": "xyflow-package-consumption",
       "notes": "Repo-authored regression that compiles the complete authored public entry with the production Octane Vite plugin, verifies component exports, and executes node/edge helpers.",
       "files": [
         {
