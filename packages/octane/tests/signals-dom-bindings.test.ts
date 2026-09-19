@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { act, flushSync, hydrateRoot, startTransition } from 'octane';
+import { act, createRoot, flushSync, hydrateRoot, startTransition } from 'octane';
 import { renderToString } from 'octane/server';
 import { createResource, createScope, query } from 'octane/signals';
 import type { CSSProperties } from 'octane/jsx-runtime';
@@ -11,11 +11,223 @@ import * as SignalRead from '../src/signals/read-protocol.js';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import * as client from './_fixtures/signals-dom-bindings.tsrx';
+import * as plainStyles from './_fixtures/plain-signal-styles.tsrx';
 
 const server = loadServerFixture<typeof client>(
 	'packages/octane/tests/_fixtures/signals-dom-bindings.tsrx',
 	{ runtimeModules: { 'octane/signals': Signals, 'octane/signals/server': ServerSignals } },
 );
+
+const plainStyleSource = readFileSync(
+	'packages/octane/tests/_fixtures/plain-signal-styles.tsrx',
+	'utf8',
+);
+
+describe('plain styles alongside native signal reads', () => {
+	for (const compileOptions of [
+		{ dev: true, hmr: false },
+		{ dev: false, hmr: false },
+		{ dev: false, hmr: false, strong: true },
+	]) {
+		const options = { id: '/plain-signal-styles.tsrx', compileOptions };
+		const compiled = loadCompiledFixtureSource<typeof plainStyles>(plainStyleSource, {
+			...options,
+			mode: 'client',
+		});
+		const renderedServer = loadCompiledFixtureSource<typeof plainStyles>(plainStyleSource, {
+			...options,
+			mode: 'server',
+		});
+
+		it(`adopts plain styles and preserves edits across prop updates in ${JSON.stringify(compileOptions)}`, () => {
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = renderToString(renderedServer.PlainStyles, {
+				offset: 5,
+				colored: true,
+			}).html;
+			const host = container.querySelector('div')!;
+			const input = container.querySelector('input')!;
+			const child = container.querySelector('span');
+			input.value = 'typed before hydration';
+			input.focus();
+			input.setSelectionRange(3, 8);
+			const root = hydrateRoot(container, compiled.PlainStyles, { offset: 5, colored: true });
+			try {
+				flushSync(() => root.render(compiled.PlainStyles, { offset: 12, colored: false }));
+				expect(container.querySelector('div')).toBe(host);
+				expect(container.querySelector('input')).toBe(input);
+				expect(container.querySelector('span')).toBe(child);
+				expect([host.style.display, host.style.marginTop, host.style.color]).toEqual([
+					'flex',
+					'12px',
+					'',
+				]);
+				expect(input.value).toBe('typed before hydration');
+				expect(document.activeElement).toBe(input);
+				expect([input.selectionStart, input.selectionEnd]).toEqual([3, 8]);
+				flushSync(() => root.render(compiled.PlainStyles, { offset: 0, colored: true }));
+				expect([host.style.display, host.style.marginTop, host.style.color]).toEqual([
+					'flex',
+					'0px',
+					'red',
+				]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		});
+
+		it(`keeps computed and accessor reads live after source replacement in ${JSON.stringify(compileOptions)}`, () => {
+			for (const hydration of [false, true])
+				for (const name of [
+					'ReadStyles',
+					'GetterStyles',
+					'AccessorStyles',
+					'SpreadStyles',
+				] as const) {
+					const scope = createScope({ scopeKey: `plain-style-${name}` });
+					const first$ = scope.signal$('first', 5);
+					const next$ = scope.signal$('next', 12);
+					const propsFor$ = (source$: typeof first$) => {
+						const props = { source$, position: 0 };
+						const read$ = () => source$.get();
+						Object.defineProperty(props, 'position', { get: read$ });
+						return props;
+					};
+					const Component = compiled[name];
+					const container = document.createElement('div');
+					document.body.appendChild(container);
+					if (hydration)
+						container.innerHTML = renderToString(renderedServer[name], propsFor$(first$)).html;
+					const serverHost = container.querySelector('div');
+					const root = hydration
+						? hydrateRoot(container, Component, propsFor$(first$))
+						: createRoot(container);
+					if (!hydration) root.render(Component, propsFor$(first$));
+					const host = container.querySelector('div')!;
+					const child = container.querySelector('span');
+					try {
+						if (hydration) expect(host).toBe(serverHost);
+						expect([host.style.display, host.style.marginTop]).toEqual(['flex', '5px']);
+						flushSync(() => first$.set(8));
+						expect(host.style.marginTop).toBe('8px');
+						flushSync(() => root.render(Component, propsFor$(next$)));
+						flushSync(() => first$.set(30));
+						expect(host.style.marginTop).toBe('12px');
+						flushSync(() => next$.set(15));
+						expect(host.style.marginTop).toBe('15px');
+						expect(container.querySelector('div')).toBe(host);
+						expect(container.querySelector('span')).toBe(child);
+						if (name === 'ReadStyles') expect(host.style.getPropertyValue('--position')).toBe('15');
+						root.unmount();
+						flushSync(() => next$.set(50));
+						expect(host.style.marginTop).toBe('15px');
+					} finally {
+						root.unmount();
+						container.remove();
+						scope.dispose();
+					}
+				}
+		});
+
+		it(`retains scalar SVG and custom-property styles during hydration in ${JSON.stringify(compileOptions)}`, () => {
+			const container = document.createElement('div');
+			container.innerHTML = renderToString(renderedServer.PlainSvgStyles, { offset: 5 }).html;
+			const host = container.querySelector('svg')!;
+			const root = hydrateRoot(container, compiled.PlainSvgStyles, { offset: 5 });
+			try {
+				flushSync(() => root.render(compiled.PlainSvgStyles, { offset: 0 }));
+				expect(container.querySelector('svg')).toBe(host);
+				expect(host.namespaceURI).toBe('http://www.w3.org/2000/svg');
+				expect([host.style.opacity, host.style.getPropertyValue('--position')]).toEqual(['0', '0']);
+			} finally {
+				root.unmount();
+			}
+		});
+
+		it(`routes pending and failed scalar reads through their boundary in ${JSON.stringify(compileOptions)}`, async () => {
+			for (const failed of [false, true]) {
+				const scope = createScope({ scopeKey: `scalar-style-boundary-${failed}` });
+				let resolve!: (value: number) => void;
+				let reject!: (error: Error) => void;
+				const request = query(
+					'position',
+					() =>
+						new Promise<number>((done, fail) => {
+							resolve = done;
+							reject = fail;
+						}),
+				);
+				const source$ = createResource(scope, 'position', () => request(undefined));
+				const root = mount(compiled.GuardedReadStyles, { source$ });
+				try {
+					expect(root.find('p').textContent).toBe('waiting');
+					await act(() => (failed ? reject(new Error('expected style failure')) : resolve(15)));
+					if (failed) expect(root.find('p').textContent).toBe('failed');
+					else expect((root.find('div') as HTMLElement).style.marginTop).toBe('15px');
+				} finally {
+					root.unmount();
+					scope.dispose();
+				}
+			}
+		});
+
+		it(`reads handles returned by opaque get calls in ${JSON.stringify(compileOptions)}`, () => {
+			for (const name of [
+				'ReturnedHandleStyles',
+				'ConditionalReturnedHandleStyles',
+				'LogicalReturnedHandleStyles',
+				'SequenceReturnedHandleStyles',
+				'OptionalReturnedHandleStyles',
+				'InheritedHandleStyles',
+			] as const) {
+				const scope = createScope({ scopeKey: 'returned-style-handle' });
+				const source$ = scope.signal$('position', 5);
+				const return$ = () => source$;
+				const palette = Object.fromEntries([['get', return$]]) as { get: typeof return$ };
+				const rendered = mount(compiled[name], { palette, enabled: true, source$ });
+				try {
+					const host = rendered.find('div') as HTMLElement;
+					expect(host.style.marginTop).toBe('5px');
+					flushSync(() => source$.set(9));
+					expect(host.style.marginTop).toBe('9px');
+					expect(rendered.find('div')).toBe(host);
+				} finally {
+					rendered.unmount();
+					scope.dispose();
+				}
+			}
+		});
+
+		it(`replaces nested handle sources in ${JSON.stringify(compileOptions)}`, () => {
+			const scope = createScope({ scopeKey: 'nested-style-handle' });
+			const first$ = scope.signal$('first', 5);
+			const next$ = scope.signal$('next', 12);
+			const outer$ = scope.signal$('outer', first$);
+			const rendered = mount(compiled.NestedHandleStyles, { outer$ });
+			try {
+				const host = rendered.find('div') as HTMLElement;
+				expect(host.style.marginTop).toBe('5px');
+				flushSync(() => first$.set(9));
+				expect(host.style.marginTop).toBe('9px');
+				flushSync(() => outer$.set(next$));
+				expect(host.style.marginTop).toBe('12px');
+				flushSync(() => first$.set(30));
+				expect(host.style.marginTop).toBe('12px');
+				flushSync(() => next$.set(15));
+				expect(host.style.marginTop).toBe('15px');
+				expect(rendered.find('div')).toBe(host);
+				rendered.unmount();
+				flushSync(() => next$.set(50));
+				expect(host.style.marginTop).toBe('15px');
+			} finally {
+				rendered.unmount();
+				scope.dispose();
+			}
+		});
+	}
+});
 
 describe('signal-valued DOM styles', () => {
 	it.each([client.GuardedStyles, client.SignalStyles, client.InlineGuardedStyles])(

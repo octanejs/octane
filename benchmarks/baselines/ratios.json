@@ -8708,6 +8708,22 @@
     "note": "Direct signal-valued styles update through their DOM binding without re-running component setup. The sampled-read control must display the same styles and preserve the same host and child identities."
   },
   {
+    "suite": "signal-dom-bindings",
+    "op": "style_blocks",
+    "target": "plain",
+    "reference": "direct",
+    "maxRatio": 0,
+    "note": "Plain scalar styles inside a native-capable module allocate no presentation blocks. Direct-handle controls exercise the observer and preserve the same styled host and child."
+  },
+  {
+    "suite": "signal-dom-bindings",
+    "op": "style_update_bodies",
+    "target": "plain",
+    "reference": "direct",
+    "maxRatio": 0,
+    "note": "Changing ordinary scalar style props uses fixed-field writers without additional native style body invocations; the observed handle control must update the same CSS and preserve identity."
+  },
+  {
     "suite": "runtime-style-dedup",
     "op": "style_records",
     "target": "repeated",
