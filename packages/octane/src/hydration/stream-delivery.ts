@@ -30,7 +30,7 @@ export interface StreamedRendererDeliveryOptions {
 	/** Includes style/composition waits; also caps unfinished inline result channels. */
 	readonly maxPendingFrames?: number;
 	readonly maxPendingBytes?: number;
-	/** Maximum queue/placement and inline result lifetime; readers also bound the response. */
+	/** Maximum queue/placement wait and result inactivity; readers also bound each pending read. */
 	readonly timeoutMs?: number;
 }
 
@@ -216,8 +216,11 @@ export function installStreamedRendererGlobal(
 		if (disposition === 'stale' || frame.channel !== 'result') return;
 		if (frame.kind === 'complete' || frame.kind === 'error') {
 			forgetResult(frame.identity);
-		} else if (frame.kind === 'open') {
-			if (openResults.size >= maxOpenResults)
+		} else {
+			const key = streamFrameIdentityKey(frame.identity);
+			const previous = openResults.get(key);
+			if (previous !== undefined) clearTimeout(previous.timer);
+			else if (openResults.size >= maxOpenResults)
 				throw new StreamedReceiverError(
 					'overflow',
 					'Streamed renderer exceeded its open result budget.',
@@ -233,7 +236,7 @@ export function installStreamedRendererGlobal(
 					/* The result was fenced before the host error callback ran. */
 				}
 			}, resultTimeoutMs);
-			openResults.set(streamFrameIdentityKey(frame.identity), { identity: frame.identity, timer });
+			openResults.set(key, { identity: frame.identity, timer });
 		}
 	});
 	let removed = false;
@@ -348,17 +351,24 @@ export async function readStreamedRendererResponse(
 		failOpenResults(failure);
 		void reader.cancel(options.signal?.reason).catch(() => {});
 	};
-	const timer = setTimeout(() => {
-		failure ??= new StreamedReceiverError('timeout', 'Streamed renderer response timed out.');
-		abort();
-	}, timeoutMs);
 	options.signal?.addEventListener('abort', abort, { once: true });
 	if (options.signal?.aborted) abort();
 	try {
 		for (;;) {
 			if (failure !== undefined && options.signal?.aborted) throw failure;
 			options.signal?.throwIfAborted();
-			const next = await reader.read();
+			// Local delivery backpressure has its own bounded wait. Only time
+			// spent waiting for the transport belongs to the response deadline.
+			const timer = setTimeout(() => {
+				failure ??= new StreamedReceiverError('timeout', 'Streamed renderer response timed out.');
+				abort();
+			}, timeoutMs);
+			let next: ReadableStreamReadResult<Uint8Array>;
+			try {
+				next = await reader.read();
+			} finally {
+				clearTimeout(timer);
+			}
 			if (next.done) break;
 			totalBytes += next.value.byteLength;
 			if (totalBytes > maxTotalBytes) {
@@ -406,7 +416,6 @@ export async function readStreamedRendererResponse(
 		failOpenResults(error);
 		throw error;
 	} finally {
-		clearTimeout(timer);
 		options.signal?.removeEventListener('abort', abort);
 		if (!finished) {
 			try {
