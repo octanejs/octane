@@ -532,7 +532,8 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				);
 			}
 			.bx-cell-ref {
-				border: 1px dashed var(--border);
+				outline: 1px dashed var(--border);
+				outline-offset: -1px;
 				background: transparent;
 				color: var(--text-secondary);
 			}
