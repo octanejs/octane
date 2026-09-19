@@ -4936,37 +4936,43 @@ export function ssrComponent(
 		// the path so sibling instances of the same component get distinct keys). `pf`
 		// is only null defensively (render() always installs a root frame); use an
 		// ad-hoc root frame so keys still work.
-		const frame: Frame =
-			pf === null
-				? {
-						parent: null,
-						seg: 0,
-						nextChild: 0,
-						scopedChildren: null,
-						occ: null,
-						path: null,
-						deferred: false,
-						asyncScope: ASYNC_SCOPE,
-						namespace: explicitNamespace ?? undefined,
-					}
-				: {
-						parent: pf,
-						seg: nextChildSegment(pf),
-						nextChild: 0,
-						scopedChildren: null,
-						occ: null,
-						path: null,
-						deferred: false,
-						asyncScope: ASYNC_SCOPE,
-						namespace: explicitNamespace ?? pf.namespace,
-					};
-		if (signalInstanceKey === undefined && SERVER_SIGNAL_BINDINGS_POTENTIAL) {
-			frame.signalParentKey = SIGNAL_COMPONENT_INSTANCE_KEY;
-			frame.signalInvocationSite = invocationSite;
-			frame.signalListKeys = SIGNAL_LIST_KEYS;
-			frame.signalKey = key;
-			signalInstanceKey = frame;
-		}
+		// Keep a potential binding's lazy recipe in its initial object shape.
+		// Ordinary frames omit these fields; a first handle can still materialize
+		// the retained recipe after its ancestors have already rendered.
+		// Reserve the materialized cache slot too, so that first read does not
+		// move the optional fields into a separately allocated property backing.
+		const seg = pf === null ? 0 : nextChildSegment(pf);
+		const namespace = explicitNamespace ?? pf?.namespace;
+		const potentialSignalKey = signalInstanceKey === undefined && SERVER_SIGNAL_BINDINGS_POTENTIAL;
+		const frame: Frame = potentialSignalKey
+			? {
+					parent: pf,
+					seg,
+					nextChild: 0,
+					scopedChildren: null,
+					occ: null,
+					path: null,
+					deferred: false,
+					asyncScope: ASYNC_SCOPE,
+					namespace,
+					signalParentKey: SIGNAL_COMPONENT_INSTANCE_KEY,
+					signalInvocationSite: invocationSite,
+					signalListKeys: SIGNAL_LIST_KEYS,
+					signalKey: key,
+					signalInstanceKey: undefined,
+				}
+			: {
+					parent: pf,
+					seg,
+					nextChild: 0,
+					scopedChildren: null,
+					occ: null,
+					path: null,
+					deferred: false,
+					asyncScope: ASYNC_SCOPE,
+					namespace,
+				};
+		if (potentialSignalKey) signalInstanceKey = frame;
 		// Function components are transparent to the HTML parser. Carry the active
 		// namespace through arbitrary wrapper chains; an explicitly compiled host
 		// transition (`<svg>`, `<math>`, or `<foreignObject>`) overrides it for the

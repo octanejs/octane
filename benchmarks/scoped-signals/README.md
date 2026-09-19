@@ -1,5 +1,24 @@
 # Scoped signal graph experiment
 
+## Server component frame recipes
+
+`ssr-component-frames.test.mjs` compiles matched public keyed SSR workloads in
+development and production modes. An ordinary module keeps the nine-field frame;
+an opaque text/control module starts with its four lazy signal identity fields and
+an empty materialized-identity cache slot. The untimed observer counts subsequent recipe-field assignments, component
+frames, restore envelopes and cache-slot appends. These are source-work counts, not V8 heap bytes.
+
+Each observed build must match its clean build's HTML exactly. The controls check
+text and input values, reordered real-handle control identities after ordinary
+renders, deferred raw object-key coercion, nested rendering and static output. The
+observer restores an existing global property descriptor. This gate runs through
+`ci:workflow:test`; it does not establish a runtime CPU improvement or remove the
+per-component restore envelope.
+
+```bash
+node --test benchmarks/scoped-signals/ssr-component-frames.test.mjs
+```
+
 ## Optional server list identity work
 
 The server-list case in `bundle-boundaries.test.mjs` compiles an opaque text and
