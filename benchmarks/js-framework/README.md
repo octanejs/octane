@@ -452,6 +452,15 @@ and keeps the boundary pinned.)
 
 Two methodology points, both visible in the harness source:
 
+Before each timer starts, both harnesses collect garbage and synchronously
+finish pending style and layout of the current table. This keeps a fresh
+`#run` reset comparable with a table that has already received a frame; a settle
+sleep alone does not guarantee that layout happened. Only preparation moves
+outside the timer: clicks, all repeated permutations and any awaited scheduler
+flushes retain their measured boundaries. No additional post-operation paint
+wait is introduced. Re-record local timing baselines after this methodology
+change; see [browser sample preparation](../README.md#browser-sample-preparation).
+
 - **Inner-loop timing.** The tiny ops (rotate / displace_k / remove\*) are far
   below `performance.now()` resolution for a single click, so each timed
   sample loops N clicks and divides: N=20 for displace/rotate/remove, N=4 for

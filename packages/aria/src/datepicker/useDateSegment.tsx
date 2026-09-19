@@ -13,15 +13,18 @@
  */
 
 import { CalendarDate, toCalendar } from '@internationalized/date';
-import { DateFieldState, DateSegment } from '../upstream-exports/react-stately/useDateFieldState';
+import type {
+	DateFieldState,
+	DateSegment,
+} from '../upstream-exports/react-stately/useDateFieldState';
 import { getActiveElement, nodeContains } from '../utils/shadowdom/DOMFunctions';
 import { getScrollParent } from '../utils/getScrollParent';
 import { hookData } from './useDateField';
 import { isIOS } from '../utils/platform';
 import { mergeProps } from '../utils/mergeProps';
 import { NumberParser } from '@internationalized/number';
-import React, { CSSProperties, useMemo, useRef } from '../compat/react';
-import { RefObject } from '@react-types/shared';
+import React, { type CSSProperties, useMemo, useRef } from '../compat/react';
+import type { RefObject } from '@react-types/shared';
 import { scrollIntoViewport } from '../utils/scrollIntoView';
 import { useDateFormatter } from '../i18n/useDateFormatter';
 import { useDisplayNames } from './useDisplayNames';

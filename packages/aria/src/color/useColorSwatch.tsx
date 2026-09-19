@@ -12,10 +12,10 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaLabelingProps, DOMProps } from '@react-types/shared';
-import { Color } from '../upstream-exports/react-stately/Color';
+import type { AriaLabelingProps, DOMProps } from '@react-types/shared';
+import type { Color } from '../upstream-exports/react-stately/Color';
 import { filterDOMProps } from '../utils/filterDOMProps';
-import { HTMLAttributes, useMemo } from '../compat/react';
+import { type HTMLAttributes, useMemo } from '../compat/react';
 import intlMessages from '../intl/color/index';
 import { parseColor } from '../upstream-exports/react-stately/Color';
 import { useId } from '../utils/useId';

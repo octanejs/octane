@@ -12,9 +12,9 @@
  * governing permissions and limitations under the License.
  */
 
-import { Key } from '@react-types/shared';
+import type { Key } from '@react-types/shared';
 import { LayoutInfo } from './LayoutInfo';
-import { Rect, RectCorner } from './Rect';
+import { Rect, type RectCorner } from './Rect';
 import { Size } from './Size';
 
 export type ScrollAnchorAxis = 'x' | 'y';

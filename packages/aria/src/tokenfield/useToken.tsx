@@ -12,7 +12,7 @@
  * governing
  */
 
-import { HTMLAttributes, RefObject, useRef, useState } from '../compat/react';
+import { type HTMLAttributes, type RefObject, useRef, useState } from '../compat/react';
 import { useEvent } from '../utils/useEvent';
 
 export interface TokenProps {}

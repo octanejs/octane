@@ -1,9 +1,9 @@
-import { createContext, OctaneNode, useCallback, useContext, useMemo } from 'octane';
-import { EdgeChange, NodeChange } from '@xyflow/system';
+import { createContext, type OctaneNode, useCallback, useContext, useMemo } from 'octane';
+import type { EdgeChange, NodeChange } from '@xyflow/system';
 
 import { useStoreApi } from '../../hooks/useStore';
 import { getElementsDiffChanges } from '../../utils';
-import { Queue, QueueItem } from './types';
+import type { Queue, QueueItem } from './types';
 import type { Edge, Node } from '../../types';
 import { useQueue } from './useQueue';
 

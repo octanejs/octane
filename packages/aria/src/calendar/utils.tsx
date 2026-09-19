@@ -19,13 +19,13 @@ import {
 	isSameDay,
 	startOfMonth,
 } from '@internationalized/date';
-import {
+import type {
 	CalendarSelectionMode,
 	CalendarState,
 } from '../upstream-exports/react-stately/useCalendarState';
 import intlMessages from '../intl/calendar/index';
 import type { LocalizedStringFormatter } from '@internationalized/string';
-import { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
+import type { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
 import { useDateFormatter } from '../i18n/useDateFormatter';
 import { useLocale } from '../i18n/I18nProvider';
 import { useLocalizedStringFormatter } from '../i18n/useLocalizedStringFormatter';

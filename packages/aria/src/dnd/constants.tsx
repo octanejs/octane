@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import { DropOperation } from '@react-types/shared';
+import type { DropOperation } from '@react-types/shared';
 
 export interface IDropOperation {
 	readonly none: 0;
