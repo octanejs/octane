@@ -24255,15 +24255,19 @@ export function setEventHandler(el: Element, key?: string, handler?: any): void 
 			// Later writers must replace explicit authority with the usual scope
 			// token, including when both writers are still waiting for publication.
 			const owners = (SIGNAL_EVENT_OWNERS ??= new WeakMap());
+			// Compare queued writes at publication: an earlier preparation may
+			// replace even the authority that is currently committed.
 			if (STAGED_COMMIT_CAPTURE !== null)
-				DEFERRED_LAYOUT_DRIVER!.stageAction(() => owners.set(el, owner));
+				DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
+					if (owners.get(el) !== owner) owners.set(el, owner);
+				});
 			else {
-				if (TRANSITION_JOURNAL !== null) {
-					const previous = owners.get(el);
-					if (previous !== owner)
+				const previous = owners.get(el);
+				if (previous !== owner) {
+					if (TRANSITION_JOURNAL !== null)
 						TRANSITION_JOURNAL.push(JOURNAL_EVENT_OWNER, owners, el, previous);
+					owners.set(el, owner);
 				}
-				owners.set(el, owner);
 			}
 		}
 	}
