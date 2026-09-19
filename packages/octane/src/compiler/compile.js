@@ -23595,7 +23595,8 @@ function applyStringChildProofs(ast, source, filename, facts) {
 		const visibleMutation =
 			intrinsicMutationReferences.some(([receiver, reference, parent]) => {
 				const origin = globalOrigin(receiver);
-				const property = reference.type === 'Property' ? reference.key : reference.property;
+				const key = reference.type === 'Property' ? reference.key : reference.property;
+				const property = reference.computed ? unwrapTsExpr(key) : key;
 				const method = reference.computed ? property?.value : (property?.name ?? property?.value);
 				if (origin === 'Object' || origin === 'Reflect') {
 					// A normal native call targeting a fresh literal cannot directly write
@@ -23735,7 +23736,8 @@ const INLINE_INTRINSIC_MUTATION_GLOBALS = new Set([
 // hide its eventual call. Lexical receiver checks keep ordinary computed reads
 // and application .set methods from invalidating intrinsic-result proofs.
 function isPossibleIntrinsicMutator(node) {
-	const property = node.type === 'Property' ? node.key : node.property;
+	const key = node.type === 'Property' ? node.key : node.property;
+	const property = node.computed ? unwrapTsExpr(key) : key;
 	const name = node.computed ? property?.value : (property?.name ?? property?.value);
 	return (
 		INLINE_INTRINSIC_MUTATION_METHODS.has(name) || (node.computed && property?.type !== 'Literal')

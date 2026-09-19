@@ -148,6 +148,121 @@ export function run(host){const writes=[];const model={set(key,value){writes.pus
 	}
 });
 
+test('computed literal method keys preserve scalar conversion work', async (t) => {
+	const source = `import {createRoot,flushSync}from'octane';
+function View(props) @{MUTATE;
+<section><output title={String(props.labels[props.key])}>{String(props.labels[props.key])}</output><input value={String(props.labels[props.key])}/><b>{Number(props.key==='a'?1:2)}</b></section>}
+export function run(host){const root=createRoot(host);root.render(View,{key:'a',labels:{a:'first'}});const output=host.querySelector('output'),input=host.querySelector('input');const initial=[output.textContent,output.title,input.value];const numbers=[host.querySelector('b').textContent];root.render(View,{key:'b',labels:{b:'next'}});flushSync(()=>{});const updated=[output.textContent,output.title,input.value];numbers.push(host.querySelector('b').textContent);const identity=host.querySelector('output')===output&&host.querySelector('input')===input;root.unmount();return{initial,updated,identity,numbers,retired:host.childNodes.length===0};}`;
+	for (const wrapper of [
+		(name) => `('${name}' as '${name}')`,
+		(name) => `('${name}'!)`,
+		(name) => `('${name}' satisfies '${name}')`,
+		(name) => `(('${name}'))`,
+	]) {
+		for (const [label, mutation] of [
+			['object literal', (key) => `Object[${key('assign')}]({},props.labels)`],
+			['array literal', (key) => `Reflect[${key('set')}]([],0,props.labels[props.key])`],
+			['object key reads', (key) => `Object[${key('keys')}](props.labels)`],
+			['reflect scalar reads', (key) => `Reflect[${key('get')}](props.labels,props.key)`],
+			[
+				'const object alias',
+				(key) =>
+					`const initial={};const target=initial;Object[${key('assign')}](target,props.labels)`,
+			],
+		]) {
+			const candidate = source.replace('MUTATE', mutation(wrapper));
+			const ordinary = source.replace(
+				'MUTATE',
+				mutation((name) => `'${name}'`),
+			);
+			for (const dev of [true, false]) {
+				for (const mode of ['client', 'server']) {
+					const options = { dev, mode, hmr: false };
+					assert.equal(
+						compile(candidate, 'FreshComputedMutation.tsrx', options).code,
+						compile(ordinary, 'FreshComputedMutation.tsrx', options).code,
+						`${label} ${wrapper('method')} ${mode}/${dev ? 'dev' : 'prod'} retains the matched scalar output`,
+					);
+				}
+			}
+			// Both bundles execute the same updates, identity and cleanup controls.
+			// Only clean production bundles contribute to this byte comparison.
+			const candidateBytes = await consumer(candidate, {
+				expected: {
+					initial: ['first', 'first', 'first'],
+					updated: ['next', 'next', 'next'],
+					identity: true,
+					numbers: ['1', '2'],
+					retired: true,
+				},
+			});
+			const ordinaryBytes = await consumer(ordinary, {
+				expected: {
+					initial: ['first', 'first', 'first'],
+					updated: ['next', 'next', 'next'],
+					identity: true,
+					numbers: ['1', '2'],
+					retired: true,
+				},
+			});
+			assert.equal(candidateBytes, ordinaryBytes, `${label} keeps the matched gzip closure`);
+			t.diagnostic(`${label} ${wrapper('method')}: ${candidateBytes} gzip, public controls pass`);
+		}
+	}
+});
+
+test('computed literal mutation keys still preserve real handles through global aliases', async () => {
+	for (const wrapper of [
+		(name) => `('${name}' as '${name}')`,
+		(name) => `('${name}'!)`,
+		(name) => `('${name}' satisfies '${name}')`,
+		(name) => `(('${name}'))`,
+	]) {
+		for (const mutation of [
+			`const receiver=Object;receiver[${wrapper('assign')}](env,{String:props.replacement})`,
+			`const receiver=Reflect;const{[${wrapper('set')}]:mutate}=receiver;mutate(env,'String',props.replacement)`,
+		]) {
+			const source = `export function View(props) @{const env=globalThis;${mutation};<section><output>{String(props.value$)}</output><b>{props.scalar}</b></section>}`;
+			const hole = 'String(props.value$)';
+			const start = source.indexOf('>{' + hole + '}') + 2;
+			const scalarStart = source.indexOf('>{props.scalar}') + 2;
+			const facts = {
+				version: 1,
+				filename: 'ComputedGlobalMutation.tsrx',
+				sourceVersion: textTypeSourceVersion(source),
+				projectVersion: 'computed-visible-mutation',
+				stringChildRanges: [
+					[start, start + hole.length],
+					[scalarStart, scalarStart + 'props.scalar'.length],
+				],
+			};
+			for (const dev of [true, false]) {
+				for (const mode of ['client', 'server']) {
+					const extraCode = `import{createScope}from'octane/signals';${mode === 'client' ? "import{createRoot,flushSync}from'octane';" : "import{renderToString}from'octane/server';"}
+export function run(host,prepare){const scope=createScope({scopeKey:'computed-global'});const value$=scope.signal$('value','first');const descriptor=Object.getOwnPropertyDescriptor(globalThis,'String');const builtin=String;const replacement=prepare(value$,builtin);let root;try{const props={value$,replacement,scalar:'scalar'};${mode === 'server' ? "const html=renderToString(View,props,{signalOwner:scope}).html;return{initial:html.includes('>first<'),scalar:html.includes('>scalar<')};" : "root=createRoot(host);root.render(View,props);Object.defineProperty(globalThis,'String',descriptor);const output=host.querySelector('output');const initial=host.textContent;flushSync(()=>scope.set(value$,'next'));const updated=host.textContent;const identity=output===host.querySelector('output');root.unmount();flushSync(()=>scope.set(value$,'retired'));return{initial,updated,identity,retired:output.textContent,empty:host.childNodes.length===0};"}}finally{Object.defineProperty(globalThis,'String',descriptor);root?.unmount();scope.dispose();}}`;
+					await consumer(source, {
+						filename: facts.filename,
+						facts,
+						extraCode,
+						dev,
+						mode,
+						expected:
+							mode === 'server'
+								? { initial: true, scalar: true }
+								: {
+										initial: 'firstscalar',
+										updated: 'nextscalar',
+										identity: true,
+										retired: 'next',
+										empty: true,
+									},
+					});
+				}
+			}
+		}
+	}
+});
+
 test('typed inline and alias results retain real handles after visible constructor mutation', async () => {
 	for (const [alias, optional] of [
 		[false, false],
