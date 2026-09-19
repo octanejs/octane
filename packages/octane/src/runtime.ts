@@ -19181,7 +19181,11 @@ function preparePresentationSignalBinding(
 	const value = args[text ? 3 : 4];
 	const site = args[text ? 4 : 5] as string;
 	const attributeKind = text ? undefined : ((args[6] ?? 'attr') as DirectSignalAttributeKind);
-	const kind = text ? (args[5] ? 'textOnlyChild' : 'text') : 'attribute';
+	const policy = text
+		? args[5]
+			? DIRECT_SIGNAL_TEXT_ONLY_POLICY
+			: DIRECT_SIGNAL_TEXT_POLICY
+		: DIRECT_SIGNAL_ATTRIBUTE_POLICY;
 	return runWithBlockSignalOwner(scope, () => {
 		const handle = isSignalHandle(value) ? value : null;
 		// Unlike the ordinary direct-binding read, this read belongs to validation.
@@ -19213,7 +19217,7 @@ function preparePresentationSignalBinding(
 				return prepared;
 			}
 			preparePresentationOperation(frame, element, name!, () =>
-				writeDirectSignalScalar(element, prepared, 'attribute', previous, name, attributeKind),
+				writeDirectSignalAttribute(element, prepared, 'attribute', previous, name, attributeKind),
 			);
 			return value;
 		}
@@ -19224,7 +19228,7 @@ function preparePresentationSignalBinding(
 			prior.unsubscribe === undefined &&
 			prior.handle === handle &&
 			prior.target === element &&
-			prior.kind === kind &&
+			prior.policy === policy &&
 			prior.site === site &&
 			prior.name === name &&
 			prior.attributeKind === attributeKind;
@@ -19234,7 +19238,7 @@ function preparePresentationSignalBinding(
 					[DIRECT_SIGNAL_BINDING]: true,
 					scope,
 					target: element,
-					kind,
+					policy,
 					site,
 					name,
 					attributeKind,
@@ -19249,7 +19253,7 @@ function preparePresentationSignalBinding(
 		preparePresentationOperation(frame, element, name ?? 'signalText', () => {
 			if (binding.disposed) return;
 			if (!text)
-				writeDirectSignalScalar(element, prepared, 'attribute', previous, name, attributeKind);
+				writeDirectSignalAttribute(element, prepared, 'attribute', previous, name, attributeKind);
 			binding.value = current;
 			runWithBlockSignalOwner(scope, () => activateDirectSignalBinding(binding, undefined));
 		});
@@ -19295,7 +19299,7 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 			prior.input === undefined &&
 			prior.handle === handle &&
 			prior.target === element &&
-			prior.kind === 'value' &&
+			prior.policy === DIRECT_SIGNAL_VALUE_POLICY &&
 			prior.site === site;
 		const binding: DirectSignalBinding = reusable
 			? prior
@@ -19303,7 +19307,7 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 					[DIRECT_SIGNAL_BINDING]: true,
 					scope,
 					target: element,
-					kind: 'value',
+					policy: DIRECT_SIGNAL_VALUE_POLICY,
 					site,
 					handle,
 					value,
@@ -19891,10 +19895,31 @@ const DIRECT_SIGNAL_BINDING = /* @__PURE__ */ Symbol('octane.direct-signal-bindi
 type DirectSignalBindingKind = 'text' | 'textOnlyChild' | 'attribute' | 'value' | 'checked';
 type DirectSignalAttributeKind = 'attr' | 'class' | 'booleanAttr' | 'ariaAttr' | 'stringData';
 
+// Shared renderer policies keep the subscription/lifetime path independent of
+// control adoption. Scalar bindings still use their existing cache tokens.
+interface DirectSignalBindingPolicy {
+	readonly kind: DirectSignalBindingKind;
+	readonly writeBinding: (binding: DirectSignalBinding, value: unknown) => void;
+	readonly write: (
+		target: Node,
+		value: unknown,
+		kind: DirectSignalBindingKind,
+		previous: unknown,
+		name?: string,
+		attributeKind?: DirectSignalAttributeKind,
+	) => unknown;
+	readonly control?: {
+		validateNew: (scope: Scope, target: Node, kind: DirectSignalBindingKind) => void;
+		snapshot: (target: Node, site: string) => ReturnType<typeof snapshotHydrationControl>;
+		activate: (binding: DirectSignalBinding, revision: number) => void;
+		adopt: (binding: DirectSignalBinding) => void;
+	};
+}
+
 interface DirectSignalBinding {
 	readonly [DIRECT_SIGNAL_BINDING]: true;
 	readonly scope: Scope;
-	readonly kind: DirectSignalBindingKind;
+	readonly policy: DirectSignalBindingPolicy;
 	readonly target: Node;
 	readonly site: string;
 	readonly name?: string;
@@ -19962,7 +19987,7 @@ function directSignalControlValue(
 	binding: DirectSignalBinding,
 	snapshot: NonNullable<ReturnType<typeof snapshotHydrationControl>>,
 ): unknown {
-	if (binding.kind === 'checked') return snapshot.checked ?? false;
+	if (binding.policy.kind === 'checked') return snapshot.checked ?? false;
 	return snapshot.selectedValues ?? snapshot.value;
 }
 
@@ -19979,90 +20004,151 @@ function validateDirectSignalControl(element: Element, site: string): void {
 
 function writeDirectSignalBinding(binding: DirectSignalBinding, value: unknown): void {
 	if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
-	if (binding.kind === 'text' || binding.kind === 'textOnlyChild') {
-		if (binding.text === undefined) {
-			binding.text =
-				binding.kind === 'textOnlyChild'
-					? htext(binding.target, value)
-					: htextSwap(binding.target, value);
-		} else {
-			setText(binding.text, value);
-		}
-	} else if (binding.kind === 'attribute') {
-		const element = binding.target as Element;
-		switch (binding.attributeKind) {
-			case 'class':
-				if (element.namespaceURI === HTML_NS) setClassName(element, value);
-				else setClassAttr(element, value);
-				break;
-			case 'booleanAttr':
-				setBooleanAttribute(element, binding.name!, value);
-				break;
-			case 'ariaAttr':
-				setAriaAttribute(element, binding.name!, value);
-				break;
-			case 'stringData':
-				setStringData(element, binding.name!, value);
-				break;
-			default:
-				setAttribute(element, binding.name!, value);
-		}
-	} else if (binding.kind === 'value') {
-		const element = binding.target as Element;
-		const tag = element.localName;
-		if (tag === 'select') setSelectValue(element, value);
-		else setValue(element, value, tag === 'textarea' && isWritableSignal(binding.handle));
-	} else {
-		setChecked(binding.target as Element, value);
-	}
+	binding.policy.writeBinding(binding, value);
 	binding.value = value;
 }
 
-function writeDirectSignalScalar(
+function writeDirectSignalBoundText(binding: DirectSignalBinding, value: unknown): void {
+	if (binding.text === undefined) {
+		binding.text =
+			binding.policy.kind === 'textOnlyChild'
+				? htext(binding.target, value)
+				: htextSwap(binding.target, value);
+	} else {
+		// Adopted Text can belong to another document. The binding already owns
+		// this cache; checking its realm's constructor again would discard it.
+		setText(binding.text, value);
+	}
+}
+
+function writeDirectSignalBoundAttribute(binding: DirectSignalBinding, value: unknown): void {
+	writeDirectSignalAttribute(
+		binding.target,
+		value,
+		'attribute',
+		undefined,
+		binding.name,
+		binding.attributeKind,
+	);
+}
+
+function writeDirectSignalBoundValue(binding: DirectSignalBinding, value: unknown): void {
+	const element = binding.target as Element;
+	const tag = element.localName;
+	if (tag === 'select') setSelectValue(element, value);
+	else setValue(element, value, tag === 'textarea' && isWritableSignal(binding.handle));
+}
+
+function writeDirectSignalBoundChecked(binding: DirectSignalBinding, value: unknown): void {
+	setChecked(binding.target as Element, value);
+}
+
+function writeDirectSignalText(
 	target: Node,
 	value: unknown,
 	kind: DirectSignalBindingKind,
 	previous: unknown,
+): Text {
+	if (previous instanceof Text) {
+		setText(previous, value);
+		return previous;
+	}
+	// The compiler owns this distinction: an empty sibling text hole can
+	// point at the next element while hydrating, not an only-child parent.
+	return kind === 'textOnlyChild' ? htext(target, value) : htextSwap(target, value);
+}
+
+function writeDirectSignalAttribute(
+	target: Node,
+	value: unknown,
+	_kind: DirectSignalBindingKind,
+	_previous: unknown,
 	name?: string,
 	attributeKind?: DirectSignalAttributeKind,
 ): unknown {
-	if (kind === 'text' || kind === 'textOnlyChild') {
-		if (previous instanceof Text) {
-			setText(previous, value);
-			return previous;
-		}
-		// The compiler owns this distinction: an empty sibling text hole can
-		// point at the next element while hydrating, not an only-child parent.
-		return kind === 'textOnlyChild' ? htext(target, value) : htextSwap(target, value);
-	}
-	if (kind === 'attribute') {
-		const element = target as Element;
-		switch (attributeKind) {
-			case 'class':
-				if (element.namespaceURI === HTML_NS) setClassName(element, value);
-				else setClassAttr(element, value);
-				break;
-			case 'booleanAttr':
-				setBooleanAttribute(element, name!, value);
-				break;
-			case 'ariaAttr':
-				setAriaAttribute(element, name!, value);
-				break;
-			case 'stringData':
-				setStringData(element, name!, value);
-				break;
-			default:
-				setAttribute(element, name!, value);
-		}
-	} else if (kind === 'value') {
-		const element = target as Element;
-		if (element.localName === 'select') setSelectValue(element, value);
-		else setValue(element, value);
-	} else {
-		setChecked(target as Element, value);
+	const element = target as Element;
+	switch (attributeKind) {
+		case 'class':
+			if (element.namespaceURI === HTML_NS) setClassName(element, value);
+			else setClassAttr(element, value);
+			break;
+		case 'booleanAttr':
+			setBooleanAttribute(element, name!, value);
+			break;
+		case 'ariaAttr':
+			setAriaAttribute(element, name!, value);
+			break;
+		case 'stringData':
+			setStringData(element, name!, value);
+			break;
+		default:
+			setAttribute(element, name!, value);
 	}
 	return value;
 }
+
+function writeDirectSignalValue(
+	target: Node,
+	value: unknown,
+	_kind: DirectSignalBindingKind,
+	_previous: unknown,
+	_name?: string,
+	_attributeKind?: DirectSignalAttributeKind,
+): unknown {
+	const element = target as Element;
+	if (element.localName === 'select') setSelectValue(element, value);
+	else setValue(element, value);
+	return value;
+}
+
+function writeDirectSignalChecked(target: Node, value: unknown): unknown {
+	setChecked(target as Element, value);
+	return value;
+}
+
+const DIRECT_SIGNAL_TEXT_POLICY: DirectSignalBindingPolicy = {
+	kind: 'text',
+	writeBinding: writeDirectSignalBoundText,
+	write: writeDirectSignalText,
+};
+const DIRECT_SIGNAL_TEXT_ONLY_POLICY: DirectSignalBindingPolicy = {
+	kind: 'textOnlyChild',
+	writeBinding: writeDirectSignalBoundText,
+	write: writeDirectSignalText,
+};
+const DIRECT_SIGNAL_ATTRIBUTE_POLICY: DirectSignalBindingPolicy = {
+	kind: 'attribute',
+	writeBinding: writeDirectSignalBoundAttribute,
+	write: writeDirectSignalAttribute,
+};
+const DIRECT_SIGNAL_CONTROL_POLICY: NonNullable<DirectSignalBindingPolicy['control']> = {
+	validateNew(scope, target, kind) {
+		if (kind === 'value' && scope.block.idState.renderOwner?.controlLeases?.has(target as Element))
+			presentationMiss(false);
+	},
+	snapshot(target, site) {
+		const snapshot = snapshotHydrationControl(target as Element);
+		if (snapshot !== null) validateDirectSignalControl(target as Element, site);
+		return snapshot;
+	},
+	activate(binding, revision) {
+		installDirectSignalControl(binding);
+		if (!binding.pendingControl) consumeHydrationControl(binding.target as Element, revision);
+	},
+	adopt: queueDirectSignalControlAdoption,
+};
+const DIRECT_SIGNAL_VALUE_POLICY: DirectSignalBindingPolicy = {
+	kind: 'value',
+	writeBinding: writeDirectSignalBoundValue,
+	write: writeDirectSignalValue,
+	control: DIRECT_SIGNAL_CONTROL_POLICY,
+};
+const DIRECT_SIGNAL_CHECKED_POLICY: DirectSignalBindingPolicy = {
+	kind: 'checked',
+	writeBinding: writeDirectSignalBoundChecked,
+	write: writeDirectSignalChecked,
+	control: DIRECT_SIGNAL_CONTROL_POLICY,
+};
 
 function updateDirectSignalBinding(binding: DirectSignalBinding): void {
 	if (
@@ -20111,7 +20197,7 @@ function installDirectSignalControl(binding: DirectSignalBinding): void {
 	(STAGED_DOM?.view(element) ?? element).addEventListener('input', input);
 	binding.controlWriterCleanup = registerHydrationControlSignalWriter(
 		element,
-		binding.kind === 'checked' ? 'checked' : 'value',
+		binding.policy.kind === 'checked' ? 'checked' : 'value',
 		(value) =>
 			withoutSignalCandidate(() =>
 				runWithBlockSignalOwner(binding.scope, () => {
@@ -20157,10 +20243,7 @@ function activateDirectSignalBinding(
 		binding.unsubscribe = binding.handle[SIGNAL_BINDING_SUBSCRIBE](
 			nativeTransitionBindingNotify(binding, () => updateDirectSignalBinding(binding)),
 		);
-	if (revision !== undefined) {
-		installDirectSignalControl(binding);
-		if (!binding.pendingControl) consumeHydrationControl(binding.target as Element, revision);
-	}
+	if (revision !== undefined) binding.policy.control!.activate(binding, revision);
 }
 
 function createDirectSignalBinding(
@@ -20168,18 +20251,17 @@ function createDirectSignalBinding(
 	target: Node,
 	value: unknown,
 	site: string,
-	kind: DirectSignalBindingKind,
+	policy: DirectSignalBindingPolicy,
 	name?: string,
 	attributeKind?: DirectSignalAttributeKind,
 	text?: Text,
 ): DirectSignalBinding {
-	if (kind === 'value' && scope.block.idState.renderOwner?.controlLeases?.has(target as Element))
-		presentationMiss(false);
+	policy.control?.validateNew(scope, target, policy.kind);
 	const handle = isSignalHandle(value) ? value : null;
 	const binding: DirectSignalBinding = {
 		[DIRECT_SIGNAL_BINDING]: true,
 		scope,
-		kind,
+		policy,
 		target,
 		site,
 		name,
@@ -20191,9 +20273,7 @@ function createDirectSignalBinding(
 	// A previous text token has already gone through mount/hydration. Reuse
 	// it across capability changes; a raw SSR Text target still needs adoption.
 	if (text !== undefined) binding.text = text;
-	const controlSnapshot =
-		kind === 'value' || kind === 'checked' ? snapshotHydrationControl(target as Element) : null;
-	if (controlSnapshot !== null) validateDirectSignalControl(target as Element, site);
+	const controlSnapshot = policy.control?.snapshot(target, site) ?? null;
 	binding.pendingControl =
 		activeHydration() !== null &&
 		isWritableSignal(handle) &&
@@ -20210,7 +20290,7 @@ function createDirectSignalBinding(
 			updateDirectSignalBinding(binding);
 		});
 	} else activateDirectSignalBinding(binding, controlSnapshot?.revision);
-	if (binding.pendingControl) queueDirectSignalControlAdoption(binding);
+	if (binding.pendingControl) policy.control!.adopt(binding);
 	registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
 	return binding;
 }
@@ -20221,10 +20301,11 @@ function bindDirectSignal(
 	target: Node,
 	value: unknown,
 	site: string,
-	kind: DirectSignalBindingKind,
+	policy: DirectSignalBindingPolicy,
 	name?: string,
 	attributeKind?: DirectSignalAttributeKind,
 ): unknown {
+	const kind = policy.kind;
 	const prior =
 		typeof previous === 'object' &&
 		previous !== null &&
@@ -20241,7 +20322,7 @@ function bindDirectSignal(
 		// the ambient render frame may have started before document activation.
 		if (!signalDocumentEnabled) enableSignalBindings();
 		return runWithBlockSignalOwner(scope, () =>
-			bindDirectSignal(scope, previous, target, value, site, kind, name, attributeKind),
+			bindDirectSignal(scope, previous, target, value, site, policy, name, attributeKind),
 		);
 	}
 	if (handle === null && prior === null) {
@@ -20253,13 +20334,13 @@ function bindDirectSignal(
 		if (TRANSITION_JOURNAL !== null) journalBag();
 		const scalarTarget =
 			(kind === 'text' || kind === 'textOnlyChild') && previous instanceof Text ? previous : target;
-		return writeDirectSignalScalar(scalarTarget, value, kind, previous, name, attributeKind);
+		return policy.write(scalarTarget, value, kind, previous, name, attributeKind);
 	}
 	if (
 		prior !== null &&
 		!prior.disposed &&
 		prior.target === target &&
-		prior.kind === kind &&
+		prior.policy === policy &&
 		prior.site === site &&
 		prior.name === name &&
 		prior.attributeKind === attributeKind &&
@@ -20267,7 +20348,7 @@ function bindDirectSignal(
 	) {
 		if (prior.pendingControl) {
 			// The preceding attempt's action may have been dropped by rollback.
-			queueDirectSignalControlAdoption(prior);
+			policy.control!.adopt(prior);
 			return prior;
 		}
 		const next = readSignalBinding(handle!);
@@ -20280,7 +20361,7 @@ function bindDirectSignal(
 			kind === 'text' || kind === 'textOnlyChild'
 				? (prior?.text ?? prior?.target ?? target)
 				: target;
-		const token = writeDirectSignalScalar(
+		const token = policy.write(
 			scalarTarget,
 			value,
 			kind,
@@ -20304,7 +20385,7 @@ function bindDirectSignal(
 		signalTarget,
 		value,
 		site,
-		kind,
+		policy,
 		name,
 		attributeKind,
 		kind === 'text' || kind === 'textOnlyChild'
@@ -20363,7 +20444,7 @@ export function bindSignalText(
 		prior?.target ?? (previous instanceof Text ? previous : position),
 		value,
 		site,
-		onlyChild ? 'textOnlyChild' : 'text',
+		onlyChild ? DIRECT_SIGNAL_TEXT_ONLY_POLICY : DIRECT_SIGNAL_TEXT_POLICY,
 	);
 }
 
@@ -20377,7 +20458,16 @@ export function bindSignalAttribute(
 	site: string,
 	attributeKind: DirectSignalAttributeKind = 'attr',
 ): unknown {
-	return bindDirectSignal(scope, previous, element, value, site, 'attribute', name, attributeKind);
+	return bindDirectSignal(
+		scope,
+		previous,
+		element,
+		value,
+		site,
+		DIRECT_SIGNAL_ATTRIBUTE_POLICY,
+		name,
+		attributeKind,
+	);
 }
 
 /** @internal Compiler target for a direct signal/scalar value binding. */
@@ -20388,7 +20478,7 @@ export function bindSignalValue(
 	value: unknown,
 	site: string,
 ): unknown {
-	return bindDirectSignal(scope, previous, element, value, site, 'value');
+	return bindDirectSignal(scope, previous, element, value, site, DIRECT_SIGNAL_VALUE_POLICY);
 }
 
 /** @internal Compiler target for a direct signal/scalar checked binding. */
@@ -20399,7 +20489,7 @@ export function bindSignalChecked(
 	value: unknown,
 	site: string,
 ): unknown {
-	return bindDirectSignal(scope, previous, element, value, site, 'checked');
+	return bindDirectSignal(scope, previous, element, value, site, DIRECT_SIGNAL_CHECKED_POLICY);
 }
 
 /**
