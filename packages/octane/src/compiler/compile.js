@@ -83,6 +83,7 @@ import {
 	prepareServerRendererBoundaryRegions,
 } from './compile-renderer-boundaries.js';
 import {
+	compiledSplitHydrateTagsForAst,
 	hydrateBoundaryPathFromId,
 	prepareHydrateBoundaries,
 	prepareServerHydrateBoundaries,
@@ -10072,6 +10073,7 @@ function compileInternal(
 		dev: devEnabled,
 		profile: profileEnabled,
 		compiledHydrateTemplates: localVoidRootsEnabled,
+		compiledSplitHydrateTags: compiledSplitHydrateTagsForAst(parsedAst),
 		autoMemo: autoMemoEnabled,
 		strongMemo: strongMemoEnabled,
 		nativeReads: options?.nativeReads === true,
@@ -18314,7 +18316,12 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		inheritOriginLoc(
 			b.call(
 				warmChildAlias,
-				b.id(w.compName),
+				b.id(
+					ctx.compiledSplitHydrateTags?.has(w.origin.openingElement?.name) &&
+						isCompiledHydrateTemplate(w.origin, ctx, w.origin.openingElement.attributes)
+						? requireCompiledHydrateAlias(ctx)
+						: w.compName,
+				),
 				b.object(
 					w.props.map((p) =>
 						b.prop(
@@ -30327,6 +30334,17 @@ function collectAutoMemoDependencyExpressions(nodes) {
 	};
 }
 
+function requireCompiledHydrateAlias(ctx) {
+	const helper = '__HydrateCompiled';
+	let alias = ctx.privateRuntimeAliases?.get(helper);
+	if (alias === undefined) {
+		alias = allocCompilerName(ctx, rtAlias(helper));
+		(ctx.privateRuntimeAliases ??= new Map()).set(helper, alias);
+	}
+	ctx.runtimeNeeded.add(helper);
+	return alias;
+}
+
 function isCompiledHydrateTemplate(node, ctx, attrs) {
 	if (!ctx.compiledHydrateTemplates || ctx._universalRuntimeUnit != null) return false;
 	const tag = node.openingElement?.name ?? node.id;
@@ -30335,16 +30353,18 @@ function isCompiledHydrateTemplate(node, ctx, attrs) {
 		ctx.octaneImportLocals?.get(tag.name) !== 'Hydrate'
 	)
 		return false;
-	for (const attr of attrs) {
-		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') return false;
-		const name = attr.name?.name ?? attr.name;
-		if (
-			typeof name !== 'string' ||
-			name === 'children' ||
-			name === 'fallback' ||
-			name.startsWith('__')
-		)
-			return false;
+	if (!ctx.compiledSplitHydrateTags?.has(tag)) {
+		for (const attr of attrs) {
+			if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') return false;
+			const name = attr.name?.name ?? attr.name;
+			if (
+				typeof name !== 'string' ||
+				name === 'children' ||
+				name === 'fallback' ||
+				name.startsWith('__')
+			)
+				return false;
+		}
 	}
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
 	const scope = lexical.nodeScopes.get(tag);
@@ -30567,15 +30587,14 @@ function makeCompCall(
 	// elides iff the callee carries the definition-site `$$singleRoot` stamp
 	// (docs/comment-marker-elision-plan.md M1).
 	let maybeSingleRoot = false;
-	if (compiledChildren && isCompiledHydrateTemplate(node, ctx, attrs)) {
-		const helper = '__HydrateCompiled';
-		let alias = ctx.privateRuntimeAliases?.get(helper);
-		if (alias === undefined) {
-			alias = allocCompilerName(ctx, rtAlias(helper));
-			(ctx.privateRuntimeAliases ??= new Map()).set(helper, alias);
-		}
-		ctx.runtimeNeeded.add(helper);
-		compNode = inheritOriginLoc(b.id(alias), node.openingElement?.name ?? node.id);
+	if (
+		(compiledChildren || ctx.compiledSplitHydrateTags?.has(node.openingElement?.name ?? node.id)) &&
+		isCompiledHydrateTemplate(node, ctx, attrs)
+	) {
+		compNode = inheritOriginLoc(
+			b.id(requireCompiledHydrateAlias(ctx)),
+			node.openingElement?.name ?? node.id,
+		);
 		voidComponent = true;
 	} else if (staticFragmentRenderer) {
 		// The renderer is already a void, hookless component body. A memo boundary
