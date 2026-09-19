@@ -366,11 +366,19 @@
       "automaticViteMetadata": true,
       "nativeChromium": "149.0.7827.55",
       "directAndMergedNamespaceOwningControls": true
+    },
+    "contextClosure": {
+      "selectedVoidRoot": true,
+      "loadedComponentExports": ["default"],
+      "retainedEdges": [
+        "compiled ThemeContext.Provider -> componentSlot -> renderReturnedValue",
+        "createContext -> renderClientContextProvider -> childrenAsBody -> childSlot"
+      ]
     }
   },
   "limitations": [
     "Only production plain TS/JS function-local const roots with references in their original lexical scope are newly admitted.",
-    "Module-level, exported, escaped, nested-scope, unknown-target, full TSX/TSRX, dev, HMR and profile cases retain generic roots.",
+    "Module-level const roots, exported roots, escaped, nested-scope, unknown-target, full TSX/TSRX, dev, HMR and profile cases retain generic roots.",
     "Separate-entry savings remove the generic returned-value graph and are not attributable solely to signals.",
     "No CPU, compiler-time, browser latency, SSR speed or complete unused-signals regression recovery claim."
   ],

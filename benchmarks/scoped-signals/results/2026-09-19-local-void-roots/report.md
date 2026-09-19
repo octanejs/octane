@@ -14,7 +14,7 @@ The runner derives separate plain entry and compiled view modules from the uncha
 | Hooks/state | 205,942 | 95,051 | 65,394 | 31,403 | -33,991 | 56,643 | 27,938 |
 | Context | 216,895 | 216,897 | 68,608 | 68,609 | +1 | 59,319 | 59,308 |
 
-Public observations match: static renders `Octane` and cleans up; hooks render `0`, a native click produces `1`, and effect/cleanup run once; context changes `light` to `dark` and cleans up. The context component is outside the certified contract and retains the generic graph.
+Public observations match: static renders `Octane` and cleans up; hooks render `0`, a native click produces `1`, and effect/cleanup run once; context changes `light` to `dark` and cleans up. Context selects the void root, but its compiled `ThemeContext.Provider` subtree calls the generic `componentSlot`, which retains `renderReturnedValue`. The public `createContext` implementation also normalizes arbitrary children through `childrenAsBody` and its `childSlot` fallback. These context/provider edges retain the generic graph, so this root specialization does not reduce that closure.
 
 Two additional paired controls use the same consumer construction and current pinned tooling:
 
@@ -30,7 +30,7 @@ Fifteen public esbuild closure controls are byte-identical to immutable main330,
 
 ## Scope and controls
 
-Only actual function-body local const roots in plain production TS/JS entries are newly admitted. Lexical function scopes introduced by TypeScript namespaces and class static blocks do not establish this lifetime and remain generic. Direct and merged namespace exports are covered by public ordinary-renderable regressions; actual private functions inside namespaces and arrow/function-expression bodies remain positive compiler controls. Module-level roots, exports, escapes, extracted methods, computed/optional calls, closures and nested scopes, unknown or dynamic render targets, full TSX/TSRX compilation, dev, HMR and profiling retain generic roots. Every render target must satisfy the actual adapter metadata; one unknown target prevents the factory rewrite.
+Only actual function-body local const roots in plain production TS/JS entries are newly admitted. Lexical function scopes introduced by TypeScript namespaces and class static blocks do not establish this lifetime and remain generic. Direct and merged namespace exports are covered by public ordinary-renderable regressions; actual private functions inside namespaces and arrow/function-expression bodies remain positive compiler controls. Module-level const roots, exported roots, escapes, extracted methods, computed/optional calls, closures and nested scopes, unknown or dynamic render targets, full TSX/TSRX compilation, dev, HMR and profiling retain generic roots. Every render target must satisfy the actual adapter metadata; one unknown target prevents the factory rewrite.
 
 An independent actual Vite production/native Chromium consumer verifies the namespace escape correction: the initially published candidate renders `first` then loses ordinary `replacement` text, while both main330 and the corrected proof render `first` then `replacement`, with no browser errors. The corrected source retains identical whole bundle hashes for all three measured separate-entry consumers and all fifteen public closure controls.
 
