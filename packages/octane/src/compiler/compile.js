@@ -125,6 +125,7 @@ import { assertNoLegacyContextProviders } from './context-provider.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 import { findLocalVoidRootCallees } from './local-void-roots.js';
+import { findPrivateCompiledContexts } from './private-context.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
 // static bakes and dynamic writes MUST agree on which attributes render, under
@@ -1401,6 +1402,7 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeCreateScopedElement',
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
+	'__createCompiledContext',
 	'isContext',
 	'bindPresentationView',
 	'beginPresentationHydration',
@@ -9921,6 +9923,9 @@ function compileInternal(
 		options?.rendererBoundaries == null &&
 		options?.rendererRegistry == null;
 	const authoredVoidRootIds = new Set();
+	const privateCompiledContexts = localVoidRootsEnabled
+		? findPrivateCompiledContexts(ast)
+		: new Map();
 	if (
 		localVoidRootsEnabled &&
 		ast.body.some(
@@ -10066,6 +10071,7 @@ function compileInternal(
 		nativeChangeClassifications: nativeChangeAnalysis.classifications,
 		dev: devEnabled,
 		profile: profileEnabled,
+		compiledHydrateTemplates: localVoidRootsEnabled,
 		autoMemo: autoMemoEnabled,
 		strongMemo: strongMemoEnabled,
 		nativeReads: options?.nativeReads === true,
@@ -10449,6 +10455,15 @@ function compileInternal(
 				callees.has(node) ? { ...node, name: aliases.get(callees.get(node)) } : null,
 			);
 		}
+	}
+	if (privateCompiledContexts.size > 0) {
+		const helper = '__createCompiledContext';
+		const alias = allocCompilerName(ctx, rtAlias(helper));
+		(ctx.privateRuntimeAliases ??= new Map()).set(helper, alias);
+		ctx.runtimeNeeded.add(helper);
+		const callees = new Set(privateCompiledContexts.values());
+		ast = mapAst(ast, (node) => (callees.has(node) ? { ...node, name: alias } : null));
+		ctx.privateCompiledContexts = new Set(privateCompiledContexts.keys());
 	}
 	// Return-based JSX functions never attach fetch-tree warm plans, and a sole
 	// same-module component already rejects a self-only warm edge below. Avoid a
@@ -30312,6 +30327,32 @@ function collectAutoMemoDependencyExpressions(nodes) {
 	};
 }
 
+function isCompiledHydrateTemplate(node, ctx, attrs) {
+	if (!ctx.compiledHydrateTemplates || ctx._universalRuntimeUnit != null) return false;
+	const tag = node.openingElement?.name ?? node.id;
+	if (
+		(tag?.type !== 'Identifier' && tag?.type !== 'JSXIdentifier') ||
+		ctx.octaneImportLocals?.get(tag.name) !== 'Hydrate'
+	)
+		return false;
+	for (const attr of attrs) {
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') return false;
+		const name = attr.name?.name ?? attr.name;
+		if (
+			typeof name !== 'string' ||
+			name === 'children' ||
+			name === 'fallback' ||
+			name.startsWith('__')
+		)
+			return false;
+	}
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope = lexical.nodeScopes.get(tag);
+	if (scope === undefined) return false;
+	const binding = lexical.resolveBinding(scope, tag.name);
+	return binding?.scope === lexical.rootScope && binding.importSource?.value === 'octane';
+}
+
 function makeCompCall(
 	node,
 	ctx,
@@ -30330,7 +30371,7 @@ function makeCompCall(
 	const staticFragmentRenderer = node.openingElement?.metadata?.staticFragmentRenderer;
 	const activityDescriptor = isActivityLongForm(node, ctx);
 	const descriptorConfig = activityDescriptor || hasKeyedSpreadConfig(node);
-	const compNode = activityDescriptor
+	let compNode = activityDescriptor
 		? inheritOriginLoc(b.id(requireRuntimeForContext(ctx, 'Activity')), node)
 		: staticFragmentRenderer
 			? inheritOriginLoc(b.id(staticFragmentRenderer.name), node.openingElement?.name || node.id)
@@ -30403,6 +30444,7 @@ function makeCompCall(
 	// arrow while making its body printable. Whitespace-only JSXText around the
 	// arrow is ignored so source indentation doesn't defeat the detection.
 	const sourceChildren = node.children || [];
+	let compiledChildren = false;
 	const renderPropChild = soleRenderPropChild(sourceChildren);
 	if (renderPropChild) {
 		hasChildrenProp = true;
@@ -30434,6 +30476,7 @@ function makeCompCall(
 				propNodes.push(b.prop('init', b.literal('children'), childrenValue));
 			}
 		} else {
+			compiledChildren = true;
 			// Compile children as a render function: (scope) => { renders JSX into scope }.
 			// The function is inlined inside the parent component body so its closures
 			// capture the parent's locals (props, state, etc.).
@@ -30524,7 +30567,17 @@ function makeCompCall(
 	// elides iff the callee carries the definition-site `$$singleRoot` stamp
 	// (docs/comment-marker-elision-plan.md M1).
 	let maybeSingleRoot = false;
-	if (staticFragmentRenderer) {
+	if (compiledChildren && isCompiledHydrateTemplate(node, ctx, attrs)) {
+		const helper = '__HydrateCompiled';
+		let alias = ctx.privateRuntimeAliases?.get(helper);
+		if (alias === undefined) {
+			alias = allocCompilerName(ctx, rtAlias(helper));
+			(ctx.privateRuntimeAliases ??= new Map()).set(helper, alias);
+		}
+		ctx.runtimeNeeded.add(helper);
+		compNode = inheritOriginLoc(b.id(alias), node.openingElement?.name ?? node.id);
+		voidComponent = true;
+	} else if (staticFragmentRenderer) {
 		// The renderer is already a void, hookless component body. A memo boundary
 		// would force a full Block and could hide a hookful descendant's update.
 		liteEligible = true;
@@ -30638,6 +30691,7 @@ function makeCompCall(
 			maybeSingleRoot = callSiteOk;
 		}
 		const importedBinding = ctx.importedComponentBindings?.get(compName);
+		if (!voidComponent && ctx.privateCompiledContexts?.has(compName)) voidComponent = true;
 		if (
 			!voidComponent &&
 			!ctx.hmr &&

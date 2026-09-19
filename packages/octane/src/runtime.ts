@@ -13458,6 +13458,37 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	const ctx = function ProviderBody(props, scope) {
 		return renderClientContextProvider(ctx, props, scope);
 	} as Context<T>;
+	return initializeContext(ctx, defaultValue);
+}
+
+/** Compiler-owned private Context whose children are always compiled bodies. */
+/* @__NO_SIDE_EFFECTS__ */
+export function __createCompiledContext<T>(defaultValue: T): Context<T> {
+	const ctx = function ProviderBody(props, scope) {
+		provideContext(scope, ctx, props.value);
+		const children = props.children as ComponentBody | null | undefined;
+		if (children == null) return;
+		const dialect = (children as any)[CHILDREN_BODY] ?? children;
+		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+		if (previous !== dialect) {
+			if (previous !== undefined && (previous === 2 || dialect === 2)) {
+				resetScopeChildren(scope);
+				if (scope.block.disposed) return;
+			} else if (previous !== undefined) {
+				invalidateSharedBodyOutput(scope);
+				if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+					const hooks = scope.hooks!;
+					journalUndo(() => hooks.set(CHILDREN_DIALECT_SLOT, previous));
+				}
+			}
+			ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
+		}
+		renderSharedBody(children, undefined, scope, undefined);
+	} as Context<T>;
+	return initializeContext(ctx, defaultValue);
+}
+
+function initializeContext<T>(ctx: Context<T>, defaultValue: T): Context<T> {
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
 	ctx.$$version = 0;
@@ -14163,7 +14194,33 @@ function renderHydrateChild(state: HydrateSlot, scope: Scope, extra: unknown): v
 	childrenAsBody(state.props.children)(undefined, scope, extra);
 }
 
+function renderCompiledHydrateChild(state: HydrateSlot, scope: Scope, extra: unknown): void {
+	if (state.loadedBody !== null) {
+		state.loadedBody(state.props.__data, scope, extra);
+	} else {
+		(state.props.children as ComponentBody)(undefined, scope, extra);
+	}
+}
+
+const EMPTY_HYDRATE_PENDING: ComponentBody = () => undefined;
+
 function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
+	return createHydrateBoundaryBody(state, renderHydrateChild, (_props, scope) => {
+		childSlot(scope, 0, scope.block.parentNode, state.props.fallback, scope.block.endMarker);
+	});
+}
+
+function compiledHydrateBoundaryBody(state: HydrateSlot): ComponentBody {
+	// Keep a real empty pending arm: null would propagate suspension and change
+	// the try block's ownership, transition swap and scheduled visibility policy.
+	return createHydrateBoundaryBody(state, renderCompiledHydrateChild, EMPTY_HYDRATE_PENDING);
+}
+
+function createHydrateBoundaryBody(
+	state: HydrateSlot,
+	renderChild: typeof renderHydrateChild,
+	pendingBody: ComponentBody,
+): ComponentBody {
 	const contentBody: ComponentBody = (_props, scope, extra) => {
 		try {
 			if (state.loadedBody === null) {
@@ -14178,7 +14235,7 @@ function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
 					if (thenable.status !== 'fulfilled') throw new SuspenseException(thenable);
 				}
 			}
-			renderHydrateChild(state, scope, extra);
+			renderChild(state, scope, extra);
 		} catch (error) {
 			const hydration = activeHydration();
 			if (
@@ -14198,9 +14255,6 @@ function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
 		state.hydrated = true;
 		// Runtime-owned effect bodies receive their dependency tuple as arguments.
 		useEffect(notifyHydrateBoundary as EffectFn, [state, scope], HYDRATE_NOTIFY_SLOT);
-	};
-	const pendingBody: ComponentBody = (_props, scope) => {
-		childSlot(scope, 0, scope.block.parentNode, state.props.fallback, scope.block.endMarker);
 	};
 	return (_props, scope) => {
 		tryBlock(
@@ -14724,6 +14778,7 @@ function createHydrateSlot(
 	props: InternalHydrateProps,
 	scope: Scope,
 	boundaryId: string,
+	boundaryBody: typeof hydrateBoundaryBody,
 ): HydrateSlot {
 	const parentBlock = scope.block;
 	const parentNode = parentBlock.parentNode;
@@ -14855,7 +14910,7 @@ function createHydrateSlot(
 	scope.slots[0] = state;
 	registerSlot(scope, state);
 	if (!state.independent) registerHydrationIntentBoundary(wrapper, intentBoundary);
-	block.body = hydrateBoundaryBody(state);
+	block.body = boundaryBody(state);
 	const initialStrategy = resolveHydrateStrategy(state);
 	const pendingIntents = state.independent ? undefined : takePendingHydrationIntents(wrapper);
 	if (state.independent) {
@@ -15191,7 +15246,9 @@ type InternalHydrateComponent = ComponentBody<HydrateProps> & {
 	readonly __octanePermanentStatic: ComponentBody<HydrateProps>;
 };
 
-function initializeHydrateComponent(): InternalHydrateComponent {
+function initializeHydrateComponent(
+	boundaryBody: typeof hydrateBoundaryBody,
+): InternalHydrateComponent {
 	const hydrate = markComponentFlags<ComponentBody<HydrateProps>>(
 		function Hydrate(rawProps, scope) {
 			const props = rawProps as InternalHydrateProps;
@@ -15199,7 +15256,7 @@ function initializeHydrateComponent(): InternalHydrateComponent {
 			let state = scope.slots[0] as HydrateSlot | undefined;
 			let renderedChild = false;
 			if (state === undefined) {
-				state = createHydrateSlot(props, scope, boundaryId);
+				state = createHydrateSlot(props, scope, boundaryId, boundaryBody);
 			} else {
 				if (state.independent !== (props.__independent !== undefined)) {
 					throw new Error(formatClientError(66));
@@ -15268,7 +15325,12 @@ function initializeHydrateComponent(): InternalHydrateComponent {
 	return hydrate as InternalHydrateComponent;
 }
 
-export const Hydrate: ComponentBody<HydrateProps> = /* @__PURE__ */ initializeHydrateComponent();
+export const Hydrate: ComponentBody<HydrateProps> =
+	/* @__PURE__ */ initializeHydrateComponent(hydrateBoundaryBody);
+
+/** Compiler-owned template children with no authored fallback; never a descriptor entry point. */
+export const __HydrateCompiled: ComponentBody<HydrateProps> =
+	/* @__PURE__ */ initializeHydrateComponent(compiledHydrateBoundaryBody);
 
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX component form of
