@@ -1,8 +1,13 @@
 # Async signals: implementation and acceptance
 
-This guide explains how the [RFC under review](./async-signals-streaming-ssr.md)
+This implementation record explains how the [async signals design](./async-signals-streaming-ssr.md)
 maps to Octane's implementation. It separates supported behavior, implementation
 choices, measured results, and unfinished acceptance work.
+
+The core implementation landed in PR #1069 and has received follow-up changes
+on main. For a current introduction with code, start with the
+[streaming SSR guide](https://octanejs.dev/docs/signals#streaming-example) and
+[SSR host setup](./ssr.md#connect-signals-in-a-custom-ssr-host).
 
 The earlier published validation checkpoint `ac8f008e9` is recorded in
 [PR #1069](https://github.com/octanejs/octane/pull/1069).
