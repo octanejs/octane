@@ -3,6 +3,11 @@
  * so the client and server adapters can validate the same authored boundary.
  */
 import * as React from 'react';
+import {
+	CONTEXT_TAG as OCTANE_CONTEXT_TAG,
+	ELEMENT_TAG as OCTANE_ELEMENT_TAG,
+	REACT_CONTEXT_TAG,
+} from '../runtime-tags.js';
 import type { Context, OctaneNode } from '../runtime.js';
 import type { Context as ServerContext } from '../runtime.server.js';
 
@@ -49,9 +54,6 @@ export interface TransportedReactChild {
 	readonly key: string | null;
 }
 
-const OCTANE_ELEMENT_TAG = Symbol.for('octane.element');
-const OCTANE_CONTEXT_TAG = Symbol.for('octane.context');
-const REACT_CONTEXT_TAG = Symbol.for('react.context');
 const REACT_MEMO_TAG = Symbol.for('react.memo');
 const REACT_LAZY_TAG = Symbol.for('react.lazy');
 const REACT_FORWARD_REF_TAG = Symbol.for('react.forward_ref');

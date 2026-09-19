@@ -171,7 +171,30 @@ import {
 } from './component-flags.js';
 import { formatClientError } from './error-codes.client.generated.js';
 import { formAuthoringDiagnostics } from './form-diagnostics.js';
-import { isBindingOpenComment } from './dom-binding-protocol.js';
+import {
+	bindingRootMarker,
+	BINDING_OPEN_PREFIX,
+	isBindingOpenComment,
+	isForBindingOpenComment,
+} from './dom-binding-protocol.js';
+import {
+	formatUseId,
+	HYDRATION_FOR_ARM_INDEX,
+	HYDRATION_FOR_PREFIX,
+	HYDRATE_MARKER_SELECTOR,
+} from './hydration-markers.js';
+import {
+	ACTIVITY_TAG,
+	CHILDREN_BLOCK_TAG as CHILDREN_BLOCK,
+	CONTEXT_TAG,
+	ELEMENT_TAG,
+	FRAGMENT_TAG,
+	LAZY_COMPONENT_TAG as LAZY_COMPONENT,
+	PORTAL_TAG,
+	REACT_CONTEXT_TAG as REACT_FOREIGN_CONTEXT_TAG,
+	RENDERER_REGION_OWNER_TAG as RENDERER_REGION_OWNER,
+	SUSPENSE_TAG,
+} from './runtime-tags.js';
 import { moveNativeNodeBefore } from './dom-focused-move.js';
 import {
 	HYDRATE_STREAM_TOKEN_ATTR,
@@ -1891,7 +1914,6 @@ const ACTIVE_WARM_PLANS: any[] = [];
 // a remount that happens to reuse the same dependency values.
 let NEXT_WARM_EPISODE = 1;
 let CURRENT_WARM_EPISODE = 0;
-const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
 const RENDERER_REGION_DOM_OWNERS = new WeakMap<Block, RendererRegionOwnerBridge>();
 // Live region-owner roots (WeakMap exposes no size). Ordinary apps never bind
 // one, so this collapses the per-read bridge check to a single integer test.
@@ -5231,8 +5253,6 @@ function vtCaptureElements(block: Block, owner: VTOwner): Element[] {
 /** Nested declarations may share a direct host; the final release removes its marker. */
 const VT_SCOPE_OWNERS = /* @__PURE__ */ new WeakMap<Element, { owners: Block[] }>();
 const VT_INVALID_SCOPE_WARNED = /* @__PURE__ */ new WeakSet<Block>();
-const VT_SCOPE_STYLE_ID = 'octane-view-transition-scope';
-const VT_SCOPE_CSS = '[vt-scope="element"]{view-transition-scope:all!important}';
 
 const VT_SCOPE_STYLED_DOCUMENTS = /* @__PURE__ */ new WeakSet<Document>();
 
@@ -13613,7 +13633,6 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 // Context — createContext + use() (React 19 shape; useContext provided as an alias)
 // ---------------------------------------------------------------------------
 
-const CONTEXT_TAG = Symbol.for('octane.context');
 // Compiler-owned output caches compare their own lexical dependencies, but a
 // Provider update is propagated lazily through the already-mounted Block tree
 // rather than scheduling every consumer. One process-wide epoch (read as
@@ -13818,9 +13837,9 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 // while a render-prop child (`<C>{(data) => …}</C>`) is passed through RAW. Both are
 // `typeof === 'function'`, so React-ecosystem code that branches on `typeof children === 'function'`
 // (function-as-child / render-prop APIs) cannot tell them apart. The compiler tags the FORMER with
-// this symbol so `isChildrenBlock()` can exclude it. `Symbol.for` so the identity survives multiple
-// runtime copies (e.g. a binding bundled against its own octane).
-const CHILDREN_BLOCK: unique symbol = Symbol.for('octane.childrenBlock') as any;
+// this symbol so `isChildrenBlock()` can exclude it. Both this key and CHILDREN_BLOCK are
+// `Symbol.for` keys so the identity survives multiple runtime copies (e.g. a binding bundled
+// against its own octane); CHILDREN_BLOCK itself is shared with SSR through runtime-tags.ts.
 const CHILDREN_BODY: unique symbol = Symbol.for('octane.childrenBody') as any;
 
 /**
@@ -14093,7 +14112,7 @@ const HYDRATE_STRATEGY_TYPES = /* @__PURE__ */ new Set<HydrationWhen>([
 ]);
 // Boundary-local interaction capture uses the same marker protocol as the
 // lightweight pre-root event-capture module.
-const HYDRATE_MARKER_SELECTOR = '[data-octane-hydrate-id]';
+
 const HYDRATE_STREAM_ERROR_ATTR = 'data-oct-err';
 const HYDRATE_STREAM_BOUNDARY_SELECTOR = `template[${STREAM_BOUNDARY_ATTR}]`;
 const HYDRATE_STREAM_SCAN_MASK = 1 /* SHOW_ELEMENT */ | 128; /* SHOW_COMMENT */
@@ -15497,7 +15516,7 @@ export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> 
 		},
 		COMPONENT_FLAG_BOUNDARY,
 		'Suspense',
-		Symbol.for('octane.suspense'),
+		SUSPENSE_TAG,
 	);
 
 /**
@@ -15680,7 +15699,6 @@ export function use<T>(
 
 // React 19 context objects carry $$typeof: Symbol.for('react.context') — used
 // ONLY to sharpen the out-of-hosted-root diagnostic, never as a read strategy.
-const REACT_FOREIGN_CONTEXT_TAG = /* @__PURE__ */ Symbol.for('react.context');
 
 /**
  * Resolve a non-Octane usable through the enclosing renderer-region owner
@@ -17328,7 +17346,6 @@ export function memoPublishAlways<T>(slot: HookSlot, value: T): T {
 // lazy — React's code-splitting component wrapper.
 // ---------------------------------------------------------------------------
 
-const LAZY_COMPONENT = Symbol.for('octane.lazy');
 const LAZY_BODY_CHECK = Symbol.for('octane.lazyBodyCheck');
 type LazyBodyCheck = (scope: Scope) => boolean;
 
@@ -17575,7 +17592,7 @@ export function useId(slot?: HookSlot): string {
 		while (owner.limit !== undefined && owner.next >= owner.limit && owner.overflow !== undefined) {
 			owner = owner.overflow;
 		}
-		s = { id: ':' + owner.prefix + 'in-' + (owner.next++).toString(36) + ':' };
+		s = { id: formatUseId(owner.prefix, owner.next++) };
 		ensureHooks(scope).set(slot, s);
 	}
 	return s.id;
@@ -19794,7 +19811,7 @@ export function presentationWrite<T>(
 
 /** @internal Authored presentation ranges may not inherit an unrelated caller's boundary. */
 export function bindPresentationView<T extends Function>(view: T, id: string): T {
-	(view as T & { [BINDING_VIEW_ROOT]: string })[BINDING_VIEW_ROOT] = '[b;' + id + ';root';
+	(view as T & { [BINDING_VIEW_ROOT]: string })[BINDING_VIEW_ROOT] = bindingRootMarker(id);
 	return markComponentFlags(view, COMPONENT_FLAG_BOUNDARY, view.name);
 }
 
@@ -19847,7 +19864,11 @@ export function presentationStructure(
 	}
 	const range = presentationRange(frame, start, marker, kind);
 	const expected = (args[3] as Function & { [BINDING_VIEW_ROOT]?: string })[BINDING_VIEW_ROOT];
-	if (expected !== '[b;' + range.view + ';root') presentationMiss(false);
+	// The old inline concatenation stringified a missing view into the literal
+	// "undefined", which could never match a compiler-minted stamp. Reject it
+	// outright instead of handing a hole to the shared marker builder.
+	if (range.view === undefined || expected !== bindingRootMarker(range.view))
+		presentationMiss(false);
 	writer(...args);
 }
 
@@ -19903,7 +19924,11 @@ function hydrationMarkerMultiplicity(data: string, open: boolean): number {
 	const marker = open ? HYDRATION_START : HYDRATION_END;
 	if (data === marker) return 1;
 	if (open && (data === HYDRATION_FOR_EMPTY || data === HYDRATION_FOR_ITEMS)) return 1;
-	if (open && (data.startsWith('[b;') || data.startsWith('[f')) && isBindingOpenComment(data))
+	if (
+		open &&
+		(data.startsWith(BINDING_OPEN_PREFIX) || data.startsWith(HYDRATION_FOR_PREFIX)) &&
+		isBindingOpenComment(data)
+	)
 		return 1;
 	if (data.length < 2 || data.charCodeAt(0) !== marker.charCodeAt(0)) return 0;
 	// Canonical positive decimal: no signs, whitespace, zero, or leading zeroes.
@@ -20003,8 +20028,8 @@ function ssrForMarkerState(node: Node): -1 | 0 | 1 {
 	const data = (STAGED_DOM?.view(node as Comment) ?? (node as Comment)).data;
 	if (data === HYDRATION_FOR_EMPTY) return 0;
 	if (data === HYDRATION_FOR_ITEMS) return 1;
-	return isBindingOpenComment(data) && data.startsWith('[f')
-		? data.charCodeAt(2) === 48
+	return isForBindingOpenComment(data)
+		? data.charCodeAt(HYDRATION_FOR_ARM_INDEX) === 48
 			? 0
 			: 1
 		: -1;
@@ -21080,7 +21105,7 @@ type FragmentRefValue =
 // name and the runtime compares descriptor types by identity); the declared
 // TYPE is component-shaped so long-form `<Fragment key ref>` JSX type-checks —
 // which is the export's entire purpose (see above).
-export const Fragment = Symbol.for('octane.Fragment') as unknown as (props: {
+export const Fragment = FRAGMENT_TAG as unknown as (props: {
 	children?: unknown;
 	key?: string | number | bigint | null | undefined;
 	ref?: FragmentRefValue;
@@ -21097,7 +21122,7 @@ interface ActivityDescriptorDispatch {
 let activityDescriptorDispatch: ActivityDescriptorDispatch | null = null;
 
 function initializeActivitySentinel(): symbol {
-	const type = Symbol.for('octane.Activity');
+	const type: symbol = ACTIVITY_TAG;
 	activityDescriptorDispatch = { type, body: renderActivityDescriptor };
 	return type;
 }
@@ -22468,6 +22493,8 @@ import {
 	mergeClass,
 	normalizeClass,
 	styleName,
+	VIEW_TRANSITION_SCOPE_CSS as VT_SCOPE_CSS,
+	VIEW_TRANSITION_SCOPE_STYLE_ID as VT_SCOPE_STYLE_ID,
 } from './css.js';
 export { normalizeClass };
 
@@ -27856,7 +27883,7 @@ function genericPortalBody(value: any, scope: Block): void {
  * function exists so non-JSX call sites (storing in a variable, passing through props,
  * etc.) still produce something the runtime can dispatch on.
  */
-const PORTAL_TAG = Symbol.for('octane.portal');
+
 function portalKey(value: unknown): string | null {
 	return typeof value === 'string' || typeof value === 'number' ? String(value) : null;
 }
@@ -27888,7 +27915,7 @@ export function createPortal(
 // unwraps it; props are evaluated fresh at each call site, so re-rendering with
 // `root.render(<App foo={next}/>)` updates props while keeping `type` identity.
 // ---------------------------------------------------------------------------
-const ELEMENT_TAG = Symbol.for('octane.element');
+
 // ElementDescriptor.key intentionally matches React's public shape (`null` for
 // both no key and a nullish key), so preserve compiler-visible key PRESENCE out
 // of band. This lets hydration keep an explicit `key={undefined}` as an

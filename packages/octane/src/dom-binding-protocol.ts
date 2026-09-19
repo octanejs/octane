@@ -1,5 +1,32 @@
 /** Compiler-owned DOM presentation markers. This leaf is shared by client and SSR. */
+import {
+	HYDRATION_FOR_ARM_INDEX,
+	HYDRATION_FOR_EMPTY,
+	HYDRATION_FOR_ITEMS,
+	HYDRATION_FOR_PREFIX,
+	HYDRATION_START,
+} from './hydration-markers.js';
+
 export type BindingKey = string | number;
+
+/** Payload prefix opening a presentation-binding range. */
+export const BINDING_OPEN_PREFIX = HYDRATION_START + 'b;';
+const BINDING_RECEIPT = ';b;';
+const BINDING_FOR_EMPTY_PREFIX = HYDRATION_FOR_EMPTY + BINDING_RECEIPT;
+const BINDING_FOR_ITEMS_PREFIX = HYDRATION_FOR_ITEMS + BINDING_RECEIPT;
+const BINDING_FOR_ID_START = BINDING_FOR_EMPTY_PREFIX.length;
+const BINDING_ID_START = BINDING_OPEN_PREFIX.length;
+const BINDING_ROOT_SITE = 'root';
+const BINDING_ROOT_SUFFIX = ';' + BINDING_ROOT_SITE;
+
+/**
+ * Comment payload opening an authored presentation view's own component range.
+ * The client runtime and the SSR serializer both stamp this onto the view they
+ * bind, so the two must never spell it separately.
+ */
+export function bindingRootMarker(id: string): string {
+	return BINDING_OPEN_PREFIX + id + BINDING_ROOT_SUFFIX;
+}
 
 export function encodeBindingKey(key: BindingKey): string {
 	if (typeof key === 'string')
@@ -33,21 +60,22 @@ export interface BindingMarker {
 }
 
 export function parseBindingMarker(data: string): BindingMarker | null {
-	if (data.startsWith('[f0;b;') || data.startsWith('[f1;b;')) {
-		const separator = data.indexOf(';', 6);
-		if (separator <= 6 || separator === data.length - 1) return null;
+	if (data.startsWith(BINDING_FOR_EMPTY_PREFIX) || data.startsWith(BINDING_FOR_ITEMS_PREFIX)) {
+		const separator = data.indexOf(';', BINDING_FOR_ID_START);
+		if (separator <= BINDING_FOR_ID_START || separator === data.length - 1) return null;
 		return {
-			id: data.slice(6, separator),
+			id: data.slice(BINDING_FOR_ID_START, separator),
 			site: data.slice(separator + 1),
 			kind: 'for',
-			arm: data.charCodeAt(2) - 48,
+			arm: data.charCodeAt(HYDRATION_FOR_ARM_INDEX) - 48,
 		};
 	}
-	if (!data.startsWith('[b;')) return null;
-	const idEnd = data.indexOf(';', 3);
-	if (idEnd <= 3 || idEnd === data.length - 1) return null;
-	const id = data.slice(3, idEnd);
-	if (data.slice(idEnd + 1) === 'root') return { id, site: 'root', kind: 'root' };
+	if (!data.startsWith(BINDING_OPEN_PREFIX)) return null;
+	const idEnd = data.indexOf(';', BINDING_ID_START);
+	if (idEnd <= BINDING_ID_START || idEnd === data.length - 1) return null;
+	const id = data.slice(BINDING_ID_START, idEnd);
+	if (data.slice(idEnd + 1) === BINDING_ROOT_SITE)
+		return { id, site: BINDING_ROOT_SITE, kind: 'root' };
 	const siteEnd = data.indexOf(';', idEnd + 1);
 	if (siteEnd <= idEnd + 1 || siteEnd === data.length - 1) return null;
 	const site = data.slice(idEnd + 1, siteEnd);
@@ -75,13 +103,15 @@ export function parseBindingMarker(data: string): BindingMarker | null {
 export function isBindingOpenComment(data: string): boolean {
 	// The general hydration/early-stream path only counts balanced ranges. Keep
 	// exact receipt decoding, key validation, and allocations in adoption itself.
-	const list = data.startsWith('[f0;b;') || data.startsWith('[f1;b;');
-	if (!list && !data.startsWith('[b;')) return false;
-	const idStart = list ? 6 : 3;
+	const list =
+		data.startsWith(BINDING_FOR_EMPTY_PREFIX) || data.startsWith(BINDING_FOR_ITEMS_PREFIX);
+	if (!list && !data.startsWith(BINDING_OPEN_PREFIX)) return false;
+	const idStart = list ? BINDING_FOR_ID_START : BINDING_ID_START;
 	const idEnd = data.indexOf(';', idStart);
 	if (idEnd <= idStart || idEnd === data.length - 1) return false;
 	if (list) return data.indexOf(';', idEnd + 1) === -1;
-	if (data.length - idEnd === 5 && data.endsWith(';root')) return true;
+	if (data.length - idEnd === BINDING_ROOT_SUFFIX.length && data.endsWith(BINDING_ROOT_SUFFIX))
+		return true;
 	const siteEnd = data.indexOf(';', idEnd + 1);
 	if (siteEnd <= idEnd + 1 || siteEnd === data.length - 1) return false;
 	const tail = siteEnd + 1;
@@ -104,4 +134,13 @@ export function isBindingOpenComment(data: string): boolean {
 		if (code < 48 || code > 57) return false;
 	}
 	return true;
+}
+
+/**
+ * True when a binding-open payload carries an `@for` outer arm. The prefix test
+ * alone is not a decision: `isBindingOpenComment` still requires the full
+ * receipt, so this only spares callers from spelling the arm prefixes again.
+ */
+export function isForBindingOpenComment(data: string): boolean {
+	return data.startsWith(HYDRATION_FOR_PREFIX) && isBindingOpenComment(data);
 }

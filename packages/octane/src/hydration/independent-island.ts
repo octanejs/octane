@@ -1,6 +1,7 @@
 import { decodeSignalValue } from '../data-encoding.js';
 import type { SignalOwner } from '../signals/types.js';
 import {
+	HYDRATE_ID_ATTR,
 	HYDRATE_INDEPENDENT_ATTR,
 	INDEPENDENT_HYDRATE_MANIFEST_ATTR,
 } from '../hydration-markers.js';
@@ -66,7 +67,7 @@ export function registerIndependentHydrationIsland(
 	if (!isIndependentHydrateManifest(manifest)) {
 		throw new TypeError('Invalid independent Hydrate manifest.');
 	}
-	if (element.getAttribute('data-octane-hydrate-id') !== manifest.boundaryId) {
+	if (element.getAttribute(HYDRATE_ID_ATTR) !== manifest.boundaryId) {
 		throw new Error('Independent Hydrate boundary identity mismatch.');
 	}
 	element.setAttribute(HYDRATE_INDEPENDENT_ATTR, '');

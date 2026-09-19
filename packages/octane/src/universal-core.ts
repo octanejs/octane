@@ -13,6 +13,12 @@
  */
 import { bumpContextEpoch } from './context-epoch.js';
 import { hasOwnProp } from './has-own.js';
+import {
+	ACTIVITY_TAG,
+	CONTEXT_TAG,
+	LAZY_COMPONENT_TAG as LAZY_COMPONENT,
+	RENDERER_REGION_OWNER_TAG as RENDERER_REGION_OWNER,
+} from './runtime-tags.js';
 import { resolveHookPath } from './hook-slot-cache.js';
 import {
 	__profileBeginRender,
@@ -75,8 +81,6 @@ const UNIVERSAL_ACTIVITY = Symbol.for('octane.universal.activity');
 const UNIVERSAL_KEYED = Symbol.for('octane.universal.keyed');
 const UNIVERSAL_PORTAL = Symbol.for('octane.universal.portal');
 const UNIVERSAL_RENDERER_REGION = Symbol.for('octane.universal.renderer-region');
-const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
-const LAZY_COMPONENT = Symbol.for('octane.lazy');
 const UNIVERSAL_COMPONENT_REVISION = Symbol('octane.universal.component-revision');
 
 const NO_CHILDREN = Symbol('octane.universal.no-children');
@@ -6659,7 +6663,7 @@ export function lazy<C extends UniversalComponent<any>>(
 
 export function use<T>(usable: UniversalContext<T> | PromiseLike<T>): T {
 	currentDraftOwner();
-	if ((usable as UniversalContext<T>)?.$$kind === Symbol.for('octane.context')) {
+	if ((usable as UniversalContext<T>)?.$$kind === CONTEXT_TAG) {
 		return useContext(usable as UniversalContext<T>);
 	}
 	const thenable = usable as UniversalTrackedThenable<T>;
@@ -6898,7 +6902,7 @@ export function createPortal(children: UniversalRenderable, target: unknown): Un
 }
 
 /** Compiler sentinel for the supported universal Activity descriptor. */
-export const Activity: unique symbol = Symbol.for('octane.Activity') as any;
+export const Activity: unique symbol = ACTIVITY_TAG as any;
 
 function runEffectCreate(hook: EffectHook): void {
 	const cleanup = (hook.create as (...args: unknown[]) => void | (() => void))(

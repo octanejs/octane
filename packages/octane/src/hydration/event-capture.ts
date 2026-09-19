@@ -23,9 +23,7 @@ export {
 	type HydrationControlSnapshot,
 } from './control-capture.js';
 import { HYDRATE_STREAM_TOKEN_ATTR, isRendererStreamBoundaryTemplate } from '../stream-protocol.js';
-
-const HYDRATE_MARKER_SELECTOR = '[data-octane-hydrate-id]';
-const HYDRATE_WHEN_ATTR = 'data-octane-hydrate-when';
+import { HYDRATE_MARKER_SELECTOR, HYDRATE_WHEN_ATTR } from '../hydration-markers.js';
 
 // DOM constructors are realm-specific. Capture can be installed for an iframe
 // document, so use the platform nodeType contract instead of the ambient

@@ -111,3 +111,12 @@ export function devWarnStyleCoercion(name: string, value: unknown): void {
 			'This value must be coerced to a string before using it here.',
 	);
 }
+
+/**
+ * The one stylesheet element-scoped `<ViewTransition>` needs. The client
+ * dedupes the injection by this id and the SSR serializer emits the same pair,
+ * so spelling either half twice ships the rule twice or drops it on one side.
+ */
+export const VIEW_TRANSITION_SCOPE_STYLE_ID = 'octane-view-transition-scope';
+export const VIEW_TRANSITION_SCOPE_CSS =
+	'[vt-scope="element"]{view-transition-scope:all!important}';
