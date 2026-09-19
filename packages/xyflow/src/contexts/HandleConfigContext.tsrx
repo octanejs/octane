@@ -24,7 +24,7 @@ const HandleConfigContext = createContext<HandleConfig | null>(null);
  */
 export function HandleConfigProvider({ children }: { children: OctaneNode }) {
 	const config = useStore(selector, shallow);
-	return <HandleConfigContext.Provider value={config}>{children}</HandleConfigContext.Provider>;
+	return <HandleConfigContext value={config}>{children}</HandleConfigContext>;
 }
 
 export function useHandleConfig() {

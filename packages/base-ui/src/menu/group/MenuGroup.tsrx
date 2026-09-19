@@ -29,7 +29,7 @@ export const MenuGroup = function MenuGroup(
 		},
 	});
 
-	return <MenuGroupContext.Provider value={setLabelId}>{element}</MenuGroupContext.Provider>;
+	return <MenuGroupContext value={setLabelId}>{element}</MenuGroupContext>;
 };
 
 export interface MenuGroupProps extends BaseUIComponentProps<'div', MenuGroupState> {

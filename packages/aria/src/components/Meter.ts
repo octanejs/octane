@@ -94,7 +94,7 @@ export function Meter(props: MeterProps): any {
 		...mergeProps(DOMProps, renderProps, meterProps),
 		ref,
 		slot: props.slot || undefined,
-		children: createElement(LabelContext.Provider, {
+		children: createElement(LabelContext, {
 			value: { ...labelProps, ref: labelRef, elementType: 'span' },
 			children: renderProps.children,
 		}),

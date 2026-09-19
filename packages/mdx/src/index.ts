@@ -95,7 +95,7 @@ export function MDXProvider(props: MDXProviderProps): unknown {
 	} else {
 		allComponents = useMDXComponents(props.components);
 	}
-	return createElement(MDXContext.Provider as ComponentBody<any>, {
+	return createElement(MDXContext as ComponentBody<any>, {
 		value: allComponents,
 		children: props.children,
 	});

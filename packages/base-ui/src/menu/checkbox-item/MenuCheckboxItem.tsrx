@@ -109,9 +109,7 @@ export const MenuCheckboxItem = function MenuCheckboxItem(
 		ref: [itemRef, forwardedRef, listItem.ref],
 	});
 
-	return (
-		<MenuCheckboxItemContext.Provider value={state}>{element}</MenuCheckboxItemContext.Provider>
-	);
+	return <MenuCheckboxItemContext value={state}>{element}</MenuCheckboxItemContext>;
 };
 
 export interface MenuCheckboxItemState {

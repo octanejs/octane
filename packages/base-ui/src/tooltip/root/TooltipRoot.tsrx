@@ -138,7 +138,7 @@ export const TooltipRoot = fastComponent(function TooltipRoot<Payload>(
 	const shouldRenderInteractions = open || mounted || (!disabled && trackCursorAxis !== 'none');
 
 	return (
-		<TooltipRootContext.Provider value={store as TooltipRootContext}>
+		<TooltipRootContext value={store as TooltipRootContext}>
 			{handle && <PopupHandleAttachment handle={handle} store={store} />}
 			{shouldRenderInteractions && (
 				<TooltipInteractions store={store} disabled={disabled} trackCursorAxis={trackCursorAxis} />
@@ -146,7 +146,7 @@ export const TooltipRoot = fastComponent(function TooltipRoot<Payload>(
 			{typeof children === 'function' && !React.isChildrenBlock(children)
 				? children({ payload })
 				: children}
-		</TooltipRootContext.Provider>
+		</TooltipRootContext>
 	);
 });
 

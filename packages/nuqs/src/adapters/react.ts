@@ -105,7 +105,7 @@ export function NuqsAdapter({
 	fullPageNavigationOnShallowFalseUpdates?: boolean;
 }): OctaneNode {
 	return createElement(
-		NuqsReactAdapterContext.Provider,
+		NuqsReactAdapterContext,
 		{ value: { fullPageNavigationOnShallowFalseUpdates } },
 		createElement(NuqsReactAdapter, { ...adapterProps, children }),
 	);

@@ -64,11 +64,11 @@ const defaultAccessor = (entry: LabelListEntry) => {
 const CartesianLabelListContext = createContext<ReadonlyArray<CartesianLabelListEntry> | undefined>(
 	undefined,
 );
-export const CartesianLabelListContextProvider = CartesianLabelListContext.Provider;
+export const CartesianLabelListContextProvider = CartesianLabelListContext;
 const PolarLabelListContext = createContext<ReadonlyArray<PolarLabelListEntry> | undefined>(
 	undefined,
 );
-export const PolarLabelListContextProvider = PolarLabelListContext.Provider;
+export const PolarLabelListContextProvider = PolarLabelListContext;
 
 function useCartesianLabelListContext() {
 	return useContext(CartesianLabelListContext);

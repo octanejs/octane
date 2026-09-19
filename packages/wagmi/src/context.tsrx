@@ -38,5 +38,5 @@ export function WagmiProvider(props: WagmiProviderProps) @{
 		lifecycle.onMount();
 	}, [lifecycle]);
 
-	<WagmiContext.Provider value={props.config}>{props.children}</WagmiContext.Provider>
+	<WagmiContext value={props.config}>{props.children}</WagmiContext>
 }

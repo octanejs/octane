@@ -113,10 +113,10 @@ export function AutoMemoApp() @{
 				setTheme((value) => value + '!');
 			}}
 		>{'item + context'}</button>
-		<AutoMemoContext.Provider value={theme}>
+		<AutoMemoContext value={theme}>
 			<Rows items={items} />
 			<DestructuredRows items={items} />
-		</AutoMemoContext.Provider>
+		</AutoMemoContext>
 		<ReturnedValue value={theme} />
 		<CustomRows />
 		<OpaqueRows />

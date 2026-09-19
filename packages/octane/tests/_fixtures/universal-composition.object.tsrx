@@ -52,7 +52,7 @@ export function CompositionScene(props) @{
 		return markerProps.show ? <inline-marker value={markerProps.value} /> : null;
 	}
 	<scene {...props.sceneFirst} tone="explicit" {...props.sceneLast}>
-		<CompositionTheme.Provider value={props.theme}>
+		<CompositionTheme value={props.theme}>
 			<LocalStatus mode={props.statusMode} value={props.statusValue} tail={props.tail} />
 			<InlineMarker show={props.showInline} value={props.statusValue} />
 			@if (props.showIf) {
@@ -99,7 +99,7 @@ export function CompositionScene(props) @{
 			} @catch (error, reset) {
 				<caught-result value={error.message} onReset={reset} />
 			}
-		</CompositionTheme.Provider>
+		</CompositionTheme>
 	</scene>
 }
 

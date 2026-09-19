@@ -20,9 +20,9 @@ export type ScrollControlsState = {
 	visible(from: number, distance: number, margin?: number): boolean;
 };
 
-const context = createContext<ScrollControlsState>(null as unknown as ScrollControlsState);
-setScrollControlsStateProvider(context.Provider);
-export function useScroll(): ScrollControlsState { return useContext(context); }
+const ScrollControlsContext = createContext<ScrollControlsState>(null as unknown as ScrollControlsState);
+setScrollControlsStateProvider(ScrollControlsContext);
+export function useScroll(): ScrollControlsState { return useContext(ScrollControlsContext); }
 
 export function ScrollControls({ eps = 0.00001, enabled = true, infinite, horizontal, pages = 1,
 	distance = 1, damping = 0.25, maxSpeed = Infinity, prepend = false, style = {}, children }: ScrollControlsProps) @{
@@ -89,7 +89,7 @@ export function ScrollControls({ eps = 0.00001, enabled = true, infinite, horizo
 
 	let last = 0;
 	useFrame((_, delta) => { last = state.offset; easing.damp(state, 'offset', scroll.current, damping, delta, maxSpeed, undefined, eps); easing.damp(state, 'delta', Math.abs(last - state.offset), damping, delta, maxSpeed, undefined, eps); if (state.delta > eps) invalidate(); });
-	<context.Provider value={state}>{children}</context.Provider>
+	<ScrollControlsContext value={state}>{children}</ScrollControlsContext>
 }
 
 export type ScrollProps = { children?: OctaneNode; html?: false; style?: never } | { children?: OctaneNode; html: true; style?: Partial<CSSStyleDeclaration>; [key: string]: unknown };

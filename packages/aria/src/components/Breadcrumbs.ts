@@ -80,7 +80,7 @@ export function Breadcrumbs<T extends object>(props: BreadcrumbsProps<T>): any {
 				slot: props.slot || undefined,
 				style: props.style,
 				className: props.className ?? 'react-aria-Breadcrumbs',
-				children: createElement(BreadcrumbsContext.Provider, {
+				children: createElement(BreadcrumbsContext, {
 					value: props,
 					children: createElement(CollectionRoot, { collection }),
 				}),
@@ -161,7 +161,7 @@ export const Breadcrumb: (props: BreadcrumbProps & { ref?: any }) => any = creat
 			ref,
 			'data-disabled': isDisabled || isCurrent || undefined,
 			'data-current': isCurrent || undefined,
-			children: createElement(LinkContext.Provider, {
+			children: createElement(LinkContext, {
 				value: linkProps as any,
 				children: renderProps.children,
 			}),

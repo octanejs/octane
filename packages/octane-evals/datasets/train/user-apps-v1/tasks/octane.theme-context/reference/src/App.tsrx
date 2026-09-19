@@ -17,7 +17,7 @@ export function ThemeLabel(props: { id: string }) @{
 export function App() @{
 	const [theme, setTheme] = useState<Theme>('light');
 
-	<ThemeContext.Provider value={theme}>
+	<ThemeContext value={theme}>
 		<main id="settings" data-theme={theme}>
 			<button
 				id="toggle-theme"
@@ -27,9 +27,9 @@ export function App() @{
 				Toggle theme
 			</button>
 			<ThemeLabel id="current-theme" />
-			<ThemeContext.Provider value="sepia">
+			<ThemeContext value="sepia">
 				<ThemeLabel id="nested-preview" />
-			</ThemeContext.Provider>
+			</ThemeContext>
 		</main>
-	</ThemeContext.Provider>
+	</ThemeContext>
 }

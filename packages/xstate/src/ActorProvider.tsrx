@@ -27,5 +27,5 @@ export function ActorProvider(props: {
 
 	const actor = useActorRef(props.logic, props.options as never);
 
-	<ActorContext.Provider value={actor}>{props.children}</ActorContext.Provider>
+	<ActorContext value={actor}>{props.children}</ActorContext>
 }

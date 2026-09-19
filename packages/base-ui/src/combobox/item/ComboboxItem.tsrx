@@ -213,9 +213,7 @@ function ComboboxItemInner(props: ComboboxItemInnerProps) {
 		[selected, textRef],
 	);
 
-	return (
-		<ComboboxItemContext.Provider value={contextValue}>{element}</ComboboxItemContext.Provider>
-	);
+	return <ComboboxItemContext value={contextValue}>{element}</ComboboxItemContext>;
 }
 
 /**

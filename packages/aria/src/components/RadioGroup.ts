@@ -370,7 +370,7 @@ export function Radio(props: RadioProps): any {
 		subSlot(slot, 'radio'),
 	);
 
-	return createElement(InternalRadioContext.Provider, {
+	return createElement(InternalRadioContext, {
 		value: { ...aria, inputRef, defaultClassName: 'react-aria-Radio' },
 		children: createElement(RadioButton, { ...props, ref } as any),
 	});

@@ -92,7 +92,7 @@ export function CartesianLabelContextProvider(props: TrapezoidViewBox & {
 		width,
 		height,
 	]);
-	<CartesianLabelContext.Provider value={viewBox}>{children}</CartesianLabelContext.Provider>
+	<CartesianLabelContext value={viewBox}>{children}</CartesianLabelContext>
 }
 
 function useCartesianLabelContext() {
@@ -112,7 +112,7 @@ export function PolarLabelContextProvider(props: PolarViewBoxRequired & {
 		() => ({ cx, cy, innerRadius, outerRadius, startAngle, endAngle, clockWise }),
 		[cx, cy, innerRadius, outerRadius, startAngle, endAngle, clockWise],
 	);
-	<PolarLabelContext.Provider value={viewBox}>{children}</PolarLabelContext.Provider>
+	<PolarLabelContext value={viewBox}>{children}</PolarLabelContext>
 }
 
 export function usePolarLabelContext() {

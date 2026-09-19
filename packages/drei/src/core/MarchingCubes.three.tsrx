@@ -51,7 +51,7 @@ export function MarchingCubes({
 		marchingCubes.reset();
 	}, -1);
 	<primitive object={marchingCubes} ref={mergedRef as any} {...props as any}>
-		<MarchingContext.Provider value={api}>{children}</MarchingContext.Provider>
+		<MarchingContext value={api}>{children}</MarchingContext>
 	</primitive>
 }
 

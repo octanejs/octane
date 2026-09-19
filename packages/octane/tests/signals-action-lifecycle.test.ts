@@ -11,7 +11,7 @@ function deferred<T>() {
 	return { promise, resolve, reject };
 }
 
-async function pendingAction() {
+async function pendingAction(nested = true) {
 	const ready = deferred<{
 		scope: import('octane/signals').Scope;
 		count: import('octane/signals').WritableSignal<number>;
@@ -36,11 +36,13 @@ async function pendingAction() {
 				stop = count.subscribe(() => notifications.push(count.get()));
 				let synchronousCount!: number;
 				let synchronousDoubled!: number;
-				startTransition(() => {
+				const write = () => {
 					count.set(2);
 					synchronousCount = count.get();
 					synchronousDoubled = doubled.get();
-				});
+				};
+				if (nested) startTransition(write);
+				else write();
 				ready.resolve({ scope, count, notifications, synchronousCount, synchronousDoubled, stop });
 				await release.promise;
 			} catch (error) {
@@ -78,7 +80,7 @@ describe('native signal Action lifetimes', () => {
 	describe('signals imported during a pending Action', () => {
 		let state: Awaited<ReturnType<typeof pendingAction>> | undefined;
 		beforeAll(async () => {
-			state = await pendingAction();
+			state = await pendingAction(false);
 		});
 		afterAll(async () => {
 			if (state === undefined) return;
@@ -91,14 +93,95 @@ describe('native signal Action lifetimes', () => {
 		});
 		it('admits signals loaded after an Action awaits and publishes only when it settles', async () => {
 			const action = state!;
-			expect(action.synchronousCount).toBe(2);
-			expect(action.synchronousDoubled).toBe(4);
+			// Only a synchronous transition scope exposes its staged reads.
+			expect(action.synchronousCount).toBe(0);
+			expect(action.synchronousDoubled).toBe(0);
 			expect(action.count.get()).toBe(0);
 			expect(action.notifications).toEqual([]);
 			await action.finish();
 			expect(action.count.get()).toBe(2);
 			expect(action.notifications).toEqual([2]);
 		});
+	});
+
+	it('exposes staged reads inside an explicit nested transition', async () => {
+		const state = await pendingAction();
+		try {
+			expect(state.synchronousCount).toBe(2);
+			expect(state.synchronousDoubled).toBe(4);
+			expect(state.count.get()).toBe(0);
+			expect(state.notifications).toEqual([]);
+			await state.finish();
+			expect(state.count.get()).toBe(2);
+			expect(state.notifications).toEqual([2]);
+		} finally {
+			await state.finish();
+			state.stop();
+			state.scope.dispose();
+		}
+	});
+
+	it('publishes to surviving props consumers after another root is removed during an Action', async () => {
+		const { createScope } = await import('octane/signals');
+		const { SignalHandleProps } = await import('./_fixtures/signal-handle-props.js');
+		const scope = createScope({ scopeKey: 'surviving-action-owner' });
+		const count = scope.signal$('count', 0);
+		const release = deferred<void>();
+		const containers = [document.createElement('div'), document.createElement('div')];
+		for (const container of containers) document.body.appendChild(container);
+		const roots = containers.map((container) => createRoot(container));
+		let action: Promise<void> | undefined;
+		let stop: (() => void) | undefined;
+		try {
+			for (const root of roots) root.render(SignalHandleProps, { value: count });
+			const input = containers[1].querySelector('input')!;
+			const output = containers[1].querySelector('output')!;
+			const view = () => [
+				count.get(),
+				input.value,
+				output.textContent,
+				output.getAttribute('data-count'),
+			];
+			const notifications: Array<Array<number | string | null>> = [];
+			stop = count.subscribe(() => notifications.push(view()));
+			startTransition(() => {
+				action = (async () => {
+					count.set(2);
+					await release.promise;
+				})();
+				return action;
+			});
+			expect(view()).toEqual([0, '0', '0', '0']);
+			expect(notifications).toEqual([]);
+			roots[0].unmount();
+			await act(() => {
+				release.resolve();
+				return action;
+			});
+			expect(containers[0].textContent).toBe('');
+			expect(view()).toEqual([2, '2', '2', '2']);
+			expect(notifications).toEqual([[2, '2', '2', '2']]);
+			await act(() => startTransition(() => count.set(3)));
+			expect(view()).toEqual([3, '3', '3', '3']);
+			expect(notifications).toEqual([
+				[2, '2', '2', '2'],
+				[3, '3', '3', '3'],
+			]);
+			expect(containers[1].querySelector('input')).toBe(input);
+			expect(containers[1].querySelector('output')).toBe(output);
+			roots[1].unmount();
+			flushSync(() => count.set(4));
+			expect([input.value, output.textContent]).toEqual(['3', '3']);
+		} finally {
+			stop?.();
+			await act(() => {
+				release.resolve();
+				return action;
+			});
+			for (const root of roots) root.unmount();
+			for (const container of containers) container.remove();
+			scope.dispose();
+		}
 	});
 
 	it('keeps an urgent replacement when the earlier Action finishes', async () => {

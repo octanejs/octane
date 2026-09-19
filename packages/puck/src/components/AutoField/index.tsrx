@@ -225,7 +225,7 @@ function AutoFieldInternal<
 		throw new Error(`Field type for ${field.type} did not exist.`);
 	}
 
-	return <NestedFieldContext.Provider
+	return <NestedFieldContext
 		value={{
 			readOnlyFields: nestedFieldContext.readOnlyFields || readOnly || {},
 			localName: nestedFieldContext.localName ?? mergedProps.name,
@@ -243,7 +243,7 @@ function AutoFieldInternal<
 				<Children {...mergedProps} />
 			</FieldComponent>
 		</div>
-	</NestedFieldContext.Provider>;
+	</NestedFieldContext>;
 }
 
 type FieldNoLabel<Props extends any = any> = Omit<Field<Props>, 'label'>;

@@ -687,7 +687,7 @@ function RadialBarImpl(props: WithIdRequired<PropsWithDefaults>) {
 			),
 		) ??
 			STABLE_EMPTY_ARRAY;
-	return <CellsContext.Provider value={cellRegistry}>
+	return <CellsContext value={cellRegistry}>
 		<SetRadialBarTooltipEntrySettings
 			dataKey={props.dataKey}
 			sectors={sectors}
@@ -701,7 +701,7 @@ function RadialBarImpl(props: WithIdRequired<PropsWithDefaults>) {
 			id={props.id}
 		/>
 		<RadialBarWithState {...props} sectors={sectors} />
-	</CellsContext.Provider>;
+	</CellsContext>;
 }
 
 export const defaultRadialBarProps = {

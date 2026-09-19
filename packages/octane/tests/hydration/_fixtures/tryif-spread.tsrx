@@ -2,7 +2,7 @@
 // root element carries a SPREAD, reproduced without the router package:
 //
 //   Matches:  <>  <Sib/>  @if (firstId) { <Match/> }  </>      (fragment + sibling)
-//   Match:    <ctx.Provider> @try { @if (Comp) { <Comp/> } @else { <Outlet/> } } @pending {…}
+//   Match:    <Ctx> @try { @if (Comp) { <Comp/> } @else { <Outlet/> } } @pending {…}
 //   Comp:     <header {...attrs} data-n={n}>…  (a hooked layout root with a spread)
 //
 // Comp does NOT suspend (a layout like RootLayout), so the @try renders its success
@@ -13,7 +13,7 @@
 // `el.setAttribute is not a function`.
 import { createContext, useState, useRef, useLayoutEffect, useEffect } from 'octane';
 
-const ctx = createContext('none');
+const Ctx = createContext('none');
 
 // A hooked component whose ROOT element carries a spread (the RootLayout shape).
 // The hook routes it through the HOOKED `componentSlot` path (not lite).
@@ -38,7 +38,7 @@ function Sib() @{
 
 // Mirrors the router `Match`: Provider > @try > @if (truthy) { <Comp/> } @else {…}.
 function InnerMatch(props) @{
-	<ctx.Provider value={props.label}>
+	<Ctx value={props.label}>
 		@try {
 			@if (props.show) {
 				<SpreadRoot attrs={props.attrs} label={props.label} />
@@ -48,7 +48,7 @@ function InnerMatch(props) @{
 		} @pending {
 			<span class="loading">{'loading'}</span>
 		}
-	</ctx.Provider>
+	</Ctx>
 }
 
 // Mirrors the router `Matches`: a FRAGMENT (no wrapper element) whose first child is
@@ -75,7 +75,7 @@ export function MatchesLike(props) @{
 export function Wrap(props) @{
 	// A hook like QueryClientProvider's useEffect.
 	useEffect(() => {}, []);
-	<ctx.Provider value={props.value}>{props.children}</ctx.Provider>
+	<Ctx value={props.value}>{props.children}</Ctx>
 }
 
 // Mirrors RouterProvider EXACTLY: a context provider that renders the
@@ -83,9 +83,9 @@ export function Wrap(props) @{
 // INLINE), not via a `{props.children}` descriptor hole. This is the extra component
 // layer that distinguishes the real app from a plain provider stack.
 export function RPLike(props) @{
-	<ctx.Provider value="rp">
+	<Ctx value="rp">
 		<MatchesLike show={props.show} label={props.label} attrs={props.attrs} />
-	</ctx.Provider>
+	</Ctx>
 }
 
 // The hydrate root. Renders <MatchesLike/> NESTED (via componentSlot) so the

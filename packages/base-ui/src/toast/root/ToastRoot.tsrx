@@ -511,7 +511,7 @@ export const ToastRoot = function ToastRoot(
 		props: [defaultProps, elementProps],
 	});
 
-	return <ToastRootContext.Provider value={toastRoot}>{element}</ToastRootContext.Provider>;
+	return <ToastRootContext value={toastRoot}>{element}</ToastRootContext>;
 };
 
 export type ToastRootToastObject<Data extends object = any> = ToastObjectType<Data>;

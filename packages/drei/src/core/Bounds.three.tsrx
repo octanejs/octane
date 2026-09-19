@@ -314,7 +314,7 @@ export function Bounds({
 		}
 	});
 	<group ref={ref}>
-		<BoundsContext.Provider value={api}>{children as OctaneNode}</BoundsContext.Provider>
+		<BoundsContext value={api}>{children as OctaneNode}</BoundsContext>
 	</group>
 }
 

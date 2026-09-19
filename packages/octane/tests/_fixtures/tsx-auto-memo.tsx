@@ -85,7 +85,7 @@ export function TsxMapExtraArgumentApp(props: {
 
 export function TsxStatefulMappedApp(props: { rows: MappableRows; prefix: string; theme: string }) {
 	return (
-		<AutoMemoContext.Provider value={props.theme}>
+		<AutoMemoContext value={props.theme}>
 			<ul id="tsx-stateful-mapped-rows">
 				{props.rows.map((item, index) => (
 					<AutoMemoChild
@@ -95,7 +95,7 @@ export function TsxStatefulMappedApp(props: { rows: MappableRows; prefix: string
 					/>
 				))}
 			</ul>
-		</AutoMemoContext.Provider>
+		</AutoMemoContext>
 	);
 }
 
@@ -148,9 +148,9 @@ function TsxMappedComponentRows(props: MappedComponentProps) {
 
 export function TsxMappedComponentApp(props: MappedComponentProps) {
 	return (
-		<AutoMemoContext.Provider value={props.theme}>
+		<AutoMemoContext value={props.theme}>
 			<TsxMappedComponentRows {...props} />
-		</AutoMemoContext.Provider>
+		</AutoMemoContext>
 	);
 }
 
@@ -211,9 +211,9 @@ export function TsxAutoMemoApp() {
 			<button id="tsx-auto-reorder" onClick={() => setItems((current) => current.toReversed())}>
 				reorder
 			</button>
-			<AutoMemoContext.Provider value={theme}>
+			<AutoMemoContext value={theme}>
 				<TsxRows items={items} prefix={prefix} />
-			</AutoMemoContext.Provider>
+			</AutoMemoContext>
 		</section>
 	);
 }

@@ -1,0 +1,19 @@
+diff --git a/tests/upstream/src/toolbar/input/ToolbarInput.test.tsx b/tests/upstream/src/toolbar/input/ToolbarInput.test.tsx
+--- a/tests/upstream/src/toolbar/input/ToolbarInput.test.tsx
++++ b/tests/upstream/src/toolbar/input/ToolbarInput.test.tsx
+@@ -31,11 +31,11 @@ describe('<Toolbar.Input />', () => {
+     testRenderPropWith: 'input',
+     render: (node) => {
+       return render(
+-        <ToolbarRootContext.Provider value={testToolbarContext}>
+-          <CompositeRootContext.Provider value={testCompositeContext}>
++        <ToolbarRootContext value={testToolbarContext}>
++          <CompositeRootContext value={testCompositeContext}>
+             {node}
+-          </CompositeRootContext.Provider>
+-        </ToolbarRootContext.Provider>,
++          </CompositeRootContext>
++        </ToolbarRootContext>,
+       );
+     },
+   }));
