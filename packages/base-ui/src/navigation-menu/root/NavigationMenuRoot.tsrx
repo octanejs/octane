@@ -295,11 +295,11 @@ export const NavigationMenuRoot = function NavigationMenuRoot<Value = any>(
 	);
 
 	const jsx = (
-		<NavigationMenuRootContext.Provider value={contextValue}>
+		<NavigationMenuRootContext value={contextValue}>
 			<TreeContext componentProps={componentProps} forwardedRef={forwardedRef}>
 				{componentProps.children}
 			</TreeContext>
-		</NavigationMenuRootContext.Provider>
+		</NavigationMenuRootContext>
 	);
 
 	if (!nested) {
@@ -345,9 +345,9 @@ function TreeContext<Value>(props: {
 	});
 
 	return (
-		<NavigationMenuTreeContext.Provider value={nodeId}>
+		<NavigationMenuTreeContext value={nodeId}>
 			<FloatingNode id={nodeId}>{element}</FloatingNode>
-		</NavigationMenuTreeContext.Provider>
+		</NavigationMenuTreeContext>
 	);
 }
 

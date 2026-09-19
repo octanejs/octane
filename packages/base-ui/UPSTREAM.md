@@ -27,6 +27,18 @@ in CI and none otherwise. The byte-exact configuration is retained under
 `audit/repository-fixtures/`. Test identities, assertions, skips, and todos remain
 subject to the same strict report validation after retries.
 
+The `#test-utils` facades scope the unchanged upstream `waitSingleFrame` helper
+in the corresponding renderer's `act()`, so frame-driven transition updates
+commit before focus and DOM assertions. The pristine runner uses a virtual
+facade over its selected upstream root; pristine bytes, test identities,
+assertions, and warning checks remain unchanged.
+
+The adapted Accordion CSS-transition suite explicitly enables animation waiting
+and restores the prior test flag afterward, matching neighboring upstream motion
+tests. The pinned setup disables animation waiting globally; without the local
+opt-in, the authored 300ms exit transition is bypassed. This fixture correction
+preserves every assertion and registration and leaves the pristine suite unchanged.
+
 Native source and adapted type tests pass strict `tsrx-tsc` checks with declaration
 checking enabled. The formal public type gate also passes. All 79 Base UI public entries and 2,073 entry/export pairs have consumer assertions, including 31 retained Octane compatibility exports.
 The gate verifies the npm tarball integrity and installed declaration bytes before

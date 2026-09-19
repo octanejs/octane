@@ -1,4 +1,17 @@
 import {
+	activeCandidate,
+	candidateWriteCount,
+	deferCandidateInvalidation,
+	recordCandidateUrgentWrite,
+	registerCandidateGraph,
+	registerSignalActionFrameFactory,
+	registerSignalTransitionCoordinatorFactory,
+	withoutSignalCandidate,
+} from './transition-state.js';
+import { SignalActionFrame } from './transition-action.js';
+import { createSignalTransitionCoordinator } from './transition-coordinator.js';
+import type { SignalCandidateFrame } from './transition-candidate.js';
+import {
 	createReactiveSystem,
 	type ReactiveFlags as AlienReactiveFlags,
 	type ReactiveNode,
@@ -7,10 +20,14 @@ import {
 	ScopeDisposedError,
 	SignalCycleError,
 	SignalFrameError,
+	SignalIdleError,
 	SignalWriteError,
 } from './errors.js';
 import {
 	NativeAdoptionMiss,
+	NATIVE_DOM_VALUE,
+	getNativeCandidate,
+	forwardNativeTransitionConsumer,
 	getNativeReadObserver,
 	getNativeAdoptionResolver,
 	isNativeWriteGuarded,
@@ -20,20 +37,25 @@ import {
 	type NativeReadSource,
 	type NativeSerializedScope,
 } from './read-protocol.js';
-import type {
-	AdoptionFrame,
-	ConnectionState,
-	ScopeSeed,
+import {
+	SIGNAL_BINDING_READ,
+	SIGNAL_BINDING_SUBSCRIBE,
+	SIGNAL_BINDING_IDENTITY,
 	SIGNAL_HANDLE,
-	SignalHandle,
-	SignalSnapshot,
-	SignalTraceEvent,
+	type AdoptionFrame,
+	type ConnectionState,
+	type ScopeSeed,
+	type SignalHandle,
+	type SignalSnapshot,
+	type SignalTraceEvent,
 } from './types.js';
 
 export interface GraphOwner {
 	readonly scopeKey: string;
 	readonly epoch: number;
 	readonly retired: boolean;
+	/** Optional document freeze barrier; ordinary owners never allocate one. */
+	readonly readBarrier?: Promise<void> | undefined;
 	readonly observers: Set<SignalObserver>;
 	readonly seedable: boolean;
 	beginAdoption(seed: ScopeSeed): AdoptionFrame;
@@ -42,7 +64,34 @@ export interface GraphOwner {
 		read: SignalReadMode,
 	): readonly NativeSerializedScope[] | undefined;
 	trace(type: SignalTraceEvent['type'], node?: ScopedNode): void;
+	/** Internal prototype: only explicitly supported producers may enter a candidate. */
+	forkCandidate?(
+		node: ScopedNode,
+		target: ScopedNode,
+		frame: SignalCandidateFrame,
+	): CandidateProducer | undefined;
 }
+
+export interface CandidateProducer {
+	dispose(): void;
+	/** Explicit async reads complement the synchronous graph edges. */
+	dependencies?(): Iterable<ScopedNode>;
+	prepare():
+		| { status: 'ready'; receipt: CandidateProducerReceipt }
+		| { status: 'pending'; waiting: PromiseLike<unknown> }
+		| { status: 'error'; error: unknown }
+		| { status: 'invalid' };
+}
+
+export interface CandidateProducerReceipt {
+	validate(): boolean;
+	publish(): () => void;
+	/** Canonical revisions are installed; transfer leases without evaluating readers. */
+	accept?(): void;
+}
+
+export { CandidateUnsupportedError } from './transition-state.js';
+export type { SignalCandidateFrame, CandidatePreparation } from './transition-candidate.js';
 
 export type SignalReadMode = 'value' | 'latest' | 'snapshot';
 
@@ -107,7 +156,16 @@ const graph = createReactiveSystem({
 				node.flags |= ReactiveFlags.Dirty;
 			}
 			node.owner.trace('invalidate', node);
-			if (node.kind === 'async') queued.add(node);
+			if (node.invalidateAttempt) {
+				if (deferCandidateInvalidation) {
+					const invalidate = node.invalidateAttempt;
+					queued.add(() => {
+						// An accepted read can already have replaced this producer.
+						if (node.invalidateAttempt === invalidate) invalidate();
+					});
+				} else node.invalidateAttempt();
+				queued.add(node);
+			} else if (node.kind === 'async') queued.add(node);
 		} else {
 			queued.add(node as SignalObserver);
 		}
@@ -158,6 +216,11 @@ export function untrack<T>(run: () => T): T {
 		activeNode = previousNode;
 		setNativeReadObserver(previousObserver);
 	}
+}
+
+/** Cancellation callbacks observe committed state, even during candidate evaluation. */
+export function untrackCommitted<T>(run: () => T): T {
+	return withoutSignalCandidate(() => untrack(run));
 }
 
 export function startSignalBatch(): void {
@@ -258,6 +321,17 @@ export function pendingState(
 		},
 		waiting,
 		...(resolveWaiting ? { resolveWaiting } : {}),
+	};
+}
+
+export function idleState(): NodeState<never> {
+	return {
+		snapshot: {
+			status: 'idle',
+			refreshing: false,
+			connection: 'none',
+			complete: false,
+		},
 	};
 }
 
@@ -367,7 +441,9 @@ function createWakeup(): Wakeup {
 }
 
 export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
-	declare readonly [SIGNAL_HANDLE]: T;
+	get [SIGNAL_HANDLE](): true {
+		return true;
+	}
 	deps: ReactiveNode['deps'];
 	depsTail: ReactiveNode['depsTail'];
 	subs: ReactiveNode['subs'];
@@ -375,7 +451,8 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	flags: ReactiveFlags;
 	revision = 0;
 	state: NodeState<T> | undefined;
-	compute: (() => NodeState<T>) | undefined;
+	compute: ((target: ScopedNode<T>) => NodeState<T>) | undefined;
+	invalidateAttempt: (() => void) | undefined;
 	last: T | undefined;
 	lastState: NodeState<T> | undefined;
 	hasLast = false;
@@ -398,22 +475,62 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	}
 
 	get(): T {
-		return strictValue(readNode(this));
+		return strictValue(readNode(this), this.key);
+	}
+
+	[SIGNAL_BINDING_READ](): T {
+		return readSignalBinding(this);
+	}
+
+	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
+		assertAlive(this.owner);
+		// An optional native lease can end when its exact owner retires. A live
+		// computation throwing ScopeDisposedError still uses normal invalidation.
+		return attachObserver(
+			this,
+			onRetire === undefined
+				? notify
+				: forwardNativeTransitionConsumer(notify, () =>
+						this.owner.retired ? onRetire() : notify(),
+					),
+			true,
+		);
+	}
+
+	[SIGNAL_BINDING_IDENTITY]() {
+		return { scope: 'instance' as const, nodeKey: this.key };
+	}
+
+	[NATIVE_DOM_VALUE](): T {
+		return this.get();
 	}
 
 	set(value: T | ((previous: T) => T)): void {
 		assertAlive(this.owner);
 		assertWritable();
 		if (this.kind !== 'signal') throw new TypeError('Only a writable signal accepts set().');
+		const candidate = activeCandidate ?? getNativeCandidate();
+		if (candidate) {
+			candidate.run(() => candidate.write(this, value));
+			return;
+		}
 		signalBatch(() => {
-			const previous = strictValue(refreshNode(this));
+			const previous = strictValue(refreshNode(this), this.key);
 			const next =
 				typeof value === 'function'
 					? untrack(() => pure(() => (value as (previous: T) => T)(previous)))
 					: value;
-			if (Object.is(previous, next)) return;
-			publishNode(this, readyState(next));
-			this.owner.trace('write', this);
+			// Equal committed values can still withdraw private transition intent.
+			// Revoke every old receipt before cancellation callbacks can reenter.
+			const releases = candidateWriteCount ? recordCandidateUrgentWrite(this, value) : undefined;
+			try {
+				if (!Object.is(previous, next)) {
+					publishNode(this, readyState(next));
+					this.owner.trace('write', this);
+				}
+			} finally {
+				if (releases) for (const release of releases) release();
+			}
 		});
 	}
 
@@ -479,8 +596,23 @@ export function inspectNativeNode(node: ScopedNode, read: SignalReadMode): Nativ
 	};
 }
 
+function createNativeSource(node: ScopedNode, read: SignalReadMode): NativeReadSource {
+	return {
+		getVersion: () => (activeCandidate && !activeCandidate.observes(node) ? NaN : node.revision),
+		subscribe: (notify) => {
+			assertAlive(node.owner);
+			return attachObserver(node, notify, true);
+		},
+		serialize: (revision) =>
+			node.revision === revision ? node.owner.serializeRead(node, read) : undefined,
+		inspect: () => inspectNativeNode(node, read),
+	};
+}
+
 export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value'): NodeState<T> {
 	assertAlive(node.owner);
+	const candidate = activeCandidate;
+	if (candidate) node = candidate.resolve(node);
 	const historical = historicalReader?.(node, read) as NodeState<T> | undefined;
 	if (historical) return historical;
 	if (!historicalReader && node.owner.seedable) {
@@ -498,17 +630,11 @@ export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value')
 				: read === 'latest'
 					? 'nativeLatestSource'
 					: 'nativeSnapshotSource';
-		const source = (node[field] ??= {
-			getVersion: () => node.revision,
-			subscribe: (notify) => {
-				assertAlive(node.owner);
-				return attachObserver(node, notify, true);
-			},
-			serialize: (revision) =>
-				node.revision === revision ? node.owner.serializeRead(node, read) : undefined,
-			inspect: () => inspectNativeNode(node, read),
-		});
-		reportNativeRead(source, node.revision);
+		const source = (node[field] ??= createNativeSource(node, read));
+		reportNativeRead(
+			candidate ? candidate.nativeSource(node, read, source) : source,
+			node.revision,
+		);
 	}
 	// Retirement marks the owner before invoking user cancellation callbacks.
 	// A reentrant read must not expose its old value before graph teardown runs.
@@ -517,11 +643,34 @@ export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value')
 	return observed;
 }
 
-export function strictValue<T>(state: NodeState<T>): T {
+export function strictValue<T>(state: NodeState<T>, key = 'idle'): T {
 	const snapshot = state.snapshot;
 	if (snapshot.status === 'ready') return snapshot.value;
 	if (snapshot.status === 'error') throw snapshot.error;
+	if (snapshot.status === 'idle') throw new SignalIdleError(key);
 	throw state.waiting;
+}
+
+/** Track historical lease release, but keep live binding reads out of the broad collector. */
+export function readSignalBinding<T>(handle$: SignalHandle<T>): T {
+	const resolveAdoption = getNativeAdoptionResolver();
+	if (
+		(historicalReader || resolveAdoption) &&
+		handle$ instanceof ScopedNode &&
+		handle$.owner.seedable &&
+		(historicalReader || resolveAdoption?.(handle$.owner))
+	) {
+		// A historical read must witness its lease ending so the renderer can
+		// reconcile the adopted DOM with already-newer live state. Ordinary live
+		// binding reads still subscribe only to their targeted graph node below.
+		return handle$.get();
+	}
+	const observer = setNativeReadObserver(null);
+	try {
+		return handle$.get();
+	} finally {
+		setNativeReadObserver(observer);
+	}
 }
 
 export function refreshNode<T>(node: ScopedNode<T>): NodeState<T> {
@@ -573,7 +722,7 @@ function evaluate(node: ScopedNode): boolean {
 	let next: NodeState;
 	let owners: Set<GraphOwner> | undefined;
 	try {
-		next = node.compute();
+		next = node.compute(node);
 	} catch (error) {
 		if (isThenable(error)) {
 			const wakeup = (node.wakeup ??= createWakeup());
@@ -659,9 +808,23 @@ export function invalidateNode(node: ScopedNode): void {
 export function derivedState<T>(node: ScopedNode<T>, read: () => T): NodeState<T> {
 	const value = pure(read);
 	if (isThenable(value)) throw new TypeError('derived$ requires a synchronous computation.');
+	return derivedValueState(node, value);
+}
+
+export function derivedValueState<T>(
+	node: ScopedNode<T>,
+	value: T,
+	activity?: Pick<SignalSnapshot<T>, 'refreshing' | 'complete' | 'connection'>,
+	additionalDependencies?: Iterable<ScopedNode>,
+): NodeState<T> {
 	let refreshing = false;
 	let complete = true;
 	let connection: ConnectionState = 'none';
+	if (activity) {
+		refreshing = activity.refreshing;
+		complete = activity.complete;
+		connection = activity.connection;
+	}
 	for (let link = node.deps; link && node.depsTail; link = link.nextDep) {
 		const dependency = (link.dep as ScopedNode).state?.snapshot;
 		if (dependency) {
@@ -673,6 +836,18 @@ export function derivedState<T>(node: ScopedNode<T>, read: () => T): NodeState<T
 			else if (connection === 'none' && dependency.connection === 'closed') connection = 'closed';
 		}
 		if (link === node.depsTail) break;
+	}
+	if (additionalDependencies) {
+		for (const node of additionalDependencies) {
+			const dependency = node.state?.snapshot;
+			if (!dependency) continue;
+			refreshing ||= dependency.refreshing;
+			complete &&= dependency.complete;
+			if (dependency.connection === 'open') connection = 'open';
+			else if (connection !== 'open' && dependency.connection === 'connecting')
+				connection = 'connecting';
+			else if (connection === 'none' && dependency.connection === 'closed') connection = 'closed';
+		}
 	}
 	return readyState(value, { refreshing, complete, connection });
 }
@@ -690,7 +865,7 @@ export class SignalObserver implements ReactiveNode {
 	) {}
 }
 
-function attachObserver(
+export function attachObserver(
 	node: ScopedNode,
 	notify: () => void,
 	native: boolean,
@@ -700,6 +875,12 @@ function attachObserver(
 	graph.link(node, observer, ++trackingCycle);
 	node.owner.observers.add(observer);
 	return () => stopObserver(observer);
+}
+
+/** Internal attempt dependency subscription; callers already hold a graph lease. */
+export function subscribeNode(node: ScopedNode, notify: () => void): () => void {
+	const state = untrack(() => refreshNode(node));
+	return attachObserver(node, notify, true, state);
 }
 
 function runObserver(observer: SignalObserver): void {
@@ -745,6 +926,7 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 			node.state = errorState(retirementError);
 			releaseRetention(node);
 			node.compute = undefined;
+			node.invalidateAttempt = undefined;
 			if (node.kind === 'async') node.retry = ScopedNode.prototype.retry;
 			if (node.subs) {
 				graph.propagate(node.subs, executionDepth !== 0);
@@ -758,3 +940,34 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 		retirementError = previousError;
 	}
 }
+
+registerCandidateGraph({
+	ScopedNode,
+	graph,
+	flags: ReactiveFlags,
+	historical: () => historicalReader !== undefined,
+	link: (from, to) => {
+		graph.link(from, to, ++trackingCycle);
+	},
+	removeQueued: (node) => {
+		queued.delete(node);
+	},
+	assertAlive,
+	strictValue,
+	refreshNode,
+	pure,
+	untrack,
+	signalBatch,
+	publishNode,
+	readyState,
+	commitState,
+	sameState,
+	releaseRetainedOwners,
+	retainOwners,
+	releaseRetention,
+	createNativeSource,
+	attachObserver,
+});
+
+registerSignalActionFrameFactory(() => new SignalActionFrame());
+registerSignalTransitionCoordinatorFactory(createSignalTransitionCoordinator);

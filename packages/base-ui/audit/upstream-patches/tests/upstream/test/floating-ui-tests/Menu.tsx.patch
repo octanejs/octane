@@ -38,6 +38,24 @@ diff --git a/tests/upstream/test/floating-ui-tests/Menu.tsx b/tests/upstream/tes
    const [isOpen, setIsOpen] = React.useState(false);
    const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
    const [allowHover, setAllowHover] = React.useState(false);
+@@ -250,7 +248,7 @@ export const MenuComponent = React.forwardRef<
+           </span>
+         )}
+       </button>
+-      <MenuContext.Provider
++      <MenuContext
+         // eslint-disable-next-line react/jsx-no-constructed-context-values
+         value={{
+           activeIndex,
+@@ -302,7 +300,7 @@ export const MenuComponent = React.forwardRef<
+             </FloatingPortal>
+           )}
+         </CompositeList>
+-      </MenuContext.Provider>
++      </MenuContext>
+     </FloatingNode>
+   );
+ });
 @@ -313,10 +311,9 @@ interface MenuItemProps {
  }
  

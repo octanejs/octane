@@ -1,7 +1,7 @@
 import type { Ref } from '../util/OctaneTypes.ts';
 
 import { arrayTooltipSearcher } from '../state/optionsSlice';
-import { PolarChartProps, TooltipEventType } from '../util/types';
+import type { PolarChartProps, TooltipEventType } from '../util/types';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { defaultPolarChartProps, PolarChart } from './PolarChart.tsrx';
 

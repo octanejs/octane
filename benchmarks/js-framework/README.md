@@ -347,6 +347,68 @@ was unchanged in all four modes. Rebuilding the production work gate after the
 compiler correction reproduced the exact candidate bundle and readable-source
 checksums above, so its recorded work and timing evidence remains applicable.
 
+### Leading inline style spreads (opt-in)
+
+The `literals` mode includes two imported runtime style objects followed by
+`fontWeight` and `color` expressions. `leadingSpread` exercises that inline
+literal; `leadingGeneric` evaluates the same object as an ordinary style value.
+`collisionSpread` and `collisionGeneric` add a prefix `color` key, checking the
+fallback that preserves the key's original insertion position. All four cases
+verify complete CSS declarations, labels, selection, and surviving DOM nodes on
+mount, one-row selection, two-row selection changes, and unrelated updates.
+
+The optimized literal still snapshots and diffs its spread prefix. Only the
+fixed suffix uses scalar comparisons and direct setters after mount. A prefix
+collision keeps the complete object diff. Chromium precise coverage counts
+previous/current object-diff property visits and setter calls separately from
+CSSOM writes. These counts establish work removed from the generic diff, not
+heap allocation counts or browser layout savings. Full-object mount and
+collision fallback can do more object construction than the generic control.
+
+Freeze readable production builds from each compiler revision before measuring:
+
+```bash
+cd benchmarks/js-framework/octane-tsrx-naive
+node ../../../node_modules/vite/bin/vite.js build --config vite.style-literals.config.js --outDir dist/style-literals-baseline
+node ../../../node_modules/vite/bin/vite.js preview --config vite.style-literals.config.js --outDir dist/style-literals-baseline --host 127.0.0.1 --port 5333 --strictPort
+```
+
+Build the candidate into `dist/style-literals-candidate`, then serve it on 5334.
+Run the gates from the repository root; change the URL and remove
+`WORK_EXPECT_SPREADS_OPTIMIZED=0` for the candidate:
+
+```bash
+WORK_CASES=leadingSpread,leadingGeneric,collisionSpread,collisionGeneric WORK_EXPECT_SPREADS_OPTIMIZED=0 TARGET_URL=http://127.0.0.1:5333/style-literals.html WORK_JSON=/tmp/style-spreads-baseline.json node benchmarks/js-framework/style-literals-work.mjs
+```
+
+The baseline switch changes only expected work, never the fixtures. The expected
+candidate reduces both old-key and new-key scans from 4,000 to 2,000 per update
+in `leadingSpread`; its two suffix setters run only for changed rows. Both
+generic controls and the collision fallback retain 4,000 scans in each direction.
+CSSOM writes remain identical in all cases: 4,000 on mount, two or four for
+selection, and zero for an unrelated update.
+
+For timing, build each revision again with `--minify esbuild` and a separate
+output directory, then serve those artifacts on separate ports. Set
+`WORK_SAMPLES=30` and `WORK_TIMING_URL` to the corresponding minified URL while
+`TARGET_URL` stays on the readable artifact used for work coverage. Timing uses
+a separate browser without coverage or CSSOM instrumentation, two warmup trials,
+and a fresh context for each sample. This measures mounting and the first update,
+not a warmed long-running application's steady-state throughput. Keep artifacts
+fixed, run A–B–B–A without concurrent tests, and compare the generic controls
+before claiming a timing benefit. Omit `WORK_CASES` to retain the original literal
+and duplicate-key gates as well.
+
+For a bounded comparison with closer controls, alternate baseline/candidate URLs
+within each sample and rotate the four modes each round. Both artifacts must
+pass the same post-timer CSS and DOM assertions. `pairedMedianRatio` is the
+median candidate/baseline ratio of those adjacent samples;
+`controlAdjustedMedianRatio` divides each pair by its same-round generic control:
+
+```bash
+WORK_CASES=leadingSpread,leadingGeneric,collisionSpread,collisionGeneric WORK_TIMING_OPERATIONS=select_another,unrelated_update WORK_SAMPLES=15 TARGET_URL=http://127.0.0.1:5334/style-literals.html WORK_TIMING_URL=http://127.0.0.1:5336/style-literals.html WORK_TIMING_BASELINE_URL=http://127.0.0.1:5335/style-literals.html WORK_JSON=/tmp/style-spreads-paired.json node benchmarks/js-framework/style-literals-work.mjs
+```
+
 ## Keyed-reorder matrix (`run-reorder.mjs`)
 
 The canonical suite only ever reorders two rows (`swap`). `run-reorder.mjs`

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	createResource,
 	createScope,
 	query,
 	ScopeDisposedError,
@@ -32,7 +33,7 @@ describe('scoped signal serialization and adoption', () => {
 		);
 		const scope = createScope({ scopeKey: 'editable-seed' });
 		const selected$ = scope.signal$('selected', 1);
-		const result$ = scope.asyncSignal$('result', () => load(selected$.get()));
+		const result$ = createResource(scope, 'result', () => load(selected$.get()));
 		first.resolve('old');
 		await drain();
 		selected$.set(2);
@@ -56,10 +57,26 @@ describe('scoped signal serialization and adoption', () => {
 		const seed = JSON.parse(JSON.stringify(server.serialize()));
 		const client = createScope({ scopeKey: 'plain', seed });
 		const data$ = client.signal$('data', {} as typeof original);
+		const historical = client.beginAdoption(seed);
+		// Wire data belongs to the caller. Neither subsequent mutation nor a
+		// live edit may change the historical value already accepted by a frame.
+		seed.entries[0].value = ['string', 'changed outside the owner'];
 		expect(data$.get()).toEqual(original);
 		expect(Object.is(data$.get().items[1], -0)).toBe(true);
 		expect(Object.getPrototypeOf(data$.get())).toBe(Object.prototype);
 		expect(Object.isFrozen(data$.get().items)).toBe(true);
+		data$.set({ items: ['live'] });
+		expect(historical.run(() => data$.get())).toEqual(original);
+		expect(data$.get()).toEqual({ items: ['live'] });
+		historical.release();
+		// Direct input may contain aliases or null prototypes; normalization
+		// preserves data, not those implementation-specific object shapes.
+		const directSeed = server.serialize();
+		Object.setPrototypeOf(directSeed, null);
+		Object.setPrototypeOf(directSeed.entries[0]!, null);
+		const directClient = createScope({ scopeKey: 'plain', seed: directSeed });
+		expect(directClient.signal$('data', {}).get()).toEqual(original);
+		directClient.dispose();
 		server.dispose();
 		client.dispose();
 	});
@@ -207,7 +224,7 @@ describe('scoped signal serialization and adoption', () => {
 				});
 				return new Promise<void>(() => {});
 			});
-			data.asyncSignal$('work', () => load(undefined));
+			createResource(data, 'work', () => load(undefined));
 			try {
 				expect(card$.get()).toEqual({ title: 'private text' });
 				if (mode === 'retained') blocked$.set(true);
@@ -227,7 +244,7 @@ describe('scoped signal serialization and adoption', () => {
 		const load = query('person', (id: number) => (id === 1 ? one.promise : two.promise));
 		const scope = createScope({ scopeKey: 'people' });
 		const id$ = scope.signal$('id', 1);
-		const person$ = scope.asyncSignal$('person', () => load(id$.get()));
+		const person$ = createResource(scope, 'person', () => load(id$.get()));
 		one.resolve({ name: 'one' });
 		await drain();
 		id$.set(2);
@@ -246,7 +263,7 @@ describe('scoped signal serialization and adoption', () => {
 		const pending = deferred<string>();
 		const load = query('pending', () => pending.promise);
 		const scope = createScope({ scopeKey: 'fallback' });
-		const value$ = scope.asyncSignal$('value', () => load(undefined));
+		const value$ = createResource(scope, 'value', () => load(undefined));
 		expect(value$.latest('waiting')).toBe('waiting');
 		const frame = scope.beginAdoption(scope.serialize());
 		pending.resolve('ready');
@@ -263,7 +280,7 @@ describe('scoped signal serialization and adoption', () => {
 		const load = query('result', (id: number) => (id === 1 ? first.promise : second.promise));
 		const scope = createScope({ scopeKey: 'projection' });
 		const id$ = scope.signal$('id', 1);
-		const result$ = scope.asyncSignal$('result', () => load(id$.get()));
+		const result$ = createResource(scope, 'result', () => load(id$.get()));
 		const view$ = scope.derived$('view', () => ({ id: id$.get(), result: result$.get() }));
 		first.resolve('first');
 		await drain();
@@ -284,7 +301,7 @@ describe('scoped signal serialization and adoption', () => {
 		let index = 0;
 		const load = query('refresh', () => attempts[index++]!.promise);
 		const scope = createScope({ scopeKey: 'activity' });
-		const value$ = scope.asyncSignal$('value', () => load(undefined));
+		const value$ = createResource(scope, 'value', () => load(undefined));
 		attempts[0]!.resolve('old');
 		await drain();
 		value$.retry();
@@ -302,15 +319,19 @@ describe('scoped signal serialization and adoption', () => {
 	it('uses a matching completed request seed without starting the client loader', async () => {
 		const serverLoad = query('request', (id: number) => `server:${id}`);
 		const server = createScope({ scopeKey: 'ready' });
-		server.asyncSignal$('result', () => serverLoad(1));
+		createResource(server, 'result', () => serverLoad(1));
 		await drain();
 		let starts = 0;
 		const clientLoad = query('request', (id: number) => {
 			starts++;
 			return `client:${id}`;
 		});
-		const client = createScope({ scopeKey: 'ready', seed: server.serialize() });
-		const result$ = client.asyncSignal$('result', () => clientLoad(1));
+		const seed = server.serialize();
+		const client = createScope({ scopeKey: 'ready', seed });
+		const argument = seed.entries[0]!.request!.argument;
+		if (argument[0] !== 'number') throw new Error('Expected the serialized numeric selection.');
+		argument[1] = 99;
+		const result$ = createResource(client, 'result', () => clientLoad(1));
 		expect(result$.get()).toBe('server:1');
 		expect(starts).toBe(0);
 		server.dispose();
@@ -321,14 +342,14 @@ describe('scoped signal serialization and adoption', () => {
 		const server = createScope({ scopeKey: 'changed-argument' });
 		const serverId$ = server.signal$('id', 1);
 		const serverLoad = query('request', (id: number) => `server:${id}`);
-		server.asyncSignal$('result', () => serverLoad(serverId$.get()));
+		createResource(server, 'result', () => serverLoad(serverId$.get()));
 		await drain();
 		const pending = deferred<string>();
 		const clientLoad = query('request', () => pending.promise);
 		const client = createScope({ scopeKey: 'changed-argument', seed: server.serialize() });
 		const id$ = client.signal$('id', 0);
 		id$.set(2);
-		const result$ = client.asyncSignal$('result', () => clientLoad(id$.get()));
+		const result$ = createResource(client, 'result', () => clientLoad(id$.get()));
 		expect(client.isPending(() => result$.get())).toBe(true);
 		pending.resolve('client:2');
 		await drain();
@@ -362,6 +383,12 @@ describe('scoped signal serialization and adoption', () => {
 		const cyclic: unknown[] = ['array', []];
 		(cyclic[1] as unknown[]).push(cyclic);
 		const sparse = ['array', new Array(1)];
+		const extraProperty = ['string', 'value'];
+		Object.defineProperty(extraProperty, 'hidden', { value: true });
+		const symbolicProperty = ['string', 'value'];
+		Object.defineProperty(symbolicProperty, Symbol('extra'), { value: true });
+		const hiddenIndex = ['string', 'value'];
+		Object.defineProperty(hiddenIndex, '1', { enumerable: false });
 		let getterCalls = 0;
 		const accessor: unknown[] = ['string', 'value'];
 		Object.defineProperty(accessor, '1', {
@@ -375,7 +402,11 @@ describe('scoped signal serialization and adoption', () => {
 			cyclic,
 			sparse,
 			accessor,
+			extraProperty,
+			symbolicProperty,
+			hiddenIndex,
 			['number', NaN],
+			['number', -0],
 			[
 				'object',
 				[

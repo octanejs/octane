@@ -30,7 +30,7 @@
     {
       "path": "packages/tanstack-store/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Runs the exact selector, atom, created-store, action, and context scenario against @tanstack/react-store@0.11.0."
+      "oracle": "Runs the exact selector, atom, created-store, action, and context scenario against @tanstack/react-store@0.11.1."
     },
     {
       "path": "packages/tanstack-store/tests/differential/setup.test.ts",

@@ -1,4 +1,5 @@
 /** Optional component hooks for the native-read DOM compiler mode. */
+export * from './index.js';
 import { nativeLocalHook } from '../runtime.js';
 import { createLocalScope } from './engine.js';
 import type { Scope, WritableSignal } from './types.js';

@@ -97,6 +97,10 @@ export interface ServerRouteOptions {
 // ============================================================================
 
 export interface Context {
+	/** Trusted completed client generation. Browser routing data is not authorization. */
+	readonly clientBuild?: import('./production.js').ClientBuildManifest;
+	/** Production asset identities; development renders retain inline scoped CSS. */
+	readonly clientAssets?: Readonly<Record<string, import('./production.js').ClientAssetEntry>>;
 	/** The incoming Request object */
 	request: Request;
 	/** URL parameters extracted from the route pattern */
@@ -109,6 +113,8 @@ export interface Context {
 	 * renderer inline scripts, hydration data, and the hydrate module script.
 	 */
 	state: Map<string, unknown>;
+	/** Identity established by authorization middleware, never by browser RPC arguments. */
+	viewer?: unknown;
 	/** Request-scoped bindings supplied by the active platform integration. */
 	platform?: unknown;
 	/**
@@ -168,6 +174,11 @@ export function handleServerRoute(
 export function is_rpc_request(pathname: string): boolean;
 
 /** Security policy and execution dependencies for a server-function request. */
+export interface SignalRequestHooks {
+	install: typeof import('octane/server').installSignalOwnerEnvironment;
+	retire: typeof import('octane/server').retireSignalOwnerIdentity;
+}
+
 export interface RpcRequestOptions {
 	resolveFunction: (hash: string) => Function | null | Promise<Function | null>;
 	/**
@@ -177,8 +188,30 @@ export interface RpcRequestOptions {
 	 * mapping, and the middleware chain must not wait on it.
 	 */
 	describeFunction?: (hash: string) => { module: string; export: string } | null;
-	executeServerFunction: (fn: Function, body: string) => Promise<string>;
-	asyncContext: AsyncContext<{ origin?: string; platform?: unknown; context?: Context }>;
+	executeServerFunction: (
+		fn: Function,
+		body: string,
+		context?: import('octane/server').ServerCallContext,
+	) => Promise<string>;
+	streamServerFunction?: (
+		fn: Function,
+		body: string,
+		context: import('octane/server').ServerCallContext,
+		limits?: import('octane/server').ServerResultLimits,
+	) => ReadableStream<Uint8Array> | Promise<ReadableStream<Uint8Array>>;
+	resultLimits?: import('octane/server').ServerResultLimits;
+	batchServerFunctions?: (
+		...args: Parameters<typeof import('octane/server').executeServerFunctionBatch>
+	) => ReadableStream<Uint8Array> | Promise<ReadableStream<Uint8Array>>;
+	asyncContext: AsyncContext<{
+		origin?: string;
+		platform?: unknown;
+		context?: Context;
+		serverCallHost?: import('octane/server').ServerCallHost;
+		signalOwner?: import('octane/server').SignalOwner;
+		signalRequestContext?: Context;
+	}>;
+	signalOwners?: SignalRequestHooks;
 	trustProxy?: boolean;
 	middlewares?: Middleware[];
 	allowedOrigins?: readonly string[];
@@ -188,6 +221,21 @@ export interface RpcRequestOptions {
 
 /** Apply Octane's security policy and global middleware to a server function. */
 export function handleRpcRequest(request: Request, options: RpcRequestOptions): Promise<Response>;
+
+/** Shared request boundary for dev, production, and host-managed render routes. */
+export function runServerRequest(
+	storage: RpcRequestOptions['asyncContext'],
+	store: NonNullable<ReturnType<RpcRequestOptions['asyncContext']['getStore']>>,
+	hooks: SignalRequestHooks | undefined,
+	callback: () => Promise<Response>,
+): Promise<Response>;
+
+export function createServerCallHost(
+	parent: Context,
+	options: Pick<RpcRequestOptions, 'asyncContext' | 'middlewares'> & { origin: string },
+): import('octane/server').ServerCallHost;
+
+export function setRequestContextSource(storage: RpcRequestOptions['asyncContext']): void;
 
 /**
  * The `Context` for the in-flight request.
@@ -430,6 +478,8 @@ export interface OctaneConfigOptions {
 			allowedOrigins?: string[];
 			/** Maximum encoded request size in bytes. @default 1048576 */
 			maxBodyBytes?: number;
+			/** Budgets for the opt-in streamed response, separate from request size. */
+			resultLimits?: import('octane/server').ServerResultLimits;
 		};
 		/**
 		 * Production SSR mode: 'streaming' (default) flushes the shell at
@@ -477,6 +527,8 @@ export interface ResolvedOctaneConfig {
 			allowedOrigins: string[];
 			/** Maximum encoded request size in bytes. @default 1048576 */
 			maxBodyBytes: number;
+			/** Explicit response-frame, total-byte, and invocation-deadline budgets. */
+			resultLimits?: import('octane/server').ServerResultLimits;
 		};
 		/** @default 'streaming' */
 		render: 'streaming' | 'buffered';

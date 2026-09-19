@@ -1,8 +1,8 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { StackOffsetType } from '../util/types';
-import { SyncMethod } from '../synchronisation/types';
-import { BaseValue } from '../cartesian/Area.tsrx';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { StackOffsetType } from '../util/types';
+import type { SyncMethod } from '../synchronisation/types';
+import type { BaseValue } from '../cartesian/Area.tsrx';
 
 /**
  * These are chart options that users can choose - which means they can also

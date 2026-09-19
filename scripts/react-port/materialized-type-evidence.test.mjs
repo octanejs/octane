@@ -13,12 +13,14 @@ import { buildUpstreamLock, gitBlobSha1 } from './materialize-lib.mjs';
 
 const roots = [];
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
-function fixture() {
+function fixture({ file = 'src/api.spec.ts', kind = 'type', prefix = '' } = {}) {
 	const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'materialized-type-evidence-')));
 	roots.push(root);
 	execFileSync('git', ['init', '--quiet', root]);
 	const packageDirectory = path.join(root, 'packages/widget');
-	const source = `import { api } from 'widget/subpath';\nexpectType<string>(api());\n// @ts-expect-error wrong argument\napi(12);\n`;
+	const source =
+		prefix +
+		`import { api } from 'widget/subpath';\nexpectType<string>(api());\n// @ts-expect-error wrong argument\napi(12);\n`;
 	const identity = {
 		packageName: 'widget',
 		integrity: 'sha512-fixture',
@@ -27,7 +29,7 @@ function fixture() {
 		repository: { owner: 'fixture', repo: 'widget', subdirectory: 'packages/widget' },
 	};
 	const files = {
-		'src/api.spec.ts': source,
+		[file]: source,
 		'package.json': '{"name":"widget","version":"1.0.0"}\n',
 	};
 	const lock = buildUpstreamLock({
@@ -67,8 +69,8 @@ function fixture() {
 		identity,
 		upstreamTestInventory: [
 			{
-				kind: 'type',
-				path: 'packages/widget/src/api.spec.ts',
+				kind,
+				path: `packages/widget/${file}`,
 				gitBlob: gitBlobSha1(Buffer.from(source)),
 				size: Buffer.byteLength(source),
 			},
@@ -81,7 +83,7 @@ function fixture() {
 		programFiles: [
 			path.join(
 				packageDirectory,
-				lane === 'pristine' ? 'upstream/src/api.spec.ts' : 'tests/upstream/api.spec.ts',
+				lane === 'pristine' ? `upstream/${file}` : `tests/upstream/${path.basename(file)}`,
 			),
 		],
 	});
@@ -90,6 +92,21 @@ function fixture() {
 
 test('accepts complete pinned and regenerated suites with subpath-only imports', () => {
 	const { inputs } = fixture();
+	for (const lane of ['pristine', 'adapted'])
+		assert.doesNotThrow(() => assertMaterializedTypeEvidence(inputs(lane)));
+});
+test('requires and executes type suites stored as runtime registrations by older intake', () => {
+	const { inputs } = fixture({ file: 'src/types.test.tsx', kind: 'runtime' });
+	for (const lane of ['pristine', 'adapted']) {
+		assert.doesNotThrow(() => assertMaterializedTypeEvidence(inputs(lane)));
+		assert.throws(
+			() => assertMaterializedTypeEvidence({ ...inputs(lane), programFiles: [] }),
+			/omits pinned type file/,
+		);
+	}
+});
+test('accepts explanatory comments mentioning disabled directives without suppressing checking', () => {
+	const { inputs } = fixture({ prefix: '// [ONLY-TS-3.9] @ts-ignore\n' });
 	for (const lane of ['pristine', 'adapted'])
 		assert.doesNotThrow(() => assertMaterializedTypeEvidence(inputs(lane)));
 });

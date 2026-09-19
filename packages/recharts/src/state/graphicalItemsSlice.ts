@@ -1,16 +1,16 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { createSlice, current, PayloadAction, prepareAutoBatched } from '@reduxjs/toolkit';
+import { createSlice, current, type PayloadAction, prepareAutoBatched } from '@reduxjs/toolkit';
 import { castDraft, type Draft } from 'immer';
-import { ChartData } from './chartDataSlice';
-import { AxisId } from './cartesianAxisSlice';
-import { DataKey } from '../util/types';
-import { LineSettings } from './types/LineSettings';
-import { ScatterSettings } from './types/ScatterSettings';
-import { AreaSettings } from './types/AreaSettings';
-import { BarSettings } from './types/BarSettings';
-import { RadialBarSettings } from './types/RadialBarSettings';
-import { PieSettings } from './types/PieSettings';
-import { RadarSettings } from './types/RadarSettings';
+import type { ChartData } from './chartDataSlice';
+import type { AxisId } from './cartesianAxisSlice';
+import type { DataKey } from '../util/types';
+import type { LineSettings } from './types/LineSettings';
+import type { ScatterSettings } from './types/ScatterSettings';
+import type { AreaSettings } from './types/AreaSettings';
+import type { BarSettings } from './types/BarSettings';
+import type { RadialBarSettings } from './types/RadialBarSettings';
+import type { PieSettings } from './types/PieSettings';
+import type { RadarSettings } from './types/RadarSettings';
 
 /**
  * Unique ID of the graphical item.

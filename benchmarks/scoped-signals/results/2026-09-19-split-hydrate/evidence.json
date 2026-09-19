@@ -1,0 +1,901 @@
+{
+  "baseline": {
+    "gitCommit": "9291944a2091cdfc3f5a7a5223c8f7fdef50cc48",
+    "srcGitTree": "ca87aa61d247e20e02d597ca60cb26d9422249dd",
+    "archiveSHA256": "485187c8f94bf3a646b717cfe47ec436e8b7ebc36373b0124b9b5e6bb8e9fcf6"
+  },
+  "toolchain": {
+    "node": "24.19.0",
+    "pnpm": "11.15.1",
+    "vite": "8.1.5",
+    "esbuild": "0.28.1",
+    "vitest": "4.1.10",
+    "chromium": "149.0.7827.55",
+    "platform": "darwin/arm64",
+    "lockSHA256": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+    "install": "own workspace; offline, frozen lock, ignore-scripts; 0 downloaded"
+  },
+  "runner": {
+    "path": "benchmarks/scoped-signals/split-hydrate-size-audit.mjs",
+    "sha256": "fe5025f00a059ab224756000cfbbef6406246514d00ec1823fc21db0b4d799fb",
+    "command": "node benchmarks/scoped-signals/split-hydrate-size-audit.mjs /path/to/baseline-checkout . /path/to/output.json",
+    "fixture": "benchmarks/scoped-signals/split-hydrate-consumer.tsrx",
+    "fixtureSHA256": "6f877d5184b5b71e40b3ced368d429865a96d04c0b28cb8f742c5eccc923db78",
+    "gzipLevel": 9,
+    "brotliQuality": 11,
+    "target": "esnext",
+    "minifier": "esbuild",
+    "mode": "production",
+    "hmr": false,
+    "wholeClosureFormat": "esbuild browser IIFE; dynamic query included; no output imports",
+    "splitFormat": "Vite production HTML entry plus deferred ESM query chunk; chunks measured individually"
+  },
+  "bundles": [
+    {
+      "label": "baseline",
+      "explicitFallback": false,
+      "authoredSHA": "6f877d5184b5b71e40b3ced368d429865a96d04c0b28cb8f742c5eccc923db78",
+      "sourceHashes": {
+        "runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+        "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+        "compiler/compile.js": "4d3cded752dfbd16539bb996a02edd009e246fc98850f897c0711670c61ecb92",
+        "compiler/hydrate-boundaries.js": "9699d764766dd5a957484c1d67648101e334c0d3547636c28ae3c0638c1e3e36",
+        "compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+        "compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587"
+      },
+      "completeEsbuild": {
+        "raw": 280914,
+        "gzip": 90273,
+        "brotli": 77101,
+        "sha256": "01fccdaed60c0ce8631fc6b79194951dfa7c9a01ed3e34da0076741c75874a88",
+        "semantic": {
+          "initial": "first:0",
+          "updated": "first:1",
+          "identity": true,
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "outputImports": []
+      },
+      "viteChunks": [
+        {
+          "file": "assets/index-CbkXGtHl.js",
+          "isEntry": true,
+          "isDynamicEntry": false,
+          "imports": [],
+          "dynamicImports": ["assets/Consumer-B_j8Sf1I.js"],
+          "raw": 284288,
+          "gzip": 89744,
+          "brotli": 76878,
+          "sha256": "75b7283c0f53f9b9d81005273efed57389189e89fd926b7fb2f8875f1cd2af42"
+        },
+        {
+          "file": "assets/Consumer-B_j8Sf1I.js",
+          "isEntry": false,
+          "isDynamicEntry": true,
+          "imports": ["assets/index-CbkXGtHl.js"],
+          "dynamicImports": [],
+          "raw": 619,
+          "gzip": 413,
+          "brotli": 364,
+          "sha256": "925b535e3f29831142312687c8092a7e6e44f301587ba912508326b012f76b7a"
+        }
+      ]
+    },
+    {
+      "label": "baseline",
+      "explicitFallback": true,
+      "authoredSHA": "bb80c1f55ebb88914de9932c8db4b0f7d3dc87cbb34d822b9bcf1cb3df42325d",
+      "sourceHashes": {
+        "runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+        "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+        "compiler/compile.js": "4d3cded752dfbd16539bb996a02edd009e246fc98850f897c0711670c61ecb92",
+        "compiler/hydrate-boundaries.js": "9699d764766dd5a957484c1d67648101e334c0d3547636c28ae3c0638c1e3e36",
+        "compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+        "compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587"
+      },
+      "completeEsbuild": {
+        "raw": 280962,
+        "gzip": 90281,
+        "brotli": 77030,
+        "sha256": "65191a3e07d4ff0b03ee9749c2f83fb796e9ae9fa9bba8d97f19a1a58ee3838a",
+        "semantic": {
+          "initial": "first:0",
+          "updated": "first:1",
+          "identity": true,
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "outputImports": []
+      },
+      "viteChunks": [
+        {
+          "file": "assets/index-7xjfhHbG.js",
+          "isEntry": true,
+          "isDynamicEntry": false,
+          "imports": [],
+          "dynamicImports": ["assets/Consumer-DhmKTAle.js"],
+          "raw": 284336,
+          "gzip": 89754,
+          "brotli": 76850,
+          "sha256": "5b741b10e465ce8281e4db1d3c1c94ef96effcff2c6860eaaf15dc1c39aa9ab1"
+        },
+        {
+          "file": "assets/Consumer-DhmKTAle.js",
+          "isEntry": false,
+          "isDynamicEntry": true,
+          "imports": ["assets/index-7xjfhHbG.js"],
+          "dynamicImports": [],
+          "raw": 619,
+          "gzip": 413,
+          "brotli": 372,
+          "sha256": "cb27e6b914796dcfbebcecf40bd24e7201666066b7438012aeb3332896ad87e1"
+        }
+      ]
+    },
+    {
+      "label": "candidate",
+      "explicitFallback": false,
+      "authoredSHA": "6f877d5184b5b71e40b3ced368d429865a96d04c0b28cb8f742c5eccc923db78",
+      "sourceHashes": {
+        "runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+        "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+        "compiler/compile.js": "b11fbb09999f2c471cc5faaa87297dcdf2bca99b43203ff1e42fe2e34d9257ea",
+        "compiler/hydrate-boundaries.js": "72316ede0163f8391d3b2d18b9bfd1520e85bbd4318cb0692eee39ceb9125d5f",
+        "compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+        "compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587"
+      },
+      "completeEsbuild": {
+        "raw": 193026,
+        "gzip": 63235,
+        "brotli": 54564,
+        "sha256": "4e677901374d993542123b56c8ffa42049e3e4045a9ba00cc45e9dbe41ad077a",
+        "semantic": {
+          "initial": "first:0",
+          "updated": "first:1",
+          "identity": true,
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "outputImports": []
+      },
+      "viteChunks": [
+        {
+          "file": "assets/index-aEhjbNly.js",
+          "isEntry": true,
+          "isDynamicEntry": false,
+          "imports": [],
+          "dynamicImports": ["assets/Consumer-DPGuxGxU.js"],
+          "raw": 195496,
+          "gzip": 62770,
+          "brotli": 54279,
+          "sha256": "3b70fe62b912d1b4ac925869d3124bbbdb24fa4ba96d2bd97b42e37d6a180d37"
+        },
+        {
+          "file": "assets/Consumer-DPGuxGxU.js",
+          "isEntry": false,
+          "isDynamicEntry": true,
+          "imports": ["assets/index-aEhjbNly.js"],
+          "dynamicImports": [],
+          "raw": 619,
+          "gzip": 412,
+          "brotli": 366,
+          "sha256": "6bb1bc20a38d0e358b0b53929685bcb772d83d4d6f1e6c720be8c4b49525b9e3"
+        }
+      ]
+    },
+    {
+      "label": "candidate",
+      "explicitFallback": true,
+      "authoredSHA": "bb80c1f55ebb88914de9932c8db4b0f7d3dc87cbb34d822b9bcf1cb3df42325d",
+      "sourceHashes": {
+        "runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+        "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+        "compiler/compile.js": "b11fbb09999f2c471cc5faaa87297dcdf2bca99b43203ff1e42fe2e34d9257ea",
+        "compiler/hydrate-boundaries.js": "72316ede0163f8391d3b2d18b9bfd1520e85bbd4318cb0692eee39ceb9125d5f",
+        "compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+        "compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587"
+      },
+      "completeEsbuild": {
+        "raw": 280962,
+        "gzip": 90281,
+        "brotli": 77030,
+        "sha256": "65191a3e07d4ff0b03ee9749c2f83fb796e9ae9fa9bba8d97f19a1a58ee3838a",
+        "semantic": {
+          "initial": "first:0",
+          "updated": "first:1",
+          "identity": true,
+          "effects": ["mount", "cleanup"],
+          "cleaned": true
+        },
+        "outputImports": []
+      },
+      "viteChunks": [
+        {
+          "file": "assets/index-7xjfhHbG.js",
+          "isEntry": true,
+          "isDynamicEntry": false,
+          "imports": [],
+          "dynamicImports": ["assets/Consumer-DhmKTAle.js"],
+          "raw": 284336,
+          "gzip": 89754,
+          "brotli": 76850,
+          "sha256": "5b741b10e465ce8281e4db1d3c1c94ef96effcff2c6860eaaf15dc1c39aa9ab1"
+        },
+        {
+          "file": "assets/Consumer-DhmKTAle.js",
+          "isEntry": false,
+          "isDynamicEntry": true,
+          "imports": ["assets/index-7xjfhHbG.js"],
+          "dynamicImports": [],
+          "raw": 619,
+          "gzip": 413,
+          "brotli": 372,
+          "sha256": "cb27e6b914796dcfbebcecf40bd24e7201666066b7438012aeb3332896ad87e1"
+        }
+      ]
+    }
+  ],
+  "stockControls": {
+    "auditRunnerSHA256": "934dd4fa81f1900b84867b38c9b1511fd0f79c1a14f3db42bde77f277a5b54ea",
+    "fixtureSHA256": {
+      "root-static": "11de23976d8dd67593331ae6e18aee9a4bc65f5975c85bc0542d21de3d625f52",
+      "hooks-state": "6ea5c5984e655be2202a2ff68b916f60bff39f48038f44984e0c429afce27aff",
+      "context": "2114d2581836c6dea70b1b0f586c85685dd26f76d6fbf562cfc6d268da0ee36e",
+      "hydrate-root": "c1c3389646de012ea363e9db0c99a9a7b684ff2494f0ea30e58008dab1c3637f",
+      "suspense-transition": "e10714ae7abadbf13c532b6db72296d8eff932628cfe2b152469fb07eae439d3",
+      "deferred-hydration": "d989278c273166b281729a60a5863f27423cca9c72158d2527d32ccaaacee256"
+    },
+    "rows": [
+      {
+        "id": "root-static",
+        "baseline": {
+          "raw": 73618,
+          "gzip": 24574,
+          "brotli": 21990,
+          "sha256": "cd02fa80f356aaf660eac5ad3f76cef23eb28fd02da6d817844a1bfff994e394"
+        },
+        "candidate": {
+          "raw": 73618,
+          "gzip": 24574,
+          "brotli": 21990,
+          "sha256": "cd02fa80f356aaf660eac5ad3f76cef23eb28fd02da6d817844a1bfff994e394"
+        },
+        "exactOutputEqual": true,
+        "semantic": {
+          "text": "Octane",
+          "cleaned": true
+        }
+      },
+      {
+        "id": "hooks-state",
+        "baseline": {
+          "raw": 85594,
+          "gzip": 28579,
+          "brotli": 25503,
+          "sha256": "a78e20d0887d44ce186abca1535abaaf64df025db0aaf6ef51f01f664fd99cc7"
+        },
+        "candidate": {
+          "raw": 85594,
+          "gzip": 28579,
+          "brotli": 25503,
+          "sha256": "a78e20d0887d44ce186abca1535abaaf64df025db0aaf6ef51f01f664fd99cc7"
+        },
+        "exactOutputEqual": true,
+        "semantic": {
+          "before": "0",
+          "after": "1",
+          "clicks": 1,
+          "effects": 1,
+          "cleanups": 1,
+          "cleaned": true
+        }
+      },
+      {
+        "id": "context",
+        "baseline": {
+          "raw": 106690,
+          "gzip": 35477,
+          "brotli": 31443,
+          "sha256": "d38f3d85ee05d6593a8fa5c100fad2c494025ecbfd89672b0eb34322bb20be8b"
+        },
+        "candidate": {
+          "raw": 106690,
+          "gzip": 35477,
+          "brotli": 31443,
+          "sha256": "d38f3d85ee05d6593a8fa5c100fad2c494025ecbfd89672b0eb34322bb20be8b"
+        },
+        "exactOutputEqual": true,
+        "semantic": {
+          "before": "light",
+          "after": "dark",
+          "cleaned": true
+        }
+      },
+      {
+        "id": "hydrate-root",
+        "baseline": {
+          "raw": 143194,
+          "gzip": 46396,
+          "brotli": 40590,
+          "sha256": "714ce8a9187c2aea0a16abdb4394043f72dd6ac1af660b0411cc39801570a4f1"
+        },
+        "candidate": {
+          "raw": 143194,
+          "gzip": 46396,
+          "brotli": 40590,
+          "sha256": "714ce8a9187c2aea0a16abdb4394043f72dd6ac1af660b0411cc39801570a4f1"
+        },
+        "exactOutputEqual": true,
+        "semantic": {
+          "adopted": true,
+          "before": "server",
+          "after": "client",
+          "cleaned": true
+        }
+      },
+      {
+        "id": "suspense-transition",
+        "baseline": {
+          "raw": 157184,
+          "gzip": 50805,
+          "brotli": 44378,
+          "sha256": "473e4ba9a5cc85a826195fb96aea2b290456896e910689b4d4d7529055b69bd1"
+        },
+        "candidate": {
+          "raw": 157184,
+          "gzip": 50805,
+          "brotli": 44378,
+          "sha256": "473e4ba9a5cc85a826195fb96aea2b290456896e910689b4d4d7529055b69bd1"
+        },
+        "exactOutputEqual": true,
+        "semantic": {
+          "pending": "loading",
+          "resolved": "ready",
+          "transition": "next",
+          "cleaned": true
+        }
+      },
+      {
+        "id": "deferred-hydration",
+        "baseline": {
+          "raw": 202135,
+          "gzip": 64913,
+          "brotli": 56114,
+          "sha256": "a4decd80e63d1320a91bddb8a9e5809afa18b366c4ee25164ae2717e16a7b8e8"
+        },
+        "candidate": {
+          "raw": 202135,
+          "gzip": 64913,
+          "brotli": 56114,
+          "sha256": "a4decd80e63d1320a91bddb8a9e5809afa18b366c4ee25164ae2717e16a7b8e8"
+        },
+        "exactOutputEqual": true,
+        "semantic": {
+          "before": "dormant",
+          "after": "active",
+          "clicks": 1,
+          "cleaned": true
+        }
+      },
+      {
+        "id": "createRoot-export",
+        "baseline": {
+          "raw": 189578,
+          "gzip": 60742,
+          "brotli": 52588,
+          "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+        },
+        "candidate": {
+          "raw": 189578,
+          "gzip": 60742,
+          "brotli": 52588,
+          "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+        },
+        "exactOutputEqual": true
+      }
+    ]
+  },
+  "publicControls": {
+    "auditRunnerSHA256": "b829eb3f4ca01a6e9373e80b6b08579cec29dc872d1b0ed25c6ca8310631a554",
+    "rows": [
+      {
+        "id": "ordinary-client",
+        "baseline": {
+          "raw": 189578,
+          "gzip": 60742,
+          "brotli": 52588,
+          "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+        },
+        "candidate": {
+          "raw": 189578,
+          "gzip": 60742,
+          "brotli": 52588,
+          "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+        },
+        "exactOutputEqual": true,
+        "authored": "export { createRoot } from \"octane\";\n"
+      },
+      {
+        "id": "ordinary-server",
+        "baseline": {
+          "raw": 50662,
+          "gzip": 17837,
+          "brotli": 16071,
+          "sha256": "6e810c24ae503bdabb4c699e5cb39bbba036f4a191fcf2fb3168cd28ac549e34"
+        },
+        "candidate": {
+          "raw": 50662,
+          "gzip": 17837,
+          "brotli": 16071,
+          "sha256": "6e810c24ae503bdabb4c699e5cb39bbba036f4a191fcf2fb3168cd28ac549e34"
+        },
+        "exactOutputEqual": true,
+        "authored": "export { renderToString } from \"octane/server\";\n"
+      },
+      {
+        "id": "binding-scalar",
+        "baseline": {
+          "raw": 13823,
+          "gzip": 5251,
+          "brotli": 4748,
+          "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+        },
+        "candidate": {
+          "raw": 13823,
+          "gzip": 5251,
+          "brotli": 4748,
+          "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+        },
+        "exactOutputEqual": true,
+        "authored": "export { __adoptBindings } from \"octane/dom-bindings\";\n"
+      },
+      {
+        "id": "binding-structural",
+        "baseline": {
+          "raw": 31292,
+          "gzip": 10455,
+          "brotli": 9553,
+          "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+        },
+        "candidate": {
+          "raw": 31292,
+          "gzip": 10455,
+          "brotli": 9553,
+          "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+        },
+        "exactOutputEqual": true,
+        "authored": "export { __adoptBindingProgram, __mountBindingProgram } from \"octane/dom-binding-program\";\n"
+      },
+      {
+        "id": "binding-controls",
+        "baseline": {
+          "raw": 9046,
+          "gzip": 3525,
+          "brotli": 3190,
+          "sha256": "bec148cacddac1583607ce39ca584e9c6aaad70687a0651b59f9f7823c37a843"
+        },
+        "candidate": {
+          "raw": 9046,
+          "gzip": 3525,
+          "brotli": 3190,
+          "sha256": "bec148cacddac1583607ce39ca584e9c6aaad70687a0651b59f9f7823c37a843"
+        },
+        "exactOutputEqual": true,
+        "authored": "export { __createBindingControls } from \"octane/dom-binding-controls\";\n"
+      },
+      {
+        "id": "binding-whole-style",
+        "baseline": {
+          "raw": 6199,
+          "gzip": 2630,
+          "brotli": 2360,
+          "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+        },
+        "candidate": {
+          "raw": 6199,
+          "gzip": 2630,
+          "brotli": 2360,
+          "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+        },
+        "exactOutputEqual": true,
+        "authored": "export { __createBindingStyles } from \"octane/dom-binding-styles\";\n"
+      },
+      {
+        "id": "binding-scalar-controls-style",
+        "baseline": {
+          "raw": 27473,
+          "gzip": 9954,
+          "brotli": 9044,
+          "sha256": "80f8610c76cc1f8e22f5d9fe9be9f4f83d6bbb2d972a4de38fd0dd56b1555932"
+        },
+        "candidate": {
+          "raw": 27473,
+          "gzip": 9954,
+          "brotli": 9044,
+          "sha256": "80f8610c76cc1f8e22f5d9fe9be9f4f83d6bbb2d972a4de38fd0dd56b1555932"
+        },
+        "exactOutputEqual": true,
+        "authored": "export { __adoptBindings } from \"octane/dom-bindings\";\nexport { __createBindingControls } from \"octane/dom-binding-controls\";\nexport { __createBindingStyles } from \"octane/dom-binding-styles\";\n"
+      },
+      {
+        "id": "engine",
+        "baseline": {
+          "raw": 47423,
+          "gzip": 14480,
+          "brotli": 13123,
+          "sha256": "cc3549d21079c1eda52036e6f6749532a604ec402f21f73391e37f57eef07ca6"
+        },
+        "candidate": {
+          "raw": 47423,
+          "gzip": 14480,
+          "brotli": 13123,
+          "sha256": "cc3549d21079c1eda52036e6f6749532a604ec402f21f73391e37f57eef07ca6"
+        },
+        "exactOutputEqual": true,
+        "authored": "export { createScope, query } from \"octane/signals\";\n"
+      },
+      {
+        "id": "native-client",
+        "baseline": {
+          "raw": 50263,
+          "gzip": 15894,
+          "brotli": 14356,
+          "sha256": "325d1412e91f483fa8b686c922b83212af6731cde5f2df2b43be92e8cd81e065"
+        },
+        "candidate": {
+          "raw": 50263,
+          "gzip": 15894,
+          "brotli": 14356,
+          "sha256": "325d1412e91f483fa8b686c922b83212af6731cde5f2df2b43be92e8cd81e065"
+        },
+        "exactOutputEqual": true,
+        "authored": "export { useSignal$ } from \"octane/signals/client\";\n"
+      },
+      {
+        "id": "native-server",
+        "baseline": {
+          "raw": 50131,
+          "gzip": 15801,
+          "brotli": 14281,
+          "sha256": "ee81533ad689d1912ed30441a339a688cd85de4647e4527c2ea4ab6d48540cf8"
+        },
+        "candidate": {
+          "raw": 50131,
+          "gzip": 15801,
+          "brotli": 14281,
+          "sha256": "ee81533ad689d1912ed30441a339a688cd85de4647e4527c2ea4ab6d48540cf8"
+        },
+        "exactOutputEqual": true,
+        "authored": "export { useSignal$ } from \"octane/signals/server\";\n"
+      },
+      {
+        "id": "compiled-plain-signals",
+        "baseline": {
+          "raw": 70005,
+          "gzip": 20599,
+          "brotli": 18584,
+          "sha256": "2b2b74757bdd78e809320fdf146e8c325513e5cf58ab4dba67f3aa1eebefc14e"
+        },
+        "candidate": {
+          "raw": 70005,
+          "gzip": 20599,
+          "brotli": 18584,
+          "sha256": "2b2b74757bdd78e809320fdf146e8c325513e5cf58ab4dba67f3aa1eebefc14e"
+        },
+        "exactOutputEqual": true,
+        "authored": "import { signal$, derived$, query$, runWithSignalOwner, retireSignalOwnerIdentity } from 'octane/signals';\nconst count$ = signal$(1);\nconst double$ = derived$(() => count$.get() * 2);\nconst result$ = query$(() => count$.get(), async (value) => value * 3);\n// An unused declaration must not retain its general async implementation.\nconst unused$ = derived$(async () => count$.get());\nexport async function exercise() {\n  const owner = { scopeKey: 'compiled-plain-bundle' };\n  const read = (callback) => runWithSignalOwner(owner, callback);\n  try {\n    const initial = read(() => double$.get());\n    read(() => count$.set(2));\n    const updated = read(() => double$.get());\n    try { read(() => result$.get()); } catch (pending) {\n      if (typeof pending?.then !== 'function') throw pending;\n      await pending;\n    }\n    return { initial, updated, result: read(() => result$.get()) };\n  } finally { retireSignalOwnerIdentity(owner); }\n}\n"
+      },
+      {
+        "id": "streamed-signals-bootstrap",
+        "baseline": {
+          "raw": 75913,
+          "gzip": 23519,
+          "brotli": 21071,
+          "sha256": "6ef5ebb8d92dd6a5c370f3bbc4bfc21178adc13918cac3d491a540d2ca88536f"
+        },
+        "candidate": {
+          "raw": 75913,
+          "gzip": 23519,
+          "brotli": 21071,
+          "sha256": "6ef5ebb8d92dd6a5c370f3bbc4bfc21178adc13918cac3d491a540d2ca88536f"
+        },
+        "exactOutputEqual": true,
+        "authored": "export { bootstrapStreamedSignalHydration, installSignalDocumentLifecycle } from \"octane/hydration/streamed-signals\";\n"
+      },
+      {
+        "id": "streamed-signal-results-bootstrap",
+        "baseline": {
+          "raw": 69894,
+          "gzip": 21531,
+          "brotli": 19332,
+          "sha256": "f251b2cf7bc0202e32a90be70fafb141391dd4b06bf3e26a89a74bfb9c11fb15"
+        },
+        "candidate": {
+          "raw": 69894,
+          "gzip": 21531,
+          "brotli": 19332,
+          "sha256": "f251b2cf7bc0202e32a90be70fafb141391dd4b06bf3e26a89a74bfb9c11fb15"
+        },
+        "exactOutputEqual": true,
+        "authored": "export { bootstrapStreamedSignalResults, installSignalDocumentLifecycle } from \"octane/hydration/streamed-signals\";\n"
+      },
+      {
+        "id": "used-native-app",
+        "baseline": {
+          "raw": 248643,
+          "gzip": 78987,
+          "brotli": 68592,
+          "sha256": "1d4c7e7e8ae4edfec209cd1209742379a463b091b3893b49fbcb23f2655087a3"
+        },
+        "candidate": {
+          "raw": 248643,
+          "gzip": 78987,
+          "brotli": 68592,
+          "sha256": "1d4c7e7e8ae4edfec209cd1209742379a463b091b3893b49fbcb23f2655087a3"
+        },
+        "exactOutputEqual": true,
+        "authored": "import {createRoot,startTransition} from 'octane';\nimport {createScope} from 'octane/signals';\nimport {DirectStyles} from \"/private/tmp/octane-split-hydrate-public-fixtures-929/benchmarks/scoped-signals/dom-bindings.tsrx\";\nexport function mount(container) {const scope=createScope({scopeKey:'used-native-app'});const left=scope.signal$('left',1);const right=scope.signal$('right',2);const root=createRoot(container);root.render(DirectStyles,{left$:left,right$:right,record(){}});startTransition(()=>{scope.set(left,3);scope.set(right,4);});return()=>{root.unmount();scope.dispose();};}\n"
+      },
+      {
+        "id": "used-native-ssr",
+        "baseline": {
+          "raw": 102558,
+          "gzip": 33559,
+          "brotli": 30271,
+          "sha256": "1da7687f35e87fee1ffb28910de154261259774d86e4ca32030b9b0fd1d6a045"
+        },
+        "candidate": {
+          "raw": 102558,
+          "gzip": 33559,
+          "brotli": 30271,
+          "sha256": "1da7687f35e87fee1ffb28910de154261259774d86e4ca32030b9b0fd1d6a045"
+        },
+        "exactOutputEqual": true,
+        "authored": "import {renderToString} from 'octane/server';\nimport {createScope} from 'octane/signals';\nimport {DirectStyles} from \"/private/tmp/octane-split-hydrate-public-fixtures-929/benchmarks/scoped-signals/dom-bindings.tsrx\";\nexport function render() {const scope=createScope({scopeKey:'used-native-ssr'});try{return renderToString(DirectStyles,{left$:scope.signal$('left',1),right$:scope.signal$('right',2),record(){}});}finally{scope.dispose();}}\n"
+      }
+    ],
+    "limits": "export/module-loading and model-engine/SSR smoke controls; not a broad browser integration suite"
+  },
+  "nativeSpotChecks": {
+    "runnerSHA256": "8caa79e444d74d1c186a9234a2ae9b7d55ab97cf62286b080260ee587df117f4",
+    "authoredFixtureSHA256": "19b0b406ff8819774301012af25e8d449ed4a64c904f5882cd51168a3e4eb383",
+    "consoleCapture": "before navigation; warning/error plus pageerror",
+    "rows": [
+      {
+        "kind": "adopt",
+        "baselineSemanticPass": true,
+        "candidateSemanticPass": true,
+        "snapshotsEqual": true,
+        "snapshots": [
+          {
+            "text": "first:0authored::in-0:",
+            "hydrated": 0,
+            "effects": [],
+            "clicked": [],
+            "handled": [],
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "value": "server draft",
+            "focused": false,
+            "caret": [0, 0],
+            "children": 1,
+            "outer": false
+          },
+          {
+            "text": "latest:1authored::in-0:",
+            "hydrated": 1,
+            "effects": ["mount"],
+            "clicked": [":in-2:"],
+            "handled": [],
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "value": "native draft",
+            "focused": true,
+            "caret": [2, 7],
+            "children": 1,
+            "outer": false
+          },
+          {
+            "text": "",
+            "hydrated": 1,
+            "effects": ["mount", "cleanup"],
+            "clicked": [":in-2:"],
+            "handled": [],
+            "editorSame": false,
+            "buttonSame": false,
+            "inputSame": false,
+            "focused": false,
+            "caret": null,
+            "children": 0,
+            "outer": false
+          }
+        ],
+        "baselineSSR_SHA256": "072d3e28bbacd0b6692bd8d69bb2c11183f9b6f8deb7ea87690d0ff3f498cde6",
+        "candidateSSR_SHA256": "072d3e28bbacd0b6692bd8d69bb2c11183f9b6f8deb7ea87690d0ff3f498cde6",
+        "baselineErrors": [],
+        "candidateErrors": []
+      },
+      {
+        "kind": "pending",
+        "baselineSemanticPass": true,
+        "candidateSemanticPass": true,
+        "snapshotsEqual": true,
+        "snapshots": [
+          {
+            "text": "",
+            "hydrated": 0,
+            "effects": [],
+            "clicked": [],
+            "handled": [],
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "focused": false,
+            "caret": null,
+            "children": 9,
+            "outer": false
+          },
+          {
+            "text": "",
+            "hydrated": 0,
+            "effects": [],
+            "clicked": [],
+            "handled": [],
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "focused": false,
+            "caret": null,
+            "children": 0,
+            "outer": false
+          }
+        ],
+        "baselineSSR_SHA256": "072d3e28bbacd0b6692bd8d69bb2c11183f9b6f8deb7ea87690d0ff3f498cde6",
+        "candidateSSR_SHA256": "072d3e28bbacd0b6692bd8d69bb2c11183f9b6f8deb7ea87690d0ff3f498cde6",
+        "baselineErrors": [],
+        "candidateErrors": []
+      },
+      {
+        "kind": "fallback",
+        "baselineSemanticPass": true,
+        "candidateSemanticPass": true,
+        "snapshotsEqual": true,
+        "snapshots": [
+          {
+            "text": "authored pending",
+            "hydrated": 0,
+            "effects": [],
+            "clicked": [],
+            "handled": [],
+            "editorSame": true,
+            "buttonSame": true,
+            "inputSame": true,
+            "focused": false,
+            "caret": null,
+            "children": 3,
+            "outer": false
+          },
+          {
+            "text": "first:0",
+            "hydrated": 0,
+            "effects": ["mount"],
+            "clicked": [],
+            "handled": [],
+            "editorSame": false,
+            "buttonSame": false,
+            "inputSame": false,
+            "value": "server draft",
+            "focused": false,
+            "caret": [12, 12],
+            "children": 3,
+            "outer": false
+          }
+        ],
+        "baselineSSR_SHA256": "072d3e28bbacd0b6692bd8d69bb2c11183f9b6f8deb7ea87690d0ff3f498cde6",
+        "candidateSSR_SHA256": "072d3e28bbacd0b6692bd8d69bb2c11183f9b6f8deb7ea87690d0ff3f498cde6",
+        "baselineErrors": [],
+        "candidateErrors": []
+      },
+      {
+        "kind": "descriptor",
+        "baselineSemanticPass": true,
+        "candidateSemanticPass": true,
+        "snapshotsEqual": true,
+        "snapshots": [],
+        "baselineSSR_SHA256": "072d3e28bbacd0b6692bd8d69bb2c11183f9b6f8deb7ea87690d0ff3f498cde6",
+        "candidateSSR_SHA256": "072d3e28bbacd0b6692bd8d69bb2c11183f9b6f8deb7ea87690d0ff3f498cde6",
+        "baselineErrors": [],
+        "candidateErrors": []
+      }
+    ],
+    "sourceHashes": {
+      "baseline": {
+        "runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+        "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+        "compiler/compile.js": "4d3cded752dfbd16539bb996a02edd009e246fc98850f897c0711670c61ecb92",
+        "compiler/hydrate-boundaries.js": "9699d764766dd5a957484c1d67648101e334c0d3547636c28ae3c0638c1e3e36",
+        "compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+        "compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587"
+      },
+      "candidate": {
+        "runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123",
+        "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+        "compiler/compile.js": "b11fbb09999f2c471cc5faaa87297dcdf2bca99b43203ff1e42fe2e34d9257ea",
+        "compiler/hydrate-boundaries.js": "72316ede0163f8391d3b2d18b9bfd1520e85bbd4318cb0692eee39ceb9125d5f",
+        "compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+        "compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587"
+      }
+    },
+    "browserVersion": "149.0.7827.55"
+  },
+  "mutants": {
+    "restored": true,
+    "sourceSHA256": {
+      "packages/octane/src/compiler/compile.js": "b11fbb09999f2c471cc5faaa87297dcdf2bca99b43203ff1e42fe2e34d9257ea",
+      "packages/octane/src/compiler/hydrate-boundaries.js": "72316ede0163f8391d3b2d18b9bfd1520e85bbd4318cb0692eee39ceb9125d5f",
+      "packages/octane/src/runtime.ts": "5f1bea3fbc3be54af95063cf77aa008ca75de12ecdc73d2f837c5fee45c2c123"
+    },
+    "rows": [
+      {
+        "name": "public-warm-callee",
+        "exitCode": 1,
+        "command": [
+          "node",
+          "--test",
+          "--test-name-pattern=code-split template consumers",
+          "benchmarks/scoped-signals/split-hydrate-boundary.test.mjs"
+        ]
+      },
+      {
+        "name": "lost-extraction-admission",
+        "exitCode": 1,
+        "command": [
+          "node",
+          "--test",
+          "--test-name-pattern=code-split template consumers",
+          "benchmarks/scoped-signals/split-hydrate-boundary.test.mjs"
+        ]
+      },
+      {
+        "name": "authored-fallback-admitted",
+        "exitCode": 1,
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "packages/octane/tests/hydration/split-template-consumers.test.ts",
+          "--project=octane",
+          "--maxWorkers=1",
+          "--silent=passed-only",
+          "--testNamePattern=renders authored explicit"
+        ]
+      },
+      {
+        "name": "empty-pending-removed",
+        "exitCode": 1,
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "packages/octane/tests/hydration/split-template-consumers.test.ts",
+          "--project=octane",
+          "--maxWorkers=1",
+          "--silent=passed-only",
+          "--testNamePattern=keeps a local empty pending"
+        ]
+      }
+    ]
+  },
+  "limits": [
+    "No runtime source changes, CPU speed or zero compiler-cost claim.",
+    "Other landed standalone engine/SSR tradeoffs remain in the baseline.",
+    "The unchanged stock deferred fixture uses split=false; all seven stock outputs are exact controls.",
+    "Generic returned-value and descriptor graph deletion contributes to the measured savings; this is not a signals-only attribution.",
+    "No full-issue1118 regression recovery or combined/remote CI claim."
+  ]
+}

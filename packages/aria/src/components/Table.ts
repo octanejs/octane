@@ -615,7 +615,7 @@ export function ResizableTableContainer(props: ResizableTableContainerProps & { 
 		className: props.className || 'react-aria-ResizableTableContainer',
 		style: props.style,
 		onScroll: (props as any).onScroll,
-		children: createElement(ResizableTableContainerContext.Provider, {
+		children: createElement(ResizableTableContainerContext, {
 			value: ctx,
 			children: props.children,
 		}),
@@ -715,7 +715,7 @@ export function Table(props: TableProps): any {
 		subSlot(slot, 'options'),
 	);
 
-	let content = createElement(TableOptionsContext.Provider, {
+	let content = createElement(TableOptionsContext, {
 		value: ctx,
 		children: createElement(Collection, props as any),
 	});
@@ -2361,7 +2361,7 @@ export const Cell: (props: CellProps & { ref?: any }) => any = /*#__PURE__*/ cre
 			'data-level': row.level + 1,
 			'data-tree-column': cell.column!.key === state.treeColumn || undefined,
 			'data-disabled': isDisabled || undefined,
-			children: createElement(CollectionRendererContext.Provider, {
+			children: createElement(CollectionRendererContext, {
 				value: DefaultCollectionRenderer,
 				children: renderProps.children,
 			}),

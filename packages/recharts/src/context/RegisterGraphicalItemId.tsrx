@@ -17,9 +17,7 @@ const GraphicalItemIdContext = createContext<GraphicalItemId | undefined>(undefi
 export function RegisterGraphicalItemId(props: IdSetter) {
 	const { id, type, children } = props;
 	const resolvedId = useUniqueId('recharts-' + type, id);
-	return <GraphicalItemIdContext.Provider value={resolvedId}>{children(
-		resolvedId,
-	)}</GraphicalItemIdContext.Provider>;
+	return <GraphicalItemIdContext value={resolvedId}>{children(resolvedId)}</GraphicalItemIdContext>;
 }
 
 export function useGraphicalItemId() {

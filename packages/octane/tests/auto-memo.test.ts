@@ -104,7 +104,7 @@ function loadMappedComponentHydrationComponents() {
 		}
 
 		export function App(props) {
-			return <Theme.Provider value={props.theme}><Rows {...props} /></Theme.Provider>;
+			return <Theme value={props.theme}><Rows {...props} /></Theme>;
 		}
 	`;
 	const id = 'tsx-mapped-component-hydration.tsx';
@@ -149,9 +149,9 @@ function loadReturnedProviderComponentMapFixture() {
 					<button id="returned-provider-map-update" onClick={() => setTick(tick + 1)}>
 						{tick}
 					</button>
-					<Theme.Provider value={null}>
+					<Theme value={null}>
 						<Rows items={items} />
-					</Theme.Provider>
+					</Theme>
 				</section>
 			);
 		}
@@ -821,34 +821,34 @@ describe('compiler-owned component-region memoization', () => {
 			},
 		);
 		const Context = createContext('default');
-		const root = mount(Context.Provider, { value: 'initial', children: client.First });
+		const root = mount(Context, { value: 'initial', children: client.First });
 		const input = root.find('input') as HTMLInputElement;
 		const label = root.find('#shared-label');
 		expect(label.textContent).toBe('first');
 		input.value = 'typed';
 		input.focus();
 
-		root.update(Context.Provider, { value: 'updated', children: client.Second });
+		root.update(Context, { value: 'updated', children: client.Second });
 		expect(root.find('input')).toBe(input);
 		expect(input.value).toBe('typed');
 		expect(document.activeElement).toBe(input);
 		expect(root.find('#shared-label')).toBe(label);
 		expect(label.textContent).toBe('second');
 
-		root.update(Context.Provider, { value: 'again', children: client.Second });
+		root.update(Context, { value: 'again', children: client.Second });
 		expect(root.find('input')).toBe(input);
 		expect(input.value).toBe('typed');
 		expect(root.find('#shared-label')).toBe(label);
 		expect(label.textContent).toBe('second');
 		root.unmount();
 
-		const alternate = mount(Context.Provider, { value: 'initial', children: client.AutoFirst });
+		const alternate = mount(Context, { value: 'initial', children: client.AutoFirst });
 		const alternateInput = alternate.find('input') as HTMLInputElement;
 		const firstLabel = alternate.find('#shared-label');
 		expect(firstLabel.textContent).toBe('same');
 		alternateInput.value = 'edited';
 		alternateInput.focus();
-		alternate.update(Context.Provider, { value: 'updated', children: client.AutoSecond });
+		alternate.update(Context, { value: 'updated', children: client.AutoSecond });
 		expect(alternate.find('input')).toBe(alternateInput);
 		expect(alternateInput.value).toBe('edited');
 		expect(document.activeElement).toBe(alternateInput);
@@ -983,9 +983,9 @@ describe('compiler-owned component-region memoization', () => {
 				const Theme = props.context;
 				<main>
 					<button id="hookful-child-theme" onClick={() => setTheme('dark')}>{'theme'}</button>
-					<Theme.Provider value={theme}>
+					<Theme value={theme}>
 						<Parent label={props.label} context={Theme} onEffect={props.onEffect} />
-					</Theme.Provider>
+					</Theme>
 				</main>
 			}
 		`;
@@ -1420,9 +1420,9 @@ describe('compiler-owned component-region memoization', () => {
 
 			export function App(props) @{
 				const Context = props.context;
-				<Context.Provider value={props.theme}>
+				<Context value={props.theme}>
 					<Parent label={props.label} context={Context} />
-				</Context.Provider>
+				</Context>
 			}
 		`;
 		const id = 'hookful-child-hydration.tsrx';
@@ -3259,9 +3259,9 @@ describe('compiler-owned component-region memoization', () => {
 						<button id="provider-component-reorder" onClick={() => setItems(items.toReversed())}>
 							reorder
 						</button>
-						<Theme.Provider value={theme}>
+						<Theme value={theme}>
 							<Rows items={items} />
-						</Theme.Provider>
+						</Theme>
 					</section>
 				);
 			}
@@ -3351,9 +3351,9 @@ describe('compiler-owned component-region memoization', () => {
 						<button id="provider-component-plain-update" onClick={() => setTick(tick + 1)}>
 							{tick}
 						</button>
-						<Theme.Provider value={null}>
+						<Theme value={null}>
 							<Rows items={items} />
-						</Theme.Provider>
+						</Theme>
 					</section>
 				);
 			}
@@ -3633,9 +3633,9 @@ describe('compiler-owned component-region memoization', () => {
 						<button id="provider-component-default-update" onClick={() => setTick(tick + 1)}>
 							{tick}
 						</button>
-						<Theme.Provider value={null}>
+						<Theme value={null}>
 							<Rows items={items} />
-						</Theme.Provider>
+						</Theme>
 					</section>
 				);
 			}
@@ -3781,9 +3781,9 @@ describe('compiler-owned component-region memoization', () => {
 						<button id="provider-component-hydrated-update" onClick={() => setTick(tick + 1)}>
 							{tick}
 						</button>
-						<Theme.Provider value={theme}>
+						<Theme value={theme}>
 							<Rows items={items} />
-						</Theme.Provider>
+						</Theme>
 					</section>
 				);
 			}
@@ -3901,9 +3901,9 @@ describe('compiler-owned component-region memoization', () => {
 						<button id="returned-descriptor-reorder" onClick={() => setItems(items.toReversed())}>
 							reorder
 						</button>
-						<Theme.Provider value={theme}>
+						<Theme value={theme}>
 							<div id="returned-descriptor-rows">{rows}</div>
-						</Theme.Provider>
+						</Theme>
 					</section>
 				);
 			}
@@ -3990,9 +3990,9 @@ describe('compiler-owned component-region memoization', () => {
 				return (
 					<section>
 						<button id="returned-hydrated-tick" onClick={() => setTick(tick + 1)}>{tick}</button>
-						<Theme.Provider value={theme}>
+						<Theme value={theme}>
 							<div id="returned-hydrated-rows">{rows}</div>
-						</Theme.Provider>
+						</Theme>
 					</section>
 				);
 			}
@@ -4080,9 +4080,9 @@ describe('compiler-owned component-region memoization', () => {
 									setTick(tick + 1);
 								}}
 							>{tick}</button>
-							<Context.Provider value={null}>
+							<Context value={null}>
 								<div>{rows}</div>
-							</Context.Provider>
+							</Context>
 						</section>
 					);
 				}
@@ -4136,9 +4136,9 @@ describe('compiler-owned component-region memoization', () => {
 						<button id="returned-scoped-update" onClick={() => setTheme('updated')}>
 							update context
 						</button>
-						<Theme.Provider value={theme}>
+						<Theme value={theme}>
 							<div>{rows}</div>
-						</Theme.Provider>
+						</Theme>
 					</section>
 				);
 			}
@@ -4186,9 +4186,9 @@ describe('compiler-owned component-region memoization', () => {
 								setTick(tick + 1);
 							}}
 						>{tick}</button>
-						<Context.Provider value={null}>
+						<Context value={null}>
 							<div>{rows}</div>
-						</Context.Provider>
+						</Context>
 					</section>
 				);
 			}
@@ -4365,9 +4365,9 @@ describe('compiler-owned component-region memoization', () => {
 							setTick(tick + 1);
 						}}
 					>{tick as number}</button>
-					<Context.Provider value={null}>
+					<Context value={null}>
 						<div id="derived-accessor-rows">{rows}</div>
-					</Context.Provider>
+					</Context>
 				</section>
 			}
 		`;
@@ -4419,9 +4419,9 @@ describe('compiler-owned component-region memoization', () => {
 					<button id="derived-scoped-update" onClick={() => setTheme('updated')}>
 						{'update context'}
 					</button>
-					<Theme.Provider value={theme}>
+					<Theme value={theme}>
 						<div id="derived-scoped-rows">{rows}</div>
-					</Theme.Provider>
+					</Theme>
 				</section>
 			}
 		`;
@@ -5412,7 +5412,7 @@ describe('compiler-owned component-region memoization', () => {
 		const destructuringDefault = compile(
 			`import { fallback } from './live';
 			 function Rows(props) @{
-				<ul>@for (const &{ label = fallback } of props.items; key label) { <li>{label}</li> }</ul>
+				<ul>@for (const { label = fallback } of props.items; key label) { <li>{label}</li> }</ul>
 			 }
 			 function App(props) @{ <Rows items={props.items} /> }`,
 			'auto-memo-binding-default.tsrx',

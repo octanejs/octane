@@ -1,5 +1,4 @@
-import type { ElementDescriptor, OctaneNode } from 'octane';
-import type { Octane } from 'octane/jsx-runtime';
+import type { CSSProperties as PlainCSSProperties, ElementDescriptor, OctaneNode } from 'octane';
 
 // Octane renderable holes accept descriptors, primitives, arrays and nullish
 // values. Keep this deliberately broad: it is the Sonner-facing equivalent of
@@ -7,10 +6,7 @@ import type { Octane } from 'octane/jsx-runtime';
 // return contract.
 export type ToastContent = OctaneNode;
 export type ToastElement = ElementDescriptor<any>;
-export type CSSProperties = Exclude<
-	Octane.JSX.IntrinsicElements['div']['style'],
-	string | undefined
-> & {
+export type CSSProperties = PlainCSSProperties & {
 	[customProperty: `--${string}`]: string | number | undefined;
 };
 export type StateSetter<T> = (value: T | ((previous: T) => T)) => void;

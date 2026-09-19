@@ -1,11 +1,11 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { createSlice, current, PayloadAction, prepareAutoBatched } from '@reduxjs/toolkit';
+import { createSlice, current, type PayloadAction, prepareAutoBatched } from '@reduxjs/toolkit';
 import { castDraft, type Draft } from 'immer';
-import { TooltipTrigger } from '../chart/types';
+import type { TooltipTrigger } from '../chart/types';
 import type { NameType, Payload, ValueType } from '../component/DefaultTooltipContent.tsrx';
-import { CartesianViewBoxRequired, Coordinate, DataKey, PolarCoordinate } from '../util/types';
-import { AxisId } from './cartesianAxisSlice';
-import { GraphicalItemId } from './graphicalItemsSlice';
+import type { CartesianViewBoxRequired, Coordinate, DataKey, PolarCoordinate } from '../util/types';
+import type { AxisId } from './cartesianAxisSlice';
+import type { GraphicalItemId } from './graphicalItemsSlice';
 
 /**
  * One Tooltip can display multiple TooltipPayloadEntries at a time.

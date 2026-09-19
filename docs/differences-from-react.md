@@ -115,6 +115,21 @@ omitted. Mutating such an object in place is therefore not witnessed by a
 dependency array; state that should drive rendering belongs in state, context,
 or a store rather than a module singleton.
 
+Member reads inside a conditional branch, after a possible early exit, or
+protected by exception handling preserve that protection. For one-level reads,
+the inferred array inspects an own property descriptor: a data property tracks
+its value, while an accessor or inherited property tracks its receiver without
+invoking a getter. An absent property tracks `undefined`. Failed reflection
+probes track the receiver, leaving the
+authored callback responsible for the read and its exception handling. Thus a
+guarded `props.onChange(...)` still tracks a stable own callback when the props
+container changes, while method getters stay behind their authored guard.
+Null and undefined receivers use separate module-local markers, so a failed receiver
+read does not compare equal to a successful own-data read of null or undefined.
+These markers are created once per module, rather than once per probe.
+These guarded probes allocate a property descriptor; ordinary unguarded
+one-level method calls retain the allocation-free comparison below.
+
 A one-level method call tracks the value that can change between renders. The
 compiled array selects that value on each render, based on where the method
 lives:
@@ -479,6 +494,11 @@ The tuple also supports the same optional latest-value getter as `useState`.
 
 ## Optional Strong mode
 
+Strong modules also require inferred dependencies, compiler-owned memoization,
+keyed template lists in `.tsrx`, and branded HTML values. Standard keyed JSX
+mapping remains supported in `.tsx`. See the
+[Strong compiler checks and migration table](./strong-compiler-checks.md).
+
 Strong mode opts into the immutable render-snapshot contract above and adds
 compile-time checks for detectable violations. Opt into one module with a
 directive before its imports:
@@ -503,11 +523,11 @@ when rendering; call the getter in events, effects, or deferred work. Reading a
 reassigned module-scope `let` or `var` during render is also an error
 (`OCTANE_STRONG_RENDER_MODULE_STATE_READ`): move changing values into state or
 context, or pass an immutable snapshot as a prop. The checks follow provable
-synchronous calls through `useCallback`, `useEffectEvent`,
-and functions returned by analyzable `useMemo` factories. Calling a statically
+synchronous calls through local callbacks and `useEffectEvent`. Calling a statically
 known Effect Event during render or including it in an explicit hook dependency
-list is also a compile error. The hooks themselves remain supported, and other
-explicit dependency lists retain their existing meaning.
+list is also a compile error. Strong modules use normal const declarations for
+automatic memoization. Manual memo hooks and non-equivalent explicit dependencies
+are errors; equivalent arrays keep their behavior and produce a hint.
 
 The compiler also rejects render-time writes through a provable state snapshot
 (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`) and direct calls to known
@@ -559,10 +579,13 @@ its JSX, including `<button {onClick} />`. A named callback declared outside
 the sole deeper nested `@{…}` block containing its direct event use reports
 `OCTANE_STRONG_EVENT_HANDLER_LOCALITY`; a callback declared in the same scope
 as the JSX is valid. Shared, imported, and forwarded callbacks remain
-supported. The diagnostics use the authored source location in client, server,
-and editor compilation; they do not move declarations or change emitted code
-for valid modules. Setting `compiler: { strong: true }` applies these checks
-across application-owned modules; installed dependencies opt in separately.
+supported. Locality diagnostics use authored source locations and preserve
+declaration positions in client, server, and editor compilation. Strong also
+adds eligible hook-input caches in development and production, so opting in can
+change generated code. The [eligibility rules](./strong-compiler-checks.md)
+describe which declarations keep a stable identity. Setting
+`compiler: { strong: true }` applies these checks and caches across
+application-owned modules; installed dependencies opt in separately.
 
 Event handlers, genuinely deferred callbacks, effect cleanup, effects that
 synchronize an external system, and normal DOM or timer refs remain supported.
@@ -585,9 +608,9 @@ const theme = {
 
 function Page() {
   const content = (
-    <Theme.Provider value="inner">
+    <Theme value="inner">
       <span data-theme={theme.current}>{theme.current}</span>
-    </Theme.Provider>
+    </Theme>
   );
 
   return <main>{content}</main>; // data-theme="inner" and text "inner".
@@ -968,15 +991,26 @@ The compiler reports these as compile errors, each carrying its code:
 - `CSS_GLOBAL_PLACEMENT` — `:global(...)` in the middle of a selector sequence
   or nested inside a pseudo-class.
 
-## Context: callable provider object, no Consumer
+## Context: direct provider component, no Provider or Consumer
 
 `createContext` returns a context that is itself the provider component —
-React 19's `<MyContext value={…}>` form is the native shape, and
-`MyContext.Provider` is retained as an identity alias for React-18-shaped
-libraries. The render-prop `<MyContext.Consumer>` does not exist and will not
-be added: Octane's slot-keyed hooks make `use(MyContext)`/`useContext` legal
-behind any condition, which is the pattern Consumer existed to work around.
+React 19's `<MyContext value={…}>` form is the supported shape.
+`MyContext.Provider` does not exist; known legacy `.Provider` access reports
+the `OCTANE_CONTEXT_PROVIDER` compiler error. Replace
+`<MyContext.Provider value={value}>` with `<MyContext value={value}>`, and pass
+`MyContext` directly to `createElement`
+or `root.render`. The render-prop `<MyContext.Consumer>` does not exist and
+will not be added: Octane's slot-keyed hooks make `use(MyContext)`/`useContext`
+legal behind any condition, which is the pattern Consumer existed to work around.
 Read the context in the child (or an inline component) instead.
+
+Production DOM compilation can omit generic descriptor-child rendering for a
+private context when its complete usage is proven to be compiled template
+providers and canonical `use`/`useContext` reads. Exported or escaped contexts,
+aliases, reflection, and opaque children retain generic rendering. This changes
+bundle reachability while preserving context identity, hook state, hydration
+adoption, and uncontrolled edits across provider value updates. Development,
+HMR, profiling, server, and custom-renderer compilation keep the generic path.
 
 In development, accessing `.Consumer` logs a one-time migration diagnostic and
 still returns `undefined`, so feature probes (`MyContext.Consumer || fallback`)
@@ -1613,6 +1647,17 @@ exclusively resettable DOM range. The emitted accept block then calls
 Hook slot ids are numbered per module in source order, so inserting or reordering
 a hook call shifts every later hook's key in that file and remaps its state. That
 is a known limitation, not a supported edit.
+
+## Element-scoped View Transitions
+
+Octane adds `scope="element"` to `ViewTransition`. A persistent direct host owns
+its native capture, descendant names, and pseudo-element handles. Independent
+scopes can animate concurrently after capture, while a batch spanning scopes
+still publishes one DOM commit. Omitted scopes inherit their nearest declaration
+or use the document. This extension falls back to a normal commit when
+`Element.startViewTransition` is unavailable; it is not a React 19.3 API.
+See [View Transitions](view-transitions.md#element-scopes) for host constraints,
+scheduling, and browser support.
 
 ## Not implemented (by design)
 

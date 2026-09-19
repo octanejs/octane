@@ -1,5 +1,44 @@
 # @octanejs/cli
 
+## 0.0.11
+
+### Patch Changes
+
+- 5ead1ff: Add owner-bound signal declarations, async derivations and keyed streams, direct native signal bindings, and independent hydration infrastructure. Add request-local server-call context, bounded streamed RPC, and explicitly batched independent reads. Preserve operation identity and cancellation boundaries across navigation and uncertain acknowledgements.
+
+  Allow a later widget activation to retry a failed framework-loaded stylesheet
+  without discarding queued interactions or revealing the widget before CSS loads.
+
+  Support renderer-free global signal and streamed-state activation for hosts that
+  retain server-owned HTML. Adopt initial document seeds before behavior reads,
+  preserve early edits, bind native control properties without reconciliation, and
+  let envelope owners emit the early capture script before interactive markup
+  without duplicating it in rendered fragments.
+
+  Catalog the new core runtime diagnostics while preserving their error classes,
+  and verify the published streaming bootstrap subpath and inline script export.
+
+  Keep individual and batched server calls on the page's origin when an authored
+  base element points to another origin.
+
+  Keep reusable DOM, CSS, and component prop types scalar while allowing direct
+  signal bindings at native JSX sites, preserving existing binding consumers.
+  Use scalar public props for Zag's state-machine normalization results and
+  to-print's imperative iframe options.
+
+## 0.0.10
+
+### Patch Changes
+
+- 888e71d: Declare imported and lifecycle-owned Anime.js surfaces and recommend direct upstream imports for vanilla APIs in the package documentation and CLI binding catalog. Existing convenience exports remain supported.
+- 527358c: Complete the remaining Strong compiler checks for fetch-driven effects, effect chains, prop-derived initial state, explicit and null dependencies, manual memo hooks, JSX list mapping, index keys, suppression props, trusted HTML, and compatibility imports. Preserve equivalent dependency arrays as hints and report them without failing strict CLI analysis. Add compiler-owned declaration caching for Strong authoring, the `trustHTML`/`TrustedHTML` API, and nominal Strong JSX types while preserving compatibility modules.
+
+  Strong opt-in intentionally changes generated code for eligible hook-input declarations: their identities are cached in development and production until inferred inputs change. It also normalizes proven built-in hook aliases and infers dependencies for unshadowed `undefined` placeholders. This applies to both the directive and the global `strong: true` option. Ordinary callbacks and mutable values retain their authored evaluation and lifetime. The keyed `@for` migration applies to `.tsrx`; keyed JSX mapping remains supported in `.tsx`.
+
+  CLI JSON reports include the hint count even when it is zero, and MDX diagnostic types represent errors, warnings, and hints.
+
+  The eager prop-state check covers both `useState(value)` and `useReducer(reducer, value)`. A lazy state initializer or explicit third reducer initializer declares a deliberate initial capture. Subscription and timer callbacks keep their event-driven semantics and are excluded from effect-chain writes.
+
 ## 0.0.9
 
 ### Patch Changes

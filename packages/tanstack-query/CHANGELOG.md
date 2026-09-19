@@ -1,5 +1,21 @@
 # @octanejs/tanstack-query
 
+## 0.1.54
+
+### Patch Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+
+## 0.1.53
+
+### Patch Changes
+
+- 911ed1d: Update TanStack Query bindings and the core dependency to 5.102.8. Match the new prefetch options and query-key tags, infinite-query defaults, mutation-state inference, passive queries and error handling. Restore mixed-query tuple inference and precise boundary props. Remove the upstream-retired experimental render-prefetch promise API and validate the full pinned runtime and type suites.
+
+  Declare Wagmi’s Query core dependency so its mutation options share the QueryClient type used by the native Query binding.
+
+  Declare the SSR integration’s Query core dependency so its options accept the same QueryClient instance type as the native provider.
+
 ## 0.1.52
 
 ### Patch Changes

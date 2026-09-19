@@ -41,6 +41,7 @@ const LOADER_OPTION_KEYS = new Set([
 	'dev',
 	'profile',
 	'strong',
+	'knownAttributeSpreads',
 	'exclude',
 	'renderers',
 	'requireDirective',
@@ -54,6 +55,7 @@ const PLUGIN_OPTION_KEYS = new Set([
 	'runtime',
 	'transpile',
 	'cssModuleConstants',
+	'clientBuildMode',
 ]);
 const LAYER_SPECIALIZATION_KEYS = new Set(['runtime', 'renderers', 'universalRuntime']);
 
@@ -199,6 +201,16 @@ function normalizeOptions(value, plugin) {
 	}
 	if (plugin) normalizeRuntimeRequest(options.runtime);
 	if (
+		plugin &&
+		options.clientBuildMode !== undefined &&
+		options.clientBuildMode !== 'production' &&
+		options.clientBuildMode !== 'development'
+	) {
+		throw new TypeError(
+			'@octanejs/rspack-plugin: `clientBuildMode` must be "production" or "development".',
+		);
+	}
+	if (
 		options.environment !== undefined &&
 		options.environment !== 'client' &&
 		options.environment !== 'server'
@@ -255,6 +267,9 @@ function normalizeOptions(value, plugin) {
 		...(options.dev === undefined ? null : { dev: options.dev }),
 		...(options.profile === undefined ? null : { profile: options.profile }),
 		...(options.strong === undefined ? null : { strong: options.strong }),
+		...(options.knownAttributeSpreads === undefined
+			? null
+			: { knownAttributeSpreads: options.knownAttributeSpreads }),
 		...(options.exclude === undefined ? null : { exclude: [...options.exclude] }),
 		...(renderers === undefined ? null : { renderers }),
 		...(universalRuntime === undefined ? null : { universalRuntime }),
@@ -266,6 +281,9 @@ function normalizeOptions(value, plugin) {
 			? null
 			: { textTypes: Object.freeze({ tsconfig: options.textTypes.tsconfig }) }),
 		...(plugin && parallel !== undefined ? { parallel } : null),
+		...(plugin && options.clientBuildMode !== undefined
+			? { clientBuildMode: options.clientBuildMode }
+			: null),
 		...(plugin && options.transpile !== undefined ? { transpile: options.transpile } : null),
 		...(plugin && options.runtime !== undefined ? { runtime: options.runtime } : null),
 		...(plugin && options.cssModuleConstants !== undefined
@@ -307,6 +325,8 @@ export function getOctaneRspackBuildInfo(module) {
 			value.transformKind === 'slots' ||
 			value.transformKind === 'client-only-stub') &&
 		typeof value.serverRpc === 'boolean' &&
+		(value.resourceQuery === undefined || typeof value.resourceQuery === 'string') &&
+		(value.independentWidgets === undefined || Array.isArray(value.independentWidgets)) &&
 		(value.clientReference === undefined || nestedReferenceValid) &&
 		(value.universalRuntime === undefined || universalRuntimeValid)
 	) {

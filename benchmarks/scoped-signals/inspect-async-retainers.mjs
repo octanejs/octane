@@ -48,7 +48,7 @@ export function inspectAsyncRetainers(
 	const prototypes = { scope: new Set(), signal: new Set(), request: new Set() };
 	for (let node = 0; node < nodeCount; node++) {
 		if (nodeType(node) !== 'object') continue;
-		if (hasProperties(node, ['scopeKey', 'signal$', 'derived$', 'asyncSignal$', 'dispose']))
+		if (hasProperties(node, ['scopeKey', 'signal$', 'derived$', 'serialize', 'dispose']))
 			prototypes.scope.add(node);
 		if (hasProperties(node, ['get', 'latest', 'snapshot', 'subscribe', 'retry']))
 			prototypes.signal.add(node);

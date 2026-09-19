@@ -38,6 +38,12 @@ type ServerErrorArguments = {
 	58: [];
 	59: [unknown];
 	60: [];
+	65: [];
+	68: [];
+	69: [];
+	70: [];
+	71: [];
+	73: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -170,6 +176,30 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 					'A component suspended without a Suspense boundary during synchronous server rendering. Use prerender() or a streaming renderer to await it.',
 					args,
 				);
+			case 65:
+				return formatDevErrorMessage(
+					"Internal SSR invariant violated: ASYNC_SCOPE is not an extension of the active frame's async scope. Please file an Octane issue.",
+					args,
+				);
+			case 68:
+				return formatDevErrorMessage(
+					'A signal control cannot join values from different document owners.',
+					args,
+				);
+			case 69:
+				return formatDevErrorMessage(
+					'Independent Hydrate requires a build manifest in RenderOptions.',
+					args,
+				);
+			case 70:
+				return formatDevErrorMessage(
+					'Independent Hydrate activation chunk is missing from the build manifest.',
+					args,
+				);
+			case 71:
+				return formatDevErrorMessage('Unsupported Octane server signal binding ABI.', args);
+			case 73:
+				return formatDevErrorMessage('Octane DOM bindings require unique list keys.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

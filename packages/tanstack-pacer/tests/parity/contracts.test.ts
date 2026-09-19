@@ -15,9 +15,9 @@ describe('@octanejs/tanstack-pacer parity audit contracts', () => {
 	// @parity-case adapted:tanstack-pacer-upstream-ledger
 	it('authenticates all 16 entrypoints and the absent runtime suite', () => {
 		expect(manifest.provenance).toMatchObject({
-			version: '0.22.1',
-			commit: 'a894009100aeb373965d4121eb92a1af634af012',
-			verification: 'recorded-unverified',
+			version: '0.23.0',
+			commit: 'c75895520669b08dc8946b42e1a6d529ca977230',
+			verification: 'verified',
 		});
 		expect(() =>
 			execFileSync(

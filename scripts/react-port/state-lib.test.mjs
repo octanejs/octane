@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, readdir, stat } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, stat, symlink, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
@@ -7,6 +8,7 @@ import { createEvidenceMatrix } from './evidence-lib.mjs';
 import {
 	acquireBatchLock,
 	createBatchManifest,
+	captureWorktreeBaseline,
 	detectWorktreeCollisions,
 	invalidateChangedEvidence,
 	releaseBatchLock,
@@ -240,6 +242,47 @@ describe('batch state', () => {
 	});
 
 	for (const action of ['create-binding', 'extend-binding']) {
+		test(`captures a newly resolved ${action} path without accepting prior dirty files`, () => {
+			const previous = fixtureManifest();
+			previous.nodes['pkg:leaf'].state = 'blocked';
+			previous.baseline['packages/new/local.ts'] = 'original-local';
+			const next = fixtureManifest();
+			next.nodes['pkg:leaf'] = {
+				...next.nodes['pkg:leaf'],
+				state: 'ready',
+				action,
+				bindingDirectory: 'packages/new',
+				nodeFingerprint: 'resolved',
+			};
+			next.baseline = {
+				'packages/new': 'directory',
+				'packages/new/package.json': 'existing-package',
+				'packages/new/local.ts': 'changed-local',
+				'packages/neighbor/a.ts': 'unrelated',
+			};
+			const resumed = reconcileBatchManifest(previous, next);
+			assert.deepEqual(
+				detectWorktreeCollisions({
+					plannedPaths: ['packages/new', 'packages/new/package.json', 'packages/new/local.ts'],
+					baseline: resumed.baseline,
+					current: next.baseline,
+				}),
+				['packages/new/local.ts'],
+			);
+			assert.equal(resumed.baseline['packages/neighbor/a.ts'], undefined);
+			const later = structuredClone(next);
+			later.baseline['packages/new/later.ts'] = 'unreviewed';
+			const again = reconcileBatchManifest(resumed, later);
+			assert.deepEqual(
+				detectWorktreeCollisions({
+					plannedPaths: ['packages/new/later.ts'],
+					baseline: again.baseline,
+					current: later.baseline,
+				}),
+				['packages/new/later.ts'],
+			);
+		});
+
 		test(`does not accept changed paths during ordinary ${action} resume`, () => {
 			const previous = fixtureManifest();
 			const next = fixtureManifest();
@@ -302,4 +345,28 @@ describe('batch state', () => {
 		assert.ok((await readdir(directory)).some((file) => file.startsWith('.lock.stale.')));
 		await releaseBatchLock(replacement);
 	});
+});
+
+test('planned source baselines exclude installs and record symlinks without following them', async () => {
+	const root = await mkdtemp(path.join(tmpdir(), 'react-port-baseline-'));
+	execFileSync('git', ['init', '--quiet', root]);
+	await writeFile(path.join(root, '.gitignore'), 'node_modules/\n');
+	await mkdir(path.join(root, 'packages/fixture/src'), { recursive: true });
+	await mkdir(path.join(root, 'outside'), { recursive: true });
+	await writeFile(path.join(root, 'outside/foreign.ts'), 'foreign');
+	await writeFile(path.join(root, 'packages/fixture/src/index.ts'), 'export const value=1;');
+	await symlink('../../../outside', path.join(root, 'packages/fixture/src/link'));
+	await mkdir(path.join(root, 'packages/fixture/node_modules'));
+	await symlink('../../../outside', path.join(root, 'packages/fixture/node_modules/dependency'));
+	const baseline = captureWorktreeBaseline(root, ['packages/fixture']);
+	assert.equal(baseline['packages/fixture/src/link'], 'symlink:../../../outside');
+	assert.equal(baseline['packages/fixture/src/link/foreign.ts'], undefined);
+	assert.equal(baseline['packages/fixture/node_modules'], undefined);
+	assert.equal(baseline['packages/fixture/node_modules/dependency/foreign.ts'], undefined);
+	await writeFile(path.join(root, 'packages/fixture/src/index.ts'), 'export const value=2;');
+	const current = captureWorktreeBaseline(root, ['packages/fixture']);
+	assert.deepEqual(
+		detectWorktreeCollisions({ plannedPaths: Object.keys(baseline), baseline, current }),
+		['packages/fixture/src/index.ts'],
+	);
 });

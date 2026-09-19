@@ -112,13 +112,13 @@ function CurrentMailbox() {
 export function ReturnedProviderMailbox(props) {
 	return <>
 		<h2 id="provider-title">Mailbox context</h2>
-		<MailboxContext.Provider value={props.folder}>
+		<MailboxContext value={props.folder}>
 			@if (props.show) {
 				<CurrentMailbox />
 			} @else {
 				<span id="no-mailbox">No mailbox selected</span>
 			}
-		</MailboxContext.Provider>
+		</MailboxContext>
 	</>;
 }
 

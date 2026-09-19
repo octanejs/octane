@@ -1,9 +1,9 @@
 {
   "upstream": {
     "package": "@tanstack/react-pacer",
-    "version": "0.22.1"
+    "version": "0.23.0"
   },
-  "surface": "Surface-present for all 15 runtime/type entrypoints from `@tanstack/react-pacer@0.22.1`, plus the byte-identical `@tanstack/pacer@0.21.1` core re-export. Repo-authored adapted-octane and differential lanes cover a representative debounce/throttle/batching/teardown lifecycle; upstream has no runtime suite and insufficient type evidence, so provenance remains `recorded-unverified` with nearly every export still `surface-present-unverified`.",
+  "surface": "All 15 runtime/type entrypoints from @tanstack/react-pacer@0.23.0, with framework-neutral @tanstack/pacer@0.22.0 imported directly. Complete source/type structural crosswalk and strict public contracts accompany paired scheduler runtime scenarios, all ten scheduler stores and cleanup, nested providers, and server/hydration adoption. The three async callback helpers preserve Awaited results and possible undefined. Upstream publishes no runtime or dedicated type-assertion suite; independent probes retain that distinction.",
   "divergences": [
     "Upstream types spelled with `React.Dispatch<React.SetStateAction<T>>` use structurally identical local aliases (Octane state setters have the same shape)."
   ],
@@ -12,5 +12,5 @@
     "Created for the tanstack-com benchmark's octane flavor (Phase 2c); `useDebouncedValue` and `useAsyncDebouncer` are exercised by that app's application-builder and DeployDialog surfaces.",
     "Upstream `React`-prefixed type names (`ReactDebouncer`, `ReactThrottler`, ...) are kept verbatim so ports only change the import specifier."
   ],
-  "verified": "2026-08-03"
+  "verified": "2026-09-12"
 }

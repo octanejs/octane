@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createStore } from '@octanejs/zustand';
-import { subscribeWithSelector } from '@octanejs/zustand/middleware';
+import { persist, subscribeWithSelector } from '@octanejs/zustand/middleware';
 import { shallow } from '@octanejs/zustand/shallow';
 import { mount, nextPaint } from '../_helpers';
 import { useObj, ShallowObject } from '../_fixtures/shallow.tsrx';
@@ -44,6 +44,30 @@ describe('useShallow (object-slice selection)', () => {
 });
 
 describe('middleware (re-exported verbatim)', () => {
+	it('clearing persistence prevents a pending hydration from restoring cleared state', async () => {
+		const stored = Promise.withResolvers<{ state: { count: number }; version: number } | null>();
+		const removed: string[] = [];
+		const api = createStore(
+			persist(() => ({ count: 0 }), {
+				name: 'counter',
+				skipHydration: true,
+				storage: {
+					getItem: () => stored.promise,
+					setItem: () => {},
+					removeItem: (name) => {
+						removed.push(name);
+					},
+				},
+			}),
+		);
+		const hydration = api.persist.rehydrate();
+		api.persist.clearStorage();
+		stored.resolve({ state: { count: 42 }, version: 0 });
+		await hydration;
+		expect(removed).toEqual(['counter']);
+		expect(api.getState()).toEqual({ count: 0 });
+	});
+
 	it('combine() composes with create()/useStore()', async () => {
 		const r = mount(CombinedView);
 		expect(r.find('#c').textContent).toBe('0');

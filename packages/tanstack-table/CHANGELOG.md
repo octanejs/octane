@@ -1,5 +1,25 @@
 # @octanejs/tanstack-table
 
+## 0.1.53
+
+### Patch Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+- Updated dependencies [a6d7f49]
+  - @octanejs/tanstack-store@0.0.50
+
+## 0.1.52
+
+### Patch Changes
+
+- 911ed1d: Update the TanStack Table adapter and neutral core to 9.2.4. Publish controlled
+  state after commit, preserve zero/empty-string renderables, and provide the
+  legacy migration entrypoint with native hooks and typed helpers.
+
+  Render compiled template children safely in Subscribe while preserving function-as-child callbacks.
+- Updated dependencies [911ed1d]
+  - @octanejs/tanstack-store@0.0.49
+
 ## 0.1.51
 
 ### Patch Changes

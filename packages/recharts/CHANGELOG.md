@@ -1,5 +1,43 @@
 # @octanejs/recharts
 
+## 0.1.53
+
+### Patch Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+- Updated dependencies [a6d7f49]
+  - @octanejs/redux@0.1.51
+
+## 0.1.52
+
+### Patch Changes
+
+- 43192e1: Fix consumer production builds failing under Vite 8 + Rolldown with
+  `MISSING_EXPORT` errors.
+
+  Many internal modules imported type-only symbols (`export type` /
+  `export interface` declarations such as `ValueType`, `NameType`, `Payload`,
+  `SymbolType`) as runtime values. Rolldown now treats a missing runtime export as
+  a hard error, so any application bundling `@octanejs/recharts` failed at build
+  time.
+
+  All type-only imports are now declared with `import type` or inline `type`
+  modifiers, and the package enables `verbatimModuleSyntax` so the typecheck gates
+  regressions. No public API, props, or export map changed; the packed-consumer
+  canary in `check-package-packs` now covers the package.
+- @octanejs/redux@0.1.50
+
+## 0.1.51
+
+### Patch Changes
+
+- ede01de: Accept native signal handles in DOM styles, including individual CSS properties and whole style values. Direct template styles update without rerunning component setup, and preserve signal cleanup, Suspense, server rendering, and hydration. Export `SignalCSSProperties` for signal-aware style objects while keeping `CSSProperties` compatible with ordinary CSS consumers.
+
+  Keep binding CSS compatibility aliases pointed at plain `CSSProperties` when their layout helpers consume ordinary CSS values.
+
+  Expose the signal style regression benchmark through the MCP benchmark tool.
+- @octanejs/redux@0.1.50
+
 ## 0.1.50
 
 ### Patch Changes

@@ -1021,10 +1021,19 @@ function positiveAssertionProvenance(
 		const root = assertionRootIdentifier(node.expression);
 		const rootSymbol = root && checker.getSymbolAtLocation(root);
 		if (!rootSymbol || !trustedAssertionSymbols.has(rootSymbol)) return null;
+		const exactEquality =
+			ts.isPropertyAccessExpression(node.expression) &&
+			node.expression.name.text === 'toEqualTypeOf';
 		if (
-			node.typeArguments?.some((argument) =>
-				typeContainsUnsafe(checker.getTypeFromTypeNode(argument), checker),
-			)
+			node.typeArguments?.some((argument) => {
+				const type = checker.getTypeFromTypeNode(argument);
+				// Exact equality preserves nested opaque leaves in a pinned contract.
+				// Bare any/unknown and permissive structural matches are not proof.
+				// Public export inspection above separately rejects new type erasure.
+				return exactEquality
+					? Boolean(type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown))
+					: typeContainsUnsafe(type, checker);
+			})
 		) {
 			return null;
 		}
@@ -1428,7 +1437,7 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 			const semantics = analyzeTypeEvidence(
 				programFiles,
 				parsed,
-				concretePublicSpecifiers(packageDirectory, node.binding),
+				concretePublicSpecifiers(packageDirectory, node.binding, { excludePackageMetadata: true }),
 				trustedTypeAssertionModulePath,
 				loaded.config.reactPortEvidence?.publicMode === 'pinned'
 					? pinnedPublicEntries(packageDirectory, node)
@@ -1480,6 +1489,9 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 			parsed,
 			[expectedImport],
 			canonicalPath(path.join(workspaceRoot, 'scripts/react-port/type-assertions.d.ts')),
+			loaded.config.reactPortEvidence?.publicMode === 'pinned'
+				? pinnedPublicEntries(packageDirectory, { ...node, binding: expectedImport })
+				: undefined,
 		);
 		if (!analysis.hasPositiveAssertion || !analysis.hasNegativeControl) {
 			throw new Error(

@@ -1,7 +1,7 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { createSlice, PayloadAction, prepareAutoBatched } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction, prepareAutoBatched } from '@reduxjs/toolkit';
 import { castDraft, type Draft } from 'immer';
-import {
+import type {
 	AxisDomain,
 	AxisInterval,
 	AxisTick,
@@ -10,9 +10,9 @@ import {
 	ScaleType,
 	TickProp,
 } from '../util/types';
-import { TickFormatter } from '../cartesian/CartesianAxis.tsrx';
+import type { TickFormatter } from '../cartesian/CartesianAxis.tsrx';
 import type { AxisRange } from './selectors/axisSelectors';
-import { CustomScaleDefinition } from '../util/scale/CustomScaleDefinition';
+import type { CustomScaleDefinition } from '../util/scale/CustomScaleDefinition';
 
 /**
  * @inline

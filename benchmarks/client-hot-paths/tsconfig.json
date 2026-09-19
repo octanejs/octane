@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "paths": {
+      "octane": ["../../packages/octane/src/index.ts"],
+      "octane/*": ["../../packages/octane/src/*"]
+    }
+  },
+  "include": ["slots-fixture.tsrx"]
+}

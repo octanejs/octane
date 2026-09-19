@@ -9,13 +9,15 @@
  * @param {string} prefix
  * @param {ReadableStream<Uint8Array>} renderStream
  * @param {string} suffix
+ * @param {string} [afterShell] Owned bootstrap after the renderer's first complete shell chunk.
  * @returns {ReadableStream<Uint8Array>}
  */
-export function composeHtmlStream(prefix, renderStream, suffix) {
+export function composeHtmlStream(prefix, renderStream, suffix, afterShell = '') {
 	const encoder = new TextEncoder();
 	const reader = renderStream.getReader();
 	let phase = 0; // 0 prefix, 1 renderer, 2 suffix, 3 closed
 	let released = false;
+	let shellWritten = false;
 
 	function release() {
 		if (released) return;
@@ -37,8 +39,14 @@ export function composeHtmlStream(prefix, renderStream, suffix) {
 						}
 
 						if (phase === 1) {
+							if (shellWritten && afterShell !== '') {
+								controller.enqueue(encoder.encode(afterShell));
+								afterShell = '';
+								return;
+							}
 							const { done, value } = await reader.read();
 							if (!done) {
+								shellWritten = true;
 								controller.enqueue(value);
 								return;
 							}

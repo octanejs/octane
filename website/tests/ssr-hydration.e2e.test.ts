@@ -220,9 +220,10 @@ async function loadRoute(
 		if (m.type() === 'error') errors.push(m.text());
 	});
 	page.on('pageerror', (e) => errors.push('pageerror: ' + String(e)));
+	let navigationStatus: number | undefined;
 	try {
 		await options.beforeNavigation?.(page, errors);
-		await page.goto(base + path, { waitUntil: 'load' });
+		navigationStatus = (await page.goto(base + path, { waitUntil: 'load' }))?.status();
 		// The dev server can replace the document AFTER `load`: Vite reloads the
 		// page when a request resolves against a stale optimized-dependency hash,
 		// which is its normal recovery, not something the caller asked about. That
@@ -256,8 +257,26 @@ async function loadRoute(
 			}
 		}
 	} catch (error) {
+		// A readiness timeout alone cannot distinguish a missing route from an
+		// error document or stalled browser. Keep diagnostic collection bounded.
+		let diagnosticTimer: ReturnType<typeof setTimeout> | undefined;
+		const snapshot = await Promise.race([
+			page.evaluate(() => ({
+				readyState: document.readyState,
+				visibilityState: document.visibilityState,
+				mainChildPresent: document.querySelector('main > *') !== null,
+				main: document.querySelector('main')?.outerHTML.slice(0, 4000),
+				bodyText: document.body?.textContent?.slice(0, 2000),
+			})),
+			new Promise<null>((resolve) => {
+				diagnosticTimer = setTimeout(() => resolve(null), 250);
+			}),
+		])
+			.catch(() => null)
+			.finally(() => clearTimeout(diagnosticTimer));
+		const diagnostics = JSON.stringify({ url: page.url(), navigationStatus, errors, snapshot });
 		await page.close().catch(() => {});
-		throw error;
+		throw new Error(`Failed to load ${base + path}: ${diagnostics}`, { cause: error });
 	}
 }
 
@@ -1971,16 +1990,25 @@ describe(
 					},
 				});
 				try {
-					await page.locator('section.lynx').scrollIntoViewIfNeeded();
-					await page.waitForFunction(
-						() => {
-							const pending = (window as Window & { pendingLynxMetadata?: () => number })
-								.pendingLynxMetadata;
-							return pending !== undefined && pending() > 0;
-						},
-						null,
-						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-					);
+					// Hydration may still be in flight after `load`: when it finishes,
+					// the router's scroll restoration snaps the page back to top and
+					// undoes a scroll that landed too early, leaving the lazy boundary
+					// outside its observer margin forever. Keep the section in view
+					// until the boundary mounts and starts its held metadata fetch.
+					await expect
+						.poll(
+							async () => {
+								await page.locator('section.lynx').scrollIntoViewIfNeeded();
+								return page.evaluate(
+									() =>
+										(
+											window as Window & { pendingLynxMetadata?: () => number }
+										).pendingLynxMetadata?.() ?? 0,
+								);
+							},
+							{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+						)
+						.toBeGreaterThan(0);
 					navigating = true;
 					await page.click('a.nav-link[href="/benchmarks"]');
 					await page.waitForFunction(() => location.pathname === '/benchmarks', null, {

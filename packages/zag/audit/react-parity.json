@@ -11,7 +11,10 @@
     "integrity": "sha256:037f857d00462559b9790acc2214c818678eb9d61970d6c394dc26dcfcd1516d",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/zag/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91164c02c6f38c2386b86b5cabf2ee914c9cf0ea1fcefa1c8875da9cd5982c9e"
+      "lockfileSha256": "7ecbdfab4ba778c50295dc17e8d2d62af01b18e3ccd5585c6f02dc5eed5a3145"
     }
   },
   "lanes": [
@@ -87,7 +90,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "8092b77be0374936ce7ee2968aa74b92e7ddc629d8efd36e8daa148d79c87507"
+          "sha256": "ce5c2fc3c13e7f405456323a94fe67dcabeabf2fe8f48f5526d915d196cec501"
         },
         {
           "path": "packages/zag/tests/upstream-vitest.config.ts",

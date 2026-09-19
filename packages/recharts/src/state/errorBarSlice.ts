@@ -1,8 +1,8 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { ErrorBarDirection } from '../cartesian/ErrorBar.tsrx';
-import { DataKey } from '../util/types';
-import { GraphicalItemId } from './graphicalItemsSlice';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { ErrorBarDirection } from '../cartesian/ErrorBar.tsrx';
+import type { DataKey } from '../util/types';
+import type { GraphicalItemId } from './graphicalItemsSlice';
 
 /**
  * ErrorBars have lot more settings but all the others are scoped to the component itself.

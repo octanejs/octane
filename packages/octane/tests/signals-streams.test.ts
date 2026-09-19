@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createScope, query, ScopeDisposedError, type Resource, type Scope } from 'octane/signals';
+import {
+	createResource,
+	createScope,
+	query,
+	ScopeDisposedError,
+	type Resource,
+	type Scope,
+} from 'octane/signals';
 import {
 	capturePending$,
 	controlledStream,
@@ -35,7 +42,7 @@ describe('scoped stream resources', () => {
 				},
 				{ kind: 'stream' },
 			);
-			const resource$ = scope.asyncSignal$('resource', () => load(selected$.get()));
+			const resource$ = createResource(scope, 'resource', () => load(selected$.get()));
 			await stream.started;
 			if (operation === 'retry') resource$.retry();
 			else selected$.set('b');
@@ -59,7 +66,7 @@ describe('scoped stream resources', () => {
 			},
 			{ kind: 'stream' },
 		);
-		resource$ = scope.asyncSignal$('resource', () => load(undefined));
+		resource$ = createResource(scope, 'resource', () => load(undefined));
 		await first.started;
 		resource$.retry();
 		expect(signals.map((signal) => signal.aborted)).toEqual([true, false]);
@@ -77,7 +84,7 @@ describe('scoped stream resources', () => {
 		const scope = owner();
 		const stream = controlledStream<string>();
 		const load = query('messages', () => stream.iterable, { kind: 'stream' });
-		const messages$ = scope.asyncSignal$('messages', () => load(undefined));
+		const messages$ = createResource(scope, 'messages', () => load(undefined));
 		expect(messages$.snapshot()).toMatchObject({
 			status: 'pending',
 			connection: 'connecting',
@@ -125,7 +132,7 @@ describe('scoped stream resources', () => {
 			const scope = owner();
 			const stream = controlledStream<typeof value>();
 			const load = query('empty-yield', () => stream.iterable, { kind: 'stream' });
-			const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+			const resource$ = createResource(scope, 'resource', () => load(undefined));
 			const ready = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
 			stream.emit(value);
 			await ready;
@@ -148,7 +155,7 @@ describe('scoped stream resources', () => {
 		const scope = owner();
 		const stream = controlledStream<string>();
 		const load = query('empty-stream', () => stream.iterable, { kind: 'stream' });
-		const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(scope, 'resource', () => load(undefined));
 		const wakeup = capturePending$(() => resource$.get());
 		const failed = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'error');
 		stream.end();
@@ -171,7 +178,7 @@ describe('scoped stream resources', () => {
 			const scope = owner();
 			const stream = controlledStream<string>();
 			const load = query('stream-failure', () => stream.iterable, { kind: 'stream' });
-			const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+			const resource$ = createResource(scope, 'resource', () => load(undefined));
 			if (hasValue) {
 				const ready = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
 				stream.emit('retained');
@@ -211,7 +218,7 @@ describe('scoped stream resources', () => {
 				},
 				{ kind: 'stream' },
 			);
-			const resource$ = scope.asyncSignal$('resource', () =>
+			const resource$ = createResource(scope, 'resource', () =>
 				load(selected$.get() as keyof typeof streams),
 			);
 			const first = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
@@ -257,7 +264,7 @@ describe('scoped stream resources', () => {
 				},
 				{ kind: 'stream' },
 			);
-			const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+			const resource$ = createResource(scope, 'resource', () => load(undefined));
 			const first = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
 			attempts[0].emit('retained');
 			await first;
@@ -308,7 +315,7 @@ describe('scoped stream resources', () => {
 			},
 			{ kind: 'stream' },
 		);
-		const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(scope, 'resource', () => load(undefined));
 		const first = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
 		attempts[0].emit('retained');
 		await first;
@@ -335,10 +342,10 @@ describe('scoped stream resources', () => {
 			},
 			{ kind: 'stream' },
 		);
-		const first$ = scope.asyncSignal$('first', () =>
+		const first$ = createResource(scope, 'first', () =>
 			load({ id: firstId$.get() as keyof typeof streams }),
 		);
-		const second$ = scope.asyncSignal$('second', () =>
+		const second$ = createResource(scope, 'second', () =>
 			load({ id: secondId$.get() as keyof typeof streams }),
 		);
 		const ready = Promise.all(
@@ -380,7 +387,7 @@ describe('scoped stream resources', () => {
 			},
 			{ kind: 'stream' },
 		);
-		const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(scope, 'resource', () => load(undefined));
 		const observed: unknown[] = [];
 		const stop = resource$.subscribe(() => observed.push(resource$.snapshot()));
 		await stream.started;
@@ -411,7 +418,7 @@ describe('scoped stream resources', () => {
 				},
 				{ kind: 'stream' },
 			);
-			const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+			const resource$ = createResource(scope, 'resource', () => load(undefined));
 			const observed: unknown[] = [];
 			resource$.subscribe(() => observed.push(resource$.snapshot()));
 			const wakeup = capturePending$(() => resource$.get());
@@ -437,7 +444,7 @@ describe('scoped stream resources', () => {
 		const stream = controlledStream<string>();
 		const factory = deferred<AsyncIterable<string>>();
 		const load = query('late-stream-factory', () => factory.promise, { kind: 'stream' });
-		const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(scope, 'resource', () => load(undefined));
 		expect(resource$.snapshot().status).toBe('pending');
 		scope.dispose();
 		factory.resolve(stream.iterable);
@@ -464,7 +471,7 @@ describe('scoped stream resources', () => {
 				(id: string) => (id === 'a' ? first.iterable : second.iterable),
 				{ kind: 'stream' },
 			);
-			const resource$ = scope.asyncSignal$('resource', () => load(selected$.get()));
+			const resource$ = createResource(scope, 'resource', () => load(selected$.get()));
 			await first.started;
 			expect(() => selected$.set('b')).not.toThrow();
 			expect(first.cancellations).toBe(1);
@@ -501,7 +508,7 @@ describe('scoped stream resources', () => {
 				},
 				{ kind: 'stream' },
 			);
-			const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+			const resource$ = createResource(scope, 'resource', () => load(undefined));
 			await nextSnapshot$(resource$, (snapshot) => snapshot.status === 'error');
 			expect(resource$.snapshot()).toMatchObject({
 				status: 'error',
@@ -537,7 +544,7 @@ describe('scoped stream resources', () => {
 		const load = query('invalid-producer', () => create() as AsyncIterable<string>, {
 			kind: 'stream',
 		});
-		const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(scope, 'resource', () => load(undefined));
 		await nextSnapshot$(resource$, (snapshot) => snapshot.status === 'error');
 		expect(() => resource$.get()).toThrow(TypeError);
 		expect(resource$.snapshot()).toMatchObject({
@@ -579,7 +586,7 @@ describe('scoped stream resources', () => {
 				},
 			};
 			const load = query('throwing-result', () => iterable, { kind: 'stream' });
-			const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+			const resource$ = createResource(scope, 'resource', () => load(undefined));
 			await drainProducers();
 			expect(resource$.snapshot()).toMatchObject({
 				status: 'error',
@@ -601,7 +608,7 @@ describe('scoped stream resources', () => {
 			(id: string) => (id === 'a' ? first.iterable : second.iterable),
 			{ kind: 'stream' },
 		);
-		const resource$ = scope.asyncSignal$('resource', () => load(selected$.get()));
+		const resource$ = createResource(scope, 'resource', () => load(selected$.get()));
 		await second.started;
 		expect(selected$.get()).toBe('b');
 		expect(first.cancellations).toBe(1);
@@ -625,7 +632,7 @@ describe('scoped stream resources', () => {
 			(id: string) => (id === 'a' ? first.iterable : id === 'b' ? second.iterable : third.iterable),
 			{ kind: 'stream' },
 		);
-		const resource$ = scope.asyncSignal$('resource', () => load(selected$.get()));
+		const resource$ = createResource(scope, 'resource', () => load(selected$.get()));
 		await first.started;
 		selected$.set('b');
 		expect(selected$.get()).toBe('c');

@@ -2,7 +2,7 @@
 import type { CSSProperties } from './OctaneTypes';
 
 import { Global } from './Global';
-import { Size } from './types';
+import type { Size } from './types';
 import { LRUCache } from './LRUCache';
 
 export interface TextMeasurementConfig {

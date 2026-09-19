@@ -1,6 +1,6 @@
 import { createSelector } from 'reselect';
-import { SeriesPoint } from 'victory-vendor/d3-shape';
-import { NullableCoordinate } from '../../util/types';
+import type { SeriesPoint } from 'victory-vendor/d3-shape';
+import type { NullableCoordinate } from '../../util/types';
 import { computeArea } from '../../cartesian/Area.tsrx';
 import {
 	selectAxisWithScale,
@@ -8,12 +8,12 @@ import {
 	selectTicksOfGraphicalItem,
 	selectUnfilteredCartesianItems,
 } from './axisSelectors';
-import { RechartsRootState } from '../store';
-import { AxisId } from '../cartesianAxisSlice';
+import type { RechartsRootState } from '../store';
+import type { AxisId } from '../cartesianAxisSlice';
 import { selectChartLayout } from '../../context/chartLayoutContext';
 import { selectChartDataWithIndexesIfNotInPanoramaPosition3 } from './dataSelectors';
-import { getBandSizeOfAxis, isCategoricalAxis, StackId } from '../../util/ChartUtils';
-import { ChartData } from '../chartDataSlice';
+import { getBandSizeOfAxis, isCategoricalAxis, type StackId } from '../../util/ChartUtils';
+import type { ChartData } from '../chartDataSlice';
 import { getStackSeriesIdentifier } from '../../util/stacks/getStackSeriesIdentifier';
 import type {
 	StackDataPoint,
@@ -22,7 +22,7 @@ import type {
 	StackSeriesIdentifier,
 } from '../../util/stacks/stackTypes';
 import type { AreaSettings } from '../types/AreaSettings';
-import { GraphicalItemId } from '../graphicalItemsSlice';
+import type { GraphicalItemId } from '../graphicalItemsSlice';
 import { selectChartBaseValue } from './rootPropsSelectors';
 import {
 	selectXAxisIdFromGraphicalItemId,

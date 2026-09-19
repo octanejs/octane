@@ -15,16 +15,24 @@
 
 import { parseModule, builders as b } from '@tsrx/core';
 import { parseModule as parseFallbackModule } from '#octane/compiler-parser';
+import {
+	createLexicalAnalysis,
+	forEachRuntimeAstChild,
+	isIdentifierReference,
+} from './compile-universal.js';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
 import { NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
-import { METHOD_DEP_IMPORT, annotateHookCalls } from './hook-deps.js';
+import { METHOD_DEP_IMPORT, annotateHookCalls, analyzeStrongMemoCandidates } from './hook-deps.js';
 import { inlinePlainHookMemos } from './plain-hook-memo.js';
 import { assertStrongMode } from './strong-mode.js';
+import { unsupportedStrongAutomaticMemo } from './strong-auto-memo.js';
 import { assertNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
 import { nativeReadActivationIndex } from './native-read-codegen.js';
 import { findManualHookProviders, manualHookWrapperParameters } from './manual-hooks.js';
 import { findLeadingJsxImportSourcePragma } from './pragma.js';
 import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
+import { assertNoLegacyContextProviders } from './context-provider.js';
+import { signalDeclarationSourceEdits } from './signal-declarations.js';
 import {
 	hookMethodName,
 	hasHookMethods,
@@ -105,18 +113,19 @@ function octaneHookLocals(ast, nativeReads = false, explicitlyOwned = false) {
 	};
 }
 
-// Find only the disposable top-level root shape used by production entries:
-// `createRoot(target).render(ImportedComponent[, props]);`. Keeping the matcher
-// this narrow means the specialized root can never escape and receive a later
-// unknown render. The bundler adapter resolves and loads each returned import;
-// this pass never guesses what a request points at from the importer's path.
+// A disposable expression or nonescaping local const root can omit return-value
+// reconciliation only when every render calls an imported compiled void body.
+// The adapter resolves each export's actual ABI; lexical binding identity keeps
+// shadows, aliases, closure captures and unknown future renders on the generic path.
 function collectVoidRootCandidates(ast) {
 	const createRootLocals = new Set();
 	const componentImports = new Map();
 	for (const node of ast.body || []) {
 		if (node.type !== 'ImportDeclaration' || typeof node.source?.value !== 'string') continue;
+		if (node.importKind === 'type') continue;
 		const request = node.source.value;
 		for (const sp of node.specifiers || []) {
+			if (sp.importKind === 'type') continue;
 			if (request === 'octane' && sp.type === 'ImportSpecifier') {
 				const imported = sp.imported?.name ?? sp.imported?.value;
 				if (imported === 'createRoot' && sp.local?.name) createRootLocals.add(sp.local.name);
@@ -135,7 +144,104 @@ function collectVoidRootCandidates(ast) {
 	}
 	if (createRootLocals.size === 0 || componentImports.size === 0) return [];
 
+	const analysis = createLexicalAnalysis(ast);
+	const importedBinding = (node, imports) =>
+		node?.type === 'Identifier' &&
+		imports.has(node.name) &&
+		analysis.resolveBinding(analysis.nodeScopes.get(node), node.name)?.scope === analysis.rootScope;
 	const candidates = [];
+	const localRoots = new Map();
+	const actualFunctionScopes = new Set();
+	let opaqueLexicalAccess = false;
+	const walk = (node, parent, key) => {
+		if (node === null || typeof node !== 'object') return;
+		if (
+			node.type === 'FunctionDeclaration' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'ArrowFunctionExpression'
+		) {
+			const scope = analysis.nodeScopes.get(node.body)?.functionScope;
+			if (scope !== undefined) actualFunctionScopes.add(scope);
+		}
+		if (
+			node.type === 'WithStatement' ||
+			(node.type === 'Identifier' &&
+				node.name === 'eval' &&
+				isIdentifierReference(node, parent, key, analysis) &&
+				analysis.resolveBinding(analysis.nodeScopes.get(node), 'eval') === null)
+		)
+			opaqueLexicalAccess = true;
+		if (
+			node.type === 'VariableDeclarator' &&
+			parent?.type === 'VariableDeclaration' &&
+			parent.kind === 'const' &&
+			node.id?.type === 'Identifier' &&
+			node.init?.type === 'CallExpression' &&
+			node.init.optional !== true &&
+			importedBinding(node.init.callee, createRootLocals)
+		) {
+			const scope = analysis.resolveBinding(analysis.nodeScopes.get(node.id), node.id.name)?.scope;
+			// Namespaces and static blocks also own lexical function scopes, but
+			// neither establishes the nonescaping function-local root lifetime.
+			if (scope && actualFunctionScopes.has(scope.functionScope)) {
+				let names = localRoots.get(scope);
+				if (names === undefined) localRoots.set(scope, (names = new Map()));
+				names.set(node.id.name, {
+					valid: true,
+					components: [],
+					scope,
+					start: node.init.callee.start,
+					end: node.init.callee.end,
+				});
+			}
+		}
+		forEachRuntimeAstChild(node, (child, childKey) => walk(child, node, childKey));
+	};
+	walk(ast);
+	if (!opaqueLexicalAccess && localRoots.size > 0) {
+		const inspect = (node, parent, key, grandparent) => {
+			if (node === null || typeof node !== 'object') return;
+			if (node.type === 'Identifier' && isIdentifierReference(node, parent, key, analysis)) {
+				const scope = analysis.resolveBinding(analysis.nodeScopes.get(node), node.name)?.scope;
+				const root = localRoots.get(scope)?.get(node.name);
+				if (root !== undefined) {
+					const member = parent;
+					const call = grandparent;
+					const directMethod =
+						analysis.nodeScopes.get(node) === root.scope &&
+						member?.type === 'MemberExpression' &&
+						key === 'object' &&
+						member.computed !== true &&
+						member.optional !== true &&
+						member.property?.type === 'Identifier' &&
+						call?.type === 'CallExpression' &&
+						call.callee === member &&
+						call.optional !== true;
+					if (directMethod && member.property.name === 'unmount' && call.arguments.length === 0) {
+						// unmount never changes the root's component-return contract.
+					} else if (
+						directMethod &&
+						member.property.name === 'render' &&
+						call.arguments.length >= 1 &&
+						call.arguments.length <= 2 &&
+						!call.arguments.some((argument) => argument.type === 'SpreadElement') &&
+						importedBinding(call.arguments[0], componentImports)
+					) {
+						root.components.push(componentImports.get(call.arguments[0].name));
+					} else root.valid = false;
+				}
+			}
+			forEachRuntimeAstChild(node, (child, childKey) => inspect(child, node, childKey, parent));
+		};
+		inspect(ast);
+		for (const names of localRoots.values())
+			for (const root of names.values()) {
+				if (!root.valid || root.components.length === 0) continue;
+				for (const component of root.components)
+					candidates.push({ ...component, start: root.start, end: root.end });
+			}
+	}
+
 	for (const statement of ast.body || []) {
 		if (statement.type !== 'ExpressionStatement') continue;
 		const renderCall = statement.expression;
@@ -160,13 +266,13 @@ function collectVoidRootCandidates(ast) {
 			rootCall?.type !== 'CallExpression' ||
 			rootCall.optional === true ||
 			rootCall.callee?.type !== 'Identifier' ||
-			!createRootLocals.has(rootCall.callee.name)
+			!importedBinding(rootCall.callee, createRootLocals)
 		)
 			continue;
 		const component = renderCall.arguments[0];
 		if (component?.type !== 'Identifier') continue;
+		if (!importedBinding(component, componentImports)) continue;
 		const imported = componentImports.get(component.name);
-		if (imported === undefined) continue;
 		candidates.push({
 			...imported,
 			start: rootCall.callee.start,
@@ -280,8 +386,16 @@ export function findVoidComponentImports(source, id) {
 
 function collectVoidRootEdits(ast, st, isVoidComponentImport) {
 	if (typeof isVoidComponentImport !== 'function') return;
+	const groups = new Map();
 	for (const candidate of collectVoidRootCandidates(ast)) {
-		if (!isVoidComponentImport(candidate.request, candidate.imported)) continue;
+		let group = groups.get(candidate.start);
+		if (group === undefined) groups.set(candidate.start, (group = []));
+		group.push(candidate);
+	}
+	for (const group of groups.values()) {
+		if (!group.every((candidate) => isVoidComponentImport(candidate.request, candidate.imported)))
+			continue;
+		const candidate = group[0];
 		if (st.voidRootName === null) st.voidRootName = allocSlotName(st, '_$createVoidRoot');
 		st.edits.push({
 			pos: candidate.start,
@@ -1109,12 +1223,51 @@ function emitHookMethodChain(node, owner, st) {
 	return true;
 }
 
+function strongCallSeparator(node, st) {
+	// Parser expression ranges omit grouping parentheses. Append at the CALL
+	// delimiter so a new slot never becomes part of an authored comma expression.
+	const tail = st.source
+		.slice(node.arguments.at(-1)?.end ?? node.start, node.end - 1)
+		.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
+		.trimEnd();
+	return tail.endsWith(',') ? ' ' : ', ';
+}
+
+function emitInferredDependencies(dependencies, st) {
+	return dependencies
+		.map((dependency) =>
+			dependency.method
+				? `${requireParallelHelper(st, METHOD_DEP_IMPORT)}(${dependency.method.root.name}, ${JSON.stringify(dependency.method.name)}${dependency.method.guarded ? ', true' : ''})`
+				: st.source.slice(dependency.node.start, dependency.node.end),
+		)
+		.join(', ');
+}
+
+function emitStrongMemo(node, owner, st) {
+	if (node.type !== 'VariableDeclarator') return;
+	const memo = st.strongMemos?.get(node.start);
+	if (!memo) return;
+	const slot = allocHookSymbol(st, owner, node.id.name, memo.hook, node.init);
+	const helper = requireParallelHelper(
+		st,
+		st.nativeReads && memo.hook === 'useMemo' ? 'nativePuMemo' : memo.hook,
+	);
+	const dependencyText = emitInferredDependencies(memo.dependencies, st);
+	st.edits.push({
+		pos: node.init.start,
+		text: `${helper}(${memo.hook === 'useMemo' ? '() => ' : ''}(`,
+	});
+	st.edits.push({ pos: node.init.end, text: `), [${dependencyText}], ${slot})` });
+}
+
 function walk(node, owner, st) {
 	if (!node || typeof node !== 'object') return;
 	if (Array.isArray(node)) {
 		for (const n of node) walk(n, owner, st);
 		return;
 	}
+
+	emitStrongMemo(node, owner, st);
 
 	// A `const x = (…) => …` / `function …` gives the enclosing name used in the
 	// (debug-only) slot key. For a named declaration the id is on the node; for an
@@ -1195,17 +1348,17 @@ function walk(node, owner, st) {
 				// dependencies are the one synthesized form: the helper call's root is
 				// a bare identifier and its name a JSON string, so no arbitrary TS
 				// syntax needs reprinting there either.
-				const deps = inferred.dependencies
-					.map((dependency) =>
-						dependency.method
-							? `${requireParallelHelper(st, METHOD_DEP_IMPORT)}(${dependency.method.root.name}, ${JSON.stringify(dependency.method.name)})`
-							: st.source.slice(dependency.node.start, dependency.node.end),
-					)
-					.join(', ');
-				st.edits.push({
-					pos: node.arguments[node.arguments.length - 1].end,
-					text: `, [${deps}], ${sym}`,
-				});
+				const deps = emitInferredDependencies(inferred.dependencies, st);
+				if (inferred.replaceDependency) {
+					const argument = node.arguments[inferred.depsIndex];
+					st.edits.push({ pos: argument.start, end: argument.end, text: `[${deps}]` });
+					st.edits.push({ pos: node.end - 1, text: `${strongCallSeparator(node, st)}${sym}` });
+				} else {
+					st.edits.push({
+						pos: st.strong ? node.end - 1 : node.arguments[node.arguments.length - 1].end,
+						text: `${st.strong ? strongCallSeparator(node, st) : ', '}[${deps}], ${sym}`,
+					});
+				}
 			} else if (node.arguments.length === 0) {
 				// State/ref initializers may themselves be Symbols. Reserve their
 				// authored position even when empty; other hooks keep their ABI.
@@ -1217,8 +1370,8 @@ function walk(node, owner, st) {
 				// `useState(0)` → `useState(0, _h$N)` — insert AFTER the last arg's end so
 				// trailing commas / whitespace before `)` stay valid.
 				st.edits.push({
-					pos: node.arguments[node.arguments.length - 1].end,
-					text: ', ' + sym,
+					pos: st.strong ? node.end - 1 : node.arguments[node.arguments.length - 1].end,
+					text: (st.strong ? strongCallSeparator(node, st) : ', ') + sym,
 				});
 			}
 		}
@@ -1297,7 +1450,7 @@ function parseHookSource(source, id) {
  *   `inlineHookMemo: true` enables the production-client whole-AST memo path;
  *   the default remains surgical. `manualSlots: true` permits memo and observed
  *   getter rewrites without injecting or changing the authored slot policy.
- * @returns {{ code: string, map: any } | null}
+ * @returns {{ code: string, map: any, streamedSignals?: true, diagnostics?: any[] } | null}
  */
 export function slotHooks(source, id, options) {
 	const environment = options?.environment ?? 'client';
@@ -1313,16 +1466,36 @@ export function slotHooks(source, id, options) {
 	} catch {
 		return null; // let the normal pipeline surface the parse error
 	}
+	assertNoLegacyContextProviders(ast, source, id);
 	options = nativeReadOptions(ast, options);
-	assertStrongMode(ast, source, id, options);
+	const strongAnalysis = assertStrongMode(ast, source, id, { ...options, onlyImported: true });
+	const strongHints = strongAnalysis?.diagnostics.length
+		? { diagnostics: strongAnalysis.diagnostics }
+		: {};
 	assertNativeReadDiagnostics(ast, source, id, options);
+	const strongHookAnalysis = strongAnalysis?.strongHookAnalysis ?? null;
+	const strongPlan = strongHookAnalysis
+		? analyzeStrongMemoCandidates(ast, { ...options, onlyImported: true, strongHookAnalysis })
+		: null;
+	if (strongPlan?.candidates.size && options?.manualSlots)
+		throw unsupportedStrongAutomaticMemo(
+			ast.body[0],
+			id,
+			'Strong declaration caching cannot add cache slots to a manually slotted module.',
+		);
 	const importInfo = octaneHookLocals(
 		ast,
 		options?.nativeReads === true,
-		findLeadingJsxImportSourcePragma(source) === 'octane',
+		// The bundler claims both pragmas for Octane (see pragmaOwnedModules).
+		['octane', 'octane/strong'].includes(findLeadingJsxImportSourcePragma(source)),
 	);
+	if (strongHookAnalysis?.callNames.size)
+		importInfo.importsHook ||= [...strongHookAnalysis.callNames.values()].some((name) =>
+			HOOK_NAMES.has(name),
+		);
 	const manualProviders = options?.manualSlots ? findManualHookProviders(ast) : new Map();
 	const nativeReadActivation = options?.nativeReads === true && importsNativeRenderer(ast);
+	const signalLowering = signalDeclarationSourceEdits(ast, id, source);
 	const canSpecializeRoot =
 		!options?.manualSlots &&
 		!options?.hmr &&
@@ -1333,9 +1506,10 @@ export function slotHooks(source, id, options) {
 		!importInfo.importsHook &&
 		!canSpecializeRoot &&
 		!nativeReadActivation &&
+		!signalLowering.usesSignals &&
 		!manualProviders.size
 	) {
-		return null;
+		return strongAnalysis?.diagnostics.length ? { code: source, map: null, ...strongHints } : null;
 	}
 	// The parsed tree is never mutated: annotateHookCalls returns a COW-rebuilt
 	// module whose hook calls carry their `_octane*` props (start/end offsets are
@@ -1346,6 +1520,7 @@ export function slotHooks(source, id, options) {
 		const annotated = annotateHookCalls(ast, {
 			filename: id,
 			onlyImported: true,
+			...(strongHookAnalysis ? { strongHookAnalysis } : {}),
 			nativeReads: options?.nativeReads === true,
 			...(options?.nativeReads === true
 				? { hookRuntimeModules: ['octane/signals/client', 'octane/signals/server'] }
@@ -1357,6 +1532,9 @@ export function slotHooks(source, id, options) {
 	}
 	const getterCalls = importInfo.importsHook ? collectStateGetterCalls(ast) : new WeakSet();
 	if (
+		!strongAnalysis?.enabled &&
+		// The whole-AST memo path does not apply declaration identity edits.
+		!signalLowering.usesSignals &&
 		canPrint &&
 		options?.inlineHookMemo === true &&
 		environment === 'client' &&
@@ -1380,9 +1558,16 @@ export function slotHooks(source, id, options) {
 			getterCalls,
 			stateGetterHelpers: STATE_GETTER_HELPERS,
 		});
-		if (inlined !== null) return inlined;
+		if (inlined !== null) return { ...inlined, ...strongHints };
 	}
 	const st = {
+		strong: strongAnalysis?.enabled === true,
+		strongMemos: new Map(
+			[...(strongPlan?.candidates ?? [])].map(([node, hook]) => [
+				node.start,
+				{ hook, dependencies: strongPlan.candidateDependencies.get(node) },
+			]),
+		),
 		manualSlots: options?.manualSlots === true,
 		nativeReads: options?.nativeReads === true,
 		locals: importInfo.locals,
@@ -1398,7 +1583,7 @@ export function slotHooks(source, id, options) {
 		hash: hookSlotHash(id),
 		nextId: 0,
 		nextPuId: 0,
-		edits: [],
+		edits: [...signalLowering.edits],
 		decls: [],
 		parallelHelpers: new Map(),
 		provenContextBindings: collectProvenContextBindings(ast),
@@ -1418,7 +1603,8 @@ export function slotHooks(source, id, options) {
 	if (canSpecializeRoot) {
 		collectVoidRootEdits(ast, st, options.isVoidComponentImport);
 	}
-	if (st.edits.length === 0 && !nativeReadActivation) return null;
+	if (st.edits.length === 0 && !nativeReadActivation && !signalLowering.usesSignals)
+		return strongAnalysis?.diagnostics.length ? { code: source, map: null, ...strongHints } : null;
 	const activation = nativeReadActivation
 		? requireParallelHelper(st, 'enableNativeReadCollection')
 		: null;
@@ -1458,6 +1644,35 @@ export function slotHooks(source, id, options) {
 	const otherHelperImports = [...otherHelpers]
 		.map(([request, specifiers]) => `import { ${specifiers.join(', ')} } from '${request}';\n`)
 		.join('');
+	const signalHelperImports = new Map();
+	for (const helper of signalLowering.imports) {
+		let specifiers = signalHelperImports.get(helper.source);
+		if (specifiers === undefined) signalHelperImports.set(helper.source, (specifiers = []));
+		specifiers.push(`${helper.imported} as ${helper.local}`);
+	}
+	let signalActivation = '';
+	if (signalLowering.usesSignals) {
+		const request =
+			environment === 'server'
+				? 'octane/internal/server'
+				: nativeReadActivation
+					? 'octane/internal/client'
+					: 'octane/signals';
+		const imported =
+			environment === 'server'
+				? 'enableServerSignalBindings'
+				: nativeReadActivation
+					? 'enableSignalBindings'
+					: '__enableSignalDocument';
+		const local = allocSlotName(st, `_$${imported}`);
+		let specifiers = signalHelperImports.get(request);
+		if (specifiers === undefined) signalHelperImports.set(request, (specifiers = []));
+		specifiers.push(`${imported} as ${local}`);
+		signalActivation = `${local}(1);\n`;
+	}
+	const signalImports = [...signalHelperImports]
+		.map(([request, specifiers]) => `import { ${specifiers.join(', ')} } from '${request}';\n`)
+		.join('');
 	const profileImport =
 		st.profile && !st.manualSlots
 			? "import { __profileHook as _$__profileHook } from 'octane/profiling';\n"
@@ -1467,26 +1682,58 @@ export function slotHooks(source, id, options) {
 			? `const ${st.slotBaseName} = /* @__PURE__ */ ${st.hookSlotsName}(${st.nextId});\n`
 			: '';
 	const block =
-		helperImport + otherHelperImports + profileImport + slotBase + st.decls.join('\n') + '\n';
-	if (activation !== null) {
-		// Native plain modules can render a local function during evaluation.
-		// Its slots and invocation collector must already exist at that call.
+		helperImport +
+		otherHelperImports +
+		signalImports +
+		profileImport +
+		slotBase +
+		st.decls.join('\n') +
+		'\n' +
+		signalActivation;
+	if (activation !== null || signalLowering.usesSignals) {
+		// Plain modules may read global signals or render during evaluation.
+		// Their document capability and any render slots must already exist.
 		// No newline is inserted, retaining the surgical pass's line mapping.
 		const index = nativeReadActivationIndex(ast.body);
 		st.edits.push({
 			pos: ast.body[index]?.start ?? source.length,
-			text: `;${block.replace(/\n/g, ' ')}${activation}(1); `,
+			text: `;${block.replace(/\n/g, ' ')}${activation === null ? '' : `${activation}(1); `}`,
 		});
 	}
-	// Apply insertions right-to-left so earlier offsets stay valid.
+	// Assemble disjoint edits once instead of copying the growing module for
+	// every insertion. Descending, stable order retains the existing rule that
+	// later insertions at the same offset appear before earlier insertions.
 	st.edits.sort((a, b) => b.pos - a.pos);
-	let code = source;
+	const chunks = [];
+	let cursor = source.length;
+	let overlaps = false;
 	for (const edit of st.edits) {
-		code =
-			code.slice(0, edit.pos) +
-			edit.text +
-			code.slice(edit.end === undefined ? edit.pos : edit.end);
+		const end = edit.end ?? edit.pos;
+		if (end > cursor) {
+			overlaps = true;
+			break;
+		}
+		chunks.push(source.slice(end, cursor), edit.text);
+		cursor = edit.pos;
 	}
-	if (activation === null) code = code.endsWith('\n') ? code + block : code + '\n' + block;
-	return { code, map: null };
+	let code;
+	if (overlaps) {
+		// Overlapping replacements refer to the already edited text. Preserve
+		// that sequential behavior, including insertion/replacement ties.
+		code = source;
+		for (const edit of st.edits) {
+			code = code.slice(0, edit.pos) + edit.text + code.slice(edit.end ?? edit.pos);
+		}
+	} else {
+		chunks.push(source.slice(0, cursor));
+		code = chunks.reverse().join('');
+	}
+	if (activation === null && !signalLowering.usesSignals)
+		code = code.endsWith('\n') ? code + block : code + '\n' + block;
+	return {
+		code,
+		map: null,
+		...(signalLowering.usesSignals || nativeReadActivation ? { streamedSignals: true } : null),
+		...strongHints,
+	};
 }

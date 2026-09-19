@@ -14,56 +14,64 @@ import { clsx } from 'clsx';
 import { Layer } from '../container/Layer.tsrx';
 import {
 	CartesianLabelListContextProvider,
-	CartesianLabelListEntry,
-	ImplicitLabelListType,
+	type CartesianLabelListEntry,
+	type ImplicitLabelListType,
 	LabelListFromLabelProp,
 } from '../component/LabelList.tsrx';
-import { Curve, CurveType, Props as CurveProps } from '../shape/Curve.tsrx';
-import { ErrorBarDataItem, ErrorBarDataPointFormatter, ErrorBarDirection } from './ErrorBar.tsrx';
+import { Curve, type CurveType, type Props as CurveProps } from '../shape/Curve.tsrx';
+import type {
+	ErrorBarDataItem,
+	ErrorBarDataPointFormatter,
+	ErrorBarDirection,
+} from './ErrorBar.tsrx';
 import { getLinearRegression, interpolate, isNullish } from '../util/DataUtils';
 import { getCateCoordinateOfLine, getTooltipNameProp, getValueByDataKey } from '../util/ChartUtils';
 import {
-	ActiveShape,
+	type ActiveShape,
 	adaptEventsOfChild,
-	AnimationDuration,
-	EasingInput,
-	Coordinate,
-	DataConsumer,
-	DataKey,
-	DataProvider,
+	type AnimationDuration,
+	type EasingInput,
+	type Coordinate,
+	type DataConsumer,
+	type DataKey,
+	type DataProvider,
 	isNonEmptyArray,
-	LegendType,
-	NonEmptyArray,
-	NullableCoordinate,
-	PresentationAttributesAdaptChildEvent,
-	ShapeAnimationProps,
-	SymbolType,
-	TickItem,
-	TrapezoidViewBox,
-	CartesianLayout,
+	type LegendType,
+	type NonEmptyArray,
+	type NullableCoordinate,
+	type PresentationAttributesAdaptChildEvent,
+	type ShapeAnimationProps,
+	type SymbolType,
+	type TickItem,
+	type TrapezoidViewBox,
+	type CartesianLayout,
 } from '../util/types';
-import { Formatter, TooltipType } from '../component/DefaultTooltipContent.tsrx';
-import { ScatterShapeProps, ScatterSymbol } from '../util/ScatterUtils.tsrx';
-import { InnerSymbolsProp } from '../shape/Symbols.tsrx';
+import type { Formatter, TooltipType } from '../component/DefaultTooltipContent.tsrx';
+import { type ScatterShapeProps, ScatterSymbol } from '../util/ScatterUtils.tsrx';
+import type { InnerSymbolsProp } from '../shape/Symbols.tsrx';
 import type { LegendPayload } from '../component/DefaultLegendContent.tsrx';
 import {
 	useMouseClickItemDispatch,
 	useMouseEnterItemDispatch,
 	useMouseLeaveItemDispatch,
 } from '../context/tooltipContext';
-import {
+import type {
 	TooltipPayload,
 	TooltipPayloadConfiguration,
 	TooltipPayloadEntry,
 } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
 import { SetErrorBarContext } from '../context/ErrorBarContext.tsrx';
-import { AxisId } from '../state/cartesianAxisSlice';
+import type { AxisId } from '../state/cartesianAxisSlice';
 import { GraphicalItemClipPath, useNeedsClip } from './GraphicalItemClipPath.tsrx';
 import { selectScatterPoints } from '../state/selectors/scatterSelectors';
 import { useAppSelector } from '../state/hooks';
-import { RechartsRootState } from '../state/store';
-import { BaseAxisWithScale, implicitZAxis, ZAxisWithScale } from '../state/selectors/axisSelectors';
+import type { RechartsRootState } from '../state/store';
+import {
+	type BaseAxisWithScale,
+	implicitZAxis,
+	type ZAxisWithScale,
+} from '../state/selectors/axisSelectors';
 import { useIsPanorama } from '../context/PanoramaContext';
 import { selectActiveTooltipIndex } from '../state/selectors/tooltipSelectors';
 import { SetLegendPayload } from '../state/SetLegendPayload';
@@ -79,16 +87,16 @@ import {
 import { useCartesianChartLayout, useViewBox } from '../context/chartLayoutContext';
 import {
 	AnimatedItems,
-	AnimationInterpolateFn,
+	type AnimationInterpolateFn,
 	useAnimationCallbacks,
 } from '../animation/AnimatedItems.tsrx';
-import { AnimationMatchByProp, matchAppend } from '../animation/matchBy';
-import { WithIdRequired, WithoutId } from '../util/useUniqueId';
-import { GraphicalItemId } from '../state/graphicalItemsSlice';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
+import { type AnimationMatchByProp, matchAppend } from '../animation/matchBy';
+import type { WithIdRequired, WithoutId } from '../util/useUniqueId';
+import type { GraphicalItemId } from '../state/graphicalItemsSlice';
+import { type ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { propsAreEqual } from '../util/propsAreEqual';
-import { ChartData } from '../state/chartDataSlice';
+import type { ChartData } from '../state/chartDataSlice';
 import { CellsContext, useCellRegistry } from '../context/CellsContext';
 
 export interface ScatterPointNode {
@@ -997,9 +1005,9 @@ function ScatterImpl(props: WithIdRequired<Props>) {
 		return selectScatterPoints(state, xAxisId, yAxisId, zAxisId, props.id, cells, isPanorama);
 	});
 	if (needClip == null || points == null) {
-		return <CellsContext.Provider value={cellRegistry}>{props.children}</CellsContext.Provider>;
+		return <CellsContext value={cellRegistry}>{props.children}</CellsContext>;
 	}
-	return <CellsContext.Provider value={cellRegistry}>
+	return <CellsContext value={cellRegistry}>
 		<SetScatterTooltipEntrySettings
 			dataKey={props.dataKey}
 			points={points}
@@ -1029,7 +1037,7 @@ function ScatterImpl(props: WithIdRequired<Props>) {
 			points={points}
 			needClip={needClip}
 		/>
-	</CellsContext.Provider>;
+	</CellsContext>;
 }
 
 function ScatterFn<DataPointType = any, ValueAxisType = any>(

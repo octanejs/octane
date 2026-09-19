@@ -41,7 +41,9 @@
  * `.tsx` sources) can type-check JSX against octane's real contract.
  */
 import type * as React from 'react';
+import type * as CSS from 'csstype';
 import type { ElementDescriptor, FragmentInstance } from './index.js';
+import type { SignalHandle } from './signals/types.js';
 
 /**
  * Octane's element type — the analog of React's `ReactElement`, and what a
@@ -53,9 +55,20 @@ import type { ElementDescriptor, FragmentInstance } from './index.js';
  */
 export interface OctaneElement<P = any> extends ElementDescriptor<P> {}
 
-export interface CSSProperties extends React.CSSProperties {
+/** Inline styles use Octane's numeric length coercion for both property spellings. */
+export interface CSSProperties extends React.CSSProperties, CSS.PropertiesHyphen<string | number> {
 	cssFloat?: React.CSSProperties['float'];
+	/** Element-scoped View Transition isolation, including authored `!important` values. */
+	viewTransitionScope?: 'none' | 'all' | (string & {});
 }
+
+/** Native DOM style values; plain CSSProperties remains usable by CSS-consuming libraries. */
+export type SignalCSSProperties = {
+	[K in keyof CSSProperties]: CSSProperties[K] | SignalHandle<CSSProperties[K] | null>;
+} & {
+	[customProperty: `--${string}`]:
+		string | number | SignalHandle<string | number | null | undefined> | undefined;
+};
 
 export type ClassValue =
 	| string
@@ -132,6 +145,19 @@ type ExistingButtonAttribute<
 	Fallback,
 > = K extends keyof React.ButtonHTMLAttributes<T> ? React.ButtonHTMLAttributes<T>[K] : Fallback;
 
+/** Uncontrolled initialization and framework instructions are not live bindings. */
+type UnboundProps =
+	| 'defaultValue'
+	| 'defaultChecked'
+	| 'dangerouslySetInnerHTML'
+	| 'suppressContentEditableWarning'
+	| 'suppressHydrationWarning'
+	| 'suppressNativeChangeWarning'
+	| '__octaneNativeChangeDiagnostic'
+	| 'ref'
+	| 'key'
+	| 'children';
+
 /** Octane's attribute transform over one React attribute interface. */
 type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | 'children'> &
 	NativeEventHandlers<P, T & EventTarget> & {
@@ -142,6 +168,28 @@ type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | '
 		style?: string | CSSProperties;
 		children?: unknown;
 	};
+
+type BoundStyle<S> = S | SignalCSSProperties | null | SignalHandle<S | SignalCSSProperties | null>;
+
+/** Provider-owned compiler attributes. Augment without widening component props or signal types. */
+export interface NativeAttributeExtensions {}
+
+/**
+ * Only a host JSX site installs direct bindings. Keep reusable attribute and
+ * component-prop types scalar: their consumers may read values imperatively.
+ * A component can explicitly opt in with SignalHandle or this JSX namespace.
+ */
+type BoundIntrinsicProps<P> = {
+	[K in keyof P]: K extends UnboundProps | ReactSyntheticProps
+		? P[K]
+		: K extends 'style'
+			? BoundStyle<P[K]>
+			: P[K] | SignalHandle<P[K]>;
+} & NativeAttributeExtensions;
+
+type BoundIntrinsicElements = {
+	[K in keyof Octane.JSX.IntrinsicElements]: BoundIntrinsicProps<Octane.JSX.IntrinsicElements[K]>;
+};
 
 declare namespace Octane {
 	type Key = string | number | bigint;
@@ -599,7 +647,15 @@ declare namespace Octane {
 	}
 }
 
-export import JSX = Octane.JSX;
+/** Automatic JSX runtime types include the host's direct signal bindings. */
+export namespace JSX {
+	type ElementType = Octane.JSX.ElementType;
+	interface Element extends Octane.JSX.Element {}
+	interface ElementChildrenAttribute extends Octane.JSX.ElementChildrenAttribute {}
+	interface IntrinsicAttributes extends Octane.JSX.IntrinsicAttributes {}
+	interface IntrinsicClassAttributes<T> extends Octane.JSX.IntrinsicClassAttributes<T> {}
+	interface IntrinsicElements extends BoundIntrinsicElements {}
+}
 export { Octane };
 
 // The automatic-runtime entry points, for type resolution only — octane's

@@ -1,5 +1,19 @@
 # @octanejs/tanstack-router
 
+## 0.1.55
+
+### Patch Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+
+## 0.1.54
+
+### Patch Changes
+
+- 1cd6c4c: Stop emitting `modulepreload` link tags for the whole boot chunk graph in SSR head output.
+
+  The manifest still carries `routes[*].preloads`, so client-side navigation preloading is unchanged; what is gone is the per-request document head spending nine `<link rel="modulepreload">` fetches on chunks the entry script already imports. On the Octane website (simulated-throttling Lighthouse, median of 3 cold runs) removing them moved LCP −9.8% and FCP −28%.
+
 ## 0.1.53
 
 ### Patch Changes

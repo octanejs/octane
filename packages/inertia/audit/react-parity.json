@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91164c02c6f38c2386b86b5cabf2ee914c9cf0ea1fcefa1c8875da9cd5982c9e"
+      "lockfileSha256": "7ecbdfab4ba778c50295dc17e8d2d62af01b18e3ccd5585c6f02dc5eed5a3145"
     }
   },
   "lanes": [
@@ -67,7 +67,7 @@
         {
           "path": "packages/inertia/tests/_fixtures/page-provider.tsrx",
           "role": "support",
-          "sha256": "29f535ea46ee9bbdf505ecb9d712ed2181bf4f4eac651ad5ccbbd6d60f972c7f"
+          "sha256": "fca567e065736fe44b569756f5fcd64839ddd559e8774f896ab31773f523ed99"
         }
       ]
     },
@@ -95,12 +95,12 @@
         {
           "path": "packages/inertia/tests/_fixtures/use-page-diff.tsrx",
           "role": "support",
-          "sha256": "de7b09a8b39559d008db1ce44697754a4ab9c2ba40a6597ec0e09fc524cf5327"
+          "sha256": "da57c2aeb321365cb3f4f3c78e357b9b941ff35fc733608abdd9121d58552a98"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
         },
         {
           "path": "packages/inertia/tests/differential/_setup.ts",

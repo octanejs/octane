@@ -14,15 +14,8 @@
 import { useRef, useMemo, useEffect } from 'octane';
 import { hydrate } from '@tanstack/query-core';
 import { resolveClient } from './context.ts';
-import type { OctaneNode } from 'octane';
-import type { DehydratedState, HydrateOptions, QueryClient } from '@tanstack/query-core';
-
-type HydrationBoundaryProps = {
-	state?: unknown;
-	options?: HydrateOptions;
-	queryClient?: QueryClient;
-	children?: OctaneNode;
-};
+import type { DehydratedState } from '@tanstack/query-core';
+import type { HydrationBoundaryProps } from './types';
 
 export function HydrationBoundary(props: HydrationBoundaryProps) @{
 	const client = resolveClient(props.queryClient);

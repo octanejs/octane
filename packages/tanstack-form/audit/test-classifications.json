@@ -54,7 +54,7 @@
     {
       "path": "packages/tanstack-form/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Runs one exact shared interaction fixture against @tanstack/react-form@1.33.2."
+      "oracle": "Runs one exact shared interaction fixture against @tanstack/react-form@1.33.5."
     },
     {
       "path": "packages/tanstack-form/tests/ssr/server.test.ts",

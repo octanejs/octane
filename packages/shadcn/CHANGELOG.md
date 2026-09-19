@@ -1,5 +1,28 @@
 # @octanejs/shadcn
 
+## 0.0.42
+
+### Patch Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+- Updated dependencies [a6d7f49]
+  - @octanejs/aria@0.0.49
+  - @octanejs/base-ui@0.1.54
+  - @octanejs/lucide@0.1.48
+  - @octanejs/radix@0.1.54
+  - @octanejs/sonner@0.1.49
+
+## 0.0.41
+
+### Patch Changes
+
+- Updated dependencies [ede01de]
+  - @octanejs/sonner@0.1.48
+  - @octanejs/aria@0.0.48
+  - @octanejs/base-ui@0.1.53
+  - @octanejs/lucide@0.1.47
+  - @octanejs/radix@0.1.53
+
 ## 0.0.40
 
 ### Patch Changes

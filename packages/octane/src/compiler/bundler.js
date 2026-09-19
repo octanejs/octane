@@ -14,6 +14,7 @@ import * as nodeFs from 'node:fs';
 import * as nodeModule from 'node:module';
 import * as nodePath from 'node:path';
 import { parseModule } from '@tsrx/core';
+export { DOM_BINDING_COMPILER_ABI_VERSION } from './dom-bindings.js';
 import {
 	compile,
 	compileForBundler,
@@ -22,7 +23,9 @@ import {
 	isVoidJsxCodeBlockFunction,
 } from './compile.js';
 import { validateRendererModuleSource } from './compile-universal.js';
+import { collectReassignedBindings } from './hook-deps.js';
 import { HYDRATE_QUERY_PARAM, hydrateBoundaryPathFromId } from './hydrate-boundaries.js';
+import { parseDomBindingRequest, formatDomBindingRequest } from './dom-binding-request.js';
 import {
 	DOM_RENDERER_MODULE,
 	normalizeRendererConfig,
@@ -54,6 +57,7 @@ export {
 	CLIENT_REFERENCE_MANIFEST_VERSION,
 	createClientReferenceManifest,
 } from './client-only-server.js';
+export const INDEPENDENT_HYDRATION_MANIFEST_FILENAME = 'octane-independent-hydration.json';
 export {
 	DOM_RENDERER_ID,
 	DOM_RENDERER_MODULE,
@@ -251,6 +255,10 @@ export function findVoidComponentExports(source, id) {
 			return [];
 		}
 	}
+	// A live function export can change its return ABI through an authored write
+	// or direct eval even without HMR. Share the lexical write proof used by memo
+	// inference instead of treating a declaration's initial body as permanent.
+	const reassigned = collectReassignedBindings(ast);
 	const memoLocals = new Set();
 	const declarations = [];
 	for (const node of ast.body || []) {
@@ -284,7 +292,9 @@ export function findVoidComponentExports(source, id) {
 		hasLowerableJsxReturnBranches(node);
 	for (const declaration of declarations) {
 		if (declaration.type === 'FunctionDeclaration' && declaration.id?.name) {
-			if (isVoidFunction(declaration)) voidBindings.add(declaration.id.name);
+			if (!reassigned.has(declaration.id) && isVoidFunction(declaration)) {
+				voidBindings.add(declaration.id.name);
+			}
 			continue;
 		}
 		if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
@@ -296,6 +306,7 @@ export function findVoidComponentExports(source, id) {
 			const init = item.init;
 			if (
 				item.id?.type === 'Identifier' &&
+				!reassigned.has(item.id) &&
 				(init?.type === 'FunctionExpression' || init?.type === 'ArrowFunctionExpression') &&
 				isVoidFunction(init)
 			) {
@@ -303,6 +314,7 @@ export function findVoidComponentExports(source, id) {
 			}
 			if (
 				item.id?.type !== 'Identifier' ||
+				reassigned.has(item.id) ||
 				init?.type !== 'CallExpression' ||
 				init.callee?.type !== 'Identifier' ||
 				!memoLocals.has(init.callee.name) ||
@@ -333,6 +345,7 @@ export function findVoidComponentExports(source, id) {
 				(declaration?.type === 'FunctionDeclaration' ||
 					declaration?.type === 'FunctionExpression' ||
 					declaration?.type === 'ArrowFunctionExpression') &&
+				(declaration.id == null || !reassigned.has(declaration.id)) &&
 				isVoidFunction(declaration)
 			) {
 				exports.push('default');
@@ -516,6 +529,7 @@ class OctaneBundlerCompiler {
 			profile: options.profile === true,
 			inlineHookMemo: options.inlineHookMemo !== false,
 			strong: options.strong === true,
+			knownAttributeSpreads: options.knownAttributeSpreads,
 			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
@@ -523,17 +537,17 @@ class OctaneBundlerCompiler {
 		// Octane islands): when enabled, a project `.tsrx` is Octane's by
 		// extension (nothing else compiles the syntax), and a project
 		// `.tsx`/`.ts`/`.js` is Octane's only if it opens with a leading
-		// `/** @jsxImportSource octane */` pragma (any registered renderer's
-		// intrinsics module also counts) — full compilation for `.tsx`, hook
-		// slotting for plain `.ts`/`.js`. A leading pragma naming a foreign
-		// source (`react`, …) does NOT claim the file. Unmarked project
+		// `/** @jsxImportSource octane */` pragma (the `octane/strong` type
+		// surface and registered renderer intrinsics also count) — full
+		// compilation for `.tsx`, hook slotting for plain `.ts`/`.js`. A leading
+		// pragma naming a foreign source (`react`, …) does NOT claim the file. Unmarked project
 		// modules pass through to the host toolchain. Installed/linked
 		// packages keep their manifest `usesOctane` decision. The pragma
 		// always ships unchanged — it is meaningful to TypeScript and
 		// downstream tools (in a JSX-less `.ts`/`.js` module TypeScript
 		// ignores it, so there it acts purely as the ownership marker).
 		this.requireDirective = options.requireDirective === true;
-		this.pragmaOwnedModules = new Set([DOM_RENDERER_MODULE]);
+		this.pragmaOwnedModules = new Set([DOM_RENDERER_MODULE, 'octane/strong']);
 		for (const renderer of Object.values(this.renderers.registry)) {
 			if (renderer.intrinsics !== undefined) this.pragmaOwnedModules.add(renderer.intrinsics);
 		}
@@ -691,7 +705,7 @@ class OctaneBundlerCompiler {
 
 	/**
 	 * Does a leading `@jsxImportSource` pragma claim this module for Octane?
-	 * `octane` itself and every registered renderer's intrinsics module count;
+	 * `octane`, its Strong type surface, and registered renderer intrinsics count;
 	 * a pragma naming a FOREIGN source (`react`, `@emotion/react`, …) does not
 	 * claim the file — under the requireDirective gate the module behaves
 	 * exactly like an unmarked one.
@@ -706,9 +720,9 @@ class OctaneBundlerCompiler {
 	 * A project `.tsrx` is Octane's by extension — in an Octane pipeline
 	 * nothing else compiles the syntax, so there is nothing to opt into;
 	 * every other project module is Octane's only when `pragmaOwned` (its
-	 * leading `@jsxImportSource` pragma names octane or a registered
-	 * renderer's intrinsics module). This gate covers full compilation; the
-	 * plain `.ts`/`.js` hook-slotting branch of `transform` applies the same
+	 * leading `@jsxImportSource` pragma names octane, octane/strong, or a
+	 * registered renderer's intrinsics module). This gate covers full compilation;
+	 * the plain `.ts`/`.js` hook-slotting branch of `transform` applies the same
 	 * pragma rule inline.
 	 * Two carve-outs: installed and linked packages are exempt (their
 	 * manifest `usesOctane` rule is already the explicit per-package
@@ -1064,6 +1078,10 @@ class OctaneBundlerCompiler {
 		);
 		const file = cleanModuleId(id);
 		const hydrateBoundaryPath = hydrateBoundaryPathFromId(id);
+		const bindingRequest = parseDomBindingRequest(id);
+		if (bindingRequest !== null && hydrateBoundaryPath !== null) {
+			throw new Error('Octane DOM binding and Hydrate queries cannot be combined.');
+		}
 		const collected = {
 			dependencies: new Set(),
 			missingDependencies: new Set(),
@@ -1096,7 +1114,7 @@ class OctaneBundlerCompiler {
 			options.universalRuntime ?? this.defaults.universalRuntime,
 		);
 		const filename = this._canonicalModuleId(file);
-		const targetRuntimeRequests = (source, kind) => {
+		const targetRuntimeRequests = (source, kind, streamedSignals = false) => {
 			if (environment !== 'server' || options.explicitRuntimeRequests !== true) return null;
 			const runtimeResult = rewriteServerRuntimeRequests(source, filename);
 			if (runtimeResult === null) return null;
@@ -1104,6 +1122,7 @@ class OctaneBundlerCompiler {
 				code: runtimeResult.code,
 				map: runtimeResult.map,
 				kind,
+				...(streamedSignals ? { streamedSignals: true } : null),
 				...finishMetadata(collected),
 			};
 		};
@@ -1131,6 +1150,9 @@ class OctaneBundlerCompiler {
 		const fullCompile =
 			this._isFullCompileSource(file, collected) &&
 			this._passesOwnershipGate(file, filename, pragmaOwned);
+		if (bindingRequest !== null && !fullCompile) {
+			throw new Error('Octane DOM binding queries require a compiler-owned .tsrx/.tsx view.');
+		}
 		// The narrow-the-rule config error concerns modules Octane owns. Under
 		// the ownership gate a host-owned project module (unmarked, or in an
 		// excluded path) may legitimately sit inside a client-only include in a
@@ -1177,13 +1199,22 @@ class OctaneBundlerCompiler {
 				!hasRendererBoundaries &&
 				typeof options.resolveCssModuleConstant === 'function';
 			const compileFilename =
-				hydrateBoundaryPath === null
-					? filename
-					: `${filename}?${HYDRATE_QUERY_PARAM}=${encodeURIComponent(hydrateBoundaryPath)}`;
+				bindingRequest !== null
+					? formatDomBindingRequest(filename, bindingRequest)
+					: hydrateBoundaryPath === null
+						? filename
+						: `${filename}?${HYDRATE_QUERY_PARAM}=${encodeURIComponent(hydrateBoundaryPath)}`;
 			const compileOptions = {
 				hmr,
 				mode: environment,
 				dev,
+				...(renderer.target === 'dom' &&
+				(options.knownAttributeSpreads ?? this.defaults.knownAttributeSpreads) !== undefined
+					? {
+							knownAttributeSpreads:
+								options.knownAttributeSpreads ?? this.defaults.knownAttributeSpreads,
+						}
+					: null),
 				...(renderer.target === 'dom' && options.textTypeFacts !== undefined
 					? { textTypeFacts: options.textTypeFacts }
 					: null),
@@ -1223,9 +1254,12 @@ class OctaneBundlerCompiler {
 			let out;
 			let voidComponentAst = null;
 			let cssModuleConstantImports;
-			if (collectVoidComponentExports || collectCssModuleConstants) {
+			let independentWidgets;
+			const collectIndependentWidgets = code.includes('Hydrate') && code.includes('independent');
+			if (collectVoidComponentExports || collectCssModuleConstants || collectIndependentWidgets) {
 				const compilation = compileForBundler(code, compileFilename, compileOptions);
 				out = compilation.result;
+				if (collectIndependentWidgets) independentWidgets = compilation.independentWidgets;
 				if (collectVoidComponentExports) voidComponentAst = compilation.hydrateAst;
 				if (collectCssModuleConstants) {
 					cssModuleConstantImports = compilation.cssModuleConstantImports;
@@ -1239,6 +1273,8 @@ class OctaneBundlerCompiler {
 				map: out.map,
 				diagnostics: out.diagnostics,
 				kind: 'compile',
+				...(out.streamedSignals === true ? { streamedSignals: true } : null),
+				...(out.bindingConstants === undefined ? null : { bindingConstants: out.bindingConstants }),
 				renderer,
 				...(out.universalRuntime === undefined ? null : { universalRuntime: out.universalRuntime }),
 				...(clientReference === null ? null : { clientReference }),
@@ -1248,6 +1284,7 @@ class OctaneBundlerCompiler {
 							voidComponentExports: findVoidComponentExports(voidComponentAst, filename),
 						}),
 				...(cssModuleConstantImports === undefined ? null : { cssModuleConstantImports }),
+				...(independentWidgets === undefined ? null : { independentWidgets }),
 				descriptorChildrenExports:
 					preparedDescriptorChildrenExports === null
 						? findDescriptorChildrenExports(code, filename)
@@ -1340,14 +1377,16 @@ class OctaneBundlerCompiler {
 					: {}),
 			});
 			if (out === null) return passThrough();
-			return (
-				targetRuntimeRequests(out.code, 'slots') ?? {
-					code: out.code,
-					map: out.map,
-					kind: 'slots',
-					...finishMetadata(collected),
-				}
-			);
+			// Strong plain modules report nonfatal hints like compiled modules do.
+			this._forwardCompileDiagnostics(out.diagnostics);
+			const slotted = targetRuntimeRequests(out.code, 'slots', out.streamedSignals) ?? {
+				code: out.code,
+				map: out.map,
+				kind: 'slots',
+				...(out.streamedSignals === true ? { streamedSignals: true } : null),
+				...finishMetadata(collected),
+			};
+			return out.diagnostics === undefined ? slotted : { ...slotted, diagnostics: out.diagnostics };
 		}
 
 		return passThrough();

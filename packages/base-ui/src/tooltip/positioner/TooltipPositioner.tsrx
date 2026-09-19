@@ -102,11 +102,7 @@ export const TooltipPositioner = function TooltipPositioner(
 		inert: !open || trackCursorAxis === 'both' || disableHoverablePopup,
 	});
 
-	return (
-		<TooltipPositionerContext.Provider value={positioning}>
-			{element}
-		</TooltipPositionerContext.Provider>
-	);
+	return <TooltipPositionerContext value={positioning}>{element}</TooltipPositionerContext>;
 };
 
 export interface TooltipPositionerState {

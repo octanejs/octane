@@ -5,17 +5,17 @@ import type { SVGProps } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
 
 import { Layer } from '../container/Layer.tsrx';
-import { EasingInput, DataKey, RectangleCoordinate } from '../util/types';
-import { BarRectangleItem } from './Bar';
-import { LinePointItem } from './Line';
-import { ScatterPointItem } from './Scatter.tsrx';
+import type { EasingInput, DataKey, RectangleCoordinate } from '../util/types';
+import type { BarRectangleItem } from './Bar';
+import type { LinePointItem } from './Line';
+import type { ScatterPointItem } from './Scatter.tsrx';
 import { ReportErrorBarSettings, useErrorBarContext } from '../context/ErrorBarContext.tsrx';
 import { useXAxis, useYAxis } from '../hooks';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
 import { useChartLayout } from '../context/chartLayoutContext';
 import { CSSTransitionAnimate, extractCssEasing } from '../animation/CSSTransitionAnimate.tsrx';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
+import { type ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 
 export interface ErrorBarDataItem {

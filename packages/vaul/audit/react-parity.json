@@ -36,7 +36,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91164c02c6f38c2386b86b5cabf2ee914c9cf0ea1fcefa1c8875da9cd5982c9e"
+      "lockfileSha256": "7ecbdfab4ba778c50295dc17e8d2d62af01b18e3ccd5585c6f02dc5eed5a3145"
     }
   },
   "lanes": [
@@ -73,7 +73,7 @@
         {
           "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "20701aea9b5e5f5249a2559f847aac79cb28f9e0bb5d24d3ef50b06101205a02"
+          "sha256": "23bfcd3ad08ac13b98aa002a8c55fb05f986d98096f557f716c9124e1df2da65"
         },
         {
           "path": "packages/vaul/audit/provenance.json",

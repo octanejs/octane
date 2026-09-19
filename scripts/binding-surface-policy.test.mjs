@@ -495,3 +495,13 @@ test('dependency aliases and associated adapter types retain focused evidence', 
 	assert.equal(policy.requiresCopiedEvidence, false);
 	assert.equal(policy.requiresLifecycleEvidence, true);
 });
+
+test('parses generic arrows in TypeScript source without treating them as JSX', (t) => {
+	const { root, write } = fixture(t);
+	write(
+		'src/hook.ts',
+		"import { useEffect } from 'octane';\nconst identity = <T>(value: T) => value;\nexport function useEngine() { useEffect(() => { identity(1); }); }\n",
+	);
+	const policy = readBindingSurfacePolicy(root);
+	assert.equal(policy.valid, true, policy.issues.join('\n'));
+});

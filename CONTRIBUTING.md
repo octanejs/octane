@@ -245,11 +245,12 @@ test-only, or internal tooling work:
 pnpm changeset
 ```
 
-While packages are 0.x, changesets stay on the `patch` track by default. Core
-`octane` may use `minor` for a coordinated beta-line bump; bindings remain
-patch-only, and `major` is reserved for 1.0. A coordinated core minor also
-patch-releases its publishable peer dependents with ranges covering the old and
-new core lines. CI validates both declared bumps and the computed release plan.
+While packages are 0.x, use `patch` for fixes and `minor` for new features or
+intentional beta-line changes in any package, including bindings. `major` is
+reserved for 1.0. Changesets v3 patch-bumps peer dependents when their dependency
+range needs updating; it no longer promotes them to a major release. Review
+compatibility when changing peer ranges. CI validates both declared bumps and
+the computed release plan.
 
 ## Commits and pull requests
 

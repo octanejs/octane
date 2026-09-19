@@ -11,7 +11,10 @@
     "integrity": "sha256:6cd8b2e5d49973e75033f66cd74024918c8e635621dc5f18aaa556dcfccda06c",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/alien-signals/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91164c02c6f38c2386b86b5cabf2ee914c9cf0ea1fcefa1c8875da9cd5982c9e"
+      "lockfileSha256": "7ecbdfab4ba778c50295dc17e8d2d62af01b18e3ccd5585c6f02dc5eed5a3145"
     }
   },
   "lanes": [
@@ -77,7 +80,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "8092b77be0374936ce7ee2968aa74b92e7ddc629d8efd36e8daa148d79c87507"
+          "sha256": "ce5c2fc3c13e7f405456323a94fe67dcabeabf2fe8f48f5526d915d196cec501"
         },
         {
           "path": "packages/alien-signals/audit/pristine-oracle-environment.json",

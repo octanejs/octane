@@ -399,7 +399,7 @@ export const OTPFieldRoot = function OTPFieldRoot(
 				setInputCount(newMap.size);
 			}}
 		>
-			<OTPFieldRootContext.Provider value={contextValue}>
+			<OTPFieldRootContext value={contextValue}>
 				{element}
 				{hasValidLength && (
 					<input
@@ -456,7 +456,7 @@ export const OTPFieldRoot = function OTPFieldRoot(
 						style={name ? visuallyHiddenInput : visuallyHidden}
 					/>
 				)}
-			</OTPFieldRootContext.Provider>
+			</OTPFieldRootContext>
 		</CompositeList>
 	);
 };

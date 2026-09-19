@@ -1,4 +1,5 @@
 import { attachBehaviorRoot } from '../../../src/index.js';
+import { captureHydrationControlCandidate } from '../../../src/hydration/index.js';
 
 type BehaviorRoot = ReturnType<typeof attachBehaviorRoot>;
 type BehaviorRegistration = ReturnType<BehaviorRoot['registerBehavior']>;
@@ -18,6 +19,8 @@ const nested = shell.querySelector('#nested-range') as HTMLElement;
 const article = shell.querySelector('#streamed-text') as HTMLElement;
 const initialWidget = shell.querySelector('#initial-widget') as HTMLButtonElement;
 const form = shell.querySelector('#repeated-form') as HTMLFormElement;
+const snapshotForm = shell.querySelector('#snapshot-form') as HTMLFormElement;
+const snapshotEditor = snapshotForm.elements.namedItem('text') as HTMLTextAreaElement;
 const svgGroup = shell.querySelector('#external-svg-group')!;
 const mathRow = shell.querySelector('#external-math-row')!;
 
@@ -34,6 +37,12 @@ let nativeSubmissions = 0;
 let trustedSubmissions = 0;
 let hashChanges = 0;
 let streamCanceled = false;
+type SavePayload = Readonly<{ selectedId: string; text: string }>;
+const savedCommands: SavePayload[] = [];
+const nativeSaveEvents: Event[] = [];
+const deliveredSaveEvents: Event[] = [];
+const commandErrors: string[] = [];
+let readLiveDraft: (() => string) | undefined;
 
 function observeOriginalEvents(container: HTMLElement): void {
 	container.ownerDocument.addEventListener(
@@ -54,6 +63,7 @@ form.addEventListener('submit', (event) => {
 	nativeSubmissions++;
 	if (event.isTrusted) trustedSubmissions++;
 });
+snapshotForm.addEventListener('submit', (event) => nativeSaveEvents.push(event));
 window.addEventListener('hashchange', () => hashChanges++);
 
 function registerActions(
@@ -148,6 +158,58 @@ function mountPendingInteractions(): void {
 	registerActions('stream', '[data-pending-action]', {
 		id: 'pending-actions',
 		ready: deferred(),
+	});
+}
+
+function mountCommandCapture(): void {
+	root?.dispose();
+	snapshotForm.reset();
+	savedCommands.length = nativeSaveEvents.length = deliveredSaveEvents.length = 0;
+	commandErrors.length = 0;
+	readLiveDraft = undefined;
+	// Live-edit handoff and command snapshots have independent owners. The
+	// binding/command implementation is not loaded until readiness is released.
+	captureHydrationControlCandidate(snapshotEditor);
+	root = attachBehaviorRoot(shell);
+	let submit: ((payload: SavePayload) => void) | undefined;
+	root.registerBehavior({
+		target: snapshotForm,
+		events: ['submit'],
+		ready: deferred(),
+		captureEvent(event, element) {
+			event.preventDefault();
+			const data = new FormData(element as HTMLFormElement);
+			return Object.freeze({
+				selectedId: String(data.get('selectedId')),
+				text: String(data.get('text')),
+			});
+		},
+		async adopt() {
+			const { action$, bindSignalControl, createScope, runWithSignalOwner } =
+				await import('../../../src/signals/index.js');
+			const scope = createScope({ scopeKey: 'captured-form-command' });
+			const draft$ = scope.signal$('draft', 'server');
+			const unbind = bindSignalControl(snapshotEditor, 'value', draft$);
+			readLiveDraft = () => draft$.get();
+			const save = action$('captured-save', (_operation, payload: SavePayload) => {
+				savedCommands.push(payload);
+			});
+			submit = (payload) => {
+				try {
+					runWithSignalOwner(scope, () => save(payload));
+				} catch (error) {
+					commandErrors.push(String(error));
+				}
+			};
+			return () => {
+				unbind();
+				scope.dispose();
+			};
+		},
+		handleEvent(event, _element, _context, payload) {
+			deliveredSaveEvents.push(event);
+			submit!(payload);
+		},
 	});
 }
 
@@ -249,6 +311,16 @@ function state() {
 			svgGroup: shell.querySelector('#external-svg-group') === svgGroup,
 		},
 		interactions: interactions.map((interaction) => ({ ...interaction })),
+		commands: {
+			saved: savedCommands.slice(),
+			draft: readLiveDraft?.(),
+			value: snapshotEditor.value,
+			identity: snapshotForm.elements.namedItem('text') === snapshotEditor,
+			nativeSubmissions: nativeSaveEvents.length,
+			trusted: nativeSaveEvents.every((event) => event.isTrusted),
+			original: deliveredSaveEvents.every((event, index) => event === nativeSaveEvents[index]),
+			errors: commandErrors.slice(),
+		},
 		nativeDispatches: Object.fromEntries(nativeDispatches),
 		nativeSubmissions,
 		namespaces: {
@@ -280,6 +352,7 @@ const harness = {
 	handoffNestedOwner,
 	mountAbortedInteractions,
 	mountChangingSelectors,
+	mountCommandCapture,
 	mountPendingInteractions,
 	mountPendingRange,
 	mountStreaming,

@@ -11,7 +11,10 @@
  * may change in patch releases until real Three and transported renderers
  * validate the protocol.
  */
+import { bumpContextEpoch } from './context-epoch.js';
+import { isContext } from './context-identity.js';
 import { hasOwnProp } from './has-own.js';
+import { resolveHookPath } from './hook-slot-cache.js';
 import {
 	__profileBeginRender,
 	__profileComponentSource,
@@ -98,6 +101,11 @@ export type UniversalKey = string | number | symbol | bigint;
 export interface UniversalContext<T> {
 	readonly $$kind: symbol;
 	readonly defaultValue: T;
+	/**
+	 * Bumped on every committed provider change; each bump must move the shared
+	 * context epoch too (bumpContextEpoch in context-epoch.ts) — the
+	 * $$ctxDepsEpoch bail fast path treats an unmoved epoch as "nothing changed".
+	 */
 	$$version: number;
 }
 
@@ -109,6 +117,11 @@ export interface UniversalRendererMetadata {
 
 const UNIVERSAL_LAZY_METADATA: UniversalRendererMetadata = Object.freeze({
 	id: '<lazy>',
+	target: 'universal',
+});
+
+const UNIVERSAL_CONTEXT_METADATA: UniversalRendererMetadata = Object.freeze({
+	id: '<context>',
 	target: 'universal',
 });
 
@@ -424,6 +437,7 @@ export type UniversalHostPropEncoding =
 	| { readonly kind: 'resource'; readonly handle: UniversalResourceHandle }
 	| { readonly kind: 'unsupported'; readonly reason?: string };
 
+/** One encoding call's context. Codecs may retain it across later props and renders. */
 export interface UniversalHostPropCodecContext<Container = unknown> {
 	readonly container: Container;
 	readonly renderer: string;
@@ -973,6 +987,8 @@ interface LogicalRecord {
 	portalRegistration: UniversalPortalTargetRegistration | null;
 	parent: LogicalRecord | null;
 	children: LogicalRecord[];
+	/** Lazily computed from accepted topology; null also invalidates ancestor unions. */
+	treeFeatures: number | null;
 	collapsedTemplate?: CommittedCollapsedTemplate;
 }
 
@@ -1185,6 +1201,9 @@ interface RenderAttempt {
 	// owners, and the last draft for a record must win after a retained retry.
 	draftLookup: { indexed: number; byRecord: Map<UniversalOwnerRecord, DraftOwner> } | null;
 	treeFeatures: number;
+	// Compact list markers need expansion before ordinary reconciliation. A
+	// retry may leave this true after discarding a marker; that only keeps a walk.
+	hasCompactLists: boolean;
 	replayEntries: readonly SuspendedMemoEntry[];
 	retryThenables: Set<PromiseLike<unknown>>;
 	nextUniversalId: number;
@@ -1724,17 +1743,28 @@ export function universalProps(
 			hasChildren: false,
 		};
 	}
-	const props: Record<string, unknown> = {};
+	// Explicit compiler keys never enter the props object. Spread keys are lifted
+	// only after Object.assign has observed every getter in authored key order.
+	let props: Record<string, unknown> = {};
+	let key: unknown = null;
+	let hasKey = false;
 	if (!canonicalizeHostClass) {
 		for (const entry of entries) {
 			if (entry[0] === 'set') {
-				if (entry[1] === '__proto__') defineUniversalProtoProp(props, entry[2]);
+				if (entry[1] === 'key') {
+					key = entry[2];
+					hasKey = true;
+				} else if (entry[1] === '__proto__') defineUniversalProtoProp(props, entry[2]);
 				else props[entry[1]] = entry[2];
 				continue;
 			}
 			const spread = entry[1];
 			if (spread == null) continue;
 			assignUniversalPropSpread(props, spread, false);
+			if (hasOwnProp.call(props, 'key')) {
+				({ key, ...props } = props);
+				hasKey = true;
+			}
 		}
 	} else {
 		// Universal host compilers canonicalize React's alias in authored prop
@@ -1742,19 +1772,23 @@ export function universalProps(
 		for (const entry of entries) {
 			if (entry[0] === 'set') {
 				const name = entry[1];
-				if (name === '__proto__') defineUniversalProtoProp(props, entry[2]);
+				if (name === 'key') {
+					key = entry[2];
+					hasKey = true;
+				} else if (name === '__proto__') defineUniversalProtoProp(props, entry[2]);
 				else props[name === 'className' ? 'class' : name] = entry[2];
 				continue;
 			}
 			const spread = entry[1];
 			if (spread == null) continue;
 			assignUniversalPropSpread(props, spread, true);
+			if (hasOwnProp.call(props, 'key')) {
+				({ key, ...props } = props);
+				hasKey = true;
+			}
 		}
 	}
 	if (children !== NO_CHILDREN) props.children = children;
-	const hasKey = hasOwnProp.call(props, 'key');
-	const key = hasKey ? props.key : null;
-	if (hasKey) delete props.key;
 	return {
 		$$kind: UNIVERSAL_PROPS,
 		props: Object.freeze(props),
@@ -2175,6 +2209,7 @@ export function hmrUniversalComponent<P>(
 function getComponentMetadata(component: UniversalComponent): UniversalRendererMetadata {
 	const metadata = component?.[UNIVERSAL_COMPONENT];
 	if (metadata === undefined) {
+		if (isContext(component)) return UNIVERSAL_CONTEXT_METADATA;
 		if ((component as any)?.[LAZY_COMPONENT] === true) return UNIVERSAL_LAZY_METADATA;
 		throw new Error('Universal roots accept only compiler-defined universal components.');
 	}
@@ -2681,6 +2716,23 @@ function materializeComponentValue(
 		);
 	}
 	const metadata = getComponentMetadata(value.component);
+	if (metadata === UNIVERSAL_CONTEXT_METADATA) {
+		// Imported contexts reach the ordinary component descriptor path. Context
+		// identity is renderer-neutral; provide it without invoking its DOM body.
+		const normalized = normalizePropsValue(value.props);
+		const provider = universalContext(
+			value.component as unknown as UniversalContext<unknown>,
+			normalized.props.value,
+			normalized.props.children as UniversalRenderable | (() => UniversalRenderable),
+		);
+		const key = value.hasKey ? normalizeUniversalKey(value.key) : null;
+		return materializeValue(
+			key === null ? provider : universalKey(key, provider),
+			expectedRenderer,
+			null,
+			path,
+		);
+	}
 	if (metadata !== UNIVERSAL_LAZY_METADATA && metadata.id !== expectedRenderer) {
 		throw new Error(
 			`Universal renderer mismatch: owner ${JSON.stringify(expectedRenderer)} cannot render nested component ${JSON.stringify(metadata.id)}.`,
@@ -2693,7 +2745,8 @@ function materializeComponentValue(
 	if (host !== null) {
 		// Certified adapters cannot own hooks or context; the ordinary host
 		// materializer still classifies their refs, callbacks, events, and children.
-		const nodes = materializeNode(host.plan.root, [normalized], expectedRenderer, path);
+		const nodes: BlueprintNode[] = [];
+		materializeNode(host.plan.root, [normalized], expectedRenderer, path, nodes);
 		if (value.hasKey) nodes[0].key = normalizeUniversalKey(value.key);
 		return nodes;
 	}
@@ -2759,6 +2812,7 @@ function materializeScoped(
 	key: unknown,
 	build: () => UniversalRenderable,
 	contextValues: Map<UniversalContext<any>, unknown> | null = null,
+	outputPath: readonly unknown[] = [...path, 'output'],
 ): BlueprintNode[] {
 	const attempt = currentAttempt();
 	const universalIdCheckpoint = attempt.nextUniversalId;
@@ -2766,7 +2820,7 @@ function materializeScoped(
 	owner.contextValues = contextValues;
 	try {
 		const nodes = executeOwner(owner, () =>
-			materializeValue(build(), parent.record.renderer, null, [...path, 'output']),
+			materializeValue(build(), parent.record.renderer, null, outputPath),
 		);
 		return ownerRange(owner, nodes);
 	} catch (error) {
@@ -2967,10 +3021,11 @@ function ownerlessLeafHostPlan(plan: UniversalPlan): UniversalHostPlan | null {
 	return host;
 }
 
+// The sole caller has already selected the compilerLeafProps capability.
+// Callback-shaped values on this path are ordinary driver-owned props.
 function materializeOwnerlessLeafValue(
 	value: unknown,
 	expectedRenderer: string,
-	compilerLeafProps: boolean,
 	owner: DraftOwner = CURRENT_OWNER!,
 ): BlueprintHost | null {
 	if ((value as UniversalPlanValue)?.$$kind !== UNIVERSAL_VALUE) return null;
@@ -2986,9 +3041,6 @@ function materializeOwnerlessLeafValue(
 
 	const props: Record<string, unknown> = { ...(node.props ?? {}) };
 	for (const [name, slot] of node.bindings ?? []) props[name] = planValue.values[slot];
-	let events: Map<string, BlueprintEvent> | null = null;
-	let lifecycles: Map<string, BlueprintHostCallback> | null = null;
-	let localCallbacks: Map<string, BlueprintHostCallback> | null = null;
 	let hostBindings: Map<string, UniversalHostBinding<unknown>> | null = null;
 	const attempt = currentAttempt();
 	for (const name of Object.keys(props)) {
@@ -3004,76 +3056,9 @@ function materializeOwnerlessLeafValue(
 			props[name] = attempt.root.encodeHostProp(node.type, name, handler.getSnapshot());
 			continue;
 		}
-		if (compilerLeafProps) {
-			if (isRendererRegion(handler)) markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
-			props[name] = attempt.root.encodeHostProp(node.type, name, handler);
-			continue;
-		}
-		const lifecycle = attempt.root.classifyLifecycle(name, handler);
-		if (lifecycle !== null) {
-			delete props[name];
-			if (handler == null) continue;
-			if (typeof handler !== 'function') {
-				throw new TypeError(
-					`Universal lifecycle prop ${JSON.stringify(name)} for renderer ${JSON.stringify(expectedRenderer)} must be a function, null, or undefined.`,
-				);
-			}
-			(lifecycles ??= new Map()).set(lifecycle.type, {
-				prop: name,
-				type: lifecycle.type,
-				handler: handler as (...args: any[]) => any,
-				owner: owner.record,
-			});
-			continue;
-		}
-		const local = attempt.root.classifyLocalCallback(name, handler);
-		if (local !== null) {
-			delete props[name];
-			if (attempt.root.driverCapabilities().localHostCallbacks !== true) {
-				throw new Error(
-					`Universal renderer ${JSON.stringify(expectedRenderer)} does not declare the local-host-callback capability.`,
-				);
-			}
-			if (handler == null) continue;
-			if (typeof handler !== 'function') {
-				throw new TypeError(
-					`Universal local callback prop ${JSON.stringify(name)} for renderer ${JSON.stringify(expectedRenderer)} must be a function, null, or undefined.`,
-				);
-			}
-			(localCallbacks ??= new Map()).set(local.type, {
-				prop: name,
-				type: local.type,
-				handler: handler as (...args: any[]) => any,
-				owner: owner.record,
-			});
-			continue;
-		}
-		const definition = attempt.root.classifyEvent(name);
-		if (definition !== null) {
-			delete props[name];
-			if (handler == null) continue;
-			if (typeof handler !== 'function') {
-				throw new TypeError(
-					`Universal event prop ${JSON.stringify(name)} for renderer ${JSON.stringify(expectedRenderer)} must be a function, null, or undefined.`,
-				);
-			}
-			(events ??= new Map()).set(definition.type, {
-				prop: name,
-				type: definition.type,
-				priority: definition.priority ?? 'default',
-				handler: handler as (...args: any[]) => any,
-				owner: owner.record,
-			});
-			continue;
-		}
 		if (isRendererRegion(handler)) markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
 		props[name] = attempt.root.encodeHostProp(node.type, name, handler);
 	}
-	if (events !== null && events.size !== 0) markUniversalTreeFeature(UNIVERSAL_TREE_EVENT);
-	if (lifecycles !== null && lifecycles.size !== 0)
-		markUniversalTreeFeature(UNIVERSAL_TREE_LIFECYCLE);
-	if (localCallbacks !== null && localCallbacks.size !== 0)
-		markUniversalTreeFeature(UNIVERSAL_TREE_LOCAL_CALLBACK);
 	if (owner.visibility !== 'visible') markUniversalTreeFeature(UNIVERSAL_TREE_HIDDEN);
 	return {
 		kind: 'host',
@@ -3083,9 +3068,9 @@ function materializeOwnerlessLeafValue(
 		...(hostBindings === null ? null : { hostBindings }),
 		ref: null,
 		owner: owner.record,
-		events: events ?? EMPTY_BLUEPRINT_EVENTS,
-		lifecycles: lifecycles ?? EMPTY_BLUEPRINT_HOST_CALLBACKS,
-		localCallbacks: localCallbacks ?? EMPTY_BLUEPRINT_HOST_CALLBACKS,
+		events: EMPTY_BLUEPRINT_EVENTS,
+		lifecycles: EMPTY_BLUEPRINT_HOST_CALLBACKS,
+		localCallbacks: EMPTY_BLUEPRINT_HOST_CALLBACKS,
 		visibility: owner.visibility,
 		children: [],
 	};
@@ -3386,6 +3371,7 @@ function materializeValue(
 			if (compactIndex !== 0 && owner.visibility !== 'visible') {
 				markUniversalTreeFeature(UNIVERSAL_TREE_HIDDEN);
 			}
+			currentAttempt().hasCompactLists = true;
 			return [
 				{
 					kind: 'range',
@@ -3433,6 +3419,10 @@ function materializeValue(
 		const componentPath = componentScopeEnabled
 			? [...lazyOwnerScope!.identityPath, 'output']
 			: null;
+		// Every scoped item has the same structural site; the separate owner key
+		// distinguishes items. Share these immutable paths within this render.
+		let listOwnerPath = lazyOwnerScope?.identityPath ?? null;
+		let listOutputPath = componentPath;
 		let index = 0;
 		for (const item of list.items) {
 			const itemIndex = index++;
@@ -3569,12 +3559,7 @@ function materializeValue(
 				);
 				const rendered = materializeRawUniversalListValue(list, rawOutput, expectedRenderer);
 				const itemOwner = lazyOwnerScope!.owner ?? parent;
-				const leaf = materializeOwnerlessLeafValue(
-					rendered,
-					expectedRenderer,
-					compilerLeafProps,
-					itemOwner,
-				);
+				const leaf = materializeOwnerlessLeafValue(rendered, expectedRenderer, itemOwner);
 				if (leaf !== null) {
 					leaf.key = itemKey;
 					output.push(leaf);
@@ -3604,18 +3589,27 @@ function materializeValue(
 				nodes[0].key = itemKey;
 				output.push(nodes[0]);
 			} else {
+				listOwnerPath ??= [...path, 'for'];
+				listOutputPath ??= [...listOwnerPath, 'output'];
 				output.push(
-					...materializeScoped(parent, [...path, 'for'], itemKey, () => {
-						return materializeRawUniversalListValue(
-							list,
-							list.render(item, itemIndex),
-							expectedRenderer,
-						);
-					}),
+					...materializeScoped(
+						parent,
+						listOwnerPath,
+						itemKey,
+						() =>
+							materializeRawUniversalListValue(
+								list,
+								list.render(item, itemIndex),
+								expectedRenderer,
+							),
+						null,
+						listOutputPath,
+					),
 				);
 			}
 		}
 		if (compactTemplateEnabled && compactTemplateList !== null) {
+			attempt.hasCompactLists = true;
 			return [{ kind: 'range', key: null, children: [], compactTemplateList }];
 		}
 		if (index === 0 && list.empty !== null) {
@@ -3720,13 +3714,25 @@ function materializeValue(
 	}
 	if (Array.isArray(value)) {
 		const output: BlueprintNode[] = [];
-		const keys = new Set<UniversalKey>();
+		// Remember the first key even if this array grows during a child render.
+		// A Set is needed only when another keyed child appears.
+		let firstKey: UniversalKey | null = null;
+		let keys: Set<UniversalKey> | undefined;
 		for (let index = 0; index < value.length; index++) {
 			const item = value[index] as UniversalRenderable;
 			const itemKey = renderableKey(item);
 			if (itemKey !== null) {
-				if (keys.has(itemKey)) throw new Error(`Duplicate universal child key ${String(itemKey)}.`);
-				keys.add(itemKey);
+				if (firstKey === null) {
+					firstKey = itemKey;
+				} else {
+					if (keys === undefined) {
+						keys = new Set();
+						keys.add(firstKey);
+					}
+					if (keys.has(itemKey))
+						throw new Error(`Duplicate universal child key ${String(itemKey)}.`);
+					keys.add(itemKey);
+				}
 			}
 			output.push(
 				...materializeValue(item, expectedRenderer, itemKey, [
@@ -3766,26 +3772,52 @@ function materializeValue(
 	);
 }
 
+// Preserve the already encoded ordinary prefix when the first consumed host
+// prop is reached. Unfiltered hosts keep their original allocation and shape.
+function copyUniversalHostPropPrefix(
+	source: Record<string, unknown>,
+	names: readonly string[],
+	end: number,
+): Record<string, unknown> {
+	const props: Record<string, unknown> = {};
+	for (let index = 0; index < end; index++) {
+		const name = names[index];
+		if (name === '__proto__') defineUniversalProtoProp(props, source[name]);
+		else props[name] = source[name];
+	}
+	for (const symbol of Object.getOwnPropertySymbols(source)) {
+		(props as Record<PropertyKey, unknown>)[symbol] = (source as Record<PropertyKey, unknown>)[
+			symbol
+		];
+	}
+	return props;
+}
+
 function materializeNode(
 	node: UniversalPlanNode,
 	values: readonly unknown[],
 	renderer: string,
 	path: readonly unknown[],
-): BlueprintNode[] {
-	if (node.kind === 'slot')
-		return materializeValue(values[node.slot], renderer, null, [...path, 'slot', node.slot]);
+	output: BlueprintNode[],
+): void {
+	if (node.kind === 'slot') {
+		output.push(
+			...materializeValue(values[node.slot], renderer, null, [...path, 'slot', node.slot]),
+		);
+		return;
+	}
 	if (node.kind === 'text') {
 		const value = node.slot === undefined ? (node.value ?? '') : values[node.slot];
-		return materializeValue(value, renderer, null, [...path, 'text']);
+		output.push(...materializeValue(value, renderer, null, [...path, 'text']));
+		return;
 	}
 	if (node.kind === 'range') {
 		const children: BlueprintNode[] = [];
 		for (let index = 0; index < node.children.length; index++) {
-			children.push(
-				...materializeNode(node.children[index], values, renderer, [...path, 'range', index]),
-			);
+			materializeNode(node.children[index], values, renderer, [...path, 'range', index], children);
 		}
-		return [{ kind: 'range', key: null, children }];
+		output.push({ kind: 'range', key: null, children });
+		return;
 	}
 	if (node.kind === 'component') {
 		const component = node.component ?? (values[node.componentSlot!] as UniversalComponent<any>);
@@ -3801,32 +3833,36 @@ function materializeNode(
 			const children = universalChildren(renderer, () => universalValue(childPlan, values));
 			props = universalProps([['spread', props.props]], children);
 		}
-		return materializeComponentValue(
-			universalComponent(
-				node.renderer,
-				component,
-				props,
-				node.keySlot === undefined ? NO_KEY : values[node.keySlot],
+		output.push(
+			...materializeComponentValue(
+				universalComponent(
+					node.renderer,
+					component,
+					props,
+					node.keySlot === undefined ? NO_KEY : values[node.keySlot],
+				),
+				renderer,
+				[...path, 'component'],
 			),
-			renderer,
-			[...path, 'component'],
 		);
+		return;
 	}
 	if (node.kind === 'if') {
 		const selected = values[node.conditionSlot] ? node.then : node.else;
-		if (selected === undefined) return [];
+		if (selected === undefined) return;
 		const owner = claimChildOwner(
 			CURRENT_OWNER!,
 			null,
 			[...path, 'if'],
 			values[node.conditionSlot] ? 1 : 0,
 		);
-		return ownerRange(
-			owner,
-			executeOwner(owner, () =>
-				materializeNode(selected, values, renderer, [...path, 'if-output']),
-			),
-		);
+		const children = executeOwner(owner, () => {
+			const nodes: BlueprintNode[] = [];
+			materializeNode(selected, values, renderer, [...path, 'if-output'], nodes);
+			return nodes;
+		});
+		output.push(...ownerRange(owner, children));
+		return;
 	}
 	if (node.kind === 'switch') {
 		let selected = node.default;
@@ -3838,18 +3874,19 @@ function materializeNode(
 				break;
 			}
 		}
-		if (selected === undefined) return [];
+		if (selected === undefined) return;
 		const owner = claimChildOwner(CURRENT_OWNER!, null, [...path, 'switch'], selectedKey);
-		return ownerRange(
-			owner,
-			executeOwner(owner, () =>
-				materializeNode(selected!, values, renderer, [...path, 'switch-output']),
-			),
-		);
+		const children = executeOwner(owner, () => {
+			const nodes: BlueprintNode[] = [];
+			materializeNode(selected!, values, renderer, [...path, 'switch-output'], nodes);
+			return nodes;
+		});
+		output.push(...ownerRange(owner, children));
+		return;
 	}
 	if (node.type === '#text') {
 		const text = currentAttempt().root.textPolicy();
-		if (text === 'ignore') return [];
+		if (text === 'ignore') return;
 		if (text === 'reject') {
 			throw new Error(
 				`Universal renderer ${JSON.stringify(renderer)} rejects primitive text children.`,
@@ -3859,40 +3896,45 @@ function materializeNode(
 	const attempt = currentAttempt();
 	const root = attempt.root;
 	const staticProps = root.materializeStaticHostProps(node);
-	const props: Record<string, unknown> = staticProps ?? { ...(node.props ?? {}) };
+	const sourceProps: Record<string, unknown> = staticProps ?? { ...(node.props ?? {}) };
 	if (staticProps === null) {
-		for (const [name, slot] of node.bindings ?? []) props[name] = values[slot];
+		for (const [name, slot] of node.bindings ?? []) sourceProps[name] = values[slot];
 	}
 	let propsValue: UniversalPropsValue | null = null;
 	if (node.propsSlot !== undefined) {
 		propsValue = normalizePropsValue(values[node.propsSlot] as any);
-		Object.assign(props, propsValue.props);
+		Object.assign(sourceProps, propsValue.props);
 	}
 	if (
-		isUniversalHostBinding(props.ref) ||
-		isUniversalHostBinding(props.key) ||
-		isUniversalHostBinding(props.children)
+		isUniversalHostBinding(sourceProps.ref) ||
+		isUniversalHostBinding(sourceProps.key) ||
+		isUniversalHostBinding(sourceProps.children)
 	) {
 		throw new Error('Experimental host bindings require an ordinary host property.');
 	}
-	const hasKey = staticProps === null && (propsValue?.hasKey || hasOwnProp.call(props, 'key'));
+	const hasKey =
+		staticProps === null && (propsValue?.hasKey || hasOwnProp.call(sourceProps, 'key'));
 	const hostKey = normalizeUniversalKey(
-		propsValue?.hasKey ? propsValue.key : hasKey ? props.key : null,
+		propsValue?.hasKey ? propsValue.key : hasKey ? sourceProps.key : null,
 	);
-	const ref = staticProps === null && hasOwnProp.call(props, 'ref') ? props.ref : null;
+	const ref = staticProps === null && hasOwnProp.call(sourceProps, 'ref') ? sourceProps.ref : null;
 	const dynamicChildren =
-		staticProps === null && hasOwnProp.call(props, 'children') ? props.children : undefined;
-	if (staticProps === null) {
-		delete props.ref;
-		delete props.key;
-		delete props.children;
-	}
+		staticProps === null && hasOwnProp.call(sourceProps, 'children')
+			? sourceProps.children
+			: undefined;
+	let props = sourceProps;
 	let events: Map<string, BlueprintEvent> | null = null;
 	let lifecycles: Map<string, BlueprintHostCallback> | null = null;
 	let localCallbacks: Map<string, BlueprintHostCallback> | null = null;
 	let hostBindings: Map<string, UniversalHostBinding<unknown>> | null = null;
-	for (const name of staticProps === null ? Object.keys(props) : EMPTY_STATIC_PROP_NAMES) {
-		const handler = props[name];
+	const names = staticProps === null ? Object.keys(sourceProps) : EMPTY_STATIC_PROP_NAMES;
+	for (let index = 0; index < names.length; index++) {
+		const name = names[index];
+		if (name === 'ref' || name === 'key' || name === 'children') {
+			if (props === sourceProps) props = copyUniversalHostPropPrefix(sourceProps, names, index);
+			continue;
+		}
+		const handler = sourceProps[name];
 		if (isUniversalHostBinding(handler)) {
 			if (root.hasHostBindingUnsupportedConfiguration() || name.startsWith('on')) {
 				throw new Error(
@@ -3901,12 +3943,14 @@ function materializeNode(
 			}
 			markUniversalTreeFeature(UNIVERSAL_TREE_HOST_BINDING);
 			(hostBindings ??= new Map()).set(name, handler);
-			props[name] = root.encodeHostProp(node.type, name, handler.getSnapshot());
+			const encoded = root.encodeHostProp(node.type, name, handler.getSnapshot());
+			if (name === '__proto__') defineUniversalProtoProp(props, encoded);
+			else props[name] = encoded;
 			continue;
 		}
 		const lifecycle = root.classifyLifecycle(name, handler);
 		if (lifecycle !== null) {
-			delete props[name];
+			if (props === sourceProps) props = copyUniversalHostPropPrefix(sourceProps, names, index);
 			if (handler == null) continue;
 			if (typeof handler !== 'function') {
 				throw new TypeError(
@@ -3923,7 +3967,7 @@ function materializeNode(
 		}
 		const local = root.classifyLocalCallback(name, handler);
 		if (local !== null) {
-			delete props[name];
+			if (props === sourceProps) props = copyUniversalHostPropPrefix(sourceProps, names, index);
 			if (root.driverCapabilities().localHostCallbacks !== true) {
 				throw new Error(
 					`Universal renderer ${JSON.stringify(renderer)} does not declare the local-host-callback capability.`,
@@ -3945,7 +3989,7 @@ function materializeNode(
 		}
 		const definition = root.classifyEvent(name);
 		if (definition !== null) {
-			delete props[name];
+			if (props === sourceProps) props = copyUniversalHostPropPrefix(sourceProps, names, index);
 			if (handler == null) continue;
 			if (typeof handler !== 'function') {
 				throw new TypeError(
@@ -3962,8 +4006,11 @@ function materializeNode(
 			continue;
 		}
 		if (isRendererRegion(handler)) markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
-		props[name] = root.encodeHostProp(node.type, name, handler);
+		const encoded = root.encodeHostProp(node.type, name, handler);
+		if (name === '__proto__') defineUniversalProtoProp(props, encoded);
+		else props[name] = encoded;
 	}
+	if (props !== sourceProps) Object.setPrototypeOf(props, Object.getPrototypeOf(sourceProps));
 	if (events !== null && events.size !== 0) markUniversalTreeFeature(UNIVERSAL_TREE_EVENT);
 	if (lifecycles !== null && lifecycles.size !== 0)
 		markUniversalTreeFeature(UNIVERSAL_TREE_LIFECYCLE);
@@ -3974,29 +4021,25 @@ function materializeNode(
 	const children: BlueprintNode[] = [];
 	if ((node.children?.length ?? 0) > 0) {
 		for (let index = 0; index < node.children!.length; index++) {
-			children.push(
-				...materializeNode(node.children![index], values, renderer, [...path, 'host', index]),
-			);
+			materializeNode(node.children![index], values, renderer, [...path, 'host', index], children);
 		}
 	} else if (dynamicChildren !== undefined) {
 		children.push(...materializeValue(dynamicChildren, renderer, null, [...path, 'host-children']));
 	}
-	return [
-		{
-			kind: 'host',
-			key: hostKey,
-			type: node.type,
-			props,
-			...(hostBindings === null ? null : { hostBindings }),
-			ref,
-			owner: CURRENT_OWNER!.record,
-			events: events ?? EMPTY_BLUEPRINT_EVENTS,
-			lifecycles: lifecycles ?? EMPTY_BLUEPRINT_HOST_CALLBACKS,
-			localCallbacks: localCallbacks ?? EMPTY_BLUEPRINT_HOST_CALLBACKS,
-			visibility: CURRENT_OWNER!.visibility,
-			children,
-		},
-	];
+	output.push({
+		kind: 'host',
+		key: hostKey,
+		type: node.type,
+		props,
+		...(hostBindings === null ? null : { hostBindings }),
+		ref,
+		owner: CURRENT_OWNER!.record,
+		events: events ?? EMPTY_BLUEPRINT_EVENTS,
+		lifecycles: lifecycles ?? EMPTY_BLUEPRINT_HOST_CALLBACKS,
+		localCallbacks: localCallbacks ?? EMPTY_BLUEPRINT_HOST_CALLBACKS,
+		visibility: CURRENT_OWNER!.visibility,
+		children,
+	});
 }
 
 function materializePlanValue(
@@ -4014,7 +4057,8 @@ function materializePlanValue(
 		if (value.key !== null) collapsed.key = value.key;
 		return [collapsed];
 	}
-	const nodes = materializeNode(value.plan.root, value.values, expectedRenderer, [...path, 'plan']);
+	const nodes: BlueprintNode[] = [];
+	materializeNode(value.plan.root, value.values, expectedRenderer, [...path, 'plan'], nodes);
 	if (
 		currentAttempt().root.driverCapabilities().templateMount === true &&
 		value.plan.root.kind === 'host' &&
@@ -4082,11 +4126,14 @@ function materializeCollapsedTemplate(value: UniversalPlanValue): BlueprintHost 
 			nodes[index] = { props: staticProps };
 			continue;
 		}
-		const props: Record<string, unknown> = { ...(node.props ?? EMPTY_STATIC_HOST_PROPS) };
-		for (const [name, slot] of node.bindings ?? []) props[name] = value.values[slot];
+		const sourceProps: Record<string, unknown> = { ...(node.props ?? EMPTY_STATIC_HOST_PROPS) };
+		for (const [name, slot] of node.bindings ?? []) sourceProps[name] = value.values[slot];
+		let props = sourceProps;
 		let events: BlueprintEvent[] | undefined;
-		for (const name of Object.keys(props)) {
-			const current = props[name];
+		const names = Object.keys(sourceProps);
+		for (let propIndex = 0; propIndex < names.length; propIndex++) {
+			const name = names[propIndex];
+			const current = sourceProps[name];
 			if (
 				isUniversalHostBinding(current) ||
 				root.classifyLifecycle(name, current) !== null ||
@@ -4097,7 +4144,8 @@ function materializeCollapsedTemplate(value: UniversalPlanValue): BlueprintHost 
 			}
 			const definition = root.classifyEvent(name);
 			if (definition !== null) {
-				delete props[name];
+				if (props === sourceProps)
+					props = copyUniversalHostPropPrefix(sourceProps, names, propIndex);
 				if (current == null) continue;
 				if (typeof current !== 'function') return null;
 				(events ??= []).push({
@@ -4109,8 +4157,11 @@ function materializeCollapsedTemplate(value: UniversalPlanValue): BlueprintHost 
 				});
 				continue;
 			}
-			props[name] = root.encodeHostProp(node.type, name, current);
+			const encoded = root.encodeHostProp(node.type, name, current);
+			if (name === '__proto__') defineUniversalProtoProp(props, encoded);
+			else props[name] = encoded;
 		}
+		if (props !== sourceProps) Object.setPrototypeOf(props, Object.getPrototypeOf(sourceProps));
 		if (events !== undefined) markUniversalTreeFeature(UNIVERSAL_TREE_EVENT);
 		nodes[index] = events === undefined ? { props } : { props, events };
 	}
@@ -4295,6 +4346,7 @@ function createLogicalRecord(id: number, blueprint: BlueprintNode): LogicalRecor
 		portalRegistration: null,
 		parent: null,
 		children: [],
+		treeFeatures: null,
 	};
 }
 
@@ -4691,27 +4743,41 @@ function walkDraftPostOrder(record: DraftRecord, visit: (record: DraftRecord) =>
 	visit(record);
 }
 
+/**
+ * Accepted writes invalidate at most the previously cached ancestor chain.
+ * Compact update admissions prove a fixed feature set (zero or fixed template
+ * event sites), so their in-place prop writes preserve these cached unions.
+ */
+function invalidateLogicalTreeFeatures(record: LogicalRecord): void {
+	let current: LogicalRecord | null = record;
+	while (current !== null && current.treeFeatures !== null) {
+		current.treeFeatures = null;
+		current = current.parent;
+	}
+}
+
 function logicalTreeFeatures(record: LogicalRecord): number {
+	if (record.treeFeatures !== null) return record.treeFeatures;
 	let features = 0;
-	walkLogical(record, (current) => {
-		if (current.kind === 'portal') {
-			features |= UNIVERSAL_TREE_PORTAL;
-			return;
+	if (record.kind === 'portal') features |= UNIVERSAL_TREE_PORTAL;
+	else if (record.kind === 'host') {
+		if (record.events.size !== 0 || (record.collapsedTemplate?.events.length ?? 0) !== 0) {
+			features |= UNIVERSAL_TREE_EVENT;
 		}
-		if (current.kind !== 'host') return;
-		if (current.events.size !== 0) features |= UNIVERSAL_TREE_EVENT;
-		if (current.lifecycles.size !== 0) features |= UNIVERSAL_TREE_LIFECYCLE;
-		if (current.localCallbacks.size !== 0) features |= UNIVERSAL_TREE_LOCAL_CALLBACK;
-		if (current.ref != null) features |= UNIVERSAL_TREE_REF;
-		if (current.visibility !== 'visible') features |= UNIVERSAL_TREE_HIDDEN;
-		for (const value of Object.values(current.props)) {
-			if (isRendererRegion(value)) {
+		if (record.lifecycles.size !== 0) features |= UNIVERSAL_TREE_LIFECYCLE;
+		if (record.localCallbacks.size !== 0) features |= UNIVERSAL_TREE_LOCAL_CALLBACK;
+		if (record.ref != null) features |= UNIVERSAL_TREE_REF;
+		if (record.visibility !== 'visible') features |= UNIVERSAL_TREE_HIDDEN;
+		// Own-key enumeration preserves props with user-defined prototype traps.
+		for (const name of Object.keys(record.props)) {
+			if (isRendererRegion(record.props[name])) {
 				features |= UNIVERSAL_TREE_REGION;
 				break;
 			}
 		}
-	});
-	return features;
+	}
+	for (const child of record.children) features |= logicalTreeFeatures(child);
+	return (record.treeFeatures = features);
 }
 
 function ownerTreeHasWarmPlan(owner: UniversalOwnerRecord): boolean {
@@ -4956,16 +5022,7 @@ function resolveHookSlot(slot: unknown): unknown {
 	const own = slot ?? `implicit:${owner.implicitSlot++}`;
 	const depth = UNIVERSAL_SLOT_STACK.length;
 	if (depth === 0) return own;
-	let key = '@octane:universal-hook:';
-	for (let index = 0; index <= depth; index++) {
-		const part = index === depth ? own : UNIVERSAL_SLOT_STACK[index];
-		const value =
-			typeof part === 'symbol'
-				? `s${part.description?.length ?? 0}:${part.description ?? ''}`
-				: `v${String(part).length}:${String(part)}`;
-		key += value;
-	}
-	return Symbol.for(key);
+	return resolveHookPath(UNIVERSAL_SLOT_STACK, own, true);
 }
 
 export function hookSlots(count: number): number {
@@ -6100,16 +6157,18 @@ export function useSyncExternalStore<T>(
 export function useSyncExternalStore<T>(
 	subscribe: (onStoreChange: () => void) => () => void,
 	getSnapshot: () => T,
-	...serverSnapshotAndSlot: unknown[]
+	serverSnapshotOrSlot: unknown = undefined,
+	lastSlot?: unknown,
 ): T {
 	let slot: unknown;
-	if (serverSnapshotAndSlot.length === 1) {
+	const count = arguments.length;
+	if (count === 3) {
 		// An authored two-argument call receives only the compiler slot here. A
 		// direct, uncompiled three-argument call may instead provide a server
 		// snapshot function and relies on the implicit slot fallback.
-		slot = typeof serverSnapshotAndSlot[0] === 'function' ? undefined : serverSnapshotAndSlot[0];
-	} else if (serverSnapshotAndSlot.length > 1) {
-		slot = serverSnapshotAndSlot[serverSnapshotAndSlot.length - 1];
+		slot = typeof serverSnapshotOrSlot === 'function' ? undefined : serverSnapshotOrSlot;
+	} else if (count > 3) {
+		slot = count > 4 ? arguments[count - 1] : lastSlot;
 	}
 	const base = resolveHookSlot(slot);
 	return withSlot(base, () => {
@@ -6146,10 +6205,16 @@ export function useSyncExternalStore<T>(
 	});
 }
 
-export function useDeferredValue<T>(value: T, ...initialValueAndSlot: unknown[]): T {
-	const slot = initialValueAndSlot[initialValueAndSlot.length - 1];
-	const hasInitialValue = initialValueAndSlot.length >= 2;
-	const initialValue = initialValueAndSlot[0] as T;
+export function useDeferredValue<T>(value: T, ...initialValueAndSlot: unknown[]): T;
+export function useDeferredValue<T>(
+	value: T,
+	initialValueOrSlot: unknown = undefined,
+	lastSlot?: unknown,
+): T {
+	const count = arguments.length;
+	const slot = count > 3 ? arguments[count - 1] : count === 3 ? lastSlot : initialValueOrSlot;
+	const hasInitialValue = count >= 3;
+	const initialValue = initialValueOrSlot as T;
 	const base = resolveHookSlot(slot);
 	return withSlot(base, () => {
 		const owner = currentDraftOwner();
@@ -7237,6 +7302,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			portalRegistration: null,
 			parent: null,
 			children: [],
+			treeFeatures: null,
 		};
 		this.initializeHostAttachments();
 	}
@@ -8049,6 +8115,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			if (current === undefined) events.set(entry.index, (current = new Map()));
 			current.set(entry.event.type, entry.event);
 		}
+		// New child records start uncached, so invalidate the previously compact union.
+		invalidateLogicalTreeFeatures(record);
 		const records: LogicalRecord[] = [record];
 		for (let index = 1; index < state.shape.length; index++) {
 			const node = materializeCommittedCollapsedNode(state, index);
@@ -8069,6 +8137,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				portalRegistration: null,
 				parent: records[state.shape[index].parent],
 				children: [],
+				treeFeatures: null,
 			};
 			records.push(child);
 			child.parent!.children.push(child);
@@ -9186,6 +9255,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			owners: [owner],
 			draftLookup: null,
 			treeFeatures: 0,
+			hasCompactLists: false,
 			replayEntries: [],
 			retryThenables: new Set(),
 			nextUniversalId: this.nextUniversalId,
@@ -9251,7 +9321,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		};
 		// Retained compact rows are ordinary expanded host records, so the scoped
 		// blueprint expands the same way before it is compared or reconciled.
-		this.expandCompactLeafLists(blueprint);
+		if (attempt.hasCompactLists) this.expandCompactLeafLists(blueprint);
 		// Structural changes commit through a physical frame for the scope. A
 		// portal or detached ancestor has no such frame, so those scopes fall
 		// back once their shape changes; shape-stable updates need no frame.
@@ -9497,6 +9567,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			owners: [owner],
 			draftLookup: null,
 			treeFeatures: 0,
+			hasCompactLists: false,
 			replayEntries,
 			retryThenables: new Set(),
 			nextUniversalId: this.nextUniversalId,
@@ -10344,7 +10415,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		const hasHostBindings =
 			(this.boundHosts?.size ?? 0) !== 0 ||
 			(attempt.treeFeatures & UNIVERSAL_TREE_HOST_BINDING) !== 0;
-		if (!hasHostBindings) {
+		if (attempt.hasCompactLists && !hasHostBindings) {
 			const compactTemplateUpdate = this.tryCreateCompactTemplateUpdateTransaction(
 				blueprint,
 				attempt,
@@ -10360,7 +10431,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			);
 			if (compactLeafUpdate !== null) return compactLeafUpdate;
 		}
-		this.expandCompactLeafLists(blueprint);
+		if (attempt.hasCompactLists) this.expandCompactLeafLists(blueprint);
 		if (!hasHostBindings) {
 			const stableLeafUpdate = this.tryCreateStableLeafUpdateTransaction(
 				blueprint,
@@ -10498,7 +10569,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				let keys: Set<UniversalKey> | undefined;
 				for (let index = 0; index < blueprints.length; index++) {
 					let child = blueprints[index];
-					if (child.key !== null) {
+					if (child.key !== null && blueprints.length > 1) {
 						keys ??= new Set();
 						if (keys.has(child.key)) {
 							throw new Error(`Duplicate universal child key ${String(child.key)}.`);
@@ -10562,16 +10633,19 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			const keyed = new Map<UniversalKey, LogicalRecord>();
 			for (const old of oldChildren) if (old.key !== null) keyed.set(old.key, old);
 			const claimed = new Set<LogicalRecord>();
-			const nextKeys = new Set<UniversalKey>();
+			let nextKeys: Set<UniversalKey> | undefined;
 			const output: DraftRecord[] = [];
 			for (let childIndex = 0; childIndex < blueprints.length; childIndex++) {
 				let child = blueprints[childIndex];
 				let record: LogicalRecord | undefined;
 				if (child.key !== null) {
-					if (nextKeys.has(child.key)) {
-						throw new Error(`Duplicate universal child key ${String(child.key)}.`);
+					if (blueprints.length > 1) {
+						nextKeys ??= new Set();
+						if (nextKeys.has(child.key)) {
+							throw new Error(`Duplicate universal child key ${String(child.key)}.`);
+						}
+						nextKeys.add(child.key);
 					}
-					nextKeys.add(child.key);
 					const candidate = keyed.get(child.key);
 					if (
 						candidate !== undefined &&
@@ -11868,6 +11942,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			const applyHost = (draft: DraftRecord) => {
 				const record = draft.record;
 				const host = draft.blueprint as BlueprintHost;
+				invalidateLogicalTreeFeatures(record);
 				record.type = host.type;
 				record.props = host.props;
 				record.ref = host.ref;
@@ -11894,6 +11969,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					record.parent = parent;
 					return;
 				}
+				invalidateLogicalTreeFeatures(record);
 				record.parent = parent;
 				record.key = draft.blueprint.key;
 				if (record.kind === 'host') {
@@ -12173,6 +12249,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					? this.treeFeatures | attempt.treeFeatures
 					: attempt.treeFeatures;
 				for (const context of changedContexts) context.$$version++;
+				// Shared epoch must move with every $$version bump — runtime bail
+				// fast paths treat an unmoved epoch as "no context changed".
+				if (changedContexts.size !== 0) bumpContextEpoch();
 				const retainedRegionCells = new Set<RendererRegionBridgeCell>();
 				for (const { next, previous } of stagedRegionBridges) {
 					retainedRegionCells.add(next.activate(previous));
@@ -12622,6 +12701,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					}
 				}
 				this.rootRecord.children = [];
+				this.rootRecord.treeFeatures = null;
 				this.rootRecord.owner = null;
 				let portalReleaseError: unknown = NO_PENDING_PASSIVE_ERROR;
 				for (const registration of portalRegistrations) {
@@ -12782,6 +12862,7 @@ class UniversalBoundHostTransaction<
 			try {
 				// Binding-only batches contain update commands in changed-record order.
 				for (let index = 0; index < this.changedRecords.length; index++) {
+					invalidateLogicalTreeFeatures(this.changedRecords[index]);
 					this.changedRecords[index].props = (
 						this.batch.commands[index] as Extract<UniversalHostCommand, { op: 'update' }>
 					).props;

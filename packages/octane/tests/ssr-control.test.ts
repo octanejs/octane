@@ -5,6 +5,7 @@ import { compile } from 'octane/compiler';
 import { injectStyle } from '../src/index.js';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
+import { loadCompiledFixtureSource } from './_server-fixture';
 
 // SSR Phase 3 — control flow (@if/@for/@switch/@try) + component children +
 // portals emitted to HTML strings with block markers, plus scoped-CSS de-dup.
@@ -60,7 +61,7 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 		expect(code).not.toContain('() => _$ssrBlock(__sitem');
 	});
 
-	it('@for retains per-item async identity when an item can suspend', () => {
+	it('@for keeps async values with their item keys across a retry that reorders the list', async () => {
 		const source = `
 			import { use } from 'octane';
 			export function List(props) @{
@@ -71,8 +72,26 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 				</ul>
 			}
 		`;
-		const code = compile(source, 'suspending-list.tsrx', { mode: 'server' }).code;
-		expect(code).toContain('__html += _$ssrArm');
+		const { List } = loadCompiledFixtureSource(source, {
+			id: 'suspending-list.tsrx',
+			mode: 'server',
+		});
+		let resolveFirst!: (value: string) => void;
+		const items = [
+			{
+				id: 'a',
+				value: new Promise<string>((resolve) => {
+					resolveFirst = resolve;
+				}),
+			},
+			{ id: 'b', value: Promise.resolve('B') },
+		];
+		const pending = prerender(List, { items });
+		items.reverse();
+		resolveFirst('A');
+		const container = document.createElement('div');
+		container.innerHTML = (await pending).html;
+		expect([...container.querySelectorAll('li')].map((row) => row.textContent)).toEqual(['B', 'A']);
 	});
 
 	it('@for retains per-item pairs for multi-root item bodies', () => {
@@ -211,5 +230,99 @@ describe('SSR Phase 3 — scoped CSS across the boundary', () => {
 		expect(out.css).toBe(
 			'<style data-octane="tsrx-server-nonce" nonce="style-&quot;csp">.nonce{color:green}</style>',
 		);
+	});
+
+	it.each(['hydratable', 'static'])(
+		'keeps the final CSS and nonce for repeated styles in %s output',
+		(mode) => {
+			const { createElement: h } = RT;
+			const Sheet = ({ id, css, nonce }: { id: string; css: string; nonce?: string }) => {
+				RT.injectStyle(id, css, nonce);
+				return h('span', null, id);
+			};
+			const App = () =>
+				h(
+					'main',
+					null,
+					h(Sheet, { id: 'shared', css: '.shared{color:red}', nonce: 'first' }),
+					h(Sheet, { id: 'other', css: '.other{color:blue}' }),
+					h(Sheet, { id: 'shared', css: '.shared{color:red}', nonce: 'first' }),
+					h(Sheet, { id: 'shared', css: '.shared{color:green}', nonce: 'first' }),
+					h(Sheet, { id: 'shared', css: '.shared{color:green}', nonce: 'second' }),
+					h(Sheet, { id: 'shared', css: '.shared{color:green}' }),
+				);
+			const render = mode === 'static' ? RT.renderToStaticMarkup : RT.renderToString;
+			const result = render(App, undefined, { nonce: 'request' });
+			expect(result.css).toBe(
+				'<style data-octane="shared" nonce="request">.shared{color:green}</style>' +
+					'<style data-octane="other" nonce="request">.other{color:blue}</style>',
+			);
+			const container = document.createElement('div');
+			container.innerHTML = result.html;
+			expect(Array.from(container.querySelectorAll('span'), (node) => node.textContent)).toEqual([
+				'shared',
+				'other',
+				'shared',
+				'shared',
+				'shared',
+				'shared',
+			]);
+			expect(render(App, undefined, { nonce: 'request' })).toEqual(result);
+		},
+	);
+
+	it('restores repeated styles and nonces after render-phase retries and nested requests', () => {
+		const { App } = loadCompiledFixtureSource(
+			`
+			import { injectStyle, renderToString, useState } from 'octane/server';
+			function Repeated(p) @{
+				injectStyle('shared', p.css, p.nonce);
+				<span>repeated</span>
+			}
+			function Changed() @{
+				injectStyle('shared', '.shared{color:green}', 'accepted');
+				<i>changed</i>
+			}
+			function Retry(p) @{
+				const [phase, setPhase] = useState(0);
+				if (phase < 2) {
+					injectStyle('shared', '.shared{color:blue}', 'discarded');
+					injectStyle('discarded', '.discarded{color:blue}');
+					p.nested.push(renderToString(() => {
+						injectStyle('shared', '.shared{color:purple}', 'nested');
+						return null;
+					}));
+					setPhase(phase + 1);
+				}
+				<b>{phase as string}</b>
+			}
+			export function App(p) @{
+				injectStyle('shared', '.shared{color:red}', 'kept');
+				<main>
+					<Repeated css=".shared{color:red}" nonce="kept"/>
+					<Repeated css=".shared{color:red}" nonce="kept"/>
+					<Changed/>
+					<Repeated css=".shared{color:green}" nonce="accepted"/>
+					<Retry nested={p.nested}/>
+				</main>
+			}
+			`,
+			{ id: 'repeated-styles-retry.tsrx', mode: 'server' },
+		);
+		const nested: RT.RenderResult[] = [];
+		const result = RT.renderToString(App, { nested });
+		expect(result.css).toBe(
+			'<style data-octane="shared" nonce="accepted">.shared{color:green}</style>',
+		);
+		const container = document.createElement('div');
+		container.innerHTML = result.html;
+		expect(container.querySelector('b')?.textContent).toBe('2');
+		expect(container.querySelector('main')?.textContent).toBe('repeatedrepeatedchangedrepeated2');
+		expect(nested.length).toBeGreaterThan(0);
+		for (const output of nested) {
+			expect(output.css).toBe(
+				'<style data-octane="shared" nonce="nested">.shared{color:purple}</style>',
+			);
+		}
 	});
 });

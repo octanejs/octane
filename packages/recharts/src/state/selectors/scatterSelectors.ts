@@ -1,22 +1,22 @@
 import type { RegisteredCell } from '../../context/CellsContext';
 import { createSelector } from 'reselect';
 
-import { computeScatterPoints, ScatterPointItem } from '../../cartesian/Scatter.tsrx';
-import { RechartsRootState } from '../store';
-import { AxisId } from '../cartesianAxisSlice';
+import { computeScatterPoints, type ScatterPointItem } from '../../cartesian/Scatter.tsrx';
+import type { RechartsRootState } from '../store';
+import type { AxisId } from '../cartesianAxisSlice';
 import { selectChartDataWithIndexesIfNotInPanoramaPosition4 } from './dataSelectors';
-import { ChartData, ChartDataState } from '../chartDataSlice';
+import type { ChartData, ChartDataState } from '../chartDataSlice';
 import {
-	BaseAxisWithScale,
+	type BaseAxisWithScale,
 	selectAxisWithScale,
 	selectTicksOfGraphicalItem,
 	selectUnfilteredCartesianItems,
 	selectZAxisWithScale,
-	ZAxisWithScale,
+	type ZAxisWithScale,
 } from './axisSelectors';
 import type { ScatterSettings } from '../types/ScatterSettings';
-import { GraphicalItemId } from '../graphicalItemsSlice';
-import { TickItem } from '../../util/types';
+import type { GraphicalItemId } from '../graphicalItemsSlice';
+import type { TickItem } from '../../util/types';
 
 const selectXAxisWithScale = (
 	state: RechartsRootState,

@@ -1,5 +1,23 @@
 # @octanejs/tanstack-pacer
 
+## 0.0.45
+
+### Patch Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+- Updated dependencies [a6d7f49]
+  - @octanejs/tanstack-store@0.0.50
+
+## 0.0.44
+
+### Patch Changes
+
+- 911ed1d: Update the Pacer adapter to 0.23.0 and the shared scheduler core to 0.22.0. Async debounce, rate-limit and throttle callbacks now preserve awaited result types and suppressed `undefined` results. Retain all entrypoints and verify scheduler ownership, provider isolation and hydration against the updated dependencies.
+
+  Render compiled template children safely in Subscribe while preserving function-as-child callbacks.
+- Updated dependencies [911ed1d]
+  - @octanejs/tanstack-store@0.0.49
+
 ## 0.0.43
 
 ### Patch Changes

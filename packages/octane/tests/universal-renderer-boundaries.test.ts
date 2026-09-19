@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
 	act,
+	createContext as createDomContext,
 	createElement,
 	createRoot,
 	flushSync,
@@ -18,6 +19,7 @@ import {
 	isRendererRegion,
 	rendererRegion,
 	startTransition,
+	universalComponent,
 	universalContext,
 	universalPlan,
 	universalTry,
@@ -28,6 +30,7 @@ import {
 	useState,
 	useTransition,
 	type RendererRegion,
+	type UniversalComponent,
 } from '../src/universal.js';
 import { mount } from './_helpers.js';
 import {
@@ -163,12 +166,166 @@ async function flushBridgeWork(): Promise<void> {
 }
 
 describe('compiler-owned renderer child regions', () => {
+	it.each([
+		['renderer-local', createNativeContext],
+		['DOM', createDomContext],
+	] as const)(
+		'provides %s contexts through generic universal tags and preserves keyed children',
+		(_name, createContext) => {
+			const Theme = createContext('default');
+			const { container, root } = objectRoot();
+			const effects: string[] = [];
+			const updates = new Map<string, (value: number) => void>();
+			const plan = universalPlan('object', {
+				kind: 'host',
+				type: 'context-value',
+				bindings: [
+					['theme', 0],
+					['count', 1],
+				],
+			});
+			const Reader = defineUniversalComponent('object', (props: { id: string }) => {
+				const [count, update] = useState(0, 'generic-context-reader-count');
+				updates.set(props.id, update);
+				useLayoutEffect(
+					() => {
+						effects.push(`mount:${props.id}`);
+						return () => {
+							effects.push(`cleanup:${props.id}`);
+						};
+					},
+					[props.id],
+					'generic-context-reader-effect',
+				);
+				return universalValue(plan, [useContext(Theme), count]);
+			});
+			const Scene = defineUniversalComponent(
+				'object',
+				(props: { entries: Array<{ id: string; theme: string }> }) =>
+					props.entries.map(({ id, theme }) =>
+						universalComponent(
+							'object',
+							Theme as unknown as UniversalComponent,
+							{
+								value: theme,
+								children: () => universalComponent('object', Reader, { id }),
+							},
+							id,
+						),
+					),
+			);
+
+			try {
+				root.render(Scene, {
+					entries: [
+						{ id: 'first', theme: 'dark' },
+						{ id: 'second', theme: 'light' },
+					],
+				});
+				const [first, second] = container.children;
+				expect(first.props).toEqual({ theme: 'dark', count: 0 });
+				expect(second.props).toEqual({ theme: 'light', count: 0 });
+				expect(effects).toEqual(['mount:first', 'mount:second']);
+
+				flushUniversalSync(() => updates.get('first')!(1));
+				expect(first.props.count).toBe(1);
+				root.render(Scene, {
+					entries: [
+						{ id: 'second', theme: 'blue' },
+						{ id: 'first', theme: 'purple' },
+					],
+				});
+				expect(container.children).toHaveLength(2);
+				expect(container.children[0]).toBe(second);
+				expect(container.children[1]).toBe(first);
+				expect(first.props).toEqual({ theme: 'purple', count: 1 });
+				expect(second.props).toEqual({ theme: 'blue', count: 0 });
+				expect(effects).toEqual(['mount:first', 'mount:second']);
+
+				root.render(Scene, { entries: [{ id: 'first', theme: 'green' }] });
+				expect(container.children).toHaveLength(1);
+				expect(container.children[0]).toBe(first);
+				expect(first.props).toEqual({ theme: 'green', count: 1 });
+				expect(effects).toEqual(['mount:first', 'mount:second', 'cleanup:second']);
+			} finally {
+				root.unmount();
+			}
+			expect(container.children).toEqual([]);
+			expect(effects).toEqual(['mount:first', 'mount:second', 'cleanup:second', 'cleanup:first']);
+		},
+	);
+
+	it.each([
+		['renderer-local', createNativeContext],
+		['DOM', createDomContext],
+	] as const)(
+		'remounts a single %s context provider when its descriptor key changes',
+		(_name, createContext) => {
+			const Theme = createContext('default');
+			const { container, root } = objectRoot();
+			const effects: string[] = [];
+			let update!: (value: number) => void;
+			const plan = universalPlan('object', {
+				kind: 'host',
+				type: 'single-context-value',
+				bindings: [
+					['theme', 0],
+					['count', 1],
+				],
+			});
+			const Reader = defineUniversalComponent('object', () => {
+				const [count, setCount] = useState(0, 'single-context-reader-count');
+				update = setCount;
+				useLayoutEffect(
+					() => {
+						effects.push('mount');
+						return () => {
+							effects.push('cleanup');
+						};
+					},
+					[],
+					'single-context-reader-effect',
+				);
+				return universalValue(plan, [useContext(Theme), count]);
+			});
+			const Scene = defineUniversalComponent(
+				'object',
+				(props: { providerKey: string; theme: string }) =>
+					universalComponent('object', Theme as unknown as UniversalComponent, {
+						key: props.providerKey,
+						value: props.theme,
+						children: () => universalComponent('object', Reader),
+					}),
+			);
+
+			try {
+				root.render(Scene, { providerKey: 'initial', theme: 'dark' });
+				const first = container.children[0];
+				expect(first.props).toEqual({ theme: 'dark', count: 0 });
+				flushUniversalSync(() => update(1));
+				root.render(Scene, { providerKey: 'initial', theme: 'light' });
+				expect(container.children[0]).toBe(first);
+				expect(first.props).toEqual({ theme: 'light', count: 1 });
+				expect(effects).toEqual(['mount']);
+
+				root.render(Scene, { providerKey: 'replacement', theme: 'blue' });
+				expect(container.children[0]).not.toBe(first);
+				expect(container.children[0].props).toEqual({ theme: 'blue', count: 0 });
+				expect(effects).toEqual(['mount', 'cleanup', 'mount']);
+			} finally {
+				root.unmount();
+			}
+			expect(container.children).toEqual([]);
+			expect(effects).toEqual(['mount', 'cleanup', 'mount', 'cleanup']);
+		},
+	);
+
 	it('renders renderer-local context providers through DOM owners without replacing their children', () => {
 		const Theme = createNativeContext('default');
 		const Reader = () =>
 			createElement('span', { className: 'renderer-local-theme' }, useDomContext(Theme as any));
 		const Provider = ({ theme }: { theme: string }) =>
-			createElement(Theme.Provider as any, { value: theme }, createElement(Reader, null));
+			createElement(Theme as any, { value: theme }, createElement(Reader, null));
 		const mounted = mount(Provider as unknown as ComponentBody<{ theme: string }>, {
 			theme: 'dark',
 		});

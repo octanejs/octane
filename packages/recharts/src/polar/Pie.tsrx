@@ -16,39 +16,39 @@ import { clsx } from 'clsx';
 import { selectPieLegend, selectPieSectors } from '../state/selectors/pieSelectors';
 import { useAppSelector } from '../state/hooks';
 import { Layer } from '../container/Layer.tsrx';
-import { Curve, Props as CurveProps } from '../shape/Curve.tsrx';
+import { Curve, type Props as CurveProps } from '../shape/Curve.tsrx';
 import { Sector } from '../shape/Sector.tsrx';
 import { Text, type RenderableText, type TextAnchor } from '../component/Text.tsrx';
 import { getMaxRadius, polarToCartesian } from '../util/PolarUtils';
 import { getPercentValue, interpolate, isNumber, mathSign } from '../util/DataUtils';
 import { getTooltipNameProp, getValueByDataKey } from '../util/ChartUtils';
 import {
-	ActiveShape,
+	type ActiveShape,
 	adaptEventsOfChild,
-	AnimationDuration,
-	ChartOffsetInternal,
-	Coordinate,
-	DataConsumer,
-	DataKey,
-	DataProvider,
-	EasingInput,
-	GeometrySector,
-	LegendType,
-	PolarLayout,
-	PresentationAttributesAdaptChildEvent,
-	ShapeAnimationProps,
-	TooltipType,
+	type AnimationDuration,
+	type ChartOffsetInternal,
+	type Coordinate,
+	type DataConsumer,
+	type DataKey,
+	type DataProvider,
+	type EasingInput,
+	type GeometrySector,
+	type LegendType,
+	type PolarLayout,
+	type PresentationAttributesAdaptChildEvent,
+	type ShapeAnimationProps,
+	type TooltipType,
 } from '../util/types';
 import { Shape } from '../util/ActiveShapeUtils.tsrx';
 import {
-	TooltipTriggerInfo,
+	type TooltipTriggerInfo,
 	useMouseClickItemDispatch,
 	useMouseEnterItemDispatch,
 	useMouseLeaveItemDispatch,
 } from '../context/tooltipContext';
-import { TooltipPayload, TooltipPayloadConfiguration } from '../state/tooltipSlice';
+import type { TooltipPayload, TooltipPayloadConfiguration } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
-import { Formatter } from '../component/DefaultTooltipContent.tsrx';
+import type { Formatter } from '../component/DefaultTooltipContent.tsrx';
 import {
 	selectActiveTooltipDataKey,
 	selectActiveTooltipGraphicalItemId,
@@ -61,31 +61,31 @@ import {
 } from '../util/Constants';
 import {
 	AnimatedItems,
-	AnimationInterpolateFn,
+	type AnimationInterpolateFn,
 	useAnimationCallbacks,
 } from '../animation/AnimatedItems.tsrx';
-import { AnimationMatchByProp, matchAppend } from '../animation/matchBy';
-import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import { type AnimationMatchByProp, matchAppend } from '../animation/matchBy';
+import { type RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
 import { SetPolarGraphicalItem } from '../state/SetGraphicalItem';
 import type { PiePresentationProps, PieSettings } from '../state/types/PieSettings';
 import {
 	svgPropertiesNoEvents,
 	svgPropertiesNoEventsFromUnknown,
-	SVGPropsNoEvents,
+	type SVGPropsNoEvents,
 } from '../util/svgPropertiesNoEvents';
 import {
 	LabelListFromLabelProp,
 	PolarLabelListContextProvider,
-	PolarLabelListEntry,
-	Props as LabelListProps,
+	type PolarLabelListEntry,
+	type Props as LabelListProps,
 } from '../component/LabelList.tsrx';
-import { GraphicalItemId } from '../state/graphicalItemsSlice';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
+import type { GraphicalItemId } from '../state/graphicalItemsSlice';
+import { type ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
-import { ChartData } from '../state/chartDataSlice';
+import type { ChartData } from '../state/chartDataSlice';
 import { getClassNameFromUnknown } from '../util/getClassNameFromUnknown';
-import { WithIdRequired } from '../util/useUniqueId';
+import type { WithIdRequired } from '../util/useUniqueId';
 import { usePolarChartLayout } from '../context/chartLayoutContext';
 import { CellsContext, useCellRegistry } from '../context/CellsContext';
 
@@ -1154,17 +1154,17 @@ function PieImpl(props: WithIdRequired<PropsWithResolvedDefaults>) {
 
 	if (sectors == null) {
 		previousSectorsRef.current = null;
-		return <CellsContext.Provider value={cellRegistry}>
+		return <CellsContext value={cellRegistry}>
 			<SetPiePayloadLegend cells={cells} id={id} />
 			<Layer tabIndex={rootTabIndex} className={layerClass}>{props.children}</Layer>
-		</CellsContext.Provider>;
+		</CellsContext>;
 	}
 
 	if (hide) {
 		previousSectorsRef.current = null;
 	}
 
-	return <CellsContext.Provider value={cellRegistry}>
+	return <CellsContext value={cellRegistry}>
 		<SetPiePayloadLegend cells={cells} id={id} />
 		<ZIndexLayer zIndex={props.zIndex}>
 			<SetPieTooltipEntrySettings
@@ -1191,7 +1191,7 @@ function PieImpl(props: WithIdRequired<PropsWithResolvedDefaults>) {
 					: props.children}
 			</Layer>
 		</ZIndexLayer>
-	</CellsContext.Provider>;
+	</CellsContext>;
 }
 
 type PropsWithResolvedDefaults = RequiresDefaultProps<Props, typeof defaultPieProps>;

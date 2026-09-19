@@ -5,6 +5,9 @@ import base from './vitest.config.ts';
 
 export default defineConfig({
 	...base,
+	// Repeated isolated module loads can lose Chromium's transport with HTTP
+	// caching enabled. Serve the adapted lane's module graph without HTTP caching.
+	server: { headers: { 'Cache-Control': 'no-store' } },
 	optimizeDeps: {
 		exclude: ['@mui/internal-test-utils', '@octanejs/testing-library', '@testing-library/react'],
 		include: [

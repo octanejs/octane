@@ -6,7 +6,8 @@ import type { AnyAsyncFunction } from '@tanstack/pacer/types';
 /**
  * An Octane hook that creates a debounced version of an async callback
  * function. The returned function resolves with the callback's result once
- * the debounced execution runs.
+ * the debounced execution runs. Suppressed or disabled calls may resolve with
+ * undefined when no prior result is available.
  *
  * @example
  * ```tsx
@@ -16,10 +17,7 @@ import type { AnyAsyncFunction } from '@tanstack/pacer/types';
 export function useAsyncDebouncedCallback<TFn extends AnyAsyncFunction>(
 	fn: TFn,
 	options: ReactAsyncDebouncerOptions<TFn, {}>,
-): (...args: Parameters<TFn>) => Promise<ReturnType<TFn>> {
+): (...args: Parameters<TFn>) => Promise<Awaited<ReturnType<TFn>> | undefined> {
 	const asyncDebouncedFn = useAsyncDebouncer(fn, options).maybeExecute;
-	return useCallback(
-		(...args) => asyncDebouncedFn(...args) as Promise<ReturnType<TFn>>,
-		[asyncDebouncedFn],
-	);
+	return useCallback((...args) => asyncDebouncedFn(...args), [asyncDebouncedFn]);
 }

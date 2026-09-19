@@ -169,7 +169,7 @@ function statusFromTest(test) {
 	return status;
 }
 
-function collectTests(suites, fileFromSpec) {
+export function collectTests(suites, fileFromSpec) {
 	const tests = [];
 	function visit(suite, ancestors, isRoot) {
 		const title = typeof suite.title === 'string' ? suite.title : '';

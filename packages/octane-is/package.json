@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/octane-is",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Element-kind predicates for Octane, matching react-is 19.2.7's public surface.",
   "license": "MIT",
   "type": "module",
@@ -39,7 +39,7 @@
     "upstream:test": "node ../../scripts/react-parity/run-pristine.mjs octane-is"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0"
+    "octane": "workspace:^"
   },
   "devDependencies": {
     "octane": "workspace:*",

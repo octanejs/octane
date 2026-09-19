@@ -1,3 +1,5 @@
+export { trustHTML, type TrustedHTML } from './trusted-html.js';
+export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.js';
 /**
  * octane server runtime (SSR).
  *
@@ -24,6 +26,9 @@
 // module-global "current scope" (mirroring the client's CURRENT_SCOPE) is safe.
 // ---------------------------------------------------------------------------
 
+import { resolveHookPath } from './hook-slot-cache.js';
+import { encodeBindingKey, isBindingOpenComment, type BindingKey } from './dom-binding-protocol.js';
+
 import {
 	BLOCK_OPEN,
 	BLOCK_CLOSE,
@@ -45,6 +50,9 @@ import {
 	HYDRATE_ID_COUNT_ATTR,
 	HYDRATE_STREAM_TOKEN_ATTR,
 	HYDRATE_SEED_ATTR,
+	INDEPENDENT_HYDRATE_MANIFEST_ATTR,
+	HYDRATE_INDEPENDENT_ATTR,
+	SIGNAL_CONTROL_ATTR,
 	STREAM_BOUNDARY_ATTR,
 	STREAM_SEGMENT_ATTR,
 	STREAM_SEED_ATTR,
@@ -63,6 +71,12 @@ import {
 	// static-markup emission of `ssrEmitElement`.
 	VOID_ELEMENTS,
 } from './constants.js';
+import {
+	createIndependentHydrateManifest,
+	serializeIndependentHydrateManifest,
+	type IndependentHydrateBuildRecord,
+	type IndependentHydrateManifestTemplate,
+} from './independent-hydration-protocol.js';
 import { hasOwnProp } from './has-own.js';
 import { headOwnershipSuffix } from './head-ownership.js';
 import { resourceHintWarning } from './resource-hint-diagnostics.js';
@@ -80,6 +94,7 @@ import {
 	unsupportedAttributeCoercionWarning,
 } from './host-property-diagnostics.js';
 import type { HydrateProps, HydrationStrategy } from './hydration/types.js';
+import { streamedSignalBootstrapJs } from './server/early-signals.js';
 import {
 	applyElementDefaultProps,
 	childElementKey,
@@ -111,6 +126,7 @@ import {
 import { formatServerError } from './error-codes.server.generated.js';
 import { formAuthoringDiagnostics } from './form-diagnostics.js';
 import { isRendererContext, registerServerRendererContextProvider } from './renderer-bridge.js';
+import { registerContext } from './context-identity.js';
 import {
 	validateNativeReadWitness,
 	type NativeReadWitness,
@@ -123,9 +139,121 @@ import {
 	type NativeSeedReads,
 	type NativeSignalManifest,
 } from './signals/native-read-seeds.js';
+import {
+	captureSignalOwner,
+	currentSignalOwner,
+	enterSynchronousSignalOwner,
+	retireSignalOwnerIdentity,
+	restoreSynchronousSignalOwner,
+	runWithSignalOwner,
+} from './signals/owner-context.js';
+import {
+	runWithServerSignalQueryAttemptObserver,
+	type ServerSignalQueryAttempt,
+	type ServerSignalQueryAttemptObservations,
+} from './signals/query-attempt-observer.js';
+import {
+	SIGNAL_BINDING_IDENTITY,
+	SIGNAL_HANDLE,
+	type SignalBindingIdentity,
+	type SignalHandle,
+	type SignalOwner,
+	type SignalRendererOwnerIdentity,
+} from './signals/types.js';
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
 export { validateNativeReadWitness };
 export type { NativeSignalManifest };
+
+function isSignalHandle(value: unknown): value is SignalHandle<unknown> {
+	return (
+		(typeof value === 'object' || typeof value === 'function') &&
+		value !== null &&
+		(value as SignalHandle<unknown>)[SIGNAL_HANDLE] === true
+	);
+}
+
+function readSignalBinding(handle: SignalHandle<unknown>): unknown {
+	// Server bindings must contribute their historical value to the hydration
+	// snapshot. Only client bindings bypass the component-wide read collector.
+	if (RESOLVED !== null && !SERVER_SIGNAL_OWNER_ACTIVE) {
+		return withServerSignalBinding(() => handle.get());
+	}
+	return handle.get();
+}
+
+function withServerSignalBinding<T>(read: () => T): T {
+	ensureServerSignalOwner();
+	const owner = serverSignalOwner(FRAME)!;
+	const injection = (RESOLVED!.resourceOptions as StreamOptions | undefined)?.injection;
+	return runWithSignalOwner(owner, () =>
+		injection?.observeSignalAttempt === undefined
+			? read()
+			: runWithServerSignalQueryAttemptObserver(
+					owner,
+					(attempt) => injection.observeSignalAttempt!(attempt, captureSignalOwner(owner)),
+					injection.createSignalAttemptObservations!,
+					read,
+				),
+	);
+}
+
+function isWritableSignal(value: unknown): value is SignalHandle<unknown> & {
+	readonly kind: 'signal';
+	set(value: unknown): void;
+} {
+	return (
+		isSignalHandle(value) && value.kind === 'signal' && typeof (value as any).set === 'function'
+	);
+}
+
+/** @internal Compiler target for strict server reads of a direct signal binding. */
+export function ssrSignalValue(value: unknown): unknown {
+	return isSignalHandle(value) ? readSignalBinding(value) : value;
+}
+
+const SSR_SIGNAL_CONTROL = /* @__PURE__ */ Symbol('octane.ssr-signal-control');
+
+interface SsrSignalControlValue {
+	readonly [SSR_SIGNAL_CONTROL]: true;
+	readonly value: unknown;
+	readonly site: string;
+	readonly owner: SignalRendererOwnerIdentity;
+	readonly binding: SignalBindingIdentity;
+}
+
+function isSsrSignalControlValue(value: unknown): value is SsrSignalControlValue {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		(value as SsrSignalControlValue)[SSR_SIGNAL_CONTROL] === true
+	);
+}
+
+function unwrapSsrSignalControlValue(value: unknown): unknown {
+	return isSsrSignalControlValue(value) ? value.value : value;
+}
+
+/** @internal Preserve a writable control's identity until the final JSX winner is known. */
+export function ssrSignalControlValue(value: unknown, site: string): unknown {
+	if (!isWritableSignal(value)) return ssrSignalValue(value);
+	if (RESOLVED !== null && !SERVER_SIGNAL_OWNER_ACTIVE) {
+		return withServerSignalBinding(() => serverSignalControlValue(value, site));
+	}
+	return serverSignalControlValue(value, site);
+}
+
+function serverSignalControlValue(value: SignalHandle<unknown>, site: string): unknown {
+	const owner = currentSignalOwner();
+	if (owner === null || !('documentOwner' in owner)) return value.get();
+	if (RESOLVED !== null) RESOLVED.hasSignalControls = true;
+	return {
+		[SSR_SIGNAL_CONTROL]: true,
+		value: value.get(),
+		site,
+		owner,
+		binding: value[SIGNAL_BINDING_IDENTITY](),
+	} satisfies SsrSignalControlValue;
+}
 
 const NATIVE_ARRAY_MAP = Array.prototype.map;
 const NATIVE_REFLECT_APPLY = Reflect.apply;
@@ -310,11 +438,35 @@ const ACTIVE_PU_WARM_PLANS: Array<() => void> = [];
 let CURRENT_PU_WARM_CLAIMS: Set<object> | null = null;
 let ID_COUNTER = 0;
 let ID_PREFIX = '';
+let SIGNAL_INSTANCE_PREFIX = '';
+type ServerSignalInstanceKey = string | Frame;
+let SIGNAL_COMPONENT_INSTANCE_KEY: ServerSignalInstanceKey = '';
+let SERVER_SIGNAL_OWNER_ACTIVE = false;
+let SIGNAL_CONTROL_SITE = '';
+interface ServerSignalListKeys {
+	parent: ServerSignalListKeys | null;
+	key: unknown;
+	mapped: boolean;
+	values: readonly string[] | null;
+}
+// Potential bindings keep raw keys until a real read needs their wire identity.
+// The recipe is persistent because a descendant frame can outlive its list arm.
+const EMPTY_SIGNAL_LIST_KEYS: readonly string[] = [];
+let SIGNAL_LIST_KEYS: ServerSignalListKeys | null = null;
 interface InjectedStyle {
 	css: string;
 	nonce?: string;
 }
-let CSS: Map<string, InjectedStyle> | null = null;
+interface StyleCollector extends Map<string, InjectedStyle> {
+	/** Pristine replay copy for the current contents, released by the next write. */
+	replay: Map<string, InjectedStyle> | null;
+}
+function newStyleCollector(): StyleCollector {
+	const collector = new Map<string, InjectedStyle>() as StyleCollector;
+	collector.replay = null;
+	return collector;
+}
+let CSS: StyleCollector | null = null;
 // Pre-escaped ` nonce="..."` fragment for renderer-owned inline tags emitted
 // during the active pass. Saved/restored with every other ambient so nested or
 // concurrent server renders cannot leak a CSP nonce across requests.
@@ -335,7 +487,15 @@ let PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 // per-pass local capture keeps accumulating via `HEAD.html +=` even though
 // strings are immutable). Folded into the result `html` by `spliceHead` (into
 // a document or leading fragment `<head>`, else prepended).
+interface HeadReplayCollections {
+	hints: Set<string>;
+	sheets: HeadBuffer['sheets'];
+	hintHtml: HeadBuffer['hintHtml'];
+	preloadXfer: HeadBuffer['preloadXfer'];
+}
 interface HeadBuffer {
+	/** Pristine collection copies shared until the next resource write. */
+	replay: HeadReplayCollections | null;
 	html: string;
 	/**
 	 * Priority hoistables, folded ahead of everything else (React Fizz parity:
@@ -435,11 +595,11 @@ interface Frame {
 	// Arm/list-local child counters. The same component position can be visited
 	// in multiple mutually-exclusive scopes during SSR retries; each scope must
 	// retain its own ordinal just as the client retains a separate Block tree.
-	scopedChildren: Map<string, number> | null;
+	scopedChildren: ScopedCounts | null;
 	// Per-site use() occurrence counter (a use() in an inline @for hits the same
 	// site N times → distinct keys). Lazily allocated (never for a use()-free
 	// component, i.e. the common case).
-	occ: Map<string, number> | null;
+	occ: ScopedCounts | null;
 	// Memoized materialized path ('/seg/seg…'); segs are immutable so it's stable.
 	path: string | null;
 	// Whether this component already registered a discovery job this pass (dedupe
@@ -451,12 +611,20 @@ interface Frame {
 	asyncScope: string;
 	/** Parser context supplied by, or inherited through, the component call site. */
 	namespace: 'html' | 'svg' | 'mathml' | undefined;
+	// Potential bindings retain identity on the existing invocation frame, not
+	// an owner or serialized ancestor path. Discovery jobs retain this same node.
+	signalParentKey?: ServerSignalInstanceKey;
+	signalInvocationSite?: string;
+	signalListKeys?: ServerSignalListKeys | null;
+	signalKey?: unknown;
+	signalInstanceKey?: string;
 }
 interface Job {
 	comp: ServerComponent;
 	props: any;
 	parentScope: SSRScope | null;
 	frame: Frame;
+	signalInstanceKey: ServerSignalInstanceKey;
 }
 let SUSPENDED: { promise: PromiseLike<unknown>; key: string }[] | null = null;
 let RESOLVED: ResolvedMap | null = null;
@@ -503,20 +671,68 @@ function asyncFramePath(frame: Frame | null): string {
 	return (frame === null ? '' : framePath(frame)) + ASYNC_SCOPE;
 }
 
+// Scoped counters live in a flat [key, count, …] pair list until they outgrow
+// it: keys are the frame-relative scope suffix (short — see the call sites
+// below), so a short scan compares them directly while a Map would still pay a
+// hash per get/set. Frames seeing more distinct scopes than the limit promote
+// to a Map so a pathological fan-out still gets O(1) lookups.
+type ScopedCounts = (string | number)[] | Map<string, number>;
+const SCOPED_COUNTS_ARRAY_LIMIT = 8;
+
+function nextScopedCount(frame: Frame, slot: 'occ' | 'scopedChildren', key: string): number {
+	let counts = frame[slot];
+	if (counts === null) {
+		frame[slot] = [key, 1];
+		return 0;
+	}
+	if (!Array.isArray(counts)) {
+		const next = counts.get(key) ?? 0;
+		counts.set(key, next + 1);
+		return next;
+	}
+	for (let i = 0; i < counts.length; i += 2) {
+		if (counts[i] === key) {
+			const next = counts[i + 1] as number;
+			counts[i + 1] = next + 1;
+			return next;
+		}
+	}
+	if (counts.length === SCOPED_COUNTS_ARRAY_LIMIT * 2) {
+		const promoted = new Map<string, number>();
+		for (let i = 0; i < counts.length; i += 2) {
+			promoted.set(counts[i] as string, counts[i + 1] as number);
+		}
+		promoted.set(key, 1);
+		frame[slot] = promoted;
+		return 0;
+	}
+	counts.push(key, 1);
+	return 0;
+}
+
+// Every scope key reaching nextScopedCount under `frame` is frame.asyncScope or
+// a membrane extension of it (all ASYNC_SCOPE writes append to, or restore
+// toward, the active frame's scope). The suffix alone discriminates between
+// this frame's scopes, so counters key on it rather than re-scanning a shared
+// path prefix that grows with component depth. Development asserts the prefix
+// invariant: a violated scope would slice to a colliding key and silently merge
+// counters where the old full-path keys stayed unique.
+function scopeSuffix(frame: Frame): string {
+	const scope = ASYNC_SCOPE;
+	if (process.env.NODE_ENV !== 'production' && !scope.startsWith(frame.asyncScope)) {
+		throw new Error(formatServerError(65));
+	}
+	return scope.slice(frame.asyncScope.length);
+}
+
 function nextFrameOccurrence(frame: Frame, base: string): number {
-	if (frame.occ === null) frame.occ = new Map();
-	const scopedBase = ASYNC_SCOPE === frame.asyncScope ? base : ASYNC_SCOPE + '\0' + base;
-	const next = frame.occ.get(scopedBase) ?? 0;
-	frame.occ.set(scopedBase, next + 1);
-	return next;
+	const scopedBase = ASYNC_SCOPE === frame.asyncScope ? base : scopeSuffix(frame) + '\0' + base;
+	return nextScopedCount(frame, 'occ', scopedBase);
 }
 
 function nextChildSegment(frame: Frame): number {
 	if (ASYNC_SCOPE === frame.asyncScope) return frame.nextChild++;
-	if (frame.scopedChildren === null) frame.scopedChildren = new Map();
-	const next = frame.scopedChildren.get(ASYNC_SCOPE) ?? 0;
-	frame.scopedChildren.set(ASYNC_SCOPE, next + 1);
-	return next;
+	return nextScopedCount(frame, 'scopedChildren', scopeSuffix(frame));
 }
 
 function ssrScope(parent: SSRScope | null): SSRScope {
@@ -703,6 +919,8 @@ interface ElementDescriptor {
 	// `createElement(type, props, ...children)` children for the host form; `null`
 	// for the component-value form (children flow through the component's props).
 	children: any;
+	/** @internal Compiler-stable component invocation identity. */
+	__octaneInvocationSite?: string;
 }
 
 // Scoped descriptors keep their ordinary public shape while deferring child
@@ -760,6 +978,13 @@ const SCOPED_VALUE_PROPERTIES: PropertyDescriptorMap = {
 		enumerable: true,
 		get(this: DeferredValue) {
 			return this[SCOPED_VALUE_RESOLVER]().children;
+		},
+	},
+	__octaneInvocationSite: {
+		configurable: true,
+		enumerable: false,
+		get(this: DeferredValue) {
+			return this[SCOPED_VALUE_RESOLVER]().__octaneInvocationSite;
 		},
 	},
 };
@@ -974,6 +1199,11 @@ function scopedValueDescriptor(resolve: () => ElementDescriptor): ElementDescrip
 	Object.defineProperty(descriptor, 'key', SCOPED_VALUE_PROPERTIES.key);
 	Object.defineProperty(descriptor, 'ref', SCOPED_VALUE_PROPERTIES.ref);
 	Object.defineProperty(descriptor, 'children', SCOPED_VALUE_PROPERTIES.children);
+	Object.defineProperty(
+		descriptor,
+		'__octaneInvocationSite',
+		SCOPED_VALUE_PROPERTIES.__octaneInvocationSite,
+	);
 	if (process.env.NODE_ENV !== 'production') Object.freeze(descriptor);
 	return descriptor;
 }
@@ -983,6 +1213,7 @@ export function createScopedElement(
 	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props: any,
 	readChildren: () => unknown,
+	invocationSite?: string,
 ): ElementDescriptor {
 	const src = (props ?? null) as any;
 	const key = hasElementConfigKey(src) ? '' + src.key : null;
@@ -1001,7 +1232,7 @@ export function createScopedElement(
 		}
 		return resolvedChildren;
 	};
-	return scopedElementDescriptor(type, copiedProps, key, children);
+	return scopedElementDescriptor(type, copiedProps, key, children, invocationSite);
 }
 
 /** @internal Native child deferral with evidence on every resolving scope. */
@@ -1009,6 +1240,7 @@ export function nativeCreateScopedElement(
 	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props: any,
 	readChildren: () => unknown,
+	invocationSite?: string,
 ): ElementDescriptor {
 	const src = (props ?? null) as any;
 	const key = hasElementConfigKey(src) ? '' + src.key : null;
@@ -1018,6 +1250,7 @@ export function nativeCreateScopedElement(
 		copiedProps,
 		key,
 		createNativeServerScopedResolver(readChildren),
+		invocationSite,
 	);
 }
 
@@ -1026,6 +1259,7 @@ function scopedElementDescriptor(
 	copiedProps: any,
 	key: string | null,
 	children: () => unknown,
+	invocationSite?: string,
 ): ElementDescriptor {
 	setScopedChildrenResolver(copiedProps, children);
 	SCOPED_ELEMENT_PROPS.add(copiedProps);
@@ -1036,6 +1270,7 @@ function scopedElementDescriptor(
 		key,
 		ref: copiedProps.ref !== undefined ? copiedProps.ref : null,
 	} as ElementDescriptor;
+	if (invocationSite !== undefined) descriptor.__octaneInvocationSite = invocationSite;
 	Object.defineProperty(descriptor, 'children', SCOPED_CHILDREN_PROPERTY);
 	setScopedChildrenResolver(descriptor, children);
 	return finalizeElementDescriptor(descriptor);
@@ -1051,29 +1286,54 @@ export function createElement(
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
+	return createElementFromConfig(undefined, type, props, children);
+}
+
+/** @internal Compiler-authored element descriptor with stable invocation identity. */
+export function createElementAt(
+	invocationSite: string,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
+	props?: any,
+	...children: any[]
+): ElementDescriptor {
+	return createElementFromConfig(invocationSite, type, props, children);
+}
+
+/** @internal Compiler-owned positional children; omitted children allocate no rest array. */
+export function createElementFromConfig(
+	invocationSite: string | undefined,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
+	props: any,
+	children?: any[],
+): ElementDescriptor {
 	if (typeof type === 'function' && isRendererContext(type)) {
 		registerServerRendererContextProvider(renderServerContextProvider);
 	}
 	const src = (props ?? null) as any;
 	const key = hasElementConfigKey(src) ? '' + src.key : null;
-	let kids = children.length > 0 ? (children.length === 1 ? children[0] : children) : src?.children;
-	if (children.length > 1) POSITIONAL_CHILDREN.add(children);
-	if (children.length > 1 && process.env.NODE_ENV !== 'production') Object.freeze(children);
+	const hasPositional = children !== undefined && children.length > 0;
+	let kids = hasPositional ? (children.length === 1 ? children[0] : children) : src?.children;
+	if (children !== undefined && children.length > 1) {
+		POSITIONAL_CHILDREN.add(children);
+		if (process.env.NODE_ENV !== 'production') Object.freeze(children);
+	}
 	// Lift `key` OUT of props (React semantics — key is never a real prop), and mirror
 	// positional children into `props.children` for the same React element shape as the
 	// client runtime. Positional children override an explicit `props.children`.
 	const p = copyElementConfig(src);
-	if (children.length > 0) p.children = kids;
+	if (hasPositional) p.children = kids;
 	applyElementDefaultProps(type, p);
 	kids = p.children;
-	return finalizeElementDescriptor({
+	const descriptor: ElementDescriptor = {
 		$$kind: ELEMENT_TAG,
 		type,
 		props: p,
 		key,
 		ref: p.ref !== undefined ? p.ref : null,
 		children: kids ?? null,
-	});
+	};
+	if (invocationSite !== undefined) descriptor.__octaneInvocationSite = invocationSite;
+	return finalizeElementDescriptor(descriptor);
 }
 
 // Multiple createElement children and compiler-lowered shorthand fragments are
@@ -1413,6 +1673,8 @@ export function cloneElement(
 			children: kids ?? null,
 		};
 	}
+	if (element.__octaneInvocationSite !== undefined)
+		descriptor.__octaneInvocationSite = element.__octaneInvocationSite;
 	return finalizeElementDescriptor(descriptor);
 }
 
@@ -1668,12 +1930,16 @@ export function createPortal(body: unknown, target: unknown, props: any = undefi
 // Escaping
 // ---------------------------------------------------------------------------
 
-// Guarded escapers: a single .test() scan first, so the common no-escape case
-// returns the ORIGINAL string with zero allocation (~5x on clean text). When
-// something does need escaping, native replacement passes are kept —
-// measured faster than an exec-loop or replace-with-callback single pass on V8
-// for both sparse and dense escape densities.
-const HTML_ESCAPE_RE = /[&<>]/g;
+// Guarded escapers: a cheap pre-scan decides whether the ORIGINAL string can
+// be returned with zero allocation. The regexps are deliberately non-global —
+// no lastIndex to reset per call, and a nested render cannot corrupt a shared
+// scan position. escapeHtml splits the pre-scan by length: a regexp .test()
+// has lower fixed cost on short strings, while three memchr-backed indexOf
+// scans win on long ones (crossover measured at ~32 chars). When something
+// does need escaping, native replacement passes are kept — measured faster
+// than an exec-loop or replace-with-callback single pass on V8 for both
+// sparse and dense escape densities.
+const HTML_ESCAPE_RE = /[&<>]/;
 
 // A primitive component return is user text. Only compiler-owned HTML may
 // bypass escaping; carrying the proof with the value also preserves it through
@@ -1689,9 +1955,45 @@ class ServerHtml {
 	}
 }
 
+// Async component results and memoized output can outlive their rendering pass.
+// Restore raw provenance through the existing branded read, keeping ordinary
+// ServerHtml values and their consumption path unchanged.
+class RawServerHtml {
+	constructor(html: string) {
+		this.html = html;
+	}
+	private readonly html: string;
+	get [SERVER_HTML](): string {
+		VT_SSR_HAS_RAW_HTML = true;
+		return this.html;
+	}
+	toString(): string {
+		return this[SERVER_HTML];
+	}
+}
+
 /** @internal Brand the final serialized output of a compiled server body. */
 export function ssrHtml(html: string): string {
-	return typeof html === 'string' ? (new ServerHtml(html) as unknown as string) : html;
+	if (typeof html !== 'string') return html;
+	if (!VT_SSR_HAS_RAW_HTML) return new ServerHtml(html) as unknown as string;
+	// An async continuation runs outside a synchronous pass. Its wrapper now
+	// owns this provenance; do not leave it behind for an unrelated continuation.
+	if (CURRENT_SCOPE === null) VT_SSR_HAS_RAW_HTML = false;
+	return new RawServerHtml(html) as unknown as string;
+}
+
+const BINDING_HTML_ROOT = /* @__PURE__ */ Symbol.for('octane.binding.html');
+
+/** @internal Preserve the existing component range while identifying an authored binding view. */
+export function ssrBindingHtml(html: string, id: string): string {
+	const output = new ServerHtml(html) as ServerHtml & { [BINDING_HTML_ROOT]: string };
+	output[BINDING_HTML_ROOT] = '[b;' + id + ';root';
+	return output as unknown as string;
+}
+
+/** @internal Match the client definition-site boundary capability. */
+export function bindPresentationView<T extends Function>(view: T, _id: string): T {
+	return markComponentFlags(view, COMPONENT_FLAG_BOUNDARY, view.name);
 }
 
 function serverComponentOutput(out: unknown, scope: SSRScope): string {
@@ -1703,17 +2005,19 @@ function serverComponentOutput(out: unknown, scope: SSRScope): string {
 
 export function escapeHtml(v: unknown): string {
 	const s = typeof v === 'string' ? v : String(v);
-	HTML_ESCAPE_RE.lastIndex = 0;
-	if (!HTML_ESCAPE_RE.test(s)) return s;
+	const needsEscape =
+		s.length < 32
+			? HTML_ESCAPE_RE.test(s)
+			: s.indexOf('&') !== -1 || s.indexOf('<') !== -1 || s.indexOf('>') !== -1;
+	if (!needsEscape) return s;
 	return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
-const ATTR_ESCAPE_RE = /[&"]/g;
+const ATTR_ESCAPE_RE = /[&"]/;
 export function escapeAttr(v: unknown): string {
 	const s = typeof v === 'string' ? v : String(v);
-	ATTR_ESCAPE_RE.lastIndex = 0;
 	if (!ATTR_ESCAPE_RE.test(s)) return s;
-	return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+	return s.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 }
 
 // ---------------------------------------------------------------------------
@@ -1756,16 +2060,37 @@ export function ssrTextPre(v: unknown): string {
 // with a distinct non-null children field need a repaired props object.
 function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
 	if (SCOPED_ELEMENT_PROPS.has(d.props)) {
-		return ssrComponent(scope, d.type as ServerComponent, d.props);
+		return ssrComponent(
+			scope,
+			d.type as ServerComponent,
+			d.props,
+			undefined,
+			d.key ?? undefined,
+			undefined,
+			d.__octaneInvocationSite,
+		);
 	}
 	const children = d.children;
 	if (children == null || children === d.props?.children) {
-		return ssrComponent(scope, d.type as ServerComponent, d.props);
+		return ssrComponent(
+			scope,
+			d.type as ServerComponent,
+			d.props,
+			undefined,
+			d.key ?? undefined,
+			undefined,
+			d.__octaneInvocationSite,
+		);
 	}
-	return ssrComponent(scope, d.type as ServerComponent, {
-		...d.props,
-		children,
-	});
+	return ssrComponent(
+		scope,
+		d.type as ServerComponent,
+		{ ...d.props, children },
+		undefined,
+		d.key ?? undefined,
+		undefined,
+		d.__octaneInvocationSite,
+	);
 }
 
 /**
@@ -1776,8 +2101,28 @@ function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
  * `{x as string}` / literals / `+`-concats to `ssrText`, everything else here.
  */
 export function ssrChild(v: unknown, scope: SSRScope): string {
+	if (isSignalHandle(v)) {
+		v = readSignalBinding(v);
+	}
 	if (probingDangerHtmlChild(v)) return '';
 	return ssrChildValue(v, scope, true);
+}
+
+/** @internal Give an authored child slot an identity without adding a second hydration range. */
+export function ssrBindingChild(value: unknown, scope: SSRScope, marker: string): string {
+	const html = ssrChild(value, scope);
+	if (!MARKERS) return html;
+	// Ordinary renderables already own exactly one child-slot range. The private
+	// compiled-HTML carrier is the sole unframed exception.
+	const openingEnd = html.indexOf('-->');
+	const framed =
+		html.startsWith(BLOCK_OPEN) ||
+		(html.startsWith('<!--') &&
+			openingEnd !== -1 &&
+			isBindingOpenComment(html.slice(4, openingEnd)));
+	const content =
+		framed && html.endsWith(BLOCK_CLOSE) ? html.slice(openingEnd + 3, -BLOCK_CLOSE.length) : html;
+	return ssrBindingBlock(content, marker);
 }
 
 function ssrChildValue(
@@ -2009,6 +2354,7 @@ function ssrHostElement(
 		}
 		let inner = '';
 		if (hasDangerHTML) {
+			VT_SSR_HAS_RAW_HTML = true;
 			const html = (innerHTMLValue as { __html?: unknown }).__html;
 			const raw = html == null ? '' : String(html);
 			// HTML tag names are ASCII case-insensitive on the public descriptor path
@@ -2226,6 +2572,34 @@ export function ssrBlock(content: string): string {
 	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : String(content);
 }
 
+/** @internal Opt-in identity payload on an otherwise ordinary hydration range. */
+export function ssrBindingBlock(content: string, marker: string): string {
+	return MARKERS ? '<!--' + marker + '-->' + content + BLOCK_CLOSE : String(content);
+}
+
+/** @internal Authenticate keyed item identity before emitting any item HTML. */
+export function ssrBindingKey(key: unknown, seen: Set<string>): string {
+	const encoded = encodeBindingKey(key as BindingKey);
+	if (seen.has(encoded)) throw new TypeError(formatServerError(73));
+	seen.add(encoded);
+	return encoded;
+}
+
+/** @internal One evaluation supplies both presentation classes and their adoption receipt. */
+export function ssrBindingClass(receipt: string, values: [unknown, unknown[]]): string {
+	const snapshot = [normalizeClass(values[0]), values[1].map(normalizeClass)] as const;
+	const classes = [snapshot[0], ...snapshot[1]].filter(Boolean).join(' ');
+	return (
+		' class="' +
+		escapeAttr(classes) +
+		'" ' +
+		receipt +
+		'="' +
+		escapeAttr(JSON.stringify(snapshot)) +
+		'"'
+	);
+}
+
 /**
  * Preserve a Fragment ref's authored evaluation order without attaching its
  * value. Hydratable output needs the exact comments its client template adopts;
@@ -2369,20 +2743,74 @@ function withAsyncListScope<T>(kind: string, fn: () => T): T {
 export function ssrControl<T>(siteKey: string, fn: () => T): T {
 	const frame = FRAME;
 	const occurrence = frame === null ? 0 : nextFrameOccurrence(frame, '@control:' + siteKey);
-	return withAsyncIdentity('control:' + siteKey, occurrence, fn);
+	const previousSignalControl = SIGNAL_CONTROL_SITE;
+	SIGNAL_CONTROL_SITE = siteKey;
+	try {
+		return withAsyncIdentity('control:' + siteKey, occurrence, fn);
+	} finally {
+		SIGNAL_CONTROL_SITE = previousSignalControl;
+	}
+}
+
+function enterAsyncArm(armKey: unknown, mapped = false): void {
+	const previous = ASYNC_SCOPE;
+	const frame = FRAME;
+	// The counter key already carries the frame-relative scope suffix; embedding
+	// `previous` again would only lengthen every stored key without changing the
+	// (frame, scope) partition the counter counts within.
+	const occurrence = frame === null ? 0 : nextFrameOccurrence(frame, '@arm-position:');
+	// A freshly allocated object key has no cross-pass identity. Reuse the same
+	// lexical item position only as its fallback lookup. The final scope remains
+	// keyed solely by armKey, so a stable primitive/object key keeps its identity
+	// when an @for reorders between streaming passes. Only object/function/symbol
+	// keys ever consult the fallback (asyncIdentityKey), so primitive-keyed arms
+	// skip building the position string.
+	const fallbackPosition =
+		armKey !== null &&
+		(typeof armKey === 'object' || typeof armKey === 'function' || typeof armKey === 'symbol')
+			? previous + '|@arm-position:' + occurrence
+			: undefined;
+	if (SERVER_SIGNAL_BINDINGS_POTENTIAL && SIGNAL_CONTROL_SITE.charCodeAt(0) === 102) {
+		SIGNAL_LIST_KEYS = { parent: SIGNAL_LIST_KEYS, key: armKey, mapped, values: null };
+	}
+	ASYNC_SCOPE = previous + '|@arm:' + asyncIdentityKey(armKey, false, fallbackPosition);
 }
 
 /** Compiler-emitted identity membrane for one arm/item inside ssrControl. */
 export function ssrArm<T>(armKey: unknown, fn: () => T): T {
-	const frame = FRAME;
-	const occurrence =
-		frame === null ? 0 : nextFrameOccurrence(frame, '@arm-position:' + ASYNC_SCOPE);
-	// A freshly allocated object key has no cross-pass identity. Reuse the same
-	// lexical item position only as its fallback lookup. The final scope remains
-	// keyed solely by armKey, so a stable primitive/object key keeps its identity
-	// when an @for reorders between streaming passes.
-	const fallbackPosition = ASYNC_SCOPE + '|@arm-position:' + occurrence;
-	return withAsyncIdentity('arm', armKey, fn, false, fallbackPosition);
+	const previous = ASYNC_SCOPE;
+	const previousSignalKeys = SIGNAL_LIST_KEYS;
+	try {
+		enterAsyncArm(armKey);
+		return fn();
+	} finally {
+		ASYNC_SCOPE = previous;
+		SIGNAL_LIST_KEYS = previousSignalKeys;
+	}
+}
+
+/** Invoke a compiled list body without allocating a callback per item. */
+export function ssrForItem(
+	armKey: unknown,
+	fn: (...args: any[]) => string,
+	item: unknown,
+	index: number | undefined,
+	scope: SSRScope,
+	block: boolean,
+	mapped = false,
+): string {
+	const previous = ASYNC_SCOPE;
+	const previousSignalKeys = SIGNAL_LIST_KEYS;
+	try {
+		enterAsyncArm(armKey, mapped);
+		// Preserve the authored body's parameter/default evaluation and exact
+		// argument count, including an @for that declares no index binding.
+		const html = index === undefined ? fn(item, scope) : fn(item, index, scope);
+		return block ? ssrBlock(html) : html;
+	} finally {
+		ASYNC_SCOPE = previous;
+		SIGNAL_LIST_KEYS = previousSignalKeys;
+	}
 }
 
 /**
@@ -2517,14 +2945,14 @@ export function ssrAttr(
 	tag?: string,
 	namespace: AttributeNamespace = 'html',
 ): string {
+	// Hoisted env check: each `dev` use would otherwise be a fresh
+	// `process.env` lookup. Must stay the first statement — bundlers only
+	// fold the check into its uses (keeping prod bundles free of dev
+	// warnings) while it syntactically precedes other statements.
+	const dev = process.env.NODE_ENV !== 'production';
 	namespace = resolveAttributeNamespace(namespace);
 	const isCustomTag = namespace === 'html' && tag !== undefined && tag.indexOf('-') !== -1;
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		!isCustomTag &&
-		tag !== undefined &&
-		DEV_SSR_CUSTOM_HOST_DEPTH === 0
-	) {
+	if (dev && !isCustomTag && tag !== undefined && DEV_SSR_CUSTOM_HOST_DEPTH === 0) {
 		const warning = isAriaAttributeName(name)
 			? ariaAttributeWarning(name, tag)
 			: hostPropertyWarning(
@@ -2550,11 +2978,7 @@ export function ssrAttr(
 		}
 		const alias = ATTRIBUTE_ALIASES.get(name);
 		if (alias !== undefined) name = alias;
-		else if (
-			process.env.NODE_ENV !== 'production' &&
-			(tag === 'button' || tag === 'input') &&
-			name === 'formAction'
-		) {
+		else if (dev && (tag === 'button' || tag === 'input') && name === 'formAction') {
 			name = 'formaction';
 		}
 	}
@@ -2607,7 +3031,7 @@ export function ssrAttr(
 		) {
 			return '';
 		}
-		if (process.env.NODE_ENV !== 'production' && !isCustomTag && tag !== undefined) {
+		if (dev && !isCustomTag && tag !== undefined) {
 			if (
 				t === 'function' &&
 				name.length > 2 &&
@@ -2644,7 +3068,7 @@ export function ssrAttr(
 		// the canonical `attr=""` presence form, falsy drops — mirroring the
 		// client's coerceAttrValue byte-for-byte (hydration parity).
 		if (BOOLEAN_ATTR_PROPS.has(lower)) {
-			if (process.env.NODE_ENV !== 'production' && tag !== undefined) {
+			if (dev && tag !== undefined) {
 				const warning = booleanAttributeStringWarning(name, v);
 				if (warning !== null) devWarnSsrAttributeOnce(name, warning);
 			}
@@ -2665,7 +3089,7 @@ export function ssrAttr(
 		// Booleans on non-boolean attributes never serialize (client parity:
 		// `title={true}` removes).
 		if (t === 'boolean') {
-			if (process.env.NODE_ENV !== 'production' && tag !== undefined) {
+			if (dev && tag !== undefined) {
 				devWarnSsrAttributeOnce(
 					name,
 					`Received \`${v}\` for a non-boolean attribute \`${name}\`. ` +
@@ -2685,7 +3109,7 @@ export function ssrAttr(
 	// A plain object has no useful attribute representation. Objects with an
 	// intentional toString retain their normal coercion and stay silent.
 	if (
-		process.env.NODE_ENV !== 'production' &&
+		dev &&
 		!isCustomTag &&
 		tag !== undefined &&
 		t === 'object' &&
@@ -2697,20 +3121,14 @@ export function ssrAttr(
 				'"[object Object]". Pass a string (or a value with a meaningful toString) instead.',
 		);
 	}
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		!isCustomTag &&
-		tag !== undefined &&
-		t === 'number' &&
-		Number.isNaN(v)
-	) {
+	if (dev && !isCustomTag && tag !== undefined && t === 'number' && Number.isNaN(v)) {
 		devWarnSsrAttributeOnce(
 			name,
 			`Received NaN for the \`${name}\` attribute. If this is expected, cast the value to a string.`,
 		);
 	}
 	let s: string;
-	if (process.env.NODE_ENV !== 'production' && !isCustomTag && tag !== undefined) {
+	if (dev && !isCustomTag && tag !== undefined) {
 		try {
 			s = v === true ? '' : String(v);
 		} catch (error) {
@@ -2732,7 +3150,7 @@ export function ssrAttr(
 			(name === 'href' && tag !== undefined && tag !== 'a' && tag !== 'area') ||
 			(name === 'data' && tag === 'object'))
 	) {
-		if (process.env.NODE_ENV !== 'production' && !isCustomTag && tag !== undefined) {
+		if (dev && !isCustomTag && tag !== undefined) {
 			devWarnSsrAttributeOnce('empty:' + name, emptyResourceUrlWarning(name));
 		}
 		return '';
@@ -2742,6 +3160,7 @@ export function ssrAttr(
 }
 
 function styleObjectToCss(obj: Record<string, unknown>): string {
+	const dev = process.env.NODE_ENV !== 'production';
 	let out = '';
 	for (const k in obj) {
 		const val = obj[k];
@@ -2750,7 +3169,7 @@ function styleObjectToCss(obj: Record<string, unknown>): string {
 		if (val == null || typeof val === 'boolean') continue;
 		// React parity: numeric values get `px` (except 0 / unitless / custom props).
 		let serialized: string;
-		if (process.env.NODE_ENV !== 'production' && SSR_NESTING_WARNINGS !== null) {
+		if (dev && SSR_NESTING_WARNINGS !== null) {
 			devWarnStyleProperty(k, val, true);
 			try {
 				serialized = cssStyleValue(k, val);
@@ -2860,7 +3279,9 @@ export function ssrAttrs(
 	tag?: string,
 	namespace: AttributeNamespace = 'html',
 	skipFormControls = false,
+	readStyle?: (value: unknown) => unknown,
 ): string {
+	const dev = process.env.NODE_ENV !== 'production';
 	namespace = resolveAttributeNamespace(namespace);
 	interface PropWriter {
 		name: string;
@@ -2909,7 +3330,7 @@ export function ssrAttrs(
 		}
 	}
 
-	if (process.env.NODE_ENV === 'production' && classMerges === null) {
+	if (!dev && classMerges === null) {
 		let canonical = true;
 		for (const name of props.keys()) {
 			if (
@@ -2930,7 +3351,12 @@ export function ssrAttrs(
 					(skipFormControls && isAggregatedFormAttribute(tag, rawName))
 				)
 					continue;
-				out += ssrAttrEntry(rawName, value, tag, namespace);
+				out += ssrAttrEntry(
+					rawName,
+					readStyle !== undefined && rawName === 'style' ? readStyle(value) : value,
+					tag,
+					namespace,
+				);
 			}
 			return out;
 		}
@@ -2970,10 +3396,7 @@ export function ssrAttrs(
 			// an earlier normalized identity without moving its Map entry.
 			needsWinningOrderSort = true;
 		}
-		writer.name =
-			process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
-				? rawName
-				: name;
+		writer.name = dev && (rawName === 'tabIndex' || rawName === 'htmlFor') ? rawName : name;
 		resolved.set(identity, writer);
 	}
 	if (classMerges !== null) {
@@ -2993,13 +3416,12 @@ export function ssrAttrs(
 		}
 	}
 
+	const style = resolved.get('style');
+	if (readStyle !== undefined && style !== undefined) style.value = readStyle(style.value);
 	let out = '';
-	const ordered =
-		process.env.NODE_ENV !== 'production' || needsWinningOrderSort
-			? [...resolved.values()]
-			: resolved.values();
+	const ordered = dev || needsWinningOrderSort ? [...resolved.values()] : resolved.values();
 	if (needsWinningOrderSort) (ordered as PropWriter[]).sort((a, b) => a.firstOrder - b.firstOrder);
-	if (process.env.NODE_ENV !== 'production') {
+	if (dev) {
 		devValidateSsrAriaProps(
 			(ordered as PropWriter[]).map(({ name }) => name),
 			tag,
@@ -3019,7 +3441,7 @@ export function ssrAttrs(
 		}
 	}
 	if (
-		process.env.NODE_ENV !== 'production' &&
+		dev &&
 		(ordered as PropWriter[]).some(({ name, value }) => name === 'is' && typeof value === 'string')
 	) {
 		DEV_SSR_CUSTOM_HOST_DEPTH++;
@@ -3067,7 +3489,11 @@ export function ssrClass(sources: Array<[boolean, unknown]>): string {
  * string keys participate, and getters run once at the spread's authored
  * evaluation position before later direct prop expressions.
  */
-export function ssrSnapshotSpread(obj: unknown): Record<string, unknown> | null {
+export function ssrSnapshotSpread(
+	obj: unknown,
+	controlSite?: string,
+	deferStyle = false,
+): Record<string, unknown> | null {
 	if (obj == null) return null;
 	const source = Object(obj) as Record<PropertyKey, unknown>;
 	const snapshot: Record<string, unknown> = Object.create(null);
@@ -3076,8 +3502,33 @@ export function ssrSnapshotSpread(obj: unknown): Record<string, unknown> | null 
 	// authored position; retain only string keys after performing each read.
 	for (const key of Reflect.ownKeys(source)) {
 		if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue;
-		const value = source[key];
-		if (typeof key === 'string') snapshot[key] = value;
+		let value = source[key];
+		if (typeof key !== 'string') continue;
+		if (key === 'style' && deferStyle) {
+			// Native style reads happen after JSX precedence chooses the winner.
+			snapshot[key] = value;
+			continue;
+		}
+		if (
+			controlSite !== undefined &&
+			(key === 'value' || key === 'checked') &&
+			isWritableSignal(value)
+		) {
+			value = ssrSignalControlValue(value, controlSite);
+		} else if (isSignalHandle(value)) value = readSignalBinding(value);
+		else if (key === 'style' && value !== null && typeof value === 'object') {
+			// Non-native SSR retains targeted binding reads, without introducing
+			// native observation or allocating snapshots for ordinary styles.
+			let style: Record<string, unknown> | undefined;
+			for (const name of Object.keys(value)) {
+				const current = (value as Record<string, unknown>)[name];
+				if (!isSignalHandle(current)) continue;
+				style ??= { ...(value as Record<string, unknown>) };
+				style[name] = readSignalBinding(current);
+			}
+			if (style !== undefined) value = style;
+		}
+		snapshot[key] = value;
 	}
 	return snapshot;
 }
@@ -3162,6 +3613,7 @@ export function ssrInnerHtml(
 			}
 		}
 		const html = (value as { __html?: unknown }).__html;
+		VT_SSR_HAS_RAW_HTML = true;
 		return html == null ? '' : String(html);
 	}
 	return undefined;
@@ -3253,6 +3705,7 @@ export function ssrSpreadContent(
 		}
 		if (child != null) throw new Error(formatServerError(5));
 		const value = (html as { __html?: unknown }).__html;
+		VT_SSR_HAS_RAW_HTML = true;
 		return value == null ? '' : String(value);
 	}
 	return child === undefined ? '' : ssrChildText(child, scope);
@@ -3323,12 +3776,14 @@ export function ssrFormAuthoringDiagnostics(
  * (the generic ssrAttr would DROP a false boolean); only nullish omits.
  */
 export function ssrValueAttr(v: unknown): string {
+	v = unwrapSsrSignalControlValue(v);
 	if (v == null || typeof v === 'function' || typeof v === 'symbol') return '';
 	return ' value="' + escapeAttr(typeof v === 'string' ? v : String(v)) + '"';
 }
 
 /** The `checked` attribute (presence semantics; mirrors setChecked's `!!v`). */
 export function ssrCheckedAttr(v: unknown): string {
+	v = unwrapSsrSignalControlValue(v);
 	return v == null || !v ? '' : ' checked';
 }
 
@@ -3345,10 +3800,10 @@ export function ssrInputAttrs(
 	const props = resolveFormControlSources(sources);
 	if (process.env.NODE_ENV !== 'production') {
 		devValidateSsrFormProps('input', {
-			value: props.value,
-			defaultValue: props.defaultValue,
-			checked: props.checked,
-			defaultChecked: props.defaultChecked,
+			value: unwrapSsrSignalControlValue(props.value),
+			defaultValue: unwrapSsrSignalControlValue(props.defaultValue),
+			checked: unwrapSsrSignalControlValue(props.checked),
+			defaultChecked: unwrapSsrSignalControlValue(props.defaultChecked),
 		});
 	}
 	return (
@@ -3358,6 +3813,32 @@ export function ssrInputAttrs(
 }
 
 type SsrFormControlSource = readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown];
+
+/** @internal Join the final writable control winners to the baked control-site key. */
+export function ssrSignalControlAttrs(sources: readonly SsrFormControlSource[]): string {
+	const props = resolveFormControlSources(sources);
+	const controls: Array<readonly [string, string, 'value' | 'checked']> = [];
+	let ownerKey: string | undefined;
+	const record = (value: unknown, channel: 'value' | 'checked'): void => {
+		if (!isSsrSignalControlValue(value)) return;
+		const documentKey = value.owner.documentOwner.scopeKey;
+		if (ownerKey !== undefined && ownerKey !== documentKey) {
+			throw new Error(formatServerError(68));
+		}
+		ownerKey = documentKey;
+		controls.push([
+			value.binding.scope === 'document' ? '' : value.owner.instanceKey,
+			value.binding.nodeKey,
+			channel,
+		]);
+	};
+	record(props.value, 'value');
+	record(props.checked, 'checked');
+	if (controls.length === 0) return '';
+	return (
+		' ' + SIGNAL_CONTROL_ATTR + '="' + escapeAttr(JSON.stringify([1, ownerKey, controls])) + '"'
+	);
+}
 
 interface ResolvedFormControlSources {
 	value: unknown;
@@ -3429,6 +3910,7 @@ function resolveFormControlSources(
  * Mirrors the client's toControlledString (booleans/numbers stringify).
  */
 export function ssrTextareaValue(v: unknown): string {
+	v = unwrapSsrSignalControlValue(v);
 	if (v == null) return '';
 	const s = escapeHtml(typeof v === 'string' ? v : String(v));
 	return s.charCodeAt(0) === 10 ? '\n' + s : s;
@@ -3445,8 +3927,8 @@ export function ssrTextareaValueSources(
 	const props = resolveFormControlSources(sources);
 	if (process.env.NODE_ENV !== 'production') {
 		devValidateSsrFormProps('textarea', {
-			value: props.value,
-			defaultValue: props.defaultValue,
+			value: unwrapSsrSignalControlValue(props.value),
+			defaultValue: unwrapSsrSignalControlValue(props.defaultValue),
 		});
 	}
 	const value = props.value ?? props.defaultValue;
@@ -3484,6 +3966,8 @@ export function ssrSelectScope(
 	multiple: unknown,
 	children: () => string,
 ): string {
+	value = unwrapSsrSignalControlValue(value);
+	defaultValue = unwrapSsrSignalControlValue(defaultValue);
 	if (process.env.NODE_ENV !== 'production') {
 		devValidateSsrFormProps('select', { value, defaultValue, multiple });
 	}
@@ -3637,8 +4121,8 @@ interface NativeLocalHookRec {
 type AnyHookRec = HookRec | LinkedHookRec<any, any> | MemoHookRec | RefHookRec | NativeLocalHookRec;
 type ServerHookSlot = symbol | string | number;
 
-// Server twin of the client helper/custom-hook ABI. Modules reserve a range
-// only when globally composable Symbol descriptions are required.
+// Server twin of the client slot ABI. Modules reserve disjoint ranges for
+// numeric base-hook identities and globally composable Symbol descriptions.
 let nextHookSlot = 0;
 export function hookSlots(count: number): number {
 	const base = nextHookSlot;
@@ -3647,10 +4131,11 @@ export function hookSlots(count: number): number {
 }
 
 interface HookPass {
-	/** Slot → occurrence-indexed records, persisting across this body's passes. */
-	hooks: Map<ServerHookSlot, AnyHookRec[]>;
+	/** Slot → occurrence-indexed records, persisting across this body's passes.
+	 * Allocated on first hook use — most presentational bodies never call one. */
+	hooks: Map<ServerHookSlot, AnyHookRec[]> | null;
 	/** Per-pass occurrence counters (fresh each pass, like Frame.occ). */
-	occ: Map<ServerHookSlot, number>;
+	occ: Map<ServerHookSlot, number> | null;
 	/** A dispatch fired during the current pass → re-invoke the body. */
 	update: boolean;
 }
@@ -3666,22 +4151,6 @@ const HOOK_SLOT_PATH: ServerHookSlot[] = [];
 // Key for slot-less hook calls outside any withSlot (plain call-order keying).
 const NO_SLOT = '@state';
 
-function appendHookSlotPath(key: string, slot: ServerHookSlot): string {
-	let type: string;
-	let value: string;
-	if (typeof slot === 'number') {
-		type = 'n';
-		value = String(slot);
-	} else if (typeof slot === 'symbol') {
-		type = 's';
-		value = slot.description ?? '';
-	} else {
-		type = 't';
-		value = slot;
-	}
-	return key + type + value.length + ':' + value;
-}
-
 function resolveHookSlot(slot: unknown): ServerHookSlot {
 	const own: ServerHookSlot | undefined =
 		typeof slot === 'symbol' || typeof slot === 'string' || typeof slot === 'number'
@@ -3691,10 +4160,7 @@ function resolveHookSlot(slot: unknown): ServerHookSlot {
 	if (depth === 0) return own ?? NO_SLOT;
 	if (own === undefined && depth === 1) return HOOK_SLOT_PATH[0];
 
-	let key = '@octane:hook:';
-	for (let i = 0; i < depth; i++) key = appendHookSlotPath(key, HOOK_SLOT_PATH[i]);
-	if (own !== undefined) key = appendHookSlotPath(key, own);
-	return Symbol.for(key);
+	return resolveHookPath(HOOK_SLOT_PATH, own, false, true);
 }
 
 // React's cap (and message shape): a dispatch that fires unconditionally during
@@ -3713,10 +4179,12 @@ function hookPosition(slot: unknown): {
 	const hp = HOOK_PASS;
 	if (hp === null) return null;
 	const key = resolveHookSlot(slot);
-	const index = hp.occ.get(key) ?? 0;
-	hp.occ.set(key, index + 1);
-	let list = hp.hooks.get(key);
-	if (list === undefined) hp.hooks.set(key, (list = []));
+	const occ = (hp.occ ??= new Map());
+	const index = occ.get(key) ?? 0;
+	occ.set(key, index + 1);
+	const hooks = (hp.hooks ??= new Map());
+	let list = hooks.get(key);
+	if (list === undefined) hooks.set(key, (list = []));
 	return { hp, list, index };
 }
 
@@ -3824,9 +4292,82 @@ function stateHook<S, A>(
 // Keep the large retry snapshot off the recursive component-call stack. Fizz
 // supports very deep trees; retaining dozens of snapshot locals in
 // invokeComponentBody's live frame would exhaust the JavaScript stack first.
+// Replay snapshots copy ambient collections so a discarded pass can be rewound,
+// yet in the common case every source is empty — share immutable empties rather
+// than allocate a private copy per component invocation. Every consumer only
+// iterates or re-copies them, and null remains the distinct "source absent"
+// state (absent skips the restore; empty still clears what a discarded pass
+// added). The list is frozen so an accidental write fails loudly instead of
+// leaking state into an unrelated snapshot; nothing mutates the maps or sets.
+const EMPTY_SNAPSHOT_MAP: Map<never, never> = new Map<never, never>();
+const EMPTY_SNAPSHOT_SET: Set<never> = new Set<never>();
+const EMPTY_SNAPSHOT_LIST = Object.freeze([]) as never[];
+
+function snapshotMap<K, V>(map: Map<K, V> | null | undefined): Map<K, V> | null {
+	return map == null ? null : map.size === 0 ? EMPTY_SNAPSHOT_MAP : new Map(map);
+}
+function snapshotSet<T>(set: Set<T> | null | undefined): Set<T> | null {
+	return set == null ? null : set.size === 0 ? EMPTY_SNAPSHOT_SET : new Set(set);
+}
+function snapshotList<T>(list: readonly T[] | null | undefined): T[] {
+	return list == null || list.length === 0 ? EMPTY_SNAPSHOT_LIST : list.slice();
+}
+// A populated collector often stays unchanged across hundreds of components.
+// Its pristine replay copy is shared until a write invalidates it; snapshots
+// already held by ancestor components keep the old copy for repeated rewinds.
+// These caches belong to pass-local collectors, so nested renders and completed
+// requests cannot share resources or retain each other's snapshots. Empty
+// collectors still use the shared empties without allocating a memo record.
+function snapshotStyles(css: StyleCollector | null): Map<string, InjectedStyle> | null {
+	if (css === null || css.size === 0) return snapshotMap(css);
+	return (css.replay ??= snapshotMap(css)!);
+}
+const EMPTY_HEAD_REPLAY: HeadReplayCollections = {
+	hints: EMPTY_SNAPSHOT_SET,
+	sheets: null,
+	hintHtml: null,
+	preloadXfer: null,
+};
+function snapshotHeadCollections(head: HeadBuffer | null): HeadReplayCollections | null {
+	if (head === null) return null;
+	if (head.replay !== null) return head.replay;
+	if (
+		head.hints.size === 0 &&
+		head.sheets === null &&
+		head.hintHtml === null &&
+		head.preloadXfer === null
+	)
+		return EMPTY_HEAD_REPLAY;
+	return (head.replay = {
+		hints: snapshotSet(head.hints)!,
+		sheets: snapshotMap(head.sheets),
+		hintHtml: snapshotMap(head.hintHtml),
+		preloadXfer: snapshotMap(head.preloadXfer),
+	});
+}
+function snapshotVtStack(): Array<{ candidate: VtSsrCandidate; consumed: boolean }> {
+	return VT_SSR_STACK.length === 0
+		? EMPTY_SNAPSHOT_LIST
+		: VT_SSR_STACK.map((candidate) => ({ candidate, consumed: candidate.consumed }));
+}
+function snapshotScopedCounts(counts: ScopedCounts | null | undefined): ScopedCounts | null {
+	if (counts == null) return null;
+	if (Array.isArray(counts)) {
+		return counts.length === 0 ? EMPTY_SNAPSHOT_LIST : counts.slice();
+	}
+	return snapshotMap(counts);
+}
+function restoreScopedCounts(snapshot: ScopedCounts | null): ScopedCounts | null {
+	if (snapshot === null) return null;
+	// Copy, never alias: the live list mutates in place, and a snapshot must
+	// restore identically on every retry that rewinds to it.
+	return Array.isArray(snapshot) ? snapshot.slice() : new Map(snapshot);
+}
+
 function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 	const css = CSS;
 	const head = HEAD;
+	const headCollections = snapshotHeadCollections(head);
 	const serial = SERIAL;
 	const susp = SUSPENDED;
 	const jobs = DEFERRED;
@@ -3839,15 +4380,15 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		nativeMixed: NATIVE_SERVER_READS?.mixed ?? false,
 		nativeFailures: NATIVE_SERVER_FAILURES,
 		css,
-		cssEntries: css === null ? null : new Map(css),
+		cssEntries: snapshotStyles(css),
 		head,
 		headLength: head !== null ? head.html.length : 0,
 		headCharsetLength: head !== null ? head.charset.length : 0,
 		headViewportLength: head !== null ? head.viewport.length : 0,
-		headHints: head === null ? null : new Set(head.hints),
-		headSheets: head === null || head.sheets === null ? null : new Map(head.sheets),
-		headHintHtml: head === null || head.hintHtml === null ? null : new Map(head.hintHtml),
-		headXfer: head === null || head.preloadXfer === null ? null : new Map(head.preloadXfer),
+		headHints: headCollections?.hints ?? null,
+		headSheets: headCollections?.sheets ?? null,
+		headHintHtml: headCollections?.hintHtml ?? null,
+		headXfer: headCollections?.preloadXfer ?? null,
 		serial,
 		serialLength: serial !== null ? serial.length : 0,
 		susp,
@@ -3857,24 +4398,18 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		context: scope.$$ctxValues,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
-		vtStack: VT_SSR_STACK.map((candidate) => ({
-			candidate,
-			consumed: candidate.consumed,
-		})),
+		vtStack: snapshotVtStack(),
 		stream,
 		streamNextId: stream?.nextId ?? 0,
-		streamActiveTryKeys: stream?.activeTryKeys.slice() ?? [],
-		streamActiveOwnerKeys: stream?.activeOwnerKeys.slice() ?? [],
+		streamActiveTryKeys: snapshotList(stream?.activeTryKeys),
+		streamActiveOwnerKeys: snapshotList(stream?.activeOwnerKeys),
 		streamPassBoundaryCount: stream?.activePassBoundaryKeys?.size ?? 0,
 		asyncScope: ASYNC_SCOPE,
 		streamReplayCheckpoint: stream?.replay?.length ?? 0,
 		frameDeferred: frame?.deferred ?? false,
 		frameNextChild: frame?.nextChild ?? 0,
-		frameScopedChildren:
-			frame?.scopedChildren === null || frame?.scopedChildren === undefined
-				? null
-				: new Map(frame.scopedChildren),
-		frameOccurrences: frame?.occ === null || frame?.occ === undefined ? null : new Map(frame.occ),
+		frameScopedChildren: snapshotScopedCounts(frame?.scopedChildren),
+		frameOccurrences: snapshotScopedCounts(frame?.occ),
 	};
 }
 
@@ -3894,10 +4429,12 @@ function rewindComponentReplayState(
 	NATIVE_SERVER_FAILURES = snapshot.nativeFailures;
 	ASYNC_SCOPE = snapshot.asyncScope;
 	if (snapshot.css !== null && snapshot.cssEntries !== null) {
+		snapshot.css.replay = null;
 		snapshot.css.clear();
 		for (const [hash, sheet] of snapshot.cssEntries) snapshot.css.set(hash, sheet);
 	}
 	if (snapshot.head !== null && snapshot.headHints !== null) {
+		snapshot.head.replay = null;
 		snapshot.head.html = snapshot.head.html.slice(0, snapshot.headLength);
 		snapshot.head.charset = snapshot.head.charset.slice(0, snapshot.headCharsetLength);
 		snapshot.head.viewport = snapshot.head.viewport.slice(0, snapshot.headViewportLength);
@@ -3929,6 +4466,8 @@ function rewindComponentReplayState(
 	if (snapshot.jobs !== null) snapshot.jobs.length = snapshot.jobsLength;
 	VT_SSR_TRY_SEQ = snapshot.vtTrySeq;
 	VT_SSR_HAS_CANDIDATES = snapshot.vtHasCandidates;
+	// Memoized HTML can survive a render-phase retry. Retain the conservative
+	// raw-HTML requirement for this pass even when other output is discarded.
 	VT_SSR_STACK.length = 0;
 	for (const entry of snapshot.vtStack) {
 		entry.candidate.consumed = entry.consumed;
@@ -3955,9 +4494,8 @@ function rewindComponentReplayState(
 	if (frame !== null) {
 		frame.deferred = snapshot.frameDeferred;
 		frame.nextChild = snapshot.frameNextChild;
-		frame.scopedChildren =
-			snapshot.frameScopedChildren === null ? null : new Map(snapshot.frameScopedChildren);
-		frame.occ = snapshot.frameOccurrences === null ? null : new Map(snapshot.frameOccurrences);
+		frame.scopedChildren = restoreScopedCounts(snapshot.frameScopedChildren);
+		frame.occ = restoreScopedCounts(snapshot.frameOccurrences);
 	}
 }
 
@@ -3985,12 +4523,155 @@ function replayUpdatedComponentBody(
 			throw new Error(formatServerError(9));
 		}
 		hp.update = false;
-		hp.occ = new Map();
+		hp.occ = null;
 		rewindComponentReplayState(snapshot, scope, frame);
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
-		out = comp(props ?? {}, scope, undefined);
+		out = invokeServerSignalComponent(comp, props, scope, serverSignalOwner(frame));
 	} while (hp.update);
 	return out;
+}
+
+function signalIdentityKey(value: unknown): string {
+	if (value === null) return 'null';
+	const kind = typeof value;
+	return kind === 'string' || kind === 'number' || kind === 'bigint' || kind === 'boolean'
+		? kind.charCodeAt(0).toString(36) + ':' + String(value)
+		: kind === 'undefined'
+			? 'u:'
+			: 'o:' + String(value);
+}
+
+function serverStructuralSignalInstanceKey(
+	invocationSite: string | undefined,
+	key: unknown,
+): string {
+	// Match the client's concatenated JSON segments without re-escaping the
+	// complete ancestor path at every component invocation.
+	return (
+		resolveServerSignalInstanceKey(SIGNAL_COMPONENT_INSTANCE_KEY) +
+		JSON.stringify([
+			invocationSite ?? 'legacy',
+			resolveServerSignalListKeys(SIGNAL_LIST_KEYS),
+			key != null ? signalIdentityKey(key) : '',
+		])
+	);
+}
+
+function resolveServerSignalListKeys(keys: ServerSignalListKeys | null): readonly string[] {
+	if (keys === null) return EMPTY_SIGNAL_LIST_KEYS;
+	if (keys.values !== null) return keys.values;
+	const pending: ServerSignalListKeys[] = [];
+	let parent: ServerSignalListKeys | null = keys;
+	while (parent !== null && parent.values === null) {
+		pending.push(parent);
+		parent = parent.parent;
+	}
+	let values = parent?.values ?? EMPTY_SIGNAL_LIST_KEYS;
+	for (let index = pending.length - 1; index >= 0; index--) {
+		const entry = pending[index]!;
+		values = [...values, signalIdentityKey(entry.mapped ? 'k' + String(entry.key) : entry.key)];
+		entry.values = values;
+	}
+	return values;
+}
+
+function resolveServerSignalInstanceKey(identity: ServerSignalInstanceKey): string {
+	if (typeof identity === 'string') return identity;
+	if (identity.signalInstanceKey !== undefined) return identity.signalInstanceKey;
+	// A first read can occur at the bottom of an already-deep component stack.
+	// Materialize ancestors iteratively, without adding another recursive stack.
+	const pending: Frame[] = [];
+	while (typeof identity !== 'string') {
+		if (identity.signalInstanceKey !== undefined) {
+			identity = identity.signalInstanceKey;
+			break;
+		}
+		pending.push(identity);
+		identity = identity.signalParentKey!;
+	}
+	for (let index = pending.length - 1; index >= 0; index--) {
+		const frame = pending[index]!;
+		identity += JSON.stringify([
+			frame.signalInvocationSite ?? 'legacy',
+			resolveServerSignalListKeys(frame.signalListKeys ?? null),
+			frame.signalKey != null ? signalIdentityKey(frame.signalKey) : '',
+		]);
+		frame.signalInstanceKey = identity;
+	}
+	return identity;
+}
+
+function serverSignalOwner(_frame: Frame | null): SignalRendererOwnerIdentity | undefined {
+	// An async continuation can compose cached compiled HTML outside a render pass.
+	// Only an active pass may assign a request-owned signal instance.
+	const resolved = RESOLVED;
+	if (resolved !== null && SERVER_SIGNAL_BINDINGS_ENABLED && resolved.signalOwner === undefined) {
+		ensureServerSignalOwner();
+	}
+	if (
+		resolved === null ||
+		resolved.signalOwner === undefined ||
+		resolved.signalInstances === undefined
+	)
+		return;
+	const instanceKey =
+		resolveServerSignalInstanceKey(SIGNAL_COMPONENT_INSTANCE_KEY) ||
+		JSON.stringify([SIGNAL_INSTANCE_PREFIX, 'root']);
+	let owner = resolved.signalInstances.get(instanceKey);
+	if (owner === undefined) {
+		owner = Object.freeze({
+			scopeKey: resolved.signalOwner.scopeKey,
+			documentOwner: resolved.signalOwner,
+			instanceOwner: Object.freeze({}),
+			instanceKey,
+		});
+		resolved.signalInstances.set(instanceKey, owner);
+	}
+	return owner;
+}
+
+function ensureServerSignalOwner(): void {
+	const resolved = RESOLVED!;
+	if (resolved.signalOwner !== undefined && resolved.signalInstances !== undefined) return;
+	const ambient = currentSignalOwner();
+	resolved.signalOwner =
+		ambient === null
+			? Object.freeze({ scopeKey: 'octane:document' })
+			: isRendererSignalOwner(ambient)
+				? ambient.documentOwner
+				: ambient;
+	resolved.ownedSignalOwner = ambient === null;
+	resolved.signalInstances = new Map();
+}
+
+function invokeServerSignalComponent(
+	comp: ServerComponent,
+	props: any,
+	scope: SSRScope,
+	owner: SignalRendererOwnerIdentity | undefined,
+): unknown {
+	if (owner === undefined) return comp(props ?? {}, scope, undefined);
+	const invoke = () => {
+		const previous = SERVER_SIGNAL_OWNER_ACTIVE;
+		SERVER_SIGNAL_OWNER_ACTIVE = true;
+		try {
+			return comp(props ?? {}, scope, undefined);
+		} finally {
+			SERVER_SIGNAL_OWNER_ACTIVE = previous;
+		}
+	};
+	const injection = (RESOLVED?.resourceOptions as StreamOptions | undefined)?.injection;
+	const observe = injection?.observeSignalAttempt;
+	return runWithSignalOwner(owner, () =>
+		observe === undefined
+			? invoke()
+			: runWithServerSignalQueryAttemptObserver(
+					owner,
+					(attempt) => observe(attempt, captureSignalOwner(owner)),
+					injection!.createSignalAttemptObservations!,
+					invoke,
+				),
+	);
 }
 
 function invokeComponentBody(
@@ -4000,13 +4681,13 @@ function invokeComponentBody(
 	frame: Frame | null,
 ): unknown {
 	const prevHP = HOOK_PASS;
-	const hp: HookPass = { hooks: new Map(), occ: new Map(), update: false };
+	const hp: HookPass = { hooks: null, occ: null, update: false };
 	const snapshot = captureComponentReplayState(scope, frame);
 	const warmPlanCheckpoint = ACTIVE_PU_WARM_PLANS.length;
 	HOOK_PASS = hp;
 	try {
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
-		let out: unknown = comp(props ?? {}, scope, undefined);
+		let out: unknown = invokeServerSignalComponent(comp, props, scope, serverSignalOwner(frame));
 		if (hp.update) {
 			out = replayUpdatedComponentBody(comp, props, scope, frame, hp, snapshot, warmPlanCheckpoint);
 		}
@@ -4017,6 +4698,25 @@ function invokeComponentBody(
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		HOOK_PASS = prevHP;
 	}
+}
+
+function captureServerComponentContext() {
+	// Keep the restore state off the recursive component stack. Constructing this
+	// envelope in its own completed call also avoids retaining its initializer slots.
+	return {
+		scope: CURRENT_SCOPE,
+		frame: FRAME,
+		comp: CURRENT_COMP,
+		props: CURRENT_PROPS,
+		parent: CURRENT_PARENT_SCOPE,
+		asyncScope: ASYNC_SCOPE,
+		signalInstance: SIGNAL_COMPONENT_INSTANCE_KEY,
+		signalOwnerActive: SERVER_SIGNAL_OWNER_ACTIVE,
+		signalControl: SIGNAL_CONTROL_SITE,
+		signalListKeys: SIGNAL_LIST_KEYS,
+		owner: undefined as SignalRendererOwnerIdentity | undefined,
+		previousOwner: undefined as SignalOwner | null | undefined,
+	};
 }
 
 // Render a component body under an explicit frame, tracking it as the innermost
@@ -4034,14 +4734,11 @@ function renderComponentFramed(
 	// is still created (use() path keys / seed order unchanged); the client's
 	// componentSlot(inherit) borrows the parent range instead of adopting.
 	inherit?: boolean,
+	instanceKey?: ServerSignalInstanceKey,
+	bindingMarker?: string,
 ): string {
-	const prevScope = CURRENT_SCOPE;
-	const prevFrame = FRAME;
-	const prevComp = CURRENT_COMP;
-	const prevProps = CURRENT_PROPS;
-	const prevParent = CURRENT_PARENT_SCOPE;
-	const prevAsyncScope = ASYNC_SCOPE;
-	const parentScope = parent ?? prevScope;
+	const previous = captureServerComponentContext();
+	const parentScope = parent ?? previous.scope;
 	const scope = ssrScope(parentScope);
 	CURRENT_SCOPE = scope;
 	FRAME = frame;
@@ -4049,6 +4746,9 @@ function renderComponentFramed(
 	CURRENT_PROPS = props;
 	CURRENT_PARENT_SCOPE = parentScope;
 	ASYNC_SCOPE = frame.asyncScope;
+	if (instanceKey !== undefined) SIGNAL_COMPONENT_INSTANCE_KEY = instanceKey;
+	SIGNAL_CONTROL_SITE = '';
+	SIGNAL_LIST_KEYS = null;
 	const nativeToken = NATIVE_READ_COLLECTOR === null ? -1 : beginActiveNativeReadScope(scope);
 	let nativeCompleted = false;
 	try {
@@ -4065,14 +4765,31 @@ function renderComponentFramed(
 		// their shared loop lives behind a cold branch without charging that extra
 		// frame to normal component nesting.
 		const previousHookPass = HOOK_PASS;
-		const hookPass: HookPass = { hooks: new Map(), occ: new Map(), update: false };
+		const hookPass: HookPass = { hooks: null, occ: null, update: false };
 		const replaySnapshot = captureComponentReplayState(scope, frame);
 		const warmPlanCheckpoint = ACTIVE_PU_WARM_PLANS.length;
 		let out: unknown;
 		HOOK_PASS = hookPass;
 		try {
 			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
-			out = comp(props ?? {}, scope, undefined);
+			previous.owner = serverSignalOwner(frame);
+			if (previous.owner === undefined) {
+				out = comp(props ?? {}, scope, undefined);
+			} else if (
+				(RESOLVED?.resourceOptions as StreamOptions | undefined)?.injection
+					?.observeSignalAttempt !== undefined ||
+				(previous.previousOwner = enterSynchronousSignalOwner(previous.owner)) === undefined
+			) {
+				out = invokeServerSignalComponent(comp, props, scope, previous.owner);
+			} else {
+				try {
+					SERVER_SIGNAL_OWNER_ACTIVE = true;
+					out = comp(props ?? {}, scope, undefined);
+				} finally {
+					SERVER_SIGNAL_OWNER_ACTIVE = previous.signalOwnerActive;
+					restoreSynchronousSignalOwner(previous.previousOwner);
+				}
+			}
 			if (hookPass.update) {
 				out = replayUpdatedComponentBody(
 					comp,
@@ -4096,17 +4813,27 @@ function renderComponentFramed(
 		// An inherit-range site (M3) skips the wrap: the parent's own pair bounds
 		// this output, and the client borrows it instead of adopting.
 		nativeCompleted = true;
-		return MARKERS && !inherit ? BLOCK_OPEN + inner + BLOCK_CLOSE : inner;
+		if (!MARKERS || inherit) return inner;
+		const marker =
+			bindingMarker ??
+			(out !== null && typeof out === 'object'
+				? (out as { [BINDING_HTML_ROOT]?: string })[BINDING_HTML_ROOT]
+				: undefined);
+		return (marker === undefined ? BLOCK_OPEN : '<!--' + marker + '-->') + inner + BLOCK_CLOSE;
 	} catch (error) {
 		throw normalizeThrownServerThenable(error);
 	} finally {
 		if (nativeToken >= 0) NATIVE_READ_COLLECTOR!.endScope(nativeToken, nativeCompleted);
-		CURRENT_SCOPE = prevScope;
-		FRAME = prevFrame;
-		CURRENT_COMP = prevComp;
-		CURRENT_PROPS = prevProps;
-		CURRENT_PARENT_SCOPE = prevParent;
-		ASYNC_SCOPE = prevAsyncScope;
+		CURRENT_SCOPE = previous.scope;
+		FRAME = previous.frame;
+		CURRENT_COMP = previous.comp;
+		CURRENT_PROPS = previous.props;
+		CURRENT_PARENT_SCOPE = previous.parent;
+		ASYNC_SCOPE = previous.asyncScope;
+		SIGNAL_COMPONENT_INSTANCE_KEY = previous.signalInstance;
+		SERVER_SIGNAL_OWNER_ACTIVE = previous.signalOwnerActive;
+		SIGNAL_CONTROL_SITE = previous.signalControl;
+		SIGNAL_LIST_KEYS = previous.signalListKeys;
 	}
 }
 
@@ -4124,6 +4851,8 @@ export function ssrComponent(
 	inherit?: boolean,
 	key?: unknown,
 	identityScoped?: boolean,
+	invocationSite?: string,
+	bindingMarker?: string,
 ): string {
 	// A runtime-resolved Activity is a symbol, not a callable component. Keep its
 	// original identity for async keys, then use the stable cold body below. A
@@ -4134,6 +4863,9 @@ export function ssrComponent(
 	// this small string-rendering wrapper does not retain the client Activity engine.
 	const activity = comp === Activity;
 	if (activity && key === undefined) key = props?.key;
+	let signalInstanceKey: ServerSignalInstanceKey | undefined = SERVER_SIGNAL_BINDINGS_ENABLED
+		? serverStructuralSignalInstanceKey(invocationSite, key)
+		: undefined;
 	// Component recursion is one of SSR's hottest and deepest paths. Install the
 	// same async-identity membrane inline instead of recursing back through
 	// ssrComponent from two wrapper callbacks. Besides avoiding callback overhead,
@@ -4204,35 +4936,56 @@ export function ssrComponent(
 		// the path so sibling instances of the same component get distinct keys). `pf`
 		// is only null defensively (render() always installs a root frame); use an
 		// ad-hoc root frame so keys still work.
-		const frame: Frame =
-			pf === null
-				? {
-						parent: null,
-						seg: 0,
-						nextChild: 0,
-						scopedChildren: null,
-						occ: null,
-						path: null,
-						deferred: false,
-						asyncScope: ASYNC_SCOPE,
-						namespace: explicitNamespace ?? undefined,
-					}
-				: {
-						parent: pf,
-						seg: nextChildSegment(pf),
-						nextChild: 0,
-						scopedChildren: null,
-						occ: null,
-						path: null,
-						deferred: false,
-						asyncScope: ASYNC_SCOPE,
-						namespace: explicitNamespace ?? pf.namespace,
-					};
+		// Keep a potential binding's lazy recipe in its initial object shape.
+		// Ordinary frames omit these fields; a first handle can still materialize
+		// the retained recipe after its ancestors have already rendered.
+		// Reserve the materialized cache slot too, so that first read does not
+		// move the optional fields into a separately allocated property backing.
+		const seg = pf === null ? 0 : nextChildSegment(pf);
+		const namespace = explicitNamespace ?? pf?.namespace;
+		const potentialSignalKey = signalInstanceKey === undefined && SERVER_SIGNAL_BINDINGS_POTENTIAL;
+		const frame: Frame = potentialSignalKey
+			? {
+					parent: pf,
+					seg,
+					nextChild: 0,
+					scopedChildren: null,
+					occ: null,
+					path: null,
+					deferred: false,
+					asyncScope: ASYNC_SCOPE,
+					namespace,
+					signalParentKey: SIGNAL_COMPONENT_INSTANCE_KEY,
+					signalInvocationSite: invocationSite,
+					signalListKeys: SIGNAL_LIST_KEYS,
+					signalKey: key,
+					signalInstanceKey: undefined,
+				}
+			: {
+					parent: pf,
+					seg,
+					nextChild: 0,
+					scopedChildren: null,
+					occ: null,
+					path: null,
+					deferred: false,
+					asyncScope: ASYNC_SCOPE,
+					namespace,
+				};
+		if (potentialSignalKey) signalInstanceKey = frame;
 		// Function components are transparent to the HTML parser. Carry the active
 		// namespace through arbitrary wrapper chains; an explicitly compiled host
 		// transition (`<svg>`, `<math>`, or `<foreignObject>`) overrides it for the
 		// next component frame through ssrComponentNS.
-		return renderComponentFramed(comp as ServerComponent, props, parent, frame, inherit);
+		return renderComponentFramed(
+			comp as ServerComponent,
+			props,
+			parent,
+			frame,
+			inherit,
+			signalInstanceKey,
+			bindingMarker,
+		);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
 	}
@@ -4248,11 +5001,22 @@ export function ssrComponentNS(
 	namespace: 'html' | 'svg' | 'mathml',
 	inherit?: boolean,
 	key?: unknown,
+	invocationSite?: string,
+	bindingMarker?: string,
 ): string {
 	const previous = NEXT_COMPONENT_NAMESPACE;
 	NEXT_COMPONENT_NAMESPACE = namespace;
 	try {
-		return ssrComponent(parent, comp, props, inherit, key);
+		return ssrComponent(
+			parent,
+			comp,
+			props,
+			inherit,
+			key,
+			undefined,
+			invocationSite,
+			bindingMarker,
+		);
 	} finally {
 		NEXT_COMPONENT_NAMESPACE = previous;
 	}
@@ -4288,6 +5052,68 @@ function streamTokenForPendingHtml(html: string): string | null {
 	return stream !== null && html.includes(STREAM_BOUNDARY_ATTR + '="' + stream.token + '-')
 		? stream.token
 		: null;
+}
+
+type InternalHydrateProps = HydrateProps & {
+	readonly __independent?: {
+		readonly manifestTemplate: IndependentHydrateManifestTemplate;
+		readonly captures: readonly unknown[];
+	};
+};
+
+function ssrIndependentHydrateSidecar(props: InternalHydrateProps, instanceId: string): string {
+	const independent = props.__independent;
+	if (independent === undefined) return '';
+	const registry = RESOLVED?.resourceOptions?.independentHydration;
+	if (registry === undefined) {
+		throw new Error(formatServerError(69));
+	}
+	const build = registry.resolve(independent.manifestTemplate.boundaryId);
+	if (build === undefined) {
+		throw new Error(formatServerError(70));
+	}
+	const manifest = createIndependentHydrateManifest(
+		independent.manifestTemplate,
+		independent.captures,
+		instanceId,
+		registry.buildId,
+		build,
+	);
+	return (
+		'<script type="application/json" ' +
+		INDEPENDENT_HYDRATE_MANIFEST_ATTR +
+		NONCE_ATTR +
+		'>' +
+		serializeIndependentHydrateManifest(manifest) +
+		'</script>'
+	);
+}
+
+function withServerIndependentIdentity<T>(prefix: string, idSeed: number, render: () => T): T {
+	const previous = SIGNAL_INSTANCE_PREFIX;
+	const previousInstance = SIGNAL_COMPONENT_INSTANCE_KEY;
+	const previousControl = SIGNAL_CONTROL_SITE;
+	const previousListKeys = SIGNAL_LIST_KEYS;
+	const previousIdPrefix = ID_PREFIX;
+	const previousIdCounter = ID_COUNTER;
+	SIGNAL_INSTANCE_PREFIX = prefix;
+	SIGNAL_COMPONENT_INSTANCE_KEY = JSON.stringify([prefix, 'root']);
+	SIGNAL_CONTROL_SITE = '';
+	SIGNAL_LIST_KEYS = null;
+	ID_PREFIX = prefix + '-';
+	ID_COUNTER = idSeed;
+	try {
+		return render();
+	} finally {
+		SIGNAL_INSTANCE_PREFIX = previous;
+		SIGNAL_COMPONENT_INSTANCE_KEY = previousInstance;
+		SIGNAL_CONTROL_SITE = previousControl;
+		SIGNAL_LIST_KEYS = previousListKeys;
+		ID_PREFIX = previousIdPrefix;
+		// The island hydrates in its own deterministic namespace. The parent
+		// still reserves the IDs consumed here when it adopts the outer wrapper.
+		ID_COUNTER = previousIdCounter + ID_COUNTER - idSeed;
+	}
 }
 
 /** Serialize runtime-owned and strategy-supplied attributes for `<Hydrate>`. */
@@ -4391,7 +5217,8 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 );
 
 const hydrate = /* @__PURE__ */ markComponentFlags(
-	function Hydrate(props: HydrateProps, scope: SSRScope): string {
+	function Hydrate(rawProps: HydrateProps, scope: SSRScope): string {
+		const props = rawProps as InternalHydrateProps;
 		const id = useId();
 		// The client always creates an HTMLDivElement. Force the same namespace for
 		// SSR children and attribute semantics instead of inheriting SVG/MathML from
@@ -4419,16 +5246,25 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 						let children: string;
 						let nativeReads: NativeSeedReads | null = null;
 						try {
-							children = ssrBlock(
-								ssrTry(
-									scope,
-									'jsx-hydrate',
-									(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
-									null,
-									null,
-									'html',
-								),
-							);
+							const renderChildren = () =>
+								ssrBlock(
+									ssrTry(
+										scope,
+										'jsx-hydrate',
+										(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
+										null,
+										null,
+										'html',
+									),
+								);
+							children =
+								props.__independent === undefined
+									? renderChildren()
+									: withServerIndependentIdentity(
+											id,
+											props.__independent.manifestTemplate.idSeed,
+											renderChildren,
+										);
 						} finally {
 							nativeReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
 						}
@@ -4460,8 +5296,21 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 							: NATIVE_READ_COLLECTOR?.serialize(nativeReads);
 						const nativeSidecar =
 							nativeSeeds === undefined ? '' : serializeNativeSignalSeeds(nativeSeeds, NONCE_ATTR);
+						const independentSidecar = permanentStaticAncestor
+							? ''
+							: ssrIndependentHydrateSidecar(props, id);
 
-						return '<div' + attrs + '>' + children + seedSidecar + nativeSidecar + '</div>';
+						return (
+							'<div' +
+							attrs +
+							(props.__independent === undefined ? '' : ' ' + HYDRATE_INDEPENDENT_ATTR + '=""') +
+							'>' +
+							children +
+							seedSidecar +
+							nativeSidecar +
+							independentSidecar +
+							'</div>'
+						);
 					}),
 				'html',
 			),
@@ -4530,9 +5379,10 @@ export const Suspense = /* @__PURE__ */ markComponentFlags(
 //                Suspense content).
 // Arm-top detection is POSITIONAL, not flag-based (compiled static elements
 // emit as string concatenation — no runtime call to consult): every boundary
-// stamps CANDIDATE attributes (vt-enter-x / vt-exit-x) on its first element;
-// each @try arm then CLAIMS the matching candidate on the arm's first element
-// (renaming -x → real). Ordering makes this exact — an OUTER boundary's
+// stamps CANDIDATE attributes (vt-enter-x / vt-exit-x) on each direct host;
+// each @try arm then CLAIMS matching direct hosts (renaming -x → real) and
+// relays through nested boundaries that opt in with parentEnter/parentExit.
+// Ordering makes this exact — an OUTER boundary's
 // surgery runs after the arm's claim, so its candidates are never claimed by
 // an arm it merely contains. Residual candidates are stripped at the final
 // emission points (buffered html / stream shell / stream segments).
@@ -4540,15 +5390,21 @@ export const Suspense = /* @__PURE__ */ markComponentFlags(
 type VtSsrClassValue = string | Record<string, string>;
 interface VtSsrProps {
 	name?: string;
+	scope?: 'element';
 	enter?: VtSsrClassValue;
 	exit?: VtSsrClassValue;
 	update?: VtSsrClassValue;
 	share?: VtSsrClassValue;
 	default?: VtSsrClassValue;
+	parentEnter?: VtSsrClassValue;
+	parentExit?: VtSsrClassValue;
+	onParentEnter?: unknown;
+	onParentExit?: unknown;
 	children?: unknown;
 }
 interface VtSsrCandidate {
 	name: string;
+	elementScope: boolean;
 	share: string;
 	update: string;
 	consumed: boolean;
@@ -4559,48 +5415,22 @@ let VT_SSR_TRY_SEQ = 0;
 // contain residual vt-enter-x / vt-exit-x attributes. Threaded into the pass
 // result so ordinary SSR can skip scanning the entire emitted HTML string.
 let VT_SSR_HAS_CANDIDATES = false;
+// Compiler-emitted attributes escape quotes, so their candidates can be stripped
+// by a native regex. Trusted raw HTML needs the quote-aware tag/attribute walk.
+// Keep this alongside candidate state through render retries and reentrancy.
+let VT_SSR_HAS_RAW_HTML = false;
 const VT_SSR_STACK: VtSsrCandidate[] = [];
 
 /** Resolve a class-prop value server-side (no types → maps use `default`). */
-function vtSsrResolve(props: VtSsrProps, kind: 'enter' | 'exit' | 'update' | 'share'): string {
-	let v: VtSsrClassValue | undefined = props[kind];
-	if (v == null) v = props.default;
-	if (v == null) return 'auto';
-	if (typeof v === 'string') return v;
-	return v.default != null ? v.default : 'auto';
-}
-
-/** Skip comment markers and streaming placeholders to locate the visible root. */
-function vtSsrFirstVisibleOpenTag(html: string): number {
-	const n = html.length;
-	let i = 0;
-	while (i < n) {
-		const lt = html.indexOf('<', i);
-		if (lt === -1) return -1;
-		if (html.startsWith('<!--', lt)) {
-			const close = html.indexOf('-->', lt + 4);
-			if (close === -1) return -1;
-			i = close + 3;
-			continue;
-		}
-		const c = html.charCodeAt(lt + 1);
-		if (!((c >= 65 && c <= 90) || (c >= 97 && c <= 122))) {
-			// Not an element open (a closing tag or stray '<' text) — move on.
-			i = lt + 1;
-			continue;
-		}
-		let e = lt + 1;
-		while (e < n && /[a-zA-Z0-9-]/.test(html[e])) e++;
-		if (e - lt === 9 && html.slice(lt + 1, e).toLowerCase() === 'template') {
-			const j = vtSsrOpenTagEnd(html, e);
-			if (j === -1) return -1;
-			const close = html.indexOf('</template>', j);
-			i = close === -1 ? j + 1 : close + 11;
-			continue;
-		}
-		return lt;
-	}
-	return -1;
+function vtSsrResolve(
+	props: VtSsrProps,
+	kind: 'enter' | 'exit' | 'update' | 'share' | 'parentEnter' | 'parentExit',
+): string {
+	const value = props[kind];
+	const resolved = typeof value === 'string' ? value : value?.default;
+	if (resolved != null) return resolved;
+	const fallback = props.default;
+	return (typeof fallback === 'string' ? fallback : fallback?.default) ?? 'auto';
 }
 
 /** Find an opening tag's actual terminator without allocating scan state. */
@@ -4619,52 +5449,366 @@ function vtSsrOpenTagEnd(html: string, from: number): number {
 	return -1;
 }
 
-/**
- * Inject `vt-*` attributes into the first visible element's opening tag.
- * An inner boundary owns attributes it has already placed on the same root.
- */
-function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
-	const start = vtSsrFirstVisibleOpenTag(html);
-	if (start === -1) return html;
-	const end = vtSsrOpenTagEnd(html, start + 1);
-	if (end === -1) return html;
-	const open = html.slice(start, end);
-	let inject = '';
-	for (let index = 0; index < attrs.length; index++) {
-		if (open.indexOf(attrs[index][0] + '="') === -1) {
-			inject += ' ' + attrs[index][0] + '="' + escapeAttr(attrs[index][1]) + '"';
+/** Walk rendered opening tags without interpreting quoted attributes or raw text as markup. */
+function vtSsrMapTags(
+	html: string,
+	visit: (open: string, depth: number, tag: string) => string,
+	visitText?: (text: string, depth: number) => void,
+	visitAllElements = false,
+	rootOnly = false,
+): string {
+	let depth = 0;
+	let from = 0;
+	let copied = 0;
+	let out = '';
+	while (from < html.length) {
+		const start = html.indexOf('<', from);
+		if (visitText && (!rootOnly || depth === 0))
+			visitText(html.slice(from, start < 0 ? html.length : start), depth);
+		if (start < 0) break;
+		if (html.startsWith('<!--', start)) {
+			const end = html.indexOf('-->', start + 4);
+			if (end < 0) break;
+			from = end + 3;
+			continue;
 		}
+		const closing = html[start + 1] === '/';
+		const nameStart = start + (closing ? 2 : 1);
+		const initial = html.charCodeAt(nameStart);
+		if (!((initial >= 65 && initial <= 90) || (initial >= 97 && initial <= 122))) {
+			from = start + 1;
+			continue;
+		}
+		let nameEnd = nameStart + 1;
+		while (nameEnd < html.length) {
+			const code = html.charCodeAt(nameEnd);
+			if (!(
+				(code >= 65 && code <= 90) ||
+				(code >= 97 && code <= 122) ||
+				(code >= 48 && code <= 57) ||
+				code === 58 ||
+				code === 45
+			))
+				break;
+			nameEnd++;
+		}
+		const tag = html.slice(nameStart, nameEnd).toLowerCase();
+		const end = vtSsrOpenTagEnd(html, nameStart + tag.length);
+		if (end < 0) break;
+		from = end + 1;
+		if (closing) {
+			depth = Math.max(0, depth - 1);
+			continue;
+		}
+		const inert = tag === 'template' || tag === 'script' || tag === 'style' || tag === 'title';
+		const isVoid = VOID_ELEMENTS.has(tag) || html[end - 1] === '/';
+		if (
+			(!rootOnly || depth === 0) &&
+			(visitAllElements ||
+				(!inert && tag !== 'link' && tag !== 'meta' && tag !== 'base' && tag !== 'option'))
+		) {
+			const open = html.slice(start, end + 1);
+			const next = visit(open, depth, tag);
+			if (next !== open) {
+				out += html.slice(copied, start) + next;
+				copied = end + 1;
+			}
+		}
+		// Resource tags are not visual hosts. Templates hold inert transport markup;
+		// scope validation alone visits every direct element, including stream sentinels.
+		if (inert) {
+			const close = new RegExp('</' + tag + '[\\t\\n\\f\\r ]*>', 'gi');
+			close.lastIndex = from;
+			from = close.exec(html) === null ? html.length : close.lastIndex;
+			continue;
+		}
+		if (!isVoid) depth++;
 	}
-	if (inject === '') return html;
-	const insertion = html[end - 1] === '/' ? end - 1 : end;
-	return html.slice(0, insertion) + inject + html.slice(insertion);
+	return copied === 0 ? html : out + html.slice(copied);
 }
 
-/**
- * Claim an arm-top candidate: rename `vt-enter-x`/`vt-exit-x` → `vt-enter`/
- * `vt-exit` on the FIRST element of an arm's HTML (same template/comment
- * skipping as vtSsrAnnotate). A first element without the candidate (e.g. a
- * static wrapper above the boundary, or an outer boundary's annotation target)
- * claims nothing — that is exactly React's "top of the arm only" rule.
- */
+function vtSsrInject(open: string, attrs: Array<[string, string]>): string {
+	// Every injected marker starts with vt-. Most authored hosts have none;
+	// only parse once when a marker might already belong to an inner boundary.
+	let existing: Set<string> | undefined;
+	if (/vt-/i.test(open)) {
+		existing = new Set();
+		vtSsrAttributes(open, (name) => {
+			existing!.add(name);
+		});
+	}
+	let inject = '';
+	for (const [name, value] of attrs) {
+		if (!existing?.has(name)) inject += ' ' + name + '="' + escapeAttr(value) + '"';
+	}
+	if (inject === '') return open;
+	const insertion = open[open.length - 2] === '/' ? open.length - 2 : open.length - 1;
+	return open.slice(0, insertion) + inject + open.slice(insertion);
+}
+
+/** Every direct host participates; inner boundaries retain their own classes. */
+function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
+	let index = 0;
+	return vtSsrMapTags(
+		html,
+		(open, depth) => {
+			if (depth !== 0) return open;
+			const suffix = index++;
+			return vtSsrInject(
+				open,
+				suffix === 0
+					? attrs
+					: attrs.map(([name, value]) => [name, name === 'vt-name' ? value + '-' + suffix : value]),
+			);
+		},
+		undefined,
+		false,
+		true,
+	);
+}
+
+/** HTML attribute whitespace (not arbitrary whitespace inside an attribute name). */
+function vtSsrSpace(code: number): boolean {
+	return code === 32 || code === 9 || code === 10 || code === 12 || code === 13;
+}
+
+/** Scan actual attributes once, skipping quoted text in other attribute values. */
+function vtSsrAttributes(
+	open: string,
+	visit: (
+		name: string,
+		start: number,
+		end: number,
+		quote: string,
+		nameStart: number,
+		nameEnd: number,
+	) => boolean | void,
+): void {
+	let i = 1;
+	while (i < open.length && !vtSsrSpace(open.charCodeAt(i)) && open[i] !== '/' && open[i] !== '>')
+		i++;
+	while (i < open.length) {
+		while (vtSsrSpace(open.charCodeAt(i))) i++;
+		if (i >= open.length || open[i] === '>' || open[i] === '/') break;
+		const start = i;
+		while (
+			i < open.length &&
+			!vtSsrSpace(open.charCodeAt(i)) &&
+			open[i] !== '=' &&
+			open[i] !== '/' &&
+			open[i] !== '>'
+		)
+			i++;
+		const nameEnd = i;
+		const name = open.slice(start, i).toLowerCase();
+		while (vtSsrSpace(open.charCodeAt(i))) i++;
+		if (open[i] !== '=') {
+			if (visit(name, nameEnd, nameEnd, '', start, nameEnd)) return;
+			continue;
+		}
+		i++;
+		while (vtSsrSpace(open.charCodeAt(i))) i++;
+		const quote = open[i] === '"' || open[i] === "'" ? open[i++] : '';
+		const valueStart = i;
+		if (quote) {
+			const closing = open.indexOf(quote, i);
+			i = closing < 0 ? open.length : closing;
+		} else {
+			while (i < open.length && !vtSsrSpace(open.charCodeAt(i)) && open[i] !== '>') i++;
+		}
+		const valueEnd = i;
+		if (quote) i++;
+		if (visit(name, valueStart, valueEnd, quote, start, nameEnd)) return;
+	}
+}
+
+/** Read one actual attribute using the shared quote-aware scanner. */
+function vtSsrAttribute(
+	open: string,
+	wanted: string,
+): { start: number; end: number; quote: string; nameStart: number; nameEnd: number } | null {
+	let result: ReturnType<typeof vtSsrAttribute> = null;
+	vtSsrAttributes(open, (name, start, end, quote, nameStart, nameEnd) => {
+		if (name !== wanted) return;
+		result = { start, end, quote, nameStart, nameEnd };
+		return true;
+	});
+	return result;
+}
+
+/** A scope owns one host that contains, rather than replaces, streamed boundaries. */
+function vtSsrAnnotateScope(html: string): string {
+	let roots = 0;
+	let sentinel = false;
+	let text = false;
+	vtSsrMapTags(
+		html,
+		(open, depth, tag) => {
+			if (depth === 0) {
+				if (tag === 'template' && vtSsrAttribute(open, STREAM_BOUNDARY_ATTR) !== null)
+					sentinel = true;
+				else roots++;
+			}
+			return open;
+		},
+		(value, depth) => {
+			if (depth === 0 && /\S/.test(value)) text = true;
+		},
+		true,
+		true,
+	);
+	const valid = roots === 1 && !sentinel && !text;
+	if (valid)
+		injectStyle(
+			'octane-view-transition-scope',
+			'[vt-scope="element"]{view-transition-scope:all!important}',
+		);
+	return vtSsrMapTags(
+		html,
+		(open) => vtSsrInject(open, [['vt-scope', valid ? 'element' : 'none']]),
+		undefined,
+		true,
+		true,
+	);
+}
+
+/** Resolve arm entry/exit and opt-in relays after the actual host hierarchy is known. */
 function vtSsrClaimArm(html: string, kind: 'enter' | 'exit'): string {
 	if (!VT_SSR_HAS_CANDIDATES) return html;
-	const start = vtSsrFirstVisibleOpenTag(html);
-	if (start === -1) return html;
-	const end = vtSsrOpenTagEnd(html, start + 1);
-	if (end === -1) return html;
-	const marker = ' vt-' + kind + '-x="';
-	const offset = html.slice(start, end).indexOf(marker);
-	if (offset === -1) return html;
-	const insertion = start + offset;
-	return html.slice(0, insertion) + ' vt-' + kind + '="' + html.slice(insertion + marker.length);
+	const active: boolean[] = [];
+	const eventName = 'vt-' + kind;
+	const candidateName = eventName + '-x';
+	const relayName = 'vt-parent-' + kind + '-x';
+	return vtSsrMapTags(html, (open, depth) => {
+		let candidate: string | undefined;
+		let candidateEnd = -1;
+		let event: string | undefined;
+		let eventStart = Infinity;
+		let relay: string | undefined;
+		let relayEnd = -1;
+		if (/vt-/i.test(open))
+			vtSsrAttributes(open, (name, start, end, _quote, nameStart, nameEnd) => {
+				if (name === candidateName && candidate === undefined) {
+					candidate = open.slice(start, end);
+					candidateEnd = nameEnd;
+				} else if (name === eventName && event === undefined) {
+					event = open.slice(start, end);
+					eventStart = nameStart;
+				} else if (name === relayName && relay === undefined) {
+					relay = open.slice(start, end);
+					relayEnd = nameEnd;
+				}
+			});
+		let claimEnd = -1;
+		if (depth === 0 && candidate !== undefined && candidate !== 'none') {
+			claimEnd = candidateEnd;
+			// Browser duplicate-attribute semantics choose the first occurrence,
+			// including an authored event preceding the newly claimed candidate.
+			if (candidateEnd < eventStart) event = candidate;
+		}
+		const parentActive = depth > 0 && active[depth - 1];
+		if (parentActive && relay !== undefined && relay !== 'none' && relay !== 'auto') {
+			claimEnd = relayEnd;
+		}
+		active[depth] =
+			(event !== undefined && event !== 'none') ||
+			(parentActive && (relay === undefined || relay !== 'none'));
+		// Root hosts claim their event; descendants claim only a parent relay.
+		// Values are already escaped and are never serialized a second time.
+		return claimEnd < 0 ? open : open.slice(0, claimEnd - 2) + open.slice(claimEnd);
+	});
 }
 
-/** Strip residual (unclaimed) arm candidates before emission. */
-function vtSsrStrip(html: string): string {
-	// Cheap fast path — apps without ViewTransition never pay the regex.
-	if (html.indexOf(' vt-e') === -1) return html;
-	return html.replace(/ vt-(?:enter|exit)-x="[^"]*"/g, '');
+// Keep the candidate prefix separate from opaque markup. A mixed alternation
+// makes the native matcher inspect every ordinary tag in a large document.
+const VT_SSR_STRIP = / vt-(?:parent-)?(?:enter|exit)-x="[^"]*"(?=[^<>"]*(?:"[^"]*"[^<>"]*)*>)/gi;
+const VT_SSR_OPAQUE = /<!--|<(script|style|title|template)(?=[\t\n\f\r />])/gi;
+const VT_SSR_CANDIDATE = /vt-(?:parent-)?(?:enter|exit)-x/i;
+
+/** Strip staging attributes, including blocked and unclaimed relay candidates. */
+function vtSsrStrip(html: string, rawHtml: boolean): string {
+	if (!rawHtml) {
+		let lower = html.indexOf('-x="');
+		let upper = html.indexOf('-X="');
+		if (lower < 0 && upper < 0) return html;
+		// Cache each spelling's next match, including its absent state, so many
+		// candidates never repeatedly search the suffix for the other spelling.
+		const advance = (from: number): number => {
+			if (lower >= 0 && lower < from) lower = html.indexOf('-x="', from);
+			if (upper >= 0 && upper < from) upper = html.indexOf('-X="', from);
+			return lower < 0 ? upper : upper < 0 ? lower : Math.min(lower, upper);
+		};
+		let candidate = advance(0);
+		let from = 0;
+		let copied = 0;
+		let out = '';
+		VT_SSR_OPAQUE.lastIndex = 0;
+		let opaque: RegExpExecArray | null;
+		while ((opaque = VT_SSR_OPAQUE.exec(html)) !== null) {
+			const start = opaque.index;
+			// Compiler attributes escape quotes but may contain literal '<'. Check
+			// only opaque openers and bound the search to fresh input, so adjacent
+			// component markers never repeatedly scan an attribute-free prefix.
+			const attr = html.slice(from, start).lastIndexOf('="');
+			if (attr >= 0 && html.indexOf('"', from + attr + 2) > start) {
+				rawHtml = true;
+				break;
+			}
+			if (candidate < start) {
+				const part = html.slice(from, start);
+				const next = part.replace(VT_SSR_STRIP, '');
+				if (next !== part) {
+					out += html.slice(copied, from) + next;
+					copied = start;
+				}
+				candidate = advance(start);
+				if (candidate < 0) return copied === 0 ? html : out + html.slice(copied);
+			}
+			const tag = opaque[1];
+			let end: number;
+			if (tag === undefined) {
+				const close = html.indexOf('-->', start + 4);
+				end = close < 0 ? html.length : close + 3;
+			} else {
+				const openingEnd = vtSsrOpenTagEnd(html, start + tag.length + 1) + 1;
+				const close = html.indexOf('</' + tag + '>', openingEnd);
+				if (close >= 0) end = close + tag.length + 3;
+				else {
+					const closing = new RegExp('</' + tag + '[\\t\\n\\f\\r ]*>', 'gi');
+					closing.lastIndex = openingEnd;
+					end = closing.exec(html) === null ? html.length : closing.lastIndex;
+				}
+			}
+			if (candidate < end) {
+				candidate = advance(end);
+				if (candidate < 0) return copied === 0 ? html : out + html.slice(copied);
+			}
+			from = VT_SSR_OPAQUE.lastIndex = end;
+		}
+		if (!rawHtml)
+			return out + html.slice(copied, from) + html.slice(from).replace(VT_SSR_STRIP, '');
+	}
+	if (!VT_SSR_CANDIDATE.test(html)) return html;
+	return vtSsrMapTags(html, (open) => {
+		if (!VT_SSR_CANDIDATE.test(open)) return open;
+		let out = '';
+		let copied = 0;
+		vtSsrAttributes(open, (name, _start, end, quote, nameStart) => {
+			if (
+				name === 'vt-enter-x' ||
+				name === 'vt-exit-x' ||
+				name === 'vt-parent-enter-x' ||
+				name === 'vt-parent-exit-x'
+			) {
+				// HTML accepts an attribute immediately after a quoted value. Only
+				// consume the preceding byte when it actually separates attributes.
+				const start = vtSsrSpace(open.charCodeAt(nameStart - 1)) ? nameStart - 1 : nameStart;
+				out += open.slice(copied, start);
+				copied = end + (quote ? 1 : 0);
+			}
+		});
+		return copied === 0 ? open : out + open.slice(copied);
+	});
 }
 
 /**
@@ -4678,12 +5822,17 @@ function vtSsrStrip(html: string): string {
 export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 	function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
 		VT_SSR_HAS_CANDIDATES = true;
-		const explicit = typeof props.name === 'string';
+		const explicit = typeof props.name === 'string' && props.name !== 'auto';
 		const frame = FRAME;
 		const cand: VtSsrCandidate = {
+			elementScope: props.scope === 'element',
 			name: explicit
 				? (props.name as string)
-				: '_O' + (frame !== null ? framePath(frame).replace(/\//g, '-') : '') + '_',
+				: '_O' +
+					ID_PREFIX +
+					(STREAM !== null ? STREAM.token + '-' : '') +
+					(frame !== null ? framePath(frame).replace(/\//g, '-') : '') +
+					'_',
 			share: vtSsrResolve(props, 'share'),
 			update: vtSsrResolve(props, 'update'),
 			consumed: false,
@@ -4696,7 +5845,7 @@ export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 		} finally {
 			VT_SSR_STACK.pop();
 		}
-		const named = explicit || VT_SSR_TRY_SEQ !== seqBefore;
+		const named = explicit || (props.scope !== 'element' && VT_SSR_TRY_SEQ !== seqBefore);
 		const attrs: Array<[string, string]> = [];
 		if (named) attrs.push(['vt-name', cand.name]);
 		attrs.push(['vt-update', cand.update]);
@@ -4704,8 +5853,18 @@ export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 		// this boundary tops, stripped at emission when unclaimed.
 		attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
 		attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
-		if (named) attrs.push(['vt-share', cand.share]);
-		return ssrHtml(ssrBlock(vtSsrAnnotate(inner, attrs)));
+		if (named) attrs.push(['vt-share', VT_SSR_TRY_SEQ !== seqBefore ? cand.update : cand.share]);
+		for (const kind of ['Enter', 'Exit'] as const) {
+			const prop = props[('parent' + kind) as 'parentEnter' | 'parentExit'];
+			const value =
+				prop === undefined
+					? undefined
+					: vtSsrResolve(props, ('parent' + kind) as 'parentEnter' | 'parentExit');
+			const handler = props[('onParent' + kind) as 'onParentEnter' | 'onParentExit'];
+			attrs.push(['vt-parent-' + kind.toLowerCase() + '-x', value ?? (handler ? 'auto' : 'none')]);
+		}
+		const annotated = vtSsrAnnotate(inner, attrs);
+		return ssrHtml(ssrBlock(props.scope === 'element' ? vtSsrAnnotateScope(annotated) : annotated));
 	},
 	COMPONENT_FLAG_BOUNDARY,
 	'ViewTransition',
@@ -4770,7 +5929,6 @@ export interface Context<T> {
 	(props: { value: T; children?: any }, scope: SSRScope): string;
 	$$kind: typeof CONTEXT_TAG;
 	defaultValue: T;
-	Provider: (props: { value: T; children?: any }, scope: SSRScope) => string;
 }
 
 export function createContext<T>(defaultValue: T): Context<T> {
@@ -4779,7 +5937,7 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	} as Context<T>;
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
-	ctx.Provider = ctx;
+	registerContext(ctx);
 	if (process.env.NODE_ENV !== 'production') {
 		// Mirror of the client's Consumer diagnostic (see runtime.ts): warn once
 		// per context on access, return undefined so probes behave as in prod.
@@ -4862,6 +6020,7 @@ function normalizeThrownServerThenable(error: unknown): unknown {
 			props: CURRENT_PROPS,
 			parentScope: CURRENT_PARENT_SCOPE,
 			frame,
+			signalInstanceKey: SIGNAL_COMPONENT_INSTANCE_KEY,
 		});
 	}
 	return SSR_SUSPENSE;
@@ -5261,6 +6420,7 @@ export function use<T>(
 			props: CURRENT_PROPS,
 			parentScope: CURRENT_PARENT_SCOPE,
 			frame,
+			signalInstanceKey: SIGNAL_COMPONENT_INSTANCE_KEY,
 		});
 	}
 	throw SSR_SUSPENSE;
@@ -5562,6 +6722,7 @@ export function puBatch(thenables: unknown[], warm?: () => void): void {
 			props: CURRENT_PROPS,
 			parentScope: CURRENT_PARENT_SCOPE,
 			frame,
+			signalInstanceKey: SIGNAL_COMPONENT_INSTANCE_KEY,
 		});
 	}
 	throw SSR_SUSPENSE;
@@ -5812,6 +6973,7 @@ export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C & { disp
 				props: CURRENT_PROPS,
 				parentScope: CURRENT_PARENT_SCOPE,
 				frame,
+				signalInstanceKey: SIGNAL_COMPONENT_INSTANCE_KEY,
 			});
 		}
 		throw SSR_SUSPENSE;
@@ -6179,18 +7341,29 @@ export function useTransition(): [boolean, (fn: () => void | Promise<unknown>) =
 	return [false, NOOP];
 }
 
-export function useDeferredValue<T>(value: T, ...rest: any[]): T {
+export function useDeferredValue<T>(value: T, ...rest: any[]): T;
+export function useDeferredValue<T>(
+	value: T,
+	initialValueOrSlot: unknown = undefined,
+	_slot?: unknown,
+): T {
 	// Optional initialValue precedes the trailing slot symbol.
-	return rest.length >= 2 ? (rest[0] as T) : value;
+	return arguments.length >= 3 ? (initialValueOrSlot as T) : value;
 }
 
 export function useSyncExternalStore<T>(
 	_subscribe: unknown,
 	getSnapshot: () => T,
 	...rest: any[]
+): T;
+export function useSyncExternalStore<T>(
+	_subscribe: unknown,
+	getSnapshot: () => T,
+	serverSnapshotOrSlot: unknown = undefined,
+	_slot?: unknown,
 ): T {
 	// `getServerSnapshot` (if provided) precedes the trailing slot symbol.
-	const getServerSnapshot = rest.length >= 2 ? (rest[0] as () => T) : undefined;
+	const getServerSnapshot = arguments.length >= 4 ? (serverSnapshotOrSlot as () => T) : undefined;
 	return getServerSnapshot ? getServerSnapshot() : getSnapshot();
 }
 
@@ -6406,7 +7579,14 @@ export function isChildrenBlock(value: unknown): boolean {
 // ---------------------------------------------------------------------------
 
 export function injectStyle(id: string, css: string, nonce?: string): void {
-	if (CSS !== null) CSS.set(id, nonce === undefined ? { css } : { css, nonce });
+	if (CSS !== null) {
+		const previous = CSS.get(id);
+		// Repeated component/theme styles leave the replay generation unchanged.
+		// Changed CSS or nonce still replaces the sheet without moving its order.
+		if (previous !== undefined && previous.css === css && previous.nonce === nonce) return;
+		CSS.replay = null;
+		CSS.set(id, nonce === undefined ? { css } : { css, nonce });
+	}
 }
 
 /**
@@ -6587,6 +7767,24 @@ export interface RenderResult {
 
 /** Options accepted by the buffered render entry points (React-shaped subset). */
 export interface RenderOptions {
+	/** The host already emitted earlySignalBootstrapScript before interactive HTML. */
+	earlySignalBootstrap?: 'external';
+	/** Shared request/account data owner borrowed across sibling SSR regions. */
+	signalOwner?: SignalOwner;
+	/** Automatically publish query attempts into the pre-module streamed receiver. */
+	streamedSignals?: {
+		readonly buildId: string;
+		readonly documentId: string;
+		readonly selectionGeneration?: number;
+		readonly maxFrameBytes?: number;
+		readonly maxTotalBytes?: number;
+		readonly timeoutMs?: number;
+	};
+	/** Compiler/bundler records for strict independently activated Hydrate boundaries. */
+	independentHydration?: {
+		readonly buildId: string;
+		readonly resolve: (templateBoundaryId: string) => IndependentHydrateBuildRecord | undefined;
+	};
 	/** Caller-controlled namespace for `useId`; use distinct prefixes for sibling roots. */
 	identifierPrefix?: string;
 	/** Called with any error thrown during the render (before it propagates). */
@@ -6791,12 +7989,19 @@ type SuspenseOutcome = SuspenseResult & {
 //              can't know the unwraps' string keys, but puMemo makes instance
 //              identity stable across passes);
 type ResolvedMap = Map<string, SuspenseOutcome> & {
+	/** Pending streaming subscriptions shared across this request's settle waves. */
+	streamSettlements?: StreamSettlements;
 	/** Recoverable buffered-boundary errors are reported once across async retries. */
 	bufferedErrors?: Map<string, { error: unknown; reported: boolean }>;
 	/** Undefined for externally hosted passes whose request lifetime is not owned here. */
 	resourceOptions?: RenderOptions | null;
 	/** Optional renderer resources; allocated only by a participating adapter. */
 	resources?: ServerRenderResources;
+	/** One request/account owner shared by every pass and streamed region. */
+	signalOwner?: SignalOwner;
+	ownedSignalOwner?: boolean;
+	signalInstances?: Map<string, SignalRendererOwnerIdentity>;
+	hasSignalControls?: boolean;
 	/** Render-local stable ids for non-primitive and long string control/list keys. */
 	asyncIdentities: Map<unknown, number>;
 	/** Cross-pass fallback ids for transient object keys at one lexical position. */
@@ -6827,9 +8032,38 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 		touched?: Set<PromiseLike<unknown>>;
 	};
 };
+
+// Server signal ownership is compiler-selected. Signal-free programs avoid
+// consulting the host async context and allocate no owner or instance map.
+let SERVER_SIGNAL_BINDINGS_ENABLED = false;
+let SERVER_SIGNAL_BINDINGS_POTENTIAL = false;
+
+/** @internal Compiler/runtime server signal capability version 1. */
+export function enableServerSignalBindings(abi = 1, potentialOnly = false): void {
+	if (abi !== 1) throw new TypeError(formatServerError(71));
+	SERVER_SIGNAL_BINDINGS_POTENTIAL = true;
+	if (!potentialOnly) SERVER_SIGNAL_BINDINGS_ENABLED = true;
+}
+
+function isRendererSignalOwner(owner: SignalOwner): owner is SignalRendererOwnerIdentity {
+	return 'documentOwner' in owner;
+}
+
 function newResolvedMap(resourceOptions?: RenderOptions | null): ResolvedMap {
 	const m = new Map() as ResolvedMap;
 	if (resourceOptions !== undefined) m.resourceOptions = resourceOptions;
+	if (SERVER_SIGNAL_BINDINGS_ENABLED || resourceOptions?.signalOwner !== undefined) {
+		const ambient = currentSignalOwner();
+		const configured = resourceOptions?.signalOwner ?? ambient;
+		m.signalOwner =
+			configured === undefined || configured === null
+				? Object.freeze({ scopeKey: 'octane:document' })
+				: isRendererSignalOwner(configured)
+					? configured.documentOwner
+					: configured;
+		m.ownedSignalOwner = configured === undefined || configured === null;
+		m.signalInstances = new Map();
+	}
 	m.asyncIdentities = new Map();
 	m.asyncPositionIdentities = new Map();
 	m.nextAsyncIdentity = 0;
@@ -6886,10 +8120,27 @@ export function getServerRenderResourceContext(): ServerRenderResourceContext | 
 }
 
 function releaseServerRenderResources(resolved: ResolvedMap): void {
+	const settlements = resolved.streamSettlements;
+	if (settlements !== undefined) {
+		// Promise callbacks cannot be detached, but a late outcome must not retain
+		// or refill the completed request. Shared producers keep running normally.
+		resolved.streamSettlements = undefined;
+		settlements.resolved = null;
+		settlements.wake = null;
+		for (const recorder of settlements.pending.values()) recorder.keys = null;
+		settlements.pending.clear();
+	}
 	const resources = resolved.resources;
 	// Native thenable settlement callbacks can retain this cache after an abort.
 	// They must not also keep a completed request's options or foreign resources.
 	resolved.resourceOptions = undefined;
+	if (resolved.signalInstances !== undefined) {
+		for (const owner of resolved.signalInstances.values()) retireSignalOwnerIdentity(owner);
+		resolved.signalInstances.clear();
+	}
+	if (resolved.ownedSignalOwner && resolved.signalOwner !== undefined) {
+		retireSignalOwnerIdentity(resolved.signalOwner);
+	}
 	if (resources !== undefined) resolved.resources = undefined;
 	if (resources === undefined || resources.finished) return;
 	resources.finished = true;
@@ -6917,6 +8168,8 @@ interface FullPassResult {
 	/** Whether this pass rendered ViewTransition candidate attributes that need
 	 *  the final residual-candidate cleanup scan. */
 	vtCandidates: boolean;
+	/** Whether emitted HTML may contain unescaped trusted attribute syntax. */
+	rawHtml: boolean;
 	/** Per-hash scoped stylesheets from this pass — the streaming renderer diffs
 	 *  these against what it already flushed to emit late boundaries' styles. */
 	cssEntries: Map<string, InjectedStyle>;
@@ -6924,6 +8177,7 @@ interface FullPassResult {
 	 *  diffed the same way so late-discovered resources ride the wave chunks. */
 	sheets: Map<string, { precedence: string; html: string }> | null;
 	signals?: NativeSignalManifest;
+	hasSignalControls: boolean;
 }
 
 // Snapshot / install / restore the module globals around ONE synchronous pass
@@ -6940,7 +8194,12 @@ interface Ambient {
 	warmClaims: Set<object> | null;
 	id: number;
 	idPrefix: string;
-	css: Map<string, InjectedStyle> | null;
+	signalInstancePrefix: string;
+	signalComponentInstanceKey: ServerSignalInstanceKey;
+	signalOwnerActive: boolean;
+	signalControlSite: string;
+	signalListKeys: ServerSignalListKeys | null;
+	css: StyleCollector | null;
 	nonceAttr: string;
 	markers: boolean;
 	permanentStaticHydrateDepth: number;
@@ -6959,6 +8218,7 @@ interface Ambient {
 	nestingWarnings: Set<string> | null | undefined;
 	vtTrySeq: number;
 	vtHasCandidates: boolean;
+	vtHasRawHtml: boolean;
 	vtStack: Array<{ candidate: VtSsrCandidate; consumed: boolean }>;
 }
 function saveAmbient(): Ambient {
@@ -6972,6 +8232,11 @@ function saveAmbient(): Ambient {
 		warmClaims: CURRENT_PU_WARM_CLAIMS,
 		id: ID_COUNTER,
 		idPrefix: ID_PREFIX,
+		signalInstancePrefix: SIGNAL_INSTANCE_PREFIX,
+		signalComponentInstanceKey: SIGNAL_COMPONENT_INSTANCE_KEY,
+		signalOwnerActive: SERVER_SIGNAL_OWNER_ACTIVE,
+		signalControlSite: SIGNAL_CONTROL_SITE,
+		signalListKeys: SIGNAL_LIST_KEYS,
 		css: CSS,
 		nonceAttr: NONCE_ATTR,
 		markers: MARKERS,
@@ -6991,7 +8256,8 @@ function saveAmbient(): Ambient {
 		nestingWarnings: SSR_NESTING_WARNINGS,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
-		vtStack: VT_SSR_STACK.map((candidate) => ({ candidate, consumed: candidate.consumed })),
+		vtHasRawHtml: VT_SSR_HAS_RAW_HTML,
+		vtStack: snapshotVtStack(),
 	};
 }
 function restoreAmbient(a: Ambient): void {
@@ -7024,6 +8290,11 @@ function restoreAmbient(a: Ambient): void {
 	CURRENT_PU_WARM_CLAIMS = a.warmClaims;
 	ID_COUNTER = a.id;
 	ID_PREFIX = a.idPrefix;
+	SIGNAL_INSTANCE_PREFIX = a.signalInstancePrefix;
+	SIGNAL_COMPONENT_INSTANCE_KEY = a.signalComponentInstanceKey;
+	SERVER_SIGNAL_OWNER_ACTIVE = a.signalOwnerActive;
+	SIGNAL_CONTROL_SITE = a.signalControlSite;
+	SIGNAL_LIST_KEYS = a.signalListKeys;
 	CSS = a.css;
 	NONCE_ATTR = a.nonceAttr;
 	MARKERS = a.markers;
@@ -7043,6 +8314,7 @@ function restoreAmbient(a: Ambient): void {
 	SSR_NESTING_WARNINGS = a.nestingWarnings;
 	VT_SSR_TRY_SEQ = a.vtTrySeq;
 	VT_SSR_HAS_CANDIDATES = a.vtHasCandidates;
+	VT_SSR_HAS_RAW_HTML = a.vtHasRawHtml;
 	VT_SSR_STACK.length = 0;
 	for (const snapshot of a.vtStack) {
 		snapshot.candidate.consumed = snapshot.consumed;
@@ -7077,15 +8349,22 @@ function runFullFramedPass(
 	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
 	ID_PREFIX = identifierPrefix;
+	SIGNAL_INSTANCE_PREFIX = identifierPrefix;
+	SIGNAL_COMPONENT_INSTANCE_KEY = JSON.stringify([identifierPrefix, 'root']);
+	SERVER_SIGNAL_OWNER_ACTIVE = false;
+	SIGNAL_CONTROL_SITE = '';
+	SIGNAL_LIST_KEYS = null;
 	NONCE_ATTR = nonceAttr;
 	ASYNC_SCOPE = '';
 	MARKERS = markers;
 	PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
+	VT_SSR_HAS_RAW_HTML = false;
 	VT_SSR_STACK.length = 0;
-	const cssMap = (CSS = new Map<string, InjectedStyle>());
+	const cssMap = (CSS = newStyleCollector());
 	const headBuf = (HEAD = {
+		replay: null,
 		html: '',
 		charset: '',
 		viewport: '',
@@ -7122,6 +8401,7 @@ function runFullFramedPass(
 	CURRENT_PARENT_SCOPE = null;
 	let body = '';
 	let vtCandidates = false;
+	let rawHtml = false;
 	let rootSuspended = false;
 	let signals: NativeSignalManifest | undefined;
 	let nativePassCompleted = false;
@@ -7133,6 +8413,10 @@ function runFullFramedPass(
 		// createElement descriptor that must render through ssrChild.
 		const out = invokeComponentBody(component, props, root, FRAME);
 		body = serverComponentOutput(out, root);
+		if (markers && out !== null && typeof out === 'object') {
+			const marker = (out as { [BINDING_HTML_ROOT]?: string })[BINDING_HTML_ROOT];
+			if (marker !== undefined) body = ssrBindingBlock(body, marker);
+		}
 		nativePassCompleted = true;
 	} catch (err) {
 		err = normalizeThrownServerThenable(err);
@@ -7143,12 +8427,20 @@ function runFullFramedPass(
 		rootSuspended = true;
 	} finally {
 		vtCandidates = VT_SSR_HAS_CANDIDATES;
+		rawHtml = VT_SSR_HAS_RAW_HTML;
 		try {
 			if (nativeToken >= 0) NATIVE_READ_COLLECTOR!.endScope(nativeToken, nativePassCompleted);
 			if (markers && nativePassCompleted)
 				signals = NATIVE_READ_COLLECTOR?.serialize(NATIVE_SERVER_READS);
 		} finally {
-			restoreAmbient(saved);
+			try {
+				restoreAmbient(saved);
+			} finally {
+				// Cleanup callbacks may render too; release memo copies only after
+				// they finish. Hosted results and streams can retain cssEntries.
+				cssMap.replay = null;
+				headBuf.replay = null;
+			}
 		}
 	}
 	if (resolved.bufferedErrors !== undefined) {
@@ -7179,8 +8471,10 @@ function runFullFramedPass(
 		deferred,
 		rootSuspended,
 		vtCandidates,
+		rawHtml,
 		cssEntries: cssMap,
 		sheets: headBuf.sheets,
+		hasSignalControls: resolved.hasSignalControls === true,
 	};
 	if (signals !== undefined) result.signals = signals;
 	return result;
@@ -7206,15 +8500,22 @@ function runDiscoveryRound(
 	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
 	ID_PREFIX = identifierPrefix;
+	SIGNAL_INSTANCE_PREFIX = identifierPrefix;
+	SIGNAL_COMPONENT_INSTANCE_KEY = JSON.stringify([identifierPrefix, 'root']);
+	SERVER_SIGNAL_OWNER_ACTIVE = false;
+	SIGNAL_CONTROL_SITE = '';
+	SIGNAL_LIST_KEYS = null;
 	NONCE_ATTR = '';
 	ASYNC_SCOPE = '';
 	MARKERS = true;
 	PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
+	VT_SSR_HAS_RAW_HTML = false;
 	VT_SSR_STACK.length = 0;
-	CSS = new Map();
+	CSS = newStyleCollector();
 	HEAD = {
+		replay: null,
 		html: '',
 		charset: '',
 		viewport: '',
@@ -7253,7 +8554,14 @@ function runDiscoveryRound(
 				namespace: undefined,
 			};
 			try {
-				renderComponentFramed(job.comp, job.props, job.parentScope, frame);
+				renderComponentFramed(
+					job.comp,
+					job.props,
+					job.parentScope,
+					frame,
+					undefined,
+					job.signalInstanceKey,
+				);
 			} catch (err) {
 				// A bare (@try-less) use() in the job body rethrows SSR_SUSPENSE; the
 				// thenable is already queued. A REAL error is DISCARDED here, not
@@ -7360,6 +8668,50 @@ const yieldMacrotask: () => Promise<void> =
 		? () => new Promise((resolve) => setImmediate(resolve))
 		: () => new Promise((resolve) => setTimeout(resolve, 0));
 
+interface StreamSettlementRecorder {
+	promise: PromiseLike<unknown>;
+	key: string;
+	/** Batch registrations get a fresh synthetic key on every pass. */
+	keys: Set<string> | null;
+	batch: boolean;
+	wave: number;
+}
+
+interface StreamSettlements {
+	resolved: ResolvedMap | null;
+	pending: Map<PromiseLike<unknown>, StreamSettlementRecorder>;
+	wave: number;
+	wake: (() => void) | null;
+}
+
+async function recordStreamSettlement(
+	settlements: StreamSettlements,
+	recorder: StreamSettlementRecorder,
+): Promise<void> {
+	let outcome: SuspenseOutcome;
+	try {
+		outcome = { value: await recorder.promise, thenable: recorder.promise };
+	} catch (reason) {
+		outcome = { reason, thenable: recorder.promise };
+	}
+	const resolved = settlements.resolved;
+	if (resolved === null) return;
+	if (!resolved.has(recorder.key)) resolved.set(recorder.key, outcome);
+	if (recorder.keys !== null) {
+		for (const key of recorder.keys) {
+			if (!resolved.has(key)) resolved.set(key, outcome);
+		}
+		recorder.keys = null;
+	}
+	if (recorder.batch && !resolved.pu.resolvedT.has(recorder.promise)) {
+		resolved.pu.resolvedT.set(recorder.promise, outcome);
+	}
+	settlements.pending.delete(recorder.promise);
+	// Only a member of the current suspended list may end its wait. A vanished
+	// branch's late result can warm replay state without starting another pass.
+	if (recorder.wave === settlements.wave) settlements.wake?.();
+}
+
 // The STREAMING settle: await only until the FIRST unresolved thenable
 // settles, then coalesce — one macrotask yield plus microtask drains — so
 // everything else that landed in the same event-loop wave records into
@@ -7376,27 +8728,42 @@ async function settleFirstOfWave(
 ): Promise<void> {
 	const pu = (resolved as ResolvedMap).pu;
 	pu.recreate ??= { strikes: 0, prevCreated: pu.created.size };
-	const recorders: Promise<void>[] = [];
+	const settlements = (resolved.streamSettlements ??= {
+		resolved,
+		pending: new Map(),
+		wave: 0,
+		wake: null,
+	});
+	const wave = ++settlements.wave;
+	let waiting = false;
 	for (const { promise, key } of suspended) {
 		if (resolved.has(key)) continue;
-		const isPu = key.startsWith('|pu#');
-		recorders.push(
-			(async () => {
-				try {
-					const value = await promise;
-					const outcome = { value, thenable: promise };
-					if (!resolved.has(key)) resolved.set(key, outcome);
-					if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, outcome);
-				} catch (reason) {
-					const outcome = { reason, thenable: promise };
-					if (!resolved.has(key)) resolved.set(key, outcome);
-					if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, outcome);
-				}
-			})(),
-		);
+		let recorder = settlements.pending.get(promise);
+		if (recorder === undefined) {
+			recorder = { promise, key, keys: null, batch: key.startsWith('|pu#'), wave };
+			settlements.pending.set(promise, recorder);
+			// Attach once per thenable, preserving a first-writer outcome for each
+			// occurrence key. Even non-native thenables resume after this loop has
+			// installed the wake-up. A shared producer never merges its use sites.
+			void recordStreamSettlement(settlements, recorder);
+		} else {
+			if (key !== recorder.key) (recorder.keys ??= new Set()).add(key);
+			if (key.startsWith('|pu#')) recorder.batch = true;
+			recorder.wave = wave;
+		}
+		waiting = true;
 	}
-	if (recorders.length === 0) return;
-	await raceSettleGuards(Promise.race(recorders), timeoutMs, signal);
+	if (!waiting) return;
+	// A single wake-up replaces Promise.race's reaction on every still-pending
+	// recorder each wave. Recording always precedes waking the next full pass.
+	const first = new Promise<void>((resolve) => {
+		settlements.wake = resolve;
+	});
+	try {
+		await raceSettleGuards(first, timeoutMs, signal);
+	} finally {
+		settlements.wake = null;
+	}
 	// The winning recorder has recorded. Yield one macrotask so the rest of
 	// this turn's burst fires, then drain microtasks while settlements keep
 	// recording (a chained/non-native thenable needs an extra tick or two);
@@ -7603,10 +8970,21 @@ function passToResult(
 	pass: FullPassResult,
 	nonceAttr: string,
 	separateHead: boolean = false,
+	independentHydration: boolean = false,
+	externalSignalBootstrap: boolean = false,
 ): RenderResult {
 	let body = pass.body;
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	if (pass.signals !== undefined) body += serializeNativeSignalSeeds(pass.signals, nonceAttr);
+	if (!externalSignalBootstrap && (pass.hasSignalControls || independentHydration)) {
+		body +=
+			'<script ' +
+			STREAM_SCRIPT_ATTR +
+			nonceAttr +
+			'>' +
+			streamedSignalBootstrapJs(independentHydration) +
+			'</script>';
+	}
 	// Unclaimed view-transition arm candidates strip at emission (see vtSsrStrip).
 	// Stripping the two channels separately equals stripping the folded string:
 	// no match spans the join. On body-only renders, `head + html` remains
@@ -7614,16 +8992,84 @@ function passToResult(
 	let result: RenderResult;
 	if (separateHead) {
 		result = {
-			html: pass.vtCandidates ? vtSsrStrip(body) : body,
+			html: pass.vtCandidates ? vtSsrStrip(body, pass.rawHtml) : body,
 			css: pass.css,
-			head: pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head,
+			head: pass.vtCandidates ? vtSsrStrip(pass.head, pass.rawHtml) : pass.head,
 		};
 	} else {
 		const html = spliceHead(body, pass.head);
-		result = { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
+		result = { html: pass.vtCandidates ? vtSsrStrip(html, pass.rawHtml) : html, css: pass.css };
 	}
 	if (pass.signals !== undefined) result.signals = pass.signals;
 	return result;
+}
+
+async function collectBufferedInjection(
+	injection: StreamInjectionSource,
+	signal: AbortSignal | undefined,
+): Promise<string> {
+	let revision = 0;
+	let wake: (() => void) | undefined;
+	let settled = false;
+	let failed = false;
+	let failure: unknown;
+	const notify = (): void => {
+		revision++;
+		const resume = wake;
+		wake = undefined;
+		resume?.();
+	};
+	const unsubscribe = injection.subscribe(notify);
+	signal?.addEventListener('abort', notify, { once: true });
+	injection.done.then(
+		() => {
+			settled = true;
+			notify();
+		},
+		(error) => {
+			failed = true;
+			failure = error;
+			settled = true;
+			notify();
+		},
+	);
+	let html = '';
+	try {
+		injection.renderComplete?.();
+		for (;;) {
+			signal?.throwIfAborted();
+			const chunk = injection.take();
+			if (chunk !== '') {
+				html += chunk;
+				injection.accepted?.();
+				continue;
+			}
+			if (settled) {
+				if (failed) throw failure;
+				return html;
+			}
+			const observed = revision;
+			await new Promise<void>((resolve) => {
+				wake = resolve;
+				if (settled || revision !== observed) {
+					wake = undefined;
+					resolve();
+				}
+			});
+		}
+	} finally {
+		unsubscribe();
+		signal?.removeEventListener('abort', notify);
+	}
+}
+
+function insertBufferedInjection(pass: FullPassResult, injection: string): void {
+	if (injection === '') return;
+	const tailStart = documentTailStart(pass.body);
+	pass.body =
+		tailStart === -1
+			? pass.body + injection
+			: pass.body.slice(0, tailStart) + injection + pass.body.slice(tailStart);
 }
 
 /**
@@ -7643,14 +9089,53 @@ export async function prerender(
 		options ??= props;
 		props = { value: entryComponent };
 	}
-	const nonceAttr = nonceAttrOf(options);
-	const resolved = newResolvedMap(options ?? null);
+	const preparedOptions = needsAutomaticSignalInjection(options)
+		? await prepareAutomaticSignalInjection(options as StreamOptions)
+		: options;
+	const injection = (preparedOptions as StreamOptions | undefined)?.injection;
+	const cancelRender = injection === undefined ? undefined : new AbortController();
+	// The producer's deadline can expire while the render is still suspended.
+	// Abort the renderer's own guarded waits rather than abandoning a raced render.
+	injection?.done.then(NOOP, (error) => cancelRender!.abort(error));
+	const renderOptions =
+		cancelRender === undefined
+			? preparedOptions
+			: {
+					...preparedOptions,
+					signal:
+						preparedOptions?.signal === undefined
+							? cancelRender.signal
+							: AbortSignal.any([preparedOptions.signal, cancelRender.signal]),
+				};
+	const nonceAttr = nonceAttrOf(renderOptions);
+	const resolved = newResolvedMap(renderOptions ?? null);
 	try {
+		const pass = await runBuffered(component, props, renderOptions, nonceAttr, resolved);
+		if (injection !== undefined) {
+			try {
+				insertBufferedInjection(
+					pass,
+					await collectBufferedInjection(injection, renderOptions?.signal),
+				);
+			} catch (error) {
+				renderOptions?.onError?.(error);
+				throw error;
+			}
+		}
 		return passToResult(
-			await runBuffered(component, props, options, nonceAttr, resolved),
+			pass,
 			nonceAttr,
-			options?.headChannel === 'separate',
+			renderOptions?.headChannel === 'separate',
+			renderOptions?.independentHydration !== undefined,
+			renderOptions?.earlySignalBootstrap === 'external',
 		);
+	} catch (error) {
+		try {
+			injection?.cancel?.(error);
+		} catch {
+			// Cleanup cannot replace the render failure or request's abort reason.
+		}
+		throw error;
 	} finally {
 		releaseServerRenderResources(resolved);
 	}
@@ -7836,7 +9321,7 @@ export function renderHostedAttempt(
 	let body = pass.body;
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	if (pass.signals !== undefined) body += serializeNativeSignalSeeds(pass.signals, nonceAttr);
-	if (pass.vtCandidates) body = vtSsrStrip(body);
+	if (pass.vtCandidates) body = vtSsrStrip(body, pass.rawHtml);
 	return { status: 'complete', html: body, head: pass.head, cssEntries: pass.cssEntries };
 }
 
@@ -7873,7 +9358,13 @@ export function renderToString(
 	} finally {
 		releaseServerRenderResources(resolved);
 	}
-	return passToResult(pass, nonceAttr, options?.headChannel === 'separate');
+	return passToResult(
+		pass,
+		nonceAttr,
+		options?.headChannel === 'separate',
+		options?.independentHydration !== undefined,
+		options?.earlySignalBootstrap === 'external',
+	);
 }
 
 /**
@@ -7918,13 +9409,13 @@ export function renderToStaticMarkup(
 	// handed over on its own under `headChannel: 'separate'`.
 	if (options?.headChannel === 'separate') {
 		return {
-			html: pass.vtCandidates ? vtSsrStrip(pass.body) : pass.body,
+			html: pass.vtCandidates ? vtSsrStrip(pass.body, pass.rawHtml) : pass.body,
 			css: pass.css,
-			head: pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head,
+			head: pass.vtCandidates ? vtSsrStrip(pass.head, pass.rawHtml) : pass.head,
 		};
 	}
 	const html = spliceHead(pass.body, pass.head);
-	return { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
+	return { html: pass.vtCandidates ? vtSsrStrip(html, pass.rawHtml) : html, css: pass.css };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -7996,6 +9487,8 @@ interface StreamBoundary {
 	serverOwnedStatic: boolean;
 	/** Inner branch-range html (`<!--[-->…<!--]-->`) from the resolving pass. */
 	html: string;
+	/** Whether the accepted segment requires quote-aware candidate stripping. */
+	rawHtml: boolean;
 	/** This boundary's `use()` seed slice from the resolving pass. */
 	seeds: unknown[];
 	/** Ready native values captured with this exact accepted segment. */
@@ -8024,6 +9517,13 @@ interface StreamState {
 	activeOwnerKeys: string[];
 	/** Undo log scoped to one synchronous full pass; null between passes. */
 	replay: StreamBoundaryReplayEntry[] | null;
+}
+
+function hasPendingStreamBoundary(stream: StreamState): boolean {
+	for (const boundary of stream.boundaries.values()) {
+		if (boundary.state === 'pending') return true;
+	}
+	return false;
 }
 
 interface StreamBoundaryReplayEntry {
@@ -8190,7 +9690,7 @@ export function ssrTry(
 	let vtOuter: VtSsrCandidate | null = null;
 	if (VT_SSR_STACK.length > 0) {
 		const top = VT_SSR_STACK[VT_SSR_STACK.length - 1];
-		if (!top.consumed) {
+		if (!top.consumed && !top.elementScope) {
 			top.consumed = true;
 			vtOuter = top;
 		}
@@ -8210,12 +9710,12 @@ export function ssrTry(
 	const armScope = outerAsyncScope + '|@arm:' + siteKey + '#' + occurrence.toString(36) + ':';
 	let entry: StreamBoundary | undefined;
 	const serialStart = SERIAL?.length ?? 0;
-	let ancestorKeys: string[] = [];
-	let ownerKeys: string[] = [];
+	let ancestorKeys: string[] = EMPTY_SNAPSHOT_LIST;
+	let ownerKeys: string[] = EMPTY_SNAPSHOT_LIST;
 	if (stream !== null) {
 		stream.activePassBoundaryKeys?.add(key);
-		ancestorKeys = stream.activeTryKeys.slice();
-		ownerKeys = stream.activeOwnerKeys.slice();
+		ancestorKeys = snapshotList(stream.activeTryKeys);
+		ownerKeys = snapshotList(stream.activeOwnerKeys);
 		entry = stream.boundaries.get(key);
 		if (entry !== undefined) {
 			recordStreamBoundaryMutation(stream, key);
@@ -8346,22 +9846,19 @@ export function ssrTry(
 			const deferredStart = DEFERRED?.length ?? 0;
 			const serialStart = SERIAL?.length ?? 0;
 			const css = CSS;
-			const cssSnapshot = css === null ? null : new Map(css);
+			const cssSnapshot = snapshotStyles(css);
 			const head = HEAD;
+			const headCollections = snapshotHeadCollections(head);
 			const headHtml = head?.html;
 			const headCharset = head?.charset;
 			const headViewport = head?.viewport;
-			const headHints = head === null ? null : new Set(head.hints);
-			const headSheets = head === null || head.sheets === null ? null : new Map(head.sheets);
-			const headHintHtml = head === null || head.hintHtml === null ? null : new Map(head.hintHtml);
-			const headXfer =
-				head === null || head.preloadXfer === null ? null : new Map(head.preloadXfer);
+			const headHints = headCollections?.hints ?? null;
+			const headSheets = headCollections?.sheets ?? null;
+			const headHintHtml = headCollections?.hintHtml ?? null;
+			const headXfer = headCollections?.preloadXfer ?? null;
 			const vtTrySeq = VT_SSR_TRY_SEQ;
 			const vtHasCandidates = VT_SSR_HAS_CANDIDATES;
-			const vtStack = VT_SSR_STACK.map((candidate) => ({
-				candidate,
-				consumed: candidate.consumed,
-			}));
+			const vtStack = snapshotVtStack();
 			try {
 				fallback = withStream(null, renderFallback);
 			} catch (error) {
@@ -8378,10 +9875,12 @@ export function ssrTry(
 				if (DEFERRED !== null) DEFERRED.length = deferredStart;
 				if (SERIAL !== null) SERIAL.length = serialStart;
 				if (css !== null && cssSnapshot !== null) {
+					css.replay = null;
 					css.clear();
 					for (const [hash, sheet] of cssSnapshot) css.set(hash, sheet);
 				}
 				if (head !== null && headHints !== null) {
+					head.replay = null;
 					head.html = headHtml!;
 					head.charset = headCharset!;
 					head.viewport = headViewport!;
@@ -8408,6 +9907,8 @@ export function ssrTry(
 				}
 				VT_SSR_TRY_SEQ = vtTrySeq;
 				VT_SSR_HAS_CANDIDATES = vtHasCandidates;
+				// The fallback HTML still supplies the transport placeholder, so its
+				// raw-HTML requirement survives even though its side effects do not.
 				VT_SSR_STACK.length = 0;
 				for (const snapshot of vtStack) {
 					snapshot.candidate.consumed = snapshot.consumed;
@@ -8446,12 +9947,13 @@ export function ssrTry(
 					if (!entry.serverOwnedStatic)
 						entry.signals = NATIVE_READ_COLLECTOR?.serialize(nativeReads);
 					entry.state = 'done';
+					entry.rawHtml = VT_SSR_HAS_RAW_HTML;
 					entry.html =
 						vtOuter !== null
 							? vtSsrAnnotate(inner, [
 									['vt-name', vtOuter.name],
 									['vt-update', vtOuter.update],
-									['vt-share', vtOuter.share],
+									['vt-share', vtOuter.update],
 								])
 							: inner;
 					if (SERIAL !== null) {
@@ -8507,6 +10009,7 @@ export function ssrTry(
 							state: 'pending',
 							serverOwnedStatic: PERMANENT_STATIC_HYDRATE_DEPTH !== 0,
 							html: '',
+							rawHtml: false,
 							seeds: [],
 							pendingIdOffset,
 							namespace,
@@ -8556,6 +10059,7 @@ export function ssrTry(
 						}
 						entry.state = 'done';
 						entry.html = inner;
+						entry.rawHtml = VT_SSR_HAS_RAW_HTML;
 						entry.seeds = nativeFresh ? [] : caughtSeeds;
 						pruneUnrepresentedStreamDescendants(stream!, key, entry.html);
 					} else if (SERIAL !== null) {
@@ -8584,6 +10088,7 @@ export function ssrTry(
 						serverOwnedStatic: false,
 						error: e,
 						html: '',
+						rawHtml: false,
 						seeds: [],
 						pendingIdOffset,
 						namespace,
@@ -8632,17 +10137,26 @@ export function ssrTry(
 // `<!--oct-seed:id-->` scoping comment. `id` is the full render-scoped opaque
 // key, so both document queries and the seed stash remain disjoint when output
 // from multiple streams is composed into one page. $OCTRX(id) marks the
-// boundary errored (hydration client-renders it via mismatch recovery). A
+// boundary errored (hydration client-renders it via mismatch recovery). Error
+// instructions that arrive before a queued parent reveal are retained until
+// insertion exposes their sentinel; transport order alone does not imply DOM
+// availability when an optional animation driver delays the parent swap. A
 // truthy second argument removes only a server-owned permanent-static sentinel,
 // retaining its already-flushed fallback because no client graph can recover it.
 let STREAM_RUNTIME_JS: string | undefined;
 function streamRuntimeJs(): string {
 	return (STREAM_RUNTIME_JS ??=
-		'(function(){var d=document;var S=window.$OCTS=window.$OCTS||{};' +
+		'(function(){if(window.$OCTRC)return;var d=document;var S=window.$OCTS=window.$OCTS||{},E;' +
 		// Legacy `[` / `]` means one physical range; `[N` / `]N` is canonical only
 		// for safe integer N >= 2. Keep this in sync with hydrationMarkerMultiplicity.
 		'var M=function(v,c){if(v===c)return 1;if(!v||v.charAt(0)!==c)return 0;' +
 		'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s;};' +
+		// Share parser/range rules with the optional driver; the base swap owns
+		// transport even when animation prepares its carrier before insertion.
+		'var P=function(s){var q=s.firstElementChild;if(q&&q.localName==="script"&&q.hasAttribute("' +
+		STREAM_SCRIPT_ATTR +
+		'")){var z=d.createElement("template");try{z.innerHTML=JSON.parse(q.textContent);return z.content;}catch(e){return null;}}return s;};' +
+		'var C=function(c,nc){if(!nc)return c;var n=c.firstElementChild;while(n&&n.localName==="script")n=n.nextElementSibling;return n;};' +
 		'window.$OCTRC=function(id,nc){' +
 		"var t=d.querySelector('template[" +
 		STREAM_BOUNDARY_ATTR +
@@ -8651,8 +10165,7 @@ function streamRuntimeJs(): string {
 		STREAM_SEGMENT_ATTR +
 		"=\"'+id+'\"]');" +
 		'if(!s)return;if(!t){s.remove();return;}' +
-		'var q=s.firstElementChild,z=d.createElement("template"),c=s;' +
-		'if(q&&q.localName==="script"){try{z.innerHTML=JSON.parse(q.textContent);c=z.content;}catch(e){return;}}' +
+		'var c=P(s);if(!c)return;' +
 		'var sd=c.querySelector("script[' +
 		STREAM_SEED_ATTR +
 		']");' +
@@ -8661,7 +10174,7 @@ function streamRuntimeJs(): string {
 		NATIVE_SIGNAL_SEED_ATTR +
 		'")))ns=ns.nextElementSibling;' +
 		'if(ns){S[id+"$signals"]=ns.textContent;ns.parentNode.removeChild(ns);}' +
-		'if(nc)c=c.firstElementChild;' +
+		'c=C(c,nc);if(!c)return;' +
 		'var n=t.nextSibling,depth=1;' +
 		'while(n){var x=n.nextSibling,v=n.nodeType===8?n.data:null;' +
 		'if(M(v,"["))depth++;else if(M(v,"]")){depth--;if(depth===0)break;}' +
@@ -8671,12 +10184,13 @@ function streamRuntimeJs(): string {
 		'p.replaceChild(d.createComment("' +
 		STREAM_SEED_COMMENT +
 		'"+id),t);' +
-		's.parentNode.removeChild(s);};' +
-		'window.$OCTRX=function(id,so){' +
+		's.parentNode.removeChild(s);if(E){var errors=E;E=undefined;for(var i=0;i<errors.length;i++)X(errors[i][0],errors[i][1]);}};' +
+		'window.$OCTRC.marker=M;window.$OCTRC.parse=P;window.$OCTRC.content=C;' +
+		'var X=window.$OCTRX=function(id,so){' +
 		"var t=d.querySelector('template[" +
 		STREAM_BOUNDARY_ATTR +
 		"=\"'+id+'\"]');" +
-		'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}};' +
+		'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}else(E||(E=[])).push([id,so]);};' +
 		// $OCTRH(id): hoist a wave carrier's Float sheet tags into document.head.
 		// With a live client runtime (window.$OCTFR, installed once client Float
 		// resource state exists) each tag is handed over so ONE authority keeps
@@ -8697,6 +10211,226 @@ function streamRuntimeJs(): string {
 		'if(x)x.after(n);else if(t)t.after(n);else d.head.appendChild(n);}' +
 		'c.remove();};' +
 		'})();');
+}
+
+/**
+ * Optional streaming animation driver. The ordinary swap remains the transport
+ * authority: animation only schedules that same swap after the old snapshot.
+ * Native handles are shared with hydration per document or persistent element
+ * owner. Siblings can overlap, while a containing capture waits for its active
+ * children. A new child waits only for its ancestor's old snapshot to complete.
+ * A batch enters every element callback before starting a document capture;
+ * otherwise the document's rendering freeze can prevent those callbacks from
+ * entering. All participating callbacks then publish the same swap plan once.
+ */
+let STREAM_VIEW_TRANSITION_RUNTIME_JS: string | undefined;
+function streamViewTransitionRuntimeJs(): string {
+	return (STREAM_VIEW_TRANSITION_RUNTIME_JS ??= `(function(){
+var w=window,d=document;
+if(w.$OCTVT)return;
+w.$OCTVT=true;
+var reveal=w.$OCTRC,queue=[],scheduled=false,callbackOnly=new WeakSet(),ready=new WeakSet(),waitReady=new WeakSet(),waitFinish=new WeakSet();
+w.$OCTRC=function(id,nc){
+ if(typeof d.startViewTransition!=="function"&&typeof Element.prototype.startViewTransition!=="function"){reveal(id,nc);return;}
+ queue.push([id,nc]);later();
+};
+function later(){if(queue.length&&!scheduled){scheduled=true;queueMicrotask(function(){scheduled=false;drain();});}}
+function watch(handle,untilReady){
+ var watched=untilReady?waitReady:waitFinish;
+ if(watched.has(handle))return;
+ watched.add(handle);
+ if(untilReady)handle.ready.then(function(){ready.add(handle);later();},function(){watch(handle,false);});
+ else handle.finished.then(later,later);
+}
+function ownerOf(t){
+ var scope=t.closest("[vt-scope]");
+ return scope?(scope.getAttribute("vt-scope")==="element"?scope:null):d;
+}
+function blocked(owner){
+ var handle=d.__octaneViewTransition,blocked=false;
+ if(handle&&!(owner&&owner!==d&&ready.has(handle))){watch(handle,!!owner&&owner!==d);blocked=true;}
+ var scopes=d.__octaneViewTransitionScopes;
+ if(scopes)scopes.forEach(function(active,element){
+  if(!owner||owner===d||owner===element||owner.contains(element)){watch(active,false);blocked=true;}
+  else if(element.contains(owner)&&!ready.has(active)){watch(active,true);blocked=true;}
+ });
+ return blocked;
+}
+function drain(){
+ if(!queue.length)return;
+ var selected=[],pending=[],groups=[],owners=new Map();
+ for(var i=0;i<queue.length;i++){
+  var item=queue[i],t=d.querySelector('template[${STREAM_BOUNDARY_ATTR}="'+item[0]+'"]'),owner=t?ownerOf(t):null;
+  if(blocked(owner)){pending.push(item);continue;}
+  selected.push(item);
+  var group=owners.get(owner);
+  if(!group){group={owner:owner,items:[],restore:[],changed:new Set(),prepared:[],arrived:false};owners.set(owner,group);groups.push(group);}
+  group.items.push(item);
+ }
+ queue=pending;
+ if(!selected.length)return;
+ var committed=false,animated=false,images=[],resourceWait;
+ function commit(){
+  if(committed)return resourceWait;
+  committed=true;for(var i=0;i<selected.length;i++)reveal(selected[i][0],selected[i][1]);
+  if(!animated)return;
+  var blockers=[],cleanups=[];
+  d.documentElement.clientHeight;
+  if(d.fonts&&d.fonts.status!=="loaded")blockers.push(d.fonts.ready);
+  for(var i=0;i<images.length;i++){
+   var img=images[i],bounds=img.getBoundingClientRect();
+   if(!img.complete&&bounds.bottom>0&&bounds.right>0&&bounds.top<w.innerHeight&&bounds.left<w.innerWidth){
+    blockers.push(new Promise(function(resolve){
+     var image=img;image.addEventListener("load",resolve);image.addEventListener("error",resolve);
+     cleanups.push(function(){image.removeEventListener("load",resolve);image.removeEventListener("error",resolve);});
+    }));
+   }
+  }
+  images.length=0;
+  if(blockers.length)resourceWait=new Promise(function(resolve){
+   var timer=setTimeout(done,500),settled=false;
+   function done(){if(settled)return;settled=true;clearTimeout(timer);for(var i=0;i<cleanups.length;i++)cleanups[i]();cleanups.length=0;resolve();}
+   Promise.all(blockers).then(done,done);
+  });
+  return resourceWait;
+ }
+ function reset(group){
+  var restore=group.restore;
+  for(var i=restore.length-1;i>=0;i--){
+   var entry=restore[i],el=entry[0],style=el.style;
+   if(style.getPropertyValue("view-transition-name")===entry[5]&&style.getPropertyPriority("view-transition-name")===entry[8]){
+    if(entry[1])style.setProperty("view-transition-name",entry[1],entry[2]);
+    else style.removeProperty("view-transition-name");
+   }
+   if(style.getPropertyValue("view-transition-class")===entry[6]&&style.getPropertyPriority("view-transition-class")===entry[9]){
+    if(entry[3])style.setProperty("view-transition-class",entry[3],entry[4]);
+    else style.removeProperty("view-transition-class");
+   }
+   if(!style.length&&!entry[7])el.removeAttribute("style");
+  }
+  restore.length=0;group.changed.clear();
+ }
+ function prepare(group){
+  var owner=group.owner,restore=group.restore,changed=group.changed,appearing=new Map();
+  if(!owner||typeof owner.startViewTransition!=="function")return;
+  function owns(el,content){
+   for(var node=el;node&&node.nodeType===1;node=node.parentElement){
+    if(node===owner)return true;
+    if(node.getAttribute("vt-scope")==="element")return false;
+    if(node===content)return true;
+   }
+   return owner===d;
+  }
+  function apply(el,attr,content){
+   var cls=el.getAttribute(attr);
+   if(!cls||cls==="none"||changed.has(el)||!owns(el,content))return;
+   var style=el.style;
+   if(!style)return;
+   var explicit=el.getAttribute("vt-name"),name=explicit||("_OT_"+restore.length+"_");
+   var entry=[el,style.getPropertyValue("view-transition-name"),style.getPropertyPriority("view-transition-name"),style.getPropertyValue("view-transition-class"),style.getPropertyPriority("view-transition-class"),"","",el.hasAttribute("style")];
+   if(el!==owner||explicit)style.setProperty("view-transition-name",w.CSS.escape(name));
+   if(cls!=="auto")style.setProperty("view-transition-class",cls);
+   entry[5]=style.getPropertyValue("view-transition-name");entry[6]=style.getPropertyValue("view-transition-class");
+   entry[8]=style.getPropertyPriority("view-transition-name");entry[9]=style.getPropertyPriority("view-transition-class");
+   restore.push(entry);changed.add(el);
+  }
+  function descendants(el,attr,content){
+   var nodes=el.querySelectorAll("["+attr+"]");
+   for(var i=0;i<nodes.length;i++)apply(nodes[i],attr,content);
+  }
+  for(var k=0;k<group.items.length;k++){
+   var id=group.items[k][0],nc=group.items[k][1];
+   var t=d.querySelector('template[${STREAM_BOUNDARY_ATTR}="'+id+'"]');
+   var s=d.querySelector('[${STREAM_SEGMENT_ATTR}="'+id+'"]');
+   if(!t||!s)continue;
+   var parent=t.parentNode,rect=parent.getBoundingClientRect();
+   if(!rect.width&&!rect.height&&!rect.left&&!rect.top)continue;
+   var parsed=reveal.parse(s);
+   if(!parsed)continue;
+   if(parsed!==s)s.replaceChildren(parsed);
+   var content=reveal.content(s,nc);
+   if(!content)continue;
+   group.prepared.push([t,content,parent]);
+   var matches=content.querySelectorAll("[vt-share]");
+   for(var i=0;i<matches.length;i++)if(matches[i].getAttribute("vt-share")!=="none"&&owns(matches[i],content))appearing.set(matches[i].getAttribute("vt-name"),matches[i]);
+   var pendingImages=content.querySelectorAll('img[src]:not([loading="lazy"])');
+   for(var i=0;i<pendingImages.length;i++)if(owns(pendingImages[i],content))images.push(pendingImages[i]);
+  }
+  function pair(el){
+   if(!owns(el))return false;
+   var other=appearing.get(el.getAttribute("vt-name"));
+   if(other&&el.getAttribute("vt-share")&&el.getAttribute("vt-share")!=="none"){
+    apply(el,"vt-share");apply(other,"vt-share",other.closest('[${STREAM_SEGMENT_ATTR}]'));appearing.delete(el.getAttribute("vt-name"));return true;
+   }
+   return false;
+  }
+  for(var k=0;k<group.prepared.length;k++){
+   var t=group.prepared[k][0],content=group.prepared[k][1],parent=group.prepared[k][2];
+   var node=t.nextSibling,depth=1;
+   while(node){
+    if(node.nodeType===8){
+     var v=node.data;
+     if(reveal.marker(v,"["))depth++;else if(reveal.marker(v,"]")&&!--depth)break;
+    }else if(node.nodeType===1){
+     if(!pair(node))apply(node,"vt-exit");
+     matches=node.querySelectorAll("[vt-share]");for(var j=0;j<matches.length;j++)pair(matches[j]);
+     descendants(node,"vt-parent-exit");
+    }
+    node=node.nextSibling;
+   }
+   for(var el=content.firstElementChild;el;el=el.nextElementSibling){apply(el,"vt-enter",content);descendants(el,"vt-parent-enter",content);}
+   do{
+    for(var sibling=parent.firstElementChild;sibling;sibling=sibling.nextElementSibling)apply(sibling,"vt-update");
+    if(parent===owner)break;
+    parent=parent.parentNode;
+   }while(parent&&parent.nodeType===1&&parent.getAttribute("vt-update")!=="none");
+  }
+  if(owner!==d&&group.prepared.length)apply(owner,"vt-update");
+ }
+ var captures=[],documentGroup=null,elementsToEnter=0,remaining=0,resolveGate,rejectGate;
+ var gate=new Promise(function(resolve,reject){resolveGate=resolve;rejectGate=reject;});
+ gate.catch(function(){});
+ for(var i=0;i<groups.length;i++){
+  try{prepare(groups[i]);}catch(error){reset(groups[i]);}
+  if(groups[i].restore.length){captures.push(groups[i]);if(groups[i].owner===d)documentGroup=groups[i];else elementsToEnter++;}
+ }
+ remaining=captures.length;animated=remaining>0;
+ if(!remaining){images.length=0;commit();later();return;}
+ function arrive(group){
+  if(group.arrived)return gate;
+  group.arrived=true;remaining--;
+  if(group.owner!==d&&!--elementsToEnter&&documentGroup)start(documentGroup);
+  if(!remaining){try{Promise.resolve(commit()).then(resolveGate,rejectGate);}catch(error){rejectGate(error);}}
+  return gate;
+ }
+ function start(group){
+  if(group.started)return;group.started=true;
+  var owner=group.owner,transition,startNative=owner.startViewTransition,update=function(){return arrive(group);};
+  try{
+   if(callbackOnly.has(startNative))transition=startNative.call(owner,update);
+   else{
+    try{transition=startNative.call(owner,{update:update,types:[]});}
+    catch(error){
+     if(!(error instanceof TypeError))throw error;
+     transition=startNative.call(owner,update);callbackOnly.add(startNative);
+    }
+   }
+   if(owner===d)d.__octaneViewTransition=transition;
+   else (d.__octaneViewTransitionScopes||(d.__octaneViewTransitionScopes=new Map())).set(owner,transition);
+   transition.ready.then(function(){ready.add(transition);reset(group);later();},function(){reset(group);});
+   function complete(){
+    reset(group);
+    if(owner===d){if(d.__octaneViewTransition===transition)d.__octaneViewTransition=null;}
+    else{var scopes=d.__octaneViewTransitionScopes;if(scopes&&scopes.get(owner)===transition)scopes.delete(owner);}
+    drain();
+   }
+   transition.finished.then(complete,complete);
+  }catch(error){reset(group);arrive(group);if(!error||(error.name!=="AbortError"&&error.name!=="InvalidStateError"))console.error(error);}
+ }
+ for(var i=0;i<captures.length;i++)if(captures[i].owner!==d)start(captures[i]);
+ if(!elementsToEnter&&documentGroup&&!documentGroup.arrived)start(documentGroup);
+}
+})();`);
 }
 
 interface StreamSink {
@@ -8734,11 +10468,30 @@ interface StreamSink {
  * construction.
  */
 export interface StreamInjectionSource {
+	/** @internal Pending query authority must precede shell-time module execution. */
+	takeInitialSelections?(): string;
+	/** This source emits validated renderer frames and needs the pre-module mailbox. */
+	readonly streamedRenderer?: true;
+	/** @internal Automatic query-attempt sink installed by streamedSignals. */
+	readonly observeSignalAttempt?: (
+		attempt: ServerSignalQueryAttempt,
+		run: <T>(callback: () => T) => T,
+	) => void;
+	/** @internal Server-only mirrors paired with the automatic attempt sink. */
+	readonly createSignalAttemptObservations?: () => ServerSignalQueryAttemptObservations;
 	/**
 	 * Pull all queued HTML (concatenated, verbatim). Called at emission
 	 * boundaries and after `subscribe` notifications; return '' when empty.
 	 */
 	take(): string;
+	/**
+	 * Optional transport acknowledgement for demand-driven producers. Called
+	 * after the string returned by take() has been accepted by the renderer's
+	 * sink. A producer may defer its next iterator pull until this callback.
+	 */
+	accepted?(): void;
+	/** Release this response's producer when rendering fails or its request is canceled. */
+	cancel?(reason: unknown): void;
 	/**
 	 * The source notifies when new HTML is queued; the renderer then drains
 	 * promptly — even while the render itself is idle awaiting `done`.
@@ -8764,6 +10517,12 @@ export interface StreamInjectionSource {
 
 export interface StreamOptions extends RenderOptions {
 	onShellReady?: () => void;
+	/**
+	 * The initial shell uses signals requiring activation before document EOF.
+	 * Called before shell publication, after its query authority is serialized.
+	 * Feature-free renders do not call this hook.
+	 */
+	onEarlyHydrationReady?: () => void;
 	onShellError?: (err: unknown) => void;
 	onAllReady?: () => void;
 	/**
@@ -8782,6 +10541,25 @@ export interface StreamOptions extends RenderOptions {
 	onHeadReady?: (head: string) => void;
 	/** Merge externally-produced HTML into the stream (see StreamInjectionSource). */
 	injection?: StreamInjectionSource;
+}
+
+function needsAutomaticSignalInjection(options: RenderOptions | undefined): boolean {
+	return (
+		options?.streamedSignals !== undefined &&
+		(options as StreamOptions | undefined)?.injection?.observeSignalAttempt === undefined
+	);
+}
+
+async function prepareAutomaticSignalInjection(options: StreamOptions): Promise<StreamOptions> {
+	const config = options.streamedSignals!;
+	const { createAutomaticStreamedSignalInjection } = await import('./server/streamed-signals.js');
+	return {
+		...options,
+		injection: createAutomaticStreamedSignalInjection(
+			{ ...config, nonce: options.nonce },
+			options.injection,
+		),
+	};
 }
 
 function withStream<T>(stream: StreamState | null, fn: () => T): T {
@@ -8918,7 +10696,7 @@ function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 	// them while this is still markup: once the parsing-safe carrier below turns
 	// the segment into a JSON string, vtSsrStrip can no longer recognize quoted
 	// HTML attributes inside it.
-	const html = vtSsrStrip(b.html);
+	const html = vtSsrStrip(b.html, b.rawHtml);
 	const content =
 		b.namespace === 'svg'
 			? seedScript + '<svg>' + html + '</svg>'
@@ -9098,7 +10876,14 @@ async function runStream(
 			return;
 		}
 		if (!html) return;
-		return write(html, false, rememberUnaccepted);
+		const written = write(html, false, rememberUnaccepted);
+		if (written === undefined) {
+			injection.accepted?.();
+			return;
+		}
+		return (written as Promise<void>).then(() => {
+			injection.accepted?.();
+		});
 	};
 	const recoveryInjection: (() => Promise<string>) | undefined =
 		injection === undefined
@@ -9167,16 +10952,22 @@ async function runStream(
 		const done: StreamBoundary[] = [];
 		const reachable = new Set(flushedSegments);
 		for (;;) {
-			const next = [...stream.boundaries.values()]
-				.filter((boundary) => {
-					if (boundary.state !== 'done' || reachable.has(boundary.id)) return false;
-					for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
-						const ancestor = stream.boundaries.get(boundary.ancestors[i]);
-						if (ancestor !== undefined) return reachable.has(ancestor.id);
+			const next: StreamBoundary[] = [];
+			// Selection only reads renderer-owned records; no render or transport
+			// callback can change the registry during this scan.
+			for (const boundary of stream.boundaries.values()) {
+				if (boundary.state !== 'done' || reachable.has(boundary.id)) continue;
+				let visible = true;
+				for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
+					const ancestor = stream.boundaries.get(boundary.ancestors[i]);
+					if (ancestor !== undefined) {
+						visible = reachable.has(ancestor.id);
+						break;
 					}
-					return true;
-				})
-				.sort((a, b) => a.order - b.order);
+				}
+				if (visible) next.push(boundary);
+			}
+			next.sort((a, b) => a.order - b.order);
 			if (next.length === 0) return done;
 			for (const boundary of next) {
 				done.push(boundary);
@@ -9191,17 +10982,22 @@ async function runStream(
 			options?.onError?.(boundary.error);
 		}
 	};
-	const reachableErroredBoundaries = (): StreamBoundary[] =>
-		[...stream.boundaries.values()]
-			.filter((boundary) => {
-				if (boundary.state !== 'errored' || boundary.errorFlushed) return false;
-				for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
-					const ancestor = stream.boundaries.get(boundary.ancestors[i]);
-					if (ancestor !== undefined) return flushedSegments.has(ancestor.id);
+	const reachableErroredBoundaries = (): StreamBoundary[] => {
+		const errors: StreamBoundary[] = [];
+		for (const boundary of stream.boundaries.values()) {
+			if (boundary.state !== 'errored' || boundary.errorFlushed) continue;
+			let visible = true;
+			for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
+				const ancestor = stream.boundaries.get(boundary.ancestors[i]);
+				if (ancestor !== undefined) {
+					visible = flushedSegments.has(ancestor.id);
+					break;
 				}
-				return true;
-			})
-			.sort((a, b) => a.order - b.order);
+			}
+			if (visible) errors.push(boundary);
+		}
+		return errors.sort((a, b) => a.order - b.order);
+	};
 	const flushRecoverableBoundaryErrors = (): void | Promise<void> => {
 		const errors = reachableErroredBoundaries();
 		if (errors.length === 0) return;
@@ -9317,7 +11113,7 @@ async function runStream(
 	const separateHead = options?.headChannel === 'separate';
 	if (separateHead) {
 		try {
-			options?.onHeadReady?.(pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head);
+			options?.onHeadReady?.(pass.vtCandidates ? vtSsrStrip(pass.head, pass.rawHtml) : pass.head);
 		} catch (err) {
 			try {
 				completeInjection();
@@ -9354,11 +11150,41 @@ async function runStream(
 	}
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	if (pass.signals !== undefined) shell += serializeNativeSignalSeeds(pass.signals, nonceAttr);
+	if (
+		options?.earlySignalBootstrap !== 'external' &&
+		(injection?.streamedRenderer === true ||
+			pass.hasSignalControls ||
+			options?.independentHydration !== undefined)
+	) {
+		shell +=
+			'<script ' +
+			STREAM_SCRIPT_ATTR +
+			nonceAttr +
+			'>' +
+			streamedSignalBootstrapJs(options?.independentHydration !== undefined) +
+			'</script>';
+	}
+	if (injection?.takeInitialSelections !== undefined) shell += injection.takeInitialSelections();
 	const anyPending = stream.boundaries.size > 0;
+	let sentViewTransitions = pass.vtCandidates;
 	if (anyPending)
-		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + streamRuntimeJs() + '</script>';
+		shell +=
+			'<script ' +
+			STREAM_SCRIPT_ATTR +
+			nonceAttr +
+			'>' +
+			streamRuntimeJs() +
+			(sentViewTransitions ? streamViewTransitionRuntimeJs() : '') +
+			'</script>';
 	try {
-		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
+		if (
+			injection?.streamedRenderer === true ||
+			pass.hasSignalControls ||
+			options?.independentHydration !== undefined
+		) {
+			options?.onEarlyHydrationReady?.();
+		}
+		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell, pass.rawHtml) : shell);
 		if (shellWrite !== undefined) await shellWrite;
 	} catch (err) {
 		try {
@@ -9410,7 +11236,7 @@ async function runStream(
 		if (initiallyDone.length > 0) {
 			let chunk = '';
 			for (const boundary of initiallyDone) chunk += segmentChunk(boundary, nonceAttr);
-			const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+			const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk, pass.rawHtml) : chunk);
 			if (segmentWrite !== undefined) await segmentWrite;
 			for (const boundary of initiallyDone) {
 				flushedSegments.add(boundary.id);
@@ -9419,7 +11245,7 @@ async function runStream(
 		}
 		const initialErrorWrite = flushRecoverableBoundaryErrors();
 		if (initialErrorWrite !== undefined) await initialErrorWrite;
-		while ([...stream.boundaries.values()].some((b) => b.state === 'pending')) {
+		while (hasPendingStreamBoundary(stream)) {
 			signal?.throwIfAborted();
 			if (suspended.length === 0) {
 				throw new Error(formatServerError(36));
@@ -9484,9 +11310,19 @@ async function runStream(
 			// ancestor is already flushed or earlier in this same chunk. Browser script
 			// execution then introduces each child template before its `$OCTRC` call.
 			const done = reachableDoneSegments();
+			if (!sentViewTransitions && pass.vtCandidates && done.length > 0) {
+				sentViewTransitions = true;
+				chunk +=
+					'<script ' +
+					STREAM_SCRIPT_ATTR +
+					nonceAttr +
+					'>' +
+					streamViewTransitionRuntimeJs() +
+					'</script>';
+			}
 			for (const b of done) chunk += segmentChunk(b, nonceAttr);
 			if (chunk !== '') {
-				const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+				const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk, pass.rawHtml) : chunk);
 				if (segmentWrite !== undefined) await segmentWrite;
 				// A boundary isn't considered flushed until the transport accepted its
 				// chunk through any active backpressure gate.
@@ -9500,9 +11336,10 @@ async function runStream(
 		// boundary whose segment was not accepted. A live consumer receives these
 		// through the same pressure gate; a disconnected consumer rejects and the
 		// renderer simply stops.
-		const pendingBoundaryCount = [...stream.boundaries.values()].filter(
-			(boundary) => boundary.state === 'pending' && !flushedSegments.has(boundary.id),
-		).length;
+		let pendingBoundaryCount = 0;
+		for (const boundary of stream.boundaries.values()) {
+			if (boundary.state === 'pending' && !flushedSegments.has(boundary.id)) pendingBoundaryCount++;
+		}
 		const reports = signal?.aborted ? Math.max(1, pendingBoundaryCount) : 1;
 		for (let i = 0; i < reports; i++) options?.onError?.(err);
 		// Rendering ends here, degraded — the source still gets its completion
@@ -9809,10 +11646,8 @@ export function renderToPipeableStream(
 		finishEnd();
 	};
 	let started = false;
-	const startRender = (): void => {
-		if (started) return;
-		started = true;
-		const renderOptions = { ...options, signal: controller.signal };
+	const beginRender = (preparedOptions: StreamOptions | undefined): void => {
+		const renderOptions = { ...preparedOptions, signal: controller.signal };
 		const resolved = newResolvedMap(renderOptions);
 		void runStream(
 			component,
@@ -9838,11 +11673,6 @@ export function renderToPipeableStream(
 				},
 				fatal() {
 					releaseServerRenderResources(resolved);
-					// Once the shell exists, abort/error degradation is a terminal
-					// completion of the pipeable request. Fizz fires onAllReady after its
-					// recovery instructions have been accepted even though onError also
-					// reported the reason; consumers use this callback to end surrounding
-					// document work in both success and aborted paths.
 					options?.onAllReady?.();
 					flushEnd();
 				},
@@ -9853,6 +11683,18 @@ export function renderToPipeableStream(
 			options?.onError?.(err);
 			flushEnd();
 		});
+	};
+	const startRender = (): void => {
+		if (started) return;
+		started = true;
+		if (needsAutomaticSignalInjection(options)) {
+			void prepareAutomaticSignalInjection(options!).then(beginRender, (error) => {
+				shellFailure = { error };
+				options?.onShellError?.(error);
+				options?.onError?.(error);
+				flushEnd();
+			});
+		} else beginRender(options);
 	};
 	// Fizz callbacks never run before the caller receives the `{ pipe, abort }`
 	// handle. Starting from a microtask preserves that ordering when the caller
@@ -9913,6 +11755,11 @@ export function renderToReadableStream(
 	if (typeof entryComponent !== 'function') {
 		options ??= props;
 		props = { value: entryComponent };
+	}
+	if (needsAutomaticSignalInjection(options)) {
+		return prepareAutomaticSignalInjection(options!).then((prepared) =>
+			renderToReadableStream(component, props, prepared),
+		);
 	}
 	return new Promise((resolveShell, rejectShell) => {
 		const encoder = new TextEncoder();
@@ -10135,6 +11982,7 @@ export function renderToReadableStream(
 function emitHeadHint(key: string, html: string): void {
 	if (HEAD === null) return;
 	if (HEAD.hints.has(key)) return;
+	HEAD.replay = null;
 	HEAD.hints.add(key);
 	(HEAD.hintHtml ??= new Map()).set(key, html);
 }
@@ -10229,7 +12077,10 @@ export function preload(href: string, options: { as: string } & Record<string, u
 				const v = (options as any)[k];
 				if (v != null) (subset ??= {})[k] = v;
 			}
-			if (subset !== null) (HEAD.preloadXfer ??= new Map()).set(as + ':' + value, subset);
+			if (subset !== null) {
+				HEAD.replay = null;
+				(HEAD.preloadXfer ??= new Map()).set(as + ':' + value, subset);
+			}
 		}
 	}
 	const imageSrcSet = as === 'image' ? options.imageSrcSet : undefined;
@@ -10269,6 +12120,9 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 	if (as !== 'style' && as !== 'script') return;
 	let seeded: Record<string, unknown> | null = null;
 	if (HEAD !== null) {
+		// Preinit may remove an existing hint/transfer even when the resource
+		// itself was already emitted, so invalidate before those deletions.
+		HEAD.replay = null;
 		const xfer = HEAD.preloadXfer?.get(as + ':' + value);
 		if (xfer !== undefined) {
 			seeded = xfer;
@@ -10386,6 +12240,7 @@ export function ssrStylesheetResource(
 	if (typeof href !== 'string' || href === '') return '';
 	const key = 'sheet:' + href;
 	if (HEAD.hints.has(key)) return '';
+	HEAD.replay = null;
 	HEAD.hints.add(key);
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
 	const tag =
@@ -10396,6 +12251,9 @@ export function ssrStylesheetResource(
 		'"' +
 		resourceAttrs(attrs, 'link') +
 		'>';
+	// Attribute coercion may render a child and capture another checkpoint.
+	// Invalidate again at the final write after all caller-controlled reads.
+	HEAD.replay = null;
 	const sheets = (HEAD.sheets ??= new Map());
 	sheets.set(href, { precedence, html: tag });
 	return '';
@@ -10446,6 +12304,7 @@ export function ssrStyleResource(
 		}
 		HEAD.hints.add('dev-inline-style:' + href);
 	}
+	HEAD.replay = null;
 	HEAD.hints.add(key);
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
 	const tag =
@@ -10458,6 +12317,9 @@ export function ssrStyleResource(
 		'>' +
 		css +
 		'</style>';
+	// Attribute coercion may render a child and capture another checkpoint.
+	// Invalidate again at the final write after all caller-controlled reads.
+	HEAD.replay = null;
 	const sheets = (HEAD.sheets ??= new Map());
 	sheets.set(href, { precedence, html: tag });
 	return '';
@@ -10471,6 +12333,7 @@ export function ssrScriptResource(attrs: Record<string, unknown> | null): string
 	const key = 'script:' + src;
 	// One executable per src per pass, across the classic and module forms.
 	if (HEAD.hints.has(key) || HEAD.hints.has('module:' + src)) return '';
+	HEAD.replay = null;
 	HEAD.hints.add(key);
 	HEAD.html +=
 		'<script src="' +

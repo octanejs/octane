@@ -230,3 +230,36 @@ test('accepts the public export contracts of every publishable workspace package
 
 	assert.deepEqual(failures, []);
 });
+
+test('type entry selection excludes only the canonical package metadata export', () => {
+	const name = '@octanejs/metadata-fixture';
+	const directory = createPackage(
+		name,
+		{
+			'.': './src/index.ts',
+			'./package.json': './package.json',
+			'./schema.json': './src/schema.ts',
+		},
+		{
+			'src/index.ts': 'export const root = true;',
+			'src/schema.ts': 'export type Schema = {value:string};',
+		},
+	);
+	assert.deepEqual(concretePublicSpecifiers(directory, name), [
+		name,
+		name + '/package.json',
+		name + '/schema.json',
+	]);
+	assert.deepEqual(concretePublicSpecifiers(directory, name, { excludePackageMetadata: true }), [
+		name,
+		name + '/schema.json',
+	]);
+	const disguised = createPackage(
+		name,
+		{ './package.json': './src/index.ts' },
+		{ 'src/index.ts': 'export const root = true;' },
+	);
+	assert.deepEqual(concretePublicSpecifiers(disguised, name, { excludePackageMetadata: true }), [
+		name + '/package.json',
+	]);
+});

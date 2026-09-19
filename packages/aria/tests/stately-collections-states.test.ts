@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { compile } from 'octane/compiler';
+import { compile, compileToVolarMappings } from 'octane/compiler';
 import { act, mount } from '../../octane/tests/_helpers';
 import {
 	ListHarness,
@@ -250,10 +250,18 @@ describe('@octanejs/aria/stately — useComboBoxState', () => {
 });
 
 describe('@octanejs/aria/stately — useNumberFieldState', () => {
-	it('compiles the published number-field hook with Strong render-purity checks enabled', () => {
+	it('keeps the published compatibility hook free of Strong render-purity violations', () => {
 		const filename = resolve(__dirname, '../src/stately/numberfield/useNumberFieldState.ts');
+		const source = readFileSync(filename, 'utf8');
 
-		expect(() => compile(readFileSync(filename, 'utf8'), filename, { strong: true })).not.toThrow();
+		expect(() => compile(source, filename)).not.toThrow();
+		// This compatibility binding deliberately retains upstream memo hooks.
+		// Collect every Strong diagnostic so their authoring-policy errors cannot
+		// hide a return of the render-time state update fixed by linked state.
+		const { diagnostics } = compileToVolarMappings(source, filename, { strong: true });
+		expect(new Set(diagnostics.map(({ code }) => code))).toEqual(
+			new Set(['OCTANE_STRONG_MANUAL_MEMO']),
+		);
 	});
 
 	it('preserves unfinished controlled edits when equivalent formatting options are recreated', async () => {

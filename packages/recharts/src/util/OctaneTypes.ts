@@ -1,14 +1,15 @@
 // DOM contracts shared by the authored Recharts port. Events are native,
 // while element props and refs follow Octane's public JSX type surface.
-import type { OctaneNode } from 'octane';
+import type { CSSProperties, OctaneNode } from 'octane';
 import type { Octane } from 'octane/jsx-runtime';
 
-export type { OctaneNode } from 'octane';
+export type { CSSProperties, OctaneNode } from 'octane';
 export type { OctaneElement } from 'octane/jsx-runtime';
-export type CSSProperties = Exclude<NonNullable<Octane.HTMLAttributes<Element>['style']>, string>;
-export type SVGProps<T> = Octane.SVGProps<T>;
-export type SVGAttributes<T> = Octane.SVGAttributes<T>;
-export type HTMLAttributes<T> = Octane.HTMLAttributes<T>;
+// Chart layout and text measurement consume CSS values before rendering them.
+type PlainStyleProps<P> = Omit<P, 'style'> & { style?: CSSProperties };
+export type SVGProps<T> = PlainStyleProps<Octane.SVGProps<T>>;
+export type SVGAttributes<T> = PlainStyleProps<Octane.SVGAttributes<T>>;
+export type HTMLAttributes<T> = PlainStyleProps<Octane.HTMLAttributes<T>>;
 export type AriaAttributes = Pick<
 	Octane.SVGAttributes<Element>,
 	Extract<keyof Octane.SVGAttributes<Element>, `aria-${string}`>

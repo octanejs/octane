@@ -1,5 +1,30 @@
 # @octanejs/tanstack-router-ssr-query
 
+## 0.0.46
+
+### Patch Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+- Updated dependencies [a6d7f49]
+  - @octanejs/tanstack-query@0.1.54
+  - @octanejs/tanstack-router@0.1.55
+
+## 0.0.45
+
+### Patch Changes
+
+- Updated dependencies [911ed1d]
+  - @octanejs/tanstack-query@0.1.53
+  - @octanejs/tanstack-router@0.1.54
+
+## 0.0.44
+
+### Patch Changes
+
+- Updated dependencies [1cd6c4c]
+  - @octanejs/tanstack-router@0.1.54
+  - @octanejs/tanstack-query@0.1.52
+
 ## 0.0.43
 
 ### Patch Changes

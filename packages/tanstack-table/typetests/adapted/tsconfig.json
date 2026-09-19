@@ -1,19 +1,22 @@
 {
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "module": "esnext",
-    "lib": ["esnext", "dom", "dom.iterable"],
-    "target": "esnext",
+    "skipLibCheck": false,
+    "types": ["node"],
     "jsx": "react-jsx",
     "jsxImportSource": "octane",
-    "noEmit": true,
-    "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true,
-    "types": ["node"],
-    "strict": true,
     "paths": {
-      "@octanejs/tanstack-table": ["../../src/index.ts"]
-    }
+      "react": ["../../node_modules/@types/react/index.d.ts"],
+      "@octanejs/tanstack-table": ["../../src/index.ts"],
+      "@octanejs/tanstack-table/*": ["../../src/*.ts"]
+    },
+    "verbatimModuleSyntax": false
   },
-  "include": ["./types.test-d.ts"]
+  "include": ["./*.test-d.ts", "../../src/**/*"],
+  "exclude": ["node_modules"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "publicMode": "pinned",
+    "upstreamRegistrations": []
+  }
 }

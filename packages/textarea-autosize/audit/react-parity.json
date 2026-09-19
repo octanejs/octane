@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91164c02c6f38c2386b86b5cabf2ee914c9cf0ea1fcefa1c8875da9cd5982c9e"
+      "lockfileSha256": "7ecbdfab4ba778c50295dc17e8d2d62af01b18e3ccd5585c6f02dc5eed5a3145"
     }
   },
   "lanes": [
@@ -223,7 +223,7 @@
         {
           "path": "packages/textarea-autosize/tests/ssr/react-contract.test.ts",
           "role": "test",
-          "sha256": "5dae604942e7a8c91920bbf15b0ea31d2333a2b3bf1054d561313d9136232b9b",
+          "sha256": "e025b7c0bfaa762a7457beed30da5d7f263bbea6a07d15c30498a85a09e39a12",
           "cases": [
             {
               "id": "ssr:react-contract",

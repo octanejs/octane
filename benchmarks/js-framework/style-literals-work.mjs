@@ -3,19 +3,43 @@
 
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import { parseModule } from '../../packages/octane/src/compiler/parser.node.js';
 
 const URL = process.env.TARGET_URL || 'http://127.0.0.1:5233/style-literals.html';
+const TIMING_URL = process.env.WORK_TIMING_URL || URL;
+const BASELINE_TIMING_URL = process.env.WORK_TIMING_BASELINE_URL;
 const ROWS = 1000;
 const OPTIMIZED_MULTI = process.env.WORK_EXPECT_MULTI_OPTIMIZED !== '0';
 const OPTIMIZED_DUPLICATES = process.env.WORK_EXPECT_DUPLICATES_OPTIMIZED !== '0';
+const OPTIMIZED_SPREADS = process.env.WORK_EXPECT_SPREADS_OPTIMIZED !== '0';
 const TIMING_SAMPLES = Number(process.env.WORK_SAMPLES || 0);
-const MODES = ['single', 'multi', 'generic', 'interleaved', 'duplicateStatic', 'duplicateDynamic'];
+const ALL_MODES = [
+	'single',
+	'multi',
+	'generic',
+	'interleaved',
+	'duplicateStatic',
+	'duplicateDynamic',
+	'leadingSpread',
+	'leadingGeneric',
+	'collisionSpread',
+	'collisionGeneric',
+];
+const MODES = process.env.WORK_CASES ? process.env.WORK_CASES.split(',') : ALL_MODES;
+if (MODES.some((mode) => !ALL_MODES.includes(mode))) throw new Error('Unsupported WORK_CASES');
 const OPS = [
 	{ name: 'mount_1k', setup: [], action: 'mount', changedRows: ROWS },
 	{ name: 'select_one', setup: ['mount'], action: 'select4', changedRows: 1 },
 	{ name: 'select_another', setup: ['mount', 'select4'], action: 'select5', changedRows: 2 },
 	{ name: 'unrelated_update', setup: ['mount'], action: 'update', changedRows: 0 },
 ];
+const TIMING_OPERATION_NAMES = process.env.WORK_TIMING_OPERATIONS?.split(',');
+if (TIMING_OPERATION_NAMES?.some((name) => !OPS.some((operation) => operation.name === name))) {
+	throw new Error('Unsupported WORK_TIMING_OPERATIONS');
+}
+const TIMING_OPS = OPS.filter(
+	(operation) => !TIMING_OPERATION_NAMES || TIMING_OPERATION_NAMES.includes(operation.name),
+);
 const METRICS = [
 	'setStyle',
 	'setStyleProperty',
@@ -28,6 +52,10 @@ const METRICS = [
 	'InterleavedRow',
 	'DuplicateStaticRow',
 	'DuplicateDynamicRow',
+	'LeadingSpreadRow',
+	'LeadingGenericRow',
+	'CollisionSpreadRow',
+	'CollisionGenericRow',
 ];
 
 async function invoke(page, action) {
@@ -37,6 +65,56 @@ async function invoke(page, action) {
 		else document.querySelectorAll('tbody tr')[next === 'select4' ? 4 : 5].click();
 		await window.__benchFlush();
 	}, action);
+}
+
+// Readable production source identifies the object-diff loop bodies. Coverage of
+// their first statements counts property visits, separately from CSSOM writes.
+// This measures executed loop work, not engine allocations or layout cost.
+async function countStyleScans(cdp, coverage) {
+	const scans = { stylePreviousScans: 0, styleValueScans: 0 };
+	for (const script of coverage.result) {
+		if (!script.url.includes('/assets/')) continue;
+		const fn = script.functions.find((entry) => entry.functionName === 'applyStyleValue');
+		if (!fn || fn.ranges[0]?.count === 0) continue;
+		const { scriptSource } = await cdp.send('Debugger.getScriptSource', {
+			scriptId: script.scriptId,
+		});
+		const ast = parseModule(scriptSource, 'style-work.js');
+		const declaration = ast.body.find(
+			(node) => node.type === 'FunctionDeclaration' && node.id?.name === 'applyStyleValue',
+		);
+		if (!declaration) throw new Error('Missing readable production style diff');
+		let found = 0;
+		function visit(node) {
+			if (!node || typeof node !== 'object') return;
+			if (
+				node.type === 'ForInStatement' &&
+				(node.body.type === 'BlockStatement' || node.body.type === 'IfStatement')
+			) {
+				const name = node.right.name;
+				if (name === 'prev' || name === 'value') {
+					const statement =
+						node.body.type === 'BlockStatement' ? node.body.body[0] : node.body.test;
+					const range = fn.ranges
+						.filter(
+							(entry) => entry.startOffset <= statement.start && entry.endOffset >= statement.end,
+						)
+						.sort((a, b) => a.endOffset - a.startOffset - (b.endOffset - b.startOffset))[0];
+					if (!range || range.startOffset <= fn.ranges[0].startOffset)
+						throw new Error('Missing style diff loop coverage');
+					scans[name === 'prev' ? 'stylePreviousScans' : 'styleValueScans'] += range.count;
+					found++;
+				}
+			}
+			for (const value of Object.values(node)) {
+				if (Array.isArray(value)) value.forEach(visit);
+				else if (value && typeof value === 'object') visit(value);
+			}
+		}
+		visit(declaration.body);
+		if (found !== 3) throw new Error(`Expected three object-diff loops; saw ${found}`);
+	}
+	return scans;
 }
 
 function countCalls(coverage) {
@@ -58,6 +136,7 @@ async function measure(browser, mode, operation) {
 	const cdp = await context.newCDPSession(page);
 	let profiling = false;
 	try {
+		await cdp.send('Debugger.enable');
 		await cdp.send('Profiler.enable');
 		await cdp.send('Profiler.startPreciseCoverage', {
 			callCount: true,
@@ -113,6 +192,18 @@ async function measure(browser, mode, operation) {
 					) {
 						throw new Error(`${action}: row ${index} selection or label differs`);
 					}
+					if (mode.startsWith('leading') || mode.startsWith('collision')) {
+						const color = selected ? 'red' : 'black';
+						const weight = selected ? 'bold' : 'normal';
+						const expectedStyle = mode.startsWith('collision')
+							? `color: ${color}; font-style: normal; font-variant: normal; font-weight: ${weight};`
+							: `font-style: normal; font-variant: normal; font-weight: ${weight}; color: ${color};`;
+						if (cell.style.fontVariant !== 'normal' || cell.style.cssText !== expectedStyle) {
+							throw new Error(
+								`${action}: row ${index} lost spread declarations or insertion order`,
+							);
+						}
+					}
 					if (mode === 'interleaved') {
 						if (
 							cell.style.left !== (selected ? '8px' : '0px') ||
@@ -155,7 +246,8 @@ async function measure(browser, mode, operation) {
 			},
 			{ action: operation.action, mode, expectedRows: ROWS },
 		);
-		return { ...countCalls(await cdp.send('Profiler.takePreciseCoverage')), ...observed };
+		const coverage = await cdp.send('Profiler.takePreciseCoverage');
+		return { ...countCalls(coverage), ...(await countStyleScans(cdp, coverage)), ...observed };
 	} finally {
 		if (profiling) {
 			await cdp.send('Profiler.stopPreciseCoverage').catch(() => {});
@@ -167,6 +259,23 @@ async function measure(browser, mode, operation) {
 
 function expected(mode, operation) {
 	const changes = operation.changedRows;
+	if (mode.startsWith('leading') || mode.startsWith('collision')) {
+		const scalar = mode === 'leadingSpread' && OPTIMIZED_SPREADS && operation.action !== 'mount';
+		return {
+			setStyle: ROWS,
+			setStyleProperty: scalar ? changes * 2 : 0,
+			setStyleProperties: 0,
+			applyStyleValue: ROWS,
+			applyStyleProperty: operation.action === 'mount' ? ROWS * 4 : changes * 2,
+			styleSets: operation.action === 'mount' ? ROWS * 4 : changes * 2,
+			styleRemoves: 0,
+			fontStyleWrites: operation.action === 'mount' ? ROWS : 0,
+			stylePreviousScans: operation.action === 'mount' ? 0 : ROWS * (scalar ? 2 : 4),
+			styleValueScans: ROWS * (scalar ? 2 : 4),
+			colorEvaluations: 0,
+			rows: ROWS,
+		};
+	}
 	const duplicate = mode === 'duplicateStatic' || mode === 'duplicateDynamic';
 	const properties = mode === 'single' ? 1 : mode === 'interleaved' ? 3 : 2;
 	const changing = mode === 'duplicateStatic' ? 1 : mode === 'interleaved' ? 2 : properties;
@@ -201,24 +310,105 @@ function expected(mode, operation) {
 	};
 }
 
-async function sampleTiming(browser, mode, operation) {
+async function sampleTiming(browser, mode, operation, timingUrl = TIMING_URL) {
 	const context = await browser.newContext();
 	try {
 		const page = await context.newPage();
-		await page.goto(`${URL}?case=${mode}`, { waitUntil: 'load' });
+		await page.goto(`${timingUrl}?case=${mode}`, { waitUntil: 'load' });
 		await page.waitForSelector('#run');
 		for (const action of operation.setup) await invoke(page, action);
-		return await page.evaluate(async (action) => {
-			const start = performance.now();
-			if (action === 'mount') document.getElementById('run').click();
-			else if (action === 'update') document.getElementById('update').click();
-			else document.querySelectorAll('tbody tr')[action === 'select4' ? 4 : 5].click();
-			await window.__benchFlush();
-			return performance.now() - start;
-		}, operation.action);
+		return await page.evaluate(
+			async ({ action, mode }) => {
+				const before = Array.from(document.querySelectorAll('tbody tr'));
+				const start = performance.now();
+				if (action === 'mount') document.getElementById('run').click();
+				else if (action === 'update') document.getElementById('update').click();
+				else document.querySelectorAll('tbody tr')[action === 'select4' ? 4 : 5].click();
+				await window.__benchFlush();
+				const elapsed = performance.now() - start;
+				// The minified timing asset must finish the same observable work.
+				// All assertions run after the timer, with no DOM instrumentation.
+				const rows = Array.from(document.querySelectorAll('tbody tr'));
+				if (rows.length !== 1000 || (before.length && rows.some((row, i) => row !== before[i]))) {
+					throw new Error(`${mode}.${action}: timed rows or survivor identity differ`);
+				}
+				if (mode.startsWith('leading') || mode.startsWith('collision')) {
+					const selection = action === 'select4' ? 4 : action === 'select5' ? 5 : -1;
+					rows.forEach((row, index) => {
+						const selected = index === selection;
+						const color = selected ? 'red' : 'black';
+						const weight = selected ? 'bold' : 'normal';
+						const expected = mode.startsWith('collision')
+							? `color: ${color}; font-style: normal; font-variant: normal; font-weight: ${weight};`
+							: `font-style: normal; font-variant: normal; font-weight: ${weight}; color: ${color};`;
+						if (
+							row.classList.contains('selected') !== selected ||
+							row.firstElementChild.textContent !== String(index) ||
+							row.firstElementChild.style.cssText !== expected
+						) {
+							throw new Error(`${mode}.${action}: timed row ${index} differs`);
+						}
+					});
+				}
+				return elapsed;
+			},
+			{ action: operation.action, mode },
+		);
 	} finally {
 		await context.close();
 	}
+}
+
+// Alternate artifact order and rotate modes each round so a changing machine
+// load cannot consistently favor one revision or separate it from its control.
+async function measurePairedTiming(browser) {
+	const timing = Object.fromEntries(MODES.map((mode) => [mode, {}]));
+	const median = (values) => values.sort((a, b) => a - b)[Math.floor((values.length - 1) / 2)];
+	for (const operation of TIMING_OPS) {
+		const pairs = Object.fromEntries(MODES.map((mode) => [mode, []]));
+		for (let round = -2; round < TIMING_SAMPLES; round++) {
+			for (let index = 0; index < MODES.length; index++) {
+				const mode = MODES[(index + round + 2) % MODES.length];
+				const pair = {};
+				for (const baseline of round % 2 === 0 ? [true, false] : [false, true]) {
+					pair[baseline ? 'baselineMs' : 'candidateMs'] = await sampleTiming(
+						browser,
+						mode,
+						operation,
+						baseline ? BASELINE_TIMING_URL : TIMING_URL,
+					);
+				}
+				if (round >= 0) pairs[mode].push(pair);
+			}
+		}
+		for (const mode of MODES) {
+			const samples = pairs[mode].map((pair) => pair.candidateMs).sort((a, b) => a - b);
+			const quantile = (fraction) => samples[Math.floor(fraction * (samples.length - 1))];
+			const control = pairs[mode.replace(/Spread$/, 'Generic')];
+			timing[mode][operation.name] = {
+				medianMs: quantile(0.5),
+				p25Ms: quantile(0.25),
+				p75Ms: quantile(0.75),
+				samplesMs: samples,
+				baselineMedianMs: median(pairs[mode].map((pair) => pair.baselineMs)),
+				pairedMedianRatio: median(pairs[mode].map((pair) => pair.candidateMs / pair.baselineMs)),
+				...(control && control !== pairs[mode]
+					? {
+							controlAdjustedMedianRatio: median(
+								pairs[mode].map(
+									(pair, index) =>
+										pair.candidateMs /
+										pair.baselineMs /
+										(control[index].candidateMs / control[index].baselineMs),
+								),
+							),
+						}
+					: {}),
+				pairedSamples: pairs[mode],
+			};
+		}
+	}
+	return timing;
 }
 
 async function measureTiming() {
@@ -229,9 +419,10 @@ async function measureTiming() {
 	const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 	const timing = {};
 	try {
+		if (BASELINE_TIMING_URL) return await measurePairedTiming(browser);
 		for (const mode of MODES) {
 			timing[mode] = {};
-			for (const operation of OPS) {
+			for (const operation of TIMING_OPS) {
 				// Browser warmup is separate from measured trials; no profiler or CSSOM
 				// instrumentation runs in these browser contexts.
 				await sampleTiming(browser, mode, operation);
@@ -287,25 +478,34 @@ try {
 
 const timing = failures.length === 0 ? await measureTiming() : null;
 
-console.log('case             operation        map grouped scalar CSS writes fixed writes rows');
+console.log(
+	'case             operation        map grouped scalar CSS writes fixed writes prev scans next scans rows',
+);
 for (const mode of MODES) {
 	for (const operation of OPS) {
 		const r = results[mode][operation.name];
 		console.log(
 			`${mode.padEnd(16)} ${operation.name.padEnd(16)} ${String(r.setStyle).padStart(4)} ` +
 				`${String(r.setStyleProperties).padStart(7)} ${String(r.setStyleProperty).padStart(6)} ` +
-				`${String(r.styleSets).padStart(10)} ${String(r.fontStyleWrites).padStart(12)} ${r.rows}`,
+				`${String(r.styleSets).padStart(10)} ${String(r.fontStyleWrites).padStart(12)} ` +
+				`${String(r.stylePreviousScans).padStart(10)} ${String(r.styleValueScans).padStart(10)} ${r.rows}`,
 		);
 	}
 }
 if (timing !== null) {
 	console.log('\nUninstrumented timing (median ms [p25, p75]):');
 	for (const mode of MODES) {
-		for (const operation of OPS) {
+		for (const operation of TIMING_OPS) {
 			const t = timing[mode][operation.name];
 			console.log(
 				`${mode.padEnd(16)} ${operation.name.padEnd(16)} ` +
-					`${t.medianMs.toFixed(2)} [${t.p25Ms.toFixed(2)}, ${t.p75Ms.toFixed(2)}]`,
+					`${t.medianMs.toFixed(2)} [${t.p25Ms.toFixed(2)}, ${t.p75Ms.toFixed(2)}]` +
+					(t.pairedMedianRatio === undefined
+						? ''
+						: ` baseline=${t.baselineMedianMs.toFixed(2)} ratio=${t.pairedMedianRatio.toFixed(3)}`) +
+					(t.controlAdjustedMedianRatio === undefined
+						? ''
+						: ` control-adjusted=${t.controlAdjustedMedianRatio.toFixed(3)}`),
 			);
 		}
 	}

@@ -1,12 +1,25 @@
 import * as devalue from 'devalue';
+import {
+	InvalidServerFunctionPayloadError,
+	invokeServerFunction,
+	type ServerCallContext,
+} from '../server-call.js';
+import { createServerResultStream } from './rpc-stream.js';
+import {
+	decodeServerArguments,
+	serverResultLimits,
+	type ServerResultLimits,
+} from '../server-rpc-protocol.js';
 
-class InvalidServerFunctionPayloadError extends Error {
-	readonly code = 'OCTANE_INVALID_RPC_PAYLOAD';
-
-	constructor(cause?: unknown) {
-		super('Invalid server function arguments', { cause });
-		this.name = 'InvalidServerFunctionPayloadError';
+function serverArguments(body: string): unknown[] {
+	let args: unknown;
+	try {
+		args = devalue.parse(body);
+	} catch (error) {
+		throw new InvalidServerFunctionPayloadError(error);
 	}
+	if (!Array.isArray(args)) throw new InvalidServerFunctionPayloadError();
+	return args;
 }
 
 /**
@@ -19,18 +32,40 @@ class InvalidServerFunctionPayloadError extends Error {
  * server function share one runtime.
  */
 export async function executeServerFunction(
-	fn: (...args: any[]) => unknown,
+	fn: Function,
 	body: string,
+	context?: ServerCallContext,
 ): Promise<string> {
-	let args: unknown;
+	const args = serverArguments(body);
+	const value = await invokeServerFunction(fn, args, context);
+	return devalue.stringify({ value });
+}
+
+/** Opt-in result streaming; application authorization runs before this executor. */
+export function executeServerFunctionStream(
+	fn: Function,
+	body: string,
+	context?: ServerCallContext,
+	limits?: ServerResultLimits,
+): ReadableStream<Uint8Array> {
+	const resolvedLimits = serverResultLimits(limits);
+	let args: unknown[];
 	try {
-		args = devalue.parse(body);
+		args = decodeServerArguments(body);
 	} catch (error) {
 		throw new InvalidServerFunctionPayloadError(error);
 	}
-	if (!Array.isArray(args)) {
-		throw new InvalidServerFunctionPayloadError();
-	}
-	const value = await fn.apply(null, args);
-	return devalue.stringify({ value });
+	const cancellation = new AbortController();
+	const signal =
+		context === undefined
+			? cancellation.signal
+			: AbortSignal.any([context.signal, cancellation.signal]);
+	const trusted = context === undefined ? undefined : { ...context, signal };
+	return createServerResultStream(
+		Promise.resolve().then(() => {
+			signal.throwIfAborted();
+			return invokeServerFunction(fn, args, trusted);
+		}),
+		{ ...resolvedLimits, signal, cancel: () => cancellation.abort() },
+	);
 }

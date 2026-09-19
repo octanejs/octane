@@ -157,6 +157,99 @@ function preprocessTsrxComponentBodies(source) {
 	return text;
 }
 
+function normalizeContextProviderTags(sourceFile) {
+	const options = { noLib: true, noResolve: true, types: [], allowNonTsExtensions: true };
+	const host = ts.createCompilerHost(options);
+	const sourcePath = resolve(sourceFile.fileName);
+	host.getSourceFile = (fileName) => (resolve(fileName) === sourcePath ? sourceFile : undefined);
+	host.fileExists = (fileName) => resolve(fileName) === sourcePath;
+	host.readFile = () => undefined;
+	host.getDirectories = () => [];
+	const program = ts.createProgram([sourceFile.fileName], options, host);
+	const checker = program.getTypeChecker();
+	const factories = new Set();
+	for (const statement of sourceFile.statements) {
+		if (
+			!ts.isImportDeclaration(statement) ||
+			!ts.isStringLiteral(statement.moduleSpecifier) ||
+			!['react', 'octane'].includes(statement.moduleSpecifier.text) ||
+			statement.importClause?.isTypeOnly
+		)
+			continue;
+		const bindings = statement.importClause?.namedBindings;
+		if (!bindings || !ts.isNamedImports(bindings)) continue;
+		for (const specifier of bindings.elements) {
+			if (
+				!specifier.isTypeOnly &&
+				(specifier.propertyName ?? specifier.name).text === 'createContext'
+			) {
+				const symbol = checker.getSymbolAtLocation(specifier.name);
+				if (symbol) factories.add(symbol);
+			}
+		}
+	}
+	const contexts = new Set();
+	for (const statement of sourceFile.statements) {
+		if (
+			!ts.isVariableStatement(statement) ||
+			!(statement.declarationList.flags & ts.NodeFlags.Const)
+		)
+			continue;
+		for (const declaration of statement.declarationList.declarations) {
+			if (
+				ts.isIdentifier(declaration.name) &&
+				declaration.initializer &&
+				ts.isCallExpression(declaration.initializer) &&
+				factories.has(checker.getSymbolAtLocation(declaration.initializer.expression))
+			) {
+				const symbol = checker.getSymbolAtLocation(declaration.name);
+				if (symbol) contexts.add(symbol);
+			}
+		}
+	}
+	if (contexts.size === 0) return sourceFile;
+	// Only JSX tags backed by the framework factory share the direct-context
+	// spelling. Binding symbols keep ordinary namespaces and local shadows intact.
+	const transformation = ts.transform(sourceFile, [
+		(context) => {
+			function visit(node) {
+				const visited = ts.visitEachChild(node, visit, context);
+				if (
+					(ts.isJsxOpeningElement(node) ||
+						ts.isJsxClosingElement(node) ||
+						ts.isJsxSelfClosingElement(node)) &&
+					ts.isPropertyAccessExpression(node.tagName) &&
+					node.tagName.name.text === 'Provider' &&
+					ts.isIdentifier(node.tagName.expression) &&
+					contexts.has(checker.getSymbolAtLocation(node.tagName.expression))
+				) {
+					const tag = node.tagName.expression;
+					if (ts.isJsxOpeningElement(visited))
+						return ts.factory.updateJsxOpeningElement(
+							visited,
+							tag,
+							visited.typeArguments,
+							visited.attributes,
+						);
+					if (ts.isJsxSelfClosingElement(visited))
+						return ts.factory.updateJsxSelfClosingElement(
+							visited,
+							tag,
+							visited.typeArguments,
+							visited.attributes,
+						);
+					return ts.factory.updateJsxClosingElement(visited, tag);
+				}
+				return visited;
+			}
+			return (node) => ts.visitNode(node, visit);
+		},
+	]);
+	const result = transformation.transformed[0];
+	transformation.dispose();
+	return result;
+}
+
 /**
  * Normalize upstream/adapted adapter sources under the permitted transforms in
  * type-parity.json / assertions.md so only unauthorized structural drift fails.
@@ -173,12 +266,7 @@ export function structuralSource(source, fileName, { mergeProviderContext = fals
 	text = text.replace(/\bReactNode\b/g, 'NODE').replace(/\bOctaneNode\b/g, 'NODE');
 	text = text.replace(/\bFunctionComponent\b/g, 'FC');
 	text = text.replace(/useSelectorSlot\s*\(/g, 'useSelector(');
-	text = text.replace(
-		/:\s*\(\(state: TSelected\) => unknown\) \| unknown/g,
-		': ((state: TSelected) => NODE) | NODE',
-	);
 	text = text.replace(/=>\s*ReturnType<\s*FC\s*>/g, '=> NODE');
-	text = text.replace(/=>\s*unknown\b/g, '=> NODE');
 	text = text.replace(
 		/\(props\.children as \(state: TSelected\) => [^)]+\)\s*\(/g,
 		'props.children(',
@@ -189,15 +277,12 @@ export function structuralSource(source, fileName, { mergeProviderContext = fals
 			.replace(/\bexport interface PacerContextValue\b/g, 'interface PacerContextValue')
 			.replace(/\bexport const PacerContext\b/g, 'const PacerContext');
 	}
+	// Compiled children blocks are callable renderables in Octane.
+	text = text.replace(/\s*&&\s*!isChildrenBlock\(props\.children\)/g, '');
 	text = dropSelectorSlotsAndUseStateTypeArgs(text, fileName);
 
-	const sf = ts.createSourceFile(
-		fileName,
-		text,
-		ts.ScriptTarget.Latest,
-		true,
-		scriptKind(fileName),
-	);
+	let sf = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, scriptKind(fileName));
+	if (mergeProviderContext) sf = normalizeContextProviderTags(sf);
 	const printer = ts.createPrinter({ removeComments: true });
 	const importMap = new Map();
 	const otherParts = [];
@@ -226,6 +311,7 @@ export function structuralSource(source, fileName, { mergeProviderContext = fals
 			if (nb && ts.isNamedImports(nb)) {
 				for (const el of nb.elements) {
 					if (DROP_TYPE_NAMES.has(el.name.text)) continue;
+					if (spec === 'octane' && el.name.text === 'isChildrenBlock') continue;
 					named.push(el.name.text);
 				}
 			}

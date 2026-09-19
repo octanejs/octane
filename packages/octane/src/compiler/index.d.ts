@@ -33,6 +33,9 @@ export interface OctaneCssModuleConstants {
 /** The version checked by compiler-emitted external Valdi adapter calls. */
 export const VALDI_COMPILER_ABI_VERSION: 1;
 
+/** Compiler-owned native presentation, known-shape spreads, and direct signal artifacts. */
+export const DOM_BINDING_COMPILER_ABI_VERSION: 1;
+
 export type ValdiWriterEffectiveType = 'boolean' | 'number' | 'string' | 'function' | 'style';
 
 /** An exact authored-expression fact supplied by an integration's type checker. */
@@ -51,6 +54,25 @@ export interface ValdiWriterFacts {
 	expressions: readonly ValdiWriterExpressionFact[];
 }
 
+/**
+ * A provider guarantee for a pure factory returning nullish or an object with
+ * exactly these own data fields. Result fields must remain stable throughout
+ * the render; getters or a shared result mutated during render are not valid.
+ */
+export interface KnownAttributeSpread {
+	/** Exact module specifier and imported export (`*` for a namespace). */
+	source: string;
+	imported: string;
+	/** Statically named member path from the imported binding to the factory. */
+	members?: readonly string[];
+	/** Exact stable own native presentation data fields; never accessors. */
+	fields: readonly string[];
+	/** Use signal-aware style-object bindings; fields must include style. Omitted retains CSS text. */
+	style?: 'object';
+	/** Opt-in native JSX expression shorthand, passed as one argument to this factory. */
+	jsxAttribute?: string;
+}
+
 export interface CompileOptions {
 	mode?: 'client' | 'server';
 	hmr?: boolean | 'vite' | 'webpack';
@@ -67,6 +89,8 @@ export interface CompileOptions {
 	dataCallbackHooks?: readonly string[];
 	/** Exact authored-source facts from octane/compiler/typescript. */
 	textTypeFacts?: TextTypeFacts;
+	/** Trusted provider contracts for pure, fixed-shape native attribute factories. */
+	knownAttributeSpreads?: readonly KnownAttributeSpread[];
 	/** Optional exact attribute-expression proofs; used only by the Valdi target. */
 	valdiWriterFacts?: ValdiWriterFacts;
 	/**
@@ -107,7 +131,7 @@ export interface CompilePosition {
 
 export interface CompileDiagnostic {
 	code: string;
-	severity: 'warning' | 'error';
+	severity: 'warning' | 'error' | 'hint';
 	message: string;
 	filename: string;
 	start: CompilePosition;
@@ -203,6 +227,14 @@ export interface CompileResult {
 	diagnostics: readonly CompileDiagnostic[];
 	inspect?: CompileInspection;
 	universalRuntime?: CompileOptions['universalRuntime'];
+	/** This module contains compiler-proven signal declarations or native reads. */
+	streamedSignals?: true;
+	/** Production client constants used by compiled binding views; build-time adapter metadata. */
+	bindingConstants?: {
+		version: 1;
+		source: string;
+		names: readonly string[];
+	};
 }
 
 /** Compile authored TSRX/JSX to Octane client or server JavaScript. */
@@ -217,7 +249,12 @@ export function compile(source: string, filename: string, options?: CompileOptio
 export function compileToVolarMappings(
 	source: string,
 	filename?: string,
-	options?: { loose?: boolean; renderers?: unknown; strong?: boolean },
+	options?: {
+		loose?: boolean;
+		renderers?: unknown;
+		strong?: boolean;
+		knownAttributeSpreads?: readonly KnownAttributeSpread[];
+	},
 ): VolarCompileResult;
 
 /** @internal Shared authored-JSX diagnostic analysis for compiler integrations. */

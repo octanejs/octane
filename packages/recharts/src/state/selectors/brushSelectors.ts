@@ -1,10 +1,10 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
 import { createSelector } from 'reselect';
-import { RechartsRootState } from '../store';
+import type { RechartsRootState } from '../store';
 import { selectChartOffsetInternal } from './selectChartOffsetInternal';
 import { selectMargin } from './containerSelectors';
 import { isNumber } from '../../util/DataUtils';
-import { BrushSettings } from '../brushSlice';
+import type { BrushSettings } from '../brushSlice';
 
 export const selectBrushSettings = (state: RechartsRootState): BrushSettings => state.brush;
 

@@ -32,7 +32,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91164c02c6f38c2386b86b5cabf2ee914c9cf0ea1fcefa1c8875da9cd5982c9e"
+      "lockfileSha256": "7ecbdfab4ba778c50295dc17e8d2d62af01b18e3ccd5585c6f02dc5eed5a3145"
     }
   },
   "lanes": [
@@ -127,7 +127,7 @@
         {
           "path": "packages/octane-is/audit/upstream-patches/tests/upstream/ReactIs-test.js.patch",
           "role": "support",
-          "sha256": "e385e8d8d5e281bb72303efc32c022325206e0075edcd52346cb5c87a2a10a85"
+          "sha256": "6714d84c75a129589883dbc6d80793aa4ff0a6ed5a09f1bd826d4f9521c123d3"
         }
       ]
     },
@@ -142,7 +142,7 @@
         {
           "path": "packages/octane-is/tests/differential.test.ts",
           "role": "test",
-          "sha256": "fd36c95e58cfe17f8d6e4c37dcfa1f45b2ac872108884bd7c60ba673a132d28e",
+          "sha256": "aed5bb57b181c9568a6fa30d5f8fb8826bdfa1d58c2851d12460ac12a9c6e299",
           "cases": [
             {
               "id": "differential:octane-is-supported-surface",

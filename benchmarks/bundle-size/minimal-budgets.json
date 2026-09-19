@@ -4,6 +4,16 @@
     "gzip": 1728,
     "brotli": 1536
   },
+  "behavior-root-vite": {
+    "raw": 14240,
+    "gzip": 4544,
+    "brotli": 4096
+  },
+  "behavior-root-esbuild": {
+    "raw": 14512,
+    "gzip": 4688,
+    "brotli": 4224
+  },
   "cli-spa-starter": {
     "raw": 69617,
     "gzip": 24621,
@@ -15,6 +25,11 @@
     "brotli": 15088
   },
   "root-static": {
+    "raw": 111952,
+    "gzip": 36480,
+    "brotli": 32096
+  },
+  "root-static-local": {
     "raw": 111952,
     "gzip": 36480,
     "brotli": 32096

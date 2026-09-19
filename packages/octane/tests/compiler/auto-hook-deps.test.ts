@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
+import { parseModule } from '@tsrx/core';
+import { walkAst } from '../_profile-output.js';
 import { slotHooks } from '../../src/compiler/slot-hooks.js';
 
 // This file's contract is the INFERENCE — the dependency argument the
@@ -9,6 +11,54 @@ import { slotHooks } from '../../src/compiler/slot-hooks.js';
 // routing and semantics are covered by inline-hook-memo*.test.ts).
 const c = (source: string, options?: { mode?: 'client' | 'server' }): string =>
 	compile(source, 'auto-deps.tsrx', { inlineHookMemo: false, ...options }).code;
+
+// Resolve imported hook names, then inspect only their dependency argument.
+// Method dependencies retain a distinct semantic spelling without depending
+// on the generated import alias or the unrelated hook-slot expression.
+function depsOf(code: string, hook = 'useEffect'): Array<string[] | string | null | undefined> {
+	const ast = parseModule(code, 'auto-deps.js');
+	const imports = new Map<string, string>();
+	const namespaces = new Set<string>();
+	for (const statement of ast.body) {
+		if (statement.type !== 'ImportDeclaration' || !/^octane(?:\/|$)/.test(statement.source.value))
+			continue;
+		for (const specifier of statement.specifiers) {
+			if (specifier.type === 'ImportSpecifier')
+				imports.set(specifier.local.name, specifier.imported.name);
+			else if (specifier.type === 'ImportNamespaceSpecifier') namespaces.add(specifier.local.name);
+		}
+	}
+	const format = (node: any): string => {
+		if (node.type === 'CallExpression' && imports.get(node.callee.name) === '__methodDep') {
+			const [receiver, property] = node.arguments;
+			return `method(${code.slice(receiver.start, receiver.end)}, ${JSON.stringify(property.value)})`;
+		}
+		return code.slice(node.start, node.end).replace(/\s+/g, ' ').trim();
+	};
+	const dependencies: Array<string[] | string | null | undefined> = [];
+	walkAst(ast, (node) => {
+		if (node.type !== 'CallExpression') return;
+		const callee = node.callee;
+		const name =
+			callee.type === 'Identifier'
+				? imports.get(callee.name)
+				: callee.type === 'MemberExpression' && namespaces.has(callee.object.name)
+					? callee.property.name
+					: undefined;
+		if (name !== hook) return;
+		const dependency = node.arguments[hook === 'useImperativeHandle' ? 2 : 1];
+		dependencies.push(
+			dependency === undefined
+				? undefined
+				: dependency.type === 'ArrayExpression'
+					? dependency.elements.map(format)
+					: dependency.type === 'Literal' && dependency.value === null
+						? null
+						: format(dependency),
+		);
+	});
+	return dependencies;
+}
 
 describe('automatic hook dependencies — full compiler', () => {
 	it('infers precise member paths and omits known-stable hook results', () => {
@@ -30,9 +80,7 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(
-			/useEffect\([\s\S]*?,\s*\[_\$__methodDep\(props, "onValue"\), props\.value, count\],\s*\d+\s*\)/,
-		);
+		expect(depsOf(code)).toEqual([['method(props, "onValue")', 'props.value', 'count']]);
 	});
 
 	it('covers the complete dependency-hook family', () => {
@@ -52,16 +100,14 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(/useEffect\([^;]+\[_\$__methodDep\(props, "passive"\), props\.value\]/);
-		expect(code).toMatch(
-			/useLayoutEffect\([^;]+\[_\$__methodDep\(props, "layout"\), props\.value\]/,
-		);
-		expect(code).toMatch(
-			/useInsertionEffect\([^;]+\[_\$__methodDep\(props, "insert"\), props\.value\]/,
-		);
-		expect(code).toMatch(/useMemo\([^;]+\[props\.value\]/);
-		expect(code).toMatch(/useCallback\([^;]+\[_\$__methodDep\(props, "onEvent"\), props\.value\]/);
-		expect(code).toMatch(/useImperativeHandle\([^;]+\[callback, memo\]/);
+		expect(depsOf(code, 'useEffect')).toEqual([['method(props, "passive")', 'props.value']]);
+		expect(depsOf(code, 'useLayoutEffect')).toEqual([['method(props, "layout")', 'props.value']]);
+		expect(depsOf(code, 'useInsertionEffect')).toEqual([
+			['method(props, "insert")', 'props.value'],
+		]);
+		expect(depsOf(code, 'useMemo')).toEqual([['props.value']]);
+		expect(depsOf(code, 'useCallback')).toEqual([['method(props, "onEvent")', 'props.value']]);
+		expect(depsOf(code, 'useImperativeHandle')).toEqual([['callback', 'memo']]);
 	});
 
 	it('tracks captures through nested lexical scopes without including callback locals', () => {
@@ -81,9 +127,7 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(
-			/useEffect\([\s\S]*?,\s*\[local, outer, _\$__methodDep\(props, "log"\)\],\s*\d+\s*\)/,
-		);
+		expect(depsOf(code)).toEqual([['local', 'outer', 'method(props, "log")']]);
 	});
 
 	it('tracks lexical bindings declared directly in switch cases', () => {
@@ -102,7 +146,7 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(/useEffect\([^;]+\[_\$__methodDep\(props, "log"\), selected\]/);
+		expect(depsOf(code)).toEqual([['method(props, "log")', 'selected']]);
 	});
 
 	it('tracks one-level receivers for deep reads and method calls', () => {
@@ -117,9 +161,7 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(
-			/useEffect\([\s\S]*?,\s*\[props\.user, props\.order, props\.value\],\s*\d+\s*\)/,
-		);
+		expect(depsOf(code)).toEqual([['props.user', 'props.order', 'props.value']]);
 	});
 
 	it('routes one-level method-call receivers through the own-property discriminator', () => {
@@ -137,11 +179,11 @@ describe('automatic hook dependencies — full compiler', () => {
 		// The method value alone can never witness a changed receiver
 		// (`Number.prototype.toFixed` is one shared function), so the inferred
 		// dependency defers the receiver-vs-member choice to the runtime helper.
-		expect(code).toMatch(/useMemo\([^;]+\[[\w$]+\(count, ["']toFixed["']\)\],\s*\d+\s*\)/);
-		expect(code).not.toMatch(/\[count\.toFixed\]/);
-		expect(code).not.toMatch(/\[count\?\.toFixed\]/);
-		// Every optional spelling funnels into the same null-safe helper form.
-		expect(code.match(/\(count, ["']toFixed["']\)/g)).toHaveLength(3);
+		expect(depsOf(code, 'useMemo')).toEqual([
+			['method(count, "toFixed")'],
+			['method(count, "toFixed")'],
+			['method(count, "toFixed")'],
+		]);
 	});
 
 	it('keeps computed and deep method calls on their existing receiver deps', () => {
@@ -158,9 +200,9 @@ describe('automatic hook dependencies — full compiler', () => {
 
 		// A computed callee already tracks receiver and key; a deep callee already
 		// tracks its receiver path. Neither needs the helper.
-		expect(code).toMatch(
-			/useEffect\([\s\S]*?,\s*\[props\.handlers, props\.kind, props\.payload, props\.value\],\s*\d+\s*\)/,
-		);
+		expect(depsOf(code)).toEqual([
+			['props.handlers', 'props.kind', 'props.payload', 'props.value'],
+		]);
 	});
 
 	it('emits the method-call helper during server compilation', () => {
@@ -175,8 +217,7 @@ describe('automatic hook dependencies — full compiler', () => {
       `,
 			{ mode: 'server' },
 		);
-		expect(code).toMatch(/\[[\w$]+\(count, ["']toFixed["']\)\]/);
-		expect(code).toMatch(/import \{[^}]*__methodDep[^}]*\} from ['"]octane\/server['"]/);
+		expect(depsOf(code, 'useMemo')).toEqual([['method(count, "toFixed")']]);
 	});
 
 	it('tracks only root captures inside opaque-execution directive closures', () => {
@@ -204,7 +245,10 @@ describe('automatic hook dependencies — full compiler', () => {
 
 		// props.root from the (render-time) method call; roots only from the
 		// shader closure — timeUniform without .$, props without .scale.factor.
-		expect(code).toMatch(/\[props\.root, timeUniform, props\],\s*\d+\s*\)/);
+		expect(depsOf(code, 'useMemo')).toEqual([
+			['props.root', 'tick'],
+			['props.root', 'timeUniform', 'props'],
+		]);
 	});
 
 	it('applies the same opaque-closure rule to the worklet directive', () => {
@@ -221,7 +265,7 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(/\[_\$__methodDep\(props, "schedule"\), props\],\s*\d+\s*\)/);
+		expect(depsOf(code)).toEqual([['method(props, "schedule")', 'props']]);
 	});
 
 	it('does not truncate closures with same-context or unknown directives', () => {
@@ -255,9 +299,7 @@ describe('automatic hook dependencies — full compiler', () => {
 
 		// Member paths survive: only allowlisted directives mark another
 		// execution context. A truncating regression would emit [props] here.
-		expect(code).toMatch(/\[props\.name\],\s*\d+\s*\)/);
-		expect(code).toMatch(/\[props\.email\],\s*\d+\s*\)/);
-		expect(code).toMatch(/\[props\.id\],\s*\d+\s*\)/);
+		expect(depsOf(code, 'useMemo')).toEqual([['props.name'], ['props.email'], ['props.id']]);
 	});
 
 	it('compiles method-call deps inside custom hooks for the server print', () => {
@@ -281,7 +323,7 @@ describe('automatic hook dependencies — full compiler', () => {
       `,
 			{ mode: 'server' },
 		);
-		expect(code).toMatch(/\(context, ["']report["']\), id\]/);
+		expect(depsOf(code, 'useLayoutEffect')).toEqual([['method(context, "report")', 'id']]);
 	});
 
 	it('does not treat simple assignment targets as value reads', () => {
@@ -299,10 +341,17 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(
-			/useEffect\([\s\S]*?,\s*\[\s*props\.value,\s*props\.box,\s*props\.other,\s*props\.key,\s*props\.dynamic,\s*props\.total,\s*props\.delta\s*\],\s*\d+\s*\)/,
-		);
-		expect(code).not.toMatch(/\[\s*ref\.current/);
+		expect(depsOf(code)).toEqual([
+			[
+				'props.value',
+				'props.box',
+				'props.other',
+				'props.key',
+				'props.dynamic',
+				'props.total',
+				'props.delta',
+			],
+		]);
 	});
 
 	it('tracks mutable module bindings while omitting immutable ones', () => {
@@ -323,9 +372,7 @@ describe('automatic hook dependencies — full compiler', () => {
 		// the only one a dependency array can witness. An import and a module-scope
 		// `const` are both fixed for the program's lifetime — see
 		// auto-hook-deps-stability.test.ts for that contract in full.
-		expect(code).toMatch(
-			/useEffect\([\s\S]*?,\s*\[_\$__methodDep\(props, "log"\), moduleValue\],\s*\d+\s*\)/,
-		);
+		expect(depsOf(code)).toEqual([['method(props, "log")', 'moduleValue']]);
 	});
 
 	it('emits valid chain expressions for deep optional reads', () => {
@@ -337,7 +384,7 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(/useMemo\(\(\) => props\?\.user\?\.name, \[props\?\.user\], \d+\)/);
+		expect(depsOf(code, 'useMemo')).toEqual([['props?.user']]);
 	});
 
 	it('infers [] for capture-free callbacks and honors every explicit second argument', () => {
@@ -354,12 +401,9 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(/useEffect\(\(\) => console\.log\('once'\), \[], \d+\)/);
-		expect(code).toMatch(/useEffect\(\(\) => console\.log\(props\.a\), \[], \d+\)/);
-		expect(code).toMatch(/useEffect\(\(\) => console\.log\(props\.b\), \[props\.b\], \d+\)/);
-		expect(code).toMatch(/useEffect\(\(\) => console\.log\(props\.c\), null, \d+\)/);
-		expect(code).toMatch(/useMemo\(\(\) => 1, \[], \d+\)/);
-		expect(code).toMatch(/useCallback\(\(\) => 2, \[], \d+\)/);
+		expect(depsOf(code, 'useEffect')).toEqual([[], [], ['props.b'], null]);
+		expect(depsOf(code, 'useMemo')).toEqual([[]]);
+		expect(depsOf(code, 'useCallback')).toEqual([[]]);
 	});
 
 	it('uses a referenced callback identity and rejects opaque callback creation', () => {
@@ -372,8 +416,7 @@ describe('automatic hook dependencies — full compiler', () => {
         <div />
       }
     `);
-		expect(referenced).toMatch(/useEffect\(props\?\.api\?\.run, \[props\?\.api\?\.run\], \d+\)/);
-		expect(referenced).toMatch(/useEffect\(ref\.current, \[ref\.current\], \d+\)/);
+		expect(depsOf(referenced)).toEqual([['props?.api?.run'], ['ref.current']]);
 
 		for (const callback of [
 			'props.makeEffect()',
@@ -403,7 +446,7 @@ describe('automatic hook dependencies — full compiler', () => {
       `,
 			{ mode: 'server' },
 		);
-		expect(code).toMatch(/useMemo\(\(\) => props\.value \* 2, \[props\.value\], \d+\)/);
+		expect(depsOf(code, 'useMemo')).toEqual([['props.value']]);
 	});
 
 	it('applies local custom-hook inference during server compilation', () => {
@@ -435,10 +478,7 @@ describe('automatic hook dependencies — full compiler', () => {
         <div />
       }
     `);
-		expect(code).toMatch(
-			/Octane\.useEffect\(\(\) => console\.log\(props\.value\), \[props\.value\], \d+\)/,
-		);
-		expect(code).not.toContain('[props.shadowed]');
+		expect(depsOf(code)).toEqual([['props.value'], undefined]);
 	});
 
 	it('does not infer dependencies for a lexically bound built-in lookalike', () => {
@@ -540,10 +580,8 @@ export function useThing<T>(value: T) {
 }
 `;
 		const code = slotHooks(source, 'use-thing.ts')!.code;
-		expect(code).toMatch(
-			/effect\(\(\) => console\.log\(value, ref\.current\), \[value\], _h\$\d+\)/,
-		);
-		expect(code).toContain('useRef<T | null>(null, _h$');
+		expect(depsOf(code)).toEqual([['value']]);
+		expect(code).toContain('useRef<T | null>(null,');
 	});
 
 	it('preserves source ranges for module values and optional chains', () => {
@@ -556,9 +594,8 @@ export function useThing<T extends { deep?: { name?: string } }>(value: T) {
 }
 `;
 		const code = slotHooks(source, 'use-thing.ts')!.code;
-		expect(code).toMatch(
-			/memo\(\(\) => \[importedValue, moduleValue, value\?\.deep\?\.name\], \[moduleValue, value\?\.deep\], _h\$\d+\)/,
-		);
+		expect(depsOf(code, 'useMemo')).toEqual([['moduleValue', 'value?.deep']]);
+		expect(code).toContain('() => [importedValue, moduleValue, value?.deep?.name]');
 	});
 
 	it('routes one-level method-call receivers through the imported helper', () => {
@@ -569,10 +606,7 @@ export function useFixed(count: number) {
 }
 `;
 		const code = slotHooks(source, 'use-fixed.ts')!.code;
-		expect(code).toMatch(
-			/useMemo\(\(\) => count\.toFixed\(2\), \[[\w$]+\(count, ["']toFixed["']\)\], _h\$\d+\)/,
-		);
-		expect(code).toMatch(/import \{[^}]*__methodDep[^}]*\} from ['"]octane['"]/);
+		expect(depsOf(code, 'useMemo')).toEqual([['method(count, "toFixed")']]);
 	});
 
 	it('tracks roots only for worklet closures in plain TypeScript', () => {
@@ -588,7 +622,7 @@ export function useWorklet(shared: { value: number }, schedule: (fn: () => void)
 }
 `;
 		const code = slotHooks(source, 'use-worklet.ts')!.code;
-		expect(code).toMatch(/, \[schedule, shared\], _h\$\d+\)/);
+		expect(depsOf(code)).toEqual([['schedule', 'shared']]);
 	});
 
 	it('preserves complete referenced callback paths', () => {
@@ -599,7 +633,8 @@ export function useThing(props: { api?: { run?: () => void } }) {
 }
 `;
 		const code = slotHooks(source, 'use-thing.ts')!.code;
-		expect(code).toMatch(/effect\(props\?\.api\?\.run, \[props\?\.api\?\.run\], _h\$\d+\)/);
+		expect(depsOf(code)).toEqual([['props?.api?.run']]);
+		expect(code).toContain('effect(props?.api?.run,');
 	});
 
 	it('infers and slots namespace-imported hooks', () => {
@@ -611,8 +646,8 @@ export function useThing(value: string) {
 }
 `;
 		const code = slotHooks(source, 'namespace-hooks.ts')!.code;
-		expect(code).toMatch(/Octane\.useEffect\([^;]+, \[value\], _h\$\d+\)/);
-		expect(code).toMatch(/Octane\.useMemo\([^;]+, \[value\], _h\$\d+\)/);
+		expect(depsOf(code, 'useEffect')).toEqual([['value']]);
+		expect(depsOf(code, 'useMemo')).toEqual([['value']]);
 	});
 
 	it('leaves local custom dependency calls unchanged without a custom-call slot boundary', () => {

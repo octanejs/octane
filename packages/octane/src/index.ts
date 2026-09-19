@@ -1,3 +1,4 @@
+export { trustHTML, type TrustedHTML } from './trusted-html.js';
 // Keep package metadata behind an isolated re-export: applications that do not
 // read `version` can tree-shake this module and the package.json payload in full.
 export { version } from './version.js';
@@ -83,6 +84,7 @@ export {
 	Suspense,
 	ErrorBoundary,
 	Hydrate,
+	__HydrateCompiled,
 	Activity,
 	// React shipped Activity as unstable_Activity before 19.2 — alias it so
 	// experimental-channel ports compile unchanged (mirrors unstable_ViewTransition).
@@ -118,6 +120,7 @@ export {
 	__useLinkedStateWithGetter,
 	__useReducerWithGetter,
 	__createVoidRoot,
+	__hydrateVoidRoot,
 	bindRendererRegionOwner,
 	EXTERNAL_HYDRATION_PROMISE,
 	HYDRATION_RANGE_BOUNDARY,
@@ -155,6 +158,8 @@ export {
 	evt1u,
 	evt2,
 	evt2u,
+	evt1e,
+	evt2e,
 	evtN,
 	evtNu,
 	setEventHandler,
@@ -303,6 +308,8 @@ export type {
 
 // Semi-public compiler target for `module server` browser stubs.
 export { __serverRpc } from './server-rpc-client.js';
+export { ServerCallUncertainError } from './server-rpc-protocol.js';
+export { batchServerCalls, type ServerCallBatchOptions } from './server-rpc-batch-client.js';
 
 // Semi-public compiler target for inferred method-call dependencies.
 export { __methodDep } from './method-dep.js';

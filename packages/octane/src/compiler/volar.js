@@ -26,6 +26,8 @@ import { parseModule } from './parser.browser.js';
 
 import {
 	analyzeTsrx,
+	builders as b,
+	clone_ast_node as cloneAstNode,
 	createJsxTransform,
 	createVolarMappingsResult,
 	dedupeMappings,
@@ -36,6 +38,13 @@ import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { analyzeStrongMode } from './strong-mode.js';
 import { analyzeNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
+import { inheritHookMemoOrigin } from './inline-hook-memo.js';
+import { lowerNativeAttributeReads } from './native-attribute-reads.js';
+import {
+	collectServerFunctionNodes,
+	serverContextTypeImports,
+	serverFunctionContextIndex,
+} from './server-context.js';
 import {
 	DOM_RENDERER_MODULE,
 	normalizeRendererConfig,
@@ -101,6 +110,226 @@ const OCTANE_PLATFORM = {
 
 const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
 
+// Type-check only the reads that runtime compilation also admits. A StyleX
+// function keeps its ordinary parameter types everywhere outside native `sx`.
+function projectNativeDomReads(ast, contracts) {
+	const attributes = new Set(
+		contracts?.flatMap((contract) => (contract.jsxAttribute ? [contract.jsxAttribute] : [])),
+	);
+	const names = new Set();
+	const walk = (node, replace) => {
+		if (!node || typeof node !== 'object') return node;
+		if (Array.isArray(node)) return node.map((child) => walk(child, replace));
+		let result = node;
+		for (const key of Object.keys(node)) {
+			if (['metadata', 'loc', 'start', 'end', 'parent'].includes(key)) continue;
+			const value = node[key];
+			if (!value || typeof value !== 'object') continue;
+			const next = walk(value, replace);
+			if (next !== value) {
+				if (result === node) result = { ...node };
+				result[key] = next;
+			}
+		}
+		return replace(result) ?? result;
+	};
+	walk(ast, (node) => {
+		if (node.type === 'Identifier' || node.type === 'JSXIdentifier') names.add(node.name);
+		return null;
+	});
+	let helper = '__octane_nativeAttributeValue';
+	while (names.has(helper)) helper += '_';
+	let used = false;
+	const read = (value) => {
+		used = true;
+		return inheritHookMemoOrigin(b.call(b.id(helper), value), value);
+	};
+	// A text assertion selects the scalar child binding, which unwraps a direct
+	// handle. Preserve the assertion so non-text payloads still get TS errors;
+	// do not unwrap operands inside calls/operators or ordinary JS assertions.
+	const projectText = (node) => {
+		if (!node) return node;
+		if (
+			['TSAsExpression', 'TSTypeAssertion', 'TSSatisfiesExpression'].includes(node.type) &&
+			node.typeAnnotation?.type === 'TSStringKeyword'
+		) {
+			used = true;
+			const expression = projectText(node.expression);
+			return {
+				...node,
+				expression: expression === node.expression ? b.call(b.id(helper), expression) : expression,
+			};
+		}
+		if (
+			[
+				'TSAsExpression',
+				'TSTypeAssertion',
+				'TSNonNullExpression',
+				'TSSatisfiesExpression',
+				'TSInstantiationExpression',
+				'ParenthesizedExpression',
+			].includes(node.type)
+		) {
+			const expression = projectText(node.expression);
+			return expression === node.expression ? node : { ...node, expression };
+		}
+		return node;
+	};
+	const projected = walk(ast, (node) => {
+		if (['JSXElement', 'JSXFragment', 'Element', 'Fragment'].includes(node.type)) {
+			node = {
+				...node,
+				children: node.children.map((child) => {
+					if (child.type !== 'JSXExpressionContainer') return child;
+					const expression = projectText(child.expression);
+					return expression === child.expression ? child : { ...child, expression };
+				}),
+			};
+		}
+		if (node.type !== 'JSXOpeningElement' && node.type !== 'Element') return node;
+		const name = node.type === 'Element' ? node.id : node.name;
+		if (
+			(name?.type !== 'JSXIdentifier' && name?.type !== 'Identifier') ||
+			typeof name.name !== 'string' ||
+			name.name[0] !== name.name[0].toLowerCase()
+		)
+			return node;
+		return {
+			...node,
+			attributes: node.attributes.map((attribute) => {
+				if (
+					!attributes.has(attribute.name?.name ?? attribute.name) ||
+					attribute.value?.type !== 'JSXExpressionContainer'
+				)
+					return attribute;
+				const result = lowerNativeAttributeReads(attribute.value.expression, read);
+				return { ...attribute, value: { ...attribute.value, expression: result.expression } };
+			}),
+		};
+	});
+	return used
+		? {
+				...projected,
+				body: [
+					b.imports([['readNativeDomValue', helper]], 'octane/internal/signal-read'),
+					...projected.body,
+				],
+			}
+		: ast;
+}
+
+/**
+ * A trusted final context belongs to the implementation, not its RPC caller.
+ * Project only those boundary value imports before the shared type-only print;
+ * the namespace and ordinary function/type aliases retain their authored types.
+ * Recognition is shared with runtime registration so editor and wire arity agree.
+ */
+function projectServerContextCalls(ast, filename) {
+	const declaration = ast.body.find(
+		(node) =>
+			node.type === 'TSModuleDeclaration' &&
+			node.kind === 'module' &&
+			!node.declare &&
+			(node.id?.name ?? node.id?.value) === 'server',
+	);
+	if (!Array.isArray(declaration?.body?.body)) return ast;
+	const statements = declaration.body.body;
+	const functions = collectServerFunctionNodes(statements);
+	const imports = serverContextTypeImports(statements);
+	const contextExports = new Set();
+	const add = (exported, local) => {
+		const fn = functions.get(local);
+		if (fn === undefined) return;
+		try {
+			if (serverFunctionContextIndex(fn, imports, filename) !== -1) contextExports.add(exported);
+		} catch {
+			// Invalid/incomplete declarations stay checkable as authored. Runtime
+			// compilation owns the final-context placement diagnostic.
+		}
+	};
+	for (const statement of statements) {
+		if (statement.type !== 'ExportNamedDeclaration' || statement.exportKind === 'type') continue;
+		const node = statement.declaration;
+		if (node?.type === 'FunctionDeclaration') add(node.id?.name, node.id?.name);
+		if (node?.type === 'VariableDeclaration') {
+			for (const item of node.declarations) add(item.id?.name, item.id?.name);
+		}
+		for (const specifier of statement.specifiers ?? []) {
+			if (specifier.exportKind !== 'type') {
+				add(specifier.exported.name ?? specifier.exported.value, specifier.local.name);
+			}
+		}
+	}
+	if (contextExports.size === 0) return ast;
+	const names = new Set();
+	const collectNames = (node) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) collectNames(child);
+			return;
+		}
+		if (node.type === 'Identifier') names.add(node.name);
+		for (const key in node) {
+			if (key !== 'metadata' && key !== 'loc' && key !== 'parent') collectNames(node[key]);
+		}
+	};
+	collectNames(ast);
+	let helper = '__octane_ServerFunction';
+	while (names.has(helper)) helper += '_';
+	let changed = false;
+	const body = [];
+	for (const statement of ast.body) {
+		if (
+			statement.type !== 'ImportDeclaration' ||
+			statement.source.value !== 'server' ||
+			statement.importKind === 'type'
+		) {
+			body.push(statement);
+			continue;
+		}
+		const retained = [];
+		for (const specifier of statement.specifiers) {
+			if (
+				specifier.type !== 'ImportSpecifier' ||
+				specifier.importKind === 'type' ||
+				!contextExports.has(specifier.imported.name ?? specifier.imported.value)
+			) {
+				retained.push(specifier);
+				continue;
+			}
+			changed = true;
+			const reference = () =>
+				b.member(
+					b.id('server'),
+					{ ...specifier.imported },
+					specifier.imported.type !== 'Identifier',
+				);
+			body.push(
+				inheritHookMemoOrigin(
+					b.const(
+						{ ...specifier.local },
+						b.ts_as(
+							b.ts_as(reference(), b.ts_keyword_type('unknown')),
+							b.ts_type_reference(
+								b.id(helper),
+								b.ts_type_parameter_instantiation([b.ts_type_query(reference())]),
+							),
+						),
+					),
+					specifier,
+				),
+			);
+		}
+		if (retained.length > 0) body.push({ ...statement, specifiers: retained });
+	}
+	return changed
+		? {
+				...ast,
+				body: [b.imports([['ServerFunction', helper]], 'octane/server', [], 'type'), ...body],
+			}
+		: ast;
+}
+
 const octaneTransformWithAuthoredSuspense = createJsxTransform({
 	...OCTANE_PLATFORM,
 	hooks: {
@@ -137,20 +366,20 @@ function selectOctaneTransform(ast) {
  * LEADING comments (the position TS reads pragmas from)? Decided on the parse
  * artifacts — the collected comment nodes and the first statement's offset —
  * not by re-scanning text. `@tsrx/core` ≥0.1.43 re-emits preserved leading
- * comments into the virtual TSX, so when this is true the authored pragma is
- * already in the generated code and no renderer-config prelude may be added:
- * TS honors the FIRST pragma, so a prelude would shadow the authored one.
+ * comments into the virtual TSX, so the authored pragma is already
+ * in the generated code. Keep one effective pragma rather than introducing
+ * competing renderer and authored settings.
  */
-function hasAuthoredLeadingPragma(ast, comments) {
+function authoredLeadingPragma(ast, comments) {
 	const firstStatementStart = ast.body?.[0]?.start;
-	return comments.some(
+	return comments.find(
 		(comment) =>
 			(firstStatementStart == null || comment.end <= firstStatementStart) &&
 			jsxImportSourcePragmaModule(comment.value) !== null,
 	);
 }
 
-function createRendererTypePragma(renderer, ast) {
+function createRendererTypePragma(renderer, ast, strong = false) {
 	// A `.tsrx` file's JSX is octane's dialect BY DEFINITION, so the built-in
 	// DOM renderer pins the virtual TSX to octane's jsx-runtime types even when
 	// the registry entry declares no `intrinsics`. Without the pragma the host
@@ -171,7 +400,7 @@ function createRendererTypePragma(renderer, ast) {
 		type: 'Block',
 		// @tsrx/core's semantic-comment formatter turns this into the canonical
 		// `/** @jsxImportSource … */` spelling during the one type-only print.
-		value: `*@jsxImportSource ${intrinsics}`,
+		value: `*@jsxImportSource ${strong && intrinsics === DOM_RENDERER_MODULE ? 'octane/strong' : intrinsics}`,
 		start: ast.start ?? 0,
 		end: ast.start ?? 0,
 		loc: { start: { ...start }, end: { ...start } },
@@ -228,7 +457,7 @@ function markNativeTemplateBodies(root) {
  * `intrinsics`; when present, the virtual TSX gets a file-local pragma so host
  * element types cannot leak into files owned by another renderer.
  *
- * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean }} [options]
+ * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean, knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[] }} [options]
  * @returns {import('./index.js').VolarCompileResult}
  */
 export function compileToVolarMappings(source, filename, options) {
@@ -253,17 +482,26 @@ export function compileToVolarMappings(source, filename, options) {
 	});
 	const rendererConfig = normalizeRendererConfig(options?.renderers);
 	const renderer = resolveRendererForFile(rendererConfig, filename ?? 'untitled.tsrx');
-	const diagnostics = analyzeNativeChangeDiagnostics(ast, source, filename, {
-		dom: renderer.target === 'dom',
-		renderer,
-		rendererBoundaries: rendererConfig.boundaries,
-		rendererRegistry: rendererConfig.registry,
-	}).diagnostics;
-	const strongDiagnostics =
+	const strongAnalysis =
 		options?.strong === true || source.includes('use strong')
-			? analyzeStrongMode(ast, source, filename, options).diagnostics
+			? analyzeStrongMode(ast, source, filename, {
+					...options,
+					renderer,
+					rendererBoundaries: rendererConfig.boundaries,
+					rendererRegistry: rendererConfig.registry,
+				})
 			: null;
-	if (strongDiagnostics !== null) diagnostics.push(...strongDiagnostics);
+	const strongDiagnostics = strongAnalysis?.diagnostics ?? null;
+	const diagnostics = strongAnalysis?.enabled
+		? [...strongDiagnostics]
+		: analyzeNativeChangeDiagnostics(ast, source, filename, {
+				dom: renderer.target === 'dom',
+				renderer,
+				rendererBoundaries: rendererConfig.boundaries,
+				rendererRegistry: rendererConfig.registry,
+			}).diagnostics;
+	if (!strongAnalysis?.enabled && strongDiagnostics !== null)
+		diagnostics.push(...strongDiagnostics);
 	const nativeReadDiagnostics = analyzeNativeReadDiagnostics(
 		ast,
 		source,
@@ -279,10 +517,43 @@ export function compileToVolarMappings(source, filename, options) {
 	// The renderer pragma belongs to the semantic comment set consumed by
 	// @tsrx/core's type-only Program print. This keeps code and mappings in one
 	// coordinate system instead of prepending text and shifting every mapping.
-	const rendererPragma = hasAuthoredLeadingPragma(ast, comments)
-		? null
-		: createRendererTypePragma(renderer, ast);
-	const printComments = rendererPragma === null ? comments : [rendererPragma, ...comments];
+	const authoredPragma = authoredLeadingPragma(ast, comments);
+	const strongDOM = strongAnalysis?.enabled === true && renderer.target === 'dom';
+	const rendererPragma = authoredPragma ? null : createRendererTypePragma(renderer, ast, strongDOM);
+	const replacePragma =
+		authoredPragma &&
+		strongDOM &&
+		jsxImportSourcePragmaModule(authoredPragma.value) === DOM_RENDERER_MODULE;
+	// Keep the authored comment form: a line pragma prints as `// …`, so the
+	// block-comment body would leave TypeScript with no readable pragma.
+	const strongPragma = replacePragma
+		? {
+				...authoredPragma,
+				value:
+					authoredPragma.type === 'Line'
+						? ' @jsxImportSource octane/strong'
+						: '*@jsxImportSource octane/strong',
+			}
+		: null;
+	const printComments = strongPragma
+		? comments.map((comment) => (comment === authoredPragma ? strongPragma : comment))
+		: rendererPragma === null
+			? comments
+			: [rendererPragma, ...comments];
+	// Semantic comments are also attached to the first statement. Replace the
+	// attached copy on a cloned statement so the printer cannot retain a second,
+	// compatibility pragma. The parsed source tree and source positions stay intact.
+	let transformAst = ast;
+	if (strongPragma && ast.body.length > 0) {
+		const first = cloneAstNode(ast.body[0]);
+		first.leadingComments = first.leadingComments?.map((comment) =>
+			comment.start === authoredPragma.start && comment.end === authoredPragma.end
+				? strongPragma
+				: comment,
+		);
+		transformAst = { ...ast, body: [first, ...ast.body.slice(1)] };
+	}
+
 	// The `module server { … }` dialect is lowered to plain checkable TS by
 	// the shared transform itself (via the platform's `serverModule` option)
 	// before the typeOnly print. The lowering is copy-on-write inside
@@ -290,18 +561,29 @@ export function compileToVolarMappings(source, filename, options) {
 	// original parse, and replacement nodes keep authored locations so
 	// mappings/hover still work.
 	const transform = selectOctaneTransform(ast);
-	const transformed = transform(ast, source, filename, {
-		collect: true,
-		loose: !!options?.loose,
-		// @tsrx/core routes `typeOnly: true` to its TSX esrap language with
-		// `boundaryTokens: true`. Structural delimiters then carry their own
-		// one-character mappings without changing the virtual TSX bytes.
-		typeOnly: true,
-		errors,
-		comments: printComments,
-	});
+	const transformed = transform(
+		projectServerContextCalls(
+			renderer.target === 'dom'
+				? projectNativeDomReads(transformAst, options?.knownAttributeSpreads)
+				: transformAst,
+			filename,
+		),
+		source,
+		filename,
+		{
+			collect: true,
+			loose: !!options?.loose,
+			// @tsrx/core routes `typeOnly: true` to its TSX esrap language with
+			// `boundaryTokens: true`. Structural delimiters then carry their own
+			// one-character mappings without changing the virtual TSX bytes.
+			typeOnly: true,
+			errors,
+			comments: printComments,
+		},
+	);
 	if (strongDiagnostics !== null || nativeReadDiagnostics.length > 0) {
 		for (const diagnostic of [...(strongDiagnostics ?? []), ...nativeReadDiagnostics]) {
+			if (diagnostic.severity !== 'error') continue;
 			collectCompileError(
 				diagnostic.message,
 				diagnostic.filename ?? null,
@@ -525,18 +807,26 @@ export function compileTypesInspection(source, filename, options) {
 	analyzeTsrx(ast, filename, { collect: true, loose: true, to_ts: true, errors, comments });
 	const rendererConfig = normalizeRendererConfig(options?.renderers);
 	const renderer = resolveRendererForFile(rendererConfig, filename ?? 'untitled.tsrx');
-	const rendererPragma = hasAuthoredLeadingPragma(ast, comments)
+	const rendererPragma = authoredLeadingPragma(ast, comments)
 		? null
 		: createRendererTypePragma(renderer, ast);
 	const transform = selectOctaneTransform(ast);
-	const transformed = transform(ast, source, filename, {
-		collect: true,
-		loose: true,
-		typeOnly: true,
-		inspect: true,
-		errors,
-		comments: rendererPragma === null ? comments : [rendererPragma, ...comments],
-	});
+	const transformed = transform(
+		projectServerContextCalls(
+			renderer.target === 'dom' ? projectNativeDomReads(ast) : ast,
+			filename,
+		),
+		source,
+		filename,
+		{
+			collect: true,
+			loose: true,
+			typeOnly: true,
+			inspect: true,
+			errors,
+			comments: rendererPragma === null ? comments : [rendererPragma, ...comments],
+		},
+	);
 	markNativeTemplateBodies(ast);
 	return {
 		code: transformed.code,

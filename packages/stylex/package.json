@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/stylex",
-  "version": "0.1.51",
+  "version": "0.1.53",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -35,6 +35,8 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./compiler": "./src/compiler.js",
+    "./compiler/contract": "./src/compiler-contract.js",
     "./vite": "./src/vite.js"
   },
   "scripts": {
@@ -46,7 +48,7 @@
     "@stylexjs/stylex": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0"
+    "octane": "workspace:^0.1.51 || ^0.2.0 || ^0.3.0"
   },
   "devDependencies": {
     "@types/babel__core": "catalog:default",

@@ -1,5 +1,17 @@
 # @octanejs/three
 
+## 0.1.47
+
+### Patch Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+
+## 0.1.46
+
+### Patch Changes
+
+- 43568ef: Align the test renderer's camera option with the root camera configuration type so constructed and declarative cameras remain compatible with current Three declarations.
+
 ## 0.1.45
 
 ### Patch Changes

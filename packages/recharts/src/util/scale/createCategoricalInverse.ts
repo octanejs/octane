@@ -1,6 +1,6 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { InverseScaleFunction } from '../../hooks';
-import { CustomScaleDefinition } from './CustomScaleDefinition';
+import type { InverseScaleFunction } from '../../hooks';
+import type { CustomScaleDefinition } from './CustomScaleDefinition';
 
 /**
  * Binary search to find the index where x would fit in array a.

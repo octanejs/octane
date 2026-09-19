@@ -10,3 +10,21 @@ diff --git a/tests/upstream/test/floating-ui-tests/ListboxFocus.tsx b/tests/upst
    const [activeIndex, setActiveIndex] = React.useState<number | null>(1);
    const [selectedIndex, setSelectedIndex] = React.useState<number | null>(null);
  
+@@ -61,7 +61,7 @@ function Listbox({ children }: { children: React.ReactNode }) {
+   );
+ 
+   return (
+-    <SelectContext.Provider value={selectContext}>
++    <SelectContext value={selectContext}>
+       <button onClick={() => setSelectedIndex(1)} data-testid="reference" type="button">
+         Select
+       </button>
+@@ -70,7 +70,7 @@ function Listbox({ children }: { children: React.ReactNode }) {
+           {children}
+         </CompositeList>
+       </div>
+-    </SelectContext.Provider>
++    </SelectContext>
+   );
+ }
+ 

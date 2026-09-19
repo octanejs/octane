@@ -142,7 +142,7 @@ const ToastRegion = /*#__PURE__*/ (forwardRef as any)(function ToastRegion<T>(
 	let DOMProps = filterDOMProps(props, { global: true });
 
 	let region = (
-		<ToastStateContext.Provider value={state}>
+		<ToastStateContext value={state}>
 			<dom.div
 				{...mergeProps(DOMProps, renderProps, regionProps, focusProps, hoverProps)}
 				dir={direction}
@@ -164,7 +164,7 @@ const ToastRegion = /*#__PURE__*/ (forwardRef as any)(function ToastRegion<T>(
 					props.children
 				)}
 			</dom.div>
-		</ToastStateContext.Provider>
+		</ToastStateContext>
 	);
 
 	return state.visibleToasts.length > 0 && portalContainer

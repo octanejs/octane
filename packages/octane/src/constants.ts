@@ -55,7 +55,7 @@ export const HYDRATION_TEXT_SEP = ' ';
  * render order) so a hydrating boundary returns synchronously instead of
  * re-suspending. Shared so server emit and client read stay byte-identical.
  */
-export const SUSPENSE_SCRIPT_ATTR = 'data-octane-suspense';
+export { SUSPENSE_SCRIPT_ATTR } from './stream-protocol.js';
 // A resolved server arm can hydrate independently if client data suspends.
 export const SUSPENSE_RESOLVED_COMMENT = 'oct-suspense:';
 export const SUSPENSE_RESOLVED_SEED_ATTR = 'data-octane-suspense-seeds';
@@ -122,6 +122,12 @@ export const HYDRATE_ID_COUNT_ATTR = 'data-octane-hydrate-id-count';
 export { HYDRATE_STREAM_TOKEN_ATTR } from './stream-protocol.js';
 /** Direct-child JSON script carrying this boundary's `use()` seed slice. */
 export const HYDRATE_SEED_ATTR = 'data-octane-hydrate-seed';
+export {
+	INDEPENDENT_HYDRATE_MANIFEST_ATTR,
+	HYDRATE_INDEPENDENT_ATTR,
+	HYDRATE_INPUT_ATTR,
+	SIGNAL_CONTROL_ATTR,
+} from './hydration-markers.js';
 
 // ── Streaming SSR protocol (renderToPipeableStream / renderToReadableStream) ──
 // A boundary that is still PENDING when the shell flushes emits its fallback
@@ -139,7 +145,7 @@ export const STREAM_SEGMENT_ATTR = 'data-oct-s';
 /** Per-boundary seed-JSON script attribute (inside the segment). */
 export const STREAM_SEED_ATTR = 'data-oct-seed';
 /** Renderer-owned executable/data scripts emitted by the streaming protocol. */
-export const STREAM_SCRIPT_ATTR = 'data-octane-stream';
+export { STREAM_SCRIPT_ATTR } from './stream-protocol.js';
 /** Hidden carrier for Float sheet resources discovered after the shell; the
  *  inline `$OCTRH` call hoists its tags into document.head. */
 export const STREAM_RESOURCE_ATTR = 'data-oct-fr';

@@ -809,3 +809,60 @@ describe('React parity validators', () => {
 		);
 	});
 });
+
+test('pinned registrar wrappers inventory call sites rather than conditional implementation branches', () => {
+	const source = `function runSuite(driver) {
+  const scenario = (key, name, fn) => { if (driver.gap(key)) it.fails(name, fn); else it(name, fn); };
+  scenario('a', 'inserts rows', () => {});
+  scenario('b', 'removes rows', () => {});
+  it('validates keys', () => {});
+ }`;
+	const cases = extractTestCases(source, {
+		registrarWrappers: [{ name: 'scenario', titleArgument: 1 }],
+	});
+	assert.deepEqual(
+		cases.map((c) => [c.title, c.estimatedRegistrations]),
+		[
+			['inserts rows', 1],
+			['removes rows', 1],
+			['validates keys', 1],
+		],
+	);
+});
+
+test('pinned registrar wrappers reject shadowing, escaping and missing declarations', () => {
+	for (const source of [
+		`const scenario=(key,name,fn)=>it(name,fn); function nested(scenario) {scenario('k','name',()=>{});}`,
+		`const scenario=(key,name,fn)=>it(name,fn); register(scenario);`,
+		`scenario('k','name',()=>{});`,
+	])
+		assert.throws(
+			() =>
+				extractTestCases(source, { registrarWrappers: [{ name: 'scenario', titleArgument: 1 }] }),
+			/registrar wrapper/,
+		);
+});
+
+test('Playwright suite and lifecycle methods are not concrete test registrations', () => {
+	const cases = extractTestCases(
+		`test.describe('suite', () => { test.beforeEach('setup', () => {}); test.afterEach('cleanup', () => {}); test('works', () => { test.step('action', () => {}); }); });`,
+	);
+	assert.deepEqual(
+		cases.map((c) => c.title),
+		['works'],
+	);
+});
+
+test('typed test.each matrices retain rows and surrounding loop multiplicity', () => {
+	const cases = extractTestCases(
+		`for (const server of [true,false]) { test.each<[string, ReadonlyArray<string>]>([['a',[]],['b',[]]] as const)('href %s', () => {}); }`,
+	);
+	assert.equal(
+		cases.reduce((count, c) => count + c.estimatedRegistrations, 0),
+		4,
+	);
+	assert.deepEqual(
+		cases.map((c) => c.title),
+		['href a', 'href b'],
+	);
+});

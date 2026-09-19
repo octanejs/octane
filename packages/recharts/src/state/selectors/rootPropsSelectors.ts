@@ -1,8 +1,8 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { RechartsRootState } from '../store';
-import { StackOffsetType } from '../../util/types';
-import { SyncMethod } from '../../synchronisation/types';
-import { BaseValue } from '../../cartesian/Area.tsrx';
+import type { RechartsRootState } from '../store';
+import type { StackOffsetType } from '../../util/types';
+import type { SyncMethod } from '../../synchronisation/types';
+import type { BaseValue } from '../../cartesian/Area.tsrx';
 
 export const selectRootMaxBarSize = (state: RechartsRootState): number | undefined =>
 	state.rootProps.maxBarSize;

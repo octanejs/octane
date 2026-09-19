@@ -398,6 +398,33 @@ JavaScript. Only inject source you trust.
 
 ## Styles
 
+### Inline styles
+
+The `style` attribute accepts a CSS string or an object. Object keys support
+camelCase, kebab-case, vendor prefixes, and CSS custom properties. Import
+`CSSProperties` from `octane` or `octane/jsx-runtime` to check reusable objects:
+
+```ts
+import type { CSSProperties } from 'octane';
+
+const panelStyle = {
+  width: 400,
+  'font-size': '1rem',
+  lineHeight: 1.5,
+} satisfies CSSProperties;
+```
+
+Octane adds `px` to numeric lengths (`width: 400` becomes `400px`). Zero,
+unitless properties such as `lineHeight`, and custom properties keep their
+numeric values without units. Durations still need explicit units, such as
+`transitionDuration: '200ms'`. HTML and SVG use the same property-specific
+style types; CSS strings and custom property values are not syntax-checked.
+`SignalCSSProperties` accepts custom property keys (such as `--accent`) and
+signals for individual property values. Use it for reusable objects containing
+custom properties; these keys are also accepted directly in the `style` prop.
+
+### Scoped styles
+
 A `<style>` block written among the children of an element or a fragment is
 scoped CSS. The block is scoped to its siblings, not to the `@{ … }` body around
 it: it styles the items beside it and everything below them and never the
@@ -701,6 +728,10 @@ resource, or on a `<style>` inside `<head>`, is an error
 
 ## Strong mode
 
+See the [Strong compiler check reference](./strong-compiler-checks.md) for
+effect data flow, dependency inference, automatic memoization, keyed lists,
+compatibility APIs, and trusted HTML.
+
 Strong mode is an optional immutable render-snapshot contract with compiler
 checks for state, refs, Effect Events, and detectable impure render calls. It is
 also an author assertion that rendering is pure, which production memoization
@@ -937,12 +968,12 @@ forwarded through component props, or imported from another module can retain
 their named bindings. These placement checks apply only to modules that opt into
 Strong mode; ordinary modules keep their existing behavior.
 
-The checks follow provable synchronous calls through local helpers,
-`useCallback` and `useEffectEvent` results, and functions returned by analyzable
-`useMemo` factories. These hooks remain supported; creating a callback is not
-itself an error. Effect Events are non-reactive and should be omitted from hook
-dependencies. Other explicit dependency arrays keep their existing meaning and
-are never rewritten.
+The checks follow provable synchronous calls through local helpers and
+`useEffectEvent` results. Creating a callback remains valid. Effect Events are
+non-reactive and should be omitted from hook dependencies. Strong uses automatic
+declaration caching and inferred dependencies: manual memo hooks and conflicting
+dependency arrays are errors. Equivalent arrays preserve their behavior and
+produce a redundancy hint.
 
 The analysis is deliberately bounded. Factories with unknown return values or
 complex control flow remain opaque. Dependency checks follow literal arrays,

@@ -10,26 +10,26 @@ import type {
 import { isValidElement } from 'octane';
 import type * as d3Scales from 'victory-vendor/d3-scale';
 import type { Props as DotProps } from '../shape/Dot.tsrx';
-import { AxisRange } from '../state/selectors/axisSelectors';
-import { ExternalMouseEvents } from '../chart/types';
-import { SyncMethod } from '../synchronisation/types';
+import type { AxisRange } from '../state/selectors/axisSelectors';
+import type { ExternalMouseEvents } from '../chart/types';
+import type { SyncMethod } from '../synchronisation/types';
 import { isEventKey, type EventKeysType } from './excludeEventProps';
-import { DotPoint } from '../component/Dots.tsrx';
-import { SVGPropsNoEvents } from './svgPropertiesNoEvents';
-import { BaseValue } from '../cartesian/Area.tsrx';
-import { ImplicitLabelType } from '../component/Label.tsrx';
-import { CustomScaleDefinition } from './scale/CustomScaleDefinition';
-import { ChartData } from '../state/chartDataSlice';
-import {
+import type { DotPoint } from '../component/Dots.tsrx';
+import type { SVGPropsNoEvents } from './svgPropertiesNoEvents';
+import type { BaseValue } from '../cartesian/Area.tsrx';
+import type { ImplicitLabelType } from '../component/Label.tsrx';
+import type { CustomScaleDefinition } from './scale/CustomScaleDefinition';
+import type { ChartData } from '../state/chartDataSlice';
+import type {
 	XAxisOrientation,
 	XAxisPadding,
 	YAxisOrientation,
 	YAxisPadding,
 } from '../state/cartesianAxisSlice';
-import { TextAnchor, TextVerticalAnchor } from '../component/Text.tsrx';
+import type { TextAnchor, TextVerticalAnchor } from '../component/Text.tsrx';
 import type { TickFormatter } from '../cartesian/CartesianAxis.tsrx';
 import type { Props as TextProps } from '../component/Text.tsrx';
-import { TypedDataKey } from './typedDataKey';
+import type { TypedDataKey } from './typedDataKey';
 import type { EasingInput } from '../animation/easing';
 
 /**

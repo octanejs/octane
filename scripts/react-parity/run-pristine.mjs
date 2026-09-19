@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const runners = new Map([
+	['tanstack-table', { module: './tanstack-table-pristine-runtime.mjs', label: 'TanStack Table' }],
 	['base-ui', { module: './base-ui-pristine-runtime.mjs', label: '@base-ui/react' }],
 	['base-ui-utils', { module: './base-ui-utils-pristine-runtime.mjs', label: '@base-ui/utils' }],
 	['octane-is', { module: './octane-is-pristine-runtime.mjs', label: 'react-is' }],
@@ -15,11 +16,17 @@ export const runners = new Map([
 	['draggable', { module: './react-draggable-pristine-runtime.mjs', label: 'react-draggable' }],
 	['floating-ui', { module: './floating-ui-pristine-runtime.mjs', label: '@floating-ui/react' }],
 	['livestore', { module: './livestore-pristine-runtime.mjs', label: 'LiveStore' }],
+	['jotai', { module: './jotai-pristine-runtime.mjs', label: 'Jotai' }],
 	[
 		'monaco-editor',
 		{ module: './monaco-editor-pristine-runtime.mjs', label: '@monaco-editor/react' },
 	],
 	['solana-kit', { module: './solana-kit-pristine-runtime.mjs', label: '@solana/react' }],
+	[
+		'tanstack-virtual',
+		{ module: './tanstack-virtual-pristine-runtime.mjs', label: 'TanStack Virtual' },
+	],
+	['tanstack-query', { module: './tanstack-query-pristine-runtime.mjs', label: 'TanStack Query' }],
 	['tanstack-store', { module: './tanstack-store-pristine-runtime.mjs', label: 'TanStack Store' }],
 	['zag', { module: './zag-pristine-runtime.mjs', label: 'Zag' }],
 ]);

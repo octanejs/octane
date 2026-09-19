@@ -165,8 +165,9 @@ one manifest suite by name (`js-framework`, `todomvc`, `weather-app`,
 `application-composition`, `scaling-curves`, `dev-form-diagnostics`,
 `behavior-root-events`, `radix-collection-order`, `router-dispatch`,
 `floating-tree-navigation`, `manifest-cache-invalidation`, `vite-client-assets`, `activity`,
-`streaming-ssr`, `streaming-backpressure`,
-`compiler-throughput`, `tsrx-component-graph`, `codegen-size`, `hook-memo`,
+`streaming-ssr`, `streaming-backpressure`, `ssr-final-metadata`, `ssr-final-replay`,
+`audit-981-coverage`, `view-transitions`,
+`compiler-throughput`, `tsrx-component-graph`, `codegen-size`, `hook-memo`, `body-ownership`,
 `transition-hooks`, `template-call-memo`, `tsrx-renderer-selection`, `bundle-size`, `bundle-reachability`, `three-renderer`,
 `three-bundle-size`, …)
 or every suite with `all`; `quick` selects the reduced-iteration smoke pass. The

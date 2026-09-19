@@ -118,6 +118,9 @@ for (const name of ['base-ui', 'base-ui-utils']) {
 						? 'scripts/react-parity/base-ui-pristine-config.mjs'
 						: `${prefix}/tests/support/renderer.ts`,
 				),
+				...(!pristine && name === 'base-ui'
+					? [evidence(`${prefix}/tests/support/test-utils.ts`)]
+					: []),
 			],
 		};
 	};

@@ -1,7 +1,7 @@
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
 import {
@@ -26,20 +26,11 @@ function evalServer(
 	file: string,
 	options: Record<string, unknown> = {},
 ): Record<string, any> {
-	let { code } = compile(source, file, { ...options, mode: 'server' });
-	// Bind the server-runtime import to the live module, and capture exports.
-	code = code.replace(
-		/import\s+\*\s+as\s+(\w+)\s+from\s+['"]octane\/server['"];?/g,
-		'const $1 = __rt;',
-	);
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/(?:server|internal\/server)['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export default (\w+);?/g, '__exports.default = $1;');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(RT, {});
+	return loadCompiledFixtureSource(source, {
+		id: file,
+		mode: 'server',
+		compileOptions: { ...options, mode: 'server' },
+	});
 }
 
 const fixture = (name: string) => readFileSync(join(FIXTURES, `${name}.tsrx`), 'utf8');
@@ -76,12 +67,15 @@ describe('SSR Phase 1 — ssr fixture (style / spread / innerHTML / components /
 	});
 
 	it('renders boolean attributes, void elements, and dynamic attrs', async () => {
-		expect(await RT.renderToString(ssr.Field, { value: 'v', disabled: true })).toMatchSnapshot(
-			'Field-disabled',
-		);
-		expect(await RT.renderToString(ssr.Field, { value: 'v', disabled: false })).toMatchSnapshot(
-			'Field-enabled',
-		);
+		for (const disabled of [true, false]) {
+			const result = await RT.renderToString(ssr.Field, { value: 'v', disabled });
+			expect({
+				...result,
+				// Opaque compiler hydration IDs are covered by adoption tests, not
+				// this host-attribute serialization snapshot.
+				html: result.html.replace(/ data-octane-input="[^"]*"/g, ''),
+			}).toMatchSnapshot(disabled ? 'Field-disabled' : 'Field-enabled');
+		}
 	});
 
 	it('serializes spread attributes', async () => {
@@ -483,6 +477,22 @@ describe('SSR Phase 1 — semantics', () => {
 			'unpaired surrogates and null characters',
 			'😀\ud800&\udfff<\u0000>',
 			'😀\ud800&amp;\udfff&lt;\u0000&gt;',
+		],
+		// Boundary inputs at and around 32 chars plus long strings whose only
+		// escapable char is late — covers both sides of escapeHtml's length-keyed
+		// pre-scan and each of its detection disjuncts.
+		['a 31-char string ending in >', 'a'.repeat(30) + '>', 'a'.repeat(30) + '&gt;'],
+		['a 32-char string ending in >', 'a'.repeat(31) + '>', 'a'.repeat(31) + '&gt;'],
+		['a 32-char string ending in <', 'a'.repeat(31) + '<', 'a'.repeat(31) + '&lt;'],
+		[
+			'a long string whose only escapable char is a late &',
+			'word '.repeat(10) + '& done',
+			'word '.repeat(10) + '&amp; done',
+		],
+		[
+			'a long string needing no escape',
+			'long string without anything sensitive, padded past the threshold',
+			'long string without anything sensitive, padded past the threshold',
 		],
 	])('escapes %s identically in buffered and static markup', (_label, value, expected) => {
 		const expectedMarkup = `<span>${expected}</span>`;

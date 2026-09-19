@@ -1,5 +1,22 @@
 # @octanejs/stylex
 
+## 0.1.53
+
+### Patch Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+
+## 0.1.52
+
+### Patch Changes
+
+- 5ead1ff: Add opt-in native `sx` authoring with signal-aware StyleX arguments. Normal rendering and renderer-free bindings share a native projection that prepares class, style, and metadata together, preserves SSR adoption and source ownership, and skips unchanged DOM writes. StyleX remains responsible for style composition, units, and extracted CSS.
+
+  Expose a shared StyleX compiler contract and a TSRX type-check provider so supported native `sx` expressions can sample signal arguments without widening ordinary StyleX function parameters or component props. Forward native attribute contracts through the application Vite plugin.
+- 5ead1ff: Share eligible compiled StyleX recipe constants between normal components and renderer-free binding artifacts in production browser builds. Preserve local StyleX optimization, style precedence, extracted CSS, and authored source maps. Expose the build-time sharing plugin for custom compiler adapters; leave development, server, and unsupported definitions on their existing paths.
+- 5ead1ff: Recognize namespace `stylex.props()` imports in the shipped compiler contract, including renderer-free bindings and conflicting-field diagnostics. Document the renderer-free restriction on computed dynamic-style calls.
+- 5ead1ff: Accept compiled StyleX styles with nested conditional pseudo-element values in native `sx` attributes, including forced-colors rules. Preserve rejection of raw style objects, uncalled style factories, and `true` values.
+
 ## 0.1.51
 
 ### Patch Changes

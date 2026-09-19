@@ -10,7 +10,22 @@ import type {
 	Suspense,
 } from './runtime.js';
 
-export type { JSX, Octane, OctaneElement, ClassValue, CSSProperties } from './jsx-runtime.js';
+export type {
+	Octane,
+	OctaneElement,
+	ClassValue,
+	CSSProperties,
+	SignalCSSProperties,
+} from './jsx-runtime.js';
+/** Reusable component props remain scalar; the automatic JSX runtime adds bindings. */
+export declare namespace JSX {
+	type ElementType = Octane.JSX.ElementType;
+	interface Element extends Octane.JSX.Element {}
+	interface ElementChildrenAttribute extends Octane.JSX.ElementChildrenAttribute {}
+	interface IntrinsicAttributes extends Octane.JSX.IntrinsicAttributes {}
+	interface IntrinsicClassAttributes<T> extends Octane.JSX.IntrinsicClassAttributes<T> {}
+	interface IntrinsicElements extends Octane.JSX.IntrinsicElements {}
+}
 
 /** Migration alias. New Octane code should use OctaneNode. */
 export type ReactNode = OctaneNode;
@@ -96,7 +111,7 @@ export type ComponentRef<T extends ElementType> =
 	ComponentProps<T> extends { ref?: Ref<infer Instance> } ? Instance : never;
 export type ElementRef<T extends ElementType> = ComponentRef<T>;
 export type ContextType<C extends Context<any>> = C extends Context<infer T> ? T : never;
-export type Provider<T> = Context<T>['Provider'];
+export type Provider<T> = Context<T>;
 export interface ProviderProps<T> {
 	value: T;
 	children?: OctaneNode;

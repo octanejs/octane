@@ -9,6 +9,7 @@ import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
 import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
 import { bundleVolarCompiler } from '../../scripts/bundle-volar.mjs';
+import { compileToVolarMappings as compileStylexToVolarMappings } from '../../../stylex/src/compiler.js';
 
 const OBJECT_RENDERERS = {
 	registry: {
@@ -832,7 +833,201 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		}
 	});
 
-	it('type-checks absent and optional host spread refs without weakening authored prop types', () => {
+	it('type-checks StyleX attributes and the consumer-selected compiler', () => {
+		const stylexRoot = mkdtempSync(join(tmpdir(), 'octane-volar-stylex-types-'));
+		try {
+			mkdirSync(join(stylexRoot, 'node_modules/@octanejs'), { recursive: true });
+			symlinkSync(
+				fileURLToPath(new URL('../..', import.meta.url)),
+				join(stylexRoot, 'node_modules/octane'),
+				'dir',
+			);
+			symlinkSync(
+				fileURLToPath(new URL('../../../stylex', import.meta.url)),
+				join(stylexRoot, 'node_modules/@octanejs/stylex'),
+				'dir',
+			);
+			const imports = `import * as stylex from '@octanejs/stylex';
+import type { SignalHandle } from 'octane/signals';
+const tokens = stylex.defineVars({ border: 'black' });
+const styles = stylex.create({
+  height: (height: number | null) => ({ height }),
+  root: { color: 'red' },
+  forcedColors: { '::before': { borderColor: { default: tokens.border, '@media (forced-colors: active)': 'GrayText' } } },
+});
+declare const compiledStyle: stylex.CompiledStyles;
+declare const height$: SignalHandle<number | null>;
+declare const wrong$: SignalHandle<boolean>;
+declare const appearance$: SignalHandle<typeof styles.root>;
+declare const selected$: SignalHandle<'root'>;
+declare const dynamicStyle$: SignalHandle<'height'>;
+declare const payload$: SignalHandle<{ selected: typeof styles.root }>;
+declare function Custom(props: { sx: SignalHandle<number | null> }): null;
+`;
+			const valid = `${imports}
+export function Panel() @{
+  <div sx={styles.height(height$)}>
+    <span sx={appearance$} />
+    <span sx={styles[selected$]} />
+    <span sx={styles[dynamicStyle$](height$)} />
+    <span sx={(styles[dynamicStyle$])(height$)} />
+    <span sx={styles.height((height$).get())} />
+    <span sx={payload$.get().selected} />
+    <span sx={[styles.forcedColors, [false, null, undefined, compiledStyle]]} />
+    <Custom sx={height$} />
+  </div>
+}`;
+			const compiled = compileStylexToVolarMappings(valid, join(stylexRoot, 'Panel.tsrx'));
+			expect(compiled.errors).toEqual([]);
+			const valueOffset = valid.indexOf('styles.height(height$)') + 'styles.height('.length;
+			expect(
+				compiled.mappings.some((mapping) =>
+					mapping.sourceOffsets.some(
+						(start, index) =>
+							start === valueOffset &&
+							compiled.code.slice(
+								mapping.generatedOffsets[index],
+								mapping.generatedOffsets[index] + 'height$'.length,
+							) === 'height$',
+					),
+				),
+			).toBe(true);
+			const validFile = join(stylexRoot, 'Panel.tsx');
+			writeFileSync(validFile, compiled.code);
+			const invalid = `${imports}
+const outside = styles.height(height$);
+export function Invalid() @{
+  <div sx={styles.height(wrong$)}>
+    <span sx={styles.height('invalid-length')} />
+    <Custom sx={42} />
+    <span sx={true} />
+    <span sx={[[true]]} />
+    <span sx={{ color: 'red' }} />
+    <span sx={{ '::before': { borderColor: { default: 'black', '@media (forced-colors: active)': 'GrayText' } } }} />
+    <span sx={styles.height} />
+    <span sx={[styles.root, { '--fake': 'red' }]} />
+  </div>
+}`;
+			const invalidFile = join(stylexRoot, 'Invalid.tsx');
+			writeFileSync(
+				invalidFile,
+				compileStylexToVolarMappings(invalid, join(stylexRoot, 'Invalid.tsrx')).code,
+			);
+			const program = ts.createProgram({
+				rootNames: [validFile, invalidFile],
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					strict: true,
+					skipLibCheck: true,
+					noEmit: true,
+					target: ts.ScriptTarget.ESNext,
+					types: [],
+				},
+			});
+			expect(
+				program
+					.getSemanticDiagnostics(program.getSourceFile(validFile))
+					.map((error) => ts.flattenDiagnosticMessageText(error.messageText, ' ')),
+			).toEqual([]);
+			const invalidDiagnostics = program.getSemanticDiagnostics(program.getSourceFile(invalidFile));
+			expect(invalidDiagnostics.map(({ code }) => code)).toEqual([
+				2345, 2345, 2345, 2322, 2322, 2322, 2322, 2322, 2322, 2322,
+			]);
+			expect(() =>
+				compileStylexToVolarMappings(
+					`${imports} export function Invalid() @{<div sx={payload$.selected}/>} `,
+					'Invalid.tsrx',
+				),
+			).toThrow(/\.get\(\)/);
+			expect(() =>
+				compileStylexToVolarMappings(
+					`${imports} export function Invalid() @{<div sx={(payload$).selected}/>} `,
+					'Invalid.tsrx',
+				),
+			).toThrow(/\.get\(\)/);
+			// Exercise the consumer-selected provider, not just a manually compiled TSX file.
+			writeFileSync(join(stylexRoot, 'Panel.tsrx'), valid);
+			writeFileSync(join(stylexRoot, 'Invalid.tsrx'), invalid);
+			writeFileSync(join(stylexRoot, 'package.json'), JSON.stringify({ type: 'module' }));
+			writeFileSync(
+				join(stylexRoot, 'config.mts'),
+				`import { knownAttributeSpreads } from '@octanejs/stylex/compiler/contract';
+import { compileToVolarMappings } from '@octanejs/stylex/compiler';
+import type { KnownAttributeSpread } from 'octane/compiler';
+const contracts: readonly KnownAttributeSpread[] = knownAttributeSpreads;
+compileToVolarMappings('', 'Panel.tsrx', { knownAttributeSpreads: contracts });
+// @ts-expect-error The provider retains the Octane compiler's source type.
+compileToVolarMappings(42);
+// @ts-expect-error The contract retains its exact fixed-field type.
+const invalid: number = knownAttributeSpreads[0].fields[0];
+`,
+			);
+			writeFileSync(
+				join(stylexRoot, 'tsconfig.json'),
+				JSON.stringify({
+					compilerOptions: {
+						jsx: 'preserve',
+						module: 'nodenext',
+						moduleResolution: 'nodenext',
+						strict: true,
+						skipLibCheck: true,
+						noEmit: true,
+						target: 'esnext',
+						types: [],
+					},
+					tsrx: { compiler: '@octanejs/stylex/compiler' },
+					include: ['Panel.tsrx', 'Invalid.tsrx', 'config.mts'],
+				}),
+			);
+			const checkConsumer = () => {
+				try {
+					execFileSync(
+						process.execPath,
+						[
+							fileURLToPath(
+								new URL(
+									'../../../../node_modules/@tsrx/typescript-plugin/dist/tsc.js',
+									import.meta.url,
+								),
+							),
+							'--noEmit',
+							'-p',
+							join(stylexRoot, 'tsconfig.json'),
+						],
+						{ encoding: 'utf8', timeout: 30_000 },
+					);
+				} catch (error) {
+					throw new Error(String((error as { stdout?: string }).stdout ?? error));
+				}
+			};
+			let consumerDiagnostics = '';
+			try {
+				checkConsumer();
+			} catch (error) {
+				consumerDiagnostics = String((error as { stdout?: string }).stdout ?? error);
+			}
+			// One compiler invocation checks both fixtures and the provider's public
+			// types. Every error must belong to the deliberately invalid fixture.
+			const errorLines = consumerDiagnostics
+				.split('\n')
+				.filter((line) => line.includes('error TS'));
+			expect(errorLines.map((line) => Number(/error TS(\d+):/.exec(line)?.[1]))).toEqual([
+				2345, 2345, 2345, 2322, 2322, 2322, 2322, 2322, 2322, 2322,
+			]);
+			for (const line of errorLines) expect(line).toMatch(/Invalid\.tsrx\(\d+,\d+\): error TS/);
+			expect(consumerDiagnostics).toContain("Argument of type 'boolean'");
+			const wrongLine = invalid
+				.slice(0, invalid.indexOf('styles.height(wrong$)'))
+				.split('\n').length;
+			expect(consumerDiagnostics).toContain(`Invalid.tsrx(${wrongLine},`);
+		} finally {
+			rmSync(stylexRoot, { recursive: true, force: true });
+		}
+	}, 15_000);
+
+	it('type-checks native refs and spreads without weakening component props', () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-volar-spread-types-'));
 		try {
 			mkdirSync(join(root, 'node_modules'));
@@ -843,6 +1038,27 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 			);
 			const sources: ReadonlyArray<readonly [name: string, source: string]> = [
 				...refSpreadModules(),
+				[
+					'scalar text handles and unions',
+					`import type { SignalHandle, WritableSignal } from 'octane/signals';
+import 'octane/signals';
+function Label({children}: {children: string}) @{ <span>{children}</span> }
+export function Text(props: {
+	readable: SignalHandle<string>;
+	writable: WritableSignal<string>;
+	label: string | number | SignalHandle<string | number>;
+}) @{
+	const __octane_nativeAttributeValue = 'authored';
+	<p title={__octane_nativeAttributeValue}>
+		{props.readable as string}
+		{(props.writable as string)!}
+		{props.readable satisfies string}
+		{((props.writable as string) as string)!}
+		{props.label as string}
+		<Label>{props.readable as string}</Label>
+	</p>
+}`,
+				],
 				[
 					'optional refs in a typed SVG spread',
 					`import type { Octane } from 'octane/jsx-runtime';
@@ -892,11 +1108,60 @@ export function Chart<T extends Octane.SVGProps<SVGTextElement>>(props: T) {
 			const files = sources.map(([name, source], index) => {
 				const compiled = compileToVolarMappings(source, `/src/Spread${index}.tsrx`);
 				expect(compiled.errors, name).toEqual([]);
+				if (name === 'scalar text handles and unions') {
+					for (const token of ['props.readable', 'props.writable', 'props.label']) {
+						const offset = source.indexOf(token);
+						expect(
+							compiled.mappings.some((mapping) =>
+								mapping.sourceOffsets.some((start, position) => {
+									if (offset < start || offset >= start + mapping.lengths[position]) return false;
+									const generated = mapping.generatedOffsets[position] + offset - start;
+									return compiled.code.slice(generated, generated + token.length) === token;
+								}),
+							),
+						).toBe(true);
+					}
+					const authored = source.indexOf('props.readable as string');
+					const expressions: string[] = [];
+					const visit = (node: any): void => {
+						if (!node || typeof node !== 'object') return;
+						if (node.type === 'TSAsExpression' && node.start === authored) {
+							expressions.push(node.expression.type);
+						}
+						for (const key of Object.keys(node)) {
+							if (!['metadata', 'loc', 'parent'].includes(key)) visit(node[key]);
+						}
+					};
+					visit(compiled.sourceAst);
+					expect(expressions).toEqual(['MemberExpression']);
+				}
 				const file = join(root, `Spread${index}.tsx`);
 				writeFileSync(file, compiled.code);
 				return { name, file };
 			});
-			const invalidSources: ReadonlyArray<readonly [source: string, errorCode: number]> = [
+			const textSource = sources.find(([name]) => name === 'scalar text handles and unions')![1];
+			const inspectionFile = join(root, 'TextInspection.tsx');
+			writeFileSync(inspectionFile, compileTypesInspection(textSource, 'Text.tsrx').code);
+			files.push({ name: 'inspected scalar text handles', file: inspectionFile });
+			const invalidSources: ReadonlyArray<
+				readonly [source: string, errorCode: number, objectRenderer?: boolean]
+			> = [
+				[
+					`import type { SignalHandle } from 'octane/signals';
+export function Invalid(value: SignalHandle<string>) @{ <p>{value as string}</p> }`,
+					2352,
+					true,
+				],
+				...[
+					`export function Invalid(value: SignalHandle<{ invalid: true }>) @{ <p>{value as string}</p> }`,
+					`export function Invalid(value: { invalid: true }) @{ <p>{value as string}</p> }`,
+					`export function Invalid(value: SignalHandle<string>) { return value as string; }`,
+					`export function Invalid(value: SignalHandle<string>) @{ <p title={value as string} /> }`,
+					`export function Invalid(value: SignalHandle<string>) @{ <p>{String(value as string)}</p> }`,
+				].map(
+					(source) =>
+						[`import type { SignalHandle } from 'octane/signals';\n${source}`, 2352] as const,
+				),
 				[
 					`export function Invalid(props: { ref: (node: SVGSVGElement | null) => void; rest: { id: string } }) {
 	return <input ref={props.ref} {...props.rest} />;
@@ -940,8 +1205,23 @@ export function Chart<T extends Octane.SVGProps<SVGTextElement>>(props: T) {
 					2322,
 				],
 			];
-			const invalidFiles = invalidSources.map(([source], index) => {
-				const compiled = compileToVolarMappings(source, `/src/Invalid${index}.tsrx`);
+			const invalidResults = invalidSources.map(([source, , objectRenderer], index) => {
+				return compileToVolarMappings(
+					source,
+					`/src/Invalid${index}.tsrx`,
+					objectRenderer
+						? {
+								renderers: {
+									registry: {
+										object: { module: '@fixture/object-renderer', intrinsics: 'octane' },
+									},
+									rules: [{ include: '**/*.tsrx', renderer: 'object' }],
+								},
+							}
+						: undefined,
+				);
+			});
+			const invalidFiles = invalidResults.map((compiled, index) => {
 				expect(compiled.errors).toEqual([]);
 				const file = join(root, `Invalid${index}.tsx`);
 				writeFileSync(file, compiled.code);
@@ -977,6 +1257,24 @@ export function Chart<T extends Octane.SVGProps<SVGTextElement>>(props: T) {
 					errors.map(({ code }) => code),
 					file,
 				).toContain(invalidSources[index][1]);
+				if (invalidSources[index][1] === 2352) {
+					const source = invalidSources[index][0];
+					const authored = source.lastIndexOf('value as string');
+					const diagnostic = errors.find(({ code }) => code === 2352)!;
+					expect(
+						invalidResults[index].mappings.some((mapping) =>
+							mapping.sourceOffsets.some(
+								(offset, position) =>
+									offset <= authored &&
+									authored < offset + mapping.lengths[position] &&
+									mapping.generatedOffsets[position] <= diagnostic.start! &&
+									diagnostic.start! <
+										mapping.generatedOffsets[position] +
+											(mapping.generatedLengths?.[position] ?? mapping.lengths[position]),
+							),
+						),
+					).toBe(true);
+				}
 			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1138,6 +1436,76 @@ export function Chart<T extends Octane.SVGProps<SVGTextElement>>(props: T) {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	it.each([
+		["import type { ServerCallContext as Context } from 'octane/server';", 'Context'],
+		["import type * as Server from 'octane/server';", 'Server.ServerCallContext'],
+	])(
+		'projects trusted server context only at browser call boundaries (%s)',
+		(typeImport, contextType) => {
+			const source = `module server {
+	${typeImport}
+	async function save(value: string, context: ${contextType}) {
+		const request: Request = context.request;
+		return value + request.method;
+	}
+	const alias = save;
+	export const persist = alias;
+	export function ordinary(value: string, options: { count: number }) { return value + options.count; }
+	export function local(context: ${contextType}) { return save('inside', context); }
+}
+import { persist as save, ordinary, local } from 'server';
+export const pending: Promise<string> = save('draft');
+export const cancellable: Promise<string> = save('draft', { signal: new AbortController().signal });
+export const localResult: Promise<string> = local();
+export const ordinaryResult: string = ordinary('draft', { count: 1 });
+`;
+			const root = mkdtempSync(join(tmpdir(), 'octane-volar-server-context-'));
+			try {
+				const check = (authored: string) => {
+					const result = compileToVolarMappings(authored, '/src/Calls.tsrx');
+					expect(result.errors).toEqual([]);
+					const file = join(root, 'Calls.tsx');
+					writeFileSync(file, result.code);
+					const program = ts.createProgram({
+						rootNames: [file],
+						options: {
+							module: ts.ModuleKind.ESNext,
+							moduleResolution: ts.ModuleResolutionKind.Bundler,
+							noEmit: true,
+							skipLibCheck: true,
+							strict: true,
+							target: ts.ScriptTarget.ESNext,
+							paths: {
+								'octane/server': [
+									fileURLToPath(new URL('../../src/server-call.ts', import.meta.url)),
+								],
+							},
+						},
+					});
+					return ts.getPreEmitDiagnostics(program).map((diagnostic) => ({
+						code: diagnostic.code,
+						message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+					}));
+				};
+				expect(check(source)).toEqual([]);
+				expect(
+					check(
+						source +
+							"save('draft', { request: new Request('https://example.test'), signal: new AbortController().signal, viewer: {} });",
+					),
+				).toEqual([expect.objectContaining({ code: 2353 })]);
+				expect(check(source + "ordinary('draft');")).toEqual([
+					expect.objectContaining({ code: 2554 }),
+				]);
+				expect(check(source.replace("save('inside', context)", "save('inside')"))).toEqual([
+					expect.objectContaining({ code: 2554 }),
+				]);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 
 	it('keeps plain overload signatures non-ambient in the virtual TSX', () => {
 		// esrap <2.3.2 printed `declare` on EVERY bodyless function, so a plain

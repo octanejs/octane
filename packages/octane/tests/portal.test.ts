@@ -24,7 +24,7 @@ describe('portal', () => {
 		expect(r.findAll('.modal')).toHaveLength(0);
 		expect(portalTarget.querySelector('.modal')).not.toBe(null);
 
-		// Context (the `Theme.Provider value="dark"`) flows through the portal.
+		// Context (the `Theme value="dark"`) flows through the portal.
 		expect(portalTarget.querySelector('.child')!.textContent).toBe('dark');
 
 		r.unmount();

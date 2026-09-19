@@ -7,6 +7,9 @@ const entryPoint = process.argv[1] ?? '';
 const entryName = path.basename(entryPoint);
 
 function registerInvocation(runner) {
+	// This report owns the package-script invocation. Nested pristine runners
+	// keep their own report paths; their result is asserted by the parent test.
+	delete process.env.REACT_PORT_TEST_REPORT_DIR;
 	const invocationId = randomUUID();
 	const reportFile = `${runner}-${process.pid}-${invocationId}.report.json`;
 	writeFileSync(

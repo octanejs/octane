@@ -8,60 +8,63 @@ import { clsx } from 'clsx';
 import { selectActiveIndex } from '../state/selectors/selectors';
 import { useAppSelector } from '../state/hooks';
 import { Layer } from '../container/Layer.tsrx';
-import { Props as TrapezoidProps } from '../shape/Trapezoid.tsrx';
+import type { Props as TrapezoidProps } from '../shape/Trapezoid.tsrx';
 import {
 	CartesianLabelListContextProvider,
-	CartesianLabelListEntry,
-	ImplicitLabelListType,
+	type CartesianLabelListEntry,
+	type ImplicitLabelListType,
 	LabelListFromLabelProp,
 } from '../component/LabelList.tsrx';
 import { getPercentValue, interpolate } from '../util/DataUtils';
 import { getValueByDataKey } from '../util/ChartUtils';
 import {
-	ActiveShape,
+	type ActiveShape,
 	adaptEventsOfChild,
-	AnimationDuration,
-	EasingInput,
-	CartesianViewBoxRequired,
-	ChartOffsetInternal,
-	Coordinate,
-	DataConsumer,
-	DataKey,
-	DataProvider,
-	LegendType,
-	PresentationAttributesAdaptChildEvent,
-	ShapeAnimationProps,
-	TooltipType,
-	TrapezoidViewBox,
-	CartesianLayout,
+	type AnimationDuration,
+	type EasingInput,
+	type CartesianViewBoxRequired,
+	type ChartOffsetInternal,
+	type Coordinate,
+	type DataConsumer,
+	type DataKey,
+	type DataProvider,
+	type LegendType,
+	type PresentationAttributesAdaptChildEvent,
+	type ShapeAnimationProps,
+	type TooltipType,
+	type TrapezoidViewBox,
+	type CartesianLayout,
 } from '../util/types';
 import {
 	defaultFunnelShape,
 	FunnelTrapezoid,
-	FunnelTrapezoidProps,
+	type FunnelTrapezoidProps,
 } from '../util/FunnelUtils.tsrx';
 import {
 	useMouseClickItemDispatch,
 	useMouseEnterItemDispatch,
 	useMouseLeaveItemDispatch,
 } from '../context/tooltipContext';
-import { TooltipPayload, TooltipPayloadConfiguration } from '../state/tooltipSlice';
+import type { TooltipPayload, TooltipPayloadConfiguration } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
-import { Formatter } from '../component/DefaultTooltipContent.tsrx';
+import type { Formatter } from '../component/DefaultTooltipContent.tsrx';
 import type { LegendPayload } from '../component/DefaultLegendContent.tsrx';
-import { ResolvedFunnelSettings, selectFunnelTrapezoids } from '../state/selectors/funnelSelectors';
-import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import {
+	type ResolvedFunnelSettings,
+	selectFunnelTrapezoids,
+} from '../state/selectors/funnelSelectors';
+import { type RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 import { usePlotArea } from '../hooks';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
 import {
 	AnimatedItems,
-	AnimationInterpolateFn,
+	type AnimationInterpolateFn,
 	useAnimationCallbacks,
 } from '../animation/AnimatedItems.tsrx';
-import { AnimationMatchByProp, matchAppend } from '../animation/matchBy';
-import { GraphicalItemId } from '../state/graphicalItemsSlice';
+import { type AnimationMatchByProp, matchAppend } from '../animation/matchBy';
+import type { GraphicalItemId } from '../state/graphicalItemsSlice';
 import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
-import { WithIdRequired } from '../util/useUniqueId';
+import type { WithIdRequired } from '../util/useUniqueId';
 import { SetLegendPayload } from '../state/SetLegendPayload';
 import { CellsContext, useCellRegistry } from '../context/CellsContext';
 import { useCartesianChartLayout } from '../context/chartLayoutContext';
@@ -611,7 +614,7 @@ function FunnelImpl(props: WithIdRequired<RequiresDefaultProps<Props, typeof def
 	}, [fill, hide, legendType, props.dataKey, trapezoids]);
 
 	if (hide || !trapezoids || !trapezoids.length || !plotArea) {
-		return <CellsContext.Provider value={cellRegistry}>
+		return <CellsContext value={cellRegistry}>
 			<SetLegendPayload legendPayload={legendPayload} />
 			<SetFunnelTooltipEntrySettings
 				dataKey={props.dataKey}
@@ -628,13 +631,13 @@ function FunnelImpl(props: WithIdRequired<RequiresDefaultProps<Props, typeof def
 				id={id}
 			/>
 			{props.children}
-		</CellsContext.Provider>;
+		</CellsContext>;
 	}
 	const { height, width } = plotArea;
 
 	const layerClass = clsx('recharts-trapezoids', props.className);
 
-	return <CellsContext.Provider value={cellRegistry}>
+	return <CellsContext value={cellRegistry}>
 		<SetLegendPayload legendPayload={legendPayload} />
 		<SetFunnelTooltipEntrySettings
 			dataKey={props.dataKey}
@@ -669,7 +672,7 @@ function FunnelImpl(props: WithIdRequired<RequiresDefaultProps<Props, typeof def
 				trapezoids={trapezoids}
 			/>
 		</Layer>
-	</CellsContext.Provider>;
+	</CellsContext>;
 }
 
 function normalizeFunnelValue(value: unknown): {

@@ -282,7 +282,7 @@ export function CustomViewsAsPropParity(props) @{
 		}
 	};
 
-	<ParityTheme.Provider value={theme}>
+	<ParityTheme value={theme}>
 		<section data-custom-views-parity="true">
 			<output data-parity-editor-text="true">{editorText ?? 'deferred'}</output>
 			<button type="button" data-parity-theme-toggle="true" onClick={() => setTheme('night')}>
@@ -312,5 +312,5 @@ export function CustomViewsAsPropParity(props) @{
 				<EditorContent editor={editor} data-parity-editor-host="true" />
 			}
 		</section>
-	</ParityTheme.Provider>
+	</ParityTheme>
 }

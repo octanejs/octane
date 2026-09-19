@@ -8,7 +8,7 @@ export type ThemeProviderProps = ThemeScopeProps;
 export default function ThemeProvider(props: ThemeProviderProps) {
 	const runtimeTheme = createRuntimeTheme(props.theme ?? 'auto');
 
-	return <ThemeContext.Provider value={runtimeTheme}>
+	return <ThemeContext value={runtimeTheme}>
 		<ThemeScope {...props} />
-	</ThemeContext.Provider>;
+	</ThemeContext>;
 }

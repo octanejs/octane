@@ -263,6 +263,62 @@ createRoot(container).render(Retained);
 		).toEqual([true]);
 		button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
 		expect((dom.window as Window & { __octaneOwnerClicks?: number }).__octaneOwnerClicks).toBe(1);
+
+		const presentationBytes: number[] = [];
+		for (const spread of [false, true]) {
+			const presentation = await build({
+				stdin: {
+					contents: compile(
+						`
+import { createRoot } from 'octane';
+export function Presented({ label, onAction, ...rest }) @{
+	'use dom bindings';
+	<button type="button" title={label} onClick={onAction} ${spread ? '{...rest}' : ''}>
+		{label as string}
+	</button>
+}
+createRoot(document.body).render(Presented, {
+	label: 'ready',
+	onAction() { globalThis.__presentationClicked = true; },
+	'data-extra': 'forwarded',
+});
+`,
+						'presentation-bundle.tsrx',
+						{ hmr: false, dev: false },
+					).code,
+					loader: 'js',
+					resolveDir: resolve(import.meta.dirname, '../..'),
+					sourcefile: 'presentation-bundle.js',
+				},
+				bundle: true,
+				define: {
+					'process.env.NODE_ENV': JSON.stringify('production'),
+					__OCTANE_PROFILE_ENABLED__: 'false',
+				},
+				format: 'iife',
+				logLevel: 'silent',
+				minify: true,
+				platform: 'browser',
+				target: 'esnext',
+				treeShaking: true,
+				write: false,
+			});
+			presentationBytes.push(presentation.outputFiles[0].contents.byteLength);
+			const view = new JSDOM('<!doctype html><html><head></head><body></body></html>', {
+				runScripts: 'outside-only',
+			});
+			view.window.eval(presentation.outputFiles[0].text);
+			const action = view.window.document.querySelector('button')!;
+			expect(action.textContent?.trim()).toBe('ready');
+			expect(action.title).toBe('ready');
+			expect(action.getAttribute('data-extra')).toBe(spread ? 'forwarded' : null);
+			action.dispatchEvent(new view.window.MouseEvent('click', { bubbles: true }));
+			expect(
+				(view.window as Window & { __presentationClicked?: boolean }).__presentationClicked,
+			).toBe(true);
+		}
+		// Simple presentation writers must not retain generic host-spread capabilities.
+		expect(presentationBytes[0]! / presentationBytes[1]!).toBeLessThan(0.98);
 	});
 
 	it('does not activate view transitions for an unused named import', () => {

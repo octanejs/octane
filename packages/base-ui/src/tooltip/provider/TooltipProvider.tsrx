@@ -15,11 +15,11 @@ export const TooltipProvider: React.FC<TooltipProvider.Props> = function Tooltip
 	const delayValue = React.useMemo(() => ({ open: delay, close: closeDelay }), [delay, closeDelay]);
 
 	return (
-		<TooltipProviderContext.Provider value={delay}>
+		<TooltipProviderContext value={delay}>
 			<FloatingDelayGroup delay={delayValue} timeoutMs={timeout}>
 				{props.children}
 			</FloatingDelayGroup>
-		</TooltipProviderContext.Provider>
+		</TooltipProviderContext>
 	);
 };
 

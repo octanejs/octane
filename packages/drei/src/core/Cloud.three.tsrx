@@ -190,7 +190,7 @@ export function Clouds({
 	const maximum = Math.max(imageBounds[0]!, imageBounds[1]!);
 	imageBounds = [imageBounds[0]! / maximum, imageBounds[1]! / maximum];
 	<group ref={mergedRef} {...props}>
-		<CloudsContext.Provider value={cloudsRef}>
+		<CloudsContext value={cloudsRef}>
 			{children}
 			<instancedMesh
 				matrixAutoUpdate={false}
@@ -204,7 +204,7 @@ export function Clouds({
 				</planeGeometry>
 				<CloudMaterialElement map={cloudTexture} transparent={true} depthWrite={false} />
 			</instancedMesh>
-		</CloudsContext.Provider>
+		</CloudsContext>
 	</group>
 }
 

@@ -277,59 +277,990 @@ exports[`SyntaxHighlighter renders text while language loads 1`] = `
           "props": {},
           "type": "span",
         },
-        "            C AREA OF A TRIANGLE WITH A STANDARD SQUARE ROOT FUNCTION
+        {
+          "children": [
+            "            C AREA OF A TRIANGLE WITH A STANDARD SQUARE ROOT ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "FUNCTION",
+          ],
+          "props": {
+            "className": "hljs-function hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
 ",
-        "            C INPUT - TAPE READER UNIT 5, INTEGER INPUT
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "            C INPUT - TAPE READER ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "UNIT",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "5",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "INTEGER",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " INPUT
 ",
-        "            C OUTPUT - LINE PRINTER UNIT 6, REAL OUTPUT
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "            C OUTPUT - LINE PRINTER ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "UNIT",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "6",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "REAL",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " OUTPUT
 ",
-        "            C INPUT ERROR DISPLAY ERROR OUTPUT CODE 1 IN JOB CONTROL LISTING
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "            C INPUT ERROR DISPLAY ERROR OUTPUT CODE ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "1",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "IN",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " JOB CONTROL LISTING
 ",
-        "                READ INPUT TAPE 5, 501, IA, IB, IC
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "                READ INPUT TAPE ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "5",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "501",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", IA, IB, IC
 ",
-        "            501 FORMAT (3I5)
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "            ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "501",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "FORMAT",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " (",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "3",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "I5)
 ",
+          ],
+          "props": {},
+          "type": "span",
+        },
         "            C IA, IB, AND IC MAY NOT BE NEGATIVE OR ZERO
 ",
-        "            C FURTHERMORE, THE SUM OF TWO SIDES OF A TRIANGLE
+        {
+          "children": [
+            "            C FURTHERMORE, THE ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "SUM",
+          ],
+          "props": {
+            "className": "hljs-built_in",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " OF TWO SIDES OF A TRIANGLE
 ",
+          ],
+          "props": {},
+          "type": "span",
+        },
         "            C MUST BE GREATER THAN THE THIRD SIDE, SO WE CHECK FOR THAT, TOO
 ",
-        "                IF (IA) 777, 777, 701
+        {
+          "children": [
+            "                ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "IF",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " (IA) ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "701",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
 ",
-        "            701 IF (IB) 777, 777, 702
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "            ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "701",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "IF",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " (IB) ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "702",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
 ",
-        "            702 IF (IC) 777, 777, 703
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "            ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "702",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "IF",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " (IC) ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "703",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
 ",
-        "            703 IF (IA+IB-IC) 777, 777, 704
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "            ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "703",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "IF",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " (IA+IB-IC) ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "704",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
 ",
-        "            704 IF (IA+IC-IB) 777, 777, 705
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "            ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "704",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "IF",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " (IA+IC-IB) ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "705",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
 ",
-        "            705 IF (IB+IC-IA) 777, 777, 799
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "            ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "705",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "IF",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " (IB+IC-IA) ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ", ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "799",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
 ",
-        "            777 STOP 1
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "            ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "777",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "STOP",
+          ],
+          "props": {
+            "className": "hljs-keyword",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "1",
+          ],
+          "props": {
+            "className": "hljs-number",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
 ",
-        "            C USING HERON'S FORMULA WE CALCULATE THE
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "            C USING HERON",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "'S FORMULA WE CALCULATE THE
 ",
-        "            C AREA OF THE TRIANGLE
+          ],
+          "props": {
+            "className": "hljs-string",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "            C AREA OF THE TRIANGLE
 ",
-        "            799 S = FLOATF (IA + IB + IC) / 2.0
+          ],
+          "props": {
+            "className": "hljs-string",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "            799 S = FLOATF (IA + IB + IC) / 2.0
 ",
-        "                AREA = SQRTF( S * (S - FLOATF(IA)) * (S - FLOATF(IB)) *
+          ],
+          "props": {
+            "className": "hljs-string",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "                AREA = SQRTF( S * (S - FLOATF(IA)) * (S - FLOATF(IB)) *
 ",
-        "                +     (S - FLOATF(IC)))
+          ],
+          "props": {
+            "className": "hljs-string",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "                +     (S - FLOATF(IC)))
 ",
-        "                WRITE OUTPUT TAPE 6, 601, IA, IB, IC, AREA
+          ],
+          "props": {
+            "className": "hljs-string",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "                WRITE OUTPUT TAPE 6, 601, IA, IB, IC, AREA
 ",
-        "            601 FORMAT (4H A= ,I5,5H  B= ,I5,5H  C= ,I5,8H  AREA= ,F10.2,
+          ],
+          "props": {
+            "className": "hljs-string",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "            601 FORMAT (4H A= ,I5,5H  B= ,I5,5H  C= ,I5,8H  AREA= ,F10.2,
 ",
-        "                +        13H SQUARE UNITS)
+          ],
+          "props": {
+            "className": "hljs-string",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "                +        13H SQUARE UNITS)
 ",
-        "                STOP
+          ],
+          "props": {
+            "className": "hljs-string",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "                STOP
 ",
-        "                END
+          ],
+          "props": {
+            "className": "hljs-string",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "                END
 ",
-        "                   ",
+          ],
+          "props": {
+            "className": "hljs-string",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "                   ",
+          ],
+          "props": {
+            "className": "hljs-string",
+          },
+          "type": "span",
+        },
       ],
       "props": {
         "className": "language-gherkin",

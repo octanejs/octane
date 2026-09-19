@@ -1,24 +1,24 @@
 import { createSelector } from 'reselect';
-import { RechartsRootState } from '../store';
+import type { RechartsRootState } from '../store';
 import {
-	AngleAxisForRadar,
+	type AngleAxisForRadar,
 	computeRadarPoints,
-	RadarComposedData,
-	RadiusAxisForRadar,
+	type RadarComposedData,
+	type RadiusAxisForRadar,
 } from '../../polar/Radar.tsrx';
-import { BaseAxisWithScale } from './axisSelectors';
+import type { BaseAxisWithScale } from './axisSelectors';
 import { selectPolarAxisScale, selectPolarAxisTicks } from './polarScaleSelectors';
 import { selectAngleAxis, selectPolarViewBox, selectRadiusAxis } from './polarAxisSelectors';
-import { AxisId } from '../cartesianAxisSlice';
+import type { AxisId } from '../cartesianAxisSlice';
 import { selectChartDataAndAlwaysIgnoreIndexes } from './dataSelectors';
-import { ChartDataState } from '../chartDataSlice';
-import { DataKey, LayoutType, PolarViewBoxRequired, TickItem } from '../../util/types';
+import type { ChartDataState } from '../chartDataSlice';
+import type { DataKey, LayoutType, PolarViewBoxRequired, TickItem } from '../../util/types';
 import { selectChartLayout } from '../../context/chartLayoutContext';
 import { getBandSizeOfAxis, isCategoricalAxis } from '../../util/ChartUtils';
-import { AngleAxisSettings, RadiusAxisSettings } from '../polarAxisSlice';
+import type { AngleAxisSettings, RadiusAxisSettings } from '../polarAxisSlice';
 import { selectUnfilteredPolarItems } from './polarSelectors';
-import { GraphicalItemId } from '../graphicalItemsSlice';
-import { RechartsScale } from '../../util/scale/RechartsScale';
+import type { GraphicalItemId } from '../graphicalItemsSlice';
+import type { RechartsScale } from '../../util/scale/RechartsScale';
 
 const selectRadiusAxisScale = (
 	state: RechartsRootState,

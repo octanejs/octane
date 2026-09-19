@@ -29,7 +29,7 @@
  */
 
 /** @import { Route, RootBoundaryOptions } from '@octanejs/app-core' */
-/** @import { ClientAssetEntry } from '../../types/production.d.ts' */
+/** @import { ClientAssetEntry } from '@octanejs/app-core/production' */
 
 import { get_route_entry_export_name, get_route_entry_path } from '../routes.js';
 
@@ -41,6 +41,10 @@ import { get_route_entry_export_name, get_route_entry_path } from '../routes.js'
  * @property {string[]} [rpcModulePaths] - Project-root module IDs containing `module server`
  * @property {Record<string, ClientAssetEntry>} [clientAssetMap] - Route entry path → built client asset paths
  * @property {string} [clientAssetMapFile] - JSON asset map, resolved beside the built server entry at runtime
+ * @property {import('@octanejs/app-core/production').ClientBuildManifest} [clientBuild] - Completed client compilation identity
+ * @property {string} [clientBuildFile] - Required completed client metadata, resolved beside the server entry
+ * @property {Record<string, unknown>} [independentHydrationManifest] - Completed client-build independent Hydrate manifest
+ * @property {string} [independentHydrationManifestFile] - Optional JSON manifest resolved beside the built server entry
  * @property {Record<string, string>} [moduleImports] - Stable module ID → bundler import specifier
  * @property {((id: string) => string)} [resolveImport] - Fallback module-specifier mapper
  * @property {string} [configImportPath] - Bundler import specifier for octane.config.ts
@@ -65,6 +69,10 @@ export function generateServerEntry(options) {
 		rpcModulePaths = [],
 		clientAssetMap = {},
 		clientAssetMapFile,
+		clientBuild,
+		clientBuildFile,
+		independentHydrationManifest,
+		independentHydrationManifestFile,
 		moduleImports = {},
 		resolveImport,
 		configImportPath,
@@ -168,10 +176,29 @@ export function generateServerEntry(options) {
 			return `\t${JSON.stringify(modulePath)}: ${varName}._$_server_$_,`;
 		})
 		.join('\n');
+	const independentHydrationSource = independentHydrationManifestFile
+		? `(() => {
+	try {
+		return JSON.parse(readFileSync(join(__dirname, ${JSON.stringify(independentHydrationManifestFile)}), 'utf-8'));
+	} catch (error) {
+		if (error && typeof error === 'object' && error.code === 'ENOENT') return null;
+		throw error;
+	}
+})()`
+		: JSON.stringify(independentHydrationManifest ?? null, null, '\t');
+	const clientBuildSource = clientBuildFile
+		? `(() => {
+	const value = JSON.parse(readFileSync(join(__dirname, ${JSON.stringify(clientBuildFile)}), 'utf-8'));
+	if (value == null) throw new Error('[octane] Completed client build metadata is required.');
+	return value;
+})()`
+		: JSON.stringify(clientBuild ?? null, null, '\t');
 
 	if (mode === 'manifest' || mode === 'webworker') {
 		const isWebWorker = mode === 'webworker';
-		const readsAssetFile = !isWebWorker && Boolean(clientAssetMapFile);
+		const readsAssetFile =
+			!isWebWorker &&
+			Boolean(clientAssetMapFile || independentHydrationManifestFile || clientBuildFile);
 		const assetFileImports = readsAssetFile
 			? `import { readFileSync } from 'node:fs';\nimport { fileURLToPath } from 'node:url';\nimport { dirname, join } from 'node:path';\n`
 			: '';
@@ -185,7 +212,9 @@ export function generateServerEntry(options) {
 			? `const __dirname = dirname(fileURLToPath(import.meta.url));\n`
 			: '';
 		const clientAssets = readsAssetFile
-			? `JSON.parse(readFileSync(join(__dirname, ${JSON.stringify(clientAssetMapFile)}), 'utf-8'))`
+			? clientAssetMapFile
+				? `JSON.parse(readFileSync(join(__dirname, ${JSON.stringify(clientAssetMapFile)}), 'utf-8'))`
+				: JSON.stringify(clientAssetMap, null, '\t')
 			: JSON.stringify(clientAssetMap, null, '\t');
 		const runtime = isWebWorker
 			? `const runtime = octaneConfig.adapter?.runtime;
@@ -203,9 +232,15 @@ if (!runtime) {
 };`;
 		const workerFactory = isWebWorker
 			? `
-export function createWebWorkerHandler({ htmlTemplate, clientAssets = manifest.clientAssets }) {
+export function createWebWorkerHandler({
+	htmlTemplate,
+	clientAssets = manifest.clientAssets,
+	clientBuild = manifest.clientBuild,
+	independentHydration = manifest.independentHydration,
+}) {
+	if (!clientBuild) throw new Error('[octane] Completed client build metadata is required.');
 	return createHandler(
-		{ ...manifest, clientAssets },
+		{ ...manifest, clientAssets, clientBuild, independentHydration },
 		{ ...rendererDeps, htmlTemplate },
 	);
 }
@@ -222,6 +257,10 @@ export function createWebWorkerHandler({ htmlTemplate, clientAssets = manifest.c
 ${assetFileImports}${platformImports}import {
 	renderToReadableStream,
 	executeServerFunction,
+	executeServerFunctionStream,
+	executeServerFunctionBatch,
+	installSignalOwnerEnvironment,
+	retireSignalOwnerIdentity,
 	Suspense,
 	ErrorBoundary,
 	createElement,
@@ -270,6 +309,8 @@ ${rpc_entries}
 };
 
 ${assetDirectory}const clientAssets = ${clientAssets};
+const clientBuild = ${isWebWorker && clientBuildFile ? 'null' : clientBuildSource};
+const independentHydration = ${isWebWorker && independentHydrationManifestFile ? 'null' : independentHydrationSource};
 
 export const manifest = {
 	routes: octaneConfig.router.routes,
@@ -285,12 +326,17 @@ export const manifest = {
 	rpcModules,
 	runtime,
 	clientAssets,
+	clientBuild,
+	independentHydration,
 };
 
 export const rendererDeps = {
 	renderToReadableStream,
 	prerender,
 	executeServerFunction,
+	streamServerFunction: executeServerFunctionStream,
+	batchServerFunctions: executeServerFunctionBatch,
+	signalOwners: { install: installSignalOwnerEnvironment, retire: retireSignalOwnerIdentity },
 	Suspense,
 	ErrorBoundary,
 	createElement,
@@ -312,6 +358,10 @@ import { dirname, join, resolve } from 'node:path';
 import {
 	renderToReadableStream,
 	executeServerFunction,
+	executeServerFunctionStream,
+	executeServerFunctionBatch,
+	installSignalOwnerEnvironment,
+	retireSignalOwnerIdentity,
 	Suspense,
 	ErrorBoundary,
 	createElement,
@@ -380,6 +430,8 @@ const clientAssets = ${
 			? `JSON.parse(readFileSync(join(__dirname, ${JSON.stringify(clientAssetMapFile)}), 'utf-8'))`
 			: JSON.stringify(clientAssetMap, null, '\t')
 	};
+const independentHydration = ${independentHydrationSource};
+const clientBuild = ${clientBuildSource};
 
 export const handler = createHandler(
 	{
@@ -396,12 +448,17 @@ export const handler = createHandler(
 		rpcModules,
 		runtime,
 		clientAssets,
+		clientBuild,
+		independentHydration,
 	},
 	{
 		renderToReadableStream,
 		prerender,
 		htmlTemplate,
 		executeServerFunction,
+		streamServerFunction: executeServerFunctionStream,
+		batchServerFunctions: executeServerFunctionBatch,
+		signalOwners: { install: installSignalOwnerEnvironment, retire: retireSignalOwnerIdentity },
 		Suspense,
 		ErrorBoundary,
 		createElement,

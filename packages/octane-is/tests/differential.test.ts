@@ -29,7 +29,7 @@ it('matches every predicate for corresponding supported element values', () => {
 			runtime.createElement(runtime.Suspense),
 			runtime.createElement(runtime.memo(C)),
 			runtime.createElement(runtime.lazy(async () => C)),
-			runtime.createElement(runtime.createContext(null).Provider),
+			runtime.createElement(runtime.createContext(null)),
 			portal(runtime.createElement('span'), target),
 		];
 	};

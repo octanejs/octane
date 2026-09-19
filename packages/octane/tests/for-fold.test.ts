@@ -1,7 +1,7 @@
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import * as ServerRT from 'octane/server';
 import { mount } from './_helpers';
 import { hydrateRoot, flushSync } from '../src/index.js';
@@ -9,15 +9,11 @@ import { RetList, AtList, RetListApp } from './_fixtures/for-fold.tsrx';
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/for-fold.tsrx');
 function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'for-fold.tsrx', { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, 'const $1 = __exports.$1 = function $1');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(ServerRT, {});
+	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
+		id: 'for-fold.tsrx',
+		mode: 'server',
+		compileOptions: { mode: 'server' },
+	});
 }
 
 const ITEMS = [
