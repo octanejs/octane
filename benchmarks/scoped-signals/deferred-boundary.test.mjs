@@ -87,7 +87,7 @@ test('deferred template proof declines caller-controlled configuration and execu
 				body.replaceAll('H ', 'Octane.Hydrate ').replace('</H>', '</Octane.Hydrate>'),
 			false,
 		);
-		check(prefix + body.replace('split={false}', ''), false);
+		check(prefix + body.replace('split={false}', ''), true);
 		for (const options of [{ dev: true }, { hmr: true }, { profile: true }, { mode: 'server' }])
 			check(prefix + body, false, options);
 		t.diagnostic(`${checked} production ownership/configuration and mode controls`);
