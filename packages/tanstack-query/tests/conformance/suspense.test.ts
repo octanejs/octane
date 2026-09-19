@@ -24,6 +24,7 @@ async function flush() {
 }
 
 describe('suspense query', () => {
+	// @parity-case conformance:628d806d9707980d
 	it('shows @catch when the suspense query errors', async () => {
 		let rejectFn: (e: Error) => void = () => {};
 		const queryFn = () => new Promise<string>((_res, rej) => (rejectFn = rej));
@@ -39,6 +40,7 @@ describe('suspense query', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:182bb67f7cee96dc
 	it('works with octane’s <Suspense> component (not just @try)', async () => {
 		let resolveFn: (v: string) => void = () => {};
 		const queryFn = () => new Promise<string>((res) => (resolveFn = res));
@@ -54,6 +56,7 @@ describe('suspense query', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:e0f7e8f4dc4c97a3
 	it('supports useSuspenseQueries for multiple suspense queries', async () => {
 		let resolveA: (v: string) => void = () => {};
 		let resolveB: (v: string) => void = () => {};

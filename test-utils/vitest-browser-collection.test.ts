@@ -1,9 +1,52 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { mkdtemp, realpath, readFile, writeFile, symlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 import { test } from 'vitest';
 import { createVitest } from 'vitest/node';
+
+test('the Intersection Observer browser lane starts from a cold cache without reloading tests', async (t) => {
+	const root = await realpath(await mkdtemp(join(tmpdir(), 'parity-browser-cold-start-')));
+	t.onTestFinished(() => rm(root, { recursive: true, force: true }));
+	const repo = resolve(import.meta.dirname, '..');
+	await symlink(join(repo, 'node_modules'), join(root, 'node_modules'), 'dir');
+	const config = join(root, 'vitest.config.mjs');
+	const reportFile = join(root, 'report.json');
+	await writeFile(
+		config,
+		`
+import workspace from ${JSON.stringify(pathToFileURL(join(repo, 'vitest.config.js')).href)};
+const project = workspace.test.projects.find(entry => entry.test?.name === 'intersection-observer-adapted-browser');
+export default {
+  ...project,
+  root: ${JSON.stringify(repo)},
+  cacheDir: ${JSON.stringify(join(root, 'vite-cache'))},
+  test: { ...project.test, silent: false },
+};
+`,
+	);
+	const { stdout, stderr } = await promisify(execFile)(
+		process.execPath,
+		[
+			join(repo, 'node_modules/vitest/vitest.mjs'),
+			'run',
+			'--config',
+			config,
+			'--reporter=json',
+			'--outputFile',
+			reportFile,
+		],
+		{ cwd: repo, timeout: 25_000, maxBuffer: 1024 * 1024 },
+	);
+	const report = JSON.parse(await readFile(reportFile, 'utf8'));
+	assert.equal(report.success, true);
+	assert.equal(report.numPassedTests, 2);
+	assert.equal(report.numFailedTests, 0);
+	assert.doesNotMatch(stdout + stderr, /Vite unexpectedly reloaded a test/);
+});
 
 test('browser collection releases a file mock before collecting an unmocked consumer', async (t) => {
 	const root = await realpath(await mkdtemp(join(tmpdir(), 'parity-browser-collection-')));

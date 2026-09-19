@@ -183,7 +183,7 @@ export const Button = /*#__PURE__*/ createHideableComponent(function Button(
 		'data-focused': isFocused || undefined,
 		'data-pending': isPending || undefined,
 		'data-focus-visible': isFocusVisible || undefined,
-		children: createElement(ProgressBarContext.Provider, {
+		children: createElement(ProgressBarContext, {
 			value: { id: progressId },
 			children: renderProps.children,
 		}),

@@ -93,6 +93,33 @@ export function createPackedJavascriptConsumerManifest(archiveSpecs) {
 	};
 }
 
+const packedRuntimeConsumerPackages = [
+	'@octanejs/alien-signals',
+	'@octanejs/apollo-client',
+	'@octanejs/dropzone',
+	'@octanejs/hook-form',
+	'@octanejs/recharts',
+	'@octanejs/syntax-highlighter',
+	'@octanejs/three',
+	'@octanejs/window',
+	'octane',
+];
+
+export function createPackedRuntimeConsumerDependencies(manifests, archiveSpecs) {
+	const dependencies = {};
+	for (const packageName of findPackedWorkspaceDependencyClosure(
+		manifests,
+		packedRuntimeConsumerPackages,
+	)) {
+		const archiveSpec = archiveSpecs[packageName];
+		if (typeof archiveSpec !== 'string' || !archiveSpec.startsWith('file:')) {
+			throw new Error(`no packed archive was provided for ${packageName}`);
+		}
+		dependencies[packageName] = archiveSpec;
+	}
+	return dependencies;
+}
+
 export function renderPackedCommonjsConsumerSource() {
 	return `const assert = require('node:assert/strict');
 const octane = require('octane');

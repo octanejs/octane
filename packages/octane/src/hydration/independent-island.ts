@@ -139,7 +139,8 @@ export function registerIndependentHydrationIsland(
 		return status;
 	};
 	registerHydrationIntentBoundary(element, boundary);
-	if (intents.length !== 0) activate();
+	if (intents.length !== 0 || element.getAttribute('data-octane-hydrate-when') === 'load')
+		activate();
 	return Object.assign(
 		() => {
 			if (disposed) return;
@@ -162,7 +163,8 @@ export function registerIndependentHydrationIsland(
 			resume() {
 				if (disposed || !paused) return;
 				paused = false;
-				if (intents.length) activate();
+				if (intents.length || element.getAttribute('data-octane-hydrate-when') === 'load')
+					activate();
 			},
 		},
 	);

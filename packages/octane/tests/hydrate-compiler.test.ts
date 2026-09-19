@@ -1256,4 +1256,137 @@ export function App(props) @{
 `;
 		expect(() => compiler().transform(serializable, FILE, { environment: 'client' })).not.toThrow();
 	});
+
+	for (const authoring of ['template', 'jsx'] as const) {
+		for (const dev of [false, true]) {
+			for (const environment of ['client', 'server'] as const) {
+				const file = authoring === 'template' ? FILE : FILE.replace('.tsrx', '.tsx');
+				const sourceWithCapture = (setup: string, unrelated: string) => `
+import { Hydrate, useRef, useState } from 'octane';
+import { interaction } from 'octane/hydration';
+import { choose } from './actions';
+export function App(props) ${authoring === 'template' ? '@{' : '{'}
+  ${setup}
+  ${authoring === 'template' ? '' : 'return'} <Hydrate independent when={interaction()}>
+    <button onClick={() => choose(value)}>Choose</button>
+  </Hydrate>${authoring === 'template' ? '' : ';'}
+}
+function Unrelated() { ${unrelated} return null; }
+`;
+				it.each([
+					'let owner; owner = useRef(null); const value = owner;',
+					'let owner; owner = useState(0); const value = { owner };',
+					'let owner; [owner] = useState(0); const value = owner;',
+					"let owner = 'Allowed'; owner = props.parentValue; const value = { owner };",
+					"let owner = 'Allowed'; if (props.enabled) owner = props.parentValue; const value = owner;",
+					"let owner = 'Allowed'; (() => { owner = props.parentValue; })(); const value = owner;",
+					"let owner = 'Allowed'; function change() { owner = props.parentValue; } const value = { owner };",
+					'let owner = 0; owner++; const alias = owner; const value = { alias };',
+				])(
+					`rejects captures through an assigned intermediate binding: %s (${authoring}, dev=${dev}, ${environment})`,
+					(setup) => {
+						expect(() =>
+							createOctaneCompiler({ root: ROOT, hmr: false, dev }).transform(
+								sourceWithCapture(setup, "const owner = 'Unrelated';"),
+								file,
+								{ environment },
+							),
+						).toThrowError(
+							expect.objectContaining({ code: 'OCTANE_HYDRATE_INDEPENDENT_OWNER_CAPTURE' }),
+						);
+					},
+				);
+
+				it(`accepts immutable aliases despite intermediate-name writes in other scopes (${authoring}, dev=${dev}, ${environment})`, () => {
+					for (const setup of [
+						"const owner = 'Allowed'; const value = owner;",
+						"let owner = 'Allowed'; const value = { owner };",
+						"const owner = { label: 'Allowed' }; const value = { owner };",
+						"const value = { owner: 'Allowed' }; let owner; owner = useRef(null);",
+						"const owner = 'Allowed'; { let owner; owner = useRef(null); } const value = { owner };",
+						"const owner = 'Allowed'; const change = (owner) => { owner = useRef(null); }; const value = owner;",
+						"const owner = 'Allowed'; try {} catch (owner) { owner = props.parentValue; } const value = owner;",
+					]) {
+						const result = createOctaneCompiler({ root: ROOT, hmr: false, dev }).transform(
+							sourceWithCapture(setup, 'let owner; owner = useRef(null);'),
+							file,
+							{ environment },
+						);
+						if (!result || !('independentWidgets' in result))
+							throw new Error('Missing independent widget metadata');
+						expect(result.independentWidgets).toEqual([
+							expect.objectContaining({ captureSchema: [{ name: 'value', type: 'json' }] }),
+						]);
+					}
+				});
+
+				it(`checks assignments outside each sibling widget separately (${authoring}, dev=${dev}, ${environment})`, () => {
+					const source = `import { Hydrate } from 'octane';
+import { interaction } from 'octane/hydration';
+import { choose } from './actions';
+export function App() ${authoring === 'template' ? '@{' : '{'}
+  let owner = 'Allowed';
+  const value = owner;
+  ${authoring === 'template' ? '' : 'return'} <main>
+    <Hydrate independent when={interaction()}><button onClick={() => { owner = 'Changed'; choose(value); }}>Choose</button></Hydrate>
+    <Hydrate independent when={interaction()}><button onClick={() => choose(value)}>Sibling</button></Hydrate>
+  </main>${authoring === 'template' ? '' : ';'}
+}`;
+					expect(() =>
+						createOctaneCompiler({ root: ROOT, hmr: false, dev }).transform(source, file, {
+							environment,
+						}),
+					).toThrowError(
+						expect.objectContaining({
+							code: 'OCTANE_HYDRATE_INDEPENDENT_OWNER_CAPTURE',
+							message: expect.stringContaining('capture `value`'),
+						}),
+					);
+				});
+				it(`accepts serializable captures despite unrelated same-name locals (${authoring}, dev=${dev}, ${environment})`, () => {
+					for (const unrelated of ['const value = useRef(null);', 'let value = 0; value++;']) {
+						for (const setup of [
+							"const value = 'Allowed';",
+							"const data = 'Allowed'; const value = { label: data };",
+							"const owner = useRef(null); const value = { owner: 'Allowed' };",
+							"type Data = { label: string }; const value = { label: 'Allowed' } as Data;",
+						]) {
+							const result = createOctaneCompiler({ root: ROOT, hmr: false, dev }).transform(
+								sourceWithCapture(setup, unrelated),
+								file,
+								{ environment },
+							);
+							if (!result || !('independentWidgets' in result))
+								throw new Error('Missing independent widget metadata');
+							expect(result.independentWidgets?.[0]?.captureSchema).toEqual([
+								{ name: 'value', type: 'json' },
+							]);
+						}
+					}
+				});
+
+				it(`rejects parent-owned captures despite unrelated same-name data (${authoring}, dev=${dev}, ${environment})`, () => {
+					for (const setup of [
+						'const value = useRef(null);',
+						'const owner = useRef(null); const value = owner;',
+						'const owner = useRef(null); const value = { owner };',
+						'const owner = useRef(null); const value = owner.current;',
+						'const value = useRef(null).current;',
+						'const [owner] = useState(0); const value = owner;',
+						"let value = 'Allowed'; value = 'Changed';",
+					]) {
+						expect(() =>
+							createOctaneCompiler({ root: ROOT, hmr: false, dev }).transform(
+								sourceWithCapture(setup, "const value = 'Unrelated';"),
+								file,
+								{ environment },
+							),
+						).toThrowError(
+							expect.objectContaining({ code: 'OCTANE_HYDRATE_INDEPENDENT_OWNER_CAPTURE' }),
+						);
+					}
+				});
+			}
+		}
+	}
 });

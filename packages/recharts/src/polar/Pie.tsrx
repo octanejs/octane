@@ -1154,17 +1154,17 @@ function PieImpl(props: WithIdRequired<PropsWithResolvedDefaults>) {
 
 	if (sectors == null) {
 		previousSectorsRef.current = null;
-		return <CellsContext.Provider value={cellRegistry}>
+		return <CellsContext value={cellRegistry}>
 			<SetPiePayloadLegend cells={cells} id={id} />
 			<Layer tabIndex={rootTabIndex} className={layerClass}>{props.children}</Layer>
-		</CellsContext.Provider>;
+		</CellsContext>;
 	}
 
 	if (hide) {
 		previousSectorsRef.current = null;
 	}
 
-	return <CellsContext.Provider value={cellRegistry}>
+	return <CellsContext value={cellRegistry}>
 		<SetPiePayloadLegend cells={cells} id={id} />
 		<ZIndexLayer zIndex={props.zIndex}>
 			<SetPieTooltipEntrySettings
@@ -1191,7 +1191,7 @@ function PieImpl(props: WithIdRequired<PropsWithResolvedDefaults>) {
 					: props.children}
 			</Layer>
 		</ZIndexLayer>
-	</CellsContext.Provider>;
+	</CellsContext>;
 }
 
 type PropsWithResolvedDefaults = RequiresDefaultProps<Props, typeof defaultPieProps>;

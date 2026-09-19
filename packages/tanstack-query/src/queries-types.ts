@@ -32,7 +32,7 @@ type MAXIMUM_DEPTH = 20;
 // Widen the type of the symbol to enable type inference even if skipToken is not immutable.
 type SkipTokenForUseQueries = symbol;
 
-type GetUseQueryOptionsForUseQueries<T> =
+export type GetUseQueryOptionsForUseQueries<T> =
 	// Part 1: responsible for applying explicit type parameter to function arguments, if object { queryFnData: TQueryFnData, error: TError, data: TData }
 	T extends {
 		queryFnData: infer TQueryFnData;

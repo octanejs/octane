@@ -69,6 +69,8 @@ import {
 import {
 	compileUniversal,
 	createLexicalAnalysis,
+	forEachRuntimeAstChild,
+	isIdentifierReference,
 	UNIVERSAL_COMPILER_RUNTIME_IMPORTS,
 	UNIVERSAL_THREAD_RUNTIME_IMPORTS,
 } from './compile-universal.js';
@@ -81,6 +83,8 @@ import {
 	prepareServerRendererBoundaryRegions,
 } from './compile-renderer-boundaries.js';
 import {
+	compiledSplitHydrateTagsForAst,
+	privateCompiledContextsForHydrateAst,
 	hydrateBoundaryPathFromId,
 	prepareHydrateBoundaries,
 	prepareServerHydrateBoundaries,
@@ -119,8 +123,11 @@ import {
 	serializeTemplateIr,
 } from './template-ir.js';
 import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
+import { assertNoLegacyContextProviders } from './context-provider.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
+import { findLocalVoidRootCallees } from './local-void-roots.js';
+import { findPrivateCompiledContexts } from './private-context.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
 // static bakes and dynamic writes MUST agree on which attributes render, under
@@ -531,8 +538,13 @@ function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
 	}
 }
 
-function canCarryDirectSignalHandle(node) {
-	if (!node || node.metadata?.octane_string_child || node.metadata?.octane_primitive_text_child) {
+function canCarryDirectSignalHandle(node, conservativeResult = false) {
+	if (
+		!node ||
+		node.metadata?.octane_string_child ||
+		node.metadata?.octane_primitive_text_child ||
+		node.metadata?.octane_primitive_value
+	) {
 		return false;
 	}
 	if (
@@ -542,20 +554,25 @@ function canCarryDirectSignalHandle(node) {
 		node.type === 'ParenthesizedExpression' ||
 		node.type === 'ChainExpression'
 	) {
-		return canCarryDirectSignalHandle(node.expression);
+		return canCarryDirectSignalHandle(node.expression, conservativeResult);
 	}
 	if (node.type === 'ConditionalExpression') {
 		return (
-			canCarryDirectSignalHandle(node.consequent) || canCarryDirectSignalHandle(node.alternate)
+			canCarryDirectSignalHandle(node.consequent, conservativeResult) ||
+			canCarryDirectSignalHandle(node.alternate, conservativeResult)
 		);
 	}
 	if (node.type === 'LogicalExpression') {
-		return canCarryDirectSignalHandle(node.left) || canCarryDirectSignalHandle(node.right);
+		return (
+			canCarryDirectSignalHandle(node.left, conservativeResult) ||
+			canCarryDirectSignalHandle(node.right, conservativeResult)
+		);
 	}
 	if (node.type === 'SequenceExpression') {
-		return canCarryDirectSignalHandle(node.expressions.at(-1));
+		return canCarryDirectSignalHandle(node.expressions.at(-1), conservativeResult);
 	}
 	if (
+		!conservativeResult &&
 		(node.type === 'CallExpression' || node.type === 'OptionalCallExpression') &&
 		(node.callee?.type === 'MemberExpression' ||
 			node.callee?.type === 'OptionalMemberExpression') &&
@@ -564,6 +581,20 @@ function canCarryDirectSignalHandle(node) {
 			: node.callee.property?.name === 'get')
 	) {
 		return false;
+	}
+	if (conservativeResult) {
+		// Style values must be genuinely scalar: structured values can inherit
+		// the native value protocol, and even an opaque .get() can return a handle.
+		return (
+			(node.type === 'Literal' && node.regex !== undefined) ||
+			![
+				'Literal',
+				'TemplateLiteral',
+				'UnaryExpression',
+				'BinaryExpression',
+				'UpdateExpression',
+			].includes(node.type)
+		);
 	}
 	return ![
 		'Literal',
@@ -626,7 +657,7 @@ function componentInvocationSite(ctx, node) {
 function markDirectSignalBinding(binding, ctx, origin, kind) {
 	if (!canCarryDirectSignalHandle(binding.expr)) return binding;
 	ctx.signalBindingsUsed = true;
-	if (binding.kind !== 'text' && binding.kind !== 'textOnlyChild') ctx.signalBindingsEager = true;
+	if (isDirectSignalHandleExpression(binding.expr)) ctx.signalBindingsEager = true;
 	return {
 		...binding,
 		signalDirect: true,
@@ -644,8 +675,8 @@ function ssrSignalValue(node, ctx, origin, capability = false) {
 }
 
 function ssrSignalStyleObject(node, ctx, origin) {
-	// Non-native compilation only: preserve targeted binding reads without
-	// opting an otherwise ordinary module into a native renderer read frame.
+	// Preserve targeted binding reads when the style has no implicit native
+	// reads, without adding a separate native style snapshot.
 	if (node?.type !== 'ObjectExpression') return node;
 	let changed = false;
 	const properties = (node.properties ?? []).map((property) => {
@@ -1274,7 +1305,11 @@ function requireRuntimeForContext(ctx, name) {
 	const alias = ctx._universalRuntimeUnit?.generatedRuntimeAliases?.[name];
 	if (alias !== undefined) return alias;
 	ctx.runtimeNeeded.add(name);
-	if (HOOK_MEMO_RUNTIME_HELPERS.has(name) || NATIVE_READ_RUNTIME_HELPERS.has(name)) {
+	if (
+		name === 'isContext' ||
+		HOOK_MEMO_RUNTIME_HELPERS.has(name) ||
+		NATIVE_READ_RUNTIME_HELPERS.has(name)
+	) {
 		let local = ctx.privateRuntimeAliases?.get(name);
 		if (local === undefined) {
 			local = allocCompilerName(ctx, rtAlias(name));
@@ -1369,6 +1404,8 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeCreateScopedElement',
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
+	'__createCompiledContext',
+	'isContext',
 	'bindPresentationView',
 	'beginPresentationHydration',
 	'endPresentationHydration',
@@ -1412,6 +1449,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	...NATIVE_READ_RUNTIME_HELPERS,
 ]);
 const INTERNAL_SERVER_RUNTIME_HELPERS = new Set([
+	'isContext',
 	'bindPresentationView',
 	'ssrBindingHtml',
 	'ssrBindingBlock',
@@ -1787,7 +1825,7 @@ function lowerImportedErrorBoundaries(ast) {
 // whose ENTIRE output is one component call spans its own block's range by
 // construction, so the call site can INHERIT the parent block's markers on the
 // client and the server can skip the child's frame pair — collapsing sole-child
-// wrapper chains (incl. `<ctx.Provider>` router/binding stacks) to the
+// wrapper chains (including context router/binding stacks) to the
 // outermost pair. The predicate must be computed from the same AST by BOTH
 // compile modes (client stamp ↔ server pair-skip ↔ hydration adopt-nothing
 // agree by construction). Exclusions:
@@ -2349,6 +2387,23 @@ function objectExprIsStaticLiteral(obj) {
 			return false;
 	}
 	return true;
+}
+
+function styleObjectNeedsNativeBinding(node) {
+	if (node?.type !== 'ObjectExpression') return true;
+	return (node.properties ?? []).some((property) => {
+		if (
+			(property.type !== 'Property' && property.type !== 'ObjectProperty') ||
+			property.computed ||
+			property.method ||
+			(property.kind !== undefined && property.kind !== 'init') ||
+			(property.key?.name ?? property.key?.value) === '__proto__'
+		)
+			return true;
+		// Structured or opaque values may implement the native value protocol.
+		// Only primitive operations or existing value proofs rule that out.
+		return canCarryDirectSignalHandle(property.value, true);
+	});
 }
 
 // DEV must send invalid literal declarations through the same style helpers as
@@ -6268,10 +6323,7 @@ function collectPrivateMappedProviderComponents(body, ctx) {
 		}
 		if (node.type === 'Element' || node.type === 'JSXElement') {
 			const name = node.openingElement?.name || node.id;
-			if (
-				(name?.type === 'MemberExpression' || name?.type === 'JSXMemberExpression') &&
-				name.property?.name === 'Provider'
-			) {
+			if (name?.type === 'Identifier' || name?.type === 'JSXIdentifier') {
 				const child = onlyMeaningfulJsxChild(node.children);
 				const candidate =
 					child?.type === 'Element' || child?.type === 'JSXElement'
@@ -9461,6 +9513,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	);
 	analyzeTsrx(analyzedAst, cleanFilename);
 	adoptParserAst(analyzedAst);
+	assertNoLegacyContextProviders(analyzedAst, source, cleanFilename);
 	options = nativeReadOptions(analyzedAst, options);
 	assertNativeReadDiagnostics(analyzedAst, source, cleanFilename, options);
 	const strongAnalysis = assertStrongMode(analyzedAst, source, cleanFilename, options);
@@ -9860,6 +9913,48 @@ function compileInternal(
 	// rebuilt with builders/spreads (locations carried via setLocation) and
 	// untouched subtrees stay shared with the parse by reference.
 	let ast = parsedAst;
+	const localVoidRootsEnabled =
+		!options?.dev &&
+		!options?.hmr &&
+		!options?.profile &&
+		options?.renderer == null &&
+		options?.universalRuntime == null &&
+		options?.__universal == null &&
+		!options?.__rendererBoundariesLowered &&
+		rendererBoundaryPreparation === null &&
+		options?.rendererBoundaries == null &&
+		options?.rendererRegistry == null;
+	const authoredVoidRootIds = new Set();
+	const privateCompiledContexts = localVoidRootsEnabled
+		? findPrivateCompiledContexts(ast)
+		: new Map();
+	const splitPrivateContexts = localVoidRootsEnabled
+		? privateCompiledContextsForHydrateAst(parsedAst)
+		: null;
+	if (
+		localVoidRootsEnabled &&
+		ast.body.some(
+			(node) =>
+				node.type === 'ImportDeclaration' &&
+				node.source?.value === 'octane' &&
+				node.specifiers.some(
+					(specifier) =>
+						specifier.type === 'ImportSpecifier' &&
+						['createRoot', 'hydrateRoot'].includes(
+							specifier.imported.name ?? specifier.imported.value,
+						),
+				),
+		)
+	) {
+		for (const statement of ast.body) {
+			const node =
+				statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+					? statement.declaration
+					: statement;
+			if (node?.type === 'FunctionDeclaration' && node.id && isVoidJsxCodeBlockFunction(node))
+				authoredVoidRootIds.add(node.id);
+		}
+	}
 	// Drop type-only statements (interface / type / declare / import-export type)
 	// and inline `type` specifiers before emit — they carry no runtime value and
 	// would leak invalid TS into the .js (or crash the printer). Runtime-only;
@@ -9981,6 +10076,9 @@ function compileInternal(
 		nativeChangeClassifications: nativeChangeAnalysis.classifications,
 		dev: devEnabled,
 		profile: profileEnabled,
+		compiledHydrateTemplates: localVoidRootsEnabled,
+		compiledSplitHydrateTags: compiledSplitHydrateTagsForAst(parsedAst),
+		privateSplitContextProviders: splitPrivateContexts?.providers,
 		autoMemo: autoMemoEnabled,
 		strongMemo: strongMemoEnabled,
 		nativeReads: options?.nativeReads === true,
@@ -10343,6 +10441,39 @@ function compileInternal(
 				voidOutput: isVoidJsxCodeBlockFunction(compNode),
 			});
 		}
+	}
+	if (authoredVoidRootIds.size > 0) {
+		const definitions = new Set(
+			[...ctx.componentInfo.values()]
+				.filter((info) => info.voidOutput && authoredVoidRootIds.has(info.node.id))
+				.map((info) => info.node.id),
+		);
+		const components = new Set([...ctx.componentInfo.values()].map((info) => info.node));
+		const callees = findLocalVoidRootCallees(ast, definitions, components);
+		if (callees.size > 0) {
+			const aliases = new Map();
+			for (const helper of new Set(callees.values())) {
+				const alias = allocCompilerName(ctx, rtAlias(helper));
+				(ctx.privateRuntimeAliases ??= new Map()).set(helper, alias);
+				ctx.runtimeNeeded.add(helper);
+				aliases.set(helper, alias);
+			}
+			ast = mapAst(ast, (node) =>
+				callees.has(node) ? { ...node, name: aliases.get(callees.get(node)) } : null,
+			);
+		}
+	}
+	if (privateCompiledContexts.size > 0 || splitPrivateContexts?.callees.size > 0) {
+		const helper = '__createCompiledContext';
+		const alias = allocCompilerName(ctx, rtAlias(helper));
+		(ctx.privateRuntimeAliases ??= new Map()).set(helper, alias);
+		ctx.runtimeNeeded.add(helper);
+		const callees = new Set([
+			...privateCompiledContexts.values(),
+			...(splitPrivateContexts?.callees ?? []),
+		]);
+		ast = mapAst(ast, (node) => (callees.has(node) ? { ...node, name: alias } : null));
+		ctx.privateCompiledContexts = new Set(privateCompiledContexts.keys());
 	}
 	// Return-based JSX functions never attach fetch-tree warm plans, and a sole
 	// same-module component already rejects a self-only warm edge below. Avoid a
@@ -13192,7 +13323,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			ctx.runtimeNeeded.add('ssrStyle');
 			registerAttrLoweringOrigin(ctx, attr.name, 'ssrStyle', null);
 			inner = tsrxExprNode(inner, ctx, name, inlinedSubs);
-			if (ctx.nativeReads)
+			if (ctx.nativeReads && styleObjectNeedsNativeBinding(inner))
 				inner = b.call(requireRuntimeForContext(ctx, 'readNativeDomStyle'), inner);
 			else inner = ssrSignalStyleObject(inner, ctx, attr);
 			parts.push(ssrCall('ssrStyle', [bindAttributeEvaluation(inner)], attr));
@@ -16606,37 +16737,167 @@ function depPathKey(node) {
 // Dep extraction for a memoized creation: one-level member paths for free
 // identifiers used as `obj.prop` or `obj['prop']` (→ `props.id`, so a fresh
 // props OBJECT with unchanged fields doesn't refetch), bare identifiers
-// otherwise. Scope-aware: identifiers bound inside nested functions don't
-// become deps.
-function collectDepPaths(expr) {
+// otherwise. Only outer runtime references become deps; locally declared
+// bindings and erased syntax do not.
+function collectDepPaths(expr, coarsenDepRoots = null) {
 	const deps = [];
 	const seen = new Set();
+	const lexical = createLexicalAnalysis(expr);
+	let guards = null;
+	let nextGuard = 0;
+	const isFree = (node, parent, key) =>
+		isIdentifierReference(node, parent, key, lexical) &&
+		!lexical.isBound(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name);
 	const push = (node, key) => {
+		if (coarsenDepRoots !== null) {
+			const member = depPathMember(node);
+			if (member?.object.type === 'Identifier' && coarsenDepRoots.has(member.object.name)) {
+				node = b.id(member.object.name);
+				key = depPathKey(node);
+			}
+		}
+		if (guards !== null) key += `:guard:${guards.id}`;
 		if (seen.has(key)) return;
 		seen.add(key);
+		if (guards !== null) {
+			for (let guard = guards; guard !== null; guard = guard.parent) {
+				node = b.conditional(guard.test, node, b.void0);
+			}
+		}
 		deps.push(node);
 	};
-	walk(expr, new Set());
+	walk(expr, null, null);
 	return deps;
 
-	function walk(n, bound) {
-		if (!n || typeof n !== 'object') return;
-		if (Array.isArray(n)) {
-			for (const x of n) walk(x, bound);
+	// Only repeat guards whose evaluation is a free typeof probe, not a call,
+	// accessor, or callback-local reference. Keeping the entire predicate also
+	// leaves member reads disabled for other types, not just absent globals.
+	function isTypeofGuard(node) {
+		node = unwrapTsExpr(node);
+		if (node?.type === 'UnaryExpression') {
+			if (node.operator === '!') return isTypeofGuard(node.argument);
+			const argument = unwrapTsExpr(node.argument);
+			return (
+				node.operator === 'typeof' &&
+				argument?.type === 'Identifier' &&
+				isFree(argument, node, 'argument')
+			);
+		}
+		if (node?.type === 'LogicalExpression' && (node.operator === '&&' || node.operator === '||')) {
+			return isTypeofGuard(node.left) && isTypeofGuard(node.right);
+		}
+		if (
+			node?.type === 'BinaryExpression' &&
+			(node.operator === '===' ||
+				node.operator === '!==' ||
+				node.operator === '==' ||
+				node.operator === '!=')
+		) {
+			const left = unwrapTsExpr(node.left);
+			const right = unwrapTsExpr(node.right);
+			return (
+				(left?.type === 'Literal' && typeof left.value === 'string' && isTypeofGuard(right)) ||
+				(right?.type === 'Literal' && typeof right.value === 'string' && isTypeofGuard(left))
+			);
+		}
+		return false;
+	}
+
+	function necessaryTypeofGuard(node, truthy) {
+		node = unwrapTsExpr(node);
+		if (isTypeofGuard(node)) return truthy ? node : b.unary('!', node);
+		if (node?.type === 'UnaryExpression' && node.operator === '!') {
+			return necessaryTypeofGuard(node.argument, !truthy);
+		}
+		// A true conjunction requires both operands; a false disjunction
+		// requires neither. Unknown operands contribute no proof and are never
+		// replayed: getters and calls remain in the authored predicate.
+		if (node?.type === 'LogicalExpression' && node.operator === (truthy ? '&&' : '||')) {
+			const left = necessaryTypeofGuard(node.left, truthy);
+			const right = necessaryTypeofGuard(node.right, truthy);
+			return left === null ? right : right === null ? left : b.logical('&&', left, right);
+		}
+		return null;
+	}
+
+	function walkGuarded(node, test, truthy) {
+		const guard = necessaryTypeofGuard(test, truthy);
+		if (guard === null) {
+			walk(node, null, null);
 			return;
 		}
+		const previous = guards;
+		guards = { test: guard, parent: guards, id: nextGuard++ };
+		walk(node, null, null);
+		guards = previous;
+	}
+
+	function exits(node) {
+		if (node?.type === 'ReturnStatement' || node?.type === 'ThrowStatement') return true;
+		if (node?.type === 'BlockStatement') return node.body.some(exits);
+		return node?.type === 'IfStatement' && exits(node.consequent) && exits(node.alternate);
+	}
+
+	function walk(n, parent, key) {
+		if (!n || typeof n !== 'object') return;
 		switch (n.type) {
+			case 'BlockStatement': {
+				const previous = guards;
+				for (const statement of n.body) {
+					walk(statement, n, 'body');
+					if (statement.type !== 'IfStatement') continue;
+					const consequentExit = exits(statement.consequent);
+					const alternateExit = exits(statement.alternate);
+					if (consequentExit !== alternateExit) {
+						const guard = necessaryTypeofGuard(statement.test, !consequentExit);
+						if (guard === null) continue;
+						guards = {
+							test: guard,
+							parent: guards,
+							id: nextGuard++,
+						};
+					}
+				}
+				guards = previous;
+				return;
+			}
+			case 'IfStatement':
+			case 'ConditionalExpression':
+				walk(n.test, n, 'test');
+				walkGuarded(n.consequent, n.test, true);
+				walkGuarded(n.alternate, n.test, false);
+				return;
+			case 'LogicalExpression':
+				walk(n.left, n, 'left');
+				if (n.operator === '&&' || n.operator === '||') {
+					walkGuarded(n.right, n.left, n.operator === '&&');
+				} else {
+					walk(n.right, n, 'right');
+				}
+				return;
 			case 'MetaProperty':
 				// `import.meta` and `new.target` contain syntax tokens, not free
 				// bindings. Visiting their Identifier children creates invalid deps.
 				return;
 			case 'Identifier':
-				if (!bound.has(n.name)) push(b.id(n.name), n.name);
+				if (isFree(n, parent, key)) push(b.id(n.name), depPathKey(n));
 				return;
+			case 'UnaryExpression': {
+				const argument = unwrapTsExpr(n.argument);
+				if (n.operator === 'typeof' && argument?.type === 'Identifier') {
+					// A guarded global may not exist. Reading its bare identifier as a
+					// dependency defeats typeof's protection; its type is the witness.
+					if (isFree(argument, n, 'argument')) {
+						push(b.unary('typeof', b.id(argument.name)), `typeof:${argument.name}`);
+					}
+					return;
+				}
+				break;
+			}
 			case 'MemberExpression': {
 				const propertyName = staticDepMemberName(n);
 				if (n.object.type === 'Identifier' && propertyName !== null) {
-					if (!bound.has(n.object.name)) {
+					if (isFree(n.object, n, 'object')) {
 						const member = b.member(
 							b.id(n.object.name),
 							n.computed
@@ -16653,30 +16914,10 @@ function collectDepPaths(expr) {
 					}
 					return;
 				}
-				walk(n.object, bound);
-				if (n.computed) walk(n.property, bound);
-				return;
+				break;
 			}
-			case 'FunctionExpression':
-			case 'ArrowFunctionExpression': {
-				const inner = new Set(bound);
-				for (const p of n.params || []) collectPatternNames(p, inner);
-				walk(n.body, inner);
-				return;
-			}
-			case 'Property':
-				if (n.computed) walk(n.key, bound);
-				walk(n.value, bound);
-				return;
-			case 'VariableDeclarator':
-				walk(n.init, bound);
-				return;
-			default:
-				for (const k in n) {
-					if (k === 'loc' || k === 'start' || k === 'end' || k === 'metadata') continue;
-					walk(n[k], bound);
-				}
 		}
+		forEachRuntimeAstChild(n, (child, childKey) => walk(child, n, childKey));
 	}
 }
 
@@ -16909,29 +17150,13 @@ function makeCreationMemoCall(
 		// composable Symbol for every warmable creation site.
 		true,
 	);
-	let deps = collectDepPaths(expr);
 	// Chain-local roots must dep on the LOCAL'S identity, not a one-level
 	// member path: `userPromise.then(…)` would otherwise dep on
 	// `userPromise.then` — Promise.prototype.then, identical across every
 	// promise — and the derived creation would never refresh when its upstream
 	// promise does. Coarsen member deps rooted at render-created locals to the
 	// bare identifier (dedup follows).
-	if (coarsenDepRoots !== null) {
-		const seen = new Set();
-		const coarsened = [];
-		for (const dep of deps) {
-			const member = depPathMember(dep);
-			const next =
-				member?.object.type === 'Identifier' && coarsenDepRoots.has(member.object.name)
-					? b.id(member.object.name)
-					: dep;
-			const key = depPathKey(next);
-			if (key !== null && seen.has(key)) continue;
-			if (key !== null) seen.add(key);
-			coarsened.push(next);
-		}
-		deps = coarsened;
-	}
+	const deps = collectDepPaths(expr, coarsenDepRoots);
 	// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
 	// SSRScope per pass makes client useMemo semantics useless there).
 	const memoHelper = ctx.nativeReads
@@ -17329,8 +17554,47 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 					nameNode && nameNode.type === 'JSXIdentifier' && /^[A-Z]/.test(nameNode.name);
 				const transparentBoundary =
 					isComponent &&
-					ctx._octaneSuspenseNames?.has(nameNode.name) &&
-					!ctx.currentComponentLocals?.has(nameNode.name);
+					(ctx._octaneSuspenseNames?.has(nameNode.name) ||
+						ctx.provenContextBindings?.has(nameNode.name)) &&
+					!ctx.currentComponentLocals?.has(nameNode.name) &&
+					!locals.has(nameNode.name);
+				const guardedContext =
+					isComponent &&
+					!transparentBoundary &&
+					!ctx.componentInfo.has(nameNode.name) &&
+					!ctx._octaneBoundaryNames?.has(nameNode.name) &&
+					!ctx.currentComponentLocals?.has(nameNode.name) &&
+					!locals.has(nameNode.name) &&
+					(node.children?.length ?? 0) > 0 &&
+					(node.openingElement.attributes ?? []).some(
+						(attribute) =>
+							attribute.type === 'JSXSpreadAttribute' ||
+							(attribute.type === 'JSXAttribute' && attribute.name?.name === 'value'),
+					);
+				if (guardedContext) {
+					// An imported Context has the same transparent children contract as
+					// a local one. Check its registered identity only on the cold warm
+					// path; ordinary components must retain ownership of their children.
+					const contextGuard = inheritOriginLoc(
+						b.call(
+							requireRuntimeForContext(ctx, 'isContext'),
+							inheritOriginLoc(b.id(nameNode.name), nameNode),
+						),
+						nameNode,
+					);
+					return {
+						...node,
+						children: parallelUseWalkJsx(
+							node.children,
+							ctx,
+							componentName,
+							creations,
+							warmChildren,
+							[...guards, contextGuard],
+							locals,
+						),
+					};
+				}
 				if (isComponent && !transparentBoundary) {
 					// Server: creations flowing INTO child props (`<Kid p={make(x)}/>`)
 					// need the same cross-pass identity as use()-site creations — every
@@ -18060,7 +18324,12 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		inheritOriginLoc(
 			b.call(
 				warmChildAlias,
-				b.id(w.compName),
+				b.id(
+					ctx.compiledSplitHydrateTags?.has(w.origin.openingElement?.name) &&
+						isCompiledHydrateTemplate(w.origin, ctx, w.origin.openingElement.attributes)
+						? requireCompiledHydrateAlias(ctx)
+						: w.compName,
+				),
 				b.object(
 					w.props.map((p) =>
 						b.prop(
@@ -19864,7 +20133,70 @@ function memberProps(hn, src) {
 		// node so the extracted fragment keeps it (dev hydration LOC / DevTools). Without
 		// this, fragment extraction would silently drop the upstream position.
 		loc: src && src.loc,
+		// The extracted prop carries the already-evaluated source value. Preserve
+		// primitive value proofs separately from the renderer's text assertions:
+		// an authored `as string` still permits a signal handle at runtime.
+		...(isPrimitiveValueExpression(src)
+			? { metadata: { ...src?.metadata, octane_primitive_value: true } }
+			: null),
 	};
+}
+
+function isPrimitiveValueExpression(node) {
+	if (!node || typeof node !== 'object') return false;
+	if (
+		node.type === 'TSAsExpression' ||
+		node.type === 'TSTypeAssertion' ||
+		node.type === 'TSSatisfiesExpression' ||
+		node.type === 'TSNonNullExpression' ||
+		node.type === 'TSInstantiationExpression' ||
+		node.type === 'ParenthesizedExpression' ||
+		node.type === 'ChainExpression'
+	) {
+		return isPrimitiveValueExpression(node.expression);
+	}
+	if (
+		node.metadata?.octane_string_child ||
+		node.metadata?.octane_primitive_text_child ||
+		node.metadata?.octane_primitive_value
+	) {
+		return true;
+	}
+	if (node.type === 'Literal') {
+		return (
+			node.regex == null &&
+			(node.value == null || (typeof node.value !== 'object' && typeof node.value !== 'function'))
+		);
+	}
+	if (
+		node.type === 'StringLiteral' ||
+		node.type === 'NumericLiteral' ||
+		node.type === 'BigIntLiteral' ||
+		node.type === 'BooleanLiteral' ||
+		node.type === 'NullLiteral' ||
+		node.type === 'TemplateLiteral' ||
+		node.type === 'UnaryExpression' ||
+		node.type === 'BinaryExpression' ||
+		node.type === 'UpdateExpression'
+	) {
+		return true;
+	}
+	if (node.type === 'ConditionalExpression') {
+		return (
+			isPrimitiveValueExpression(node.consequent) && isPrimitiveValueExpression(node.alternate)
+		);
+	}
+	if (node.type === 'LogicalExpression') {
+		return isPrimitiveValueExpression(node.left) && isPrimitiveValueExpression(node.right);
+	}
+	if (node.type === 'SequenceExpression') {
+		return isPrimitiveValueExpression(node.expressions.at(-1));
+	}
+	if (node.type === 'AssignmentExpression') {
+		if (node.operator === '=') return isPrimitiveValueExpression(node.right);
+		return node.operator === '+=' || NUMERIC_TEXT_OPERATORS.has(node.operator.slice(0, -1));
+	}
+	return false;
 }
 function objectProp(hn, valNode) {
 	return b.prop('init', b.id(hn), valNode);
@@ -21054,6 +21386,8 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 		if (isFunctionNode(n) && n.body?.type === 'JSXCodeBlock') {
 			const name = n.id?.name ?? allocCompilerName(ctx, '__template');
 			const previousLocals = ctx.currentComponentLocals;
+			// A nested body must not replace the enclosing component's warm plan.
+			const previousWarm = ctx._pendingWarm;
 			ctx.currentComponentLocals = collectComponentLocals(n);
 			try {
 				const compiled =
@@ -21063,6 +21397,7 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 				return functionExpressionFromDeclaration({ ...compiled, id: n.id ?? null }, n);
 			} finally {
 				ctx.currentComponentLocals = previousLocals;
+				ctx._pendingWarm = previousWarm;
 			}
 		}
 		if (
@@ -21382,9 +21717,7 @@ function autoMemoReturnedProviderChild(node, nameNode, ctx) {
 		ctx._universalRuntimeUnit != null ||
 		ctx._foldCtx?.immediateRenderedOutput !== true ||
 		!Array.isArray(ctx._foldCtx.compInlinedSubs) ||
-		(nameNode?.type !== 'MemberExpression' && nameNode?.type !== 'JSXMemberExpression') ||
-		(nameNode.object?.type !== 'Identifier' && nameNode.object?.type !== 'JSXIdentifier') ||
-		nameNode.property?.name !== 'Provider'
+		(nameNode?.type !== 'Identifier' && nameNode?.type !== 'JSXIdentifier')
 	) {
 		return null;
 	}
@@ -21443,7 +21776,7 @@ function autoMemoReturnedProviderChild(node, nameNode, ctx) {
 		}
 		return {
 			host,
-			contextName: nameNode.object.name,
+			contextName: nameNode.name,
 			rows: items,
 			component: name,
 			captures: candidate.captures,
@@ -21476,7 +21809,7 @@ function autoMemoReturnedProviderChild(node, nameNode, ctx) {
 	}
 	for (let proof = ctx.currentAutoCalculatedRenderableRefs; proof !== null; proof = proof.parent) {
 		if (proof.nodes.has(child.expression)) {
-			return { host, contextName: nameNode.object.name, rows: child.expression };
+			return { host, contextName: nameNode.name, rows: child.expression };
 		}
 	}
 	return null;
@@ -21591,8 +21924,12 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		eagerRoot &&
 		componentTag &&
 		childrenNeedRenderScope &&
-		(nameNode?.type === 'MemberExpression' || nameNode?.type === 'JSXMemberExpression') &&
-		nameNode.property?.name === 'Provider';
+		(nameNode?.type === 'Identifier' || nameNode?.type === 'JSXIdentifier') &&
+		attrs.some(
+			(attribute) =>
+				(attribute.type === 'Attribute' || attribute.type === 'JSXAttribute') &&
+				jsxAttrRawName(attribute) === 'value',
+		);
 	const autoMemoProviderChild = eagerProviderChildren
 		? autoMemoReturnedProviderChild(node, nameNode, ctx)
 		: null;
@@ -21631,14 +21968,14 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		if (autoMemoProviderChild !== null && loweredChildren.length === 1) {
 			const { host, contextName, rows, component, captures, witnesses } = autoMemoProviderChild;
 			if (component === undefined) ctx.runtimeNeeded.add('compilerCacheArray');
-			// `.Provider` is a public property and can belong to any component.
+			// The tag can name either a Context or an ordinary component.
 			// Ask the runtime whether this exact value is provided by the CURRENT
-			// scope. Its identity-map lookup never re-reads `.Provider`, invokes
+			// scope. Its identity-map lookup never reads an object's fields, invokes
 			// a fake component's `$$kind` getter, or observes a user Proxy trap.
 			const genuineContext = inheritOriginLoc(
 				b.call(
 					requireRuntimeForContext(ctx, 'compilerOwnsContextProvider'),
-					inheritOriginLoc(b.id(contextName), nameNode.object),
+					inheritOriginLoc(b.id(contextName), nameNode),
 				),
 				nameNode,
 			);
@@ -25267,7 +25604,7 @@ function planJsx(
 			}
 			if (!noTemplate && cc.signalSite != null && (ctx.signalBindingsUsed || ctx.nativeReads)) {
 				ctx.signalBindingsUsed = true;
-				ctx.signalBindingsEager = true;
+				if (isDirectSignalHandleExpression(cc.valueExpr)) ctx.signalBindingsEager = true;
 				ctx.runtimeNeeded.add('bindSignalChild');
 				const tokenKey = `_sigch$${cc.id}`;
 				bag.constField(tokenKey, b.literal(null));
@@ -27810,7 +28147,7 @@ function emitElementHtml(
 		const site = directSignalSite(ctx, node, 'input');
 		ensureDirectControlSite(site);
 		ctx.signalBindingsUsed = true;
-		ctx.signalBindingsEager = true;
+		if (isDirectSignalHandleExpression(expression)) ctx.signalBindingsEager = true;
 		return { ...binding, signalDirect: true, signalSite: site };
 	};
 	const hostSignalSite = directSignalSite(ctx, node, 'binding');
@@ -28227,10 +28564,10 @@ function emitElementHtml(
 				appendBakedAttribute(attrTemplate, chunk, attrName, attr.name, inner, ctx.inspect);
 				continue;
 			}
-			if (
-				ctx.nativeReads &&
-				(inner.type !== 'ObjectExpression' || !objectExprIsStaticLiteral(inner))
-			) {
+			// Scalar value evaluation stays inside the enclosing native read frame.
+			// Only implicit handle/accessor reads need a separate style owner; plain
+			// fixed declarations can retain their baked prefix and ordinary writers.
+			if (ctx.nativeReads && styleObjectNeedsNativeBinding(inner)) {
 				bindings.push({
 					id: bindings.length,
 					kind: 'nativeStyle',
@@ -28579,7 +28916,15 @@ function emitElementHtml(
 			);
 		if (signalHostSources) {
 			ctx.signalBindingsUsed = true;
-			ctx.signalBindingsEager = true;
+			if (
+				hasDirectSignalStyle ||
+				hostClientSources.some((source) =>
+					source.spread
+						? spreadContainsDirectSignalHandle(source.binding.expr)
+						: isDirectSignalHandleExpression(source.binding.expr),
+				)
+			)
+				ctx.signalBindingsEager = true;
 		}
 		hostCommitClientBinding = {
 			id: bindings.length,
@@ -29667,7 +30012,7 @@ function isDirectActivityLongForm(node, ctx = null) {
 }
 
 // ===========================================================================
-// Component-as-tag — `<Foo>...</Foo>`, `<ctx.Provider>...</ctx.Provider>`
+// Component-as-tag — `<Foo>...</Foo>`, `<ctx.Component>...</ctx.Component>`
 // ===========================================================================
 
 // Long-form Fragments can use their conventional unbound spelling, an Octane
@@ -29707,7 +30052,7 @@ function isComponentTag(node) {
 	// `<{expr}>` — @tsrx/core 0.1.29 emits a JSXExpressionContainer with
 	// isDynamic === true at openingElement.name. Always a component (no HTML
 	// string tag is possible here); routes through the same componentSlot
-	// codegen path as `<Foo>` / `<ctx.Provider>`.
+	// codegen path as `<Foo>` / `<ctx.Component>`.
 	if (name.type === 'JSXExpressionContainer' && name.isDynamic === true) return true;
 	if (name.type === 'Identifier' || name.type === 'JSXIdentifier') {
 		if (typeof name.name !== 'string') return false;
@@ -29997,6 +30342,59 @@ function collectAutoMemoDependencyExpressions(nodes) {
 	};
 }
 
+function requireCompiledHydrateAlias(ctx) {
+	const helper = '__HydrateCompiled';
+	let alias = ctx.privateRuntimeAliases?.get(helper);
+	if (alias === undefined) {
+		alias = allocCompilerName(ctx, rtAlias(helper));
+		(ctx.privateRuntimeAliases ??= new Map()).set(helper, alias);
+	}
+	ctx.runtimeNeeded.add(helper);
+	return alias;
+}
+
+function isPrivateSplitContextProvider(node, ctx) {
+	const tag = node.openingElement?.name ?? node.id;
+	const binding = ctx.privateSplitContextProviders?.get(tag);
+	if (binding === undefined || tag.type !== 'JSXIdentifier' || tag.name !== binding.name)
+		return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	if (!lexical.bindingNodes.has(binding)) return false;
+	const owner = lexical.resolveBinding(lexical.nodeScopes.get(binding), binding.name);
+	return (
+		owner !== null &&
+		lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name)?.scope === owner.scope
+	);
+}
+
+function isCompiledHydrateTemplate(node, ctx, attrs) {
+	if (!ctx.compiledHydrateTemplates || ctx._universalRuntimeUnit != null) return false;
+	const tag = node.openingElement?.name ?? node.id;
+	if (
+		(tag?.type !== 'Identifier' && tag?.type !== 'JSXIdentifier') ||
+		ctx.octaneImportLocals?.get(tag.name) !== 'Hydrate'
+	)
+		return false;
+	if (!ctx.compiledSplitHydrateTags?.has(tag)) {
+		for (const attr of attrs) {
+			if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') return false;
+			const name = attr.name?.name ?? attr.name;
+			if (
+				typeof name !== 'string' ||
+				name === 'children' ||
+				name === 'fallback' ||
+				name.startsWith('__')
+			)
+				return false;
+		}
+	}
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope = lexical.nodeScopes.get(tag);
+	if (scope === undefined) return false;
+	const binding = lexical.resolveBinding(scope, tag.name);
+	return binding?.scope === lexical.rootScope && binding.importSource?.value === 'octane';
+}
+
 function makeCompCall(
 	node,
 	ctx,
@@ -30015,7 +30413,7 @@ function makeCompCall(
 	const staticFragmentRenderer = node.openingElement?.metadata?.staticFragmentRenderer;
 	const activityDescriptor = isActivityLongForm(node, ctx);
 	const descriptorConfig = activityDescriptor || hasKeyedSpreadConfig(node);
-	const compNode = activityDescriptor
+	let compNode = activityDescriptor
 		? inheritOriginLoc(b.id(requireRuntimeForContext(ctx, 'Activity')), node)
 		: staticFragmentRenderer
 			? inheritOriginLoc(b.id(staticFragmentRenderer.name), node.openingElement?.name || node.id)
@@ -30088,6 +30486,7 @@ function makeCompCall(
 	// arrow while making its body printable. Whitespace-only JSXText around the
 	// arrow is ignored so source indentation doesn't defeat the detection.
 	const sourceChildren = node.children || [];
+	let compiledChildren = false;
 	const renderPropChild = soleRenderPropChild(sourceChildren);
 	if (renderPropChild) {
 		hasChildrenProp = true;
@@ -30119,6 +30518,7 @@ function makeCompCall(
 				propNodes.push(b.prop('init', b.literal('children'), childrenValue));
 			}
 		} else {
+			compiledChildren = true;
 			// Compile children as a render function: (scope) => { renders JSX into scope }.
 			// The function is inlined inside the parent component body so its closures
 			// capture the parent's locals (props, state, etc.).
@@ -30209,7 +30609,16 @@ function makeCompCall(
 	// elides iff the callee carries the definition-site `$$singleRoot` stamp
 	// (docs/comment-marker-elision-plan.md M1).
 	let maybeSingleRoot = false;
-	if (staticFragmentRenderer) {
+	if (
+		(compiledChildren || ctx.compiledSplitHydrateTags?.has(node.openingElement?.name ?? node.id)) &&
+		isCompiledHydrateTemplate(node, ctx, attrs)
+	) {
+		compNode = inheritOriginLoc(
+			b.id(requireCompiledHydrateAlias(ctx)),
+			node.openingElement?.name ?? node.id,
+		);
+		voidComponent = true;
+	} else if (staticFragmentRenderer) {
 		// The renderer is already a void, hookless component body. A memo boundary
 		// would force a full Block and could hide a hookful descendant's update.
 		liteEligible = true;
@@ -30323,6 +30732,11 @@ function makeCompCall(
 			maybeSingleRoot = callSiteOk;
 		}
 		const importedBinding = ctx.importedComponentBindings?.get(compName);
+		if (
+			!voidComponent &&
+			(ctx.privateCompiledContexts?.has(compName) || isPrivateSplitContextProvider(node, ctx))
+		)
+			voidComponent = true;
 		if (
 			!voidComponent &&
 			!ctx.hmr &&

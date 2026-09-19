@@ -1,5 +1,42 @@
 # Scoped signal graph experiment
 
+## Server component frame recipes
+
+`ssr-component-frames.test.mjs` compiles matched public keyed SSR workloads in
+development and production modes. An ordinary module keeps the nine-field frame;
+an opaque text/control module starts with its four lazy signal identity fields and
+an empty materialized-identity cache slot. The untimed observer counts subsequent recipe-field assignments, component
+frames, restore envelopes and cache-slot appends. These are source-work counts, not V8 heap bytes.
+
+Each observed build must match its clean build's HTML exactly. The controls check
+text and input values, reordered real-handle control identities after ordinary
+renders, deferred raw object-key coercion, nested rendering and static output. The
+observer restores an existing global property descriptor. This gate runs through
+`ci:workflow:test`; it does not establish a runtime CPU improvement or remove the
+per-component restore envelope.
+
+```bash
+node --test benchmarks/scoped-signals/ssr-component-frames.test.mjs
+```
+
+## Optional server list identity work
+
+The server-list case in `bundle-boundaries.test.mjs` compiles an opaque text and
+control consumer through the production SSR compiler. Across two orders of a
+100-row object-keyed list, ordinary scalar output must serialize no optional
+signal keys. Its actual-handle control must preserve distinct serialized control
+identities across both orders and exercise key serialization. Both lanes check
+the resulting text and input values.
+
+```bash
+node --test --test-name-pattern='ordinary server lists defer' benchmarks/scoped-signals/bundle-boundaries.test.mjs
+```
+
+This is a deterministic work guard, not a timing or heap claim. Potential list
+arms still allocate a persistent raw-key recipe; actual handles resolve and cache
+the original wire keys. The owning hydration regression also checks nested
+directive and mapped lists, adopted native controls, native edits and cleanup.
+
 ## Compiled native presentation channels
 
 `run-native-presentation.mjs` compiles the authored `native-presentation/View.tsrx`
@@ -38,9 +75,10 @@ filename; source drift during a run fails instead of publishing mixed evidence.
 
 ## Signal-valued DOM styles
 
-`run-dom-bindings.mjs` compiles and bundles two production components through the
-public entries. Both update two CSS properties and preserve a child node. One
-passes signal handles directly; the control samples them with `.get()` in setup.
+`run-dom-bindings.mjs` compiles and bundles three production components through the
+public entries. All update two CSS properties and preserve a child node. One
+passes signal handles directly; another samples them with `.get()` in setup.
+The plain-props lane uses numeric expressions in the same signal-capable module.
 Every sample checks the resulting CSS, host and child identity, and teardown.
 
 ```bash
@@ -49,9 +87,14 @@ BENCH_JSON=/private/tmp/signal-dom-bindings.json node benchmarks/scoped-signals/
 node benchmarks/scoped-signals/run-dom-bindings.mjs --quick --fault-component-read
 ```
 
-The ratio guard requires zero component-setup calls for direct signal updates;
+The ratio guards require zero component-setup calls for direct signal updates;
 the sampled control must execute setup for every update. The fault command
-deliberately adds component reads and must fail that guard. JSON records source,
+deliberately adds component reads and must fail. Plain fixed-property styles must
+allocate no native presentation blocks or run native style update bodies. A
+separate observed production bundle counts those sites after compilation; the
+direct-handle lane must exercise both observers. Its CSS and text must match the
+clean bundle, and both retain host/child identity and detach on unmount. Observed
+bundles do not contribute to bytes or timing. JSON records source,
 compiler-output, bundle and input hashes. Synchronous happy-dom timings are
 supplemental: they exclude browser layout/paint and have no hard speed threshold.
 
@@ -304,6 +347,22 @@ Preserve each report and rerun into a new filename after source changes instead
 of replacing the earlier measurement. The first recorded comparison is in
 `results/2026-08-27/bundles-preliminary.json` with its interpretation in the
 adjacent `bundles-preliminary.md`.
+
+The opaque-attribute work guard compiles the same consumer with one or 100
+attributes in TSX/TSRX and development/production modes. An observed build counts
+attribute helper and policy entries after compilation; its output, evaluation
+counts, host identity, input restoration, handle updates, and teardown must agree
+with an unobserved build. Repeated strictly equal defined scalar attributes retain
+the shared helper call and omit deeper policy/handle probes. Changed values,
+undefined, objects, functions, and handles exercise the binding path. NaN also
+re-enters conservatively. Bundle bytes use only the unobserved build. This guard
+measures deterministic work, not CPU time or browser layout, and its used-signal
+fixture does not establish a reduction in generic runtime bundle size.
+
+```bash
+node --test --test-name-pattern='repeated opaque primitive attributes' \
+  benchmarks/scoped-signals/bundle-boundaries.test.mjs
+```
 
 ## Retained asynchronous producers
 

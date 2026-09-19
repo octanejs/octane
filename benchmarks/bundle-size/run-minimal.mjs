@@ -13,6 +13,7 @@ import { octane } from 'octane/compiler/vite';
 import { build as buildVite } from 'vite';
 import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
+import { selectMinimalScenarios, verifyByteBudget } from './minimal-gates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(directory, '../..');
@@ -24,6 +25,7 @@ const existingScenarios = [
 	['cli-spa-starter', 'ts'],
 	['root-static-specialized', 'ts'],
 	['root-static', 'tsrx'],
+	['root-static-local', 'tsrx'],
 	['hooks-state', 'tsrx'],
 	['context', 'tsrx'],
 	['hydrate-root', 'tsrx'],
@@ -35,6 +37,17 @@ const existingScenarios = [
 	['binding-vanilla', 'ts'],
 	['binding-hooks', 'tsrx'],
 ];
+const signalFreeClientScenarios = new Set([
+	'cli-spa-starter',
+	'root-static-specialized',
+	'root-static',
+	'root-static-local',
+	'hooks-state',
+	'context',
+	'hydrate-root',
+	'deferred-hydration',
+	'suspense-transition',
+]);
 const bindingScenarios = [
 	{
 		id: 'binding-base-ui',
@@ -86,6 +99,12 @@ const scenarios = [
 		name: id,
 		extension,
 		bundler: 'vite',
+	})),
+	...['vite', 'esbuild'].map((bundler) => ({
+		id: 'behavior-root',
+		name: `behavior-root-${bundler}`,
+		extension: 'ts',
+		bundler,
 	})),
 	...bindingScenarios.flatMap((scenario) =>
 		['vite', 'esbuild'].map((bundler) => ({
@@ -187,6 +206,11 @@ assert.deepEqual(
 	'minimal-import budgets must cover every scenario exactly once',
 );
 
+const { selectedScenarios, enforceBudgets } = selectMinimalScenarios(
+	process.argv.slice(2),
+	scenarios,
+);
+
 const payload = { suite: 'bundle-reachability', iterations: 1, targets: [] };
 
 function cliStarterPlugin(entry) {
@@ -207,14 +231,13 @@ export function run(container) {
 	const page = container.querySelector('main.page');
 	const title = page?.querySelector('h1');
 	const quickStart = container.querySelector('a[href="https://octanejs.dev/docs/quick-start"]');
-	const scopedStyle = document.head.querySelector('style[data-octane]');
 	return {
 		page: page !== null,
 		title: title?.textContent,
 		quickStart: quickStart?.querySelector('.link-title')?.textContent,
 		quickStartHref: quickStart?.getAttribute('href'),
 		links: container.querySelectorAll('a').length,
-		styled: scopedStyle?.textContent?.includes('.page') ?? false,
+		styled: page !== null && getComputedStyle(page).display === 'flex',
 	};
 }
 `;
@@ -318,24 +341,44 @@ async function buildScenario(scenario, entry) {
 	const modules = Object.entries(chunk.modules)
 		.filter(([, module]) => !scenario.package || module.renderedLength > 0)
 		.map(([id]) => id);
+	const emittedModules = Object.entries(chunk.modules)
+		.filter(([, module]) => module.renderedLength > 0)
+		.map(([id]) => id);
 	const runtimeModule = modules.find((id) => id.endsWith('/packages/octane/src/runtime.ts'));
 	return {
 		code: chunk.code,
 		modules,
+		emittedModules,
 		runtimeExports: runtimeModule ? chunk.modules[runtimeModule].renderedExports : [],
 	};
 }
 
 try {
-	for (const scenario of scenarios) {
+	for (const scenario of selectedScenarios) {
 		const { id, name } = scenario;
 		const serverScenario = id.startsWith('server-');
 		const entry = path.join(fixtures, `${id}.${scenario.extension}`);
-		const { code, modules, runtimeExports } = await buildScenario(scenario, entry);
+		const {
+			code,
+			modules,
+			emittedModules = modules,
+			runtimeExports,
+		} = await buildScenario(scenario, entry);
 		for (const [label, pattern] of forbidden) {
 			if (serverScenario && label === 'server runtime') continue;
 			const leaked = modules.find((id) => pattern.test(id));
 			assert.equal(leaked, undefined, `${name}: ${label} reached the production bundle: ${leaked}`);
+		}
+		if (signalFreeClientScenarios.has(id)) {
+			assert.deepEqual(
+				emittedModules.filter((module) =>
+					/\/packages\/octane\/src\/signals\/transition-(?:candidate|action|coordinator)\.[jt]s$/.test(
+						module,
+					),
+				),
+				[],
+				`${name}: signal-free client retained the concrete native transition implementation`,
+			);
 		}
 		const hasRuntime = modules.some((module) => module.endsWith('/packages/octane/src/runtime.ts'));
 		const hasServerRuntime = modules.some((module) =>
@@ -352,16 +395,32 @@ try {
 					`${name}: unrelated DOM namespace tables reached isolated server helpers`,
 				);
 			}
-		} else if (id === 'capture-only' || id === 'binding-vanilla' || id === 'binding-floating-ui') {
+		} else if (
+			id === 'capture-only' ||
+			id === 'behavior-root' ||
+			id === 'binding-vanilla' ||
+			id === 'binding-floating-ui'
+		) {
 			assert.equal(hasRuntime, false, `${name}: unrelated client runtime reached isolated entry`);
 		} else if (id !== 'binding-motion' && id !== 'binding-aria') {
 			assert.equal(hasRuntime, true, `${name}: executable feature omitted the client runtime`);
 		}
-		if (id === 'root-static-specialized' || id === 'cli-spa-starter') {
+		if (id === 'behavior-root') {
+			assert.deepEqual(
+				modules.filter((id) => /\/packages\/octane\/src\/compiler\//.test(id)),
+				[],
+				`${name}: compiler reached the behavior-only production bundle`,
+			);
+		}
+		if (
+			id === 'root-static-specialized' ||
+			id === 'root-static-local' ||
+			id === 'cli-spa-starter'
+		) {
 			assert.equal(
 				runtimeExports.includes('__createVoidRoot'),
 				true,
-				`${name}: the disposable application root lost compiler specialization`,
+				`${name}: the compiled application root lost compiler specialization`,
 			);
 			assert.equal(
 				runtimeExports.includes('createRoot'),
@@ -405,19 +464,15 @@ try {
 			}).length,
 		};
 		const budget = budgets[name];
-		for (const metric of ['raw', 'gzip', 'brotli']) {
-			assert.equal(
-				Number.isSafeInteger(budget[metric]) && budget[metric] > 0,
-				true,
-				`${name}: invalid committed ${metric} byte budget`,
-			);
-		}
+		const budgetEnforced = enforceBudgets || id === 'behavior-root';
+		verifyByteBudget(name, measured, budget, budgetEnforced);
 		payload.targets.push({
 			name,
 			ops: Object.fromEntries(
 				Object.entries(measured).map(([metric, value]) => [metric, stat(value)]),
 			),
 			meta: {
+				budgetEnforced,
 				modules: modules.map((id) =>
 					id.startsWith(repository + path.sep) ? path.relative(repository, id) : id,
 				),

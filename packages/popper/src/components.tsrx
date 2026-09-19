@@ -30,11 +30,11 @@ export function Manager({ children }: ManagerProps): OctaneNode {
 	const handleSetReferenceNode = useCallback((node: Element | null) => {
 		if (!hasUnmounted.current) setReferenceNode(node);
 	}, []);
-	return <ManagerReferenceNodeContext.Provider value={referenceNode}>
-		<ManagerReferenceNodeSetterContext.Provider
+	return <ManagerReferenceNodeContext value={referenceNode}>
+		<ManagerReferenceNodeSetterContext
 			value={handleSetReferenceNode}
-		>{children}</ManagerReferenceNodeSetterContext.Provider>
-	</ManagerReferenceNodeContext.Provider>;
+		>{children}</ManagerReferenceNodeSetterContext>
+	</ManagerReferenceNodeContext>;
 }
 
 export function Reference({ children, innerRef }: ReferenceProps): OctaneNode {

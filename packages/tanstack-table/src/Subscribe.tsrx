@@ -1,6 +1,7 @@
 // Authored in .tsrx because it is a COMPONENT that calls a slot-keyed hook
 // (`useSelector`); the compiler assigns its call-site slot. The types live in
 // `./types` so the `.tsrx.d.ts` sidecar only restates the signature.
+import { isChildrenBlock } from 'octane';
 import { shallow, useSelector } from '@octanejs/tanstack-store';
 import type { SubscribeComponent, SubscribeProps } from './types';
 
@@ -19,7 +20,7 @@ function SubscribeImpl(props: SubscribeProps<any, any, any>) @{
 	);
 
 	<>
-		{typeof props.children === 'function'
+		{typeof props.children === 'function' && !isChildrenBlock(props.children)
 			? (props.children as (state: unknown) => unknown)(selected)
 			: props.children}
 	</>

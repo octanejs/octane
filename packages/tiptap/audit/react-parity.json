@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "0707bd97d6588d87733568b7d79c17f974585ace1ca97759aff98d4a6dec1116"
+      "lockfileSha256": "668143841492d0265af79fe1b718a7f90606eab9d79c2d8cf4d17f654f8f1641"
     }
   },
   "lanes": [
@@ -210,12 +210,12 @@
         {
           "path": "packages/tiptap/tests/_fixtures/custom-views-parity.tsrx",
           "role": "support",
-          "sha256": "2150de75b00deb207f1ac8270818c39852c4ba5ba1c10cc2cc87ec6cb496fde5"
+          "sha256": "31441271ee23c59643d6b0551d44482c9ee8606c79f0cbdc122a4e14ba275b4e"
         },
         {
           "path": "packages/tiptap/tests/_fixtures/custom-views-as-prop-parity.tsrx",
           "role": "support",
-          "sha256": "5be071a5b39421959ed575061639931631e39f5e8e08057e03ac02c7d5f06796"
+          "sha256": "c13782e4e1b10a9244bb476b8c84116c3a5e5186675d32e3c45ee052672ddba6"
         },
         {
           "path": "packages/tiptap/tests/differential/mark-view-portal-cleanup.test.ts",

@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "0707bd97d6588d87733568b7d79c17f974585ace1ca97759aff98d4a6dec1116"
+      "lockfileSha256": "668143841492d0265af79fe1b718a7f90606eab9d79c2d8cf4d17f654f8f1641"
     }
   },
   "lanes": [
@@ -67,7 +67,7 @@
         {
           "path": "packages/inertia/tests/_fixtures/page-provider.tsrx",
           "role": "support",
-          "sha256": "29f535ea46ee9bbdf505ecb9d712ed2181bf4f4eac651ad5ccbbd6d60f972c7f"
+          "sha256": "fca567e065736fe44b569756f5fcd64839ddd559e8774f896ab31773f523ed99"
         }
       ]
     },
@@ -95,7 +95,7 @@
         {
           "path": "packages/inertia/tests/_fixtures/use-page-diff.tsrx",
           "role": "support",
-          "sha256": "de7b09a8b39559d008db1ce44697754a4ab9c2ba40a6597ec0e09fc524cf5327"
+          "sha256": "da57c2aeb321365cb3f4f3c78e357b9b941ff35fc733608abdd9121d58552a98"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",

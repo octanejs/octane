@@ -28,6 +28,7 @@ export type DropZoneContext =
 	| null;
 
 export const dropZoneContext = createContext<DropZoneContext>(null);
+const DropZoneContextProvider = dropZoneContext;
 
 export type Preview =
 	| {
@@ -69,7 +70,7 @@ export const ZoneStoreContext = createContext<StoreApi<ZoneStore>>(
 export const ZoneStoreProvider = ({ children, store }: PropsWithChildren<{
 	store: StoreApi<ZoneStore>;
 }>) => {
-	return <ZoneStoreContext.Provider value={store}>{children}</ZoneStoreContext.Provider>;
+	return <ZoneStoreContext value={store}>{children}</ZoneStoreContext>;
 };
 
 export const DropZoneProvider = ({
@@ -96,6 +97,6 @@ export const DropZoneProvider = ({
 	}, [value]);
 
 	return <>
-		{memoValue && <dropZoneContext.Provider value={memoValue}>{children}</dropZoneContext.Provider>}
+		{memoValue && <DropZoneContextProvider value={memoValue}>{children}</DropZoneContextProvider>}
 	</>;
 };

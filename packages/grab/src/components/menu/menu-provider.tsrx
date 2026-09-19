@@ -7,4 +7,4 @@ interface MenuProviderProps {
 }
 
 export const MenuProvider: Component<MenuProviderProps> = (props) =>
-	<MenuContext.Provider value={props.store}>{props.children}</MenuContext.Provider>;
+	<MenuContext value={props.store}>{props.children}</MenuContext>;

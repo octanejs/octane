@@ -1,5 +1,45 @@
 # octane
 
+## 0.3.0
+
+### Minor Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+
+### Patch Changes
+
+- debd7df: Specialize nonescaping function-local const roots in production JavaScript and TypeScript entries when every render uses an imported compiled void component. Keep writable component exports on the generic rendering path so authored replacements can return ordinary renderable values.
+- 873f4d2: Move native signal transition coordination behind the signals model capability so ordinary client applications no longer retain its preparation, retry, and publication policy. Preserve signals imported after an async Action awaits and atomic updates to consumers that receive signal handles through props.
+
+  The model entry now retains this coordinator, increasing standalone signals and signal-using SSR bundle sizes.
+- 68a6690: Preserve explicit signal ownership when native event handlers are installed by components without signal bindings, including handlers adopted during hydration. Refresh ownership when bare or compiler-lifted handlers publish changed callbacks or captures, while keeping the committed authority if a suspended update is abandoned. Keep already queued native callbacks under their original authority when an earlier listener publishes a replacement. Avoid extra publication calls during ordinary mounting and updates that keep the same scope authority, and record rollback without per-handler undo closures.
+- c32e76b: Keep fixed scalar inline styles on their ordinary writers inside modules that use signals, while preserving reactive reads and native bindings for handles, spreads and accessors.
+- 14fd908: Allow text and attribute signal bindings to omit unused form-control writer and
+  hydration adoption policies from production bundles. Keep the compiler helper
+  ABI, scalar caches, live subscriptions, and native control behavior unchanged.
+- 893cc83: Specialize production function-local roots created or hydrated with stable same-module compiled void components when their complete lifetime uses only proven void bodies. Preserve generic roots for escaping roots, writable component bindings, unknown initial or later render targets, development and alternate renderer modes.
+
+## 0.2.16
+
+### Patch Changes
+
+- 2049fa7: Keep native-only DOM presentation initialization separate from control and grouped-projection capabilities, so initializer-only compiled views do not retain unrelated host-operation helpers. Preserve initialization order, early edits, and older mount/adoption capability overrides.
+- 80d5fb6: Preserve scoped CSS selectors in split Hydrate children when production builds compile mutable parser ASTs. Deferred and independent activation now inject the same scoped stylesheet that matches the server DOM.
+- 3814f71: Preserve control-flow guards when inferring hook dependencies. Property reads behind a condition, an early return, or exception handling inspect own data values without invoking getters during render. Accessors and inherited properties track their receiver, while stable own fields and callbacks retain precise dependencies across fresh props and store snapshots. Optional receivers and guarded getters therefore retain their authored behavior.
+- b519670: Resolve independent Hydrate captures by their lexical binding and reject aliases or wrappers of parent-owned hook state. Unrelated same-name locals no longer reject valid standalone data or hide invalid captures; nested independent extraction also plans module moves before manifests are available.
+- ac02371: Avoid activating document-wide signal ownership for opaque scalar bindings and preserve proven primitive values through extracted JSX fragments. Register model Action frames from the signal graph so applications without signals can omit that implementation, while retaining late-loaded signals and atomic native presentation.
+- 2049fa7: Expose `getLeadingHydrationListRange` from `octane/hydration` to resolve an owned
+  SSR host's leading list through canonical wrapper ranges while preserving its
+  binding receipt and rejecting incomplete or malformed boundaries.
+- 2049fa7: Diagnose reserved `on*` attributes in native binding views as unsupported attributes rather than event handlers. Keep native camelCase event recognition, explicit unbound ownership and inline-event attribute safeguards unchanged.
+- 2049fa7: Allow scalar native-parent hydration handoffs to retain independently owned `data-*`, `aria-*`, and `tabIndex` bindings alongside class and style. Keep opaque children and their controls outside the parent lease, preserve native attribute removal semantics, and retain the existing collision, cancellation, and host identity checks. Keep explicitly unbound lowercase native event handlers under normal renderer ownership.
+- 9b22cff: Keep explicit keys distinct from implicit positions and nested array paths in host-only children, preserving the correct input nodes and typed values when keyed children reorder.
+- 02e0946: Activate independent Hydrate widgets using load() when their server sidecars are registered, and resume pending activation after a paused document becomes active again. Preserve the existing server DOM when independent widgets activate beneath parents that return JSX. Preserve the enclosing component's parallel use() warm plan when compiling nested templates.
+- 358b5d4: Fix automatically inferred async creation dependencies to respect lexical scope and erased TypeScript syntax. Preserve safe evaluation of `typeof` guards and their value reads for absent globals, and refresh requests when callback parameter defaults reference changed outer values.
+- c988ad1: Preserve native Undo/Redo grouping when a writable textarea signal echoes an
+  accepted native edit. Different programmatic values still update the textarea's
+  reset baseline, and scalar or read-only values keep controlled-value mirroring.
+
 ## 0.2.15
 
 ### Patch Changes

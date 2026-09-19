@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, readdir, stat } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, stat, symlink, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
@@ -7,6 +8,7 @@ import { createEvidenceMatrix } from './evidence-lib.mjs';
 import {
 	acquireBatchLock,
 	createBatchManifest,
+	captureWorktreeBaseline,
 	detectWorktreeCollisions,
 	invalidateChangedEvidence,
 	releaseBatchLock,
@@ -343,4 +345,28 @@ describe('batch state', () => {
 		assert.ok((await readdir(directory)).some((file) => file.startsWith('.lock.stale.')));
 		await releaseBatchLock(replacement);
 	});
+});
+
+test('planned source baselines exclude installs and record symlinks without following them', async () => {
+	const root = await mkdtemp(path.join(tmpdir(), 'react-port-baseline-'));
+	execFileSync('git', ['init', '--quiet', root]);
+	await writeFile(path.join(root, '.gitignore'), 'node_modules/\n');
+	await mkdir(path.join(root, 'packages/fixture/src'), { recursive: true });
+	await mkdir(path.join(root, 'outside'), { recursive: true });
+	await writeFile(path.join(root, 'outside/foreign.ts'), 'foreign');
+	await writeFile(path.join(root, 'packages/fixture/src/index.ts'), 'export const value=1;');
+	await symlink('../../../outside', path.join(root, 'packages/fixture/src/link'));
+	await mkdir(path.join(root, 'packages/fixture/node_modules'));
+	await symlink('../../../outside', path.join(root, 'packages/fixture/node_modules/dependency'));
+	const baseline = captureWorktreeBaseline(root, ['packages/fixture']);
+	assert.equal(baseline['packages/fixture/src/link'], 'symlink:../../../outside');
+	assert.equal(baseline['packages/fixture/src/link/foreign.ts'], undefined);
+	assert.equal(baseline['packages/fixture/node_modules'], undefined);
+	assert.equal(baseline['packages/fixture/node_modules/dependency/foreign.ts'], undefined);
+	await writeFile(path.join(root, 'packages/fixture/src/index.ts'), 'export const value=2;');
+	const current = captureWorktreeBaseline(root, ['packages/fixture']);
+	assert.deepEqual(
+		detectWorktreeCollisions({ plannedPaths: Object.keys(baseline), baseline, current }),
+		['packages/fixture/src/index.ts'],
+	);
 });

@@ -141,7 +141,7 @@ export function SidebarProvider({
 	);
 
 	return createElement(
-		SidebarContext.Provider,
+		SidebarContext,
 		{ value: contextValue },
 		createElement(
 			'div',

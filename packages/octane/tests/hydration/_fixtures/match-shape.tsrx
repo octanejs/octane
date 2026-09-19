@@ -21,7 +21,7 @@ export interface ResetStore {
 	get: () => number;
 }
 
-const matchContext = createContext<string | undefined>(undefined);
+const MatchContext = createContext<string | undefined>(undefined);
 
 function SafeFragment(props: any) @{
 	<>
@@ -87,7 +87,7 @@ export function MatchShape(props: {
 	const ShellComponent = SafeFragment;
 
 	<ShellComponent>
-		<matchContext.Provider value="match-id">
+		<MatchContext value="match-id">
 			<SuspenseWrap fallback={null}>
 				<CatchWrap getResetKey={() => resetKey} onCatch={() => undefined}>
 					<NotFoundWrap
@@ -103,7 +103,7 @@ export function MatchShape(props: {
 					</NotFoundWrap>
 				</CatchWrap>
 			</SuspenseWrap>
-		</matchContext.Provider>
+		</MatchContext>
 	</ShellComponent>
 }
 
@@ -165,7 +165,7 @@ function StartMatch(props: StartShapeProps) @{
 	const ShellComponent = RootShell;
 
 	<ShellComponent isServer={props.isServer}>
-		<matchContext.Provider value="match-id">
+		<MatchContext value="match-id">
 			<SuspenseWrap fallback={null}>
 				<CatchWrap getResetKey={() => resetKey} onCatch={() => undefined}>
 					<NotFoundWrap
@@ -181,7 +181,7 @@ function StartMatch(props: StartShapeProps) @{
 					</NotFoundWrap>
 				</CatchWrap>
 			</SuspenseWrap>
-		</matchContext.Provider>
+		</MatchContext>
 	</ShellComponent>
 }
 
@@ -195,13 +195,13 @@ function StartMatchesInner(props: StartShapeProps) @{
 	);
 	const CatchWrap = CatchBoundary;
 
-	<matchContext.Provider value="root-match-id">
+	<MatchContext value="root-match-id">
 		<CatchWrap getResetKey={() => resetKey} onCatch={() => undefined}>
 			@if (true) {
 				<StartMatch {...props} />
 			}
 		</CatchWrap>
-	</matchContext.Provider>
+	</MatchContext>
 }
 
 // Matches analog: InnerWrap passthrough + the always-present root Suspense.

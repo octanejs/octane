@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -10,8 +11,15 @@ import { build } from 'esbuild';
 import { Window } from 'happy-dom';
 import { compile } from '../../packages/octane/src/compiler/compile.js';
 import { slotHooks } from '../../packages/octane/src/compiler/slot-hooks.js';
+import { findPrivateCompiledContexts } from '../../packages/octane/src/compiler/private-context.js';
+import {
+	createOctaneCompiler,
+	findVoidRootImports,
+} from '../../packages/octane/src/compiler/bundler.js';
 import { knownAttributeSpreads } from '../../packages/stylex/src/compiler-contract.js';
+import { verifyScenario } from '../bundle-size/verify-reachability.mjs';
 import { generateStylexCSS, transformStylex } from '../../packages/stylex/src/transform.js';
+import { measureOpaqueAttributes } from './opaque-attributes.mjs';
 import {
 	BUNDLE_CASES,
 	baselineUnavailableReason,
@@ -21,11 +29,192 @@ import {
 	verifyTransitionBoundary,
 } from './bundle-boundaries.mjs';
 
+test('opaque scalar rows do not activate signal owner allocations', async (t) => {
+	const directory = path.resolve('packages/octane');
+	const app = `import {createRoot, flushSync} from 'octane';
+function Row(props) @{
+ <article data-row={props.item.id}><span title={props.item.label}>{props.item.label as string}</span><input /></article>
+}
+function List(props) @{
+ <main>@for (const item of props.items; key item.id) { <Row item={item} /> }</main>
+}
+export function mount(parent, items) {
+ const root = createRoot(parent); root.render(List, {items});
+ return {update(items) { flushSync(() => root.render(List, {items})); }, dispose() {root.unmount();}};
+}`;
+	const contents = compile(app, path.join(directory, 'SignalFreeOwners.tsrx'), {
+		mode: 'client',
+		dev: false,
+		hmr: false,
+	}).code;
+	const bundle = await build({
+		stdin: { contents, resolveDir: directory },
+		bundle: true,
+		write: false,
+		minify: true,
+		format: 'esm',
+		platform: 'browser',
+		target: 'es2022',
+		legalComments: 'none',
+		tsconfigRaw: { compilerOptions: {} },
+		define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+	});
+	const window = new Window();
+	const globals = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+	const api = await import(
+		'data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64')
+	);
+	const host = window.document.createElement('div');
+	window.document.body.append(host);
+	const items = Array.from({ length: 100 }, (_, i) => ({ id: String(i), label: 'Row ' + i }));
+	const stringify = JSON.stringify;
+	const freeze = Object.freeze;
+	let serializedIdentities = 0;
+	let frozenOwners = 0;
+	// Count the public renderer-owner shape without changing framework source.
+	// Serialization is observed only during this compiled scalar view's work.
+	JSON.stringify = function (...args) {
+		serializedIdentities++;
+		return Reflect.apply(stringify, this, args);
+	};
+	Object.freeze = function (value) {
+		if (value && typeof value === 'object' && 'documentOwner' in value && 'instanceKey' in value)
+			frozenOwners++;
+		return freeze(value);
+	};
+	let root;
+	try {
+		root = api.mount(host, items);
+		assert.equal(host.querySelectorAll('article').length, items.length);
+		const first = host.querySelector('article[data-row="0"]');
+		const input = first.querySelector('input');
+		input.value = 'typed before reorder';
+		for (let i = 0; i < 4; i++) {
+			const updated = items.map((item) => ({ ...item, label: 'Update ' + i + ' ' + item.id }));
+			root.update(i % 2 === 0 ? updated.toReversed() : updated);
+			assert.equal(host.querySelector('article[data-row="0"]'), first);
+			assert.equal(first.querySelector('input'), input);
+			assert.equal(input.value, 'typed before reorder');
+			assert.equal(first.querySelector('span').title, 'Update ' + i + ' 0');
+			assert.equal(first.querySelector('span').textContent, 'Update ' + i + ' 0');
+		}
+		root.dispose();
+		root = undefined;
+		assert.equal(host.childNodes.length, 0);
+	} finally {
+		JSON.stringify = stringify;
+		Object.freeze = freeze;
+		root?.dispose();
+		host.remove();
+	}
+	assert.equal(frozenOwners, 0, 'Scalar values must not allocate renderer signal owners.');
+	assert.equal(serializedIdentities, 0, 'Scalar values must not serialize signal instance paths.');
+});
+
 const scenario = (id) => BUNDLE_CASES.find((entry) => entry.id === id);
 const source = (name) => ({ path: `packages/octane/src/${name}` });
 const alien = (version = '3.2.0') => ({
 	path: 'node_modules/alien-signals/esm/system.mjs',
 	package: { name: 'alien-signals', version },
+});
+
+test('ordinary server lists defer key serialization until a real handle is read', async (t) => {
+	const directory = path.resolve('packages/octane');
+	const app = `function Row(props) @{
+ const value = props.produce(props.item.label);
+ <section><output>{value as string}</output><input value={value}/></section>
+}
+function List(props) @{
+ <main>@for (const item of props.items; key item.key) { <Row item={item} produce={props.produce}/> }</main>
+}
+export function render(items, produce) { return renderToString(List, {items, produce}); }
+import {renderToString} from 'octane/server';`;
+	const contents = compile(app, path.join(directory, 'KeyedServerOutput.tsrx'), {
+		mode: 'server',
+		dev: false,
+		hmr: false,
+	}).code;
+	const bundle = await build({
+		stdin: {
+			contents: contents + '\nexport {__signalAt} from "octane/signals";',
+			resolveDir: directory,
+		},
+		bundle: true,
+		write: false,
+		minify: true,
+		format: 'esm',
+		platform: 'node',
+		target: 'es2022',
+		legalComments: 'none',
+		tsconfigRaw: { compilerOptions: {} },
+		define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+	});
+	const api = await import(
+		'data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64')
+	);
+	let coercions = 0;
+	const items = Array.from({ length: 100 }, (_, index) => ({
+		label: 'Row ' + index,
+		key: {
+			[Symbol.toPrimitive]() {
+				coercions++;
+				return 'key ' + index;
+			},
+		},
+	}));
+	const window = new Window();
+	t.after(() => window.close());
+	const fragment = window.document.createElement('template');
+	for (const rows of [items, items.toReversed()]) {
+		const scalar = api.render(rows, (label) => label);
+		fragment.innerHTML = scalar.html;
+		assert.deepEqual(
+			[...fragment.content.querySelectorAll('output')].map((node) => node.textContent),
+			rows.map((item) => item.label),
+		);
+		assert.deepEqual(
+			[...fragment.content.querySelectorAll('input')].map((node) => node.value),
+			rows.map((item) => item.label),
+		);
+		assert.equal(scalar.signals, undefined);
+	}
+	assert.equal(coercions, 0, 'Ordinary rows must not serialize optional signal list identities.');
+	let previousIdentities;
+	for (const rows of [items, items.toReversed()]) {
+		const used = api.render(rows, (label) => api.__signalAt('i:keyed-server-output', label));
+		fragment.innerHTML = used.html;
+		const controls = [...fragment.content.querySelectorAll('input')];
+		assert.deepEqual(
+			controls.map((node) => node.value),
+			rows.map((item) => item.label),
+		);
+		const identities = controls.map((node) => node.getAttribute('data-octane-signal-control'));
+		assert.ok(identities.every((identity) => identity !== null));
+		assert.equal(new Set(identities).size, items.length);
+		const byLabel = Object.fromEntries(
+			controls.map((node, index) => [node.value, identities[index]]),
+		);
+		if (previousIdentities) assert.deepEqual(byLabel, previousIdentities);
+		previousIdentities = byLabel;
+	}
+	assert.ok(coercions > 0, 'The actual-handle control must exercise identity serialization.');
+	t.diagnostic(
+		JSON.stringify({ scalarRows: 200, scalarKeyCoercions: 0, usedKeyCoercions: coercions }),
+	);
 });
 
 test('entry fixtures retain precisely the named public functions', () => {
@@ -96,6 +285,153 @@ test('ordinary entries allow protocol seams but reject both scoped and raw engin
 			verifyBundleInputs(scenario('ordinary-client'), [...ordinary, source('signals/engine.ts')]),
 		/ordinary imports reached the scoped engine/,
 	);
+});
+
+test('ordinary client roots tree-shake native transitions and require emitted-byte evidence', () => {
+	const ordinary = [source('runtime.ts'), source('signals/read-protocol.ts')];
+	verifyTransitionBoundary(scenario('ordinary-client'), ordinary);
+	for (const name of [
+		'signals/transition-candidate.ts',
+		'signals/transition-action.ts',
+		'signals/transition-coordinator.ts',
+	]) {
+		verifyTransitionBoundary(scenario('ordinary-client'), [
+			...ordinary,
+			{ ...source(name), bytesInOutput: 0 },
+		]);
+		assert.throws(
+			() =>
+				verifyTransitionBoundary(scenario('ordinary-client'), [
+					...ordinary,
+					{ ...source(name), bytesInOutput: 1 },
+				]),
+			/ordinary client retained transition orchestration/,
+		);
+		assert.throws(
+			() => verifyTransitionBoundary(scenario('ordinary-client'), [...ordinary, source(name)]),
+			/missing emitted-byte evidence/,
+		);
+	}
+});
+
+test('production public roots omit concrete native transitions while native reads retain them', async (t) => {
+	const bundle = async (id) => {
+		const entry = scenario(id);
+		const directory = path.resolve('packages/octane');
+		const native = `import {createRoot, startTransition} from 'octane';
+import {useSignal$} from 'octane/signals/client';
+function View() @{
+ const count$ = useSignal$(0);
+ <button onClick={() => startTransition(() => count$.set(count$.get() + 1))}>
+  {String(count$.get()) as string}
+ </button>
+}
+export function mount(parent) { const root = createRoot(parent); root.render(View); return root; }`;
+		const contents =
+			id === 'native-client'
+				? compile(native, path.join(directory, 'NativeTransitionControl.tsrx'), {
+						mode: 'client',
+						dev: false,
+						hmr: false,
+						nativeReads: true,
+					}).code
+				: entrySource(entry);
+		const result = await build({
+			stdin: { contents, resolveDir: directory },
+			bundle: true,
+			write: false,
+			minify: true,
+			metafile: true,
+			format: 'esm',
+			platform: 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+		});
+		const outputs = Object.values(result.metafile.outputs);
+		assert.equal(outputs.length, 1, `${id}: expected one production bundle`);
+		const inputs = Object.keys(result.metafile.inputs).map((name) => ({
+			path: path.resolve(name),
+			bytesInOutput: outputs[0].inputs[name]?.bytesInOutput ?? 0,
+			package: /\/node_modules\/alien-signals\//.test(name)
+				? { name: 'alien-signals' }
+				: /\/node_modules\/react(?:-dom)?\//.test(name)
+					? { name: 'react' }
+					: undefined,
+		}));
+		return { inputs, code: result.outputFiles[0].text };
+	};
+	const [ordinary, engine, native] = await Promise.all([
+		bundle('ordinary-client'),
+		bundle('engine'),
+		bundle('native-client'),
+	]);
+	assert.ok(
+		ordinary.inputs.some(
+			(input) => input.path.endsWith('/src/runtime.ts') && input.bytesInOutput > 0,
+		),
+		'The public createRoot control must retain its actual renderer.',
+	);
+	assert.match(ordinary.code, /createRoot/);
+	verifyBundleInputs(scenario('ordinary-client'), ordinary.inputs);
+	assert.ok(
+		engine.inputs.some(
+			(input) => input.path.endsWith('/src/signals/graph.ts') && input.bytesInOutput > 0,
+		),
+		'The independent engine control must retain its actual graph.',
+	);
+	verifyTransitionBoundary(scenario('engine'), engine.inputs);
+	assert.ok(
+		native.inputs.some(
+			(input) =>
+				input.path.endsWith('/src/signals/transition-candidate.ts') && input.bytesInOutput > 0,
+		),
+		'The compiled native-read control must retain the concrete transition implementation.',
+	);
+	assert.ok(
+		native.inputs.some(
+			(input) =>
+				input.path.endsWith('/src/signals/transition-coordinator.ts') && input.bytesInOutput > 0,
+		),
+		'The compiled signal Action control must retain its transition coordinator.',
+	);
+	const window = new Window();
+	const globals = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+	const api = await import(
+		'data:text/javascript;base64,' + Buffer.from(native.code).toString('base64')
+	);
+	const host = window.document.createElement('div');
+	window.document.body.append(host);
+	const root = api.mount(host);
+	try {
+		const button = host.querySelector('button');
+		assert.equal(button.textContent, '0');
+		button.click();
+		const deadline = performance.now() + 2_000;
+		while (button.textContent !== '1' && performance.now() < deadline)
+			await new Promise((resolve) => setTimeout(resolve, 1));
+		assert.equal(host.querySelector('button'), button);
+		assert.equal(button.textContent, '1');
+	} finally {
+		root.unmount();
+		host.remove();
+	}
+	verifyTransitionBoundary(scenario('ordinary-client'), ordinary.inputs);
 });
 
 for (const id of ['ordinary-client', 'ordinary-server']) {
@@ -1343,5 +1679,903 @@ export function mount(parent, source) { return mountBindings({parent}, SharedRec
 	]) {
 		const results = lanes.map((lane) => lane.update(props));
 		for (const result of results.slice(1)) assert.deepEqual(result, results[0]);
+	}
+});
+
+test('extracted primitive values omit signal binding work without trusting casts or opaque results', (t) => {
+	const cases = [
+		{ expression: 'String(props.value)', primitive: true },
+		{ expression: 'Number(props.value)', primitive: true },
+		{ expression: 'BigInt(props.value)', primitive: true },
+		{ expression: 'Date()', primitive: true },
+		{ expression: '`value:${props.value}`', primitive: true },
+		{ expression: 'typeof props.value', primitive: true },
+		{ expression: 'props.value + 1', primitive: true },
+		{ expression: '!props.value', primitive: true },
+		{ expression: 'props.value++', primitive: true },
+		{ expression: 'props.active ? String(props.value) : "fallback"', primitive: true },
+		{ expression: 'String(props.left) || String(props.right)', primitive: true },
+		{ expression: '(props.touch(), typeof props.value)', primitive: true },
+		{ expression: 'props.value = String(props.other)', primitive: true },
+		{ expression: 'props.value += props.other', primitive: true },
+		{ expression: 'props.value as string', primitive: false },
+		{ expression: 'props.value!', primitive: false },
+		{ expression: 'props.value', primitive: false },
+		{ expression: 'props.read()', primitive: false },
+		{ expression: 'props.api.get()', primitive: false },
+		{ expression: 'props.active ? String(props.value) : props.other', primitive: false },
+		{ expression: 'String(props.left) || props.right', primitive: false },
+		{ expression: 'props.value ||= props.other', primitive: false },
+		{
+			prefix: 'function String(value) { return value; }',
+			expression: 'String(props.value)',
+			primitive: false,
+		},
+		{
+			prefix: 'globalThis.String = (value) => value;',
+			expression: 'String(props.value)',
+			primitive: false,
+		},
+		{
+			prefix: "import { passThrough } from './value-barrel';",
+			expression: 'passThrough(props.value)',
+			primitive: false,
+		},
+	];
+	let checked = 0;
+	for (const extension of ['tsx', 'tsrx'])
+		for (const dev of [false, true])
+			for (const { expression, prefix = '', primitive } of cases) {
+				const source = `${prefix}
+export function App(props) {
+					return <span title={${expression}}>{${expression} as string}</span>;
+				}`;
+				const { code } = compile(source, `/project/primitive-binding.${extension}`, {
+					mode: 'client',
+					dev,
+					hmr: false,
+				});
+				// This is a compiler-cost guard: behavior is covered by public hydration
+				// and late writable-prop tests. Count the emitted runtime capabilities,
+				// rather than treating smaller fixture bytes as a speed measurement.
+				const bindings = [...code.matchAll(/\bbindSignal\w*\s+as\b/g)];
+				const description = `${extension}, ${dev ? 'dev' : 'prod'}: ${prefix} ${expression}`;
+				if (primitive) assert.equal(bindings.length, 0, description);
+				else assert.ok(bindings.length > 0, description);
+				checked++;
+			}
+	t.diagnostic(`${checked} fixed-source primitive and opaque compiler controls`);
+});
+
+test('text and attribute bindings omit unselected control writer policies', async (t) => {
+	const source = path.resolve('packages/octane/src');
+	const alias = {
+		'octane/internal/client': path.join(source, 'internal/client.ts'),
+		'octane/signals': path.join(source, 'signals/index.ts'),
+		octane: path.join(source, 'index.ts'),
+	};
+	const bundle = async (contents) => {
+		const result = await build({
+			stdin: { contents, resolveDir: path.dirname(source) },
+			bundle: true,
+			write: false,
+			minify: true,
+			format: 'esm',
+			platform: 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			alias,
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+		});
+		return result.outputFiles[0].text;
+	};
+	// Compare actual compiled consumers in one pipeline. Both retain the same
+	// model scope and updates; only the selected host channels differ.
+
+	const app = `import {createRoot,flushSync} from 'octane';
+import {createScope} from 'octane/signals';
+function View(props) @{
+ <section title={props.label}><p>{props.label as string}</p><input value={props.label} /><input type="checkbox" checked={props.checked} /><select value={props.selected}><option value="a">A</option><option value="b">B</option></select><textarea value={props.label} /></section>
+}
+export function mount(parent) {
+ const scope=createScope({scopeKey:'writer-control'});
+ const label$=scope.signal$('label','initial'), checked$=scope.signal$('checked',false), selected$=scope.signal$('selected','a');
+ const root=createRoot(parent);root.render(View,{label:label$,checked:checked$,selected:selected$});
+ return {update(){flushSync(()=>scope.batch(()=>{scope.set(label$,'updated');scope.set(checked$,true);scope.set(selected$,'b');}));},dispose(){root.unmount();scope.dispose();}};
+}`;
+	const buildConsumer = async (authored) =>
+		bundle(
+			compile(authored, path.join(source, 'writer-control.tsrx'), {
+				mode: 'client',
+				dev: false,
+				hmr: false,
+			}).code,
+		);
+	const plain = app.replace(
+		'<input value={props.label} /><input type="checkbox" checked={props.checked} /><select value={props.selected}><option value="a">A</option><option value="b">B</option></select><textarea value={props.label} />',
+		'',
+	);
+	assert.notEqual(plain, app);
+	const plainCode = await buildConsumer(plain);
+	const code = await buildConsumer(app);
+	const plainBytes = gzipSync(plainCode, { level: 9 }).length;
+	const controlsBytes = gzipSync(code, { level: 9 }).length;
+	t.diagnostic(`compiled plain/control closure gzip: ${plainBytes}/${controlsBytes}`);
+	assert.ok(plainBytes + 1000 <= controlsBytes, 'Unselected controls must be removable.');
+	const window = new Window();
+	const globals = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+	const plainApi = await import(
+		'data:text/javascript;base64,' + Buffer.from(plainCode).toString('base64')
+	);
+	const plainHost = window.document.createElement('div');
+	window.document.body.append(plainHost);
+	const plainMounted = plainApi.mount(plainHost);
+	try {
+		const paragraph = plainHost.querySelector('p');
+		const text = paragraph.firstChild;
+		assert.equal(paragraph.textContent, 'initial');
+		plainMounted.update();
+		assert.equal(plainHost.querySelector('p'), paragraph);
+		assert.equal(paragraph.firstChild, text);
+		assert.equal(paragraph.textContent, 'updated');
+		assert.equal(plainHost.querySelector('section').title, 'updated');
+	} finally {
+		plainMounted.dispose();
+		plainHost.remove();
+	}
+	assert.equal(plainHost.childNodes.length, 0);
+	const api = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+	const host = window.document.createElement('div');
+	window.document.body.append(host);
+	const mounted = api.mount(host);
+	try {
+		const paragraph = host.querySelector('p');
+		const textNode = paragraph.firstChild;
+		assert.equal(paragraph.textContent, 'initial');
+		mounted.update();
+		assert.equal(host.querySelector('p'), paragraph);
+		assert.equal(paragraph.firstChild, textNode);
+		assert.equal(paragraph.textContent, 'updated');
+		assert.equal(host.querySelector('section').title, 'updated');
+		assert.equal(host.querySelector('input').value, 'updated');
+		assert.equal(host.querySelector('[type="checkbox"]').checked, true);
+		assert.equal(host.querySelector('select').value, 'b');
+		assert.equal(host.querySelector('textarea').value, 'updated');
+	} finally {
+		mounted.dispose();
+		host.remove();
+	}
+	assert.equal(host.childNodes.length, 0);
+});
+
+test('local void root specialization needs every lexical use and the loaded export contract', async (t) => {
+	const directory = path.resolve('packages/octane');
+	const id = path.join(directory, 'LocalRoot.ts');
+	const compiler = createOctaneCompiler({ root: directory, dev: false, hmr: false });
+	const component = compiler.transform(
+		'export default function View() @{ <main>Octane</main> }',
+		path.join(directory, 'LocalView.tsrx'),
+		{ collectVoidComponentExports: true },
+	);
+	assert.ok(component);
+	assert.deepEqual(component.voidComponentExports, ['default']);
+	const imports =
+		"import {createRoot} from 'octane'; import View from './LocalView.tsrx'; import Other from './Other.tsrx';\n";
+	const proves = (request, imported) =>
+		request === './LocalView.tsrx' && component.voidComponentExports.includes(imported);
+	const sources = [
+		[
+			'local',
+			'export function run(el) { const root=createRoot(el); root.render(View); root.unmount(); }',
+			true,
+		],
+		[
+			'repeated void render',
+			'export function run(el) { const root=createRoot(el); root.render(View); root.render(View, {}); root.unmount(); }',
+			true,
+		],
+		[
+			'unrelated root shadow',
+			'export function run(el) { const root=createRoot(el); root.render(View); root.unmount(); } function unrelated(root) { root.render(Other); }',
+			true,
+		],
+		[
+			'function expression',
+			'export const run=function(el) { const root=createRoot(el); root.render(View); root.unmount(); };',
+			true,
+		],
+		[
+			'block arrow',
+			'export const run=el=>{ const root=createRoot(el); root.render(View); root.unmount(); };',
+			true,
+		],
+		[
+			'concise arrow with private function',
+			'export const run=el=>(()=>{ const root=createRoot(el); root.render(View); root.unmount(); })();',
+			true,
+		],
+		[
+			'namespace exported root',
+			'namespace N { export const root=createRoot(document.body); root.render(View); } export function run() { N.root.render("ordinary"); }',
+			false,
+		],
+		[
+			'merged namespace exported root',
+			'namespace N { export const root=createRoot(document.body); root.render(View); } namespace N { export function replace() { N.root.render("ordinary"); } }',
+			false,
+		],
+		[
+			'namespace private function',
+			'namespace N { export function run(el) { const root=createRoot(el); root.render(View); root.unmount(); } }',
+			true,
+		],
+		[
+			'module static block',
+			'class N { static { const root=createRoot(document.body); root.render(View); root.unmount(); } }',
+			false,
+		],
+		[
+			'function static block',
+			'export function run(el) { class N { static { const root=createRoot(el); root.render(View); root.unmount(); } } }',
+			false,
+		],
+		['exported root', 'export const root=createRoot(document.body); root.render(View);', false],
+		[
+			'returned root',
+			'export function run(el) { const root=createRoot(el); root.render(View); return root; }',
+			false,
+		],
+		[
+			'alias',
+			'export function run(el) { const root=createRoot(el); root.render(View); const alias=root; }',
+			false,
+		],
+		[
+			'object escape',
+			'export function run(el) { const root=createRoot(el); root.render(View); return {root}; }',
+			false,
+		],
+		[
+			'callback escape',
+			'export function run(el) { const root=createRoot(el); root.render(View); return () => root.render(View); }',
+			false,
+		],
+		[
+			'argument escape',
+			'export function run(el) { const root=createRoot(el); root.render(View); consume(root); }',
+			false,
+		],
+		[
+			'method extraction',
+			'export function run(el) { const root=createRoot(el); root.render(View); return root.render; }',
+			false,
+		],
+		[
+			'computed render',
+			'export function run(el) { const root=createRoot(el); root["render"](View); }',
+			false,
+		],
+		[
+			'optional render',
+			'export function run(el) { const root=createRoot(el); root.render?.(View); }',
+			false,
+		],
+		[
+			'unknown render target',
+			'export function run(el) { const root=createRoot(el); root.render(View); root.render(Other); }',
+			false,
+		],
+		[
+			'dynamic render target',
+			'export function run(el, Component) { const root=createRoot(el); root.render(View); root.render(Component); }',
+			false,
+		],
+		[
+			'renderable text',
+			'export function run(el) { const root=createRoot(el); root.render(View); root.render("text"); }',
+			false,
+		],
+		[
+			'factory shadow',
+			'export function run(el, createRoot) { const root=createRoot(el); root.render(View); }',
+			false,
+		],
+		[
+			'component shadow',
+			'export function run(el, View) { const root=createRoot(el); root.render(View); }',
+			false,
+		],
+		[
+			'hoisted factory shadow',
+			'export function run(el) { const root=createRoot(el); root.render(View); var createRoot; }',
+			false,
+		],
+		[
+			'TDZ component shadow',
+			'export function run(el) { const root=createRoot(el); root.render(View); let View; }',
+			false,
+		],
+		[
+			'block escape',
+			'export function run(el) { const root=createRoot(el); root.render(View); { consume(root); } }',
+			false,
+		],
+		[
+			'catch escape',
+			'export function run(el) { const root=createRoot(el); root.render(View); try {} catch (error) { consume(root); } }',
+			false,
+		],
+		[
+			'class field escape',
+			'export function run(el) { const root=createRoot(el); root.render(View); return class { field = root; }; }',
+			false,
+		],
+		[
+			'direct eval',
+			'export function run(el) { const root=createRoot(el); root.render(View); eval("root.render(\\\"text\\\")"); }',
+			false,
+		],
+		[
+			'typed direct eval',
+			'export function run(el) { const root=createRoot(el); root.render(View); (eval as Function)("root.render(\\\"text\\\")"); }',
+			false,
+		],
+	];
+	let checked = 0;
+	for (const extension of ['ts', 'js'])
+		for (const [label, body, eligible] of sources) {
+			if (extension === 'js' && label.includes('namespace')) continue;
+			const source = imports + body;
+			const output = slotHooks(source, id.replace(/ts$/, extension), {
+				dev: false,
+				hmr: false,
+				isVoidComponentImport: proves,
+			});
+			assert.equal(
+				output?.code.includes('__createVoidRoot') === true,
+				eligible,
+				`${extension}: ${label}`,
+			);
+			if (eligible)
+				assert.deepEqual(findVoidRootImports(source, id), [
+					{ request: './LocalView.tsrx', imported: 'default' },
+				]);
+			for (const options of [
+				{ hmr: 'vite' },
+				{ hmr: 'webpack' },
+				{ profile: true },
+				{ dev: true },
+			]) {
+				const transformed = compiler.transform(source, id, {
+					isVoidComponentImport: proves,
+					...options,
+				});
+				assert.equal(
+					transformed?.code.includes('__createVoidRoot') === true,
+					false,
+					`${label}: ${JSON.stringify(options)}`,
+				);
+			}
+			checked++;
+		}
+
+	// JSX entries use the full compiler, so they remain a generic-root control.
+	for (const [label, body] of sources) {
+		const transformed = compiler.transform(imports + body, id.replace(/ts$/, 'tsx'), {
+			isVoidComponentImport: proves,
+		});
+		assert.equal(
+			transformed?.code.includes('__createVoidRoot') === true,
+			false,
+			`full JSX compiler: ${label}`,
+		);
+		checked++;
+	}
+
+	const entry =
+		imports +
+		`export function run(host) { const root=createRoot(host); root.render(View); const text=host.textContent; root.unmount(); return {text,cleaned:host.childNodes.length===0}; }`;
+	const window = new Window();
+	const previous = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		previous.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of previous)
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		window.close();
+	});
+	const bytes = [];
+	for (const specialize of [false, true]) {
+		const transformed = compiler.transform(entry, id, {
+			isVoidComponentImport: specialize ? proves : () => false,
+		});
+		const bundled = await build({
+			stdin: { contents: transformed.code, resolveDir: directory },
+			bundle: true,
+			write: false,
+			minify: true,
+			format: 'esm',
+			platform: 'browser',
+			target: 'esnext',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			plugins: [
+				{
+					name: 'loaded-compiled-contract',
+					setup(plugin) {
+						plugin.onResolve({ filter: /^\.\/(?:LocalView|Other)\.tsrx$/ }, () => ({
+							path: 'view',
+							namespace: 'local-void-view',
+						}));
+						plugin.onLoad({ filter: /.*/, namespace: 'local-void-view' }, () => ({
+							contents: component.code,
+							loader: 'js',
+							resolveDir: directory,
+						}));
+					},
+				},
+			],
+		});
+		const code = bundled.outputFiles[0].text;
+		const api = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+		const host = window.document.createElement('div');
+		window.document.body.append(host);
+		assert.deepEqual(api.run(host), { text: 'Octane', cleaned: true });
+		host.remove();
+		bytes.push(gzipSync(code, { level: 9 }).length);
+	}
+	assert.ok(
+		bytes[1] <= bytes[0] * 0.6,
+		`Loaded local void root must delete the generic return graph: ${bytes.join(' -> ')} gzip`,
+	);
+	t.diagnostic(
+		`${checked} lexical/escape controls; actual compiled contract generic ${bytes[0]} -> local ${bytes[1]} gzip with matching text and cleanup`,
+	);
+});
+
+test('same-file void roots remove returned-value machinery while preserving stock consumers', async (t) => {
+	for (const id of ['root-static-local', 'hooks-state', 'hydrate-root']) {
+		const filename = path.resolve(`benchmarks/bundle-size/fixtures/minimal/${id}.tsrx`);
+		const authored = await readFile(filename, 'utf8');
+		const sizes = [];
+		for (const opaque of [false, true]) {
+			// The sequence expression intentionally declines exact-factory proof.
+			// Both programs execute the same public createRoot/render/unmount ABI.
+			const source = opaque
+				? id === 'hydrate-root'
+					? authored.replace('hydrateRoot(container,', '(0, hydrateRoot)(container,')
+					: authored.replace('createRoot(container)', '(0, createRoot)(container)')
+				: authored;
+			assert.notEqual(source, opaque ? authored : '', `${id}: matched generic control`);
+			const compiled = compile(source, filename, { mode: 'client', dev: false, hmr: false }).code;
+			const result = await build({
+				stdin: { contents: compiled, resolveDir: path.resolve('packages/octane'), loader: 'js' },
+				bundle: true,
+				write: false,
+				minify: true,
+				format: 'iife',
+				globalName: '__OCTANE_REACHABILITY__',
+				platform: 'browser',
+				target: 'esnext',
+				legalComments: 'none',
+				tsconfigRaw: { compilerOptions: {} },
+				define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			});
+			const code = result.outputFiles[0].text;
+			await verifyScenario(id, code);
+			sizes.push(gzipSync(code, { level: 9 }).length);
+		}
+		assert.ok(
+			sizes[0] < sizes[1] * (id === 'hydrate-root' ? 0.75 : 0.6),
+			`${id}: proven root ${sizes[0]} gzip; generic control ${sizes[1]} gzip`,
+		);
+		t.diagnostic(
+			`${id}: proven ${sizes[0]}, generic ${sizes[1]} gzip bytes; both stock semantic controls pass`,
+		);
+	}
+});
+
+test('same-file root optimization proves complete lifetimes across bindings and modes', (t) => {
+	const previous = process.env.OCTANE_COMPILE_FROZEN_AST;
+	process.env.OCTANE_COMPILE_FROZEN_AST = '1';
+	let checked = 0;
+	const check = (source, helper, selected, options = {}) => {
+		const code = compile(source, 'root-proof.tsrx', { hmr: false, dev: false, ...options }).code;
+		assert.equal(code.includes(helper + ' as'), selected, source + JSON.stringify(options));
+		checked++;
+	};
+	const createPrefix =
+		"import {createRoot} from 'octane';\nfunction View() @{ <main>first</main> }\n";
+	const createBody =
+		'export function mount(el) { const root=createRoot(el); root.render(View); root.unmount(); }';
+	const hydratePrefix =
+		"import {hydrateRoot} from 'octane';\nfunction View() @{ <main>first</main> }\n";
+	const hydrateBody =
+		'export function mount(el) { const root=hydrateRoot(el,View); root.unmount(); }';
+	try {
+		check(createPrefix + createBody, '__createVoidRoot', true);
+		check(hydratePrefix + hydrateBody, '__hydrateVoidRoot', true);
+		for (const body of [
+			'const root=createRoot(el); root.render(View); root.unmount();',
+			'namespace N { export const root=createRoot(el); root.render(View); root.unmount(); }',
+			'class C { static { const root=createRoot(el); root.render(View); root.unmount(); } }',
+			'export function mount(el) { const root=createRoot(el); root.render(View); return root; }',
+			'export function mount(el, unknown) { const root=createRoot(el); root.render(View); root.render(unknown); }',
+			'export function mount(el) { const root=createRoot(el); root.render(View); return () => root.unmount(); }',
+			'export function mount(el) { const root=createRoot(el); root["render"](View); root.unmount(); }',
+			'export function mount(el) { const root=createRoot(el); root.render(View); eval("root.render(1)"); }',
+			'function Outer() { function mount(el) { const root=createRoot(el); root.render(View); root.unmount(); } return <section/>; }',
+			'namespace N { function mount(el) {const root=createRoot(el);root.render(View);root.unmount();} }',
+		])
+			check(createPrefix + body, '__createVoidRoot', false);
+		for (const definition of [
+			'const View=()=> @{ <main>first</main> };',
+			'let View=()=> @{ <main>first</main> };',
+			'function View() { return <main>first</main>; }',
+			'function View() @{ return "ordinary"; <main>first</main> }',
+			'function View(props) @{ if(!props.ready) return null; <main>first</main> }',
+		])
+			check(
+				"import {createRoot} from 'octane';\n" + definition + '\n' + createBody,
+				'__createVoidRoot',
+				false,
+			);
+		for (const args of [
+			'el,<View/>',
+			'el,"returned"',
+			'el,null',
+			'el',
+			'el,unknown',
+			'el,(0,View)',
+			'el,views.View',
+			'el,View,...props',
+		]) {
+			check(
+				hydratePrefix +
+					`export function mount(el,unknown,props,views){const root=hydrateRoot(${args});root.render(View);root.unmount();}`,
+				'__hydrateVoidRoot',
+				false,
+			);
+		}
+		for (const body of [
+			'const root=hydrateRoot(el,View);root.render(unknown);root.unmount();',
+			'const root=hydrateRoot(el,View);return root;',
+			'const root=hydrateRoot(el,View);return()=>root.unmount();',
+			'const root=hydrateRoot(el,View);root["render"](View);',
+			'const root=hydrateRoot(el,View);root.render?.(View);',
+			'const root=hydrateRoot(el,View);const alias=root;alias.render(View);',
+			'const root=hydrateRoot(el,View);const other=hydrateRoot(el,unknown,eval("View=()=>1"));root.unmount();',
+		])
+			check(
+				hydratePrefix + `export function mount(el,unknown){${body}}`,
+				'__hydrateVoidRoot',
+				false,
+			);
+		for (const body of [
+			'export function mount(el,View){const root=hydrateRoot(el,View);root.unmount();}',
+			'export function mount(el,hydrateRoot){const root=hydrateRoot(el,View);root.unmount();}',
+			'function replace(){View=()=>1;}export function mount(el){const root=hydrateRoot(el,View);root.unmount();}',
+			'namespace N {export const root=hydrateRoot(el,View);root.unmount();}',
+			'class C {static{const root=hydrateRoot(el,View);root.unmount();}}',
+		])
+			check(hydratePrefix + body, '__hydrateVoidRoot', false);
+		for (const options of [
+			{ dev: true },
+			{ hmr: 'vite' },
+			{ hmr: 'webpack' },
+			{ profile: true },
+			{ mode: 'server' },
+			{ renderer: { id: 'dom', module: 'octane', target: 'dom' } },
+			{ rendererBoundaries: { rules: [] } },
+		]) {
+			check(createPrefix + createBody, '__createVoidRoot', false, options);
+			check(hydratePrefix + hydrateBody, '__hydrateVoidRoot', false, options);
+		}
+		check(
+			createPrefix + 'function unrelated(View){View=()=>1;}\n' + createBody,
+			'__createVoidRoot',
+			true,
+		);
+	} finally {
+		if (previous === undefined) delete process.env.OCTANE_COMPILE_FROZEN_AST;
+		else process.env.OCTANE_COMPILE_FROZEN_AST = previous;
+	}
+	t.diagnostic(
+		`${checked} fixed-source activation controls; public semantics covered by same-file root tests and matched stock bundle controls`,
+	);
+});
+
+test('root optimization fails closed on unscoped runtime AST references', async (t) => {
+	const { parseModule, builders: b } = createRequire(
+		new URL('../../packages/octane/package.json', import.meta.url),
+	)('@tsrx/core');
+	const { findLocalVoidRootCallees } =
+		await import('../../packages/octane/src/compiler/local-void-roots.js');
+	for (const factory of ['createRoot(el)', 'hydrateRoot(el,View)']) {
+		const ast = parseModule(
+			`import {createRoot,hydrateRoot} from 'octane';function View() @{<main>server</main>}function mount(el){const root=${factory};root.render(View);function decorated(){}root.unmount();}`,
+			'unscoped-root.tsrx',
+		);
+		const view = ast.body[1],
+			mount = ast.body[2];
+		// Synthesized AST proof control, not supported authored function-decorator
+		// syntax: runtime traversal visits this reference, lexical analysis does not.
+		const decorated = {
+			...mount,
+			body: {
+				...mount.body,
+				body: mount.body.body.map((node) =>
+					node.type === 'FunctionDeclaration'
+						? {
+								...node,
+								decorators: [
+									{ type: 'Decorator', expression: b.call(b.id('publish'), [b.id('root')]) },
+								],
+							}
+						: node,
+				),
+			},
+		};
+		const supplied = { ...ast, body: [ast.body[0], view, decorated] };
+		const freeze = (node) => {
+			if (node && typeof node === 'object' && !Object.isFrozen(node)) {
+				Object.freeze(node);
+				for (const child of Object.values(node)) freeze(child);
+			}
+		};
+		freeze(supplied);
+		freeze(ast);
+		assert.equal(
+			findLocalVoidRootCallees(ast, new Set([view.id]), new Set([view])).size,
+			1,
+			factory + ' positive control',
+		);
+		assert.equal(
+			findLocalVoidRootCallees(supplied, new Set([view.id]), new Set([view])).size,
+			0,
+			factory + ' unscoped reference',
+		);
+	}
+	t.diagnostic(
+		'2 frozen COW AST positive/negative pairs; future-proof admission, not a reproduced supported runtime bug',
+	);
+});
+
+test('repeated opaque primitive attributes omit policy probes without hiding handles or controls', async (t) => {
+	for (const dev of [false, true]) {
+		for (const extension of ['tsrx', 'tsx']) {
+			for (const attributeCount of [1, 100]) {
+				const result = await measureOpaqueAttributes({ dev, extension, attributeCount });
+				const { snapshot, ...metrics } = result;
+				t.diagnostic(JSON.stringify(metrics));
+				assert.deepEqual(
+					result.steady,
+					{ helperEntries: 100 * attributeCount, policyEntries: 0 },
+					'The shared helper remains; equal defined scalars omit policy/handle probes.',
+				);
+				for (const [phase, count] of [
+					['changed', 1],
+					['nan', 2],
+					['undefinedCalls', 2],
+					['objects', 2],
+					['functions', 2],
+				]) {
+					assert.deepEqual(
+						result[phase],
+						{ helperEntries: count * attributeCount, policyEntries: count * attributeCount },
+						`${phase}: the binding path remains available.`,
+					);
+				}
+				assert.equal(result.handles.helperEntries, 2 * attributeCount);
+				// The first real handle can re-enter once to establish stamped ownership.
+				assert.ok(result.handles.policyEntries >= 2 * attributeCount);
+			}
+		}
+	}
+});
+
+test('private compiled contexts omit descriptor rendering with a callable exported control', async (t) => {
+	const filename = path.resolve('benchmarks/bundle-size/fixtures/minimal/context.tsrx');
+	const authored = await readFile(filename, 'utf8');
+	const sizes = [];
+	for (const exported of [false, true]) {
+		const source =
+			authored +
+			(exported
+				? `
+import {createElement} from 'octane';
+export {ThemeContext};
+export function descriptor(parent) {
+ const root=createRoot(parent);
+ root.render(ThemeContext,{value:'external',children:createElement('article',{children:'Descriptor children'})});
+ const before=parent.textContent;
+ root.render(ThemeContext,{value:'external',children:['ordinary',' children']});
+ root.unmount();
+ return {before,cleaned:parent.childNodes.length===0};
+}
+`
+				: '');
+		const compiled = compile(source, filename, { mode: 'client', dev: false, hmr: false }).code;
+		const result = await build({
+			stdin: { contents: compiled, resolveDir: path.resolve('packages/octane'), loader: 'js' },
+			bundle: true,
+			write: false,
+			minify: true,
+			format: 'iife',
+			globalName: '__OCTANE_REACHABILITY__',
+			platform: 'browser',
+			target: 'esnext',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+		});
+		const code = result.outputFiles[0].text;
+		await verifyScenario('context', code);
+		if (exported) {
+			const window = new Window();
+			try {
+				window.eval(code);
+				const host = window.document.createElement('div');
+				window.document.body.appendChild(host);
+				assert.deepEqual(
+					JSON.parse(JSON.stringify(window.__OCTANE_REACHABILITY__.descriptor(host))),
+					{ before: 'Descriptor children', cleaned: true },
+				);
+			} finally {
+				await window.happyDOM.close();
+			}
+		}
+		sizes.push(gzipSync(code, { level: 9 }).length);
+	}
+	assert.ok(sizes[0] < sizes[1] * 0.7, `Private ${sizes[0]} vs exported ${sizes[1]} gzip`);
+	t.diagnostic(
+		`Private ${sizes[0]} -> exported ${sizes[1]} gzip; provider updates and cleanup match`,
+	);
+});
+
+test('private context proof declines escaped values and noncompiled child dialects', (t) => {
+	const require = createRequire(path.resolve('packages/octane/package.json'));
+	const { parseModule } = require('@tsrx/core');
+	const prefix =
+		"import {createContext,useContext,createElement,descriptorChildren} from 'octane';\nconst Theme=createContext('default');\n";
+	const provider = 'function App() @{ <Theme value="provided"><span>child</span></Theme> }\n';
+	const escapes = [
+		'export {Theme};',
+		'export default Theme;',
+		'export function exposed() {return Theme;}',
+		'const alias=Theme;',
+		'const holder={Theme};',
+		'const holder=[Theme];',
+		'consume(Theme);',
+		'const reflected=Theme.defaultValue;',
+		'const {defaultValue}=Theme;',
+		'descriptorChildren(Theme);',
+		'createElement(Theme,{children:"descriptor"});',
+		'function change(root) {root.render(Theme,{children:"descriptor"});}',
+		'function read() {return useContext(consume(Theme));}',
+		'function read(Theme) {return Theme;}',
+		'function read() {eval("Theme({children:[]})");}',
+		'class Escape {static value=Theme;}',
+		'class Escape {static {consume(Theme);}}',
+		'const closure=createContext(()=>Theme);',
+		'function App2() @{ <Theme value={Theme}><span /></Theme> }',
+		'function App2() @{ <Theme.Render /> }',
+		'const node=<Theme value="descriptor"><span /></Theme>;',
+		'function App2(props) @{ <Theme {...props} /> }',
+		'function App2(props) @{ <Theme value="descriptor" children={props.children} /> }',
+		'function App2(props) @{ <Theme __proto__={props.proto} /> }',
+		'function App2(props) @{ <Theme ns:children={props.children} /> }',
+		'function App2(props) @{ <Theme __compiler={props.children} /> }',
+		...[
+			'(value)=>value',
+			'((value)=>value) as unknown',
+			'((value)=>value)!',
+			'((value)=>value) satisfies Function',
+			'(((value)=>value))',
+		].map((child) => `function App2() @{ <Theme value="descriptor">{${child}}</Theme> }`),
+	];
+	function freeze(value) {
+		if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return;
+		for (const child of Object.values(value)) freeze(child);
+		Object.freeze(value);
+	}
+	for (const extra of ['', ...escapes]) {
+		const ast = parseModule(prefix + provider + extra, 'private-context.tsrx');
+		freeze(ast);
+		assert.equal(findPrivateCompiledContexts(ast).has('Theme'), extra === '', extra);
+	}
+	const ast = parseModule(prefix + provider + 'function decorate(){}', 'private-context.tsrx');
+	const supplied = {
+		...ast,
+		body: ast.body.map((node) =>
+			node.type === 'FunctionDeclaration' && node.id.name === 'decorate'
+				? {
+						...node,
+						decorators: [{ type: 'Decorator', expression: { type: 'Identifier', name: 'Theme' } }],
+					}
+				: node,
+		),
+	};
+	freeze(supplied);
+	freeze(ast);
+	assert.equal(findPrivateCompiledContexts(ast).has('Theme'), true, 'positive scoped control');
+	assert.equal(
+		findPrivateCompiledContexts(supplied).has('Theme'),
+		false,
+		'unscoped runtime reference',
+	);
+	t.diagnostic(`${escapes.length} authored lifetime/dialect controls on frozen parser ASTs`);
+});
+
+test('private context specialization preserves factory source ranges and deployment boundaries', () => {
+	const authored =
+		"import {createContext as context,useContext} from 'octane';\nconst Theme=context('default');\nfunction Reader() @{<span>{useContext(Theme) as string}</span>}\nexport function App() @{<Theme value=\"provided\"><Reader/></Theme>}";
+	const options = [
+		{},
+		{ dev: true },
+		{ hmr: 'vite' },
+		{ hmr: 'webpack' },
+		{ profile: true },
+		{ mode: 'server' },
+		{ renderer: { id: 'dom', module: 'octane', target: 'dom' } },
+		{ rendererBoundaries: { rules: [] } },
+	];
+	for (const settings of options) {
+		const result = compile(authored, 'private-context.tsrx', {
+			dev: false,
+			hmr: false,
+			mode: 'client',
+			...settings,
+			inspect: true,
+		});
+		const start = authored.indexOf("context('default')");
+		assert.ok(
+			result.inspect.segments.some(
+				(segment) => segment.srcStart === start && segment.srcEnd === start + 'context'.length,
+			),
+			'factory callee range ' + JSON.stringify(settings),
+		);
+		const specialized = result.inspect.ast.body.some(
+			(node) =>
+				node.type === 'ImportDeclaration' &&
+				node.source.value === 'octane/internal/client' &&
+				node.specifiers.some((specifier) => specifier.imported?.name === '__createCompiledContext'),
+		);
+		assert.equal(specialized, Object.keys(settings).length === 0, JSON.stringify(settings));
+	}
+	for (const importSource of ['octane/server', 'octane/native', 'octane/lynx']) {
+		const source = authored.replace("from 'octane'", "from '" + importSource + "'");
+		assert.equal(
+			findPrivateCompiledContexts(
+				createRequire(path.resolve('packages/octane/package.json'))('@tsrx/core').parseModule(
+					source,
+					'private-context.tsrx',
+				),
+			).size,
+			0,
+			importSource,
+		);
 	}
 });

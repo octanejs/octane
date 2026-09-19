@@ -31,6 +31,7 @@ afterEach(() => {
 });
 
 describe('useWindowVirtualizer', () => {
+	// @parity-case conformance:103ef876c99af74b
 	it('windows from the native 1024×768 jsdom viewport', async () => {
 		const r = mount(WindowList, {});
 		await flush();
@@ -39,6 +40,7 @@ describe('useWindowVirtualizer', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:6e0aee886ac505db
 	it('shifts the window on window scroll', async () => {
 		const r = mount(WindowList, {});
 		await flush();
@@ -52,6 +54,7 @@ describe('useWindowVirtualizer', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:1569a866a7ff2929
 	it('honors initialOffset on mount (no scroll event needed)', async () => {
 		const r = mount(WindowList, { initialOffset: 500 });
 		await flush();

@@ -180,6 +180,7 @@ import {
 	rendererRangeClose,
 } from './stream-protocol.js';
 import { isRendererContext, registerClientRendererBridge } from './renderer-bridge.js';
+import { registerContext } from './context-identity.js';
 import { createNativeReadDriver, type NativeReadDriver } from './signals/native-read-client.js';
 import {
 	validateNativeReadWitness,
@@ -188,10 +189,17 @@ import {
 import { createNativeReadRetry, type NativeReadRetry } from './signals/native-read-retry.js';
 import {
 	activeCandidate,
+	createSignalActionFrame,
+	createSignalTransitionCoordinator,
 	swapActiveSignalCandidate,
 	withoutSignalCandidate,
 } from './signals/transition-state.js';
-import { SignalCandidateFrame } from './signals/transition-candidate.js';
+import { installNativeSignalActionExtension } from './signals/transition-candidate.js';
+import type { SignalActionFrame } from './signals/transition-action.js';
+import type {
+	NativeTransitionAttempt,
+	SignalTransitionCoordinator,
+} from './signals/transition-coordinator.js';
 import {
 	NativeAdoptionMiss,
 	NATIVE_TRANSITION_CONSUMER,
@@ -200,7 +208,6 @@ import {
 	runNativeBatch,
 	setNativeCandidateResolver,
 	setNativeAdoptionResolver,
-	type NativeTransitionPresentation,
 } from './signals/read-protocol.js';
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
 import {
@@ -1131,6 +1138,7 @@ function scheduleNativeRead(target: Block): void {
 
 function ensureNativeReadDriver(): NativeReadDriver {
 	if (NATIVE_READ_DRIVER !== null) return NATIVE_READ_DRIVER;
+	installNativeSignalActionExtension();
 	NATIVE_READ_DRIVER = createNativeReadDriver({
 		capture: () => WIP_CAPTURE,
 		cleanup: registerHookCleanup,
@@ -2102,307 +2110,52 @@ interface TransitionActionBatch {
 	pendingHolds?: number;
 	workComplete?: boolean;
 	/** Allocated only by a native write inside this Action. */
-	native?: SignalCandidateFrame;
+	native?: SignalActionFrame;
 	nativeWake?: () => void;
 	nativeBlocks?: Set<Block>;
 	nativeBoundaries?: Map<TrySlot, TrackedThenable<any>>;
 }
 
-interface NativeTransitionAttempt {
-	blocks: Set<Block>;
-	transactions: Set<RootRenderTransaction>;
-	attempts: TransitionAttempt[];
-	presentations: NativeTransitionPresentation[];
-	suspensions: Map<TrySlot, TrackedThenable<any>>;
-	errorBlock?: Block;
+type NativeTransitionUpdate =
+	TransitionActionBatch['updates'] extends Map<object, infer U> ? U : never;
+
+/** Associate neutral coordinator ports with the renderer's actual object types. */
+interface NativeTransitionTypes {
+	Block: Block;
+	Owner: RootRenderOwner;
+	Transaction: RootRenderTransaction;
+	Attempt: TransitionAttempt;
+	Update: NativeTransitionUpdate;
+	Hook: TransitionHookSlot;
+	Batch: TransitionActionBatch;
+	Boundary: TrySlot;
+	Thenable: TrackedThenable;
+	Suspense: SuspenseException;
+	Capture: OffscreenCapture;
+	RootFrame: RootRenderFrame;
+	MemoSwap: TransitionMemoSwap;
+	Value: NativeTransitionUpdate['slot']['value'];
 }
 
-let NATIVE_TRANSITION_QUEUE: Set<TransitionActionBatch> | null = null;
-let NATIVE_TRANSITION_ATTEMPT: NativeTransitionAttempt | null = null;
+let NATIVE_TRANSITION_DRIVER: SignalTransitionCoordinator<NativeTransitionTypes> | null = null;
+let NATIVE_TRANSITION_ATTEMPT: NativeTransitionAttempt<NativeTransitionTypes> | null = null;
 
 function queueNativeTransition(batch: TransitionActionBatch): void {
-	(NATIVE_TRANSITION_QUEUE ??= new Set()).add(batch);
-	if (!scheduled && !syncFlush) {
-		scheduled = true;
-		queueMicrotask(flush);
-	}
+	NATIVE_TRANSITION_DRIVER!.queue(batch);
 }
 
-/** The graph calls only tagged presentation readers, never subscriber callbacks. */
 function prepareNativeTransitionBlock(block: Block): void {
-	const admission = NATIVE_TRANSITION_ATTEMPT!;
-	if (block.disposed || admission.blocks.has(block)) return;
-	const hidden = SCHEDULED_VISIBILITY_DRIVER?.find(block, false);
-	if (hidden?.nativeTransition !== undefined && hidden.tryBlock !== null) block = hidden.tryBlock;
-	if (admission.blocks.has(block)) return;
-	const owner = block.idState.renderOwner;
-	if (owner === undefined || owner.disposed) return;
-	const retired = owner.transaction?.retired;
-	if (retired !== undefined && retired !== null)
-		for (let current: Block | null = block; current !== null; current = current.parentBlock)
-			if (retired.has(current)) return;
-	admission.blocks.add(block);
-	const root = beginRootRender(owner);
-	admission.transactions.add(owner.transaction!);
-	const mode = block.pendingMode;
-	block.pendingMode = 'transition';
-	const attempt = beginTransitionAttempt(block);
-	if (attempt !== null) admission.attempts.push(attempt);
-	try {
-		invalidateRender(block, block);
-		if (hidden?.nativeTransition !== undefined) {
-			journalObjectOnce(hidden);
-			journalRootProperty(block, 'inactive', block.inactive);
-			SCHEDULED_VISIBILITY_DRIVER!.reveal(hidden, 'transition');
-		} else renderBlock(block);
-	} catch (error) {
-		if (isSuspenseException(error)) {
-			// Independent consumers enter below their boundary's render catch.
-			// Route only to the real boundary to retain its configured timeout.
-			for (let owner: Block | null = block; owner !== null; owner = owner.parentBlock) {
-				const handler = (owner as any).__suspenseHandler;
-				if (handler) {
-					try {
-						handler(error.thenable, block);
-					} catch (suspension) {
-						if (!isSuspenseException(suspension)) throw suspension;
-					}
-					break;
-				}
-			}
-			throw error.thenable;
-		}
-		admission.errorBlock ??= block;
-		throw error;
-	} finally {
-		endTransitionAttempt(attempt);
-		block.pendingMode = mode;
-		endRootRender(root);
-	}
-}
-
-function finishNativeTransition(batch: TransitionActionBatch): void {
-	batch.nativeWake?.();
-	batch.nativeWake = undefined;
-	batch.native = undefined;
-	for (const block of batch.nativeBlocks ?? [])
-		block.idState.renderOwner?.nativeTransitions?.delete(batch);
-	batch.nativeBlocks = undefined;
-	for (const state of batch.nativeBoundaries?.keys() ?? []) {
-		if (state.nativeTransition !== batch) continue;
-		state.nativeTransition = undefined;
-		if (state.transitionTimeoutId !== null) {
-			clearTimeout(state.transitionTimeoutId);
-			state.transitionTimeoutId = null;
-		}
-	}
-	batch.nativeBoundaries = undefined;
-	NATIVE_TRANSITION_QUEUE?.delete(batch);
-	if (NATIVE_TRANSITION_QUEUE?.size === 0) NATIVE_TRANSITION_QUEUE = null;
-	releaseTransitionHookHolder(batch);
+	NATIVE_TRANSITION_DRIVER!.prepare(block);
 }
 
 function retireNativeTransitionBlock(block: Block): void {
-	if (ROOT_RENDER_ROLLBACK) return;
-	for (const batch of block.idState.renderOwner?.nativeTransitions ?? []) {
-		if (!batch.nativeBlocks?.has(block)) continue;
-		// Retiring demand revokes that presentation, not the model write. The
-		// next preparation discovers only the surviving subscriber frontier.
-		queueNativeTransition(batch);
-	}
+	NATIVE_TRANSITION_DRIVER?.retire(block);
 }
 
-function prepareNativeTransitionUpdates(batch: TransitionActionBatch): void {
-	for (const update of batch.updates.values()) {
-		const { block, slot, state, reducer } = update;
-		const owner = block.idState.renderOwner;
-		if (block.disposed || owner === undefined || owner.disposed) continue;
-		const frame = beginRootRender(owner);
-		NATIVE_TRANSITION_ATTEMPT!.transactions.add(owner.transaction!);
-		try {
-			journalObjectOnce(slot);
-			if (state !== undefined) {
-				state.renderTransition = update;
-				state.updates = undefined;
-			} else if (reducer !== undefined) {
-				reducer.renderTransition = update;
-				reducer.renderPhaseActions = undefined;
-			} else slot.value = rebaseTransitionActionUpdate(update);
-			if (slot.pendingActionBatch === batch) {
-				slot.pendingActionBatch = undefined;
-				slot.pendingActionValue = undefined;
-			}
-		} finally {
-			endRootRender(frame);
-		}
-	}
-}
-
-function prepareNativeTransitionHook(batch: TransitionActionBatch, hook: TransitionHookSlot): void {
-	const owner = hook.block.idState.renderOwner;
-	if (hook.block.disposed || owner === undefined || owner.disposed) return;
-	const frame = beginRootRender(owner);
-	NATIVE_TRANSITION_ATTEMPT!.transactions.add(owner.transaction!);
-	try {
-		if (batch.hooksPending && hook.pendingBatches === 1) {
-			journalObjectOnce(hook);
-			hook.isPending = false;
-		}
-	} finally {
-		endRootRender(frame);
-	}
-	prepareNativeTransitionBlock(hook.block);
-}
-
-/** Native candidates share the existing root journals and scheduler commit wave. */
-function flushNativeTransitions(): void {
-	const queue = NATIVE_TRANSITION_QUEUE;
-	if (queue === null) return;
-	NATIVE_TRANSITION_QUEUE = null;
-	for (const batch of queue) {
-		const candidate = batch.native;
-		if (candidate === undefined) continue;
-		batch.nativeWake?.();
-		batch.nativeWake = undefined;
-		try {
-			if (!candidate.validate()) candidate.rebase();
-		} catch {
-			candidate.discard();
-			finishNativeTransition(batch);
-			flushTransitionActionBatch(batch);
-			continue;
-		}
-		if (!candidate.hasWrites()) {
-			candidate.discard();
-			finishNativeTransition(batch);
-			flushTransitionActionBatch(batch);
-			continue;
-		}
-		const admission: NativeTransitionAttempt = {
-			blocks: new Set(),
-			transactions: new Set(),
-			attempts: [],
-			presentations: [],
-			suspensions: new Map(),
-		};
-		NATIVE_TRANSITION_ATTEMPT = admission;
-		let outcome;
-		try {
-			outcome = candidate.prepare([
-				() => prepareNativeTransitionUpdates(batch),
-				...(batch.hook === null ? [] : [() => prepareNativeTransitionHook(batch, batch.hook!)]),
-				...(batch.hooks ?? []).map((hook) => () => prepareNativeTransitionHook(batch, hook)),
-				...[...batch.updates.values()].map(
-					(update) => () => prepareNativeTransitionBlock(update.block),
-				),
-				...candidate
-					.consumers()
-					.filter((consumer) => consumer.active())
-					.map((consumer) => () => {
-						const presentation = consumer.prepare();
-						if (presentation !== undefined) admission.presentations.push(presentation);
-					}),
-			]);
-		} finally {
-			NATIVE_TRANSITION_ATTEMPT = null;
-		}
-		for (const block of batch.nativeBlocks ?? [])
-			block.idState.renderOwner?.nativeTransitions?.delete(batch);
-		batch.nativeBlocks = admission.blocks;
-		for (const transaction of admission.transactions)
-			(transaction.owner.nativeTransitions ??= new Set()).add(batch);
-		const valid =
-			outcome.status === 'ready' &&
-			admission.presentations.every((presentation) => presentation.validate()) &&
-			[...admission.transactions].every(
-				(transaction) =>
-					!transaction.aborted &&
-					!transaction.owner.disposed &&
-					currentPresentations(transaction.capture) &&
-					(NATIVE_READ_DRIVER === null || NATIVE_READ_DRIVER.validateCapture(transaction.capture)),
-			);
-		if (
-			valid &&
-			outcome.status === 'ready' &&
-			outcome.receipt.publish(() => {
-				// All accepted subscriptions transfer before a public subscriber runs.
-				for (const transaction of admission.transactions) {
-					transaction.nativeAdmitted = true;
-					acceptNativeCapture(transaction.capture, transaction.owner, true);
-				}
-				batch.flushed = true;
-				batch.updates.clear();
-				finishNativeTransition(batch);
-				for (const presentation of admission.presentations) presentation.commit();
-				commitRootRenders();
-			})
-		) {
-			continue;
-		}
-		for (const transaction of admission.transactions) rollbackRootRender(transaction);
-		for (const presentation of admission.presentations) presentation.discard();
-		for (let i = admission.attempts.length - 1; i >= 0; i--) {
-			const swaps = admission.attempts[i].memoSwaps;
-			if (swaps !== null)
-				for (let j = swaps.length - 1; j >= 0; j--) applyTransitionMemoSwap(swaps[j], false);
-		}
-		commitRootRenders();
-		if (outcome.status === 'pending') {
-			for (const state of batch.nativeBoundaries?.keys() ?? []) {
-				if (admission.suspensions.has(state)) continue;
-				if (state.nativeTransition === batch) state.nativeTransition = undefined;
-				if (state.transitionTimeoutId !== null) {
-					clearTimeout(state.transitionTimeoutId);
-					state.transitionTimeoutId = null;
-				}
-			}
-			for (const [state, thenable] of admission.suspensions) {
-				state.nativeTransition = batch;
-				if (
-					state.hasResolved &&
-					state.branch === 1 &&
-					state.pendingBody !== null &&
-					TRANSITION_FALLBACK_TIMEOUT_MS !== Infinity &&
-					TRANSITION_FALLBACK_TIMEOUT_MS >= 0 &&
-					(state.transitionTimeoutId === null || batch.nativeBoundaries?.get(state) !== thenable)
-				) {
-					if (state.transitionTimeoutId !== null) clearTimeout(state.transitionTimeoutId);
-					state.transitionTimeoutId = setTimeout(() => {
-						state.transitionTimeoutId = null;
-						if (
-							state.nativeTransition === batch &&
-							!state.parentBlock.disposed &&
-							state.branch === 1
-						)
-							SCHEDULED_VISIBILITY_DRIVER!.hidePending(state);
-					}, TRANSITION_FALLBACK_TIMEOUT_MS);
-				}
-			}
-			batch.nativeBoundaries = admission.suspensions;
-			batch.nativeWake = candidate.watchPreparation(outcome, () => queueNativeTransition(batch));
-		} else if (
-			outcome.status === 'ready' ||
-			(outcome.status === 'invalid' && outcome.reason === 'stale')
-		) {
-			queueNativeTransition(batch);
-		} else {
-			candidate.discard();
-			finishNativeTransition(batch);
-			for (const update of batch.updates.values()) {
-				if (update.slot.pendingActionBatch === batch) {
-					update.slot.pendingActionBatch = undefined;
-					update.slot.pendingActionValue = undefined;
-				}
-			}
-			batch.updates.clear();
-			batch.flushed = true;
-			if (outcome.status === 'error') {
-				if (admission.errorBlock !== undefined && !admission.errorBlock.disposed)
-					handleResumeError(admission.errorBlock, outcome.error);
-				else reportTransitionError(outcome.error, batch.hook ?? undefined);
-			} else if (outcome.status === 'invalid')
-				reportTransitionError(new TypeError(formatClientError(79)), batch.hook ?? undefined);
-		}
+function scheduleNativeTransitionFlush(): void {
+	if (!scheduled && !syncFlush) {
+		scheduled = true;
+		queueMicrotask(flush);
 	}
 }
 
@@ -2424,7 +2177,7 @@ let ACTIVE_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
 let IN_FLIGHT_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
 let nativeActionResolverInstalled = false;
 
-function nativeCandidateForAction(batch: TransitionActionBatch): SignalCandidateFrame {
+function nativeCandidateForAction(batch: TransitionActionBatch): SignalActionFrame | undefined {
 	let candidate = batch.native;
 	if (candidate !== undefined && !candidate.validate()) {
 		if (candidate.hasWrites()) candidate.rebase();
@@ -2433,7 +2186,52 @@ function nativeCandidateForAction(batch: TransitionActionBatch): SignalCandidate
 			candidate = undefined;
 		}
 	}
-	return candidate ?? (batch.native = new SignalCandidateFrame());
+	candidate ??= batch.native = createSignalActionFrame?.();
+	if (candidate !== undefined && NATIVE_TRANSITION_DRIVER === null) {
+		// Signals can first load after this Action awaited. Both capabilities are
+		// live registrations, so initialize only when its first frame is acquired.
+		NATIVE_TRANSITION_DRIVER = createSignalTransitionCoordinator!<NativeTransitionTypes>({
+			get attempt() {
+				return NATIVE_TRANSITION_ATTEMPT;
+			},
+			set attempt(admission) {
+				NATIVE_TRANSITION_ATTEMPT = admission;
+			},
+			get visibility() {
+				return SCHEDULED_VISIBILITY_DRIVER;
+			},
+			get rollback() {
+				return ROOT_RENDER_ROLLBACK;
+			},
+			get fallbackTimeout() {
+				return TRANSITION_FALLBACK_TIMEOUT_MS;
+			},
+			schedule: scheduleNativeTransitionFlush,
+			beginRoot: beginRootRender,
+			endRoot: endRootRender,
+			beginAttempt: beginTransitionAttempt,
+			endAttempt: endTransitionAttempt,
+			invalidate: invalidateRender,
+			render: renderBlock,
+			journal: journalObjectOnce,
+			journalProperty: journalRootProperty,
+			isSuspense: isSuspenseException,
+			releaseHookHolder: releaseTransitionHookHolder,
+			rebaseUpdate: rebaseTransitionActionUpdate,
+			flushBatch: flushTransitionActionBatch,
+			currentPresentations,
+			validateCapture: (capture) =>
+				NATIVE_READ_DRIVER === null || NATIVE_READ_DRIVER.validateCapture(capture),
+			acceptCapture: acceptNativeCapture,
+			commitRoots: commitRootRenders,
+			rollbackRoot: rollbackRootRender,
+			applyMemoSwap: applyTransitionMemoSwap,
+			handleError: handleResumeError,
+			reportError: reportTransitionError,
+			unsupportedError: () => new TypeError(formatClientError(79)),
+		});
+	}
+	return candidate;
 }
 
 /** Setters, not reads, consult the same post-await batch as ordinary hooks. */
@@ -3474,6 +3272,7 @@ const JOURNAL_RENDER = 5;
 const JOURNAL_UNDO = 6;
 const JOURNAL_RETIRED = 7;
 const JOURNAL_INPUTS = 8;
+const JOURNAL_EVENT_OWNER = 9;
 /** Flat undo log, four slots per entry: kind, target, a, b. */
 let TRANSITION_JOURNAL: any[] | null = null;
 /** Bags already captured in the open window, so each is snapshotted once. */
@@ -3935,6 +3734,13 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 					undoCreatedInRootRender(transaction.log[i + 1], transaction.log[i + 2]);
 				else if (transaction.log[i] === JOURNAL_RETIRED)
 					transaction.log[i + 1].delete(transaction.log[i + 2]);
+				else if (transaction.log[i] === JOURNAL_EVENT_OWNER) {
+					const owners = transaction.log[i + 1];
+					const el = transaction.log[i + 2];
+					const previous = transaction.log[i + 3];
+					if (previous === undefined) owners.delete(el);
+					else owners.set(el, previous);
+				}
 			}
 			transaction.log.length = 0;
 		}
@@ -4811,6 +4617,10 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 					break;
 				case JOURNAL_UNDO:
 					target();
+					break;
+				case JOURNAL_EVENT_OWNER:
+					if (b === undefined) target.delete(a);
+					else target.set(a, b);
 					break;
 				default:
 					// Spread snapshots include enumerable symbols as well as strings.
@@ -7037,7 +6847,7 @@ function drainQueue(): { err: any } | null {
 		for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide(activity);
 	}
 	commitRootRenders();
-	flushNativeTransitions();
+	NATIVE_TRANSITION_DRIVER?.flush();
 	return pendingError;
 }
 
@@ -9552,7 +9362,7 @@ export function hasPendingWork(): boolean {
 	return (
 		QUEUE.length > 0 ||
 		ROOT_RENDER_TRANSACTIONS.length > 0 ||
-		NATIVE_TRANSITION_QUEUE !== null ||
+		NATIVE_TRANSITION_DRIVER?.hasWork() === true ||
 		effectEventQueue.length > 0 ||
 		effectEventCommitActions.length > 0 ||
 		effectQueues[INSERTION].length > 0 ||
@@ -13624,7 +13434,6 @@ export interface Context<T> {
 	(props: { value: T; children?: any }, scope: Scope, extra?: unknown): void;
 	$$kind: typeof CONTEXT_TAG;
 	defaultValue: T;
-	Provider: ComponentBody<{ value: T; children?: any }>;
 	/**
 	 * Monotonic version bumped whenever a Provider for this context commits a
 	 * changed value. Consumers record the version they read at; the memo bailout
@@ -13645,16 +13454,45 @@ export interface Context<T> {
  */
 /* @__NO_SIDE_EFFECTS__ */
 export function createContext<T>(defaultValue: T): Context<T> {
-	// React 19 lets the Context itself serve as its Provider. Make the callable
-	// provider the context object, then retain `.Provider` as an identity alias
-	// for existing code and React 18-shaped libraries.
+	// The Context itself is the provider component.
 	const ctx = function ProviderBody(props, scope) {
 		return renderClientContextProvider(ctx, props, scope);
 	} as Context<T>;
+	return initializeContext(ctx, defaultValue);
+}
+
+/** Compiler-owned private Context whose children are always compiled bodies. */
+/* @__NO_SIDE_EFFECTS__ */
+export function __createCompiledContext<T>(defaultValue: T): Context<T> {
+	const ctx = function ProviderBody(props, scope) {
+		provideContext(scope, ctx, props.value);
+		const children = props.children as ComponentBody | null | undefined;
+		if (children == null) return;
+		const dialect = (children as any)[CHILDREN_BODY] ?? children;
+		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+		if (previous !== dialect) {
+			if (previous !== undefined && (previous === 2 || dialect === 2)) {
+				resetScopeChildren(scope);
+				if (scope.block.disposed) return;
+			} else if (previous !== undefined) {
+				invalidateSharedBodyOutput(scope);
+				if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+					const hooks = scope.hooks!;
+					journalUndo(() => hooks.set(CHILDREN_DIALECT_SLOT, previous));
+				}
+			}
+			ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
+		}
+		renderSharedBody(children, undefined, scope, undefined);
+	} as Context<T>;
+	return initializeContext(ctx, defaultValue);
+}
+
+function initializeContext<T>(ctx: Context<T>, defaultValue: T): Context<T> {
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
 	ctx.$$version = 0;
-	ctx.Provider = ctx;
+	registerContext(ctx);
 	if (process.env.NODE_ENV !== 'production') {
 		// Octane deliberately has no render-prop Consumer (slot-keyed hooks make
 		// use()/useContext legal behind any condition — the pattern Consumer
@@ -13701,7 +13539,7 @@ export function renderClientContextProvider<T>(
 	// Children between the Provider tags reach us in one of two shapes:
 	//   - a compiled render-body FUNCTION — the `.tsrx` `{props.children}` lowering;
 	//   - an element descriptor / renderable — a React-style `.tsx` parent, where
-	//     `<Ctx.Provider>…</Ctx.Provider>` lowers to `createElement(Ctx.Provider,
+	//     `<Ctx>…</Ctx>` lowers to `createElement(Ctx,
 	//     { value }, …children)` and `createElement` mirrors the positional children
 	//     into `props.children` (a descriptor, an array, or text — never a function).
 	// `childrenAsBody` normalizes either shape to a callable body, so both dialects
@@ -13783,7 +13621,7 @@ function invalidateSharedBodyMemoRegion(region: CompilerMemoRegion): void {
 
 /**
  * Programmatically provide a context value for a scope's descendants — the same
- * stamping `<Context.Provider value={…}>` performs, exposed for plain-TS
+ * stamping `<Context value={…}>` performs, exposed for plain-TS
  * (non-template) components that render children and want to provide context to
  * them without authoring a `.tsrx` Provider wrapper. Call it during the component's
  * render, before rendering `children` into the same `scope`. (Used by runtime
@@ -14356,7 +14194,33 @@ function renderHydrateChild(state: HydrateSlot, scope: Scope, extra: unknown): v
 	childrenAsBody(state.props.children)(undefined, scope, extra);
 }
 
+function renderCompiledHydrateChild(state: HydrateSlot, scope: Scope, extra: unknown): void {
+	if (state.loadedBody !== null) {
+		state.loadedBody(state.props.__data, scope, extra);
+	} else {
+		(state.props.children as ComponentBody)(undefined, scope, extra);
+	}
+}
+
+const EMPTY_HYDRATE_PENDING: ComponentBody = () => undefined;
+
 function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
+	return createHydrateBoundaryBody(state, renderHydrateChild, (_props, scope) => {
+		childSlot(scope, 0, scope.block.parentNode, state.props.fallback, scope.block.endMarker);
+	});
+}
+
+function compiledHydrateBoundaryBody(state: HydrateSlot): ComponentBody {
+	// Keep a real empty pending arm: null would propagate suspension and change
+	// the try block's ownership, transition swap and scheduled visibility policy.
+	return createHydrateBoundaryBody(state, renderCompiledHydrateChild, EMPTY_HYDRATE_PENDING);
+}
+
+function createHydrateBoundaryBody(
+	state: HydrateSlot,
+	renderChild: typeof renderHydrateChild,
+	pendingBody: ComponentBody,
+): ComponentBody {
 	const contentBody: ComponentBody = (_props, scope, extra) => {
 		try {
 			if (state.loadedBody === null) {
@@ -14371,7 +14235,7 @@ function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
 					if (thenable.status !== 'fulfilled') throw new SuspenseException(thenable);
 				}
 			}
-			renderHydrateChild(state, scope, extra);
+			renderChild(state, scope, extra);
 		} catch (error) {
 			const hydration = activeHydration();
 			if (
@@ -14391,9 +14255,6 @@ function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
 		state.hydrated = true;
 		// Runtime-owned effect bodies receive their dependency tuple as arguments.
 		useEffect(notifyHydrateBoundary as EffectFn, [state, scope], HYDRATE_NOTIFY_SLOT);
-	};
-	const pendingBody: ComponentBody = (_props, scope) => {
-		childSlot(scope, 0, scope.block.parentNode, state.props.fallback, scope.block.endMarker);
 	};
 	return (_props, scope) => {
 		tryBlock(
@@ -14917,6 +14778,7 @@ function createHydrateSlot(
 	props: InternalHydrateProps,
 	scope: Scope,
 	boundaryId: string,
+	boundaryBody: typeof hydrateBoundaryBody,
 ): HydrateSlot {
 	const parentBlock = scope.block;
 	const parentNode = parentBlock.parentNode;
@@ -15048,7 +14910,7 @@ function createHydrateSlot(
 	scope.slots[0] = state;
 	registerSlot(scope, state);
 	if (!state.independent) registerHydrationIntentBoundary(wrapper, intentBoundary);
-	block.body = hydrateBoundaryBody(state);
+	block.body = boundaryBody(state);
 	const initialStrategy = resolveHydrateStrategy(state);
 	const pendingIntents = state.independent ? undefined : takePendingHydrationIntents(wrapper);
 	if (state.independent) {
@@ -15384,7 +15246,9 @@ type InternalHydrateComponent = ComponentBody<HydrateProps> & {
 	readonly __octanePermanentStatic: ComponentBody<HydrateProps>;
 };
 
-function initializeHydrateComponent(): InternalHydrateComponent {
+function initializeHydrateComponent(
+	boundaryBody: typeof hydrateBoundaryBody,
+): InternalHydrateComponent {
 	const hydrate = markComponentFlags<ComponentBody<HydrateProps>>(
 		function Hydrate(rawProps, scope) {
 			const props = rawProps as InternalHydrateProps;
@@ -15392,7 +15256,7 @@ function initializeHydrateComponent(): InternalHydrateComponent {
 			let state = scope.slots[0] as HydrateSlot | undefined;
 			let renderedChild = false;
 			if (state === undefined) {
-				state = createHydrateSlot(props, scope, boundaryId);
+				state = createHydrateSlot(props, scope, boundaryId, boundaryBody);
 			} else {
 				if (state.independent !== (props.__independent !== undefined)) {
 					throw new Error(formatClientError(66));
@@ -15461,7 +15325,12 @@ function initializeHydrateComponent(): InternalHydrateComponent {
 	return hydrate as InternalHydrateComponent;
 }
 
-export const Hydrate: ComponentBody<HydrateProps> = /* @__PURE__ */ initializeHydrateComponent();
+export const Hydrate: ComponentBody<HydrateProps> =
+	/* @__PURE__ */ initializeHydrateComponent(hydrateBoundaryBody);
+
+/** Compiler-owned template children with no authored fallback; never a descriptor entry point. */
+export const __HydrateCompiled: ComponentBody<HydrateProps> =
+	/* @__PURE__ */ initializeHydrateComponent(compiledHydrateBoundaryBody);
 
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX component form of
@@ -19374,7 +19243,11 @@ function preparePresentationSignalBinding(
 	const value = args[text ? 3 : 4];
 	const site = args[text ? 4 : 5] as string;
 	const attributeKind = text ? undefined : ((args[6] ?? 'attr') as DirectSignalAttributeKind);
-	const kind = text ? (args[5] ? 'textOnlyChild' : 'text') : 'attribute';
+	const policy = text
+		? args[5]
+			? DIRECT_SIGNAL_TEXT_ONLY_POLICY
+			: DIRECT_SIGNAL_TEXT_POLICY
+		: DIRECT_SIGNAL_ATTRIBUTE_POLICY;
 	return runWithBlockSignalOwner(scope, () => {
 		const handle = isSignalHandle(value) ? value : null;
 		// Unlike the ordinary direct-binding read, this read belongs to validation.
@@ -19406,7 +19279,7 @@ function preparePresentationSignalBinding(
 				return prepared;
 			}
 			preparePresentationOperation(frame, element, name!, () =>
-				writeDirectSignalScalar(element, prepared, 'attribute', previous, name, attributeKind),
+				writeDirectSignalAttribute(element, prepared, 'attribute', previous, name, attributeKind),
 			);
 			return value;
 		}
@@ -19417,7 +19290,7 @@ function preparePresentationSignalBinding(
 			prior.unsubscribe === undefined &&
 			prior.handle === handle &&
 			prior.target === element &&
-			prior.kind === kind &&
+			prior.policy === policy &&
 			prior.site === site &&
 			prior.name === name &&
 			prior.attributeKind === attributeKind;
@@ -19427,7 +19300,7 @@ function preparePresentationSignalBinding(
 					[DIRECT_SIGNAL_BINDING]: true,
 					scope,
 					target: element,
-					kind,
+					policy,
 					site,
 					name,
 					attributeKind,
@@ -19442,7 +19315,7 @@ function preparePresentationSignalBinding(
 		preparePresentationOperation(frame, element, name ?? 'signalText', () => {
 			if (binding.disposed) return;
 			if (!text)
-				writeDirectSignalScalar(element, prepared, 'attribute', previous, name, attributeKind);
+				writeDirectSignalAttribute(element, prepared, 'attribute', previous, name, attributeKind);
 			binding.value = current;
 			runWithBlockSignalOwner(scope, () => activateDirectSignalBinding(binding, undefined));
 		});
@@ -19488,7 +19361,7 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 			prior.input === undefined &&
 			prior.handle === handle &&
 			prior.target === element &&
-			prior.kind === 'value' &&
+			prior.policy === DIRECT_SIGNAL_VALUE_POLICY &&
 			prior.site === site;
 		const binding: DirectSignalBinding = reusable
 			? prior
@@ -19496,7 +19369,7 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 					[DIRECT_SIGNAL_BINDING]: true,
 					scope,
 					target: element,
-					kind: 'value',
+					policy: DIRECT_SIGNAL_VALUE_POLICY,
 					site,
 					handle,
 					value,
@@ -19680,7 +19553,8 @@ export function presentationWrite<T>(
 						];
 		if (
 			element !== frame.lease.root ||
-			keys.some((key: string) => !channels.has(key)) ||
+			// Preserve authored names for diagnostics; receipts use native field names.
+			keys.some((key: string) => !channels.has(ATTRIBUTE_ALIASES.get(key) ?? key)) ||
 			kind === 'bindSignalValue' ||
 			kind === 'setEventHandler' ||
 			kind === 'bindSignalText' ||
@@ -20083,10 +19957,31 @@ const DIRECT_SIGNAL_BINDING = /* @__PURE__ */ Symbol('octane.direct-signal-bindi
 type DirectSignalBindingKind = 'text' | 'textOnlyChild' | 'attribute' | 'value' | 'checked';
 type DirectSignalAttributeKind = 'attr' | 'class' | 'booleanAttr' | 'ariaAttr' | 'stringData';
 
+// Shared renderer policies keep the subscription/lifetime path independent of
+// control adoption. Scalar bindings still use their existing cache tokens.
+interface DirectSignalBindingPolicy {
+	readonly kind: DirectSignalBindingKind;
+	readonly writeBinding: (binding: DirectSignalBinding, value: unknown) => void;
+	readonly write: (
+		target: Node,
+		value: unknown,
+		kind: DirectSignalBindingKind,
+		previous: unknown,
+		name?: string,
+		attributeKind?: DirectSignalAttributeKind,
+	) => unknown;
+	readonly control?: {
+		validateNew: (scope: Scope, target: Node, kind: DirectSignalBindingKind) => void;
+		snapshot: (target: Node, site: string) => ReturnType<typeof snapshotHydrationControl>;
+		activate: (binding: DirectSignalBinding, revision: number) => void;
+		adopt: (binding: DirectSignalBinding) => void;
+	};
+}
+
 interface DirectSignalBinding {
 	readonly [DIRECT_SIGNAL_BINDING]: true;
 	readonly scope: Scope;
-	readonly kind: DirectSignalBindingKind;
+	readonly policy: DirectSignalBindingPolicy;
 	readonly target: Node;
 	readonly site: string;
 	readonly name?: string;
@@ -20154,7 +20049,7 @@ function directSignalControlValue(
 	binding: DirectSignalBinding,
 	snapshot: NonNullable<ReturnType<typeof snapshotHydrationControl>>,
 ): unknown {
-	if (binding.kind === 'checked') return snapshot.checked ?? false;
+	if (binding.policy.kind === 'checked') return snapshot.checked ?? false;
 	return snapshot.selectedValues ?? snapshot.value;
 }
 
@@ -20171,89 +20066,151 @@ function validateDirectSignalControl(element: Element, site: string): void {
 
 function writeDirectSignalBinding(binding: DirectSignalBinding, value: unknown): void {
 	if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
-	if (binding.kind === 'text' || binding.kind === 'textOnlyChild') {
-		if (binding.text === undefined) {
-			binding.text =
-				binding.kind === 'textOnlyChild'
-					? htext(binding.target, value)
-					: htextSwap(binding.target, value);
-		} else {
-			setText(binding.text, value);
-		}
-	} else if (binding.kind === 'attribute') {
-		const element = binding.target as Element;
-		switch (binding.attributeKind) {
-			case 'class':
-				if (element.namespaceURI === HTML_NS) setClassName(element, value);
-				else setClassAttr(element, value);
-				break;
-			case 'booleanAttr':
-				setBooleanAttribute(element, binding.name!, value);
-				break;
-			case 'ariaAttr':
-				setAriaAttribute(element, binding.name!, value);
-				break;
-			case 'stringData':
-				setStringData(element, binding.name!, value);
-				break;
-			default:
-				setAttribute(element, binding.name!, value);
-		}
-	} else if (binding.kind === 'value') {
-		const element = binding.target as Element;
-		if (element.localName === 'select') setSelectValue(element, value);
-		else setValue(element, value);
-	} else {
-		setChecked(binding.target as Element, value);
-	}
+	binding.policy.writeBinding(binding, value);
 	binding.value = value;
 }
 
-function writeDirectSignalScalar(
+function writeDirectSignalBoundText(binding: DirectSignalBinding, value: unknown): void {
+	if (binding.text === undefined) {
+		binding.text =
+			binding.policy.kind === 'textOnlyChild'
+				? htext(binding.target, value)
+				: htextSwap(binding.target, value);
+	} else {
+		// Adopted Text can belong to another document. The binding already owns
+		// this cache; checking its realm's constructor again would discard it.
+		setText(binding.text, value);
+	}
+}
+
+function writeDirectSignalBoundAttribute(binding: DirectSignalBinding, value: unknown): void {
+	writeDirectSignalAttribute(
+		binding.target,
+		value,
+		'attribute',
+		undefined,
+		binding.name,
+		binding.attributeKind,
+	);
+}
+
+function writeDirectSignalBoundValue(binding: DirectSignalBinding, value: unknown): void {
+	const element = binding.target as Element;
+	const tag = element.localName;
+	if (tag === 'select') setSelectValue(element, value);
+	else setValue(element, value, tag === 'textarea' && isWritableSignal(binding.handle));
+}
+
+function writeDirectSignalBoundChecked(binding: DirectSignalBinding, value: unknown): void {
+	setChecked(binding.target as Element, value);
+}
+
+function writeDirectSignalText(
 	target: Node,
 	value: unknown,
 	kind: DirectSignalBindingKind,
 	previous: unknown,
+): Text {
+	if (previous instanceof Text) {
+		setText(previous, value);
+		return previous;
+	}
+	// The compiler owns this distinction: an empty sibling text hole can
+	// point at the next element while hydrating, not an only-child parent.
+	return kind === 'textOnlyChild' ? htext(target, value) : htextSwap(target, value);
+}
+
+function writeDirectSignalAttribute(
+	target: Node,
+	value: unknown,
+	_kind: DirectSignalBindingKind,
+	_previous: unknown,
 	name?: string,
 	attributeKind?: DirectSignalAttributeKind,
 ): unknown {
-	if (kind === 'text' || kind === 'textOnlyChild') {
-		if (previous instanceof Text) {
-			setText(previous, value);
-			return previous;
-		}
-		// The compiler owns this distinction: an empty sibling text hole can
-		// point at the next element while hydrating, not an only-child parent.
-		return kind === 'textOnlyChild' ? htext(target, value) : htextSwap(target, value);
-	}
-	if (kind === 'attribute') {
-		const element = target as Element;
-		switch (attributeKind) {
-			case 'class':
-				if (element.namespaceURI === HTML_NS) setClassName(element, value);
-				else setClassAttr(element, value);
-				break;
-			case 'booleanAttr':
-				setBooleanAttribute(element, name!, value);
-				break;
-			case 'ariaAttr':
-				setAriaAttribute(element, name!, value);
-				break;
-			case 'stringData':
-				setStringData(element, name!, value);
-				break;
-			default:
-				setAttribute(element, name!, value);
-		}
-	} else if (kind === 'value') {
-		const element = target as Element;
-		if (element.localName === 'select') setSelectValue(element, value);
-		else setValue(element, value);
-	} else {
-		setChecked(target as Element, value);
+	const element = target as Element;
+	switch (attributeKind) {
+		case 'class':
+			if (element.namespaceURI === HTML_NS) setClassName(element, value);
+			else setClassAttr(element, value);
+			break;
+		case 'booleanAttr':
+			setBooleanAttribute(element, name!, value);
+			break;
+		case 'ariaAttr':
+			setAriaAttribute(element, name!, value);
+			break;
+		case 'stringData':
+			setStringData(element, name!, value);
+			break;
+		default:
+			setAttribute(element, name!, value);
 	}
 	return value;
 }
+
+function writeDirectSignalValue(
+	target: Node,
+	value: unknown,
+	_kind: DirectSignalBindingKind,
+	_previous: unknown,
+	_name?: string,
+	_attributeKind?: DirectSignalAttributeKind,
+): unknown {
+	const element = target as Element;
+	if (element.localName === 'select') setSelectValue(element, value);
+	else setValue(element, value);
+	return value;
+}
+
+function writeDirectSignalChecked(target: Node, value: unknown): unknown {
+	setChecked(target as Element, value);
+	return value;
+}
+
+const DIRECT_SIGNAL_TEXT_POLICY: DirectSignalBindingPolicy = {
+	kind: 'text',
+	writeBinding: writeDirectSignalBoundText,
+	write: writeDirectSignalText,
+};
+const DIRECT_SIGNAL_TEXT_ONLY_POLICY: DirectSignalBindingPolicy = {
+	kind: 'textOnlyChild',
+	writeBinding: writeDirectSignalBoundText,
+	write: writeDirectSignalText,
+};
+const DIRECT_SIGNAL_ATTRIBUTE_POLICY: DirectSignalBindingPolicy = {
+	kind: 'attribute',
+	writeBinding: writeDirectSignalBoundAttribute,
+	write: writeDirectSignalAttribute,
+};
+const DIRECT_SIGNAL_CONTROL_POLICY: NonNullable<DirectSignalBindingPolicy['control']> = {
+	validateNew(scope, target, kind) {
+		if (kind === 'value' && scope.block.idState.renderOwner?.controlLeases?.has(target as Element))
+			presentationMiss(false);
+	},
+	snapshot(target, site) {
+		const snapshot = snapshotHydrationControl(target as Element);
+		if (snapshot !== null) validateDirectSignalControl(target as Element, site);
+		return snapshot;
+	},
+	activate(binding, revision) {
+		installDirectSignalControl(binding);
+		if (!binding.pendingControl) consumeHydrationControl(binding.target as Element, revision);
+	},
+	adopt: queueDirectSignalControlAdoption,
+};
+const DIRECT_SIGNAL_VALUE_POLICY: DirectSignalBindingPolicy = {
+	kind: 'value',
+	writeBinding: writeDirectSignalBoundValue,
+	write: writeDirectSignalValue,
+	control: DIRECT_SIGNAL_CONTROL_POLICY,
+};
+const DIRECT_SIGNAL_CHECKED_POLICY: DirectSignalBindingPolicy = {
+	kind: 'checked',
+	writeBinding: writeDirectSignalBoundChecked,
+	write: writeDirectSignalChecked,
+	control: DIRECT_SIGNAL_CONTROL_POLICY,
+};
 
 function updateDirectSignalBinding(binding: DirectSignalBinding): void {
 	if (
@@ -20302,7 +20259,7 @@ function installDirectSignalControl(binding: DirectSignalBinding): void {
 	(STAGED_DOM?.view(element) ?? element).addEventListener('input', input);
 	binding.controlWriterCleanup = registerHydrationControlSignalWriter(
 		element,
-		binding.kind === 'checked' ? 'checked' : 'value',
+		binding.policy.kind === 'checked' ? 'checked' : 'value',
 		(value) =>
 			withoutSignalCandidate(() =>
 				runWithBlockSignalOwner(binding.scope, () => {
@@ -20348,10 +20305,7 @@ function activateDirectSignalBinding(
 		binding.unsubscribe = binding.handle[SIGNAL_BINDING_SUBSCRIBE](
 			nativeTransitionBindingNotify(binding, () => updateDirectSignalBinding(binding)),
 		);
-	if (revision !== undefined) {
-		installDirectSignalControl(binding);
-		if (!binding.pendingControl) consumeHydrationControl(binding.target as Element, revision);
-	}
+	if (revision !== undefined) binding.policy.control!.activate(binding, revision);
 }
 
 function createDirectSignalBinding(
@@ -20359,18 +20313,17 @@ function createDirectSignalBinding(
 	target: Node,
 	value: unknown,
 	site: string,
-	kind: DirectSignalBindingKind,
+	policy: DirectSignalBindingPolicy,
 	name?: string,
 	attributeKind?: DirectSignalAttributeKind,
 	text?: Text,
 ): DirectSignalBinding {
-	if (kind === 'value' && scope.block.idState.renderOwner?.controlLeases?.has(target as Element))
-		presentationMiss(false);
+	policy.control?.validateNew(scope, target, policy.kind);
 	const handle = isSignalHandle(value) ? value : null;
 	const binding: DirectSignalBinding = {
 		[DIRECT_SIGNAL_BINDING]: true,
 		scope,
-		kind,
+		policy,
 		target,
 		site,
 		name,
@@ -20382,9 +20335,7 @@ function createDirectSignalBinding(
 	// A previous text token has already gone through mount/hydration. Reuse
 	// it across capability changes; a raw SSR Text target still needs adoption.
 	if (text !== undefined) binding.text = text;
-	const controlSnapshot =
-		kind === 'value' || kind === 'checked' ? snapshotHydrationControl(target as Element) : null;
-	if (controlSnapshot !== null) validateDirectSignalControl(target as Element, site);
+	const controlSnapshot = policy.control?.snapshot(target, site) ?? null;
 	binding.pendingControl =
 		activeHydration() !== null &&
 		isWritableSignal(handle) &&
@@ -20401,7 +20352,7 @@ function createDirectSignalBinding(
 			updateDirectSignalBinding(binding);
 		});
 	} else activateDirectSignalBinding(binding, controlSnapshot?.revision);
-	if (binding.pendingControl) queueDirectSignalControlAdoption(binding);
+	if (binding.pendingControl) policy.control!.adopt(binding);
 	registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
 	return binding;
 }
@@ -20412,10 +20363,11 @@ function bindDirectSignal(
 	target: Node,
 	value: unknown,
 	site: string,
-	kind: DirectSignalBindingKind,
+	policy: DirectSignalBindingPolicy,
 	name?: string,
 	attributeKind?: DirectSignalAttributeKind,
 ): unknown {
+	const kind = policy.kind;
 	const prior =
 		typeof previous === 'object' &&
 		previous !== null &&
@@ -20432,7 +20384,7 @@ function bindDirectSignal(
 		// the ambient render frame may have started before document activation.
 		if (!signalDocumentEnabled) enableSignalBindings();
 		return runWithBlockSignalOwner(scope, () =>
-			bindDirectSignal(scope, previous, target, value, site, kind, name, attributeKind),
+			bindDirectSignal(scope, previous, target, value, site, policy, name, attributeKind),
 		);
 	}
 	if (handle === null && prior === null) {
@@ -20444,13 +20396,13 @@ function bindDirectSignal(
 		if (TRANSITION_JOURNAL !== null) journalBag();
 		const scalarTarget =
 			(kind === 'text' || kind === 'textOnlyChild') && previous instanceof Text ? previous : target;
-		return writeDirectSignalScalar(scalarTarget, value, kind, previous, name, attributeKind);
+		return policy.write(scalarTarget, value, kind, previous, name, attributeKind);
 	}
 	if (
 		prior !== null &&
 		!prior.disposed &&
 		prior.target === target &&
-		prior.kind === kind &&
+		prior.policy === policy &&
 		prior.site === site &&
 		prior.name === name &&
 		prior.attributeKind === attributeKind &&
@@ -20458,7 +20410,7 @@ function bindDirectSignal(
 	) {
 		if (prior.pendingControl) {
 			// The preceding attempt's action may have been dropped by rollback.
-			queueDirectSignalControlAdoption(prior);
+			policy.control!.adopt(prior);
 			return prior;
 		}
 		const next = readSignalBinding(handle!);
@@ -20471,7 +20423,7 @@ function bindDirectSignal(
 			kind === 'text' || kind === 'textOnlyChild'
 				? (prior?.text ?? prior?.target ?? target)
 				: target;
-		const token = writeDirectSignalScalar(
+		const token = policy.write(
 			scalarTarget,
 			value,
 			kind,
@@ -20495,7 +20447,7 @@ function bindDirectSignal(
 		signalTarget,
 		value,
 		site,
-		kind,
+		policy,
 		name,
 		attributeKind,
 		kind === 'text' || kind === 'textOnlyChild'
@@ -20554,7 +20506,7 @@ export function bindSignalText(
 		prior?.target ?? (previous instanceof Text ? previous : position),
 		value,
 		site,
-		onlyChild ? 'textOnlyChild' : 'text',
+		onlyChild ? DIRECT_SIGNAL_TEXT_ONLY_POLICY : DIRECT_SIGNAL_TEXT_POLICY,
 	);
 }
 
@@ -20568,7 +20520,24 @@ export function bindSignalAttribute(
 	site: string,
 	attributeKind: DirectSignalAttributeKind = 'attr',
 ): unknown {
-	return bindDirectSignal(scope, previous, element, value, site, 'attribute', name, attributeKind);
+	// Defined scalar equality needs no binding token/handle probe. Undefined
+	// still reconciles hydration; stable objects/functions can reveal handles.
+	if (
+		previous === value &&
+		value !== undefined &&
+		(value === null || (typeof value !== 'object' && typeof value !== 'function'))
+	)
+		return previous;
+	return bindDirectSignal(
+		scope,
+		previous,
+		element,
+		value,
+		site,
+		DIRECT_SIGNAL_ATTRIBUTE_POLICY,
+		name,
+		attributeKind,
+	);
 }
 
 /** @internal Compiler target for a direct signal/scalar value binding. */
@@ -20579,7 +20548,7 @@ export function bindSignalValue(
 	value: unknown,
 	site: string,
 ): unknown {
-	return bindDirectSignal(scope, previous, element, value, site, 'value');
+	return bindDirectSignal(scope, previous, element, value, site, DIRECT_SIGNAL_VALUE_POLICY);
 }
 
 /** @internal Compiler target for a direct signal/scalar checked binding. */
@@ -20590,7 +20559,7 @@ export function bindSignalChecked(
 	value: unknown,
 	site: string,
 ): unknown {
-	return bindDirectSignal(scope, previous, element, value, site, 'checked');
+	return bindDirectSignal(scope, previous, element, value, site, DIRECT_SIGNAL_CHECKED_POLICY);
 }
 
 /**
@@ -22583,7 +22552,22 @@ export function setStyleProperty(
 	// The compiler seeds each binding with its private scope, distinguishing a
 	// genuinely absent initial longhand from a preserved suspended-mount retry.
 	if (remove && previous === CURRENT_SCOPE) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
+	if (TRANSITION_JOURNAL !== null) {
+		const log = TRANSITION_JOURNAL;
+		let tail = log.length - 4;
+		// A declaration snapshots its binding bag immediately after the style.
+		// Only that metadata record is transparent; other writes and savepoints
+		// still require their own live-browser snapshot.
+		if (log[tail] === JOURNAL_BAG && log[tail + 1] === CURRENT_SCOPE?.slots[0]) tail -= 4;
+		if (
+			tail < TRANSITION_JOURNAL_CHECKPOINT ||
+			log[tail] !== JOURNAL_ATTR ||
+			log[tail + 1] !== el ||
+			log[tail + 2] !== 'style'
+		)
+			journalAttr(el, 'style');
+		else journalBag();
+	}
 	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, previous, name)) return;
 	const style = (STAGED_DOM?.view(el as HTMLElement) ?? (el as HTMLElement)).style;
 	if (remove) style.removeProperty(styleName(name));
@@ -23004,6 +22988,7 @@ export function setHostPropSources(
 	hasNestedChildren = false,
 	readStyle?: (value: unknown) => unknown,
 	deferControl = false,
+	writableTextareaValue = false,
 ): Record<string, unknown> {
 	const props = new Map<string, HostPropWriter>();
 	const resolved = resolveHostPropSources(el, sources, props, readStyle);
@@ -23023,6 +23008,7 @@ export function setHostPropSources(
 			props.get('checked')?.value,
 			props.get('defaultChecked')?.value,
 			props.get('multiple')?.value,
+			writableTextareaValue,
 		);
 	return resolved;
 }
@@ -23072,17 +23058,21 @@ function resolveSignalHostPropSources(
 	sources: readonly HostPropSource[],
 	readStyle?: (value: unknown) => unknown,
 	read: (handle: SignalHandle<unknown>) => unknown = readSignalBinding,
+	textarea = false,
 ): {
 	sources: readonly HostPropSource[];
 	handles: Set<SignalHandle<unknown>>;
+	writableTextareaValue?: boolean;
 } {
 	// Children keep their handle for the separate child binding; resolving them
 	// here would subscribe only the host props and strand later child updates.
 	const handles = new Set<SignalHandle<unknown>>();
 	let rows: HostPropSource[] | undefined;
+	let writableTextareaValue = false;
 	for (let i = 0; i < sources.length; i++) {
 		const source = sources[i];
 		if (!source[0]) {
+			if (textarea && source[1] === 'value') writableTextareaValue = isWritableSignal(source[2]);
 			const value =
 				source[1] === 'children' || (source[1] === 'style' && readStyle !== undefined)
 					? source[2]
@@ -23102,6 +23092,7 @@ function resolveSignalHostPropSources(
 		let copy: Record<string, unknown> | undefined;
 		for (const name of Object.keys(spread)) {
 			const current = (spread as Record<string, unknown>)[name];
+			if (textarea && name === 'value') writableTextareaValue = isWritableSignal(current);
 			const value =
 				name === 'children' || (name === 'style' && readStyle !== undefined)
 					? current
@@ -23120,7 +23111,9 @@ function resolveSignalHostPropSources(
 			rows[i] = [true, copy];
 		}
 	}
-	return { sources: rows ?? sources, handles };
+	return textarea
+		? { sources: rows ?? sources, handles, writableTextareaValue }
+		: { sources: rows ?? sources, handles };
 }
 
 function winningSignalHostControl(
@@ -23149,7 +23142,12 @@ function updateSignalHostPropSources(binding: SignalHostPropSourcesBinding): voi
 	if (binding.disposed || binding.pendingControl || binding.scope.block.disposed) return;
 	try {
 		runWithBlockSignalOwner(binding.scope, () => {
-			const next = resolveSignalHostPropSources(binding.sources, binding.readStyle);
+			const next = resolveSignalHostPropSources(
+				binding.sources,
+				binding.readStyle,
+				undefined,
+				binding.element.localName === 'textarea',
+			);
 			binding.resolved = setHostPropSources(
 				binding.element,
 				next.sources,
@@ -23157,6 +23155,8 @@ function updateSignalHostPropSources(binding: SignalHostPropSourcesBinding): voi
 				binding.scope,
 				binding.hasNestedChildren,
 				binding.readStyle,
+				false,
+				next.writableTextareaValue,
 			);
 			if (process.env.NODE_ENV !== 'production' && STAGED_DOM === null)
 				drainDevFormDiagnostics(binding.element);
@@ -23520,7 +23520,12 @@ export function bindSignalHostPropSources(
 		validateDirectSignalControl(element, site);
 		binding.pendingControl ||= activeHydration() !== null && controlSnapshot.editRevision > 0;
 	}
-	const next = resolveSignalHostPropSources(sources, readStyle);
+	const next = resolveSignalHostPropSources(
+		sources,
+		readStyle,
+		undefined,
+		element.localName === 'textarea',
+	);
 	binding.resolved = setHostPropSources(
 		element,
 		next.sources,
@@ -23529,6 +23534,7 @@ export function bindSignalHostPropSources(
 		hasNestedChildren,
 		readStyle,
 		binding.pendingControl,
+		next.writableTextareaValue,
 	);
 	if (STAGED_COMMIT_CAPTURE !== null) {
 		DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
@@ -24129,6 +24135,8 @@ interface HandlerBundle {
 	args: any[] | 1 | 2 | -1 | -2;
 	a0?: any;
 	a1?: any;
+	// Live compiled bundles retain their host; queued dispatch snapshots do not update.
+	el?: Element;
 }
 
 interface InvalidEventListenerSlot {
@@ -24207,30 +24215,43 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 // Project bundles only during an active staged capture, which initializes the
 // driver before publishing its capture. The driver remains installed afterward;
 // a direct guard avoids an idle projection call or an ordinary self-assignment.
+// A live scope token already captures unchanged authority. Explicit/environment
+// and document owners still refresh it; staged updates must publish in order
+// even when the committed map matches, because an earlier owner write may be pending.
 // ---------------------------------------------------------------------------
 
 const EMPTY_ARGS: any[] = [];
 let SIGNAL_EVENT_OWNERS: WeakMap<Element, SignalOwner | ScopeImpl | BlockImpl> | null = null;
 
-/** Publish a native delegated handler with the same rollback ownership as its bindings. */
-export function setEventHandler(el: Element, key: string, handler: any): void {
-	if (TRANSITION_JOURNAL !== null) {
-		TRANSITION_JOURNAL.push(
-			JOURNAL_PROP,
-			el,
-			key,
-			(STAGED_DOM?.view(el as any) ?? (el as any))[key],
-		);
-		journalBag();
+/** Publish a native handler; compiled bundle updates omit the key to refresh only authority. */
+export function setEventHandler(el: Element, key?: string, handler?: any): void {
+	if (key !== undefined) {
+		if (TRANSITION_JOURNAL !== null) {
+			TRANSITION_JOURNAL.push(
+				JOURNAL_PROP,
+				el,
+				key,
+				(STAGED_DOM?.view(el as any) ?? (el as any))[key],
+			);
+			journalBag();
+		}
+		(STAGED_DOM?.view(el as any) ?? (el as any))[key] = handler;
 	}
-	(STAGED_DOM?.view(el as any) ?? (el as any))[key] = handler;
-	if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
+	// Explicit authority also applies to handlers in modules with no signal bindings.
+	const explicitOwner =
+		activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
+			? currentExplicitSignalOwner()
+			: null;
+	if (
+		SIGNAL_BINDINGS_ENABLED ||
+		signalDocumentEnabled ||
+		explicitOwner !== null ||
+		SIGNAL_EVENT_OWNERS !== null
+	) {
 		// Retain the precise invocation for an event-only reader whose signal
 		// module may arrive later. No owner or wrapper is allocated speculatively.
 		const owner =
-			(activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
-				? currentExplicitSignalOwner()
-				: null) ??
+			explicitOwner ??
 			(signalDocumentEnabled || CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined
 				? CURRENT_SCOPE === null
 					? currentSignalOwner()
@@ -24246,17 +24267,25 @@ export function setEventHandler(el: Element, key: string, handler: any): void {
 				SCOPE_SIGNAL_OWNERS.get(owner) === undefined
 			)
 				SCOPE_SIGNAL_OWNERS.set(owner, false);
+			// Later writers must replace explicit authority with the usual scope
+			// token, including when both writers are still waiting for publication.
+			const owners = (SIGNAL_EVENT_OWNERS ??= new WeakMap());
 			if (STAGED_COMMIT_CAPTURE !== null)
-				DEFERRED_LAYOUT_DRIVER!.stageAction(() =>
-					(SIGNAL_EVENT_OWNERS ??= new WeakMap()).set(el, owner),
-				);
-			else (SIGNAL_EVENT_OWNERS ??= new WeakMap()).set(el, owner);
+				DEFERRED_LAYOUT_DRIVER!.stageAction(() => owners.set(el, owner));
+			else {
+				if (TRANSITION_JOURNAL !== null) {
+					const previous = owners.get(el);
+					if (previous !== owner)
+						TRANSITION_JOURNAL.push(JOURNAL_EVENT_OWNER, owners, el, previous);
+				}
+				owners.set(el, owner);
+			}
 		}
 	}
 }
 
 export function evt0(el: Element, key: string, fn: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: EMPTY_ARGS, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args: EMPTY_ARGS, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -24265,9 +24294,23 @@ export function evt0u(d: HandlerBundle, fn: any): void {
 	if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
 	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 	d.fn = fn;
+	if (
+		(SIGNAL_BINDINGS_ENABLED ||
+			signalDocumentEnabled ||
+			activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			SIGNAL_EVENT_OWNERS !== null) &&
+		(activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			STAGED_COMMIT_CAPTURE !== null ||
+			signalDocumentEnabled ||
+			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
+			SIGNAL_EVENT_OWNERS?.get(d.el!) !== CURRENT_SCOPE)
+	)
+		setEventHandler(d.el!);
 }
 export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: 1, a0, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args: 1, a0, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -24277,9 +24320,23 @@ export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
 	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 	d.fn = fn;
 	d.a0 = a0;
+	if (
+		(SIGNAL_BINDINGS_ENABLED ||
+			signalDocumentEnabled ||
+			activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			SIGNAL_EVENT_OWNERS !== null) &&
+		(activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			STAGED_COMMIT_CAPTURE !== null ||
+			signalDocumentEnabled ||
+			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
+			SIGNAL_EVENT_OWNERS?.get(d.el!) !== CURRENT_SCOPE)
+	)
+		setEventHandler(d.el!);
 }
 export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: 2, a0, a1, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args: 2, a0, a1, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -24290,22 +24347,36 @@ export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
 	d.fn = fn;
 	d.a0 = a0;
 	d.a1 = a1;
+	if (
+		(SIGNAL_BINDINGS_ENABLED ||
+			signalDocumentEnabled ||
+			activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			SIGNAL_EVENT_OWNERS !== null) &&
+		(activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			STAGED_COMMIT_CAPTURE !== null ||
+			signalDocumentEnabled ||
+			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
+			SIGNAL_EVENT_OWNERS?.get(d.el!) !== CURRENT_SCOPE)
+	)
+		setEventHandler(d.el!);
 }
 // Lifted block arrows receive the native event before their lexical captures.
 // Negative arities preserve the ordinary bundle's exact authored argument list
 // and reuse its field layout, update helpers, journal, and dispatch snapshot.
 export function evt1e(el: Element, key: string, fn: any, a0: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: -1, a0, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args: -1, a0, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
 export function evt2e(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: -2, a0, a1, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args: -2, a0, a1, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
 export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBundle {
-	const d: HandlerBundle = { fn, args, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -24315,6 +24386,20 @@ export function evtNu(d: HandlerBundle, fn: any, args: any[]): void {
 	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 	d.fn = fn;
 	d.args = args;
+	if (
+		(SIGNAL_BINDINGS_ENABLED ||
+			signalDocumentEnabled ||
+			activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			SIGNAL_EVENT_OWNERS !== null) &&
+		(activeSynchronousSignalOwner !== null ||
+			activeSignalOwnerEnvironment !== undefined ||
+			STAGED_COMMIT_CAPTURE !== null ||
+			signalDocumentEnabled ||
+			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
+			SIGNAL_EVENT_OWNERS?.get(d.el!) !== CURRENT_SCOPE)
+	)
+		setEventHandler(d.el!);
 }
 
 // Delegated event names registered by compiled modules' `delegateEvents([...])`
@@ -24906,6 +24991,9 @@ const CAPTURE_PATH: any[] = [];
 // Snapshot each native phase before user code runs. Re-entrant dispatch borrows a
 // separate frame, and clearing the frame releases all node/handler references.
 const CAPTURE_SLOTS: EventSlot[] = [];
+// Authority is a phase snapshot too: an earlier callback may publish a new
+// handler/owner before a queued ancestor runs. Allocate only after ownership exists.
+let CAPTURE_OWNERS: (SignalOwner | ScopeImpl | BlockImpl | undefined)[] | null = null;
 
 function snapshotDelegatedSlots(base: number, type: DelegatedEventType, capture: boolean): void {
 	const key = capture ? type.captureKey : type.bubbleKey;
@@ -24925,6 +25013,8 @@ function snapshotDelegatedSlots(base: number, type: DelegatedEventType, capture:
 				node.localName === 'textarea')
 				? null
 				: slot;
+		if (SIGNAL_EVENT_OWNERS !== null && CAPTURE_SLOTS[index] != null)
+			(CAPTURE_OWNERS ??= [])[index] = SIGNAL_EVENT_OWNERS.get(node);
 	}
 }
 
@@ -25175,7 +25265,11 @@ function buildDelegatedPath(event: Event, listener: Node, path = event.composedP
 // receive the event, exactly as separate native listeners would. `reportError`
 // surfaces through the global error event (window.onerror) like an uncaught
 // listener exception; console.error is the non-browser fallback.
-function fireEventSlot(slot: EventSlot, event: Event, currentTarget: Element): void {
+function fireEventSlot(
+	slot: EventSlot,
+	event: Event,
+	recorded: SignalOwner | ScopeImpl | BlockImpl | undefined,
+): void {
 	// DOM writes can synchronously dispatch native events (for example blur when
 	// disabling a focused input). Their handlers are outside component rendering,
 	// even when the compiled DOM patch is still on the render stack. Restore that
@@ -25224,7 +25318,6 @@ function fireEventSlot(slot: EventSlot, event: Event, currentTarget: Element): v
 		invokeInvalidEventListener(`${event.type} event`, slot, event);
 	};
 	try {
-		const recorded = SIGNAL_EVENT_OWNERS?.get(currentTarget);
 		const owner =
 			recorded instanceof ScopeImpl || recorded instanceof BlockImpl
 				? scopeSignalOwner(recorded)
@@ -25405,7 +25498,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 			const slot = CAPTURE_SLOTS[i];
 			if (slot != null && !consumeBindingEvent(event, current, false)) {
 				setCurrentTarget(event, current, frame);
-				fireEventSlot(slot, event, current);
+				fireEventSlot(slot, event, CAPTURE_OWNERS?.[i]);
 				if ((frame.flags & 1) !== 0) break;
 			}
 			if (targetOnly) break;
@@ -25423,6 +25516,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 	} finally {
 		CAPTURE_PATH.length = pathBase;
 		CAPTURE_SLOTS.length = pathBase;
+		if (CAPTURE_OWNERS !== null) CAPTURE_OWNERS.length = pathBase;
 		if (propagationStarted) endDelegatedPropagation(event, stop, null);
 		if (submitRec !== null) {
 			ACTIVE_SUBMIT_DISPATCH = prevSubmitRec;
@@ -25473,7 +25567,7 @@ function dispatchDelegatedCapture(
 			const slot = CAPTURE_SLOTS[i];
 			if (slot != null && !consumeBindingEvent(event, CAPTURE_PATH[i], true)) {
 				setCurrentTarget(event, CAPTURE_PATH[i], frame);
-				fireEventSlot(slot, event, CAPTURE_PATH[i]);
+				fireEventSlot(slot, event, CAPTURE_OWNERS?.[i]);
 				if ((frame.flags & 1) !== 0) break;
 			}
 		}
@@ -25481,6 +25575,7 @@ function dispatchDelegatedCapture(
 		stopped = frame?.flags !== 0 || (!wasCancelled && event.cancelBubble);
 		CAPTURE_PATH.length = pathBase;
 		CAPTURE_SLOTS.length = pathBase;
+		if (CAPTURE_OWNERS !== null) CAPTURE_OWNERS.length = pathBase;
 		endDelegatedPropagation(event, stop, immediate);
 		clearCurrentTarget(event);
 		try {
@@ -26310,7 +26405,7 @@ function setNativeChangeDiagnosticMetadata(el: Element, value: unknown): void {
  * attribute write never clobbers what the user typed, and it keeps SSR
  * output, form.reset() baselines, and differential byte-compares aligned.
  */
-export function setValue(el: Element, value: unknown): void {
+export function setValue(el: Element, value: unknown, writableTextareaEcho = false): void {
 	// An unmatched scalar or spread is not permission to steal an offered control.
 	if (CURRENT_SCOPE?.block.idState.renderOwner?.controlLeases?.has(el)) presentationMiss(false);
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
@@ -26362,6 +26457,17 @@ export function setValue(el: Element, value: unknown): void {
 	// the reset button's default action, i.e. any script-dispatched click.
 	// IME: an UNCHANGED rendered value must not cancel an active composition;
 	// a genuinely changed one still wins (React: setState during composition).
+	// A writable textarea's native input already published this exact value. An
+	// echo must retain the browser's edit transaction: changing its text-content
+	// reset baseline splits native Undo into individual keystrokes. Scalar and
+	// read-only values keep the ordinary attribute mirroring contract.
+	if (writableTextareaEcho) {
+		if ((STAGED_DOM?.view(input) ?? input).value === s) return;
+		if (!(ctrl.composing && Object.is(prev, value))) (STAGED_DOM?.view(input) ?? input).value = s;
+		if ((STAGED_DOM?.view(input) ?? input).defaultValue !== s)
+			(STAGED_DOM?.view(input) ?? input).defaultValue = s;
+		return;
+	}
 	if (!(ctrl.composing && Object.is(prev, value)) && valueNeedsWrite(input, value))
 		(STAGED_DOM?.view(input) ?? input).value = s;
 	if ((STAGED_DOM?.view(input) ?? input).defaultValue !== s)
@@ -26800,6 +26906,7 @@ function applyFormControlValues(
 	checked: unknown,
 	defaultChecked: unknown,
 	multiple: unknown,
+	writableTextareaValue = false,
 ): void {
 	const ctrl = armControlled(el);
 	const first = !ctrl.formSeen;
@@ -26842,7 +26949,7 @@ function applyFormControlValues(
 
 	if (tag === 'textarea') {
 		const textarea = el as HTMLTextAreaElement;
-		setValue(textarea, value);
+		setValue(textarea, value, writableTextareaValue);
 		if (value == null) {
 			if (defaultValue != null) setDefaultValue(textarea, defaultValue, first);
 			else if (!first && (STAGED_DOM?.view(textarea) ?? textarea).defaultValue !== '')
@@ -28682,7 +28789,7 @@ export const Children = {
 };
 
 // ---------------------------------------------------------------------------
-// Component slot — JSX `<Foo>` / `<ctx.Provider>` invocation as a Block
+// Component slot — JSX `<Foo>` / `<Context>` invocation as a Block
 // ---------------------------------------------------------------------------
 
 interface CompSlot {
@@ -30768,7 +30875,10 @@ function flattenDeoptChildren(out: any[], v: any): void {
 // (the old compact-then-match-in-order behavior morphed them: inputs swapped
 // values, a clicked button could morph into a submit button MID-DISPATCH and
 // fire a phantom form submission). Nested arrays key within their slot;
-// explicit keys ride inside the same scheme.
+// explicit keys ride inside the same scheme. Nested keys start with ':<index>'
+// and end in distinct 'i' (index) and 'k' (explicit key) namespaces, so user keys
+// cannot impersonate deeper wrappers. Top-level string keys starting with ':'
+// escape it as '::'; ordinary flat keys keep their allocation-free path.
 function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefix: string): void {
 	if (v == null || v === false || v === true || v === '') return;
 	if (Array.isArray(v)) {
@@ -30776,20 +30886,26 @@ function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefi
 		for (let i = 0; i < v.length; i++) {
 			const item = v[i];
 			if (Array.isArray(item)) {
-				flattenDeoptChildrenKeyed(outVals, outKeys, item, prefix + i + ':');
+				flattenDeoptChildrenKeyed(outVals, outKeys, item, prefix + ':' + i);
 			} else if (item == null || item === false || item === true || item === '') {
 				// empty — consumes its position, emits nothing
 			} else {
 				outVals.push(item);
 				const k = keyForItem(item, i);
-				outKeys.push(prefix === '' ? k : prefix + String(k));
+				if (prefix === '') {
+					outKeys.push(typeof k === 'string' && k[0] === ':' ? ':' + k : k);
+				} else {
+					const explicit = item?.$$kind === ELEMENT_TAG && item.key != null;
+					outKeys.push(prefix + ':' + (explicit ? 'k' : 'i') + String(k));
+				}
 			}
 		}
 		return;
 	}
 	outVals.push(v);
+	const k = v?.$$kind === ELEMENT_TAG && v.key != null ? v.key : 0;
 	outKeys.push(
-		prefix === '' ? (v?.$$kind === ELEMENT_TAG && v.key != null ? v.key : 0) : prefix + '0',
+		prefix === '' ? (typeof k === 'string' && k[0] === ':' ? ':' + k : k) : prefix + ':i0',
 	);
 }
 
@@ -35355,7 +35471,7 @@ export function tryBlock(
 		// slot; mountTry brackets the content and the seeded use() values let the try
 		// body render its success arm synchronously. `resolveHydrationOpen` also covers
 		// the SOLE-hole case (a @try that is the only thing a component/arm renders —
-		// the router `Match` shape `<ctx.Provider> @try {…}`), where the anchor is the
+		// the router `Match` shape `<Context> @try {…}`), where the anchor is the
 		// enclosing scope's end marker and the cursor is parked on the @try's open.
 		const open = passthrough ? null : (hydration?.resolveOpen(anchor ?? null, domParent) ?? null);
 		if (passthrough) {
@@ -43716,6 +43832,32 @@ export function hydrateRoot(
 	propsOrOptions?: any,
 	rootOptions?: RootOptions,
 ): Root {
+	return hydrateRootWithOutputHandler(
+		container,
+		bodyOrElement,
+		propsOrOptions,
+		rootOptions,
+		renderReturnedValue,
+	);
+}
+
+/** Compiler-only hydration for a statically proven void `@{}` entry component. */
+export function __hydrateVoidRoot(
+	container: RootContainer,
+	body: ComponentBody,
+	props?: any,
+	options?: RootOptions,
+): Root {
+	return hydrateRootWithOutputHandler(container, body, props, options, null);
+}
+
+function hydrateRootWithOutputHandler(
+	container: RootContainer,
+	bodyOrElement: ComponentBody | ElementDescriptor,
+	propsOrOptions: any,
+	rootOptions: RootOptions | undefined,
+	outputHandler: OutputHandler | null,
+): Root {
 	assertValidRootContainer(container);
 	let body: ComponentBody;
 	let props: any;
@@ -43799,7 +43941,7 @@ export function hydrateRoot(
 		body,
 		props,
 		undefined,
-		renderReturnedValue,
+		outputHandler,
 	);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(rootBlock, body);
@@ -43849,7 +43991,7 @@ export function hydrateRoot(
 		body,
 		rootKey,
 		idState,
-		renderReturnedValue,
+		outputHandler,
 		ownerToken,
 		rootOptions?.signalOwner ??
 			(signalDocumentEnabled ? documentSignalOwner(container) : undefined),
@@ -43877,7 +44019,7 @@ export function hydrateRoot(
 				body,
 				props,
 				undefined,
-				renderReturnedValue,
+				outputHandler,
 			);
 			rootBlock.idState = idState;
 			registerRootErrorHandlers(rootBlock, rootOptions);

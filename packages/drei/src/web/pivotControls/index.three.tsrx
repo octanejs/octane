@@ -21,7 +21,7 @@ import { Html } from '@octanejs/drei';
 import { Line } from '../../core/lines.three.tsrx';
 import { calculateScaleFactor } from '../../core/calculateScaleFactor.js';
 import { PivotAnnotation } from './annotation.tsrx';
-import { context, type Limits, type OnDragStartProps, type PivotContext } from './context.js';
+import { context as PivotControlsContext, type Limits, type OnDragStartProps, type PivotContext } from './context.js';
 
 const mL0 = new THREE.Matrix4(), mW0 = new THREE.Matrix4(), mP = new THREE.Matrix4(), mPInv = new THREE.Matrix4();
 const mW = new THREE.Matrix4(), mL = new THREE.Matrix4(), mL0Inv = new THREE.Matrix4(), mdL = new THREE.Matrix4(), mG = new THREE.Matrix4();
@@ -111,7 +111,7 @@ export function calculateOffset(
 }
 
 function AxisArrow({ direction, axis }: { direction: THREE.Vector3; axis: 0 | 1 | 2 }) @{
-	const config = useContext(context), controls = useThree((state) => state.controls) as {
+	const config = useContext(PivotControlsContext), controls = useThree((state) => state.controls) as {
 		enabled: boolean;
 	} | undefined;
 	const divRef = useRef<HTMLDivElement | null>(null), objectRef = useRef<THREE.Group | null>(null);
@@ -250,7 +250,7 @@ function PlaneSlider({
 	dir2: THREE.Vector3;
 	axis: 0 | 1 | 2;
 }) @{
-	const config = useContext(context), controls = useThree((state) => state.controls) as {
+	const config = useContext(PivotControlsContext), controls = useThree((state) => state.controls) as {
 		enabled: boolean;
 	} | undefined;
 	const divRef = useRef<HTMLDivElement | null>(null), objectRef = useRef<THREE.Group | null>(
@@ -422,7 +422,7 @@ function AxisRotator({
 	dir2: THREE.Vector3;
 	axis: 0 | 1 | 2;
 }) @{
-	const config = useContext(context), controls = useThree((state) => state.controls) as {
+	const config = useContext(PivotControlsContext), controls = useThree((state) => state.controls) as {
 		enabled: boolean;
 	} | undefined;
 	const divRef = useRef<HTMLDivElement | null>(null), objectRef = useRef<THREE.Group | null>(
@@ -560,7 +560,7 @@ function AxisRotator({
 }
 
 function ScalingSphere({ direction, axis }: { direction: THREE.Vector3; axis: 0 | 1 | 2 }) @{
-	const config = useContext(context), size = useThree((state) => state.size), controls = useThree(
+	const config = useContext(PivotControlsContext), size = useThree((state) => state.size), controls = useThree(
 		(state) => state.controls,
 	) as { enabled: boolean } | undefined;
 	const divRef = useRef<HTMLDivElement | null>(null), objectRef = useRef<THREE.Group | null>(
@@ -827,7 +827,7 @@ export function PivotControls({
 		}
 	});
 	useImperativeHandle((forwardedRef ?? null) as any, () => ref.current!, []);
-	<context.Provider value={config}>
+	<PivotControlsContext value={config}>
 		<group ref={parentRef}>
 			<group ref={ref} matrix={matrix} matrixAutoUpdate={false} {...props}>
 				<group visible={visible} ref={gizmoRef} position={offset} rotation={rotation}>
@@ -871,7 +871,7 @@ export function PivotControls({
 				<group ref={childrenRef}>{children}</group>
 			</group>
 		</group>
-	</context.Provider>
+	</PivotControlsContext>
 }
 
 export type { OnDragStartProps, PivotContext } from './context.js';

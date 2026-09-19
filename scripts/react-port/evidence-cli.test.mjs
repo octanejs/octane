@@ -496,7 +496,7 @@ function createCompletePackage(root) {
 			files: ['src', 'README.md', 'UPSTREAM.md', 'LICENSE'],
 			exports: { '.': './src/index.ts' },
 			scripts: { test: 'vitest run' },
-			peerDependencies: { octane: 'workspace:^0.1.51 || ^0.2.0' },
+			peerDependencies: { octane: 'workspace:^0.1.51 || ^0.2.0 || ^0.3.0' },
 			devDependencies: { octane: 'workspace:*' },
 		}),
 	);
@@ -1003,7 +1003,7 @@ describe('evidence CLI', () => {
 		);
 	});
 
-	test('witnesses upstream type lanes against the pinned declarations when artifacts exist', () => {
+	test('witnesses upstream type lanes against explicitly opted-in pinned declarations', () => {
 		const { workspaceRoot } = createReadyBatch();
 		const packageDirectory = createCompletePackage(workspaceRoot);
 		const put = (file, contents) => {
@@ -1091,23 +1091,20 @@ describe('evidence CLI', () => {
 			['upstream-types-pristine', 'tsc'],
 			['upstream-types-adapted', 'tsrx-tsc'],
 		]) {
-			assert.doesNotThrow(
-				() =>
-					assertApprovedGateCommand(
-						[gate],
-						[
-							'pnpm',
-							'exec',
-							compiler,
-							'--noEmit',
-							'-p',
-							`packages/widget/typetests/tsconfig.${gate.endsWith('pristine') ? 'pristine' : 'adapted'}.json`,
-						],
-						node,
-						{ workspaceRoot },
-					),
-				gate,
-			);
+			const configFile = `typetests/tsconfig.${gate.endsWith('pristine') ? 'pristine' : 'adapted'}.json`;
+			const validate = () =>
+				assertApprovedGateCommand(
+					[gate],
+					['pnpm', 'exec', compiler, '--noEmit', '-p', `packages/widget/${configFile}`],
+					node,
+					{ workspaceRoot },
+				);
+			// Authenticated artifacts alone do not grant an opacity waiver.
+			assert.throws(validate, /any or unknown/i, gate);
+			const config = JSON.parse(readFileSync(path.join(packageDirectory, configFile), 'utf8'));
+			config.reactPortEvidence.publicMode = 'pinned';
+			put(configFile, JSON.stringify(config));
+			assert.doesNotThrow(validate, gate);
 		}
 		// New erasure beyond the pinned contract still fails the adapted lane.
 		put(

@@ -15,7 +15,7 @@ export function UniversalBoundaryFixture(props) @{
 		return () => props.log('dom-cleanup');
 	}, [props.log]);
 	<>
-		<UniversalTheme.Provider value={props.theme}>
+		<UniversalTheme value={props.theme}>
 			@try {
 				<>
 					<ObjectBoundary root={props.root} component={props.component} props={props.childProps} />
@@ -24,7 +24,7 @@ export function UniversalBoundaryFixture(props) @{
 			} @catch (error) {
 				<span class="caught">{'caught: ' + error.message}</span>
 			}
-		</UniversalTheme.Provider>
+		</UniversalTheme>
 	</>
 }
 

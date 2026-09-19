@@ -743,7 +743,7 @@ describe('Strong memoization preserves dependency and setup semantics', () => {
 	it('invalidates a child whose setup custom hook reads context', () => {
 		function ContextHost(props: { value: string }): OctaneNode {
 			return createElement(
-				StrongTheme.Provider,
+				StrongTheme,
 				{ value: props.value },
 				createElement(StrongCustomHookContext, { context: StrongTheme }),
 			);

@@ -7,14 +7,14 @@ dedicated `.test-d.ts` assertion files at the pin.
 
 - Compiler: `tsc`
 - Project: `typetests/pristine/tsconfig.json`
-- Includes the vendored `@tanstack/react-pacer@0.22.1` source under `upstream/src`
+- Includes the vendored `@tanstack/react-pacer@0.23.0` source under `upstream/src`
 - Inventory: `audit/upstream-types.json` (per-file sha256; empty assertion groups)
 
 ## Adapted
 
 - Compiler: `tsrx-tsc`
 - Project: `typetests/adapted/tsconfig.json`
-- Includes the complete Octane adapter source under `src/` only (one-for-one with
+- Includes the complete Octane adapter source under `src/` (one-for-one with
   upstream `test:types`)
 - Inventory: `audit/adapted-types.json`
 
@@ -41,7 +41,12 @@ comparison of every mapped file:
 6. Renderable types in Subscribe signatures: `ReactNode` / `FunctionComponent` → Octane equivalents
 7. Provider context helpers extracted to adapted-only `provider/context.ts`
 8. Adapted-only modules: `src/internal.ts` and `src/provider/context.ts`
+9. JSX provider tags: `Context.Provider` → `Context` only for module-level `const`
+   contexts created directly by React/Octane's named `createContext` import;
+   retain ordinary `Provider` members and bindings that shadow the context.
 
 Any other structural change is drift. Controls reject a skipped adapted file, an
 unauthorized change outside these transforms, a deleted assertion group, or a
-removed `@ts-expect-error`.
+removed `@ts-expect-error`, or erasing an unrelated `Provider` member.
+
+Both source programs also include independent public contract probes. The separate tests/types program checks all public entrypoints. These authored assertions do not add fabricated upstream registrations.

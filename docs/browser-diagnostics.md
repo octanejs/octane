@@ -31,7 +31,52 @@ Compare timestamps to see whether a socket failure precedes page closure,
 server teardown, or resource pressure. These are observations, not proof of
 causation. The intermittent disconnect's root cause is still unconfirmed; the
 initial controlled trials passed and did not establish memory, disk or file
-limit exhaustion. No timeout increase, retry or browser workaround is included.
+limit exhaustion.
+
+## Base UI headless transport
+
+The September 18 failure reproduced locally in Chromium headless shell during
+the full adapted suite, after 8,481 passing tests. It also reproduced while
+only loading the test files, including with diagnostics disabled. The browser
+closed both the orchestrator and tester WebSockets before server/provider
+teardown, without a page crash or navigation. Chromium reported an empty
+transport error; its internal cause is still unconfirmed.
+
+Changing Chromium 149 from headless shell to new headless mode was not sufficient:
+one complete run passed all 8,709 adapted tests, but a repeat disconnected
+after 7,235. Moving the React oracle to that mode also triggered `act()` warnings
+in a nested context-menu pointer test. Neither failure was suppressed.
+
+Playwright 1.63.0 / Chromium 153 also disconnected on a repeated full run, after
+7,034 passing tests, so the toolchain remains unchanged. Navigation-start
+and HMR tracing did not observe a reload request before the disconnect.
+
+The adapted Base UI browser test server now sends `Cache-Control: no-store`. Three
+consecutive complete 315-file loading probes passed with this setting on the
+original Playwright 1.61.1 / Chromium 149 toolchain. Four consecutive full adapted
+runs also passed all 8,709 tests each. Both lanes retain the default
+headless-shell configuration and UTC timezone. These controls implicate the
+cached module-loading path; they do not establish the browser-internal cause.
+Test inventories, assertions, isolation, timeouts and retry policies are unchanged.
+
+The React oracle retains its original test-server settings. The nested
+context-menu `act()` warning occurred both with the no-store experiment and in an
+untouched reference repeat (8,725 passes, one failure), after an untouched run
+passed all 8,726 tests. It is an independent intermittent baseline failure, not
+evidence that the header caused it. Console-error checks remain enabled.
+
+## Intersection Observer cold dependency reload
+
+A separate cold-start failure aborted the adapted Intersection Observer browser
+test import: Vite discovered `devalue` during the import, rebuilt its optimized
+dependencies, and reloaded the running test. This lane now preloads
+`octane > devalue`, the nested dependency used by Octane's RPC client.
+The browser-tooling regression runs the existing two behavior tests from a fresh
+cache and rejects Vitest's unexpected-reload warning. It fails with the original
+configuration and passes with the preload; five additional cold starts also
+passed without the warning. No test cases or assertions were removed.
+
+## Observer constraints
 
 The lifecycle observer depends on the pinned Vitest Playwright provider and
 attaches after the initial page navigation. A real Chromium smoke test in normal

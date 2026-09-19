@@ -210,13 +210,13 @@ function FunctionSwitchShell(props) @{
 	const [value, setValue] = useState('initial');
 	_setFunctionSwitchMode = setTagged;
 	_setFunctionSwitchContext = setValue;
-	<FunctionSwitchContext.Provider value={value}>
+	<FunctionSwitchContext value={value}>
 		<FunctionSwitchPassthrough
 			tagged={tagged}
 			taggedChild={props.children}
 			initialChild={props.initialChild}
 		/>
-	</FunctionSwitchContext.Provider>
+	</FunctionSwitchContext>
 }
 
 export function FunctionToTaggedChildrenHost(props) @{

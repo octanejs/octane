@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false,
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "paths": {
+      "react": ["../../node_modules/@types/react/index.d.ts"],
+      "@octanejs/tanstack-table": ["../../src/index.ts"],
+      "@octanejs/tanstack-table/*": ["../../src/*.ts"]
+    },
+    "verbatimModuleSyntax": false
+  },
+  "include": ["./*.test-d.ts", "../../src/**/*"],
+  "exclude": ["node_modules"],
+  "reactPortEvidence": {
+    "gate": "public-types",
+    "publicMode": "pinned"
+  }
+}

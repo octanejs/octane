@@ -108,7 +108,7 @@ export function BatchProvider<NodeType extends Node = Node, EdgeType extends Edg
 
 	const value = useMemo(() => ({ nodeQueue, edgeQueue }), []);
 
-	return <BatchContext.Provider value={value}>{children}</BatchContext.Provider>;
+	return <BatchContext value={value}>{children}</BatchContext>;
 }
 
 export function useBatchContext(..._rest: [slot?: symbol]) {

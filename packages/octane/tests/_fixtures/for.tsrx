@@ -514,13 +514,13 @@ export function FastContextGetterList(props: {
 	items: Array<{ id: number; label: string }>;
 	value: string;
 }) @{
-	<FastRowContext.Provider value={props.value}>
+	<FastRowContext value={props.value}>
 		<ul id="fast-context-getter-list">
 			@for (const row of props.items; key row.id) {
 				<li class="fast-context-getter-row">{row.label as string}</li>
 			}
 		</ul>
-	</FastRowContext.Provider>
+	</FastRowContext>
 }
 
 export function FastRenderableProbe(props: {
@@ -536,11 +536,11 @@ export function FastMappedRenderableList(props: {
 	items: Array<{ id: number; content: OctaneNode }>;
 	value: string;
 }) @{
-	<FastRowContext.Provider value={props.value}>
+	<FastRowContext value={props.value}>
 		<ul id="fast-renderable-list">{props.items.map(
 			(row) => <li class="fast-renderable-row" key={row.id}>{row.content}</li>,
 		)}</ul>
-	</FastRowContext.Provider>
+	</FastRowContext>
 }
 
 export function FastMappedBoundaryList(props: {
@@ -721,7 +721,7 @@ interface HostBindingListProps {
 
 export function HostBindingList(props: HostBindingListProps) @{
 	const version = props.version;
-	<FastRowContext.Provider value={props.context}>
+	<FastRowContext value={props.context}>
 		<ul>
 			@for (const row of props.items; key row.id) {
 				<li
@@ -741,12 +741,12 @@ export function HostBindingList(props: HostBindingListProps) @{
 				</li>
 			}
 		</ul>
-	</FastRowContext.Provider>
+	</FastRowContext>
 }
 
 export function HostMappedBindingList(props: HostBindingListProps) @{
 	const version = props.version;
-	<FastRowContext.Provider value={props.context}>
+	<FastRowContext value={props.context}>
 		<ul>{props.items.map(
 			(row) => <li
 				key={row.id}
@@ -765,5 +765,5 @@ export function HostMappedBindingList(props: HostBindingListProps) @{
 				</span>
 			</li>,
 		)}</ul>
-	</FastRowContext.Provider>
+	</FastRowContext>
 }

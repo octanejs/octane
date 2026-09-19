@@ -103,7 +103,5 @@ export function LexicalComposer(props: Props) @{
 		editor.setEditable(isEditable !== undefined ? isEditable : true);
 	}, []);
 
-	<LexicalComposerContext.Provider
-		value={composerContext}
-	>{props.children}</LexicalComposerContext.Provider>
+	<LexicalComposerContext value={composerContext}>{props.children}</LexicalComposerContext>
 }

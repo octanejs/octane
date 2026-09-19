@@ -24,6 +24,7 @@ async function flush() {
 }
 
 describe('useQuery lifecycle (via QueryClientProvider)', () => {
+	// @parity-case conformance:0ded035c4aa94922
 	it('pending -> success', async () => {
 		let resolveFn: (v: string) => void = () => {};
 		const queryFn = () => new Promise<string>((r) => (resolveFn = r));
@@ -36,6 +37,7 @@ describe('useQuery lifecycle (via QueryClientProvider)', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:4f4f4ffe44244f05
 	it('pending -> error (retry disabled)', async () => {
 		let rejectFn: (e: Error) => void = () => {};
 		const queryFn = () => new Promise<string>((_res, rej) => (rejectFn = rej));
@@ -50,6 +52,7 @@ describe('useQuery lifecycle (via QueryClientProvider)', () => {
 });
 
 describe('useQueryClient', () => {
+	// @parity-case conformance:89de76a78d6909f7
 	it('resolves the client provided by QueryClientProvider', async () => {
 		let seen: unknown = null;
 		const r = mount(ProbeApp, { client, onClient: (c: unknown) => (seen = c) });
@@ -61,6 +64,7 @@ describe('useQueryClient', () => {
 });
 
 describe('useMutation lifecycle', () => {
+	// @parity-case conformance:d07d05fa8332f6c1
 	it('idle -> pending -> success on mutate()', async () => {
 		let resolveFn: (v: string) => void = () => {};
 		const mutationFn = () => new Promise<string>((r) => (resolveFn = r));

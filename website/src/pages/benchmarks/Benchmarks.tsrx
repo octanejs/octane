@@ -104,12 +104,12 @@ export function Benchmarks() @{
 				padding: 0.45rem 0.75rem;
 				border-radius: 0.75rem;
 				background: rgba(255, 65, 90, 0.14);
-				color: var(--accent-text);
+				color: var(--danger-text);
 				font-size: 0.925rem;
 				font-weight: 500;
 			}
 			.benchpage-sidebar-link:hover {
-				color: var(--accent-text);
+				color: var(--danger-text);
 				text-decoration: none;
 			}
 			.benchpage-main {

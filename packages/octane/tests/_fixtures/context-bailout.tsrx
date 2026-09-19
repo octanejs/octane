@@ -47,9 +47,9 @@ const OuterIndirection = memo(OuterIndirectionImpl);
 export function App(props) @{
 	log('App');
 	<div id="app-same">
-		<Ctx.Provider value={props.value}>
+		<Ctx value={props.value}>
 			<OuterIndirection />
-		</Ctx.Provider>
+		</Ctx>
 	</div>
 }
 
@@ -86,9 +86,9 @@ const PureIndirection = memo(PureIndirectionImpl);
 export function AppIndirect(props) @{
 	log('App');
 	<div id="app-indirect">
-		<Ctx.Provider value={props.value}>
+		<Ctx value={props.value}>
 			<PureIndirection />
-		</Ctx.Provider>
+		</Ctx>
 	</div>
 }
 
@@ -120,12 +120,12 @@ export function AppSiblings(props) @{
 	log('App');
 	<div id="app-siblings">
 		<button id="bump" onClick={() => setStep(step + 1)}>{'bump'}</button>
-		<Ctx.Provider value={step}>
+		<Ctx value={step}>
 			<StaticContent />
 			@if (step > 0) {
 				<SibConsumer />
 			}
-		</Ctx.Provider>
+		</Ctx>
 	</div>
 }
 
@@ -158,9 +158,9 @@ const ListWrapper = memo(ListWrapperImpl);
 export function AppList(props) @{
 	log('App');
 	<div id="app-list">
-		<Ctx.Provider value={props.value}>
+		<Ctx value={props.value}>
 			<ListWrapper ids={props.ids} showExtra={true} />
-		</Ctx.Provider>
+		</Ctx>
 	</div>
 }
 
@@ -197,8 +197,8 @@ const OuterWrap = memo(OuterWrapImpl);
 export function AppInterleaved(props) @{
 	log('App');
 	<div id="app-interleaved">
-		<Ctx.Provider value={props.value}>
+		<Ctx value={props.value}>
 			<OuterWrap label={props.label} />
-		</Ctx.Provider>
+		</Ctx>
 	</div>
 }

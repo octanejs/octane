@@ -1,5 +1,20 @@
 # @octanejs/xyflow
 
+## 0.1.7
+
+### Patch Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+- Updated dependencies [a6d7f49]
+  - @octanejs/zustand@0.1.54
+
+## 0.1.6
+
+### Patch Changes
+
+- Updated dependencies [911ed1d]
+  - @octanejs/zustand@0.1.53
+
 ## 0.1.5
 
 ### Patch Changes

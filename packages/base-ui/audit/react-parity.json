@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "0707bd97d6588d87733568b7d79c17f974585ace1ca97759aff98d4a6dec1116"
+      "lockfileSha256": "668143841492d0265af79fe1b718a7f90606eab9d79c2d8cf4d17f654f8f1641"
     }
   },
   "lanes": [
@@ -434,7 +434,7 @@
         {
           "path": "packages/base-ui/tests/vitest.browser.config.ts",
           "role": "support",
-          "sha256": "2fb077defa09dc8b6968892fe2a4e668b6eca0852d59d0a4869374db6c892b37"
+          "sha256": "85efaa605c51c67de96730b839e8ed66e1feb2efb432da5f2b4adfb2cbf4e33f"
         },
         {
           "path": "patches/@vitest__browser@4.1.10.patch",

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
 	collectVaulTests,
+	collectTests,
 	playwrightConfigSource,
 	prepareSonnerAppSource,
 	validateDependencyWorkspace,
@@ -114,4 +115,22 @@ test('rejects unrecognized Sonner demo wiring instead of silently changing the o
 		() => prepareSonnerAppSource('export default function App() {}\n'),
 		/expected server-action import/,
 	);
+});
+
+test('full Playwright identities retain renderer-mode titles and reject skipped or failed results', () => {
+	const specs = ['passed', 'skipped', 'failed'].map((status) => ({
+		title: status,
+		file: 'scroll.spec.ts',
+		ok: true,
+		tests: [{ results: [{ status }] }],
+	}));
+	const observed = collectTests(
+		[{ title: 'scroll.spec.ts', suites: [{ title: 'mode=transform', specs }] }],
+		(spec) => `upstream/${spec.file}`,
+	);
+	assert.deepEqual(observed, [
+		{ file: 'upstream/scroll.spec.ts', fullName: 'mode=transform failed', status: 'failed' },
+		{ file: 'upstream/scroll.spec.ts', fullName: 'mode=transform passed', status: 'passed' },
+		{ file: 'upstream/scroll.spec.ts', fullName: 'mode=transform skipped', status: 'skipped' },
+	]);
 });

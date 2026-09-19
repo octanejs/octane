@@ -39,7 +39,7 @@ export const SelectGroup = function SelectGroup(
 		],
 	});
 
-	return <SelectGroupContext.Provider value={contextValue}>{element}</SelectGroupContext.Provider>;
+	return <SelectGroupContext value={contextValue}>{element}</SelectGroupContext>;
 };
 
 export interface SelectGroupState {}

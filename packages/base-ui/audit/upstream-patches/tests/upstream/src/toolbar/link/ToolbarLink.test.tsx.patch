@@ -1,0 +1,19 @@
+diff --git a/tests/upstream/src/toolbar/link/ToolbarLink.test.tsx b/tests/upstream/src/toolbar/link/ToolbarLink.test.tsx
+--- a/tests/upstream/src/toolbar/link/ToolbarLink.test.tsx
++++ b/tests/upstream/src/toolbar/link/ToolbarLink.test.tsx
+@@ -27,11 +27,11 @@ describe('<Toolbar.Link />', () => {
+     testRenderPropWith: 'a',
+     render: (node) => {
+       return render(
+-        <ToolbarRootContext.Provider value={testToolbarContext}>
+-          <CompositeRootContext.Provider value={testCompositeContext}>
++        <ToolbarRootContext value={testToolbarContext}>
++          <CompositeRootContext value={testCompositeContext}>
+             {node}
+-          </CompositeRootContext.Provider>
+-        </ToolbarRootContext.Provider>,
++          </CompositeRootContext>
++        </ToolbarRootContext>,
+       );
+     },
+   }));

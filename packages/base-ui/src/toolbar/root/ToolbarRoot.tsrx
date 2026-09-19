@@ -63,7 +63,7 @@ export const ToolbarRoot = function ToolbarRoot(
 	};
 
 	return (
-		<ToolbarRootContext.Provider value={toolbarRootContext}>
+		<ToolbarRootContext value={toolbarRootContext}>
 			<CompositeRoot
 				render={render}
 				className={className}
@@ -76,7 +76,7 @@ export const ToolbarRoot = function ToolbarRoot(
 				onMapChange={setItemMap}
 				orientation={orientation}
 			/>
-		</ToolbarRootContext.Provider>
+		</ToolbarRootContext>
 	);
 };
 

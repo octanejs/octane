@@ -6,6 +6,16 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		prevented: true,
 		bubbled: false,
 	},
+	'behavior-root': {
+		adopted: true,
+		ownerMatched: true,
+		before: '0',
+		after: '1',
+		afterDispose: '1',
+		cleanups: 1,
+		preserved: true,
+		aborted: true,
+	},
 	'cli-spa-starter': {
 		page: true,
 		title: 'octane',
@@ -15,6 +25,15 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		styled: true,
 	},
 	'root-static': {
+		returnedText: 'generic',
+		text: 'Octane',
+		cleaned: true,
+	},
+	'root-static-local': {
+		text: 'Octane',
+		cleaned: true,
+	},
+	'root-descriptor': {
 		text: 'Octane',
 		cleaned: true,
 	},

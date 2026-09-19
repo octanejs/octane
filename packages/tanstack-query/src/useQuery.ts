@@ -15,7 +15,7 @@ export function useQuery<
 >(
 	options: DefinedInitialDataOptions<TQueryFnData, TError, TData, TQueryKey>,
 	queryClient?: QueryClient,
-): DefinedUseQueryResult<NoInfer<TData>, TError>;
+): DefinedUseQueryResult<TData, TError>;
 
 export function useQuery<
 	TQueryFnData = unknown,
@@ -25,7 +25,7 @@ export function useQuery<
 >(
 	options: UndefinedInitialDataOptions<TQueryFnData, TError, TData, TQueryKey>,
 	queryClient?: QueryClient,
-): UseQueryResult<NoInfer<TData>, TError>;
+): UseQueryResult<TData, TError>;
 
 export function useQuery<
 	TQueryFnData = unknown,
@@ -35,7 +35,7 @@ export function useQuery<
 >(
 	options: UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>,
 	queryClient?: QueryClient,
-): UseQueryResult<NoInfer<TData>, TError>;
+): UseQueryResult<TData, TError>;
 
 export function useQuery(options: any, ...rest: any[]): any {
 	// `[queryClient?, slot?]` — the slot (symbol) is the compiler-injected trailing

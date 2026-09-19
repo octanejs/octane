@@ -3,7 +3,7 @@ import { useState } from 'octane';
 // `<{expr}>` — dynamic-tag syntax. Lets a parent pick the rendered
 // component at the call site. Parser emits a JSXExpressionContainer at
 // openingElement.name with `isDynamic === true`; the compiler routes
-// through the same componentSlot path as `<Foo>` / `<ctx.Provider>`,
+// through the same componentSlot path as `<Foo>` / `<Context>`,
 // with the inner expression interpolated verbatim as the component
 // reference.
 

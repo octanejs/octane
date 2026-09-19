@@ -216,6 +216,13 @@ eligible after compiler lifting.
 Ordinary `<Hydrate>` boundaries, including the default split form, retain the
 existing parent-first activation behavior.
 
+An independent widget with `when={load()}` activates when the document bootstrap
+registers its SSR sidecar, without waiting for interaction or evaluating its
+lexical parent. Its styles load before its activation module. A paused document
+resumes an unfinished load activation when it becomes active again.
+Activation adopts the matching server DOM in template and JSX-returning
+components, preserving edits made to uncontrolled inputs before activation.
+
 #### Replaceable selections versus commands
 
 Independent widgets normally preserve every captured interaction in order. A
@@ -586,16 +593,27 @@ The renderer validates that proof again before publishing, including after a
 suspended or staged attempt. A stale attempt cannot overwrite a newer early
 presentation.
 
-An opted-in component with one native host can transfer only its declared class
-and known-provider style bindings while leaving its children outside that lease:
+An opted-in component with one native host can transfer its declared class,
+style, `data-*`, `aria-*`, and `tabIndex` bindings while leaving its children
+outside that lease. Reserved `data-octane-*` protocol fields do not qualify.
+Known-provider spreads retain their exact declared fields:
 
 ```tsrx
 import type { OctaneNode } from 'octane';
 import { unbound } from 'octane/behavior';
 
-export function ComposerFrame(props: { recovery: boolean; children: OctaneNode }) @{
+export function NativeFrame(props: {
+	recovery: boolean;
+	compact: boolean;
+	children: OctaneNode;
+}) @{
 	'use dom bindings';
-	<form class={props.recovery ? 'recovery' : 'ready'}>
+	<form
+		class={props.recovery ? 'recovery' : 'ready'}
+		data-compact={props.compact ? '' : undefined}
+		aria-busy={props.recovery}
+		tabIndex={props.compact ? -1 : undefined}
+	>
 		{unbound(props.children)}
 	</form>
 }
@@ -607,13 +625,22 @@ Normal hydration still renders them in the same application tree; independently
 bound textarea controls and deferred children keep their own ownership. Other
 host properties can remain outside this lease through `unbound`.
 
+This parent-only proof currently requires a named `props` parameter and no local
+setup declarations. Inline pure expressions, signal `.get()` reads, and imported
+pure projections retain that scalar shape. Destructured parameters or local
+`const` declarations select the general binding program, which supports those
+forms but cannot transfer a parent with opaque children. This is a handoff
+capability limit, not a restriction on renderer-free authoring generally.
+
 The compiler must prove the single host and its owned presentation fields.
 Hydration checks that exact host and source before publishing, and closes the
 host's preparation before entering its children. A child update alone does not
 invalidate a host lease. Moving or replacing the host, conflicting ownership,
 or a stale source cannot authorize takeover. Suspension or refusal leaves the
-early layout live; accepted transfer preserves its current classes and styles
-until the normal host bindings publish before refs.
+early layout live; accepted transfer preserves its current owned fields until
+the normal host bindings publish before refs. Nullable attributes are removed
+using their normal DOM semantics; `tabIndex` uses its canonical `tabindex`
+attribute without changing descendant control ownership.
 
 If retirement cleanup invalidates the host after acceptance, its successor
 writers and pending host refs are revoked. This does not roll back cleanup or

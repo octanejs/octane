@@ -107,7 +107,7 @@ describe('CI workflow aggregation', () => {
 	test('runs only required-check reporters for draft pull requests', () => {
 		assert.match(
 			workflow,
-			/^  pull_request:\n    branches: \[main\]\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft, closed\]$/m,
+			/^  pull_request:\n    branches: \[main, "jon\/update-bindings-\*"\]\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft, closed\]$/m,
 		);
 
 		const draftGuard =
@@ -157,6 +157,24 @@ describe('CI workflow aggregation', () => {
 		const shard = jobSource('test_shard');
 		assert.match(shard, /--exclude "packages\/input-otp\/tests\/browser\/\*\*\/\*"/);
 		assert.doesNotMatch(shard, /input-otp\/tests\/browser\/\*\*\/\*\.spec\.ts/);
+	});
+
+	test('gates the renderer-free behavior bundle once per full CI run', () => {
+		assert.match(
+			jobSource('test_shard'),
+			/- name: Verify renderer-free behavior bundle\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs behavior-root/,
+		);
+	});
+
+	test('enforces recovered signal-free application budgets once per full CI run', () => {
+		assert.match(
+			jobSource('test_shard'),
+			/- name: Verify signal-free application bundle budgets\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs --budgets root-static-local hooks-state context/,
+		);
+		assert.match(
+			packageJson.scripts['ci:workflow:test'],
+			/benchmarks\/bundle-size\/minimal-gates\.test\.mjs/,
+		);
 	});
 
 	test('runs and reports tests only on Node 24 while retaining the Node 22 engine baseline', () => {

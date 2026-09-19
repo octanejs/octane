@@ -203,7 +203,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 				color: var(--text);
 			}
 			.pkg-tab-active {
-				color: var(--accent-text);
+				color: var(--danger-text);
 			}
 			.pkg-tab-active::after {
 				background: var(--accent);

@@ -121,3 +121,10 @@ test('rejects an unclassified port-authored typetest', async (t) => {
 		/every port-authored styled-components test must have exactly one classification/,
 	);
 });
+
+test('rejects an unclassified public declaration test under tests', async (t) => {
+	const root = await fixture();
+	t.after(() => rm(root, { recursive: true, force: true }));
+	await writeFile(join(root, 'packages/hook-form/tests/public.test-d.ts'), 'export {};\n');
+	assert.throws(() => verifyPortTestClassifications(root), /exactly one classification/);
+});

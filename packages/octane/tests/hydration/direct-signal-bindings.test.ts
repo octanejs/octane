@@ -34,6 +34,349 @@ import {
 } from '../../src/signals/index.js';
 import type { SignalOwner } from '../../src/signals/types.js';
 
+describe('opaque host attribute updates', () => {
+	it.each(
+		[false, true].flatMap((dev) =>
+			['tsrx', 'tsx'].flatMap((ext) =>
+				[false, true].flatMap((strong) =>
+					[false, true].map((hydrate) => ({ dev, ext, strong, hydrate })),
+				),
+			),
+		),
+	)(
+		'preserves evaluated attributes, controlled edits, and abandoned updates (%j)',
+		async ({ dev, ext, strong, hydrate }) => {
+			const markup = `<section title={props.read()} data-count={props.count}><input value={props.value}/><input type="checkbox" checked={props.checked}/><p>{String(props.tick)}</p><footer>{props.finish?.() as string}</footer></section>`;
+			const source = `export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'return ' : ''}${markup}${ext === 'tsx' ? ';' : ''} }`;
+			const options = {
+				id: `/src/opaque-attributes.${ext}`,
+				compileOptions: { dev, hmr: false, strong },
+			};
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: Root | undefined;
+			let owner: ReturnType<typeof createScope> | undefined;
+			let reads = 0;
+			let tick = 0;
+			const props = (label: unknown, count: unknown = 1, finish?: () => string) => ({
+				read: () => (reads++, label),
+				count,
+				tick: tick++,
+				value: 'fixed',
+				checked: true,
+				finish,
+			});
+			try {
+				const initial = props('initial');
+				let adopted: Element[] | undefined;
+				if (hydrate) {
+					const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+					container.innerHTML = renderToString(server.App, initial).html;
+					reads = 0;
+					adopted = [...container.querySelectorAll('section,input,p,footer')];
+					await act(() => {
+						root = hydrateRoot(container, client.App, initial);
+					});
+				} else {
+					root = createRoot(container);
+					root.render(client.App, initial);
+				}
+				expect(reads).toBe(1);
+				const hosts = [...container.querySelectorAll('section,input,p,footer')];
+				if (adopted) expect(hosts).toEqual(adopted);
+				const [section, input, checkbox] = hosts as [
+					HTMLElement,
+					HTMLInputElement,
+					HTMLInputElement,
+				];
+				for (let i = 0; i < 3; i++) {
+					input.value = 'edited';
+					checkbox.checked = false;
+					reads = 0;
+					await act(() => root!.render(client.App, props('initial')));
+					expect(reads).toBe(1);
+					expect(section.title).toBe('initial');
+					expect(input.value).toBe('fixed');
+					expect(checkbox.checked).toBe(true);
+				}
+				await act(() => root!.render(client.App, props('changed', 0)));
+				expect(section.title).toBe('changed');
+				expect(section.getAttribute('data-count')).toBe('0');
+				await act(() => root!.render(client.App, props(null, null)));
+				expect(section.hasAttribute('title')).toBe(false);
+				expect(section.hasAttribute('data-count')).toBe(false);
+				await act(() => root!.render(client.App, props(undefined, undefined)));
+				await act(() => root!.render(client.App, props(undefined, undefined)));
+				expect(section.hasAttribute('title')).toBe(false);
+				owner = createScope({ scopeKey: options.id });
+				const label = owner.signal$('label', 'first handle');
+				await act(() => root!.render(client.App, props(label)));
+				await act(() => owner!.set(label, 'live handle'));
+				expect(section.title).toBe('live handle');
+				await act(() => root!.render(client.App, props(label)));
+				expect(section.title).toBe('live handle');
+				await act(() => root!.render(client.App, props('detached')));
+				await act(() => owner!.set(label, 'obsolete'));
+				expect(section.title).toBe('detached');
+				const pending = new Promise<never>(() => {});
+				flushSync(() =>
+					root!.render(
+						client.App,
+						props('abandoned', 1, () => {
+							throw pending;
+						}),
+					),
+				);
+				expect(section.title).toBe('detached');
+				flushSync(() => root!.render(client.App, props('abandoned')));
+				expect(section.title).toBe('abandoned');
+				expect([...container.querySelectorAll('section,input,p,footer')]).toEqual(hosts);
+				root!.unmount();
+				root = undefined;
+				await act(() => owner!.set(label, 'after disposal'));
+				expect(container.childNodes.length).toBe(0);
+				expect(section.title).toBe('abandoned');
+			} finally {
+				root?.unmount();
+				owner?.dispose();
+				container.remove();
+			}
+		},
+	);
+
+	it.each([false, true].flatMap((dev) => ['tsrx', 'tsx'].map((ext) => ({ dev, ext }))))(
+		'reconciles an absent client attribute when adopting server output (%j)',
+		async ({ dev, ext }) => {
+			const source = `export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'return ' : ''}<section title={props.value}><input defaultValue="draft"/></section>${ext === 'tsx' ? ';' : ''} }`;
+			const options = { id: `/src/absent-attribute.${ext}`, compileOptions: { dev, hmr: false } };
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const container = document.createElement('div');
+			container.innerHTML = renderToString(server.App, { value: 'server' }).html;
+			document.body.append(container);
+			const section = container.querySelector('section')!;
+			const input = container.querySelector('input')!;
+			input.value = 'typed before hydration';
+			const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
+			let root: Root | undefined;
+			try {
+				await act(() => {
+					root = hydrateRoot(
+						container,
+						client.App,
+						{ value: undefined },
+						{ onRecoverableError() {} },
+					);
+				});
+				expect(container.querySelector('section')).toBe(section);
+				expect(section.hasAttribute('title')).toBe(false);
+				expect(container.querySelector('input')).toBe(input);
+				expect(input.value).toBe('typed before hydration');
+				await act(() => root!.render(client.App, { value: undefined }));
+				expect(section.hasAttribute('title')).toBe(false);
+			} finally {
+				root?.unmount();
+				diagnostic.mockRestore();
+				container.remove();
+			}
+		},
+	);
+
+	it.each([false, true].flatMap((dev) => [false, true].map((callable) => ({ dev, callable }))))(
+		'observes capability revealed by a stable object or callable (%j)',
+		async ({ dev, callable }) => {
+			const source = `export function App(props) @{ <section title={props.value}><p>{String(props.tick)}</p></section> }`;
+			const client = loadCompiledFixtureSource(source, {
+				id: '/src/revealed-attribute.tsrx',
+				mode: 'client',
+				compileOptions: { dev, hmr: false },
+			});
+			const owner = createScope({ scopeKey: `revealed-attribute-${dev}-${callable}` });
+			const label = owner.signal$('label', 'revealed');
+			const value = callable ? () => {} : { toString: () => 'ordinary object' };
+			let active = false;
+			Object.assign(value, {
+				key: label.key,
+				kind: label.kind,
+				get: label.get.bind(label),
+				latest: label.latest.bind(label),
+				snapshot: label.snapshot.bind(label),
+				subscribe: label.subscribe.bind(label),
+			});
+			Object.defineProperties(value, {
+				[Signals.SIGNAL_HANDLE]: { get: () => active },
+				[Signals.SIGNAL_BINDING_READ]: { value: label[Signals.SIGNAL_BINDING_READ].bind(label) },
+				[Signals.SIGNAL_BINDING_SUBSCRIBE]: {
+					value: label[Signals.SIGNAL_BINDING_SUBSCRIBE].bind(label),
+				},
+				[Signals.SIGNAL_BINDING_IDENTITY]: {
+					value: label[Signals.SIGNAL_BINDING_IDENTITY].bind(label),
+				},
+			});
+			const container = document.createElement('div');
+			document.body.append(container);
+			const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
+			let root: Root | undefined;
+			try {
+				root = createRoot(container);
+				root.render(client.App, { value, tick: 0 });
+				const section = container.querySelector('section')!;
+				expect(section.getAttribute('title')).toBe(callable ? null : 'ordinary object');
+				active = true;
+				await act(() => root!.render(client.App, { value, tick: 1 }));
+				expect(section.title).toBe('revealed');
+				await act(() => owner.set(label, 'live'));
+				expect(section.title).toBe('live');
+				expect(container.querySelector('section')).toBe(section);
+			} finally {
+				root?.unmount();
+				owner.dispose();
+				diagnostic.mockRestore();
+				container.remove();
+			}
+		},
+	);
+});
+
+describe('signal-valued props from ordinary modules', () => {
+	it.each(
+		[false, true].flatMap((dev) =>
+			['tsrx', 'tsx'].flatMap((ext) => [false, true].map((hydrate) => ({ dev, ext, hydrate }))),
+		),
+	)(
+		'preserves extracted primitive evaluations ($ext, dev=$dev, hydrate=$hydrate)',
+		async ({ dev, ext, hydrate }) => {
+			const source = `export function App(props) {
+				return <section title={String(props.label)}><p>{String(props.value)}</p><input value={props.count + 1} data-type={typeof props.count} /></section>;
+			}`;
+			const options = {
+				id: `/src/primitive-values.${ext}`,
+				compileOptions: { dev, hmr: false },
+			};
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const reads: string[] = [];
+			const props = (label: string, value: string, count: number) => ({
+				label: { [Symbol.toPrimitive]: () => (reads.push('label'), label) },
+				value: { [Symbol.toPrimitive]: () => (reads.push('value'), value) },
+				count,
+			});
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: Root | undefined;
+			try {
+				const initial = props('initial title', 'initial text', 1);
+				let serverHosts: Element[] | undefined;
+				if (hydrate) {
+					const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+					container.innerHTML = renderToString(server.App, initial).html;
+					expect(reads).toEqual(['label', 'value']);
+					reads.length = 0;
+					serverHosts = [...container.querySelectorAll('section,p,input')];
+					await act(() => {
+						root = hydrateRoot(container, client.App, initial);
+					});
+				} else {
+					root = createRoot(container);
+					root.render(client.App, initial);
+				}
+				expect(reads).toEqual(['label', 'value']);
+				const hosts = [...container.querySelectorAll('section,p,input')];
+				if (serverHosts) expect(hosts).toEqual(serverHosts);
+				const [section, paragraph, input] = hosts as [HTMLElement, HTMLElement, HTMLInputElement];
+				expect(section.title).toBe('initial title');
+				expect(paragraph.textContent).toBe('initial text');
+				expect(input.value).toBe('2');
+				expect(input.getAttribute('data-type')).toBe('number');
+				reads.length = 0;
+				await act(() => root!.render(client.App, props('changed title', 'changed text', 9)));
+				expect(reads).toEqual(['label', 'value']);
+				expect([...container.querySelectorAll('section,p,input')]).toEqual(hosts);
+				expect(section.title).toBe('changed title');
+				expect(paragraph.textContent).toBe('changed text');
+				expect(input.value).toBe('10');
+			} finally {
+				root?.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it.each(
+		[false, true].flatMap((dev) =>
+			['tsrx', 'tsx'].flatMap((ext) => [false, true].map((hydrate) => ({ dev, ext, hydrate }))),
+		),
+	)(
+		'preserves imported pass-through bindings ($ext, dev=$dev, hydrate=$hydrate)',
+		async (entry) => {
+			const { dev, ext, hydrate } = entry;
+			const markup = `<section title={passThrough(props.value)}><p>{passThrough(props.value) as string}</p><input value={passThrough(props.value)} /></section>`;
+			const source = `import { passThrough } from './value-barrel';
+export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'return ' : ''}${markup}${ext === 'tsx' ? ';' : ''} }`;
+			const options = {
+				id: `/src/pass-through-value.${ext}`,
+				compileOptions: { dev, hmr: false },
+				runtimeModules: { './value-barrel': { passThrough: (value: unknown) => value } },
+			};
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const owner = createScope({ scopeKey: `pass-through-${dev}-${ext}-${hydrate}` });
+			const value = owner.signal$('value', 'server');
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: Root | undefined;
+			try {
+				if (hydrate) {
+					const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+					container.innerHTML = renderToString(server.App, { value }, { signalOwner: owner }).html;
+					const input = container.querySelector('input')!;
+					input.value = 'entered before hydration';
+					input.focus();
+					input.setSelectionRange(2, 6);
+					owner.set(value, input.value);
+					await act(() => {
+						root = hydrateRoot(container, client.App, { value }, { signalOwner: owner });
+					});
+					expect(container.querySelector('input')).toBe(input);
+					expect(input.value).toBe('entered before hydration');
+					expect(document.activeElement).toBe(input);
+					expect([input.selectionStart, input.selectionEnd]).toEqual([2, 6]);
+				} else {
+					root = createRoot(container);
+					root.render(client.App, { value: 'primitive' });
+					expect(container.querySelector('p')?.textContent).toBe('primitive');
+					await act(() => root!.render(client.App, { value }));
+				}
+				const section = container.querySelector('section')!;
+				const paragraph = container.querySelector('p')!;
+				const input = container.querySelector('input')!;
+				await act(() => owner.set(value, 'live'));
+				expect(section.title).toBe('live');
+				expect(paragraph.textContent).toBe('live');
+				expect(input.value).toBe('live');
+				await act(() => {
+					input.value = 'entered after activation';
+					input.dispatchEvent(new Event('input', { bubbles: true }));
+				});
+				expect(owner.get(value)).toBe('entered after activation');
+				expect(paragraph.textContent).toBe('entered after activation');
+				expect(section.title).toBe('entered after activation');
+				await act(() => root!.render(client.App, { value: 'primitive again' }));
+				await act(() => owner.set(value, 'detached'));
+				expect(container.querySelector('section')).toBe(section);
+				expect(container.querySelector('p')).toBe(paragraph);
+				expect(container.querySelector('input')).toBe(input);
+				expect(paragraph.textContent).toBe('primitive again');
+				expect(section.title).toBe('primitive again');
+				expect(input.value).toBe('primitive again');
+			} finally {
+				root?.unmount();
+				owner.dispose();
+				container.remove();
+			}
+		},
+	);
+});
+
 describe('direct signal child bindings', () => {
 	let root: Root | undefined;
 
@@ -1105,4 +1448,153 @@ export function App(props) @{
 			expect(snapshotHydrationControl(input)?.editRevision).toBeGreaterThan(0);
 		},
 	);
+});
+
+describe('mixed live text, attributes, and form controls', () => {
+	it.each(
+		[false, true].flatMap((dev) =>
+			['tsrx', 'tsx'].flatMap((ext) =>
+				[false, true].flatMap((strong) =>
+					[false, true].map((hydrate) => ({ dev, ext, strong, hydrate })),
+				),
+			),
+		),
+	)(
+		'keeps each channel live across capability changes (%j)',
+		async ({ dev, ext, strong, hydrate }) => {
+			const markup = `<section title={forward(props.label)} class={forward(props.classes)} aria-hidden={forward(props.checked)}>
+<p>{forward(props.label) as string}<b>suffix</b></p>
+<button disabled={forward(props.checked)}>toggle</button>
+<svg><g class={forward(props.classes)} data-label={forward(props.label)} /></svg>
+<input aria-label="Text" value={forward(props.label)} />
+<input aria-label="Checked" type="checkbox" checked={forward(props.checked)} />
+<select value={forward(props.selected)}><option value="a">A</option><option value="b">B</option></select>
+<textarea value={forward(props.label)} />
+</section>`;
+			const source = `import {forward} from './forwarded-values';
+export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'return ' : ''}${markup}${ext === 'tsx' ? ';' : ''} }`;
+			const options = {
+				id: `/src/mixed-channels.${ext}`,
+				compileOptions: { dev, hmr: false, strong },
+				runtimeModules: { './forwarded-values': { forward: (value: unknown) => value } },
+			};
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const owner = createScope({ scopeKey: `mixed-${dev}-${ext}-${strong}-${hydrate}` });
+			const label$ = owner.signal$('label', 'initial');
+			const checked$ = owner.signal$('checked', false);
+			const selected$ = owner.signal$('selected', 'a');
+			const classes$ = owner.signal$('classes', ['first', false, 'second']);
+			const live = { label: label$, checked: checked$, selected: selected$, classes: classes$ };
+			const scalar = { label: 'scalar', checked: false, selected: 'a', classes: ['plain'] };
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: Root | undefined;
+			try {
+				if (hydrate) {
+					const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+					container.innerHTML = renderToString(server.App, scalar).html;
+					const hosts = [...container.querySelectorAll('*')];
+					await act(() => {
+						root = hydrateRoot(container, client.App, scalar);
+					});
+					expect([...container.querySelectorAll('*')]).toEqual(hosts);
+				} else {
+					root = createRoot(container);
+					root.render(client.App, scalar);
+				}
+				const hosts = [...container.querySelectorAll('*')];
+				const section = container.querySelector('section')!;
+				const paragraph = container.querySelector('p')!;
+				const suffix = container.querySelector('b')!;
+				const text = paragraph.firstChild;
+				const textInput = container.querySelector<HTMLInputElement>('[aria-label="Text"]')!;
+				const checkbox = container.querySelector<HTMLInputElement>('[aria-label="Checked"]')!;
+				const select = container.querySelector('select')!;
+				const textarea = container.querySelector('textarea')!;
+				await act(() => root!.render(client.App, live));
+				expect(section.title).toBe('initial');
+				expect(paragraph.firstChild).toBe(text);
+				expect(paragraph.textContent).toBe('initialsuffix');
+				expect(section.className).toBe('first second');
+				expect(container.querySelector('g')!.getAttribute('class')).toBe('first second');
+				await act(() => {
+					owner.batch(() => {
+						owner.set(label$, 'updated');
+						owner.set(checked$, true);
+						owner.set(selected$, 'b');
+						owner.set(classes$, ['third']);
+					});
+				});
+				expect([...container.querySelectorAll('*')]).toEqual(hosts);
+				expect(paragraph.firstChild).toBe(text);
+				expect(paragraph.querySelector('b')).toBe(suffix);
+				expect(paragraph.textContent).toBe('updatedsuffix');
+				expect(section.title).toBe('updated');
+				expect(section.className).toBe('third');
+				expect(section.getAttribute('aria-hidden')).toBe('true');
+				expect(container.querySelector('button')!.disabled).toBe(true);
+				expect(container.querySelector('g')!.getAttribute('class')).toBe('third');
+				expect(container.querySelector('g')!.getAttribute('data-label')).toBe('updated');
+				expect([textInput.value, checkbox.checked, select.value, textarea.value]).toEqual([
+					'updated',
+					true,
+					'b',
+					'updated',
+				]);
+				await act(() => {
+					checkbox.checked = false;
+					checkbox.dispatchEvent(new Event('input', { bubbles: true }));
+					select.value = 'a';
+					select.dispatchEvent(new Event('input', { bubbles: true }));
+				});
+				expect(owner.get(checked$)).toBe(false);
+				expect(owner.get(selected$)).toBe('a');
+				expect(section.getAttribute('aria-hidden')).toBe('false');
+				expect(container.querySelector('button')!.disabled).toBe(false);
+				await act(() => root!.render(client.App, scalar));
+				await act(() => owner.set(label$, 'retired'));
+				expect([...container.querySelectorAll('*')]).toEqual(hosts);
+				expect(paragraph.firstChild).toBe(text);
+				expect(paragraph.textContent).toBe('scalarsuffix');
+				expect(section.title).toBe('scalar');
+				expect([textInput.value, textarea.value]).toEqual(['scalar', 'scalar']);
+			} finally {
+				root?.unmount();
+				owner.dispose();
+				container.remove();
+			}
+		},
+	);
+});
+
+it('retains adopted text from another document during live updates', async () => {
+	const source = `export function App(props) @{ <p>{props.value as string}</p> }`;
+	const options = { id: '/src/adopted-document-text.tsrx', compileOptions: { dev: false } };
+	const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+	const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+	const iframe = document.createElement('iframe');
+	document.body.append(iframe);
+	const container = iframe.contentDocument!.createElement('div');
+	iframe.contentDocument!.body.append(container);
+	container.innerHTML = renderToString(server.App, { value: 'initial' }).html;
+	const paragraph = container.querySelector('p')!;
+	const text = paragraph.firstChild!;
+	expect(text instanceof Text).toBe(false);
+	const owner = createScope({ scopeKey: 'adopted-document-text' });
+	const value$ = owner.signal$('value', 'initial');
+	let root: Root | undefined;
+	try {
+		await act(() => {
+			root = hydrateRoot(container, client.App, { value: value$ });
+		});
+		expect(container.querySelector('p')).toBe(paragraph);
+		expect(paragraph.firstChild).toBe(text);
+		await act(() => owner.set(value$, 'updated'));
+		expect(paragraph.textContent).toBe('updated');
+		expect(paragraph.firstChild).toBe(text);
+	} finally {
+		root?.unmount();
+		owner.dispose();
+		iframe.remove();
+	}
 });

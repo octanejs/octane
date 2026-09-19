@@ -41,7 +41,7 @@
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsc --noEmit -p typetests/pristine/tsconfig.json && tsrx-tsc --noEmit -p typetests/adapted/tsconfig.json && tsrx-tsc --noEmit -p tests/types/tsconfig.json"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0"
+    "octane": "workspace:^0.1.51 || ^0.2.0 || ^0.3.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

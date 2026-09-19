@@ -20,3 +20,10 @@ export function SampledStyles(props: Props) @{
 		<span>{'stable'}</span>
 	</div>
 }
+
+export function PlainStyles(props: { left: number; right: number; record: () => void }) @{
+	props.record();
+	<div style={{ color: 'red', left: props.left + 0, right: props.right + 0 }}>
+		<span>{'stable'}</span>
+	</div>
+}

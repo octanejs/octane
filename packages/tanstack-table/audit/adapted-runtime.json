@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-table-adapted",
+  "roots": ["packages/tanstack-table/tests/upstream"],
+  "files": [
+    "packages/tanstack-table/tests/upstream/adapterReactivity.test.tsx",
+    "packages/tanstack-table/tests/upstream/createTableHook.test.tsx",
+    "packages/tanstack-table/tests/upstream/expandedAutoResetLoop.test.tsx",
+    "packages/tanstack-table/tests/upstream/useLegacyTable.test.tsx",
+    "packages/tanstack-table/tests/upstream/useTable.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:ef7db42b748a109f",
+      "file": "packages/tanstack-table/tests/upstream/adapterReactivity.test.tsx",
+      "fullName": "React adapter reactivity and lifecycle bridges external atoms through both Subscribe source overloads"
+    },
+    {
+      "id": "runtime:989259986ce4632b",
+      "file": "packages/tanstack-table/tests/upstream/adapterReactivity.test.tsx",
+      "fullName": "React adapter reactivity and lifecycle exposes React adapter APIs through the returned table surface"
+    },
+    {
+      "id": "runtime:a5c779eec724ed75",
+      "file": "packages/tanstack-table/tests/upstream/adapterReactivity.test.tsx",
+      "fullName": "React adapter reactivity and lifecycle isolates Subscribe render cycles to each selected dependency"
+    },
+    {
+      "id": "runtime:0f7f3872e6362d8f",
+      "file": "packages/tanstack-table/tests/upstream/adapterReactivity.test.tsx",
+      "fullName": "React adapter reactivity and lifecycle refreshes data, columns, and table options together on the next render"
+    },
+    {
+      "id": "runtime:8c9a4ee97c1e9c77",
+      "file": "packages/tanstack-table/tests/upstream/adapterReactivity.test.tsx",
+      "fullName": "React adapter reactivity and lifecycle stops root and isolated React observers after unmount"
+    },
+    {
+      "id": "runtime:8c2cbad4f3ce0cfa",
+      "file": "packages/tanstack-table/tests/upstream/adapterReactivity.test.tsx",
+      "fullName": "React adapter reactivity and lifecycle updates the paginated row model without invalidating the core row model"
+    },
+    {
+      "id": "runtime:771a9ae6a12d7771",
+      "file": "packages/tanstack-table/tests/upstream/createTableHook.test.tsx",
+      "fullName": "createTableHook runtime binds components, contexts, FlexRender, and state selectors"
+    },
+    {
+      "id": "runtime:04f25b5e91e1eac6",
+      "file": "packages/tanstack-table/tests/upstream/createTableHook.test.tsx",
+      "fullName": "createTableHook runtime keeps App wrappers mounted while their contexts receive new table objects"
+    },
+    {
+      "id": "runtime:ba0bdf89c27b646a",
+      "file": "packages/tanstack-table/tests/upstream/createTableHook.test.tsx",
+      "fullName": "createTableHook runtime throws focused errors when context hooks are used outside wrappers"
+    },
+    {
+      "id": "runtime:ed7c4d265e17fcc9",
+      "file": "packages/tanstack-table/tests/upstream/expandedAutoResetLoop.test.tsx",
+      "fullName": "expanded auto reset with an unstable data reference (#6519) a real reset still fires when expanded state has diverged"
+    },
+    {
+      "id": "runtime:7dfe68f83544f21a",
+      "file": "packages/tanstack-table/tests/upstream/expandedAutoResetLoop.test.tsx",
+      "fullName": "expanded auto reset with an unstable data reference (#6519) a stable data reference behaves identically"
+    },
+    {
+      "id": "runtime:d0e9e88590c7ed95",
+      "file": "packages/tanstack-table/tests/upstream/expandedAutoResetLoop.test.tsx",
+      "fullName": "expanded auto reset with an unstable data reference (#6519) autoResetExpanded: false behaves identically"
+    },
+    {
+      "id": "runtime:d76df1851260b71c",
+      "file": "packages/tanstack-table/tests/upstream/expandedAutoResetLoop.test.tsx",
+      "fullName": "expanded auto reset with an unstable data reference (#6519) items ?? [] does not loop when the reset reaches controlled state"
+    },
+    {
+      "id": "runtime:13f679b6af8364c5",
+      "file": "packages/tanstack-table/tests/upstream/expandedAutoResetLoop.test.tsx",
+      "fullName": "expanded auto reset with an unstable data reference (#6519) same-tick controlled updates compose against the host queue"
+    },
+    {
+      "id": "runtime:2624275ee831fa27",
+      "file": "packages/tanstack-table/tests/upstream/useLegacyTable.test.tsx",
+      "fullName": "useLegacyTable accepts built-in fn names on helper-built column defs"
+    },
+    {
+      "id": "runtime:b733deef2701580d",
+      "file": "packages/tanstack-table/tests/upstream/useLegacyTable.test.tsx",
+      "fullName": "useLegacyTable applies declaration-merged sort and aggregation fn names"
+    },
+    {
+      "id": "runtime:37276dabb6fdb1a6",
+      "file": "packages/tanstack-table/tests/upstream/useLegacyTable.test.tsx",
+      "fullName": "useLegacyTable applies the declaration-merged filter fn name"
+    },
+    {
+      "id": "runtime:3aae3d1268a5b643",
+      "file": "packages/tanstack-table/tests/upstream/useLegacyTable.test.tsx",
+      "fullName": "useLegacyTable applies the named filter fn to the filtered row model"
+    },
+    {
+      "id": "runtime:bfd2aa82820dd46c",
+      "file": "packages/tanstack-table/tests/upstream/useLegacyTable.test.tsx",
+      "fullName": "useLegacyTable applies the named sort fn to the sorted row model"
+    },
+    {
+      "id": "runtime:ab1ee1bf7691ec3b",
+      "file": "packages/tanstack-table/tests/upstream/useTable.test.tsx",
+      "fullName": "useTable state subscriptions does not mutate base state or notify subscribers from a suspended render"
+    },
+    {
+      "id": "runtime:7ec2a112eea894d3",
+      "file": "packages/tanstack-table/tests/upstream/useTable.test.tsx",
+      "fullName": "useTable state subscriptions does not re-render when an uncontrolled update misses the selected slice"
+    },
+    {
+      "id": "runtime:e785d4b8e57083ee",
+      "file": "packages/tanstack-table/tests/upstream/useTable.test.tsx",
+      "fullName": "useTable state subscriptions gives an external atom precedence over controlled state for the same slice"
+    },
+    {
+      "id": "runtime:aabd338b0d1afd99",
+      "file": "packages/tanstack-table/tests/upstream/useTable.test.tsx",
+      "fullName": "useTable state subscriptions invalidates an isolated subscriber when a controlled slice is released"
+    },
+    {
+      "id": "runtime:40e5fe7922ed3ee9",
+      "file": "packages/tanstack-table/tests/upstream/useTable.test.tsx",
+      "fullName": "useTable state subscriptions keeps imperative table.setOptions eager outside render"
+    },
+    {
+      "id": "runtime:a5368eb67e4457ea",
+      "file": "packages/tanstack-table/tests/upstream/useTable.test.tsx",
+      "fullName": "useTable state subscriptions publishes controlled pagination after commit without a render-phase update"
+    },
+    {
+      "id": "runtime:2a9c5c472f346516",
+      "file": "packages/tanstack-table/tests/upstream/useTable.test.tsx",
+      "fullName": "useTable state subscriptions renders each controlled update once without a redundant commit render"
+    },
+    {
+      "id": "runtime:40da4f7bf9d34240",
+      "file": "packages/tanstack-table/tests/upstream/useTable.test.tsx",
+      "fullName": "useTable state subscriptions resolves changes in slice ownership"
+    },
+    {
+      "id": "runtime:014a76f76741fc0a",
+      "file": "packages/tanstack-table/tests/upstream/useTable.test.tsx",
+      "fullName": "useTable state subscriptions returns the selected slice and still reacts to uncontrolled updates"
+    },
+    {
+      "id": "runtime:00768b0e9481f204",
+      "file": "packages/tanstack-table/tests/upstream/useTable.test.tsx",
+      "fullName": "useTable state subscriptions settles when a controlled slice is recreated during an unrelated render"
+    },
+    {
+      "id": "runtime:c411ba631b263db5",
+      "file": "packages/tanstack-table/tests/upstream/useTable.test.tsx",
+      "fullName": "useTable state subscriptions subscribes to an external atom without an outer React subscription"
+    },
+    {
+      "id": "runtime:1149892543e86edf",
+      "file": "packages/tanstack-table/tests/upstream/useTable.test.tsx",
+      "fullName": "useTable state subscriptions updates an isolated subscriber after rapid controlled updates"
+    }
+  ],
+  "snapshots": 0
+}

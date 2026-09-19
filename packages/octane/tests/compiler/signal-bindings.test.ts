@@ -230,7 +230,7 @@ export function App() @{ <input value={draft$.get()} /> }`,
 		expect(code).toContain('setValue');
 	});
 
-	it('recognizes prop-passed capability names without factory heuristics', () => {
+	it('keeps prop-passed capabilities available without eager signal activation', () => {
 		const { code } = compile(
 			`export function Field(props) @{
 				const label = props.label;
@@ -241,7 +241,7 @@ export function App() @{ <input value={draft$.get()} /> }`,
 		);
 		expect(code).toContain('bindSignalAttribute');
 		expect(code).toContain('bindSignalText');
-		expect(code).toContain('enableSignalBindings(1)');
+		expect(code).not.toContain('enableSignalBindings(1)');
 	});
 
 	it('routes a non-suffixed writable alias through runtime capability validation', () => {

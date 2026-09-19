@@ -42,7 +42,12 @@ function runtimeSourceGraph(entry: string): { files: string[]; packages: string[
 		const source = readFileSync(filename, 'utf8');
 		const parsed = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true);
 		for (const statement of parsed.statements) {
-			if (!ts.isImportDeclaration(statement) || statement.importClause?.isTypeOnly) continue;
+			if (ts.isImportDeclaration(statement)) {
+				if (statement.importClause?.isTypeOnly) continue;
+			} else if (ts.isExportDeclaration(statement)) {
+				if (statement.isTypeOnly) continue;
+			} else continue;
+			if (!statement.moduleSpecifier) continue;
 			if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
 			const request = statement.moduleSpecifier.text;
 			if (!request.startsWith('.')) {
@@ -151,6 +156,12 @@ describe('Lynx runtime compatibility evidence', () => {
 				'src/main-thread.ts',
 				'src/resource.ts',
 			],
+			packages: ['octane/internal/context'],
+		});
+		expect(
+			runtimeSourceGraph(resolve(REPOSITORY_ROOT, 'packages/octane/src/internal/context.ts')),
+		).toEqual({
+			files: ['../octane/src/context-identity.ts', '../octane/src/internal/context.ts'],
 			packages: [],
 		});
 	});

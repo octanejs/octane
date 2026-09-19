@@ -1,10 +1,10 @@
 import type { createReactiveSystem } from 'alien-signals/system';
 import type { GraphOwner, ScopedNode, NodeState, SignalReadMode } from './graph.js';
-import type { SignalCandidateFrame } from './transition-candidate.js';
+import type { SignalActionFrame } from './transition-action.js';
+import type { SignalTransitionCoordinatorFactory } from './transition-coordinator.js';
 import { setNativeCandidateResolver, type NativeReadSource } from './read-protocol.js';
 
-/** Shared state must not import the candidate implementation: eager signal chunks
- * can otherwise absorb the full class used only by a later renderer chunk. */
+/** Shared state keeps model registration separate from optional native presentation. */
 interface CandidateGraph {
 	ScopedNode: typeof import('./graph.js').ScopedNode;
 	graph: ReturnType<typeof createReactiveSystem>;
@@ -29,10 +29,24 @@ interface CandidateGraph {
 	attachObserver(node: ScopedNode, notify: () => void, native: boolean): () => void;
 }
 
-/** The graph registers primitives, never a candidate factory. */
+/** Graph registration owns model transactions; native presentation remains optional. */
 export let candidateGraph: CandidateGraph;
 export function registerCandidateGraph(graph: CandidateGraph): void {
 	candidateGraph = graph;
+}
+
+/** Live registration also admits signals loaded after an Action has awaited. */
+export let createSignalActionFrame: (() => SignalActionFrame) | undefined;
+export function registerSignalActionFrameFactory(factory: () => SignalActionFrame): void {
+	createSignalActionFrame = factory;
+}
+
+/** The renderer consults this live capability when its first native write occurs. */
+export let createSignalTransitionCoordinator: SignalTransitionCoordinatorFactory | undefined;
+export function registerSignalTransitionCoordinatorFactory(
+	factory: SignalTransitionCoordinatorFactory,
+): void {
+	createSignalTransitionCoordinator = factory;
 }
 
 export function withoutSignalCandidate<T>(callback: () => T): T {
@@ -50,11 +64,11 @@ export function withoutSignalCandidate<T>(callback: () => T): T {
 /** Internal capability refusal, distinct from an authored TypeError. */
 export class CandidateUnsupportedError extends TypeError {}
 
-export let activeCandidate: SignalCandidateFrame | undefined;
+export let activeCandidate: SignalActionFrame | undefined;
 /** Synchronous action scope; never keep a candidate active across an await. */
 export function swapActiveSignalCandidate(
-	frame: SignalCandidateFrame | undefined,
-): SignalCandidateFrame | undefined {
+	frame: SignalActionFrame | undefined,
+): SignalActionFrame | undefined {
 	const previous = activeCandidate;
 	activeCandidate = frame;
 	return previous;
@@ -68,9 +82,9 @@ export function swapCandidateInvalidation(defer: boolean): boolean {
 }
 
 export let candidateWriteCount = 0;
-export let candidateWriters: WeakMap<ScopedNode, Set<SignalCandidateFrame>> | undefined;
+export let candidateWriters: WeakMap<ScopedNode, Set<SignalActionFrame>> | undefined;
 
-export function addCandidateWriter(node: ScopedNode, frame: SignalCandidateFrame): void {
+export function addCandidateWriter(node: ScopedNode, frame: SignalActionFrame): void {
 	candidateWriteCount++;
 	candidateWriters ??= new WeakMap();
 	let writers = candidateWriters.get(node);
@@ -78,7 +92,7 @@ export function addCandidateWriter(node: ScopedNode, frame: SignalCandidateFrame
 	writers.add(frame);
 }
 
-export function removeCandidateWriter(node: ScopedNode, frame: SignalCandidateFrame): void {
+export function removeCandidateWriter(node: ScopedNode, frame: SignalActionFrame): void {
 	const writers = candidateWriters!.get(node)!;
 	writers.delete(frame);
 	if (writers.size === 0) candidateWriters!.delete(node);

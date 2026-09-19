@@ -4,77 +4,77 @@
     {
       "path": ".",
       "octanePath": ".",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./async-batcher",
       "octanePath": "./async-batcher",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./async-debouncer",
       "octanePath": "./async-debouncer",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./async-queuer",
       "octanePath": "./async-queuer",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./async-rate-limiter",
       "octanePath": "./async-rate-limiter",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./async-retryer",
       "octanePath": "./async-retryer",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./async-throttler",
       "octanePath": "./async-throttler",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./batcher",
       "octanePath": "./batcher",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./debouncer",
       "octanePath": "./debouncer",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./provider",
       "octanePath": "./provider",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./queuer",
       "octanePath": "./queuer",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./rate-limiter",
       "octanePath": "./rate-limiter",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./throttler",
       "octanePath": "./throttler",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./types",
       "octanePath": "./types",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./utils",
       "octanePath": "./utils",
-      "disposition": "surface-present-unverified"
+      "disposition": "ported"
     },
     {
       "path": "./package.json",
@@ -89,331 +89,331 @@
       "source": "upstream/src/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "PacerProvider",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/provider/PacerProvider.tsx",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "PacerProviderOptions",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/provider/PacerProvider.tsx",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "PacerProviderProps",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/provider/PacerProvider.tsx",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncBatcher",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/async-batcher/useAsyncBatcher.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncBatcherOptions",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/async-batcher/useAsyncBatcher.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncDebouncer",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/async-debouncer/useAsyncDebouncer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncDebouncerOptions",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/async-debouncer/useAsyncDebouncer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncQueuer",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/async-queuer/useAsyncQueuer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncQueuerOptions",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/async-queuer/useAsyncQueuer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncRateLimiter",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/async-rate-limiter/useAsyncRateLimiter.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncRateLimiterOptions",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/async-rate-limiter/useAsyncRateLimiter.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncThrottler",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/async-throttler/useAsyncThrottler.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncThrottlerOptions",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/async-throttler/useAsyncThrottler.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactBatcher",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/batcher/useBatcher.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactBatcherOptions",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/batcher/useBatcher.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactDebouncer",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/debouncer/useDebouncer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactDebouncerOptions",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/debouncer/useDebouncer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactQueuer",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/queuer/useQueuer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactQueuerOptions",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/queuer/useQueuer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactRateLimiter",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/rate-limiter/useRateLimiter.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactRateLimiterOptions",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/rate-limiter/useRateLimiter.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactThrottler",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/throttler/useThrottler.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactThrottlerOptions",
       "kind": "type",
       "entrypoint": ".",
       "source": "upstream/src/throttler/useThrottler.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncBatchedCallback",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/async-batcher/useAsyncBatchedCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncBatcher",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/async-batcher/useAsyncBatcher.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncDebouncedCallback",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/async-debouncer/useAsyncDebouncedCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncDebouncer",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/async-debouncer/useAsyncDebouncer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncQueuedState",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/async-queuer/useAsyncQueuedState.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncQueuer",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/async-queuer/useAsyncQueuer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncRateLimitedCallback",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/async-rate-limiter/useAsyncRateLimitedCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncRateLimiter",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/async-rate-limiter/useAsyncRateLimiter.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncThrottledCallback",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/async-throttler/useAsyncThrottledCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncThrottler",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/async-throttler/useAsyncThrottler.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useBatchedCallback",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/batcher/useBatchedCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useBatcher",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/batcher/useBatcher.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/tests/differential/parity.test.ts",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useDebouncedCallback",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/debouncer/useDebouncedCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/tests/differential/parity.test.ts",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useDebouncedState",
@@ -438,63 +438,63 @@
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/debouncer/useDebouncer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useDefaultPacerOptions",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/provider/PacerProvider.tsx",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "usePacerContext",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/provider/PacerProvider.tsx",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useQueuedState",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/queuer/useQueuedState.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useQueuedValue",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/queuer/useQueuedValue.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useQueuer",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/queuer/useQueuer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useRateLimitedCallback",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/rate-limiter/useRateLimitedCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useRateLimitedState",
@@ -519,18 +519,18 @@
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/rate-limiter/useRateLimiter.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useThrottledCallback",
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/throttler/useThrottledCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/tests/differential/parity.test.ts",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useThrottledState",
@@ -555,9 +555,9 @@
       "kind": "value",
       "entrypoint": ".",
       "source": "upstream/src/throttler/useThrottler.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
-      "note": "Also published from the package root entrypoint."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "* from @tanstack/pacer/async-batcher",
@@ -566,39 +566,43 @@
       "source": "upstream/src/async-batcher/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "ReactAsyncBatcher",
       "kind": "type",
       "entrypoint": "./async-batcher",
       "source": "upstream/src/async-batcher/useAsyncBatcher.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncBatcherOptions",
       "kind": "type",
       "entrypoint": "./async-batcher",
       "source": "upstream/src/async-batcher/useAsyncBatcher.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncBatchedCallback",
       "kind": "value",
       "entrypoint": "./async-batcher",
       "source": "upstream/src/async-batcher/useAsyncBatchedCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncBatcher",
       "kind": "value",
       "entrypoint": "./async-batcher",
       "source": "upstream/src/async-batcher/useAsyncBatcher.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "* from @tanstack/pacer/async-debouncer",
@@ -607,39 +611,43 @@
       "source": "upstream/src/async-debouncer/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "ReactAsyncDebouncer",
       "kind": "type",
       "entrypoint": "./async-debouncer",
       "source": "upstream/src/async-debouncer/useAsyncDebouncer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncDebouncerOptions",
       "kind": "type",
       "entrypoint": "./async-debouncer",
       "source": "upstream/src/async-debouncer/useAsyncDebouncer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncDebouncedCallback",
       "kind": "value",
       "entrypoint": "./async-debouncer",
       "source": "upstream/src/async-debouncer/useAsyncDebouncedCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncDebouncer",
       "kind": "value",
       "entrypoint": "./async-debouncer",
       "source": "upstream/src/async-debouncer/useAsyncDebouncer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "* from @tanstack/pacer/async-queuer",
@@ -648,39 +656,43 @@
       "source": "upstream/src/async-queuer/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "ReactAsyncQueuer",
       "kind": "type",
       "entrypoint": "./async-queuer",
       "source": "upstream/src/async-queuer/useAsyncQueuer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncQueuerOptions",
       "kind": "type",
       "entrypoint": "./async-queuer",
       "source": "upstream/src/async-queuer/useAsyncQueuer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncQueuedState",
       "kind": "value",
       "entrypoint": "./async-queuer",
       "source": "upstream/src/async-queuer/useAsyncQueuedState.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncQueuer",
       "kind": "value",
       "entrypoint": "./async-queuer",
       "source": "upstream/src/async-queuer/useAsyncQueuer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "* from @tanstack/pacer/async-rate-limiter",
@@ -689,39 +701,43 @@
       "source": "upstream/src/async-rate-limiter/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "ReactAsyncRateLimiter",
       "kind": "type",
       "entrypoint": "./async-rate-limiter",
       "source": "upstream/src/async-rate-limiter/useAsyncRateLimiter.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncRateLimiterOptions",
       "kind": "type",
       "entrypoint": "./async-rate-limiter",
       "source": "upstream/src/async-rate-limiter/useAsyncRateLimiter.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncRateLimitedCallback",
       "kind": "value",
       "entrypoint": "./async-rate-limiter",
       "source": "upstream/src/async-rate-limiter/useAsyncRateLimitedCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncRateLimiter",
       "kind": "value",
       "entrypoint": "./async-rate-limiter",
       "source": "upstream/src/async-rate-limiter/useAsyncRateLimiter.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "* from @tanstack/pacer/async-retryer",
@@ -730,7 +746,7 @@
       "source": "upstream/src/async-retryer/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "* from @tanstack/pacer/async-throttler",
@@ -739,39 +755,43 @@
       "source": "upstream/src/async-throttler/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "ReactAsyncThrottler",
       "kind": "type",
       "entrypoint": "./async-throttler",
       "source": "upstream/src/async-throttler/useAsyncThrottler.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactAsyncThrottlerOptions",
       "kind": "type",
       "entrypoint": "./async-throttler",
       "source": "upstream/src/async-throttler/useAsyncThrottler.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncThrottledCallback",
       "kind": "value",
       "entrypoint": "./async-throttler",
       "source": "upstream/src/async-throttler/useAsyncThrottledCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useAsyncThrottler",
       "kind": "value",
       "entrypoint": "./async-throttler",
       "source": "upstream/src/async-throttler/useAsyncThrottler.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "* from @tanstack/pacer/batcher",
@@ -780,40 +800,43 @@
       "source": "upstream/src/batcher/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "ReactBatcher",
       "kind": "type",
       "entrypoint": "./batcher",
       "source": "upstream/src/batcher/useBatcher.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactBatcherOptions",
       "kind": "type",
       "entrypoint": "./batcher",
       "source": "upstream/src/batcher/useBatcher.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useBatchedCallback",
       "kind": "value",
       "entrypoint": "./batcher",
       "source": "upstream/src/batcher/useBatchedCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useBatcher",
       "kind": "value",
       "entrypoint": "./batcher",
       "source": "upstream/src/batcher/useBatcher.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/tests/differential/parity.test.ts",
-      "note": "Exercised by the representative differential lifecycle."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "* from @tanstack/pacer/debouncer",
@@ -822,32 +845,34 @@
       "source": "upstream/src/debouncer/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "ReactDebouncer",
       "kind": "type",
       "entrypoint": "./debouncer",
       "source": "upstream/src/debouncer/useDebouncer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactDebouncerOptions",
       "kind": "type",
       "entrypoint": "./debouncer",
       "source": "upstream/src/debouncer/useDebouncer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useDebouncedCallback",
       "kind": "value",
       "entrypoint": "./debouncer",
       "source": "upstream/src/debouncer/useDebouncedCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/tests/differential/parity.test.ts",
-      "note": "Exercised by the representative differential lifecycle."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useDebouncedState",
@@ -872,48 +897,54 @@
       "kind": "value",
       "entrypoint": "./debouncer",
       "source": "upstream/src/debouncer/useDebouncer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "PacerProvider",
       "kind": "value",
       "entrypoint": "./provider",
       "source": "upstream/src/provider/PacerProvider.tsx",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "PacerProviderOptions",
       "kind": "type",
       "entrypoint": "./provider",
       "source": "upstream/src/provider/PacerProvider.tsx",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "PacerProviderProps",
       "kind": "type",
       "entrypoint": "./provider",
       "source": "upstream/src/provider/PacerProvider.tsx",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useDefaultPacerOptions",
       "kind": "value",
       "entrypoint": "./provider",
       "source": "upstream/src/provider/PacerProvider.tsx",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "usePacerContext",
       "kind": "value",
       "entrypoint": "./provider",
       "source": "upstream/src/provider/PacerProvider.tsx",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "* from @tanstack/pacer/queuer",
@@ -922,47 +953,52 @@
       "source": "upstream/src/queuer/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "ReactQueuer",
       "kind": "type",
       "entrypoint": "./queuer",
       "source": "upstream/src/queuer/useQueuer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactQueuerOptions",
       "kind": "type",
       "entrypoint": "./queuer",
       "source": "upstream/src/queuer/useQueuer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useQueuedState",
       "kind": "value",
       "entrypoint": "./queuer",
       "source": "upstream/src/queuer/useQueuedState.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useQueuedValue",
       "kind": "value",
       "entrypoint": "./queuer",
       "source": "upstream/src/queuer/useQueuedValue.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useQueuer",
       "kind": "value",
       "entrypoint": "./queuer",
       "source": "upstream/src/queuer/useQueuer.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "* from @tanstack/pacer/rate-limiter",
@@ -971,31 +1007,34 @@
       "source": "upstream/src/rate-limiter/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "ReactRateLimiter",
       "kind": "type",
       "entrypoint": "./rate-limiter",
       "source": "upstream/src/rate-limiter/useRateLimiter.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactRateLimiterOptions",
       "kind": "type",
       "entrypoint": "./rate-limiter",
       "source": "upstream/src/rate-limiter/useRateLimiter.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useRateLimitedCallback",
       "kind": "value",
       "entrypoint": "./rate-limiter",
       "source": "upstream/src/rate-limiter/useRateLimitedCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useRateLimitedState",
@@ -1020,8 +1059,9 @@
       "kind": "value",
       "entrypoint": "./rate-limiter",
       "source": "upstream/src/rate-limiter/useRateLimiter.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "* from @tanstack/pacer/throttler",
@@ -1030,32 +1070,34 @@
       "source": "upstream/src/throttler/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "ReactThrottler",
       "kind": "type",
       "entrypoint": "./throttler",
       "source": "upstream/src/throttler/useThrottler.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "ReactThrottlerOptions",
       "kind": "type",
       "entrypoint": "./throttler",
       "source": "upstream/src/throttler/useThrottler.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useThrottledCallback",
       "kind": "value",
       "entrypoint": "./throttler",
       "source": "upstream/src/throttler/useThrottledCallback.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/tests/differential/parity.test.ts",
-      "note": "Exercised by the representative differential lifecycle."
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "useThrottledState",
@@ -1080,8 +1122,9 @@
       "kind": "value",
       "entrypoint": "./throttler",
       "source": "upstream/src/throttler/useThrottler.ts",
-      "disposition": "surface-present-unverified",
-      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+      "disposition": "ported",
+      "evidence": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "note": "Strict public type probe and complete source structural mapping; runtime families additionally covered by the differential and lifecycle suites. This does not claim every option combination is tested."
     },
     {
       "name": "* from @tanstack/pacer/types",
@@ -1090,7 +1133,7 @@
       "source": "upstream/src/types/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     },
     {
       "name": "* from @tanstack/pacer/utils",
@@ -1099,7 +1142,7 @@
       "source": "upstream/src/utils/index.ts",
       "disposition": "reused-byte-identically",
       "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
-      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+      "note": "Framework-neutral @tanstack/pacer@0.22.0 re-export; Octane reuses the same package identity."
     }
   ],
   "expectedTotals": {
@@ -1110,13 +1153,13 @@
   },
   "coreReexport": {
     "package": "@tanstack/pacer",
-    "version": "0.21.1",
+    "version": "0.22.0",
     "disposition": "reused-byte-identically"
   },
   "upstreamTests": [],
   "typeSuite": {
     "disposition": "compile-only",
-    "reason": "Upstream test:types runs tsc over package source with no dedicated assertion files. Pristine and adapted compile lanes inventory that accept evidence; setter-type accept/reject assertions cover the documented adaptation.",
+    "reason": "The pinned upstream source compiles with tsc and contains no dedicated assertion registrations. Both source programs additionally execute independently authored positive and negative public contract probes; the public binding project imports all 15 entrypoints.",
     "pristine": {
       "compiler": "tsc",
       "project": "packages/tanstack-pacer/typetests/pristine/tsconfig.json",
