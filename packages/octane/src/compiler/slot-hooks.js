@@ -150,9 +150,18 @@ function collectVoidRootCandidates(ast) {
 		analysis.resolveBinding(analysis.nodeScopes.get(node), node.name)?.scope === analysis.rootScope;
 	const candidates = [];
 	const localRoots = new Map();
+	const actualFunctionScopes = new Set();
 	let opaqueLexicalAccess = false;
 	const walk = (node, parent, key) => {
 		if (node === null || typeof node !== 'object') return;
+		if (
+			node.type === 'FunctionDeclaration' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'ArrowFunctionExpression'
+		) {
+			const scope = analysis.nodeScopes.get(node.body)?.functionScope;
+			if (scope !== undefined) actualFunctionScopes.add(scope);
+		}
 		if (
 			node.type === 'WithStatement' ||
 			(node.type === 'Identifier' &&
@@ -171,7 +180,9 @@ function collectVoidRootCandidates(ast) {
 			importedBinding(node.init.callee, createRootLocals)
 		) {
 			const scope = analysis.resolveBinding(analysis.nodeScopes.get(node.id), node.id.name)?.scope;
-			if (scope && scope.functionScope !== analysis.rootScope.functionScope) {
+			// Namespaces and static blocks also own lexical function scopes, but
+			// neither establishes the nonescaping function-local root lifetime.
+			if (scope && actualFunctionScopes.has(scope.functionScope)) {
 				let names = localRoots.get(scope);
 				if (names === undefined) localRoots.set(scope, (names = new Map()));
 				names.set(node.id.name, {

@@ -30,11 +30,13 @@ Fifteen public esbuild closure controls are byte-identical to immutable main330,
 
 ## Scope and controls
 
-Only function-local const roots in plain production TS/JS entries are newly admitted. Module-level roots, exports, escapes, extracted methods, computed/optional calls, closures and nested scopes, unknown or dynamic render targets, full TSX/TSRX compilation, dev, HMR and profiling retain generic roots. Every render target must satisfy the actual adapter metadata; one unknown target prevents the factory rewrite.
+Only actual function-body local const roots in plain production TS/JS entries are newly admitted. Lexical function scopes introduced by TypeScript namespaces and class static blocks do not establish this lifetime and remain generic. Direct and merged namespace exports are covered by public ordinary-renderable regressions; actual private functions inside namespaces and arrow/function-expression bodies remain positive compiler controls. Module-level roots, exports, escapes, extracted methods, computed/optional calls, closures and nested scopes, unknown or dynamic render targets, full TSX/TSRX compilation, dev, HMR and profiling retain generic roots. Every render target must satisfy the actual adapter metadata; one unknown target prevents the factory rewrite.
+
+An independent actual Vite production/native Chromium consumer verifies the namespace escape correction: the initially published candidate renders `first` then loses ordinary `replacement` text, while both main330 and the corrected proof render `first` then `replacement`, with no browser errors. The corrected source retains identical whole bundle hashes for all three measured separate-entry consumers and all fifteen public closure controls.
 
 The consumer regressions observe props refresh, state/native events, retained typed uncontrolled DOM, identity, cleanup/unmount, escaped roots and later text renders, lexical shadows, direct eval, and mutable component exports. A late engine-import control mounts first, imports `octane/signals`, then forwards direct text/value handles and observes live updates on the retained DOM. Adopted parser ASTs are deep-frozen in the export-proof regression. Unsupported async/generator components retain the public compiler diagnostic before adapters attach any facts.
 
-The deterministic boundary suite passes 19 cases, including 72 local-root admission/fallback controls. Its plain static consumer shrinks from 62,364 to 27,577 gzip bytes while preserving public text and cleanup. The owning and nearby dev/prod compiler/runtime matrix passed 164 cases before the final late-engine control; that new control also passed in both modes. Changed compiler source and new owning test programs pass scoped typecheck. Repository-wide CI remains a separate qualification.
+The deterministic boundary suite passes 19 cases, including 93 local-root admission/fallback controls. Its plain static consumer shrinks from 62,364 to 27,577 gzip bytes while preserving public text and cleanup. The final owning and nearby dev/prod compiler/runtime matrix passes 170 cases, including the late-engine and exported namespace regressions. Changed compiler source and new owning test programs pass scoped typecheck. Repository-wide CI remains a separate qualification.
 
 Four deliberate mutants are rejected: admitting mutable exports loses replacement text; admitting escaped/dynamic roots loses later renderables; removing specialization fails the activation guard; retaining the generic return graph inside the void root makes both closures 62,364 gzip bytes and fails the size guard despite unchanged public behavior. All mutated source was restored to the recorded hashes.
 
@@ -54,7 +56,7 @@ Exact baseline: `330bb0878b42dbc445659c5ea40494067c4ef296`. Its selected source 
 
 Final implementation hashes:
 
-- `compiler/slot-hooks.js`: `f36731dc0cd46ad4b5df5d47c1f9261dbd360c212ab9070065044c398e557937`
+- `compiler/slot-hooks.js`: `26e34b31ca5f97e8c106203e20afd70359c97746ed1aba67986071f13a430c97`
 - `compiler/bundler.js`: `f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779`
 - Unchanged `runtime.ts`: `4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674`
 

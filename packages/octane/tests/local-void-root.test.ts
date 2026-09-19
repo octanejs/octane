@@ -147,6 +147,23 @@ export function run() { const host=document.querySelector('#host'); const root=m
 		expect(await runConsumer(VIEW, entry)).toEqual({ text: 'returned', cleaned: true });
 	});
 
+	it.each([
+		`namespace N { export const root=createRoot(document.querySelector('#host')); root.render(View, {label:'first'}); }
+export function run() { flushSync(()=>N.root.render('ordinary')); const host=document.querySelector('#host');
+ const text=host.textContent; N.root.unmount(); return {text,cleaned:host.childNodes.length===0}; }`,
+		`namespace N { export const root=createRoot(document.querySelector('#host')); root.render(View, {label:'first'}); }
+namespace N { export function replace() { flushSync(()=>N.root.render('ordinary')); } }
+export function run() { N.replace(); const host=document.querySelector('#host');
+ const text=host.textContent; N.root.unmount(); return {text,cleaned:host.childNodes.length===0}; }`,
+	])('keeps exported namespace roots reusable for ordinary renderables', async (body) => {
+		for (const dev of [false, true]) {
+			expect(await runConsumer(VIEW, IMPORTS + body, dev)).toEqual({
+				text: 'ordinary',
+				cleaned: true,
+			});
+		}
+	});
+
 	it('keeps a local root generic when a later render target is unknown', async () => {
 		const entry = `${IMPORTS}
 function Plain() { return 'plain'; }

@@ -15,7 +15,7 @@
   "runnerSHA": "f8fd05b24d29500cdc975ee38ea599ea4466002bc6e5872b78b923383119c682",
   "sourceHashes": {
     "packages/octane/src/compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
-    "packages/octane/src/compiler/slot-hooks.js": "f36731dc0cd46ad4b5df5d47c1f9261dbd360c212ab9070065044c398e557937",
+    "packages/octane/src/compiler/slot-hooks.js": "26e34b31ca5f97e8c106203e20afd70359c97746ed1aba67986071f13a430c97",
     "packages/octane/src/compiler/compile.js": "11da48eaf3e3881b99c091539c5f0f50327405e1663db98272f5e7c20bcd4869",
     "packages/octane/src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674"
   },
@@ -359,12 +359,27 @@
       "escaped/dynamic local root certified void",
       "local specialization removed",
       "generic return graph retained in void root"
-    ]
+    ],
+    "exportedNamespaceRoots": {
+      "published398aTextAfterReplacement": "",
+      "correctedTextAfterReplacement": "replacement",
+      "automaticViteMetadata": true,
+      "nativeChromium": "149.0.7827.55",
+      "directAndMergedNamespaceOwningControls": true
+    }
   },
   "limitations": [
     "Only production plain TS/JS function-local const roots with references in their original lexical scope are newly admitted.",
     "Module-level, exported, escaped, nested-scope, unknown-target, full TSX/TSRX, dev, HMR and profile cases retain generic roots.",
     "Separate-entry savings remove the generic returned-value graph and are not attributable solely to signals.",
     "No CPU, compiler-time, browser latency, SSR speed or complete unused-signals regression recovery claim."
-  ]
+  ],
+  "validation": {
+    "nearbyDevProdTests": 170,
+    "boundaryTests": 19,
+    "lexicalAndEscapeControls": 93,
+    "scopedCompilerAndNewTestTypesPass": true,
+    "threeViteBundlesIdenticalToPriorCandidate": true,
+    "fifteenPublicClosuresExactMain330": true
+  }
 }

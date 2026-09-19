@@ -1678,6 +1678,46 @@ test('local void root specialization needs every lexical use and the loaded expo
 			'export function run(el) { const root=createRoot(el); root.render(View); root.unmount(); } function unrelated(root) { root.render(Other); }',
 			true,
 		],
+		[
+			'function expression',
+			'export const run=function(el) { const root=createRoot(el); root.render(View); root.unmount(); };',
+			true,
+		],
+		[
+			'block arrow',
+			'export const run=el=>{ const root=createRoot(el); root.render(View); root.unmount(); };',
+			true,
+		],
+		[
+			'concise arrow with private function',
+			'export const run=el=>(()=>{ const root=createRoot(el); root.render(View); root.unmount(); })();',
+			true,
+		],
+		[
+			'namespace exported root',
+			'namespace N { export const root=createRoot(document.body); root.render(View); } export function run() { N.root.render("ordinary"); }',
+			false,
+		],
+		[
+			'merged namespace exported root',
+			'namespace N { export const root=createRoot(document.body); root.render(View); } namespace N { export function replace() { N.root.render("ordinary"); } }',
+			false,
+		],
+		[
+			'namespace private function',
+			'namespace N { export function run(el) { const root=createRoot(el); root.render(View); root.unmount(); } }',
+			true,
+		],
+		[
+			'module static block',
+			'class N { static { const root=createRoot(document.body); root.render(View); root.unmount(); } }',
+			false,
+		],
+		[
+			'function static block',
+			'export function run(el) { class N { static { const root=createRoot(el); root.render(View); root.unmount(); } } }',
+			false,
+		],
 		['exported root', 'export const root=createRoot(document.body); root.render(View);', false],
 		[
 			'returned root',
@@ -1783,6 +1823,7 @@ test('local void root specialization needs every lexical use and the loaded expo
 	let checked = 0;
 	for (const extension of ['ts', 'js'])
 		for (const [label, body, eligible] of sources) {
+			if (extension === 'js' && label.includes('namespace')) continue;
 			const source = imports + body;
 			const output = slotHooks(source, id.replace(/ts$/, extension), {
 				dev: false,
