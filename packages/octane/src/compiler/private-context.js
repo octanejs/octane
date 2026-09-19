@@ -6,6 +6,13 @@ import {
 
 /** Only private contexts whose complete authored lifetime stays in template bodies. */
 export function findPrivateCompiledContexts(ast) {
+	return new Map(
+		[...findPrivateCompiledContextProofs(ast)].map(([name, context]) => [name, context.callee]),
+	);
+}
+
+/** Definition and exact provider tags accepted by the same closed-module proof. */
+export function findPrivateCompiledContextProofs(ast) {
 	const imports = new Map();
 	for (const statement of ast.body ?? []) {
 		if (
@@ -55,7 +62,12 @@ export function findPrivateCompiledContexts(ast) {
 				call.arguments.length === 1 &&
 				call.arguments[0].type !== 'SpreadElement'
 			)
-				contexts.set(entry.id.name, { id: entry.id, callee: call.callee, valid: true });
+				contexts.set(entry.id.name, {
+					id: entry.id,
+					callee: call.callee,
+					providerTags: new Set(),
+					valid: true,
+				});
 		}
 	}
 	if (contexts.size === 0) return new Map();
@@ -125,6 +137,7 @@ export function findPrivateCompiledContexts(ast) {
 						grandparent?.type === 'JSXElement' &&
 						providerChildren(grandparent);
 					if (!read && !provider) context.valid = false;
+					if (provider) context.providerTags.add(node);
 				}
 			}
 		}
@@ -143,9 +156,5 @@ export function findPrivateCompiledContexts(ast) {
 	};
 	inspect(ast);
 	if (opaque) return new Map();
-	return new Map(
-		[...contexts]
-			.filter(([, context]) => context.valid)
-			.map(([name, context]) => [name, context.callee]),
-	);
+	return new Map([...contexts].filter(([, context]) => context.valid));
 }
