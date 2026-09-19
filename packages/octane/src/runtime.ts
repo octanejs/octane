@@ -24251,13 +24251,21 @@ export function setEventHandler(el: Element, key: string, handler: any): void {
 		journalBag();
 	}
 	(STAGED_DOM?.view(el as any) ?? (el as any))[key] = handler;
-	if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
+	// Explicit authority also applies to handlers in modules with no signal bindings.
+	const explicitOwner =
+		activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
+			? currentExplicitSignalOwner()
+			: null;
+	if (
+		SIGNAL_BINDINGS_ENABLED ||
+		signalDocumentEnabled ||
+		explicitOwner !== null ||
+		SIGNAL_EVENT_OWNERS !== null
+	) {
 		// Retain the precise invocation for an event-only reader whose signal
 		// module may arrive later. No owner or wrapper is allocated speculatively.
 		const owner =
-			(activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
-				? currentExplicitSignalOwner()
-				: null) ??
+			explicitOwner ??
 			(signalDocumentEnabled || CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined
 				? CURRENT_SCOPE === null
 					? currentSignalOwner()
@@ -24273,11 +24281,21 @@ export function setEventHandler(el: Element, key: string, handler: any): void {
 				SCOPE_SIGNAL_OWNERS.get(owner) === undefined
 			)
 				SCOPE_SIGNAL_OWNERS.set(owner, false);
+			// Later writers must replace explicit authority with the usual scope
+			// token, including when both writers are still waiting for publication.
+			const owners = (SIGNAL_EVENT_OWNERS ??= new WeakMap());
 			if (STAGED_COMMIT_CAPTURE !== null)
-				DEFERRED_LAYOUT_DRIVER!.stageAction(() =>
-					(SIGNAL_EVENT_OWNERS ??= new WeakMap()).set(el, owner),
-				);
-			else (SIGNAL_EVENT_OWNERS ??= new WeakMap()).set(el, owner);
+				DEFERRED_LAYOUT_DRIVER!.stageAction(() => owners.set(el, owner));
+			else {
+				if (TRANSITION_JOURNAL !== null) {
+					const previous = owners.get(el);
+					if (previous !== owner)
+						journalUndo(() =>
+							previous === undefined ? owners.delete(el) : owners.set(el, previous),
+						);
+				}
+				owners.set(el, owner);
+			}
 		}
 	}
 }
