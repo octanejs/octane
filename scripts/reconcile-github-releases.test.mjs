@@ -128,6 +128,51 @@ describe('GitHub release reconciliation', () => {
 		assert.ok(elapsed <= 130_000);
 	});
 
+	test('confirms a release whose last package becomes available after nine minutes', async () => {
+		const early = { name: '@octanejs/example', version: '0.1.2' };
+		const late = { name: 'octane', version: '0.3.0' };
+		let elapsed = 0;
+		const state = await waitForNpmPublication([early, late], {
+			inspectReleaseState: async () => ({
+				invalid: [],
+				pending: elapsed < 540_000 ? [late] : [],
+				published: elapsed < 540_000 ? [early] : [early, late],
+				unbootstrapped: [],
+				unreachable: [],
+			}),
+			log: () => {},
+			sleep: async (delay) => {
+				elapsed += delay;
+			},
+		});
+
+		assert.deepEqual(state.pending, []);
+		assert.deepEqual(state.published, [early, late]);
+		assert.ok(elapsed >= 540_000 && elapsed <= 570_000);
+	});
+
+	test('keeps an unpublished package missing after the bounded default wait', async () => {
+		const pkg = { name: '@octanejs/example', version: '0.1.2' };
+		let elapsed = 0;
+		const state = await waitForNpmPublication([pkg], {
+			inspectReleaseState: async () => ({
+				invalid: [],
+				pending: [pkg],
+				published: [],
+				unbootstrapped: [],
+				unreachable: [],
+			}),
+			log: () => {},
+			sleep: async (delay) => {
+				elapsed += delay;
+			},
+		});
+
+		assert.deepEqual(state.pending, [pkg]);
+		assert.deepEqual(state.published, []);
+		assert.ok(elapsed >= 900_000 && elapsed <= 930_000);
+	});
+
 	test('pushes annotated missing tags atomically without repository identity and creates every missing release sequentially', async () => {
 		const { expectedSha, remote, repository, root } = await createRepositoryFixture();
 		try {
