@@ -1,0 +1,717 @@
+{
+  "baseline": "330bb0878b42dbc445659c5ea40494067c4ef296",
+  "historical": "1ed5d2ab9c6291b734a70a102c78b25c8bcdb3d1",
+  "historicalMethod": "Same authored330 fixtures, historical source reconstructed with current330 lock/tooling; signals already existed at this checkpoint.",
+  "candidateSourceTreeSha256": "68bc437046578e8a5e929c8bee97bf6f0724b2c81d8563003485cede1e3789f9",
+  "sourceSha256": {
+    "packages/octane/src/compiler/bundler.js": "77599ba3ddb26c16f3cd05eb01297409f74e60884fe57fe88fa2a27f6487bd0b",
+    "packages/octane/src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+    "packages/octane/src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46",
+    "packages/octane/src/compiler/slot-hooks.js": "2f6e8091e5dab19c6bf126d0cf94a30f30454f9fe95b8731833e7e3d7ade1102",
+    "packages/octane/src/runtime.ts": "4354f73d46dfc378c9cd580c1ab6a882a7eff3632478326413152e923faca674"
+  },
+  "lockSha256": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+  "node": "v24.19.0",
+  "platform": "darwin/arm64",
+  "tooling": {
+    "esbuild": {
+      "name": "esbuild",
+      "version": "0.28.1",
+      "entrySha256": "8331fe1d8b3a07381f33cc425fcfaa94776e263113653f80ec3ba433e9657e73",
+      "manifestSha256": "d55d1d19fcc5b6079e4a71dd4111340c79c682bc36835ac7058a0c364c7db58a"
+    },
+    "vite": {
+      "name": "vite",
+      "version": "8.1.5",
+      "entrySha256": "c7ea52906f843318d7971209ce62bd24bab60590275e8f415c5564fa35cb82dc",
+      "manifestSha256": "2f482c846a1c5b9e5883b458b3e54a171a320c2e8d9b924c7383c4baef607b09"
+    },
+    "alien-signals": {
+      "name": "alien-signals",
+      "version": "3.2.0",
+      "entrySha256": "4176a9035b7898debb4601fd0ba8076e279befc470816336260847bd44720299",
+      "manifestSha256": "246a6dc2e0b031c5a274df8fdd6f84d7880aa11d8d945a3579a6214a1afe8831"
+    },
+    "devalue": {
+      "name": "devalue",
+      "version": "5.8.2",
+      "entrySha256": "0e7da1121acb03d39b45ab700e950e6174d5f6393f7da4c95fd78b4e18680d22",
+      "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+    },
+    "@tsrx/core": {
+      "name": "@tsrx/core",
+      "version": "0.2.0",
+      "entrySha256": "5220ae1bb76b19a8cee85ee20f784a0f13559bf1525c67e8c02328ec52a063bd",
+      "manifestSha256": "e9ff90dc24b69ef397f415911564845fd00607edd15f2e1d7839a6056477dee0"
+    },
+    "@tsrx/oxc/tsrx-core-compat": {
+      "name": "@tsrx/oxc",
+      "version": "0.13.0",
+      "entrySha256": "b19aaa027ce33226f5d2ff782bd0340cbc564b963339a6115ddf3144b0ea8d09",
+      "manifestSha256": "4d918232648d8b650ad40b32a8a56cf0dcedacfbe23b6dde74615b1fe90a0cb2"
+    },
+    "esrap": {
+      "name": "esrap",
+      "version": "2.3.2",
+      "entrySha256": "068b1a13c0860d8e5a230b59024e7da95ad25507209d388ccfe7348309811b6a",
+      "manifestSha256": "b48eec3fd9649a3f30d68d9d2c74476c56cd37dbd94c165b04bbc4d5b3686f0f"
+    },
+    "entities": {
+      "name": "entities",
+      "version": "7.0.1",
+      "entrySha256": "d060ec5833fe555e66ce01b4f82dbb73cb1ce695ed4a4222e68da334ac057e40",
+      "manifestSha256": "b33b5d3fd4a8e196d3245c10ebb8feb2e076fc8d392f99a1050377d6e2b8b641"
+    },
+    "es-module-lexer": {
+      "name": "es-module-lexer",
+      "version": "1.7.0",
+      "entrySha256": "4e55aa9233ffc5f051b44808b5e2f9c747fe9b1fa91b5de19c6134ebc4837cbd",
+      "manifestSha256": "de68b22f72517f94d53290ecdbaf975f5e79ca26d8757768b07c5b466749c494"
+    }
+  },
+  "fixtureSha256": {
+    "root-static": "11de23976d8dd67593331ae6e18aee9a4bc65f5975c85bc0542d21de3d625f52",
+    "hooks-state": "6ea5c5984e655be2202a2ff68b916f60bff39f48038f44984e0c429afce27aff",
+    "context": "03b2265c546f182af9be5a6c5d0eb21c206e0d0e53af0667597122809a0e7e19",
+    "hydrate-root": "c1c3389646de012ea363e9db0c99a9a7b684ff2494f0ea30e58008dab1c3637f",
+    "suspense-transition": "e10714ae7abadbf13c532b6db72296d8eff932628cfe2b152469fb07eae439d3",
+    "deferred-hydration": "d989278c273166b281729a60a5863f27423cca9c72158d2527d32ccaaacee256"
+  },
+  "method": {
+    "stock": "Production Vite8 IIFE library, target esnext, esbuild minification, whole executable closure. Generic createRoot export control: esbuild ESM browser bundle.",
+    "compression": "gzip level9, Brotli quality11, no sum of independently compressed modules.",
+    "stockRunnerSha256": "934dd4fa81f1900b84867b38c9b1511fd0f79c1a14f3db42bde77f277a5b54ea",
+    "publicRunnerSha256": "b829eb3f4ca01a6e9373e80b6b08579cec29dc872d1b0ed25c6ca8310631a554",
+    "public": "entrySource(BUNDLE_CASES) from benchmarks/scoped-signals/bundle-boundaries.mjs; same definitions, selected source exports, target esnext, ESM, platform from each case, esbuild production minification; public exports/engine/SSR smoke and retained input checks.",
+    "stockSourceDrift": false,
+    "publicSourceDrift": false,
+    "finalNullComparedToPrototypeBundleHashes": "All7 stock rows and15 public controls SHA256/raw/gzip/Brotli identical, measured on final null-safe source."
+  },
+  "stock": [
+    {
+      "id": "root-static",
+      "baseline330": {
+        "id": "root-static",
+        "bundler": "vite",
+        "raw": 197931,
+        "gzip": 62583,
+        "brotli": 54294,
+        "sha256": "c42a8832776417f94fc44ae3e9cad58cd1d44fce5fecb87f649bdff27db56c28"
+      },
+      "candidate": {
+        "id": "root-static",
+        "bundler": "vite",
+        "raw": 83633,
+        "gzip": 27583,
+        "brotli": 24583,
+        "sha256": "4e5137830ce11041e8f6b3df6d841ba2c359edce084650aeec385b83545e8b19"
+      },
+      "historicalCurrentLock": {
+        "id": "root-static",
+        "bundler": "vite",
+        "raw": 172092,
+        "gzip": 54306,
+        "brotli": 47312,
+        "sha256": "03b16ce32c494d397dcc2ac7c81faccf65d0b3a1a317bfd8624267f0229b2043"
+      },
+      "deltaGzip": -35000,
+      "deltaFromHistoricalGzip": -26723,
+      "semantic": {
+        "text": "Octane",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "hooks-state",
+      "baseline330": {
+        "id": "hooks-state",
+        "bundler": "vite",
+        "raw": 205942,
+        "gzip": 65394,
+        "brotli": 56643,
+        "sha256": "80721dd32d4cfd2cb2f992e140ccff11577adabecf9537b3ffc6556c2aedb43f"
+      },
+      "candidate": {
+        "id": "hooks-state",
+        "bundler": "vite",
+        "raw": 95051,
+        "gzip": 31403,
+        "brotli": 27938,
+        "sha256": "5662209cfdaccdc07553239a298fdaebc53e60aa04d89092c6a09c55837fe5b9"
+      },
+      "historicalCurrentLock": {
+        "id": "hooks-state",
+        "bundler": "vite",
+        "raw": 180364,
+        "gzip": 57211,
+        "brotli": 49785,
+        "sha256": "1f6ed130a98c33cc88505592e3ac79395b3798578bd324894a64b9f33272589b"
+      },
+      "deltaGzip": -33991,
+      "deltaFromHistoricalGzip": -25808,
+      "semantic": {
+        "before": "0",
+        "after": "1",
+        "clicks": 1,
+        "effects": 1,
+        "cleanups": 1,
+        "cleaned": true
+      }
+    },
+    {
+      "id": "context",
+      "baseline330": {
+        "id": "context",
+        "bundler": "vite",
+        "raw": 216895,
+        "gzip": 68606,
+        "brotli": 59253,
+        "sha256": "8d662a7544c25654ed5f21bbcd5760e5f4f43ce76d06185a4156e9510e212f1a"
+      },
+      "candidate": {
+        "id": "context",
+        "bundler": "vite",
+        "raw": 216897,
+        "gzip": 68607,
+        "brotli": 59307,
+        "sha256": "b3fca6d03fcf0b7b97937d8b95a6ecc5c2e8b69e91be6ad9719e08a2a9231ae7"
+      },
+      "historicalCurrentLock": {
+        "id": "context",
+        "bundler": "vite",
+        "raw": 181363,
+        "gzip": 57492,
+        "brotli": 50110,
+        "sha256": "35043432a2b3cabba0296ce6eaaa2e8d6f4868e5a09379d62c7b638139da9f33"
+      },
+      "deltaGzip": 1,
+      "deltaFromHistoricalGzip": 11115,
+      "semantic": {
+        "before": "light",
+        "after": "dark",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "hydrate-root",
+      "baseline330": {
+        "id": "hydrate-root",
+        "bundler": "vite",
+        "raw": 259659,
+        "gzip": 81503,
+        "brotli": 69834,
+        "sha256": "550e489f422d5d7551ffe0122c14b8151657a10fdaadc3e71c067b9890282cef"
+      },
+      "candidate": {
+        "id": "hydrate-root",
+        "bundler": "vite",
+        "raw": 259659,
+        "gzip": 81503,
+        "brotli": 69834,
+        "sha256": "550e489f422d5d7551ffe0122c14b8151657a10fdaadc3e71c067b9890282cef"
+      },
+      "historicalCurrentLock": {
+        "id": "hydrate-root",
+        "bundler": "vite",
+        "raw": 221558,
+        "gzip": 69639,
+        "brotli": 59989,
+        "sha256": "22679f9ff00d96c972dc89321987722384367df2fc0f6c1c35d1155e78235db7"
+      },
+      "deltaGzip": 0,
+      "deltaFromHistoricalGzip": 11864,
+      "semantic": {
+        "adopted": true,
+        "before": "server",
+        "after": "client",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "suspense-transition",
+      "baseline330": {
+        "id": "suspense-transition",
+        "bundler": "vite",
+        "raw": 250679,
+        "gzip": 78571,
+        "brotli": 67622,
+        "sha256": "02adc64114e139adf3083f6f1cba9674993130f2f4d7d2425950b6a002067894"
+      },
+      "candidate": {
+        "id": "suspense-transition",
+        "bundler": "vite",
+        "raw": 182476,
+        "gzip": 58104,
+        "brotli": 50594,
+        "sha256": "34c35566930422429d1bb3f950fab600c03cee37bc16cbb187974b762a24d771"
+      },
+      "historicalCurrentLock": {
+        "id": "suspense-transition",
+        "bundler": "vite",
+        "raw": 215074,
+        "gzip": 67599,
+        "brotli": 58446,
+        "sha256": "cb69e14dee2de10d992a2d6f2012b6e08717cbafc3bb03c1c76def222914b647"
+      },
+      "deltaGzip": -20467,
+      "deltaFromHistoricalGzip": -9495,
+      "semantic": {
+        "pending": "loading",
+        "resolved": "ready",
+        "transition": "next",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "deferred-hydration",
+      "baseline330": {
+        "id": "deferred-hydration",
+        "bundler": "vite",
+        "raw": 296675,
+        "gzip": 93135,
+        "brotli": 79639,
+        "sha256": "e818553bddd6260d5cd591439e441a05e79f9f997172d228a0d712e2fe43d209"
+      },
+      "candidate": {
+        "id": "deferred-hydration",
+        "bundler": "vite",
+        "raw": 296675,
+        "gzip": 93135,
+        "brotli": 79639,
+        "sha256": "e818553bddd6260d5cd591439e441a05e79f9f997172d228a0d712e2fe43d209"
+      },
+      "historicalCurrentLock": {
+        "id": "deferred-hydration",
+        "bundler": "vite",
+        "raw": 255101,
+        "gzip": 80206,
+        "brotli": 68805,
+        "sha256": "e973fd8598273576021c3d1117340eacdf92546c6f6e5ddfe7d05766b6b1d606"
+      },
+      "deltaGzip": 0,
+      "deltaFromHistoricalGzip": 12929,
+      "semantic": {
+        "before": "dormant",
+        "after": "active",
+        "clicks": 1,
+        "cleaned": true
+      }
+    },
+    {
+      "id": "createRoot-export",
+      "baseline330": {
+        "id": "createRoot-export",
+        "bundler": "esbuild",
+        "raw": 193173,
+        "gzip": 61565,
+        "brotli": 53439,
+        "sha256": "d706dba033132ab7e68586a2e7e2ade1b95045919b00684cf844a3ac1c9bcdf5"
+      },
+      "candidate": {
+        "id": "createRoot-export",
+        "bundler": "esbuild",
+        "raw": 193173,
+        "gzip": 61565,
+        "brotli": 53439,
+        "sha256": "d706dba033132ab7e68586a2e7e2ade1b95045919b00684cf844a3ac1c9bcdf5"
+      },
+      "historicalCurrentLock": {
+        "id": "createRoot-export",
+        "bundler": "esbuild",
+        "raw": 167670,
+        "gzip": 53295,
+        "brotli": 46402,
+        "sha256": "316d5841048308c93b82fe34e4b3bdfc8cb8407b55b00a6146d8a4a1bc365c02"
+      },
+      "deltaGzip": 0,
+      "deltaFromHistoricalGzip": 8270,
+      "semantic": null
+    }
+  ],
+  "unchangedPublicClosures": [
+    {
+      "id": "ordinary-client",
+      "bundler": "esbuild",
+      "raw": 193173,
+      "gzip": 61565,
+      "brotli": 53439,
+      "sha256": "d706dba033132ab7e68586a2e7e2ade1b95045919b00684cf844a3ac1c9bcdf5"
+    },
+    {
+      "id": "ordinary-server",
+      "bundler": "esbuild",
+      "raw": 50366,
+      "gzip": 17728,
+      "brotli": 15990,
+      "sha256": "62940952060a7e32918f66495e0ebd908710945035092908e0c66708569e5ebc"
+    },
+    {
+      "id": "binding-scalar",
+      "bundler": "esbuild",
+      "raw": 13823,
+      "gzip": 5251,
+      "brotli": 4748,
+      "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+    },
+    {
+      "id": "binding-structural",
+      "bundler": "esbuild",
+      "raw": 31292,
+      "gzip": 10455,
+      "brotli": 9553,
+      "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+    },
+    {
+      "id": "binding-controls",
+      "bundler": "esbuild",
+      "raw": 9046,
+      "gzip": 3525,
+      "brotli": 3190,
+      "sha256": "f9d9f7ca38bd4591295e188a20aa78de7a84aabbd5e1b78935f1619cdee18e3d"
+    },
+    {
+      "id": "binding-whole-style",
+      "bundler": "esbuild",
+      "raw": 6199,
+      "gzip": 2630,
+      "brotli": 2360,
+      "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+    },
+    {
+      "id": "binding-scalar-controls-style",
+      "bundler": "esbuild",
+      "raw": 27473,
+      "gzip": 9954,
+      "brotli": 9029,
+      "sha256": "f26ff87b831d27584d84a74ebeacc8787600cb2eb7e0523c5a49ea0d5c3aed80"
+    },
+    {
+      "id": "engine",
+      "bundler": "esbuild",
+      "raw": 42253,
+      "gzip": 12889,
+      "brotli": 11672,
+      "sha256": "3264d5ac64941955c4e9edadb70c17385d67b03ebd611f54dbdd96c5e6478a43"
+    },
+    {
+      "id": "native-client",
+      "bundler": "esbuild",
+      "raw": 45094,
+      "gzip": 14297,
+      "brotli": 12931,
+      "sha256": "46037b83c2f05c341757c96be73b7fb6b5ba61bce3de8f4a6de4b8cd1efc7e62"
+    },
+    {
+      "id": "native-server",
+      "bundler": "esbuild",
+      "raw": 44962,
+      "gzip": 14215,
+      "brotli": 12841,
+      "sha256": "4b0c2329255b4cdcba1bbe57fe009860e85e0725b09320ff7b36122ec3a1d9b3"
+    },
+    {
+      "id": "compiled-plain-signals",
+      "bundler": "esbuild",
+      "raw": 64833,
+      "gzip": 19026,
+      "brotli": 17176,
+      "sha256": "817525035dacdc1cb59e77176e9b7271740271fd41abf791c18689da74da8b73"
+    },
+    {
+      "id": "streamed-signals-bootstrap",
+      "bundler": "esbuild",
+      "raw": 70744,
+      "gzip": 21933,
+      "brotli": 19640,
+      "sha256": "cc7c410ff2a691465cab4708aac58d2f0f48ddfacf9e5e70ba108ea1841bc5e3"
+    },
+    {
+      "id": "streamed-signal-results-bootstrap",
+      "bundler": "esbuild",
+      "raw": 64725,
+      "gzip": 19935,
+      "brotli": 17902,
+      "sha256": "6f04f8d035089562dcebed5de4ade9b524eddc667ed1bc5770bb0a37eb3554e5"
+    },
+    {
+      "id": "used-native-app",
+      "bundler": "esbuild",
+      "raw": 247072,
+      "gzip": 78310,
+      "brotli": 68002,
+      "sha256": "cb62bf7aa6146e0fe0079b5eb13e67f8446d988279262310d65c75f279dad524"
+    },
+    {
+      "id": "used-native-ssr",
+      "bundler": "esbuild",
+      "raw": 97093,
+      "gzip": 31888,
+      "brotli": 28769,
+      "sha256": "919d86a76c9637c84e47210d979095de8a3540c3bbe893a486b9923e27415934"
+    }
+  ],
+  "compileTime": {
+    "runnerSha256": "c08f615d9bbbc6921aaba630231a1d3799c2a33161b789d52697646436f26318",
+    "sourceHashes": {
+      "baseline": {
+        "pnpm-lock.yaml": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+        "packages/octane/src/compiler/compile.js": "11da48eaf3e3881b99c091539c5f0f50327405e1663db98272f5e7c20bcd4869"
+      },
+      "candidate": {
+        "pnpm-lock.yaml": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+        "packages/octane/src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf",
+        "packages/octane/src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46"
+      }
+    },
+    "options": {
+      "mode": "client",
+      "hmr": false,
+      "dev": false
+    },
+    "batch": 10,
+    "warmup": 3,
+    "pairs": 12,
+    "rows": [
+      {
+        "id": "root-static",
+        "sourceSha256": "11de23976d8dd67593331ae6e18aee9a4bc65f5975c85bc0542d21de3d625f52",
+        "sourceBytes": 336,
+        "samplesMs": {
+          "baseline": [
+            0.5211792000000003, 0.43141669999999976, 0.4115958999999975, 0.4852041999999983,
+            0.41550409999999827, 0.5098917000000028, 0.435533300000003, 0.46794170000000007,
+            0.5248125000000016, 0.41864170000000056, 0.36084579999999844, 0.4998124999999959
+          ],
+          "candidate": [
+            0.5656583000000012, 0.5161209000000042, 0.5677083000000038, 0.4248292000000049,
+            0.9192999999999983, 0.4397958000000017, 0.5381249999999966, 0.5533999999999992,
+            0.6270749999999964, 0.42218330000000037, 0.5505832999999996, 0.4529874999999947
+          ]
+        },
+        "baseline": {
+          "median": 0.46794170000000007,
+          "mean": 0.4568649416666663,
+          "p25": 0.41864170000000056,
+          "p75": 0.5098917000000028
+        },
+        "candidate": {
+          "median": 0.5505832999999996,
+          "mean": 0.5481472166666667,
+          "p25": 0.4529874999999947,
+          "p75": 0.5677083000000038
+        },
+        "pairedRatio": {
+          "median": 1.1948553054662274,
+          "mean": 1.2220983908625886,
+          "p25": 1.0084597401548863,
+          "p75": 1.3792856051287372
+        },
+        "emittedSha256": {
+          "baseline": "ac850c8bc9906efe836f10226b3ebcbed2fa0f03a27abb93c258b4b6958711d3",
+          "candidate": "c5b8e2cf852269dfd47810b5a7fade21fa1c3c6279c7bf01c45661fc809ea02f"
+        }
+      },
+      {
+        "id": "hooks-state",
+        "sourceSha256": "6ea5c5984e655be2202a2ff68b916f60bff39f48038f44984e0c429afce27aff",
+        "sourceBytes": 887,
+        "samplesMs": {
+          "baseline": [
+            1.042954099999997, 1.0793000000000006, 0.9753417000000013, 1.1185917000000019,
+            1.1976457999999979, 1.133062499999994, 1.030845899999997, 1.1779540999999996,
+            1.0292707999999948, 1.0822416999999973, 0.9608166000000097, 0.9980957999999986
+          ],
+          "candidate": [
+            1.3505999999999971, 1.2665124999999988, 1.3962457999999969, 1.220895900000005,
+            1.1759458999999992, 1.1109540999999923, 1.1422415999999997, 1.060091699999998,
+            1.158462499999996, 1.2445666000000073, 1.0499666000000047, 1.2993082999999956
+          ]
+        },
+        "baseline": {
+          "median": 1.0793000000000006,
+          "mean": 1.0688433916666658,
+          "p25": 1.0292707999999948,
+          "p75": 1.133062499999994
+        },
+        "candidate": {
+          "median": 1.220895900000005,
+          "mean": 1.2063159583333325,
+          "p25": 1.1422415999999997,
+          "p75": 1.2993082999999956
+        },
+        "pairedRatio": {
+          "median": 1.1255176966061815,
+          "mean": 1.1359909031377786,
+          "p25": 1.0914580360286985,
+          "p75": 1.2949754931688757
+        },
+        "emittedSha256": {
+          "baseline": "fc1b94751c86cd6f7d3750c27a449d71696b471905343d431cb4086d6a19fae9",
+          "candidate": "8c07353da7f294fd4c7d2b169a6c7f063ddd5be929078123daa0dcc09bd9892e"
+        }
+      },
+      {
+        "id": "context",
+        "sourceSha256": "03b2265c546f182af9be5a6c5d0eb21c206e0d0e53af0667597122809a0e7e19",
+        "sourceBytes": 996,
+        "samplesMs": {
+          "baseline": [
+            1.3604041999999936, 1.3493791999999984, 1.4455791999999974, 1.5115792000000057,
+            1.3579750000000104, 1.3484666999999946, 1.2529332999999951, 1.340541700000017,
+            1.4933541999999989, 1.5436583000000155, 1.2993332999999894, 1.3751500000000079
+          ],
+          "candidate": [
+            1.601354200000003, 1.3259916999999972, 1.507974999999999, 1.429933399999993,
+            1.4996417000000064, 1.6083250000000135, 1.5985875000000078, 1.4199792000000115,
+            1.5381583000000092, 1.3866208000000142, 1.3830416000000014, 1.5501541999999973
+          ]
+        },
+        "baseline": {
+          "median": 1.3604041999999936,
+          "mean": 1.3898628583333352,
+          "p25": 1.3484666999999946,
+          "p75": 1.4933541999999989
+        },
+        "candidate": {
+          "median": 1.507974999999999,
+          "mean": 1.487480216666671,
+          "p25": 1.4199792000000115,
+          "p75": 1.5985875000000078
+        },
+        "pairedRatio": {
+          "median": 1.0644240396209446,
+          "mean": 1.0750878191122888,
+          "p25": 1.0300023263067868,
+          "p75": 1.1771164775880658
+        },
+        "emittedSha256": {
+          "baseline": "ce72ed3cee57db3a065c8b839cc7011551e8fa0ec5550c745c87540ffbf0eede",
+          "candidate": "c64a06e7a0e154cf56b9978414ce2e36e570b515609b1f59f59d23b15d8ffb41"
+        }
+      },
+      {
+        "id": "root-free-100-hosts",
+        "sourceSha256": "9e81721db901049f0844227ccb32829b03bb77cd7d3f4dfcef326dd439a7d5fd",
+        "sourceBytes": 5940,
+        "samplesMs": {
+          "baseline": [
+            16.67092499999999, 17.682024999999975, 16.335112500000015, 18.388675000000013,
+            16.21605840000002, 17.981766700000026, 16.32183329999998, 18.050787500000023,
+            16.214216599999965, 18.047312500000043, 16.74284579999994, 17.09711669999997
+          ],
+          "candidate": [
+            17.177879200000007, 17.609616600000027, 18.017000000000007, 17.81701670000002,
+            17.207654200000025, 17.36422910000001, 17.932329200000005, 16.902900000000045,
+            18.081516699999973, 16.23187910000006, 17.893091699999967, 16.280633299999955
+          ]
+        },
+        "baseline": {
+          "median": 17.09711669999997,
+          "mean": 17.14572291666666,
+          "p25": 16.335112500000015,
+          "p75": 18.047312500000043
+        },
+        "candidate": {
+          "median": 17.609616600000027,
+          "mean": 17.376312150000008,
+          "p25": 17.177879200000007,
+          "p75": 17.932329200000005
+        },
+        "pairedRatio": {
+          "median": 1.0304094823772536,
+          "mean": 1.0162992203444494,
+          "p25": 0.9656575680074853,
+          "p75": 1.098671262620972
+        },
+        "emittedSha256": {
+          "baseline": "e95d5e5634537fe3fac30c8bc9afb3f914c25821e43ceed927d152213be6976f",
+          "candidate": "e95d5e5634537fe3fac30c8bc9afb3f914c25821e43ceed927d152213be6976f"
+        }
+      },
+      {
+        "id": "50-components-and-roots",
+        "sourceSha256": "500d1b34c04b707b060dc427a138c57306c569239a3128d786534c10bfb5e31c",
+        "sourceBytes": 8494,
+        "samplesMs": {
+          "baseline": [
+            14.698237500000051, 15.4311917, 14.001808400000026, 14.881079099999988,
+            14.566420899999866, 13.941337500000008, 15.420349999999962, 13.843070799999987,
+            14.812425000000076, 14.679275000000052, 13.838970899999913, 15.818729200000053
+          ],
+          "candidate": [
+            15.310624999999982, 15.064754200000062, 17.14682500000008, 15.343816599999991,
+            17.579891700000008, 15.361337500000081, 17.718629099999998, 15.078383300000132,
+            17.009483300000102, 15.246429100000023, 17.527700000000003, 15.50721250000006
+          ]
+        },
+        "baseline": {
+          "median": 14.698237500000051,
+          "mean": 14.661074666666664,
+          "p25": 14.001808400000026,
+          "p75": 15.420349999999962
+        },
+        "candidate": {
+          "median": 15.50721250000006,
+          "mean": 16.157923941666713,
+          "p25": 15.310624999999982,
+          "p75": 17.527700000000003
+        },
+        "pairedRatio": {
+          "median": 1.1018553635904784,
+          "mean": 1.1045379697014392,
+          "p25": 1.0386363836088615,
+          "p75": 1.206877916043204
+        },
+        "emittedSha256": {
+          "baseline": "ab49d064dbd687577fc4ecacc4c6aeca29cffa4c1be9193aba16ca4f8206a714",
+          "candidate": "077aae6186357496f079e8f8b0bb91ccb0cc522c0648588a5e8ed154864c2467"
+        }
+      }
+    ]
+  },
+  "validation": {
+    "compilerProofControls": 24,
+    "owningTotal": 52,
+    "nearbyMatrixActualRun": 195,
+    "nodeBoundarySuite": 19,
+    "independentPublicPairedConsumers": 20,
+    "scopedTypes": "pass",
+    "restoredSourceSha256": {
+      "packages/octane/src/compiler/local-void-roots.js": "b4ecfb0a686dd135a588dde57fe0e81e720fc8a38fdbadd9747de826f4749d46",
+      "packages/octane/src/compiler/compile.js": "fdf81f4653e33d9087fb8a209a5b01a41f2a46bf0484f9fce4f0dc5888f48bbf"
+    },
+    "owningPublicTestResults": 28,
+    "fiveMutants": [
+      {
+        "name": "binding-writes",
+        "exit": 1
+      },
+      {
+        "name": "lexical-identity",
+        "exit": 1
+      },
+      {
+        "name": "escaping-root",
+        "exit": 1
+      },
+      {
+        "name": "deletion-disabled",
+        "exit": 1
+      },
+      {
+        "name": "null-admission",
+        "exit": 1
+      }
+    ],
+    "mutantProvenance": "First4 proof/deletion mutants ran on the pre-null-guard prototype;5th null-admission mutant ran on final source. Each modified source was restored exactly; final28 public-test results/24 proof controls/195 nearby tests/19 boundaries passed after restoration."
+  },
+  "limits": [
+    "Only production ordinary DOM function-local const roots; exact authored top-module @{} FunctionDeclarations whose IDs remain certified after lowering.",
+    "All root references remain in their declaration lexical scope and every render target resolves to a stable same-module compiled-void binding.",
+    "Module-level const roots, imported/wrapped/arrow/return-JSX targets, aliases, escapes, closures, unknown targets, writable definitions and direct eval decline this proof. Runtime namespace/enum syntax conservatively invalidates visible binding-write facts.",
+    "Development, HMR, profiling, server, explicit renderer/universal/renderer-boundary modes remain generic.",
+    "No runtime ABI/source changes, no SSR or standalone model cost transfer in the15 unchanged public closure controls.",
+    "Compiler proof has measured overhead; no runtime CPU, SSR speed, universal unused-signals recovery or combined PR/CI claim. Budget caps unchanged."
+  ],
+  "candidateSourceTreeHashMethod": "SHA256 of sorted path-to-fileSHA256 canonical JSON, compact separators"
+}

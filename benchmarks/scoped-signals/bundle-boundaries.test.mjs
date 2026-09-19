@@ -11,6 +11,7 @@ import { Window } from 'happy-dom';
 import { compile } from '../../packages/octane/src/compiler/compile.js';
 import { slotHooks } from '../../packages/octane/src/compiler/slot-hooks.js';
 import { knownAttributeSpreads } from '../../packages/stylex/src/compiler-contract.js';
+import { verifyScenario } from '../bundle-size/verify-reachability.mjs';
 import { generateStylexCSS, transformStylex } from '../../packages/stylex/src/transform.js';
 import {
 	BUNDLE_CASES,
@@ -1641,4 +1642,44 @@ export function App(props) {
 				checked++;
 			}
 	t.diagnostic(`${checked} fixed-source primitive and opaque compiler controls`);
+});
+
+test('same-file void roots remove returned-value machinery while preserving stock consumers', async (t) => {
+	for (const id of ['root-static', 'hooks-state']) {
+		const filename = path.resolve(`benchmarks/bundle-size/fixtures/minimal/${id}.tsrx`);
+		const authored = await readFile(filename, 'utf8');
+		const sizes = [];
+		for (const opaque of [false, true]) {
+			// The sequence expression intentionally declines exact-factory proof.
+			// Both programs execute the same public createRoot/render/unmount ABI.
+			const source = opaque
+				? authored.replace('createRoot(container)', '(0, createRoot)(container)')
+				: authored;
+			assert.notEqual(source, opaque ? authored : '', `${id}: matched generic control`);
+			const compiled = compile(source, filename, { mode: 'client', dev: false, hmr: false }).code;
+			const result = await build({
+				stdin: { contents: compiled, resolveDir: path.resolve('packages/octane'), loader: 'js' },
+				bundle: true,
+				write: false,
+				minify: true,
+				format: 'iife',
+				globalName: '__OCTANE_REACHABILITY__',
+				platform: 'browser',
+				target: 'esnext',
+				legalComments: 'none',
+				tsconfigRaw: { compilerOptions: {} },
+				define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			});
+			const code = result.outputFiles[0].text;
+			await verifyScenario(id, code);
+			sizes.push(gzipSync(code, { level: 9 }).length);
+		}
+		assert.ok(
+			sizes[0] < sizes[1] * 0.6,
+			`${id}: proven root ${sizes[0]} gzip; generic control ${sizes[1]} gzip`,
+		);
+		t.diagnostic(
+			`${id}: proven ${sizes[0]}, generic ${sizes[1]} gzip bytes; both stock semantic controls pass`,
+		);
+	}
 });

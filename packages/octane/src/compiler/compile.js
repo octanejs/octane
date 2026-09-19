@@ -123,6 +123,7 @@ import {
 import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
+import { findLocalVoidRootCallees } from './local-void-roots.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
 // static bakes and dynamic writes MUST agree on which attributes render, under
@@ -9867,6 +9868,40 @@ function compileInternal(
 	// rebuilt with builders/spreads (locations carried via setLocation) and
 	// untouched subtrees stay shared with the parse by reference.
 	let ast = parsedAst;
+	const localVoidRootsEnabled =
+		!options?.dev &&
+		!options?.hmr &&
+		!options?.profile &&
+		options?.renderer == null &&
+		options?.universalRuntime == null &&
+		options?.__universal == null &&
+		!options?.__rendererBoundariesLowered &&
+		rendererBoundaryPreparation === null &&
+		options?.rendererBoundaries == null &&
+		options?.rendererRegistry == null;
+	const authoredVoidRootIds = new Set();
+	if (
+		localVoidRootsEnabled &&
+		ast.body.some(
+			(node) =>
+				node.type === 'ImportDeclaration' &&
+				node.source?.value === 'octane' &&
+				node.specifiers.some(
+					(specifier) =>
+						specifier.type === 'ImportSpecifier' &&
+						(specifier.imported.name ?? specifier.imported.value) === 'createRoot',
+				),
+		)
+	) {
+		for (const statement of ast.body) {
+			const node =
+				statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+					? statement.declaration
+					: statement;
+			if (node?.type === 'FunctionDeclaration' && node.id && isVoidJsxCodeBlockFunction(node))
+				authoredVoidRootIds.add(node.id);
+		}
+	}
 	// Drop type-only statements (interface / type / declare / import-export type)
 	// and inline `type` specifiers before emit — they carry no runtime value and
 	// would leak invalid TS into the .js (or crash the printer). Runtime-only;
@@ -10349,6 +10384,21 @@ function compileInternal(
 				returnJsx: isReturnJsxFunction(compNode),
 				voidOutput: isVoidJsxCodeBlockFunction(compNode),
 			});
+		}
+	}
+	if (authoredVoidRootIds.size > 0) {
+		const definitions = new Set(
+			[...ctx.componentInfo.values()]
+				.filter((info) => info.voidOutput && authoredVoidRootIds.has(info.node.id))
+				.map((info) => info.node.id),
+		);
+		const components = new Set([...ctx.componentInfo.values()].map((info) => info.node));
+		const callees = new Set(findLocalVoidRootCallees(ast, definitions, components));
+		if (callees.size > 0) {
+			const alias = allocCompilerName(ctx, rtAlias('__createVoidRoot'));
+			(ctx.privateRuntimeAliases ??= new Map()).set('__createVoidRoot', alias);
+			ctx.runtimeNeeded.add('__createVoidRoot');
+			ast = mapAst(ast, (node) => (callees.has(node) ? { ...node, name: alias } : null));
 		}
 	}
 	// Return-based JSX functions never attach fetch-tree warm plans, and a sole
