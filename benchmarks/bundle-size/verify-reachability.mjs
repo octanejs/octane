@@ -33,6 +33,10 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		text: 'Octane',
 		cleaned: true,
 	},
+	'root-descriptor': {
+		text: 'Octane',
+		cleaned: true,
+	},
 	'root-static-specialized': {
 		text: 'Octane',
 	},
