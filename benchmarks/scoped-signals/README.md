@@ -508,3 +508,33 @@ are reachable. `heap-reachability.mjs` implements that rule, with synthetic
 controls in `inspect-async-retainers.test.mjs`. Reports preserve known scope
 labels, object counts, paths, snapshot hashes, and the source/toolchain inputs.
 Heap-byte deltas are diagnostic only and are not a leak criterion.
+
+
+## Immutable primitive setup values
+
+`primitive-local-values.test.mjs` is part of `ci:workflow:test`. It checks matched
+client/server, development/production, TSRX/returned-JSX output using frozen
+parser ASTs. Immutable lexical values derived from proven primitives omit the
+optional value adapters; authored casts, opaque calls and members, mutable
+bindings, shadowed intrinsics, and invalidating writes keep their adapters.
+Constructor-name member writes and unknown computed member writes also decline
+new intrinsic-result local facts, even through aliases. References to mutating
+member methods such as `Object.assign`, `Object.defineProperty`, and `Reflect.set`
+(and unknown computed member calls) also conservatively decline these facts. JavaScript operator and
+template guarantees remain eligible; preexisting child proofs remain intact.
+
+The public controls keep controlled-input restoration, hidden native reads,
+real handles, and keyed identities observable. A real split model module loads
+only after two keyed components mount, then exercises event counts through
+reorder, retirement, and remount. Newly proven locals retain the existing
+potential capability and SSR/client input markers; this optimization does not
+remove the identity metadata needed by late signals.
+
+The SSR work observation renders two orders of 100 keyed rows. Each row reads
+its opaque callback once and renders matching text, title, and input values.
+The primitive lane makes zero `ssrSignalValue`/`ssrSignalControlValue` entries;
+the opaque control makes 600/200 entries respectively. The latter includes the
+value entry made inside each control adapter. Real handles remain a separate
+positive control. Clean and instrumented public results must agree exactly;
+instrumented bundles never contribute byte measurements. No timing threshold
+or budget changes are added.

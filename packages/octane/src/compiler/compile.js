@@ -56,6 +56,7 @@ import {
 	analyzeCallbackDependencies,
 	analyzeHookDependencies,
 	applyHookDependencies,
+	collectReassignedBindings,
 	isInvariantLiteral,
 } from './hook-deps.js';
 import {
@@ -537,12 +538,17 @@ function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
 	}
 }
 
-function canCarryDirectSignalHandle(node, conservativeResult = false) {
+function canCarryDirectSignalHandle(
+	node,
+	conservativeResult = false,
+	retainLocalCapability = false,
+) {
 	if (
 		!node ||
 		node.metadata?.octane_string_child ||
 		node.metadata?.octane_primitive_text_child ||
-		node.metadata?.octane_primitive_value
+		(node.metadata?.octane_primitive_value &&
+			!(retainLocalCapability && node.metadata?.octane_primitive_local_value))
 	) {
 		return false;
 	}
@@ -553,22 +559,26 @@ function canCarryDirectSignalHandle(node, conservativeResult = false) {
 		node.type === 'ParenthesizedExpression' ||
 		node.type === 'ChainExpression'
 	) {
-		return canCarryDirectSignalHandle(node.expression, conservativeResult);
+		return canCarryDirectSignalHandle(node.expression, conservativeResult, retainLocalCapability);
 	}
 	if (node.type === 'ConditionalExpression') {
 		return (
-			canCarryDirectSignalHandle(node.consequent, conservativeResult) ||
-			canCarryDirectSignalHandle(node.alternate, conservativeResult)
+			canCarryDirectSignalHandle(node.consequent, conservativeResult, retainLocalCapability) ||
+			canCarryDirectSignalHandle(node.alternate, conservativeResult, retainLocalCapability)
 		);
 	}
 	if (node.type === 'LogicalExpression') {
 		return (
-			canCarryDirectSignalHandle(node.left, conservativeResult) ||
-			canCarryDirectSignalHandle(node.right, conservativeResult)
+			canCarryDirectSignalHandle(node.left, conservativeResult, retainLocalCapability) ||
+			canCarryDirectSignalHandle(node.right, conservativeResult, retainLocalCapability)
 		);
 	}
 	if (node.type === 'SequenceExpression') {
-		return canCarryDirectSignalHandle(node.expressions.at(-1), conservativeResult);
+		return canCarryDirectSignalHandle(
+			node.expressions.at(-1),
+			conservativeResult,
+			retainLocalCapability,
+		);
 	}
 	if (
 		!conservativeResult &&
@@ -654,7 +664,16 @@ function componentInvocationSite(ctx, node) {
 }
 
 function markDirectSignalBinding(binding, ctx, origin, kind) {
-	if (!canCarryDirectSignalHandle(binding.expr)) return binding;
+	if (!canCarryDirectSignalHandle(binding.expr)) {
+		// Newly certified locals still retain the prior potential capability:
+		// opaque events can import instance models after their first mount. A
+		// primitive result removes this adapter, not structural owner identity.
+		if (canCarryDirectSignalHandle(binding.expr, false, true)) {
+			ctx.signalBindingsUsed = true;
+			if (isDirectSignalHandleExpression(binding.expr)) ctx.signalBindingsEager = true;
+		}
+		return binding;
+	}
 	ctx.signalBindingsUsed = true;
 	if (isDirectSignalHandleExpression(binding.expr)) ctx.signalBindingsEager = true;
 	return {
@@ -666,6 +685,7 @@ function markDirectSignalBinding(binding, ctx, origin, kind) {
 
 function ssrSignalValue(node, ctx, origin, capability = false) {
 	if (!(capability ? canCarryDirectSignalHandle(node) : isDirectSignalHandleExpression(node))) {
+		if (capability && canCarryDirectSignalHandle(node, false, true)) ctx.signalBindingsUsed = true;
 		return node;
 	}
 	ctx.signalBindingsUsed = true;
@@ -12736,8 +12756,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	);
 	const hostSignalSite = directSignalSite(ctx, node, 'binding');
 	let directSignalControlSite = null;
+	let directSignalControlValues = false;
 	const markDirectControl = (expression, origin) => {
-		if (!canCarryDirectSignalHandle(expression)) return expression;
+		const carriesHandle = canCarryDirectSignalHandle(expression);
+		if (!carriesHandle && !canCarryDirectSignalHandle(expression, false, true)) return expression;
 		const site = firstSpreadIdx === -1 ? directSignalSite(ctx, node, 'input') : hostSignalSite;
 		if (directSignalControlSite === null) {
 			if (directAttributeIdentities.has('data-octane-input')) {
@@ -12749,10 +12771,13 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			bakeLit(` data-octane-input="${escapeAttr(site)}"`, 'data-octane-input', null, null);
 		}
 		ctx.signalBindingsUsed = true;
+		if (!carriesHandle) return expression;
+		directSignalControlValues = true;
 		ctx.runtimeNeeded.add('ssrSignalControlValue');
 		return ssrCall('ssrSignalControlValue', [expression, b.literal(site)], origin);
 	};
 	if (firstSpreadIdx !== -1 && (tag === 'input' || tag === 'textarea' || tag === 'select')) {
+		directSignalControlValues = true;
 		directSignalControlSite = hostSignalSite;
 		if (directAttributeIdentities.has('data-octane-input')) {
 			throw new Error(
@@ -13431,7 +13456,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		parts.push(singleDirectAttribute);
 	}
 	let signalControlAttrs = null;
-	if (directSignalControlSite !== null) {
+	if (directSignalControlValues) {
 		ctx.runtimeNeeded.add('ssrSignalControlAttrs');
 		signalControlAttrs = ssrCall('ssrSignalControlAttrs', [b.array(formControlSources)], node);
 	}
@@ -20129,13 +20154,22 @@ function memberProps(hn, src) {
 		// primitive value proofs separately from the renderer's text assertions:
 		// an authored `as string` still permits a signal handle at runtime.
 		...(isPrimitiveValueExpression(src)
-			? { metadata: { ...src?.metadata, octane_primitive_value: true } }
+			? {
+					metadata: {
+						...src?.metadata,
+						octane_primitive_value: true,
+						...(canCarryDirectSignalHandle(src, false, true) && !canCarryDirectSignalHandle(src)
+							? { octane_primitive_local_value: true }
+							: null),
+					},
+				}
 			: null),
 	};
 }
 
-function isPrimitiveValueExpression(node) {
+function isPrimitiveValueExpression(node, proveExpression = null) {
 	if (!node || typeof node !== 'object') return false;
+	if (proveExpression?.(node) === true) return true;
 	if (
 		node.type === 'TSAsExpression' ||
 		node.type === 'TSTypeAssertion' ||
@@ -20145,7 +20179,7 @@ function isPrimitiveValueExpression(node) {
 		node.type === 'ParenthesizedExpression' ||
 		node.type === 'ChainExpression'
 	) {
-		return isPrimitiveValueExpression(node.expression);
+		return isPrimitiveValueExpression(node.expression, proveExpression);
 	}
 	if (
 		node.metadata?.octane_string_child ||
@@ -20175,17 +20209,21 @@ function isPrimitiveValueExpression(node) {
 	}
 	if (node.type === 'ConditionalExpression') {
 		return (
-			isPrimitiveValueExpression(node.consequent) && isPrimitiveValueExpression(node.alternate)
+			isPrimitiveValueExpression(node.consequent, proveExpression) &&
+			isPrimitiveValueExpression(node.alternate, proveExpression)
 		);
 	}
 	if (node.type === 'LogicalExpression') {
-		return isPrimitiveValueExpression(node.left) && isPrimitiveValueExpression(node.right);
+		return (
+			isPrimitiveValueExpression(node.left, proveExpression) &&
+			isPrimitiveValueExpression(node.right, proveExpression)
+		);
 	}
 	if (node.type === 'SequenceExpression') {
-		return isPrimitiveValueExpression(node.expressions.at(-1));
+		return isPrimitiveValueExpression(node.expressions.at(-1), proveExpression);
 	}
 	if (node.type === 'AssignmentExpression') {
-		if (node.operator === '=') return isPrimitiveValueExpression(node.right);
+		if (node.operator === '=') return isPrimitiveValueExpression(node.right, proveExpression);
 		return node.operator === '+=' || NUMERIC_TEXT_OPERATORS.has(node.operator.slice(0, -1));
 	}
 	return false;
@@ -23406,10 +23444,12 @@ function applyStringChildProofs(ast, source, filename, facts) {
 		source.includes('BigInt') ||
 		source.includes('Date') ||
 		source.includes('\\u');
+	const inspectPrimitiveLocals = source.includes('const');
 	if (
 		(typedRanges === null || typedRanges.size === 0) &&
 		(primitiveRanges === null || primitiveRanges.size === 0) &&
-		!inspectIntrinsicCalls
+		!inspectIntrinsicCalls &&
+		!inspectPrimitiveLocals
 	) {
 		return ast;
 	}
@@ -23417,7 +23457,10 @@ function applyStringChildProofs(ast, source, filename, facts) {
 	const primitiveProofs = new Set();
 	const intrinsicCalls = [];
 	const writes = [];
+	let intrinsicMutationReference = false;
 	const ambientIntrinsicValues = new Set();
+	const constantDeclarations = [];
+	const references = [];
 	const seen = new WeakSet();
 	const collect = (node, parent = null, key = null) => {
 		if (node === null || typeof node !== 'object') return;
@@ -23427,6 +23470,20 @@ function applyStringChildProofs(ast, source, filename, facts) {
 		}
 		if (seen.has(node)) return;
 		seen.add(node);
+		if (inspectPrimitiveLocals) {
+			if (
+				node.type === 'VariableDeclarator' &&
+				parent?.type === 'VariableDeclaration' &&
+				parent.kind === 'const' &&
+				parent.declare !== true &&
+				node.id?.type === 'Identifier' &&
+				node.init
+			) {
+				constantDeclarations.push(node);
+			} else if (node.type === 'Identifier') {
+				references.push({ node, parent, key });
+			}
+		}
 		if (
 			(typedRanges !== null || primitiveRanges !== null) &&
 			node.type === 'JSXExpressionContainer' &&
@@ -23443,6 +23500,23 @@ function applyStringChildProofs(ast, source, filename, facts) {
 			if (primitiveRanges?.delete(range)) primitiveProofs.add(expr);
 		}
 		if (inspectIntrinsicCalls) {
+			if (
+				node.type === 'MemberExpression' ||
+				(node.type === 'Property' && parent?.type === 'ObjectPattern')
+			) {
+				const property = node.type === 'MemberExpression' ? node.property : node.key;
+				const method = node.computed ? property?.value : (property?.name ?? property?.value);
+				if (
+					INTRINSIC_MUTATION_METHODS.has(method) ||
+					(node.computed &&
+						property?.type !== 'Literal' &&
+						(node.type === 'Property' || (parent?.type === 'CallExpression' && key === 'callee')))
+				) {
+					// Receiver aliases and extracted mutators can still replace a global
+					// constructor. This is rejection only, not built-in name admission.
+					intrinsicMutationReference = true;
+				}
+			}
 			if (
 				node.type === 'CallExpression' &&
 				node.optional !== true &&
@@ -23517,7 +23591,65 @@ function applyStringChildProofs(ast, source, filename, facts) {
 			}
 		}
 	}
-	if (stringProofs.size === 0 && primitiveProofs.size === 0) return ast;
+	const valueProofs = new Set();
+	if (
+		constantDeclarations.length > 0 &&
+		(stringProofs.size > 0 ||
+			primitiveProofs.size > 0 ||
+			constantDeclarations.some((declaration) => isPrimitiveValueExpression(declaration.init)))
+	) {
+		lexical ??= createLexicalAnalysis(ast);
+		// A local alias can mutate a global constructor without spelling its
+		// global receiver. This check only declines new local intrinsic facts;
+		// operator/template primitives and existing child proofs remain.
+		const intrinsicLocalResultsSafe =
+			!intrinsicMutationReference && !writes.some(mayWriteTextIntrinsicMember);
+		const reassigned = collectReassignedBindings(ast);
+		const declarationsByScope = new Map();
+		for (const declaration of constantDeclarations) {
+			if (reassigned.has(declaration.id)) continue;
+			const scope = lexical.nodeScopes.get(declaration.id);
+			if (scope === undefined) continue;
+			const binding = lexical.resolveBinding(scope, declaration.id.name);
+			if (binding === null) continue;
+			let declarations = declarationsByScope.get(binding.scope);
+			if (declarations === undefined) {
+				declarations = new Map();
+				declarationsByScope.set(binding.scope, declarations);
+			}
+			declarations.set(declaration.id.name, declaration);
+		}
+		const proven = new Map();
+		const visiting = new Set();
+		const primitive = (node) => isPrimitiveValueExpression(node, proveLocal);
+		const proveLocal = (node) => {
+			if (intrinsicLocalResultsSafe && (stringProofs.has(node) || primitiveProofs.has(node))) {
+				return true;
+			}
+			if (node.type === 'Identifier') {
+				const scope = lexical.nodeScopes.get(node);
+				const binding = scope === undefined ? null : lexical.resolveBinding(scope, node.name);
+				const declaration = declarationsByScope.get(binding?.scope)?.get(node.name);
+				if (declaration === undefined || visiting.has(declaration)) return false;
+				if (proven.has(declaration)) return proven.get(declaration);
+				visiting.add(declaration);
+				const result = primitive(declaration.init);
+				visiting.delete(declaration);
+				proven.set(declaration, result);
+				return result;
+			}
+			return false;
+		};
+		// A value proof follows the lexical binding and its immutable initializer,
+		// never a TS annotation or a renderer's authored text assertion. Reads and
+		// throws still occur in setup; primitive results can contain native reads.
+		for (const { node, parent, key } of references) {
+			if (isIdentifierReference(node, parent, key, lexical) && primitive(node)) {
+				valueProofs.add(node);
+			}
+		}
+	}
+	if (stringProofs.size === 0 && primitiveProofs.size === 0 && valueProofs.size === 0) return ast;
 	const rewritten = new WeakMap();
 	const rewrite = (node) => {
 		if (node === null || typeof node !== 'object') return node;
@@ -23543,7 +23675,18 @@ function applyStringChildProofs(ast, source, filename, facts) {
 					out[key] = next;
 				}
 			}
-			if (stringProofs.has(node)) {
+			if (valueProofs.has(node)) {
+				out = {
+					...out,
+					metadata: {
+						...out.metadata,
+						octane_primitive_value: true,
+						octane_primitive_local_value: true,
+						...(stringProofs.has(node) ? { octane_string_child: true } : null),
+						...(primitiveProofs.has(node) ? { octane_primitive_text_child: true } : null),
+					},
+				};
+			} else if (stringProofs.has(node)) {
 				out = { ...out, metadata: { ...out.metadata, octane_string_child: true } };
 			} else if (primitiveProofs.has(node)) {
 				out = { ...out, metadata: { ...out.metadata, octane_primitive_text_child: true } };
@@ -23556,6 +23699,35 @@ function applyStringChildProofs(ast, source, filename, facts) {
 }
 
 const TEXT_INTRINSICS = new Set(['String', 'Number', 'BigInt', 'Date']);
+const INTRINSIC_MUTATION_METHODS = new Set(['assign', 'defineProperty', 'defineProperties', 'set']);
+
+function mayWriteTextIntrinsicMember(target) {
+	if (!target || typeof target !== 'object') return false;
+	if (
+		target.type === 'TSAsExpression' ||
+		target.type === 'TSTypeAssertion' ||
+		target.type === 'TSNonNullExpression' ||
+		target.type === 'ParenthesizedExpression' ||
+		target.type === 'AssignmentPattern'
+	) {
+		return mayWriteTextIntrinsicMember(target.expression ?? target.left);
+	}
+	if (target.type === 'MemberExpression') {
+		return target.computed
+			? target.property?.type !== 'Literal' || TEXT_INTRINSICS.has(target.property.value)
+			: TEXT_INTRINSICS.has(target.property?.name);
+	}
+	if (target.type === 'RestElement') return mayWriteTextIntrinsicMember(target.argument);
+	if (target.type === 'ArrayPattern') {
+		return (target.elements || []).some(mayWriteTextIntrinsicMember);
+	}
+	if (target.type === 'ObjectPattern') {
+		return (target.properties || []).some((property) =>
+			mayWriteTextIntrinsicMember(property.argument ?? property.value),
+		);
+	}
+	return false;
+}
 
 // A visible replacement of a global constructor invalidates inferred text
 // proofs for the module. Calls still evaluate the authored callee: a replacement
@@ -28135,11 +28307,13 @@ function emitElementHtml(
 		appendTemplatePart(attrTemplate, ` data-octane-input="${escapeAttr(site)}"`, 'attribute', null);
 	};
 	const markDirectControl = (binding, expression, origin) => {
-		if (!canCarryDirectSignalHandle(expression)) return binding;
+		const carriesHandle = canCarryDirectSignalHandle(expression);
+		if (!carriesHandle && !canCarryDirectSignalHandle(expression, false, true)) return binding;
 		const site = directSignalSite(ctx, node, 'input');
 		ensureDirectControlSite(site);
 		ctx.signalBindingsUsed = true;
 		if (isDirectSignalHandleExpression(expression)) ctx.signalBindingsEager = true;
+		if (!carriesHandle) return binding;
 		return { ...binding, signalDirect: true, signalSite: site };
 	};
 	const hostSignalSite = directSignalSite(ctx, node, 'binding');
