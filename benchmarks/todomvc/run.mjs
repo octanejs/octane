@@ -246,6 +246,7 @@ async function timeOp(page, op) {
 		${HELPERS}
 		const flush = window.__benchFlush;
 		(window.gc || (() => {}))();
+		void document.body?.offsetHeight;
 		const t0 = performance.now();
 		${op.body}
 		const dt = performance.now() - t0;

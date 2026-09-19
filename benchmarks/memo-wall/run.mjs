@@ -144,6 +144,7 @@ async function measureMount(browser, url) {
 		const { ctx, page } = await freshPage(browser, url);
 		const dt = await page.evaluate(async () => {
 			(window.gc || (() => {}))();
+			void document.body?.offsetHeight;
 			const t0 = performance.now();
 			const r = window.__mount();
 			if (r && typeof r.then === 'function') await r;
@@ -190,6 +191,7 @@ async function measureLoop(browser, url, op) {
 			if (typeof fn !== 'function') throw new Error('missing ' + hook);
 			const gc = window.gc || (() => {});
 			const runBatch = async (count) => {
+				void document.body?.offsetHeight;
 				const t0 = performance.now();
 				// Async-commit targets (Preact and vue-vapor) await the flush BETWEEN
 				// reps so they don't coalesce into one commit; sync targets are unchanged.

@@ -792,6 +792,9 @@ jobs:
       - name: Verify Chromium diagnostic tracing
         run: node --test scripts/react-parity/tests/browser-diagnostics.smoke.mjs
 
+      - name: Verify browser benchmark timing boundaries
+        run: node --test benchmarks/js-framework/timing.test.mjs
+
       - name: Run ${{ matrix.lane }} integration tests
         run: |
           SPECS="$(node scripts/discover-heavy-browser-specs.mjs)"

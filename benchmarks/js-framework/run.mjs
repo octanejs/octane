@@ -157,6 +157,7 @@ async function timeClick(page, op, selector) {
 				op === 'update' ? firstRow?.querySelector('td:nth-child(2) a')?.textContent : null;
 			const flush = window.__benchFlush;
 			(window.gc || (() => {}))();
+			void document.body?.offsetHeight;
 			const t0 = performance.now();
 			el.click();
 			if (flush) await flush();

@@ -103,6 +103,7 @@ const measureOp = (page, op) =>
 				pre();
 				await yieldTask();
 				gc();
+				void document.body?.offsetHeight;
 				const t0 = performance.now();
 				fn();
 				const dt = performance.now() - t0;

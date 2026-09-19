@@ -135,6 +135,7 @@ async function measureOp(page, op) {
 					await yieldTask();
 				}
 				gc();
+				void document.body?.offsetHeight;
 				const t0 = performance.now();
 				for (let k = 0; k < inner; k++) {
 					const r = fn();

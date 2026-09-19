@@ -48,6 +48,7 @@
 // TARGETS env overrides the target list exactly like run.mjs.
 
 import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
@@ -217,13 +218,14 @@ async function identityGate(page, op, ctx, targetName) {
 // await the scheduler flush BETWEEN clicks: without it the REPS state changes
 // would coalesce into one commit and the sample would time a single net
 // permutation instead of REPS full commits.
-async function timeSample(page, sel, reps) {
+export async function timeSample(page, sel, reps) {
 	return await page.evaluate(
 		async ({ sel, reps }) => {
 			const el = document.querySelector(sel);
 			if (!el) throw new Error('selector not found: ' + sel);
 			const flush = window.__benchFlush;
 			(window.gc || (() => {}))();
+			void document.body?.offsetHeight;
 			const t0 = performance.now();
 			if (flush) {
 				for (let k = 0; k < reps; k++) {
@@ -496,7 +498,7 @@ function writeBenchJson(payload) {
 	console.error(`BENCH_JSON written to ${process.env.BENCH_JSON}`);
 }
 
-(async () => {
+async function main() {
 	const all = {};
 	// A hard crash (server down, selector missing, etc.) still writes a flagged
 	// BENCH_JSON from whatever completed, then rethrows → exit 1.
@@ -588,7 +590,11 @@ function writeBenchJson(payload) {
 		for (const f of failures) console.error(`  ✗ ${f}`);
 		process.exit(1);
 	}
-})().catch((e) => {
-	console.error(e);
-	process.exit(1);
-});
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+	main().catch((e) => {
+		console.error(e);
+		process.exit(1);
+	});
+}

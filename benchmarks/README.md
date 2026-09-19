@@ -98,6 +98,34 @@ and **codegen-size** / **bundle-size** / **bundle-reachability** /
 **three-bundle-size** /
 **lynx-bundle-size** are deterministic build/byte checks.
 
+## Browser sample preparation
+
+The js-framework (including reorder), chat-stream, dbmon, effectful-list,
+list-clear, memo-wall, portal-swarm, recursive-context, signal-favoring,
+spa-navigation, svg-dashboard, and TodoMVC harnesses finish pending style and
+layout for the current document immediately before starting each sample timer.
+This follows sample setup and garbage collection, so freshly reset rows and
+rows that already received a browser frame start from the same layout state.
+Adaptive memo-wall batches use the same preparation during calibration.
+
+The geometry read prepares the existing DOM; operations, repeated commits and
+their awaited scheduler flushes remain inside the timer. The harnesses do not
+add a post-operation layout or paint wait. Any geometry read already performed
+by a workload retains its original timing boundary.
+
+Absolute browser timing records made before this preparation was added are
+different measurements. Re-record affected suites on the same machine with
+`--record` before using `--compare`. Keep paired ratio guards until new matched
+measurements justify a change; an increased duration can reflect corrected
+initial layout state rather than slower framework code.
+
+The real Chromium regression checks initial layout, measured geometry work,
+sync/async commit boundaries and keyed survivor identity:
+
+```bash
+node --test benchmarks/js-framework/timing.test.mjs
+```
+
 ## Regression modes
 
 | flag | what it does | fails the run? |

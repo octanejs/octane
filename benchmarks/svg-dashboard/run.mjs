@@ -587,6 +587,7 @@ async function measureOps(page) {
 					if (pre) pre();
 					await yieldTask();
 					gc();
+					void document.body?.offsetHeight;
 					const t0 = performance.now();
 					fn();
 					const dt = performance.now() - t0;
