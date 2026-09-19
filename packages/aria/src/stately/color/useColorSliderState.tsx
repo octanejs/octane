@@ -12,9 +12,9 @@
  * governing permissions and limitations under the License.
  */
 
-import { Color, ColorChannel, ColorSpace } from './types';
+import type { Color, ColorChannel, ColorSpace } from './types';
 import { normalizeColor, parseColor } from './Color';
-import { SliderProps, SliderState, useSliderState } from '../slider/useSliderState';
+import { type SliderProps, type SliderState, useSliderState } from '../slider/useSliderState';
 import { useControlledState } from '../utils/useControlledState';
 import { useMemo, useState } from '../../compat/react';
 
