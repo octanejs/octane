@@ -11,7 +11,10 @@
     "integrity": "sha256:ddfb74037a3979ed98c8784034071f24040b5a6b7d560254fcb6c6676946da47",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "absent", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/xyflow/src"],
@@ -184,6 +187,29 @@
           "path": "packages/xyflow/tests/differential/_setup.ts",
           "role": "support",
           "sha256": "897efdd4751f2397fe53003c131f24975710209d886cc64406149b9763432c62"
+        }
+      ]
+    },
+    {
+      "id": "xyflow-package-consumption",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "available": true,
+      "environment": "workspace-node",
+      "project": "xyflow",
+      "notes": "Repo-authored regression that compiles the complete authored public entry with the production Octane Vite plugin, verifies component exports, and executes node/edge helpers.",
+      "files": [
+        {
+          "path": "packages/xyflow/tests/package-consumption.test.ts",
+          "role": "test",
+          "sha256": "ebe3b4f663c50757e8875243c4dc6c45af85dbf26388968d96369e5f2764b930",
+          "cases": [
+            {
+              "id": "adapted:package-consumption",
+              "testName": "preserves flow components and change helpers in a production consumer bundle",
+              "fullName": "preserves flow components and change helpers in a production consumer bundle"
+            }
+          ]
         }
       ]
     }

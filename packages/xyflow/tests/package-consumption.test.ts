@@ -6,6 +6,7 @@ import { octane } from 'octane/compiler/vite';
 import { build } from 'vite';
 import { expect, it } from 'vitest';
 
+// @parity-case adapted:package-consumption
 it('preserves flow components and change helpers in a production consumer bundle', async () => {
 	const root = resolve(import.meta.dirname, '../../..');
 	const result = await build({

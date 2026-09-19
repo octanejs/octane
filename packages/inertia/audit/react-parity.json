@@ -11,7 +11,10 @@
     "integrity": "sha256:15742c04ce626d9f02d78be4c0550dc95a221410e47e1688ebc060a0d7fd2d47",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "absent", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/inertia/src"],
@@ -184,6 +187,34 @@
           "path": "packages/inertia/typetests/assertions.md",
           "role": "support",
           "sha256": "1c346f25803d8b3950d572db2bb1752d9030dfb3c79dfe287c6909940b404b3f"
+        }
+      ]
+    },
+    {
+      "id": "inertia-package-consumption",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "available": true,
+      "environment": "workspace-node",
+      "project": "inertia",
+      "notes": "Repo-authored regression that compiles the complete authored public entry with the production Octane Vite plugin and verifies public hooks and unchanged core singleton identities.",
+      "files": [
+        {
+          "path": "packages/inertia/tests/package-consumption.test.ts",
+          "role": "test",
+          "sha256": "ccc5d7fb4eda44366e19de56db03894bbded863de4a53f6953bca1568a14e72d",
+          "cases": [
+            {
+              "id": "adapted:package-consumption",
+              "testName": "preserves public hooks and core singleton identities in a production consumer bundle",
+              "fullName": "preserves public hooks and core singleton identities in a production consumer bundle"
+            }
+          ]
+        },
+        {
+          "path": "packages/inertia/tests/_fixtures/package-consumer.ts",
+          "role": "support",
+          "sha256": "32471cd57f19ab0936515e172198f918fec58115d4cc046109a99f17d9082bb5"
         }
       ]
     }

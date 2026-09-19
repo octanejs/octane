@@ -1352,8 +1352,12 @@ export default defineConfig({
 				},
 			},
 			{
-				// Octane-only unpaired conformance for @octanejs/inertia.
-				// Parity-owned adapted / differential projects are separate.
+				// Keep unpaired conformance ordinary while parity owns the
+				// authored production-consumer regression.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/inertia/tests/package-consumption.test.ts'],
+				},
 				test: {
 					name: 'inertia',
 					include: ['packages/inertia/tests/**/*.test.ts'],

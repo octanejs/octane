@@ -6,6 +6,7 @@ import { octane } from 'octane/compiler/vite';
 import { build } from 'vite';
 import { expect, it } from 'vitest';
 
+// @parity-case adapted:package-consumption
 it('preserves public hooks and core singleton identities in a production consumer bundle', async () => {
 	const result = await build({
 		configFile: false,
