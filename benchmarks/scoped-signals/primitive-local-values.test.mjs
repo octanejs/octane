@@ -91,6 +91,45 @@ test('immutable primitive locals omit optional value adapters in client and SSR 
 				'const env=globalThis;Object[props.method](env,{String:(value)=>value});const value=String(props.value);',
 			primitive: false,
 		},
+		...[
+			'env.__defineGetter__("String",()=>props.convert);',
+			'env.__defineSetter__("String",props.setter);',
+			'Object.setPrototypeOf(env,props.prototype);',
+			'Reflect.setPrototypeOf(env,props.prototype);',
+			'Reflect.deleteProperty(env,"String");',
+			'const mutate=env.__defineGetter__;mutate.call(env,"String",()=>props.convert);',
+			'const {setPrototypeOf}=Object;setPrototypeOf(env,props.prototype);',
+			'const {deleteProperty}=Reflect;deleteProperty(env,"String");',
+		].map((mutation) => ({
+			setup: `const env=globalThis;${mutation}const value=String(props.value);`,
+			primitive: false,
+		})),
+		...[
+			'(Reflect[props.method] as typeof Reflect.set)(env,"String",props.convert);',
+			'(Reflect[props.method]!)(env,"String",props.convert);',
+			'(Reflect[props.method] satisfies typeof Reflect.set)(env,"String",props.convert);',
+			'(Reflect[props.method] as typeof Reflect.set)?.(env,"String",props.convert);',
+			'(Reflect?.[props.method] as typeof Reflect.set)(env,"String",props.convert);',
+			'const mutate=Reflect[props.method];mutate(env,"String",props.convert);',
+			'Object.assign?.(env,{String:props.convert});',
+			'Object?.assign(env,{String:props.convert});',
+			'(Object.assign as typeof Object.assign)(env,{String:props.convert});',
+		].map((mutation) => ({
+			setup: `const env=globalThis;${mutation}const value=String(props.value);`,
+			primitive: false,
+		})),
+		{
+			setup: 'const observed=props.values[props.index];const value=String(observed);',
+			primitive: false,
+		},
+		{
+			setup: 'const observed=props.values[props.index];const value=observed+1;',
+			primitive: true,
+		},
+		{
+			setup: 'const observed=props.values[props.index];const value=`${observed}`;',
+			primitive: true,
+		},
 		{
 			setup:
 				'const env=globalThis;const {assign}=Object;assign(env,{String:(value)=>value});const value=String(props.value);',

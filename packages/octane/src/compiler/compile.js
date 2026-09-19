@@ -23508,12 +23508,12 @@ function applyStringChildProofs(ast, source, filename, facts) {
 				const method = node.computed ? property?.value : (property?.name ?? property?.value);
 				if (
 					INTRINSIC_MUTATION_METHODS.has(method) ||
-					(node.computed &&
-						property?.type !== 'Literal' &&
-						(node.type === 'Property' || (parent?.type === 'CallExpression' && key === 'callee')))
+					(node.computed && property?.type !== 'Literal')
 				) {
-					// Receiver aliases and extracted mutators can still replace a global
-					// constructor. This is rejection only, not built-in name admission.
+					// Unknown computed references may extract a mutator or sit under a
+					// TypeScript/optional-chain wrapper before invocation. Decline the new
+					// intrinsic-local proof even for unrelated dynamic property reads;
+					// this is rejection only, not built-in name admission.
 					intrinsicMutationReference = true;
 				}
 			}
@@ -23699,7 +23699,16 @@ function applyStringChildProofs(ast, source, filename, facts) {
 }
 
 const TEXT_INTRINSICS = new Set(['String', 'Number', 'BigInt', 'Date']);
-const INTRINSIC_MUTATION_METHODS = new Set(['assign', 'defineProperty', 'defineProperties', 'set']);
+const INTRINSIC_MUTATION_METHODS = new Set([
+	'assign',
+	'defineProperty',
+	'defineProperties',
+	'set',
+	'__defineGetter__',
+	'__defineSetter__',
+	'setPrototypeOf',
+	'deleteProperty',
+]);
 
 function mayWriteTextIntrinsicMember(target) {
 	if (!target || typeof target !== 'object') return false;

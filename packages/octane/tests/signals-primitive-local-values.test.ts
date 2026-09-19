@@ -6,6 +6,8 @@ import { loadServerFixture } from './_server-fixture.js';
 import * as client from './_fixtures/primitive-local-values.tsrx';
 import * as native from './_fixtures/primitive-local-native-values.tsrx';
 import { GlobalMutationValue } from './_fixtures/primitive-local-global-mutation.tsrx';
+import { WrappedMutationValue } from './_fixtures/primitive-local-wrapped-mutation.tsrx';
+import { NativeMutationValue } from './_fixtures/primitive-local-native-mutation.tsrx';
 
 const compileOptions = { dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod', hmr: false };
 const server = loadServerFixture<typeof client>(
@@ -20,6 +22,24 @@ const globalServer = loadServerFixture<{ GlobalMutationValue: typeof GlobalMutat
 	'packages/octane/tests/_fixtures/primitive-local-global-mutation.tsrx',
 	{ compileOptions },
 );
+const wrappedServer = loadServerFixture<{ WrappedMutationValue: typeof WrappedMutationValue }>(
+	'packages/octane/tests/_fixtures/primitive-local-wrapped-mutation.tsrx',
+	{ compileOptions },
+);
+
+const nativeMutationServer = loadServerFixture<{ NativeMutationValue: typeof NativeMutationValue }>(
+	'packages/octane/tests/_fixtures/primitive-local-native-mutation.tsrx',
+	{ compileOptions },
+);
+
+// Prepare native static methods outside compiled fixtures so this setup cannot
+// mask the specific authored global mutation each fixture must preserve.
+function conversionReturningHandle(handle: unknown) {
+	const builtin = String;
+	const replacement = (value: unknown) => (value === handle ? value : builtin(value));
+	Object.setPrototypeOf(replacement, builtin);
+	return replacement;
+}
 
 describe('primitive setup values across server rendering and adoption', () => {
 	let host: HTMLDivElement;
@@ -177,7 +197,7 @@ describe('primitive setup values across server rendering and adoption', () => {
 			const scope = createScope({ scopeKey: 'primitive-global-alias-' + mutation });
 			scopes.push(scope);
 			const value$ = scope.signal$('value', 'actual handle');
-			const props = { value$, mutation };
+			const props = { value$, mutation, replacement: conversionReturningHandle(value$) };
 			const original = Object.getOwnPropertyDescriptor(globalThis, 'String')!;
 			let html: string;
 			try {
@@ -199,6 +219,116 @@ describe('primitive setup values across server rendering and adoption', () => {
 			}
 			expect(host.querySelector('output')).toBe(output);
 			expect(host.querySelector('input')).toBe(input);
+			expect([output.textContent, output.title, input.value]).toEqual([
+				'actual handle',
+				'actual handle',
+				'actual handle',
+			]);
+			flushSync(() => scope.set(value$, 'still live'));
+			expect([output.textContent, output.title, input.value]).toEqual([
+				'still live',
+				'still live',
+				'still live',
+			]);
+		});
+	}
+
+	for (const mutation of [
+		'cast',
+		'nonNull',
+		'satisfies',
+		'optionalCall',
+		'optionalReceiver',
+		'extracted',
+	] as const) {
+		it(`keeps handles live after a ${mutation} computed global mutator`, () => {
+			const scope = createScope({ scopeKey: 'primitive-wrapped-mutator-' + mutation });
+			scopes.push(scope);
+			const value$ = scope.signal$('value', 'actual handle');
+			const props = {
+				value$,
+				mutation,
+				method: 'set' as const,
+				replacement: conversionReturningHandle(value$),
+			};
+			const original = Object.getOwnPropertyDescriptor(globalThis, 'String')!;
+			let html: string;
+			try {
+				html = renderToString(wrappedServer.WrappedMutationValue, props, {
+					signalOwner: scope,
+				}).html;
+			} finally {
+				Object.defineProperty(globalThis, 'String', original);
+			}
+			host.innerHTML = html;
+			const output = host.querySelector('output')!;
+			const input = host.querySelector('input')!;
+			input.focus();
+			input.setSelectionRange(2, 5);
+			try {
+				flushSync(() => {
+					root = hydrateRoot(host, WrappedMutationValue, props, { signalOwner: scope });
+				});
+			} finally {
+				Object.defineProperty(globalThis, 'String', original);
+			}
+			expect(host.querySelector('output')).toBe(output);
+			expect(host.querySelector('input')).toBe(input);
+			expect(document.activeElement).toBe(input);
+			expect([input.selectionStart, input.selectionEnd]).toEqual([2, 5]);
+			expect([output.textContent, output.title, input.value]).toEqual([
+				'actual handle',
+				'actual handle',
+				'actual handle',
+			]);
+			flushSync(() => scope.set(value$, 'still live'));
+			expect([output.textContent, output.title, input.value]).toEqual([
+				'still live',
+				'still live',
+				'still live',
+			]);
+		});
+	}
+
+	for (const mutation of ['defineGetter', 'objectPrototype', 'reflectPrototype'] as const) {
+		it(`preserves adopted live handles after native global ${mutation}`, () => {
+			const scope = createScope({ scopeKey: 'primitive-native-mutator-' + mutation });
+			scopes.push(scope);
+			const value$ = scope.signal$('value', 'actual handle');
+			const original = Object.getOwnPropertyDescriptor(globalThis, 'String')!;
+			const originalPrototype = Object.getPrototypeOf(globalThis);
+			const replacement = conversionReturningHandle(value$);
+			const prototype = Object.create(originalPrototype);
+			Object.defineProperty(prototype, 'String', { value: replacement, configurable: true });
+			const props = { value$, replacement, prototype, mutation };
+			const restore = () => {
+				Object.setPrototypeOf(globalThis, originalPrototype);
+				Object.defineProperty(globalThis, 'String', original);
+			};
+			let html: string;
+			try {
+				html = renderToString(nativeMutationServer.NativeMutationValue, props, {
+					signalOwner: scope,
+				}).html;
+			} finally {
+				restore();
+			}
+			host.innerHTML = html;
+			const output = host.querySelector('output')!;
+			const input = host.querySelector('input')!;
+			input.focus();
+			input.setSelectionRange(2, 5);
+			try {
+				flushSync(() => {
+					root = hydrateRoot(host, NativeMutationValue, props, { signalOwner: scope });
+				});
+			} finally {
+				restore();
+			}
+			expect(host.querySelector('output')).toBe(output);
+			expect(host.querySelector('input')).toBe(input);
+			expect(document.activeElement).toBe(input);
+			expect([input.selectionStart, input.selectionEnd]).toEqual([2, 5]);
 			expect([output.textContent, output.title, input.value]).toEqual([
 				'actual handle',
 				'actual handle',

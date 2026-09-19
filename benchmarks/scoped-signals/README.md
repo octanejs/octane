@@ -519,9 +519,13 @@ optional value adapters; authored casts, opaque calls and members, mutable
 bindings, shadowed intrinsics, and invalidating writes keep their adapters.
 Constructor-name member writes and unknown computed member writes also decline
 new intrinsic-result local facts, even through aliases. References to mutating
-member methods such as `Object.assign`, `Object.defineProperty`, and `Reflect.set`
-(and unknown computed member calls) also conservatively decline these facts. JavaScript operator and
-template guarantees remain eligible; preexisting child proofs remain intact.
+member methods such as `Object.assign`, `Object.defineProperty`, `Reflect.set`,
+`__defineGetter__`/`__defineSetter__`, `setPrototypeOf`, and `deleteProperty`
+(including optional and TypeScript-wrapped calls) also conservatively decline
+these facts. Every unknown computed member reference declines new intrinsic-local
+facts, including extracted mutators and unrelated dynamic property reads.
+JavaScript operator and template guarantees remain eligible; preexisting child
+proofs remain intact.
 
 The public controls keep controlled-input restoration, hidden native reads,
 real handles, and keyed identities observable. A real split model module loads
