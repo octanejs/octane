@@ -12,8 +12,8 @@
     }
   ],
   "dependencies": [
-    "@octanejs/base-ui@0.1.53",
-    "@octanejs/lucide@0.1.47",
+    "@octanejs/base-ui@0.1.54",
+    "@octanejs/lucide@0.1.48",
     "cn"
   ],
   "registryDependencies": [

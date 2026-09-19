@@ -1,5 +1,14 @@
 # @octanejs/base-ui
 
+## 0.1.54
+
+### Patch Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+- Updated dependencies [a6d7f49]
+  - @octanejs/base-ui-utils@0.1.2
+  - @octanejs/floating-ui@0.1.54
+
 ## 0.1.53
 
 ### Patch Changes

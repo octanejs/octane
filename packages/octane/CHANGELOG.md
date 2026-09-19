@@ -1,5 +1,24 @@
 # octane
 
+## 0.3.0
+
+### Minor Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+
+### Patch Changes
+
+- debd7df: Specialize nonescaping function-local const roots in production JavaScript and TypeScript entries when every render uses an imported compiled void component. Keep writable component exports on the generic rendering path so authored replacements can return ordinary renderable values.
+- 873f4d2: Move native signal transition coordination behind the signals model capability so ordinary client applications no longer retain its preparation, retry, and publication policy. Preserve signals imported after an async Action awaits and atomic updates to consumers that receive signal handles through props.
+
+  The model entry now retains this coordinator, increasing standalone signals and signal-using SSR bundle sizes.
+- 68a6690: Preserve explicit signal ownership when native event handlers are installed by components without signal bindings, including handlers adopted during hydration. Refresh ownership when bare or compiler-lifted handlers publish changed callbacks or captures, while keeping the committed authority if a suspended update is abandoned. Keep already queued native callbacks under their original authority when an earlier listener publishes a replacement. Avoid extra publication calls during ordinary mounting and updates that keep the same scope authority, and record rollback without per-handler undo closures.
+- c32e76b: Keep fixed scalar inline styles on their ordinary writers inside modules that use signals, while preserving reactive reads and native bindings for handles, spreads and accessors.
+- 14fd908: Allow text and attribute signal bindings to omit unused form-control writer and
+  hydration adoption policies from production bundles. Keep the compiler helper
+  ABI, scalar caches, live subscriptions, and native control behavior unchanged.
+- 893cc83: Specialize production function-local roots created or hydrated with stable same-module compiled void components when their complete lifetime uses only proven void bodies. Preserve generic roots for escaping roots, writable component bindings, unknown initial or later render targets, development and alternate renderer modes.
+
 ## 0.2.16
 
 ### Patch Changes
