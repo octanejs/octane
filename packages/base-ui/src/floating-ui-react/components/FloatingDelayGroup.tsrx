@@ -87,7 +87,7 @@ export function FloatingDelayGroup(props: FloatingDelayGroupProps): React.ReactE
 	}, [delay, currentIdRef, delayRef, initialDelayRef]);
 
 	return (
-		<FloatingDelayGroupContext.Provider
+		<FloatingDelayGroupContext
 			value={React.useMemo(
 				() => ({
 					hasProvider: true,
@@ -102,7 +102,7 @@ export function FloatingDelayGroup(props: FloatingDelayGroupProps): React.ReactE
 			)}
 		>
 			{children}
-		</FloatingDelayGroupContext.Provider>
+		</FloatingDelayGroupContext>
 	);
 }
 

@@ -27,7 +27,10 @@ import type {
 import { DayFlag, SelectionState, UI } from './UI.js';
 import { useAnimation } from './useAnimation.js';
 import { useCalendar } from './useCalendar.js';
-import { type DayPickerContext, dayPickerContext } from './useDayPicker.js';
+import {
+	type DayPickerContext,
+	dayPickerContext as DayPickerContextProvider,
+} from './useDayPicker.js';
 import { useFocus } from './useFocus.js';
 import { useSelection } from './useSelection.js';
 import { convertMatchersToTimeZone } from './utils/convertMatchersToTimeZone.js';
@@ -384,7 +387,7 @@ export function DayPicker(initialProps: DayPickerProps) @{
 		formatters,
 	};
 
-	<dayPickerContext.Provider value={contextValue}>
+	<DayPickerContextProvider value={contextValue}>
 		<components.Root
 			rootRef={props.animate ? rootElRef : undefined}
 			className={className}
@@ -712,5 +715,5 @@ export function DayPicker(initialProps: DayPickerProps) @{
 					aria-live="polite"
 				>{props.footer}</components.Footer>}
 		</components.Root>
-	</dayPickerContext.Provider>
+	</DayPickerContextProvider>
 }

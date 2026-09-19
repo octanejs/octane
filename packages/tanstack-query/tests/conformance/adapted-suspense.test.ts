@@ -21,6 +21,7 @@ async function flush() {
 }
 
 describe('suspense query', () => {
+	// @parity-case conformance:568093c25d813cc1
 	it('shows @pending while loading, then the data', async () => {
 		let resolveFn: (v: string) => void = () => {};
 		const queryFn = () => new Promise<string>((res) => (resolveFn = res));

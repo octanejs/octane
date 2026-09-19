@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { prerender } from 'octane/static';
+import { createContext as createServerContext } from 'octane/server';
 import {
 	createContext,
 	createElement,
@@ -10,6 +11,7 @@ import {
 } from '../src/index.js';
 import { mount, act } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
+import { WithheldChildren } from './_fixtures/imported-context';
 import {
 	DynamicProvider,
 	CombinedDynamic,
@@ -26,6 +28,8 @@ import {
 	MixedContextPromiseHost,
 	ContextOnlyAsyncHost,
 	ShadowedContextPromiseHost,
+	ImportedContextPromiseHost,
+	WithheldImportedChildHost,
 } from './_fixtures/context.tsrx';
 
 describe('context — value updates', () => {
@@ -268,8 +272,65 @@ describe('context — use() alongside other reads', () => {
 		}
 	});
 
+	it('starts an independent child request while an imported context provider is pending', async () => {
+		let resolveGate!: (value: string) => void;
+		let resolveDetail!: (value: string) => void;
+		const gate = new Promise<string>((resolve) => (resolveGate = resolve));
+		const detail = new Promise<string>((resolve) => (resolveDetail = resolve));
+		let detailStarted = false;
+		const r = mount(ImportedContextPromiseHost, {
+			gate,
+			load() {
+				detailStarted = true;
+				return detail;
+			},
+		});
+		try {
+			expect(r.find('.imported-context-pending').textContent).toBe('loading');
+			expect(detailStarted).toBe(true);
+			await act(() => resolveGate('ready'));
+			expect(r.find('.imported-context-pending').textContent).toBe('loading');
+			await act(() => resolveDetail('more'));
+			expect(r.find('.imported-context-result').textContent).toBe('dark:ready');
+			expect(r.find('.imported-context-detail').textContent).toBe('more');
+			expect(r.find('.imported-context-authored').textContent).toBe('authored');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('does not start a request for children withheld by an imported component', async () => {
+		let resolveGate!: (value: string) => void;
+		const gate = new Promise<string>((resolve) => (resolveGate = resolve));
+		let detailStarted = false;
+		const r = mount(WithheldImportedChildHost, {
+			gate,
+			load() {
+				detailStarted = true;
+				return Promise.resolve('hidden');
+			},
+		});
+		try {
+			expect(r.find('.withheld-imported-pending').textContent).toBe('loading');
+			expect(detailStarted).toBe(false);
+			await act(() => resolveGate('ready'));
+			expect(r.find('.withheld-imported-result').textContent).toBe('ready');
+			expect(r.container.querySelector('.imported-context-detail')).toBeNull();
+			expect(detailStarted).toBe(false);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('hydrates context-only reads and keeps provider updates live', async () => {
-		const server = loadServerFixture('packages/octane/tests/_fixtures/context.tsrx');
+		const server = loadServerFixture('packages/octane/tests/_fixtures/context.tsrx', {
+			runtimeModules: {
+				'./imported-context': {
+					ImportedTheme: createServerContext('default'),
+					WithheldChildren,
+				},
+			},
+		});
 		const { html } = await prerender(server.ContextOnlyHost, {});
 		const container = document.createElement('div');
 		container.innerHTML = html;
@@ -297,7 +358,7 @@ describe('context — retained provider resolution', () => {
 			return createElement('output', { className: 'optional-value' }, String(use(Value)));
 		}
 		function Host(props: { value: string | undefined }) {
-			return createElement(Value.Provider, { value: props.value }, createElement(Reader));
+			return createElement(Value, { value: props.value }, createElement(Reader));
 		}
 		const r = mount(Host, { value: 'first' });
 		try {
@@ -324,12 +385,12 @@ describe('context — retained provider resolution', () => {
 		}
 		function Host(props: { first: string; second: string; third: string }) {
 			return createElement(
-				First.Provider,
+				First,
 				{ value: props.first },
 				createElement(
-					Second.Provider,
+					Second,
 					{ value: props.second },
-					createElement(Third.Provider, { value: props.third }, createElement(Reader)),
+					createElement(Third, { value: props.third }, createElement(Reader)),
 				),
 			);
 		}
@@ -365,13 +426,13 @@ describe('context — retained provider resolution', () => {
 		}
 		function Host(props: { readSecond: boolean; second: string; third: string }) {
 			return createElement(
-				First.Provider,
+				First,
 				{ value: 'a0' },
 				createElement(
-					Second.Provider,
+					Second,
 					{ value: props.second },
 					createElement(
-						Third.Provider,
+						Third,
 						{ value: props.third },
 						createElement(Reader, { readSecond: props.readSecond }),
 					),
@@ -400,7 +461,7 @@ describe('context — retained provider resolution', () => {
 			return createElement('output', { className: 'new-root-value' }, use(Value));
 		}
 		function Host(props: { value: string }) {
-			return createElement(Value.Provider, { value: props.value }, createElement(Reader));
+			return createElement(Value, { value: props.value }, createElement(Reader));
 		}
 		const container = document.createElement('div');
 		document.body.appendChild(container);

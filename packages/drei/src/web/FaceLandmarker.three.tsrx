@@ -40,7 +40,7 @@ export function FaceLandmarker({
 		clearResource(keys);
 	}, [faceLandmarker, basePath, serializedOptions]);
 	useImperativeHandle((ref ?? null) as any, () => faceLandmarker, [faceLandmarker]);
-	<FaceLandmarkerContext.Provider value={faceLandmarker}>{children}</FaceLandmarkerContext.Provider>
+	<FaceLandmarkerContext value={faceLandmarker}>{children}</FaceLandmarkerContext>
 }
 
 export function useFaceLandmarker(): FaceLandmarkerImpl | undefined {

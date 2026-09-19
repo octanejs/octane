@@ -73,18 +73,18 @@ export function CachedValuePositionRows() @{
 			id="memo-value-reorder"
 			onClick={() => setItems([items[1]!, items[0]!])}
 		>{'reorder'}</button>
-		<ValuePositionTheme.Provider value={theme}>
+		<ValuePositionTheme value={theme}>
 			<div id="memo-value-rows">{rows}</div>
-		</ValuePositionTheme.Provider>
+		</ValuePositionTheme>
 	</section>
 }
 
 function ValuePositionMemoBoundaryBody(props: { items: ValuePositionRow[]; tick: number }) @{
 	const items = props.items;
 	const rows = buildValuePositionRows(items);
-	<ValuePositionBoundaryContext.Provider value="unrelated">
+	<ValuePositionBoundaryContext value="unrelated">
 		<div id="memo-value-boundary-rows" data-tick={props.tick}>{rows}</div>
-	</ValuePositionBoundaryContext.Provider>
+	</ValuePositionBoundaryContext>
 }
 
 const MemoValuePositionBoundary = memo(ValuePositionMemoBoundaryBody);
@@ -102,9 +102,9 @@ export function CachedValuePositionMemoContext() @{
 			onClick={() => setTick(tick + 1)}
 		>{tick as number}</button>
 		<button id="memo-value-boundary-theme" onClick={() => setTheme(theme + '!')}>{'theme'}</button>
-		<ValuePositionTheme.Provider value={theme}>
+		<ValuePositionTheme value={theme}>
 			<MemoValuePositionBoundary items={items} tick={tick} />
-		</ValuePositionTheme.Provider>
+		</ValuePositionTheme>
 	</section>
 }
 
@@ -133,9 +133,9 @@ export function CachedValuePositionRoundTrip() @{
 			id="memo-value-round-trip-theme"
 			onClick={() => setTheme(theme + '!')}
 		>{'change theme'}</button>
-		<ValuePositionTheme.Provider value={theme}>
+		<ValuePositionTheme value={theme}>
 			<div id="memo-value-round-trip-rows">{output}</div>
-		</ValuePositionTheme.Provider>
+		</ValuePositionTheme>
 	</section>
 }
 
@@ -234,9 +234,9 @@ export function CachedValuePositionActivity(props: { mode: 'visible' | 'hidden' 
 			onClick={() => setItems([items[1]!, items[0]!])}
 		>{'reorder'}</button>
 		<Activity mode={props.mode}>
-			<ValuePositionTheme.Provider value="initial">
+			<ValuePositionTheme value="initial">
 				<div id="memo-value-activity-rows">{rows}</div>
-			</ValuePositionTheme.Provider>
+			</ValuePositionTheme>
 		</Activity>
 	</section>
 }
@@ -255,9 +255,9 @@ export function CachedValuePositionSuspense(props: { promise: PromiseLike<string
 	<section>
 		@try {
 			<>
-				<ValuePositionTheme.Provider value="initial">
+				<ValuePositionTheme value="initial">
 					<div id="memo-value-suspense-rows">{rows}</div>
-				</ValuePositionTheme.Provider>
+				</ValuePositionTheme>
 				<ValuePositionSuspender promise={props.promise} />
 			</>
 		} @pending {
@@ -296,9 +296,9 @@ export function CachedValuePositionTransition(props: {
 		>{'update urgently'}</button>
 		@try {
 			<>
-				<ValuePositionTheme.Provider value="initial">
+				<ValuePositionTheme value="initial">
 					<div id="memo-value-transition-rows">{rows}</div>
-				</ValuePositionTheme.Provider>
+				</ValuePositionTheme>
 				<ValuePositionSuspender promise={resource} />
 			</>
 		} @pending {

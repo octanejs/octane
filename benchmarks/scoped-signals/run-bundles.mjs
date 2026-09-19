@@ -8,10 +8,12 @@ import { pathToFileURL } from 'node:url';
 import { brotliCompressSync, constants as zlib, gzipSync } from 'node:zlib';
 import {
 	BUNDLE_CASES,
+	baselineUnavailableReason,
 	entrySource,
 	gitBlobHash,
 	sha256,
 	verifyBundleInputs,
+	verifyTransitionBoundary,
 } from './bundle-boundaries.mjs';
 
 const HERE = import.meta.dirname;
@@ -43,9 +45,10 @@ const payload = {
 	request: process.argv,
 	startedAt: new Date().toISOString(),
 	limitations: [
-		'Public source-entry export costs, not compiled .tsrx or application bundles.',
+		'Public source-entry exports and a compiled plain state module, not compiled .tsrx application bundles.',
 		'Native client/server hook entries are measured independently; their sizes are not incremental application costs.',
-		'Export loading and a small engine smoke test do not establish DOM, hydration, or async behavior.',
+		'Binding capability entries are isolated closures; use the combined entry instead of adding independently compressed leaf sizes.',
+		'Export loading and focused signal semantics do not establish DOM, streamed handoff, hydration, or browser behavior.',
 		'Preliminary while integration source is changing; rerun after the final source freeze.',
 	],
 	buildOptions: {
@@ -73,7 +76,7 @@ function cachedSource(filename) {
 	return sourceCache.get(resolved);
 }
 
-function findPackage(filename) {
+function findPackage(filename, expectedName) {
 	let directory = path.dirname(fs.realpathSync(filename));
 	while (true) {
 		const manifest = path.join(directory, 'package.json');
@@ -86,7 +89,8 @@ function findPackage(filename) {
 					manifestSha256: sha256(contents),
 				});
 			}
-			return manifestCache.get(manifest);
+			const data = manifestCache.get(manifest);
+			if (expectedName === undefined || data.name === expectedName) return data;
 		}
 		const parent = path.dirname(directory);
 		if (parent === directory) return null;
@@ -95,7 +99,7 @@ function findPackage(filename) {
 }
 
 function packageEvidence(entry, expectedName) {
-	const manifest = findPackage(entry);
+	const manifest = findPackage(entry, expectedName);
 	assert.equal(manifest?.name, expectedName, `Unexpected package for ${entry}`);
 	return {
 		name: manifest.name,
@@ -213,7 +217,7 @@ try {
 				});
 			}
 			// Hash the exact bytes supplied to esbuild, not a later disk read.
-			// Repeated inputs use the same bytes across all seven builds.
+			// Repeated inputs use the same bytes across all builds.
 			builder.onLoad({ filter: /\.(?:[cm]?[jt]s|jsx|tsx|json)$/ }, ({ path: filename }) => {
 				const extension = path.extname(filename);
 				const loader = ['.ts', '.mts', '.cts'].includes(extension)
@@ -225,12 +229,75 @@ try {
 			});
 		},
 	};
+	let plainCompiler;
+	function recordCompilerSources(directory) {
+		for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+			const file = path.join(directory, entry.name);
+			if (entry.isDirectory()) recordCompilerSources(file);
+			else if (/\.[cm]?js$/.test(entry.name)) cachedSource(file);
+		}
+	}
+	async function compilePlainSource(source, filename) {
+		if (plainCompiler === undefined) {
+			const compilerEntry = createRequire(path.join(candidateRoot, 'package.json')).resolve(
+				'octane/compiler/bundler',
+			);
+			recordCompilerSources(path.dirname(compilerEntry));
+			const { createOctaneCompiler } = await import(pathToFileURL(compilerEntry).href);
+			const compilerOptions = {
+				root: candidateRoot,
+				requireDirective: false,
+				environment: 'client',
+				hmr: false,
+				dev: false,
+				profile: false,
+			};
+			plainCompiler = createOctaneCompiler(compilerOptions);
+			payload.compiler = {
+				request: 'octane/compiler/bundler',
+				entry: compilerEntry,
+				options: compilerOptions,
+				dependencies: Object.fromEntries(
+					['@tsrx/core', 'esrap', 'entities', 'es-module-lexer', '@tsrx/oxc'].map((name) => [
+						name,
+						packageEvidence(
+							createRequire(compilerEntry).resolve(
+								name === '@tsrx/oxc' ? '@tsrx/oxc/tsrx-core-compat' : name,
+							),
+							name,
+						),
+					]),
+				),
+				sources: [...sourceCache]
+					.filter(([file]) => file.startsWith(path.dirname(compilerEntry) + path.sep))
+					.map(([file, contents]) => ({ file, sha256: sha256(contents) })),
+			};
+		}
+		const transformed = plainCompiler.transform(source, filename);
+		assert.equal(
+			transformed?.kind,
+			'slots',
+			'Plain signal declarations must exercise the public compiler hook-slot transform',
+		);
+		assert.notEqual(transformed.code, source, 'Plain signal fixture was not compiled');
+		return transformed.code;
+	}
 
 	for (const scenario of BUNDLE_CASES) {
-		for (const label of scenario.baseline ? ['baseline', 'candidate'] : ['candidate']) {
+		const unavailable = baselineUnavailableReason(scenario, manifests.baseline.exports);
+		for (const label of scenario.baseline && unavailable === null
+			? ['baseline', 'candidate']
+			: ['candidate']) {
 			const root = roots[label];
-			const source = entrySource(scenario);
+			const authored = entrySource(scenario);
+			const exports = [
+				...scenario.exports,
+				...Object.values(scenario.additionalExports ?? {}).flat(),
+			];
 			const sourcefile = `${label}-${scenario.id}-public-entry.mjs`;
+			const source = scenario.compilePlain
+				? await compilePlainSource(authored, path.join(root, 'renderer-free-state.ts'))
+				: authored;
 			const result = await esbuild.build({
 				...payload.buildOptions,
 				absWorkingDir: REPO,
@@ -306,7 +373,16 @@ try {
 				ops: Object.fromEntries(Object.entries(measured).map(([key, value]) => [key, stat(value)])),
 				meta: {
 					request: scenario.request,
-					exports: scenario.exports,
+					exports,
+					...(scenario.additionalExports ? { additionalExports: scenario.additionalExports } : {}),
+					...(scenario.compilePlain
+						? {
+								authoredSource: authored,
+								authoredSha256: sha256(authored),
+								compiledSource: source,
+								compiledSha256: sha256(source),
+							}
+						: {}),
 					platform: scenario.platform,
 					bundleSha256: sha256(bytes),
 					inputs,
@@ -316,20 +392,32 @@ try {
 			};
 			payload.targets.push(row);
 			try {
+				verifyTransitionBoundary(scenario, inputs);
+				row.meta.transitionBoundary = 'passed';
+			} catch (error) {
+				row.meta.transitionBoundary = error.message;
+				// Preserve the failing historical control, but gate the candidate.
+				if (label === 'candidate') failures.push(`${row.name}: ${error.message}`);
+			}
+			try {
 				verifyBundleInputs(scenario, inputs);
-				const exportKey =
-					scenario.request === 'octane' ? '.' : `.${scenario.request.slice('octane'.length)}`;
-				const entryExport = manifests[label].exports[exportKey];
-				assert.equal(
-					typeof entryExport,
-					'string',
-					`${label}/${scenario.id}: expected direct public source export`,
-				);
-				const expectedEntry = `packages/octane/${entryExport.replace(/^\.\//, '')}`;
-				assert.ok(
-					inputs.some((input) => input.path === expectedEntry),
-					`${label}/${scenario.id}: public package export not bundled`,
-				);
+				for (const request of [
+					scenario.request,
+					...Object.keys(scenario.additionalExports ?? {}),
+				]) {
+					const exportKey = request === 'octane' ? '.' : `.${request.slice('octane'.length)}`;
+					const entryExport = manifests[label].exports[exportKey];
+					assert.equal(
+						typeof entryExport,
+						'string',
+						`${label}/${scenario.id}: expected direct public source export for ${request}`,
+					);
+					const expectedEntry = `packages/octane/${entryExport.replace(/^\.\//, '')}`;
+					assert.ok(
+						inputs.some((input) => input.path === expectedEntry),
+						`${label}/${scenario.id}: public package export not bundled for ${request}`,
+					);
+				}
 				row.meta.boundaryChecks = 'passed';
 			} catch (error) {
 				row.meta.boundaryChecks = error.message;
@@ -341,10 +429,10 @@ try {
 				);
 				assert.deepEqual(
 					Object.keys(api).sort(),
-					[...scenario.exports].sort(),
+					[...exports].sort(),
 					`${row.name}: wrong runtime export surface`,
 				);
-				for (const name of scenario.exports)
+				for (const name of exports)
 					assert.equal(typeof api[name], 'function', `${row.name}: ${name} did not load`);
 				if (scenario.id === 'ordinary-server') {
 					assert.deepEqual(
@@ -368,6 +456,11 @@ try {
 						scope.dispose();
 					}
 				}
+				if (scenario.compilePlain) {
+					assert.deepEqual(await api.exercise(), { initial: 2, updated: 4, result: 6 });
+					// A second owner lifetime must start from the declaration, not the retired value.
+					assert.deepEqual(await api.exercise(), { initial: 2, updated: 4, result: 6 });
+				}
 				row.meta.exportLoadSmoke = 'passed';
 			} catch (error) {
 				row.meta.exportLoadSmoke = error.message;
@@ -379,10 +472,21 @@ try {
 		}
 	}
 	for (const scenario of BUNDLE_CASES.filter((entry) => entry.baseline)) {
+		const unavailable = baselineUnavailableReason(scenario, manifests.baseline.exports);
+		if (unavailable !== null) {
+			payload.comparisons.push({
+				scenario: scenario.id,
+				status: 'unavailable',
+				reason: unavailable,
+			});
+			console.log(`${scenario.id}: baseline comparison unavailable — ${unavailable}`);
+			continue;
+		}
 		const baseline = payload.targets.find((entry) => entry.name === `baseline/${scenario.id}`);
 		const candidate = payload.targets.find((entry) => entry.name === `candidate/${scenario.id}`);
 		payload.comparisons.push({
 			scenario: scenario.id,
+			status: 'available',
 			metrics: Object.fromEntries(
 				['raw', 'gzip', 'brotli'].map((metric) => {
 					const before = baseline.ops[metric].median;

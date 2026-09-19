@@ -26,6 +26,54 @@
   {
     "suite": "bundle-reachability",
     "op": "raw",
+    "target": "behavior-root-vite",
+    "reference": "behavior-root-vite-budget",
+    "maxRatio": 1,
+    "note": "Behavior-only adoption, external ownership, native interaction, and disposal without a renderer or compiler; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "behavior-root-vite",
+    "reference": "behavior-root-vite-budget",
+    "maxRatio": 1,
+    "note": "Behavior-only adoption, external ownership, native interaction, and disposal without a renderer or compiler; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "behavior-root-vite",
+    "reference": "behavior-root-vite-budget",
+    "maxRatio": 1,
+    "note": "Behavior-only adoption, external ownership, native interaction, and disposal without a renderer or compiler; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "behavior-root-esbuild",
+    "reference": "behavior-root-esbuild-budget",
+    "maxRatio": 1,
+    "note": "Behavior-only adoption, external ownership, native interaction, and disposal without a renderer or compiler; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "behavior-root-esbuild",
+    "reference": "behavior-root-esbuild-budget",
+    "maxRatio": 1,
+    "note": "Behavior-only adoption, external ownership, native interaction, and disposal without a renderer or compiler; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "behavior-root-esbuild",
+    "reference": "behavior-root-esbuild-budget",
+    "maxRatio": 1,
+    "note": "Behavior-only adoption, external ownership, native interaction, and disposal without a renderer or compiler; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
     "target": "cli-spa-starter",
     "reference": "cli-spa-starter-budget",
     "maxRatio": 1,
@@ -94,6 +142,30 @@
     "reference": "root-static-budget",
     "maxRatio": 1,
     "note": "An escaped reusable root with public render and unmount semantics; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "root-static-local",
+    "reference": "root-static-local-budget",
+    "maxRatio": 1,
+    "note": "Same-file compiled static rendering and cleanup, preserving the existing static-root ceiling; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "root-static-local",
+    "reference": "root-static-local-budget",
+    "maxRatio": 1,
+    "note": "Same-file compiled static rendering and cleanup, preserving the existing static-root ceiling; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "root-static-local",
+    "reference": "root-static-local-budget",
+    "maxRatio": 1,
+    "note": "Same-file compiled static rendering and cleanup, preserving the existing static-root ceiling; deterministic production brotli bytes must not exceed the committed same-run budget."
   },
   {
     "suite": "bundle-reachability",
@@ -8658,6 +8730,22 @@
     "reference": "sampled",
     "maxRatio": 0,
     "note": "Direct signal-valued styles update through their DOM binding without re-running component setup. The sampled-read control must display the same styles and preserve the same host and child identities."
+  },
+  {
+    "suite": "signal-dom-bindings",
+    "op": "style_blocks",
+    "target": "plain",
+    "reference": "direct",
+    "maxRatio": 0,
+    "note": "Plain scalar styles inside a native-capable module allocate no presentation blocks. Direct-handle controls exercise the observer and preserve the same styled host and child."
+  },
+  {
+    "suite": "signal-dom-bindings",
+    "op": "style_update_bodies",
+    "target": "plain",
+    "reference": "direct",
+    "maxRatio": 0,
+    "note": "Changing ordinary scalar style props uses fixed-field writers without additional native style body invocations; the observed handle control must update the same CSS and preserve identity."
   },
   {
     "suite": "runtime-style-dedup",

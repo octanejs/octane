@@ -2,8 +2,8 @@
 import { createSelector } from 'reselect';
 import { sortBy } from 'es-toolkit/compat';
 import { useAppSelector } from '../hooks';
-import { RechartsRootState } from '../store';
-import {
+import type { RechartsRootState } from '../store';
+import type {
 	ActiveTooltipProps,
 	TooltipIndex,
 	TooltipInteractionState,
@@ -11,7 +11,7 @@ import {
 	TooltipPayloadConfiguration,
 } from '../tooltipSlice';
 import { calculateCartesianTooltipPos, calculatePolarTooltipPos } from '../../util/ChartUtils';
-import {
+import type {
 	AxisType,
 	CartesianLayout,
 	ChartOffsetInternal,
@@ -24,14 +24,14 @@ import {
 	TickItem,
 	TooltipEventType,
 } from '../../util/types';
-import { TooltipTrigger } from '../../chart/types';
+import type { TooltipTrigger } from '../../chart/types';
 import { selectChartDataWithIndexes } from './dataSelectors';
 import {
 	selectTooltipAxisDomain,
 	selectTooltipAxisTicks,
 	selectTooltipDisplayedData,
 } from './tooltipSelectors';
-import { AxisRange, selectTooltipAxisDataKey } from './axisSelectors';
+import { type AxisRange, selectTooltipAxisDataKey } from './axisSelectors';
 import { selectChartName } from './rootPropsSelectors';
 import { selectChartLayout } from '../../context/chartLayoutContext';
 import { selectChartOffsetInternal } from './selectChartOffsetInternal';

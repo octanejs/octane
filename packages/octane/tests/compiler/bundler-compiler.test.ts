@@ -1,4 +1,5 @@
 import { parseModule } from '@tsrx/core';
+import { compile } from 'octane/compiler';
 import { parseModule as parseCompilerModule } from '@tsrx/oxc/tsrx-core-compat';
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
@@ -17,6 +18,14 @@ import {
 } from '../../src/compiler/bundler.js';
 import { inspectProfileOutput, uniqueMetadata } from '../_profile-output';
 import { decodeMappings } from '../_source-map.js';
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
+import { renderToString } from 'octane/server';
+import * as Bindings from '../../src/dom-bindings.js';
+import * as BindingStyles from '../../src/dom-binding-styles.js';
+import * as BindingSignals from '../../src/dom-binding-signals.js';
+import * as SignalRead from '../../src/signals/read-protocol.js';
+import { createScope } from 'octane/signals';
+import * as Behavior from 'octane/behavior';
 
 const COMPONENT =
 	"import { useState } from 'octane';\n" +
@@ -47,6 +56,493 @@ function emittedHeadKey(code: string | undefined): string | undefined {
 }
 
 describe('bundler-neutral compiler integration', () => {
+	it.each(['online', 'once', 'only', 'onclick', 'onkeydown', 'ONCLICK'])(
+		'diagnoses %s as an unsupported binding attribute, not an event handler',
+		(name) => {
+			for (const dev of [false, true]) {
+				for (const mode of ['client', 'server'] as const) {
+					for (const extension of ['tsx', 'tsrx']) {
+						const source = `export function View(props) ${extension === 'tsrx' ? "@{ 'use dom bindings';" : "{ 'use dom bindings'; return ("}
+ <div ${name}={props.value} />
+${extension === 'tsrx' ? '}' : '); }'}`;
+						const id = `/src/AttributeView.${extension}`;
+						const moduleIds =
+							mode === 'server'
+								? [id]
+								: [id, `${id}?octane-bindings=View`, `${id}?octane-bindings=View&octane-mount=1`];
+						for (const moduleId of moduleIds) {
+							expect(() => compile(source, moduleId, { mode, dev, hmr: false })).toThrow(
+								`attribute ${JSON.stringify(name)} is not supported in binding views`,
+							);
+						}
+					}
+				}
+			}
+		},
+	);
+
+	it.each([
+		'(external as typeof external)(stylex.attrs(styles))',
+		'external!(stylex.attrs(styles))',
+		'(external satisfies typeof external)((stylex.attrs(styles) as object))',
+		'external((stylex.attrs as typeof stylex.attrs)(styles))',
+		'external(stylex.attrs!(styles))',
+		'external((stylex as typeof stylex).attrs(styles))',
+		'external(stylex!.attrs(styles))',
+		'external((stylex satisfies typeof stylex).attrs(styles))',
+		'external((((stylex as typeof stylex)!) satisfies typeof stylex).attrs(styles))',
+		'external(((stylex as typeof stylex).nested as typeof stylex.nested).attrs(styles))',
+		'external(((stylex!.nested)! satisfies typeof stylex.nested).attrs(styles))',
+	])('preserves typed unbound provider spreads: %s', (spread) => {
+		const styles = { class: 'styled', style: { color: 'red' } };
+		const runtimeModules = {
+			'@stylexjs/stylex': {
+				attrs: (value: unknown) => value,
+				nested: { attrs: (value: unknown) => value },
+			},
+			'octane/behavior': Behavior,
+		};
+		for (const dev of [false, true]) {
+			for (const extension of ['tsx', 'tsrx']) {
+				const source = `import { unbound as external } from 'octane/behavior';
+import * as stylex from '@stylexjs/stylex';
+export function View({ styles, label }) ${extension === 'tsrx' ? "@{ 'use dom bindings';" : "{ 'use dom bindings'; return ("}
+ <div {...${spread}} aria-label={label} />
+${extension === 'tsrx' ? '}' : '); }'}`;
+				const id = `/project/src/TypedSpread.${extension}`;
+				const compileOptions = {
+					dev,
+					hmr: false,
+					knownAttributeSpreads: [
+						{
+							source: '@stylexjs/stylex',
+							imported: '*',
+							members: spread.includes('.nested') ? ['nested', 'attrs'] : ['attrs'],
+							fields: ['class', 'style'],
+							style: 'object' as const,
+						},
+					],
+				};
+				const server = loadCompiledFixtureSource(source, {
+					id,
+					mode: 'server',
+					compileOptions,
+					runtimeModules,
+				});
+				const html = renderToString(server.View, { styles, label: 'Message' }).html;
+				expect(html).toContain('class="styled"');
+				expect(html).toContain('color:red');
+				expect(html).toContain('aria-label="Message"');
+				for (const moduleId of [id, `${id}?octane-bindings=View`])
+					expect(() =>
+						parseModule(
+							compile(source, moduleId, { ...compileOptions, mode: 'client' }).code,
+							'TypedSpread.js',
+						),
+					).not.toThrow();
+				// External provider fields have the same ownership boundary as an
+				// unbound object, including class/className aliases in either direction.
+				for (const providerClass of ['class', 'className']) {
+					for (const mode of ['client', 'server'] as const) {
+						const options = {
+							...compileOptions,
+							mode,
+							knownAttributeSpreads: [
+								{ ...compileOptions.knownAttributeSpreads[0], fields: [providerClass, 'style'] },
+							],
+						};
+						const withAttribute = (attribute: string) =>
+							source
+								.replace('{ styles, label }', '{ styles, label, owned$ }')
+								.replace('aria-label={label}', `${attribute} aria-label={label}`);
+						for (const name of ['class', 'className', 'style']) {
+							const conflict = withAttribute(
+								name === 'style' ? 'style={{ color: owned$ }}' : `${name}={owned$}`,
+							);
+							for (const moduleId of mode === 'client' ? [id, `${id}?octane-bindings=View`] : [id])
+								expect(() => compile(conflict, moduleId, options)).toThrow(
+									/unbound spreads must not contribute owned attribute/,
+								);
+							for (const value of ['"fixed"', '{external(owned$)}'])
+								expect(() => compile(withAttribute(`${name}=${value}`), id, options)).not.toThrow();
+							expect(() =>
+								compile(conflict, id, {
+									...options,
+									knownAttributeSpreads: [
+										{
+											...options.knownAttributeSpreads[0],
+											fields: name === 'style' ? [providerClass] : ['style'],
+											style: name === 'style' ? undefined : 'object',
+										},
+									],
+								}),
+							).not.toThrow();
+						}
+						const provider = `stylex.${spread.includes('.nested') ? 'nested.' : ''}attrs(styles)`;
+						expect(() => compile(withAttribute(`{...${provider}}`), id, options)).toThrow(
+							/known spread conflicts with attribute/,
+						);
+						expect(() =>
+							compile(
+								source.replace(
+									`{...${spread}} aria-label={label}`,
+									`aria-label={label} {...${spread}}`,
+								),
+								id,
+								options,
+							),
+						).toThrow(/unbound attribute spreads must precede owned binding attributes/);
+					}
+				}
+				// Transparent receiver syntax must retain the fixed-field contract
+				// even without the unbound escape hatch for generic spreads.
+				if (spread.startsWith('external(')) {
+					const owned = source.replace(spread, spread.slice('external('.length, -1));
+					for (const mode of ['client', 'server'] as const)
+						expect(() => compile(owned, id, { ...compileOptions, mode })).not.toThrow();
+				}
+				for (const rejected of [
+					source.replace('{ styles, label }', '{ styles, label, external }'),
+					source.replace('{ styles, label }', '{ styles, label, stylex }'),
+					source.replace(spread, 'external?.(stylex.attrs(styles))'),
+					...[
+						'(stylex as typeof stylex)["attrs"](styles)',
+						'(stylex as typeof stylex)?.attrs(styles)',
+						'(stylex as typeof stylex).attrs?.(styles)',
+						'((stylex as typeof stylex)["nested"]).attrs(styles)',
+						'((stylex as typeof stylex)?.nested).attrs(styles)',
+						'(stylex as typeof stylex).other(styles)',
+					].map((call) => source.replace(spread, call)),
+				])
+					expect(() => compile(rejected, id, { ...compileOptions, mode: 'client' })).toThrow(
+						/explicitly unbound|pure projections|unbound requires/,
+					);
+			}
+		}
+	});
+
+	it('preserves compiler signal capability through client and server runtime-request transforms', () => {
+		const cleanupSource = `import { useLayoutEffect } from 'octane';
+export function Lifecycle(props) @{
+ useLayoutEffect(() => () => props.cleanups.push('cleanup'), []);
+ <span>ordinary</span>
+}
+export function View(props) @{ 'use dom bindings'; <p>{props.label as string}</p> }`;
+		for (const mode of ['client', 'server'] as const) {
+			for (const dev of [false, true]) {
+				const result = compile(cleanupSource, '/project/src/View.tsrx', { mode, dev, hmr: false });
+				expect(result.code).not.toBe('');
+				expect(() => parseModule(result.code, 'View.js')).not.toThrow();
+			}
+		}
+		const compiler = createOctaneCompiler({
+			root: '/project',
+			knownAttributeSpreads: [
+				{ source: '@stylexjs/stylex', imported: 'attrs', fields: ['class', 'style'] },
+				{
+					source: '@stylexjs/stylex',
+					imported: 'props',
+					fields: ['className', 'style'],
+					style: 'object',
+				},
+			],
+		});
+		const bindingSource = `export function View(props) @{ 'use dom bindings'; <p>{props.label as string}</p> }`;
+		for (const query of [
+			'octane-props=%5B1%2C%5B%5D%5D',
+			'octane-bindings=View&octane-props=not-json',
+			'octane-bindings=View&octane-props=%5B2%2C%5B%5D%5D',
+			'octane-bindings=View&octane-props=%5B1%2Cnull%5D',
+			'octane-bindings=View&octane-props=%5B1%2C%5B1%5D%5D',
+			'octane-bindings=View&octane-props=%5B1%2C%5B%5D%2Cnull%5D',
+			'octane-bindings=View&octane-props=%5B1%2C%5B%22label%22%2C%22label%22%5D%5D',
+			'octane-bindings=View&octane-props=%5B1%2C%5B%5D%5D&octane-props=%5B1%2C%5B%5D%5D',
+		]) {
+			const id = `/project/src/View.tsrx?${query}`;
+			expect(() => compile(bindingSource, id, { mode: 'client', hmr: false })).toThrowError(
+				/octane-props/,
+			);
+			expect(() => compiler.transform(bindingSource, id, { environment: 'client' })).toThrowError(
+				/octane-props/,
+			);
+		}
+		const childSource = `export function ClosedChild({ ...rest }) @{ 'use dom bindings'; <button {...rest} /> }`;
+		const pairSource = `import { ClosedChild } from './ClosedChild.tsrx';
+export function Pair(props) @{
+ 'use dom bindings';
+ <section>
+  <ClosedChild title={props.title} data-second={props.second} />
+  <ClosedChild data-second={props.second} title={props.title} />
+  <ClosedChild title={props.title} data-second={props.second} />
+ </section>
+}`;
+		for (const dev of [false, true]) {
+			const pair = compiler.transform(pairSource, '/project/src/Pair.tsrx?octane-bindings=Pair', {
+				environment: 'client',
+				dev,
+				hmr: false,
+			})!;
+			const requests: string[] = [];
+			for (const node of parseModule(pair.code, 'Pair.js').body) {
+				if (
+					node.type === 'ImportDeclaration' &&
+					node.source.value.startsWith('./ClosedChild.tsrx?')
+				)
+					requests.push(node.source.value);
+			}
+			expect(requests).toEqual(
+				[
+					['title', 'data-second'],
+					['data-second', 'title'],
+				].map(
+					(keys) =>
+						`./ClosedChild.tsrx?octane-bindings=ClosedChild&octane-mount=1&octane-props=${encodeURIComponent(JSON.stringify([1, keys]))}`,
+				),
+			);
+			// The bundler canonicalizes the file before compiling it. Extraction
+			// must still receive each request's complete closed caller shape.
+			for (const request of [
+				...requests,
+				`./ClosedChild.tsrx?octane-bindings=ClosedChild&octane-props=${encodeURIComponent(JSON.stringify([1, []]))}`,
+			]) {
+				const id = `/project/src/${request.slice(2)}`;
+				const selected = compiler.transform(childSource, id, {
+					environment: 'client',
+					dev,
+					hmr: false,
+				})!;
+				expect(() => parseModule(selected.code, 'ClosedChild.js')).not.toThrow();
+				expect(() => compiler.transform(childSource, id, { environment: 'server' })).toThrow(
+					/client DOM target/,
+				);
+			}
+			expect(() =>
+				compiler.transform(
+					childSource,
+					'/project/src/ClosedChild.tsrx?octane-bindings=ClosedChild',
+					{
+						environment: 'client',
+						dev,
+						hmr: false,
+					},
+				),
+			).toThrow(/spread/);
+		}
+		for (const environment of ['client', 'server'] as const) {
+			for (const extension of ['ts', 'js', 'tsrx']) {
+				const result = compiler.transform(
+					`import { signal$ } from 'octane/signals'; export const draft$ = signal$('');`,
+					`/project/src/state.${extension}`,
+					{ environment, explicitRuntimeRequests: true },
+				);
+				expect(result?.streamedSignals).toBe(true);
+			}
+			expect(
+				compiler.transform(HOOK, '/project/src/useCount.ts', {
+					environment,
+					explicitRuntimeRequests: true,
+				})?.streamedSignals,
+			).toBeUndefined();
+			const source = `import { attrs as nativeAttrs } from '@stylexjs/stylex';
+export function Styled(props) @{ 'use dom bindings'; <div {...nativeAttrs(props.styles)} /> }`;
+			expect(
+				compiler.transform(source, '/project/src/Styled.tsrx', { environment }),
+			).not.toBeNull();
+			if (environment === 'client')
+				expect(
+					compiler.transform(source, '/project/src/Styled.tsrx?octane-bindings=Styled', {
+						environment,
+					}),
+				).not.toBeNull();
+			expect(() =>
+				createOctaneCompiler({ root: '/project' }).transform(
+					source,
+					'/project/src/Styled.tsrx?octane-bindings=Styled',
+					{ environment },
+				),
+			).toThrow();
+			for (const extension of ['tsx', 'tsrx']) {
+				const source = `import { props as styleProps } from '@stylexjs/stylex';
+export function Styled(props) ${extension === 'tsrx' ? "@{ 'use dom bindings'; <div {...styleProps(props.styles)} /> }" : "{ 'use dom bindings'; return <div {...styleProps(props.styles)} />; }"}`;
+				expect(
+					compiler.transform(source, `/project/src/Styled.${extension}`, { environment }),
+				).not.toBeNull();
+				if (environment === 'client') {
+					const selected = compiler.transform(
+						source,
+						`/project/src/Styled.${extension}?octane-bindings=Styled`,
+						{ environment },
+					);
+					expect(selected?.code).toContain('octane/dom-binding-styles');
+					expect(selected?.code).not.toContain('octane/internal/client');
+				}
+			}
+		}
+		const factory = (styles: { className: string; style: object }[]) => ({
+			...styles[0],
+			'data-style-src': 'source',
+		});
+		const styles = { className: 'styled', style: { color: 'red' } };
+		const runtimeModules = {
+			'@stylexjs/stylex': { props: factory, default: { props: factory } },
+			'octane/dom-bindings': Bindings,
+			'octane/dom-binding-styles': BindingStyles,
+			'octane/dom-binding-signals': BindingSignals,
+		};
+		for (const provider of [
+			{ imported: 'props', prelude: "import { props as factory } from '@stylexjs/stylex';" },
+			{
+				imported: '*',
+				members: ['props'],
+				prelude: "import * as factory from '@stylexjs/stylex';",
+			},
+			{
+				imported: 'default',
+				members: ['props'],
+				prelude: "import factory from '@stylexjs/stylex';",
+			},
+			{ imported: 'props', prelude: '' },
+		]) {
+			const contract = {
+				source: '@stylexjs/stylex',
+				imported: provider.imported,
+				members: provider.members,
+				fields: ['className', 'style', 'data-style-src'],
+				style: 'object' as const,
+				jsxAttribute: 'sx',
+			};
+			for (const dev of [false, true]) {
+				for (const extension of ['tsx', 'tsrx']) {
+					// The parameter shadows every authored factory import. A generated
+					// import must not capture another authored binding either.
+					const source = `${provider.prelude}
+const _jsxAttribute = 'untouched';
+export function Styled(factory) ${extension === 'tsrx' ? "@{ 'use dom bindings';" : "{ 'use dom bindings'; return ("}
+ <div title={_jsxAttribute} sx={[factory.styles]} />
+${extension === 'tsrx' ? '}' : '); }'}`;
+					const id = `/project/src/Shorthand.${extension}`;
+					const compileOptions = { dev, hmr: false, knownAttributeSpreads: [contract] };
+					const server = loadCompiledFixtureSource(source, {
+						id,
+						mode: 'server',
+						compileOptions,
+						runtimeModules,
+					});
+					const html = renderToString(server.Styled, { styles }).html;
+					expect(html).toContain('class="styled"');
+					expect(html).toContain('color:red');
+					expect(html).toContain('data-style-src="source"');
+					expect(html).toContain('title="untouched"');
+					expect(html).not.toContain(' sx=');
+					expect(() =>
+						parseModule(
+							compile(source, id, { ...compileOptions, mode: 'client' }).code,
+							'Shorthand.js',
+						),
+					).not.toThrow();
+					const bindings = loadCompiledFixtureSource(source, {
+						id: `${id}?octane-bindings=Styled`,
+						mode: 'client',
+						compileOptions,
+						runtimeModules,
+					}).default;
+					expect(bindings.project({ styles })).toEqual([
+						'untouched',
+						'styled',
+						{ color: 'red' },
+						'source',
+					]);
+				}
+			}
+			const unchanged = `export function Child(props) { return props.sx; }
+export function App() @{ <><Child sx="component"/><div sx="native"/><div sx/></> }`;
+			const server = loadCompiledFixtureSource(unchanged, {
+				id: '/project/src/Unchanged.tsrx',
+				mode: 'server',
+				compileOptions: { knownAttributeSpreads: [contract] },
+				runtimeModules,
+			});
+			expect(renderToString(server.App).html).toContain('component');
+			expect(renderToString(server.App).html).toContain('sx="native"');
+			for (const invalid of ['', 'bad name', 'ns:sx']) {
+				expect(() =>
+					compile(COMPONENT, '/project/src/Invalid.tsrx', {
+						knownAttributeSpreads: [{ ...contract, jsxAttribute: invalid }],
+					}),
+				).toThrow(/jsxAttribute/);
+			}
+			expect(() =>
+				compile(COMPONENT, '/project/src/Ambiguous.tsrx', {
+					knownAttributeSpreads: [contract, { ...contract, source: 'another-provider' }],
+				}),
+			).toThrow(/jsxAttribute/);
+		}
+		const scope = createScope({ scopeKey: 'compiler-sx-projection' });
+		try {
+			const height$ = scope.signal$<number | null>('height', 12);
+			const height = (value: number | null) => ({
+				className: value === null ? undefined : 'height',
+				style: value === null ? undefined : { '--height': `${value}px` },
+				'data-style-src': 'height',
+			});
+			const appearance$ = scope.signal$('appearance', height(12));
+			const projectionContract = {
+				source: '@stylexjs/stylex',
+				imported: '*',
+				members: ['props'],
+				fields: ['className', 'style', 'data-style-src'],
+				style: 'object' as const,
+				jsxAttribute: 'sx',
+			};
+			for (const [expression, initial] of [
+				['stylex.height(props.height$)', 12],
+				['props.appearance$', 12],
+				['stylex.height(props.height$ === null ? null : props.height$ * 2)', 24],
+			] as const) {
+				const source = `import * as stylex from '@stylexjs/stylex';
+export function Styled(props) @{ 'use dom bindings'; <div sx={${expression}}/> }`;
+				const server = loadCompiledFixtureSource(source, {
+					id: '/project/src/Reactive.tsrx',
+					mode: 'server',
+					compileOptions: { knownAttributeSpreads: [projectionContract] },
+					runtimeModules: {
+						'@stylexjs/stylex': { props: (value: unknown) => value, height },
+						'octane/internal/signal-read': SignalRead,
+						'octane/dom-binding-signals': BindingSignals,
+						'octane/dom-binding-styles': BindingStyles,
+					},
+				});
+				expect(renderToString(server.Styled, { height$, appearance$ }).html).toContain(
+					`--height:${initial}px`,
+				);
+				height$.set(null);
+				appearance$.set(height(null));
+				expect(renderToString(server.Styled, { height$, appearance$ }).html).not.toContain(
+					'--height:',
+				);
+				height$.set(12);
+				appearance$.set(height(12));
+			}
+			for (const sibling of ['className="other"', 'style={{ color: "red" }}', '{...props.extra}']) {
+				expect(() =>
+					compile(
+						`export function Styled(props) @{ <div sx={props.appearance$} ${sibling}/> }`,
+						'/project/src/Conflicting.tsrx',
+						{ knownAttributeSpreads: [projectionContract] },
+					),
+				).toThrow(/cannot overlap/);
+			}
+			const staticCode = compile(
+				`export function Styled(props) @{ <div sx={props.appearance}/> }`,
+				'/project/src/Static.tsrx',
+				{ knownAttributeSpreads: [projectionContract] },
+			).code;
+			expect(staticCode).not.toContain('octane/internal/signal-read');
+		} finally {
+			scope.dispose();
+		}
+	});
+
 	it('accepts only a one-shot descriptor proof for its exact source', () => {
 		const authority = Symbol('test descriptor preflight');
 		const compiler = createOctaneCompiler({

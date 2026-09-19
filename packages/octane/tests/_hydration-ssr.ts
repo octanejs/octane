@@ -17,7 +17,11 @@ type HydrationBinding =
 	| 'react-map-gl'
 	| 'select'
 	| 'solana-kit'
-	| 'testing-library';
+	| 'testing-library'
+	| 'tanstack-pacer'
+	| 'tanstack-query'
+	| 'tanstack-virtual'
+	| 'tanstack-table';
 
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
@@ -115,6 +119,28 @@ function bindingAliases(binding: HydrationBinding) {
 
 	if (binding === 'react-map-gl') {
 		return [{ find: /^@octanejs\/react-map-gl$/, replacement: resolve(source, 'index.ts') }];
+	}
+
+	if (binding === 'tanstack-table')
+		return [{ find: /^@octanejs\/tanstack-table$/, replacement: resolve(source, 'index.ts') }];
+
+	if (binding === 'tanstack-virtual') {
+		return [{ find: /^@octanejs\/tanstack-virtual$/, replacement: resolve(source, 'index.ts') }];
+	}
+
+	if (binding === 'tanstack-query') {
+		return [{ find: /^@octanejs\/tanstack-query$/, replacement: resolve(source, 'index.ts') }];
+	}
+
+	if (binding === 'tanstack-pacer') {
+		return [
+			{ find: /^@octanejs\/tanstack-pacer$/, replacement: resolve(source, 'index.ts') },
+			{ find: /^@octanejs\/tanstack-pacer\/(.*)$/, replacement: `${source}/$1/index.ts` },
+			{
+				find: /^@octanejs\/tanstack-store$/,
+				replacement: resolve(repositoryRoot, 'packages/tanstack-store/src/index.ts'),
+			},
+		];
 	}
 
 	if (binding === 'select') return [];

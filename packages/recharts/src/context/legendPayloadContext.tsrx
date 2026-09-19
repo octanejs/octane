@@ -1,4 +1,4 @@
-import { LegendPayload } from '../component/DefaultLegendContent.tsrx';
+import type { LegendPayload } from '../component/DefaultLegendContent.tsrx';
 import { useAppSelector } from '../state/hooks';
 import { selectLegendPayload } from '../state/selectors/legendSelectors';
 

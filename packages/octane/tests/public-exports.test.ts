@@ -79,10 +79,18 @@ describe('published package export contract', () => {
 			['./signals/server', './dist/cjs/signals/server.cjs'],
 			['./internal/client', './dist/cjs/internal/client.cjs'],
 			['./internal/server', './dist/cjs/internal/server.cjs'],
+			['./internal/context', './dist/cjs/internal/context.cjs'],
 		]);
 
 		expect(
 			missingPublishedPublicSubpaths(manifest.exports, manifest.publishConfig.exports),
 		).toEqual([]);
+		expect(Object.keys(REQUIRED_PUBLIC_VALUE_EXPORTS).sort()).toEqual(
+			[
+				...new Set(
+					publishedRuntimeEntries(manifest.publishConfig.exports).map(([subpath]) => subpath),
+				),
+			].sort(),
+		);
 	});
 });

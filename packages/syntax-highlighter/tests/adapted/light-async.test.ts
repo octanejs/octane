@@ -114,14 +114,18 @@ test('SyntaxHighlighter renders fortran highlighted text', async () => {
 });
 test('SyntaxHighlighter renders text while language loads', async () => {
 	await SyntaxHighlighter.preload();
+	await Promise.all(
+		['javascript', 'fortran'].map((language) => SyntaxHighlighter.loadLanguage(language)),
+	);
 	const loadLanguage = vi
 		.spyOn(SyntaxHighlighter, 'loadLanguage')
 		.mockImplementation(() => new Promise(() => {}));
-	const tree = renderer.create(
-		/* @__PURE__ */ React.createElement(
-			SyntaxHighlighter,
-			{ language: 'gherkin', style: prism },
-			`
+	try {
+		const tree = renderer.create(
+			/* @__PURE__ */ React.createElement(
+				SyntaxHighlighter,
+				{ language: 'gherkin', style: prism },
+				`
             C AREA OF A TRIANGLE WITH A STANDARD SQUARE ROOT FUNCTION
             C INPUT - TAPE READER UNIT 5, INTEGER INPUT
             C OUTPUT - LINE PRINTER UNIT 6, REAL OUTPUT
@@ -149,9 +153,12 @@ test('SyntaxHighlighter renders text while language loads', async () => {
                 STOP
                 END
                    `,
-		),
-	);
-	await vi.waitFor(() => expect(loadLanguage).toHaveBeenCalledWith('gherkin'));
-	expect(tree.toJSON()).toMatchSnapshot();
-	loadLanguage.mockRestore();
+			),
+		);
+		await vi.waitFor(() => expect(loadLanguage).toHaveBeenCalledWith('gherkin'));
+		expect(SyntaxHighlighter.isRegistered('gherkin')).toBe(false);
+		expect(tree.toJSON()).toMatchSnapshot();
+	} finally {
+		loadLanguage.mockRestore();
+	}
 });

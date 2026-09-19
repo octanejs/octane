@@ -78,7 +78,7 @@ export function DragOverlay<T extends Data, U extends Draggable<T>>(props: DragO
 			: children;
 	}
 
-	return createElement(DragDropContext.Provider, {
+	return createElement(DragDropContext, {
 		value: patchedManager as DragDropManager | null,
 		children: createElement(
 			tag || 'div',

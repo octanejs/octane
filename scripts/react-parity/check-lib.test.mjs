@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { existsSync, writeFileSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import test from 'node:test';
@@ -91,6 +91,45 @@ test('prints runner-level Vitest errors that the JSON reporter omits', () => {
 		'Vitest reported 1 unhandled error(s):',
 		'Error: worker failed\n    at worker.js:1:1',
 	]);
+});
+
+test('preserves the nested cause of a browser-runner failure without looping on cycles', () => {
+	const messages = [];
+	const originalError = console.error;
+	const cause = { message: 'Browser page closed', cause: 'Connection lost' };
+	const wrapper = {
+		stack: 'Error: Failed to run the test MenuPortal.test.tsx',
+		cause,
+	};
+	const circular = { message: 'Runner shutdown failed' };
+	circular.cause = circular;
+	console.error = (message) => messages.push(message);
+	try {
+		new ReactParityUnhandledReporter().onTestRunEnd([], [wrapper, circular]);
+	} finally {
+		console.error = originalError;
+	}
+	assert.match(messages[1], /Failed to run the test MenuPortal\.test\.tsx/);
+	assert.match(messages[1], /Browser page closed/);
+	assert.match(messages[1], /Connection lost/);
+	assert.match(messages[2], /Runner shutdown failed/);
+	assert.match(messages[2], /Circular error cause/);
+});
+
+test('prints nested browser runner causes without looping on circular errors', () => {
+	const messages = [];
+	const originalError = console.error;
+	console.error = (message) => messages.push(message);
+	const cause = new Error('browser connection closed');
+	const error = new Error('Failed to run the test example.test.ts', { cause });
+	cause.cause = error;
+	try {
+		new ReactParityUnhandledReporter().onTestRunEnd([], [error]);
+	} finally {
+		console.error = originalError;
+	}
+	assert.match(messages.join('\n'), /Failed to run the test example\.test\.ts/);
+	assert.match(messages.join('\n'), /Caused by: Error: browser connection closed/);
 });
 
 test('rebuilds timeout placeholder stacks around the real failure message', () => {
@@ -250,6 +289,8 @@ test('runs one native Vitest file shard and writes its verified report', async (
 	t.after(() => rm(root, { recursive: true, force: true }));
 	const reportPath = join(root, 'reports', 'shard-2.json');
 	const child = fakeVitestRun();
+	await mkdir(dirname(reportPath), { recursive: true });
+	await writeFile(`${reportPath}.failed`, 'stale failure');
 
 	await runRequiredVitestLanes({
 		lanes: exampleVitestLanes,
@@ -269,6 +310,7 @@ test('runs one native Vitest file shard and writes its verified report', async (
 	assert.equal(calls[0][2].stdio, 'inherit');
 	assert.equal(calls[0][2].env, process.env);
 	assert.equal(await readFile(reportPath, 'utf8'), passingVitestReport);
+	assert.equal(existsSync(`${reportPath}.failed`), false);
 	assert.equal(existsSync(dirname(child.outputFile)), false);
 });
 
@@ -303,6 +345,7 @@ test('rejects missing, malformed, failed and interrupted reports without reusing
 		await t.test(name, async () => {
 			const reportPath = join(root, `${name}.json`);
 			await writeFile(reportPath, passingVitestReport);
+			await writeFile(`${reportPath}.failed`, 'stale failed evidence');
 			const child = fakeVitestRun(options);
 			await assert.rejects(
 				runRequiredVitestLanes({
@@ -314,6 +357,14 @@ test('rejects missing, malformed, failed and interrupted reports without reusing
 				expected,
 			);
 			assert.equal(existsSync(reportPath), false);
+			if (options.report === null || options.error) {
+				assert.equal(existsSync(`${reportPath}.failed`), false);
+			} else {
+				assert.equal(
+					await readFile(`${reportPath}.failed`, 'utf8'),
+					options.report ?? passingVitestReport,
+				);
+			}
 			assert.equal(existsSync(dirname(child.outputFile)), false);
 		});
 	}

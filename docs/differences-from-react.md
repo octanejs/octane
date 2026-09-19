@@ -115,6 +115,21 @@ omitted. Mutating such an object in place is therefore not witnessed by a
 dependency array; state that should drive rendering belongs in state, context,
 or a store rather than a module singleton.
 
+Member reads inside a conditional branch, after a possible early exit, or
+protected by exception handling preserve that protection. For one-level reads,
+the inferred array inspects an own property descriptor: a data property tracks
+its value, while an accessor or inherited property tracks its receiver without
+invoking a getter. An absent property tracks `undefined`. Failed reflection
+probes track the receiver, leaving the
+authored callback responsible for the read and its exception handling. Thus a
+guarded `props.onChange(...)` still tracks a stable own callback when the props
+container changes, while method getters stay behind their authored guard.
+Null and undefined receivers use separate module-local markers, so a failed receiver
+read does not compare equal to a successful own-data read of null or undefined.
+These markers are created once per module, rather than once per probe.
+These guarded probes allocate a property descriptor; ordinary unguarded
+one-level method calls retain the allocation-free comparison below.
+
 A one-level method call tracks the value that can change between renders. The
 compiled array selects that value on each render, based on where the method
 lives:
@@ -593,9 +608,9 @@ const theme = {
 
 function Page() {
   const content = (
-    <Theme.Provider value="inner">
+    <Theme value="inner">
       <span data-theme={theme.current}>{theme.current}</span>
-    </Theme.Provider>
+    </Theme>
   );
 
   return <main>{content}</main>; // data-theme="inner" and text "inner".
@@ -976,15 +991,26 @@ The compiler reports these as compile errors, each carrying its code:
 - `CSS_GLOBAL_PLACEMENT` — `:global(...)` in the middle of a selector sequence
   or nested inside a pseudo-class.
 
-## Context: callable provider object, no Consumer
+## Context: direct provider component, no Provider or Consumer
 
 `createContext` returns a context that is itself the provider component —
-React 19's `<MyContext value={…}>` form is the native shape, and
-`MyContext.Provider` is retained as an identity alias for React-18-shaped
-libraries. The render-prop `<MyContext.Consumer>` does not exist and will not
-be added: Octane's slot-keyed hooks make `use(MyContext)`/`useContext` legal
-behind any condition, which is the pattern Consumer existed to work around.
+React 19's `<MyContext value={…}>` form is the supported shape.
+`MyContext.Provider` does not exist; known legacy `.Provider` access reports
+the `OCTANE_CONTEXT_PROVIDER` compiler error. Replace
+`<MyContext.Provider value={value}>` with `<MyContext value={value}>`, and pass
+`MyContext` directly to `createElement`
+or `root.render`. The render-prop `<MyContext.Consumer>` does not exist and
+will not be added: Octane's slot-keyed hooks make `use(MyContext)`/`useContext`
+legal behind any condition, which is the pattern Consumer existed to work around.
 Read the context in the child (or an inline component) instead.
+
+Production DOM compilation can omit generic descriptor-child rendering for a
+private context when its complete usage is proven to be compiled template
+providers and canonical `use`/`useContext` reads. Exported or escaped contexts,
+aliases, reflection, and opaque children retain generic rendering. This changes
+bundle reachability while preserving context identity, hook state, hydration
+adoption, and uncontrolled edits across provider value updates. Development,
+HMR, profiling, server, and custom-renderer compilation keep the generic path.
 
 In development, accessing `.Consumer` logs a one-time migration diagnostic and
 still returns `undefined`, so feature probes (`MyContext.Consumer || fallback`)

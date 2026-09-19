@@ -15,7 +15,9 @@ const directory = path.resolve(process.argv[2]);
 const manifest = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'));
 const lock = JSON.parse(readFileSync(path.join(directory, 'audit/upstream.lock.json'), 'utf8'));
 const entries = pinnedPublicEntries(directory, { identity: lock.identity, binding: manifest.name });
-const specifiers = concretePublicSpecifiers(directory, manifest.name);
+const specifiers = concretePublicSpecifiers(directory, manifest.name, {
+	excludePackageMetadata: true,
+});
 const folder = path.join(directory, 'tests/types');
 mkdirSync(folder, { recursive: true });
 const probe = path.join(folder, '.public-contract-probe.ts');

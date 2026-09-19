@@ -1,8 +1,8 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import { RechartsRootState } from '../store';
-import { TooltipEventType } from '../../util/types';
+import type { RechartsRootState } from '../store';
+import type { TooltipEventType } from '../../util/types';
 import { useAppSelector } from '../hooks';
-import { SharedTooltipSettings } from '../tooltipSlice';
+import type { SharedTooltipSettings } from '../tooltipSlice';
 
 export const selectDefaultTooltipEventType = (state: RechartsRootState): TooltipEventType =>
 	state.options.defaultTooltipEventType;

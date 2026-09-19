@@ -1,10 +1,10 @@
 // Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
-import {
+import type {
 	AnimationController,
 	AnimationControllerHandle,
 	OnAnimationStateUpdate,
 } from './AnimationController';
-import { CancelableTimeout, TimeoutController } from './timeoutController';
+import type { CancelableTimeout, TimeoutController } from './timeoutController';
 
 /**
  * JavaScript animations require trigger and repaint as soon as possible,

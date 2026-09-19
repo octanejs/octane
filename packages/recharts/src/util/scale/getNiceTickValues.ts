@@ -6,8 +6,8 @@
  */
 import Decimal from 'decimal.js-light';
 import { getDigitCount, rangeStep } from './util/arithmetic';
-import { NumberDomain } from '../types';
-import { NiceTicksAlgorithm } from '../../state/cartesianAxisSlice';
+import type { NumberDomain } from '../types';
+import type { NiceTicksAlgorithm } from '../../state/cartesianAxisSlice';
 
 /**
  * Calculate a interval of a minimum value and a maximum value

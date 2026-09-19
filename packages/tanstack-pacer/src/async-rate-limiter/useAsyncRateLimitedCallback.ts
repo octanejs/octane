@@ -18,10 +18,7 @@ import type { AnyAsyncFunction } from '@tanstack/pacer/types';
 export function useAsyncRateLimitedCallback<TFn extends AnyAsyncFunction>(
 	fn: TFn,
 	options: ReactAsyncRateLimiterOptions<TFn, {}>,
-): (...args: Parameters<TFn>) => Promise<ReturnType<TFn>> {
+): (...args: Parameters<TFn>) => Promise<Awaited<ReturnType<TFn>> | undefined> {
 	const asyncRateLimitedFn = useAsyncRateLimiter(fn, options).maybeExecute;
-	return useCallback(
-		(...args) => asyncRateLimitedFn(...args) as Promise<ReturnType<TFn>>,
-		[asyncRateLimitedFn],
-	);
+	return useCallback((...args) => asyncRateLimitedFn(...args), [asyncRateLimitedFn]);
 }

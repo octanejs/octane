@@ -89,7 +89,7 @@ export function useRenderDialogRoot<Payload>(
 	const shouldRenderInteractions = open || mounted;
 
 	return (
-		<DialogRootContext.Provider value={store as DialogStore<unknown>}>
+		<DialogRootContext value={store as DialogStore<unknown>}>
 			{handle && <PopupHandleAttachment handle={handle} store={store} />}
 			{shouldRenderInteractions && (
 				<DialogInteractions
@@ -101,7 +101,7 @@ export function useRenderDialogRoot<Payload>(
 			{typeof children === 'function' && !React.isChildrenBlock(children)
 				? children({ payload })
 				: children}
-		</DialogRootContext.Provider>
+		</DialogRootContext>
 	);
 }
 

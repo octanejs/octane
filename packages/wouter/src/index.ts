@@ -246,7 +246,7 @@ export function Router({ children, ...props }: RouterProps): OctaneNode {
 		}
 	}
 
-	return h(RouterCtx.Provider, { value, children });
+	return h(RouterCtx, { value, children });
 }
 
 export interface RouteComponentProps<T extends DefaultParams = DefaultParams> {
@@ -331,7 +331,7 @@ export function Route<
 		? h(Router, { base, children: renderRoute(renderProps, params) } as RouterProps)
 		: renderRoute(renderProps, params);
 
-	return h(ParamsCtx.Provider, { value: params, children });
+	return h(ParamsCtx, { value: params, children });
 }
 
 export type NavigationalProps<H extends BaseLocationHook = typeof useBrowserLocation> = (

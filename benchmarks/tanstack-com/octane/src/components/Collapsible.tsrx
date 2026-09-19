@@ -63,11 +63,11 @@ export function Collapsible({
 	// React accepts render-prop children (`{({ open }) => ...}`); in octane a
 	// compiled children block is also a function, so distinguish the user render
 	// prop with isChildrenBlock.
-	return <CollapsibleContext.Provider value={value}>
+	return <CollapsibleContext value={value}>
 		<div className={className} data-collapsible>
 			{typeof children === 'function' && !isChildrenBlock(children) ? children(value) : children}
 		</div>
-	</CollapsibleContext.Provider>;
+	</CollapsibleContext>;
 }
 
 export function CollapsibleTrigger({

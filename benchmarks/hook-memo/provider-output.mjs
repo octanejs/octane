@@ -59,9 +59,9 @@ const fixture = `
 	}
 	export function Inline({ tick, label }: { tick: number; label: string }) @{
 		<main data-tick={tick}>
-			<Theme.Provider value="constant">
+			<Theme value="constant">
 				<section><input defaultValue="draft" /><Label text={label} /><Counter /></section>
-			</Theme.Provider>
+			</Theme>
 		</main>
 	}
 	function buildRows(label: string) {
@@ -70,9 +70,9 @@ const fixture = `
 	export function InlineMemo({ tick, label }: { tick: number; label: string }) @{
 		const rows = buildRows(label);
 		<main data-tick={tick}>
-			<Theme.Provider value="constant">
+			<Theme value="constant">
 				<section><input defaultValue="draft" /><div>{rows}</div><Counter /></section>
-			</Theme.Provider>
+			</Theme>
 		</main>
 	}
 `;
@@ -352,13 +352,11 @@ function exercise(app) {
 	});
 	inlineMemo.close();
 	const Context = app.createContext('default');
-	const direct = mount('direct', Context.Provider, { value: 'first', children: app.First });
+	const direct = mount('direct', Context, { value: 'first', children: app.First });
 	direct.verify('first');
 	phase('same_body', () => {
 		for (let tick = 1; tick <= REPEATS; tick++) {
-			app.flushSync(() =>
-				direct.root.render(Context.Provider, { value: tick, children: app.First }),
-			);
+			app.flushSync(() => direct.root.render(Context, { value: tick, children: app.First }));
 			direct.verify('first');
 		}
 	});
@@ -369,7 +367,7 @@ function exercise(app) {
 			[app.Second, 'second'],
 			[app.First, 'first'],
 		]) {
-			app.flushSync(() => direct.root.render(Context.Provider, { value: text, children: body }));
+			app.flushSync(() => direct.root.render(Context, { value: text, children: body }));
 			direct.verify(text, true);
 			snapshot.push({ requested: text, rendered: direct.label.textContent });
 		}

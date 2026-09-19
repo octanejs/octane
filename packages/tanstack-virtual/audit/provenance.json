@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json"],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@tanstack/react-virtual",
+    "version": "3.14.12",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"]
+}

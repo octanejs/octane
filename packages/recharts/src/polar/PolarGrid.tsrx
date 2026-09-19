@@ -3,13 +3,13 @@ import { clsx } from 'clsx';
 import * as React from 'octane';
 
 import { polarToCartesian } from '../util/PolarUtils';
-import { AxisId } from '../state/cartesianAxisSlice';
+import type { AxisId } from '../state/cartesianAxisSlice';
 import { useAppSelector } from '../state/hooks';
 import { selectPolarGridAngles, selectPolarGridRadii } from '../state/selectors/polarGridSelectors';
 import { selectPolarViewBox } from '../state/selectors/polarAxisSelectors';
-import { PolarViewBoxRequired } from '../util/types';
+import type { PolarViewBoxRequired } from '../util/types';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
+import { type ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 

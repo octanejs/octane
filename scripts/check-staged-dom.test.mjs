@@ -121,6 +121,21 @@ test('rejects unwrapped structure, arbitrary native properties, and any-cast ali
 			'write:[dynamic]',
 		],
 	);
+	// Constant keys retain their native-property classification without making
+	// a renderer-owned expando look like an arbitrary computed native access.
+	const constants = inspectStagedDOM(`
+	const NATIVE = 'nodeValue';
+	const EXPANDO = '__oct_dangerHTML';
+	function renderHost(node: Node, key: string, claimed: '__oct_dangerHTML') {
+	 const active = (node as any)[EXPANDO];
+	 (node as any)[NATIVE] = 'early';
+	 return [(node as any)[NATIVE], (node as any)[key], active,
+	   (node as any)[key as '__oct_dangerHTML'], (node as any)[claimed]];
+	}`);
+	assert.deepEqual(
+		constants.map((finding) => finding.operation),
+		['write:nodeValue', 'read:nodeValue', 'read:[dynamic]', 'read:[dynamic]', 'read:[dynamic]'],
+	);
 });
 
 test('native exceptions are specific operations, not blanket function exemptions', () => {
@@ -129,10 +144,63 @@ test('native exceptions are specific operations, not blanket function exemptions
 	 const complete = img.complete;
 	 img.setAttribute('src', 'early');
 	 return complete;
+	}
+	function hydrateRootWithOutputHandler(container: Node, anchor: Node) {
+	 const owned = container.contains(anchor);
+	 container.appendChild(anchor);
+	 return owned;
+	}
+	function hydrateRoot(container: Node, anchor: Node) {
+	 return container.contains(anchor);
+	}
+	function beginPresentationHydration(marker: Node) {
+	 const sibling = marker.nextSibling;
+	 marker.textContent = 'early';
+	 return sibling;
+	}
+	function retireDetachedBindingLeases(container: Node, anchor: Node) {
+	 const retained = container.contains(anchor);
+	 container.removeChild(anchor);
+	 return retained;
+	}
+	function currentPresentation(node: Node, container: Node) {
+	 const parent = node.parentNode;
+	 const owned = container.contains(node);
+	 node.textContent = 'early';
+	 return [parent, owned];
+	}
+	function presentationRange(node: Comment) {
+	 const marker = node.data;
+	 node.data = 'early';
+	 return marker;
+	}
+	function prepareSignalHostPropSources(node: Element) {
+	 const custom = node.hasAttribute('is');
+	 node.setAttribute('is', 'early');
+	 return custom;
+	}
+	function preparePresentationSignalValue(container: Node, element: HTMLTextAreaElement) {
+	 const owned = container.contains(element);
+	 element.addEventListener('blur', () => {});
+	 const value = element.value;
+	 element.value = 'early';
+	 element.setAttribute('title', 'early');
+	 return [owned, value];
 	}`);
 	assert.deepEqual(
 		findings.map((finding) => finding.operation),
-		['call:setAttribute'],
+		[
+			'call:setAttribute',
+			'call:appendChild',
+			'call:contains',
+			'write:textContent',
+			'call:removeChild',
+			'write:textContent',
+			'write:data',
+			'call:setAttribute',
+			'write:value',
+			'call:setAttribute',
+		],
 	);
 });
 
@@ -148,9 +216,16 @@ test('nested declarations cannot reuse a reviewed native-operation exemption', (
 	  animate() { return el.animate({ opacity: [0, 1] }); }
 	 }
 	 return vtFlush();
-	};`);
+	};
+	function renderHydratedHost(container: Node, anchor: Node) {
+	 function hydrateRootWithOutputHandler() {
+	  container.contains(anchor);
+	  container.appendChild(anchor);
+	 }
+	 return hydrateRootWithOutputHandler();
+	}`);
 	assert.deepEqual(
 		findings.map((finding) => finding.operation),
-		['call:getAttribute', 'call:getAttribute', 'call:animate'],
+		['call:getAttribute', 'call:getAttribute', 'call:animate', 'call:contains', 'call:appendChild'],
 	);
 });

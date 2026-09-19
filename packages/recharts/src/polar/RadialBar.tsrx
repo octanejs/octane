@@ -13,24 +13,24 @@ import * as React from 'octane';
 import { useRef } from 'octane';
 import { clsx } from 'clsx';
 
-import { Series } from 'victory-vendor/d3-shape';
+import type { Series } from 'victory-vendor/d3-shape';
 import {
 	defaultRadialBarShape,
 	parseCornerRadius,
 	RadialBarSector,
-	RadialBarSectorProps,
+	type RadialBarSectorProps,
 } from '../util/RadialBarUtils.tsrx';
 import { defaultSectorProps, type Props as SectorProps } from '../shape/Sector.tsrx';
 import { Layer } from '../container/Layer.tsrx';
 import {
-	ImplicitLabelListType,
+	type ImplicitLabelListType,
 	LabelListFromLabelProp,
 	PolarLabelListContextProvider,
-	PolarLabelListEntry,
+	type PolarLabelListEntry,
 } from '../component/LabelList.tsrx';
 import { interpolate, mathSign, noop } from '../util/DataUtils';
 import {
-	BarPositionPosition,
+	type BarPositionPosition,
 	getCateCoordinateOfBar,
 	getNormalizedStackId,
 	getTooltipNameProp,
@@ -38,32 +38,32 @@ import {
 	truncateByDomain,
 } from '../util/ChartUtils';
 import {
-	ActiveShape,
+	type ActiveShape,
 	adaptEventsOfChild,
-	AnimationDuration,
-	EasingInput,
-	DataConsumer,
-	DataKey,
-	GeometrySector,
-	LayoutType,
-	LegendType,
-	PresentationAttributesAdaptChildEvent,
-	ShapeAnimationProps,
-	TickItem,
-	TooltipType,
-	PolarLayout,
+	type AnimationDuration,
+	type EasingInput,
+	type DataConsumer,
+	type DataKey,
+	type GeometrySector,
+	type LayoutType,
+	type LegendType,
+	type PresentationAttributesAdaptChildEvent,
+	type ShapeAnimationProps,
+	type TickItem,
+	type TooltipType,
+	type PolarLayout,
 } from '../util/types';
 import {
-	TooltipTriggerInfo,
+	type TooltipTriggerInfo,
 	useMouseClickItemDispatch,
 	useMouseEnterItemDispatch,
 	useMouseLeaveItemDispatch,
 } from '../context/tooltipContext';
-import { TooltipPayloadConfiguration } from '../state/tooltipSlice';
+import type { TooltipPayloadConfiguration } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
-import { Formatter } from '../component/DefaultTooltipContent.tsrx';
-import { BaseAxisWithScale } from '../state/selectors/axisSelectors';
-import { ChartData } from '../state/chartDataSlice';
+import type { Formatter } from '../component/DefaultTooltipContent.tsrx';
+import type { BaseAxisWithScale } from '../state/selectors/axisSelectors';
+import type { ChartData } from '../state/chartDataSlice';
 import {
 	selectRadialBarLegendPayload,
 	selectRadialBarSectors,
@@ -73,11 +73,11 @@ import { selectActiveTooltipIndex } from '../state/selectors/tooltipSelectors';
 import { SetPolarLegendPayload } from '../state/SetLegendPayload';
 import {
 	AnimatedItems,
-	AnimationInterpolateFn,
+	type AnimationInterpolateFn,
 	useAnimationCallbacks,
 } from '../animation/AnimatedItems.tsrx';
-import { AnimationMatchByProp, matchAppend } from '../animation/matchBy';
-import { AxisId } from '../state/cartesianAxisSlice';
+import { type AnimationMatchByProp, matchAppend } from '../animation/matchBy';
+import type { AxisId } from '../state/cartesianAxisSlice';
 import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
 import type { RadialBarSettings } from '../state/types/RadialBarSettings';
 import { SetPolarGraphicalItem } from '../state/SetGraphicalItem';
@@ -85,9 +85,9 @@ import {
 	svgPropertiesNoEvents,
 	svgPropertiesNoEventsFromUnknown,
 } from '../util/svgPropertiesNoEvents';
-import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
-import { WithIdRequired } from '../util/useUniqueId';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
+import { type RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import type { WithIdRequired } from '../util/useUniqueId';
+import { type ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { getZIndexFromUnknown } from '../zIndex/getZIndexFromUnknown';
 import { usePolarChartLayout } from '../context/chartLayoutContext';
@@ -687,7 +687,7 @@ function RadialBarImpl(props: WithIdRequired<PropsWithDefaults>) {
 			),
 		) ??
 			STABLE_EMPTY_ARRAY;
-	return <CellsContext.Provider value={cellRegistry}>
+	return <CellsContext value={cellRegistry}>
 		<SetRadialBarTooltipEntrySettings
 			dataKey={props.dataKey}
 			sectors={sectors}
@@ -701,7 +701,7 @@ function RadialBarImpl(props: WithIdRequired<PropsWithDefaults>) {
 			id={props.id}
 		/>
 		<RadialBarWithState {...props} sectors={sectors} />
-	</CellsContext.Provider>;
+	</CellsContext>;
 }
 
 export const defaultRadialBarProps = {

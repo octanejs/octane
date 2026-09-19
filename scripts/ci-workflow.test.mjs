@@ -107,7 +107,7 @@ describe('CI workflow aggregation', () => {
 	test('runs only required-check reporters for draft pull requests', () => {
 		assert.match(
 			workflow,
-			/^  pull_request:\n    branches: \[main\]\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft, closed\]$/m,
+			/^  pull_request:\n    branches: \[main, "jon\/update-bindings-\*"\]\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft, closed\]$/m,
 		);
 
 		const draftGuard =
@@ -157,6 +157,24 @@ describe('CI workflow aggregation', () => {
 		const shard = jobSource('test_shard');
 		assert.match(shard, /--exclude "packages\/input-otp\/tests\/browser\/\*\*\/\*"/);
 		assert.doesNotMatch(shard, /input-otp\/tests\/browser\/\*\*\/\*\.spec\.ts/);
+	});
+
+	test('gates the renderer-free behavior bundle once per full CI run', () => {
+		assert.match(
+			jobSource('test_shard'),
+			/- name: Verify renderer-free behavior bundle\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs behavior-root/,
+		);
+	});
+
+	test('enforces recovered signal-free application budgets once per full CI run', () => {
+		assert.match(
+			jobSource('test_shard'),
+			/- name: Verify signal-free application bundle budgets\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs --budgets root-static-local hooks-state context/,
+		);
+		assert.match(
+			packageJson.scripts['ci:workflow:test'],
+			/benchmarks\/bundle-size\/minimal-gates\.test\.mjs/,
+		);
 	});
 
 	test('runs and reports tests only on Node 24 while retaining the Node 22 engine baseline', () => {
@@ -471,6 +489,10 @@ describe('CI workflow aggregation', () => {
 			/REACT_PARITY_VITEST_REPORT: \$\{\{ runner\.temp \}\}\/react-parity-vitest\/shard-\$\{\{ matrix\.shard \}\}\.json/,
 		);
 		assert.match(parity, /actions\/upload-artifact@/);
+		assert.match(
+			parity,
+			/name: Upload failed React parity diagnostics\s+if: failure\(\)[\s\S]*?name: react-parity-diagnostics-\$\{\{ matrix\.shard \}\}[\s\S]*?\.json\.failed/,
+		);
 		assert.doesNotMatch(parity, /pnpm react-parity:(?:test|validate)/);
 		assert.match(parityAggregate, /^    name: React parity checks$/m);
 		assert.match(parityAggregate, /needs: \[release_change, react_parity_shard\]/);
@@ -480,6 +502,8 @@ describe('CI workflow aggregation', () => {
 		);
 		assert.match(parityAggregate, /actions\/checkout@/);
 		assert.match(parityAggregate, /actions\/download-artifact@/);
+		assert.match(parityAggregate, /pattern: react-parity-vitest-\*/);
+		assert.doesNotMatch(parityAggregate, /react-parity-diagnostics-/);
 		assert.match(
 			parityAggregate,
 			/node scripts\/react-parity\/verify-vitest-shards\.mjs\s+--reports-directory/,
@@ -673,9 +697,11 @@ describe('CI workflow aggregation', () => {
 		assert.equal([...combined.matchAll(/pnpm install --prod false --frozen-lockfile/g)].length, 1);
 		assert.equal([...combined.matchAll(/oven-sh\/setup-bun/g)].length, 1);
 		assert.equal([...combined.matchAll(/playwright install --with-deps chromium/g)].length, 1);
+		assert.match(combined, /playwright install --with-deps chromium webkit(?:\n|$)/);
 		for (const spec of [
 			'website-mcp/tests/built-handler.e2e.test.ts',
 			'packages/rspeedy-plugin-octane/tests/packed-consumer.test.ts',
+			'packages/vite-plugin-octane/tests/production.test.ts',
 			'packages/octane-evals/tests/user-app-corpus.test.ts',
 			'packages/octane/tests/register-hook.test.ts',
 			'packages/octane/tests/register-hook-bun.integration.test.mjs',
@@ -919,6 +945,13 @@ describe('CI workflow aggregation', () => {
 });
 
 describe('Publish workflow validation', () => {
+	test('normalizes generated changelogs before validating and committing a release', () => {
+		assert.match(
+			packageJson.scripts['changeset:version'],
+			/changeset version && node scripts\/normalize-changelogs\.mjs &&/,
+		);
+	});
+
 	test('owns GitHub tag and release reconciliation outside changesets/action', () => {
 		assert.match(publishWorkflow, /create-github-releases:\s*false/);
 		assert.match(publishWorkflow, /push-git-tags:\s*false/);

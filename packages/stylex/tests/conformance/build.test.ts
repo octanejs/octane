@@ -4,6 +4,8 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { octane } from '../../../octane/src/compiler/vite.js';
 import { stylex } from '../../src/vite';
+import { knownAttributeSpreads } from '../../src/compiler-contract.js';
+import { evaluateCompiledFixtureCode } from '../../../octane/tests/_server-fixture.js';
 
 // End-to-end validation against a REAL `vite build`: octane() compiles the `.tsrx`
 // components, stylex() compiles their StyleX away, and the generated sheet (filled in
@@ -18,7 +20,8 @@ describe('production vite build', () => {
 		const result: any = await build({
 			root: APP,
 			logLevel: 'silent',
-			plugins: [octane(), stylex()],
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			plugins: [octane({ knownAttributeSpreads }), stylex()],
 			resolve: {
 				// Resolve the workspace package to source so the build matches the test setup.
 				alias: [
@@ -30,8 +33,9 @@ describe('production vite build', () => {
 			},
 			build: {
 				write: false,
+				sourcemap: true,
 				cssCodeSplit: false,
-				rollupOptions: { input: resolve(APP, 'main.ts') },
+				lib: { entry: resolve(APP, 'main.tsrx'), formats: ['iife'], name: 'StylexBuild' },
 			},
 		});
 
@@ -47,5 +51,59 @@ describe('production vite build', () => {
 		expect(css).toContain('background-color:navy');
 		// the placeholder was swapped out
 		expect(css).not.toContain('__stylex_sheet__');
+
+		const chunk = output.find((item) => item.type === 'chunk' && item.isEntry);
+		const app = evaluateCompiledFixtureCode<any>(
+			`${chunk.code}\nexport const fixture = StylexBuild;`,
+			chunk.fileName,
+			'client',
+			undefined,
+		).fixture;
+		const parent = document.createElement('div');
+		const reference = document.createElement('div');
+		document.body.append(parent, reference);
+		let snapshot = { compact: false, width: 12 as number | null };
+		let notify = () => {};
+		const binding = app.bound(parent, {
+			getSnapshot: () => snapshot,
+			subscribe(next: () => void) {
+				notify = next;
+				return () => {
+					notify = () => {};
+				};
+			},
+		});
+		try {
+			for (const value of [
+				snapshot,
+				{ compact: true, width: 24 },
+				{ compact: false, width: null },
+			]) {
+				snapshot = value;
+				notify();
+				const normal = app.normal(reference, value);
+				try {
+					expect(parent.firstElementChild?.getAttribute('class')).toBe(
+						reference.firstElementChild?.getAttribute('class'),
+					);
+					expect((parent.firstElementChild as HTMLElement).style.cssText).toBe(
+						(reference.firstElementChild as HTMLElement).style.cssText,
+					);
+					const inline = (parent.firstElementChild as HTMLElement).style.cssText;
+					if (value.width === null) expect(inline).toBe('');
+					else expect(inline).toContain(`: ${value.width}px`);
+				} finally {
+					normal.unmount();
+				}
+			}
+		} finally {
+			binding.dispose();
+			parent.remove();
+			reference.remove();
+		}
+		const sources = chunk.map.sources;
+		const boxSource = sources.findIndex((source: string) => source.endsWith('/Box.tsrx'));
+		expect(boxSource).toBeGreaterThanOrEqual(0);
+		expect(chunk.map.sourcesContent[boxSource]).toContain('width: (width: number | null)');
 	}, 60_000);
 });

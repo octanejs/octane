@@ -1,11 +1,18 @@
 /**
  * Tiny client/server streaming protocol subset shared with the lightweight
- * pre-root hydration event capture. Keep this module dependency-free: loading
+ * pre-root hydration event capture. Keep this graph renderer-free: loading
  * interaction capture before the main runtime must not initialize DOM tables.
  */
+import { isBindingOpenComment } from './dom-binding-protocol.js';
 
 /** Sentinel <template> attribute marking a pending streamed boundary. */
 export const STREAM_BOUNDARY_ATTR = 'data-oct-b';
+
+/** Renderer-owned JSON script carrying resolved SSR Suspense values. */
+export const SUSPENSE_SCRIPT_ATTR = 'data-octane-suspense';
+
+/** Renderer-owned executable/data scripts emitted by the streaming protocol. */
+export const STREAM_SCRIPT_ATTR = 'data-octane-stream';
 
 /** Render-unique token stamped on deferred-hydration owners in a streamed shell. */
 export const HYDRATE_STREAM_TOKEN_ATTR = 'data-octane-stream-token';
@@ -14,6 +21,8 @@ function hydrationMarkerMultiplicity(data: string, open: boolean): number {
 	const marker = open ? '[' : ']';
 	if (data === marker) return 1;
 	if (open && (data === '[f0' || data === '[f1')) return 1;
+	if (open && (data.startsWith('[b;') || data.startsWith('[f')) && isBindingOpenComment(data))
+		return 1;
 	if (data.length < 2 || data.charCodeAt(0) !== marker.charCodeAt(0)) return 0;
 	const first = data.charCodeAt(1);
 	if (first < 49 || first > 57) return 0;
@@ -51,6 +60,55 @@ export function rendererRangeClose(open: Node | null): Comment | null {
 			}
 		}
 		node = node.nextSibling;
+	}
+	return null;
+}
+
+/** Existing physical list boundary and marker values for an owned SSR host. */
+export interface HydrationListRange {
+	readonly start: Comment;
+	readonly end: Comment;
+	readonly emptyMarker: string;
+	readonly itemsMarker: string;
+}
+
+/** Resolve a leading list without searching later content or granting ownership. */
+export function getLeadingHydrationListRange(host: Element): HydrationListRange | null {
+	let start = host.firstChild;
+	let enclosingEnd: Comment | null = null;
+	while (start !== null && start.nodeType === 8) {
+		const data = (start as Comment).data;
+		const list =
+			data === '[f0' ||
+			data === '[f1' ||
+			((data.startsWith('[f0;b;') || data.startsWith('[f1;b;')) && isBindingOpenComment(data));
+		const wrapperMultiplicity =
+			data === '['
+				? 1
+				: data.charCodeAt(1) >= 49 && data.charCodeAt(1) <= 57
+					? hydrationMarkerMultiplicity(data, true)
+					: 0;
+		if (!list && wrapperMultiplicity === 0) return null;
+		const end = rendererRangeClose(start);
+		// All ranges are direct host children; an inner close must precede its wrapper's close.
+		if (
+			end === null ||
+			(enclosingEnd !== null && (end.compareDocumentPosition(enclosingEnd) & 4) === 0)
+		)
+			return null;
+		if (hydrationMarkerMultiplicity(end.data, false) !== (list ? 1 : wrapperMultiplicity))
+			return null;
+		if (list) {
+			const suffix = data.slice(3);
+			return {
+				start: start as Comment,
+				end,
+				emptyMarker: '[f0' + suffix,
+				itemsMarker: '[f1' + suffix,
+			};
+		}
+		enclosingEnd = end;
+		start = start.nextSibling;
 	}
 	return null;
 }

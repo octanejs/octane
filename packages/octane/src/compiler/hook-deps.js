@@ -1176,6 +1176,7 @@ function methodDepNode(dependency) {
 		b.id(`_$${METHOD_DEP_IMPORT}`, dependency.node),
 		{ ...dependency.method.root },
 		b.literal(dependency.method.name, JSON.stringify(dependency.method.name), dependency.node),
+		...(dependency.method.guarded ? [b.literal(true, 'true', dependency.node)] : []),
 	);
 	return {
 		...call,
@@ -1188,6 +1189,9 @@ function methodDepNode(dependency) {
 function collectDependencies(expression, callbackScope, analysis) {
 	const dependencies = [];
 	const seen = new Set();
+	// Only mixed guarded/unconditional captures need promotion. Keep the
+	// ordinary duplicate-read path free of dependency-array scans.
+	let guardedKeys;
 
 	function addIdentifier(node) {
 		const scope = analysis.nodeScopes.get(node);
@@ -1207,7 +1211,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 		}
 	}
 
-	function addStaticMember(info) {
+	function addStaticMember(info, guarded = false) {
 		const scope = analysis.nodeScopes.get(info.root);
 		const binding = scope ? resolveBinding(scope, info.root.name) : null;
 		if (
@@ -1221,7 +1225,14 @@ function collectDependencies(expression, callbackScope, analysis) {
 		const key = `b${binding.id}${info.path}`;
 		if (!seen.has(key)) {
 			seen.add(key);
-			dependencies.push({ node: info.node, key, binding });
+			const dependency = { node: info.node, key, binding };
+			if (guarded) {
+				dependency.method = { root: info.root, name: info.name, guarded: true };
+				(guardedKeys ??= new Set()).add(key);
+			}
+			dependencies.push(dependency);
+		} else if (!guarded && guardedKeys?.delete(key)) {
+			delete dependencies.find((dependency) => dependency.key === key).method;
 		}
 	}
 
@@ -1234,7 +1245,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 	// runtime. Deeper callees (`a.b.c(...)`) never reach here: their receiver
 	// path is recorded by the ordinary member walk, which cannot capture the
 	// method itself, so they were never exposed to the stale-method hazard.
-	function addMethodCall(info) {
+	function addMethodCall(info, guarded = false) {
 		const scope = analysis.nodeScopes.get(info.root);
 		const binding = scope ? resolveBinding(scope, info.root.name) : null;
 		if (
@@ -1254,8 +1265,11 @@ function collectDependencies(expression, callbackScope, analysis) {
 				node: info.node,
 				key,
 				binding,
-				method: { root: info.root, name: info.name },
+				method: { root: info.root, name: info.name, guarded },
 			});
+			if (guarded) (guardedKeys ??= new Set()).add(key);
+		} else if (!guarded && guardedKeys?.delete(key)) {
+			dependencies.find((dependency) => dependency.key === key).method.guarded = false;
 		}
 	}
 
@@ -1266,6 +1280,36 @@ function collectDependencies(expression, callbackScope, analysis) {
 	// array would evaluate getters in a context where they may be illegal
 	// (TypeGPU's `.$`) and at a time the program never reads them.
 	let opaqueDepth = 0;
+	// A property read in a branch, after a possible exit, or inside try/catch
+	// cannot be moved into render without bypassing its authored protection.
+	// Own data fields retain their values through a descriptor probe; getters
+	// and inherited fields track receivers while the callback retains the read.
+	let guardedDepth = 0;
+
+	function walkGuarded(node) {
+		guardedDepth++;
+		const completion = walk(node);
+		guardedDepth--;
+		return completion || 0;
+	}
+
+	// Completion bits distinguish callback exits (1), local break/continue (2),
+	// and labeled exits (4), which can escape an enclosing loop or switch.
+	// Label identities are analysis-only and allocated only for labeled flow.
+	/** @type {Map<string, object> | undefined} */
+	let labelTargets;
+	/** @type {Set<object> | undefined} */
+	let escapingLabelTargets;
+	function walkStatements(statements) {
+		const depth = guardedDepth;
+		let completion = 0;
+		for (const statement of statements || []) {
+			completion |= walk(statement) || 0;
+			if (completion) guardedDepth = depth + 1;
+		}
+		guardedDepth = depth;
+		return completion;
+	}
 
 	function walk(node) {
 		if (!node || typeof node !== 'object') return;
@@ -1279,6 +1323,55 @@ function collectDependencies(expression, callbackScope, analysis) {
 		}
 		if (node.type?.startsWith('TS')) return;
 		switch (node.type) {
+			case 'BlockStatement':
+				return walkStatements(node.body);
+			case 'IfStatement': {
+				walk(node.test);
+				return walkGuarded(node.consequent) | walkGuarded(node.alternate);
+			}
+			case 'ConditionalExpression':
+				walk(node.test);
+				walkGuarded(node.consequent);
+				walkGuarded(node.alternate);
+				return;
+			case 'LogicalExpression':
+				walk(node.left);
+				walkGuarded(node.right);
+				return;
+			case 'SwitchStatement': {
+				walk(node.discriminant);
+				let completion = 0;
+				for (const branch of node.cases || []) completion |= walkGuarded(branch);
+				return completion & 5;
+			}
+			case 'SwitchCase':
+				walk(node.test);
+				return walkStatements(node.consequent);
+			case 'ForStatement':
+				walk(node.init);
+				walk(node.test);
+				walkGuarded(node.update);
+				return walkGuarded(node.body) & 5;
+			case 'ForInStatement':
+			case 'ForOfStatement':
+				walkGuarded(node.left);
+				walk(node.right);
+				return walkGuarded(node.body) & 5;
+			case 'WhileStatement':
+				walk(node.test);
+				return walkGuarded(node.body) & 5;
+			case 'DoWhileStatement':
+				walkGuarded(node.test);
+				return walkGuarded(node.body) & 5;
+			case 'TryStatement':
+				return walkGuarded(node.block) | walkGuarded(node.handler) | walkGuarded(node.finalizer);
+			case 'CatchClause':
+				walkPatternExpression(node.param);
+				return walk(node.body);
+			case 'ReturnStatement':
+			case 'ThrowStatement':
+				walk(node.argument);
+				return 1;
 			case 'Identifier':
 				addIdentifier(node);
 				return;
@@ -1299,7 +1392,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 					callee?.type === 'MemberExpression' || callee?.type === 'ChainExpression'
 						? staticMemberInfo(callee)
 						: null;
-				if (info) addMethodCall(info);
+				if (info) addMethodCall(info, guardedDepth > 0);
 				else walk(node.callee);
 				walk(node.arguments);
 				return;
@@ -1310,7 +1403,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 					return;
 				}
 				const info = staticMemberInfo(node);
-				if (info) addStaticMember(info);
+				if (info) addStaticMember(info, guardedDepth > 0);
 				else walk(node.expression);
 				return;
 			}
@@ -1321,7 +1414,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 					return;
 				}
 				const info = staticMemberInfo(node);
-				if (info) addStaticMember(info);
+				if (info) addStaticMember(info, guardedDepth > 0);
 				else {
 					walk(node.object);
 					if (node.computed) walk(node.property);
@@ -1365,12 +1458,25 @@ function collectDependencies(expression, callbackScope, analysis) {
 			case 'ThisExpression':
 			case 'Super':
 				return;
-			case 'LabeledStatement':
-				walk(node.body);
-				return;
+			case 'LabeledStatement': {
+				labelTargets ??= new Map();
+				const name = node.label.name;
+				const previous = labelTargets.get(name);
+				const target = {};
+				labelTargets.set(name, target);
+				const completion = walk(node.body) || 0;
+				if (previous === undefined) labelTargets.delete(name);
+				else labelTargets.set(name, previous);
+				escapingLabelTargets?.delete(target);
+				return (completion & ~4) | (completion & 4 && escapingLabelTargets?.size ? 4 : 0);
+			}
 			case 'BreakStatement':
-			case 'ContinueStatement':
-				return;
+			case 'ContinueStatement': {
+				if (!node.label) return 2;
+				const target = labelTargets?.get(node.label.name);
+				if (target) (escapingLabelTargets ??= new Set()).add(target);
+				return 4;
+			}
 			case 'JSXElement':
 			case 'Element':
 				walkJsxElement(node);
@@ -1599,6 +1705,32 @@ export function collectReassignedBindings(ast) {
  */
 export function analyzeHookDependencies(ast, options = {}) {
 	return analyzeInternal(ast, options).inferred;
+}
+
+/**
+ * Infer callback captures for compiler-owned lifetimes without manufacturing a
+ * hook call. Results retain the hook collector's receiver-aware method records;
+ * null means the expression is not an analyzable callback, never an empty list.
+ * The supplied callbacks must belong to this AST so lexical bindings are shared.
+ */
+export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
+	const analysis = buildScopes(
+		ast,
+		options.onlyImported === true,
+		new Set(['octane', ...(options.hookRuntimeModules || [])]),
+	);
+	markDependencyInvariantBindings(analysis);
+	const inferred = new Map();
+	for (const original of callbacks) {
+		const callback = unwrapValue(original);
+		inferred.set(
+			original,
+			isFunction(callback)
+				? collectDependencies(callback, analysis.functionScopes.get(callback) || null, analysis)
+				: collectCallbackReference(callback, analysis),
+		);
+	}
+	return inferred;
 }
 
 // Strong dependency policy deliberately shares inference's lexical graph and

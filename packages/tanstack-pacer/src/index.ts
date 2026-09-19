@@ -1,4 +1,4 @@
-// Octane port of @tanstack/react-pacer@0.22.1 — hook wrappers over the
+// Octane port of @tanstack/react-pacer@0.23.0 — hook wrappers over the
 // framework-agnostic @tanstack/pacer core, mirroring the upstream module
 // layout (src/index.ts).
 

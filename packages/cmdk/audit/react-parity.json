@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "863e9f1035d4d61a77f76567d2d3684bd84e03619dd35e1ed838f134ee6c12a8"
+      "lockfileSha256": "bb399b1be4dde8dc7044348a89a42a7b14683c5e5600aac7060e39187084c126"
     }
   },
   "lanes": [
@@ -126,7 +126,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
         },
         {
           "path": "packages/cmdk/audit/test-classifications.json",
@@ -141,7 +141,7 @@
         {
           "path": "packages/cmdk/src/components/command.tsrx",
           "role": "support",
-          "sha256": "7e77000d7d8a854a6bcb594d60435f25c3c20bdf34966e4c89c2fe0896b31c2b"
+          "sha256": "7e8682576b12ffaf366dd134381fa43b907d38d4978fd0873d6ed008f80ee1f2"
         },
         {
           "path": "packages/cmdk/src/components/item.tsrx",

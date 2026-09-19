@@ -25,13 +25,13 @@ const ROWS = { zero: ZeroRow, one: OneRow, two: TwoRow };
 
 export default function ContextCache(props) @{
 	const Row = ROWS[props.mode];
-	<RootCtx.Provider value={props.version}>
-		<OtherCtx.Provider value={props.secondary}>
+	<RootCtx value={props.version}>
+		<OtherCtx value={props.secondary}>
 			<div class="cache-rows">
 				@for (const id of props.ids; key id) {
 					<Row id={id} version={props.version} />
 				}
 			</div>
-		</OtherCtx.Provider>
-	</RootCtx.Provider>
+		</OtherCtx>
+	</RootCtx>
 }

@@ -1,4 +1,5 @@
 import baseConfig from './vitest.config.js';
+import { withBrowserLifecycleDiagnostics } from './scripts/react-parity/browser-lifecycle-diagnostics.mjs';
 import {
 	buildParityVitestProjects,
 	loadRequiredVitestLanes,
@@ -19,6 +20,6 @@ export default {
 			baseProjects: baseConfig.test.projects,
 			lanes,
 			root,
-		}),
+		}).map(withBrowserLifecycleDiagnostics),
 	},
 };

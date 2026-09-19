@@ -58,3 +58,18 @@ diff --git a/tests/upstream/src/accordion/panel/AccordionPanel.test.tsx b/tests/
        );
  
        const panel = screen.getByTestId('panel');
+@@ -137,2 +111,14 @@ describe('<Accordion.Panel />', () => {
+   describe.skipIf(isJSDOM)('CSS transitions', () => {
++    let animationsDisabled: boolean;
++
++    beforeEach(() => {
++      animationsDisabled = globalThis.BASE_UI_ANIMATIONS_DISABLED;
++      // This suite observes the authored CSS transition, not the test animation bypass.
++      globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
++    });
++
++    afterEach(() => {
++      globalThis.BASE_UI_ANIMATIONS_DISABLED = animationsDisabled;
++    });
++
+     it('keeps the closing panel visible until its exit transition completes when switching items', async () => {

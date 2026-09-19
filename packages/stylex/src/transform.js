@@ -10,6 +10,7 @@
 // build tooling that Node executes directly cannot be raw `.ts` source.
 import babel from '@babel/core';
 import stylexBabelPlugin from '@stylexjs/babel-plugin';
+import { stylexBindingConstants } from './shared-constants.js';
 
 // `@stylexjs/babel-plugin` emits one tuple per atomic rule —
 // `[key, { ltr, rtl? }, priority]`: a stable content-hashed key, the LTR (and
@@ -41,12 +42,25 @@ export function transformStylex(code, opts) {
 					...opts.stylexOptions,
 				},
 			],
+			...(opts.bindingConstants && opts.dev !== true
+				? [
+						[
+							stylexBindingConstants,
+							{
+								bindingConstants: opts.bindingConstants,
+								importSources: opts.importSources ?? DEFAULT_IMPORT_SOURCES,
+								inputSourceMap: opts.inputSourceMap,
+							},
+						],
+					]
+				: []),
 		],
 	});
 	return {
 		code: res?.code ?? code,
 		map: res?.map ?? null,
 		rules: res?.metadata?.stylex ?? [],
+		sharedConstants: res?.metadata?.octaneStylexSharedConstants ?? [],
 	};
 }
 

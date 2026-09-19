@@ -62,6 +62,7 @@ export function baseUIPristineConfig(packageRoot, name) {
 				name: 'base-ui-pristine-repository-paths',
 				enforce: 'pre',
 				resolveId(id, importer) {
+					if (id === '#test-utils') return '\0base-ui-pristine-test-utils';
 					if (!id.startsWith('.') || !importer?.startsWith(repositoryFixtures + '/')) return;
 					const target = resolve(dirname(importer), id);
 					for (const [folder, root] of [
@@ -72,6 +73,15 @@ export function baseUIPristineConfig(packageRoot, name) {
 						if (target.startsWith(prefix + '/'))
 							return this.resolve(root + target.slice(prefix.length), importer, { skipSelf: true });
 					}
+				},
+				load(id) {
+					if (id !== '\0base-ui-pristine-test-utils') return;
+					// Keep pristine bytes intact; frame-driven React updates need the
+					// same act boundary as the adapted harness before tests observe DOM.
+					return `import { act } from 'react';
+import { waitSingleFrame as waitForAnimationFrame } from ${JSON.stringify(resolve(reactRoot, 'test/wait.ts'))};
+export * from ${JSON.stringify(resolve(reactRoot, 'test/index.ts'))};
+export async function waitSingleFrame() { await act(waitForAnimationFrame); }`;
 				},
 			},
 		],
@@ -85,7 +95,6 @@ export function baseUIPristineConfig(packageRoot, name) {
 				},
 				{ find: /^@base-ui\/react(?:\/(.*))?$/, replacement: resolve(reactRoot, 'src') + '/$1' },
 				{ find: /^@base-ui\/utils\/(.*)$/, replacement: resolve(utilsRoot, 'src') + '/$1' },
-				{ find: '#test-utils', replacement: resolve(reactRoot, 'test/index.ts') },
 				{
 					find: '#formatErrorMessage',
 					replacement: resolve(utilsRoot, 'src/formatErrorMessage.ts'),

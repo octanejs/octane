@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.2.31
+
+### Patch Changes
+
+- 5ead1ff: Expose the conversation-streaming benchmark through the MCP benchmark command.
+
 ## 0.2.30
 
 ### Patch Changes

@@ -84,7 +84,7 @@ suites reuse it. Collected results land in `benchmarks/results/<suite>.json`
 Some suites need no preview servers: **news**, **hydration-interactivity**, and
 the three runtime-stress suites vite-build and time each target themselves (the
 runner loops their per-target invocations and merges them),
-**ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
+**ssr-throughput**, **streaming-ssr**, **conversation-streaming**, **lynx-list**, **universal-leaf-update**,
 **universal-object-teardown**,
 **universal-template-events**, **universal-native-hover**, **universal-owner-drafts**,
 **universal-hook-slot**,
@@ -270,6 +270,7 @@ internally, get their own baseline and guard namespace.
 | `portal-swarm` | portal-swarm | Octane + reference frameworks | portal render/dispatch |
 | `ssr-throughput` | ssr-throughput | none (Node-only) | comparative news SSR including Inferno + Octane-only stress fixtures |
 | `streaming-ssr` | streaming-ssr | none (Node-only) | streaming targets incl. Inferno and Preact; Svelte N/A |
+| `conversation-streaming` | conversation-streaming | none (production app, Node runner; optional WebKit runner) | public shell, shared auth, independent conversation/history SSR and composer activation |
 | `ssr-replay-streaming` | ssr-replay-streaming | none (Node-only) | populated replay collection copies and streaming promise subscriptions, with clean output and unchanged/one-wave controls |
 | `ssr-final-metadata` | ssr-final-metadata | none (Node-only) | final SSR guards, identity strings, metadata and prop/children work with semantic counterexamples and retained alternatives |
 | `ssr-final-replay` | ssr-final-replay | none (Node-only) | boundary collection copies, retry snapshots, thenable probes and full passes under clean output and abort/error controls |
@@ -365,10 +366,11 @@ comparison. Ceilings retain at least 32 bytes of headroom and are rounded to
 application or runtime growth. Refresh a ceiling only with a reviewed explanation
 and a production measurement using the pinned CI Node version.
 
-`bundle-reachability` builds twenty-one independent public-entry feature fixtures
-across twenty-eight production builds with the production Octane compiler,
+`bundle-reachability` builds twenty-three independent public-entry feature fixtures
+across thirty-one production builds with the production Octane compiler,
 disabled HMR/profiling, and normalized esbuild minification. The seven package
-side-effect fixtures each run through both Vite and esbuild. Each measured IIFE
+side-effect fixtures and the behavior-only fixture each run through both Vite
+and esbuild. Each measured IIFE
 executes unchanged in an isolated jsdom realm; its visible DOM, interaction,
 hydration, Suspense, server rendering, store, and cleanup behavior must match its
 feature oracle. Client graphs reject server modules, while server graphs reject
@@ -379,25 +381,49 @@ client runtime, while the hook binding must retain the real vanilla store.
 The isolated server-hook entry also rejects unrelated DOM namespace tables, and
 the component-owned-effects entry verifies that unused sibling styles, delegated
 events, and ViewTransition initialization disappear while retained styles and
-click handlers remain live.
+click handlers remain live. The `octane/behavior` fixture adopts existing DOM,
+registers an externally owned range, handles a native click, and disposes its
+owners and handlers while preserving the original nodes. Both production builds
+reject renderer, compiler, and server modules.
 
 The generated SPA scenario loads the actual CLI entry and complete landing-page
 templates without maintaining duplicate fixture sources; its compiled bundle
-must render the public page while excluding the reusable-root runtime. The two
+must render the public page while excluding the reusable-root runtime. The three
 static-root fixtures deliberately measure different public contracts.
 `root-static-specialized` matches an application's disposable top-level
 `createRoot(container).render(ImportedComponent)` entry, allowing the production
 compiler to specialize the root. `root-static` retains an escaped, reusable
-`Root`, calls `render`, and verifies `unmount`; its broader reachable runtime is
-real and must not be disguised as the specialized entry.
+`Root` through an exported factory, renders both a returned scalar and a compiled
+component, and verifies `unmount`; its broader reachable runtime is
+real and must not be disguised as the specialized entry. `root-static-local`
+keeps the original same-file compiled render/unmount control and its existing
+static-root ceiling, so losing that specialization fails independently of the
+escaped generic contract.
 
 `bundle-size/minimal-budgets.json` supplies explicit raw, gzip, and brotli byte
 ceilings for every feature. Budgets leave about 3% deterministic headroom, with
 small byte-aligned allowances for tiny isolated entries. Each scenario publishes
 its committed ceiling as a
-same-run `*-budget` reference target, so eighty-four `maxRatio: 1` entries in
+same-run `*-budget` reference target, so ninety-three `maxRatio: 1` entries in
 `baselines/ratios.json` enforce all three metrics in the existing weekly/manual
-Bench CI workflow. Run the complete executable and byte guard directly with:
+Bench CI workflow. The behavior fixture runner also enforces its ceilings directly.
+Full PR and main CI run both behavior builds once in test shard 1/4, so changes
+that grow this renderer-free closure fail before merge. Run that focused gate
+with `node benchmarks/bundle-size/run-minimal.mjs behavior-root`; an unknown or
+empty scenario name fails instead of skipping the builds. The same shard also
+enforces the unchanged committed raw, gzip, and brotli ceilings for the recovered
+same-file static-root, hooks, and local Context fixtures:
+
+```bash
+node benchmarks/bundle-size/run-minimal.mjs --budgets root-static-local hooks-state context
+```
+
+`--budgets` applies direct byte enforcement to the selected scenarios (or all
+scenarios when no selection is supplied). Report mode still emits paired budget
+targets for the existing ratio runner. Generic roots, hydration, and SSR remain
+in that wider suite; some currently exceed their historical ceilings, so the
+focused PR gate does not claim those regressions are resolved. Run the complete
+executable and byte guard directly with:
 
 ```bash
 node benchmarks/bench.mjs --quick --ratios bundle-reachability

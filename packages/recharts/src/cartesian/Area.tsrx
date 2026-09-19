@@ -2,24 +2,24 @@ import type { MutableRefObject, OctaneElement, OctaneNode } from '../util/Octane
 import * as React from 'octane';
 import { useMemo, useRef } from 'octane';
 import { clsx } from 'clsx';
-import { BaseLineType, CurveType, Props as CurveProps } from '../shape/Curve.tsrx';
+import type { BaseLineType, CurveType, Props as CurveProps } from '../shape/Curve.tsrx';
 import { Layer } from '../container/Layer.tsrx';
 import {
 	CartesianLabelListContextProvider,
-	CartesianLabelListEntry,
-	ImplicitLabelListType,
+	type CartesianLabelListEntry,
+	type ImplicitLabelListType,
 	LabelListFromLabelProp,
 } from '../component/LabelList.tsrx';
-import { Dots, DotsDotProps } from '../component/Dots.tsrx';
+import { Dots, type DotsDotProps } from '../component/Dots.tsrx';
 import { interpolate, isNan, isNullish, isNumber, noop } from '../util/DataUtils';
 import {
 	getCateCoordinateOfLine,
 	getNormalizedStackId,
 	getTooltipNameProp,
 	getValueByDataKey,
-	StackId,
+	type StackId,
 } from '../util/ChartUtils';
-import {
+import type {
 	ActiveDotType,
 	ActiveShape,
 	AnimationDuration,
@@ -37,14 +37,18 @@ import {
 } from '../util/types';
 import { isClipDot } from '../util/ReactUtils';
 import type { LegendPayload } from '../component/DefaultLegendContent.tsrx';
-import { Formatter } from '../component/DefaultTooltipContent.tsrx';
+import type { Formatter } from '../component/DefaultTooltipContent.tsrx';
 import { ActivePoints } from '../component/ActivePoints.tsrx';
-import { TooltipPayloadConfiguration } from '../state/tooltipSlice';
+import type { TooltipPayloadConfiguration } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
 import { GraphicalItemClipPath, useNeedsClip } from './GraphicalItemClipPath.tsrx';
-import { BaseAxisWithScale } from '../state/selectors/axisSelectors';
-import { ChartData } from '../state/chartDataSlice';
-import { AreaPointItem, ComputedArea, selectArea } from '../state/selectors/areaSelectors';
+import type { BaseAxisWithScale } from '../state/selectors/axisSelectors';
+import type { ChartData } from '../state/chartDataSlice';
+import {
+	type AreaPointItem,
+	type ComputedArea,
+	selectArea,
+} from '../state/selectors/areaSelectors';
 import { useIsPanorama } from '../context/PanoramaContext';
 import { useCartesianChartLayout, useChartLayout } from '../context/chartLayoutContext';
 import { useChartName } from '../state/selectors/selectors';
@@ -52,19 +56,19 @@ import { SetLegendPayload } from '../state/SetLegendPayload';
 import { useAppSelector } from '../state/hooks';
 import {
 	AnimatedItems,
-	AnimationInterpolateFn,
+	type AnimationInterpolateFn,
 	useAnimationCallbacks,
 } from '../animation/AnimatedItems.tsrx';
 import {
-	AnimationItem,
-	AnimationMatchByProp,
+	type AnimationItem,
+	type AnimationMatchByProp,
 	matchAnimationItems,
 	matchByIndex,
 } from '../animation/matchBy';
 import { useAnimationStartSnapshot } from '../animation/useAnimationStartSnapshot';
-import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import { type RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 import { usePlotArea } from '../hooks';
-import { WithIdRequired, WithoutId } from '../util/useUniqueId';
+import type { WithIdRequired, WithoutId } from '../util/useUniqueId';
 import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
 import type { AreaSettings } from '../state/types/AreaSettings';
 import { SetCartesianGraphicalItem } from '../state/SetGraphicalItem';
@@ -72,12 +76,12 @@ import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
 import { getRadiusAndStrokeWidthFromDot } from '../util/getRadiusAndStrokeWidthFromDot';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents';
 import { Shape } from '../util/ActiveShapeUtils.tsrx';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
+import { type ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { propsAreEqual } from '../util/propsAreEqual';
-import { AxisId } from '../state/cartesianAxisSlice';
+import type { AxisId } from '../state/cartesianAxisSlice';
 import type { StackDataPoint } from '../util/stacks/stackTypes';
-import { AreaRevealShape, AreaRevealShapeProps } from './AreaRevealShape.tsrx';
+import { AreaRevealShape, type AreaRevealShapeProps } from './AreaRevealShape.tsrx';
 
 /**
  * @inline

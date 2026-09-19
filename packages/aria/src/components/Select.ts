@@ -505,7 +505,7 @@ export const SelectValue: <T>(props: SelectValueProps<T> & { ref?: any }) => any
 			...renderProps,
 			'data-placeholder': state.selectedItems.length === 0 || undefined,
 			// clear description and error message slots
-			children: createElement(TextContext.Provider, {
+			children: createElement(TextContext, {
 				value: undefined,
 				children: renderProps.children,
 			}),

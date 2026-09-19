@@ -1,5 +1,185 @@
 # octane
 
+## 0.3.0
+
+### Minor Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+
+### Patch Changes
+
+- debd7df: Specialize nonescaping function-local const roots in production JavaScript and TypeScript entries when every render uses an imported compiled void component. Keep writable component exports on the generic rendering path so authored replacements can return ordinary renderable values.
+- 873f4d2: Move native signal transition coordination behind the signals model capability so ordinary client applications no longer retain its preparation, retry, and publication policy. Preserve signals imported after an async Action awaits and atomic updates to consumers that receive signal handles through props.
+
+  The model entry now retains this coordinator, increasing standalone signals and signal-using SSR bundle sizes.
+- 68a6690: Preserve explicit signal ownership when native event handlers are installed by components without signal bindings, including handlers adopted during hydration. Refresh ownership when bare or compiler-lifted handlers publish changed callbacks or captures, while keeping the committed authority if a suspended update is abandoned. Keep already queued native callbacks under their original authority when an earlier listener publishes a replacement. Avoid extra publication calls during ordinary mounting and updates that keep the same scope authority, and record rollback without per-handler undo closures.
+- c32e76b: Keep fixed scalar inline styles on their ordinary writers inside modules that use signals, while preserving reactive reads and native bindings for handles, spreads and accessors.
+- 14fd908: Allow text and attribute signal bindings to omit unused form-control writer and
+  hydration adoption policies from production bundles. Keep the compiler helper
+  ABI, scalar caches, live subscriptions, and native control behavior unchanged.
+- 893cc83: Specialize production function-local roots created or hydrated with stable same-module compiled void components when their complete lifetime uses only proven void bodies. Preserve generic roots for escaping roots, writable component bindings, unknown initial or later render targets, development and alternate renderer modes.
+
+## 0.2.16
+
+### Patch Changes
+
+- 2049fa7: Keep native-only DOM presentation initialization separate from control and grouped-projection capabilities, so initializer-only compiled views do not retain unrelated host-operation helpers. Preserve initialization order, early edits, and older mount/adoption capability overrides.
+- 80d5fb6: Preserve scoped CSS selectors in split Hydrate children when production builds compile mutable parser ASTs. Deferred and independent activation now inject the same scoped stylesheet that matches the server DOM.
+- 3814f71: Preserve control-flow guards when inferring hook dependencies. Property reads behind a condition, an early return, or exception handling inspect own data values without invoking getters during render. Accessors and inherited properties track their receiver, while stable own fields and callbacks retain precise dependencies across fresh props and store snapshots. Optional receivers and guarded getters therefore retain their authored behavior.
+- b519670: Resolve independent Hydrate captures by their lexical binding and reject aliases or wrappers of parent-owned hook state. Unrelated same-name locals no longer reject valid standalone data or hide invalid captures; nested independent extraction also plans module moves before manifests are available.
+- ac02371: Avoid activating document-wide signal ownership for opaque scalar bindings and preserve proven primitive values through extracted JSX fragments. Register model Action frames from the signal graph so applications without signals can omit that implementation, while retaining late-loaded signals and atomic native presentation.
+- 2049fa7: Expose `getLeadingHydrationListRange` from `octane/hydration` to resolve an owned
+  SSR host's leading list through canonical wrapper ranges while preserving its
+  binding receipt and rejecting incomplete or malformed boundaries.
+- 2049fa7: Diagnose reserved `on*` attributes in native binding views as unsupported attributes rather than event handlers. Keep native camelCase event recognition, explicit unbound ownership and inline-event attribute safeguards unchanged.
+- 2049fa7: Allow scalar native-parent hydration handoffs to retain independently owned `data-*`, `aria-*`, and `tabIndex` bindings alongside class and style. Keep opaque children and their controls outside the parent lease, preserve native attribute removal semantics, and retain the existing collision, cancellation, and host identity checks. Keep explicitly unbound lowercase native event handlers under normal renderer ownership.
+- 9b22cff: Keep explicit keys distinct from implicit positions and nested array paths in host-only children, preserving the correct input nodes and typed values when keyed children reorder.
+- 02e0946: Activate independent Hydrate widgets using load() when their server sidecars are registered, and resume pending activation after a paused document becomes active again. Preserve the existing server DOM when independent widgets activate beneath parents that return JSX. Preserve the enclosing component's parallel use() warm plan when compiling nested templates.
+- 358b5d4: Fix automatically inferred async creation dependencies to respect lexical scope and erased TypeScript syntax. Preserve safe evaluation of `typeof` guards and their value reads for absent globals, and refresh requests when callback parameter defaults reference changed outer values.
+- c988ad1: Preserve native Undo/Redo grouping when a writable textarea signal echoes an
+  accepted native edit. Different programmatic values still update the textarea's
+  reset baseline, and scalar or read-only values keep controlled-value mirroring.
+
+## 0.2.15
+
+### Patch Changes
+
+- 42a07b4: Preserve accepted scalar DOM-binding updates when hydrating older server-rendered state.
+
+  Compile scalar text leaves and mixed structural/scalar projections independently,
+  retain the current bound text, attributes, classes, and style properties during
+  hydration, and release their ownership when the binding is disposed or aborted.
+  Unrelated DOM mutations still receive normal hydration diagnostics and repair.
+
+## 0.2.14
+
+### Patch Changes
+
+- 44bd89f: Allow a compiler-proven native host to transfer its class and known-provider style bindings to normal hydration while its opaque children retain their own rendering and control ownership. Keep the early layout active during suspension or refusal, preserve the current presentation during accepted transfer, and validate the host and its source before publishing the successor.
+
+  Keep the early scalar adapter's handoff symbol in the existing control registry so accessing the capability does not make cold renderer and event-lease helpers an eager dependency.
+
+  Retry skipped native effects through the existing native-read scheduler when their surviving render has already completed, without weakening stale-publication checks or reviving disposed owners. Preserve suspended-island ownership and held-transition priority.
+
+  Traverse lightweight DOM-context ancestors without treating them as hook-bearing blocks when locating a preserved hydration owner, so native effect retries remain safe while another island is suspended.
+- de270e3: Support explicit handoff of a standalone textarea signal value alongside an adopted native presentation. Hydration preserves live input and selection, transfers control ownership only at accepted publication, and keeps early bindings active when takeover is declined or suspended. Known-provider unbound style spreads retain direct compiled property bindings.
+
+  Keep early ownership intact when preparing a successor subscription fails, and avoid masking interrupted mounts with a secondary ref-cleanup error.
+
+  Release all prepared value successors when a later control invalidates presentation publication, preserving the original error and preventing stale input or model writers from being reclaimed by that root.
+
+  Reject competing presentation bindings for fields supplied by an unbound known-provider spread, including `class`/`className` aliases.
+
+  Type-check explicit scalar text intent against a signal handle's value in DOM templates, preserving direct bindings without application-side reads or unsafe casts.
+
+  Transfer direct scalar text signals through presentation hydration using the existing prepared binding lifecycle, including initially empty text ranges and live updates after acceptance.
+- 44bd89f: Mark streamed signal selection and result scripts as renderer-owned transport so hydration can adopt the server HTML without reporting leftover protocol scripts as mismatched component output.
+
+## 0.2.13
+
+### Patch Changes
+
+- 5ead1ff: Allow `adoptBindings(element, View, source)` to resolve an eligible composite view that returns another view through exact adjacent compiler-owned wrappers. Preserve native node identity and existing binding lifetimes while rejecting ambiguous, mismatched, or sibling-containing ranges.
+- 5ead1ff: Add owner-bound signal declarations, async derivations and keyed streams, direct native signal bindings, and independent hydration infrastructure. Add request-local server-call context, bounded streamed RPC, and explicitly batched independent reads. Preserve operation identity and cancellation boundaries across navigation and uncertain acknowledgements.
+
+  Allow a later widget activation to retry a failed framework-loaded stylesheet
+  without discarding queued interactions or revealing the widget before CSS loads.
+
+  Support renderer-free global signal and streamed-state activation for hosts that
+  retain server-owned HTML. Adopt initial document seeds before behavior reads,
+  preserve early edits, bind native control properties without reconciliation, and
+  let envelope owners emit the early capture script before interactive markup
+  without duplicating it in rendered fragments.
+
+  Catalog the new core runtime diagnostics while preserving their error classes,
+  and verify the published streaming bootstrap subpath and inline script export.
+
+  Keep individual and batched server calls on the page's origin when an authored
+  base element points to another origin.
+
+  Keep reusable DOM, CSS, and component prop types scalar while allowing direct
+  signal bindings at native JSX sites, preserving existing binding consumers.
+  Use scalar public props for Zag's state-machine normalization results and
+  to-print's imperative iframe options.
+- 5ead1ff: Specialize renderer-free child bindings to explicit caller prop shapes, allowing a proven destructured rest parameter to forward supported native properties. Preserve ordered shape identity through imported binding requests and share normal SSR annotation allocation without restricting the ordinary component API. Unknown spreads and unsupported native ownership conflicts still fail clearly.
+
+  Allow proven conditional, child-view, slot, and primitive-text regions to transfer from early bindings to normal hydration without replacing their native nodes. Keep early interactions active through suspended or discarded attempts, validate the current presentation before publication, and retain explicit refusal for unsupported regions and writers.
+- 5ead1ff: Support flat destructured props, aliases, primitive literal defaults, and rest bindings in renderer-free authored views. Prepare parameter bindings once per snapshot so projection, event, and ref reads preserve JavaScript destructuring semantics. Keep unsupported patterns and arbitrary native spreads explicit errors.
+- 5ead1ff: Allow renderer-free authored views to use canonical signal-handle checks, bounded native value projections, and named native event and ref callbacks. Keep callback bodies deferred until their native lifecycle, preserve committed captures and stable ref attachment, and allow explicit ref-prop forwarding through child views.
+- 5ead1ff: Extend compiler-owned native presentation to authored text, conditional content,
+  keyed lists, pure child views, and explicit mounting without loading the renderer.
+  Preserve SSR identity, early native controls, focus and composition, and native
+  ref lifetimes. Add fixed-shape imported attribute factory contracts so style
+  adapters can preserve one ordered merge without repeated spread evaluation.
+  Connect direct signal-valued native channels to the existing signal graph,
+  without rerunning unrelated presentation projections.
+- 5ead1ff: Move explicit declaration keys to trailing options: `signal$(initial, { key })`, `derived$(compute, { key })`, and `query$(select, load, { key })`. This replaces their positional authored-key overloads; update existing callers when adopting this beta API change. Compiler-generated identities and explicit `createScope` methods retain their existing ownership behavior.
+- 5ead1ff: Keep transition orchestration out of early signal and control module dependencies so split-chunk builds can defer it with the renderer. Native input and transition behavior are unchanged.
+- 5ead1ff: Allow explicitly adopted, compiler-proven fixed native views to transfer their early DOM bindings to `hydrateRoot` through `bindingLeases`. Keep early presentation and native commands active while hydration is pending, publish current values before refs, and retire old ownership without replaying already handled commands. Native updates beneath a suspended hydration boundary now retain that boundary's pending capture instead of publishing a child independently.
+
+  The early entry remains renderer-free; normal hydration still requires explicitly loading the renderer. Structural regions, dynamic text, writable controls, and unsupported writers are not eligible for this optional handoff.
+
+  Retire displaced early bindings only after staged DOM publication, suppress refs from hydration attempts that never commit, and support fixed native views using fresh array/object class values. Hydration-lease errors use the standard production error-code catalog.
+- 5ead1ff: Preserve event-time command payloads through an optional synchronous behavior capture hook, and support authoritative revision comparison for optimistic action receipts so older successful responses settle without replacing newer authority.
+- 5ead1ff: Reconcile explicitly undefined native attributes when hydrating existing server markup. Direct attributes and native prop spreads now remove stale SSR values on the first client render instead of treating an empty client cache as an unchanged value. Preserve the adopted node and unrelated server attributes.
+- 5ead1ff: Keep early whole-style bindings from sharing a module with renderer-only attribute and namespace tables. CSS serialization, units, caches, and existing helper exports remain unchanged.
+- 5ead1ff: Allow trusted `knownAttributeSpreads` contracts to opt into signal-aware style objects with `style: 'object'`. Renderer-free bindings reuse the existing style capability, while contracts without this option retain CSS-text behavior.
+- 5ead1ff: Keep query implementation out of signal-only owner bundles and remove the legacy
+  `scope.asyncSignal$` method. Explicit-owner callers now import
+  `createResource(scope, key, describe)`; native `query$` declarations are unchanged.
+  `createScope` remains optional, and synchronous signals, draft edit receipts,
+  request isolation, streaming ownership and historical adoption retain their contracts.
+
+  Discard compiler-proven unused signal declarations without dropping initializer
+  effects or diagnostics, and reduce repeated plain-data conversions when accepting
+  SSR signal seeds. No runtime capability loader or extra initialization phase is added.
+
+  Add `bootstrapStreamedSignalResults` for hosts that accept streamed signal results
+  while owning their HTML placement. It shares the full receiver's authority,
+  bounded delivery and lifecycle handling without retaining DOM placement code.
+  The existing `bootstrapStreamedSignalHydration` and region-registration API remain
+  available unchanged.
+- 5ead1ff: Reduce renderer-free signal startup dependencies by separating native-control capture from optional island activation and keeping server stream observation mirrors out of the browser request engine. Preserve early input, stream cancellation, and per-consumer backpressure without changing author-facing APIs.
+- 5ead1ff: Preserve grouped native `sx` projections through nested local components in renderer-free bindings, including reactive updates, keyed rows, and cleanup.
+- 5ead1ff: Add opt-in native `sx` authoring with signal-aware StyleX arguments. Normal rendering and renderer-free bindings share a native projection that prepares class, style, and metadata together, preserves SSR adoption and source ownership, and skips unchanged DOM writes. StyleX remains responsible for style composition, units, and extracted CSS.
+
+  Expose a shared StyleX compiler contract and a TSRX type-check provider so supported native `sx` expressions can sample signal arguments without widening ordinary StyleX function parameters or component props. Forward native attribute contracts through the application Vite plugin.
+- 5ead1ff: Open failed server signal result channels before sending their sanitized error, preserving query error adoption when a promise rejects or an iterator cannot be constructed.
+- 5ead1ff: Select keyed-list support only for renderer-free binding programs that can use it, including inactive branches, imported children, and caller-owned slots. Preserve older compiled descriptors through compatible runtime entry points.
+- 5ead1ff: Start compiler-proven independent `query$` and `derived$` reads together in complete static native JSX output, as well as adjacent local declarations. Preserve lazy declarations, branch reachability, original error and suspension boundaries, and ordered handling of opaque values. Unknown receivers, mixed text/renderable holes, dynamic host behavior, and resource-loading elements remain conservative boundaries.
+- 5ead1ff: Start compiler-proven independent query and asynchronous derivation reads together while retaining strict read order, actual data dependencies, cancellation, and lazy conditional work. This does not add transactional signal publication or delay native input updates.
+
+  Avoid speculative signal owners and eagerly serialized invocation paths in ordinary rendering. Preserve late signal activation and retired event ownership, and align keyed component identities between server rendering and hydration.
+
+  Retain pending component queries across rendering retries, releasing obsolete work on replacement, cancellation, and unmount. Support checked dynamic projection functions in immutable imported-factory configurations and imported string-token style keys in renderer-free views, preserving ordered attribute merges and property ownership.
+
+  Release native control leases when their exact signal owner retires, independent of application page-cleanup order. Initial dead-owner reads and genuine computation errors still fail; ordinary signal subscribers retain their final invalidation.
+- 5ead1ff: Select host-spread hydration preparation only for components that use it, allowing simpler early-binding handoff components to omit generic spread and form machinery. Preserve the same adoption proofs, native ownership, and normal renderer behavior.
+- 5ead1ff: Preserve streamed query delivery when a query waits for another query before
+  starting. Dependent streams remain attached to the original SSR response and
+  hydration adopts their delivered results without starting duplicate requests.
+
+  Preserve pending dependency snapshots in implicit derived signals and carry
+  dependency refresh and stream-completion activity through async derivations.
+
+  Reuse the empty SSR list-key context between components while preserving copied
+  keyed paths and request-local signal identity.
+- 5ead1ff: Stage native signal writes made in transitions until their affected renderer and renderer-free presentations are ready. Keep committed values and public notifications unchanged while a query or derived result is pending, preserve urgent edits, and transfer accepted producer and binding subscriptions without restarting them. Reuse the existing transition journals and optional visibility driver for pending cues, timeout fallbacks, and cleanup.
+- 5ead1ff: Complete renderer-free authored controls and whole/spread styles using the existing signal ownership and native style protocols. Preserve sampled one-way values, early edits, keyed controls, radio input ordering, CSS declaration order, and cleanup. Keep binding-only activation modules free of the renderer, accept the BindingSource callback contract, and support conservative chained string projections.
+
+  Preserve unchanged scalar text during native rendering and ViewTransitions by retaining its compiler-owned raw-value cache. This keeps text selection intact and avoids activating unchanged nested transition scopes without hiding signal pending/error recovery.
+- 5ead1ff: Reuse the resolved server signal owner when invoking a component, avoiding a duplicate instance lookup while preserving nested request ownership.
+- 5ead1ff: Let renderer-free structural bindings omit control, grouped-style/class, and native-initialization orchestration when their compiled view cannot use it. Preserve existing behavior for views that need these features and for older compiled descriptors.
+- 5ead1ff: Select the compiled DOM binding adopter directly and share identical local child plans, reducing renderer-free startup code without changing view authoring or ownership.
+- 5ead1ff: Share eligible compiled StyleX recipe constants between normal components and renderer-free binding artifacts in production browser builds. Preserve local StyleX optimization, style precedence, extracted CSS, and authored source maps. Expose the build-time sharing plugin for custom compiler adapters; leave development, server, and unsupported definitions on their existing paths.
+- 5ead1ff: Export signal-handle predicates directly from their lightweight protocol module so a capability check alone does not retain signal-owner initialization or the signal engine. Predicate behavior and identity are unchanged.
+- 5ead1ff: Derive direct signal binding and writable-control identities from authored source positions rather than generated component helper names. This fixes server/client identity mismatches for controls nested in conditional fragments, loops, and switch branches. Rebuild and deploy matching server and client output together because the compiler site-identity version changes.
+- 5ead1ff: Preserve global signal SSR identities and activation metadata in plain modules that also use memo hooks when production inline memo optimization is enabled.
+- 5ead1ff: Add compiler-backed adoption of fixed server-rendered DOM views through `adoptBindings` from `octane/behavior`. Opted-in views synchronously project an owned snapshot onto existing native elements without loading the renderer, replacing nodes, or taking over application event handlers. Unsupported structural authoring fails explicitly.
+- 5ead1ff: Let compiler-proven scalar signal derivations omit general async computation
+  machinery. Avoid repeated owner resolution on cached signal reads while preserving
+  request isolation, historical reads, and retirement checks.
+
 ## 0.2.12
 
 ### Patch Changes

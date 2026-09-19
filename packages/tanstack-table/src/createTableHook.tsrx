@@ -336,7 +336,7 @@ export function createTableHook<
 							})
 						: children;
 
-				return <TableContext.Provider value={currentTable}>{body}</TableContext.Provider>;
+				return <TableContext value={currentTable}>{body}</TableContext>;
 			}
 			return AppTableImpl as AppTableComponent<TFeatures>;
 		}, []);
@@ -362,7 +362,7 @@ export function createTableHook<
 							})
 						: children(extendedCell);
 
-				return <CellContext.Provider value={cell}>{body}</CellContext.Provider>;
+				return <CellContext value={cell}>{body}</CellContext>;
 			}
 			return AppCellImpl as AppCellComponent<TFeatures, TData, TCellComponents>;
 		}, []);
@@ -394,7 +394,7 @@ export function createTableHook<
 							})
 						: children(extendedHeader);
 
-				return <HeaderContext.Provider value={header}>{body}</HeaderContext.Provider>;
+				return <HeaderContext value={header}>{body}</HeaderContext>;
 			}
 			return AppHeaderImpl as AppHeaderComponent<TFeatures, TData, THeaderComponents>;
 		}, []);
@@ -427,7 +427,7 @@ export function createTableHook<
 							})
 						: children(extendedHeader);
 
-				return <HeaderContext.Provider value={header}>{body}</HeaderContext.Provider>;
+				return <HeaderContext value={header}>{body}</HeaderContext>;
 			}
 			return AppFooterImpl as AppHeaderComponent<TFeatures, TData, THeaderComponents>;
 		}, []);

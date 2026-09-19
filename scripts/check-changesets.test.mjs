@@ -154,3 +154,63 @@ for (const source of ['octane', '@octanejs/floating-ui']) {
 		}
 	});
 }
+
+test('versioning multiline release notes produces whitespace-clean changelogs', () => {
+	const directory = mkdtempSync(join(tmpdir(), 'octane-version-changelog-'));
+	try {
+		mkdirSync(join(directory, '.changeset'));
+		mkdirSync(join(directory, 'packages/demo'), { recursive: true });
+		writeFileSync(
+			join(directory, 'package.json'),
+			JSON.stringify({ name: 'fixture', private: true }),
+		);
+		writeFileSync(join(directory, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n");
+		writeFileSync(
+			join(directory, 'packages/demo/package.json'),
+			JSON.stringify({ name: 'demo', version: '0.1.0' }),
+		);
+		writeFileSync(
+			join(directory, '.changeset/config.json'),
+			JSON.stringify({
+				...JSON.parse(readFileSync(new URL('../.changeset/config.json', import.meta.url), 'utf8')),
+				changelog: fileURLToPath(import.meta.resolve('@changesets/changelog-git')),
+			}),
+		);
+		writeFileSync(
+			join(directory, '.changeset/fix.md'),
+			'---\n"demo": patch\n---\n\nFirst paragraph.\n\nSecond paragraph.\n',
+		);
+		writeFileSync(
+			join(directory, 'packages/demo/CHANGELOG.md'),
+			'# demo\n\n## 0.1.0\n\n- Existing note.  \n  Intentional Markdown line break.\n',
+		);
+		for (const args of [
+			['init', '-b', 'main'],
+			['add', '.'],
+			['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'fixture'],
+		]) {
+			const result = spawnSync('git', args, { cwd: directory, encoding: 'utf8' });
+			assert.equal(result.status, 0, result.stderr);
+		}
+		const version = spawnSync(
+			process.execPath,
+			[fileURLToPath(import.meta.resolve('@changesets/cli/bin.js')), 'version'],
+			{ cwd: directory, encoding: 'utf8' },
+		);
+		assert.equal(version.status, 0, version.stderr);
+		const normalization = spawnSync(
+			process.execPath,
+			[fileURLToPath(new URL('./normalize-changelogs.mjs', import.meta.url))],
+			{ cwd: directory, encoding: 'utf8' },
+		);
+		assert.equal(normalization.status, 0, normalization.stderr);
+		const changelogPath = join(directory, 'packages/demo/CHANGELOG.md');
+		const changelog = readFileSync(changelogPath, 'utf8');
+		assert.match(changelog, /Second paragraph/);
+		assert.match(changelog, /Existing note\.  \n/);
+		const check = spawnSync('git', ['diff', '--check'], { cwd: directory, encoding: 'utf8' });
+		assert.equal(check.status, 0, check.stdout);
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+});

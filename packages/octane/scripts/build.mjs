@@ -65,6 +65,7 @@ await buildPackageCommonjs({
 		'src/server/index.ts',
 		'src/internal/client.ts',
 		'src/internal/server.ts',
+		'src/internal/context.ts',
 		'src/signals/index.ts',
 		'src/signals/client.ts',
 		'src/signals/server.ts',
@@ -79,6 +80,7 @@ await bundleVolarCompiler({ packageDir: pkgDir, outdir: join(dist, 'compiler') }
 // declarations for the .ts sources). The JSX runtime is likewise a type-only
 // input declaration: compiled Octane JSX never imports a runtime module.
 cpSync(join(src, 'dom-tables.d.ts'), join(dist, 'dom-tables.d.ts'));
+cpSync(join(src, 'style-values.d.ts'), join(dist, 'style-values.d.ts'));
 cpSync(join(src, 'event-names.d.ts'), join(dist, 'event-names.d.ts'));
 cpSync(join(src, 'html-tree-validation.d.ts'), join(dist, 'html-tree-validation.d.ts'));
 cpSync(join(src, 'jsx-runtime.d.ts'), join(dist, 'jsx-runtime.d.ts'));

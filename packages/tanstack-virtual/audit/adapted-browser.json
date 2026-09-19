@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "mode": "adapted",
+  "tests": [
+    {
+      "file": "packages/tanstack-virtual/tests/browser-contracts/prepend.spec.ts",
+      "fullName": "direct DOM position grows the scroll extent before restoring the end anchor",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/browser-contracts/prepend.spec.ts",
+      "fullName": "direct DOM transform grows the scroll extent before restoring the end anchor",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/cached-measurements.spec.ts",
+      "fullName": "preserves item sizes when list is hidden with useCachedMeasurements",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/chat.spec.ts",
+      "fullName": "chat mode does not follow appended messages while reading history",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/chat.spec.ts",
+      "fullName": "chat mode follows appended messages from the end",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/chat.spec.ts",
+      "fullName": "chat mode keeps streaming bottom message pinned as it grows",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/chat.spec.ts",
+      "fullName": "chat mode keeps streaming bottom message pinned as it grows with paddingEnd",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/chat.spec.ts",
+      "fullName": "chat mode keeps visible messages stable when history is prepended",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/chat.spec.ts",
+      "fullName": "direct DOM chat stays pinned when a previous message grows without a re-render",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/direct-dom-updates.spec.ts",
+      "fullName": "directDomUpdates mode=position large scroll triggers a re-render and items still position correctly",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/direct-dom-updates.spec.ts",
+      "fullName": "directDomUpdates mode=position scrolling moves items via direct DOM without per-pixel React re-renders",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/direct-dom-updates.spec.ts",
+      "fullName": "directDomUpdates mode=position sets container size and positions items via direct DOM updates",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/direct-dom-updates.spec.ts",
+      "fullName": "directDomUpdates mode=position without containerRef the virtualizer makes no direct DOM writes but still skips re-renders",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/direct-dom-updates.spec.ts",
+      "fullName": "directDomUpdates mode=transform large scroll triggers a re-render and items still position correctly",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/direct-dom-updates.spec.ts",
+      "fullName": "directDomUpdates mode=transform scrolling moves items via direct DOM without per-pixel React re-renders",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/direct-dom-updates.spec.ts",
+      "fullName": "directDomUpdates mode=transform sets container size and positions items via direct DOM updates",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/direct-dom-updates.spec.ts",
+      "fullName": "directDomUpdates mode=transform without containerRef the virtualizer makes no direct DOM writes but still skips re-renders",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/measure-element.spec.ts",
+      "fullName": "positions items correctly after expand → collapse → delete → expand",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/react-compiler.spec.ts",
+      "fullName": "react-compiler directDomUpdates mode=position incremental scroll positions items without full re-render",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/react-compiler.spec.ts",
+      "fullName": "react-compiler directDomUpdates mode=position items update correctly after scrolling",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/react-compiler.spec.ts",
+      "fullName": "react-compiler directDomUpdates mode=position renders items on initial load",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/react-compiler.spec.ts",
+      "fullName": "react-compiler directDomUpdates mode=transform incremental scroll positions items without full re-render",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/react-compiler.spec.ts",
+      "fullName": "react-compiler directDomUpdates mode=transform items update correctly after scrolling",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/react-compiler.spec.ts",
+      "fullName": "react-compiler directDomUpdates mode=transform renders items on initial load",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/scroll-anchor.spec.ts",
+      "fullName": "anchored item stays stable when scrolling up into unmeasured items",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/scroll.spec.ts",
+      "fullName": "renders correctly with initialOffset and user scroll up",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/scroll.spec.ts",
+      "fullName": "scrolls to index 0",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/scroll.spec.ts",
+      "fullName": "scrolls to index 1000",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/scroll.spec.ts",
+      "fullName": "scrolls to last item",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/smooth-scroll.spec.ts",
+      "fullName": "interrupting smooth scroll with another smooth scroll",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/smooth-scroll.spec.ts",
+      "fullName": "smooth scrolls sequentially to multiple targets",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/smooth-scroll.spec.ts",
+      "fullName": "smooth scrolls to index 0 after scrolling away",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/smooth-scroll.spec.ts",
+      "fullName": "smooth scrolls to index 100",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/smooth-scroll.spec.ts",
+      "fullName": "smooth scrolls to index 1000",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/smooth-scroll.spec.ts",
+      "fullName": "smooth scrolls to index 500 with center alignment",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/smooth-scroll.spec.ts",
+      "fullName": "smooth scrolls to index 500 with start alignment",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/tests/upstream/browser/test/stale-index.spec.ts",
+      "fullName": "does not call getItemKey with stale index after removing items",
+      "status": "passed"
+    }
+  ]
+}

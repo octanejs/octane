@@ -3,7 +3,7 @@ import { sortBy } from 'es-toolkit/compat';
 import { get } from 'es-toolkit/compat';
 
 import {
-	Series,
+	type Series,
 	type SeriesPoint,
 	stack as shapeStack,
 	stackOffsetExpand,
@@ -23,8 +23,8 @@ import {
 	mathSign,
 } from './DataUtils';
 
-import { TooltipEntrySettings, TooltipPayloadEntry } from '../state/tooltipSlice';
-import {
+import type { TooltipEntrySettings, TooltipPayloadEntry } from '../state/tooltipSlice';
+import type {
 	AxisTick,
 	AxisType,
 	CartesianLayout,
@@ -42,13 +42,13 @@ import {
 	TickItem,
 	AxisDomainTypeInput,
 } from './types';
-import { ValueType } from '../component/DefaultTooltipContent.tsrx';
-import { LegendSettings } from '../state/legendSlice';
-import { AxisRange, BaseAxisWithScale } from '../state/selectors/axisSelectors';
-import { StackGroup } from './stacks/stackTypes';
+import type { ValueType } from '../component/DefaultTooltipContent.tsrx';
+import type { LegendSettings } from '../state/legendSlice';
+import type { AxisRange, BaseAxisWithScale } from '../state/selectors/axisSelectors';
+import type { StackGroup } from './stacks/stackTypes';
 import { getSliced } from './getSliced';
 import { isWellBehavedNumber } from './isWellBehavedNumber';
-import { RechartsScale } from './scale/RechartsScale';
+import type { RechartsScale } from './scale/RechartsScale';
 
 export function getValueByDataKey<DataPointType, DataValueType>(
 	obj: DataPointType | null | undefined,

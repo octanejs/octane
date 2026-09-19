@@ -14,6 +14,8 @@
 
 The binding reuses Apollo Client's framework-neutral core and mirrors the pinned React adapter layout with Octane hook and component implementations.
 
+ApolloProvider and the SSR prerender wrapper pass the Apollo Context itself to Octane's createElement API. Octane contexts directly provide values and expose no legacy Provider alias; context value merging and child rendering retain the upstream adapter behavior.
+
 ## Export crosswalk
 
 The root and `testing` entry points reuse Apollo's framework-neutral exports. The `react`, `react/internal`, `react/ssr`, and `testing/react` entry points expose the complete documented Octane adapter surface recorded in `status.json`; `exports.test.ts` and the executable public type suite guard that surface. React Server Components and the React Compiler runtime entry are explicit gaps because Octane does not consume React's runtime/compiler protocols.

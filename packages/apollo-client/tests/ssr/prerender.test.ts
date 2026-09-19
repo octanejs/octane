@@ -38,6 +38,19 @@ function createServerClient(values: Record<string, Record<string, unknown>>) {
 }
 
 describe('@octanejs/apollo-client server rendering', () => {
+	it('provides a cached Apollo client during an ordinary server render', () => {
+		const { client, operations } = createServerClient({});
+		client.writeQuery({ query: GET_SERVER_VALUE, data: { value: 'cached-server' } });
+
+		try {
+			const result = renderToString(ApolloServerFixture, { client });
+			expect(result.html).toContain('data:cached-server');
+			expect(operations).toEqual([]);
+		} finally {
+			client.stop();
+		}
+	});
+
 	it('resolves non-suspending queries and preserves the final Octane render result', async () => {
 		expect(typeof document).toBe('undefined');
 		const { client, operations } = createServerClient({

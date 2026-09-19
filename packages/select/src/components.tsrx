@@ -790,9 +790,9 @@ export function MenuPortal(props: MenuPortalProps) @{
 	};
 	const menuWrapper = <div {...menuWrapperProps}>{props.children}</div>;
 
-	<PortalPlacementContext.Provider value={portalPlacementContext}>
+	<PortalPlacementContext value={portalPlacementContext}>
 		{props.appendTo ? createPortal(menuWrapper, props.appendTo) : menuWrapper}
-	</PortalPlacementContext.Provider>
+	</PortalPlacementContext>
 }
 
 export interface SelectComponents<

@@ -88,7 +88,7 @@ export function FloatingNode(props: FloatingNodeProps): OctaneNode {
 	const id = props.id;
 	const parentId = useFloatingParentNodeId();
 	const value = useMemo(() => ({ id, parentId }), [id, parentId], S('FloatingNode:value'));
-	return createElement(FloatingNodeContext.Provider, { value, children });
+	return createElement(FloatingNodeContext, { value, children });
 }
 
 export interface FloatingTreeProps {
@@ -123,5 +123,5 @@ export function FloatingTree(props: FloatingTreeProps): OctaneNode {
 		[addNode, removeNode, events],
 		S('FloatingTree:value'),
 	);
-	return createElement(FloatingTreeContext.Provider, { value, children });
+	return createElement(FloatingTreeContext, { value, children });
 }

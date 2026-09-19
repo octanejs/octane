@@ -254,7 +254,7 @@ function TransitionImpl(props: TransitionProps) @{
 				: cloneElement(Children.only(children), childProps);
 	}
 
-	<TransitionGroupContext.Provider value={null}>{rendered}</TransitionGroupContext.Provider>
+	<TransitionGroupContext value={null}>{rendered}</TransitionGroupContext>
 }
 
 export const Transition = TransitionImpl as unknown as TransitionComponent;

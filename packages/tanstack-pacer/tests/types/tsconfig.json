@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false
+  },
+  "include": ["./*.ts"],
+  "exclude": [],
+  "reactPortEvidence": {
+    "gate": "public-types",
+    "publicMode": "pinned"
+  }
+}

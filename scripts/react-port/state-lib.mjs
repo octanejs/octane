@@ -296,9 +296,19 @@ export function captureWorktreeBaseline(repoRoot = process.cwd(), plannedRoots =
 		try {
 			paths.push(plannedRoot);
 			if (!lstatSync(rootPath).isDirectory()) continue;
-			for (const entry of readdirSync(rootPath, { recursive: true, withFileTypes: true })) {
-				paths.push(path.relative(repoRoot, path.join(entry.parentPath, entry.name)));
-			}
+			const visitDirectory = (directory) => {
+				for (const entry of readdirSync(directory, { withFileTypes: true })) {
+					// Installs are not owned binding source. Tracked dependency files,
+					// if any, are still observed by the git-status pass above.
+					if (directory === rootPath && entry.name === 'node_modules') continue;
+					const entryPath = path.join(directory, entry.name);
+					paths.push(path.relative(repoRoot, entryPath));
+					// Record the link itself, never recurse through a dependency or
+					// a source link into another package or outside this worktree.
+					if (entry.isDirectory()) visitDirectory(entryPath);
+				}
+			};
+			visitDirectory(rootPath);
 		} catch (error) {
 			if (error?.code !== 'ENOENT') throw error;
 		}

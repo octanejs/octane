@@ -203,7 +203,7 @@ export function StyleSheetManager(props: IStyleSheetManager): unknown {
 		SLOT_SSM_VALUE,
 	);
 
-	return createElement(StyleSheetContext.Provider as any, {
+	return createElement(StyleSheetContext as any, {
 		value: styleSheetContextValue,
 		children: props.children,
 	});

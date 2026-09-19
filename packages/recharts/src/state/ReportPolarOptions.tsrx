@@ -1,6 +1,6 @@
 import { useEffect } from 'octane';
 import { useAppDispatch } from './hooks';
-import { PolarChartOptions, updatePolarOptions } from './polarOptionsSlice';
+import { type PolarChartOptions, updatePolarOptions } from './polarOptionsSlice';
 
 export function ReportPolarOptions(props: PolarChartOptions): null {
 	const dispatch = useAppDispatch();

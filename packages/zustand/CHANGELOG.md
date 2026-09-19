@@ -1,5 +1,17 @@
 # @octanejs/zustand
 
+## 0.1.54
+
+### Patch Changes
+
+- a6d7f49: Remove the legacy `Context.Provider` alias from client, server, and native contexts. Provide values with `<Context value={value}>` or `createElement(Context, { value }, children)` instead. The compiler rejects statically recognized legacy Provider access with migration guidance, and Octane bindings now use contexts directly. Binding peer ranges accept Octane 0.3 alongside their previously supported runtime lines.
+
+## 0.1.53
+
+### Patch Changes
+
+- 911ed1d: Update the unchanged adapters to Zustand 5.0.15, TanStack Form 1.33.5, and TanStack Store 0.11.1. Clearing persisted Zustand storage now prevents pending hydration from restoring cleared state, and deleting a form field preserves siblings whose names share its prefix.
+
 ## 0.1.52
 
 ### Patch Changes

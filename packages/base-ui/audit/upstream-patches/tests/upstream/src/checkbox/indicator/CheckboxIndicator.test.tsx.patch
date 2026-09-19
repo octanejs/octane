@@ -1,6 +1,15 @@
 diff --git a/tests/upstream/src/checkbox/indicator/CheckboxIndicator.test.tsx b/tests/upstream/src/checkbox/indicator/CheckboxIndicator.test.tsx
 --- a/tests/upstream/src/checkbox/indicator/CheckboxIndicator.test.tsx
 +++ b/tests/upstream/src/checkbox/indicator/CheckboxIndicator.test.tsx
+@@ -30,7 +30,7 @@ describe('<Checkbox.Indicator />', () => {
+     refInstanceof: window.HTMLSpanElement,
+     render(node) {
+       return render(
+-        <CheckboxRootContext.Provider value={testContext}>{node}</CheckboxRootContext.Provider>,
++        <CheckboxRootContext value={testContext}>{node}</CheckboxRootContext>,
+       );
+     },
+   }));
 @@ -329,6 +329,12 @@ describe('<Checkbox.Indicator />', () => {
        `;
  

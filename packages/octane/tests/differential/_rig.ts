@@ -127,6 +127,9 @@ export function normaliseHtml(html: string): string {
 			collapseInterTagWhitespace(stripComments(html))
 				.replace(' data-reactroot="', ' ')
 				.replace(' data-reactroot=""', '')
+				// Compiler-owned hydration identity is not a host property or an
+				// observable form-state difference between the two renderers.
+				.replace(/ data-octane-input="[^"]*"/g, '')
 				// An EMPTY inline style attribute is residue from imperatively setting
 				// then clearing `el.style` properties (e.g. Radix's measure-then-restore
 				// dance). React leaves `style=""` behind while octane's style writer ends

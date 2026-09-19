@@ -53,7 +53,7 @@ const OCTANE_SINGLETON_CONSUMERS = new Set([
 	'@octanejs/vite-plugin',
 ]);
 
-export const OCTANE_BETA_PEER_RANGE = 'workspace:^0.1.51 || ^0.2.0';
+export const OCTANE_BETA_PEER_RANGE = 'workspace:^0.1.51 || ^0.2.0 || ^0.3.0';
 
 // These bindings use the compiler/runtime APIs first released with Octane 0.2.5.
 const OCTANE_025_CONSUMERS = new Set([
@@ -63,8 +63,30 @@ const OCTANE_025_CONSUMERS = new Set([
 	'@octanejs/testing-library',
 ]);
 
+// These packages consume compiler/runtime/server APIs from the coordinated core
+// release. pnpm publishes workspace:^ as ^<the released sibling version>,
+// while source installs keep resolving the current workspace before versioning.
+const OCTANE_CURRENT_CORE_CONSUMERS = new Set([
+	'@octanejs/app-core',
+	'@octanejs/drei',
+	'@octanejs/ink',
+	'@octanejs/lynx',
+	'@octanejs/octane-is',
+	'@octanejs/rspack-plugin',
+	'@octanejs/rsbuild-plugin',
+	'@octanejs/vite-plugin',
+]);
+
 export function octanePeerRangeFor(packageName) {
-	return OCTANE_025_CONSUMERS.has(packageName) ? 'workspace:^0.2.5' : OCTANE_BETA_PEER_RANGE;
+	if (OCTANE_CURRENT_CORE_CONSUMERS.has(packageName)) return 'workspace:^';
+	return OCTANE_025_CONSUMERS.has(packageName)
+		? 'workspace:^0.2.5 || ^0.3.0'
+		: OCTANE_BETA_PEER_RANGE;
+}
+
+export function publishedOctanePeerRangeFor(packageName, octaneVersion) {
+	const range = octanePeerRangeFor(packageName).replace(/^workspace:/, '');
+	return range === '^' ? `^${octaneVersion}` : range;
 }
 
 function readJson(file) {

@@ -1,12 +1,6 @@
 import { useEffect } from 'octane';
 import { QueryClientContext } from './context.ts';
-import type { OctaneNode } from 'octane';
-import type { QueryClient } from '@tanstack/query-core';
-
-type QueryClientProviderProps = {
-	client: QueryClient;
-	children?: OctaneNode;
-};
+import type { QueryClientProviderProps } from './types';
 
 // QueryClientProvider — provides the QueryClient via context and mounts/unmounts
 // it with the component. It's authored in .tsrx because it's a COMPONENT that
@@ -19,5 +13,5 @@ export function QueryClientProvider(props: QueryClientProviderProps) @{
 			props.client.unmount();
 		};
 	}, [props.client]);
-	<QueryClientContext.Provider value={props.client}>{props.children}</QueryClientContext.Provider>
+	<QueryClientContext value={props.client}>{props.children}</QueryClientContext>
 }

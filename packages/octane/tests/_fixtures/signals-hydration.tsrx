@@ -1,12 +1,28 @@
 import { Hydrate, useLayoutEffect, useRef } from 'octane';
 import type { HydrateWhen } from 'octane/hydration';
-import type { Resource, Scope, WritableSignal } from 'octane/signals';
+import type { DerivedSignal, Resource, Scope, WritableSignal } from 'octane/signals';
 import 'octane/signals';
 
 export interface NativeHydrationState {
 	scope: Scope;
 	value$: WritableSignal<string>;
 	log?: (value: string) => void;
+}
+
+export function StreamedSignalShell(props: {
+	onInput?: (event: Event) => void;
+}) @{
+	<>
+		<section>
+			<p>{'shell'}</p>
+			<input defaultValue="server draft" onInput={props.onInput} />
+		</section>
+		<script
+			type="application/json"
+			id="authored-data"
+			dangerouslySetInnerHTML={{ __html: '{"source":"authored"}' }}
+		/>
+	</>
 }
 
 export function SignalHydration(props: NativeHydrationState) @{
@@ -83,20 +99,21 @@ export function DeferredNativeHydration(props: NativeHydrationState & { when: Hy
 	</section>
 }
 
-export function ControlledSignalHydration(props: NativeHydrationState) @{
-	const value = props.scope.get(props.value$);
-	<input
-		value={value}
-		onInput={(event: Event) => {
-			props.scope.set(props.value$, (event.currentTarget as HTMLInputElement).value);
-		}}
-	/>
+interface DirectControlledHydrationState extends NativeHydrationState {
+	length$: DerivedSignal<string>;
 }
 
-export function DeferredControlledSignalHydration(props: NativeHydrationState & {
+export function ControlledSignalHydration(props: DirectControlledHydrationState) @{
+	<section>
+		<input value={props.value$} />
+		<output title={props.length$}>Characters: {props.length$}</output>
+	</section>
+}
+
+export function DeferredControlledSignalHydration(props: DirectControlledHydrationState & {
 	when: HydrateWhen;
 }) @{
 	<Hydrate when={props.when} split={false}>
-		<ControlledSignalHydration scope={props.scope} value$={props.value$} />
+		<ControlledSignalHydration scope={props.scope} value$={props.value$} length$={props.length$} />
 	</Hydrate>
 }

@@ -71,3 +71,25 @@ after the atomic tag push, the next successful main run or manual recovery
 retries only the missing GitHub release. GitHub API availability cannot block
 tag repair, and a package without a matching changelog entry is reported as
 skipped so later releases can still be created.
+
+After upload, reconciliation allows fifteen minutes of retry delays for npm to
+make the versions available. It succeeds only when every current version can
+be read from npm. A timeout leaves the missing versions listed in the workflow
+summary; rerun the workflow once those versions become available.
+
+An `E404` from a package upload can also mean npm rejected the workflow's
+trusted-publisher identity, even when the package already exists. This is
+different from a version that is still becoming available after a successful
+upload. The public-registry preflight cannot inspect publishing permissions.
+From an authenticated maintainer session, inspect the affected package:
+
+```bash
+npm trust list <package-name>
+```
+
+The trust must authorize direct publishing from `octanejs/octane` and
+`publish.yml`, with no environment restriction (the workflow uses no GitHub
+environment). If that trust is missing, configure it using the bootstrap command
+above. Changesets can leave dependents unpublished when a dependency fails to
+upload, so rerun the complete Publish job after repairing the trust. Its
+preflight skips versions already present on npm.

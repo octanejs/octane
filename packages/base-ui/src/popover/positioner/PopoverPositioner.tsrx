@@ -153,12 +153,12 @@ export const PopoverPositioner = function PopoverPositioner(
 	});
 
 	return (
-		<PopoverPositionerContext.Provider value={positioning}>
+		<PopoverPositionerContext value={positioning}>
 			{mounted && trueModalNonHover && (
 				<InternalBackdrop inert={inertValue(!open)} cutout={triggerElement} />
 			)}
 			<FloatingNode id={nodeId}>{element}</FloatingNode>
-		</PopoverPositionerContext.Provider>
+		</PopoverPositionerContext>
 	);
 };
 

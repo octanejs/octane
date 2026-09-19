@@ -1,3 +1,4 @@
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -15,15 +16,11 @@ import { IndexKeyedFragmentHydrationMap, MapList, reorder } from './_fixtures/ma
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/map-list.tsx');
 
 function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'map-list.tsx', { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(ServerRT, {});
+	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
+		id: 'map-list.tsx',
+		mode: 'server',
+		compileOptions: { mode: 'server' },
+	});
 }
 
 describe('hydrateRoot — `.tsx` `.map()` keyed list (forBlock parity)', () => {

@@ -523,9 +523,7 @@ export const CalendarGrid = /*#__PURE__*/ (forwardRef as any)(function CalendarG
 	let DOMProps = filterDOMProps(props, { global: true });
 
 	return (
-		<InternalCalendarGridContext.Provider
-			value={{ headerProps, weekDays, startDate, weeksInMonth }}
-		>
+		<InternalCalendarGridContext value={{ headerProps, weekDays, startDate, weeksInMonth }}>
 			<dom.table
 				render={props.render}
 				{...mergeProps(DOMProps, gridProps)}
@@ -545,7 +543,7 @@ export const CalendarGrid = /*#__PURE__*/ (forwardRef as any)(function CalendarG
 					</>
 				)}
 			</dom.table>
-		</InternalCalendarGridContext.Provider>
+		</InternalCalendarGridContext>
 	);
 });
 

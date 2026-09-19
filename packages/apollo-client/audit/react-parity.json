@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "863e9f1035d4d61a77f76567d2d3684bd84e03619dd35e1ed838f134ee6c12a8"
+      "lockfileSha256": "bb399b1be4dde8dc7044348a89a42a7b14683c5e5600aac7060e39187084c126"
     }
   },
   "lanes": [
@@ -72,7 +72,7 @@
         {
           "path": "packages/apollo-client/tests/_fixtures/upstream/ApolloProvider.tsrx",
           "role": "support",
-          "sha256": "50c8ee038a81f19899893d2383991df6449a8c79c81b66aeb8360bdf7e01f3d6"
+          "sha256": "bd664f3dc34a68ec2f36c05c620da679178e2f6de0d8edb9c644b9e65bf6342c"
         },
         {
           "path": "packages/apollo-client/tests/_fixtures/upstream/useApolloClient.tsrx",
@@ -107,7 +107,7 @@
         {
           "path": "packages/apollo-client/audit/test-classifications.json",
           "role": "support",
-          "sha256": "118ca56781ad444a1782e54090deeb3ec3e6543641a564e626f79df9d55bde16"
+          "sha256": "f8d749988e159205365a693a7e1cf4d8f0eb711c53bfb5f905b8c215c1c1135b"
         }
       ]
     },

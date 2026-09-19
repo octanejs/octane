@@ -31,14 +31,14 @@ function ToastBody(props: { onDismiss: () => void }) @{
 				font-size: 0.88rem;
 			}
 			.portal-demo-toast span {
-				color: var(--text-secondary);
+				color: var(--text-body);
 				font-size: 0.75rem;
 			}
 			.portal-demo-toast button {
 				border: 1px solid var(--border);
 				border-radius: 999px;
 				background: transparent;
-				color: var(--on-accent);
+				color: var(--text);
 				font: inherit;
 				font-size: 0.82rem;
 				font-weight: 700;

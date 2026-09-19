@@ -78,26 +78,6 @@ export function HydrationApp(props: { client: unknown; state: unknown; queryKey:
 	</QueryClientProvider>
 }
 
-// --- experimental_prefetchInRender: expose result.promise ---
-export const promiseCapture: { promise: Promise<unknown> | null } = { promise: null };
-
-function PrefetchInRenderReader(props: { queryFn: () => Promise<string> }) @{
-	const q = useQuery({
-		queryKey: ['pir'],
-		queryFn: props.queryFn,
-		experimental_prefetchInRender: true,
-		retry: false,
-	});
-	promiseCapture.promise = q.promise;
-	<span id="pir">{(q.isPending ? 'pending' : 'data:' + q.data) as string}</span>
-}
-
-export function PrefetchInRenderApp(props: { client: unknown; queryFn: () => Promise<string> }) @{
-	<QueryClientProvider client={props.client}>
-		<PrefetchInRenderReader queryFn={props.queryFn} />
-	</QueryClientProvider>
-}
-
 // --- useQueries combine ---
 function CombineReader() @{
 	const combined = useQueries({

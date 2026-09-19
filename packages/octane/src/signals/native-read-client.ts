@@ -4,13 +4,16 @@ import {
 	validateNativeReadWitness,
 	type NativeReadWitness,
 } from './native-read-collector.js';
-import type { NativeReadSource } from './read-protocol.js';
+import { NATIVE_TRANSITION_CONSUMER, type NativeReadSource } from './read-protocol.js';
 import { inspectNativeReadWitness } from './native-read-inspection.js';
 
 interface NativeReadHost {
 	capture(): object | null;
 	cleanup(scope: Scope, dispose: () => void): void;
 	schedule(block: Block): void;
+	/** Candidate admission renders this exact subscribed owner without notifying it. */
+	prepare?(block: Block): void;
+	retire?(block: Block): void;
 	/** Reuse current ref manifests after a superseding root commits. */
 	replayRefs(capture: object, owner: PublicationOwner): boolean;
 	refDisposed(entry: object): boolean;
@@ -106,6 +109,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 	function disposeConsumer(consumer: Consumer): void {
 		if (consumer.disposed) return;
 		consumer.disposed = true;
+		host.retire?.(consumer.block);
 		if (consumer.committed !== null) release(consumer.committed);
 		consumer.committed = null;
 		for (const candidate of consumer.pending) release(candidate);
@@ -131,6 +135,14 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			};
 			consumers.set(scope, consumer);
 			const owned = consumer;
+			if (host.prepare !== undefined) {
+				Object.assign(owned.notify, {
+					[NATIVE_TRANSITION_CONSUMER]: {
+						active: () => !owned.disposed && !owned.block.disposed,
+						prepare: () => host.prepare!(owned.block),
+					},
+				});
+			}
 			host.cleanup(scope, () => disposeConsumer(owned));
 		}
 		return consumer;

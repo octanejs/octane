@@ -7,9 +7,116 @@
  * module cache is required. This is important for Rspack, whose loader is
  * intentionally instantiated afresh for every resource query.
  */
-import { builders as b, parseModule } from '@tsrx/core';
+import { builders as b, parseModule, strongHash } from '@tsrx/core';
+import {
+	createLexicalAnalysis,
+	forEachRuntimeAstChild,
+	isIdentifierReference,
+} from './compile-universal.js';
+
+import { findPrivateCompiledContextProofs } from './private-context.js';
 
 export const HYDRATE_QUERY_PARAM = 'octane-hydrate';
+
+// Only this extraction pass can certify the loader/child ABI. Keep provenance
+// off authored attributes and parser metadata; COW rewrites preserve tag nodes.
+const compiledSplitHydrateTags = new WeakMap();
+
+export function compiledSplitHydrateTagsForAst(ast) {
+	return compiledSplitHydrateTags.get(ast);
+}
+
+function isCompiledSplitHydrateBoundary(boundary) {
+	if (boundary.disabled || boundary.independent || boundary.permanentStatic) return false;
+	const opening = boundary.node.openingElement;
+	if (opening.name?.type !== 'JSXIdentifier') return false;
+	if (
+		(opening.attributes ?? []).some((attribute) => {
+			const name = attribute.name?.name;
+			return (
+				attribute.type !== 'JSXAttribute' ||
+				attribute.name?.type !== 'JSXIdentifier' ||
+				typeof name !== 'string' ||
+				name === 'children' ||
+				name === 'fallback' ||
+				name.startsWith('__')
+			);
+		})
+	)
+		return false;
+	return !(boundary.node.children ?? []).some((child) => {
+		const expression = unwrapExpression(
+			child.type === 'JSXExpressionContainer' ? child.expression : null,
+		);
+		return ['ArrowFunctionExpression', 'FunctionExpression'].includes(expression?.type);
+	});
+}
+
+// Generated captures preserve a proven private Context identity, not an authored
+// escape. Certificates belong only to this prepared AST and exact parser tags.
+const privateSplitContexts = new WeakMap();
+export function privateCompiledContextsForHydrateAst(ast) {
+	return privateSplitContexts.get(ast);
+}
+
+function privateContextCaptureBoundary(boundary) {
+	if (boundary.disabled || boundary.independent || boundary.permanentStatic) return false;
+	const opening = boundary.node.openingElement;
+	if (opening?.name?.type !== 'JSXIdentifier') return false;
+	return (opening.attributes ?? []).every((attribute) => {
+		const name = attribute.name?.name;
+		return (
+			attribute.type === 'JSXAttribute' &&
+			attribute.name?.type === 'JSXIdentifier' &&
+			typeof name === 'string' &&
+			name !== 'children' &&
+			!name.startsWith('__')
+		);
+	});
+}
+
+function originalSplitContextProofs(analysis, moduleMovePlan) {
+	const contexts = findPrivateCompiledContextProofs(analysis.ast);
+	if (contexts.size === 0) return contexts;
+	const captured = new Set();
+	for (const boundary of analysis.boundaries) {
+		if (boundary.disabled || hasPermanentStaticAncestor(boundary)) continue;
+		const moduleBindings = moduleMovePlan.bindingsByPath.get(boundary.path) ?? new Set();
+		const names = collectCaptures(
+			boundary.node.children,
+			analysis.imports.importBindings,
+			boundary.shadowedImports,
+			moduleBindings.size === 0 ? null : moduleBindings,
+		);
+		for (const name of names) {
+			if (!contexts.has(name)) continue;
+			if (!privateContextCaptureBoundary(boundary)) contexts.delete(name);
+			else captured.add(name);
+		}
+	}
+	return new Map([...contexts].filter(([name]) => captured.has(name)));
+}
+
+function certifySplitContexts(ast, contexts, captureBindings) {
+	if (contexts.size === 0) return;
+	const byId = new Map(),
+		byTag = new Map(),
+		present = new WeakSet();
+	for (const [name, context] of contexts) {
+		byId.set(context.id, context.callee);
+		for (const tag of context.providerTags) byTag.set(tag, captureBindings.get(name) ?? context.id);
+	}
+	const callees = new Set(),
+		providers = new Map();
+	mapAstCow(ast, (node) => {
+		present.add(node);
+		if (byId.has(node)) callees.add(byId.get(node));
+		if (byTag.has(node)) providers.set(node, byTag.get(node));
+		return undefined;
+	});
+	for (const [tag, binding] of providers) if (!present.has(binding)) providers.delete(tag);
+	if (callees.size > 0 || providers.size > 0) privateSplitContexts.set(ast, { callees, providers });
+}
 
 const SKIP_KEYS = new Set(['type', 'loc', 'start', 'end', 'range', 'metadata', 'parent']);
 const TRANSPARENT_TS_EXPRESSIONS = new Set([
@@ -22,32 +129,42 @@ const TRANSPARENT_TS_EXPRESSIONS = new Set([
 ]);
 
 function inheritGeneratedOrigin(root, origin) {
-	const seen = new WeakSet();
+	const seen = new WeakMap();
 	const visit = (value) => {
-		if (!value || typeof value !== 'object' || seen.has(value)) return;
-		seen.add(value);
+		if (!value || typeof value !== 'object') return value;
+		// Stylesheet descendants use offsets into their own CSS source and do
+		// not carry JavaScript locations. Keep that adopted grammar intact.
+		if (value.type === 'StyleSheet') return value;
+		if (seen.has(value)) return seen.get(value);
+		seen.set(value, value);
 		if (Array.isArray(value)) {
-			for (const item of value) visit(item);
-			return;
+			let output = null;
+			for (let index = 0; index < value.length; index++) {
+				const mapped = visit(value[index]);
+				if (output === null && mapped !== value[index]) output = value.slice(0, index);
+				if (output !== null) output.push(mapped);
+			}
+			const result = output ?? value;
+			seen.set(value, result);
+			return result;
 		}
-		// Adopted parser nodes (including StyleSheet subtrees) may be frozen
-		// and already carry CSS-relative positions; only stamp generated nodes.
-		if (
-			typeof value.type === 'string' &&
-			value.loc == null &&
-			origin?.loc != null &&
-			!Object.isFrozen(value)
-		) {
-			value.start = origin.start;
-			value.end = origin.end;
-			value.loc = origin.loc;
+		let output = null;
+		if (typeof value.type === 'string' && value.loc == null && origin?.loc != null) {
+			output = { ...value, start: origin.start, end: origin.end, loc: origin.loc };
 		}
 		for (const [key, child] of Object.entries(value)) {
-			if (!SKIP_KEYS.has(key)) visit(child);
+			if (SKIP_KEYS.has(key)) continue;
+			const mapped = visit(child);
+			if (mapped !== child) {
+				if (output === null) output = { ...value };
+				output[key] = mapped;
+			}
 		}
+		const result = output ?? value;
+		seen.set(value, result);
+		return result;
 	};
-	visit(root);
-	return root;
+	return visit(root);
 }
 
 function mapAstCow(value, replace) {
@@ -113,6 +230,49 @@ function jsxExpressionAttribute(name, expression, origin) {
 			false,
 			origin,
 		),
+		origin,
+	);
+}
+
+function objectProperty(name, value) {
+	return b.prop('init', b.id(name), value);
+}
+
+function independentManifestExpression(manifest, captures, origin) {
+	const template = b.object([
+		objectProperty('version', b.literal(1)),
+		objectProperty(
+			'boundaryId',
+			b.literal(manifest.boundaryId, JSON.stringify(manifest.boundaryId)),
+		),
+		objectProperty(
+			'exportName',
+			b.literal(manifest.exportName, JSON.stringify(manifest.exportName)),
+		),
+		objectProperty(
+			'captureSchema',
+			b.array(
+				manifest.captureSchema.map((capture) =>
+					b.object([
+						objectProperty('name', b.literal(capture.name, JSON.stringify(capture.name))),
+						objectProperty('type', b.literal('json', "'json'")),
+					]),
+				),
+			),
+		),
+		objectProperty('hookSeed', b.literal(manifest.hookSeed)),
+		objectProperty('idSeed', b.literal(manifest.idSeed)),
+		objectProperty(
+			'signalSites',
+			b.array(manifest.signalSites.map((site) => b.literal(site, JSON.stringify(site)))),
+		),
+		objectProperty('parentDependencies', b.literal(false, 'false')),
+	]);
+	return inheritGeneratedOrigin(
+		b.object([
+			objectProperty('manifestTemplate', template),
+			objectProperty('captures', b.array(captures.map((name) => b.id(name)))),
+		]),
 		origin,
 	);
 }
@@ -338,6 +498,52 @@ function literalSplitDisabled(node) {
 			? unwrapExpression(split.value.expression)
 			: split.value;
 	return value?.type === 'Literal' && value.value === false;
+}
+
+function literalIndependentEnabled(node, filename) {
+	let independent = null;
+	let hasSpread = false;
+	for (const attribute of node.openingElement?.attributes ?? []) {
+		if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
+			hasSpread = true;
+			continue;
+		}
+		if (jsxAttributeName(attribute) === 'independent') independent = attribute;
+	}
+	if (independent === null) return false;
+	const raw =
+		independent.value == null
+			? null
+			: independent.value.type === 'JSXExpressionContainer'
+				? unwrapExpression(independent.value.expression)
+				: independent.value;
+	const enabled = independent.value == null || (raw?.type === 'Literal' && raw.value === true);
+	const disabled = raw?.type === 'Literal' && raw.value === false;
+	if (!enabled && !disabled) {
+		throw extractionError(
+			'OCTANE_HYDRATE_INDEPENDENT_LITERAL',
+			filename,
+			independent,
+			'`independent` must be the literal `true` or `false` so standalone ownership is decided at build time',
+		);
+	}
+	if (enabled && hasSpread) {
+		throw extractionError(
+			'OCTANE_HYDRATE_INDEPENDENT_SPREAD',
+			filename,
+			independent,
+			'an independent boundary cannot combine its ownership request with Hydrate prop spreads; author the boundary options directly',
+		);
+	}
+	if (enabled && literalSplitDisabled(node)) {
+		throw extractionError(
+			'OCTANE_HYDRATE_INDEPENDENT_SPLIT',
+			filename,
+			independent,
+			'an independent boundary requires its own split client entry; remove `split={false}` or remove `independent`',
+		);
+	}
+	return enabled;
 }
 
 /**
@@ -719,9 +925,11 @@ export function analyzeHydrateBoundaries(source, filename = 'unknown.tsrx', pars
 				const siblings = parentBoundary === null ? roots : parentBoundary.children;
 				const index = siblings.length;
 				const path = parentBoundary === null ? String(index) : `${parentBoundary.path}.${index}`;
+				const independent = literalIndependentEnabled(node, filename);
 				boundary = {
 					children: [],
 					disabled: literalSplitDisabled(node),
+					independent,
 					permanentStatic: isPermanentStaticBoundary(node, imports.neverNames, shadowed),
 					node,
 					parent: parentBoundary,
@@ -1024,6 +1232,226 @@ function collectCaptures(
 	return [...captures];
 }
 
+function captureBindingScope(lexical, node, name) {
+	return (
+		lexical.resolveBinding(lexical.nodeScopes.get(node) ?? lexical.rootScope, name)?.scope ??
+		lexical.rootScope
+	);
+}
+
+function bindingInitializers(ast, lexical) {
+	const initializers = new WeakMap();
+	const seen = new WeakSet();
+	const visit = (node) => {
+		if (!node || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (node.type === 'VariableDeclarator') {
+			const names = new Set();
+			collectBindingNames(node.id, names);
+			for (const name of names) {
+				const scope = captureBindingScope(lexical, node, name);
+				let bindings = initializers.get(scope);
+				if (bindings === undefined) initializers.set(scope, (bindings = new Map()));
+				let values = bindings.get(name);
+				if (values === undefined) bindings.set(name, (values = []));
+				values.push(node.init ?? null);
+			}
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (!SKIP_KEYS.has(key)) visit(child);
+		}
+	};
+	visit(ast);
+	return initializers;
+}
+
+function assignedBindingsOutsideBoundary(ast, boundary, lexical) {
+	const assigned = new WeakMap();
+	const inside = new WeakSet();
+	collectSubtreeNodes(boundary.node.children, inside);
+	const seen = new WeakSet();
+	const visit = (node) => {
+		if (!node || typeof node !== 'object' || seen.has(node) || inside.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (node.type === 'AssignmentExpression' || node.type === 'UpdateExpression') {
+			const names = new Set();
+			collectBindingNames(node.type === 'AssignmentExpression' ? node.left : node.argument, names);
+			for (const name of names) {
+				const scope = captureBindingScope(lexical, node, name);
+				let bindings = assigned.get(scope);
+				if (bindings === undefined) assigned.set(scope, (bindings = new Set()));
+				bindings.add(name);
+			}
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (!SKIP_KEYS.has(key)) visit(child);
+		}
+	};
+	visit(ast);
+	return assigned;
+}
+
+function unsupportedIndependentInitializer(node, lexical, initializers, assigned, memo) {
+	if (Array.isArray(node)) {
+		return node.some((value) =>
+			unsupportedIndependentInitializer(value, lexical, initializers, assigned, memo),
+		);
+	}
+	const value = unwrapExpression(node);
+	if (value == null) return false;
+	const cached = memo.get(value);
+	if (cached !== undefined) return cached;
+	// A cyclic alias cannot establish a standalone data initializer. The memo
+	// also avoids repeatedly walking shared alias chains within this widget.
+	memo.set(value, true);
+	const visit = (node, parent = null, key = null) => {
+		if (!node || typeof node !== 'object') return false;
+		if (
+			isFunction(node) ||
+			node.type === 'ClassExpression' ||
+			node.type === 'NewExpression' ||
+			node.type === 'CallExpression' ||
+			node.type === 'OptionalCallExpression'
+		) {
+			// Calls can create request, DOM, class, store, or closure identity.
+			// Wrapping that result in an alias or object does not erase its owner.
+			return true;
+		}
+		if (node.type === 'Identifier' && isIdentifierReference(node, parent, key, lexical)) {
+			const scope = captureBindingScope(lexical, node, node.name);
+			if (
+				assigned.get(scope)?.has(node.name) ||
+				unsupportedIndependentInitializer(
+					initializers.get(scope)?.get(node.name),
+					lexical,
+					initializers,
+					assigned,
+					memo,
+				)
+			) {
+				return true;
+			}
+		}
+		let unsupported = false;
+		forEachRuntimeAstChild(node, (child, childKey) => {
+			if (!unsupported) unsupported = visit(child, node, childKey);
+		});
+		return unsupported;
+	};
+	const unsupported = visit(value);
+	memo.set(value, unsupported);
+	return unsupported;
+}
+
+function signalSitesInBoundary(boundary) {
+	const sites = new Set();
+	const seen = new WeakSet();
+	const visit = (node) => {
+		if (!node || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
+			const callee = node.callee;
+			const name =
+				callee?.type === 'Identifier'
+					? callee.name
+					: callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression'
+						? nameOf(callee.property)
+						: null;
+			const site = node.arguments?.[0];
+			if (
+				/^_?\$?__(?:signal|derived|query)At$/.test(name ?? '') &&
+				site?.type === 'Literal' &&
+				typeof site.value === 'string'
+			) {
+				sites.add(site.value);
+			}
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (!SKIP_KEYS.has(key)) visit(child);
+		}
+	};
+	visit(boundary.node.children);
+	return [...sites].sort();
+}
+
+function independentWidgetMetadata(analysis, filename, moduleMovePlan) {
+	if (!analysis.boundaries.some((boundary) => boundary.independent)) return [];
+	const lexical = createLexicalAnalysis(analysis.ast);
+	const initializers = bindingInitializers(analysis.ast, lexical);
+	const widgets = [];
+	for (const boundary of analysis.boundaries) {
+		if (!boundary.independent) continue;
+		if (hasPermanentStaticAncestor(boundary)) {
+			throw extractionError(
+				'OCTANE_HYDRATE_INDEPENDENT_STATIC_PARENT',
+				filename,
+				boundary.node,
+				'an independent boundary cannot be nested below a permanently static Hydrate owner',
+			);
+		}
+		assertDirectChildren(boundary, filename);
+		validateBoundary(boundary, filename, analysis.imports.hookNames);
+		const moduleBindings = moduleMovePlan.bindingsByPath.get(boundary.path) ?? new Set();
+		const captures = collectCaptures(
+			boundary.node.children,
+			analysis.imports.importBindings,
+			boundary.shadowedImports,
+			moduleBindings.size === 0 ? null : moduleBindings,
+		);
+		const assigned = assignedBindingsOutsideBoundary(analysis.ast, boundary, lexical);
+		// Each widget excludes its own writes, so alias admission is boundary-specific.
+		const initializerMemo = new WeakMap();
+		for (const capture of captures) {
+			const scope = captureBindingScope(lexical, boundary.node, capture);
+			const initializer = initializers.get(scope)?.get(capture);
+			if (
+				assigned.get(scope)?.has(capture) ||
+				unsupportedIndependentInitializer(
+					initializer,
+					lexical,
+					initializers,
+					assigned,
+					initializerMemo,
+				)
+			) {
+				throw extractionError(
+					'OCTANE_HYDRATE_INDEPENDENT_OWNER_CAPTURE',
+					filename,
+					boundary.node,
+					`independent activation cannot preserve parent-owned runtime capture \`${capture}\`. Pass serializable data, move the lifecycle into the widget, or use ordinary parent-first Hydrate`,
+				);
+			}
+		}
+		const boundaryId = `w:${strongHash(`octane:independent-boundary:1\0${filename}\0${boundary.path}`)}`;
+		widgets.push({
+			version: 1,
+			boundaryId,
+			moduleId: filename,
+			exportName: 'default',
+			request: `${sameSourceRequest(filename)}?${HYDRATE_QUERY_PARAM}=${encodeURIComponent(boundary.path)}`,
+			captureSchema: captures.map((name) => ({ name, type: 'json' })),
+			hookSeed: Number.parseInt(strongHash(`${boundaryId}\0hook`), 16),
+			idSeed: Number.parseInt(strongHash(`${boundaryId}\0id`), 16),
+			signalSites: signalSitesInBoundary(boundary),
+			styles: [],
+			parentDependencies: false,
+		});
+	}
+	return widgets;
+}
+
 function declarationBindingSet(node) {
 	const bindings = new Set();
 	if (node?.type === 'VariableDeclaration') {
@@ -1286,6 +1714,7 @@ function hydrateBoundaryElement(
 	request,
 	importBindings,
 	additionalModuleBindings = new Set(),
+	referencesOnly = false,
 ) {
 	const node = boundary.node;
 	const opening = node.openingElement;
@@ -1320,18 +1749,41 @@ function hydrateBoundaryElement(
 		boundary.shadowedImports,
 		additionalModuleBindings.size === 0 ? null : additionalModuleBindings,
 	);
-	const attributes = [
-		...(opening.attributes ?? []),
-		jsxExpressionAttribute('__load', hydrateLoaderExpression(boundary, request), opening),
-	];
-	if (captures.length > 0) {
+	const attributes = [...(opening.attributes ?? [])];
+	if (boundary.independent) {
 		attributes.push(
 			jsxExpressionAttribute(
-				'__data',
-				inheritGeneratedOrigin(b.array(captures.map((name) => b.id(name))), opening),
+				'__independent',
+				// Move planning precedes manifest validation, but still needs every capture
+				// reference to distinguish eager declarations from widget-owned code.
+				referencesOnly
+					? inheritGeneratedOrigin(b.array(captures.map((name) => b.id(name))), opening)
+					: independentManifestExpression(boundary.independentManifest, captures, opening),
 				opening,
 			),
 		);
+		attributes.push(
+			jsxExpressionAttribute(
+				'__independentLoad',
+				hydrateLoaderExpression(boundary, request),
+				opening,
+			),
+		);
+	} else {
+		attributes.push(
+			jsxExpressionAttribute('__load', hydrateLoaderExpression(boundary, request), opening),
+		);
+	}
+	if (captures.length > 0) {
+		if (!boundary.independent) {
+			attributes.push(
+				jsxExpressionAttribute(
+					'__data',
+					inheritGeneratedOrigin(b.array(captures.map((name) => b.id(name))), opening),
+					opening,
+				),
+			);
+		}
 	}
 	attributes.push(jsxExpressionAttribute('children', b.literal(null, 'null'), opening));
 	return {
@@ -1347,6 +1799,7 @@ function transformHydrateAst(
 	request,
 	bindingsByPath = new Map(),
 	removedRecords = [],
+	referencesOnly = false,
 ) {
 	const replacements = new WeakMap();
 	for (const boundary of extractionFrontier(analysis.roots)) {
@@ -1357,6 +1810,7 @@ function transformHydrateAst(
 				request,
 				analysis.imports.importBindings,
 				bindingsByPath.get(boundary.path),
+				referencesOnly,
 			),
 		);
 	}
@@ -1403,6 +1857,7 @@ function extractedModuleAst(
 	request,
 	moduleBindingsByPath = new Map(),
 	moduleDeclarationsByPath = new Map(),
+	captureBindings = new Map(),
 ) {
 	if (boundary.disabled) {
 		throw extractionError(
@@ -1424,6 +1879,7 @@ function extractedModuleAst(
 	const pathName = boundary.path.replace(/[^A-Za-z0-9_$]/g, '_');
 	const componentName = uniqueGeneratedName(source, `__OctaneHydrateBoundary_${pathName}`);
 	const captureName = uniqueGeneratedName(source, `__octaneHydrateCaptures_${pathName}`);
+	const activatorName = uniqueGeneratedName(source, '__octaneCreateIndependentHydrateActivator');
 	const nestedAnalysis = {
 		...analysis,
 		roots: boundary.children,
@@ -1438,6 +1894,8 @@ function extractedModuleAst(
 		nestedAnalysis,
 		request,
 		moduleBindingsByPath,
+		[],
+		true,
 	).body;
 	const setup =
 		captures.length === 0
@@ -1448,6 +1906,11 @@ function extractedModuleAst(
 						boundary.node,
 					),
 				];
+	if (setup.length > 0) {
+		const pattern = setup[0].declarations[0].id;
+		for (let index = 0; index < captures.length; index++)
+			captureBindings.set(captures[index], pattern.elements[index]);
+	}
 	const codeBlock = inheritGeneratedOrigin(
 		{
 			type: 'JSXCodeBlock',
@@ -1457,16 +1920,37 @@ function extractedModuleAst(
 		},
 		boundary.node,
 	);
-	const generatedExport = inheritGeneratedOrigin(
-		b.export_default(b.function_declaration(b.id(componentName), [b.id(captureName)], codeBlock)),
+	const generatedComponent = inheritGeneratedOrigin(
+		b.function_declaration(b.id(componentName), [b.id(captureName)], codeBlock),
 		boundary.node,
 	);
+	const generatedNodes = boundary.independent
+		? [
+				generatedComponent,
+				inheritGeneratedOrigin(
+					b.export_default(b.call(b.id(activatorName), b.id(componentName))),
+					boundary.node,
+				),
+			]
+		: [inheritGeneratedOrigin(b.export_default(generatedComponent), boundary.node)];
+	const activatorImport = boundary.independent
+		? [
+				inheritGeneratedOrigin(
+					b.import_declaration(
+						[b.import_specifier('createIndependentHydrateActivator', activatorName)],
+						'octane/internal/client',
+					),
+					boundary.node,
+				),
+			]
+		: [];
 	const program = {
 		...analysis.ast,
 		body: [
 			...analysis.imports.declarations,
+			...activatorImport,
 			...(moduleDeclarationsByPath.get(boundary.path) ?? []).map((record) => record.node),
-			generatedExport,
+			...generatedNodes,
 		],
 	};
 	return pruneUnusedImportsAst(program, false);
@@ -1496,6 +1980,8 @@ function moduleReferencesForBoundary(analysis, boundary, request, moduleBindings
 		nestedAnalysis,
 		request,
 		moduleBindingsByPath,
+		[],
+		true,
 	);
 	return collectModuleReferences(fragment.body);
 }
@@ -1522,6 +2008,7 @@ function createModuleMovePlanAst(analysis, request) {
 		request,
 		allBindingsByPath,
 		candidates.records,
+		true,
 	);
 	const eagerReferences = new Set(
 		collectCaptures(
@@ -1760,6 +2247,15 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null, 
 	}
 	const request = sameSourceRequest(filename);
 	const moduleMovePlan = createModuleMovePlanAst(analysis, request);
+	const contexts = originalSplitContextProofs(analysis, moduleMovePlan);
+	const captureBindings = new Map();
+	const independentWidgets = independentWidgetMetadata(analysis, filename, moduleMovePlan);
+	let independentIndex = 0;
+	for (const boundary of analysis.boundaries) {
+		if (boundary.independent) {
+			boundary.independentManifest = independentWidgets[independentIndex++];
+		}
+	}
 	const permanentStaticRemoved =
 		boundaryPath === null
 			? createPermanentStaticRemovalPlanAst(analysis, request, moduleMovePlan)
@@ -1788,11 +2284,20 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null, 
 			request,
 			moduleMovePlan.bindingsByPath,
 			moduleMovePlan.declarationsByPath,
+			captureBindings,
 		);
 	}
+	const templateTags = new Set(
+		analysis.boundaries
+			.filter(isCompiledSplitHydrateBoundary)
+			.map((boundary) => boundary.node.openingElement.name),
+	);
+	if (templateTags.size > 0) compiledSplitHydrateTags.set(ast, templateTags);
+	certifySplitContexts(ast, contexts, captureBindings);
 	return {
 		ast,
 		boundaryPath,
+		independentWidgets,
 	};
 }
 
@@ -1893,13 +2398,33 @@ export function prepareServerHydrateBoundaries(source, filename, parsedAst = nul
 	if (!source.includes('Hydrate') || !source.includes('octane')) return null;
 	const analysis = analyzeHydrateBoundaries(source, filename, parsedAst);
 	if (analysis.boundaries.length === 0) return null;
+	for (const boundary of analysis.boundaries) {
+		boundary.filename = filename;
+		boundary.hookNames = analysis.imports.hookNames;
+		boundary.ast = analysis.ast;
+	}
+	const request = sameSourceRequest(filename);
+	const moduleMovePlan = createModuleMovePlanAst(analysis, request);
+	const independentWidgets = independentWidgetMetadata(analysis, filename, moduleMovePlan);
+	let independentIndex = 0;
+	for (const boundary of analysis.boundaries) {
+		if (!boundary.independent) continue;
+		boundary.independentManifest = independentWidgets[independentIndex++];
+		const moduleBindings = moduleMovePlan.bindingsByPath.get(boundary.path) ?? new Set();
+		boundary.independentCaptures = collectCaptures(
+			boundary.node.children,
+			analysis.imports.importBindings,
+			boundary.shadowedImports,
+			moduleBindings.size === 0 ? null : moduleBindings,
+		);
+	}
 	const constObjects = collectSingleUseConstObjects(analysis.ast);
 	const elementUpdates = new Map();
 	const objectUpdates = new Map();
 	const updateElement = (node) => {
 		let update = elementUpdates.get(node);
 		if (update === undefined) {
-			update = { permanentStatic: false, removedAttributes: new Set() };
+			update = { permanentStatic: false, independent: null, removedAttributes: new Set() };
 			elementUpdates.set(node, update);
 		}
 		return update;
@@ -1914,6 +2439,12 @@ export function prepareServerHydrateBoundaries(source, filename, parsedAst = nul
 		}
 	};
 	for (const boundary of analysis.boundaries) {
+		if (boundary.independent) {
+			updateElement(boundary.node).independent = {
+				manifest: boundary.independentManifest,
+				captures: boundary.independentCaptures,
+			};
+		}
 		if (boundary.permanentStatic) {
 			updateElement(boundary.node).permanentStatic = true;
 		}
@@ -1947,13 +2478,43 @@ export function prepareServerHydrateBoundaries(source, filename, parsedAst = nul
 		const elementUpdate = elementUpdates.get(original);
 		if (elementUpdate !== undefined) {
 			const opening = node.openingElement;
+			const attributes = (opening.attributes ?? []).filter(
+				(attribute) => !elementUpdate.removedAttributes.has(attribute),
+			);
+			if (elementUpdate.independent !== null) {
+				attributes.push(
+					jsxExpressionAttribute(
+						'__independent',
+						independentManifestExpression(
+							elementUpdate.independent.manifest,
+							elementUpdate.independent.captures,
+							opening,
+						),
+						opening,
+					),
+				);
+				// Extraction always compiles an independent widget as a template body.
+				// Keep its server children on that same path even in return-JSX parents,
+				// whose descriptor children would add a range the widget cannot adopt.
+				attributes.push(
+					jsxExpressionAttribute(
+						'children',
+						b.arrow([b.id(uniqueGeneratedName(source, '__octaneIndependentProps'))], {
+							type: 'JSXCodeBlock',
+							body: [],
+							render: b.jsx_fragment(node.children ?? []),
+							metadata: { path: [] },
+						}),
+						node,
+					),
+				);
+			}
 			return {
 				...node,
+				children: elementUpdate.independent !== null ? [] : node.children,
 				openingElement: {
 					...opening,
-					attributes: (opening.attributes ?? []).filter(
-						(attribute) => !elementUpdate.removedAttributes.has(attribute),
-					),
+					attributes,
 					name: elementUpdate.permanentStatic
 						? permanentStaticName(opening.name, opening.name)
 						: opening.name,
@@ -1979,5 +2540,6 @@ export function prepareServerHydrateBoundaries(source, filename, parsedAst = nul
 	return {
 		ast,
 		boundaryPath: null,
+		independentWidgets,
 	};
 }

@@ -1,17 +1,17 @@
 import type { RegisteredCell } from '../../context/CellsContext';
 import { createSelector } from 'reselect';
 
-import { computePieSectors, PieSectorDataItem } from '../../polar/Pie.tsrx';
-import { RechartsRootState } from '../store';
+import { computePieSectors, type PieSectorDataItem } from '../../polar/Pie.tsrx';
+import type { RechartsRootState } from '../store';
 import { selectChartDataAndAlwaysIgnoreIndexes } from './dataSelectors';
-import { ChartData, ChartDataState } from '../chartDataSlice';
-import { ChartOffsetInternal } from '../../util/types';
+import type { ChartData, ChartDataState } from '../chartDataSlice';
+import type { ChartOffsetInternal } from '../../util/types';
 import { selectChartOffsetInternal } from './selectChartOffsetInternal';
 import type { LegendPayload } from '../../component/DefaultLegendContent.tsrx';
 import { getTooltipNameProp, getValueByDataKey } from '../../util/ChartUtils';
 import { selectUnfilteredPolarItems } from './polarSelectors';
 import type { PieSettings } from '../types/PieSettings';
-import { GraphicalItemId } from '../graphicalItemsSlice';
+import type { GraphicalItemId } from '../graphicalItemsSlice';
 
 const pickId = (_state: RechartsRootState, id: GraphicalItemId): GraphicalItemId => id;
 

@@ -37,7 +37,7 @@ export function DefaultOutside() @{
 // Per ReactNewContext-test.js:381 — 'multiple consumers in different branches'.
 export function Branches(props: { value: string }) @{
 	<div class="branches">
-		<Ctx.Provider value={props.value}>
+		<Ctx value={props.value}>
 			<section class="b1">
 				<Reader tag="b1" />
 			</section>
@@ -46,7 +46,7 @@ export function Branches(props: { value: string }) @{
 					<Reader tag="b2" />
 				</div>
 			</section>
-		</Ctx.Provider>
+		</Ctx>
 	</div>
 }
 
@@ -61,9 +61,9 @@ const Shell = memo(ShellImpl);
 export function PropagationBail(props: { value: string }) @{
 	log('Root');
 	<div class="prop-bail">
-		<Ctx.Provider value={props.value}>
+		<Ctx value={props.value}>
 			<Shell />
-		</Ctx.Provider>
+		</Ctx>
 	</div>
 }
 
@@ -87,11 +87,11 @@ const Sib3 = memo(Sib3Impl);
 
 export function Siblings(props: { value: string }) @{
 	<div class="siblings">
-		<Ctx.Provider value={props.value}>
+		<Ctx value={props.value}>
 			<Sib1 />
 			<Sib2 />
 			<Sib3 />
-		</Ctx.Provider>
+		</Ctx>
 	</div>
 }
 
@@ -99,11 +99,11 @@ export function Siblings(props: { value: string }) @{
 // hidden subtree'.
 export function HiddenHost(props: { value: string; mode: string }) @{
 	<div class="hidden-host">
-		<Ctx.Provider value={props.value}>
+		<Ctx value={props.value}>
 			<Activity mode={props.mode as 'visible' | 'hidden'}>
 				<Reader tag="hidden" />
 			</Activity>
-		</Ctx.Provider>
+		</Ctx>
 	</div>
 }
 
@@ -123,9 +123,9 @@ function Middle() @{
 export function NoBailouts(props: { value: string }) @{
 	log('NB');
 	<div class="no-bail">
-		<Ctx.Provider value={props.value}>
+		<Ctx value={props.value}>
 			<Middle />
-		</Ctx.Provider>
+		</Ctx>
 	</div>
 }
 
@@ -138,11 +138,11 @@ function Sus(props: { promise: Promise<string> }) @{
 
 export function SuspendedHost(props: { value: string; promise: Promise<string> }) @{
 	<div class="sus-host">
-		<Ctx.Provider value={props.value}>
+		<Ctx value={props.value}>
 			<Suspense fallback="waiting">
 				<Sus promise={props.promise} />
 				<Reader tag="sus" />
 			</Suspense>
-		</Ctx.Provider>
+		</Ctx>
 	</div>
 }

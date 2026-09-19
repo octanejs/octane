@@ -156,7 +156,7 @@ export class ReactNodeView<
 		};
 		const Component = this.component;
 		const providerBody: ComponentBody<ReactNodeViewProps<T>> = (props) =>
-			createElement(ReactNodeViewContext.Provider, {
+			createElement(ReactNodeViewContext, {
 				value: context,
 				children: createElement(Component, props),
 			});

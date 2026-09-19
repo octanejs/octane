@@ -1,6 +1,6 @@
 {
   "name": "octane",
-  "version": "0.2.12",
+  "version": "0.3.0",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
@@ -41,7 +41,15 @@
     "./tsrx-spread": "./src/tsrx-spread.ts",
     "./react": "./src/react/index.ts",
     "./hydration": "./src/hydration/index.ts",
+    "./hydration/streamed-signals": "./src/hydration/streamed-signals.ts",
     "./behavior": "./src/behavior-root.ts",
+    "./dom-bindings": "./src/dom-bindings.ts",
+    "./dom-binding-program": "./src/dom-binding-program.ts",
+    "./dom-binding-classes": "./src/dom-binding-classes.ts",
+    "./dom-binding-signals": "./src/dom-binding-signals.ts",
+    "./dom-binding-controls": "./src/dom-binding-controls.ts",
+    "./dom-binding-styles": "./src/dom-binding-styles.ts",
+    "./dom-binding-projections": "./src/dom-binding-projections.ts",
     "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
     "./signals": "./src/signals/index.ts",
@@ -49,6 +57,8 @@
     "./signals/server": "./src/signals/server.ts",
     "./internal/client": "./src/internal/client.ts",
     "./internal/server": "./src/internal/server.ts",
+    "./internal/context": "./src/internal/context.ts",
+    "./internal/signal-read": "./src/internal/signal-read.ts",
     "./static": "./src/static/index.ts",
     "./testing": "./src/testing.ts",
     "./constants": "./src/constants.ts",
@@ -114,9 +124,45 @@
         "types": "./dist/hydration/index.d.ts",
         "default": "./dist/hydration/index.js"
       },
+      "./hydration/streamed-signals": {
+        "types": "./dist/hydration/streamed-signals.d.ts",
+        "default": "./dist/hydration/streamed-signals.js"
+      },
       "./behavior": {
         "types": "./dist/behavior-root.d.ts",
         "default": "./dist/behavior-root.js"
+      },
+      "./dom-bindings": {
+        "types": "./dist/dom-bindings.d.ts",
+        "default": "./dist/dom-bindings.js"
+      },
+      "./dom-binding-program": {
+        "types": "./dist/dom-binding-program.d.ts",
+        "default": "./dist/dom-binding-program.js"
+      },
+      "./dom-binding-classes": {
+        "types": "./dist/dom-binding-classes.d.ts",
+        "default": "./dist/dom-binding-classes.js"
+      },
+      "./dom-binding-signals": {
+        "types": "./dist/dom-binding-signals.d.ts",
+        "default": "./dist/dom-binding-signals.js"
+      },
+      "./dom-binding-controls": {
+        "types": "./dist/dom-binding-controls.d.ts",
+        "default": "./dist/dom-binding-controls.js"
+      },
+      "./dom-binding-styles": {
+        "types": "./dist/dom-binding-styles.d.ts",
+        "default": "./dist/dom-binding-styles.js"
+      },
+      "./dom-binding-projections": {
+        "types": "./dist/dom-binding-projections.d.ts",
+        "default": "./dist/dom-binding-projections.js"
+      },
+      "./internal/signal-read": {
+        "types": "./dist/internal/signal-read.d.ts",
+        "default": "./dist/internal/signal-read.js"
       },
       "./react/server": {
         "types": "./dist/react/server.d.ts",
@@ -157,6 +203,12 @@
         "import": "./dist/internal/server.js",
         "require": "./dist/cjs/internal/server.cjs",
         "default": "./dist/internal/server.js"
+      },
+      "./internal/context": {
+        "types": "./dist/internal/context.d.ts",
+        "import": "./dist/internal/context.js",
+        "require": "./dist/cjs/internal/context.cjs",
+        "default": "./dist/internal/context.js"
       },
       "./static": {
         "types": "./dist/static/index.d.ts",

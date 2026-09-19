@@ -61,11 +61,7 @@ export function ToggleGroup({
 			),
 			...props,
 		},
-		createElement(
-			ToggleGroupContext.Provider,
-			{ value: { variant, size, spacing, orientation } },
-			children,
-		),
+		createElement(ToggleGroupContext, { value: { variant, size, spacing, orientation } }, children),
 	);
 }
 

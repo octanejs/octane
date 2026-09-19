@@ -1,5 +1,6 @@
 // @ts-check
 import { readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { createRpcRegistry } from '@octanejs/app-core';
 import { composeHtmlStream } from './html-stream.js';
@@ -7,6 +8,7 @@ import {
 	getContextNonce,
 	injectHydrationEntry,
 	nonceAttribute,
+	prepareStreamingHydrationTemplate,
 	splitSsrTemplate,
 } from './html-template.js';
 import {
@@ -54,9 +56,18 @@ import {
  * @param {Context} context
  * @param {ViteDevServer} vite
  * @param {ResolvedOctaneConfig} [octaneConfig]
+ * @param {import('octane/server').RenderOptions['independentHydration']} [independentHydration]
+ * @param {() => import('@octanejs/app-core/production').ClientBuildManifest} [getClientBuild]
  * @returns {Promise<Response>}
  */
-export async function handleRenderRoute(route, context, vite, octaneConfig) {
+export async function handleRenderRoute(
+	route,
+	context,
+	vite,
+	octaneConfig,
+	independentHydration,
+	getClientBuild,
+) {
 	try {
 		// Initialize so the server can register RPC functions from `module server`
 		// declarations during SSR module loading (renderer-agnostic; harmless when
@@ -119,6 +130,13 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 			{ pending: PendingComponent, catch: CatchComponent },
 			/** @type {any} */ (serverRuntime),
 		);
+		// Discovery runs while loading the page/layout above. Snapshot capability
+		// afterwards; its live registry also resolves widgets compiled lazily later.
+		const clientBuild = getClientBuild?.();
+		const streamedSignals =
+			clientBuild === undefined
+				? undefined
+				: { buildId: clientBuild.buildId, documentId: randomUUID() };
 
 		// Build head content with hydration data. The client entry is CONFIG-FREE
 		// (importing octane.config.ts into the browser would drag the plugin + the
@@ -129,6 +147,7 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 		// entry awaits before hydrateRoot. routeIndex stays for debugging /
 		// Phase-2 static maps.
 		const routeData = JSON.stringify({
+			...(clientBuild === undefined ? {} : { clientBuild, streamedSignals }),
 			entry: entryPath,
 			exportName: get_route_entry_export_name(route.entry) ?? null,
 			layout: route.layout ?? null,
@@ -164,10 +183,19 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 		// `<title>`/`<meta>`/`<link>` must be spliced at `<!--ssr-head-->` rather
 		// than folded into a body that has no `</head>`.
 		let hoistedHead = '';
+		let earlyHydration = clientBuild?.capabilities.independentHydration === true;
 		/** @type {ReadableStream<Uint8Array>} */
 		const renderStream = await renderToReadableStream(RootComponent, undefined, {
+			onEarlyHydrationReady() {
+				earlyHydration = true;
+			},
 			nonce: nonce ?? undefined,
 			headChannel: 'separate',
+			...(streamedSignals === undefined ? {} : { streamedSignals }),
+			...(independentHydration === undefined ||
+			clientBuild?.capabilities.independentHydration === false
+				? {}
+				: { independentHydration }),
 			onHeadReady(/** @type {string} */ head) {
 				hoistedHead = head;
 			},
@@ -183,14 +211,16 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 
 		// Function replacement, so `$&`/`` $` ``/`$'`/`$1` inside the route data or
 		// author-controlled metadata cannot expand against the match.
+		const preparedTemplate = earlyHydration
+			? prepareStreamingHydrationTemplate(html)
+			: { html, afterShell: '' };
 		const [prefix, suffix] = splitSsrTemplate(
-			html.replace('<!--ssr-head-->', () => headContent + hoistedHead),
+			preparedTemplate.html.replace('<!--ssr-head-->', () => headContent + hoistedHead),
 		);
 
-		// Template prefix → render stream (shell, then out-of-order segments) →
-		// template suffix. The hydration <script> is in the SUFFIX, so by the time
-		// the browser requests the entry every segment is already in the DOM.
-		const body = composeHtmlStream(prefix, renderStream, suffix);
+		// Feature-bearing documents activate after the complete shell and its
+		// selection authority; open result channels must not hold input hostage.
+		const body = composeHtmlStream(prefix, renderStream, suffix, preparedTemplate.afterShell);
 
 		return new Response(body, { status, headers });
 	} catch (error) {

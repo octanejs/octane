@@ -5,15 +5,17 @@
 | Field | Value |
 |---|---|
 | Package | `@tanstack/react-form` |
-| Version | `1.33.2` |
+| Adapter source version | `1.33.2` |
 | Release tag | `@tanstack/react-form@1.33.2` |
 | Canonical tag commit | `5d1128141a705ebb24ade1275b3117bb4c8b1bdc` |
-| Supported upstream range | exactly `1.33.2` |
+| Runtime dependency / React oracle | `1.33.5` |
 | React / ReactDOM oracle | `react@19.2.7` / `react-dom@19.2.7` |
 | Source root | `packages/react-form/src` |
 | Test root | `packages/react-form/tests` |
 | npm tarball SHA-256 | `db24c9288d56428e8f67742ca9e0fcf314917c21c8d8d4ff095aee8043602606` |
 | License | MIT |
+
+The runtime core and React oracle have been updated to 1.33.5. All ten published React adapter source files are byte-identical to 1.33.2, so the original source and test provenance remains pinned above. The imported core fixes field deletion removing siblings whose names share a prefix. `tests/conformance/repo-regressions.test.ts` covers that behavior through the public Octane package exports and fails with 1.33.2.
 
 The canonical tagged repository contains runtime and compile-time suites. The
 published npm artifact contains source and declarations but omits those tests,

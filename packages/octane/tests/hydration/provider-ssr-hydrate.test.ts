@@ -1,7 +1,7 @@
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import {
 	createElement,
 	flushSync,
@@ -14,7 +14,7 @@ import { App } from '../_fixtures/ssr-provider.tsx';
 import { ProviderApp } from '../_fixtures/jsx-context-children.tsx';
 import { hydrationMarkerSummary } from './_marker-summary.js';
 
-// Round-trip SSR→hydrate for `.tsx` `<Ctx.Provider>` with descriptor children.
+// Round-trip SSR→hydrate for `.tsx` `<Ctx>` with descriptor children.
 // Regression for two server bugs:
 //   1. ProviderBody only rendered children when they were a render FUNCTION, so a
 //      `.tsx` `createElement(Provider, {}, <child/>)` (descriptor children) SSR'd empty.
@@ -22,20 +22,17 @@ import { hydrationMarkerSummary } from './_marker-summary.js';
 //      `createElement` descriptor (the de-opt return path) SSR'd as `[object Object]`.
 
 function serverModule(file: string): Record<string, any> {
-	let { code } = compile(readFileSync(join(process.cwd(), file), 'utf8'), file.split('/').pop()!, {
+	return loadCompiledFixtureSource(readFileSync(join(process.cwd(), file), 'utf8'), {
+		id: file.split('/').pop()!,
 		mode: 'server',
+		compileOptions: {
+			mode: 'server',
+		},
 	});
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
 }
 const server = serverModule('packages/octane/tests/_fixtures/ssr-provider.tsx');
 
-describe('hydration — .tsx <Context.Provider> descriptor children', () => {
+describe('hydration — .tsx <Context> descriptor children', () => {
 	let container: HTMLElement;
 	beforeEach(() => {
 		container = document.createElement('div');
@@ -71,7 +68,7 @@ describe('hydration — .tsx <Context.Provider> descriptor children', () => {
 			);
 		const ServerProvider = () =>
 			ServerRT.createElement(
-				Theme.Provider as any,
+				Theme as any,
 				{ value: 'server-provided' },
 				ServerRT.createElement(ServerReader as any, null),
 			);
@@ -87,11 +84,7 @@ describe('hydration — .tsx <Context.Provider> descriptor children', () => {
 				useClientContext(Theme as any),
 			);
 		const ClientProvider = () =>
-			createElement(
-				Theme.Provider as any,
-				{ value: 'server-provided' },
-				createElement(ClientReader, null),
-			);
+			createElement(Theme as any, { value: 'server-provided' }, createElement(ClientReader, null));
 		const root = hydrateRoot(container, ClientProvider as any);
 		try {
 			flushSync(() => {});

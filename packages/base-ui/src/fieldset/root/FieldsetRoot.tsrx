@@ -54,9 +54,7 @@ export const FieldsetRoot = function FieldsetRoot(
 		[legendId, setLegendId, disabled],
 	);
 
-	return (
-		<FieldsetRootContext.Provider value={contextValue}>{element}</FieldsetRootContext.Provider>
-	);
+	return <FieldsetRootContext value={contextValue}>{element}</FieldsetRootContext>;
 };
 
 export interface FieldsetRootState {

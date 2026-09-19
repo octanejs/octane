@@ -3,7 +3,7 @@
  * octane's value-position rendering: string, render-fn, component (props
  * arrive), pre-created descriptor passthrough, undefined, octane memo()
  * (a plain function — the branch upstream needed exotic-component sniffing
- * for), and the upstream falsy quirk pinned as-is.
+ * for), and the upstream nullish-only empty-renderable contract.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { flexRender } from '@octanejs/tanstack-table';
@@ -65,12 +65,12 @@ describe('flexRender through the octane render path', () => {
 		r.unmount();
 	});
 
-	it('pins the upstream falsy quirk: !Comp → null', () => {
-		// Upstream's `!Comp ? null : …` swallows '' and 0 — parity, not a bug to fix.
+	it('retains falsy renderables and only maps nullish values to null', () => {
+		// Table 9.2.4 preserves zero and empty strings; only nullish means absent.
 		expect(flexRender(undefined, {})).toBe(null);
 		expect(flexRender(null, {})).toBe(null);
-		expect(flexRender('' as never, {})).toBe(null);
-		expect(flexRender(0 as never, {})).toBe(null);
+		expect(flexRender('' as never, {})).toBe('');
+		expect(flexRender(0 as never, {})).toBe(0);
 		expect(flexRender('x', {})).toBe('x');
 		expect(flexRender(42 as never, {})).toBe(42);
 	});

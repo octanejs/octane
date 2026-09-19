@@ -3,11 +3,11 @@ import type { NativeTouchEvent } from '../util/OctaneTypes';
 import {
 	createAction,
 	createListenerMiddleware,
-	ListenerEffectAPI,
-	PayloadAction,
+	type ListenerEffectAPI,
+	type PayloadAction,
 } from '@reduxjs/toolkit';
 
-import { AppDispatch, RechartsRootState } from './store';
+import type { AppDispatch, RechartsRootState } from './store';
 import { setActiveMouseOverItemIndex, setMouseOverAxisIndex } from './tooltipSlice';
 import { selectActivePropsFromChartPointer } from './selectors/selectActivePropsFromChartPointer';
 
@@ -19,7 +19,7 @@ import {
 } from '../util/Constants';
 import { selectTooltipCoordinate } from './selectors/touchSelectors';
 import { selectAllGraphicalItemsSettings } from './selectors/tooltipSelectors';
-import { RelativePointer } from '../util/types';
+import type { RelativePointer } from '../util/types';
 import { createEventProxy } from '../util/createEventProxy';
 
 export const touchEventAction = createAction<NativeTouchEvent<HTMLDivElement>>('touchMove');

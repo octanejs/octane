@@ -10,17 +10,17 @@ function Reader(props) @{
 
 function Capture(props) @{
 	const Bridge = useContextBridge(First, Second);
-	<First.Provider value="wrong-first">
-		<Second.Provider value="wrong-second">
+	<First value="wrong-first">
+		<Second value="wrong-second">
 			<Bridge><Reader onValue={props.onValue} /></Bridge>
-		</Second.Provider>
-	</First.Provider>
+		</Second>
+	</First>
 }
 
 export function ContextBridgeScene(props) @{
-	<First.Provider value={props.first}>
-		<Second.Provider value={props.second}>
+	<First value={props.first}>
+		<Second value={props.second}>
 			<Capture onValue={props.onValue} />
-		</Second.Provider>
-	</First.Provider>
+		</Second>
+	</First>
 }

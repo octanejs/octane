@@ -10,8 +10,8 @@ npm install @octanejs/tanstack-form
 pnpm add @octanejs/tanstack-form
 ```
 
-This package ports `@tanstack/react-form@1.33.2` onto Octane while reusing
-`@tanstack/form-core@1.33.2` unchanged. The runtime export surface matches the
+This package ports `@tanstack/react-form@1.33.5` onto Octane while reusing
+`@tanstack/form-core@1.33.5` unchanged. The runtime export surface matches the
 React adapter, so migration starts by changing the package import:
 
 ```ts

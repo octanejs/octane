@@ -1,15 +1,14 @@
-// The binding-level type surface — a 1:1 port of @tanstack/react-query's
-// types.ts (it is built entirely on query-core generics; nothing here is
-// React-specific), plus the component prop / context-value types at the bottom
-// (where upstream's React.ReactNode becomes octane's `unknown` renderable).
+import type { OctaneNode } from 'octane';
+import type { DehydratedState, HydrateOptions, QueryClient } from '@tanstack/query-core';
+/* istanbul ignore file */
+
 import type {
 	DefaultError,
 	DefinedInfiniteQueryObserverResult,
 	DefinedQueryObserverResult,
-	DehydratedState,
 	DistributiveOmit,
-	FetchQueryOptions,
-	HydrateOptions,
+	InfiniteData,
+	InfiniteQueryExecuteOptions,
 	InfiniteQueryObserverOptions,
 	InfiniteQueryObserverResult,
 	MutateFunction,
@@ -17,7 +16,7 @@ import type {
 	MutationObserverResult,
 	OmitKeyof,
 	Override,
-	QueryClient,
+	QueryExecuteOptions,
 	QueryKey,
 	QueryObserverOptions,
 	QueryObserverResult,
@@ -39,17 +38,37 @@ export interface UseBaseQueryOptions<
 	subscribed?: boolean;
 }
 
-export interface UsePrefetchQueryOptions<
+export type UsePrefetchQueryOptions<
 	TQueryFnData = unknown,
 	TError = DefaultError,
 	TData = TQueryFnData,
+	TQueryData = TQueryFnData,
 	TQueryKey extends QueryKey = QueryKey,
-> extends OmitKeyof<FetchQueryOptions<TQueryFnData, TError, TData, TQueryKey>, 'queryFn'> {
+> = DistributiveOmit<
+	QueryExecuteOptions<TQueryFnData, TError, TData, TQueryData, TQueryKey>,
+	'queryFn'
+> & {
 	queryFn?: Exclude<
-		FetchQueryOptions<TQueryFnData, TError, TData, TQueryKey>['queryFn'],
+		QueryExecuteOptions<TQueryFnData, TError, TData, TQueryData, TQueryKey>['queryFn'],
 		SkipToken
 	>;
-}
+};
+
+export type UsePrefetchInfiniteQueryOptions<
+	TQueryFnData = unknown,
+	TError = DefaultError,
+	TData = InfiniteData<TQueryFnData>,
+	TQueryKey extends QueryKey = QueryKey,
+	TPageParam = unknown,
+> = DistributiveOmit<
+	InfiniteQueryExecuteOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam>,
+	'queryFn'
+> & {
+	queryFn?: Exclude<
+		InfiniteQueryExecuteOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam>['queryFn'],
+		SkipToken
+	>;
+};
 
 export type AnyUseQueryOptions = UseQueryOptions<any, any, any, any>;
 export interface UseQueryOptions<
@@ -79,7 +98,7 @@ export type AnyUseInfiniteQueryOptions = UseInfiniteQueryOptions<any, any, any, 
 export interface UseInfiniteQueryOptions<
 	TQueryFnData = unknown,
 	TError = DefaultError,
-	TData = TQueryFnData,
+	TData = InfiniteData<TQueryFnData>,
 	TQueryKey extends QueryKey = QueryKey,
 	TPageParam = unknown,
 > extends OmitKeyof<
@@ -103,7 +122,7 @@ export type AnyUseSuspenseInfiniteQueryOptions = UseSuspenseInfiniteQueryOptions
 export interface UseSuspenseInfiniteQueryOptions<
 	TQueryFnData = unknown,
 	TError = DefaultError,
-	TData = TQueryFnData,
+	TData = InfiniteData<TQueryFnData>,
 	TQueryKey extends QueryKey = QueryKey,
 	TPageParam = unknown,
 > extends OmitKeyof<
@@ -128,8 +147,7 @@ export type UseQueryResult<TData = unknown, TError = DefaultError> = UseBaseQuer
 
 export type UseSuspenseQueryResult<TData = unknown, TError = DefaultError> = DistributiveOmit<
 	DefinedQueryObserverResult<TData, TError>,
-	// Query core 5.102 removed the experimental promise result field.
-	Extract<'isPlaceholderData' | 'promise', keyof DefinedQueryObserverResult<TData, TError>>
+	'isPlaceholderData'
 >;
 
 export type DefinedUseQueryResult<
@@ -149,7 +167,7 @@ export type DefinedUseInfiniteQueryResult<
 
 export type UseSuspenseInfiniteQueryResult<TData = unknown, TError = DefaultError> = OmitKeyof<
 	DefinedInfiniteQueryObserverResult<TData, TError>,
-	Extract<'isPlaceholderData' | 'promise', keyof DefinedInfiniteQueryObserverResult<TData, TError>>
+	'isPlaceholderData'
 >;
 
 export type AnyUseMutationOptions = UseMutationOptions<any, any, any, any>;
@@ -197,14 +215,12 @@ export type UseMutationResult<
 > = UseBaseMutationResult<TData, TError, TVariables, TOnMutateResult>;
 
 // ---------------------------------------------------------------------------
-// Component prop + context-value types (octane: children are renderables, so
-// upstream's React.ReactNode becomes `unknown`; render-prop children are also
-// accepted where upstream accepts them).
+// Component props and context values use Octane's native renderable type.
 // ---------------------------------------------------------------------------
 
 export interface QueryClientProviderProps {
 	client: QueryClient;
-	children?: unknown;
+	children?: OctaneNode;
 }
 
 export interface HydrationBoundaryProps {
@@ -212,7 +228,7 @@ export interface HydrationBoundaryProps {
 	options?: OmitKeyof<HydrateOptions, 'defaultOptions'> & {
 		defaultOptions?: OmitKeyof<Exclude<HydrateOptions['defaultOptions'], undefined>, 'mutations'>;
 	};
-	children?: unknown;
+	children?: OctaneNode;
 	queryClient?: QueryClient;
 }
 
@@ -226,8 +242,8 @@ export interface QueryErrorResetBoundaryValue {
 	reset: QueryErrorResetFunction;
 }
 
-export type QueryErrorResetBoundaryFunction = (value: QueryErrorResetBoundaryValue) => unknown;
+export type QueryErrorResetBoundaryFunction = (value: QueryErrorResetBoundaryValue) => OctaneNode;
 
 export interface QueryErrorResetBoundaryProps {
-	children: QueryErrorResetBoundaryFunction | unknown;
+	children: QueryErrorResetBoundaryFunction | OctaneNode;
 }

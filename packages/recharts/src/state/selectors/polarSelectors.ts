@@ -1,13 +1,13 @@
 import { createSelector } from 'reselect';
-import { AppliedChartData, ChartData } from '../chartDataSlice';
-import { RechartsRootState } from '../store';
-import { AxisId, BaseCartesianAxis } from '../cartesianAxisSlice';
+import type { AppliedChartData, ChartData } from '../chartDataSlice';
+import type { RechartsRootState } from '../store';
+import type { AxisId, BaseCartesianAxis } from '../cartesianAxisSlice';
 import {
 	selectChartDataAndAlwaysIgnoreIndexes,
 	selectChartDataSliceIgnoringIndexes,
 } from './dataSelectors';
 import {
-	AppliedChartDataWithErrorDomain,
+	type AppliedChartDataWithErrorDomain,
 	combineAppliedValues,
 	combineAxisDomain,
 	combineAxisDomainWithNiceTicks,
@@ -25,8 +25,8 @@ import {
 	selectRealScaleType,
 	selectRenderableAxisSettings,
 } from './axisSelectors';
-import { PolarGraphicalItemSettings } from '../graphicalItemsSlice';
-import { CategoricalDomain, NumberDomain } from '../../util/types';
+import type { PolarGraphicalItemSettings } from '../graphicalItemsSlice';
+import type { CategoricalDomain, NumberDomain } from '../../util/types';
 import { selectChartLayout } from '../../context/chartLayoutContext';
 import { getValueByDataKey } from '../../util/ChartUtils';
 import { pickAxisType } from './pickAxisType';

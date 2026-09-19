@@ -1437,7 +1437,7 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 			const semantics = analyzeTypeEvidence(
 				programFiles,
 				parsed,
-				concretePublicSpecifiers(packageDirectory, node.binding),
+				concretePublicSpecifiers(packageDirectory, node.binding, { excludePackageMetadata: true }),
 				trustedTypeAssertionModulePath,
 				loaded.config.reactPortEvidence?.publicMode === 'pinned'
 					? pinnedPublicEntries(packageDirectory, node)
@@ -1489,6 +1489,9 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 			parsed,
 			[expectedImport],
 			canonicalPath(path.join(workspaceRoot, 'scripts/react-port/type-assertions.d.ts')),
+			loaded.config.reactPortEvidence?.publicMode === 'pinned'
+				? pinnedPublicEntries(packageDirectory, { ...node, binding: expectedImport })
+				: undefined,
 		);
 		if (!analysis.hasPositiveAssertion || !analysis.hasNegativeControl) {
 			throw new Error(

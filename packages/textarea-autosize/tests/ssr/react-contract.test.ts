@@ -15,9 +15,14 @@ const style = {
 
 // Octane SSR terminates every style declaration with `;`; React omits the final one.
 function normalizeServerMarkup(html: string): string {
-	return html.replace(/style="([^"]*)"/g, function (_match, css: string) {
-		return 'style="' + css.replace(/;+$/, '') + '"';
-	});
+	return (
+		html
+			// Compiler-owned input identity does not change the native control contract.
+			.replace(/ data-octane-input="[^"]*"/g, '')
+			.replace(/style="([^"]*)"/g, function (_match, css: string) {
+				return 'style="' + css.replace(/;+$/, '') + '"';
+			})
+	);
 }
 
 describe('@octanejs/textarea-autosize SSR React contract', () => {

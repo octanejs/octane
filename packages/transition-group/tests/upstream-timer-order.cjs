@@ -28,4 +28,26 @@ function drainZeroDelayTimers(run, flush) {
 	}
 }
 
-module.exports = { drainZeroDelayTimers };
+// Timers created while rendering retain their actual delay and native handle.
+// Flush their React updates before another already-due timer can observe stale
+// DOM/callback state after an event-loop stall.
+function flushTimerUpdates(run, flush) {
+	const originalSetTimeout = globalThis.setTimeout;
+	globalThis.setTimeout = (callback, delay, ...args) => {
+		if (typeof callback !== 'function') return originalSetTimeout(callback, delay, ...args);
+		return originalSetTimeout(
+			function (...received) {
+				return flushTimerUpdates(() => flush(() => callback.apply(this, received)), flush);
+			},
+			delay,
+			...args,
+		);
+	};
+	try {
+		return run();
+	} finally {
+		globalThis.setTimeout = originalSetTimeout;
+	}
+}
+
+module.exports = { drainZeroDelayTimers, flushTimerUpdates };

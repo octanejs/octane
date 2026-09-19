@@ -12,9 +12,9 @@ import sumBy from 'es-toolkit/compat/sumBy';
 import get from 'es-toolkit/compat/get';
 import { Surface } from '../container/Surface.tsrx';
 import { Layer } from '../container/Layer.tsrx';
-import { Props as RectangleProps, Rectangle } from '../shape/Rectangle.tsrx';
+import { type Props as RectangleProps, Rectangle } from '../shape/Rectangle.tsrx';
 import { getValueByDataKey } from '../util/ChartUtils';
-import {
+import type {
 	Coordinate,
 	DataKey,
 	EventThrottlingProps,
@@ -37,24 +37,24 @@ import {
 	mouseLeaveItem,
 	setActiveClickItemIndex,
 	setActiveMouseOverItemIndex,
-	TooltipIndex,
-	TooltipPayloadConfiguration,
-	TooltipPayloadSearcher,
+	type TooltipIndex,
+	type TooltipPayloadConfiguration,
+	type TooltipPayloadSearcher,
 } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
-import { ChartOptions } from '../state/optionsSlice';
+import type { ChartOptions } from '../state/optionsSlice';
 import { ReportEventSettings } from '../state/ReportEventSettings';
 import { SetComputedData } from '../context/chartDataContext';
 import {
 	svgPropertiesNoEvents,
 	svgPropertiesNoEventsFromUnknown,
 } from '../util/svgPropertiesNoEvents';
-import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import { type RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 import { isPositiveNumber } from '../util/isWellBehavedNumber';
 import { isNotNil, noop } from '../util/DataUtils';
-import { WithIdRequired } from '../util/useUniqueId';
+import type { WithIdRequired } from '../util/useUniqueId';
 import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
-import { GraphicalItemId } from '../state/graphicalItemsSlice';
+import type { GraphicalItemId } from '../state/graphicalItemsSlice';
 import { initialEventSettingsState } from '../state/eventSettingsSlice';
 
 const interpolationGenerator = (a: number, b: number) => {
@@ -1516,7 +1516,7 @@ export function Sankey(outsideProps: Props) {
 			onTouchMove={undefined}
 			onTouchEnd={undefined}
 		>
-			<TooltipPortalContext.Provider value={tooltipPortal}>
+			<TooltipPortalContext value={tooltipPortal}>
 				<RegisterGraphicalItemId id={externalId} type="sankey">
 					{(id) => <>
 						<SetSankeyTooltipEntrySettings
@@ -1532,7 +1532,7 @@ export function Sankey(outsideProps: Props) {
 						<SankeyImpl {...props} id={id} />
 					</>}
 				</RegisterGraphicalItemId>
-			</TooltipPortalContext.Provider>
+			</TooltipPortalContext>
 		</RechartsWrapper>
 	</RechartsStoreProvider>;
 }

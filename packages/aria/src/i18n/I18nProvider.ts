@@ -48,7 +48,7 @@ function I18nProviderWithLocale(props: I18nProviderWithLocaleProps): any {
 		subSlot(slot, 'value'),
 	);
 
-	return createElement(I18nContext.Provider, { value, children });
+	return createElement(I18nContext, { value, children });
 }
 
 interface I18nProviderWithDefaultLocaleProps {
@@ -63,7 +63,7 @@ function I18nProviderWithDefaultLocale(props: I18nProviderWithDefaultLocaleProps
 	let { children } = props;
 	let defaultLocale = useDefaultLocale(subSlot(slot, 'default'));
 
-	return createElement(I18nContext.Provider, { value: defaultLocale, children });
+	return createElement(I18nContext, { value: defaultLocale, children });
 }
 
 /**

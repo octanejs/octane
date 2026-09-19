@@ -26,6 +26,7 @@ import { parseModule } from './parser.browser.js';
 
 import {
 	analyzeTsrx,
+	builders as b,
 	clone_ast_node as cloneAstNode,
 	createJsxTransform,
 	createVolarMappingsResult,
@@ -37,6 +38,13 @@ import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { analyzeStrongMode } from './strong-mode.js';
 import { analyzeNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
+import { inheritHookMemoOrigin } from './inline-hook-memo.js';
+import { lowerNativeAttributeReads } from './native-attribute-reads.js';
+import {
+	collectServerFunctionNodes,
+	serverContextTypeImports,
+	serverFunctionContextIndex,
+} from './server-context.js';
 import {
 	DOM_RENDERER_MODULE,
 	normalizeRendererConfig,
@@ -101,6 +109,226 @@ const OCTANE_PLATFORM = {
 };
 
 const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
+
+// Type-check only the reads that runtime compilation also admits. A StyleX
+// function keeps its ordinary parameter types everywhere outside native `sx`.
+function projectNativeDomReads(ast, contracts) {
+	const attributes = new Set(
+		contracts?.flatMap((contract) => (contract.jsxAttribute ? [contract.jsxAttribute] : [])),
+	);
+	const names = new Set();
+	const walk = (node, replace) => {
+		if (!node || typeof node !== 'object') return node;
+		if (Array.isArray(node)) return node.map((child) => walk(child, replace));
+		let result = node;
+		for (const key of Object.keys(node)) {
+			if (['metadata', 'loc', 'start', 'end', 'parent'].includes(key)) continue;
+			const value = node[key];
+			if (!value || typeof value !== 'object') continue;
+			const next = walk(value, replace);
+			if (next !== value) {
+				if (result === node) result = { ...node };
+				result[key] = next;
+			}
+		}
+		return replace(result) ?? result;
+	};
+	walk(ast, (node) => {
+		if (node.type === 'Identifier' || node.type === 'JSXIdentifier') names.add(node.name);
+		return null;
+	});
+	let helper = '__octane_nativeAttributeValue';
+	while (names.has(helper)) helper += '_';
+	let used = false;
+	const read = (value) => {
+		used = true;
+		return inheritHookMemoOrigin(b.call(b.id(helper), value), value);
+	};
+	// A text assertion selects the scalar child binding, which unwraps a direct
+	// handle. Preserve the assertion so non-text payloads still get TS errors;
+	// do not unwrap operands inside calls/operators or ordinary JS assertions.
+	const projectText = (node) => {
+		if (!node) return node;
+		if (
+			['TSAsExpression', 'TSTypeAssertion', 'TSSatisfiesExpression'].includes(node.type) &&
+			node.typeAnnotation?.type === 'TSStringKeyword'
+		) {
+			used = true;
+			const expression = projectText(node.expression);
+			return {
+				...node,
+				expression: expression === node.expression ? b.call(b.id(helper), expression) : expression,
+			};
+		}
+		if (
+			[
+				'TSAsExpression',
+				'TSTypeAssertion',
+				'TSNonNullExpression',
+				'TSSatisfiesExpression',
+				'TSInstantiationExpression',
+				'ParenthesizedExpression',
+			].includes(node.type)
+		) {
+			const expression = projectText(node.expression);
+			return expression === node.expression ? node : { ...node, expression };
+		}
+		return node;
+	};
+	const projected = walk(ast, (node) => {
+		if (['JSXElement', 'JSXFragment', 'Element', 'Fragment'].includes(node.type)) {
+			node = {
+				...node,
+				children: node.children.map((child) => {
+					if (child.type !== 'JSXExpressionContainer') return child;
+					const expression = projectText(child.expression);
+					return expression === child.expression ? child : { ...child, expression };
+				}),
+			};
+		}
+		if (node.type !== 'JSXOpeningElement' && node.type !== 'Element') return node;
+		const name = node.type === 'Element' ? node.id : node.name;
+		if (
+			(name?.type !== 'JSXIdentifier' && name?.type !== 'Identifier') ||
+			typeof name.name !== 'string' ||
+			name.name[0] !== name.name[0].toLowerCase()
+		)
+			return node;
+		return {
+			...node,
+			attributes: node.attributes.map((attribute) => {
+				if (
+					!attributes.has(attribute.name?.name ?? attribute.name) ||
+					attribute.value?.type !== 'JSXExpressionContainer'
+				)
+					return attribute;
+				const result = lowerNativeAttributeReads(attribute.value.expression, read);
+				return { ...attribute, value: { ...attribute.value, expression: result.expression } };
+			}),
+		};
+	});
+	return used
+		? {
+				...projected,
+				body: [
+					b.imports([['readNativeDomValue', helper]], 'octane/internal/signal-read'),
+					...projected.body,
+				],
+			}
+		: ast;
+}
+
+/**
+ * A trusted final context belongs to the implementation, not its RPC caller.
+ * Project only those boundary value imports before the shared type-only print;
+ * the namespace and ordinary function/type aliases retain their authored types.
+ * Recognition is shared with runtime registration so editor and wire arity agree.
+ */
+function projectServerContextCalls(ast, filename) {
+	const declaration = ast.body.find(
+		(node) =>
+			node.type === 'TSModuleDeclaration' &&
+			node.kind === 'module' &&
+			!node.declare &&
+			(node.id?.name ?? node.id?.value) === 'server',
+	);
+	if (!Array.isArray(declaration?.body?.body)) return ast;
+	const statements = declaration.body.body;
+	const functions = collectServerFunctionNodes(statements);
+	const imports = serverContextTypeImports(statements);
+	const contextExports = new Set();
+	const add = (exported, local) => {
+		const fn = functions.get(local);
+		if (fn === undefined) return;
+		try {
+			if (serverFunctionContextIndex(fn, imports, filename) !== -1) contextExports.add(exported);
+		} catch {
+			// Invalid/incomplete declarations stay checkable as authored. Runtime
+			// compilation owns the final-context placement diagnostic.
+		}
+	};
+	for (const statement of statements) {
+		if (statement.type !== 'ExportNamedDeclaration' || statement.exportKind === 'type') continue;
+		const node = statement.declaration;
+		if (node?.type === 'FunctionDeclaration') add(node.id?.name, node.id?.name);
+		if (node?.type === 'VariableDeclaration') {
+			for (const item of node.declarations) add(item.id?.name, item.id?.name);
+		}
+		for (const specifier of statement.specifiers ?? []) {
+			if (specifier.exportKind !== 'type') {
+				add(specifier.exported.name ?? specifier.exported.value, specifier.local.name);
+			}
+		}
+	}
+	if (contextExports.size === 0) return ast;
+	const names = new Set();
+	const collectNames = (node) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) collectNames(child);
+			return;
+		}
+		if (node.type === 'Identifier') names.add(node.name);
+		for (const key in node) {
+			if (key !== 'metadata' && key !== 'loc' && key !== 'parent') collectNames(node[key]);
+		}
+	};
+	collectNames(ast);
+	let helper = '__octane_ServerFunction';
+	while (names.has(helper)) helper += '_';
+	let changed = false;
+	const body = [];
+	for (const statement of ast.body) {
+		if (
+			statement.type !== 'ImportDeclaration' ||
+			statement.source.value !== 'server' ||
+			statement.importKind === 'type'
+		) {
+			body.push(statement);
+			continue;
+		}
+		const retained = [];
+		for (const specifier of statement.specifiers) {
+			if (
+				specifier.type !== 'ImportSpecifier' ||
+				specifier.importKind === 'type' ||
+				!contextExports.has(specifier.imported.name ?? specifier.imported.value)
+			) {
+				retained.push(specifier);
+				continue;
+			}
+			changed = true;
+			const reference = () =>
+				b.member(
+					b.id('server'),
+					{ ...specifier.imported },
+					specifier.imported.type !== 'Identifier',
+				);
+			body.push(
+				inheritHookMemoOrigin(
+					b.const(
+						{ ...specifier.local },
+						b.ts_as(
+							b.ts_as(reference(), b.ts_keyword_type('unknown')),
+							b.ts_type_reference(
+								b.id(helper),
+								b.ts_type_parameter_instantiation([b.ts_type_query(reference())]),
+							),
+						),
+					),
+					specifier,
+				),
+			);
+		}
+		if (retained.length > 0) body.push({ ...statement, specifiers: retained });
+	}
+	return changed
+		? {
+				...ast,
+				body: [b.imports([['ServerFunction', helper]], 'octane/server', [], 'type'), ...body],
+			}
+		: ast;
+}
 
 const octaneTransformWithAuthoredSuspense = createJsxTransform({
 	...OCTANE_PLATFORM,
@@ -229,7 +457,7 @@ function markNativeTemplateBodies(root) {
  * `intrinsics`; when present, the virtual TSX gets a file-local pragma so host
  * element types cannot leak into files owned by another renderer.
  *
- * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean }} [options]
+ * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean, knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[] }} [options]
  * @returns {import('./index.js').VolarCompileResult}
  */
 export function compileToVolarMappings(source, filename, options) {
@@ -333,16 +561,26 @@ export function compileToVolarMappings(source, filename, options) {
 	// original parse, and replacement nodes keep authored locations so
 	// mappings/hover still work.
 	const transform = selectOctaneTransform(ast);
-	const transformed = transform(transformAst, source, filename, {
-		collect: true,
-		loose: !!options?.loose,
-		// @tsrx/core routes `typeOnly: true` to its TSX esrap language with
-		// `boundaryTokens: true`. Structural delimiters then carry their own
-		// one-character mappings without changing the virtual TSX bytes.
-		typeOnly: true,
-		errors,
-		comments: printComments,
-	});
+	const transformed = transform(
+		projectServerContextCalls(
+			renderer.target === 'dom'
+				? projectNativeDomReads(transformAst, options?.knownAttributeSpreads)
+				: transformAst,
+			filename,
+		),
+		source,
+		filename,
+		{
+			collect: true,
+			loose: !!options?.loose,
+			// @tsrx/core routes `typeOnly: true` to its TSX esrap language with
+			// `boundaryTokens: true`. Structural delimiters then carry their own
+			// one-character mappings without changing the virtual TSX bytes.
+			typeOnly: true,
+			errors,
+			comments: printComments,
+		},
+	);
 	if (strongDiagnostics !== null || nativeReadDiagnostics.length > 0) {
 		for (const diagnostic of [...(strongDiagnostics ?? []), ...nativeReadDiagnostics]) {
 			if (diagnostic.severity !== 'error') continue;
@@ -573,14 +811,22 @@ export function compileTypesInspection(source, filename, options) {
 		? null
 		: createRendererTypePragma(renderer, ast);
 	const transform = selectOctaneTransform(ast);
-	const transformed = transform(ast, source, filename, {
-		collect: true,
-		loose: true,
-		typeOnly: true,
-		inspect: true,
-		errors,
-		comments: rendererPragma === null ? comments : [rendererPragma, ...comments],
-	});
+	const transformed = transform(
+		projectServerContextCalls(
+			renderer.target === 'dom' ? projectNativeDomReads(ast) : ast,
+			filename,
+		),
+		source,
+		filename,
+		{
+			collect: true,
+			loose: true,
+			typeOnly: true,
+			inspect: true,
+			errors,
+			comments: rendererPragma === null ? comments : [rendererPragma, ...comments],
+		},
+	);
 	markNativeTemplateBodies(ast);
 	return {
 		code: transformed.code,

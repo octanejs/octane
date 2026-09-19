@@ -44,7 +44,7 @@ export function createContextScope(
 			const { scope, children, ...context } = props;
 			const Context = scope?.[scopeName]?.[index] || BaseContext;
 			const value = useMemo(() => context, Object.values(context), S(scopeName + ':P' + index));
-			return createElement(Context.Provider, { value, children });
+			return createElement(Context, { value, children });
 		}
 
 		function useContext(consumerName: string, scope?: Scope): T {
