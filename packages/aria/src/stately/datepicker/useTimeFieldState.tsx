@@ -12,8 +12,8 @@
  * governing permissions and limitations under the License.
  */
 
-import { DateFieldState, useDateFieldState } from './useDateFieldState';
-import { DateValue, MappedTimeValue, TimePickerProps, TimeValue } from './types';
+import { type DateFieldState, useDateFieldState } from './useDateFieldState';
+import type { DateValue, MappedTimeValue, TimePickerProps, TimeValue } from './types';
 import {
 	getLocalTimeZone,
 	GregorianCalendar,

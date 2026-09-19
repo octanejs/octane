@@ -11,22 +11,25 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { AriaDatePickerProps, useDatePicker } from '../upstream-exports/react-aria/useDatePicker';
 import {
-	AriaDateRangePickerProps,
+	type AriaDatePickerProps,
+	useDatePicker,
+} from '../upstream-exports/react-aria/useDatePicker';
+import {
+	type AriaDateRangePickerProps,
 	useDateRangePicker,
 } from '../upstream-exports/react-aria/useDateRangePicker';
 import { ButtonContext } from './Button';
 import { CalendarContext, RangeCalendarContext } from './Calendar';
 import {
-	ClassNameOrFunction,
-	ContextValue,
+	type ClassNameOrFunction,
+	type ContextValue,
 	dom,
 	Provider,
-	RACValidation,
+	type RACValidation,
 	removeDataAttributes,
-	RenderProps,
-	SlotProps,
+	type RenderProps,
+	type SlotProps,
 	useContextProps,
 	useRenderProps,
 	useSlot,
@@ -34,27 +37,27 @@ import {
 } from './utils';
 import { DateFieldContext } from './DateField';
 import {
-	DatePickerState,
-	DatePickerStateOptions,
-	DateValue,
+	type DatePickerState,
+	type DatePickerStateOptions,
+	type DateValue,
 	useDatePickerState,
 } from '../upstream-exports/react-stately/useDatePickerState';
 import {
-	DateRangePickerState,
-	DateRangePickerStateOptions,
+	type DateRangePickerState,
+	type DateRangePickerStateOptions,
 	useDateRangePickerState,
 } from '../upstream-exports/react-stately/useDateRangePickerState';
 import { DialogContext, OverlayTriggerStateContext } from './Dialog';
 import { FieldErrorContext } from './FieldError';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
 import { FormContext } from './Form';
-import { forwardRefType, GlobalDOMAttributes } from '@react-types/shared';
+import type { forwardRefType, GlobalDOMAttributes } from '@react-types/shared';
 import { GroupContext } from './Group';
 import { HiddenDateInput } from './HiddenDateInput';
 import { LabelContext } from './Label';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
 import { PopoverContext } from './Popover';
-import React, { createContext, ForwardedRef, forwardRef, useRef } from '../compat/react';
+import React, { createContext, type ForwardedRef, forwardRef, useRef } from '../compat/react';
 import { TextContext } from './Text';
 import { useFocusRing } from '../upstream-exports/react-aria/useFocusRing';
 

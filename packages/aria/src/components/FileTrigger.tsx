@@ -14,10 +14,10 @@
 
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
 
-import { GlobalDOMAttributes } from '@react-types/shared';
+import type { GlobalDOMAttributes } from '@react-types/shared';
 import { Input } from './Input';
 import { PressResponder } from '../upstream-exports/react-aria/private/interactions/PressResponder';
-import React, { ForwardedRef, forwardRef, ReactNode } from '../compat/react';
+import React, { type ForwardedRef, forwardRef, type ReactNode } from '../compat/react';
 import { useObjectRef } from '../upstream-exports/react-aria/useObjectRef';
 
 export interface FileTriggerProps extends GlobalDOMAttributes<HTMLInputElement> {

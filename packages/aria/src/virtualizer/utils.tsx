@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import { Direction } from '@react-types/shared';
+import type { Direction } from '@react-types/shared';
 
 export type RTLOffsetType = 'negative' | 'positive-descending' | 'positive-ascending';
 

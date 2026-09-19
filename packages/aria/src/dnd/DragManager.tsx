@@ -15,7 +15,7 @@
 import { announce } from '../live-announcer/LiveAnnouncer';
 
 import { ariaHideOutside } from '../overlays/ariaHideOutside';
-import {
+import type {
 	DragEndEvent,
 	DragItem,
 	DropActivateEvent,
@@ -31,7 +31,7 @@ import { getActiveElement, getEventTarget, nodeContains } from '../utils/shadowd
 import { getDragModality, getTypes } from './utils';
 import { isVirtualClick, isVirtualPointerEvent } from '../utils/isVirtualEvent';
 import type { LocalizedStringFormatter } from '@internationalized/string';
-import { RefObject, useEffect, useState } from '../compat/react';
+import { type RefObject, useEffect, useState } from '../compat/react';
 
 let dropTargets = new Map<Element, DropTarget>();
 let dropItems = new Map<Element, DroppableItem>();

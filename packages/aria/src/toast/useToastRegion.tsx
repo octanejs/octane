@@ -12,13 +12,18 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaLabelingProps, DOMAttributes, FocusableElement, RefObject } from '@react-types/shared';
+import type {
+	AriaLabelingProps,
+	DOMAttributes,
+	FocusableElement,
+	RefObject,
+} from '@react-types/shared';
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { getInteractionModality } from '../interactions/useFocusVisible';
 import intlMessages from '../intl/toast/index';
 import { mergeProps } from '../utils/mergeProps';
-import { ToastState } from '../upstream-exports/react-stately/useToastState';
+import type { ToastState } from '../upstream-exports/react-stately/useToastState';
 import { useCallback, useEffect, useRef } from '../compat/react';
 import { useFocusWithin } from '../interactions/useFocusWithin';
 import { useHover } from '../interactions/useHover';

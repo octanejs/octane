@@ -12,9 +12,9 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaLabelingProps, DOMProps } from '@react-types/shared';
-import { CalendarAria, useCalendarBase } from './useCalendarBase';
-import {
+import type { AriaLabelingProps, DOMProps } from '@react-types/shared';
+import { type CalendarAria, useCalendarBase } from './useCalendarBase';
+import type {
 	CalendarProps,
 	CalendarSelectionMode,
 	CalendarState,

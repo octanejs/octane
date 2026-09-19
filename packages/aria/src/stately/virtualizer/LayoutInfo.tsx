@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import { Key } from '@react-types/shared';
+import type { Key } from '@react-types/shared';
 import { Rect } from './Rect';
 
 /**

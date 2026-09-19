@@ -12,15 +12,15 @@ import {
 	type NodePositionChange,
 	handleExpandParent,
 	evaluateAbsolutePosition,
-	ParentExpandChild,
-	XYPosition,
-	ControlPosition,
+	type ParentExpandChild,
+	type XYPosition,
+	type ControlPosition,
 } from '@xyflow/system';
 
 import { useStoreApi, useStore } from '../../hooks/useStore';
 import { useNodeId } from '../../contexts/NodeIdContext';
 import type { ResizeControlProps, ResizeControlLineProps } from './types';
-import { ReactFlowState } from '../../types';
+import type { ReactFlowState } from '../../types';
 
 const scaleSelector = (calculateScale: boolean) => (store: ReactFlowState) => calculateScale
 	? `${Math.max(1 / store.transform[2], 1)}`

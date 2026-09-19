@@ -13,7 +13,7 @@
  */
 
 import {
-	Calendar,
+	type Calendar,
 	DateFormatter,
 	getLocalTimeZone,
 	now,
@@ -22,11 +22,11 @@ import {
 	toCalendarDate,
 	toCalendarDateTime,
 } from '@internationalized/date';
-import { DatePickerProps, DateValue, Granularity, TimeValue } from './types';
+import type { DatePickerProps, DateValue, Granularity, TimeValue } from './types';
 import i18nMessages from '../../intl/datepicker/index';
 import { LocalizedStringDictionary, LocalizedStringFormatter } from '@internationalized/string';
 import { mergeValidation, VALID_VALIDITY_STATE } from '../form/useFormValidationState';
-import { RangeValue, ValidationResult } from '@react-types/shared';
+import type { RangeValue, ValidationResult } from '@react-types/shared';
 import { useState } from '../../compat/react';
 
 const dictionary = new LocalizedStringDictionary(i18nMessages);

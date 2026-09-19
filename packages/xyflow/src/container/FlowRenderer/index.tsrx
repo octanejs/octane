@@ -4,7 +4,7 @@ import { shallow } from '@octanejs/zustand/shallow';
 import { useStore } from '../../hooks/useStore';
 import { useGlobalKeyHandler } from '../../hooks/useGlobalKeyHandler';
 import { useKeyPress } from '../../hooks/useKeyPress';
-import { GraphViewProps } from '../GraphView/index.tsrx';
+import type { GraphViewProps } from '../GraphView/index.tsrx';
 import { ZoomPane } from '../ZoomPane/index.tsrx';
 import { Pane } from '../Pane/index.tsrx';
 import { NodesSelection } from '../../components/NodesSelection/index.tsrx';

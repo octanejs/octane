@@ -12,18 +12,18 @@
  * governing permissions and limitations under the License.
  */
 
-import {
+import type {
 	AriaLabelingProps,
 	DOMAttributes,
 	DOMProps,
 	InputDOMProps,
 	RefObject,
 } from '@react-types/shared';
-import {
+import type {
 	ColorSliderProps,
 	ColorSliderState,
 } from '../upstream-exports/react-stately/useColorSliderState';
-import { InputHTMLAttributes } from '../compat/react';
+import type { InputHTMLAttributes } from '../compat/react';
 import { mergeProps } from '../utils/mergeProps';
 import { useLocale } from '../i18n/I18nProvider';
 import { useSlider } from '../slider/useSlider';

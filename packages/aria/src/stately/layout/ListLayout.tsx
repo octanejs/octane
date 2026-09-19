@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import {
+import type {
 	Collection,
 	DropTarget,
 	DropTargetDelegate,
@@ -22,7 +22,7 @@ import {
 	Orientation,
 } from '@react-types/shared';
 import { getChildNodes } from '../collections/getChildNodes';
-import { InvalidationContext } from '../virtualizer/types';
+import type { InvalidationContext } from '../virtualizer/types';
 import { Layout } from '../virtualizer/Layout';
 import { LayoutInfo } from '../virtualizer/LayoutInfo';
 import { Rect } from '../virtualizer/Rect';

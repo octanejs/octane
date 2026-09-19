@@ -15,7 +15,7 @@
 import { TokenFieldValue } from './TokenFieldValue';
 import { useControlledState } from '../utils/useControlledState';
 import { useState } from '../../compat/react';
-import { ValueBase } from '@react-types/shared';
+import type { ValueBase } from '@react-types/shared';
 
 export interface TokenFieldProps<
 	T extends TokenFieldValue = TokenFieldValue,

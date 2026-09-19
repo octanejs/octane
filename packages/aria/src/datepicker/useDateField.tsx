@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import {
+import type {
 	AriaLabelingProps,
 	DOMAttributes,
 	DOMProps,
@@ -21,17 +21,17 @@ import {
 	RefObject,
 	ValidationResult,
 } from '@react-types/shared';
-import { createFocusManager, FocusManager } from '../focus/FocusScope';
-import {
+import { createFocusManager, type FocusManager } from '../focus/FocusScope';
+import type {
 	DateFieldProps,
 	DateFieldState,
 	DateValue,
 } from '../upstream-exports/react-stately/useDateFieldState';
 import { filterDOMProps } from '../utils/filterDOMProps';
-import { InputHTMLAttributes, useEffect, useMemo, useRef } from '../compat/react';
+import { type InputHTMLAttributes, useEffect, useMemo, useRef } from '../compat/react';
 import intlMessages from '../intl/datepicker/index';
 import { mergeProps } from '../utils/mergeProps';
-import {
+import type {
 	TimeFieldState,
 	TimePickerProps,
 	TimeValue,

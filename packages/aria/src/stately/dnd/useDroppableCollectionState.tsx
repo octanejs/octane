@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import {
+import type {
 	Collection,
 	DragTypes,
 	DropOperation,
@@ -22,7 +22,7 @@ import {
 	Key,
 	Node,
 } from '@react-types/shared';
-import { MultipleSelectionManager } from '../selection/types';
+import type { MultipleSelectionManager } from '../selection/types';
 import { useCallback, useRef, useState } from '../../compat/react';
 
 interface DropOperationEvent {

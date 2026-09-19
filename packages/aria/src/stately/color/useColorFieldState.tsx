@@ -12,8 +12,8 @@
  * governing permissions and limitations under the License.
  */
 
-import { Color } from './types';
-import {
+import type { Color } from './types';
+import type {
 	FocusableProps,
 	HelpTextProps,
 	InputBase,
@@ -22,7 +22,7 @@ import {
 	Validation,
 	ValueBase,
 } from '@react-types/shared';
-import { FormValidationState, useFormValidationState } from '../form/useFormValidationState';
+import { type FormValidationState, useFormValidationState } from '../form/useFormValidationState';
 import { parseColor } from './Color';
 import { useColor } from './useColor';
 import { useControlledState } from '../utils/useControlledState';

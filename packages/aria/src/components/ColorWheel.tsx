@@ -1,29 +1,32 @@
 /** @jsxImportSource octane */
 // Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria-components/src/ColorWheel.tsx).
-import { AriaColorWheelOptions, useColorWheel } from '../upstream-exports/react-aria/useColorWheel';
 import {
-	ClassNameOrFunction,
-	ContextValue,
+	type AriaColorWheelOptions,
+	useColorWheel,
+} from '../upstream-exports/react-aria/useColorWheel';
+import {
+	type ClassNameOrFunction,
+	type ContextValue,
 	dom,
 	Provider,
-	RenderProps,
-	SlotProps,
-	StyleRenderProps,
+	type RenderProps,
+	type SlotProps,
+	type StyleRenderProps,
 	useContextProps,
 	useRenderProps,
 } from './utils';
 import {
-	ColorWheelState,
+	type ColorWheelState,
 	useColorWheelState,
 } from '../upstream-exports/react-stately/useColorWheelState';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
-import { GlobalDOMAttributes } from '@react-types/shared';
+import type { GlobalDOMAttributes } from '@react-types/shared';
 import { InternalColorThumbContext } from './ColorThumb';
 import React, {
 	createContext,
-	ForwardedRef,
+	type ForwardedRef,
 	forwardRef,
-	HTMLAttributes,
+	type HTMLAttributes,
 	useContext,
 	useRef,
 } from '../compat/react';

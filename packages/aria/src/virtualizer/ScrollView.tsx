@@ -23,11 +23,11 @@ import {
 import { getScrollLeft } from './utils';
 import { Point, Rect, Size } from '../upstream-exports/react-stately/useVirtualizerState';
 import React, {
-	CSSProperties,
-	ForwardedRef,
-	HTMLAttributes,
-	ReactNode,
-	RefObject,
+	type CSSProperties,
+	type ForwardedRef,
+	type HTMLAttributes,
+	type ReactNode,
+	type RefObject,
 	useCallback,
 	useEffect,
 	useRef,

@@ -12,10 +12,10 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaButtonProps } from '../button/useButton';
-import { AriaDatePickerProps } from './useDatePicker';
-import { AriaDialogProps } from '../dialog/useDialog';
-import {
+import type { AriaButtonProps } from '../button/useButton';
+import type { AriaDatePickerProps } from './useDatePicker';
+import type { AriaDialogProps } from '../dialog/useDialog';
+import type {
 	AriaLabelingProps,
 	DOMAttributes,
 	DOMProps,
@@ -26,7 +26,7 @@ import {
 	ValidationResult,
 } from '@react-types/shared';
 import { createFocusManager } from '../focus/FocusScope';
-import {
+import type {
 	DateRange,
 	DateRangePickerProps,
 	DateRangePickerState,
@@ -42,7 +42,7 @@ import { focusManagerSymbol, roleSymbol } from './useDateField';
 import intlMessages from '../intl/datepicker/index';
 import { mergeProps } from '../utils/mergeProps';
 import { nodeContains } from '../utils/shadowdom/DOMFunctions';
-import { RangeCalendarProps } from '../upstream-exports/react-stately/useRangeCalendarState';
+import type { RangeCalendarProps } from '../upstream-exports/react-stately/useRangeCalendarState';
 import { useDatePickerGroup } from './useDatePickerGroup';
 import { useDescription } from '../utils/useDescription';
 import { useField } from '../label/useField';

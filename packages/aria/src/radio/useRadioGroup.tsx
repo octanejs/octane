@@ -13,7 +13,7 @@ type DOMAttributes = Record<string, any>;
  * governing permissions and limitations under the License.
  */
 
-import {
+import type {
 	AriaLabelingProps,
 	AriaValidationProps,
 	DOMProps,
@@ -27,7 +27,7 @@ import { getFocusableTreeWalker } from '../focus/FocusScope';
 import { getOwnerWindow } from '../utils/domHelpers';
 import { mergeProps } from '../utils/mergeProps';
 import { radioGroupData } from './utils';
-import {
+import type {
 	RadioGroupProps,
 	RadioGroupState,
 } from '../upstream-exports/react-stately/useRadioGroupState';

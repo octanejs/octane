@@ -13,15 +13,15 @@
  */
 
 import * as DragManager from './DragManager';
-import { DroppableCollectionState } from '../upstream-exports/react-stately/useDroppableCollectionState';
-import { DropTarget, FocusableElement, RefObject } from '@react-types/shared';
+import type { DroppableCollectionState } from '../upstream-exports/react-stately/useDroppableCollectionState';
+import type { DropTarget, FocusableElement, RefObject } from '@react-types/shared';
 import {
 	getDroppableCollectionRef,
 	getTypes,
 	globalDndState,
 	isInternalDropOperation,
 } from './utils';
-import { HTMLAttributes, useEffect } from '../compat/react';
+import { type HTMLAttributes, useEffect } from '../compat/react';
 import { useVirtualDrop } from './useVirtualDrop';
 
 export interface DroppableItemOptions {

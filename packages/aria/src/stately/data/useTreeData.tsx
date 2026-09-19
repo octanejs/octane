@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import { Key } from '@react-types/shared';
+import type { Key } from '@react-types/shared';
 import { useState } from '../../compat/react';
 
 export interface TreeOptions<T extends object> {

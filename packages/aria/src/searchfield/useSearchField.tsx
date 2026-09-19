@@ -13,15 +13,15 @@ type DOMAttributes = Record<string, any>;
  * governing permissions and limitations under the License.
  */
 
-import { AriaButtonProps } from '../button/useButton';
+import type { AriaButtonProps } from '../button/useButton';
 import { withSlot } from 'octane';
-import { AriaTextFieldProps, useTextField } from '../textfield/useTextField';
-import { RefObject, ValidationResult } from '@react-types/shared';
-import { InputHTMLAttributes, LabelHTMLAttributes } from '../compat/react';
+import { type AriaTextFieldProps, useTextField } from '../textfield/useTextField';
+import type { RefObject, ValidationResult } from '@react-types/shared';
+import type { InputHTMLAttributes, LabelHTMLAttributes } from '../compat/react';
 import intlMessages from '../intl/searchfield/index';
 // @ts-ignore
 import { mergeProps } from '../utils/mergeProps';
-import {
+import type {
 	SearchFieldProps,
 	SearchFieldState,
 } from '../upstream-exports/react-stately/useSearchFieldState';

@@ -1,8 +1,8 @@
 /** @jsxImportSource octane */
 // Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-stately/src/color/useColorChannelFieldState.ts).
-import { Color, ColorChannel, ColorSpace } from './types';
-import { ColorFieldProps } from './useColorFieldState';
-import { NumberFieldState, useNumberFieldState } from '../numberfield/useNumberFieldState';
+import type { Color, ColorChannel, ColorSpace } from './types';
+import type { ColorFieldProps } from './useColorFieldState';
+import { type NumberFieldState, useNumberFieldState } from '../numberfield/useNumberFieldState';
 import { useColor } from './useColor';
 import { useControlledState } from '../utils/useControlledState';
 import { useMemo, useState } from '../../compat/react';

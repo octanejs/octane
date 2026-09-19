@@ -12,8 +12,8 @@
  * governing permissions and limitations under the License.
  */
 
-import { createListActions, ListData, ListState } from './useListData';
-import { Key, LoadingState, Selection, SortDescriptor } from '@react-types/shared';
+import { createListActions, type ListData, type ListState } from './useListData';
+import type { Key, LoadingState, Selection, SortDescriptor } from '@react-types/shared';
 import { useEffect, useReducer, useRef } from '../../compat/react';
 
 export interface AsyncListOptions<T, C> {

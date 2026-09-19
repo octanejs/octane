@@ -1,10 +1,10 @@
 /** @jsxImportSource octane */
 // Ported from adobe/react-spectrum@5ecb3333001313e83898cd07644227897e3bae1f (packages/react-aria/src/datepicker/useDatePickerGroup.ts).
 import { createFocusManager, getFocusableTreeWalker } from '../focus/FocusScope';
-import { DateFieldState } from '../upstream-exports/react-stately/useDateFieldState';
-import { DatePickerState } from '../upstream-exports/react-stately/useDatePickerState';
-import { DateRangePickerState } from '../upstream-exports/react-stately/useDateRangePickerState';
-import { DOMAttributes, FocusableElement, RefObject } from '@react-types/shared';
+import type { DateFieldState } from '../upstream-exports/react-stately/useDateFieldState';
+import type { DatePickerState } from '../upstream-exports/react-stately/useDatePickerState';
+import type { DateRangePickerState } from '../upstream-exports/react-stately/useDateRangePickerState';
+import type { DOMAttributes, FocusableElement, RefObject } from '@react-types/shared';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { mergeProps } from '../utils/mergeProps';
 import { useKeyboard } from '../interactions/useKeyboard';

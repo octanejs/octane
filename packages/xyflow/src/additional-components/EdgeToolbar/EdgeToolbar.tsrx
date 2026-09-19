@@ -5,7 +5,7 @@ import { getEdgeToolbarTransform } from '@xyflow/system';
 
 import { EdgeLabelRenderer } from '../../components/EdgeLabelRenderer/index.tsrx';
 import { useStore } from '../../hooks/useStore';
-import { Edge, ReactFlowState } from '../../types';
+import type { Edge, ReactFlowState } from '../../types';
 import type { EdgeToolbarProps } from './types';
 
 const zoomSelector = (state: ReactFlowState) => state.transform[2];

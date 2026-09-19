@@ -1352,8 +1352,17 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'inertia-package-consumption',
+					include: ['packages/inertia/tests/package-consumption.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
 				// Octane-only unpaired conformance for @octanejs/inertia.
-				// Parity-owned adapted / differential projects are separate.
+				// Parity-owned consumer / adapted / differential projects are separate.
 				test: {
 					name: 'inertia',
 					include: ['packages/inertia/tests/**/*.test.ts'],
@@ -1361,6 +1370,7 @@ export default defineConfig({
 						'packages/inertia/tests/ssr/**/*.test.ts',
 						'packages/inertia/tests/adapted/**/*.test.ts',
 						'packages/inertia/tests/differential/**/*.test.ts',
+						'packages/inertia/tests/package-consumption.test.ts',
 					],
 					environment: 'jsdom',
 					globals: false,
@@ -5033,9 +5043,22 @@ export default defineConfig({
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
+					name: 'xyflow-package-consumption',
+					include: ['packages/xyflow/tests/package-consumption.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
 					name: 'xyflow',
 					include: ['packages/xyflow/tests/**/*.test.ts'],
-					exclude: [...configDefaults.exclude, 'packages/xyflow/tests/differential/**/*.test.ts'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/xyflow/tests/differential/**/*.test.ts',
+						'packages/xyflow/tests/package-consumption.test.ts',
+					],
 					environment: 'jsdom',
 					testTimeout: 30_000,
 					globals: false,

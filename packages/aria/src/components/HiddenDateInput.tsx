@@ -21,13 +21,13 @@ import {
 	toCalendarDateTime,
 	toLocalTimeZone,
 } from '@internationalized/date';
-import {
+import type {
 	DateFieldState,
 	DateSegmentType,
 } from '../upstream-exports/react-stately/useDateFieldState';
-import { DatePickerState } from '../upstream-exports/react-stately/useDatePickerState';
+import type { DatePickerState } from '../upstream-exports/react-stately/useDatePickerState';
 import { getEventTarget } from '../upstream-exports/react-aria/private/utils/shadowdom/DOMFunctions';
-import React, { ReactNode } from '../compat/react';
+import React, { type ReactNode } from '../compat/react';
 import { useVisuallyHidden } from '../upstream-exports/react-aria/VisuallyHidden';
 
 interface AriaHiddenDateInputProps {

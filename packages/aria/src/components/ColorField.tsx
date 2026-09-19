@@ -13,44 +13,44 @@
  */
 
 import {
-	AriaColorFieldProps,
+	type AriaColorFieldProps,
 	useColorChannelField,
 	useColorField,
 } from '../upstream-exports/react-aria/useColorField';
 
 import {
-	ClassNameOrFunction,
-	ContextValue,
+	type ClassNameOrFunction,
+	type ContextValue,
 	dom,
 	Provider,
-	RACValidation,
+	type RACValidation,
 	removeDataAttributes,
-	RenderProps,
-	SlotProps,
+	type RenderProps,
+	type SlotProps,
 	useContextProps,
 	useRenderProps,
 	useSlot,
 } from './utils';
-import { ColorChannel, ColorSpace } from '../upstream-exports/react-stately/Color';
+import type { ColorChannel, ColorSpace } from '../upstream-exports/react-stately/Color';
 import {
-	ColorFieldState,
+	type ColorFieldState,
 	useColorChannelFieldState,
 	useColorFieldState,
 } from '../upstream-exports/react-stately/useColorFieldState';
 import { FieldErrorContext } from './FieldError';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
-import { GlobalDOMAttributes, InputDOMProps, ValidationResult } from '@react-types/shared';
+import type { GlobalDOMAttributes, InputDOMProps, ValidationResult } from '@react-types/shared';
 import { GroupContext } from './Group';
 import { InputContext } from './Input';
 import { LabelContext } from './Label';
 import React, {
 	createContext,
-	ForwardedRef,
+	type ForwardedRef,
 	forwardRef,
-	HTMLAttributes,
-	InputHTMLAttributes,
-	LabelHTMLAttributes,
-	Ref,
+	type HTMLAttributes,
+	type InputHTMLAttributes,
+	type LabelHTMLAttributes,
+	type Ref,
 	useRef,
 } from '../compat/react';
 import { TextContext } from './Text';

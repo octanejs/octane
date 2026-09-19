@@ -12,8 +12,8 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaButtonProps } from '../button/useButton';
-import { DOMAttributes } from '../compat/react';
+import type { AriaButtonProps } from '../button/useButton';
+import type { DOMAttributes } from '../compat/react';
 import * as DragManager from './DragManager';
 import intlMessages from '../intl/dnd/index';
 import { useDescription } from '../utils/useDescription';

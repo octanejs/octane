@@ -15,11 +15,11 @@
 import {
 	CalendarDate,
 	CalendarDateTime,
-	DateDuration,
+	type DateDuration,
 	ZonedDateTime,
 } from '@internationalized/date';
-import { RangeValue, ValidationState } from '@react-types/shared';
-import { ReactNode } from '../../compat/react';
+import type { RangeValue, ValidationState } from '@react-types/shared';
+import type { ReactNode } from '../../compat/react';
 
 export type DateValue = CalendarDate | CalendarDateTime | ZonedDateTime;
 export type MappedDateValue<T> = T extends ZonedDateTime

@@ -14,9 +14,9 @@ type DOMAttributes = Record<string, any>;
  */
 
 import { announce } from '../live-announcer/LiveAnnouncer';
-import { AriaButtonProps } from '../button/useButton';
+import type { AriaButtonProps } from '../button/useButton';
 import { ariaHideOutside } from '../overlays/ariaHideOutside';
-import {
+import type {
 	AriaLabelingProps,
 	DOMProps,
 	InputDOMProps,
@@ -27,18 +27,18 @@ import {
 	RouterOptions,
 	ValidationResult,
 } from '@react-types/shared';
-import { AriaListBoxOptions } from '../listbox/useListBox';
+import type { AriaListBoxOptions } from '../listbox/useListBox';
 import { chain } from '../utils/chain';
-import {
+import type {
 	ComboBoxProps,
 	ComboBoxState,
 	SelectionMode,
 } from '../upstream-exports/react-stately/useComboBoxState';
 import { dispatchVirtualFocus } from '../focus/virtualFocus';
 import {
-	ElementType,
-	InputHTMLAttributes,
-	TouchEvent,
+	type ElementType,
+	type InputHTMLAttributes,
+	type TouchEvent,
 	useEffect,
 	useMemo,
 	useRef,

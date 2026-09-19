@@ -13,10 +13,10 @@
  */
 
 import * as DragManager from './DragManager';
-import { DroppableCollectionState } from '../upstream-exports/react-stately/useDroppableCollectionState';
-import { DropTarget, FocusableElement, Key, RefObject } from '@react-types/shared';
+import type { DroppableCollectionState } from '../upstream-exports/react-stately/useDroppableCollectionState';
+import type { DropTarget, FocusableElement, Key, RefObject } from '@react-types/shared';
 import { getDroppableCollectionId } from './utils';
-import { HTMLAttributes } from '../compat/react';
+import type { HTMLAttributes } from '../compat/react';
 import intlMessages from '../intl/dnd/index';
 import { useDroppableItem } from './useDroppableItem';
 import { useId } from '../utils/useId';

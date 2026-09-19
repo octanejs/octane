@@ -13,14 +13,14 @@
  */
 
 import { CalendarDate, startOfWeek, today } from '@internationalized/date';
-import {
+import type {
 	CalendarSelectionMode,
 	CalendarState,
 } from '../upstream-exports/react-stately/useCalendarState';
-import { DOMAttributes } from '@react-types/shared';
+import type { DOMAttributes } from '@react-types/shared';
 import { hookData, useVisibleRangeDescription } from './utils';
 import { mergeProps } from '../utils/mergeProps';
-import { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
+import type { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
 import { useDateFormatter } from '../i18n/useDateFormatter';
 import { useKeyboard } from '../interactions/useKeyboard';
 import { useLabels } from '../utils/useLabels';

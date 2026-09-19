@@ -13,7 +13,7 @@ type DOMAttributes = Record<string, any>;
  * governing permissions and limitations under the License.
  */
 
-import { FocusableElement, Key, RefObject } from '@react-types/shared';
+import type { FocusableElement, Key, RefObject } from '@react-types/shared';
 import { withSlot } from 'octane';
 import { focusSafely } from '../interactions/focusSafely';
 import {
@@ -25,15 +25,15 @@ import {
 import { getFocusableTreeWalker } from '../focus/FocusScope';
 import { getOwnerDocument } from '../utils/domHelpers';
 import { getScrollParent } from '../utils/getScrollParent';
-import {
+import type {
 	IGridCollection as GridCollection,
 	GridNode,
 } from '../upstream-exports/react-stately/private/grid/GridCollection';
 import { gridMap } from './utils';
-import { GridState } from '../upstream-exports/react-stately/private/grid/useGridState';
+import type { GridState } from '../upstream-exports/react-stately/private/grid/useGridState';
 import { isFocusVisible } from '../interactions/useFocusVisible';
 import { mergeProps } from '../utils/mergeProps';
-import { KeyboardEvent as ReactKeyboardEvent, useRef } from '../compat/react';
+import { type KeyboardEvent as ReactKeyboardEvent, useRef } from '../compat/react';
 import { scrollIntoViewport } from '../utils/scrollIntoView';
 import { useLocale } from '../i18n/I18nProvider';
 import { useSelectableItem } from '../selection/useSelectableItem';

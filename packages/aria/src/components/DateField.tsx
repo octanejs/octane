@@ -12,21 +12,21 @@
  * governing permissions and limitations under the License.
  */
 import {
-	AriaDateFieldProps,
+	type AriaDateFieldProps,
 	useDateField,
 	useDateSegment,
 } from '../upstream-exports/react-aria/useDateField';
-import { AriaTimeFieldProps, useTimeField } from '../upstream-exports/react-aria/useTimeField';
+import { type AriaTimeFieldProps, useTimeField } from '../upstream-exports/react-aria/useTimeField';
 import {
-	ClassNameOrFunction,
-	ContextValue,
+	type ClassNameOrFunction,
+	type ContextValue,
 	dom,
 	Provider,
-	RACValidation,
+	type RACValidation,
 	removeDataAttributes,
-	RenderProps,
-	SlotProps,
-	StyleRenderProps,
+	type RenderProps,
+	type SlotProps,
+	type StyleRenderProps,
 	useContextProps,
 	useRenderProps,
 	useSlot,
@@ -34,38 +34,38 @@ import {
 } from './utils';
 import { createCalendar } from '@internationalized/date';
 import {
-	DateFieldState,
-	DateSegmentType,
-	DateValue,
-	DateSegment as IDateSegment,
+	type DateFieldState,
+	type DateSegmentType,
+	type DateValue,
+	type DateSegment as IDateSegment,
 	useDateFieldState,
 } from '../upstream-exports/react-stately/useDateFieldState';
 import { FieldErrorContext } from './FieldError';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
 import { FormContext } from './Form';
-import { forwardRefType, GlobalDOMAttributes } from '@react-types/shared';
+import type { forwardRefType, GlobalDOMAttributes } from '@react-types/shared';
 import { Group, GroupContext } from './Group';
 import { HiddenDateInput } from './HiddenDateInput';
-import { HoverEvents } from '@react-types/shared';
+import type { HoverEvents } from '@react-types/shared';
 import { Input, InputContext } from './Input';
 import { LabelContext } from './Label';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
 import React, {
 	cloneElement,
 	createContext,
-	ForwardedRef,
+	type ForwardedRef,
 	forwardRef,
-	JSX,
-	ReactElement,
+	type JSX,
+	type ReactElement,
 	useContext,
 	useRef,
 } from '../compat/react';
 import { TextContext } from './Text';
 import {
-	TimeFieldState,
+	type TimeFieldState,
 	useTimeFieldState,
 } from '../upstream-exports/react-stately/useTimeFieldState';
-import { TimeValue } from '../upstream-exports/react-stately/useTimeFieldState';
+import type { TimeValue } from '../upstream-exports/react-stately/useTimeFieldState';
 import { useFocusRing } from '../upstream-exports/react-aria/useFocusRing';
 import { useHover } from '../upstream-exports/react-aria/useHover';
 import { useLocale } from '../upstream-exports/react-aria/I18nProvider';

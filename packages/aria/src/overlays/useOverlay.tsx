@@ -13,7 +13,7 @@ type DOMAttributes = Record<string, any>;
  * governing permissions and limitations under the License.
  */
 
-import { RefObject } from '@react-types/shared';
+import type { RefObject } from '@react-types/shared';
 import { withSlot } from 'octane';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { isElementInChildOfActiveScope } from '../focus/FocusScope';

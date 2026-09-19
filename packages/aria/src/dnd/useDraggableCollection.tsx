@@ -12,9 +12,9 @@
  * governing permissions and limitations under the License.
  */
 
-import { DraggableCollectionState } from '../upstream-exports/react-stately/useDraggableCollectionState';
+import type { DraggableCollectionState } from '../upstream-exports/react-stately/useDraggableCollectionState';
 import { globalDndState, setDraggingCollectionRef } from './utils';
-import { RefObject } from '@react-types/shared';
+import type { RefObject } from '@react-types/shared';
 
 export interface DraggableCollectionOptions {}
 

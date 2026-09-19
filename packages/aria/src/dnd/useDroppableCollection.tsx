@@ -21,7 +21,7 @@ import {
 	isInternalDropOperation,
 	setDropCollectionRef,
 } from './utils';
-import {
+import type {
 	Collection,
 	DropEvent,
 	DropOperation,
@@ -36,8 +36,8 @@ import {
 	RefObject,
 } from '@react-types/shared';
 import * as DragManager from './DragManager';
-import { DroppableCollectionState } from '../upstream-exports/react-stately/useDroppableCollectionState';
-import { HTMLAttributes, useCallback, useEffect, useRef } from '../compat/react';
+import type { DroppableCollectionState } from '../upstream-exports/react-stately/useDroppableCollectionState';
+import { type HTMLAttributes, useCallback, useEffect, useRef } from '../compat/react';
 import { mergeProps } from '../utils/mergeProps';
 import { navigate } from './DropTargetKeyboardNavigation';
 import { setInteractionModality } from '../interactions/useFocusVisible';

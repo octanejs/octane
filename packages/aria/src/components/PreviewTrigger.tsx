@@ -14,16 +14,16 @@ import type { OctaneNode } from 'octane';
  */
 
 import {
-	AriaPreviewTriggerProps,
+	type AriaPreviewTriggerProps,
 	usePreviewTrigger,
 } from '../upstream-exports/react-aria/usePreviewTrigger';
-import { FocusableElement } from '@react-types/shared';
+import type { FocusableElement } from '@react-types/shared';
 import { FocusableProvider } from '../interactions/useFocusable';
-import { OverlayTriggerState } from '../upstream-exports/react-stately/useOverlayTriggerState';
+import type { OverlayTriggerState } from '../upstream-exports/react-stately/useOverlayTriggerState';
 import { OverlayTriggerStateContext } from './Dialog';
 import { PopoverContext } from './Popover';
 import { Provider } from './utils';
-import React, { JSX, useMemo, useRef } from '../compat/react';
+import React, { type JSX, useMemo, useRef } from '../compat/react';
 import { useTooltipTriggerState } from '../upstream-exports/react-stately/useTooltipTriggerState';
 
 export interface PreviewTriggerProps extends AriaPreviewTriggerProps {

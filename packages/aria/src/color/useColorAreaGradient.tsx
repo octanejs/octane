@@ -12,10 +12,10 @@
  * governing permissions and limitations under the License.
  */
 
-import { Color, ColorChannel } from '../upstream-exports/react-stately/Color';
+import type { Color, ColorChannel } from '../upstream-exports/react-stately/Color';
 
-import { ColorAreaState } from '../upstream-exports/react-stately/useColorAreaState';
-import { CSSProperties, useMemo } from '../compat/react';
+import type { ColorAreaState } from '../upstream-exports/react-stately/useColorAreaState';
+import { type CSSProperties, useMemo } from '../compat/react';
 import { parseColor } from '../upstream-exports/react-stately/Color';
 
 const hue = (color: Color) =>

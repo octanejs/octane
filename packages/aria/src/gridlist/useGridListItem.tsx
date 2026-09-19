@@ -14,7 +14,13 @@ type DOMAttributes = Record<string, any>;
  */
 
 import { chain } from '../utils/chain';
-import { Collection, FocusableElement, Key, RefObject, Node as RSNode } from '@react-types/shared';
+import type {
+	Collection,
+	FocusableElement,
+	Key,
+	RefObject,
+	Node as RSNode,
+} from '@react-types/shared';
 import { focusSafely } from '../interactions/focusSafely';
 import {
 	getActiveElement,
@@ -26,13 +32,17 @@ import { getFocusableTreeWalker } from '../focus/FocusScope';
 import { getOwnerDocument } from '../utils/domHelpers';
 import { getRowId, listMap } from './utils';
 import { getScrollParent } from '../utils/getScrollParent';
-import { HTMLAttributes, KeyboardEvent as ReactKeyboardEvent, useRef } from '../compat/react';
+import {
+	type HTMLAttributes,
+	type KeyboardEvent as ReactKeyboardEvent,
+	useRef,
+} from '../compat/react';
 import { withSlot } from 'octane';
 import { isFocusVisible } from '../interactions/useFocusVisible';
 import type { ListState } from '../upstream-exports/react-stately/useListState';
 import { mergeProps } from '../utils/mergeProps';
 import { scrollIntoViewport } from '../utils/scrollIntoView';
-import { SelectableItemStates, useSelectableItem } from '../selection/useSelectableItem';
+import { type SelectableItemStates, useSelectableItem } from '../selection/useSelectableItem';
 import type { TreeState } from '../upstream-exports/react-stately/useTreeState';
 import { useLocale } from '../i18n/I18nProvider';
 import { useSlotId } from '../utils/useId';

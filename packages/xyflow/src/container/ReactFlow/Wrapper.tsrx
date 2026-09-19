@@ -3,7 +3,7 @@ import { useContext, type OctaneNode } from 'octane';
 import StoreContext from '../../contexts/StoreContext';
 import { ReactFlowProvider } from '../../components/ReactFlowProvider/index.tsrx';
 import type { Node, Edge, FitViewOptions } from '../../types';
-import { CoordinateExtent, NodeOrigin, ZIndexMode } from '@xyflow/system';
+import type { CoordinateExtent, NodeOrigin, ZIndexMode } from '@xyflow/system';
 
 export function Wrapper({
 	children,

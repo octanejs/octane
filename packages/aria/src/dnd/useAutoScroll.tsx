@@ -16,7 +16,7 @@ import { getScrollParent } from '../utils/getScrollParent';
 
 import { isIOS, isWebKit } from '../utils/platform';
 import { isScrollable } from '../utils/isScrollable';
-import { RefObject } from '@react-types/shared';
+import type { RefObject } from '@react-types/shared';
 import { useCallback, useEffect, useRef } from '../compat/react';
 
 const AUTOSCROLL_AREA_SIZE = 20;

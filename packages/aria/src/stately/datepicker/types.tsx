@@ -13,7 +13,7 @@
  */
 
 import { CalendarDate, CalendarDateTime, Time, ZonedDateTime } from '@internationalized/date';
-import {
+import type {
 	FocusableProps,
 	HelpTextProps,
 	InputBase,
@@ -22,8 +22,8 @@ import {
 	Validation,
 	ValueBase,
 } from '@react-types/shared';
-import { OverlayTriggerProps } from '../overlays/useOverlayTriggerState';
-import { PageBehavior } from '../calendar/types';
+import type { OverlayTriggerProps } from '../overlays/useOverlayTriggerState';
+import type { PageBehavior } from '../calendar/types';
 
 export type DateValue = CalendarDate | CalendarDateTime | ZonedDateTime;
 export type DateRange = RangeValue<DateValue>;

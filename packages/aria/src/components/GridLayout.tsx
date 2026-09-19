@@ -14,9 +14,9 @@
 
 import {
 	GridLayout as BaseGridLayout,
-	GridLayoutOptions,
+	type GridLayoutOptions,
 } from '../upstream-exports/react-stately/useVirtualizerState';
-import { LayoutOptionsDelegate } from './Virtualizer';
+import type { LayoutOptionsDelegate } from './Virtualizer';
 import { useLocale } from '../upstream-exports/react-aria/I18nProvider';
 import { useMemo } from '../compat/react';
 

@@ -14,7 +14,7 @@ import { useEffectEvent } from '../utils/useEffectEvent';
  * governing permissions and limitations under the License.
  */
 
-import { Key, RefObject } from '@react-types/shared';
+import type { Key, RefObject } from '@react-types/shared';
 import { LayoutInfo, Size } from '../upstream-exports/react-stately/useVirtualizerState';
 import { useCallback, useEffect } from '../compat/react';
 import { useLayoutEffect } from '../utils/useLayoutEffect';

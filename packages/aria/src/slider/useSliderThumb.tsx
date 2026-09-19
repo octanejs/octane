@@ -1,7 +1,7 @@
 /** @jsxImportSource octane */
 type DOMAttributes = Record<string, any>;
 // Ported from adobe/react-spectrum@5ecb3333001313e83898cd07644227897e3bae1f (packages/react-aria/src/slider/useSliderThumb.ts).
-import {
+import type {
 	AriaLabelingProps,
 	AriaValidationProps,
 	DOMProps,
@@ -20,14 +20,14 @@ import { getSliderThumbId, sliderData } from './utils';
 import { mergeProps } from '../utils/mergeProps';
 import { withSlot } from 'octane';
 import React, {
-	ChangeEvent,
-	InputHTMLAttributes,
-	LabelHTMLAttributes,
+	type ChangeEvent,
+	type InputHTMLAttributes,
+	type LabelHTMLAttributes,
 	useCallback,
 	useEffect,
 	useRef,
 } from '../compat/react';
-import { SliderState } from '../upstream-exports/react-stately/useSliderState';
+import type { SliderState } from '../upstream-exports/react-stately/useSliderState';
 import { useFocusable } from '../interactions/useFocusable';
 import { useFormReset } from '../utils/useFormReset';
 import { useGlobalListeners } from '../utils/useGlobalListeners';

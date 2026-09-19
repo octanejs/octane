@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import {
+import type {
 	Collection,
 	DraggableCollectionEndEvent,
 	DraggableCollectionProps,
@@ -25,7 +25,7 @@ import {
 	Node,
 	RefObject,
 } from '@react-types/shared';
-import { MultipleSelectionManager } from '../selection/types';
+import type { MultipleSelectionManager } from '../selection/types';
 import { useRef, useState } from '../../compat/react';
 
 export interface DraggableCollectionStateOptions<T = object> extends DraggableCollectionProps<T> {

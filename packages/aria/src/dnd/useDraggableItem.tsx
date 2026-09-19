@@ -12,17 +12,17 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaButtonProps } from '../button/useButton';
+import type { AriaButtonProps } from '../button/useButton';
 import {
 	clearGlobalDnDState,
 	isInternalDropOperation,
 	setDraggingKeys,
 	useDragModality,
 } from './utils';
-import { DraggableCollectionState } from '../upstream-exports/react-stately/useDraggableCollectionState';
-import { HTMLAttributes, KeyboardEvent } from '../compat/react';
+import type { DraggableCollectionState } from '../upstream-exports/react-stately/useDraggableCollectionState';
+import type { HTMLAttributes, KeyboardEvent } from '../compat/react';
 import intlMessages from '../intl/dnd/index';
-import { Key } from '@react-types/shared';
+import type { Key } from '@react-types/shared';
 import { useDescription } from '../utils/useDescription';
 import { useDrag } from './useDrag';
 import { useLocalizedStringFormatter } from '../i18n/useLocalizedStringFormatter';

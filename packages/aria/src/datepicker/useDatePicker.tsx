@@ -12,9 +12,9 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaButtonProps } from '../button/useButton';
-import { AriaDialogProps } from '../dialog/useDialog';
-import {
+import type { AriaButtonProps } from '../button/useButton';
+import type { AriaDialogProps } from '../dialog/useDialog';
+import type {
 	AriaLabelingProps,
 	DOMAttributes,
 	DOMProps,
@@ -24,9 +24,9 @@ import {
 	RefObject,
 	ValidationResult,
 } from '@react-types/shared';
-import { CalendarProps } from '../upstream-exports/react-stately/useCalendarState';
+import type { CalendarProps } from '../upstream-exports/react-stately/useCalendarState';
 import { createFocusManager } from '../focus/FocusScope';
-import {
+import type {
 	DatePickerProps,
 	DatePickerState,
 	DateValue,

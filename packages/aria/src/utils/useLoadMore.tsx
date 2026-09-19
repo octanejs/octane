@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import { RefObject, useCallback, useRef } from '../compat/react';
+import { type RefObject, useCallback, useRef } from '../compat/react';
 import { useEvent } from './useEvent';
 
 import { useLayoutEffect } from './useLayoutEffect';

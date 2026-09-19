@@ -13,8 +13,8 @@
  */
 
 import {
-	Calendar,
-	CalendarIdentifier,
+	type Calendar,
+	type CalendarIdentifier,
 	DateFormatter,
 	GregorianCalendar,
 	isEqualCalendar,
@@ -23,20 +23,20 @@ import {
 import {
 	convertValue,
 	createPlaceholderDate,
-	FieldOptions,
-	FormatterOptions,
+	type FieldOptions,
+	type FormatterOptions,
 	getFormatOptions,
 	getValidationResult,
 	useDefaultProps,
 } from './utils';
-import { DatePickerProps, DateValue, Granularity, MappedDateValue } from './types';
-import { FormValidationState, useFormValidationState } from '../form/useFormValidationState';
+import type { DatePickerProps, DateValue, Granularity, MappedDateValue } from './types';
+import { type FormValidationState, useFormValidationState } from '../form/useFormValidationState';
 import { getPlaceholder } from './placeholders';
 import { IncompleteDate } from './IncompleteDate';
 import { NumberFormatter } from '@internationalized/number';
 import { useControlledState } from '../utils/useControlledState';
 import { useMemo, useState } from '../../compat/react';
-import { ValidationState } from '@react-types/shared';
+import type { ValidationState } from '@react-types/shared';
 
 export type DateSegmentType =
 	| 'era'

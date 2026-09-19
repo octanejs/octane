@@ -1,25 +1,25 @@
 /** @jsxImportSource octane */
 // Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria-components/src/ColorArea.tsx).
-import { AriaColorAreaProps, useColorArea } from '../upstream-exports/react-aria/useColorArea';
+import { type AriaColorAreaProps, useColorArea } from '../upstream-exports/react-aria/useColorArea';
 import {
-	ClassNameOrFunction,
-	ContextValue,
+	type ClassNameOrFunction,
+	type ContextValue,
 	dom,
 	Provider,
-	RenderProps,
-	SlotProps,
+	type RenderProps,
+	type SlotProps,
 	useContextProps,
 	useRenderProps,
 } from './utils';
 import {
-	ColorAreaState,
+	type ColorAreaState,
 	useColorAreaState,
 } from '../upstream-exports/react-stately/useColorAreaState';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
-import { GlobalDOMAttributes } from '@react-types/shared';
+import type { GlobalDOMAttributes } from '@react-types/shared';
 import { InternalColorThumbContext } from './ColorThumb';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
-import React, { createContext, ForwardedRef, forwardRef, useRef } from '../compat/react';
+import React, { createContext, type ForwardedRef, forwardRef, useRef } from '../compat/react';
 
 export interface ColorAreaRenderProps {
 	/**

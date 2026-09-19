@@ -1,4 +1,4 @@
-import { OctaneNode } from 'octane';
+import type { OctaneNode } from 'octane';
 import { createPortal } from 'octane';
 
 import type { ReactFlowState } from '../../types';

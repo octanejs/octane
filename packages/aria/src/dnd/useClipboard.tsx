@@ -14,7 +14,7 @@
 
 import { chain } from '../utils/chain';
 
-import { DOMAttributes, DragItem, DropItem } from '@react-types/shared';
+import type { DOMAttributes, DragItem, DropItem } from '@react-types/shared';
 import { readFromDataTransfer, writeToDataTransfer } from './utils';
 import { useEffect, useRef } from '../compat/react';
 import { useEffectEvent } from '../utils/useEffectEvent';

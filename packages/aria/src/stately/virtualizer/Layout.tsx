@@ -13,8 +13,8 @@ import type { ScrollAnchorInfo } from './ScrollAnchor';
  * governing permissions and limitations under the License.
  */
 
-import { InvalidationContext } from './types';
-import { ItemDropTarget, Key, LayoutDelegate, Node } from '@react-types/shared';
+import type { InvalidationContext } from './types';
+import type { ItemDropTarget, Key, LayoutDelegate, Node } from '@react-types/shared';
 import { LayoutInfo } from './LayoutInfo';
 import { Rect } from './Rect';
 import { Size } from './Size';

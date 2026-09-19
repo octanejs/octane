@@ -12,11 +12,11 @@
  * governing permissions and limitations under the License.
  */
 
-import { Color } from './types';
+import type { Color } from './types';
 import { normalizeColor, parseColor } from './Color';
 import { useControlledState } from '../utils/useControlledState';
 import { useMemo, useRef, useState } from '../../compat/react';
-import { ValueBase } from '@react-types/shared';
+import type { ValueBase } from '@react-types/shared';
 
 export interface ColorWheelProps extends Omit<ValueBase<string | Color>, 'onChange'> {
 	/** Whether the ColorWheel is disabled. */

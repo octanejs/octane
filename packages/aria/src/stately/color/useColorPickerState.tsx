@@ -1,10 +1,10 @@
 /** @jsxImportSource octane */
 // Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-stately/src/color/useColorPickerState.ts).
-import { Color } from './types';
+import type { Color } from './types';
 import { parseColor } from './Color';
 import { useColor } from './useColor';
 import { useControlledState } from '../utils/useControlledState';
-import { ValueBase } from '@react-types/shared';
+import type { ValueBase } from '@react-types/shared';
 
 export interface ColorPickerProps extends ValueBase<string | Color, Color> {}
 

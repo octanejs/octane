@@ -13,8 +13,8 @@ import { isIOS, isWebKit } from '../utils/platform';
  * governing permissions and limitations under the License.
  */
 
-import { AriaButtonProps } from '../button/useButton';
-import {
+import type { AriaButtonProps } from '../button/useButton';
+import type {
 	DragEndEvent,
 	DragItem,
 	DragMoveEvent,
@@ -25,11 +25,11 @@ import {
 	RefObject,
 } from '@react-types/shared';
 import {
-	DragEvent,
-	HTMLAttributes,
-	KeyboardEvent,
-	MouseEvent,
-	PointerEvent,
+	type DragEvent,
+	type HTMLAttributes,
+	type KeyboardEvent,
+	type MouseEvent,
+	type PointerEvent,
 	useEffect,
 	useRef,
 	useState,

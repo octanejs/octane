@@ -12,14 +12,14 @@
  * governing permissions and limitations under the License.
  */
 
-import { AriaLabelingProps, DOMProps, FocusableElement, RefObject } from '@react-types/shared';
-import { CalendarAria, useCalendarBase } from './useCalendarBase';
-import {
+import type { AriaLabelingProps, DOMProps, FocusableElement, RefObject } from '@react-types/shared';
+import { type CalendarAria, useCalendarBase } from './useCalendarBase';
+import type {
 	DateValue,
 	RangeCalendarState,
 } from '../upstream-exports/react-stately/useRangeCalendarState';
 import { isFocusWithin, nodeContains } from '../utils/shadowdom/DOMFunctions';
-import { RangeCalendarProps } from '../upstream-exports/react-stately/useRangeCalendarState';
+import type { RangeCalendarProps } from '../upstream-exports/react-stately/useRangeCalendarState';
 import { useEvent } from '../utils/useEvent';
 import { useRef } from '../compat/react';
 

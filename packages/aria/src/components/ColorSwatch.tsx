@@ -1,23 +1,23 @@
 /** @jsxImportSource octane */
 // Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria-components/src/ColorSwatch.tsx).
 import {
-	AriaColorSwatchProps,
+	type AriaColorSwatchProps,
 	useColorSwatch,
 } from '../upstream-exports/react-aria/useColorSwatch';
 import {
-	ClassNameOrFunction,
-	ContextValue,
+	type ClassNameOrFunction,
+	type ContextValue,
 	dom,
-	SlotProps,
-	StyleRenderProps,
+	type SlotProps,
+	type StyleRenderProps,
 	useContextProps,
 	useRenderProps,
 } from './utils';
-import { Color } from '../upstream-exports/react-stately/Color';
+import type { Color } from '../upstream-exports/react-stately/Color';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
-import { GlobalDOMAttributes } from '@react-types/shared';
+import type { GlobalDOMAttributes } from '@react-types/shared';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
-import React, { createContext, ForwardedRef, forwardRef } from '../compat/react';
+import React, { createContext, type ForwardedRef, forwardRef } from '../compat/react';
 
 export interface ColorSwatchRenderProps {
 	/** The color of the swatch. */

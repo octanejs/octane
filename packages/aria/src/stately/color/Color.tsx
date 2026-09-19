@@ -13,7 +13,7 @@
  */
 
 import { clamp, toFixedNumber } from '../utils/number';
-import {
+import type {
 	ColorAxes,
 	ColorChannel,
 	ColorChannelRange,
