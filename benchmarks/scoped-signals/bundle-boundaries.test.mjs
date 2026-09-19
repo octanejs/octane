@@ -11,6 +11,7 @@ import { build } from 'esbuild';
 import { Window } from 'happy-dom';
 import { compile } from '../../packages/octane/src/compiler/compile.js';
 import { slotHooks } from '../../packages/octane/src/compiler/slot-hooks.js';
+import { findPrivateCompiledContexts } from '../../packages/octane/src/compiler/private-context.js';
 import {
 	createOctaneCompiler,
 	findVoidRootImports,
@@ -2274,4 +2275,188 @@ test('root optimization fails closed on unscoped runtime AST references', async 
 	t.diagnostic(
 		'2 frozen COW AST positive/negative pairs; future-proof admission, not a reproduced supported runtime bug',
 	);
+});
+
+test('private compiled contexts omit descriptor rendering with a callable exported control', async (t) => {
+	const filename = path.resolve('benchmarks/bundle-size/fixtures/minimal/context.tsrx');
+	const authored = await readFile(filename, 'utf8');
+	const sizes = [];
+	for (const exported of [false, true]) {
+		const source =
+			authored +
+			(exported
+				? `
+import {createElement} from 'octane';
+export {ThemeContext};
+export function descriptor(parent) {
+ const root=createRoot(parent);
+ root.render(ThemeContext,{value:'external',children:createElement('article',{children:'Descriptor children'})});
+ const before=parent.textContent;
+ root.render(ThemeContext,{value:'external',children:['ordinary',' children']});
+ root.unmount();
+ return {before,cleaned:parent.childNodes.length===0};
+}
+`
+				: '');
+		const compiled = compile(source, filename, { mode: 'client', dev: false, hmr: false }).code;
+		const result = await build({
+			stdin: { contents: compiled, resolveDir: path.resolve('packages/octane'), loader: 'js' },
+			bundle: true,
+			write: false,
+			minify: true,
+			format: 'iife',
+			globalName: '__OCTANE_REACHABILITY__',
+			platform: 'browser',
+			target: 'esnext',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+		});
+		const code = result.outputFiles[0].text;
+		await verifyScenario('context', code);
+		if (exported) {
+			const window = new Window();
+			try {
+				window.eval(code);
+				const host = window.document.createElement('div');
+				window.document.body.appendChild(host);
+				assert.deepEqual(
+					JSON.parse(JSON.stringify(window.__OCTANE_REACHABILITY__.descriptor(host))),
+					{ before: 'Descriptor children', cleaned: true },
+				);
+			} finally {
+				await window.happyDOM.close();
+			}
+		}
+		sizes.push(gzipSync(code, { level: 9 }).length);
+	}
+	assert.ok(sizes[0] < sizes[1] * 0.7, `Private ${sizes[0]} vs exported ${sizes[1]} gzip`);
+	t.diagnostic(
+		`Private ${sizes[0]} -> exported ${sizes[1]} gzip; provider updates and cleanup match`,
+	);
+});
+
+test('private context proof declines escaped values and noncompiled child dialects', (t) => {
+	const require = createRequire(path.resolve('packages/octane/package.json'));
+	const { parseModule } = require('@tsrx/core');
+	const prefix =
+		"import {createContext,useContext,createElement,descriptorChildren} from 'octane';\nconst Theme=createContext('default');\n";
+	const provider = 'function App() @{ <Theme value="provided"><span>child</span></Theme> }\n';
+	const escapes = [
+		'export {Theme};',
+		'export default Theme;',
+		'export function exposed() {return Theme;}',
+		'const alias=Theme;',
+		'const holder={Theme};',
+		'const holder=[Theme];',
+		'consume(Theme);',
+		'const reflected=Theme.defaultValue;',
+		'const {defaultValue}=Theme;',
+		'descriptorChildren(Theme);',
+		'createElement(Theme,{children:"descriptor"});',
+		'function change(root) {root.render(Theme,{children:"descriptor"});}',
+		'function read() {return useContext(consume(Theme));}',
+		'function read(Theme) {return Theme;}',
+		'function read() {eval("Theme({children:[]})");}',
+		'class Escape {static value=Theme;}',
+		'class Escape {static {consume(Theme);}}',
+		'const closure=createContext(()=>Theme);',
+		'function App2() @{ <Theme value={Theme}><span /></Theme> }',
+		'function App2() @{ <Theme.Render /> }',
+		'const node=<Theme value="descriptor"><span /></Theme>;',
+		'function App2(props) @{ <Theme {...props} /> }',
+		'function App2(props) @{ <Theme value="descriptor" children={props.children} /> }',
+		'function App2(props) @{ <Theme __proto__={props.proto} /> }',
+		'function App2(props) @{ <Theme ns:children={props.children} /> }',
+		'function App2(props) @{ <Theme __compiler={props.children} /> }',
+		...[
+			'(value)=>value',
+			'((value)=>value) as unknown',
+			'((value)=>value)!',
+			'((value)=>value) satisfies Function',
+			'(((value)=>value))',
+		].map((child) => `function App2() @{ <Theme value="descriptor">{${child}}</Theme> }`),
+	];
+	function freeze(value) {
+		if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return;
+		for (const child of Object.values(value)) freeze(child);
+		Object.freeze(value);
+	}
+	for (const extra of ['', ...escapes]) {
+		const ast = parseModule(prefix + provider + extra, 'private-context.tsrx');
+		freeze(ast);
+		assert.equal(findPrivateCompiledContexts(ast).has('Theme'), extra === '', extra);
+	}
+	const ast = parseModule(prefix + provider + 'function decorate(){}', 'private-context.tsrx');
+	const supplied = {
+		...ast,
+		body: ast.body.map((node) =>
+			node.type === 'FunctionDeclaration' && node.id.name === 'decorate'
+				? {
+						...node,
+						decorators: [{ type: 'Decorator', expression: { type: 'Identifier', name: 'Theme' } }],
+					}
+				: node,
+		),
+	};
+	freeze(supplied);
+	freeze(ast);
+	assert.equal(findPrivateCompiledContexts(ast).has('Theme'), true, 'positive scoped control');
+	assert.equal(
+		findPrivateCompiledContexts(supplied).has('Theme'),
+		false,
+		'unscoped runtime reference',
+	);
+	t.diagnostic(`${escapes.length} authored lifetime/dialect controls on frozen parser ASTs`);
+});
+
+test('private context specialization preserves factory source ranges and deployment boundaries', () => {
+	const authored =
+		"import {createContext as context,useContext} from 'octane';\nconst Theme=context('default');\nfunction Reader() @{<span>{useContext(Theme) as string}</span>}\nexport function App() @{<Theme value=\"provided\"><Reader/></Theme>}";
+	const options = [
+		{},
+		{ dev: true },
+		{ hmr: 'vite' },
+		{ hmr: 'webpack' },
+		{ profile: true },
+		{ mode: 'server' },
+		{ renderer: { id: 'dom', module: 'octane', target: 'dom' } },
+		{ rendererBoundaries: { rules: [] } },
+	];
+	for (const settings of options) {
+		const result = compile(authored, 'private-context.tsrx', {
+			dev: false,
+			hmr: false,
+			mode: 'client',
+			...settings,
+			inspect: true,
+		});
+		const start = authored.indexOf("context('default')");
+		assert.ok(
+			result.inspect.segments.some(
+				(segment) => segment.srcStart === start && segment.srcEnd === start + 'context'.length,
+			),
+			'factory callee range ' + JSON.stringify(settings),
+		);
+		const specialized = result.inspect.ast.body.some(
+			(node) =>
+				node.type === 'ImportDeclaration' &&
+				node.source.value === 'octane/internal/client' &&
+				node.specifiers.some((specifier) => specifier.imported?.name === '__createCompiledContext'),
+		);
+		assert.equal(specialized, Object.keys(settings).length === 0, JSON.stringify(settings));
+	}
+	for (const importSource of ['octane/server', 'octane/native', 'octane/lynx']) {
+		const source = authored.replace("from 'octane'", "from '" + importSource + "'");
+		assert.equal(
+			findPrivateCompiledContexts(
+				createRequire(path.resolve('packages/octane/package.json'))('@tsrx/core').parseModule(
+					source,
+					'private-context.tsrx',
+				),
+			).size,
+			0,
+			importSource,
+		);
+	}
 });

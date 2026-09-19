@@ -13458,6 +13458,37 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	const ctx = function ProviderBody(props, scope) {
 		return renderClientContextProvider(ctx, props, scope);
 	} as Context<T>;
+	return initializeContext(ctx, defaultValue);
+}
+
+/** Compiler-owned private Context whose children are always compiled bodies. */
+/* @__NO_SIDE_EFFECTS__ */
+export function __createCompiledContext<T>(defaultValue: T): Context<T> {
+	const ctx = function ProviderBody(props, scope) {
+		provideContext(scope, ctx, props.value);
+		const children = props.children as ComponentBody | null | undefined;
+		if (children == null) return;
+		const dialect = (children as any)[CHILDREN_BODY] ?? children;
+		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+		if (previous !== dialect) {
+			if (previous !== undefined && (previous === 2 || dialect === 2)) {
+				resetScopeChildren(scope);
+				if (scope.block.disposed) return;
+			} else if (previous !== undefined) {
+				invalidateSharedBodyOutput(scope);
+				if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+					const hooks = scope.hooks!;
+					journalUndo(() => hooks.set(CHILDREN_DIALECT_SLOT, previous));
+				}
+			}
+			ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
+		}
+		renderSharedBody(children, undefined, scope, undefined);
+	} as Context<T>;
+	return initializeContext(ctx, defaultValue);
+}
+
+function initializeContext<T>(ctx: Context<T>, defaultValue: T): Context<T> {
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
 	ctx.$$version = 0;
