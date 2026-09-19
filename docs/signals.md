@@ -2,7 +2,7 @@
 
 `octane/signals` is Octane's stable, renderer-independent API for writable state, derived values, keyed async sources, and streams. `signal$`, `derived$`, and `query$` are declaration facades: the compiler assigns their stable source identities, while the current request, document or feature instance owns their cells. Compiled browser modules can read and write global signals without creating a renderer root. Server reads/writes require a request owner; there is no mutable process-global fallback. Native component reads and `useSignal$` work with the standard Octane compiler; no signal-specific compiler option is needed. Each module that consumes native reads needs a runtime import from `octane/signals`, `octane/signals/client`, or `octane/signals/server`, including modules that receive handles through props or call imported helpers. A `$` name alone does not enable native reads.
 
-The [website guide](https://octanejs.dev/docs/signals) introduces the API. This reference describes ownership, availability, and hydration in more detail. The [original implementation evidence](experimental-scoped-signals-evidence.md) and [implementation plan](plans/2026-08-27-experimental-scoped-async-signals-plan.md) are historical records.
+The [website guide](https://octanejs.dev/docs/signals) introduces the API, including a [complete streaming SSR example](https://octanejs.dev/docs/signals#streaming-example) and its [performance benefits](https://octanejs.dev/docs/signals#streaming-performance). This reference describes ownership, availability, and hydration in more detail. The [original implementation evidence](experimental-scoped-signals-evidence.md) and [implementation plan](plans/2026-08-27-experimental-scoped-async-signals-plan.md) are historical records.
 
 The existing `@octanejs/alien-signals` binding remains a separate API. Explicit hook dependency arrays keep their existing meaning; inferred `useMemo` calls also track native reads made by their callback.
 
@@ -348,9 +348,20 @@ Styled native returned fragments use an inspectable `Fragment` descriptor, inclu
 
 ## Server rendering and historical adoption
 
+For streaming pages, read queries inside separate `@try`/`@pending`/`@catch`
+boundaries. The server sends the page shell with placeholders first, then the
+first ready HTML for each boundary. Later yields from a stream query travel as
+data; an active view or binding displays them. Each yield is the whole next
+value, not an instruction to append HTML or array items.
+
+The standard fullstack host connects this result delivery automatically. A
+custom host opts in with the renderer's `streamedSignals` option and installs
+the browser bridge before importing signal consumers. See the
+[SSR setup and examples](./ssr.md#stream-data-with-signals).
+
 Use request-local data scopes on the server. Native completed reads produce a versioned, tagged seed manifest, including the exact read channel: strict value, retained `latest`, or ready snapshot. Equal textual scope keys in one presented graph must identify the same owner. A retained result keeps the query identity that produced it, not the current pending selection's arguments.
 
-Client adoption reads immutable historical frames while live state continues independently. It never rewinds a live writable value or populates a live derived cache with an older result. Root, delayed-island, and streamed-segment adoption own separate leases, released after accepted layout work. A matching completed resource seed avoids a duplicate client load; an incomplete ready seed starts a new quiet client attempt rather than transferring the server's producer.
+Client adoption reads immutable historical frames while live state continues independently. It never rewinds a live writable value or populates a live derived cache with an older result. Root, delayed-island, and streamed-segment adoption own separate leases, released after accepted layout work. A matching completed resource seed avoids a duplicate client load. An incomplete ready seed alone starts a new quiet client attempt; with a matching streamed-result channel, the client joins the existing server attempt and receives its later values. The server producer itself stays on the server.
 
 The engine also exposes `scope.serialize()` and `scope.beginAdoption(seed)` for explicit embedding. A frame's synchronous `run(read)` installs that owner's historical view, `retain()` acquires another independent lease, and `release()` ends one lease. Nested reads of other shared owners require their frames too. Releasing a frame affects presentation validity, not live data.
 

@@ -62,6 +62,112 @@ renderer through [compiled DOM bindings](./deferred-hydration.md#compiled-presen
 This updates declared properties on matching existing SSR nodes; structural
 rendering and application event ownership remain separate.
 
+### Stream data with signals
+
+Use `query$` from `octane/signals` for data that the page needs. Read it with
+`.get()` inside `@try`/`@pending`/`@catch`. While a query is waiting, the server
+sends the pending content. When its first value arrives, the server sends the
+ready HTML for that boundary. Separate boundaries let a fast section appear
+without waiting for a slower one.
+
+```tsrx
+import 'octane/signals';
+import { title$, messages$ } from './chat-data';
+
+export function Chat() @{
+	<main>
+		@try {
+			<h1>{title$.get() as string}</h1>
+		} @pending {
+			<h1>Opening chat…</h1>
+		} @catch {
+			<h1>Could not load the title.</h1>
+		}
+		@try {
+			<ul>
+				@for (const message of messages$.get(); key message.id) {
+					<li>{message.text as string}</li>
+				}
+			</ul>
+		} @pending {
+			<p>Loading messages…</p>
+		} @catch {
+			<p role="alert">Could not load messages.</p>
+		}
+	</main>
+}
+```
+
+Here `chat-data` is your application's compiled data module: `title$` is a
+`query$` returning a string, and `messages$` is a `query$` returning a list of
+`{ id, text }` records. For multiple values, make the loader an async iterable
+and pass `{ kind: 'stream' }` to `query$`. Each yield replaces the query's whole
+value; it does not append to an array automatically. See the
+[complete page and loader example](https://octanejs.dev/docs/signals#streaming-example).
+
+The standard Octane fullstack host connects query results to the browser
+automatically. It can receive them before the query module loads, so activating
+the matching view does not start the same initial request again. A new selection
+or an explicit refresh can still start a new request.
+
+**Later yields carry data, not replacement HTML on every yield.** An active
+view or binding displays those values. A deferred view keeps its initial server
+HTML until activation, then adopts those nodes and catches up to the live data.
+A stored ready snapshot on its own cannot continue a server stream: without the
+matching result channel, an incomplete resource starts a new browser attempt.
+
+This can show useful content earlier, avoid duplicate loading, and let component
+code arrive later. It does not make the underlying database call faster. Result
+payloads, capture code, and subscriptions also have a cost; measure the complete
+page. The [conversation streaming benchmark](../benchmarks/conversation-streaming/README.md)
+documents what its arrival, input-preservation, and request-reuse checks cover.
+
+### Connect signals in a custom SSR host
+
+When you call the streaming renderer yourself, enable query-result delivery with
+`streamedSignals`. These options go in the third argument when passing a
+component and its props:
+
+```ts
+import { renderToReadableStream } from 'octane/server';
+import { Chat } from './Chat.tsrx';
+
+// Called by your host for each response. It supplies the deployed build ID.
+export async function renderChat(request: Request, buildId: string) {
+	const identity = { buildId, documentId: crypto.randomUUID() };
+	const stream = await renderToReadableStream(Chat, undefined, {
+		signal: request.signal,
+		streamedSignals: identity,
+	});
+	return { stream, identity };
+}
+```
+
+The host must put the same identity in its browser bootstrap metadata and
+consume `stream` as it arrives. Do not wait for `allReady` before consuming a
+Web stream: backpressure can prevent it from finishing. A `buildId` identifies
+matching server and client output; `documentId` identifies this response.
+They are not user IDs. Query-free renders do not emit the result receiver.
+
+Before importing modules that read document signals, install
+`bootstrapStreamedSignalHydration` from `octane/hydration/streamed-signals`,
+then pass its `signalOwner` to later `hydrateRoot` calls. If the host owns HTML
+placement and only needs result delivery, choose `bootstrapStreamedSignalResults`
+instead. Install one bridge per document. The
+[custom-host example](./signals.md#server-owned-html-without-a-client-renderer)
+covers the initial signal manifest, control binding, and cleanup.
+
+Start that browser bootstrap while the response is still arriving if the page
+needs live signals before the response ends. The standard host arranges this;
+a custom host must arrange its own early script loading.
+
+An envelope-owning host can place `earlySignalBootstrapScript({ nonce })` before
+any bound controls or result frames, then pass `earlySignalBootstrap: 'external'`
+to its fragment renderers. The script records early input and results. Live
+computations still require the signal engine. Dispose the browser bridge when
+its document owner ends, and keep initial-response streams finite; ongoing live
+updates need a separately managed connection.
+
 ### Leading list ranges on an owned SSR host
 
 `getLeadingHydrationListRange(host)` from `octane/hydration` returns the first
@@ -111,7 +217,8 @@ build integration must produce the client compilation and bundle instead.
 
 ## API
 
-The three buffered renderers return `RenderResult = { html, css }`:
+The three buffered renderers return `RenderResult` with `html` and `css`, plus
+optional `head` and `signals` fields:
 
 - `html` — the rendered markup, including hydration markers and, when anything
   resolved, an inline `<script type="application/json" data-octane-suspense>`
@@ -123,6 +230,9 @@ The three buffered renderers return `RenderResult = { html, css }`:
   them and returns them as `head` instead.
 - `head` — the hoisted metadata on its own, present **only** under
   `headChannel: 'separate'` (see `RenderOptions`).
+- `signals` — a native signal manifest, when present, containing the ready
+  values represented by this result's HTML. It is a snapshot, not an ongoing
+  result stream.
 - `css` — deduped `<style data-octane="hash">` tags, one per style scope the
   request rendered: a component contributes one tag per children list that
   holds a `<style>` block (its output fragment, nested elements, the fragments
@@ -179,7 +289,11 @@ use the same keyed hydration ranges as arrays. A thenable that settles while it
 is first subscribed is unwrapped in that render without publishing a fallback.
 
 `StreamOptions` extends `RenderOptions` with `onShellReady()`,
-`onShellError(err)`, `onAllReady()`, `onHeadReady(head)`, and `injection`.
+`onShellError(err)`, `onAllReady()`, `onHeadReady(head)`,
+`onEarlyHydrationReady()`, and `injection`.
+`onEarlyHydrationReady` tells a host that the shell uses signals that need
+browser activation before the response finishes. It runs before the shell is
+sent, after its query identities are prepared; feature-free renders do not call it.
 `onHeadReady` fires only under `headChannel: 'separate'`, once, **before** the
 shell is written and therefore before `onShellReady` and before
 `renderToReadableStream`'s promise resolves, so a host still has time to place
@@ -241,6 +355,17 @@ concurrently rather than awaiting `allReady` before reading. Same
 
 ### `RenderOptions`
 
+- `streamedSignals?: { buildId, documentId, selectionGeneration?, maxFrameBytes?, maxTotalBytes?, timeoutMs? }`
+  — deliver observed query attempts to the browser's streamed-result receiver.
+  Use matching build/document identities in the browser bootstrap. The optional
+  limits bound result delivery; its `timeoutMs` is separate from the render's
+  Suspense deadline. See [custom SSR hosts](#connect-signals-in-a-custom-ssr-host).
+- `signalOwner?: SignalOwner` — share a request-local signal owner across sibling
+  SSR regions. A supplied owner is borrowed: the host retires it when its work
+  ends. Do not share mutable owners across requests.
+- `earlySignalBootstrap?: 'external'` — omit the renderer's early capture script
+  because the host has already emitted `earlySignalBootstrapScript()` before
+  bound controls and streamed results.
 - `nonce?: string` — CSP nonce stamped on every inline tag the renderer emits
   (style, suspense seed, swap-runtime, and recovery scripts). Applies to every
   buffered and streaming renderer.
