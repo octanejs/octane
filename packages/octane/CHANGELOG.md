@@ -1,5 +1,16 @@
 # octane
 
+## 0.3.1
+
+### Patch Changes
+
+- eda8994: Production DOM compilation uses a smaller deferred hydration body for compiler-generated template children with no authored fallback. Boundaries with `split={false}` can omit generic returned-output and fallback rendering while retaining SSR adoption, interaction replay, suspension and cleanup. Descriptor children, spreads, explicit fallbacks, split loaders and development/HMR builds retain the general Hydrate path.
+- b819a83: Defer server-side signal identity serialization until an actual handle is read. Ordinary object-keyed lists no longer coerce reconciliation keys merely because opaque output might contain a handle. Actual handles retain the same nested-list and component-key identities across SSR, hydration and reordering.
+- 805deef: Reduce production DOM bundles for private contexts whose complete usage is proven to stay in compiled template providers and canonical context reads. Both the context factory and provider call omit generic returned-element and descriptor-child rendering. Exported, escaped, reflected, aliased, and opaque contexts retain the callable context API and generic child support; provider identity, state, SSR adoption, and cleanup stay unchanged.
+- 9291944: Skip repeated signal-binding policy and handle probes for stable scalar attributes. Continue evaluating authored expressions, reconciling undefined attributes during hydration, reading signal handles, and restoring controlled inputs.
+- 068ead5: Reuse the whole-style rollback snapshot for consecutive fixed-key declaration updates within one render checkpoint. Preserve separate hosts, intervening writes, CSS value coercion order, and abandoned or staged render restoration.
+- 0b48d5d: Reduce production client bundles for compiler-extracted Hydrate templates without an authored fallback. Code-split boundaries reuse the compiled-child policy while preserving preload captures, native hydration, suspension, retry and cleanup. Authored overrides and opaque callers retain the general rendering path.
+
 ## 0.3.0
 
 ### Minor Changes
