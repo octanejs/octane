@@ -6,10 +6,10 @@ import {
 	Position,
 	getNodeToolbarTransform,
 	getInternalNodesBounds,
-	NodeLookup,
+	type NodeLookup,
 } from '@xyflow/system';
 
-import { InternalNode, ReactFlowState } from '../../types';
+import type { InternalNode, ReactFlowState } from '../../types';
 import { useStore } from '../../hooks/useStore';
 import { useNodeId } from '../../contexts/NodeIdContext';
 import { NodeToolbarPortal } from './NodeToolbarPortal.tsrx';

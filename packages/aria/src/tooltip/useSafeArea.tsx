@@ -13,7 +13,7 @@
  */
 
 import { getOwnerDocument, getOwnerWindow } from '../utils/domHelpers';
-import { RefObject } from '@react-types/shared';
+import type { RefObject } from '@react-types/shared';
 import { useEffect } from '../compat/react';
 import { useEffectEvent } from '../utils/useEffectEvent';
 

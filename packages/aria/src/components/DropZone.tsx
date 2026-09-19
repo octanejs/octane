@@ -13,18 +13,18 @@ import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
  * governing permissions and limitations under the License.
  */
 
-import { AriaLabelingProps, GlobalDOMAttributes, HoverEvents } from '@react-types/shared';
+import type { AriaLabelingProps, GlobalDOMAttributes, HoverEvents } from '@react-types/shared';
 import {
-	ClassNameOrFunction,
-	ContextValue,
+	type ClassNameOrFunction,
+	type ContextValue,
 	dom,
 	Provider,
-	RenderProps,
-	SlotProps,
+	type RenderProps,
+	type SlotProps,
 	useContextProps,
 	useRenderProps,
 } from './utils';
-import { DropOptions, useDrop } from '../upstream-exports/react-aria/useDrop';
+import { type DropOptions, useDrop } from '../upstream-exports/react-aria/useDrop';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
 import {
 	getEventTarget,
@@ -33,7 +33,7 @@ import {
 import intlMessages from '../intl/react-aria-components/index';
 import { isFocusable } from '../upstream-exports/react-aria/private/utils/isFocusable';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
-import React, { createContext, ForwardedRef, forwardRef, useRef } from '../compat/react';
+import React, { createContext, type ForwardedRef, forwardRef, useRef } from '../compat/react';
 import { TextContext } from './Text';
 import { useButton } from '../upstream-exports/react-aria/useButton';
 import { useClipboard } from '../upstream-exports/react-aria/useClipboard';
