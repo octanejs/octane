@@ -59,11 +59,11 @@ function ListView(props: { collection: any }) {
 	const size = String(props.collection.size);
 	const firstKey = String(props.collection.getFirstKey());
 	return (
-		<CollectionCtx.Provider value={props.collection}>
+		<CollectionCtx value={props.collection}>
 			<ul data-size={size} data-first={firstKey}>
 				<CollectionRootR collection={props.collection} />
 			</ul>
-		</CollectionCtx.Provider>
+		</CollectionCtx>
 	);
 }
 

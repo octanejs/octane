@@ -34,7 +34,7 @@ function PortalContent(props) @{
 }
 
 export function PortalScene(props) @{
-	<PortalTheme.Provider value={props.theme}>
+	<PortalTheme value={props.theme}>
 		<group
 			name="ordinary-root-child"
 			ref={props.logicalTargetRef}
@@ -59,7 +59,7 @@ export function PortalScene(props) @{
 				)}
 			</>
 		}
-	</PortalTheme.Provider>
+	</PortalTheme>
 }
 
 function NestedPortalLayer(props) @{
@@ -87,7 +87,7 @@ function NestedPortalLayer(props) @{
 }
 
 export function NestedPortalScene(props) @{
-	<PortalTheme.Provider value={props.theme}>
+	<PortalTheme value={props.theme}>
 		<>
 			{createPortal(
 				<NestedPortalLayer
@@ -104,7 +104,7 @@ export function NestedPortalScene(props) @{
 				props.outerState,
 			)}
 		</>
-	</PortalTheme.Provider>
+	</PortalTheme>
 }
 
 function ManagedTargetPortalContent(props) @{

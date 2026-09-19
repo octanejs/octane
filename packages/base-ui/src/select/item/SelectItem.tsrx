@@ -246,7 +246,7 @@ export const SelectItem = React.memo(function SelectItem(
 		[selected, index, textRef, selectedByFocus],
 	);
 
-	return <SelectItemContext.Provider value={contextValue}>{element}</SelectItemContext.Provider>;
+	return <SelectItemContext value={contextValue}>{element}</SelectItemContext>;
 });
 
 export interface SelectItemState {

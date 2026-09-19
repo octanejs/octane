@@ -129,11 +129,11 @@ export function MotionPathControls({
 		}
 	});
 	<group ref={group as any} {...props}>
-		<MotionContext.Provider value={state}>
+		<MotionContext value={state}>
 			{children}
 			@if (debug) {
 				<Debug color={debugColor} />
 			}
-		</MotionContext.Provider>
+		</MotionContext>
 	</group>
 }

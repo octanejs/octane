@@ -226,10 +226,10 @@ export const SelectPositioner = function SelectPositioner(
 			labelsRef={store.context.labelsRef}
 			onMapChange={onMapChange}
 		>
-			<SelectPositionerContext.Provider value={contextValue}>
+			<SelectPositionerContext value={contextValue}>
 				{mounted && modal && <InternalBackdrop inert={inertValue(!open)} cutout={triggerElement} />}
 				{element}
-			</SelectPositionerContext.Provider>
+			</SelectPositionerContext>
 		</CompositeList>
 	);
 };

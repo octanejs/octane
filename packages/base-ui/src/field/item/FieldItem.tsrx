@@ -44,7 +44,7 @@ export const FieldItem = function FieldItem(
 
 	return (
 		<LabelableProvider>
-			<FieldItemContext.Provider value={fieldItemContext}>{element}</FieldItemContext.Provider>
+			<FieldItemContext value={fieldItemContext}>{element}</FieldItemContext>
 		</LabelableProvider>
 	);
 };

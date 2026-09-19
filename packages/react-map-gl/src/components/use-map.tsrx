@@ -38,13 +38,13 @@ export function MapProvider(props: { children?: MapChildren }) @{
 		});
 	}, []);
 
-	<MountedMapsContext.Provider
+	<MountedMapsContext
 		value={{
 			maps,
 			onMapMount,
 			onMapUnmount,
 		}}
-	>{props.children}</MountedMapsContext.Provider>
+	>{props.children}</MountedMapsContext>
 }
 
 export type MapCollection = {

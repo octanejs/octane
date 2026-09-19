@@ -31,14 +31,14 @@ export const DialogPortal = function DialogPortal(
 	}
 
 	return (
-		<DialogPortalContext.Provider value={keepMounted}>
+		<DialogPortalContext value={keepMounted}>
 			<FloatingPortal ref={forwardedRef} {...portalProps}>
 				{mounted && modal === true && (
 					<InternalBackdrop ref={store.context.internalBackdropRef} inert={inertValue(!open)} />
 				)}
 				{props.children}
 			</FloatingPortal>
-		</DialogPortalContext.Provider>
+		</DialogPortalContext>
 	);
 };
 

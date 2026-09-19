@@ -292,7 +292,7 @@ function PopoverInner(allProps: PopoverInnerProps): any {
 			let children = renderProps.children;
 			if (clearContexts) {
 				for (let Context of clearContexts) {
-					children = createElement((Context as any).Provider, { value: null, children });
+					children = createElement(Context as any, { value: null, children });
 				}
 			}
 			return children;
@@ -353,7 +353,7 @@ function PopoverInner(allProps: PopoverInnerProps): any {
 			'data-exiting': isExiting || undefined,
 		},
 		!props.isNonModal ? createElement(DismissButton, { onDismiss: state.close }) : null,
-		createElement(OverlayArrowContext.Provider, {
+		createElement(OverlayArrowContext, {
 			value: { ...arrowProps, placement, ref: arrowRef } as any,
 			children,
 		}),
@@ -381,7 +381,7 @@ function PopoverInner(allProps: PopoverInnerProps): any {
 			createElement('div', {
 				ref: containerRef,
 				style: { display: 'contents' },
-				children: createElement(PopoverGroupContext.Provider, {
+				children: createElement(PopoverGroupContext, {
 					value: containerRef,
 					children: overlay,
 				}),

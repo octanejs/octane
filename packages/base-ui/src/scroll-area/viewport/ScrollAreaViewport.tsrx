@@ -420,11 +420,7 @@ export const ScrollAreaViewport = function ScrollAreaViewport(
 		[computeThumbPosition],
 	);
 
-	return (
-		<ScrollAreaViewportContext.Provider value={contextValue}>
-			{element}
-		</ScrollAreaViewportContext.Provider>
-	);
+	return <ScrollAreaViewportContext value={contextValue}>{element}</ScrollAreaViewportContext>;
 };
 
 export interface ScrollAreaViewportProps extends BaseUIComponentProps<

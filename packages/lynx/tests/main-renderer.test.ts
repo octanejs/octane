@@ -11,6 +11,7 @@ import {
 	defineUniversalComponent as defineBackgroundUniversalComponent,
 	use as useBackground,
 	useId as useBackgroundId,
+	useContext as useBackgroundContext,
 	type UniversalComponent,
 	type UniversalHostCommitContext,
 } from 'octane/universal/native';
@@ -1037,6 +1038,7 @@ describe('Lynx main-thread first-screen renderer', () => {
 
 	it('renders context, keyed control flow, caught errors, and pending fallbacks deterministically', () => {
 		const Context = createContext('default');
+		expect(Context).not.toHaveProperty('Provider');
 		const Read = defineUniversalComponent('lynx', () =>
 			universalValue(leafPlan, [universalProps([]), useContext(Context)]),
 		);
@@ -1065,6 +1067,43 @@ describe('Lynx main-thread first-screen renderer', () => {
 		expect(
 			creates.filter((command) => command.type === '#text').map((command) => command.props),
 		).toEqual([{ value: 'provided' }, { value: 'caught' }]);
+	});
+
+	it('provides context component descriptors with the same ownership as the background renderer', () => {
+		const Context = createContext('default');
+		const ContextComponent = Context as unknown as UniversalComponent<{
+			value: string;
+			children: UniversalRenderable;
+			key?: string;
+		}>;
+		const Read = defineUniversalComponent('lynx', () =>
+			universalValue(leafPlan, [universalProps([]), useContext(Context)]),
+		);
+		const BackgroundRead = defineBackgroundUniversalComponent('lynx', () =>
+			universalValue(leafPlan, [universalProps([]), useBackgroundContext(Context)]),
+		);
+		const Main = defineUniversalComponent('lynx', () =>
+			universalComponent('lynx', ContextComponent, {
+				value: 'provided',
+				children: universalComponent('lynx', Read),
+				key: 'context-owner',
+			}),
+		);
+		const Background = defineBackgroundUniversalComponent('lynx', () =>
+			universalComponent('lynx', ContextComponent, {
+				value: 'provided',
+				children: universalComponent('lynx', BackgroundRead),
+				key: 'context-owner',
+			}),
+		);
+
+		const main = renderLynxFirstScreen(Main, {}).batch;
+		expect(main).toEqual(captureBackgroundBatch(Background, {}));
+		expect(
+			main.commands
+				.filter((command) => command.op === 'create' && command.type === '#text')
+				.map((command) => command.op === 'create' && command.props),
+		).toEqual([{ value: 'provided' }]);
 	});
 
 	it('starts every pending member in a compiler-batched suspension stratum', () => {

@@ -64,7 +64,7 @@
     "uuid": "^9.0.1"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0"
+    "octane": "workspace:^0.1.51 || ^0.2.0 || ^0.3.0"
   },
   "devDependencies": {
     "@measured/puck": "catalog:default",

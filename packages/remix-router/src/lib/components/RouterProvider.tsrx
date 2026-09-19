@@ -332,10 +332,10 @@ export function RouterProvider(props: RouterProviderProps) @{
 	// The fragment shape mirrors upstream (kept for useId stability parity with
 	// the server-rendered StaticRouterProvider in a later phase).
 	<>
-		<DataRouterContext.Provider value={dataRouterContext}>
-			<DataRouterStateContext.Provider value={state}>
-				<FetchersContext.Provider value={fetcherData.current}>
-					<ViewTransitionContext.Provider value={vtContext}>
+		<DataRouterContext value={dataRouterContext}>
+			<DataRouterStateContext value={state}>
+				<FetchersContext value={fetcherData.current}>
+					<ViewTransitionContext value={vtContext}>
 						<Router
 							basename={basename}
 							location={state.location}
@@ -352,9 +352,9 @@ export function RouterProvider(props: RouterProviderProps) @{
 								onError={onError}
 							/>
 						</Router>
-					</ViewTransitionContext.Provider>
-				</FetchersContext.Provider>
-			</DataRouterStateContext.Provider>
-		</DataRouterContext.Provider>
+					</ViewTransitionContext>
+				</FetchersContext>
+			</DataRouterStateContext>
+		</DataRouterContext>
 	</>
 }

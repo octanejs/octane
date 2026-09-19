@@ -37,7 +37,7 @@ function harness() {
 		log.push('provider:' + n);
 		// NO memo() shim: children is the same element reference the App created
 		// once — React bails on it implicitly.
-		return createElement(Ctx.Provider, { value: n, children: props.children });
+		return createElement(Ctx, { value: n, children: props.children });
 	}
 
 	return { log, bumpRef: () => bump!, Consumer, NonConsumer, Provider };

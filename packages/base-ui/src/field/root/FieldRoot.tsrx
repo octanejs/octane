@@ -192,7 +192,7 @@ const FieldRootInner = function FieldRootInner(
 		stateAttributesMapping: fieldValidityMapping,
 	});
 
-	return <FieldRootContext.Provider value={contextValue}>{element}</FieldRootContext.Provider>;
+	return <FieldRootContext value={contextValue}>{element}</FieldRootContext>;
 };
 
 /**

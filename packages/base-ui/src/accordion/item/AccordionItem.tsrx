@@ -134,11 +134,9 @@ export const AccordionItem = function AccordionItem(
 	});
 
 	return (
-		<CollapsibleRootContext.Provider value={collapsibleContext}>
-			<AccordionItemContext.Provider value={accordionItemContext}>
-				{element}
-			</AccordionItemContext.Provider>
-		</CollapsibleRootContext.Provider>
+		<CollapsibleRootContext value={collapsibleContext}>
+			<AccordionItemContext value={accordionItemContext}>{element}</AccordionItemContext>
+		</CollapsibleRootContext>
 	);
 };
 

@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/src/menu/popup/MenuPopup.test.tsx b/tests/upstream/src/menu/popup/MenuPopup.test.tsx
+--- a/tests/upstream/src/menu/popup/MenuPopup.test.tsx
++++ b/tests/upstream/src/menu/popup/MenuPopup.test.tsx
+@@ -44,7 +44,7 @@ describe('<Menu.Popup />', () => {
+     const onParentKeyDown = vi.fn();
+ 
+     await render(
+-      <ToolbarRootContext.Provider value={{ disabled: false, orientation: 'horizontal' }}>
++      <ToolbarRootContext value={{ disabled: false, orientation: 'horizontal' }}>
+         <div onKeyDown={onParentKeyDown}>
+           <Menu.Root>
+             <Menu.Portal keepMounted>
+@@ -54,7 +54,7 @@ describe('<Menu.Popup />', () => {
+             </Menu.Portal>
+           </Menu.Root>
+         </div>
+-      </ToolbarRootContext.Provider>,
++      </ToolbarRootContext>,
+     );
+ 
+     const popup = screen.getByTestId('popup');

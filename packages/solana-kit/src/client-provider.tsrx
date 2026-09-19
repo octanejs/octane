@@ -23,5 +23,5 @@ export function ClientProvider(props: ClientProviderProps) @{
 	assertResolvedClient(props.client);
 	const store = useMemo(() => createClientStore(props.client), [props.client]);
 	useEffect(() => () => store.dispose(), [store]);
-	<ClientContext.Provider value={store}>{props.children}</ClientContext.Provider>
+	<ClientContext value={store}>{props.children}</ClientContext>
 }

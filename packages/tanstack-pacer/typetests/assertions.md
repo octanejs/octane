@@ -41,9 +41,12 @@ comparison of every mapped file:
 6. Renderable types in Subscribe signatures: `ReactNode` / `FunctionComponent` → Octane equivalents
 7. Provider context helpers extracted to adapted-only `provider/context.ts`
 8. Adapted-only modules: `src/internal.ts` and `src/provider/context.ts`
+9. JSX provider tags: `Context.Provider` → `Context` only for module-level `const`
+   contexts created directly by React/Octane's named `createContext` import;
+   retain ordinary `Provider` members and bindings that shadow the context.
 
 Any other structural change is drift. Controls reject a skipped adapted file, an
 unauthorized change outside these transforms, a deleted assertion group, or a
-removed `@ts-expect-error`.
+removed `@ts-expect-error`, or erasing an unrelated `Provider` member.
 
 Both source programs also include independent public contract probes. The separate tests/types program checks all public entrypoints. These authored assertions do not add fabricated upstream registrations.

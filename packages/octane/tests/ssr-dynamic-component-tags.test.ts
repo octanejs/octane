@@ -23,7 +23,7 @@ const mod = evalServer(
 	`
 	import { Suspense, createContext } from 'octane';
 
-	const ctx = createContext(null);
+	const Ctx = createContext(null);
 
 	function PassThrough(props) @{
 		<>
@@ -66,23 +66,23 @@ const mod = evalServer(
 		</PassThrough>
 	}
 	export function ProviderDirectiveChildren(props) @{
-		<ctx.Provider value={1}>
+		<Ctx value={1}>
 			<PassThrough>
 				@if (props.on) {
 					<span>provider-directive</span>
 				}
 			</PassThrough>
-		</ctx.Provider>
+		</Ctx>
 	}
 	export function MixedDirectiveChildren(props) @{
-		<ctx.Provider value={1}>
+		<Ctx value={1}>
 			<PassThrough>
 				<b>lead</b>
 				@if (props.on) {
 					<span>mixed-directive</span>
 				}
 			</PassThrough>
-		</ctx.Provider>
+		</Ctx>
 	}
 	`,
 	'/test/ssr-dynamic-component-tags.tsrx',

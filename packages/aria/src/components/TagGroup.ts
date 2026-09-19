@@ -134,7 +134,7 @@ export function TagGroup(props: TagGroupProps): any {
 	const slot = S('TagGroup');
 	let ref: any;
 	[props, ref] = useContextProps(props, (props as any).ref, TagGroupContext, subSlot(slot, 'ctx'));
-	return createElement(ListStateContext.Provider, {
+	return createElement(ListStateContext, {
 		value: null,
 		children: createElement(CollectionBuilder, {
 			content: props.children,

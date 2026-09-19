@@ -18,7 +18,7 @@
   },
   {
     "path": "src/react/Provider.tsrx",
-    "sha256": "0bbfb2e32a3124b4bf43b6e7898dc7ff6b0e91e8cb64d94af7e46a785bf74ee7",
+    "sha256": "94cbab3f88ef23cc72690a46efd9cf75d947d248f603627d12aa878b7b2f6372",
     "origin": "adapted",
     "packageName": "jotai"
   },

@@ -1022,9 +1022,7 @@ export const DrawerViewport = function DrawerViewport(
 			className={className}
 			style={style}
 		>
-			<DrawerViewportContext.Provider value={swipeProviderValue}>
-				{children}
-			</DrawerViewportContext.Provider>
+			<DrawerViewportContext value={swipeProviderValue}>{children}</DrawerViewportContext>
 		</DialogViewport>
 	);
 };

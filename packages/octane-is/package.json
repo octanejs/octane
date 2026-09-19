@@ -39,7 +39,7 @@
     "upstream:test": "node ../../scripts/react-parity/run-pristine.mjs octane-is"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0"
+    "octane": "workspace:^"
   },
   "devDependencies": {
     "octane": "workspace:*",

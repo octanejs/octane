@@ -203,8 +203,8 @@ function BlockNoteViewComponent<
 		};
 	}, [autoFocus, contentEditableProps, editable, defaultUIProps, portalTarget]);
 
-	return <BlockNoteContext.Provider value={blockNoteContext}>
-		<BlockNoteViewContext.Provider value={blockNoteViewContextValue}>
+	return <BlockNoteContext value={blockNoteContext}>
+		<BlockNoteViewContext value={blockNoteViewContextValue}>
 			<ElementRenderer ref={setElementRenderer} />
 			<BlockNoteViewContainer
 				class={className}
@@ -213,8 +213,8 @@ function BlockNoteViewComponent<
 				ref={ref}
 				{...rest}
 			>{children}</BlockNoteViewContainer>
-		</BlockNoteViewContext.Provider>
-	</BlockNoteContext.Provider>;
+		</BlockNoteViewContext>
+	</BlockNoteContext>;
 }
 
 /**

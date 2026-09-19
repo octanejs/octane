@@ -83,13 +83,13 @@ const PopoverRootComponent = fastComponent(function PopoverRootComponent<Payload
 	const shouldRenderInteractions = open || mounted;
 
 	return (
-		<PopoverRootContext.Provider value={store as PopoverRootContext<unknown>}>
+		<PopoverRootContext value={store as PopoverRootContext<unknown>}>
 			{handle && <PopupHandleAttachment handle={handle} store={store} />}
 			{shouldRenderInteractions && <PopoverInteractions store={store} modal={modal} />}
 			{typeof children === 'function' && !React.isChildrenBlock(children)
 				? children({ payload })
 				: children}
-		</PopoverRootContext.Provider>
+		</PopoverRootContext>
 	);
 });
 

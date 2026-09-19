@@ -709,7 +709,7 @@ describe('conformance: Fizz public streaming behavior', () => {
 				'section',
 				{ id: 'deep-context-root' },
 				ServerRuntime.createElement(
-					server.StreamContext.Provider,
+					server.StreamContext,
 					{ value: 'deeply provided' },
 					ServerRuntime.createElement(server.DeepTree, { depth: 1_000 }),
 					ServerRuntime.createElement(ContextValue, { id: 'inside-deep-provider' }),

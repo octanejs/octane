@@ -62,9 +62,9 @@ export const ComboboxChips = function ComboboxChips(
 	);
 
 	return (
-		<ComboboxChipsContext.Provider value={contextValue}>
+		<ComboboxChipsContext value={contextValue}>
 			<CompositeList elementsRef={chipsRef}>{element}</CompositeList>
-		</ComboboxChipsContext.Provider>
+		</ComboboxChipsContext>
 	);
 };
 

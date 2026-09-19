@@ -73,7 +73,7 @@ export const Menubar = function Menubar(
 	);
 
 	return (
-		<MenubarContext.Provider value={context}>
+		<MenubarContext value={context}>
 			<FloatingTree>
 				<MenubarContent>
 					<CompositeRoot
@@ -91,7 +91,7 @@ export const Menubar = function Menubar(
 					/>
 				</MenubarContent>
 			</FloatingTree>
-		</MenubarContext.Provider>
+		</MenubarContext>
 	);
 };
 

@@ -105,9 +105,9 @@ export const PreviewCardPositioner = function PreviewCardPositioner(
 	});
 
 	return (
-		<PreviewCardPositionerContext.Provider value={positioning}>
+		<PreviewCardPositionerContext value={positioning}>
 			<FloatingNode id={nodeId}>{element}</FloatingNode>
-		</PreviewCardPositionerContext.Provider>
+		</PreviewCardPositionerContext>
 	);
 };
 

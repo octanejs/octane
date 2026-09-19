@@ -28,9 +28,9 @@ export const NavigationMenuPortal = function NavigationMenuPortal(
 	}
 
 	return (
-		<NavigationMenuPortalContext.Provider value={keepMounted}>
+		<NavigationMenuPortalContext value={keepMounted}>
 			<FloatingPortal ref={forwardedRef} {...portalProps} />
-		</NavigationMenuPortalContext.Provider>
+		</NavigationMenuPortalContext>
 	);
 };
 

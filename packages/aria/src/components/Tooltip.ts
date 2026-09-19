@@ -239,7 +239,7 @@ function TooltipInner(
 		'data-placement': placement ?? undefined,
 		'data-entering': isEntering || undefined,
 		'data-exiting': props.isExiting || undefined,
-		children: createElement(OverlayArrowContext.Provider, {
+		children: createElement(OverlayArrowContext, {
 			value: { ...arrowProps, placement, ref: arrowRef } as any,
 			children: renderProps.children,
 		}),

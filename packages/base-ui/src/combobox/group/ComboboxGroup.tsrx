@@ -48,7 +48,7 @@ export const ComboboxGroup = function ComboboxGroup(
 	});
 
 	const wrappedElement = (
-		<ComboboxGroupContext.Provider value={contextValue}>{element}</ComboboxGroupContext.Provider>
+		<ComboboxGroupContext value={contextValue}>{element}</ComboboxGroupContext>
 	);
 
 	if (items) {

@@ -288,9 +288,9 @@ function MemoContextReaderImpl(props) @{
 const MemoContextReader = memo(MemoContextReaderImpl);
 
 export function MemoContextEffectEvent(props) @{
-	<EffectEventContext.Provider value={props.value}>
+	<EffectEventContext value={props.value}>
 		<MemoContextReader eventRef={props.eventRef} />
-	</EffectEventContext.Provider>
+	</EffectEventContext>
 }
 
 function RefPropContextReader(props) @{
@@ -303,9 +303,9 @@ function RefPropContextReader(props) @{
 }
 
 export function RefPropContextEffectEvent(props) @{
-	<EffectEventContext.Provider value={props.value}>
+	<EffectEventContext value={props.value}>
 		<RefPropContextReader ref={props.eventRef} />
-	</EffectEventContext.Provider>
+	</EffectEventContext>
 }
 
 export function ServerEffectEventDeclaration() @{

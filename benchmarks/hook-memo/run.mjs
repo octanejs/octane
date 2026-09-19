@@ -521,7 +521,7 @@ function exerciseCacheShapes(bundle) {
 	const root = bundle.createRoot(container);
 	const Context = bundle.createContext('default');
 	bundle.flushSync(() =>
-		root.render(Context.Provider, { value: 'initial', children: bundle.ProviderFirst }),
+		root.render(Context, { value: 'initial', children: bundle.ProviderFirst }),
 	);
 	const input = container.querySelector('input');
 	const labelNode = container.querySelector('#cache-label');
@@ -529,16 +529,14 @@ function exerciseCacheShapes(bundle) {
 	input.value = 'retained';
 	input.focus();
 	bundle.flushSync(() =>
-		root.render(Context.Provider, { value: 'changed', children: bundle.ProviderSecond }),
+		root.render(Context, { value: 'changed', children: bundle.ProviderSecond }),
 	);
 	assert.equal(container.querySelector('input'), input);
 	assert.equal(container.querySelector('#cache-label'), labelNode);
 	assert.equal(input.value, 'retained');
 	assert.equal(document.activeElement, input);
 	assert.equal(labelNode.textContent, 'second');
-	bundle.flushSync(() =>
-		root.render(Context.Provider, { value: 'again', children: bundle.ProviderSecond }),
-	);
+	bundle.flushSync(() => root.render(Context, { value: 'again', children: bundle.ProviderSecond }));
 	assert.equal(container.querySelector('input'), input);
 	assert.equal(container.querySelector('#cache-label'), labelNode);
 	assert.equal(input.value, 'retained');

@@ -29,9 +29,9 @@ export function PanoramaProbe() @{
 }
 
 export function PanoramaApp() @{
-	<PanoramaContext.Provider value={true}>
+	<PanoramaContext value={true}>
 		<PanoramaProbe />
-	</PanoramaContext.Provider>
+	</PanoramaContext>
 }
 
 export function ReferenceLineReporterApp(props) @{

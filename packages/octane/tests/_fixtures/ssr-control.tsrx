@@ -62,9 +62,9 @@ function Themed() @{
 	<span class="theme">{t as string}</span>
 }
 export function Provided(props) @{
-	<Theme.Provider value={props.theme}>
+	<Theme value={props.theme}>
 		<Themed />
-	</Theme.Provider>
+	</Theme>
 }
 
 // Portal — server emits a site marker; the body renders into a target on the client.

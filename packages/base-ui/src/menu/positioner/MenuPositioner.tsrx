@@ -300,7 +300,7 @@ export const MenuPositioner = function MenuPositioner(
 	}
 
 	return (
-		<MenuPositionerContext.Provider value={positioner}>
+		<MenuPositionerContext value={positioner}>
 			{shouldRenderBackdrop && (
 				<InternalBackdrop
 					ref={
@@ -320,7 +320,7 @@ export const MenuPositioner = function MenuPositioner(
 					{element}
 				</CompositeList>
 			</FloatingNode>
-		</MenuPositionerContext.Provider>
+		</MenuPositionerContext>
 	);
 };
 

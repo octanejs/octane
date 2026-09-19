@@ -145,7 +145,7 @@ describe('@octanejs/tanstack-router — document asset ownership', () => {
 		document.head.appendChild(existing);
 
 		function PublicAssetOwner(props: { router: AnyRouter }) {
-			return createElement(routerContext.Provider, {
+			return createElement(routerContext, {
 				value: props.router,
 				children: createElement(Asset, {
 					tag: 'meta',
@@ -177,7 +177,7 @@ describe('@octanejs/tanstack-router — document asset ownership', () => {
 		document.body.appendChild(existing);
 
 		function PublicBodyAssetOwner(props: { router: AnyRouter }) {
-			return createElement(routerContext.Provider, {
+			return createElement(routerContext, {
 				value: props.router,
 				children: createElement(Asset, {
 					tag: 'script',

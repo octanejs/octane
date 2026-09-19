@@ -736,21 +736,21 @@ function App({
 		[animationSubscribe, renderThrottleMs],
 	);
 
-	return <AppContext.Provider value={appContextValue}>
-		<StdinContext.Provider value={stdinContextValue}>
-			<StdoutContext.Provider value={stdoutContextValue}>
-				<StderrContext.Provider value={stderrContextValue}>
-					<FocusContext.Provider value={focusContextValue}>
-						<AnimationContext.Provider value={animationContextValue}>
-							<CursorContext.Provider value={cursorContextValue}>
+	return <AppContext value={appContextValue}>
+		<StdinContext value={stdinContextValue}>
+			<StdoutContext value={stdoutContextValue}>
+				<StderrContext value={stderrContextValue}>
+					<FocusContext value={focusContextValue}>
+						<AnimationContext value={animationContextValue}>
+							<CursorContext value={cursorContextValue}>
 								<ErrorBoundary onError={handleExit}>{children}</ErrorBoundary>
-							</CursorContext.Provider>
-						</AnimationContext.Provider>
-					</FocusContext.Provider>
-				</StderrContext.Provider>
-			</StdoutContext.Provider>
-		</StdinContext.Provider>
-	</AppContext.Provider>;
+							</CursorContext>
+						</AnimationContext>
+					</FocusContext>
+				</StderrContext>
+			</StdoutContext>
+		</StdinContext>
+	</AppContext>;
 }
 
 export default App;

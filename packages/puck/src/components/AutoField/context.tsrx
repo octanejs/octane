@@ -55,7 +55,7 @@ export const NestedFieldProvider = ({
 		[name, subName, wildcardName, readOnlyFields],
 	);
 
-	return <NestedFieldContext.Provider
+	return <NestedFieldContext
 		value={{ readOnlyFields: subReadOnlyFields, localName: subName }}
-	>{children}</NestedFieldContext.Provider>;
+	>{children}</NestedFieldContext>;
 };

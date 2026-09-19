@@ -799,7 +799,7 @@ export function Root({
 		}}
 		open={isOpen}
 	>
-		<DrawerContext.Provider
+		<DrawerContext
 			value={{
 				activeSnapPoint,
 				snapPoints,
@@ -831,7 +831,7 @@ export function Root({
 				container,
 				autoFocus,
 			}}
-		>{children}</DrawerContext.Provider>
+		>{children}</DrawerContext>
 	</DialogPrimitive.Root>
 }
 

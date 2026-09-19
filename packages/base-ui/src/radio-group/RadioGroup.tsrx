@@ -244,7 +244,7 @@ export const RadioGroup = function RadioGroup<Value>(
 	};
 
 	return (
-		<RadioGroupContext.Provider value={contextValue}>
+		<RadioGroupContext value={contextValue}>
 			<CompositeRoot
 				render={render}
 				className={className}
@@ -260,7 +260,7 @@ export const RadioGroup = function RadioGroup<Value>(
 				enableHomeAndEndKeys={false}
 				modifierKeys={MODIFIER_KEYS}
 			/>
-		</RadioGroupContext.Provider>
+		</RadioGroupContext>
 	);
 };
 

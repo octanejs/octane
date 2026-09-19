@@ -475,7 +475,7 @@ export const SunburstChart = (outsideProps: SunburstChartProps) => {
 		<ReportChartSize width={width} height={height} />
 		<ReportChartMargin margin={defaultSunburstMargin} />
 		<ReportEventSettings throttleDelay={throttleDelay} throttledEvents={throttledEvents} />
-		<TooltipPortalContext.Provider value={tooltipPortal}>
+		<TooltipPortalContext value={tooltipPortal}>
 			<RechartsWrapper
 				className={className}
 				width={width}
@@ -503,6 +503,6 @@ export const SunburstChart = (outsideProps: SunburstChartProps) => {
 					{(id) => <SunburstChartImpl {...props} id={id} />}
 				</RegisterGraphicalItemId>
 			</RechartsWrapper>
-		</TooltipPortalContext.Provider>
+		</TooltipPortalContext>
 	</RechartsStoreProvider>;
 };

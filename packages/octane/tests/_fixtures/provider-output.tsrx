@@ -29,18 +29,18 @@ export function Second() @{
 
 export function Shell({ Context, children, read }) @{
 	<section>
-		<Context.Provider value="value" children={children} />
+		<Context value="value" children={children} />
 		<p>{read()}</p>
 	</section>
 }
 
 export function Inline({ Context, text, onClick }) @{
-	<Context.Provider value={text}>
+	<Context value={text}>
 		<div>
 			<input defaultValue="draft" />
 			<Label text={text} />
 			<Counter />
 			<a onClick={onClick}>capture</a>
 		</div>
-	</Context.Provider>
+	</Context>
 }

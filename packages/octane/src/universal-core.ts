@@ -12,6 +12,7 @@
  * validate the protocol.
  */
 import { bumpContextEpoch } from './context-epoch.js';
+import { isContext } from './context-identity.js';
 import { hasOwnProp } from './has-own.js';
 import { resolveHookPath } from './hook-slot-cache.js';
 import {
@@ -116,6 +117,11 @@ export interface UniversalRendererMetadata {
 
 const UNIVERSAL_LAZY_METADATA: UniversalRendererMetadata = Object.freeze({
 	id: '<lazy>',
+	target: 'universal',
+});
+
+const UNIVERSAL_CONTEXT_METADATA: UniversalRendererMetadata = Object.freeze({
+	id: '<context>',
 	target: 'universal',
 });
 
@@ -2203,6 +2209,7 @@ export function hmrUniversalComponent<P>(
 function getComponentMetadata(component: UniversalComponent): UniversalRendererMetadata {
 	const metadata = component?.[UNIVERSAL_COMPONENT];
 	if (metadata === undefined) {
+		if (isContext(component)) return UNIVERSAL_CONTEXT_METADATA;
 		if ((component as any)?.[LAZY_COMPONENT] === true) return UNIVERSAL_LAZY_METADATA;
 		throw new Error('Universal roots accept only compiler-defined universal components.');
 	}
@@ -2709,6 +2716,23 @@ function materializeComponentValue(
 		);
 	}
 	const metadata = getComponentMetadata(value.component);
+	if (metadata === UNIVERSAL_CONTEXT_METADATA) {
+		// Imported contexts reach the ordinary component descriptor path. Context
+		// identity is renderer-neutral; provide it without invoking its DOM body.
+		const normalized = normalizePropsValue(value.props);
+		const provider = universalContext(
+			value.component as unknown as UniversalContext<unknown>,
+			normalized.props.value,
+			normalized.props.children as UniversalRenderable | (() => UniversalRenderable),
+		);
+		const key = value.hasKey ? normalizeUniversalKey(value.key) : null;
+		return materializeValue(
+			key === null ? provider : universalKey(key, provider),
+			expectedRenderer,
+			null,
+			path,
+		);
+	}
 	if (metadata !== UNIVERSAL_LAZY_METADATA && metadata.id !== expectedRenderer) {
 		throw new Error(
 			`Universal renderer mismatch: owner ${JSON.stringify(expectedRenderer)} cannot render nested component ${JSON.stringify(metadata.id)}.`,

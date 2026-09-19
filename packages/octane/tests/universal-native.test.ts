@@ -31,13 +31,13 @@ describe('host-neutral universal entry', () => {
 			universalValue(valuePlan, [useContext(Theme)]),
 		);
 		const ProvidedValue = defineUniversalComponent(RENDERER, (props: { theme: string }) =>
-			Theme.Provider({
+			Theme({
 				value: props.theme,
 				children: () => universalValue(valuePlan, [useContext(Theme)]),
 			}),
 		);
 
-		expect(Theme.Provider).toBe(Theme);
+		expect('Provider' in Theme).toBe(false);
 		root.render(DefaultValue, undefined);
 		expect(container.children[0].props.theme).toBe('default');
 

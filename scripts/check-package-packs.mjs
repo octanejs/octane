@@ -24,6 +24,7 @@ import {
 } from './workspace-packages.mjs';
 import {
 	createPackedJavascriptConsumerManifest,
+	createPackedRuntimeConsumerDependencies,
 	assertPackedTsrxConsumerSucceeded,
 	createPackedTsrxConsumerConfig,
 	resolvePackedTsrxSourceDirectories,
@@ -444,9 +445,18 @@ function validatePackedExample(tempRoot, archives, canary) {
  * modes. This catches peer-layout and source-publication failures that tarball
  * inspection alone cannot see.
  */
-async function validatePackedConsumer(tempRoot, archives) {
+async function validatePackedConsumer(tempRoot, archives, packedManifests) {
 	const consumerDirectory = path.join(tempRoot, 'external-consumer');
 	const sourceDirectory = path.join(consumerDirectory, 'src');
+	const archiveSpecs = createPackedRuntimeConsumerDependencies(
+		packedManifests,
+		Object.fromEntries(
+			[...archives.keys()].map((packageName) => [
+				packageName,
+				fileArchiveSpec(archives, packageName),
+			]),
+		),
+	);
 	mkdirSync(sourceDirectory, { recursive: true });
 	writeFileSync(
 		path.join(consumerDirectory, 'package.json'),
@@ -458,17 +468,9 @@ async function validatePackedConsumer(tempRoot, archives) {
 				engines: { node: '>=22.22.2' },
 				dependencies: {
 					'@apollo/client': '4.2.6',
-					'@octanejs/alien-signals': `file:${requireArchive(archives, '@octanejs/alien-signals')}`,
-					'@octanejs/apollo-client': `file:${requireArchive(archives, '@octanejs/apollo-client')}`,
-					'@octanejs/hook-form': `file:${requireArchive(archives, '@octanejs/hook-form')}`,
-					'@octanejs/dropzone': `file:${requireArchive(archives, '@octanejs/dropzone')}`,
-					'@octanejs/recharts': `file:${requireArchive(archives, '@octanejs/recharts')}`,
-					'@octanejs/syntax-highlighter': `file:${requireArchive(archives, '@octanejs/syntax-highlighter')}`,
-					'@octanejs/three': `file:${requireArchive(archives, '@octanejs/three')}`,
-					'@octanejs/window': `file:${requireArchive(archives, '@octanejs/window')}`,
+					...archiveSpecs,
 					'@types/three': '0.172.0',
 					graphql: '^16.11.0',
-					octane: `file:${requireArchive(archives, 'octane')}`,
 					rxjs: '^7.8.2',
 					three: '0.172.0',
 				},
@@ -483,6 +485,10 @@ async function validatePackedConsumer(tempRoot, archives) {
 			null,
 			2,
 		) + '\n',
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
+		renderPackedExampleWorkspace(archiveSpecs),
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'App.tsrx'),
@@ -876,6 +882,29 @@ export function renderProbe() {
 	const installedPostcss = consumerRequire('postcss/package.json').version;
 	console.log(`packed consumer resolved postcss ${installedPostcss}`);
 	const directRuntime = realpathSync(consumerRequire.resolve('octane'));
+	for (const packageName of Object.keys(archiveSpecs)) {
+		const entry = realpathSync(consumerRequire.resolve(packageName));
+		if (isWithinDirectory(REPO_ROOT, entry)) {
+			throw new Error(`${packageName} resolved back into the workspace: ${entry}`);
+		}
+		const packageRequire = createRequire(entry);
+		if (packageName !== 'octane') {
+			const peerRuntime = realpathSync(packageRequire.resolve('octane'));
+			if (peerRuntime !== directRuntime) {
+				throw new Error(`${packageName} resolved a second Octane runtime: ${peerRuntime}`);
+			}
+		}
+		for (const dependencyName of Object.keys(
+			packedManifests.get(packageName)?.dependencies ?? {},
+		)) {
+			if (!Object.hasOwn(archiveSpecs, dependencyName)) continue;
+			const directDependency = realpathSync(consumerRequire.resolve(dependencyName));
+			const nestedDependency = realpathSync(packageRequire.resolve(dependencyName));
+			if (nestedDependency !== directDependency) {
+				throw new Error(`${packageName} resolved a second ${dependencyName} install`);
+			}
+		}
+	}
 	// Resolve through real ESM package specifiers from the installed consumer,
 	// not a CommonJS-resolved file URL, so conditional `import` branches remain
 	// part of the packed contract. React-hosted entries require their intentionally
@@ -1918,7 +1947,7 @@ try {
 			},
 			{
 				label: 'external packed consumer',
-				run: () => validatePackedConsumer(tempRoot, packedArchives),
+				run: () => validatePackedConsumer(tempRoot, packedArchives, packedManifests),
 			},
 			{
 				label: 'external packed Lynx consumer',

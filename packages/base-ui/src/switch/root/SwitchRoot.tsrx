@@ -229,13 +229,13 @@ export const SwitchRoot = function SwitchRoot(
 	});
 
 	return (
-		<SwitchRootContext.Provider value={state}>
+		<SwitchRootContext value={state}>
 			{element}
 			{!checked && name && uncheckedValue !== undefined && (
 				<input type="hidden" form={form} name={name} value={uncheckedValue} disabled={disabled} />
 			)}
 			<input {...inputProps} suppressHydrationWarning />
-		</SwitchRootContext.Provider>
+		</SwitchRootContext>
 	);
 };
 

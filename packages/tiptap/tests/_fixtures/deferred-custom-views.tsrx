@@ -86,7 +86,7 @@ export function DeferredCustomViews(props) @{
 		}
 	}, [editor, props.onEditor]);
 
-	<HydrationTheme.Provider value="hydrated">
+	<HydrationTheme value="hydrated">
 		<main id="deferred-custom-views">
 			<h1 id="deferred-custom-title">Deferred custom editor</h1>
 			<output id="deferred-custom-status">
@@ -115,5 +115,5 @@ export function DeferredCustomViews(props) @{
 				</>
 			}
 		</main>
-	</HydrationTheme.Provider>
+	</HydrationTheme>
 }

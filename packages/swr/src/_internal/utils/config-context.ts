@@ -54,10 +54,7 @@ const SWRConfig = (props: SWRConfigProps) => {
 		SWR_CONFIG_CACHE_EFFECT_SLOT,
 	);
 
-	return createElement(
-		SWRConfigContext.Provider,
-		mergeObjects(props, { value: extendedConfig }) as never,
-	);
+	return createElement(SWRConfigContext, mergeObjects(props, { value: extendedConfig }) as never);
 };
 
 export default SWRConfig;

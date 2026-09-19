@@ -13,7 +13,7 @@
 import { useLayoutEffect, createElement, Suspense } from 'octane';
 import { setupScrollRestoration, rootRouteId } from '@tanstack/router-core';
 import { useStore } from './useStore.ts';
-import { useRouter, matchContext } from './context.ts';
+import { useRouter, matchContext as MatchContext } from './context.ts';
 import { useTransitioner } from './Transitioner.tsrx';
 import { Match } from './Match.tsrx';
 import { CatchBoundary, ErrorComponent } from './CatchBoundary.tsrx';
@@ -48,11 +48,11 @@ function MatchesInner() @{
 	const resetKey = useStore(router.stores.loadedAt, (l: any) => l as number | string);
 	const CatchWrap = router.options.disableGlobalCatchBoundary ? SafeFragment : CatchBoundary;
 
-	<matchContext.Provider value={matchId}>
+	<MatchContext value={matchId}>
 		<CatchWrap getResetKey={() => resetKey} errorComponent={ErrorComponent}>
 			@if (matchId) {
 				<Match matchId={matchId} />
 			}
 		</CatchWrap>
-	</matchContext.Provider>
+	</MatchContext>
 }

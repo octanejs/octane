@@ -141,7 +141,7 @@
         {
           "path": "packages/cmdk/src/components/command.tsrx",
           "role": "support",
-          "sha256": "7e77000d7d8a854a6bcb594d60435f25c3c20bdf34966e4c89c2fe0896b31c2b"
+          "sha256": "7e8682576b12ffaf366dd134381fa43b907d38d4978fd0873d6ed008f80ee1f2"
         },
         {
           "path": "packages/cmdk/src/components/item.tsrx",

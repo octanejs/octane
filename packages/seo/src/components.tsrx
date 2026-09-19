@@ -146,10 +146,10 @@ export function Head(props: { children?: OctaneNode }) @{
 	if (outer === null && registryRef.current === null) registryRef.current = createSeoRegistry();
 	useStrayOwnerDiagnostic(outer === null);
 	@if (outer === null) {
-		<SeoContext.Provider value={registryRef.current}>
+		<SeoContext value={registryRef.current}>
 			{props.children}
 			<SeoOutlet />
-		</SeoContext.Provider>
+		</SeoContext>
 	} @else {
 		<>
 			{props.children}

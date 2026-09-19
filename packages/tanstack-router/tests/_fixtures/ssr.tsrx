@@ -10,7 +10,7 @@ import {
 	createRootRoute,
 	createRoute,
 	createRouter,
-	routerContext,
+	routerContext as RouterContext,
 } from '@octanejs/tanstack-router';
 import type { AnyRouter } from '@tanstack/router-core';
 
@@ -42,12 +42,12 @@ function MultipleManagerDocument() @{
 }
 
 export function ManagedHeadOwners(props: { router: AnyRouter; secondary: boolean }) @{
-	<routerContext.Provider value={props.router}>
+	<RouterContext value={props.router}>
 		<HeadContent />
 		@if (props.secondary) {
 			<HeadContent />
 		}
-	</routerContext.Provider>
+	</RouterContext>
 }
 
 function IndexPage() @{

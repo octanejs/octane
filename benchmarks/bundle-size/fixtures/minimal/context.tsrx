@@ -11,9 +11,9 @@ function ContextRoot() @{
 	const [theme, setTheme] = useState('light');
 	<div>
 		<button id="minimal-context-action" onClick={() => setTheme('dark')}>{'change'}</button>
-		<ThemeContext.Provider value={theme}>
+		<ThemeContext value={theme}>
 			<ContextReader />
-		</ThemeContext.Provider>
+		</ThemeContext>
 	</div>
 }
 

@@ -101,7 +101,7 @@ export const MenuRadioItem = function MenuRadioItem(
 		ref: [itemRef, forwardedRef, listItem.ref],
 	});
 
-	return <MenuRadioItemContext.Provider value={state}>{element}</MenuRadioItemContext.Provider>;
+	return <MenuRadioItemContext value={state}>{element}</MenuRadioItemContext>;
 };
 
 export interface MenuRadioItemState {

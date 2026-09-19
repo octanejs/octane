@@ -23,7 +23,7 @@ export function NonceProvider(props: {
 		}),
 		[props.cacheKey, props.nonce],
 	);
-	<StyleContext.Provider value={value}>{props.children}</StyleContext.Provider>
+	<StyleContext value={value}>{props.children}</StyleContext>
 }
 
 export function useStyleResolver() {

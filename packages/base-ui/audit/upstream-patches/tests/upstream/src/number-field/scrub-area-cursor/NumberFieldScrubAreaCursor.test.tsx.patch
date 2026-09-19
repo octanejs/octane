@@ -10,3 +10,15 @@ diff --git a/tests/upstream/src/number-field/scrub-area-cursor/NumberFieldScrubA
  };
  
  // This component doesn't render on WebKit.
+@@ -26,9 +26,9 @@ describe.skipIf(isWebKit)('<NumberField.ScrubAreaCursor />', () => {
+       return render(
+         <NumberField.Root>
+           <NumberField.ScrubArea>
+-            <NumberFieldScrubAreaContext.Provider value={defaultScrubAreaContext}>
++            <NumberFieldScrubAreaContext value={defaultScrubAreaContext}>
+               {node}
+-            </NumberFieldScrubAreaContext.Provider>
++            </NumberFieldScrubAreaContext>
+           </NumberField.ScrubArea>
+         </NumberField.Root>,
+       );

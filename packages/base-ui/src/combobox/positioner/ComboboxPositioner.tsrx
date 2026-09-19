@@ -126,7 +126,7 @@ export const ComboboxPositioner = function ComboboxPositioner(
 	});
 
 	return (
-		<ComboboxPositionerContext.Provider value={positioning}>
+		<ComboboxPositionerContext value={positioning}>
 			{mounted && modal && (
 				<InternalBackdrop
 					inert={inertValue(!open)}
@@ -134,7 +134,7 @@ export const ComboboxPositioner = function ComboboxPositioner(
 				/>
 			)}
 			{element}
-		</ComboboxPositionerContext.Provider>
+		</ComboboxPositionerContext>
 	);
 };
 

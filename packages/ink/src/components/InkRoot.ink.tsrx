@@ -26,7 +26,7 @@ export interface InkRootProps<P> {
 }
 
 export function InkRoot<P>({ component, componentProps, ...props }: InkRootProps<P>) @{
-	<AccessibilityContext.Provider value={{ isScreenReaderEnabled: props.isScreenReaderEnabled }}>
+	<AccessibilityContext value={{ isScreenReaderEnabled: props.isScreenReaderEnabled }}>
 		<App
 			stdin={props.stdin}
 			stdout={props.stdout}
@@ -46,5 +46,5 @@ export function InkRoot<P>({ component, componentProps, ...props }: InkRootProps
 			component as unknown as UniversalComponent<P>,
 			componentProps as unknown as Readonly<Record<string, unknown>>,
 		)}</App>
-	</AccessibilityContext.Provider>
+	</AccessibilityContext>
 }

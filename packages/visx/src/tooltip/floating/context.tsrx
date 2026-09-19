@@ -13,9 +13,9 @@ export function FloatingTooltipContextProvider({
 	children,
 	value,
 }: FloatingTooltipContextProviderProps) {
-	return <FloatingTooltipContext.Provider
+	return <FloatingTooltipContext
 		value={value}
-	>{children}</FloatingTooltipContext.Provider>;
+	>{children}</FloatingTooltipContext>;
 }
 
 export function useFloatingTooltipContext(componentName: string) {

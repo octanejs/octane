@@ -84,7 +84,7 @@ export const MeterRoot = function MeterRoot(
 		props: [defaultProps, elementProps],
 	});
 
-	return <MeterRootContext.Provider value={contextValue}>{element}</MeterRootContext.Provider>;
+	return <MeterRootContext value={contextValue}>{element}</MeterRootContext>;
 };
 
 export interface MeterRootState {}

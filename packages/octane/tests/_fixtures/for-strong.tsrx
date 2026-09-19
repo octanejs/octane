@@ -174,12 +174,12 @@ export function StrongAliasedContextRows() @{
 		<button id="strong-aliased-context-update" onClick={() => setTheme('second')}>
 			update
 		</button>
-		<StrongTheme.Provider value={theme}>
+		<StrongTheme value={theme}>
 			@for (const item of items.slice(); key item.id) {
 				const value = readContext(StrongTheme);
 				<span class="strong-aliased-context-row">{value as string}</span>
 			}
-		</StrongTheme.Provider>
+		</StrongTheme>
 	</div>
 }
 
@@ -198,12 +198,12 @@ export function StrongConstCustomHookContextRows() @{
 		<button id="strong-const-hook-context-update" onClick={() => setTheme('second')}>
 			update
 		</button>
-		<StrongTheme.Provider value={theme}>
+		<StrongTheme value={theme}>
 			@for (const item of items.slice(); key item.id) {
 				const value = useConstStrongTheme(StrongTheme);
 				<span class="strong-const-hook-context-row">{value as string}</span>
 			}
-		</StrongTheme.Provider>
+		</StrongTheme>
 	</div>
 }
 
@@ -218,7 +218,7 @@ export function StrongOptionalAliasedContextRows() @{
 		<button id="strong-optional-context-update" onClick={() => setTheme('second')}>
 			update
 		</button>
-		<StrongTheme.Provider value={theme}>
+		<StrongTheme value={theme}>
 			@for (const item of items.slice(); key item.id) {
 				const directValue = useContext?.(StrongTheme);
 				const value = readContext?.(StrongTheme);
@@ -231,7 +231,7 @@ export function StrongOptionalAliasedContextRows() @{
 					<span class="strong-optional-namespace-context-row">{namespaceValue as string}</span>
 				</span>
 			}
-		</StrongTheme.Provider>
+		</StrongTheme>
 	</div>
 }
 
@@ -242,12 +242,12 @@ export function StrongOptionalNamespaceContextRows() @{
 		<button id="strong-optional-namespace-context-update" onClick={() => setTheme('second')}>
 			update
 		</button>
-		<StrongTheme.Provider value={theme}>
+		<StrongTheme value={theme}>
 			@for (const item of items.slice(); key item.id) {
 				const value = (OctaneHooks as any)['useContext' as string]?.(StrongTheme);
 				<span class="strong-optional-namespace-only-context-row">{value as string}</span>
 			}
-		</StrongTheme.Provider>
+		</StrongTheme>
 	</div>
 }
 
@@ -281,10 +281,10 @@ export function StrongCyclicContextReaders() @{
 		<button id="strong-cycle-context-update" onClick={() => setTheme('second')}>
 			update
 		</button>
-		<StrongTheme.Provider value={theme}>
+		<StrongTheme value={theme}>
 			<StrongCycleReaderA context={StrongTheme} />
 			<StrongCycleReaderC context={StrongTheme} />
-		</StrongTheme.Provider>
+		</StrongTheme>
 	</div>
 }
 
@@ -305,12 +305,12 @@ export function StrongShadowedAssignmentContextRows() @{
 		<button id="strong-shadow-context-update" onClick={() => setTheme('second')}>
 			update
 		</button>
-		<StrongTheme.Provider value={theme}>
+		<StrongTheme value={theme}>
 			@for (const item of items.slice(); key item.id) {
 				const value = useShadowedTheme(StrongTheme);
 				<span class="strong-shadow-context-row">{value as string}</span>
 			}
-		</StrongTheme.Provider>
+		</StrongTheme>
 	</div>
 }
 

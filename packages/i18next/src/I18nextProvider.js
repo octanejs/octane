@@ -5,5 +5,5 @@ import { S } from './internal.js';
 
 export function I18nextProvider({ i18n, defaultNS, children }) {
 	const value = useMemo(() => ({ i18n, defaultNS }), [i18n, defaultNS], S('I18nextProvider:value'));
-	return createElement(I18nContext.Provider, { value }, children);
+	return createElement(I18nContext, { value }, children);
 }

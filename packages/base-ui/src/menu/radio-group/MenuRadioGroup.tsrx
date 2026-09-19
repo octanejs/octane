@@ -75,9 +75,9 @@ export const MenuRadioGroup = React.memo(function MenuRadioGroup(
 	);
 
 	return (
-		<MenuGroupContext.Provider value={setLabelId}>
-			<MenuRadioGroupContext.Provider value={context}>{element}</MenuRadioGroupContext.Provider>
-		</MenuGroupContext.Provider>
+		<MenuGroupContext value={setLabelId}>
+			<MenuRadioGroupContext value={context}>{element}</MenuRadioGroupContext>
+		</MenuGroupContext>
 	);
 });
 

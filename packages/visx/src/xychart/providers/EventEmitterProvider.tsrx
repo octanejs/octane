@@ -6,5 +6,5 @@ import EventEmitterContext from '../context/EventEmitterContext.tsrx';
 /** Provider for EventEmitterContext. */
 export default function EventEmitterProvider({ children }: { children: OctaneNode }) {
 	const emitter = useMemo(() => mitt(), []);
-	return <EventEmitterContext.Provider value={emitter}>{children}</EventEmitterContext.Provider>;
+	return <EventEmitterContext value={emitter}>{children}</EventEmitterContext>;
 }

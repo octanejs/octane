@@ -111,17 +111,17 @@ function DefaultChildren(props: { children?: OctaneNode; sequence?: string }) @{
 function InspectChildrenThenProvide(props: { child: OctaneNode }) @{
 	const child = Children.only(props.child) as ElementDescriptor;
 	const inspected = String(child.props.children);
-	<ValueContext.Provider value={inspected === 'outer' ? 'inner' : 'unexpected'}>
+	<ValueContext value={inspected === 'outer' ? 'inner' : 'unexpected'}>
 		{child}
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 function InspectRecordThenProvide(props: { child: OctaneNode }) @{
 	const child = Children.only(props.child) as ElementDescriptor;
 	const inspected = String(child.props['data-value']);
-	<ValueContext.Provider value={inspected === 'outer' ? 'inner' : 'unexpected'}>
+	<ValueContext value={inspected === 'outer' ? 'inner' : 'unexpected'}>
 		{child}
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 function InnerFragmentComponent() @{
@@ -157,64 +157,64 @@ const throwingGetter = {
 };
 
 export function DirectContext() @{
-	<ValueContext.Provider value="inner">
+	<ValueContext value="inner">
 		<span data-context="direct">{use(ValueContext) as string}</span>
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 export function DirectGetterAttributeContext() @{
-	<ValueContext.Provider value="inner">
+	<ValueContext value="inner">
 		<span data-context="direct-attribute" data-value={getterValue.current}>
 			attribute
 		</span>
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 export function DirectSpreadAttributeContext() @{
-	<ValueContext.Provider value="inner">
+	<ValueContext value="inner">
 		<span data-context="direct-spread-attribute" {...contextualAttributes}>
 			attribute
 		</span>
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 export function DirectDynamicComponentContext() @{
-	<ValueContext.Provider value="inner">
+	<ValueContext value="inner">
 		<contextualFragmentComponent.current />
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 export function RootHostAttributeContext() @{
 	const content = <span data-context="root-host-attribute" data-value={getterValue.current}>
 		attribute
 	</span>;
-	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+	<ValueContext value="inner">{content}</ValueContext>
 }
 
 export function RootSpreadAttributeContext() @{
 	const content = <span data-context="root-spread-attribute" {...contextualAttributes}>
 		attribute
 	</span>;
-	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+	<ValueContext value="inner">{content}</ValueContext>
 }
 
 export function RootComponentAttributeContext() @{
 	const content = <ContextAttributeComponent value={getterValue.current} />;
-	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+	<ValueContext value="inner">{content}</ValueContext>
 }
 
 export function RootDynamicComponentContext() @{
 	const content = <contextualFragmentComponent.current />;
-	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+	<ValueContext value="inner">{content}</ValueContext>
 }
 
 export function RootInspectedAttributeContext() @{
 	const content = <span data-context="root-inspected-attribute" data-value={getterValue.current}>
 		attribute
 	</span>;
-	<ValueContext.Provider value="inner">
+	<ValueContext value="inner">
 		<InspectContextAttribute child={content} />
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 export function IndependentDeferredChildren(props: { first: string; second: string; value: string }) @{
@@ -224,12 +224,12 @@ export function IndependentDeferredChildren(props: { first: string; second: stri
 	const mapped = Children.map(second, (child) =>
 		cloneElement(child as ElementDescriptor, { key: 'replacement', 'data-copy': 'yes' }),
 	)![0];
-	<ValueContext.Provider value={props.value}>
+	<ValueContext value={props.value}>
 		<div data-outlet="independent-children">
 			<InspectDeferredChild child={flattened} name="first" />
 			<InspectDeferredChild child={mapped} name="second" />
 		</div>
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 export function DeferredChildrenSources(props: { value: string }) @{
@@ -242,13 +242,13 @@ export function DeferredChildrenSources(props: { value: string }) @{
 	const fromSpread = <span {...spread}>{getterValue.current as string}</span>;
 	const fromDefaults = <DefaultChildren>{getterValue.current as string}</DefaultChildren>;
 	const defaultOnly = <DefaultChildren sequence={getterValue.current} />;
-	<ValueContext.Provider value={props.value}>
+	<ValueContext value={props.value}>
 		<div data-outlet="children-sources">
 			<InspectDeferredChild child={fromSpread} name="spread" />
 			<InspectDeferredChild child={fromDefaults} name="defaults" />
 			<InspectDeferredChild child={defaultOnly} name="default-only" />
 		</div>
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 export function InspectedChildrenProviderContext() @{
@@ -266,18 +266,18 @@ export function InspectedRecordProviderContext() @{
 }
 
 export function VariableContext() @{
-	const content = <ValueContext.Provider value="inner">
+	const content = <ValueContext value="inner">
 		<span data-context="variable">{use(ValueContext) as string}</span>
-	</ValueContext.Provider>;
+	</ValueContext>;
 	<section data-outlet="variable">{content}</section>
 }
 
 export function PropContext() @{
 	<Slot
 		content={
-			<ValueContext.Provider value="inner">
+			<ValueContext value="inner">
 				<span data-context="prop">{use(ValueContext) as string}</span>
-			</ValueContext.Provider>
+			</ValueContext>
 		}
 	/>
 }
@@ -285,61 +285,61 @@ export function PropContext() @{
 export function NestedContext() @{
 	const nested = {
 		items: [
-			<ValueContext.Provider value="inner">
+			<ValueContext value="inner">
 				<span data-context="nested">{use(ValueContext) as string}</span>
-			</ValueContext.Provider>,
+			</ValueContext>,
 		],
 	};
 	<section data-outlet="nested">{nested.items[0]}</section>
 }
 
 export function GetterContext() @{
-	const content = <ValueContext.Provider value="inner">
+	const content = <ValueContext value="inner">
 		<span data-context="getter">{getterValue.current as string}</span>
-	</ValueContext.Provider>;
+	</ValueContext>;
 	<section>{content}</section>
 }
 
 export function FragmentContext() @{
 	const content = <>{use(ValueContext) as string}</>;
-	<ValueContext.Provider value="inner">
+	<ValueContext value="inner">
 		<span data-context="fragment">{content}</span>
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 export function FragmentGetterContext() @{
 	const content = <>{getterValue.current as string}</>;
-	<ValueContext.Provider value="inner">
+	<ValueContext value="inner">
 		<span data-context="fragment-getter">{content}</span>
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 export function NestedFragmentContext() @{
 	const content = <><>{getterValue.current as string}</></>;
-	<ValueContext.Provider value="inner">
+	<ValueContext value="inner">
 		<span data-context="fragment-nested">{content}</span>
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 export function FragmentPropContext() @{
 	const content = <Slot content={<>{getterValue.current as string}</>} />;
-	<ValueContext.Provider value="inner">
+	<ValueContext value="inner">
 		<section data-context="fragment-prop">{content}</section>
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 export function FragmentArrayContext() @{
 	const content = [<>{getterValue.current as string}</>];
-	<ValueContext.Provider value="inner">
+	<ValueContext value="inner">
 		<span data-context="fragment-array">{content[0]}</span>
-	</ValueContext.Provider>
+	</ValueContext>
 }
 
 export function FragmentNestedExpressionContext() @{
 	const content = <>
 		<strong data-context="fragment-nested-expression">{getterValue.current as string}</strong>
 	</>;
-	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+	<ValueContext value="inner">{content}</ValueContext>
 }
 
 export function FragmentNestedAttributeContext() @{
@@ -348,67 +348,67 @@ export function FragmentNestedAttributeContext() @{
 			attribute
 		</strong>
 	</>;
-	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+	<ValueContext value="inner">{content}</ValueContext>
 }
 
 export function FragmentDynamicComponentContext() @{
 	const content = <><contextualFragmentComponent.current /></>;
-	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+	<ValueContext value="inner">{content}</ValueContext>
 }
 
 export function ProxyContext() @{
-	const content = <ValueContext.Provider value="inner">
+	const content = <ValueContext value="inner">
 		<span data-context="proxy">{proxyValue.current as string}</span>
-	</ValueContext.Provider>;
+	</ValueContext>;
 	<section>{content}</section>
 }
 
 export function CoercionContext() @{
-	const content = <ValueContext.Provider value="inner">
+	const content = <ValueContext value="inner">
 		<span data-context="coercion">{('' + coercibleValue) as string}</span>
-	</ValueContext.Provider>;
+	</ValueContext>;
 	<section>{content}</section>
 }
 
 export function IterableContext() @{
-	const content = <ValueContext.Provider value="inner">
+	const content = <ValueContext value="inner">
 		<span data-context="iterable">{[...iterableValue]}</span>
-	</ValueContext.Provider>;
+	</ValueContext>;
 	<section>{content}</section>
 }
 
 export function OptionalComputedKeyContext() @{
-	const content = <ValueContext.Provider value="inner">
+	const content = <ValueContext value="inner">
 		<span data-context="optional-key">
 			{valuesByContext?.[computedKey as unknown as string] as string}
 		</span>
-	</ValueContext.Provider>;
+	</ValueContext>;
 	<section>{content}</section>
 }
 
 export function GetterAttributeContext() @{
-	const content = <ValueContext.Provider value="inner">
+	const content = <ValueContext value="inner">
 		<span data-context="attribute" data-value={getterValue.current}>attribute</span>
-	</ValueContext.Provider>;
+	</ValueContext>;
 	<section>{content}</section>
 }
 
 export function MappedContext() @{
 	const content = <span data-context="mapped">{getterValue.current as string}</span>;
 	const mapped = Children.map(content, (child) => child);
-	<ValueContext.Provider value="inner">{mapped}</ValueContext.Provider>
+	<ValueContext value="inner">{mapped}</ValueContext>
 }
 
 export function FlattenedContext() @{
 	const content = <span data-context="flattened">{getterValue.current as string}</span>;
 	const flattened = Children.toArray(content);
-	<ValueContext.Provider value="inner">{flattened}</ValueContext.Provider>
+	<ValueContext value="inner">{flattened}</ValueContext>
 }
 
 export function ClonedContext() @{
 	const content = <span data-context="cloned">{getterValue.current as string}</span>;
 	const cloned = cloneElement(content as ElementDescriptor, { 'data-cloned': 'yes' });
-	<ValueContext.Provider value="inner">{cloned}</ValueContext.Provider>
+	<ValueContext value="inner">{cloned}</ValueContext>
 }
 
 export function MappedClonedContext() @{
@@ -416,7 +416,7 @@ export function MappedClonedContext() @{
 	const mapped = Children.map(content, (child) =>
 		cloneElement(child as ElementDescriptor, { 'data-cloned': 'yes' }),
 	);
-	<ValueContext.Provider value="inner">{mapped}</ValueContext.Provider>
+	<ValueContext value="inner">{mapped}</ValueContext>
 }
 
 export function ConfigReplacedScopedChild() @{
@@ -445,8 +445,8 @@ export function UndefinedReplacedScopedChild() @{
 
 export function SharedDescriptorProviders(props: { first: string; second: string }) @{
 	<section data-outlet="shared">
-		<ValueContext.Provider value={props.first}>{sharedContextChild}</ValueContext.Provider>
-		<ValueContext.Provider value={props.second}>{sharedContextChild}</ValueContext.Provider>
+		<ValueContext value={props.first}>{sharedContextChild}</ValueContext>
+		<ValueContext value={props.second}>{sharedContextChild}</ValueContext>
 	</section>
 }
 
@@ -455,13 +455,13 @@ export function SharedRootAttributeProviders(props: { first: string; second: str
 		{getterValue.current as string}
 	</span>;
 	<section data-outlet="shared-root">
-		<ValueContext.Provider value={props.first}>{content}</ValueContext.Provider>
-		<ValueContext.Provider value={props.second}>{content}</ValueContext.Provider>
+		<ValueContext value={props.first}>{content}</ValueContext>
+		<ValueContext value={props.second}>{content}</ValueContext>
 	</section>
 }
 
 export function DirectiveContext(props: { visible: boolean }) @{
-	const content = <ValueContext.Provider value="inner">
+	const content = <ValueContext value="inner">
 		<div data-outlet="directive">
 			@if (props.visible) {
 				<span data-context="directive">{use(ValueContext) as string}</span>
@@ -469,7 +469,7 @@ export function DirectiveContext(props: { visible: boolean }) @{
 				<span data-context="directive">hidden</span>
 			}
 		</div>
-	</ValueContext.Provider>;
+	</ValueContext>;
 	<section>{content}</section>
 }
 

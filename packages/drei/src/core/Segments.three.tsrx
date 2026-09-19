@@ -80,7 +80,7 @@ export function Segments({
 			linewidth={lineWidth}
 			{...rest as any}
 		/>
-		<SegmentsContext.Provider value={api}>{children}</SegmentsContext.Provider>
+		<SegmentsContext value={api}>{children}</SegmentsContext>
 	</primitive>
 }
 

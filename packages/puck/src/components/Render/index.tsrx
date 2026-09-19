@@ -17,6 +17,7 @@ export const renderContext = React.createContext<{
 	data: { root: {}, content: [] },
 	metadata: {},
 });
+const RenderContextProvider = renderContext;
 
 export function Render<
 	UserConfig extends Config = Config,
@@ -69,18 +70,18 @@ export function Render<
 	);
 
 	if (config.root?.render) {
-		return <renderContext.Provider value={{ config, data: defaultedData, metadata }}>
+		return <RenderContextProvider value={{ config, data: defaultedData, metadata }}>
 			<DropZoneProvider value={nextContextValue}>
 				<config.root.render {...propsWithSlots}>
 					<DropZoneRenderPure zone={rootZone} />
 				</config.root.render>
 			</DropZoneProvider>
-		</renderContext.Provider>;
+		</RenderContextProvider>;
 	}
 
-	return <renderContext.Provider value={{ config, data: defaultedData, metadata }}>
+	return <RenderContextProvider value={{ config, data: defaultedData, metadata }}>
 		<DropZoneProvider value={nextContextValue}>
 			<DropZoneRenderPure zone={rootZone} />
 		</DropZoneProvider>
-	</renderContext.Provider>;
+	</RenderContextProvider>;
 }

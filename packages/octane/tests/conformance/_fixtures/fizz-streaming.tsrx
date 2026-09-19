@@ -36,13 +36,13 @@ function ContextOutside() @{
 
 export function ContextBoundary(props) @{
 	<>
-		<StreamContext.Provider value={props.context}>
+		<StreamContext value={props.context}>
 			@try {
 				<ContextLeaf promise={props.promise} />
 			} @pending {
 				<span class="context-fallback">{'loading'}</span>
 			}
-		</StreamContext.Provider>
+		</StreamContext>
 		<ContextOutside />
 	</>
 }
@@ -103,15 +103,15 @@ export function BoundaryRemovedBeforeRootRetry(props) @{
 }
 
 export function ContextNode() @{
-	<StreamContext.Provider value="provided">
+	<StreamContext value="provided">
 		<div id="context-node">{StreamContext}</div>
-	</StreamContext.Provider>
+	</StreamContext>
 }
 
 export function RecursiveUsableNode(props) @{
-	<StreamContext.Provider value="recursive provided">
+	<StreamContext value="recursive provided">
 		<div id="recursive-usable-node">{props.promise}</div>
-	</StreamContext.Provider>
+	</StreamContext>
 }
 
 export function TableBoundary(props) @{

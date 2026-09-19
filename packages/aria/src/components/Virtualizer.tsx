@@ -87,11 +87,11 @@ export function Virtualizer<O>(props: VirtualizerProps<O>): JSX.Element {
 	);
 
 	return (
-		<CollectionRendererContext.Provider value={renderer}>
-			<VirtualizerOptionsContext.Provider value={{ layout, layoutOptions, shouldObserveItemSize }}>
+		<CollectionRendererContext value={renderer}>
+			<VirtualizerOptionsContext value={{ layout, layoutOptions, shouldObserveItemSize }}>
 				{children}
-			</VirtualizerOptionsContext.Provider>
-		</CollectionRendererContext.Provider>
+			</VirtualizerOptionsContext>
+		</CollectionRendererContext>
 	);
 }
 
@@ -141,9 +141,9 @@ function CollectionRoot({
 
 	return (
 		<div {...contentProps}>
-			<VirtualizerContext.Provider value={state}>
+			<VirtualizerContext value={state}>
 				{renderChildren(null, state.visibleViews, renderDropIndicator, shouldObserveItemSize)}
-			</VirtualizerContext.Provider>
+			</VirtualizerContext>
 		</div>
 	);
 }

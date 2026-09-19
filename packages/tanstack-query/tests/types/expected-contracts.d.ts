@@ -15,7 +15,7 @@ export interface ExpectedContracts {
 	HydrationBoundary_1: JSX.Element;
 	HydrationBoundary_2: Omit<Parameters<typeof Expected.HydrationBoundary>[0], 'children'>;
 	HydrationBoundaryProps_1: Omit<Expected.HydrationBoundaryProps, 'children'>;
-	IsRestoringProvider_1: Context<boolean>['Provider'];
+	IsRestoringProvider_1: Context<boolean>;
 	QueriesOptions_1: Expected.QueriesOptions<never>;
 	QueriesResults_1: Expected.QueriesResults<never>;
 	QueryClientContext_1: Context<Expected.QueryClient | undefined>;

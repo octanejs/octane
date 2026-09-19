@@ -281,7 +281,7 @@ export function Document(props: DocumentProps = {}) {
 		ref={documentElement}
 		class={['react-pdf__Document', classProp, className]}
 	>
-		<DocumentContext.Provider value={contextValue}>{content}</DocumentContext.Provider>
+		<DocumentContext value={contextValue}>{content}</DocumentContext>
 	</div>;
 }
 
@@ -685,7 +685,7 @@ export function Page(props: PageProps = {}) {
 			throw new Error('renderMode was set to "custom", but no customRenderer was passed.');
 		}
 		const renderProps = contextValue as PageRenderProps;
-		content = <PageContext.Provider value={contextValue}>
+		content = <PageContext value={contextValue}>
 			{renderMode === 'canvas'
 				? <canvas
 						ref={canvasElement}
@@ -711,7 +711,7 @@ export function Page(props: PageProps = {}) {
 			{typeof children === 'function' && !isChildrenBlock(children)
 				? children(renderProps)
 				: children}
-		</PageContext.Provider>;
+		</PageContext>;
 	}
 
 	return <div
@@ -872,7 +872,7 @@ export function Outline(props: OutlineProps = {}) {
 		ref={outlineElement}
 		class={['react-pdf__Outline', classProp, className]}
 	>
-		<OutlineContext.Provider value={{ onItemClick: clickHandler }}>
+		<OutlineContext value={{ onItemClick: clickHandler }}>
 			<ul>{outline.map(
 				(item) =>
 					<OutlineItem
@@ -882,6 +882,6 @@ export function Outline(props: OutlineProps = {}) {
 						onItemClick={clickHandler}
 					/>,
 			)}</ul>
-		</OutlineContext.Provider>
+		</OutlineContext>
 	</div>;
 }

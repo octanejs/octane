@@ -348,7 +348,7 @@ export function DocsRoot(props: { children?: OctaneNode }) @{
 }
 
 export function DocVersionRoot(props: { children?: OctaneNode; version: DocsVersion }) @{
-	<VersionContext.Provider value={props.version}>{props.children}</VersionContext.Provider>
+	<VersionContext value={props.version}>{props.children}</VersionContext>
 }
 
 export function DocRoot(props: {

@@ -66,11 +66,7 @@ export const CollapsibleRoot = function CollapsibleRoot(
 		stateAttributesMapping: collapsibleStateAttributesMapping,
 	});
 
-	return (
-		<CollapsibleRootContext.Provider value={contextValue}>
-			{element}
-		</CollapsibleRootContext.Provider>
-	);
+	return <CollapsibleRootContext value={contextValue}>{element}</CollapsibleRootContext>;
 };
 
 export interface CollapsibleRootState extends Pick<

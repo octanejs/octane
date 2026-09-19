@@ -83,13 +83,13 @@ function PreviewCardRootComponent<Payload>(props: PreviewCardRoot.Props<Payload>
 	const shouldRenderInteractions = open || mounted;
 
 	return (
-		<PreviewCardRootContext.Provider value={store as PreviewCardRootContext}>
+		<PreviewCardRootContext value={store as PreviewCardRootContext}>
 			{handle && <PopupHandleAttachment handle={handle} store={store} />}
 			{shouldRenderInteractions && <PreviewCardInteractions store={store} />}
 			{typeof children === 'function' && !React.isChildrenBlock(children)
 				? children({ payload })
 				: children}
-		</PreviewCardRootContext.Provider>
+		</PreviewCardRootContext>
 	);
 }
 

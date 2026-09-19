@@ -107,11 +107,11 @@ function ColourReader() @{
 }
 
 export function NestedContext() @{
-	<Colour.Provider value="purple">
-		<Colour.Provider value="red">
+	<Colour value="purple">
+		<Colour value="red">
 			<ColourReader />
-		</Colour.Provider>
-	</Colour.Provider>
+		</Colour>
+	</Colour>
 }
 
 export function HostRef(props) @{
@@ -237,15 +237,13 @@ export function DefaultContextValue() @{
 }
 
 export function GrandchildContextValue() @{
-	<DefaultContext.Provider value="purple">
+	<DefaultContext value="purple">
 		<DefaultContextChild />
-	</DefaultContext.Provider>
+	</DefaultContext>
 }
 
 const ThemeContext = createContext('dark');
 const LanguageContext = createContext('french');
-export const contextProviderIdentity =
-	ThemeContext.Provider === ThemeContext && LanguageContext.Provider === LanguageContext;
 
 function MultipleContextReader() @{
 	const theme = useContext(ThemeContext);
@@ -257,11 +255,11 @@ function MultipleContextReader() @{
 }
 
 export function MultipleContexts() @{
-	<ThemeContext.Provider value="light">
-		<LanguageContext.Provider value="english">
+	<ThemeContext value="light">
+		<LanguageContext value="english">
 			<MultipleContextReader />
-		</LanguageContext.Provider>
-	</ThemeContext.Provider>
+		</LanguageContext>
+	</ThemeContext>
 }
 
 function ThemeValue(props) @{
@@ -276,26 +274,26 @@ function LanguageValue(props) @{
 
 export function NestedContextUnwinding() @{
 	<div id="nested-context-unwinding">
-		<ThemeContext.Provider value="light">
-			<LanguageContext.Provider value="english">
-				<ThemeContext.Provider value="dark">
+		<ThemeContext value="light">
+			<LanguageContext value="english">
+				<ThemeContext value="dark">
 					<ThemeValue id="theme1" />
-				</ThemeContext.Provider>
+				</ThemeContext>
 				<ThemeValue id="theme2" />
-				<LanguageContext.Provider value="sanskrit">
-					<ThemeContext.Provider value="blue">
-						<ThemeContext.Provider value="red">
-							<LanguageContext.Provider value="chinese">
-								<LanguageContext.Provider value="hungarian" />
+				<LanguageContext value="sanskrit">
+					<ThemeContext value="blue">
+						<ThemeContext value="red">
+							<LanguageContext value="chinese">
+								<LanguageContext value="hungarian" />
 								<LanguageValue id="language1" />
-							</LanguageContext.Provider>
-						</ThemeContext.Provider>
+							</LanguageContext>
+						</ThemeContext>
 						<ThemeValue id="theme3" />
 						<LanguageValue id="language2" />
-					</ThemeContext.Provider>
-				</LanguageContext.Provider>
-			</LanguageContext.Provider>
-		</ThemeContext.Provider>
+					</ThemeContext>
+				</LanguageContext>
+			</LanguageContext>
+		</ThemeContext>
 		<LanguageValue id="language3" />
 	</div>
 }
@@ -324,12 +322,12 @@ function CompositeBaz() @{
 }
 
 export function SameContextMultipleReads() @{
-	<CompositeContext.Provider value={{ foo: 1, bar: 3, baz: 5 }}>
+	<CompositeContext value={{ foo: 1, bar: 3, baz: 5 }}>
 		<div id="same-context-multiple-reads">
 			<CompositeFooAndBar />
 			<CompositeBaz />
 		</div>
-	</CompositeContext.Provider>
+	</CompositeContext>
 }
 
 const ErrorContext = createContext('default');
@@ -339,10 +337,10 @@ function ContextCrash() {
 }
 
 export function ContextRenderThatThrows() @{
-	<ErrorContext.Provider value="Casper">
+	<ErrorContext value="Casper">
 		<DefaultContextReader id="unused-context-before-crash" context={ErrorContext} />
 		<ContextCrash />
-	</ErrorContext.Provider>
+	</ErrorContext>
 }
 
 export function ContextAfterThrow() @{

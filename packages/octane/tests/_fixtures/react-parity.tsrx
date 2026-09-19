@@ -29,9 +29,9 @@ export function ThemeReader() @{
 }
 
 export function ThemeApp(props) @{
-	<Theme.Provider value={props.theme}>
+	<Theme value={props.theme}>
 		<ThemeReader />
-	</Theme.Provider>
+	</Theme>
 }
 
 // --- camelCase style -------------------------------------------------------

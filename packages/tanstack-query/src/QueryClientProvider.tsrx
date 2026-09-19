@@ -13,5 +13,5 @@ export function QueryClientProvider(props: QueryClientProviderProps) @{
 			props.client.unmount();
 		};
 	}, [props.client]);
-	<QueryClientContext.Provider value={props.client}>{props.children}</QueryClientContext.Provider>
+	<QueryClientContext value={props.client}>{props.children}</QueryClientContext>
 }

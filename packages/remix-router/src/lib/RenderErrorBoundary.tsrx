@@ -64,11 +64,9 @@ export function RenderErrorBoundary(props: RenderErrorBoundaryProps) @{
 
 	@try {
 		@if (state.current.error !== undefined) {
-			<RouteContext.Provider value={props.routeContext}>
-				<RouteErrorContext.Provider
-					value={state.current.error}
-				>{props.component}</RouteErrorContext.Provider>
-			</RouteContext.Provider>
+			<RouteContext value={props.routeContext}>
+				<RouteErrorContext value={state.current.error}>{props.component}</RouteErrorContext>
+			</RouteContext>
 		} @else {
 			<>
 				{props.children}
@@ -131,7 +129,7 @@ function CaughtErrorView(props: CaughtErrorViewProps) @{
 		}
 	}, [props.location, props.revalidation]);
 
-	<RouteContext.Provider value={props.routeContext}>
-		<RouteErrorContext.Provider value={error}>{props.component}</RouteErrorContext.Provider>
-	</RouteContext.Provider>
+	<RouteContext value={props.routeContext}>
+		<RouteErrorContext value={error}>{props.component}</RouteErrorContext>
+	</RouteContext>
 }

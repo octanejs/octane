@@ -765,7 +765,7 @@ export const TreeItemContent: (props: TreeItemContentProps) => any =
 				} as any,
 				subSlot(slot, 'render'),
 			);
-			return createElement(CollectionRendererContext.Provider, {
+			return createElement(CollectionRendererContext, {
 				value: DefaultCollectionRenderer,
 				children: renderProps.children,
 			});

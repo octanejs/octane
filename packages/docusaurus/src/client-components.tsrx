@@ -81,12 +81,12 @@ export function DocusaurusRouterProvider(props: {
 	manifest: DocusaurusManifestValue;
 	router: DataRouter;
 }) @{
-	<ManifestContext.Provider value={props.manifest}>
+	<ManifestContext value={props.manifest}>
 		<Head>
 			<DocusaurusSiteMetadata manifest={props.manifest} />
 			<RouterProvider router={props.router} />
 		</Head>
-	</ManifestContext.Provider>
+	</ManifestContext>
 }
 
 export function DocusaurusRouteRenderer(props: {
@@ -103,7 +103,7 @@ export function DocusaurusRouteRenderer(props: {
 	const route = { ...props.route, routes: props.route.children };
 	const Component = props.Component;
 
-	<RouteContext.Provider value={context}>
+	<RouteContext value={context}>
 		<Component
 			{...props.modules}
 			{...props.route.props}
@@ -114,7 +114,7 @@ export function DocusaurusRouteRenderer(props: {
 		>
 			<Outlet />
 		</Component>
-	</RouteContext.Provider>
+	</RouteContext>
 }
 
 export function useDocusaurusManifest(): DocusaurusManifestValue {

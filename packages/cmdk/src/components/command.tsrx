@@ -732,8 +732,8 @@ export function CommandRoot(props: CommandProps) @{
 		}}
 	>
 		<label cmdk-label="" for={inputId} id={labelId} style={srOnlyStyles}>{label}</label>
-		<StoreContext.Provider value={store}>
-			<CommandContext.Provider value={context}>{children}</CommandContext.Provider>
-		</StoreContext.Provider>
+		<StoreContext value={store}>
+			<CommandContext value={context}>{children}</CommandContext>
+		</StoreContext>
 	</div>
 }

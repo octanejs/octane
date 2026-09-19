@@ -179,9 +179,7 @@ export const NavigationMenuPositioner = function NavigationMenuPositioner(
 	});
 
 	return (
-		<NavigationMenuPositionerContext.Provider value={positioning}>
-			{element}
-		</NavigationMenuPositionerContext.Provider>
+		<NavigationMenuPositionerContext value={positioning}>{element}</NavigationMenuPositionerContext>
 	);
 };
 

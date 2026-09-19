@@ -450,12 +450,12 @@ export function ActivityNestedInsertionRetryHost(props: {
 	outerPromise: Promise<string>;
 	log: Log;
 }) @{
-	<InsertionRetryPhaseContext.Provider value={props.phase}>
+	<InsertionRetryPhaseContext value={props.phase}>
 		<Activity mode="hidden">
 			<MemoNestedInsertionRetryShell innerPromise={props.innerPromise} log={props.log} />
 			<MaybeSuspend pending={props.phase === 1} promise={props.outerPromise} />
 		</Activity>
-	</InsertionRetryPhaseContext.Provider>
+	</InsertionRetryPhaseContext>
 }
 
 export function ActivityRegionChild(props: { thenable: Promise<void> }) @{

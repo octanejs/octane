@@ -53,7 +53,7 @@ export function prerenderStatic({
 		const ApolloContext = getApolloContext();
 		const child = typeof tree === 'function' ? createElement(tree, {}) : tree;
 		function ApolloSSRTree() {
-			return createElement(ApolloContext.Provider, {
+			return createElement(ApolloContext, {
 				value: {
 					...context,
 					[wrapperSymbol]: {

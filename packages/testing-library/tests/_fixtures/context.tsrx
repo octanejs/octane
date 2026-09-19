@@ -5,5 +5,5 @@ import { createContext } from 'octane';
 export const LocaleCtx = createContext('en');
 
 export function FrenchProvider(props) @{
-	<LocaleCtx.Provider value="fr">{props.children}</LocaleCtx.Provider>
+	<LocaleCtx value="fr">{props.children}</LocaleCtx>
 }

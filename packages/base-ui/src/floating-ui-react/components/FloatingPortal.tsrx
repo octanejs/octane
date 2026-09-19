@@ -254,7 +254,7 @@ export const FloatingPortal = function FloatingPortal(
 	return (
 		<React.Fragment>
 			{portalSubtree}
-			<PortalContext.Provider value={portalContextValue}>
+			<PortalContext value={portalContextValue}>
 				{shouldRenderGuards && portalNode && (
 					<FocusGuard
 						data-type="outside"
@@ -296,7 +296,7 @@ export const FloatingPortal = function FloatingPortal(
 						}}
 					/>
 				)}
-			</PortalContext.Provider>
+			</PortalContext>
 		</React.Fragment>
 	);
 };

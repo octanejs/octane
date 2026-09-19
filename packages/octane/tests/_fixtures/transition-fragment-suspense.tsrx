@@ -58,7 +58,7 @@ function SuspendedReplacement({
 
 const Context = createContext(null);
 function Wrapper({ children }) {
-	return <Context.Provider value={null}>{children}</Context.Provider>;
+	return <Context value={null}>{children}</Context>;
 }
 
 function CurrentPortal({ target }: { target: Element }) {

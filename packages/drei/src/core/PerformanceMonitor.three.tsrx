@@ -44,7 +44,7 @@ export type PerformanceMonitorProps = {
 	children?: OctaneNode;
 };
 
-const context = createContext<PerformanceMonitorApi>(null!);
+const PerformanceMonitorContext = createContext<PerformanceMonitorApi>(null!);
 
 export function PerformanceMonitor({
 	iterations = 10,
@@ -123,7 +123,7 @@ export function PerformanceMonitor({
 			}
 		}
 	});
-	<context.Provider value={api}>{children}</context.Provider>
+	<PerformanceMonitorContext value={api}>{children}</PerformanceMonitorContext>
 }
 
 export function usePerformanceMonitor({
@@ -132,7 +132,7 @@ export function usePerformanceMonitor({
 	onChange,
 	onFallback,
 }: Partial<PerformanceMonitorHookApi>): void {
-	const api = useContext(context);
+	const api = useContext(PerformanceMonitorContext);
 	const ref = useRef({ onIncline, onDecline, onChange, onFallback });
 	useLayoutEffect(() => {
 		ref.current.onIncline = onIncline;

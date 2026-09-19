@@ -121,7 +121,7 @@ export const PopoverPopup = function PopoverPopup(
 			nextFocusableElement={store.context.triggerFocusTargetRef}
 			beforeContentFocusGuardRef={store.context.beforeContentFocusGuardRef}
 		>
-			<ClosePartContext.Provider value={closePartContext}>{element}</ClosePartContext.Provider>
+			<ClosePartContext value={closePartContext}>{element}</ClosePartContext>
 		</FloatingFocusManager>
 	);
 };

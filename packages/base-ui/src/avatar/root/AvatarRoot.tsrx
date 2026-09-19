@@ -40,7 +40,7 @@ export const AvatarRoot = function AvatarRoot(
 		stateAttributesMapping: avatarStateAttributesMapping,
 	});
 
-	return <AvatarRootContext.Provider value={contextValue}>{element}</AvatarRootContext.Provider>;
+	return <AvatarRootContext value={contextValue}>{element}</AvatarRootContext>;
 };
 
 export type ImageLoadingStatus = 'idle' | 'loading' | 'loaded' | 'error';

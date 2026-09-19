@@ -65,9 +65,9 @@ export function FloatingNode(props: FloatingNodeProps): React.ReactElement {
 	const parentId = useFloatingParentNodeId();
 
 	return (
-		<FloatingNodeContext.Provider value={React.useMemo(() => ({ id, parentId }), [id, parentId])}>
+		<FloatingNodeContext value={React.useMemo(() => ({ id, parentId }), [id, parentId])}>
 			{children}
-		</FloatingNodeContext.Provider>
+		</FloatingNodeContext>
 	);
 }
 
@@ -91,5 +91,5 @@ export function FloatingTree(props: FloatingTreeProps): React.ReactElement {
 	const { children, externalTree } = props;
 
 	const tree = useRefWithInit(() => externalTree ?? new FloatingTreeStore()).current;
-	return <FloatingTreeContext.Provider value={tree}>{children}</FloatingTreeContext.Provider>;
+	return <FloatingTreeContext value={tree}>{children}</FloatingTreeContext>;
 }

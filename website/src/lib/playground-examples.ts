@@ -497,9 +497,9 @@ export default function App() @{
 				Switch theme
 			</button>
 
-			<Theme.Provider value={theme}>
+			<Theme value={theme}>
 				<ThemeCard />
-			</Theme.Provider>
+			</Theme>
 
 			<ThemeCard />
 			<p class="hint">The second card sits outside the provider, so it sees the fallback.</p>
@@ -557,9 +557,9 @@ export default function App() {
 				Switch theme
 			</button>
 
-			<Theme.Provider value={theme}>
+			<Theme value={theme}>
 				<ThemeCard />
-			</Theme.Provider>
+			</Theme>
 
 			<ThemeCard />
 			<p style={{ opacity: 0.6 }}>

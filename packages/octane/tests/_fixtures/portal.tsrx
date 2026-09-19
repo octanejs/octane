@@ -48,11 +48,11 @@ export function App(props) @{
 	const [open, setOpen] = useState(true);
 	<div class="app-root">
 		<button onClick={() => setOpen(!open)}>{'toggle'}</button>
-		<Theme.Provider value="dark">
+		<Theme value="dark">
 			@if (open) {
 				<Modal target={props.target} />
 			}
-		</Theme.Provider>
+		</Theme>
 	</div>
 }
 
@@ -99,11 +99,11 @@ export function PortalPlacementApp(props: PortalPlacementProps) @{
 		setMode,
 		rerender: () => setTick(tick + 1),
 	});
-	<PlacementMode.Provider value={mode}>
+	<PlacementMode value={mode}>
 		<div data-slot="parent" data-tick={tick as string}>
 			<PlacementFirstChild target={props.target} />
 			<main data-slot="second">{'SECOND'}</main>
 			<aside data-slot="third">{'THIRD'}</aside>
 		</div>
-	</PlacementMode.Provider>
+	</PlacementMode>
 }

@@ -1,8 +1,6 @@
-import { installLynxTestingEnv, uninstallLynxTestingEnv } from '@lynx-js/testing-environment';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { deserialize, serialize } from 'node:v8';
-import { JSDOM } from 'jsdom';
 import {
 	defineUniversalComponent,
 	universalComponent,
@@ -16,7 +14,6 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLynxRoot, type LynxRoot } from '../src/index.js';
 import { root as firstScreenRoot } from '../src/first-screen.js';
-import { installLynxMainThread, type LynxMainThreadController } from '../src/main-thread.js';
 import * as firstScreenRenderer from '../src/main-renderer.js';
 import {
 	defineUniversalComponent as defineFirstScreenComponent,
@@ -41,6 +38,12 @@ import {
 	type LynxContextProxy,
 } from '../src/core/protocol.js';
 import { unwire, wire } from './_fixtures/lynx-wire.js';
+import {
+	backgroundContext,
+	installEnvironment,
+	mainContext,
+	uninstallEnvironment,
+} from './_fixtures/lynx-first-screen-env.js';
 
 interface SceneProps {
 	readonly id: string;
@@ -50,18 +53,6 @@ interface SceneProps {
 	readonly onRowTap?: (id: string, payload: unknown) => void;
 	readonly onTap: (payload: unknown) => void;
 	readonly onEffect: (owner: 'main' | 'background') => void;
-}
-
-interface EventRegistration {
-	readonly node: object;
-	readonly name: string;
-	readonly listener: string | undefined;
-}
-
-interface InstalledEnvironment {
-	readonly dom: JSDOM;
-	readonly main: LynxMainThreadController;
-	readonly registrations: EventRegistration[];
 }
 
 const mainPlan = firstScreenPlan('lynx', {
@@ -331,54 +322,7 @@ const BackgroundScene = defineUniversalComponent('lynx', (props: SceneProps) => 
 	];
 });
 
-let installed: InstalledEnvironment | null = null;
 let backgroundRoot: LynxRoot | null = null;
-
-function mainContext(): LynxContextProxy {
-	return (
-		globalThis as typeof globalThis & {
-			lynx: { getJSContext(): LynxContextProxy };
-		}
-	).lynx.getJSContext();
-}
-
-function backgroundContext(): LynxContextProxy {
-	return (
-		globalThis as typeof globalThis & {
-			lynx: { getCoreContext(): LynxContextProxy };
-		}
-	).lynx.getCoreContext();
-}
-
-function installEnvironment(
-	configurePAPI?: (target: Record<string, unknown>) => void,
-	installOptions?: Partial<Parameters<typeof installLynxMainThread>[0]>,
-): InstalledEnvironment {
-	const dom = new JSDOM('<!doctype html><html><body></body></html>');
-	installLynxTestingEnv(globalThis, {
-		window: dom.window as unknown as Window & typeof globalThis,
-	});
-	globalThis.lynxTestingEnv.switchToMainThread();
-	const target = globalThis as unknown as Record<string, unknown>;
-	configurePAPI?.(target);
-	const registrations: EventRegistration[] = [];
-	const addEvent = target.__AddEvent as (
-		node: object,
-		kind: string,
-		name: string,
-		listener: string | undefined,
-	) => void;
-	target.__AddEvent = (node, kind, name, listener) => {
-		registrations.push(Object.freeze({ node, name, listener }));
-		addEvent(node, kind, name, listener);
-	};
-	const main = installLynxMainThread({
-		firstScreen: true,
-		firstScreenSync: 'manual',
-		...installOptions,
-	});
-	return (installed = { dom, main, registrations });
-}
 
 afterEach(async () => {
 	if (backgroundRoot !== null) {
@@ -389,13 +333,7 @@ afterEach(async () => {
 		}
 	}
 	backgroundRoot = null;
-	if (installed !== null) {
-		installed.main.close();
-		globalThis.lynxTestingEnv.clearGlobal();
-		uninstallLynxTestingEnv(globalThis);
-		installed.dom.window.close();
-	}
-	installed = null;
+	uninstallEnvironment();
 });
 
 describe.sequential('Lynx synchronous first-screen adoption', () => {

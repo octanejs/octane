@@ -80,9 +80,9 @@ export function Overlay(props: OverlayProps): any {
 		});
 	}
 
-	contents = createElement(OverlayContext.Provider, {
+	contents = createElement(OverlayContext, {
 		value: contextValue as OverlayContextValue,
-		children: createElement(FocusableContext.Provider, {
+		children: createElement(FocusableContext, {
 			value: null,
 			children: createElement(ClearPressResponder, { children: contents }),
 		}),

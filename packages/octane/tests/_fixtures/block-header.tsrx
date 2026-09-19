@@ -67,9 +67,9 @@ export function SuspenseRoot(props) @{
 const Theme = createContext('light');
 
 export function ProviderRoot(props) @{
-	<Theme.Provider value={props.value}>
+	<Theme value={props.value}>
 		<b class="out">{props.value as string}</b>
-	</Theme.Provider>
+	</Theme>
 }
 
 // Nesting the range constructs inside each other exercises the walk over a

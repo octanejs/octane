@@ -6,9 +6,9 @@ import type { ComponentType, ErrorBoundaryProps } from './types.ts';
 // This explicit server entry therefore renders children without installing
 // Octane's native server boundary.
 export function ErrorBoundary(props: ErrorBoundaryProps) @{
-	<ErrorBoundaryContext.Provider
+	<ErrorBoundaryContext
 		value={{ didCatch: false, error: null, resetErrorBoundary: () => {} }}
-	>{props.children as OctaneNode}</ErrorBoundaryContext.Provider>
+	>{props.children as OctaneNode}</ErrorBoundaryContext>
 }
 
 export function withErrorBoundary<Props extends object>(

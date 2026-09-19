@@ -69,7 +69,7 @@ export const CodeBlock = ({
 		[trimmedCode],
 	);
 
-	return <CodeBlockContext.Provider value={{ code }}>
+	return <CodeBlockContext value={{ code }}>
 		<CodeBlockContainer isIncomplete={isIncomplete} language={language}>
 			<CodeBlockHeader language={language} />
 			{children
@@ -107,5 +107,5 @@ export const CodeBlock = ({
 				/>
 			</Suspense>
 		</CodeBlockContainer>
-	</CodeBlockContext.Provider>;
+	</CodeBlockContext>;
 };

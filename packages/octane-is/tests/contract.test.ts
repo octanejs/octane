@@ -37,7 +37,6 @@ describe('Octane element-kind predicates', () => {
 		for (const [type, kind] of [
 			[Fragment, Is.Fragment],
 			[context, Is.ContextProvider],
-			[context.Provider, Is.ContextProvider],
 			[StrictMode, Is.StrictMode],
 			[Suspense, Is.Suspense],
 		] as const) {

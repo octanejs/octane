@@ -150,9 +150,9 @@ describe('SSR suspense — resolved values and concurrent render isolation', () 
 				<span class="leaf">{(c + ':' + v) as string}</span>
 			 }
 			 export function App(p) @{
-				<Ctx.Provider value="ctxval">
+				<Ctx value="ctxval">
 					@try { <Leaf promise={p.promise} /> } @pending { <i>l</i> }
-				</Ctx.Provider>
+				</Ctx>
 			 }`,
 			'ctx-boundary.tsrx',
 		);

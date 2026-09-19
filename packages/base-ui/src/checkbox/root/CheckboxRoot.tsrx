@@ -391,13 +391,13 @@ export const CheckboxRoot = function CheckboxRoot(
 	}, [registerChildId, parent, value, renderedId]);
 
 	return (
-		<CheckboxRootContext.Provider value={state}>
+		<CheckboxRootContext value={state}>
 			{element}
 			{!checked && !groupContext && name && !parent && uncheckedValue !== undefined && (
 				<input type="hidden" form={form} name={name} value={uncheckedValue} disabled={disabled} />
 			)}
 			<input {...inputProps} suppressHydrationWarning />
-		</CheckboxRootContext.Provider>
+		</CheckboxRootContext>
 	);
 };
 

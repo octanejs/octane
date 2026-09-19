@@ -27,9 +27,9 @@ export const TooltipPortal = function TooltipPortal(
 	}
 
 	return (
-		<TooltipPortalContext.Provider value={keepMounted}>
+		<TooltipPortalContext value={keepMounted}>
 			<FloatingPortalLite ref={forwardedRef} {...portalProps} />
-		</TooltipPortalContext.Provider>
+		</TooltipPortalContext>
 	);
 };
 

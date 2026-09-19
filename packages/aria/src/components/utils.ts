@@ -50,7 +50,7 @@ interface ProviderProps<Contexts extends readonly Context<any>[]> {
 	children: ReactNode;
 }
 
-// No hooks (Provider nests plain Context.Provider descriptors), so no slot threading. The
+// No hooks (Provider nests plain Context descriptors), so no slot threading. The
 // descriptor `{ value, children }` shape stays stable per values entry (see aria memory
 // octane-provider-children-shape-flip).
 export function Provider<const Contexts extends readonly Context<any>[]>(
@@ -58,7 +58,7 @@ export function Provider<const Contexts extends readonly Context<any>[]>(
 ): any {
 	let { values, children } = props;
 	for (let [Context, value] of values) {
-		children = createElement((Context as any).Provider, { value, children });
+		children = createElement(Context, { value, children });
 	}
 
 	return children;

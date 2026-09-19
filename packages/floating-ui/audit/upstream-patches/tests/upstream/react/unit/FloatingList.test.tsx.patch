@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/react/unit/FloatingList.test.tsx b/tests/upstream/react/unit/FloatingList.test.tsx
+--- a/tests/upstream/react/unit/FloatingList.test.tsx
++++ b/tests/upstream/react/unit/FloatingList.test.tsx
+@@ -44,7 +44,7 @@ function Select({children}: {children: React.ReactNode}) {
+   ]);
+ 
+   return (
+-    <SelectContext.Provider value={{getItemProps, activeIndex}}>
++    <SelectContext value={{getItemProps, activeIndex}}>
+       <button ref={refs.setReference} {...getReferenceProps()}>
+         Open select menu
+       </button>
+@@ -55,7 +55,7 @@ function Select({children}: {children: React.ReactNode}) {
+           </div>
+         )}
+       </FloatingList>
+-    </SelectContext.Provider>
++    </SelectContext>
+   );
+ }
+ 

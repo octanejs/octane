@@ -175,9 +175,7 @@ export const CheckboxGroup = function CheckboxGroup(
 		stateAttributesMapping: fieldValidityMapping,
 	});
 
-	return (
-		<CheckboxGroupContext.Provider value={contextValue}>{element}</CheckboxGroupContext.Provider>
-	);
+	return <CheckboxGroupContext value={contextValue}>{element}</CheckboxGroupContext>;
 };
 
 export interface CheckboxGroupState extends FieldRootState {

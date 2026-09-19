@@ -60,9 +60,9 @@ export function CanvasSceneErrorApp(props) @{
 }
 
 export function ContextCanvasApp(props) @{
-	<CanvasTheme.Provider value={props.theme}>
+	<CanvasTheme value={props.theme}>
 		<Canvas gl={props.gl} frameloop="never">
 			<ContextCanvasScene objectRef={props.objectRef} />
 		</Canvas>
-	</CanvasTheme.Provider>
+	</CanvasTheme>
 }

@@ -35,9 +35,9 @@ Set shared defaults with the exported context:
 import { IconContext, MagnifyingGlass } from '@octanejs/phosphor-icons';
 
 export function SearchIcon() @{
-	<IconContext.Provider value={{ color: 'rebeccapurple', size: 20, weight: 'bold' }}>
+	<IconContext value={{ color: 'rebeccapurple', size: 20, weight: 'bold' }}>
 		<MagnifyingGlass alt="Search" />
-	</IconContext.Provider>
+	</IconContext>
 }
 ```
 

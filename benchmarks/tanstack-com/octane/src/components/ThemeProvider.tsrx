@@ -119,9 +119,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 		setTheme(getNextTheme(themeMode));
 	};
 
-	return <ThemeContext.Provider
+	return <ThemeContext
 		value={{ themeMode, resolvedTheme, setTheme, toggleMode }}
-	>{children}</ThemeContext.Provider>;
+	>{children}</ThemeContext>;
 }
 
 export const useTheme = () => {

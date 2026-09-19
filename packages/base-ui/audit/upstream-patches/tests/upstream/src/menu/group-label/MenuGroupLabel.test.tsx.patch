@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/menu/group-label/MenuGroupLabel.test.tsx b/tests/upstream/src/menu/group-label/MenuGroupLabel.test.tsx
+--- a/tests/upstream/src/menu/group-label/MenuGroupLabel.test.tsx
++++ b/tests/upstream/src/menu/group-label/MenuGroupLabel.test.tsx
+@@ -23,7 +23,7 @@ describe('<Menu.GroupLabel />', () => {
+   describeConformance(<Menu.GroupLabel />, () => ({
+     render: (node) => {
+       return render(
+-        <MenuGroupContext.Provider value={testContext}>{node}</MenuGroupContext.Provider>,
++        <MenuGroupContext value={testContext}>{node}</MenuGroupContext>,
+       );
+     },
+     refInstanceof: window.HTMLDivElement,

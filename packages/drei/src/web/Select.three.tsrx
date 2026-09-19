@@ -146,7 +146,7 @@ export function Select({
 		onPointerMissed={onPointerMissed}
 		{...props}
 	>
-		<SelectionContext.Provider value={active}>{children}</SelectionContext.Provider>
+		<SelectionContext value={active}>{children}</SelectionContext>
 	</group>
 }
 

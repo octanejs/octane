@@ -80,7 +80,7 @@ export function CollectionBuilder<C extends BaseCollection<any>>(
 		null,
 		createElement(Hidden, {
 			target: document.getRootElement(),
-			children: createElement(CollectionDocumentContext.Provider, {
+			children: createElement(CollectionDocumentContext, {
 				value: document,
 				children: props.content,
 			}),
@@ -207,7 +207,7 @@ function useSSRCollectionNode<T extends Element>(
 			parentNode.ownerDocument.nodesByProps.set(props, element);
 		}
 
-		return children ? createElement(SSRContext.Provider, { value: element, children }) : null;
+		return children ? createElement(SSRContext, { value: element, children }) : null;
 	}
 
 	// The placeholder tag is the node type (`<item>`/`<section>`-style) — a valid
@@ -240,7 +240,7 @@ export function createLeafComponent<T, P extends object, E extends Element>(
 			null,
 			(node) =>
 				// Forward FocusableContext to real DOM tree so tooltips work.
-				createElement(FocusableContext.Provider, {
+				createElement(FocusableContext, {
 					value: focusableProps,
 					children: createElement(Component, { node }),
 				}),
@@ -312,7 +312,7 @@ export function Collection<T>(props: CollectionProps<T>): any {
 		subSlot(slot, 'ctx'),
 	);
 
-	return createElement(CollectionContext.Provider, { value: ctx, children });
+	return createElement(CollectionContext, { value: ctx, children });
 }
 
 function CollectionRoot(props: { children: any }): any {
@@ -320,9 +320,9 @@ function CollectionRoot(props: { children: any }): any {
 	let doc = useContext(CollectionDocumentContext);
 	let wrappedChildren = useMemo(
 		() =>
-			createElement(CollectionDocumentContext.Provider, {
+			createElement(CollectionDocumentContext, {
 				value: null,
-				children: createElement(ShallowRenderContext.Provider, {
+				children: createElement(ShallowRenderContext, {
 					value: doc,
 					children: props.children,
 				}),
@@ -338,6 +338,6 @@ function CollectionRoot(props: { children: any }): any {
 	// container, so the placeholders land in the walked tree directly.
 	let isSSR = useIsSSR(subSlot(slot, 'ssr'));
 	return isSSR
-		? createElement(SSRContext.Provider, { value: doc, children: wrappedChildren })
+		? createElement(SSRContext, { value: doc, children: wrappedChildren })
 		: wrappedChildren;
 }

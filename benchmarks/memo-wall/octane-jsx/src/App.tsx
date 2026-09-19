@@ -45,9 +45,9 @@ export function WallA() {
 				{'wall A (compiled .map) tick '}
 				<span className="tick">{tick}</span>
 			</h2>
-			<ThemeA.Provider value={theme}>
+			<ThemeA value={theme}>
 				<RowsA items={items} />
-			</ThemeA.Provider>
+			</ThemeA>
 		</section>
 	);
 }
@@ -65,9 +65,9 @@ export function WallB() {
 				{'wall B (value-position createElement) tick '}
 				<span className="tick">{tick}</span>
 			</h2>
-			<ThemeB.Provider value={theme}>
+			<ThemeB value={theme}>
 				<div className="rows">{rows}</div>
-			</ThemeB.Provider>
+			</ThemeB>
 		</section>
 	);
 }

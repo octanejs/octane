@@ -312,7 +312,7 @@ export function FloatingPortal(props: FloatingPortalProps): OctaneNode {
 		S('FloatingPortal:value'),
 	);
 
-	return createElement(PortalContext.Provider, {
+	return createElement(PortalContext, {
 		value,
 		children: [
 			shouldRenderGuards && portalNode

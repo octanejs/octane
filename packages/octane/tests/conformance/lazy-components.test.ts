@@ -81,7 +81,7 @@ describe('ReactLazy public conformance', () => {
 	// Per ReactLazy-test.internal.js:119 (React canary b740af2).
 	it('renders a lazy context provider', async () => {
 		const context = createContext('default');
-		const module = deferred<{ default: typeof context.Provider }>();
+		const module = deferred<{ default: typeof context }>();
 		const LazyProvider = lazy(() => module.promise);
 		const root = mount(LazyProviderHost, {
 			provider: LazyProvider,
@@ -90,7 +90,7 @@ describe('ReactLazy public conformance', () => {
 		});
 		expect(root.find('.lazy-fallback').textContent).toBe('Loading...');
 
-		await act(() => module.resolve({ default: context.Provider }));
+		await act(() => module.resolve({ default: context }));
 		expect(root.find('.lazy-context').textContent).toBe('Hi');
 		root.update(LazyProviderHost, {
 			provider: LazyProvider,
@@ -328,8 +328,8 @@ describe('ReactLazy public conformance', () => {
 	}
 
 	// Per ReactDOMServerIntegrationNewContext-test.js:297 (React canary b740af2):
-	// React 19 treats Context itself as its Provider. Because Octane preserves
-	// `Context.Provider === Context`, lazy() accepts either spelling identically.
+	// OCTANE DIVERGENCE: Context itself is the only supported provider spelling,
+	// and lazy() accepts that context directly.
 	it('renders Context itself when wrapped with lazy()', () => {
 		const context = createContext('default');
 		const Lazy = lazy(() => fulfilled({ default: context as any }));
@@ -345,7 +345,7 @@ describe('ReactLazy public conformance', () => {
 	// Per ReactLazy-test.internal.js:899 (React canary b740af2).
 	it('renders a lazy context provider without value prop', () => {
 		const context = createContext('default');
-		const LazyProvider = lazy(() => lazyModule(context.Provider));
+		const LazyProvider = lazy(() => lazyModule(context));
 		const root = mount(LazyProviderHost, {
 			provider: LazyProvider,
 			context,

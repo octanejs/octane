@@ -28,16 +28,18 @@ diff --git a/tests/upstream/ReactIs-test.js b/tests/upstream/ReactIs-test.js
      const LazyComponent = React.lazy(() => Component);
      const MemoComponent = React.memo(Component);
      const Context = React.createContext(false);
-@@ -66,7 +58,7 @@ describe('ReactIs', () => {
+@@ -65,8 +57,8 @@ describe('ReactIs', () => {
+     expect(ReactIs.isValidElementType(ForwardRefComponent)).toEqual(true);
      expect(ReactIs.isValidElementType(LazyComponent)).toEqual(true);
      expect(ReactIs.isValidElementType(MemoComponent)).toEqual(true);
-     expect(ReactIs.isValidElementType(Context.Provider)).toEqual(true);
+-    expect(ReactIs.isValidElementType(Context.Provider)).toEqual(true);
 -    expect(ReactIs.isValidElementType(Context.Consumer)).toEqual(true);
++    expect(ReactIs.isValidElementType(Context)).toEqual(true);
 +    expect(ReactIs.isValidElementType(Context.Consumer)).toEqual(false);
      expect(ReactIs.isValidElementType(React.Fragment)).toEqual(true);
      expect(ReactIs.isValidElementType(React.StrictMode)).toEqual(true);
      expect(ReactIs.isValidElementType(React.Suspense)).toEqual(true);
-@@ -80,10 +72,10 @@ describe('ReactIs', () => {
+@@ -80,19 +72,19 @@ describe('ReactIs', () => {
    });
  
    it('should identify context consumers', () => {
@@ -46,11 +48,33 @@ diff --git a/tests/upstream/ReactIs-test.js b/tests/upstream/ReactIs-test.js
 -    expect(ReactIs.isValidElementType(Context.Consumer)).toBe(true);
 -    expect(ReactIs.typeOf(<Context.Consumer />)).toBe(ReactIs.ContextConsumer);
 -    expect(ReactIs.isContextConsumer(<Context.Consumer />)).toBe(true);
+-    expect(ReactIs.isContextConsumer(<Context.Provider />)).toBe(false);
 +    expect(ReactIs.isValidElementType(Context.Consumer)).toBe(false);
 +    expect(ReactIs.isContextConsumer(<div />)).toBe(false);
-     expect(ReactIs.isContextConsumer(<Context.Provider />)).toBe(false);
++    expect(ReactIs.isContextConsumer(<Context />)).toBe(false);
      expect(ReactIs.isContextConsumer(<div />)).toBe(false);
    });
+ 
+   it('should identify context providers', () => {
+     const Context = React.createContext(false);
+-    expect(ReactIs.isValidElementType(Context.Provider)).toBe(true);
+-    expect(ReactIs.typeOf(<Context.Provider />)).toBe(ReactIs.ContextProvider);
+-    expect(ReactIs.isContextProvider(<Context.Provider />)).toBe(true);
++    expect(ReactIs.isValidElementType(Context)).toBe(true);
++    expect(ReactIs.typeOf(<Context />)).toBe(ReactIs.ContextProvider);
++    expect(ReactIs.isContextProvider(<Context />)).toBe(true);
+     expect(ReactIs.isContextProvider(<Context.Consumer />)).toBe(false);
+     expect(ReactIs.isContextProvider(<div />)).toBe(false);
+   });
+@@ -109,7 +101,7 @@ describe('ReactIs', () => {
+ 
+     // It should also identify more specific types as elements
+     const Context = React.createContext(false);
+-    expect(ReactIs.isElement(<Context.Provider />)).toBe(true);
++    expect(ReactIs.isElement(<Context />)).toBe(true);
+     expect(ReactIs.isElement(<Context.Consumer />)).toBe(true);
+     expect(ReactIs.isElement(<React.Fragment />)).toBe(true);
+     expect(ReactIs.isElement(<React.StrictMode />)).toBe(true);
 @@ -117,10 +109,11 @@ describe('ReactIs', () => {
    });
  

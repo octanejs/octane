@@ -258,7 +258,7 @@ export function CustomViewsEditor(props) @{
 		props.onRenderer(renderer);
 	};
 
-	<ViewTheme.Provider value={props.theme}>
+	<ViewTheme value={props.theme}>
 		<section data-custom-views-fixture="true">
 			<button type="button" data-create-renderer="true" onClick={createRenderer}>
 				create renderer
@@ -268,5 +268,5 @@ export function CustomViewsEditor(props) @{
 				<EditorContent editor={editor} data-editor-host="custom-views" />
 			}
 		</section>
-	</ViewTheme.Provider>
+	</ViewTheme>
 }

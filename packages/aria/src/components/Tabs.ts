@@ -471,7 +471,7 @@ export const Tab: (props: TabProps & { ref?: any }) => any = createLeafComponent
 			'data-focus-visible': isFocusVisible || undefined,
 			'data-pressed': isPressed || undefined,
 			'data-hovered': isHovered || undefined,
-			children: createElement(SelectionIndicatorContext.Provider, {
+			children: createElement(SelectionIndicatorContext, {
 				value: { isSelected },
 				children: renderProps.children,
 			}),
@@ -679,7 +679,7 @@ function TabPanelInner(
 				[TabsContext, null],
 				[TabListStateContext, null],
 			] as any,
-			children: createElement(CollectionRendererContext.Provider, {
+			children: createElement(CollectionRendererContext, {
 				value: DefaultCollectionRenderer,
 				children: renderProps.children,
 			}),

@@ -3,3 +3,4 @@
  * independent of the browser renderer and its DOM-specific feature tables.
  */
 export * from '../runtime.server.js';
+export { isContext } from '../context-identity.js';

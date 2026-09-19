@@ -428,16 +428,19 @@ export function Settings() @{
 		<button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
 			Switch theme
 		</button>
-		<Theme.Provider value={theme}>
+		<Theme value={theme}>
 			<ThemeLabel />
-		</Theme.Provider>
+		</Theme>
 	</section>
 }
 ```
 
-`createContext('light')` creates the context and its fallback value. A provider makes a
-value available below it. `use(Theme)` reads the closest provider; `useContext(Theme)` is
-an equivalent, context-specific spelling.
+`createContext('light')` creates the context and its fallback value. Render the context
+directly, as `<Theme value={theme}>`, to make a value available below it.
+The legacy `Theme.Provider` alias is unsupported and reports
+`OCTANE_CONTEXT_PROVIDER` when the compiler can identify the context. `use(Theme)`
+reads the closest provider; `useContext(Theme)` is an equivalent, context-specific
+spelling.
 
 Context is not automatically global state. Keep changing data close to the components
 that own it, then lift it to a shared parent or context when several branches truly need

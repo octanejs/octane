@@ -375,7 +375,7 @@ describe('package and closure completion', () => {
 				exports: { '.': './src/index.ts' },
 				scripts: { test: 'vitest run' },
 				dependencies: { 'widget-core': '^1.0.0' },
-				peerDependencies: { octane: 'workspace:^0.1.51 || ^0.2.0' },
+				peerDependencies: { octane: 'workspace:^0.1.51 || ^0.2.0 || ^0.3.0' },
 				devDependencies: { octane: 'workspace:*' },
 			}),
 		);

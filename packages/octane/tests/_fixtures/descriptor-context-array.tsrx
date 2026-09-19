@@ -57,25 +57,25 @@ export function App({
 	read?: (() => void) | null;
 	wrapped?: boolean;
 }) @{
-	<Mode.Provider value={active}>
+	<Mode value={active}>
 		<main>
 			{wrapped ? <PassThrough /> : shared}
 			<Later read={read} />
 		</main>
-	</Mode.Provider>
+	</Mode>
 }
 
 export function Providers({ first, second }: { first: boolean; second: boolean }) @{
 	<main>
-		<Mode.Provider value={first}>{shared}</Mode.Provider>
-		<Mode.Provider value={second}>{shared}</Mode.Provider>
+		<Mode value={first}>{shared}</Mode>
+		<Mode value={second}>{shared}</Mode>
 	</main>
 }
 
 export function Inspection({ active }: { active: boolean }) @{
-	<Mode.Provider value={active}>{inspected}</Mode.Provider>
+	<Mode value={active}>{inspected}</Mode>
 }
 
 export function RecoverInspection({ active }: { active: boolean }) @{
-	<Mode.Provider value={active}>{recovered}</Mode.Provider>
+	<Mode value={active}>{recovered}</Mode>
 }

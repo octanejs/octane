@@ -232,7 +232,7 @@ export function Route(props: Record<string, any>): unknown {
 	// <Route>s inside register; descriptor children need no rendering (walked
 	// at collect time). Route itself renders nothing, as upstream.
 	if (hasBlockChildren) {
-		return createElement(RoutesCollectorContext.Provider as any, {
+		return createElement(RoutesCollectorContext as any, {
 			value: childCollectorRef.current,
 			children: props.children,
 		});

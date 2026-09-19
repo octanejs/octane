@@ -15,19 +15,17 @@ function Providers(props: {
 	collection: Payload;
 	children: OctaneNode;
 }) @{
-	<Scope.Provider value={props.profile.label}>
-		<Locale.Provider value={props.preferences.label + '/locale'}>
-			<Theme.Provider value={props.preferences.label + '/theme'}>
-				<Density.Provider value={props.preferences.label + '/density'}>
-					<Zone.Provider value={props.preferences.label + '/zone'}>
-						<Collection.Provider
-							value={props.collection.label}
-						>{props.children}</Collection.Provider>
-					</Zone.Provider>
-				</Density.Provider>
-			</Theme.Provider>
-		</Locale.Provider>
-	</Scope.Provider>
+	<Scope value={props.profile.label}>
+		<Locale value={props.preferences.label + '/locale'}>
+			<Theme value={props.preferences.label + '/theme'}>
+				<Density value={props.preferences.label + '/density'}>
+					<Zone value={props.preferences.label + '/zone'}>
+						<Collection value={props.collection.label}>{props.children}</Collection>
+					</Zone>
+				</Density>
+			</Theme>
+		</Locale>
+	</Scope>
 }
 
 function ContextLabels(props: { prefix: string }) @{

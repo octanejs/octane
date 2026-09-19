@@ -36,7 +36,7 @@ export function BackgroundRootFixture(props) @{
 		return () => props.log('passive-cleanup:' + count);
 	}, [count, props.log]);
 
-	<LabelContext.Provider value={props.label}>
+	<LabelContext value={props.label}>
 		<>
 			<view id="counter" ref={props.counterRef}>
 				<text>{'Count: ' + count}</text>
@@ -63,7 +63,7 @@ export function BackgroundRootFixture(props) @{
 				</view>
 			}
 		</>
-	</LabelContext.Provider>
+	</LabelContext>
 }
 
 function ClassAliasChild(props) @{

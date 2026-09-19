@@ -111,9 +111,9 @@ export function MemoContext(props) @{
 	// `label` is a stable prop so ThemedChild's props never change — only the
 	// context value does. A correct memo must still re-render the child.
 	<div>
-		<Theme.Provider value={theme}>
+		<Theme value={theme}>
 			<ThemedChild label="x" log={props.log} />
-		</Theme.Provider>
+		</Theme>
 		<button
 			id="toggle"
 			onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
@@ -139,9 +139,9 @@ const MemoWrapper = memo(MemoWrapperImpl);
 export function MemoContextDeep(props) @{
 	const [theme, setTheme] = useState('light');
 	<div>
-		<Theme.Provider value={theme}>
+		<Theme value={theme}>
 			<MemoWrapper label="x" log={props.log} />
-		</Theme.Provider>
+		</Theme>
 		<button
 			id="toggle"
 			onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}

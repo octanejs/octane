@@ -136,7 +136,7 @@ export function NuqsTestingAdapter({
 		autoResetQueueOnUpdate,
 	});
 	return createElement(
-		context.Provider,
+		context,
 		{ value: { useAdapter, defaultOptions, processUrlSearchParams } },
 		children,
 	);

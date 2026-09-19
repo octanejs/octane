@@ -6,12 +6,12 @@ import {
 import { Html } from '/packages/octane/tests/_fixtures/universal-renderer-boundaries.object.tsrx';
 
 export function MixedBoundaryApp(props) @{
-	<UniversalTheme.Provider value={props.theme}>
+	<UniversalTheme value={props.theme}>
 		<SceneCanvas root={props.root}>
 			<Scene log={props.log} hostRef={props.hostRef} />
 			<mesh kind="inline" />
 		</SceneCanvas>
-	</UniversalTheme.Provider>
+	</UniversalTheme>
 }
 
 function ThrowAfterBoundary() {

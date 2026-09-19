@@ -42,12 +42,12 @@ function Mid(props) {
 	_setLocal = setLocal;
 	_setVisible = setVisible;
 	return visible ? (
-		<LocalCtx.Provider value={local}>
+		<LocalCtx value={local}>
 			<div className="mid">
 				<Node depth={props.depth - 1} path={props.path + 'L'} />
 				<Node depth={props.depth - 1} path={props.path + 'R'} />
 			</div>
-		</LocalCtx.Provider>
+		</LocalCtx>
 	) : null;
 }
 
@@ -76,8 +76,8 @@ export default function App(props) {
 	const [root, setRoot] = useState(0);
 	_setRoot = setRoot;
 	return (
-		<RootCtx.Provider value={root}>
+		<RootCtx value={root}>
 			<Node depth={props.depth} path="" />
-		</RootCtx.Provider>
+		</RootCtx>
 	);
 }

@@ -112,7 +112,7 @@ export function ProgressBar(props: ProgressBarProps): any {
 		...mergeProps(DOMProps, renderProps, progressBarProps),
 		ref,
 		slot: props.slot || undefined,
-		children: createElement(LabelContext.Provider, {
+		children: createElement(LabelContext, {
 			value: { ...labelProps, ref: labelRef, elementType: 'span' },
 			children: renderProps.children,
 		}),

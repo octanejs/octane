@@ -123,7 +123,7 @@ export function FloatingDelayGroup(props: FloatingDelayGroupProps): OctaneNode {
 		[state, setCurrentId],
 		S('FloatingDelayGroup:value'),
 	);
-	return createElement(FloatingDelayGroupContext.Provider, { value, children });
+	return createElement(FloatingDelayGroupContext, { value, children });
 }
 
 /**
@@ -256,7 +256,7 @@ export function NextFloatingDelayGroup(props: NextFloatingDelayGroupProps): Octa
 		[timeoutMs],
 		S('NextFloatingDelayGroup:value'),
 	);
-	return createElement(NextFloatingDelayGroupContext.Provider, { value, children });
+	return createElement(NextFloatingDelayGroupContext, { value, children });
 }
 
 export interface UseNextDelayGroupOptions {

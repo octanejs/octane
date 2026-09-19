@@ -139,7 +139,7 @@ export function ToggleButton(props: ToggleButtonProps): any {
 		'data-selected': isSelected || undefined,
 		'data-hovered': isHovered || undefined,
 		'data-focus-visible': isFocusVisible || undefined,
-		children: createElement(SelectionIndicatorContext.Provider, {
+		children: createElement(SelectionIndicatorContext, {
 			value: { isSelected },
 			children: renderProps.children,
 		}),

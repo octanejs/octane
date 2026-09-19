@@ -57,10 +57,10 @@ export const ToastProvider: React.FC<ToastProvider.Props> = function ToastProvid
 	);
 
 	return (
-		<ToastContext.Provider value={store}>
+		<ToastContext value={store}>
 			<ToastProviderPropsSynchronizer store={store} timeout={timeout} limit={limit} />
 			{children}
-		</ToastContext.Provider>
+		</ToastContext>
 	);
 };
 

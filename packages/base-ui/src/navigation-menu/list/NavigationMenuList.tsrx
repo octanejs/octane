@@ -103,14 +103,12 @@ export const NavigationMenuList = function NavigationMenuList(
 
 	if (nested) {
 		return (
-			<NavigationMenuDismissContext.Provider value={dismissProps}>
-				{element}
-			</NavigationMenuDismissContext.Provider>
+			<NavigationMenuDismissContext value={dismissProps}>{element}</NavigationMenuDismissContext>
 		);
 	}
 
 	return (
-		<NavigationMenuDismissContext.Provider value={dismissProps}>
+		<NavigationMenuDismissContext value={dismissProps}>
 			<CompositeRoot
 				render={render}
 				className={className}
@@ -122,7 +120,7 @@ export const NavigationMenuList = function NavigationMenuList(
 				orientation={orientation}
 				tag="ul"
 			/>
-		</NavigationMenuDismissContext.Provider>
+		</NavigationMenuDismissContext>
 	);
 };
 

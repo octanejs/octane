@@ -211,9 +211,7 @@ export function CompositeList<Metadata>(props: CompositeList.Props<Metadata>) {
 		[register, unregister, subscribeMapChange, nextIndexRef],
 	);
 
-	return (
-		<CompositeListContext.Provider value={contextValue}>{children}</CompositeListContext.Provider>
-	);
+	return <CompositeListContext value={contextValue}>{children}</CompositeListContext>;
 }
 
 function createMap<Metadata>() {

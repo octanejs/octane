@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as RT from 'octane/server';
 
-// SSR backwards-compat for `.tsx`: a React-style `<Ctx.Provider value>` lowers to
+// SSR context support for `.tsx`: `<Ctx value>` lowers to
 // `createElement(Provider, {}, <child/>)`, so its children reach the server Provider
 // as an ELEMENT DESCRIPTOR (not a render function). The server must render those
 // descriptor children inside the provider's scope, or direct-JSX provider SSR emits
@@ -25,7 +25,7 @@ const m = evalServer(
 	'jsx-context-children.tsx',
 );
 
-describe('SSR — .tsx <Context.Provider> with descriptor children', () => {
+describe('SSR — .tsx <Context> with descriptor children', () => {
 	it('renders the provider element children and flows context through them', async () => {
 		const { html } = await RT.renderToString(m.ProviderApp, {});
 		// The descriptor children render (not dropped).

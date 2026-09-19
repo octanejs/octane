@@ -162,7 +162,7 @@ export const ComboBox: <T, M extends SelectionMode = 'single'>(
 	} = props;
 	let content = useMemo(
 		() =>
-			createElement(ListBoxContext.Provider, {
+			createElement(ListBoxContext, {
 				value: { items: props.items ?? props.defaultItems },
 				children:
 					typeof children === 'function' && !isChildrenBlock(children)

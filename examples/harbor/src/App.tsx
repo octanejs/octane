@@ -53,8 +53,8 @@ export function App({ url, Compat }: AppProps) {
 	const faultScenario = faultScenarioFrom(url);
 
 	return (
-		<LocaleContext.Provider value={locale}>
-			<ThemeContext.Provider value={theme}>
+		<LocaleContext value={locale}>
+			<ThemeContext value={theme}>
 				<div className="page" data-app-hydrated={hydrated ? 'true' : 'false'}>
 					<Header
 						compareCount={compares.length}
@@ -104,7 +104,7 @@ export function App({ url, Compat }: AppProps) {
 						)}
 					</main>
 				</div>
-			</ThemeContext.Provider>
-		</LocaleContext.Provider>
+			</ThemeContext>
+		</LocaleContext>
 	);
 }

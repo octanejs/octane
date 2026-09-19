@@ -48,7 +48,7 @@ function LocalScene({ items, caption, log, LocalShadow }) @{
 }
 
 export function LocalSpecializationApp(props) @{
-	<LocalTone.Provider value={props.tone}>
+	<LocalTone value={props.tone}>
 		<>
 			<aside class="dom-specialization">
 				<LocalScene items={[]} caption="dom" log={props.log} LocalShadow={DomShadow} />
@@ -68,5 +68,5 @@ export function LocalSpecializationApp(props) @{
 				/>
 			</Canvas>
 		</>
-	</LocalTone.Provider>
+	</LocalTone>
 }

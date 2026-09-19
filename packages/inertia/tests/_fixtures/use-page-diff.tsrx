@@ -23,7 +23,7 @@ function Reader() @{
 
 export function UsePageParity() @{
 	const [page, setPage] = useState(initialPage);
-	<PageContext.Provider value={page}>
+	<PageContext value={page}>
 		<div>
 			<Reader />
 			<button
@@ -42,5 +42,5 @@ export function UsePageParity() @{
 				next
 			</button>
 		</div>
-	</PageContext.Provider>
+	</PageContext>
 }

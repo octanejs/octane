@@ -171,7 +171,7 @@ export const Form = function Form<FormValues extends Record<string, any> = Recor
 		[formRef, validationMode, errors, clearErrors],
 	);
 
-	return <FormContext.Provider value={contextValue}>{element}</FormContext.Provider>;
+	return <FormContext value={contextValue}>{element}</FormContext>;
 };
 
 export type FormSubmitEventReason = typeof REASONS.none;

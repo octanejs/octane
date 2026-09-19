@@ -81,7 +81,7 @@ export function CompositeRoot<Metadata extends {}, State extends Record<string, 
 	);
 
 	return (
-		<CompositeRootContext.Provider value={contextValue}>
+		<CompositeRootContext value={contextValue}>
 			<CompositeList<Metadata>
 				elementsRef={elementsRef}
 				onMapChange={(newMap) => {
@@ -91,7 +91,7 @@ export function CompositeRoot<Metadata extends {}, State extends Record<string, 
 			>
 				{element}
 			</CompositeList>
-		</CompositeRootContext.Provider>
+		</CompositeRootContext>
 	);
 }
 

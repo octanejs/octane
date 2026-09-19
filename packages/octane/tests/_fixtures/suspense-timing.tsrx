@@ -481,9 +481,9 @@ export function AlternateRootSuspensionScreen(props: RootSuspensionProps) @{
 }
 
 export function ContextRootSuspensionScreen(props: RootSuspensionProps) @{
-	<RootSuspensionContext.Provider value={props.label}>
+	<RootSuspensionContext value={props.label}>
 		<RootSuspensionScreen {...props} />
-	</RootSuspensionContext.Provider>
+	</RootSuspensionContext>
 }
 
 export interface DefaultedRootSuspensionProps extends RootSuspensionProps {

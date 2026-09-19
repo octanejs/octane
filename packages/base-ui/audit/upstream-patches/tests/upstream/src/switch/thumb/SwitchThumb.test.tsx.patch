@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/switch/thumb/SwitchThumb.test.tsx b/tests/upstream/src/switch/thumb/SwitchThumb.test.tsx
+--- a/tests/upstream/src/switch/thumb/SwitchThumb.test.tsx
++++ b/tests/upstream/src/switch/thumb/SwitchThumb.test.tsx
+@@ -23,7 +23,7 @@ describe('<Switch.Thumb />', () => {
+     refInstanceof: window.HTMLSpanElement,
+     render: (node) => {
+       return render(
+-        <SwitchRootContext.Provider value={testContext}>{node}</SwitchRootContext.Provider>,
++        <SwitchRootContext value={testContext}>{node}</SwitchRootContext>,
+       );
+     },
+   }));

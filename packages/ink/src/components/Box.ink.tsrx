@@ -4,7 +4,7 @@ import { type Except } from 'type-fest';
 import { type Styles } from '../styles.js';
 import { type DOMElement } from '../dom.js';
 import { accessibilityContext } from './AccessibilityContext.js';
-import { backgroundContext } from './BackgroundContext.js';
+import { backgroundContext as BackgroundContext } from './BackgroundContext.js';
 
 export type Props =
 	Except<Styles, 'textWrap'> & {
@@ -96,9 +96,7 @@ const Box = ({
 
 	// If this Box has a background color, provide it to children via context
 	if (backgroundColor) {
-		return <backgroundContext.Provider
-			value={backgroundColor}
-		>{boxElement}</backgroundContext.Provider>;
+		return <BackgroundContext value={backgroundColor}>{boxElement}</BackgroundContext>;
 	}
 
 	return boxElement;

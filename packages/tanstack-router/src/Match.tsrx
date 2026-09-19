@@ -27,7 +27,7 @@ import {
 import type { NotFoundError, ParsedLocation, RootRouteOptions } from '@tanstack/router-core';
 import type { ErrorInfo, ErrorRouteComponent } from './route.ts';
 import { useStore } from './useStore.ts';
-import { useRouter, matchContext } from './context.ts';
+import { useRouter, matchContext as MatchContext } from './context.ts';
 import { Outlet } from './Outlet.tsrx';
 import { RouteNotFound } from './RouteNotFound.tsrx';
 import { CatchBoundary, ErrorComponent } from './CatchBoundary.tsrx';
@@ -83,7 +83,7 @@ export function Match(props: { matchId: string }) @{
 	const parentRouteId = route.parentRoute?.id;
 
 	<ShellComponent>
-		<matchContext.Provider value={props.matchId}>
+		<MatchContext value={props.matchId}>
 			<SuspenseWrap fallback={pendingElement}>
 				<CatchWrap
 					getResetKey={() => resetKey}
@@ -119,7 +119,7 @@ export function Match(props: { matchId: string }) @{
 					</NotFoundWrap>
 				</CatchWrap>
 			</SuspenseWrap>
-		</matchContext.Provider>
+		</MatchContext>
 		@if (parentRouteId === rootRouteId) {
 			<>
 				<OnRendered />

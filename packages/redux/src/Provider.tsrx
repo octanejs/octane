@@ -42,5 +42,5 @@ export function Provider<A extends Action<string> = UnknownAction, S = unknown>(
 
 	const Context = context || ReactReduxContext;
 
-	<Context.Provider value={contextValue}>{children}</Context.Provider>
+	<Context value={contextValue}>{children}</Context>
 }

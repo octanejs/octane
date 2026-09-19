@@ -136,7 +136,7 @@ export function LexicalNestedComposer(props: LexicalNestedComposerProps) {
 		}
 	}, [initialEditor, parentEditor, skipEditableListener]);
 
-	return <LexicalComposerContext.Provider value={composerContext}>
+	return <LexicalComposerContext value={composerContext}>
 		{!isCollabActive || isCollabReady ? props.children : null}
-	</LexicalComposerContext.Provider>;
+	</LexicalComposerContext>;
 }

@@ -40,7 +40,7 @@ function Provider(props: any) {
 	const [n, bump] = useState(0, Symbol.for('mvp.n'));
 	bumpFn = bump;
 	log.push('provider:' + n);
-	return createElement(Ctx.Provider, {
+	return createElement(Ctx, {
 		value: n,
 		children: createElement(MemoChildren, { children: props.children }),
 	});

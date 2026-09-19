@@ -72,10 +72,10 @@ type SpriteAnimatorState = {
 
 type Scale = Vector3;
 
-const context = createContext<SpriteAnimatorState | null>(null);
+const SpriteAnimatorContext = createContext<SpriteAnimatorState | null>(null);
 
 export function useSpriteAnimator(): SpriteAnimatorState | null {
-	return useContext(context);
+	return useContext(SpriteAnimatorContext);
 }
 
 function isSpriteData(data: SpriteData | null): data is SpriteData {
@@ -317,7 +317,7 @@ export function SpriteAnimator({
 	}
 
 	<group {...props as any} ref={ref} scale={multiplyScale(aspect, props.scale as Scale | undefined)}>
-		<context.Provider value={state}>
+		<SpriteAnimatorContext value={state}>
 			@if (asSprite) {
 				<Billboard>
 					<mesh ref={spriteRef as any} scale={1} geometry={geometry} {...meshProps as any}>
@@ -333,6 +333,6 @@ export function SpriteAnimator({
 				</Instances>
 			}
 			{children}
-		</context.Provider>
+		</SpriteAnimatorContext>
 	</group>
 }

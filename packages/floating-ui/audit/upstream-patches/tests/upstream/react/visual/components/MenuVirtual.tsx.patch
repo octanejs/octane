@@ -20,8 +20,21 @@ diff --git a/tests/upstream/react/visual/components/MenuVirtual.tsx b/tests/upst
    const [isOpen, setIsOpen] = React.useState(false);
    const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
    const [allowHover, setAllowHover] = React.useState(false);
-@@ -271,17 +275,19 @@ export const MenuComponent = React.forwardRef<
-       </MenuContext.Provider>
+@@ -236,7 +240,7 @@ export const MenuComponent = React.forwardRef<
+           })}
+         />
+       )}
+-      <MenuContext.Provider
++      <MenuContext
+         value={{
+           activeIndex,
+           setActiveIndex,
+@@ -268,20 +272,22 @@ export const MenuComponent = React.forwardRef<
+             </FloatingPortal>
+           )}
+         </FloatingList>
+-      </MenuContext.Provider>
++      </MenuContext>
      </FloatingNode>
    );
 -});

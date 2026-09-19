@@ -51,9 +51,7 @@ export function DrawerProvider(props: DrawerProvider.Props) {
 		[active, removeDrawer, setDrawerOpen, visualStateStore],
 	);
 
-	return (
-		<DrawerProviderContext.Provider value={contextValue}>{children}</DrawerProviderContext.Provider>
-	);
+	return <DrawerProviderContext value={contextValue}>{children}</DrawerProviderContext>;
 }
 
 export interface DrawerProviderState {}

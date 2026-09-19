@@ -496,7 +496,7 @@ export function Checkbox(props: CheckboxProps): any {
 	);
 	let [aria, inputRef] = useCheckboxAria(props, userProvidedInputRef, subSlot(slot, 'aria'));
 
-	return createElement(InternalCheckboxContext.Provider, {
+	return createElement(InternalCheckboxContext, {
 		value: {
 			...aria,
 			inputRef,

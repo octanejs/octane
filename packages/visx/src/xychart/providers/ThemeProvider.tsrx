@@ -9,5 +9,5 @@ export type ThemeProviderProps = {
 };
 
 export default function ThemeProvider({ theme = lightTheme, children }: ThemeProviderProps) {
-	return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
+	return <ThemeContext value={theme}>{children}</ThemeContext>;
 }

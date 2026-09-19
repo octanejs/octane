@@ -157,7 +157,7 @@ describe('state, component identity, and lifecycle contracts', () => {
 			}),
 		);
 		function Host(props: { theme: string; label: string }) {
-			return createElement(Theme.Provider, {
+			return createElement(Theme, {
 				value: props.theme,
 				children: rows.map((Row, index) => createElement(Row, { key: index, label: props.label })),
 			});

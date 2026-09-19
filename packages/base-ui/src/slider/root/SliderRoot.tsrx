@@ -390,11 +390,11 @@ export const SliderRoot = function SliderRoot<Value extends number | readonly nu
 	});
 
 	return (
-		<SliderRootContext.Provider value={contextValue}>
+		<SliderRootContext value={contextValue}>
 			<CompositeList elementsRef={thumbRefs} onMapChange={setThumbMap}>
 				{element}
 			</CompositeList>
-		</SliderRootContext.Provider>
+		</SliderRootContext>
 	);
 };
 

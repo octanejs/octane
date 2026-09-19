@@ -305,6 +305,7 @@ type AutoFrameContext = {
 };
 
 export const autoFrameContext = createContext<AutoFrameContext>({});
+const AutoFrameContextProvider = autoFrameContext;
 
 export const useFrame = () => useContext(autoFrameContext);
 
@@ -353,13 +354,13 @@ function AutoFrame({
 			setLoaded(true);
 		}}
 	>
-		<autoFrameContext.Provider value={ctx}>
+		<AutoFrameContextProvider value={ctx}>
 			{loaded && mountTarget &&
 				<CopyHostStyles debug={debug} onStylesLoaded={() => setStylesLoaded(true)}>{createPortal(
 					children,
 					mountTarget,
 				)}</CopyHostStyles>}
-		</autoFrameContext.Provider>
+		</AutoFrameContextProvider>
 	</iframe>;
 }
 

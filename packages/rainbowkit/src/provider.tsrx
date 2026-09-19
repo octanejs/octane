@@ -385,7 +385,7 @@ export function RainbowKitProvider(props: RainbowKitProviderProps) @{
 	);
 
 	<div data-rk="" ref={rootRef} style={themeStyle(selectedTheme)}>
-		<RainbowKitContext.Provider value={context}>
+		<RainbowKitContext value={context}>
 			{props.children}
 			@if (activeModal) {
 				<Modal
@@ -401,6 +401,6 @@ export function RainbowKitProvider(props: RainbowKitProviderProps) @{
 					opener={activeModal.opener}
 				/>
 			}
-		</RainbowKitContext.Provider>
+		</RainbowKitContext>
 	</div>
 }

@@ -9,6 +9,7 @@
  */
 import { builders as b, clone_ast_node, parseModule } from '@tsrx/core';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
+import { createContextSourceFacts } from './context-provider.js';
 
 // Keep this catalogue in the compiler, never in generated application code. It
 // is the union of actual constructor exports from Three r156, r172, and r183,
@@ -2715,12 +2716,21 @@ function jsxNameExpressionAst(node, state) {
 }
 
 function contextProviderExpressionAst(node, state) {
-	const name = node?.openingElement?.name ?? node?.name;
+	const attributes = node?.openingElement?.attributes ?? node?.attributes ?? [];
+	// The generic component descriptor already owns key reconciliation, including
+	// keys supplied by a spread. Keep those providers on that shared path.
 	if (
-		(name?.type === 'JSXMemberExpression' || name?.type === 'MemberExpression') &&
-		(name.property?.name ?? name.property?.value) === 'Provider'
-	) {
-		return jsxNameExpressionAst({ name: name.object }, state);
+		attributes.some(
+			(attribute) =>
+				attribute.type === 'JSXSpreadAttribute' ||
+				attribute.type === 'SpreadAttribute' ||
+				attributeName(attribute) === 'key',
+		)
+	)
+		return null;
+	const name = node?.openingElement?.name ?? node?.name;
+	if (state.contextSourceFacts.kindOf(name) === 'context') {
+		return jsxNameExpressionAst(node, state);
 	}
 	return null;
 }
@@ -4209,6 +4219,7 @@ export function lowerUniversalRendererRegionAst(
 		profileFilename: options.profileFilename,
 		helpers: {},
 		componentNames: collectComponentNames(analysisAst),
+		contextSourceFacts: createContextSourceFacts(analysisAst),
 		runtimeImports: new Map(),
 		planPrefix: prefix,
 		validationImportReferences: [],
@@ -4522,6 +4533,7 @@ export function compileUniversal(
 		profileFilename: options.profileFilename,
 		helpers: {},
 		componentNames: collectComponentNames(ast),
+		contextSourceFacts: createContextSourceFacts(ast),
 		runtimeImports: new Map(),
 	};
 	state.explicitThreeHostIntrinsics = collectExplicitThreeHostIntrinsics(ast, renderer);

@@ -136,16 +136,16 @@ function ReadRecoveryContext(props) @{
 
 export function ContextErrorRecovery(props) @{
 	<>
-		<RecoveryContext.Provider value="outer">
+		<RecoveryContext value="outer">
 			@try {
-				<RecoveryContext.Provider value="inner">
+				<RecoveryContext value="inner">
 					<ThrowContextError error={props.error} />
-				</RecoveryContext.Provider>
+				</RecoveryContext>
 			} @catch (error) {
 				<b id="context-error">{error.message as string}</b>
 			}
 			<ReadRecoveryContext id="context-after-error" />
-		</RecoveryContext.Provider>
+		</RecoveryContext>
 		<ReadRecoveryContext id="context-outside-provider" />
 	</>
 }

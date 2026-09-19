@@ -29,9 +29,9 @@ export const PreviewCardPortal = function PreviewCardPortal(
 	}
 
 	return (
-		<PreviewCardPortalContext.Provider value={keepMounted}>
+		<PreviewCardPortalContext value={keepMounted}>
 			<FloatingPortalLite ref={forwardedRef} {...portalProps} />
-		</PreviewCardPortalContext.Provider>
+		</PreviewCardPortalContext>
 	);
 };
 

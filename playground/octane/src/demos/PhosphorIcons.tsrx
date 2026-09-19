@@ -41,7 +41,7 @@ export function PhosphorIconsDemo() @{
 				{'Mirrored'}
 			</label>
 		</div>
-		<IconContext.Provider value={{ size: 42, color: 'currentColor', weight, mirrored }}>
+		<IconContext value={{ size: 42, color: 'currentColor', weight, mirrored }}>
 			<div class="phosphor-grid">
 				<div>
 					<Camera alt="Camera" />
@@ -68,6 +68,6 @@ export function PhosphorIconsDemo() @{
 					<span>{'Smiley'}</span>
 				</div>
 			</div>
-		</IconContext.Provider>
+		</IconContext>
 	</div>
 }

@@ -32,9 +32,7 @@ export function ErrorBoundary(props: ErrorBoundaryProps) @{
 				propsRef={propsRef}
 			/>}
 	>
-		<ErrorBoundaryContext.Provider
-			value={idleContext}
-		>{props.children}</ErrorBoundaryContext.Provider>
+		<ErrorBoundaryContext value={idleContext}>{props.children}</ErrorBoundaryContext>
 	</NativeErrorBoundary>
 }
 
@@ -93,7 +91,7 @@ function CaughtError(props: {
 		throw props.error;
 	}
 
-	<ErrorBoundaryContext.Provider value={context}>{fallback}</ErrorBoundaryContext.Provider>
+	<ErrorBoundaryContext value={context}>{fallback}</ErrorBoundaryContext>
 }
 
 function hasArrayChanged(a: unknown[] = [], b: unknown[] = []): boolean {

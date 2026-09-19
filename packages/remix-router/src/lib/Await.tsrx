@@ -102,12 +102,12 @@ function AwaitBody(props: AwaitBodyProps) @{
 	}
 
 	@if (status === 'error') {
-		<AwaitContext.Provider value={promise}>{props.errorElement}</AwaitContext.Provider>
+		<AwaitContext value={promise}>{props.errorElement}</AwaitContext>
 	} @else {
 		@try {
-			<AwaitContext.Provider value={promise}>
+			<AwaitContext value={promise}>
 				<ResolveAwait children={props.children} />
-			</AwaitContext.Provider>
+			</AwaitContext>
 		} @catch (caught, reset) {
 			<AwaitCaught caught={caught} errorElement={props.errorElement} onError={props.onError} />
 		}
@@ -147,7 +147,7 @@ function AwaitCaught(props: AwaitCaughtProps) @{
 	Object.defineProperty(promise, '_tracked', { get: () => true });
 	Object.defineProperty(promise, '_error', { get: () => renderError });
 
-	<AwaitContext.Provider value={promise}>{props.errorElement}</AwaitContext.Provider>
+	<AwaitContext value={promise}>{props.errorElement}</AwaitContext>
 }
 
 // Indirection to leverage useAsyncValue for a render-prop API on `<Await>`.

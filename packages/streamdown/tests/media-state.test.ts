@@ -23,7 +23,7 @@ function StreamdownHarness(props: StreamdownProps) {
 }
 
 function MermaidHarness({ chart, plugin }: { chart: string; plugin: DiagramPlugin }) {
-	return createElement(PluginContext.Provider, {
+	return createElement(PluginContext, {
 		value: { mermaid: plugin },
 		children: createElement(Mermaid, {
 			chart,

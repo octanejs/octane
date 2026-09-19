@@ -1,4 +1,4 @@
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
@@ -58,6 +58,23 @@ describe('differential: components.tsrx — component nesting + context flow', (
 });
 
 describe('differential: context.tsrx — multi-context + dynamic providers', () => {
+	it('ImportedContextHost: a direct imported context supplies and updates its provider value', async () => {
+		const d = await mountDifferential(CONTEXT, 'ImportedContextHost');
+		await d.step('mount dark', (i, r) => {
+			for (const mount of [i, r]) {
+				expect(mount.find('.imported-context-value').textContent).toBe('dark');
+			}
+		});
+		await d.step('update to light', async (i, r) => {
+			await i.click('.imported-context-toggle');
+			await r.click('.imported-context-toggle');
+			for (const mount of [i, r]) {
+				expect(mount.find('.imported-context-value').textContent).toBe('light');
+			}
+		});
+		d.unmount();
+	});
+
 	it('ThemeReader: bare consumer reads context default', async () => {
 		const d = await mountDifferential(CONTEXT, 'ThemeReader');
 		await d.step('mount (default light)', () => {});

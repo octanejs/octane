@@ -10,9 +10,9 @@ export function ServerMessage(props: { context: Context<string> }) @{
 
 function ServerApp(props: { component: typeof ServerMessage }) @{
 	const Message = props.component;
-	<MessageContext.Provider value="provided">
+	<MessageContext value="provided">
 		<Message context={MessageContext} />
-	</MessageContext.Provider>
+	</MessageContext>
 }
 
 export function run(component = ServerMessage) {

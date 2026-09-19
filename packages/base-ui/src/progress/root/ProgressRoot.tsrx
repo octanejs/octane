@@ -100,9 +100,7 @@ export const ProgressRoot = function ProgressRoot(
 		stateAttributesMapping: progressStateAttributesMapping,
 	});
 
-	return (
-		<ProgressRootContext.Provider value={contextValue}>{element}</ProgressRootContext.Provider>
-	);
+	return <ProgressRootContext value={contextValue}>{element}</ProgressRootContext>;
 };
 
 export type ProgressStatus = 'indeterminate' | 'progressing' | 'complete';

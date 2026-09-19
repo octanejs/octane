@@ -54,9 +54,9 @@ export function Form(props: FormProps): any {
 		...domProps,
 		ref,
 		className: className || 'react-aria-Form',
-		children: createElement(FormContext.Provider, {
+		children: createElement(FormContext, {
 			value: { ...props, validationBehavior },
-			children: createElement(FormValidationContext.Provider, {
+			children: createElement(FormValidationContext, {
 				value: validationErrors ?? {},
 				children,
 			}),

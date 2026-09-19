@@ -22,25 +22,25 @@ export function App() @{
 	const [n, setN] = useState(0);
 	<div>
 		<button onClick={() => setN(n + 1)}>{n as string}</button>
-		<Theme.Provider value={n % 2 === 0 ? 'light' : 'dark'}>
+		<Theme value={n % 2 === 0 ? 'light' : 'dark'}>
 			<ThemeReader />
-		</Theme.Provider>
+		</Theme>
 	</div>
 }
 
 // Nested Providers — inner overrides outer.
 export function Nested() @{
 	<div>
-		<Theme.Provider value="outer">
+		<Theme value="outer">
 			<div class="o">
 				<ThemeReader />
 			</div>
-			<Theme.Provider value="inner">
+			<Theme value="inner">
 				<div class="i">
 					<ThemeReader />
 				</div>
-			</Theme.Provider>
-		</Theme.Provider>
+			</Theme>
+		</Theme>
 	</div>
 }
 

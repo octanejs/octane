@@ -35,8 +35,8 @@ function Later({ read }) {
 export function App({ first, second, read = null, complete = false }) @{
 	const descriptor = complete ? sharedRecord : shared;
 	<main>
-		<Mode.Provider value={first}>{descriptor}</Mode.Provider>
-		<Mode.Provider value={second}>{descriptor}</Mode.Provider>
+		<Mode value={first}>{descriptor}</Mode>
+		<Mode value={second}>{descriptor}</Mode>
 		<Later read={read} />
 	</main>
 }

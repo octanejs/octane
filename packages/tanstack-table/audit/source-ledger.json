@@ -3,7 +3,7 @@
     "path": "package.json",
     "origin": "adapted",
     "packageName": "@tanstack/react-table",
-    "sha256": "cd4698f7665af89c61198a1991e447f8c9e7e4569f55fb868b22484e0d0751ba"
+    "sha256": "f93fe25c96f5394ad7c4ae517d455520e07c9226a97e184c90c0cbb425cad920"
   },
   {
     "path": "src/FlexRender.ts",
@@ -21,7 +21,7 @@
     "path": "src/createTableHook.tsrx",
     "origin": "adapted",
     "packageName": "@tanstack/react-table",
-    "sha256": "f685a52694c037c7b5b3d852719f02b17b70dcb1f038de13b27558cb2dc0988d"
+    "sha256": "aa5eac08aa8140c8ee19827876bf570d245bdd5c31540c069fe1f5e35b122765"
   },
   {
     "path": "src/createTableHookContexts.ts",

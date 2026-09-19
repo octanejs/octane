@@ -56,7 +56,7 @@ export const FetchersContext = createContext<FetchersContextObject>(new Map());
 export const AwaitContext = createContext<TrackedPromise | null>(null);
 
 export const AwaitContextProvider = (props: { value: TrackedPromise | null; children?: unknown }) =>
-	createElement(AwaitContext.Provider as any, props);
+	createElement(AwaitContext as any, props);
 
 export interface NavigateOptions {
 	/** Replace the current entry in the history stack instead of pushing a new one */

@@ -457,9 +457,7 @@ export const ComboboxInput = function ComboboxInput(
 	});
 
 	const renderedInput = hasPositionerParent ? (
-		<FieldRootContext.Provider value={DEFAULT_FIELD_ROOT_CONTEXT}>
-			{element}
-		</FieldRootContext.Provider>
+		<FieldRootContext value={DEFAULT_FIELD_ROOT_CONTEXT}>{element}</FieldRootContext>
 	) : (
 		element
 	);

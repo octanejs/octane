@@ -538,8 +538,7 @@ export function useOutlet(...args: any[]): unknown {
 	let context = user[0] as unknown;
 	let outlet = useContext(RouteContext).outlet;
 	return useMemo(
-		() =>
-			outlet && createElement(OutletContext.Provider as any, { value: context, children: outlet }),
+		() => outlet && createElement(OutletContext as any, { value: context, children: outlet }),
 		[outlet, context],
 		subSlot(slot, 'outlet:memo'),
 	);
@@ -911,10 +910,10 @@ export function useRoutesImpl(routes: RouteObject[], ...args: any[]): unknown {
 	);
 
 	// When a user passes in a `locationArg`, the associated routes need to
-	// be wrapped in a new `LocationContext.Provider` in order for `useLocation`
+	// be wrapped in a new `LocationContext` in order for `useLocation`
 	// to use the scoped location instead of the global location.
 	if (locationArg && renderedMatches) {
-		return createElement(LocationContext.Provider as any, {
+		return createElement(LocationContext as any, {
 			value: {
 				location: {
 					pathname: '/',
@@ -970,7 +969,7 @@ function RenderedRoute({ routeContext, match, children }: RenderedRouteProps) {
 		dataRouterContext.staticContext._deepestRenderedBoundaryId = match.route.id;
 	}
 
-	return createElement(RouteContext.Provider as any, { value: routeContext, children });
+	return createElement(RouteContext as any, { value: routeContext, children });
 }
 
 export function _renderMatches(

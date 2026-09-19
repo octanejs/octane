@@ -358,11 +358,7 @@ export const NumberFieldScrubArea = function NumberFieldScrubArea(
 		[isScrubbing, isTouchInput, isPointerLockDenied],
 	);
 
-	return (
-		<NumberFieldScrubAreaContext.Provider value={contextValue}>
-			{element}
-		</NumberFieldScrubAreaContext.Provider>
-	);
+	return <NumberFieldScrubAreaContext value={contextValue}>{element}</NumberFieldScrubAreaContext>;
 };
 
 export interface NumberFieldScrubAreaState extends NumberFieldRootState {}

@@ -67,7 +67,7 @@ describe('@octanejs/phosphor-icons — runtime behavior', () => {
 			ref: (node: SVGSVGElement | null) => contextRefs.push(node),
 		};
 		const App = () =>
-			createElement(IconContext.Provider, {
+			createElement(IconContext, {
 				value: unsafeContextValue as never,
 				children: [
 					createElement(Camera, { id: 'provided' }),

@@ -37,7 +37,7 @@ export function SetErrorBarContext<
 	children: OctaneNode;
 }) {
 	const { children, ...rest } = props;
-	return <ErrorBarContext.Provider value={rest}>{children}</ErrorBarContext.Provider>;
+	return <ErrorBarContext value={rest}>{children}</ErrorBarContext>;
 }
 
 export const useErrorBarContext = () => useContext(ErrorBarContext);

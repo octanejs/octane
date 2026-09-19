@@ -1005,9 +1005,9 @@ function ScatterImpl(props: WithIdRequired<Props>) {
 		return selectScatterPoints(state, xAxisId, yAxisId, zAxisId, props.id, cells, isPanorama);
 	});
 	if (needClip == null || points == null) {
-		return <CellsContext.Provider value={cellRegistry}>{props.children}</CellsContext.Provider>;
+		return <CellsContext value={cellRegistry}>{props.children}</CellsContext>;
 	}
-	return <CellsContext.Provider value={cellRegistry}>
+	return <CellsContext value={cellRegistry}>
 		<SetScatterTooltipEntrySettings
 			dataKey={props.dataKey}
 			points={points}
@@ -1037,7 +1037,7 @@ function ScatterImpl(props: WithIdRequired<Props>) {
 			points={points}
 			needClip={needClip}
 		/>
-	</CellsContext.Provider>;
+	</CellsContext>;
 }
 
 function ScatterFn<DataPointType = any, ValueAxisType = any>(

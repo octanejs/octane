@@ -19,7 +19,7 @@ export function CSPProvider(props: CSPProvider.Props) {
 		[nonce, disableStyleElements],
 	);
 
-	return <CSPContext.Provider value={contextValue}>{children}</CSPContext.Provider>;
+	return <CSPContext value={contextValue}>{children}</CSPContext>;
 }
 
 export interface CSPProviderState {}

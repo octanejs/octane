@@ -37,7 +37,7 @@ const DEBUG = false;
 type Events = DragDropEvents<Draggable, Droppable, DragDropManager>;
 type DragCbs = Partial<{ [eventName in keyof Events]: Events[eventName][] }>;
 
-const dragListenerContext = createContext<{
+const DragListenerContext = createContext<{
 	dragListeners: DragCbs;
 	setDragListeners?: Dispatch<SetStateAction<DragCbs>>;
 }>({
@@ -47,7 +47,7 @@ const dragListenerContext = createContext<{
 type EventKeys = keyof Events;
 
 export function useDragListener(type: EventKeys, fn: Events[EventKeys], deps: any[] = []) {
-	const { setDragListeners } = useContext(dragListenerContext);
+	const { setDragListeners } = useContext(DragListenerContext);
 
 	useEffect(() => {
 		if (setDragListeners) {
@@ -276,7 +276,7 @@ const DragDropContextClient = ({ children, disableAutoScroll }: DragDropContextP
 	);
 
 	return <div id={id}>
-		<dragListenerContext.Provider
+		<DragListenerContext
 			value={{
 				dragListeners,
 				setDragListeners,
@@ -546,7 +546,7 @@ const DragDropContextClient = ({ children, disableAutoScroll }: DragDropContextP
 					<DropZoneProvider value={nextContextValue}>{children}</DropZoneProvider>
 				</ZoneStoreProvider>
 			</DragDropProvider>
-		</dragListenerContext.Provider>
+		</DragListenerContext>
 	</div>;
 };
 

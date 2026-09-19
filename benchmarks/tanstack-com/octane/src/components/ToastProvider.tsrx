@@ -30,7 +30,7 @@ export function ToastProvider({ children }: { children?: any }) {
 
 	const contextValue = useMemo<ToastContextValue>(() => ({ notify }), [notify]);
 
-	return <ToastContext.Provider value={contextValue}>
+	return <ToastContext value={contextValue}>
 		{children}
 		<Toaster
 			theme={resolvedTheme}
@@ -46,5 +46,5 @@ export function ToastProvider({ children }: { children?: any }) {
 				},
 			}}
 		/>
-	</ToastContext.Provider>;
+	</ToastContext>;
 }

@@ -44,11 +44,11 @@ export function PressResponder(allProps: PressResponderProps): any {
 	context.ref = useObjectRef(ref || prevContext?.ref, subSlot(slot, 'ref'));
 	useSyncRef(prevContext, context.ref, subSlot(slot, 'sync'));
 
-	return createElement(PressResponderContext.Provider, { value: context, children });
+	return createElement(PressResponderContext, { value: context, children });
 }
 
 export function ClearPressResponder({ children }: { children: any }): any {
 	const slot = S('ClearPressResponder');
 	let context = useMemo(() => ({ register: () => {} }), [], subSlot(slot, 'context'));
-	return createElement(PressResponderContext.Provider, { value: context as any, children });
+	return createElement(PressResponderContext, { value: context as any, children });
 }

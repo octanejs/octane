@@ -13,7 +13,7 @@ export const StoreRegistryProvider: ComponentBody<StoreRegistryProviderProps> = 
 	storeRegistry,
 	children,
 }) =>
-	<StoreRegistryContext.Provider value={storeRegistry}>{children}</StoreRegistryContext.Provider>;
+	<StoreRegistryContext value={storeRegistry}>{children}</StoreRegistryContext>;
 
 export const useStoreRegistry = (override?: StoreRegistry): StoreRegistry => {
 	if (override !== undefined && typeof override !== 'symbol') return override;

@@ -53,9 +53,9 @@ export function WallA() @{
 			{'wall A (compiled @for) tick '}
 			<span class="tick">{tick as string}</span>
 		</h2>
-		<ThemeA.Provider value={theme}>
+		<ThemeA value={theme}>
 			<RowsA items={items} />
-		</ThemeA.Provider>
+		</ThemeA>
 	</section>
 }
 
@@ -71,9 +71,9 @@ export function WallB() @{
 			{'wall B (value-position createElement) tick '}
 			<span class="tick">{tick as string}</span>
 		</h2>
-		<ThemeB.Provider value={theme}>
+		<ThemeB value={theme}>
 			<div class="rows">{rows}</div>
-		</ThemeB.Provider>
+		</ThemeB>
 	</section>
 }
 

@@ -140,7 +140,7 @@ export function Source(props: SourceProps) @{
 
 	<>
 		@if (source) {
-			<SourceContext.Provider value={id}>{props.children}</SourceContext.Provider>
+			<SourceContext value={id}>{props.children}</SourceContext>
 		}
 	</>
 }

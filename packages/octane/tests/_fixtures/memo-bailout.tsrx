@@ -44,9 +44,9 @@ export function ContextHost(props) @{
 	// the consumer reads a context whose value changed.
 	<div>
 		<button id="ctxbump" onClick={() => setCount(count + 1)}>{'bump'}</button>
-		<CountContext.Provider value={count}>
+		<CountContext value={count}>
 			<CtxCounter label="Count" log={props.log} />
-		</CountContext.Provider>
+		</CountContext>
 	</div>
 }
 

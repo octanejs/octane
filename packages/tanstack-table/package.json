@@ -45,7 +45,7 @@
     "@tanstack/table-core": "9.2.4"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0"
+    "octane": "workspace:^0.1.51 || ^0.2.0 || ^0.3.0"
   },
   "devDependencies": {
     "@tanstack/react-table": "9.2.4",

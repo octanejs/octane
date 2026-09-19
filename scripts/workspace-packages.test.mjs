@@ -109,7 +109,7 @@ function workspacePackage(name, manifest = {}) {
 	};
 }
 
-test('accepts the coordinated Octane alpha/beta peer range', () => {
+test('accepts the supported Octane alpha/beta peer ranges', () => {
 	const errors = validateWorkspacePackages([
 		workspacePackage('octane'),
 		workspacePackage('@octanejs/example', {
@@ -118,6 +118,13 @@ test('accepts the coordinated Octane alpha/beta peer range', () => {
 	]);
 
 	assert.deepEqual(errors, []);
+	const range = OCTANE_BETA_PEER_RANGE.replace(/^workspace:/, '');
+	for (const version of ['0.1.51', '0.2.0', '0.2.15', '0.3.0', '0.3.1']) {
+		assert.equal(semver.satisfies(version, range), true);
+	}
+	for (const version of ['0.1.50', '0.4.0']) {
+		assert.equal(semver.satisfies(version, range), false);
+	}
 });
 
 test('rejects an Octane peer range that can recreate major dependent releases', () => {
@@ -129,12 +136,16 @@ test('rejects an Octane peer range that can recreate major dependent releases', 
 	]);
 
 	assert.deepEqual(errors, [
-		'packages/@octanejs-example peerDependencies.octane must be "workspace:^0.1.51 || ^0.2.0" (received "workspace:*")',
+		'packages/@octanejs-example peerDependencies.octane must be "workspace:^0.1.51 || ^0.2.0 || ^0.3.0" (received "workspace:*")',
 	]);
 });
 
 for (const name of [
 	'app-core',
+	'drei',
+	'ink',
+	'lynx',
+	'octane-is',
 	'vite-plugin-octane',
 	'rspack-plugin-octane',
 	'rsbuild-plugin-octane',
@@ -151,6 +162,10 @@ for (const name of [
 			assert.equal(semver.satisfies(version, range), true);
 			assert.equal(semver.satisfies('0.3.0', range), false);
 		}
+		const nextRange = publishedOctanePeerRangeFor(manifest.name, '0.3.0');
+		assert.equal(nextRange, '^0.3.0');
+		assert.equal(semver.satisfies('0.2.15', nextRange), false);
+		assert.equal(semver.satisfies('0.3.0', nextRange), true);
 		const correct = workspacePackage(manifest.name, manifest);
 		assert.deepEqual(validateWorkspacePackages([workspacePackage('octane'), correct]), []);
 		const legacy = workspacePackage(manifest.name, {
@@ -176,7 +191,8 @@ for (const name of ['base-ui', 'base-ui-utils', 'shadcn', 'testing-library']) {
 		assert.equal(semver.satisfies('0.2.3', range), false);
 		assert.equal(semver.satisfies('0.2.4', range), false);
 		assert.equal(semver.satisfies('0.2.5', range), true);
-		assert.equal(semver.satisfies('0.3.0', range), false);
+		assert.equal(semver.satisfies('0.3.0', range), true);
+		assert.equal(semver.satisfies('0.4.0', range), false);
 		const correct = workspacePackage(manifest.name, {
 			peerDependencies: { octane: manifest.peerDependencies.octane },
 		});

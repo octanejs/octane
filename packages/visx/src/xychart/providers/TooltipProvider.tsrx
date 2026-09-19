@@ -97,5 +97,5 @@ export default function TooltipProvider<Datum extends object>({
 		[hideTooltip, tooltipData, tooltipLeft, tooltipOpen, tooltipTop, updateTooltip],
 	);
 
-	return <TooltipContext.Provider value={value}>{children}</TooltipContext.Provider>;
+	return <TooltipContext value={value}>{children}</TooltipContext>;
 }

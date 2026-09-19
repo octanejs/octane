@@ -1641,17 +1641,15 @@ export function AriaCombobox<Value = any, Mode extends SelectionMode = 'none', I
 	);
 
 	return (
-		<ComboboxRootContext.Provider value={store}>
-			<ComboboxFloatingContext.Provider value={floatingRootContext}>
-				<ComboboxHasItemsContext.Provider value={hasItems}>
-					<ComboboxDerivedItemsContext.Provider value={itemsContextValue}>
-						<ComboboxInputValueContext.Provider value={inputValue}>
-							{children}
-						</ComboboxInputValueContext.Provider>
-					</ComboboxDerivedItemsContext.Provider>
-				</ComboboxHasItemsContext.Provider>
-			</ComboboxFloatingContext.Provider>
-		</ComboboxRootContext.Provider>
+		<ComboboxRootContext value={store}>
+			<ComboboxFloatingContext value={floatingRootContext}>
+				<ComboboxHasItemsContext value={hasItems}>
+					<ComboboxDerivedItemsContext value={itemsContextValue}>
+						<ComboboxInputValueContext value={inputValue}>{children}</ComboboxInputValueContext>
+					</ComboboxDerivedItemsContext>
+				</ComboboxHasItemsContext>
+			</ComboboxFloatingContext>
+		</ComboboxRootContext>
 	);
 }
 

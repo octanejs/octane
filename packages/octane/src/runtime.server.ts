@@ -126,6 +126,7 @@ import {
 import { formatServerError } from './error-codes.server.generated.js';
 import { formAuthoringDiagnostics } from './form-diagnostics.js';
 import { isRendererContext, registerServerRendererContextProvider } from './renderer-bridge.js';
+import { registerContext } from './context-identity.js';
 import {
 	validateNativeReadWitness,
 	type NativeReadWitness,
@@ -5900,7 +5901,6 @@ export interface Context<T> {
 	(props: { value: T; children?: any }, scope: SSRScope): string;
 	$$kind: typeof CONTEXT_TAG;
 	defaultValue: T;
-	Provider: (props: { value: T; children?: any }, scope: SSRScope) => string;
 }
 
 export function createContext<T>(defaultValue: T): Context<T> {
@@ -5909,7 +5909,7 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	} as Context<T>;
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
-	ctx.Provider = ctx;
+	registerContext(ctx);
 	if (process.env.NODE_ENV !== 'production') {
 		// Mirror of the client's Consumer diagnostic (see runtime.ts): warn once
 		// per context on access, return undefined so probes behave as in prod.

@@ -49,7 +49,7 @@ export function EditorProvider(props: EditorProviderProps) @{
 		return null;
 	}
 
-	<EditorContext.Provider value={contextValue}>
+	<EditorContext value={contextValue}>
 		{slotBefore}
 		<EditorConsumer>
 			{({ editor: currentEditor }: EditorContextValue) =>
@@ -57,5 +57,5 @@ export function EditorProvider(props: EditorProviderProps) @{
 		</EditorConsumer>
 		{children}
 		{slotAfter}
-	</EditorContext.Provider>
+	</EditorContext>
 }

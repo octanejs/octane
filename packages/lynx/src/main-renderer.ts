@@ -25,6 +25,7 @@ import type {
 	UniversalRenderable,
 	UniversalRenderContext,
 } from 'octane/universal/native';
+import { isContext, registerContext } from 'octane/internal/context';
 import { hasOwnSymbolFields } from './core/own-symbols.js';
 import { isLynxNativeResource } from './resource.js';
 
@@ -466,6 +467,13 @@ export function defineUniversalComponent<P>(
 
 /** Compiler sentinel replacing an ordinary background event expression. */
 export const firstScreenEvent = FIRST_SCREEN_EVENT;
+
+function isContextComponent(component: UniversalComponent<any>): boolean {
+	return (
+		(component as unknown as Record<PropertyKey, unknown>)[UNIVERSAL_COMPONENT] === undefined &&
+		isContext(component)
+	);
+}
 
 function componentMetadata(component: UniversalComponent<any>): {
 	readonly id?: unknown;
@@ -1059,6 +1067,19 @@ function materialize(value: unknown, key: UniversalKey | null): FirstScreenNode[
 	if (record?.$$kind === UNIVERSAL_COMPONENT_VALUE) {
 		const component = value as ComponentValue;
 		assertRenderer(component.renderer);
+		if (isContextComponent(component.component)) {
+			const props = component.props.props;
+			const provider = universalContext(
+				component.component as unknown as UniversalContext<unknown>,
+				props.value,
+				props.children as UniversalRenderable | (() => UniversalRenderable),
+			);
+			const resolvedKey = component.hasKey ? normalizeKey(component.key) : key;
+			return materialize(
+				resolvedKey === null ? provider : universalKey(resolvedKey, provider),
+				null,
+			);
+		}
 		return [
 			range(
 				renderComponent(component.component, component.props.props),
@@ -1104,6 +1125,7 @@ function materialize(value: unknown, key: UniversalKey | null): FirstScreenNode[
 				record.componentScope === true &&
 				component?.$$kind === UNIVERSAL_COMPONENT_VALUE &&
 				component.renderer === 'lynx' &&
+				!isContextComponent(component.component) &&
 				!component.hasKey;
 			let rendered: FirstScreenNode[];
 			let templateProgram: FirstScreenProgramTemplate | undefined;
@@ -1683,7 +1705,6 @@ export interface NativeUniversalContext<T> extends UniversalContext<T> {
 		value: T;
 		children?: UniversalRenderable | (() => UniversalRenderable);
 	}): UniversalRenderable;
-	readonly Provider: NativeUniversalContext<T>;
 }
 
 export function createContext<T>(defaultValue: T): NativeUniversalContext<T> {
@@ -1694,8 +1715,8 @@ export function createContext<T>(defaultValue: T): NativeUniversalContext<T> {
 	Object.defineProperties(context, {
 		$$kind: { value: CONTEXT_TAG, enumerable: true },
 		defaultValue: { value: defaultValue, enumerable: true },
-		Provider: { value: context, enumerable: true },
 		$$version: { value: 0, enumerable: true, writable: true },
 	});
+	registerContext(context);
 	return context;
 }

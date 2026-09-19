@@ -29,11 +29,11 @@ import {
 	resetNestedDefaultEvents,
 } from './_fixtures/jsx-context-children.tsx';
 
-// JSX backwards-compat: a React-style `.tsx` `<Ctx.Provider value>` with element
+// JSX context support: a `.tsx` `<Ctx value>` with element
 // children, and host elements with component children produced via `createElement`
 // from control-flow returns (the de-opt path), must render and reconcile.
 
-it('.tsx <Context.Provider> renders element-descriptor children and provides context', () => {
+it('.tsx <Context> renders element-descriptor children and provides context', () => {
 	const r = mount(ProviderApp as any);
 	// The host <div class="wrap"> with component children renders (de-opt host path).
 	expect(r.findAll('.wrap').length).toBe(1);

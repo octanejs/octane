@@ -24,7 +24,7 @@ export const PortalContext = createContext<PortalProviderContextValue>({});
 export function UNSAFE_PortalProvider(props: PortalProviderProps): any {
 	let { getContainer } = props;
 	let { getContainer: ctxGetContainer } = useUNSAFE_PortalContext();
-	return createElement(PortalContext.Provider, {
+	return createElement(PortalContext, {
 		value: {
 			getContainer: getContainer === null ? undefined : (getContainer ?? ctxGetContainer),
 		},

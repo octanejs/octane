@@ -56,10 +56,10 @@ function Later({ read }) {
 }
 
 export function App({ active, kind, read = null }) @{
-	<Mode.Provider value={{ active, kind }}>
+	<Mode value={{ active, kind }}>
 		<main>
 			{shared}
 			<Later read={read} />
 		</main>
-	</Mode.Provider>
+	</Mode>
 }

@@ -304,12 +304,12 @@ describe('hydrateRoot — only-child renderable text', () => {
 				}
 				export const child = <Consumer />;
 				export function App(props) @{
-					<Theme.Provider value={props.theme}>
+					<Theme value={props.theme}>
 						<div>
 							<output id="only">{props.value}</output>
 							<p id="mixed">{'before:'}{props.value}{':after'}</p>
 						</div>
-					</Theme.Provider>
+					</Theme>
 				}
 			`;
 			const compileOptions = { hmr: false, dev };

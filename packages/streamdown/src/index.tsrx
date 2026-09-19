@@ -318,9 +318,9 @@ export const Block = memo(({
 
 	const inner = <Markdown {...props}>{normalizedContent}</Markdown>;
 
-	return <BlockIncompleteContext.Provider value={isIncomplete}>
+	return <BlockIncompleteContext value={isIncomplete}>
 		{dir ? <div dir={dir} style={{ display: 'contents' }}>{inner}</div> : (inner)}
-	</BlockIncompleteContext.Provider>;
+	</BlockIncompleteContext>;
 });
 
 Object.assign(Block, { displayName: 'Block' });
@@ -649,11 +649,11 @@ export const Streamdown = memo(({
 	// Static mode: simple rendering without streaming features
 	if (mode === 'static') {
 		animatePlugin?.setActiveBlock('static');
-		return <TranslationsContext.Provider value={translationsValue}>
-			<PluginContext.Provider value={plugins ?? null}>
-				<StreamdownContext.Provider value={contextValue}>
+		return <TranslationsContext value={translationsValue}>
+			<PluginContext value={plugins ?? null}>
+				<StreamdownContext value={contextValue}>
 					<IconProvider icons={iconOverrides}>
-						<PrefixContext.Provider value={prefixedCn}>
+						<PrefixContext value={prefixedCn}>
 							<div
 								className={prefixedCn(
 									'space-y-4 whitespace-normal [&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
@@ -668,19 +668,19 @@ export const Streamdown = memo(({
 									{...props}
 								>{processedChildren}</Markdown>
 							</div>
-						</PrefixContext.Provider>
+						</PrefixContext>
 					</IconProvider>
-				</StreamdownContext.Provider>
-			</PluginContext.Provider>
-		</TranslationsContext.Provider>;
+				</StreamdownContext>
+			</PluginContext>
+		</TranslationsContext>;
 	}
 
 	// Streaming mode: parse into blocks with memoization and incomplete markdown handling
-	return <TranslationsContext.Provider value={translationsValue}>
-		<PluginContext.Provider value={plugins ?? null}>
-			<StreamdownContext.Provider value={contextValue}>
+	return <TranslationsContext value={translationsValue}>
+		<PluginContext value={plugins ?? null}>
+			<StreamdownContext value={contextValue}>
 				<IconProvider icons={iconOverrides}>
-					<PrefixContext.Provider value={prefixedCn}>
+					<PrefixContext value={prefixedCn}>
 						<div
 							className={prefixedCn(
 								'space-y-4 whitespace-normal [&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
@@ -711,10 +711,10 @@ export const Streamdown = memo(({
 								/>;
 							})}
 						</div>
-					</PrefixContext.Provider>
+					</PrefixContext>
 				</IconProvider>
-			</StreamdownContext.Provider>
-		</PluginContext.Provider>
-	</TranslationsContext.Provider>;
+			</StreamdownContext>
+		</PluginContext>
+	</TranslationsContext>;
 });
 Object.assign(Streamdown, { displayName: 'Streamdown' });

@@ -130,9 +130,7 @@ export const ComboboxChip = function ComboboxChip(
 		[index],
 	);
 
-	return (
-		<ComboboxChipContext.Provider value={contextValue}>{element}</ComboboxChipContext.Provider>
-	);
+	return <ComboboxChipContext value={contextValue}>{element}</ComboboxChipContext>;
 };
 
 export interface ComboboxChipState {

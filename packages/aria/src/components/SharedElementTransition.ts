@@ -35,7 +35,7 @@ export interface SharedElementTransitionProps {
 export function SharedElementTransition(props: SharedElementTransitionProps): any {
 	const slot = S('SharedElementTransition');
 	let ref = useRef<{ [name: string]: Snapshot }>({}, subSlot(slot, 'scope'));
-	return createElement(SharedElementContext.Provider, { value: ref, children: props.children });
+	return createElement(SharedElementContext, { value: ref, children: props.children });
 }
 
 export interface SharedElementRenderProps {

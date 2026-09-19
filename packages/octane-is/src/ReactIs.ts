@@ -5,6 +5,7 @@
  */
 import { Activity, StrictMode as OctaneStrictMode } from 'octane';
 import type { ElementDescriptor } from 'octane';
+import { isContext } from 'octane/internal/context';
 
 export const ContextConsumer: symbol = Symbol.for('octane.consumer');
 export const ContextProvider: symbol = Symbol.for('octane.context');
@@ -25,7 +26,6 @@ interface BrandedValue {
 }
 interface ComponentMetadata extends Function {
 	$$kind?: unknown;
-	Provider?: unknown;
 	__memo?: unknown;
 	[key: symbol]: unknown;
 }
@@ -42,8 +42,7 @@ export function typeOf(value: unknown): symbol | undefined {
 	if (typeof type === 'function') {
 		const component = type as ComponentMetadata;
 		if (component[Suspense] === true) return Suspense;
-		if (component.$$kind === ContextProvider && component.Provider === component)
-			return ContextProvider;
+		if (isContext(component)) return ContextProvider;
 		// Lazy may acquire memo bailout metadata after resolving a memo wrapper.
 		// Its public kind remains Lazy, and inspecting it never starts the load.
 		if (component[Lazy] === true) return Lazy;

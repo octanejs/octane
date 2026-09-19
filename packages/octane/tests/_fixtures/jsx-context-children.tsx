@@ -13,8 +13,8 @@ import {
 	type OctaneNode,
 } from 'octane';
 
-// Regression fixtures for octane's JSX (`.tsx`) backwards-compat path:
-//   1. `<Ctx.Provider value={…}>` with an ELEMENT-descriptor child (not a render-fn)
+// Regression fixtures for octane's JSX (`.tsx`) context and descriptor support:
+//   1. `<Ctx value={…}>` with an ELEMENT-descriptor child (not a render-fn)
 //      must render its children inside the provider's scope (so context flows).
 //   2. A host element with COMPONENT children, produced via `createElement` from a
 //      CONTROL-FLOW return (the de-opt path, NOT a static template), must render —
@@ -43,13 +43,13 @@ function Wrapper(props: { on: boolean }) {
 	return <span className="off">off</span>;
 }
 
-// `<Ctx.Provider>` (a built-in component) with a JSX descriptor child that is itself
+// `<Ctx>` (a built-in component) with a JSX descriptor child that is itself
 // a host-with-components subtree.
 export function ProviderApp() {
 	return (
-		<Ctx.Provider value="provided">
+		<Ctx value="provided">
 			<Wrapper on={true} />
-		</Ctx.Provider>
+		</Ctx>
 	);
 }
 
@@ -153,9 +153,9 @@ function DirectNestedHost(props: { label: string }) {
 
 export function DirectNestedApp(props: { label: string; theme: string }) {
 	return (
-		<Ctx.Provider value={props.theme}>
+		<Ctx value={props.theme}>
 			<DirectNestedHost label={props.label} />
-		</Ctx.Provider>
+		</Ctx>
 	);
 }
 
@@ -247,9 +247,9 @@ function MixedNestedHost() {
 
 export function MixedNestedApp(props: { theme: string }) {
 	return (
-		<Ctx.Provider value={props.theme}>
+		<Ctx value={props.theme}>
 			<MixedNestedHost />
-		</Ctx.Provider>
+		</Ctx>
 	);
 }
 
@@ -301,9 +301,9 @@ export function DefaultPropsNestedApp(props: { theme: string; version: string })
 	nestedDefaultVersion = props.version;
 
 	return (
-		<Ctx.Provider value={props.theme}>
+		<Ctx value={props.theme}>
 			<DefaultPropsNestedShell />
-		</Ctx.Provider>
+		</Ctx>
 	);
 }
 
@@ -418,9 +418,9 @@ function SuspendingNestedHost() {
 export function NestedSuspenseApp(props: { promise: Promise<string> }) {
 	return (
 		<Suspense fallback={<span className="nested-pending">pending</span>}>
-			<NestedPromiseContext.Provider value={props.promise}>
+			<NestedPromiseContext value={props.promise}>
 				<SuspendingNestedHost />
-			</NestedPromiseContext.Provider>
+			</NestedPromiseContext>
 		</Suspense>
 	);
 }

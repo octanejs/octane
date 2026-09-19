@@ -44,11 +44,11 @@ export function ContextMenuRoot(props: ContextMenuRoot.Props) {
 	);
 
 	return (
-		<ContextMenuRootContext.Provider value={contextValue}>
-			<MenuRootContext.Provider value={undefined}>
+		<ContextMenuRootContext value={contextValue}>
+			<MenuRootContext value={undefined}>
 				<Menu.Root {...props} />
-			</MenuRootContext.Provider>
-		</ContextMenuRootContext.Provider>
+			</MenuRootContext>
+		</ContextMenuRootContext>
 	);
 }
 

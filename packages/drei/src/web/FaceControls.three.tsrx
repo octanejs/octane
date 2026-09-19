@@ -151,7 +151,7 @@ export function FaceControls({
 	const faceBlendshapes = result?.faceBlendshapes?.[0];
 	const videoTextureProps = { onVideoFrame, ...videoTexture };
 	const facemeshChildren = facemesh?.children ?? <meshNormalMaterial side={THREE.DoubleSide} />;
-	<FaceControlsContext.Provider value={api}>
+	<FaceControlsContext value={api}>
 		{!manualDetect &&
 			('src' in videoTextureProps
 				? <VideoTexture ref={videoTextureRef} {...videoTextureProps as VideoTextureProps} />
@@ -172,7 +172,7 @@ export function FaceControls({
 			visible={debug}
 			children={facemeshChildren}
 		/>
-	</FaceControlsContext.Provider>
+	</FaceControlsContext>
 }
 
 export const useFaceControls = (): FaceControlsApi => useContext(FaceControlsContext);
