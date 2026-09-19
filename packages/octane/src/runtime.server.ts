@@ -443,9 +443,16 @@ type ServerSignalInstanceKey = string | Frame;
 let SIGNAL_COMPONENT_INSTANCE_KEY: ServerSignalInstanceKey = '';
 let SERVER_SIGNAL_OWNER_ACTIVE = false;
 let SIGNAL_CONTROL_SITE = '';
-// List arms extend this value by copying; resets need no per-component array.
+interface ServerSignalListKeys {
+	parent: ServerSignalListKeys | null;
+	key: unknown;
+	mapped: boolean;
+	values: readonly string[] | null;
+}
+// Potential bindings keep raw keys until a real read needs their wire identity.
+// The recipe is persistent because a descendant frame can outlive its list arm.
 const EMPTY_SIGNAL_LIST_KEYS: readonly string[] = [];
-let SIGNAL_LIST_KEYS = EMPTY_SIGNAL_LIST_KEYS;
+let SIGNAL_LIST_KEYS: ServerSignalListKeys | null = null;
 interface InjectedStyle {
 	css: string;
 	nonce?: string;
@@ -608,8 +615,8 @@ interface Frame {
 	// an owner or serialized ancestor path. Discovery jobs retain this same node.
 	signalParentKey?: ServerSignalInstanceKey;
 	signalInvocationSite?: string;
-	signalListKeys?: readonly string[];
-	signalKey?: string;
+	signalListKeys?: ServerSignalListKeys | null;
+	signalKey?: unknown;
 	signalInstanceKey?: string;
 }
 interface Job {
@@ -2764,10 +2771,7 @@ function enterAsyncArm(armKey: unknown, mapped = false): void {
 			? previous + '|@arm-position:' + occurrence
 			: undefined;
 	if (SERVER_SIGNAL_BINDINGS_POTENTIAL && SIGNAL_CONTROL_SITE.charCodeAt(0) === 102) {
-		SIGNAL_LIST_KEYS = [
-			...SIGNAL_LIST_KEYS,
-			signalIdentityKey(mapped ? 'k' + String(armKey) : armKey),
-		];
+		SIGNAL_LIST_KEYS = { parent: SIGNAL_LIST_KEYS, key: armKey, mapped, values: null };
 	}
 	ASYNC_SCOPE = previous + '|@arm:' + asyncIdentityKey(armKey, false, fallbackPosition);
 }
@@ -4547,10 +4551,28 @@ function serverStructuralSignalInstanceKey(
 		resolveServerSignalInstanceKey(SIGNAL_COMPONENT_INSTANCE_KEY) +
 		JSON.stringify([
 			invocationSite ?? 'legacy',
-			SIGNAL_LIST_KEYS,
+			resolveServerSignalListKeys(SIGNAL_LIST_KEYS),
 			key != null ? signalIdentityKey(key) : '',
 		])
 	);
+}
+
+function resolveServerSignalListKeys(keys: ServerSignalListKeys | null): readonly string[] {
+	if (keys === null) return EMPTY_SIGNAL_LIST_KEYS;
+	if (keys.values !== null) return keys.values;
+	const pending: ServerSignalListKeys[] = [];
+	let parent: ServerSignalListKeys | null = keys;
+	while (parent !== null && parent.values === null) {
+		pending.push(parent);
+		parent = parent.parent;
+	}
+	let values = parent?.values ?? EMPTY_SIGNAL_LIST_KEYS;
+	for (let index = pending.length - 1; index >= 0; index--) {
+		const entry = pending[index]!;
+		values = [...values, signalIdentityKey(entry.mapped ? 'k' + String(entry.key) : entry.key)];
+		entry.values = values;
+	}
+	return values;
 }
 
 function resolveServerSignalInstanceKey(identity: ServerSignalInstanceKey): string {
@@ -4571,8 +4593,8 @@ function resolveServerSignalInstanceKey(identity: ServerSignalInstanceKey): stri
 		const frame = pending[index]!;
 		identity += JSON.stringify([
 			frame.signalInvocationSite ?? 'legacy',
-			frame.signalListKeys,
-			frame.signalKey,
+			resolveServerSignalListKeys(frame.signalListKeys ?? null),
+			frame.signalKey != null ? signalIdentityKey(frame.signalKey) : '',
 		]);
 		frame.signalInstanceKey = identity;
 	}
@@ -4726,7 +4748,7 @@ function renderComponentFramed(
 	ASYNC_SCOPE = frame.asyncScope;
 	if (instanceKey !== undefined) SIGNAL_COMPONENT_INSTANCE_KEY = instanceKey;
 	SIGNAL_CONTROL_SITE = '';
-	SIGNAL_LIST_KEYS = EMPTY_SIGNAL_LIST_KEYS;
+	SIGNAL_LIST_KEYS = null;
 	const nativeToken = NATIVE_READ_COLLECTOR === null ? -1 : beginActiveNativeReadScope(scope);
 	let nativeCompleted = false;
 	try {
@@ -4942,7 +4964,7 @@ export function ssrComponent(
 			frame.signalParentKey = SIGNAL_COMPONENT_INSTANCE_KEY;
 			frame.signalInvocationSite = invocationSite;
 			frame.signalListKeys = SIGNAL_LIST_KEYS;
-			frame.signalKey = key != null ? signalIdentityKey(key) : '';
+			frame.signalKey = key;
 			signalInstanceKey = frame;
 		}
 		// Function components are transparent to the HTML parser. Carry the active
@@ -5071,7 +5093,7 @@ function withServerIndependentIdentity<T>(prefix: string, idSeed: number, render
 	SIGNAL_INSTANCE_PREFIX = prefix;
 	SIGNAL_COMPONENT_INSTANCE_KEY = JSON.stringify([prefix, 'root']);
 	SIGNAL_CONTROL_SITE = '';
-	SIGNAL_LIST_KEYS = EMPTY_SIGNAL_LIST_KEYS;
+	SIGNAL_LIST_KEYS = null;
 	ID_PREFIX = prefix + '-';
 	ID_COUNTER = idSeed;
 	try {
@@ -8170,7 +8192,7 @@ interface Ambient {
 	signalComponentInstanceKey: ServerSignalInstanceKey;
 	signalOwnerActive: boolean;
 	signalControlSite: string;
-	signalListKeys: readonly string[];
+	signalListKeys: ServerSignalListKeys | null;
 	css: StyleCollector | null;
 	nonceAttr: string;
 	markers: boolean;
@@ -8325,7 +8347,7 @@ function runFullFramedPass(
 	SIGNAL_COMPONENT_INSTANCE_KEY = JSON.stringify([identifierPrefix, 'root']);
 	SERVER_SIGNAL_OWNER_ACTIVE = false;
 	SIGNAL_CONTROL_SITE = '';
-	SIGNAL_LIST_KEYS = EMPTY_SIGNAL_LIST_KEYS;
+	SIGNAL_LIST_KEYS = null;
 	NONCE_ATTR = nonceAttr;
 	ASYNC_SCOPE = '';
 	MARKERS = markers;
@@ -8476,7 +8498,7 @@ function runDiscoveryRound(
 	SIGNAL_COMPONENT_INSTANCE_KEY = JSON.stringify([identifierPrefix, 'root']);
 	SERVER_SIGNAL_OWNER_ACTIVE = false;
 	SIGNAL_CONTROL_SITE = '';
-	SIGNAL_LIST_KEYS = EMPTY_SIGNAL_LIST_KEYS;
+	SIGNAL_LIST_KEYS = null;
 	NONCE_ATTR = '';
 	ASYNC_SCOPE = '';
 	MARKERS = true;
