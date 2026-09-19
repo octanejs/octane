@@ -1,0 +1,433 @@
+{
+  "baselineRef": "330bb0878b42dbc445659c5ea40494067c4ef296",
+  "node": "v24.19.0",
+  "lockfileSha256": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+  "candidateSources": {
+    "runtime.ts": "fec3015d2c49ba71346629f67afa3ced0cc8a3d847ce59edbc6230b60e7e7792",
+    "signals/graph.ts": "56f5f6c516b5c67e0df77b061cb47e47152cd99333e65bf19bb2f46ef16f7ca2",
+    "signals/transition-state.ts": "2ad5dea614ca304ccb7016d0e13f1a1a3f31f20581e5ba027541fcf9734c9dcb",
+    "signals/transition-coordinator.ts": "9713775abcb5b0db9ba66851b83371c8bc7b0d87c8053cad57d95f03446511d3"
+  },
+  "finalRunners": {
+    "minimal": "7df1c6e96699c2cbafa76427b53b4580ce81966e02cceaaa5c687f6ccbf6a55b",
+    "public-esbuild": "b829eb3f4ca01a6e9373e80b6b08579cec29dc872d1b0ed25c6ca8310631a554",
+    "vite-controls": "abec433872a0237391843cced7474f7f5147baf398f2de980646bbaee4cdf6d7"
+  },
+  "controls": {
+    "finalEsbuildRepeat": "15/15 exact bundle SHA-256/raw/gzip/Brotli equality",
+    "finalViteMatchesPrior": "6 ordinary fixtures and 2 signal controls exact bundle SHA-256 equality",
+    "dependencyBoundaries": "passed",
+    "exportEngineSsrSmokes": "passed",
+    "sourceDrift": "none"
+  },
+  "rows": [
+    {
+      "pipeline": "minimal",
+      "id": "root-static",
+      "baseline": {
+        "raw": 197931,
+        "gzip": 62583,
+        "brotli": 54294,
+        "sha256": "c42a8832776417f94fc44ae3e9cad58cd1d44fce5fecb87f649bdff27db56c28"
+      },
+      "candidate": {
+        "raw": 193904,
+        "gzip": 61598,
+        "brotli": 53440,
+        "sha256": "8be53450fdc444d38349147e43faec80272ab5fd3a094f8c867dc8d11ce1a7ec"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "minimal",
+      "id": "hooks-state",
+      "baseline": {
+        "raw": 205942,
+        "gzip": 65394,
+        "brotli": 56643,
+        "sha256": "80721dd32d4cfd2cb2f992e140ccff11577adabecf9537b3ffc6556c2aedb43f"
+      },
+      "candidate": {
+        "raw": 201915,
+        "gzip": 64402,
+        "brotli": 55827,
+        "sha256": "dc21325c29bffc5f3ec1a0785f487101e0e2c71568bfd80ccf4edb07f4fdbb3d"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "minimal",
+      "id": "context",
+      "baseline": {
+        "raw": 216895,
+        "gzip": 68606,
+        "brotli": 59253,
+        "sha256": "8d662a7544c25654ed5f21bbcd5760e5f4f43ce76d06185a4156e9510e212f1a"
+      },
+      "candidate": {
+        "raw": 212868,
+        "gzip": 67583,
+        "brotli": 58443,
+        "sha256": "61b9dc2bb769bf3d062f0ae7564eb927fa5276654eb93ace7dfecaa1c5fddf1b"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "minimal",
+      "id": "hydrate-root",
+      "baseline": {
+        "raw": 259659,
+        "gzip": 81503,
+        "brotli": 69834,
+        "sha256": "550e489f422d5d7551ffe0122c14b8151657a10fdaadc3e71c067b9890282cef"
+      },
+      "candidate": {
+        "raw": 255632,
+        "gzip": 80485,
+        "brotli": 69027,
+        "sha256": "ff08b0b9cc5672b96a351facff6a54c19d22e83e90fff469ab25752482055e20"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "minimal",
+      "id": "suspense-transition",
+      "baseline": {
+        "raw": 250679,
+        "gzip": 78571,
+        "brotli": 67622,
+        "sha256": "02adc64114e139adf3083f6f1cba9674993130f2f4d7d2425950b6a002067894"
+      },
+      "candidate": {
+        "raw": 246652,
+        "gzip": 77594,
+        "brotli": 66857,
+        "sha256": "19f3bc58bbfc27f398d73469ca516067fba55650b51ebcd1a9c443f428f5abaa"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "minimal",
+      "id": "deferred-hydration",
+      "baseline": {
+        "raw": 296675,
+        "gzip": 93135,
+        "brotli": 79639,
+        "sha256": "e818553bddd6260d5cd591439e441a05e79f9f997172d228a0d712e2fe43d209"
+      },
+      "candidate": {
+        "raw": 292648,
+        "gzip": 92103,
+        "brotli": 78669,
+        "sha256": "be49bfcb7ad0cba35a14ffc3d8c140464df4bbce1d7e407a5949522c5fc891d8"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "minimal",
+      "id": "createRoot-export",
+      "baseline": {
+        "raw": 193173,
+        "gzip": 61565,
+        "brotli": 53439,
+        "sha256": "d706dba033132ab7e68586a2e7e2ade1b95045919b00684cf844a3ac1c9bcdf5"
+      },
+      "candidate": {
+        "raw": 189212,
+        "gzip": 60603,
+        "brotli": 52514,
+        "sha256": "c704e31aa05c9c8fa350b70abab6a03628ca5e4369c2ca4d9325c2bccdf845b0"
+      },
+      "candidateMatchesPriorSha256": false
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "ordinary-client",
+      "baseline": {
+        "raw": 193173,
+        "gzip": 61565,
+        "brotli": 53439,
+        "sha256": "d706dba033132ab7e68586a2e7e2ade1b95045919b00684cf844a3ac1c9bcdf5"
+      },
+      "candidate": {
+        "raw": 189212,
+        "gzip": 60603,
+        "brotli": 52514,
+        "sha256": "c704e31aa05c9c8fa350b70abab6a03628ca5e4369c2ca4d9325c2bccdf845b0"
+      },
+      "candidateMatchesPriorSha256": false
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "ordinary-server",
+      "baseline": {
+        "raw": 50366,
+        "gzip": 17728,
+        "brotli": 15990,
+        "sha256": "62940952060a7e32918f66495e0ebd908710945035092908e0c66708569e5ebc"
+      },
+      "candidate": {
+        "raw": 50366,
+        "gzip": 17728,
+        "brotli": 15990,
+        "sha256": "62940952060a7e32918f66495e0ebd908710945035092908e0c66708569e5ebc"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "binding-scalar",
+      "baseline": {
+        "raw": 13823,
+        "gzip": 5251,
+        "brotli": 4748,
+        "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+      },
+      "candidate": {
+        "raw": 13823,
+        "gzip": 5251,
+        "brotli": 4748,
+        "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "binding-structural",
+      "baseline": {
+        "raw": 31292,
+        "gzip": 10455,
+        "brotli": 9553,
+        "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+      },
+      "candidate": {
+        "raw": 31292,
+        "gzip": 10455,
+        "brotli": 9553,
+        "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "binding-controls",
+      "baseline": {
+        "raw": 9046,
+        "gzip": 3525,
+        "brotli": 3190,
+        "sha256": "f9d9f7ca38bd4591295e188a20aa78de7a84aabbd5e1b78935f1619cdee18e3d"
+      },
+      "candidate": {
+        "raw": 9046,
+        "gzip": 3525,
+        "brotli": 3190,
+        "sha256": "bec148cacddac1583607ce39ca584e9c6aaad70687a0651b59f9f7823c37a843"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "binding-whole-style",
+      "baseline": {
+        "raw": 6199,
+        "gzip": 2630,
+        "brotli": 2360,
+        "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+      },
+      "candidate": {
+        "raw": 6199,
+        "gzip": 2630,
+        "brotli": 2360,
+        "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "binding-scalar-controls-style",
+      "baseline": {
+        "raw": 27473,
+        "gzip": 9954,
+        "brotli": 9029,
+        "sha256": "f26ff87b831d27584d84a74ebeacc8787600cb2eb7e0523c5a49ea0d5c3aed80"
+      },
+      "candidate": {
+        "raw": 27473,
+        "gzip": 9954,
+        "brotli": 9044,
+        "sha256": "80f8610c76cc1f8e22f5d9fe9be9f4f83d6bbb2d972a4de38fd0dd56b1555932"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "engine",
+      "baseline": {
+        "raw": 42253,
+        "gzip": 12889,
+        "brotli": 11672,
+        "sha256": "3264d5ac64941955c4e9edadb70c17385d67b03ebd611f54dbdd96c5e6478a43"
+      },
+      "candidate": {
+        "raw": 47423,
+        "gzip": 14480,
+        "brotli": 13123,
+        "sha256": "cc3549d21079c1eda52036e6f6749532a604ec402f21f73391e37f57eef07ca6"
+      },
+      "candidateMatchesPriorSha256": false
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "native-client",
+      "baseline": {
+        "raw": 45094,
+        "gzip": 14297,
+        "brotli": 12931,
+        "sha256": "46037b83c2f05c341757c96be73b7fb6b5ba61bce3de8f4a6de4b8cd1efc7e62"
+      },
+      "candidate": {
+        "raw": 50263,
+        "gzip": 15894,
+        "brotli": 14356,
+        "sha256": "325d1412e91f483fa8b686c922b83212af6731cde5f2df2b43be92e8cd81e065"
+      },
+      "candidateMatchesPriorSha256": false
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "native-server",
+      "baseline": {
+        "raw": 44962,
+        "gzip": 14215,
+        "brotli": 12841,
+        "sha256": "4b0c2329255b4cdcba1bbe57fe009860e85e0725b09320ff7b36122ec3a1d9b3"
+      },
+      "candidate": {
+        "raw": 50131,
+        "gzip": 15801,
+        "brotli": 14282,
+        "sha256": "643fd75915d887b3408ed7e65bd376b20c86329a5de87e8a08dddef88a143756"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "compiled-plain-signals",
+      "baseline": {
+        "raw": 64833,
+        "gzip": 19026,
+        "brotli": 17176,
+        "sha256": "817525035dacdc1cb59e77176e9b7271740271fd41abf791c18689da74da8b73"
+      },
+      "candidate": {
+        "raw": 70005,
+        "gzip": 20599,
+        "brotli": 18584,
+        "sha256": "2b2b74757bdd78e809320fdf146e8c325513e5cf58ab4dba67f3aa1eebefc14e"
+      },
+      "candidateMatchesPriorSha256": false
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "streamed-signals-bootstrap",
+      "baseline": {
+        "raw": 70744,
+        "gzip": 21933,
+        "brotli": 19640,
+        "sha256": "cc7c410ff2a691465cab4708aac58d2f0f48ddfacf9e5e70ba108ea1841bc5e3"
+      },
+      "candidate": {
+        "raw": 75913,
+        "gzip": 23519,
+        "brotli": 21071,
+        "sha256": "6ef5ebb8d92dd6a5c370f3bbc4bfc21178adc13918cac3d491a540d2ca88536f"
+      },
+      "candidateMatchesPriorSha256": false
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "streamed-signal-results-bootstrap",
+      "baseline": {
+        "raw": 64725,
+        "gzip": 19935,
+        "brotli": 17902,
+        "sha256": "6f04f8d035089562dcebed5de4ade9b524eddc667ed1bc5770bb0a37eb3554e5"
+      },
+      "candidate": {
+        "raw": 69894,
+        "gzip": 21531,
+        "brotli": 19332,
+        "sha256": "f251b2cf7bc0202e32a90be70fafb141391dd4b06bf3e26a89a74bfb9c11fb15"
+      },
+      "candidateMatchesPriorSha256": false
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "used-native-app",
+      "baseline": {
+        "raw": 247072,
+        "gzip": 78310,
+        "brotli": 68002,
+        "sha256": "cb62bf7aa6146e0fe0079b5eb13e67f8446d988279262310d65c75f279dad524"
+      },
+      "candidate": {
+        "raw": 248273,
+        "gzip": 78887,
+        "brotli": 68545,
+        "sha256": "d55a9ea248c98ca788e3f572be9da154f13d3936490ee5a6a1e4a8d066e1d5fa"
+      },
+      "candidateMatchesPriorSha256": false
+    },
+    {
+      "pipeline": "public-esbuild",
+      "id": "used-native-ssr",
+      "baseline": {
+        "raw": 97093,
+        "gzip": 31888,
+        "brotli": 28769,
+        "sha256": "919d86a76c9637c84e47210d979095de8a3540c3bbe893a486b9923e27415934"
+      },
+      "candidate": {
+        "raw": 102262,
+        "gzip": 33468,
+        "brotli": 30149,
+        "sha256": "0ea97d11268b0c0f08f8f4903e3f44a30a99db10f2e94df9bade03eeff54041d"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "vite-controls",
+      "id": "engine",
+      "baseline": {
+        "raw": 57465,
+        "gzip": 14457,
+        "brotli": 12975,
+        "sha256": "c66aecbd96400395713ac80f5f820ff0c2aa20a5a955b9a3f87086423f5c10b5"
+      },
+      "candidate": {
+        "raw": 64747,
+        "gzip": 16270,
+        "brotli": 14615,
+        "sha256": "d0b009d7bef3fd1864952b20916dd624c2621e51d4f7c6ebb5efb4169ddb9043"
+      },
+      "candidateMatchesPriorSha256": true
+    },
+    {
+      "pipeline": "vite-controls",
+      "id": "used-native-ssr",
+      "baseline": {
+        "raw": 132192,
+        "gzip": 35443,
+        "brotli": 31569,
+        "sha256": "3773f4211ab15dbbfe19dfb8826b655f768bd48813c68b851ab47c7622ebfd2d"
+      },
+      "candidate": {
+        "raw": 139474,
+        "gzip": 37282,
+        "brotli": 33164,
+        "sha256": "678d13766f6127bcf9b41e205cb0871857d5446b3ee1618b2658c7619862eb18"
+      },
+      "candidateMatchesPriorSha256": true
+    }
+  ]
+}

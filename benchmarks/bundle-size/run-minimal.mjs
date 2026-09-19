@@ -379,7 +379,9 @@ try {
 		if (signalFreeClientScenarios.has(id)) {
 			assert.deepEqual(
 				emittedModules.filter((module) =>
-					/\/packages\/octane\/src\/signals\/transition-(?:candidate|action)\.[jt]s$/.test(module),
+					/\/packages\/octane\/src\/signals\/transition-(?:candidate|action|coordinator)\.[jt]s$/.test(
+						module,
+					),
 				),
 				[],
 				`${name}: signal-free client retained the concrete native transition implementation`,
