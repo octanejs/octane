@@ -1,5 +1,11 @@
 # RFC: Async Signals Across Streaming SSR and Hydration in Octane
 
+> Design record. The core async-signals and streaming implementation landed in
+> [PR #1069](https://github.com/octanejs/octane/pull/1069), with follow-up work on
+> main. For current usage, start with the [simple streaming example](https://octanejs.dev/docs/signals#streaming-example)
+> and the [SSR host reference](./ssr.md#stream-data-with-signals). The proposals
+> and acceptance requirements below are not all shipped API guarantees.
+
 ## Motivation
 
 A server-rendered page should be useful before all of its JavaScript arrives.
@@ -11,7 +17,7 @@ This RFC connects Octane's signals, streaming SSR, and deferred hydration around
 that contract. It supports both native Octane rendering and hosts that keep
 ownership of their HTML.
 
-Status: design and implementation under review, updated September 15, 2026 after core-team feedback. Implementation claims below refer to the [PR #1069 branch](https://github.com/octanejs/octane/pull/1069), not released or mainline APIs. The
+Historical status: the design was updated September 15, 2026 after core-team feedback. The text below records the [PR #1069 work](https://github.com/octanejs/octane/pull/1069) and later acceptance discussions; it is not a current release inventory. The
 [implementation guide and acceptance checklist](./async-signals-implementation.md)
 distinguish implemented APIs from remaining work. The longer host examples below
 are design sketches, not a list of published exports. For executable examples,
