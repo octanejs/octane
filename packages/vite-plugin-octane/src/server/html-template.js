@@ -5,6 +5,7 @@ export {
 	injectHydrationEntry,
 	nonceAttribute,
 	prepareStreamingHydrationTemplate,
+	serializeRouteData,
 	splitSsrTemplate,
 	validateSsrTemplate,
 } from '@octanejs/app-core/html';

@@ -18,8 +18,8 @@
  * BUILT dist/client/index.html (hashed hydrate script already in place, so
  * nothing is injected per-request), per-route `<link rel=stylesheet/modulepreload>`
  * tags from the client manifest join the head, and render errors produce a
- * plain 500 (no dev stack page). Keep the two files in sync when the shape
- * changes.
+ * plain 500 (no dev stack page). Both handlers use the shared route-data
+ * serializer when the hydration payload shape changes.
  */
 
 import { createRouter } from './router.js';
@@ -31,6 +31,7 @@ import { runServerRequest } from './signal-owners.js';
 import { rpcIdCollision } from './rpc-registry.js';
 import { handleServerRoute } from './server-route.js';
 import { composeHtmlStream } from './html-stream.js';
+import { serializeRouteData } from './route-data.js';
 import {
 	applyHydrationNonce,
 	getContextNonce,
@@ -253,7 +254,7 @@ function prepareIndependentHydration(manifest) {
  * Snapshot completed build authority once per handler, never from request data.
  * Legacy custom handlers without a client build retain their existing path.
  * @param {ServerManifest} manifest
- * @returns {ServerManifest['clientBuild'] | undefined}
+ * @returns {import('@octanejs/app-core/production').ClientBuildManifest | undefined}
  */
 function prepareClientBuild(manifest) {
 	const build = manifest.clientBuild;
@@ -505,8 +506,7 @@ export function createHandler(manifest, deps) {
 			deps,
 		);
 
-		// The hydration payload — SAME keys, SAME order as dev render-route.js, so
-		// the data script is byte-identical between dev and production.
+		// Share payload ordering and script escaping with the dev handler.
 		const streamedSignals =
 			clientBuild == null
 				? undefined
@@ -514,7 +514,7 @@ export function createHandler(manifest, deps) {
 						buildId: clientBuild.buildId,
 						documentId: crypto.randomUUID(),
 					};
-		const routeData = JSON.stringify({
+		const routeData = serializeRouteData({
 			entry: entryPath,
 			exportName: exportName ?? null,
 			layout: route.layout ?? null,
@@ -526,7 +526,7 @@ export function createHandler(manifest, deps) {
 			clientBuild,
 			streamedSignals,
 		});
-		const dataScript = `<script id="__octane_data" type="application/json"${nonceAttribute(nonce)}>${escapeScript(routeData)}</script>`;
+		const dataScript = `<script id="__octane_data" type="application/json"${nonceAttribute(nonce)}>${routeData}</script>`;
 
 		// The page, layout, and configured root fallbacks can all contribute
 		// server HTML before hydration. Their asset records also include CSS for
@@ -619,13 +619,4 @@ export function createHandler(manifest, deps) {
 	}
 
 	return handler;
-}
-
-/**
- * Escape script content to prevent XSS in the inline JSON data block.
- * @param {string} str
- * @returns {string}
- */
-function escapeScript(str) {
-	return str.replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
 }

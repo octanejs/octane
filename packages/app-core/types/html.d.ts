@@ -1,4 +1,21 @@
 import type { Context } from '@octanejs/app-core';
+import type { ClientBuildManifest, ServerManifest } from '@octanejs/app-core/production';
+
+/** Request-local inputs to the script-safe dev/production hydration payload. */
+export interface RouteHydrationData {
+	entry: string | undefined;
+	exportName?: string | null;
+	layout?: string | null;
+	routeIndex?: number;
+	params: Record<string, string>;
+	url: string;
+	preHydrate?: string | null;
+	rootBoundary?: ServerManifest['rootBoundaryEntries'];
+	clientBuild?: ClientBuildManifest;
+	streamedSignals?: { buildId: string; documentId: string };
+}
+
+export function serializeRouteData(data: RouteHydrationData): string;
 
 export const HYDRATION_NONCE_PLACEHOLDER: '__OCTANE_REQUEST_NONCE__';
 export function composeHtmlStream(
