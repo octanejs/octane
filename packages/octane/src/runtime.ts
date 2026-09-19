@@ -22552,7 +22552,22 @@ export function setStyleProperty(
 	// The compiler seeds each binding with its private scope, distinguishing a
 	// genuinely absent initial longhand from a preserved suspended-mount retry.
 	if (remove && previous === CURRENT_SCOPE) return;
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
+	if (TRANSITION_JOURNAL !== null) {
+		const log = TRANSITION_JOURNAL;
+		let tail = log.length - 4;
+		// A declaration snapshots its binding bag immediately after the style.
+		// Only that metadata record is transparent; other writes and savepoints
+		// still require their own live-browser snapshot.
+		if (log[tail] === JOURNAL_BAG && log[tail + 1] === CURRENT_SCOPE?.slots[0]) tail -= 4;
+		if (
+			tail < TRANSITION_JOURNAL_CHECKPOINT ||
+			log[tail] !== JOURNAL_ATTR ||
+			log[tail + 1] !== el ||
+			log[tail + 2] !== 'style'
+		)
+			journalAttr(el, 'style');
+		else journalBag();
+	}
 	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, previous, name)) return;
 	const style = (STAGED_DOM?.view(el as HTMLElement) ?? (el as HTMLElement)).style;
 	if (remove) style.removeProperty(styleName(name));
