@@ -23417,6 +23417,8 @@ function applyStringChildProofs(ast, source, filename, facts) {
 	const primitiveProofs = new Set();
 	const intrinsicCalls = [];
 	const writes = [];
+	const intrinsicMutationReferences = [];
+	const intrinsicAliases = [];
 	const ambientIntrinsicValues = new Set();
 	const seen = new WeakSet();
 	const collect = (node, parent = null, key = null) => {
@@ -23444,8 +23446,25 @@ function applyStringChildProofs(ast, source, filename, facts) {
 		}
 		if (inspectIntrinsicCalls) {
 			if (
+				node.type === 'VariableDeclarator' &&
+				parent?.type === 'VariableDeclaration' &&
+				parent.kind === 'const' &&
+				node.id?.type === 'Identifier' &&
+				node.init
+			) {
+				intrinsicAliases.push(node);
+			}
+			if (node.type === 'MemberExpression' && isPossibleIntrinsicMutator(node)) {
+				intrinsicMutationReferences.push([node.object, node, parent]);
+			} else if (node.type === 'VariableDeclarator' && node.id?.type === 'ObjectPattern') {
+				for (const property of node.id.properties || []) {
+					if (property.type === 'Property' && isPossibleIntrinsicMutator(property)) {
+						intrinsicMutationReferences.push([node.init, property]);
+					}
+				}
+			}
+			if (
 				node.type === 'CallExpression' &&
-				node.optional !== true &&
 				node.callee?.type === 'Identifier' &&
 				TEXT_INTRINSICS.has(node.callee.name)
 			) {
@@ -23491,7 +23510,8 @@ function applyStringChildProofs(ast, source, filename, facts) {
 	let lexical = null;
 	if (
 		intrinsicCalls.length > 0 ||
-		((stringProofs.size > 0 || primitiveProofs.size > 0) && writes.length > 0)
+		((stringProofs.size > 0 || primitiveProofs.size > 0) &&
+			(writes.length > 0 || intrinsicMutationReferences.length > 0))
 	) {
 		// The existing scope analysis understands var hoisting, parameter defaults,
 		// imports, catch bindings, and TSRX @for/@try scopes. Pay for it only when
@@ -23507,13 +23527,133 @@ function applyStringChildProofs(ast, source, filename, facts) {
 		}
 	}
 	if (lexical !== null) {
+		const aliases = new WeakMap();
+		for (const declaration of intrinsicAliases) {
+			const scope = lexical.resolveBinding(
+				lexical.nodeScopes.get(declaration.id),
+				declaration.id.name,
+			)?.scope;
+			if (scope === undefined) continue;
+			let values = aliases.get(scope);
+			if (values === undefined) aliases.set(scope, (values = new Map()));
+			values.set(declaration.id.name, declaration.init);
+		}
+		const initializer = (node) => {
+			const scope = lexical.resolveBinding(lexical.nodeScopes.get(node), node.name)?.scope;
+			return scope === undefined ? undefined : aliases.get(scope)?.get(node.name);
+		};
+		const globalOrigin = (expression, seen = new Set(), constructors = false) => {
+			const node = unwrapTsExpr(expression);
+			if (!node || seen.has(node)) return null;
+			seen.add(node);
+			if (node.type === 'Identifier') {
+				const scope = lexical.nodeScopes.get(node);
+				if (scope === undefined) return null;
+				if (!lexical.isBound(scope, node.name)) {
+					return INLINE_INTRINSIC_MUTATION_GLOBALS.has(node.name) ||
+						(constructors && TEXT_INTRINSICS.has(node.name))
+						? node.name
+						: null;
+				}
+				return globalOrigin(initializer(node), seen, constructors);
+			}
+			if (node.type === 'ChainExpression') return globalOrigin(node.expression, seen, constructors);
+			if (node.type === 'MemberExpression') {
+				const name = node.computed ? node.property?.value : node.property?.name;
+				if (name !== 'Object' && name !== 'Reflect' && !(constructors && TEXT_INTRINSICS.has(name)))
+					return null;
+				const origin = globalOrigin(node.object, seen);
+				return origin !== null && INLINE_INTRINSIC_GLOBAL_RECEIVERS.has(origin) ? name : null;
+			}
+			return null;
+		};
+		const freshTarget = (expression, seen = new Set()) => {
+			const node = unwrapTsExpr(expression);
+			if (!node || seen.has(node)) return false;
+			seen.add(node);
+			if (node.type === 'ObjectExpression' || node.type === 'ArrayExpression') return true;
+			return node.type === 'Identifier' && freshTarget(initializer(node), seen);
+		};
+		const visibleMutation =
+			intrinsicMutationReferences.some(([receiver, reference, parent]) => {
+				const origin = globalOrigin(receiver);
+				const property = reference.type === 'Property' ? reference.key : reference.property;
+				const method = reference.computed ? property?.value : (property?.name ?? property?.value);
+				if (origin === 'Object' || origin === 'Reflect') {
+					// A normal native call targeting a fresh literal cannot directly write
+					// a global constructor. Unknown getter/callback effects retain the
+					// existing builtin assumptions; wrapped/extracted calls fail closed.
+					const target = parent?.arguments?.[0];
+					return !(
+						parent?.type === 'CallExpression' &&
+						parent.optional !== true &&
+						parent.callee === reference &&
+						reference.optional !== true &&
+						INLINE_INTRINSIC_MUTATION_METHODS.has(method) &&
+						freshTarget(target)
+					);
+				}
+				return (
+					origin !== null &&
+					INLINE_INTRINSIC_GLOBAL_RECEIVERS.has(origin) &&
+					(method === '__defineGetter__' ||
+						method === '__defineSetter__' ||
+						(reference.computed && property?.type !== 'Literal'))
+				);
+			}) ||
+			writes.some((target) => {
+				const node = unwrapTsExpr(target);
+				if (node?.type !== 'MemberExpression') return false;
+				const name = node.computed ? node.property?.value : node.property?.name;
+				if (!TEXT_INTRINSICS.has(name) && !(node.computed && node.property?.type !== 'Literal'))
+					return false;
+				const origin = globalOrigin(node.object);
+				return origin !== null && INLINE_INTRINSIC_GLOBAL_RECEIVERS.has(origin);
+			});
+		const unsafeCalls = new WeakSet();
 		for (const call of intrinsicCalls) {
 			const name = call.callee.name;
 			if (ambientIntrinsicValues.has(name)) continue;
 			const scope = lexical.nodeScopes.get(call);
 			if (scope !== undefined && !lexical.isBound(scope, name)) {
+				if (visibleMutation) {
+					unsafeCalls.add(call);
+					continue;
+				}
+				if (call.optional === true) continue;
 				if (name === 'String' || name === 'Date') stringProofs.add(call);
 				else primitiveProofs.add(call);
+			}
+		}
+		if (visibleMutation) {
+			// TypeScript still describes the built-in return type after an asserted
+			// replacement. Drop only supplied proofs that depend on these calls;
+			// unrelated typed scalars and JavaScript's own coercion guarantees survive.
+			const unsafeProof = (node, seen = new WeakSet()) => {
+				if (!node || typeof node !== 'object' || seen.has(node)) return false;
+				seen.add(node);
+				if (unsafeCalls.has(node)) return true;
+				if (node.type === 'CallExpression') {
+					let callee = unwrapTsExpr(node.callee);
+					while (callee?.type === 'ChainExpression') callee = unwrapTsExpr(callee.expression);
+					if (callee?.type === 'MemberExpression') {
+						const method = callee.computed ? callee.property?.value : callee.property?.name;
+						if (method === 'call' || method === 'apply') callee = callee.object;
+					}
+					// Supplied facts may describe a saved constructor or its Function
+					// call/apply result. Invalidation grants no new primitive admission.
+					if (TEXT_INTRINSICS.has(globalOrigin(callee, new Set(), true))) return true;
+				}
+				if (node.type === 'Identifier' && unsafeProof(initializer(node), seen)) return true;
+				if (Array.isArray(node)) return node.some((child) => unsafeProof(child, seen));
+				for (const key in node) {
+					if (AST_WALK_SKIP_KEYS.has(key)) continue;
+					if (unsafeProof(node[key], seen)) return true;
+				}
+				return false;
+			};
+			for (const proofs of [stringProofs, primitiveProofs]) {
+				for (const proof of proofs) if (unsafeProof(proof)) proofs.delete(proof);
 			}
 		}
 	}
@@ -23556,6 +23696,33 @@ function applyStringChildProofs(ast, source, filename, facts) {
 }
 
 const TEXT_INTRINSICS = new Set(['String', 'Number', 'BigInt', 'Date']);
+const INLINE_INTRINSIC_MUTATION_METHODS = new Set([
+	'assign',
+	'defineProperty',
+	'defineProperties',
+	'set',
+	'__defineGetter__',
+	'__defineSetter__',
+	'setPrototypeOf',
+	'deleteProperty',
+]);
+const INLINE_INTRINSIC_GLOBAL_RECEIVERS = new Set(['globalThis', 'window', 'self', 'global']);
+const INLINE_INTRINSIC_MUTATION_GLOBALS = new Set([
+	'Object',
+	'Reflect',
+	...INLINE_INTRINSIC_GLOBAL_RECEIVERS,
+]);
+
+// Inspect the reference itself: TS/optional wrappers and extracted methods may
+// hide its eventual call. Lexical receiver checks keep ordinary computed reads
+// and application .set methods from invalidating intrinsic-result proofs.
+function isPossibleIntrinsicMutator(node) {
+	const property = node.type === 'Property' ? node.key : node.property;
+	const name = node.computed ? property?.value : (property?.name ?? property?.value);
+	return (
+		INLINE_INTRINSIC_MUTATION_METHODS.has(name) || (node.computed && property?.type !== 'Literal')
+	);
+}
 
 // A visible replacement of a global constructor invalidates inferred text
 // proofs for the module. Calls still evaluate the authored callee: a replacement
