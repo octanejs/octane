@@ -1642,3 +1642,119 @@ export function App(props) {
 			}
 	t.diagnostic(`${checked} fixed-source primitive and opaque compiler controls`);
 });
+
+test('text and attribute bindings omit unselected control writer policies', async (t) => {
+	const source = path.resolve('packages/octane/src');
+	const alias = {
+		'octane/internal/client': path.join(source, 'internal/client.ts'),
+		'octane/signals': path.join(source, 'signals/index.ts'),
+		octane: path.join(source, 'index.ts'),
+	};
+	const bundle = async (contents) => {
+		const result = await build({
+			stdin: { contents, resolveDir: path.dirname(source) },
+			bundle: true,
+			write: false,
+			minify: true,
+			format: 'esm',
+			platform: 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			alias,
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+		});
+		return result.outputFiles[0].text;
+	};
+	// Compare actual compiled consumers in one pipeline. Both retain the same
+	// model scope and updates; only the selected host channels differ.
+
+	const app = `import {createRoot,flushSync} from 'octane';
+import {createScope} from 'octane/signals';
+function View(props) @{
+ <section title={props.label}><p>{props.label as string}</p><input value={props.label} /><input type="checkbox" checked={props.checked} /><select value={props.selected}><option value="a">A</option><option value="b">B</option></select><textarea value={props.label} /></section>
+}
+export function mount(parent) {
+ const scope=createScope({scopeKey:'writer-control'});
+ const label$=scope.signal$('label','initial'), checked$=scope.signal$('checked',false), selected$=scope.signal$('selected','a');
+ const root=createRoot(parent);root.render(View,{label:label$,checked:checked$,selected:selected$});
+ return {update(){flushSync(()=>scope.batch(()=>{scope.set(label$,'updated');scope.set(checked$,true);scope.set(selected$,'b');}));},dispose(){root.unmount();scope.dispose();}};
+}`;
+	const buildConsumer = async (authored) =>
+		bundle(
+			compile(authored, path.join(source, 'writer-control.tsrx'), {
+				mode: 'client',
+				dev: false,
+				hmr: false,
+			}).code,
+		);
+	const plain = app.replace(
+		'<input value={props.label} /><input type="checkbox" checked={props.checked} /><select value={props.selected}><option value="a">A</option><option value="b">B</option></select><textarea value={props.label} />',
+		'',
+	);
+	assert.notEqual(plain, app);
+	const plainCode = await buildConsumer(plain);
+	const code = await buildConsumer(app);
+	const plainBytes = gzipSync(plainCode, { level: 9 }).length;
+	const controlsBytes = gzipSync(code, { level: 9 }).length;
+	t.diagnostic(`compiled plain/control closure gzip: ${plainBytes}/${controlsBytes}`);
+	assert.ok(plainBytes + 1000 <= controlsBytes, 'Unselected controls must be removable.');
+	const window = new Window();
+	const globals = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+	const plainApi = await import(
+		'data:text/javascript;base64,' + Buffer.from(plainCode).toString('base64')
+	);
+	const plainHost = window.document.createElement('div');
+	window.document.body.append(plainHost);
+	const plainMounted = plainApi.mount(plainHost);
+	try {
+		const paragraph = plainHost.querySelector('p');
+		const text = paragraph.firstChild;
+		assert.equal(paragraph.textContent, 'initial');
+		plainMounted.update();
+		assert.equal(plainHost.querySelector('p'), paragraph);
+		assert.equal(paragraph.firstChild, text);
+		assert.equal(paragraph.textContent, 'updated');
+		assert.equal(plainHost.querySelector('section').title, 'updated');
+	} finally {
+		plainMounted.dispose();
+		plainHost.remove();
+	}
+	assert.equal(plainHost.childNodes.length, 0);
+	const api = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+	const host = window.document.createElement('div');
+	window.document.body.append(host);
+	const mounted = api.mount(host);
+	try {
+		const paragraph = host.querySelector('p');
+		const textNode = paragraph.firstChild;
+		assert.equal(paragraph.textContent, 'initial');
+		mounted.update();
+		assert.equal(host.querySelector('p'), paragraph);
+		assert.equal(paragraph.firstChild, textNode);
+		assert.equal(paragraph.textContent, 'updated');
+		assert.equal(host.querySelector('section').title, 'updated');
+		assert.equal(host.querySelector('input').value, 'updated');
+		assert.equal(host.querySelector('[type="checkbox"]').checked, true);
+		assert.equal(host.querySelector('select').value, 'b');
+		assert.equal(host.querySelector('textarea').value, 'updated');
+	} finally {
+		mounted.dispose();
+		host.remove();
+	}
+	assert.equal(host.childNodes.length, 0);
+});
