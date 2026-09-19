@@ -428,6 +428,170 @@ ending in `$`, and non-computed namespace calls.
 
 <h2 id="server-rendering">Server rendering and hydration</h2>
 
+Server-side rendering (SSR) sends HTML that the browser can show straight away.
+Streaming lets the server send the page in parts. **The page does not have to
+wait for its slowest query.** Hydration then connects the browser's Octane code
+to that existing HTML so it can respond to changes.
+
+Signals connect these steps. The server reads a query to render HTML and sends
+its result to the browser. The browser can use that result even if the component
+that needs it loads later.
+
+<h3 id="streaming-example">Show the page first, then its data</h3>
+
+In an Octane [fullstack app](/docs/quick-start), put this in `src/Page.tsrx`.
+The short delays stand in for database or service calls so you can see the parts
+arrive separately. `module server` keeps those functions on the server:
+
+```tsrx
+// src/Page.tsrx
+module server {
+	export async function loadTitle() {
+		await new Promise((resolve) => setTimeout(resolve, 200));
+		return 'Team chat';
+	}
+
+	export async function* loadMessages() {
+		await new Promise((resolve) => setTimeout(resolve, 500));
+		yield [
+			{ id: 1, text: 'Hello!' },
+		];
+
+		await new Promise((resolve) => setTimeout(resolve, 500));
+		yield [
+			{ id: 1, text: 'Hello!' },
+			{ id: 2, text: 'The next message is here.' },
+		];
+	}
+}
+
+import { loadTitle, loadMessages } from 'server';
+import { derived$, query$, signal$ } from 'octane/signals';
+
+const title$ = query$(() => 'team-chat', () => loadTitle());
+const messages$ = query$(() => 'team-chat', () => loadMessages(), { kind: 'stream' });
+const draft$ = signal$('');
+const draftLength$ = derived$(() => draft$.get().length);
+
+export default function Page() @{
+	<main>
+		@try {
+			<h1>{title$.get() as string}</h1>
+		} @pending {
+			<h1>Opening chat…</h1>
+		} @catch {
+			<h1>Could not load the title.</h1>
+		}
+
+		@try {
+			<ul>
+				@for (const message of messages$.get(); key message.id) {
+					<li>{message.text as string}</li>
+				}
+			</ul>
+		} @pending {
+			<p>Loading messages…</p>
+		} @catch {
+			<p role="alert">Could not load messages.</p>
+		}
+
+		<label>
+			Message
+			<textarea value={draft$} />
+		</label>
+		<p>{String(draftLength$.get())} characters</p>
+	</main>
+}
+```
+
+Register the page in your fullstack app's `octane.config.ts`:
+
+```ts
+import { defineConfig, RenderRoute } from '@octanejs/vite-plugin';
+
+export default defineConfig({
+	router: {
+		routes: [new RenderRoute({ path: '/', entry: '/src/Page.tsrx' })],
+	},
+});
+```
+
+The standard fullstack host uses streaming SSR by default and connects the
+server's query results to the browser. You do not need to create a scope or
+install a stream receiver for this page.
+
+Here is what happens:
+
+1. The server reaches both queries. Each pending `.get()` shows its own
+   `@pending` content. The initial HTML, called the **shell**, includes those
+   placeholders and the textarea.
+2. The title arrives and replaces its placeholder. It does not wait for messages.
+3. The first message list arrives and replaces the messages placeholder.
+4. The next list travels as signal data. Once the view is active, it shows the
+   new list. A view whose code is still deferred keeps its server HTML until it
+   activates.
+
+Each `yield` is the query's **whole next value**. The example includes the first
+message in the second list because Octane does not append yielded arrays for
+you. A stream is ready after its first yield; normal completion keeps its last
+value. Returning before any yield is an error.
+
+Keep independent sections in separate `@try` blocks so each can appear when it
+is ready. Read pending data inside those blocks: reading it in page setup first
+would suspend the page before it reaches the local placeholders. A real data
+dependency still has to wait; streaming cannot make its input arrive sooner.
+
+**HTML streaming and signal streaming do different jobs.** SSR sends the shell
+and the first ready HTML for each pending boundary. Later query yields send
+values, not replacement HTML for every yield. An active Octane view, compiled
+DOM binding, or your own host's presentation code displays those later values.
+
+For real loaders, pass the query callback's `signal` to work that supports
+cancellation. A changed selection or disposed owner cancels the old attempt;
+even a loader that ignores cancellation cannot publish an obsolete result.
+Keep initial-response streams finite. For ongoing live updates, use a separate
+connection with an explicit lifetime rather than holding the page response open
+forever.
+
+<h3 id="early-input">Keep input typed before hydration</h3>
+
+In the example, `value={draft$}` connects the textarea to writable state. The
+browser's native textarea works as soon as it appears. Octane's early capture
+script records edits, including clearing the field, before the component loads.
+When the signal engine takes over, those edits win over older initial values.
+
+The capture script only records input and incoming results. The character count
+starts reacting when the signal engine and its view or binding are running.
+Use [deferred hydration](/docs/core-apis#deferred-hydration) to choose when a component
+activates, or the custom-host path below to run a small control binding early.
+
+<h3 id="streaming-performance">Why this can make a page faster</h3>
+
+- **Show useful HTML sooner.** The shell and fast sections can appear while
+  slower data is still loading. Buffering the whole page would wait for all of it.
+- **Avoid fetching the same initial data twice.** A matching streamed query
+  result is reused in the browser, including when it arrives before the query's
+  module loads. Changing the selection or explicitly refreshing can start new work.
+- **Avoid unnecessary waiting between independent reads.** Separate boundaries
+  let unrelated sections progress. The compiler also starts reads together where
+  it can prove they are independent; arbitrary code is not automatically parallel.
+- **Do less work before interaction.** Deferred components can load later.
+  Custom hosts can run signals and compiled DOM bindings without loading the
+  general client renderer. Live behavior still needs the code that implements it.
+- **Update the parts that read changed state.** Native signal reads subscribe
+  their render scopes; direct bindings can update their owned properties without
+  rerunning the whole page.
+
+These are ways to reduce waiting and repeated work, not a fixed speedup for
+every app. Streaming also sends result data and bookkeeping, and signals need
+subscriptions. Measure your page's response bytes, JavaScript delivery, and
+interaction time. The [conversation streaming benchmark](https://github.com/octanejs/octane/blob/main/benchmarks/conversation-streaming/README.md)
+checks independent arrival, early typing, and result reuse; the
+[performance evidence](https://github.com/octanejs/octane/blob/main/docs/async-signals-performance.md)
+records measured builds and their limits.
+
+<h3 id="server-state-ownership">Keep server state separate for each request</h3>
+
 Module declarations resolve through the current request owner on the server.
 For explicit `createScope` usage, create a scope per request; a module singleton
 must not hold one user's mutable scope across requests. Keep each `scopeKey` and signal key consistent
@@ -440,10 +604,12 @@ serialized into shared-state seeds.
 
 Native completed reads carry a versioned seed manifest into hydration. The
 client can adopt those historical values without rewinding live writable state.
-A matching completed resource seed avoids a duplicate client load. A ready but
-incomplete stream/resource in ready-state seed transport starts a quiet client
-attempt; the server producer itself is not transferred. Root hydration, deferred islands, and streamed
-segments own separate adoption lifetimes.
+A matching completed resource seed avoids a duplicate client load. **A snapshot
+alone is not a live stream:** without a matching streamed-result channel, a ready
+but incomplete resource starts a quiet browser attempt. With that channel, the
+browser joins the server's existing attempt and receives its later values.
+The running server function stays on the server. Root hydration, deferred
+islands, and streamed segments each keep the values needed to adopt their own HTML.
 
 For explicit embedding, `scope.serialize()` returns a `ScopeSeed`, and
 `scope.beginAdoption(seed)` returns an immutable historical frame. Use
@@ -458,6 +624,9 @@ output that directly displays a pending/error snapshot or an `isPending` result
 is not supported by ready-state transport and receives a diagnostic.
 
 <h2 id="streamed-adoption">Adopt streamed results before hydration</h2>
+
+This section is for custom hosts that manage their own HTML and browser entry.
+The standard fullstack host does this setup for you.
 
 The streamed-result channel is separate from ready-state seeds. A host can
 deliver accepted query results before the query module or a component root
