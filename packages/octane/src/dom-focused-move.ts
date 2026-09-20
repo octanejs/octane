@@ -1,5 +1,5 @@
 /**
- * Move native presentation without detaching the node that owns active editing.
+ * Move native presentation without detaching active editing when possible.
  * Both the general renderer and renderer-free keyed views use this leaf; callers
  * retain their own focus/selection capture and commit lifetime.
  */
@@ -34,6 +34,13 @@ export function moveNativeNodeBefore(
 	// still collapses live Range selections inside a moved content-editable tree.
 	if (!contentEditable && typeof moveBefore === 'function') {
 		moveBefore.call(parent, node, anchor);
+		return;
+	}
+
+	// Rotation requires siblings in one parent. Cross-parent moves must insert
+	// the editing node itself; let native insertion validate foreign anchors.
+	if (node.parentNode !== parent || (anchor !== null && anchor.parentNode !== parent)) {
+		parent.insertBefore(node, anchor);
 		return;
 	}
 

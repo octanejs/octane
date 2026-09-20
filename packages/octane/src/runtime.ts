@@ -42889,6 +42889,16 @@ function moveFocusedNodeBefore(
 		return;
 	}
 
+	// Rotate only siblings of the same projected parent. Restoration can move
+	// an editing node across parents, which requires inserting that node itself.
+	if (
+		STAGED_DOM.view(node).parentNode !== parent ||
+		(anchor !== null && STAGED_DOM.view(anchor).parentNode !== parent)
+	) {
+		STAGED_DOM.view(parent).insertBefore(node, anchor);
+		return;
+	}
+
 	// insertBefore detaches an existing node, which ends a trusted keyboard
 	// composition even when the commit later restores focus. Older Chromium,
 	// Samsung Internet, and editable Range selections instead keep the focused
