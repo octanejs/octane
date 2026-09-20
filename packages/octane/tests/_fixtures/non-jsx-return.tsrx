@@ -1,4 +1,81 @@
-import { createElement, memo, use, useState, useTransition } from 'octane';
+import {
+	createElement,
+	memo,
+	use,
+	useEffect,
+	useState,
+	useTransition,
+	ViewTransition,
+} from 'octane';
+
+export interface ReturnedContentProps {
+	label: string;
+	count: number;
+	onIncrement: () => void;
+	log: (entry: string) => void;
+	onRef: (node: HTMLButtonElement | null) => void;
+}
+
+export interface OptionalReturnProps {
+	shown: boolean;
+	item?: { title: string };
+	label: string;
+	empty?: 'bare' | 'fallthrough';
+	log: ReturnedContentProps['log'];
+	onRef: ReturnedContentProps['onRef'];
+}
+
+export function ReturnedContent(props: ReturnedContentProps) @{
+	const [count, setCount] = useState(0);
+	useEffect(() => {
+		props.log('mount');
+		return () => props.log('cleanup');
+	});
+	<button
+		class="returned-content"
+		ref={props.onRef}
+		onClick={() => {
+			setCount(count + 1);
+			props.onIncrement();
+		}}
+	>
+		{props.label + ':' + props.count + ':' + count}
+	</button>
+}
+
+export function UndefinedBranch(props: OptionalReturnProps) {
+	const [count, setCount] = useState(0);
+	return props.shown
+		? <ReturnedContent
+				label={props.label}
+				count={count}
+				onIncrement={() => setCount(count + 1)}
+				log={props.log}
+				onRef={props.onRef}
+			/>
+		: undefined as never;
+}
+
+export function OptionalTransition(props: OptionalReturnProps) {
+	const [count, setCount] = useState(0);
+	return props.item &&
+		<ViewTransition exit="auto" default="none">
+			<ReturnedContent
+				label={props.item.title}
+				count={count}
+				onIncrement={() => setCount(count + 1)}
+				log={props.log}
+				onRef={props.onRef}
+			/>
+		</ViewTransition>;
+}
+
+export function ReturnedOutputWithSibling(props: OptionalReturnProps & { read: () => string }) @{
+	<section class="returned-siblings">
+		<UndefinedBranch shown={props.shown} label={props.label} log={props.log} onRef={props.onRef} />
+		<p class="returned-sibling">{props.read() as string}</p>
+	</section>
+}
 
 // A component used at a `<Foo/>` site need not return JSX — it can return a
 // primitive (coerced to text) or take an early return. "Component-ness" is the

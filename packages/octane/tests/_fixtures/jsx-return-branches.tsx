@@ -1,5 +1,87 @@
 /** @jsxImportSource octane */
-import { memo, useState } from 'octane';
+import { memo, useEffect, useState, ViewTransition } from 'octane';
+
+interface OptionalReturnProps {
+	shown: boolean;
+	item?: { title: string };
+	label: string;
+	empty?: 'bare' | 'fallthrough';
+	log: (entry: string) => void;
+	onRef: (node: HTMLButtonElement | null) => void;
+}
+
+function ReturnedContent(
+	props: Pick<OptionalReturnProps, 'label' | 'log' | 'onRef'> & {
+		count: number;
+		onIncrement: () => void;
+	},
+) {
+	const [count, setCount] = useState(0);
+	useEffect(() => {
+		props.log('mount');
+		return () => props.log('cleanup');
+	});
+	return (
+		<button
+			className="returned-content"
+			ref={props.onRef}
+			onClick={() => {
+				setCount(count + 1);
+				props.onIncrement();
+			}}
+		>
+			{props.label + ':' + props.count + ':' + count}
+		</button>
+	);
+}
+
+export function UndefinedBranch(props: OptionalReturnProps) {
+	const [count, setCount] = useState(0);
+	return props.shown ? (
+		<ReturnedContent
+			label={props.label}
+			count={count}
+			onIncrement={() => setCount(count + 1)}
+			log={props.log}
+			onRef={props.onRef}
+		/>
+	) : (
+		(undefined as never)
+	);
+}
+
+export function OptionalTransition(props: OptionalReturnProps) {
+	const [count, setCount] = useState(0);
+	return (
+		props.item && (
+			<ViewTransition exit="auto" default="none">
+				<ReturnedContent
+					label={props.item.title}
+					count={count}
+					onIncrement={() => setCount(count + 1)}
+					log={props.log}
+					onRef={props.onRef}
+				/>
+			</ViewTransition>
+		)
+	);
+}
+
+export function ReturnGuard(props: OptionalReturnProps) {
+	const [count, setCount] = useState(0);
+	if (props.shown) {
+		return (
+			<ReturnedContent
+				label={props.label}
+				count={count}
+				onIncrement={() => setCount(count + 1)}
+				log={props.log}
+				onRef={props.onRef}
+			/>
+		);
+	}
+	if (props.empty === 'bare') return;
+}
 
 // React-style components whose output is chosen by plain `if`/ternary RETURNS.
 // The semantic contract is dialect-independent: whatever compilation strategy

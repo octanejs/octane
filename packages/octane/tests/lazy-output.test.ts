@@ -1,6 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { createElement, flushSync, hydrateRoot, lazy, memo } from '../src/index.js';
+import {
+	createElement,
+	flushSync,
+	hydrateRoot,
+	lazy,
+	memo,
+	textSlot,
+	ViewTransition,
+	type ComponentBody,
+} from '../src/index.js';
 import * as ServerRuntime from 'octane/server';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { act, mount } from './_helpers.js';
@@ -25,6 +34,76 @@ function immediate<T>(value: T): PromiseLike<T> {
 }
 
 describe('resolved lazy body ownership', () => {
+	it('keeps text-only output when a returned lazy body switches to a native body', () => {
+		const TextOnly: ComponentBody<{ text: string }> = (props, scope) => {
+			textSlot(scope, 0, scope.block.parentNode, props.text, scope.block.endMarker);
+		};
+		let selected: ComponentBody<any> = (props: { text: string }) => props.text;
+		const Lazy = lazy(() =>
+			immediate({
+				get default() {
+					return selected;
+				},
+			}),
+		);
+		const view = mount(Lazy, { text: 'returned' });
+		try {
+			expect(view.container.textContent).toBe('returned');
+			selected = TextOnly;
+			const unchanged = { text: 'native unchanged' };
+			for (const props of [
+				{ text: 'native first' },
+				unchanged,
+				unchanged,
+				{ text: 'native changed' },
+			]) {
+				view.update(Lazy, props);
+				expect(view.container.textContent).toBe(props.text);
+			}
+
+			selected = () => undefined;
+			view.update(Lazy, { text: 'hidden' });
+			expect(view.container.textContent).toBe('');
+			view.update(Lazy, { text: 'still hidden' });
+			expect(view.container.textContent).toBe('');
+
+			selected = TextOnly;
+			for (const text of ['after empty', 'live again', 'live again']) {
+				view.update(Lazy, { text });
+				expect(view.container.textContent).toBe(text);
+			}
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('keeps children when a returned lazy body switches to ViewTransition, then clears undefined output', () => {
+		let selected: ComponentBody<any> = () => createElement('span', { children: 'returned' });
+		const payload = {
+			get default() {
+				return selected;
+			},
+		};
+		const Lazy = lazy(() => immediate(payload));
+		const children = createElement('em', { children: 'transition child' });
+		const view = mount(Lazy, { children });
+		try {
+			expect(view.find('span').textContent).toBe('returned');
+			selected = ViewTransition;
+			view.update(Lazy, { children });
+			expect(view.findAll('span')).toEqual([]);
+			expect(view.find('em').textContent).toBe('transition child');
+			view.update(Lazy, { children });
+			expect(view.find('em').textContent).toBe('transition child');
+
+			selected = () => undefined;
+			view.update(Lazy, { children });
+			expect(view.container.textContent).toBe('');
+		} finally {
+			view.unmount();
+		}
+	});
+
 	for (const depth of [1, 2]) {
 		it.each([false, true])(
 			`checks bodies through ${depth} memo wrappers (custom comparator=%s)`,

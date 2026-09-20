@@ -295,6 +295,7 @@ root.render(App, props);
 const initialInput = document.querySelector('#draft');
 
 interface Update {
+	optional?: AppProps['optional'];
 	visible?: boolean;
 	text?: string;
 	title?: string;

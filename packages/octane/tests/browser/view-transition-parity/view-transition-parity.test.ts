@@ -133,6 +133,28 @@ async function holdFont(page: Page) {
 }
 
 describe.sequential.each(['dev', 'prod'] as const)('native View Transition parity (%s)', (mode) => {
+	it('removes an optional sidebar returning undefined after its native exit animation', async () => {
+		const fixture = await openPage(mode);
+		try {
+			const { page, errors } = fixture;
+			await transition(page, { optional: { title: 'first' }, transition: { default: 'none' } });
+			for (const title of ['second', 'third']) {
+				const previous = await page.locator('#optional-sidebar').elementHandle();
+				expect(previous).not.toBeNull();
+				const removed = await transition(page, { optional: null });
+				expect(removed.calls.length).toBeGreaterThan(0);
+				expect(removed.calls.every((call) => call.finished === 'fulfilled')).toBe(true);
+				await expect(page.locator('#optional-sidebar').count()).resolves.toBe(0);
+				expect(await previous!.evaluate((node) => node.isConnected)).toBe(false);
+				await transition(page, { optional: { title } });
+				await expect(page.locator('#optional-sidebar').textContent()).resolves.toBe(title);
+			}
+			expect(errors).toEqual([]);
+		} finally {
+			await fixture.close();
+		}
+	});
+
 	it('preserves focus, selection and scroll while reordering a focused survivor without moveBefore', async () => {
 		const fixture = await openPage(mode);
 		try {
