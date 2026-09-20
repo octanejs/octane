@@ -266,6 +266,7 @@
   },
   "dependencies": {
     "@tsrx/core": "catalog:default",
+    "@tsrx/oxc": "catalog:default",
     "@types/react": "catalog:default",
     "@volar/language-core": "catalog:default",
     "@volar/typescript": "catalog:default",
@@ -275,7 +276,7 @@
     "entities": "7.0.1",
     "es-module-lexer": "catalog:default",
     "esrap": "catalog:default",
-    "@tsrx/oxc": "catalog:default"
+    "mdn-data": "^2.36.0"
   },
   "peerDependencies": {
     "react": "^19.0.0",
