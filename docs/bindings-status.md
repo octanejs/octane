@@ -258,7 +258,7 @@ Scope/evidence last checked: 2026-09-06.
 
 ## @octanejs/better-auth
 
-[`packages/better-auth`](../packages/better-auth) `0.0.5` — ports `better-auth@1.7.4`. Status data: [`packages/better-auth/status.json`](../packages/better-auth/status.json).
+[`packages/better-auth`](../packages/better-auth) `0.0.6` — ports `better-auth@1.7.4`. Status data: [`packages/better-auth/status.json`](../packages/better-auth/status.json).
 
 The public framework-agnostic Better Auth client is reused unchanged. `createAuthClient` converts the built-in session atom and plugin-provided atoms into Octane hooks while preserving endpoint actions, `$fetch`, `$store`, `$ERROR_CODES`, `$Infer`, and plugin inference. The upstream-compatible `useStore` helper is also included.
 
@@ -1055,7 +1055,7 @@ See also: [`docs/radix-migration-plan.md`](radix-migration-plan.md)
 
 ## @octanejs/rainbowkit
 
-[`packages/rainbowkit`](../packages/rainbowkit) `0.0.35` — ports `@rainbow-me/rainbowkit@2.2.11`. Status data: [`packages/rainbowkit/status.json`](../packages/rainbowkit/status.json).
+[`packages/rainbowkit`](../packages/rainbowkit) `0.0.36` — ports `@rainbow-me/rainbowkit@2.2.11`. Status data: [`packages/rainbowkit/status.json`](../packages/rainbowkit/status.json).
 
 Octane-native RainbowKitProvider, ConnectButton and ConnectButton.Custom, WalletButton, connect/account/chain modal hooks, connector selection, account/chain actions, native accessible dialogs, and light/dark/midnight themes.
 
@@ -1552,7 +1552,7 @@ Scope/evidence last checked: 2026-08-13.
 
 ## @octanejs/tanstack-devtools
 
-[`packages/tanstack-devtools`](../packages/tanstack-devtools) `0.0.47` — ports `@tanstack/react-devtools@0.10.12`. Status data: [`packages/tanstack-devtools/status.json`](../packages/tanstack-devtools/status.json).
+[`packages/tanstack-devtools`](../packages/tanstack-devtools) `0.0.48` — ports `@tanstack/react-devtools@0.10.12`. Status data: [`packages/tanstack-devtools/status.json`](../packages/tanstack-devtools/status.json).
 
 Surface-present for the pinned adapter's runtime entrypoint, with additive framework-neutral core re-exports. A same-fixture differential covers mount, config synchronization, plugin/title/trigger portals, and teardown. Upstream has no runtime suite; its test:types source compile is recorded as present type evidence with required pristine/adapted type lanes. Provenance is verified; core-version drift and Octane-specific type names/core re-exports stay as explicit divergences.
 
@@ -1968,7 +1968,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/wagmi
 
-[`packages/wagmi`](../packages/wagmi) `0.0.35` — ports `wagmi@3.7.7`. Status data: [`packages/wagmi/status.json`](../packages/wagmi/status.json).
+[`packages/wagmi`](../packages/wagmi) `0.0.36` — ports `wagmi@3.7.7`. Status data: [`packages/wagmi/status.json`](../packages/wagmi/status.json).
 
 WagmiProvider and createConfig over @wagmi/core 3.6.5, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks.
 

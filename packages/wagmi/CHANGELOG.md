@@ -1,5 +1,14 @@
 # @octanejs/wagmi
 
+## 0.0.36
+
+### Patch Changes
+
+- 83ee964: Update Better Auth to 1.7.4, including initial session hydration through the existing client adapter. Update TanStack Devtools core to 0.14.2 and validate the unchanged adapter against React Devtools 0.10.12.
+
+  Update the supported Wagmi adapter to core 3.6.5 and connectors 8.2.0, with compatibility against Wagmi 3.7.7.
+- @octanejs/tanstack-query@0.1.54
+
 ## 0.0.35
 
 ### Patch Changes
