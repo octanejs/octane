@@ -4,9 +4,11 @@
 
 ### Patch Changes
 
-- 87f19a8: Clear a component's previous returned subtree when its next output is undefined, including optional ViewTransition children and lazy body handoffs, while preserving compiled imperative output.
-- e855d68: Fix focused DOM moves between parents in browsers without native `moveBefore`, including staged commits. Cross-parent insertions no longer enter the sibling-rotation fallback or incorrectly skip appending a node, while same-parent reorders retain editing continuity.
-- 2a952b8: Keep deferred hydration dormant when an unchanged native signal refresh rechecks a false condition. Preserve native subscriptions and early activation for parent capture or provider-context updates.
+- 87f19a8: Clear a component's previous returned subtree when its next output is undefined, including bare returns and optional ViewTransition children. Removed children dispose effects and refs and remount with fresh state while parent state is preserved.
+
+  Correct lazy handoffs to compiled template branches, lists and Activity output, preserving updates, Activity hide/reveal and cleanup. Discarded renders retain committed output, nested branch removal preserves following siblings, and compiled imperative completion still preserves rendered content. Fixes [#1186](https://github.com/octanejs/octane/issues/1186).
+- e855d68: Fix focused DOM moves between parents in the `insertBefore` fallback, including staged commits and shadow-DOM editors. Anchored moves no longer throw or hang, and append moves place the node correctly. Same-parent reorders preserve editing continuity. Fixes [#1182](https://github.com/octanejs/octane/issues/1182).
+- 2a952b8: Keep deferred hydration dormant when a native signal refresh rechecks an unchanged false condition, preserving server DOM and native subscriptions until activation. Parent capture and provider-context updates still activate children with current values, including memo-wrapped boundaries and queued refreshes. Fixes [#1180](https://github.com/octanejs/octane/issues/1180).
 
 ## 0.3.3
 
