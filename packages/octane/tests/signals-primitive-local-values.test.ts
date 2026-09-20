@@ -8,6 +8,8 @@ import * as native from './_fixtures/primitive-local-native-values.tsrx';
 import { GlobalMutationValue } from './_fixtures/primitive-local-global-mutation.tsrx';
 import { WrappedMutationValue } from './_fixtures/primitive-local-wrapped-mutation.tsrx';
 import { NativeMutationValue } from './_fixtures/primitive-local-native-mutation.tsrx';
+import { SatisfiesWriteValue } from './_fixtures/primitive-local-satisfies-write.tsrx';
+import { GlobalSatisfiesWriteValue } from './_fixtures/primitive-local-global-satisfies-write.tsrx';
 
 const compileOptions = { dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod', hmr: false };
 const server = loadServerFixture<typeof client>(
@@ -26,6 +28,15 @@ const wrappedServer = loadServerFixture<{ WrappedMutationValue: typeof WrappedMu
 	'packages/octane/tests/_fixtures/primitive-local-wrapped-mutation.tsrx',
 	{ compileOptions },
 );
+const satisfiesWriteServer = loadServerFixture<{
+	SatisfiesWriteValue: typeof SatisfiesWriteValue;
+}>('packages/octane/tests/_fixtures/primitive-local-satisfies-write.tsrx', { compileOptions });
+
+const globalSatisfiesWriteServer = loadServerFixture<{
+	GlobalSatisfiesWriteValue: typeof GlobalSatisfiesWriteValue;
+}>('packages/octane/tests/_fixtures/primitive-local-global-satisfies-write.tsrx', {
+	compileOptions,
+});
 
 const nativeMutationServer = loadServerFixture<{ NativeMutationValue: typeof NativeMutationValue }>(
 	'packages/octane/tests/_fixtures/primitive-local-native-mutation.tsrx',
@@ -38,7 +49,7 @@ function conversionReturningHandle(handle: unknown) {
 	const builtin = String;
 	const replacement = (value: unknown) => (value === handle ? value : builtin(value));
 	Object.setPrototypeOf(replacement, builtin);
-	return replacement;
+	return replacement as typeof String;
 }
 
 describe('primitive setup values across server rendering and adoption', () => {
@@ -282,6 +293,69 @@ describe('primitive setup values across server rendering and adoption', () => {
 				'actual handle',
 			]);
 			flushSync(() => scope.set(value$, 'still live'));
+			expect([output.textContent, output.title, input.value]).toEqual([
+				'still live',
+				'still live',
+				'still live',
+			]);
+		});
+	}
+
+	for (const [kind, View, ServerView] of [
+		['opaque', SatisfiesWriteValue, satisfiesWriteServer.SatisfiesWriteValue],
+		['global', GlobalSatisfiesWriteValue, globalSatisfiesWriteServer.GlobalSatisfiesWriteValue],
+	] as const) {
+		it(`preserves adopted live handles after ${kind} satisfies-wrapped constructor write`, () => {
+			const scope = createScope({ scopeKey: 'primitive-satisfies-' + kind + '-write' });
+			scopes.push(scope);
+			const value$ = scope.signal$('value', 'actual handle');
+			const props = {
+				value$,
+				env: globalThis,
+				replacement: conversionReturningHandle(value$),
+			};
+			const original = Object.getOwnPropertyDescriptor(globalThis, 'String')!;
+			let html: string;
+			try {
+				html = renderToString(ServerView, props, {
+					signalOwner: scope,
+				}).html;
+			} finally {
+				Object.defineProperty(globalThis, 'String', original);
+			}
+			host.innerHTML = html;
+			const output = host.querySelector('output')!;
+			const input = host.querySelector('input')!;
+			input.focus();
+			input.setSelectionRange(2, 5);
+			try {
+				flushSync(() => {
+					root = hydrateRoot(host, View, props, { signalOwner: scope });
+				});
+			} finally {
+				Object.defineProperty(globalThis, 'String', original);
+			}
+			expect(host.querySelector('output')).toBe(output);
+			expect(host.querySelector('input')).toBe(input);
+			expect(document.activeElement).toBe(input);
+			expect([input.selectionStart, input.selectionEnd]).toEqual([2, 5]);
+			expect([output.textContent, output.title, input.value]).toEqual([
+				'actual handle',
+				'actual handle',
+				'actual handle',
+			]);
+			flushSync(() => scope.set(value$, 'still live'));
+			expect(host.querySelector('output')).toBe(output);
+			expect(host.querySelector('input')).toBe(input);
+			expect([output.textContent, output.title, input.value]).toEqual([
+				'still live',
+				'still live',
+				'still live',
+			]);
+			root!.unmount();
+			root = undefined;
+			flushSync(() => scope.set(value$, 'after disposal'));
+			expect(host.textContent).toBe('');
 			expect([output.textContent, output.title, input.value]).toEqual([
 				'still live',
 				'still live',

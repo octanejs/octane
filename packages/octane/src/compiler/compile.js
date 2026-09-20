@@ -23870,16 +23870,9 @@ const INTRINSIC_MUTATION_METHODS = new Set([
 ]);
 
 function mayWriteTextIntrinsicMember(target) {
+	target = unwrapTsExpr(target);
 	if (!target || typeof target !== 'object') return false;
-	if (
-		target.type === 'TSAsExpression' ||
-		target.type === 'TSTypeAssertion' ||
-		target.type === 'TSNonNullExpression' ||
-		target.type === 'ParenthesizedExpression' ||
-		target.type === 'AssignmentPattern'
-	) {
-		return mayWriteTextIntrinsicMember(target.expression ?? target.left);
-	}
+	if (target.type === 'AssignmentPattern') return mayWriteTextIntrinsicMember(target.left);
 	if (target.type === 'MemberExpression') {
 		return target.computed
 			? target.property?.type !== 'Literal' || TEXT_INTRINSICS.has(target.property.value)
@@ -23930,15 +23923,8 @@ function isPossibleIntrinsicMutator(node) {
 // proofs for the module. Calls still evaluate the authored callee: a replacement
 // may return an element rather than the built-in's primitive result.
 function writesGlobalTextIntrinsic(target, lexical) {
+	target = unwrapTsExpr(target);
 	if (!target || typeof target !== 'object') return false;
-	if (
-		target.type === 'TSAsExpression' ||
-		target.type === 'TSTypeAssertion' ||
-		target.type === 'TSNonNullExpression' ||
-		target.type === 'ParenthesizedExpression'
-	) {
-		return writesGlobalTextIntrinsic(target.expression, lexical);
-	}
 	const unbound = (node, name) => {
 		const scope = lexical.nodeScopes.get(node);
 		return scope !== undefined && !lexical.isBound(scope, name);
