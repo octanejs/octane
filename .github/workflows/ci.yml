@@ -927,6 +927,14 @@ jobs:
           OCTANE_REDACT_AUDIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: pnpm redact-audit:check
 
+      # Every observed agent styling failure becomes machinery through the
+      # audit ledger: a committed repro fixture triaged to a diagnostic, an
+      # eval task, or prose. The gate proves each triaged target exists and
+      # that each fixture compiles the way its entry records — silently until
+      # its diagnostic ships, then with the recorded code.
+      - name: Check styling failure ledger
+        run: pnpm styling-ledger:check
+
       # Production error URLs are a public compatibility surface. Keep the
       # append-only catalog, generated client/server formatters, and literal
       # runtime call sites synchronized before a package can be built.
