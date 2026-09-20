@@ -1,7 +1,7 @@
 /** @jsxImportSource octane */
 // Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria-components/src/ColorSwatchPicker.tsx).
 import { isChildrenBlock } from 'octane';
-import {
+import type {
 	AriaLabelingProps,
 	GlobalDOMAttributes,
 	HoverEvents,
@@ -9,24 +9,29 @@ import {
 	ValueBase,
 } from '@react-types/shared';
 import {
-	ClassNameOrFunction,
+	type ClassNameOrFunction,
 	composeRenderProps,
-	ContextValue,
-	RenderProps,
-	StyleRenderProps,
+	type ContextValue,
+	type RenderProps,
+	type StyleRenderProps,
 	useContextProps,
 } from './utils';
-import { Color } from '../upstream-exports/react-stately/Color';
+import type { Color } from '../upstream-exports/react-stately/Color';
 import { ColorSwatchContext } from './ColorSwatch';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
 import intlMessages from '../intl/react-aria-components/index';
-import { ListBox, ListBoxItem, ListBoxItemRenderProps, ListBoxRenderProps } from './ListBox';
+import {
+	ListBox,
+	ListBoxItem,
+	type ListBoxItemRenderProps,
+	type ListBoxRenderProps,
+} from './ListBox';
 import { parseColor } from '../upstream-exports/react-stately/Color';
 import React, {
 	createContext,
-	ForwardedRef,
+	type ForwardedRef,
 	forwardRef,
-	ReactNode,
+	type ReactNode,
 	useContext,
 	useEffect,
 	useMemo,

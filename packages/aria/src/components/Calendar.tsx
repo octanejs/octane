@@ -12,12 +12,12 @@
  * governing permissions and limitations under the License.
  */
 import {
-	CalendarHeadingProps as AriaCalendarHeadingProps,
-	CalendarMonthPickerProps as AriaCalendarMonthPickerProps,
-	AriaCalendarProps,
-	CalendarYearPickerProps as AriaCalendarYearPickerProps,
-	CalendarMonthPickerAria,
-	CalendarYearPickerAria,
+	type CalendarHeadingProps as AriaCalendarHeadingProps,
+	type CalendarMonthPickerProps as AriaCalendarMonthPickerProps,
+	type AriaCalendarProps,
+	type CalendarYearPickerProps as AriaCalendarYearPickerProps,
+	type CalendarMonthPickerAria,
+	type CalendarYearPickerAria,
 	useCalendar,
 	useCalendarCell,
 	useCalendarGrid,
@@ -26,44 +26,44 @@ import {
 	useCalendarYearPicker,
 } from '../upstream-exports/react-aria/useCalendar';
 import {
-	AriaRangeCalendarProps,
+	type AriaRangeCalendarProps,
 	useRangeCalendar,
 } from '../upstream-exports/react-aria/useRangeCalendar';
 import { ButtonContext } from './Button';
 import {
 	CalendarDate,
-	CalendarIdentifier,
+	type CalendarIdentifier,
 	createCalendar,
-	DateDuration,
+	type DateDuration,
 	endOfMonth,
-	Calendar as ICalendar,
+	type Calendar as ICalendar,
 	isSameDay,
 	isSameMonth,
 	isToday,
 } from '@internationalized/date';
-import {
+import type {
 	CalendarSelectionMode,
 	CalendarState,
 } from '../upstream-exports/react-stately/useCalendarState';
 import {
-	ClassNameOrFunction,
-	ContextValue,
+	type ClassNameOrFunction,
+	type ContextValue,
 	dom,
-	DOMProps,
-	DOMRenderProps,
+	type DOMProps,
+	type DOMRenderProps,
 	Provider,
-	RenderProps,
-	SlotProps,
-	StyleProps,
+	type RenderProps,
+	type SlotProps,
+	type StyleProps,
 	useContextProps,
 	useRenderProps,
 	useSlottedContext,
 } from './utils';
 import {
-	DateValue,
+	type DateValue,
 	useRangeCalendarState,
 } from '../upstream-exports/react-stately/useRangeCalendarState';
-import {
+import type {
 	DOMAttributes,
 	FocusableElement,
 	forwardRefType,
@@ -71,15 +71,15 @@ import {
 	HoverEvents,
 } from '@react-types/shared';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
-import { Heading, HeadingContext, HeadingProps } from './Heading';
+import { Heading, HeadingContext, type HeadingProps } from './Heading';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
-import { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
+import type { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
 import React, {
 	createContext,
-	ForwardedRef,
+	type ForwardedRef,
 	forwardRef,
-	JSX,
-	ReactElement,
+	type JSX,
+	type ReactElement,
 	useContext,
 	useRef,
 } from '../compat/react';

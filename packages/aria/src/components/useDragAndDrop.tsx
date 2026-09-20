@@ -13,43 +13,43 @@
  */
 
 import {
-	DropIndicatorProps as AriaDropIndicatorProps,
-	DropIndicatorAria,
-	DroppableCollectionOptions,
-	DroppableCollectionResult,
-	DroppableItemOptions,
-	DroppableItemResult,
+	type DropIndicatorProps as AriaDropIndicatorProps,
+	type DropIndicatorAria,
+	type DroppableCollectionOptions,
+	type DroppableCollectionResult,
+	type DroppableItemOptions,
+	type DroppableItemResult,
 	useDropIndicator,
 	useDroppableCollection,
 	useDroppableItem,
 } from '../upstream-exports/react-aria/useDroppableCollection';
 import {
-	DraggableCollectionOptions,
-	DraggableItemProps,
-	DraggableItemResult,
+	type DraggableCollectionOptions,
+	type DraggableItemProps,
+	type DraggableItemResult,
 	DragPreview,
 	useDraggableCollection,
 	useDraggableItem,
 } from '../upstream-exports/react-aria/useDraggableCollection';
-import {
+import type {
 	DraggableCollectionProps,
 	DroppableCollectionProps,
 	Key,
 	RefObject,
 } from '@react-types/shared';
 import {
-	DraggableCollectionState,
-	DraggableCollectionStateOptions,
+	type DraggableCollectionState,
+	type DraggableCollectionStateOptions,
 	useDraggableCollectionState,
 } from '../upstream-exports/react-stately/useDraggableCollectionState';
-import { DragItem, DropTarget, DropTargetDelegate } from '@react-types/shared';
+import type { DragItem, DropTarget, DropTargetDelegate } from '@react-types/shared';
 import {
-	DroppableCollectionState,
-	DroppableCollectionStateOptions,
+	type DroppableCollectionState,
+	type DroppableCollectionStateOptions,
 	useDroppableCollectionState,
 } from '../upstream-exports/react-stately/useDroppableCollectionState';
 import { isVirtualDragging } from '../upstream-exports/react-aria/private/dnd/DragManager';
-import { JSX, useMemo } from '../compat/react';
+import { type JSX, useMemo } from '../compat/react';
 import { ListDropTargetDelegate } from '../upstream-exports/react-aria/ListDropTargetDelegate';
 
 // Compatibility exports consumed by the existing collection component ports.

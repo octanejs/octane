@@ -13,8 +13,8 @@
  */
 
 import { ChildView, ReusableView, RootView } from './ReusableView';
-import { Collection, Key } from '@react-types/shared';
-import {
+import type { Collection, Key } from '@react-types/shared';
+import type {
 	InvalidationContext,
 	Mutable,
 	VirtualizerDelegate,
@@ -26,7 +26,7 @@ import { LayoutInfo } from './LayoutInfo';
 import { OverscanManager } from './OverscanManager';
 import { Point } from './Point';
 import { Rect } from './Rect';
-import { ScrollAnchor, ScrollAnchorTracker } from './ScrollAnchor';
+import { type ScrollAnchor, ScrollAnchorTracker } from './ScrollAnchor';
 import { Size } from './Size';
 
 interface VirtualizerOptions<T extends object, V> {

@@ -1,16 +1,16 @@
 /** @jsxImportSource octane */
 // Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria-components/src/ColorThumb.tsx).
-import { ClassNameOrFunction, dom, RenderProps, useRenderProps } from './utils';
-import { Color } from '../upstream-exports/react-stately/Color';
+import { type ClassNameOrFunction, dom, type RenderProps, useRenderProps } from './utils';
+import type { Color } from '../upstream-exports/react-stately/Color';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
-import { GlobalDOMAttributes, HoverEvents, RefObject } from '@react-types/shared';
+import type { GlobalDOMAttributes, HoverEvents, RefObject } from '@react-types/shared';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
 import React, {
 	createContext,
-	ForwardedRef,
+	type ForwardedRef,
 	forwardRef,
-	HTMLAttributes,
-	InputHTMLAttributes,
+	type HTMLAttributes,
+	type InputHTMLAttributes,
 	useContext,
 } from '../compat/react';
 import { useFocusRing } from '../upstream-exports/react-aria/useFocusRing';
