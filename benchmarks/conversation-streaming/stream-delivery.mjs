@@ -50,7 +50,7 @@ export {decodeStreamedRendererFrame} from './packages/octane/src/streamed-signal
 		outfile: bundle,
 	});
 	source = {
-		head: execFileSync('og', ['git', 'rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+		head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
 		bundleHash: hash(fs.readFileSync(bundle)),
 		esbuildVersion,
 		inputs: Object.fromEntries(
