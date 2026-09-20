@@ -22,6 +22,14 @@
       "sha256": "7e49845827447091a6493473779a05ba45cb8302e3703a6f9e4225dd6315cce2"
     },
     {
+      "path": "upstream/base/calendar.tsx",
+      "sha256": "0a492edf3888b88a5505786c48165159285cfde7e6c52eb5e4c2fdc44b09ba21"
+    },
+    {
+      "path": "upstream/radix/calendar.tsx",
+      "sha256": "510cd66ea92cfa85832b2106c4fe9ce850b609110925fddb67470cfffe2dac19"
+    },
+    {
       "path": "upstream/style-nova.css",
       "sha256": "5d5751579c015b61e77cf0822862a43ac79f3e6fed236a17624be8e6d1ebea1d"
     }
@@ -29,7 +37,8 @@
   "transforms": [
     "Apply the pinned CLI createStyleMap/transformStyle to resolve cn-* hooks using style-nova.css.",
     "Resolve IconPlaceholder to default Lucide icons.",
-    "React references preserve React and @base-ui/react@1.8.0 imports. Octane sources substitute octane and @octanejs/base-ui/@octanejs/lucide and omit the RSC-only directive."
+    "React references preserve React and @base-ui/react@1.8.0 imports. Octane sources substitute octane and @octanejs/base-ui/@octanejs/lucide and omit the RSC-only directive.",
+    "Calendar: react-day-picker -> @octanejs/day-picker; the four `components` overrides move out of the inline object literal so a re-render keeps their component types; CalendarDayButton attaches the ref the base flavor leaves unattached."
   ],
-  "scope": "Existing component-family delta is cn imports only; new Base UI wrappers are select, navigation-menu and scroll-area. This is not a full CLI or registry port."
+  "scope": "Existing component-family delta is cn imports only; new Base UI wrappers are select, navigation-menu and scroll-area. Calendar is a new family in the Base UI and Radix bases, transcribed from bases/{base,radix}/ui/calendar.tsx at this pin and running on @octanejs/day-picker (react-day-picker@10.0.1); those two upstream sources differ only in the ui/button import and one ref. This is not a full CLI or registry port."
 }

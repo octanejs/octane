@@ -36,6 +36,7 @@
     "./Badge": "./src/bases/radix/ui/badge.tsrx",
     "./Breadcrumb": "./src/bases/radix/ui/breadcrumb.tsrx",
     "./Button": "./src/bases/radix/ui/button.tsrx",
+    "./Calendar": "./src/bases/radix/ui/calendar.tsrx",
     "./Card": "./src/bases/radix/ui/card.tsrx",
     "./Checkbox": "./src/bases/radix/ui/checkbox.tsrx",
     "./Collapsible": "./src/bases/radix/ui/collapsible.tsrx",
@@ -113,6 +114,7 @@
     "./base-ui/Badge": "./src/bases/base-ui/ui/badge.tsrx",
     "./base-ui/Breadcrumb": "./src/bases/base-ui/ui/breadcrumb.tsrx",
     "./base-ui/Button": "./src/bases/base-ui/ui/button.tsrx",
+    "./base-ui/Calendar": "./src/bases/base-ui/ui/calendar.tsrx",
     "./base-ui/Card": "./src/bases/base-ui/ui/card.tsrx",
     "./base-ui/Checkbox": "./src/bases/base-ui/ui/checkbox.tsrx",
     "./base-ui/Collapsible": "./src/bases/base-ui/ui/collapsible.tsrx",
@@ -165,6 +167,7 @@
   "dependencies": {
     "@octanejs/aria": "workspace:*",
     "@octanejs/base-ui": "workspace:*",
+    "@octanejs/day-picker": "workspace:*",
     "@octanejs/lucide": "workspace:*",
     "@octanejs/radix": "workspace:*",
     "@octanejs/sonner": "workspace:*",
@@ -184,6 +187,7 @@
     "octane": "workspace:*",
     "radix-ui": "catalog:default",
     "react": "catalog:default",
+    "react-day-picker": "catalog:default",
     "react-dom": "catalog:default",
     "tailwind-merge": "catalog:default",
     "vitest": "catalog:default"

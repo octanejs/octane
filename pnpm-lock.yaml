@@ -8192,6 +8192,9 @@ importers:
       '@octanejs/base-ui':
         specifier: workspace:*
         version: link:../base-ui
+      '@octanejs/day-picker':
+        specifier: workspace:*
+        version: link:../day-picker
       '@octanejs/lucide':
         specifier: workspace:*
         version: link:../lucide
@@ -8235,6 +8238,9 @@ importers:
       react:
         specifier: catalog:default
         version: 19.2.7
+      react-day-picker:
+        specifier: catalog:default
+        version: 10.0.1(@types/react@19.2.18)(react@19.2.7)
       react-dom:
         specifier: catalog:default
         version: 19.2.7(react@19.2.7)

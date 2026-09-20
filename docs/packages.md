@@ -87,7 +87,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/sanity-logos` | [`packages/sanity-logos`](../packages/sanity-logos) | framework binding | `0.1.3` | 2 |
 | `@octanejs/select` | [`packages/select`](../packages/select) | framework binding | `0.1.4` | 6 |
 | `@octanejs/seo` | [`packages/seo`](../packages/seo) | document metadata | `0.0.40` | 1 |
-| `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.43` | 124 |
+| `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.43` | 126 |
 | `@octanejs/solana-kit` | [`packages/solana-kit`](../packages/solana-kit) | framework binding | `0.0.24` | 2 |
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.49` | 2 |
 | `@octanejs/spring` | [`packages/spring`](../packages/spring) | framework binding | `0.0.19` | 2 |
