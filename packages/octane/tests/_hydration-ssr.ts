@@ -411,7 +411,9 @@ async function withHydrationServer<T>(
 				...bindingAliases(binding),
 			],
 		},
-		server: { middlewareMode: true, hmr: false },
+		// This server renders one immutable fixture. Unrelated parity suites create
+		// tsconfig.json files under the root, which invalidate SSR even with HMR off.
+		server: { middlewareMode: true, hmr: false, watch: null },
 	});
 
 	const invocation = {

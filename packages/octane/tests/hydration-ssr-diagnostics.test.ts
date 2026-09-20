@@ -1,6 +1,6 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { executeHydrationFixture, renderHydrationFixture } from './_hydration-ssr';
@@ -19,6 +19,15 @@ function Reader(props) {
   return createElement('p', null, client.label);
 }
 export function prepare() {}
+export async function renderAfterWorkspaceChange(change) {
+  await change();
+  const { useQueryClient: readClient } = await import('@octanejs/tanstack-query');
+  function UpdatedReader() {
+    return createElement('p', null, readClient().label);
+  }
+  return renderToString(createElement(QueryClientContext,
+    { value: { label: 'retained provider' } }, createElement(UpdatedReader))).html;
+}
 export function render(props) {
   const context = props.provided ? QueryClientContext : OtherContext;
   const providerProps = { get value() { return props.value; } };
@@ -78,6 +87,35 @@ function diagnosticLines(write: { mock: { calls: ReadonlyArray<ReadonlyArray<unk
 }
 
 describe('SSR hydration diagnostics', () => {
+	it.each(['0', '1'])(
+		'retains providers across unrelated workspace config writes (tracing %s)',
+		(tracing) =>
+			diagnosticCase(async () => {
+				vi.stubEnv('OCTANE_HYDRATION_SSR_TRACE', tracing);
+				const workspace = mkdtempSync(
+					resolve(import.meta.dirname, '../../../.hydration-workspace-'),
+				);
+				try {
+					const html = await executeHydrationFixture<string>(
+						'tanstack-query',
+						fixture,
+						'renderAfterWorkspaceChange',
+						async () => {
+							// Pristine parity suites create configs while other suites are rendering.
+							writeFileSync(join(workspace, 'tsconfig.json'), '{}');
+							// Allow the real filesystem watcher to deliver the unrelated config event.
+							await new Promise((resolve) => setTimeout(resolve, 500));
+						},
+					);
+					const container = document.createElement('div');
+					container.innerHTML = html;
+					expect(container.textContent).toBe('retained provider');
+				} finally {
+					rmSync(workspace, { recursive: true, force: true });
+				}
+			}),
+	);
+
 	describe('provider output with tracing', () => {
 		let write: Parameters<typeof diagnosticLines>[0];
 		let results: Array<{ html: string; reads: number }>;
