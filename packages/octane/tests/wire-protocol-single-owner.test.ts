@@ -20,6 +20,7 @@
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import {
 	formatUseId,
@@ -57,41 +58,35 @@ function sourceFiles(): string[] {
 	return out;
 }
 
-/**
- * Drop whole-line comments only. A prose mention of a key (runtime.ts explains
- * `Symbol.for('react.context')` in one) is not a second spelling, but anything
- * on a line with code still counts.
- */
-function code(source: string): string {
-	const kept: string[] = [];
-	let inBlock = false;
-	for (const raw of source.split('\n')) {
-		const line = raw.trim();
-		if (inBlock) {
-			if (line.includes('*/')) inBlock = false;
-			continue;
+function stringSpellings(source: string) {
+	const literals = new Set<string>();
+	const fragments: string[] = [];
+	const file = ts.createSourceFile('protocol.ts', source, ts.ScriptTarget.Latest);
+	function visit(node: ts.Node): void {
+		if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+			literals.add(node.text);
+		} else if (ts.isTemplateExpression(node)) {
+			fragments.push(node.head.text, ...node.templateSpans.map((span) => span.literal.text));
 		}
-		if (line.startsWith('/*')) {
-			if (!line.includes('*/')) inBlock = true;
-			continue;
-		}
-		if (line.startsWith('//') || line.startsWith('*')) continue;
-		kept.push(raw);
+		ts.forEachChild(node, visit);
 	}
-	return kept.join('\n');
+	visit(file);
+	return { literals, fragments };
 }
 
 const SOURCES = sourceFiles().map((file) => ({
 	name: relative(srcRoot, file),
-	code: code(readFileSync(file, 'utf8')),
+	...stringSpellings(readFileSync(file, 'utf8')),
 }));
 
-/** Files that spell `literal` inside a quoted string, in source order. */
-function spelledIn(literal: string): string[] {
-	const quoted = [`'${literal}'`, `"${literal}"`, `\`${literal}\``];
-	return SOURCES.filter(({ code: body }) => quoted.some((form) => body.includes(form))).map(
-		({ name }) => name,
-	);
+/** Quoted values and interpolated template fragments count; comments do not. */
+function spelledIn(literal: string, sources = SOURCES): string[] {
+	return sources
+		.filter(
+			({ literals, fragments }) =>
+				literals.has(literal) || fragments.some((fragment) => fragment.includes(literal)),
+		)
+		.map(({ name }) => name);
 }
 
 describe('hydration marker payloads', () => {
@@ -121,6 +116,24 @@ describe('hydration marker payloads', () => {
 });
 
 describe('presentation binding markers', () => {
+	it.each([
+		['a template head', 'const marker = `[b;${id};root`;'],
+		['a template middle', 'const marker = `${before}<!--[b;${id};root`;'],
+		['a template tail', 'const marker = `${prefix}[b;`;'],
+		['an escaped template fragment', 'const marker = `\\u005bb;${id};root`;'],
+		['a quoted value', "const marker = '[b;';"],
+	])('rejects a second spelling in %s', (_name, source) => {
+		const sources = [{ name: 'another-owner.ts', ...stringSpellings(source) }];
+		expect(spelledIn('[b;', sources)).toEqual(['another-owner.ts']);
+	});
+
+	it('ignores prose and unrelated quoted values', () => {
+		const source = '// const marker = `[b;${id};root`;\n/* "[b;" */\nconst value = "[function]";';
+		const sources = [{ name: 'another-owner.ts', ...stringSpellings(source) }];
+		expect(spelledIn('[b;', sources)).toEqual([]);
+		expect(spelledIn('[f', sources)).toEqual([]);
+	});
+
 	it('keeps the exact wire spelling the SSR serializer stamps', () => {
 		expect(BINDING_OPEN_PREFIX).toBe('[b;');
 		expect(bindingRootMarker('v7')).toBe('[b;v7;root');
