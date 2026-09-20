@@ -19979,6 +19979,64 @@ export function setText(node: Text, value: any): void {
 }
 
 const DIRECT_SIGNAL_BINDING = /* @__PURE__ */ Symbol('octane.direct-signal-binding');
+const CLAIMED_BINDING_VALUE = /* @__PURE__ */ Symbol('octane.claimed-binding-value');
+
+/** @internal Invalidate scalar-view caches when hydration retained a claimed publication. */
+export function hydrateClaimedBindingCaches(
+	scope: Scope,
+	fields: readonly (string | number)[],
+): void {
+	if (activeHydration() === null) return;
+	const bag = scope.slots[0] as Record<string, any>;
+	for (let i = 0; i < fields.length; i += 3) {
+		const field = fields[i]!;
+		const node = bag[fields[i + 1] as string] as Node;
+		const element = (
+			node.nodeType === 3 ? (STAGED_DOM?.view(node) ?? node).parentNode : node
+		) as Element;
+		const claims = domBindingClaims.get(element);
+		if (claims === undefined) continue;
+		const channel = fields[i + 2] as string;
+		const tokenOnly = channel === '#text-token';
+		let claimed = claims.has(
+			tokenOnly
+				? '#text'
+				: channel.startsWith('style:')
+					? 'style:' + styleName(channel.slice(6))
+					: channel,
+		);
+		if (channel === 'style') {
+			for (const name of claims.keys())
+				if (name.startsWith('style:')) {
+					claimed = true;
+					break;
+				}
+		}
+		if (!claimed) continue;
+		// A whole style must retain its actual CSS so null/removal can clear it;
+		// scalar raw-value caches instead need a value no authored scalar can equal.
+		const value =
+			channel === 'style'
+				? (STAGED_DOM?.view(element as HTMLElement) ?? (element as HTMLElement)).style.cssText
+				: CLAIMED_BINDING_VALUE;
+		if (typeof field === 'number') {
+			const slots = (scope.slots[field] as NativeStyleBinding).block!.slots;
+			journalRootProperty(slots, 0, slots[0]);
+			slots[0] = value;
+		} else {
+			const cached = bag[field];
+			if (cached?.[DIRECT_SIGNAL_BINDING] === true) {
+				if (TRANSITION_JOURNAL !== null) journalObjectOnce(cached);
+				cached.value = value;
+			} else if (!tokenOnly) {
+				// Scalar text keeps its adopted Text in the token field.
+				if (TRANSITION_JOURNAL !== null) journalBag();
+				bag[field] = value;
+			}
+		}
+	}
+}
+
 type DirectSignalBindingKind = 'text' | 'textOnlyChild' | 'attribute' | 'value' | 'checked';
 type DirectSignalAttributeKind = 'attr' | 'class' | 'booleanAttr' | 'ariaAttr' | 'stringData';
 

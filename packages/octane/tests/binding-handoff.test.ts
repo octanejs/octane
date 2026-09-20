@@ -10,7 +10,7 @@ function fixture(dev: boolean, text = false, handlers = false) {
 	const source = `import { unbound } from 'octane/behavior';
   export function Status(props) @{
     'use dom bindings';
-    <button type={props.type} disabled={props.disabled} aria-label={props.label}
+    <button type={props.type} disabled={props.disabled} aria-label={props.label} tabIndex={props.tabIndex}
       class={props.classes} style={{ opacity: props.opacity }} ${handlers ? 'onClick={unbound(props.onClick)}' : ''}>
       <span hidden={props.hidden}>${text ? '{props.message as string}' : ''}</span>
     </button>
@@ -54,6 +54,7 @@ function fixture(dev: boolean, text = false, handlers = false) {
 		classes: 'ready',
 		opacity: 1,
 		hidden: true,
+		tabIndex: 0,
 		message: '',
 		onClick: vi.fn(),
 	};
@@ -129,6 +130,7 @@ describe.each([false, true])('compiled early binding handoff (dev=%s)', (dev) =>
 			classes: 'busy',
 			opacity: 0.5,
 			hidden: false,
+			tabIndex: -1,
 		});
 		const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
 		flushSync(() => {
@@ -142,11 +144,29 @@ describe.each([false, true])('compiled early binding handoff (dev=%s)', (dev) =>
 		expect(button.className).toBe('busy');
 		expect(button.style.opacity).toBe('0.5');
 		expect(span.hasAttribute('hidden')).toBe(false);
+		expect(button.tabIndex).toBe(-1);
 		expect(warn).not.toHaveBeenCalled();
-		// The application connects to the same current source at commit before
-		// releasing the early adapter. Subsequent edits can return to the SSR value.
-		flushSync(() => root!.render(view.client.Status, view.state.getSnapshot()));
 		binding.dispose();
+		// Returning directly to the historical props must publish them even though
+		// hydration already evaluated those same values while retaining the adapter.
+		flushSync(() => root!.render(view.client.Status, view.initial));
+		expect(button.type).toBe('submit');
+		expect(button.disabled).toBe(false);
+		expect(button.getAttribute('aria-label')).toBe('Send');
+		expect(button.className).toBe('ready');
+		expect(button.style.opacity).toBe('1');
+		expect(span.hasAttribute('hidden')).toBe(true);
+		expect(button.tabIndex).toBe(0);
+		const unchanged = new MutationObserver(() => {});
+		unchanged.observe(button, {
+			attributes: true,
+			childList: true,
+			characterData: true,
+			subtree: true,
+		});
+		flushSync(() => root!.render(view.client.Status, view.initial));
+		expect(unchanged.takeRecords()).toHaveLength(0);
+		unchanged.disconnect();
 		flushSync(() =>
 			root!.render(view.client.Status, {
 				...view.initial,
@@ -190,6 +210,9 @@ describe.each([false, true])('compiled early binding handoff (dev=%s)', (dev) =>
 		view.publish({ message: 'Late result' });
 		expect(span.textContent).toBe('Newer edit');
 		expect(view.cleanup).toHaveBeenCalledOnce();
+		flushSync(() => root!.render(view.client.Status, view.initial));
+		expect(span.textContent).toBe('');
+		expect(span.firstChild).toBe(text);
 		flushSync(() =>
 			root!.render(view.client.Status, { ...view.initial, message: 'Application status' }),
 		);

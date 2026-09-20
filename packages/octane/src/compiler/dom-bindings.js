@@ -2300,6 +2300,11 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			);
 		}
 		for (const [node, replacement] of rewritten) replacements.set(node, replacement);
+		if (!plan.hostHandoff)
+			replacements.set(node, {
+				...mapCow(node, rewritten),
+				_octaneScalarBindingClaims: true,
+			});
 		if (plan.hostHandoff)
 			replacements.set(node, {
 				...mapCow(node, rewritten),

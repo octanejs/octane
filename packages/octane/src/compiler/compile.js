@@ -1444,6 +1444,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'bindSignalText',
 	'bindSignalChild',
 	'bindSignalAttribute',
+	'hydrateClaimedBindingCaches',
 	'bindSignalValue',
 	'bindSignalChecked',
 	'bindSignalHostPropSources',
@@ -15590,6 +15591,8 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
  * bodies. `cssHash` selects the enclosing scoped-style expression fallback.
  */
 function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null, options = null) {
+	const previousScalarBindingClaims = ctx.scalarBindingClaims;
+	ctx.scalarBindingClaims = node._octaneScalarBindingClaims;
 	const previousPresentationHydration = ctx.presentationHydration;
 	ctx.presentationHydration = node._octanePresentationHydration;
 	const returnedOutput = options?.returnedOutput === true;
@@ -16203,6 +16206,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		ctx,
 		presentationHostEnd,
 	);
+	ctx.scalarBindingClaims = previousScalarBindingClaims;
 	ctx.presentationHydration = previousPresentationHydration;
 	const emittedFunction = b.function_declaration(
 		b.id(name, node.id ?? node),
@@ -25489,6 +25493,69 @@ function planJsx(
 		if (!updateEmit) continue;
 		if (b.deferred) everyRenderLines.push(updateEmit);
 		else updateLines.push(updateEmit);
+	}
+	if (ctx.scalarBindingClaims) {
+		// Only opted-in scalar views can retain another writer's publication at
+		// hydration. Record their existing cache fields; ordinary output is unchanged.
+		const fields = [];
+		for (const binding of elementBindings) {
+			const key = binding.id;
+			const text = binding.kind === 'textOnlyChild' || binding.kind === 'text';
+			const host = text && !binding.signalDirect ? `_txt$${key}` : `_el$${key}`;
+			if (text && binding.signalDirect)
+				fields.push(bag.letter(`_sig$${key}`), bag.letter(host), '#text-token');
+			if (binding.kind === 'nativeStyle') {
+				fields.push(binding.slotIndex, bag.letter(host), 'style');
+			} else if (binding.kind === 'styleProperties') {
+				for (let i = 0; i < binding.properties.length; i++)
+					fields.push(
+						bag.letter(`_prev$${key}_${i}`),
+						bag.letter(host),
+						`style:${binding.properties[i].name}`,
+					);
+			} else if (binding.kind === 'style') {
+				fields.push(bag.letter(`_sty$${key}`), bag.letter(host), 'style');
+			} else if (
+				text ||
+				['attr', 'stringData', 'booleanAttr', 'ariaAttr', 'class', 'styleProperty'].includes(
+					binding.kind,
+				)
+			) {
+				const cache = binding.signalDirect && !text ? `_sig$${key}` : `_prev$${key}`;
+				fields.push(
+					bag.letter(cache),
+					bag.letter(host),
+					text
+						? '#text'
+						: binding.kind === 'styleProperty'
+							? `style:${binding.name}`
+							: binding.kind === 'class'
+								? 'class'
+								: ATTRIBUTE_ALIASES.get(binding.name) || binding.name,
+				);
+			}
+		}
+		if (fields.length) {
+			const name = `_claims$${ctx.nextHelperId++}`;
+			ctx.hoistedHelpers.push(
+				inheritOriginLoc(
+					b.const(name, b.array(fields.map((value) => b.literal(value)))),
+					planOrigin,
+				),
+			);
+			everyRenderLines.push(
+				inheritOriginLoc(
+					b.stmt(
+						b.call(
+							requireRuntimeForContext(ctx, 'hydrateClaimedBindingCaches'),
+							b.id('__s'),
+							b.id(name),
+						),
+					),
+					planOrigin,
+				),
+			);
+		}
 	}
 	if (keyedSelection !== null && single && !noTemplate) {
 		// Reuse the ordinary root-class write and its exact bag fields. Updating
