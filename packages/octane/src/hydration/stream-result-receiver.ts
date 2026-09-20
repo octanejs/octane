@@ -23,6 +23,7 @@ export interface StreamedResultReceiverOptions {
 	readonly ownerKey: string;
 	readonly maxPendingFrames?: number;
 	readonly maxPendingBytes?: number;
+	/** Maximum inactivity before the first result frame or between accepted result frames. */
 	readonly pendingTimeoutMs?: number;
 	readonly onError?: (error: StreamedReceiverError) => void;
 }
@@ -182,6 +183,12 @@ export function createStreamedResultReceiverState(
 	};
 	const isCurrent = (state: StreamedSelectionState, identity: StreamFrameIdentity): boolean =>
 		!disposed && state.failure === undefined && current(identity) === state;
+	const renewResultTimeout = (state: StreamedSelectionState): void => {
+		if (state.result.timer !== undefined) clearTimeout(state.result.timer);
+		state.result.timer = setTimeout(() => {
+			report(new StreamedReceiverError('timeout', 'Streamed result timed out.'), state);
+		}, timeoutMs);
+	};
 	const registerSelection = (identity: StreamFrameIdentity, contentRevision = 0): void => {
 		if (
 			!isStreamedRendererFrame({
@@ -216,11 +223,9 @@ export function createStreamedResultReceiverState(
 			contentRevision,
 		};
 		selections.set(key, state);
-		// A selected result has a bounded lifetime even if its open frame was
-		// lost, or arrived before modules. Attaching code does not end transport.
-		state.result.timer = setTimeout(() => {
-			report(new StreamedReceiverError('timeout', 'Streamed result timed out.'), state);
-		}, timeoutMs);
+		// Bound inactivity even if the open frame is lost or arrives before
+		// modules. Only accepted result frames renew the transport's deadline.
+		renewResultTimeout(state);
 	};
 	const attachResult = (
 		identity: StreamFrameIdentity,
@@ -311,7 +316,7 @@ export function createStreamedResultReceiverState(
 		if (frame.kind === 'complete' || frame.kind === 'error') {
 			result.terminal = true;
 			if (result.timer !== undefined) clearTimeout(result.timer);
-		}
+		} else if (!result.terminal && isCurrent(state, frame.identity)) renewResultTimeout(state);
 		if (frame.kind === 'complete') retainCompletedResult(result);
 		return 'accepted';
 	};
