@@ -1,0 +1,2703 @@
+{
+  "measurementBase": "47d5d1df25ffe65a126d4593a2a457820b160efd",
+  "incorporatedHead": "47d5d1df25ffe65a126d4593a2a457820b160efd",
+  "sourceFiles": {
+    "packages/octane/src/aria-diagnostics.ts": "9d75c09635c4e91967e983a3908ec2385529fe08849cf1b0221bab7594678f48",
+    "packages/octane/src/behavior-root.ts": "14816958048db02e7a52f50318067903f373884f6f2acb07b85261219d715cce",
+    "packages/octane/src/class-names.ts": "7917bd989cd64d7967e87f2c09af66988edda60617410a906461e4f5a211d659",
+    "packages/octane/src/compatibility.ts": "b9cfa456408e7fc1393f5002d729e1fe14c9dac3913de964dd704f0cc54bd1f4",
+    "packages/octane/src/compiler/bundler.js": "f9f9311f702137a6ea7863d2b3eb039aefa93c56b5c12c2e3a72b02320b6f779",
+    "packages/octane/src/compiler/client-only-server.js": "8ade487d1d3deba4d8bf05baaf98ed1ce6835c74addfd4d1562d3fefc53074aa",
+    "packages/octane/src/compiler/compile-renderer-boundaries.js": "e27581080ff769bfacbf2056a69c5c3f7a5f7c3e9f1eff400d6352548114869f",
+    "packages/octane/src/compiler/compile-universal.js": "1576f4debae9b49c735653d249433ff880079410620f636e8a0dab303ec6db17",
+    "packages/octane/src/compiler/compile-valdi.js": "57015f01c787d1c9418e6407fa9af11e81c8088a001b499a96f281bd24db626f",
+    "packages/octane/src/compiler/compile.js": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+    "packages/octane/src/compiler/context-provider.js": "6a03d4d6d5f8cdcc709d114eabc4cea9a4e2458d98a14f3de5d6d881076b0c14",
+    "packages/octane/src/compiler/context-use.js": "e3aa0686ebdaaddd762a963e5b76b2cde7891c4bd7caabe8ffe35604631ecfeb",
+    "packages/octane/src/compiler/css-module-constants.js": "1fa82c2d4a6192f50a471263ff2005e40230f7425c75734bc3ab22299da72edf",
+    "packages/octane/src/compiler/css-module-imports.js": "d8d35d94d3afa0ed25117fc005ecb1c7599d6c190a22eedbe6a1df86137df1fa",
+    "packages/octane/src/compiler/dom-binding-program.js": "5bd768606f1866ddb6ba412f0d980a1a6b2a77df1028ff897509ff6938c5f818",
+    "packages/octane/src/compiler/dom-binding-request.js": "e8ea83ed4b2783cb4bc0bc32cb9f56eff9faeac93baa81639588b6007e4b6823",
+    "packages/octane/src/compiler/dom-bindings.js": "4725a1e5cc36e74f1ede7f3d3e003d5a79ced3026f1953471aa7fcd9c4e8d2e7",
+    "packages/octane/src/compiler/fat-segments.js": "a52585e6658955f57bc8e6606ce1bb3d0994f97cde8d9e6de972a951847ac506",
+    "packages/octane/src/compiler/hook-deps.js": "8cae3476149090d6b3d5f56f44e1518c11f20b4e135d12f793b1e2861ede4b3b",
+    "packages/octane/src/compiler/hook-methods.js": "eeeaaec599184ded86a4e7bcb09ce1c1fa63fd9ea8879c6be97b12beec448e2f",
+    "packages/octane/src/compiler/hook-names.js": "87c00bad19d5a65fe2a848bd5b0ae52511630c5389921fce115262bd439d7d39",
+    "packages/octane/src/compiler/hydrate-boundaries.js": "d219a3c1bbb715a8621ce122e9df39c728494eb4046188b200bdc10d4368c8d9",
+    "packages/octane/src/compiler/index.d.ts": "cf4981038474de37bca05b863180d97c06d847889c25e9f3dd39126e40bdee68",
+    "packages/octane/src/compiler/index.js": "433e469fd50ecc8ae5f2489d22377adf0c2b32ad3c125adec686c0fce437f10c",
+    "packages/octane/src/compiler/inline-hook-memo.js": "9b0dce97d61953a70e55990397c70aa4283353ac086f129655e1790e43c7ec17",
+    "packages/octane/src/compiler/jsx-namespace.js": "00a42ab13881cc8212e93692e604be1fb9d9fb36451a8319f3e824b9490c85ef",
+    "packages/octane/src/compiler/local-void-roots.js": "9cfcfc54aecb70f3064f4ce152999e883edd32b2e8f8063ec4ae736fc076b37b",
+    "packages/octane/src/compiler/manual-hooks.js": "e62fd8c3515664b989aac4552ccb02fd5d7b30930209996b3ca295f216de36c6",
+    "packages/octane/src/compiler/native-attribute-reads.js": "d946c64e982b19c78406c70a25143073e0228b975c65fb8c2b16c626cc6248cd",
+    "packages/octane/src/compiler/native-change-diagnostics.js": "202e38ed17ca335f9c58d7e894d1af94d43c3e11ac041de0df8de5129e1dc5c7",
+    "packages/octane/src/compiler/native-read-codegen.js": "d52d89ba1cd614c979318f4f6cb8acd6a8da5f29cb37ac850d966a428d34c3f6",
+    "packages/octane/src/compiler/native-read-diagnostics.js": "dfc62959aef5c8603ca229c9b54b77507c4214987fdeffc57da9b2a0d2d7add8",
+    "packages/octane/src/compiler/native-read-facts.js": "c75d83fe712de902efaff4604bf5482e154b9759ffa267160f2f131036fb48bf",
+    "packages/octane/src/compiler/native-read-types.js": "82d378fdefc136734c075e44c9559679263bb39309a06f7eacbe86c83e3aecb3",
+    "packages/octane/src/compiler/parser-output.js": "bdaebf946990187876af0fe3795c57bea0301117bc5bfc70eba81c2cb4ebbea3",
+    "packages/octane/src/compiler/parser.browser.js": "08ebef1ba8a253549f3a6bb534ad1795124482c094eefcc564966e5e05f0af8b",
+    "packages/octane/src/compiler/parser.node.js": "3dd19c964ee86155c9a06c66dc4ce629a565957ed0ad3bed096d09c251f2779e",
+    "packages/octane/src/compiler/plain-hook-memo.js": "ca55f6935f3268d505d61e3d999be712664d72921760264d6907b63aab521e50",
+    "packages/octane/src/compiler/pragma.js": "b7163cba5e48122e0b58923759c5c6bc2ee7a20b65f880489c2ee61e16ffac5c",
+    "packages/octane/src/compiler/private-context.js": "543f5e4b76f57305646e684f362201a50131b8fa13de4f20bce60d05599c5fdf",
+    "packages/octane/src/compiler/register.js": "60f4c4d00758cde51da27a2756ac33f66a31452683f77c45b6601480ee7a69be",
+    "packages/octane/src/compiler/renderer-boundaries.js": "660ade9162feeaf1c5d6c582c5cd65837fd9aed0bfe1f9408db91f4e03e95094",
+    "packages/octane/src/compiler/renderers.js": "55fb7b3ab989b902d13d97a23d41a9483b1907b6be0ef23b57f9ffb8c7fbe2f1",
+    "packages/octane/src/compiler/runtime-requests.js": "f4581d81b35fa73aedaa83f69ef78056bbaf12c9801f6294a82ddf15d8ccbae9",
+    "packages/octane/src/compiler/server-context.js": "033ba2fdcd8eac2a4cdbb0975907ddd2042ee9a16fb2623acc3f9a01453273e0",
+    "packages/octane/src/compiler/signal-attempt-reads.js": "4e820c6a6290de1aedbd7908769edc22e481cf1eb29170682b08f150bbc24987",
+    "packages/octane/src/compiler/signal-declarations.js": "764e35d072e0cff6fa460e2b4b8b492c63055c8f0d5f8d8a8ae966ca6032fed7",
+    "packages/octane/src/compiler/signal-start-reads.js": "4e4b795c84908c30a3cf8c11d303d10d3a35a1e1387398bfbc474cbf3d684282",
+    "packages/octane/src/compiler/slot-hooks.d.ts": "853c53c2fe56f3029d685451d479ba2773aadb5de2dda3774bb9712ac7584c4e",
+    "packages/octane/src/compiler/slot-hooks.js": "9b29cd0efea8fd2210522ff5d59a645a506ca22407a9a4e49b7e8bd6da39dc11",
+    "packages/octane/src/compiler/strong-auto-memo.js": "16b586a659d3ae818e5c8cc67b75af8c283c899a3e83f9abfa97fc4f0cd33b89",
+    "packages/octane/src/compiler/strong-html.js": "203b2156b4fb5a22cb87c36e932f1a6167fe10f234bb9fc97e68bd9d6a8cf7db",
+    "packages/octane/src/compiler/strong-mode.js": "a85cb6f2d07960da90faf8079151f51bbbb4731254764a00b40e22081d837b69",
+    "packages/octane/src/compiler/strong-template-policy.js": "831bb159a3d29a9a67a927f92572bc43a9d9eea4480342481b2bd8e0e201c4a8",
+    "packages/octane/src/compiler/style-scopes.js": "1570f1fd754e65b5d2ced3f42fe02cebd2e19f98884a2315c1b489451e805e50",
+    "packages/octane/src/compiler/template-ir.js": "f7821d41d2219c0cf5a9f9d39e2c21e5f3d72e909566cd98b0b3e72dab4c3ad1",
+    "packages/octane/src/compiler/text-type-facts.js": "9407985a8fc88a38bea5517f4f8b42662eda0826a0c8f7965d27ce5076b0283f",
+    "packages/octane/src/compiler/typescript.d.ts": "91446cc8a446af0307679fd80dcdfbdd58efd9b7f2693124d46b18c0f1958fbc",
+    "packages/octane/src/compiler/typescript.js": "5339f8c6c6325adb4e233601256ece14ee0bc8b9e9afb5bc458f61011112c03f",
+    "packages/octane/src/compiler/universal-runtime.js": "385bbb540e9a8bbfd4277b51623fb9ca6de618ff56b110e6d794f7884bdf453a",
+    "packages/octane/src/compiler/vite.d.ts": "8a691436487e5d431034ed6fcfafc8c83e1af42a6eb2e49b9ecc4e38237039df",
+    "packages/octane/src/compiler/vite.js": "f3209b7ed51a324daa5abd586d2c86626622d12c5dcc7efe40eb91e79eed4587",
+    "packages/octane/src/compiler/volar.d.ts": "5cdf624caf9a487c26c52b5fee6c608cb6e008f9c7e4bb79ad7cb0241ded3a36",
+    "packages/octane/src/compiler/volar.js": "d61b42b18f9291d50f1400984f5ac1add05651f1c17f7d5f19b20a4893816dd1",
+    "packages/octane/src/component-flags.ts": "f200eee272d1f739f2c0995102b121de03d621551f82c7994bb5c0f32641b83f",
+    "packages/octane/src/constants.ts": "826cc2ac6308c9ee7644f969dd5cf35551bf39f2ce5956b217b203644689472b",
+    "packages/octane/src/context-epoch.ts": "1bfaa4b5b8d1e9e143a11dc0e50fab9d1502133de0c3445751309bf96cde3195",
+    "packages/octane/src/context-identity.ts": "f0754271dd891d6af3189f4905985b2b1a8f6a9094327051dd378179ce6f169d",
+    "packages/octane/src/css.ts": "46f736a4c53300d698b25e3ca0dea28403a991a972f5af86e26e2cfd032d7502",
+    "packages/octane/src/data-encoding.ts": "7d6ea04bca4fc15160e6363e48581080aadbf4f10019abce3b9d33fc4f904232",
+    "packages/octane/src/devtools-hook.ts": "a9974cd69d87b664465a5a78a9ecd3f19fba83bd4c67c3c31f60cf87595b96c0",
+    "packages/octane/src/dom-binding-claims.ts": "e4d2795db0da132b6330c0eafb613788ce1c08bbf5c7ae9adc46de1bd059d0bc",
+    "packages/octane/src/dom-binding-classes.ts": "e71dd7f8d0322f12cb09c2af4474fa4b4bb31a387d14c74e5f61ebaedab60d64",
+    "packages/octane/src/dom-binding-controls.ts": "05c8249652d01910fb1b4555aaa1f573e4a4ee197d8ddfe5e84471fb344e9442",
+    "packages/octane/src/dom-binding-handoff.ts": "d2cf3946942f71302e68aa8162541b677bbe9ee5dbb47b6799d8ac75a0484a3e",
+    "packages/octane/src/dom-binding-program.ts": "a2b9830fbf5197076289a46ef44595cf414efd4237092497203b8e9054880610",
+    "packages/octane/src/dom-binding-projections.ts": "428a14d1cd70402cf3ba84eb9c1dd5eebd5b2581ef6e996ff1d400846cbfa595",
+    "packages/octane/src/dom-binding-protocol.ts": "81a08d76f9614ca572bb607ab1e666cf72ca66f883d5d923b1177fdcf6c7d17e",
+    "packages/octane/src/dom-binding-signals.ts": "72e42794e761803ab4453642a85331cc3fc6a69702ab25018e8985751ff95482",
+    "packages/octane/src/dom-binding-styles.ts": "b8be1d67cf9326f3627faecd63b098639c13a171ff386f239fe747085c066291",
+    "packages/octane/src/dom-bindings.ts": "abff4b2cf848cd5dafd7f0a89dcfc43934e2da1cd4369186b6a0124221bfb853",
+    "packages/octane/src/dom-focused-move.ts": "71971226a0c1f2cabb5c8fa1910493fec19c855d3389119d647ec28c4c7f5f9a",
+    "packages/octane/src/dom-stage.ts": "5b1170062ddefbb9cb165cfc374f53ba2f023e536b773ecb90c151b3a7dba11a",
+    "packages/octane/src/dom-tables.d.ts": "6d613824bb9853147026a63fb936e01c5ec79cb2f78fa209ecadf3493a30413f",
+    "packages/octane/src/dom-tables.js": "8f5991a8323cc6ac6f1ea1d8dce4dc9e37a8d0867b00c8ab4bffc691d31aa43c",
+    "packages/octane/src/error-codes.client.generated.ts": "d0a7242844572e5f3e41fca376062b8cd9869072d5c3853789307ba3313c6ead",
+    "packages/octane/src/error-codes.server.generated.ts": "655fb405963d5917603cfcd26eca293c8c7fe8f6c316d01f6337b4b11198335e",
+    "packages/octane/src/error-message.ts": "b6fba9d3c159ec826a81657ea162399f8e9e2ed369728c675c80b2cb7f240936",
+    "packages/octane/src/event-names.d.ts": "05e20bde4ffc41d8b4947cf3b28f251a4acf39595a73f80ef10eaaa38318decd",
+    "packages/octane/src/event-names.js": "995891cf2e7584acea096261834ad97c3705588799a46e18513250995dff433e",
+    "packages/octane/src/form-diagnostics.ts": "b6c72c5f2def715eaf30520b8f5185db91952e604e4b51f7632e7e1fba859e54",
+    "packages/octane/src/has-own.ts": "2dff73a400a6ee3df5893f9bb81f71ee71c3d767b0fc69ecf65170833a3f99a2",
+    "packages/octane/src/head-ownership.ts": "44835d0cfe9ac7bb9180e7a9e6b3108df57ad814d2c990dc12d54e0b16e0e493",
+    "packages/octane/src/hook-slot-cache.ts": "906568624f44a9b90084a0eb5cbbbf794a9f59d1a708d167f97a3c8095d94a69",
+    "packages/octane/src/host-property-diagnostics.ts": "b6d3cb3525e5f0d7c0ab4755e2d5e38345aab28c26559832e39098f01a9e5a21",
+    "packages/octane/src/html-tree-validation.d.ts": "7a022a429165c89210ae973ac28bb69d95346310bbaa6c63d7c48a2f88471cdb",
+    "packages/octane/src/html-tree-validation.js": "3f646210a9c5635380abdbb5c410f6103e607480c745d1603d3bb005f4776a4d",
+    "packages/octane/src/hydration/condition.ts": "524ff50256ff823842b4f60bd9e281e0ab7579f7575c9bbb4f6156bdca126d04",
+    "packages/octane/src/hydration/control-capture.ts": "e5d09e9e55ca6a5599a5024d8d379971d0ad7fd6ff0193696224efb359125707",
+    "packages/octane/src/hydration/document-lifecycle.ts": "6508ebc49832f9d007f07cd86ac95014e710d5f3aca5887ce75c5017e33827de",
+    "packages/octane/src/hydration/event-capture.ts": "1dd8d8df3e0d241148f18fa3b5a05c99ec4821ef553a9c2ffb1f38069bf90e47",
+    "packages/octane/src/hydration/idle.ts": "a6335fc272a18c63df21d29cefde68b9d713909cd37ab30c1f7db23b2962568b",
+    "packages/octane/src/hydration/independent-island.ts": "cc1bdab3ebcb010d38ec53b2ee99c061c9765144254ce5f4a5d94a1c233e1d54",
+    "packages/octane/src/hydration/index.ts": "0cfaa8a579e4403095e54f5fa1098488fab165a390920d606f4cfdc462b15bfb",
+    "packages/octane/src/hydration/interaction-config.ts": "00936226eea049c0ce860a68994b0cf584b8407ad2223af1d91a53215856d7af",
+    "packages/octane/src/hydration/interaction.ts": "6d827cde9b125b63900ec91c3b4478b30aac3bf67ffa91060245d076935ac163",
+    "packages/octane/src/hydration/load.ts": "f0a74f3af4d80f426f12c45a04891853b0f7968bbd83b5886667373ef2bbd09d",
+    "packages/octane/src/hydration/media.ts": "2853b8aedb7ac68ea03ee61d2dfafcb42dc3d108e7f47646e342ec795ce07486",
+    "packages/octane/src/hydration/never.ts": "b9383f3252e3861ec0d7659c3d2fd74a92156d5cdc734d014f1ac7e7959b605a",
+    "packages/octane/src/hydration/stream-delivery.ts": "21698a9b22dd833e93327793cb3d382bb44008caa712514b926db34f68022d75",
+    "packages/octane/src/hydration/stream-receiver.ts": "0bf63d57408d753447816f8ec48251c05165062d94eb0fd23910c38b8b0d9906",
+    "packages/octane/src/hydration/stream-result-receiver.ts": "efc89178fad1e5d982a612f2dcc4d96d8e5422ff7817472c894567f1fc06526e",
+    "packages/octane/src/hydration/streamed-signals.ts": "ef9dbbd8fe6baf8118dc52d65bf4dbc4338451a0f4bcac2e008bf432e7b0de88",
+    "packages/octane/src/hydration/types.ts": "44d30d24ff53d8906c7d814a30e7c1c3dc3288307f7a7f68e42c819289dc0036",
+    "packages/octane/src/hydration/visible.ts": "ad0f9d194ea2f7957b0f683cbed78e8f4162e4ebd0a9ff10c0f23dc2361ea014",
+    "packages/octane/src/hydration-markers.ts": "fac93cb14980fa142e66482612aaa201cebf6e34690b9781379f188575414b34",
+    "packages/octane/src/independent-hydration-protocol.ts": "9d62d494b11afceab1f2b867e5b69a486970e3e6f2526da3b712f1e2490e4254",
+    "packages/octane/src/index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a",
+    "packages/octane/src/internal/client.ts": "96da3fbee6b5d106a6588711a4fe05564db4cecf0933cacd56611b49e6fb8856",
+    "packages/octane/src/internal/context.ts": "29900721308ff9a30bdd4513dcf9dcfcb8b9c60a69ba5310f42a195ed9392eb2",
+    "packages/octane/src/internal/server.ts": "d4ca5bc47db0e849d4db0414bf29bbacf1241215fd6c21411d97833fb8795cac",
+    "packages/octane/src/internal/signal-read.ts": "4c6ffacdb615e8c6627bbe32bd32c8fc811a0bc39eb0f6278460ed4296a2ea9b",
+    "packages/octane/src/jsx-runtime-strong.d.ts": "4f78bcf211275640e3c6c3f10ebac3fbb9830e9ab546291561da3f36a960e98d",
+    "packages/octane/src/jsx-runtime.d.ts": "5bb6d1114f7878d27e33e50c1a5e7c1bb4d5e6cf8ce593101ab5aa3c45ca1a62",
+    "packages/octane/src/method-dep.ts": "99d31f27f1d902c2718bf35eaefd5844406445f77f21d18ac6a1b52c73c46b08",
+    "packages/octane/src/profiling.ts": "0eb11ae3d569dad7a235ba856195db6b001a868bd772071165cb6c1e2d6881d1",
+    "packages/octane/src/public-types.ts": "e3c777fb6f42c5452375557ac2fe927a2fdb3dfe3adfa483c85765459f90ab71",
+    "packages/octane/src/react/fiber-adapter.ts": "7da0054d4525d6c3e0c5c51cf32f072505d4127586e5f53c4e5123e748d3e660",
+    "packages/octane/src/react/index.ts": "30345d57e533be71102a7ece954a394b6a25b7db47b9854c419cf8caa006bbe2",
+    "packages/octane/src/react/react-compat-envelope.ts": "0d1bf0cab43b7c29c4d54d60ea7d1f888d23d3c29e06d26f47985404112eee76",
+    "packages/octane/src/react/react-compat-server.ts": "1630758c4d939a7cbe9436c35be802c2fc7ac9075d76240d1c7e98312e19c226",
+    "packages/octane/src/react/react-compat-shared.ts": "efff84c4bcda4b72a2b64c5f43e90debfd6f8bfab873cddb96bb8860fe42b7b3",
+    "packages/octane/src/react/react-compat.ts": "2823f7ffee4d583ddc70745dd4504846abb0b2549136739734a9aae182532112",
+    "packages/octane/src/react/server.ts": "ea3bd567ab2ebd979a901adff1c55beb2cd1ce630091160ccffd2ed7cbae114b",
+    "packages/octane/src/react/shared.ts": "ba5a9879863cae4a86890c6e3391e76ec14c691b7309382325acc8e4c168a712",
+    "packages/octane/src/renderer-bridge.ts": "ce7610fba826c76d37e786cce6f1a5068c8373672fb5adcbbd5122b6120f0824",
+    "packages/octane/src/resource-hint-diagnostics.ts": "2316e693515639a15f7007e4e1f33a600a46748e52365579a1bb3936b0945915",
+    "packages/octane/src/runtime.server.ts": "e98263047ea6c015a6d6a789ed9c5a90bf377c298c144cbc0af8e1894ff620d9",
+    "packages/octane/src/runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+    "packages/octane/src/sanitize-url.d.ts": "c22a26a0c412caa40b28b8e2912be087970e9b766beefd28c65f876d1d714554",
+    "packages/octane/src/sanitize-url.js": "83913b5c641ce8498ff349be46b05a9eafcb7c6a2eebc344235ae609d97b3dc7",
+    "packages/octane/src/server/early-signals.ts": "19f86831b0483720b4e09aa231bca5fc052686ac9ec023ccbc549db4fa80d4d4",
+    "packages/octane/src/server/index.ts": "fd8bbee566dfd1db4e906bd5e65570b1e3397c5ccc547c28b026dd841dfe917c",
+    "packages/octane/src/server/rpc-batch.ts": "30dd7915ad79cef77baa4fa64e7917d61db5ba537224d1a134e3dbe2d6438dc2",
+    "packages/octane/src/server/rpc-stream.ts": "20a7f5d553196fefb3fd03e5b3f2b427e7811c2ec0093abdc94509af89834a14",
+    "packages/octane/src/server/rpc.ts": "6b30d899aaae419470e14392f50103258ed6210e24f096dd3ef5292198276353",
+    "packages/octane/src/server/signal-query-observation.ts": "6f7eaeafab74a3124cba25b33722e856ee1107be17cac4f941718d5611abbd9d",
+    "packages/octane/src/server/streamed-region.ts": "65f8e4cfa4b6a7d88421ad468876dc2d222c9bfae645a826daaa7991559bec98",
+    "packages/octane/src/server/streamed-signals.ts": "0a7d0784a89a4a2a00f686441e2e5d2c29d8e2bc6aeab3a107f7e938445aaddb",
+    "packages/octane/src/server-call.ts": "ce6f598ade3d0e2ffc6ce170260b5dd39f4a8fe88573fcd054fef22e704b7275",
+    "packages/octane/src/server-rpc-batch-client.ts": "abaee6e77783b237b7cf7c734ac71c71c7777652de6eb3479b389c04a0eaa6ee",
+    "packages/octane/src/server-rpc-client.ts": "08b265bbd5a28ebf2667044c1fdd4f231f5fc8e4f83fb919e7e447ce0a37a096",
+    "packages/octane/src/server-rpc-protocol.ts": "4ed24f3eae074260261e2bbccb4da279139c49c0726699b96320b9d58238dada",
+    "packages/octane/src/server-rpc-stream-client.ts": "bb3f23de18ae597635e15eb08da22e13ea1e27f6d921d7903799cf5e7a120ebc",
+    "packages/octane/src/shared-value-helpers.ts": "e5d9d2e2ad03c6b2d0ca1274f28a132f0dfe7a55f2062772aa46457a7e766908",
+    "packages/octane/src/signals/actions.ts": "d1181b72ff2f91a02fae71d677990f4c6063927a1d4e8412028e74dadc5058e3",
+    "packages/octane/src/signals/client.ts": "353c9f7accd927879bd566d05d65e1625b0c4093ec7862e444ebadde6efb96b1",
+    "packages/octane/src/signals/computations.ts": "974c59b28f8e850f776bc2bbcb2990d0b611e34e49190f2e26dbd26c1174336a",
+    "packages/octane/src/signals/control-binding.ts": "e77e08de1b8818817a44196f5fe0e283c91fa6fdfa3c03eecc71f65a6d01cea9",
+    "packages/octane/src/signals/control-handoff.ts": "045ffaba71ef63d6f6ab687d72da7ef1ef2bfe9771bd754f4d15da60f48ca627",
+    "packages/octane/src/signals/derived-facade.ts": "3617771da6674e057a4eaf6583e615f538d9ffc535c1e6413534efe69911696c",
+    "packages/octane/src/signals/document-owner.ts": "a5ff488d397efc541c2f86f0fe74594068377b62aaa32bd1ee6e1dc6f6c4a748",
+    "packages/octane/src/signals/early-values.ts": "5e9233432c7924a2210421174d2652d6108ee7a818b69359563947eba0ff02de",
+    "packages/octane/src/signals/encoding.ts": "ca9a197828411e69b4746fc1d98cbee132f7e113e19652442278ce86f3896fe2",
+    "packages/octane/src/signals/engine.ts": "31dd18188ca33a6246d3eecf2379320896844dd16d0753e2944f9bc4b4f9aa45",
+    "packages/octane/src/signals/errors.ts": "c9d67c98cf53b2ce01e72a5f18ed0c1ab896b3287ec55f7dedddc226dd31a6e9",
+    "packages/octane/src/signals/facade.ts": "c3d7bb50efe6b937bc322b227021b8542a8a7928e97e153db811a836fb553e5e",
+    "packages/octane/src/signals/graph.ts": "56f5f6c516b5c67e0df77b061cb47e47152cd99333e65bf19bb2f46ef16f7ca2",
+    "packages/octane/src/signals/handle-protocol.ts": "a32965d9ad2bda9895faae96b94f46d962c23f98b11b5a327ba224e0e7e507c3",
+    "packages/octane/src/signals/index.ts": "86c20eb30e1141db7eb7fad031a7db0bcd2f96a96ca9fe01f4998be4f405426d",
+    "packages/octane/src/signals/native-read-client.ts": "9d417bf4d7faea284682f30d95804bbb704fe364eb6f3414ead6954cbbcd3a51",
+    "packages/octane/src/signals/native-read-collector.ts": "070c54d2fa80dd79f49124f0e1a652c67a9dc73fad0711bab9b3a45835c7f0c3",
+    "packages/octane/src/signals/native-read-events.ts": "56c5018fa198b3e531693a82f6a3581354bd41e1af4e92d91cf34e32177f3c41",
+    "packages/octane/src/signals/native-read-inspection.ts": "49054824626ef861f1b149f7ac72a990d50e2cf94b504ac2cb2f9619fd11aa0b",
+    "packages/octane/src/signals/native-read-retry.ts": "40abc7188a0b07a3665b410889bf725fdd0ba82c90b3568456282fe243b95ac7",
+    "packages/octane/src/signals/native-read-seeds.ts": "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8",
+    "packages/octane/src/signals/native-read-server.ts": "23c8b3abf7ba919dfd1ba8b1e30671d5cbf1f3a5179389292abece436d4fb614",
+    "packages/octane/src/signals/owner-context.ts": "e33820cbdd33ec9ed282304f830b3408fed97f53781a5e68a24dede727d35284",
+    "packages/octane/src/signals/query-attempt-observer.ts": "f13a4d35f027cfc6af3032dace2d1ecd93172b4526b2d43ac36a2cb0c1f2f0e4",
+    "packages/octane/src/signals/query-facade.ts": "ad68db260aaf8b92a88a62d8a677328431d1172daf0f5be970ade035eb2d8af8",
+    "packages/octane/src/signals/read-protocol.ts": "af1697b879413da7b953e0ec3c129646cf65f831d8f7449d0182eef2a4111554",
+    "packages/octane/src/signals/requests.ts": "0cb65324f546b1d83ec8e4742c33ce60da5a4dd7793166236b2a6a921b343b0a",
+    "packages/octane/src/signals/scalar-computations.ts": "a7b4a37bf6b4a91aba11d01ee8b6c0cb40d1c496ed3c9163cfbfc92562eb6405",
+    "packages/octane/src/signals/server.ts": "6aeddca2fdeebca8764bc0eee40c72725f403ce4d00dd955eba5ff1103a9936e",
+    "packages/octane/src/signals/transition-action.ts": "df1b4e19b4e48cad6d3bf700e23ef581dd35d5eb29708e91e096d37c6f63caab",
+    "packages/octane/src/signals/transition-candidate.ts": "334b706dfdaee3456b5d702e472fe653e4fd73f48cdad13964d58a834df2361d",
+    "packages/octane/src/signals/transition-coordinator.ts": "9713775abcb5b0db9ba66851b83371c8bc7b0d87c8053cad57d95f03446511d3",
+    "packages/octane/src/signals/transition-state.ts": "2ad5dea614ca304ccb7016d0e13f1a1a3f31f20581e5ba027541fcf9734c9dcb",
+    "packages/octane/src/signals/types.ts": "564cd2805e810378069287b7598589f04299815fcf6a43fa6c0a397fd4af62ca",
+    "packages/octane/src/static/index.ts": "6916587dcf4d84371c7f0c6443b25ab2405480ba8d00e0db8b8793e1ff1db954",
+    "packages/octane/src/stream-protocol.ts": "5bc09334a319726762c55b9fbc64ae440c4a4968d02e05a5c8ef874d0289c03a",
+    "packages/octane/src/streamed-signals-protocol.ts": "ed14c452ad096ed5fe2858f74499d3792737d622e901215d1f4a1ef979de0a08",
+    "packages/octane/src/style-values.d.ts": "11ea3536167fad47abb735899cfcb952821da509fa122bed40b1e43c34205380",
+    "packages/octane/src/style-values.js": "d6f54bfd14d2ca766f7e6bb9ce459aecd599a6e8217e8625f35e0ba786e09fb3",
+    "packages/octane/src/sub-slot.ts": "9d81f691d524c1938c86c5342096e53b853e8a03b79b33afd860f8b4d84d98db",
+    "packages/octane/src/testing.ts": "95e7286e36dd3a64ea8679349c51889c126e9021eabb3365307f9875161019f0",
+    "packages/octane/src/trusted-html.ts": "b2baa693b86d2c5ef317e6eb328e98acd0b2f614d090e3a9ae5c61a9950fc096",
+    "packages/octane/src/tsrx-iterable.ts": "8dfb16d235cd2bbaffe04df9e03745093158805424300b273c73de9ffe16fed1",
+    "packages/octane/src/tsrx-spread.ts": "e06c59ecb3b90e15ecb1b9b0ed165b724902d74cb1b95605154797165e27ff1b",
+    "packages/octane/src/universal-core.ts": "56ab151616a5bdf9d7632558b18f5e253d96ed22d21c01a8bd2b133becedee33",
+    "packages/octane/src/universal-dom-boundary.ts": "64008e1de161117e5bd3e3880d77bcbbb8b0e71d1a197f3f811aea6ee96d8e99",
+    "packages/octane/src/universal-native.ts": "d7c00cb11d02cc603e50447d6212cc4573a0b5bb61e8f6874df7f149b3519f82",
+    "packages/octane/src/universal.ts": "9c5d25b95a562043652ff35a61198119297b6380ca68837fcdd13bba565ba7fb",
+    "packages/octane/src/version.ts": "b40ae277d6edcb55d120282301a6021deb070cea66a26d88a10be9f72db96be8"
+  },
+  "sourceCount": 204,
+  "sourceTarSHA": "d9c5b445f48691c406c5c5bb04e534899777c143f13f1898c52643660a460f83",
+  "lockSHA": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+  "node": "v24.19.0",
+  "platform": "darwin/arm64",
+  "toolingVersions": {
+    "esbuild": {
+      "name": "esbuild",
+      "version": "0.28.1",
+      "entrySha256": "8331fe1d8b3a07381f33cc425fcfaa94776e263113653f80ec3ba433e9657e73",
+      "manifestSha256": "d55d1d19fcc5b6079e4a71dd4111340c79c682bc36835ac7058a0c364c7db58a"
+    },
+    "vite": {
+      "name": "vite",
+      "version": "8.1.5",
+      "entrySha256": "c7ea52906f843318d7971209ce62bd24bab60590275e8f415c5564fa35cb82dc",
+      "manifestSha256": "2f482c846a1c5b9e5883b458b3e54a171a320c2e8d9b924c7383c4baef607b09"
+    },
+    "alien-signals": {
+      "name": "alien-signals",
+      "version": "3.2.0",
+      "entrySha256": "4176a9035b7898debb4601fd0ba8076e279befc470816336260847bd44720299",
+      "manifestSha256": "246a6dc2e0b031c5a274df8fdd6f84d7880aa11d8d945a3579a6214a1afe8831"
+    },
+    "devalue": {
+      "name": "devalue",
+      "version": "5.8.2",
+      "entrySha256": "0e7da1121acb03d39b45ab700e950e6174d5f6393f7da4c95fd78b4e18680d22",
+      "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+    },
+    "@tsrx/core": {
+      "name": "@tsrx/core",
+      "version": "0.2.0",
+      "entrySha256": "5220ae1bb76b19a8cee85ee20f784a0f13559bf1525c67e8c02328ec52a063bd",
+      "manifestSha256": "e9ff90dc24b69ef397f415911564845fd00607edd15f2e1d7839a6056477dee0"
+    },
+    "@tsrx/oxc/tsrx-core-compat": {
+      "name": "@tsrx/oxc",
+      "version": "0.13.0",
+      "entrySha256": "b19aaa027ce33226f5d2ff782bd0340cbc564b963339a6115ddf3144b0ea8d09",
+      "manifestSha256": "4d918232648d8b650ad40b32a8a56cf0dcedacfbe23b6dde74615b1fe90a0cb2"
+    },
+    "esrap": {
+      "name": "esrap",
+      "version": "2.3.2",
+      "entrySha256": "068b1a13c0860d8e5a230b59024e7da95ad25507209d388ccfe7348309811b6a",
+      "manifestSha256": "b48eec3fd9649a3f30d68d9d2c74476c56cd37dbd94c165b04bbc4d5b3686f0f"
+    },
+    "entities": {
+      "name": "entities",
+      "version": "7.0.1",
+      "entrySha256": "d060ec5833fe555e66ce01b4f82dbb73cb1ce695ed4a4222e68da334ac057e40",
+      "manifestSha256": "b33b5d3fd4a8e196d3245c10ebb8feb2e076fc8d392f99a1050377d6e2b8b641"
+    },
+    "es-module-lexer": {
+      "name": "es-module-lexer",
+      "version": "1.7.0",
+      "entrySha256": "4e55aa9233ffc5f051b44808b5e2f9c747fe9b1fa91b5de19c6134ebc4837cbd",
+      "manifestSha256": "de68b22f72517f94d53290ecdbaf975f5e79ca26d8757768b07c5b466749c494"
+    }
+  },
+  "committedFixtureSHA": {
+    "benchmarks/scoped-signals/inline-value-conversions.test.mjs": "bc730da2243335ca345fe71c9302f48b3b277f50b70a8dc397de112a70d5e716",
+    "packages/octane/tests/inline-value-conversions.test.ts": "bac3582fdf83ee96efc0b33a074bb9dd8a8213794e5b15b81a23d01966e64b66",
+    "packages/octane/tests/_fixtures/inline-value-conversions.tsrx": "963ad04bbee91318f3c97a5d2b274dfde3db5cb0b71b1fef3ef6a40cfe05fa9e"
+  },
+  "stockFixtureSHAs": {
+    "root-static": "11de23976d8dd67593331ae6e18aee9a4bc65f5975c85bc0542d21de3d625f52",
+    "hooks-state": "6ea5c5984e655be2202a2ff68b916f60bff39f48038f44984e0c429afce27aff",
+    "context": "2114d2581836c6dea70b1b0f586c85685dd26f76d6fbf562cfc6d268da0ee36e",
+    "hydrate-root": "c1c3389646de012ea363e9db0c99a9a7b684ff2494f0ea30e58008dab1c3637f",
+    "suspense-transition": "e10714ae7abadbf13c532b6db72296d8eff932628cfe2b152469fb07eae439d3",
+    "deferred-hydration": "d989278c273166b281729a60a5863f27423cca9c72158d2527d32ccaaacee256"
+  },
+  "stockRows": [
+    {
+      "id": "root-static",
+      "bundler": "vite",
+      "baseline": {
+        "raw": 73618,
+        "gzip": 24574,
+        "brotli": 21990,
+        "sha256": "cd02fa80f356aaf660eac5ad3f76cef23eb28fd02da6d817844a1bfff994e394"
+      },
+      "final": {
+        "raw": 73618,
+        "gzip": 24574,
+        "brotli": 21990,
+        "sha256": "cd02fa80f356aaf660eac5ad3f76cef23eb28fd02da6d817844a1bfff994e394"
+      },
+      "exactBundleEquality": true,
+      "semantic": {
+        "text": "Octane",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "hooks-state",
+      "bundler": "vite",
+      "baseline": {
+        "raw": 85594,
+        "gzip": 28579,
+        "brotli": 25503,
+        "sha256": "a78e20d0887d44ce186abca1535abaaf64df025db0aaf6ef51f01f664fd99cc7"
+      },
+      "final": {
+        "raw": 85594,
+        "gzip": 28579,
+        "brotli": 25503,
+        "sha256": "a78e20d0887d44ce186abca1535abaaf64df025db0aaf6ef51f01f664fd99cc7"
+      },
+      "exactBundleEquality": true,
+      "semantic": {
+        "before": "0",
+        "after": "1",
+        "clicks": 1,
+        "effects": 1,
+        "cleanups": 1,
+        "cleaned": true
+      }
+    },
+    {
+      "id": "context",
+      "bundler": "vite",
+      "baseline": {
+        "raw": 106690,
+        "gzip": 35477,
+        "brotli": 31443,
+        "sha256": "d38f3d85ee05d6593a8fa5c100fad2c494025ecbfd89672b0eb34322bb20be8b"
+      },
+      "final": {
+        "raw": 106690,
+        "gzip": 35477,
+        "brotli": 31443,
+        "sha256": "d38f3d85ee05d6593a8fa5c100fad2c494025ecbfd89672b0eb34322bb20be8b"
+      },
+      "exactBundleEquality": true,
+      "semantic": {
+        "before": "light",
+        "after": "dark",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "hydrate-root",
+      "bundler": "vite",
+      "baseline": {
+        "raw": 143194,
+        "gzip": 46396,
+        "brotli": 40590,
+        "sha256": "714ce8a9187c2aea0a16abdb4394043f72dd6ac1af660b0411cc39801570a4f1"
+      },
+      "final": {
+        "raw": 143194,
+        "gzip": 46396,
+        "brotli": 40590,
+        "sha256": "714ce8a9187c2aea0a16abdb4394043f72dd6ac1af660b0411cc39801570a4f1"
+      },
+      "exactBundleEquality": true,
+      "semantic": {
+        "adopted": true,
+        "before": "server",
+        "after": "client",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "suspense-transition",
+      "bundler": "vite",
+      "baseline": {
+        "raw": 157184,
+        "gzip": 50805,
+        "brotli": 44378,
+        "sha256": "473e4ba9a5cc85a826195fb96aea2b290456896e910689b4d4d7529055b69bd1"
+      },
+      "final": {
+        "raw": 157184,
+        "gzip": 50805,
+        "brotli": 44378,
+        "sha256": "473e4ba9a5cc85a826195fb96aea2b290456896e910689b4d4d7529055b69bd1"
+      },
+      "exactBundleEquality": true,
+      "semantic": {
+        "pending": "loading",
+        "resolved": "ready",
+        "transition": "next",
+        "cleaned": true
+      }
+    },
+    {
+      "id": "deferred-hydration",
+      "bundler": "vite",
+      "baseline": {
+        "raw": 202135,
+        "gzip": 64913,
+        "brotli": 56114,
+        "sha256": "a4decd80e63d1320a91bddb8a9e5809afa18b366c4ee25164ae2717e16a7b8e8"
+      },
+      "final": {
+        "raw": 202135,
+        "gzip": 64913,
+        "brotli": 56114,
+        "sha256": "a4decd80e63d1320a91bddb8a9e5809afa18b366c4ee25164ae2717e16a7b8e8"
+      },
+      "exactBundleEquality": true,
+      "semantic": {
+        "before": "dormant",
+        "after": "active",
+        "clicks": 1,
+        "cleaned": true
+      }
+    },
+    {
+      "id": "createRoot-export",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 189578,
+        "gzip": 60742,
+        "brotli": 52588,
+        "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+      },
+      "final": {
+        "raw": 189578,
+        "gzip": 60742,
+        "brotli": 52588,
+        "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+      },
+      "exactBundleEquality": true,
+      "semantic": null
+    }
+  ],
+  "publicRows": [
+    {
+      "id": "ordinary-client",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 189578,
+        "gzip": 60742,
+        "brotli": 52588,
+        "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+      },
+      "final": {
+        "raw": 189578,
+        "gzip": 60742,
+        "brotli": 52588,
+        "sha256": "acbeda44c995ad538386e94c4a0669ce7ad7a4f7c8534983ee6e2bdbb3602942"
+      },
+      "exactBundleEquality": true,
+      "environment": "client",
+      "authored": "export { createRoot } from \"octane\";\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "ordinary-server",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 50690,
+        "gzip": 17847,
+        "brotli": 16086,
+        "sha256": "90c9afdc16022507ecfcddcff834b515f4caca454f6aaa83e7dbd0ce9f3715b5"
+      },
+      "final": {
+        "raw": 50690,
+        "gzip": 17847,
+        "brotli": 16086,
+        "sha256": "90c9afdc16022507ecfcddcff834b515f4caca454f6aaa83e7dbd0ce9f3715b5"
+      },
+      "exactBundleEquality": true,
+      "environment": "server",
+      "authored": "export { renderToString } from \"octane/server\";\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-scalar",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 13823,
+        "gzip": 5251,
+        "brotli": 4748,
+        "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+      },
+      "final": {
+        "raw": 13823,
+        "gzip": 5251,
+        "brotli": 4748,
+        "sha256": "6d14455b09c98e6cc856866d5870632e3382596c1448a1968b87f6bd8055dc9e"
+      },
+      "exactBundleEquality": true,
+      "environment": "client",
+      "authored": "export { __adoptBindings } from \"octane/dom-bindings\";\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-structural",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 31292,
+        "gzip": 10455,
+        "brotli": 9553,
+        "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+      },
+      "final": {
+        "raw": 31292,
+        "gzip": 10455,
+        "brotli": 9553,
+        "sha256": "98a22768736be70009332fe949eeca8686531c36c0e8f6f9c7b28e3ee310fba6"
+      },
+      "exactBundleEquality": true,
+      "environment": "client",
+      "authored": "export { __adoptBindingProgram, __mountBindingProgram } from \"octane/dom-binding-program\";\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-controls",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 9046,
+        "gzip": 3525,
+        "brotli": 3190,
+        "sha256": "bec148cacddac1583607ce39ca584e9c6aaad70687a0651b59f9f7823c37a843"
+      },
+      "final": {
+        "raw": 9046,
+        "gzip": 3525,
+        "brotli": 3190,
+        "sha256": "bec148cacddac1583607ce39ca584e9c6aaad70687a0651b59f9f7823c37a843"
+      },
+      "exactBundleEquality": true,
+      "environment": "client",
+      "authored": "export { __createBindingControls } from \"octane/dom-binding-controls\";\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-whole-style",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 6199,
+        "gzip": 2630,
+        "brotli": 2360,
+        "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+      },
+      "final": {
+        "raw": 6199,
+        "gzip": 2630,
+        "brotli": 2360,
+        "sha256": "3b36f25b76ccd1817919f2d4472606766376fa25af42039f87f41309538740fa"
+      },
+      "exactBundleEquality": true,
+      "environment": "client",
+      "authored": "export { __createBindingStyles } from \"octane/dom-binding-styles\";\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "binding-scalar-controls-style",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 27473,
+        "gzip": 9954,
+        "brotli": 9044,
+        "sha256": "80f8610c76cc1f8e22f5d9fe9be9f4f83d6bbb2d972a4de38fd0dd56b1555932"
+      },
+      "final": {
+        "raw": 27473,
+        "gzip": 9954,
+        "brotli": 9044,
+        "sha256": "80f8610c76cc1f8e22f5d9fe9be9f4f83d6bbb2d972a4de38fd0dd56b1555932"
+      },
+      "exactBundleEquality": true,
+      "environment": "client",
+      "authored": "export { __adoptBindings } from \"octane/dom-bindings\";\nexport { __createBindingControls } from \"octane/dom-binding-controls\";\nexport { __createBindingStyles } from \"octane/dom-binding-styles\";\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "engine",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 47423,
+        "gzip": 14480,
+        "brotli": 13123,
+        "sha256": "cc3549d21079c1eda52036e6f6749532a604ec402f21f73391e37f57eef07ca6"
+      },
+      "final": {
+        "raw": 47423,
+        "gzip": 14480,
+        "brotli": 13123,
+        "sha256": "cc3549d21079c1eda52036e6f6749532a604ec402f21f73391e37f57eef07ca6"
+      },
+      "exactBundleEquality": true,
+      "environment": "client",
+      "authored": "export { createScope, query } from \"octane/signals\";\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "native-client",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 50263,
+        "gzip": 15894,
+        "brotli": 14356,
+        "sha256": "325d1412e91f483fa8b686c922b83212af6731cde5f2df2b43be92e8cd81e065"
+      },
+      "final": {
+        "raw": 50263,
+        "gzip": 15894,
+        "brotli": 14356,
+        "sha256": "325d1412e91f483fa8b686c922b83212af6731cde5f2df2b43be92e8cd81e065"
+      },
+      "exactBundleEquality": true,
+      "environment": "client",
+      "authored": "export { useSignal$ } from \"octane/signals/client\";\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "native-server",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 50131,
+        "gzip": 15801,
+        "brotli": 14281,
+        "sha256": "ee81533ad689d1912ed30441a339a688cd85de4647e4527c2ea4ab6d48540cf8"
+      },
+      "final": {
+        "raw": 50131,
+        "gzip": 15801,
+        "brotli": 14281,
+        "sha256": "ee81533ad689d1912ed30441a339a688cd85de4647e4527c2ea4ab6d48540cf8"
+      },
+      "exactBundleEquality": true,
+      "environment": "server",
+      "authored": "export { useSignal$ } from \"octane/signals/server\";\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "compiled-plain-signals",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 70005,
+        "gzip": 20599,
+        "brotli": 18584,
+        "sha256": "2b2b74757bdd78e809320fdf146e8c325513e5cf58ab4dba67f3aa1eebefc14e"
+      },
+      "final": {
+        "raw": 70005,
+        "gzip": 20599,
+        "brotli": 18584,
+        "sha256": "2b2b74757bdd78e809320fdf146e8c325513e5cf58ab4dba67f3aa1eebefc14e"
+      },
+      "exactBundleEquality": true,
+      "environment": "client",
+      "authored": "import { signal$, derived$, query$, runWithSignalOwner, retireSignalOwnerIdentity } from 'octane/signals';\nconst count$ = signal$(1);\nconst double$ = derived$(() => count$.get() * 2);\nconst result$ = query$(() => count$.get(), async (value) => value * 3);\n// An unused declaration must not retain its general async implementation.\nconst unused$ = derived$(async () => count$.get());\nexport async function exercise() {\n  const owner = { scopeKey: 'compiled-plain-bundle' };\n  const read = (callback) => runWithSignalOwner(owner, callback);\n  try {\n    const initial = read(() => double$.get());\n    read(() => count$.set(2));\n    const updated = read(() => double$.get());\n    try { read(() => result$.get()); } catch (pending) {\n      if (typeof pending?.then !== 'function') throw pending;\n      await pending;\n    }\n    return { initial, updated, result: read(() => result$.get()) };\n  } finally { retireSignalOwnerIdentity(owner); }\n}\n",
+      "transformed": ";import { __signalAt as _$__signalAt, __derivedScalarAt as _$__derivedScalarAt, __queryAt as _$__queryAt, __derivedAt as _$__derivedAt, __enableSignalDocument as _$__enableSignalDocument } from 'octane/signals';  _$__enableSignalDocument(1); import { signal$, derived$, query$, runWithSignalOwner, retireSignalOwnerIdentity } from 'octane/signals';\nconst count$ = /* @__PURE__ */ _$__signalAt(\"g:1e0b00a3\", 1);\nconst double$ = /* @__PURE__ */ _$__derivedScalarAt(\"g:79291d7a\", () => count$.get() * 2);\nconst result$ = /* @__PURE__ */ _$__queryAt(\"g:fabf7c84\", () => count$.get(), async (value) => value * 3);\n// An unused declaration must not retain its general async implementation.\nconst unused$ = /* @__PURE__ */ _$__derivedAt(\"g:7c36c4f5\", async () => count$.get());\nexport async function exercise() {\n  const owner = { scopeKey: 'compiled-plain-bundle' };\n  const read = (callback) => runWithSignalOwner(owner, callback);\n  try {\n    const initial = read(() => double$.get());\n    read(() => count$.set(2));\n    const updated = read(() => double$.get());\n    try { read(() => result$.get()); } catch (pending) {\n      if (typeof pending?.then !== 'function') throw pending;\n      await pending;\n    }\n    return { initial, updated, result: read(() => result$.get()) };\n  } finally { retireSignalOwnerIdentity(owner); }\n}\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "streamed-signals-bootstrap",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 75913,
+        "gzip": 23519,
+        "brotli": 21071,
+        "sha256": "6ef5ebb8d92dd6a5c370f3bbc4bfc21178adc13918cac3d491a540d2ca88536f"
+      },
+      "final": {
+        "raw": 75913,
+        "gzip": 23519,
+        "brotli": 21071,
+        "sha256": "6ef5ebb8d92dd6a5c370f3bbc4bfc21178adc13918cac3d491a540d2ca88536f"
+      },
+      "exactBundleEquality": true,
+      "environment": "client",
+      "authored": "export { bootstrapStreamedSignalHydration, installSignalDocumentLifecycle } from \"octane/hydration/streamed-signals\";\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "streamed-signal-results-bootstrap",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 69894,
+        "gzip": 21531,
+        "brotli": 19332,
+        "sha256": "f251b2cf7bc0202e32a90be70fafb141391dd4b06bf3e26a89a74bfb9c11fb15"
+      },
+      "final": {
+        "raw": 69894,
+        "gzip": 21531,
+        "brotli": 19332,
+        "sha256": "f251b2cf7bc0202e32a90be70fafb141391dd4b06bf3e26a89a74bfb9c11fb15"
+      },
+      "exactBundleEquality": true,
+      "environment": "client",
+      "authored": "export { bootstrapStreamedSignalResults, installSignalDocumentLifecycle } from \"octane/hydration/streamed-signals\";\n",
+      "boundaries": "passed",
+      "exportLoadSmoke": "passed"
+    },
+    {
+      "id": "used-native-app",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 248643,
+        "gzip": 78987,
+        "brotli": 68592,
+        "sha256": "1d4c7e7e8ae4edfec209cd1209742379a463b091b3893b49fbcb23f2655087a3"
+      },
+      "final": {
+        "raw": 248643,
+        "gzip": 78987,
+        "brotli": 68592,
+        "sha256": "1d4c7e7e8ae4edfec209cd1209742379a463b091b3893b49fbcb23f2655087a3"
+      },
+      "exactBundleEquality": true,
+      "environment": "client",
+      "authored": "import {createRoot,startTransition} from 'octane';\nimport {createScope} from 'octane/signals';\nimport {DirectStyles} from \"/private/tmp/octane-inline-intrinsic-mutation-20260919/full-baseline-current47/benchmarks/scoped-signals/dom-bindings.tsrx\";\nexport function mount(container) {const scope=createScope({scopeKey:'used-native-app'});const left=scope.signal$('left',1);const right=scope.signal$('right',2);const root=createRoot(container);root.render(DirectStyles,{left$:left,right$:right,record(){}});startTransition(()=>{scope.set(left,3);scope.set(right,4);});return()=>{root.unmount();scope.dispose();};}\n"
+    },
+    {
+      "id": "used-native-ssr",
+      "bundler": "esbuild",
+      "baseline": {
+        "raw": 102584,
+        "gzip": 33587,
+        "brotli": 30271,
+        "sha256": "b9c5c971e60bd55a734cc4e62c26003976e997d2e4a721f8b3cd84c9c74dc7e1"
+      },
+      "final": {
+        "raw": 102584,
+        "gzip": 33587,
+        "brotli": 30271,
+        "sha256": "b9c5c971e60bd55a734cc4e62c26003976e997d2e4a721f8b3cd84c9c74dc7e1"
+      },
+      "exactBundleEquality": true,
+      "environment": "server",
+      "authored": "import {renderToString} from 'octane/server';\nimport {createScope} from 'octane/signals';\nimport {DirectStyles} from \"/private/tmp/octane-inline-intrinsic-mutation-20260919/full-baseline-current47/benchmarks/scoped-signals/dom-bindings.tsrx\";\nexport function render() {const scope=createScope({scopeKey:'used-native-ssr'});try{return renderToString(DirectStyles,{left$:scope.signal$('left',1),right$:scope.signal$('right',2),record(){}});}finally{scope.dispose();}}\n",
+      "ssrSmoke": {
+        "html": "<div style=\"color:red;left:1px;right:2px;\"><span>stable</span></div><script type=\"application/json\" data-octane-native-signals>{\"version\":1,\"scopes\":[{\"version\":1,\"scopeKey\":\"used-native-ssr\",\"entries\":[{\"key\":\"left\",\"kind\":\"signal\",\"value\":[\"number\",1],\"complete\":true,\"refreshing\":false,\"connection\":\"none\"},{\"key\":\"right\",\"kind\":\"signal\",\"value\":[\"number\",2],\"complete\":true,\"refreshing\":false,\"connection\":\"none\"}]}]}</script>",
+        "css": ""
+      }
+    }
+  ],
+  "scalarNegativeRows": [
+    {
+      "label": "baseline",
+      "name": "readonly",
+      "raw": 79997,
+      "gzip": 26647,
+      "brotli": 23698,
+      "sourceSHA": "27769eb50f1ef6585886a63ce3a02c442f7aab261ed5552ad83bf5915d815cff",
+      "bundleSHA": "9c1afcd1526a9cab3aa051202f704738006ad300d29ed4c915ecf315092ae707",
+      "observed": {
+        "initial": ["first", "first", "first"],
+        "updated": ["next", "next", "next"],
+        "identity": true,
+        "writes": ["a:first", "b:next"],
+        "retired": true
+      }
+    },
+    {
+      "label": "baseline",
+      "name": "ownObjectAssign",
+      "raw": 80024,
+      "gzip": 26660,
+      "brotli": 23755,
+      "sourceSHA": "dccf273f781bd4ba1e7291a94bed339d4c50a118a1c12ec2d654e9242e74c4f6",
+      "bundleSHA": "f334c06ad20cb9aed85da328ce6768a4036749ad059aa6fb0ce9ed21028f212a",
+      "observed": {
+        "initial": ["first", "first", "first"],
+        "updated": ["next", "next", "next"],
+        "identity": true,
+        "writes": ["a:first", "b:next"],
+        "retired": true
+      }
+    },
+    {
+      "label": "baseline",
+      "name": "constTarget",
+      "raw": 80024,
+      "gzip": 26660,
+      "brotli": 23699,
+      "sourceSHA": "09e5171c50e527a6dc9345be7abd9508c381b4378748d70d44693d16658703d5",
+      "bundleSHA": "d03016f67dc48a36a31c7372544039f089d615e8e7eca4958d3f4b60609f89c4",
+      "observed": {
+        "initial": ["first", "first", "first"],
+        "updated": ["next", "next", "next"],
+        "identity": true,
+        "writes": ["a:first", "b:next"],
+        "retired": true
+      }
+    },
+    {
+      "label": "baseline",
+      "name": "constTargetAlias",
+      "raw": 80024,
+      "gzip": 26657,
+      "brotli": 23698,
+      "sourceSHA": "a6bf28f06674880852a95bb386cf65025c44d8628dbe0ae63b3d3255514cabda",
+      "bundleSHA": "3b7779b7e29420a51fb23eadff321acb76073359d4487ccbc0ad9bff1cc46f8b",
+      "observed": {
+        "initial": ["first", "first", "first"],
+        "updated": ["next", "next", "next"],
+        "identity": true,
+        "writes": ["a:first", "b:next"],
+        "retired": true
+      }
+    },
+    {
+      "label": "candidate",
+      "name": "readonly",
+      "raw": 79997,
+      "gzip": 26647,
+      "brotli": 23698,
+      "sourceSHA": "27769eb50f1ef6585886a63ce3a02c442f7aab261ed5552ad83bf5915d815cff",
+      "bundleSHA": "9c1afcd1526a9cab3aa051202f704738006ad300d29ed4c915ecf315092ae707",
+      "observed": {
+        "initial": ["first", "first", "first"],
+        "updated": ["next", "next", "next"],
+        "identity": true,
+        "writes": ["a:first", "b:next"],
+        "retired": true
+      }
+    },
+    {
+      "label": "candidate",
+      "name": "ownObjectAssign",
+      "raw": 80024,
+      "gzip": 26660,
+      "brotli": 23755,
+      "sourceSHA": "dccf273f781bd4ba1e7291a94bed339d4c50a118a1c12ec2d654e9242e74c4f6",
+      "bundleSHA": "f334c06ad20cb9aed85da328ce6768a4036749ad059aa6fb0ce9ed21028f212a",
+      "observed": {
+        "initial": ["first", "first", "first"],
+        "updated": ["next", "next", "next"],
+        "identity": true,
+        "writes": ["a:first", "b:next"],
+        "retired": true
+      }
+    },
+    {
+      "label": "candidate",
+      "name": "constTarget",
+      "raw": 80024,
+      "gzip": 26660,
+      "brotli": 23699,
+      "sourceSHA": "09e5171c50e527a6dc9345be7abd9508c381b4378748d70d44693d16658703d5",
+      "bundleSHA": "d03016f67dc48a36a31c7372544039f089d615e8e7eca4958d3f4b60609f89c4",
+      "observed": {
+        "initial": ["first", "first", "first"],
+        "updated": ["next", "next", "next"],
+        "identity": true,
+        "writes": ["a:first", "b:next"],
+        "retired": true
+      }
+    },
+    {
+      "label": "candidate",
+      "name": "constTargetAlias",
+      "raw": 80024,
+      "gzip": 26657,
+      "brotli": 23698,
+      "sourceSHA": "a6bf28f06674880852a95bb386cf65025c44d8628dbe0ae63b3d3255514cabda",
+      "bundleSHA": "3b7779b7e29420a51fb23eadff321acb76073359d4487ccbc0ad9bff1cc46f8b",
+      "observed": {
+        "initial": ["first", "first", "first"],
+        "updated": ["next", "next", "next"],
+        "identity": true,
+        "writes": ["a:first", "b:next"],
+        "retired": true
+      }
+    }
+  ],
+  "reproduction": {
+    "originalForms": {
+      "cast": "(Reflect[method] as typeof Reflect.set)(env,\"String\",replacement);",
+      "nonNull": "Reflect[method]!(env,\"String\",replacement);",
+      "satisfies": "(Reflect[method] satisfies typeof Reflect.set)(env,\"String\",replacement);",
+      "optionalCall": "(Reflect[method] as typeof Reflect.set)?.(env,\"String\",replacement);",
+      "optionalReceiver": "(Reflect?.[method] as typeof Reflect.set)(env,\"String\",replacement);",
+      "extracted": "const mutate=Reflect[method];mutate(env,\"String\",replacement);",
+      "receiverAlias": "const receiver=Reflect;receiver[method](env,\"String\",replacement);",
+      "destructured": "const{set:mutate}=Reflect;mutate(env,\"String\",replacement);",
+      "assignment": "env.String=replacement;",
+      "knownMutator": "Object.assign(env,{String:replacement});"
+    },
+    "actualTypeProjectSources": {
+      "alias": "export function View(props: {value$:unknown,replacement:any,method:'set'}) @{const env=globalThis as any;const method=props.method;(Reflect[method] as typeof Reflect.set)(env,'String',props.replacement);const S=String;<output>{S(props.value$)}</output>}",
+      "call": "export function View(props: {value$:unknown,replacement:any,method:'set'}) @{const env=globalThis as any;const method=props.method;(Reflect[method] as typeof Reflect.set)(env,'String',props.replacement);<output>{String.call(null,props.value$)}</output>}",
+      "wrappedOptionalCall": "export function View(props: {value$:unknown,replacement:any,method:'set'}) @{const env=globalThis as any;const method=props.method;(Reflect[method] as typeof Reflect.set)(env,'String',props.replacement);<output>{(String?.call)?.(null,props.value$)}</output>}",
+      "qualifiedAs": "export function View(props: {value$:unknown,replacement:any,method:'set'}) @{const env=globalThis as any;const method=props.method;(Reflect[method] as typeof Reflect.set)(env,'String',props.replacement);<output>{globalThis[('String' as 'String')](props.value$)}</output>}",
+      "callAs": "export function View(props: {value$:unknown,replacement:any,method:'set'}) @{const env=globalThis as any;const method=props.method;(Reflect[method] as typeof Reflect.set)(env,'String',props.replacement);<output>{String[('call' as 'call')](null,props.value$)}</output>}",
+      "applySatisfies": "export function View(props: {value$:unknown,replacement:any,method:'set'}) @{const env=globalThis as any;const method=props.method;(Reflect[method] as typeof Reflect.set)(env,'String',props.replacement);<output>{String[('apply' satisfies 'apply')](null,[props.value$])}</output>}",
+      "qualifiedNonNull": "export function View(props: {value$:unknown,replacement:any,method:'set'}) @{const env=globalThis as any;const method=props.method;(Reflect[method] as typeof Reflect.set)(env,'String',props.replacement);<output>{globalThis[('String'!)](props.value$)}</output>}"
+    },
+    "actualTypeProjectRows": [
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "alias",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["S(props.value$)"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "alias",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["S(props.value$)"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "alias",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["S(props.value$)"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "alias",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["S(props.value$)"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "call",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["String.call(null,props.value$)"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "call",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["String.call(null,props.value$)"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "call",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["String.call(null,props.value$)"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "call",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["String.call(null,props.value$)"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "wrappedOptionalCall",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["(String?.call)?.(null,props.value$)"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "wrappedOptionalCall",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["(String?.call)?.(null,props.value$)"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "wrappedOptionalCall",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["(String?.call)?.(null,props.value$)"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "wrappedOptionalCall",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["(String?.call)?.(null,props.value$)"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "alias",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["S(props.value$)"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "alias",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["S(props.value$)"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "alias",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["S(props.value$)"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "alias",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["S(props.value$)"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "call",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["String.call(null,props.value$)"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "call",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["String.call(null,props.value$)"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "call",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["String.call(null,props.value$)"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "call",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["String.call(null,props.value$)"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "wrappedOptionalCall",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["(String?.call)?.(null,props.value$)"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "wrappedOptionalCall",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["(String?.call)?.(null,props.value$)"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "wrappedOptionalCall",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["(String?.call)?.(null,props.value$)"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "wrappedOptionalCall",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["(String?.call)?.(null,props.value$)"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "qualifiedAs",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["globalThis[('String' as 'String')](props.value$)"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "qualifiedAs",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["globalThis[('String' as 'String')](props.value$)"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "qualifiedAs",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["globalThis[('String' as 'String')](props.value$)"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "qualifiedAs",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["globalThis[('String' as 'String')](props.value$)"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "callAs",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["String[('call' as 'call')](null,props.value$)"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "callAs",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["String[('call' as 'call')](null,props.value$)"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "callAs",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["String[('call' as 'call')](null,props.value$)"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "callAs",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["String[('call' as 'call')](null,props.value$)"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "applySatisfies",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["String[('apply' satisfies 'apply')](null,[props.value$])"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "applySatisfies",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["String[('apply' satisfies 'apply')](null,[props.value$])"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "applySatisfies",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["String[('apply' satisfies 'apply')](null,[props.value$])"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "applySatisfies",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["String[('apply' satisfies 'apply')](null,[props.value$])"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "qualifiedNonNull",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["globalThis[('String'!)](props.value$)"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "qualifiedNonNull",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["globalThis[('String'!)](props.value$)"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "qualifiedNonNull",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["globalThis[('String'!)](props.value$)"],
+        "pass": false,
+        "error": {
+          "name": "TypeError",
+          "message": "s.indexOf is not a function"
+        }
+      },
+      {
+        "sourceLabel": "baseline",
+        "compilerSHA": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "name": "qualifiedNonNull",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["globalThis[('String'!)](props.value$)"],
+        "pass": false,
+        "initial": "[object Object]",
+        "updated": "[object Object]",
+        "identity": true,
+        "retired": "[object Object]",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "qualifiedAs",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["globalThis[('String' as 'String')](props.value$)"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "qualifiedAs",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["globalThis[('String' as 'String')](props.value$)"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "qualifiedAs",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["globalThis[('String' as 'String')](props.value$)"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "qualifiedAs",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["globalThis[('String' as 'String')](props.value$)"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "callAs",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["String[('call' as 'call')](null,props.value$)"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "callAs",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["String[('call' as 'call')](null,props.value$)"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "callAs",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["String[('call' as 'call')](null,props.value$)"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "callAs",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["String[('call' as 'call')](null,props.value$)"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "applySatisfies",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["String[('apply' satisfies 'apply')](null,[props.value$])"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "applySatisfies",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["String[('apply' satisfies 'apply')](null,[props.value$])"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "applySatisfies",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["String[('apply' satisfies 'apply')](null,[props.value$])"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "applySatisfies",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["String[('apply' satisfies 'apply')](null,[props.value$])"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "qualifiedNonNull",
+        "dev": true,
+        "mode": "server",
+        "stringExpressions": ["globalThis[('String'!)](props.value$)"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "qualifiedNonNull",
+        "dev": true,
+        "mode": "client",
+        "stringExpressions": ["globalThis[('String'!)](props.value$)"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "qualifiedNonNull",
+        "dev": false,
+        "mode": "server",
+        "stringExpressions": ["globalThis[('String'!)](props.value$)"],
+        "pass": true,
+        "html": "<output><!--[-->first<!--]--></output>"
+      },
+      {
+        "sourceLabel": "candidate",
+        "compilerSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "name": "qualifiedNonNull",
+        "dev": false,
+        "mode": "client",
+        "stringExpressions": ["globalThis[('String'!)](props.value$)"],
+        "pass": true,
+        "initial": "first",
+        "updated": "next",
+        "identity": true,
+        "retired": "next",
+        "empty": true
+      }
+    ],
+    "actualTypeProjectFacts": {
+      "alias": {
+        "version": 1,
+        "filename": "/private/tmp/octane-inline-intrinsic-mutation-20260919/typed-alias-6nX3l4/alias.tsrx",
+        "sourceVersion": "253:3787463192998f9d",
+        "projectVersion": "29845:5d470d5c237821f0",
+        "stringChildRanges": [[227, 242]],
+        "primitiveTextChildRanges": []
+      },
+      "call": {
+        "version": 1,
+        "filename": "/private/tmp/octane-inline-intrinsic-mutation-20260919/typed-alias-6nX3l4/call.tsrx",
+        "sourceVersion": "253:8e2782118772e75a",
+        "projectVersion": "29845:5d470d5c237821f0",
+        "stringChildRanges": [[212, 242]],
+        "primitiveTextChildRanges": []
+      },
+      "wrappedOptionalCall": {
+        "version": 1,
+        "filename": "/private/tmp/octane-inline-intrinsic-mutation-20260919/typed-alias-6nX3l4/wrappedOptionalCall.tsrx",
+        "sourceVersion": "258:093124468ec62efc",
+        "projectVersion": "29845:5d470d5c237821f0",
+        "stringChildRanges": [[212, 247]],
+        "primitiveTextChildRanges": []
+      },
+      "qualifiedAs": {
+        "version": 1,
+        "filename": "/private/tmp/octane-inline-intrinsic-mutation-20260919/typed-alias-8q9uPU/qualifiedAs.tsrx",
+        "sourceVersion": "271:8a5c72f80729ddb5",
+        "projectVersion": "30077:aa370e19bbad652d",
+        "stringChildRanges": [[212, 260]],
+        "primitiveTextChildRanges": []
+      },
+      "callAs": {
+        "version": 1,
+        "filename": "/private/tmp/octane-inline-intrinsic-mutation-20260919/typed-alias-8q9uPU/callAs.tsrx",
+        "sourceVersion": "268:8b4ac755dae52f89",
+        "projectVersion": "30077:aa370e19bbad652d",
+        "stringChildRanges": [[212, 257]],
+        "primitiveTextChildRanges": []
+      },
+      "applySatisfies": {
+        "version": 1,
+        "filename": "/private/tmp/octane-inline-intrinsic-mutation-20260919/typed-alias-8q9uPU/applySatisfies.tsrx",
+        "sourceVersion": "279:e1fe39ec4d7ab900",
+        "projectVersion": "30077:aa370e19bbad652d",
+        "stringChildRanges": [[212, 268]],
+        "primitiveTextChildRanges": []
+      },
+      "qualifiedNonNull": {
+        "version": 1,
+        "filename": "/private/tmp/octane-inline-intrinsic-mutation-20260919/typed-alias-8q9uPU/qualifiedNonNull.tsrx",
+        "sourceVersion": "260:b55ad0d2e4e570aa",
+        "projectVersion": "30077:aa370e19bbad652d",
+        "stringChildRanges": [[212, 249]],
+        "primitiveTextChildRanges": []
+      }
+    },
+    "limits": "Synthetic consumers; complete DOM clients use HappyDOM. No new native browser qualification.",
+    "originalMatrix": [
+      {
+        "form": "cast",
+        "mode": "server",
+        "dev": false,
+        "sourceSHA": "b37032a44eed30103bb3fd696df289a3ee153d9f6cf403ce7115e08ed8d12359",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "cast",
+        "mode": "client",
+        "dev": false,
+        "sourceSHA": "b37032a44eed30103bb3fd696df289a3ee153d9f6cf403ce7115e08ed8d12359",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "cast",
+        "mode": "server",
+        "dev": true,
+        "sourceSHA": "b37032a44eed30103bb3fd696df289a3ee153d9f6cf403ce7115e08ed8d12359",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "cast",
+        "mode": "client",
+        "dev": true,
+        "sourceSHA": "b37032a44eed30103bb3fd696df289a3ee153d9f6cf403ce7115e08ed8d12359",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "nonNull",
+        "mode": "server",
+        "dev": false,
+        "sourceSHA": "6267e393d124582d2b7ea58ab8daf9a2ad0b6909c193c2b0b2ae388317a9bea9",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "nonNull",
+        "mode": "client",
+        "dev": false,
+        "sourceSHA": "6267e393d124582d2b7ea58ab8daf9a2ad0b6909c193c2b0b2ae388317a9bea9",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "nonNull",
+        "mode": "server",
+        "dev": true,
+        "sourceSHA": "6267e393d124582d2b7ea58ab8daf9a2ad0b6909c193c2b0b2ae388317a9bea9",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "nonNull",
+        "mode": "client",
+        "dev": true,
+        "sourceSHA": "6267e393d124582d2b7ea58ab8daf9a2ad0b6909c193c2b0b2ae388317a9bea9",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "satisfies",
+        "mode": "server",
+        "dev": false,
+        "sourceSHA": "e3ddf75c8d03691b63af7e7de1bdf6e5122edbbc2a53077cb857fe0f086f8474",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "satisfies",
+        "mode": "client",
+        "dev": false,
+        "sourceSHA": "e3ddf75c8d03691b63af7e7de1bdf6e5122edbbc2a53077cb857fe0f086f8474",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "satisfies",
+        "mode": "server",
+        "dev": true,
+        "sourceSHA": "e3ddf75c8d03691b63af7e7de1bdf6e5122edbbc2a53077cb857fe0f086f8474",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "satisfies",
+        "mode": "client",
+        "dev": true,
+        "sourceSHA": "e3ddf75c8d03691b63af7e7de1bdf6e5122edbbc2a53077cb857fe0f086f8474",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "optionalCall",
+        "mode": "server",
+        "dev": false,
+        "sourceSHA": "d970332f4bf6a0a94b89386576acef92aaaa41cb1b280e57365073fbf69b9b4a",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "optionalCall",
+        "mode": "client",
+        "dev": false,
+        "sourceSHA": "d970332f4bf6a0a94b89386576acef92aaaa41cb1b280e57365073fbf69b9b4a",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "optionalCall",
+        "mode": "server",
+        "dev": true,
+        "sourceSHA": "d970332f4bf6a0a94b89386576acef92aaaa41cb1b280e57365073fbf69b9b4a",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "optionalCall",
+        "mode": "client",
+        "dev": true,
+        "sourceSHA": "d970332f4bf6a0a94b89386576acef92aaaa41cb1b280e57365073fbf69b9b4a",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "optionalReceiver",
+        "mode": "server",
+        "dev": false,
+        "sourceSHA": "4c1c0fe70f08d25376c492ec6f6aaac91430785f4503299ff59df8c7a5f4deab",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "optionalReceiver",
+        "mode": "client",
+        "dev": false,
+        "sourceSHA": "4c1c0fe70f08d25376c492ec6f6aaac91430785f4503299ff59df8c7a5f4deab",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "optionalReceiver",
+        "mode": "server",
+        "dev": true,
+        "sourceSHA": "4c1c0fe70f08d25376c492ec6f6aaac91430785f4503299ff59df8c7a5f4deab",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "optionalReceiver",
+        "mode": "client",
+        "dev": true,
+        "sourceSHA": "4c1c0fe70f08d25376c492ec6f6aaac91430785f4503299ff59df8c7a5f4deab",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "extracted",
+        "mode": "server",
+        "dev": false,
+        "sourceSHA": "ad9db55ccfc959ee421120bed2156891a5a90a3e67c85f201239ba9e2aa03c17",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "extracted",
+        "mode": "client",
+        "dev": false,
+        "sourceSHA": "ad9db55ccfc959ee421120bed2156891a5a90a3e67c85f201239ba9e2aa03c17",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "extracted",
+        "mode": "server",
+        "dev": true,
+        "sourceSHA": "ad9db55ccfc959ee421120bed2156891a5a90a3e67c85f201239ba9e2aa03c17",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "extracted",
+        "mode": "client",
+        "dev": true,
+        "sourceSHA": "ad9db55ccfc959ee421120bed2156891a5a90a3e67c85f201239ba9e2aa03c17",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "receiverAlias",
+        "mode": "server",
+        "dev": false,
+        "sourceSHA": "3ce0d05ad4784ac4ce6a71811dcad510a8309c5985cb32642651421094ae6ca9",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "receiverAlias",
+        "mode": "client",
+        "dev": false,
+        "sourceSHA": "3ce0d05ad4784ac4ce6a71811dcad510a8309c5985cb32642651421094ae6ca9",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "receiverAlias",
+        "mode": "server",
+        "dev": true,
+        "sourceSHA": "3ce0d05ad4784ac4ce6a71811dcad510a8309c5985cb32642651421094ae6ca9",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "receiverAlias",
+        "mode": "client",
+        "dev": true,
+        "sourceSHA": "3ce0d05ad4784ac4ce6a71811dcad510a8309c5985cb32642651421094ae6ca9",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "destructured",
+        "mode": "server",
+        "dev": false,
+        "sourceSHA": "09a7639f1178783b38eee3d277edfcdedf8db7877112da1ea05e9c83d8dbb55e",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "destructured",
+        "mode": "client",
+        "dev": false,
+        "sourceSHA": "09a7639f1178783b38eee3d277edfcdedf8db7877112da1ea05e9c83d8dbb55e",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "destructured",
+        "mode": "server",
+        "dev": true,
+        "sourceSHA": "09a7639f1178783b38eee3d277edfcdedf8db7877112da1ea05e9c83d8dbb55e",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "destructured",
+        "mode": "client",
+        "dev": true,
+        "sourceSHA": "09a7639f1178783b38eee3d277edfcdedf8db7877112da1ea05e9c83d8dbb55e",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "assignment",
+        "mode": "server",
+        "dev": false,
+        "sourceSHA": "be473031c007ae97a8395183f67dd7344da8d4d1d3e72cf1aeaff54750047f58",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "assignment",
+        "mode": "client",
+        "dev": false,
+        "sourceSHA": "be473031c007ae97a8395183f67dd7344da8d4d1d3e72cf1aeaff54750047f58",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "assignment",
+        "mode": "server",
+        "dev": true,
+        "sourceSHA": "be473031c007ae97a8395183f67dd7344da8d4d1d3e72cf1aeaff54750047f58",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "assignment",
+        "mode": "client",
+        "dev": true,
+        "sourceSHA": "be473031c007ae97a8395183f67dd7344da8d4d1d3e72cf1aeaff54750047f58",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "knownMutator",
+        "mode": "server",
+        "dev": false,
+        "sourceSHA": "8161f46a303f53190017d0f6af7080016c6f29ec27ebe25c12d9c73f7fa27d9c",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "knownMutator",
+        "mode": "client",
+        "dev": false,
+        "sourceSHA": "8161f46a303f53190017d0f6af7080016c6f29ec27ebe25c12d9c73f7fa27d9c",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "knownMutator",
+        "mode": "server",
+        "dev": true,
+        "sourceSHA": "8161f46a303f53190017d0f6af7080016c6f29ec27ebe25c12d9c73f7fa27d9c",
+        "baselinePass": false,
+        "finalPass": true
+      },
+      {
+        "form": "knownMutator",
+        "mode": "client",
+        "dev": true,
+        "sourceSHA": "8161f46a303f53190017d0f6af7080016c6f29ec27ebe25c12d9c73f7fa27d9c",
+        "baselinePass": false,
+        "finalPass": true
+      }
+    ],
+    "baselineFailureKinds": [
+      {
+        "message": "n.indexOf is not a function",
+        "name": "TypeError"
+      },
+      {
+        "message": "value.replace is not a function",
+        "name": "TypeError"
+      }
+    ],
+    "representativeFinalSnapshots": [
+      {
+        "mode": "server",
+        "dev": false,
+        "sourceSha256": "b37032a44eed30103bb3fd696df289a3ee153d9f6cf403ce7115e08ed8d12359",
+        "pass": true,
+        "htmlSHA": "83cff8024dd12f1037e608923f04ff545b8cb112e27fc1bd612c6214fa64a586",
+        "relevantHTML": "<section><output title=\"first\">first</output><input data-octane-input=\"i:f8417e48\" value=\"first\" data-octane-signal-control=\"[1,&quot;inline-intrinsic&quot;,[[&quot;[\\&quot;\\&quot;,\\&quot;root\\&quot;]&quot;,&quot;value&quot;,&quot;value&quot;]]]\"/></section>"
+      },
+      {
+        "mode": "client",
+        "dev": false,
+        "sourceSha256": "b37032a44eed30103bb3fd696df289a3ee153d9f6cf403ce7115e08ed8d12359",
+        "pass": true,
+        "initial": {
+          "text": "first",
+          "title": "first",
+          "value": "first"
+        },
+        "updated": {
+          "text": "next",
+          "title": "next",
+          "value": "next"
+        }
+      },
+      {
+        "mode": "server",
+        "dev": true,
+        "sourceSha256": "b37032a44eed30103bb3fd696df289a3ee153d9f6cf403ce7115e08ed8d12359",
+        "pass": true,
+        "htmlSHA": "83cff8024dd12f1037e608923f04ff545b8cb112e27fc1bd612c6214fa64a586",
+        "relevantHTML": "<section><output title=\"first\">first</output><input data-octane-input=\"i:f8417e48\" value=\"first\" data-octane-signal-control=\"[1,&quot;inline-intrinsic&quot;,[[&quot;[\\&quot;\\&quot;,\\&quot;root\\&quot;]&quot;,&quot;value&quot;,&quot;value&quot;]]]\"/></section>"
+      },
+      {
+        "mode": "client",
+        "dev": true,
+        "sourceSha256": "b37032a44eed30103bb3fd696df289a3ee153d9f6cf403ce7115e08ed8d12359",
+        "pass": true,
+        "initial": {
+          "text": "first",
+          "title": "first",
+          "value": "first"
+        },
+        "updated": {
+          "text": "next",
+          "title": "next",
+          "value": "next"
+        }
+      }
+    ],
+    "fullReproductionReportSHAs": {
+      "baseline": "db41114c1d2b5eb1dfc40ea32cabb2c16b2e2156ea06131fcf723626d89ca60e",
+      "final": "5798b05f1b5cb78c9d96cddeb9c4dc454b4d58071588321b7edb32966e3ed298",
+      "current47Constructors": "f7a21932b6cbfeb9faa03b8dbec7576f09e1770c48bde4e2610e0cb52df3e11b",
+      "current47ComputedKeys": "1f553b33bf1a5bffad01963ea01653cc5ec9d4ca57cfff425d218fb0bdd9f66a"
+    },
+    "historicalMeasurementBase": "068ead53d23feeaae0a6d8b2bf3bb3fad5eb4499",
+    "historicalOriginalFinalCompilerSHA": "f1a7f5b3982d7f5eadf388aefe0ecaca1fde9fd69a712cd3a136691b8ae5075c",
+    "actualTypeProjectBase": "47d5d1df25ffe65a126d4593a2a457820b160efd"
+  },
+  "mutants": {
+    "sourceBeforeSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+    "sourceAfterSHA": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+    "results": [
+      {
+        "label": "ignored-mutation",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "packages/octane/tests/inline-value-conversions.test.ts",
+          "--project",
+          "octane",
+          "--project",
+          "octane-prod",
+          "--maxWorkers=2",
+          "--testNamePattern",
+          "visible cast mutation",
+          "--silent=passed-only"
+        ],
+        "exitCode": 1,
+        "red": true,
+        "log": "/private/tmp/octane-inline-intrinsic-mutation-20260919/current47-mutant-ignored-mutation.log"
+      },
+      {
+        "label": "lost-computed-reference",
+        "command": [
+          "node",
+          "--test",
+          "benchmarks/scoped-signals/inline-value-conversions.test.mjs"
+        ],
+        "exitCode": 1,
+        "red": true,
+        "log": "/private/tmp/octane-inline-intrinsic-mutation-20260919/current47-mutant-lost-computed-reference.log"
+      },
+      {
+        "label": "retained-typed-proof",
+        "command": [
+          "node",
+          "--test",
+          "benchmarks/scoped-signals/inline-value-conversions.test.mjs"
+        ],
+        "exitCode": 1,
+        "red": true,
+        "log": "/private/tmp/octane-inline-intrinsic-mutation-20260919/current47-mutant-retained-typed-proof.log"
+      },
+      {
+        "label": "ordinary-receiver-taint",
+        "command": [
+          "node",
+          "--test",
+          "benchmarks/scoped-signals/inline-value-conversions.test.mjs"
+        ],
+        "exitCode": 1,
+        "red": true,
+        "log": "/private/tmp/octane-inline-intrinsic-mutation-20260919/current47-mutant-ordinary-receiver-taint.log"
+      },
+      {
+        "label": "lost-fresh-literal-target",
+        "command": [
+          "node",
+          "--test",
+          "benchmarks/scoped-signals/inline-value-conversions.test.mjs"
+        ],
+        "exitCode": 1,
+        "red": true,
+        "log": "/private/tmp/octane-inline-intrinsic-mutation-20260919/current47-mutant-lost-fresh-literal-target.log"
+      },
+      {
+        "label": "lost-constructor-dependency",
+        "command": [
+          "node",
+          "--test",
+          "benchmarks/scoped-signals/inline-value-conversions.test.mjs"
+        ],
+        "exitCode": 1,
+        "red": true,
+        "log": "/private/tmp/octane-inline-intrinsic-mutation-20260919/current47-mutant-lost-constructor-dependency.log"
+      },
+      {
+        "label": "lost-const-literal-origin",
+        "command": [
+          "node",
+          "--test",
+          "benchmarks/scoped-signals/inline-value-conversions.test.mjs"
+        ],
+        "exitCode": 1,
+        "red": true,
+        "log": "/private/tmp/octane-inline-intrinsic-mutation-20260919/current47-mutant-lost-const-literal-origin.log"
+      },
+      {
+        "label": "lost-chain-callee",
+        "command": [
+          "node",
+          "--test",
+          "benchmarks/scoped-signals/inline-value-conversions.test.mjs"
+        ],
+        "exitCode": 1,
+        "red": true,
+        "log": "/private/tmp/octane-inline-intrinsic-mutation-20260919/current47-mutant-lost-chain-callee.log"
+      },
+      {
+        "label": "lost-computed-key-unwrapping",
+        "command": [
+          "node",
+          "--test",
+          "benchmarks/scoped-signals/inline-value-conversions.test.mjs"
+        ],
+        "exitCode": 1,
+        "red": true,
+        "log": "/private/tmp/octane-inline-intrinsic-mutation-20260919/current47-mutant-lost-computed-key-unwrapping.log"
+      }
+    ]
+  },
+  "compilerCost": {
+    "node": "v24.19.0",
+    "runnerSHA": "00483b0f783acff527f8b42d0e0436ab056758ee3ce6b22f9bd3f5ff6edc6305",
+    "sourceHashes": {
+      "baseline": {
+        "compiler/compile.js": "1c9b61d0c52093fa4e26ad225fb3a8c34c1e90d8ade6632f810f3612e29571f3",
+        "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+        "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a"
+      },
+      "candidate": {
+        "compiler/compile.js": "8b6796001c4f0c9887949a8aedf65c1f6574059edb879f9135cdae92d5667317",
+        "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+        "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a"
+      }
+    },
+    "lockSHA": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+    "base": "47d5d1df25ffe65a126d4593a2a457820b160efd",
+    "options": {
+      "mode": "client",
+      "dev": false,
+      "hmr": false
+    },
+    "batch": 3,
+    "warmupPairs": 3,
+    "measuredPairs": 12,
+    "alternatingOrder": true,
+    "gcOutsideSample": true,
+    "debugFrozenAst": false,
+    "debugAssertLoc": false,
+    "rows": [
+      {
+        "id": "proof-free-fast",
+        "filename": "/public/compiler-cost/proof-free-fast.tsrx",
+        "source": "export function View(props) @{<output>{props.label as string}</output>}",
+        "authoredSHA": "f0de8deb675172281b5656d2eb0e73283c40de526e47a169e55b9a68d634f8cc",
+        "sourceBytes": 71,
+        "baseline": {
+          "medianMs": 1.1528750000000039,
+          "iqrMs": [1.125489583333329, 1.1929409166666716],
+          "outputSHA": "e789c332bf1bf6eb5b5fbfbab8ad32b4e011c25d56754e1190d57abdbd76c57c",
+          "samplesMs": [
+            1.1824026666666707, 1.1379029999999943, 1.0949583333333333, 1.26318066666668,
+            1.0530416666666724, 1.1674443333333404, 1.1356666666666608, 1.228999999999985,
+            1.2245556666666744, 1.1383056666666675, 1.169902666666682, 1.0230973333333206
+          ]
+        },
+        "candidate": {
+          "medianMs": 1.2239096666666662,
+          "iqrMs": [1.0878645833333422, 1.2701077500000033],
+          "outputSHA": "e789c332bf1bf6eb5b5fbfbab8ad32b4e011c25d56754e1190d57abdbd76c57c",
+          "samplesMs": [
+            1.2517776666666691, 1.2954030000000027, 1.108250000000017, 1.1978750000000105,
+            1.0267083333333176, 1.287389, 1.2441109999999942, 1.2037083333333385,
+            1.0132083333333337, 1.264347333333338, 1.0144029999999968, 1.2915140000000065
+          ]
+        },
+        "pairedRatio": {
+          "medianMs": 1.0354059379222522,
+          "iqrMs": [0.9683199598558591, 1.1047377811771548]
+        }
+      },
+      {
+        "id": "proof-free-marker-aliases",
+        "filename": "/public/compiler-cost/proof-free-marker-aliases.tsrx",
+        "source": "// String is discussed but never called here\nexport function inspect(props){const O0=Object,R0=Reflect;const O1=O0,R1=R0;const O2=O1,R2=R1;const O3=O2,R3=R2;const O4=O3,R4=R3;const O5=O4,R5=R4;const O6=O5,R6=R5;const O7=O6,R7=R6;const O8=O7,R8=R7;const O9=O8,R9=R8;const O10=O9,R10=R9;const O11=O10,R11=R10;const O12=O11,R12=R11;const O13=O12,R13=R12;const O14=O13,R14=R13;const O15=O14,R15=R14;const O16=O15,R16=R15;const O17=O16,R17=R16;const O18=O17,R18=R17;const O19=O18,R19=R18;const O20=O19,R20=R19;const O21=O20,R21=R20;const O22=O21,R22=R21;const O23=O22,R23=R22;const O24=O23,R24=R23;return props.value+1;}",
+        "authoredSHA": "fce3e8ffce6bd95a0c6744f62428d3059045620806d4d6217d649d6b6ab47fff",
+        "sourceBytes": 615,
+        "baseline": {
+          "medianMs": 2.1098195000000053,
+          "iqrMs": [1.9892256666666697, 2.2235623333333336],
+          "outputSHA": "b97f90230884236080e79e9d9b69ba0ed7d37e330bccaf4bb47e739865bb8beb",
+          "samplesMs": [
+            2.2011386666666604, 2.093889000000009, 1.9825696666666772, 1.9535136666666706,
+            2.1257500000000014, 1.9914443333333338, 2.002930666666657, 1.6960416666666636,
+            2.290833333333353, 2.31865266666667, 2.316000000000031, 2.197375000000003
+          ]
+        },
+        "candidate": {
+          "medianMs": 2.036791833333325,
+          "iqrMs": [1.9030032499999976, 2.147510583333343],
+          "outputSHA": "b97f90230884236080e79e9d9b69ba0ed7d37e330bccaf4bb47e739865bb8beb",
+          "samplesMs": [
+            2.0900139999999965, 2.1410280000000057, 1.9091386666666683, 2.0736806666666703,
+            1.9675276666666452, 1.8820416666666613, 1.8845969999999852, 1.7814999999999752,
+            1.9999029999999796, 2.166958333333355, 2.258305666666653, 2.1724583333333385
+          ]
+        },
+        "pairedRatio": {
+          "medianMs": 0.9562383114101336,
+          "iqrMs": [0.939333933455526, 0.997123698115075]
+        }
+      },
+      {
+        "id": "shared-50-builtin-aliases",
+        "filename": "/public/compiler-cost/shared-50-builtin-aliases.tsrx",
+        "source": "export function View(props) @{const O0=Object,R0=Reflect;const O1=O0,R1=R0;const O2=O1,R2=R1;const O3=O2,R3=R2;const O4=O3,R4=R3;const O5=O4,R5=R4;const O6=O5,R6=R5;const O7=O6,R7=R6;const O8=O7,R8=R7;const O9=O8,R9=R8;const O10=O9,R10=R9;const O11=O10,R11=R10;const O12=O11,R12=R11;const O13=O12,R13=R12;const O14=O13,R14=R13;const O15=O14,R15=R14;const O16=O15,R16=R15;const O17=O16,R17=R16;const O18=O17,R18=R17;const O19=O18,R19=R18;const O20=O19,R20=R19;const O21=O20,R21=R20;const O22=O21,R22=R21;const O23=O22,R23=R22;const O24=O23,R24=R23;const refs=[O24.assign,R24.set,O24.defineProperty,R24.deleteProperty];<output title={String(props.value)}>{String(props.value)}</output>}",
+        "authoredSHA": "33e2f857ef38fb044f4043b791e1027a33cacfae62cd125a68553652acb85a80",
+        "sourceBytes": 684,
+        "baseline": {
+          "medianMs": 4.315381833333314,
+          "iqrMs": [4.244051916666669, 4.3940000000000055],
+          "outputSHA": "1d5a23b05f31f7a41c9b6dc741b4757e9b222d4b9f882a4bfff3ca6c3dbc7a10",
+          "samplesMs": [
+            4.196278000000007, 4.011874999999994, 5.058972000000002, 4.4773333333333385,
+            4.252221999999999, 4.447625000000016, 4.274860999999949, 4.312180333333345,
+            4.346513999999995, 4.219541666666676, 4.318583333333284, 4.376125000000002
+          ]
+        },
+        "candidate": {
+          "medianMs": 4.3867014999999965,
+          "iqrMs": [4.216045083333293, 4.480194416666639],
+          "outputSHA": "dc479b7bda065b61fa0ef9c0b31e40523d8260fadb8303ec62c107be5053124c",
+          "samplesMs": [
+            3.833680666666661, 4.02227799999999, 4.915305666666654, 4.580402666666676,
+            4.410152666666666, 4.298583333333302, 4.073222333333358, 4.367902999999994,
+            4.556402666666675, 4.405499999999999, 4.263652666666606, 4.454791666666627
+          ]
+        },
+        "pairedRatio": {
+          "medianMs": 1.0077576039037395,
+          "iqrMs": [0.9703236573762707, 1.026550372314323]
+        }
+      },
+      {
+        "id": "readonly-computed",
+        "filename": "/public/compiler-cost/readonly-computed.tsrx",
+        "source": "import {createRoot,flushSync}from'octane';\nfunction View(props) @{props.model.set(props.key,props.labels[props.key]);<section><output title={String(props.labels[props.key])}>{String(props.labels[props.key])}</output><input value={String(props.labels[props.key])}/></section>}\nexport function run(host){const writes=[];const model={set(key,value){writes.push(key+':'+value)}};const root=createRoot(host);root.render(View,{model,key:'a',labels:{a:'first'}});const output=host.querySelector('output'),input=host.querySelector('input');const initial=[output.textContent,output.title,input.value];root.render(View,{model,key:'b',labels:{b:'next'}});flushSync(()=>{});const updated=[output.textContent,output.title,input.value];const identity=host.querySelector('output')===output&&host.querySelector('input')===input;root.unmount();return{initial,updated,identity,writes,retired:host.childNodes.length===0};}",
+        "authoredSHA": "27769eb50f1ef6585886a63ce3a02c442f7aab261ed5552ad83bf5915d815cff",
+        "sourceBytes": 903,
+        "baseline": {
+          "medianMs": 5.434847333333323,
+          "iqrMs": [5.275298500000001, 5.565333249999999],
+          "outputSHA": "0078d090ae8b44367bac1e49f9f47a6924949fe061123ce52f257123515baf9f",
+          "samplesMs": [
+            5.077694333333284, 5.300360999999991, 5.723416666666708, 5.7261530000000675,
+            5.200111000000031, 4.936180333333293, 5.435180666666686, 5.460555666666626,
+            5.697999999999941, 5.43451399999996, 5.317472333333323, 5.521111000000019
+          ]
+        },
+        "candidate": {
+          "medianMs": 5.415354166666665,
+          "iqrMs": [5.3104793333333005, 5.610506916666661],
+          "outputSHA": "0078d090ae8b44367bac1e49f9f47a6924949fe061123ce52f257123515baf9f",
+          "samplesMs": [
+            5.178208333333335, 5.315277999999959, 5.7377776666666405, 6.06856966666669,
+            5.467694333333308, 4.932083333333367, 5.7392220000000025, 5.363014000000021,
+            5.333958333333385, 5.568083333333334, 5.296083333333324, 5.4731389999999465
+          ]
+        },
+        "pairedRatio": {
+          "medianMs": 1.0026617510854519,
+          "iqrMs": [0.9948109923692674, 1.0312977877860918]
+        }
+      },
+      {
+        "id": "fresh-target-copy",
+        "filename": "/public/compiler-cost/fresh-target-copy.tsrx",
+        "source": "import {createRoot,flushSync}from'octane';\nfunction View(props) @{Object.assign({},props.labels);props.model.set(props.key,props.labels[props.key]);<section><output title={String(props.labels[props.key])}>{String(props.labels[props.key])}</output><input value={String(props.labels[props.key])}/></section>}\nexport function run(host){const writes=[];const model={set(key,value){writes.push(key+':'+value)}};const root=createRoot(host);root.render(View,{model,key:'a',labels:{a:'first'}});const output=host.querySelector('output'),input=host.querySelector('input');const initial=[output.textContent,output.title,input.value];root.render(View,{model,key:'b',labels:{b:'next'}});flushSync(()=>{});const updated=[output.textContent,output.title,input.value];const identity=host.querySelector('output')===output&&host.querySelector('input')===input;root.unmount();return{initial,updated,identity,writes,retired:host.childNodes.length===0};}",
+        "authoredSHA": "dccf273f781bd4ba1e7291a94bed339d4c50a118a1c12ec2d654e9242e74c4f6",
+        "sourceBytes": 934,
+        "baseline": {
+          "medianMs": 5.275534666666658,
+          "iqrMs": [5.221545166666715, 5.385222166666608],
+          "outputSHA": "80bc74eaeb511ca037735436282f65f626be7e42d4902577225ecfb51d52b12f",
+          "samplesMs": [
+            5.271764, 5.279305333333316, 5.530555333333268, 5.449805666666634, 5.313902999999907,
+            5.220305666666718, 5.241375000000062, 5.142471999999998, 5.4881666666666815,
+            5.3636943333332665, 5.22195833333338, 5.14315266666669
+          ]
+        },
+        "candidate": {
+          "medianMs": 5.299638833333384,
+          "iqrMs": [5.226552083333293, 5.454406416666606],
+          "outputSHA": "80bc74eaeb511ca037735436282f65f626be7e42d4902577225ecfb51d52b12f",
+          "samplesMs": [
+            4.993194666666644, 5.770194666666687, 5.263208333333371, 5.623999999999948,
+            5.228041666666589, 5.222083333333406, 5.155458333333324, 5.3683473333333795,
+            5.336069333333398, 5.474041666666683, 5.447861333333246, 5.245111000000027
+          ]
+        },
+        "pairedRatio": {
+          "medianMs": 1.0100823107799748,
+          "iqrMs": [0.9807775714233639, 1.034787603873216]
+        }
+      },
+      {
+        "id": "guarded-wrapped-mutation",
+        "filename": "/public/compiler-cost/guarded-wrapped-mutation.tsrx",
+        "source": "export function View(props) @{const env=globalThis as any;const method=props.method;(Reflect[method] as typeof Reflect.set)(env,'String',props.replacement);<section><output title={String(props.value$)}>{String(props.value$) as string}</output><input value={String(props.value$)}/></section>}",
+        "authoredSHA": "96ab2506350f3a6cf7eac6ab3412ff1fc2aa72fcc32038bd93b656810ac4dc19",
+        "sourceBytes": 291,
+        "baseline": {
+          "medianMs": 2.4660208333333076,
+          "iqrMs": [2.4051284166666465, 2.5042084166666805],
+          "outputSHA": "a0ee98cc2b31e01d5d3c189257048057a5432a0ff6a9614289896cf39da84a19",
+          "samplesMs": [
+            2.6007083333333867, 2.4704166666665515, 2.732916666666673, 2.258874999999989,
+            2.4269026666667437, 2.4806390000000342, 2.3444446666665804, 2.3876806666665593,
+            2.5749166666666192, 2.4109443333333425, 2.461625000000064, 2.4713056666666184
+          ]
+        },
+        "candidate": {
+          "medianMs": 2.7172291666666597,
+          "iqrMs": [2.6586561666667117, 2.7319965000000748],
+          "outputSHA": "2f50880dc4e735c27eac0c5a00f5e03499d96a2a3d7d446756bb788334151abb",
+          "samplesMs": [
+            3.010014000000107, 2.7209583333333285, 2.7134999999999914, 2.728791666666742,
+            2.6166109999999208, 2.741611000000072, 2.6135139999999715, 2.856124999999944,
+            2.6965973333332536, 2.724583333333309, 2.6633193333333716, 2.644666666666732
+          ]
+        },
+        "pairedRatio": {
+          "medianMs": 1.103310151667531,
+          "iqrMs": [1.0761640711156806, 1.1369128621605982]
+        }
+      }
+    ],
+    "limitations": "One bounded compiler-only synthetic sample. Unknown callback/getter/ambient effects retain existing builtin assumptions. No runtime/browser/SSR CPU speed claim."
+  },
+  "validation": {
+    "owningNearbyVitestResults": 224,
+    "newPublicTestResultsAcrossOctaneAndProd": 24,
+    "nodeWorkflowResults": 223,
+    "newNodeGuardResults": 3,
+    "actualTypeProjectExecutionsInsideNewNodeGuard": 36,
+    "scopedTypes": "tsrx-tsc with explicit authored .tsrx fixture and benchmark Node test",
+    "frozenAst": true,
+    "assertLoc": true,
+    "fullRepoTestLocally": false,
+    "fullRepoTypesLocally": false,
+    "remoteCI": "PR1161 draft at prior head aa2c9f18; updated feedback+true main47 merge not published; skipped draft checks are not green",
+    "incomingContextPublicResults": 12
+  },
+  "runnerSHAs": {
+    "stockAudit": "934dd4fa81f1900b84867b38c9b1511fd0f79c1a14f3db42bde77f277a5b54ea",
+    "publicClosureAudit": "b829eb3f4ca01a6e9373e80b6b08579cec29dc872d1b0ed25c6ca8310631a554",
+    "originalReproduction": "3a1d19297d2cec644a34aa6cd493265a99c9cd41cdc25d83253588626a3eacd0",
+    "actualTypeProjectReproduction": "df388f2733291a359fc7087f8719314b8575509a327afbefb7da7a93ad78d81c",
+    "scalarAttribution": "870eecc5d3f2f7fcb4ef344c05ad295c49b4c03d28791b36b7bd02783991f798",
+    "compilerCost": "00483b0f783acff527f8b42d0e0436ab056758ee3ce6b22f9bd3f5ff6edc6305",
+    "computedKeyReproduction": "39f77e9ba9e504d9aae3a8b6d764ba5a31d48e595dfb7f4d5733076af8b3d53b",
+    "mutants": "a0538ce431f8f84954f4ac5722451eb3e41c387b93226e31e5d4a1cf9183c8ad"
+  },
+  "scratchReports": {
+    "stockBaseline": {
+      "path": "/private/tmp/octane-signal-free-audit-inline-intrinsic-computed-baseline47/report.json",
+      "sha256": "ebdb639171df13f54903d52dc755f34b13b7fe6f331aa9159e9ded394a3f63aa"
+    },
+    "stockFinal": {
+      "path": "/private/tmp/octane-signal-free-audit-inline-intrinsic-computed-final47/report.json",
+      "sha256": "6194e1ae723e01278a97f8b84dca51bfb9a3952be91811f0edd5267d42f01119"
+    },
+    "publicBaseline": {
+      "path": "/private/tmp/octane-signal-free-driver-public-inline-intrinsic-computed-baseline47/report.json",
+      "sha256": "9708245c4bb1f44ee6fcc4696a57c18e245ab0265ed190bece7150706f0d95c0"
+    },
+    "publicFinal": {
+      "path": "/private/tmp/octane-signal-free-driver-public-inline-intrinsic-computed-final47/report.json",
+      "sha256": "be215ed0c4858724da27a868372969c836bb0cb8a7e02eca651650ea3e22ad44"
+    }
+  },
+  "limitations": [
+    "This guard corrects visible authored builtin mutation inference; it does not prove whole-program ambient immutability.",
+    "Unknown getters/callbacks and external mutation retain the existing builtin assumptions.",
+    "Fresh-target exemptions require an exact normal static mutator call and literal-origin immutable const identity.",
+    "No new primitive admission for constructor aliases/members.",
+    "Whole closures are compared individually; compressed module/lane totals must not be added.",
+    "Existing prior engine/model-SSR cost transfers are not erased by this compiler fix.",
+    "Used-native-app public control is size-only; the owning new public consumers provide live update/cleanup observations.",
+    "Temporary runners are audit provenance, not checked-in reusable commands; committed owning tests provide reproductions.",
+    "Computed-key invalidation unwraps only value-preserving TypeScript wrappers around exact string literals. It creates no new primitive admission and is not arbitrary dynamic-key or whole-program ambient-write analysis."
+  ],
+  "sourceGitTreeAtBase": "10bdf3c0af0d4ae1f3005850f51cd6b958b9950f",
+  "historicalExactClosureComparison": {
+    "base": "068ead53d23feeaae0a6d8b2bf3bb3fad5eb4499",
+    "incorporatedDocsHead": "95e6674e2d1d2c485e7a80bb16ff3126e6e92aa5",
+    "compilerSHA": "f1a7f5b3982d7f5eadf388aefe0ecaca1fde9fd69a712cd3a136691b8ae5075c",
+    "all22WholeBundlesExact": true,
+    "remainingGap": "ChainExpression around optional static .call callee, independently reproduced and corrected at final0843",
+    "sourceGitTreeAtHistoricalBase": "cd0c9831a71fbc6679820d7bd612c4e9907f7133"
+  },
+  "historicalPublished0843Qualification": {
+    "measurementBase": "40ff19fcf39839714f02f2dc6bfa9e9fbd2f38cd",
+    "compilerSHA": "0843dd10973deb38cbce84692dabe90c8a214a8c0de79354af6c11503c217c5f",
+    "publishedHead": "aa2c9f1844f0017203eb0f0bf84eafbf08e0855a",
+    "all22WholeBundlesExact": true,
+    "owningNearbyVitestResults": 212,
+    "nodeWorkflowResults": 219,
+    "compilerCost": {
+      "node": "v24.19.0",
+      "runnerSHA": "18617fcb12d7b2e5109aaae81835496fb15332c3a990811dff0522e61f46be7e",
+      "sourceHashes": {
+        "baseline": {
+          "compiler/compile.js": "b11fbb09999f2c471cc5faaa87297dcdf2bca99b43203ff1e42fe2e34d9257ea",
+          "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+          "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a"
+        },
+        "candidate": {
+          "compiler/compile.js": "0843dd10973deb38cbce84692dabe90c8a214a8c0de79354af6c11503c217c5f",
+          "runtime.ts": "1564db37bf2b4c389b267262fdbfe4371b5947126bceae21adacedc9dab1233d",
+          "index.ts": "e083d0e585a2944cc9f83f205c03fc116c4a36bd95feb01d151bba7a044f142a"
+        }
+      },
+      "lockSHA": "af0457e80aa081883f866fdda8aae261145eac1dd08ca9a592a0b24b3984004b",
+      "base": "40ff19fcf39839714f02f2dc6bfa9e9fbd2f38cd",
+      "options": {
+        "mode": "client",
+        "dev": false,
+        "hmr": false
+      },
+      "batch": 3,
+      "warmupPairs": 3,
+      "measuredPairs": 12,
+      "alternatingOrder": true,
+      "gcOutsideSample": true,
+      "debugFrozenAst": false,
+      "debugAssertLoc": false,
+      "rows": [
+        {
+          "id": "proof-free-fast",
+          "source": "export function View(props) @{<output>{props.label as string}</output>}",
+          "authoredSHA": "f0de8deb675172281b5656d2eb0e73283c40de526e47a169e55b9a68d634f8cc",
+          "sourceBytes": 71,
+          "baseline": {
+            "medianMs": 1.1363194999999944,
+            "iqrMs": [1.0633438333333345, 1.2356526666666716],
+            "outputSHA": "e789c332bf1bf6eb5b5fbfbab8ad32b4e011c25d56754e1190d57abdbd76c57c",
+            "samplesMs": [
+              1.0522083333333399, 1.0798333333333403, 1.3398889999999994, 1.2999026666666584,
+              1.300388666666663, 0.913597333333333, 1.1860280000000027, 1.0467636666666635,
+              1.2142360000000092, 1.067055666666666, 1.1920416666666636, 1.086610999999986
+            ]
+          },
+          "candidate": {
+            "medianMs": 1.1263609999999982,
+            "iqrMs": [1.027385333333335, 1.2559585000000009],
+            "outputSHA": "e789c332bf1bf6eb5b5fbfbab8ad32b4e011c25d56754e1190d57abdbd76c57c",
+            "samplesMs": [
+              0.9837083333333396, 1.3207779999999996, 1.1142636666666685, 1.3626943333333372,
+              1.236236333333333, 1.3151250000000043, 1.1384583333333278, 1.1873470000000073,
+              0.846305333333324, 1.0419443333333334, 0.8987639999999905, 1.074166666666675
+            ]
+          },
+          "pairedRatio": {
+            "medianMs": 0.9681791615611863,
+            "iqrMs": [0.9090763521166296, 1.0698043840661011]
+          }
+        },
+        {
+          "id": "proof-free-marker-aliases",
+          "source": "// String is discussed but never called here\nexport function inspect(props){const O0=Object,R0=Reflect;const O1=O0,R1=R0;const O2=O1,R2=R1;const O3=O2,R3=R2;const O4=O3,R4=R3;const O5=O4,R5=R4;const O6=O5,R6=R5;const O7=O6,R7=R6;const O8=O7,R8=R7;const O9=O8,R9=R8;const O10=O9,R10=R9;const O11=O10,R11=R10;const O12=O11,R12=R11;const O13=O12,R13=R12;const O14=O13,R14=R13;const O15=O14,R15=R14;const O16=O15,R16=R15;const O17=O16,R17=R16;const O18=O17,R18=R17;const O19=O18,R19=R18;const O20=O19,R20=R19;const O21=O20,R21=R20;const O22=O21,R22=R21;const O23=O22,R23=R22;const O24=O23,R24=R23;return props.value+1;}",
+          "authoredSHA": "fce3e8ffce6bd95a0c6744f62428d3059045620806d4d6217d649d6b6ab47fff",
+          "sourceBytes": 615,
+          "baseline": {
+            "medianMs": 1.5845416666666665,
+            "iqrMs": [1.4643957499999942, 1.6804930833333362],
+            "outputSHA": "b97f90230884236080e79e9d9b69ba0ed7d37e330bccaf4bb47e739865bb8beb",
+            "samplesMs": [
+              1.6276113333333342, 1.4565000000000055, 1.5124583333333323, 1.5701526666666723,
+              1.448888666666657, 1.4367640000000013, 1.9977500000000152, 1.5989306666666607,
+              1.7308473333333343, 1.7319723333333361, 1.663708333333337, 1.467027666666657
+            ]
+          },
+          "candidate": {
+            "medianMs": 1.6043193333333363,
+            "iqrMs": [1.47790641666667, 1.780638999999989],
+            "outputSHA": "b97f90230884236080e79e9d9b69ba0ed7d37e330bccaf4bb47e739865bb8beb",
+            "samplesMs": [
+              1.56797233333333, 1.6212776666666666, 1.4040833333333278, 1.4782363333333326,
+              1.587361000000006, 1.476916666666682, 1.8635416666666818, 1.7636946666666518,
+              1.7405416666666724, 1.8314720000000004, 1.8698056666666314, 1.4667223333333368
+            ]
+          },
+          "pairedRatio": {
+            "medianMs": 1.0167737580686502,
+            "iqrMs": [0.9578835340955362, 1.0974401501036668]
+          }
+        },
+        {
+          "id": "shared-50-builtin-aliases",
+          "source": "export function View(props) @{const O0=Object,R0=Reflect;const O1=O0,R1=R0;const O2=O1,R2=R1;const O3=O2,R3=R2;const O4=O3,R4=R3;const O5=O4,R5=R4;const O6=O5,R6=R5;const O7=O6,R7=R6;const O8=O7,R8=R7;const O9=O8,R9=R8;const O10=O9,R10=R9;const O11=O10,R11=R10;const O12=O11,R12=R11;const O13=O12,R13=R12;const O14=O13,R14=R13;const O15=O14,R15=R14;const O16=O15,R16=R15;const O17=O16,R17=R16;const O18=O17,R18=R17;const O19=O18,R19=R18;const O20=O19,R20=R19;const O21=O20,R21=R20;const O22=O21,R22=R21;const O23=O22,R23=R22;const O24=O23,R24=R23;const refs=[O24.assign,R24.set,O24.defineProperty,R24.deleteProperty];<output title={String(props.value)}>{String(props.value)}</output>}",
+          "authoredSHA": "33e2f857ef38fb044f4043b791e1027a33cacfae62cd125a68553652acb85a80",
+          "sourceBytes": 684,
+          "baseline": {
+            "medianMs": 3.2635486666666607,
+            "iqrMs": [3.080750000000004, 3.5237049166666643],
+            "outputSHA": "1d5a23b05f31f7a41c9b6dc741b4757e9b222d4b9f882a4bfff3ca6c3dbc7a10",
+            "samplesMs": [
+              3.2228889999999715, 3.0084999999999886, 3.908652666666702, 4.07355533333335,
+              3.437305666666665, 3.042250000000005, 3.1177083333333258, 2.9121109999999817,
+              3.093583333333337, 3.3042083333333494, 3.7829026666666627, 3.407916666666665
+            ]
+          },
+          "candidate": {
+            "medianMs": 3.5393265000000156,
+            "iqrMs": [3.0296908333333286, 3.6467639166666665],
+            "outputSHA": "dc479b7bda065b61fa0ef9c0b31e40523d8260fadb8303ec62c107be5053124c",
+            "samplesMs": [
+              3.5283750000000205, 3.6986386666666626, 3.6294723333333345, 3.743610999999987,
+              3.5502780000000107, 2.983930333333357, 3.0449443333333193, 2.796305666666664,
+              2.8756113333333437, 3.7984026666666373, 3.5900416666666692, 3.209722333333351
+            ]
+          },
+          "pairedRatio": {
+            "medianMs": 0.9684471316484505,
+            "iqrMs": [0.938767374827688, 1.048346499070863]
+          }
+        },
+        {
+          "id": "readonly-computed",
+          "source": "import {createRoot,flushSync}from'octane';\nfunction View(props) @{props.model.set(props.key,props.labels[props.key]);<section><output title={String(props.labels[props.key])}>{String(props.labels[props.key])}</output><input value={String(props.labels[props.key])}/></section>}\nexport function run(host){const writes=[];const model={set(key,value){writes.push(key+':'+value)}};const root=createRoot(host);root.render(View,{model,key:'a',labels:{a:'first'}});const output=host.querySelector('output'),input=host.querySelector('input');const initial=[output.textContent,output.title,input.value];root.render(View,{model,key:'b',labels:{b:'next'}});flushSync(()=>{});const updated=[output.textContent,output.title,input.value];const identity=host.querySelector('output')===output&&host.querySelector('input')===input;root.unmount();return{initial,updated,identity,writes,retired:host.childNodes.length===0};}",
+          "authoredSHA": "27769eb50f1ef6585886a63ce3a02c442f7aab261ed5552ad83bf5915d815cff",
+          "sourceBytes": 903,
+          "baseline": {
+            "medianMs": 3.3759723333333413,
+            "iqrMs": [3.2165730000000017, 3.673496416666694],
+            "outputSHA": "0078d090ae8b44367bac1e49f9f47a6924949fe061123ce52f257123515baf9f",
+            "samplesMs": [
+              4.215972000000041, 4.110999999999952, 3.6576526666666873, 3.34055566666666,
+              3.268236333333334, 3.0854303333333064, 3.2233473333333222, 3.091902666666632,
+              3.1962500000000396, 3.721027666666714, 3.445069333333322, 3.4113890000000233
+            ]
+          },
+          "candidate": {
+            "medianMs": 3.4013194999999996,
+            "iqrMs": [3.308201333333367, 4.0008678333333405],
+            "outputSHA": "0078d090ae8b44367bac1e49f9f47a6924949fe061123ce52f257123515baf9f",
+            "samplesMs": [
+              4.294736000000057, 4.382125000000012, 3.6303196666666886, 3.3235276666666778,
+              3.319833333333387, 3.176319666666662, 3.211527999999968, 3.332250000000007,
+              3.273305333333307, 4.061305333333318, 3.4703889999999924, 3.9807220000000143
+            ]
+          },
+          "pairedRatio": {
+            "medianMs": 1.0213951652718176,
+            "iqrMs": [1.004595456058505, 1.0688969409798816]
+          }
+        },
+        {
+          "id": "fresh-target-copy",
+          "source": "import {createRoot,flushSync}from'octane';\nfunction View(props) @{Object.assign({},props.labels);props.model.set(props.key,props.labels[props.key]);<section><output title={String(props.labels[props.key])}>{String(props.labels[props.key])}</output><input value={String(props.labels[props.key])}/></section>}\nexport function run(host){const writes=[];const model={set(key,value){writes.push(key+':'+value)}};const root=createRoot(host);root.render(View,{model,key:'a',labels:{a:'first'}});const output=host.querySelector('output'),input=host.querySelector('input');const initial=[output.textContent,output.title,input.value];root.render(View,{model,key:'b',labels:{b:'next'}});flushSync(()=>{});const updated=[output.textContent,output.title,input.value];const identity=host.querySelector('output')===output&&host.querySelector('input')===input;root.unmount();return{initial,updated,identity,writes,retired:host.childNodes.length===0};}",
+          "authoredSHA": "dccf273f781bd4ba1e7291a94bed339d4c50a118a1c12ec2d654e9242e74c4f6",
+          "sourceBytes": 934,
+          "baseline": {
+            "medianMs": 3.333645833333283,
+            "iqrMs": [3.2234064166666485, 3.3745382500000005],
+            "outputSHA": "80bc74eaeb511ca037735436282f65f626be7e42d4902577225ecfb51d52b12f",
+            "samplesMs": [
+              3.351610999999972, 3.9178333333333435, 3.433958333333294, 3.3589583333333244,
+              3.2316113333333, 3.071999999999965, 3.117625000000013, 3.3156806666665943,
+              3.2456666666666933, 3.4024859999999535, 3.3652223333333495, 3.1987916666666933
+            ]
+          },
+          "candidate": {
+            "medianMs": 3.3658959999999825,
+            "iqrMs": [3.164958333333326, 3.472062416666688],
+            "outputSHA": "80bc74eaeb511ca037735436282f65f626be7e42d4902577225ecfb51d52b12f",
+            "samplesMs": [
+              3.326347333333312, 3.733638666666669, 3.4108886666667027, 3.4671526666666828,
+              3.037750000000036, 3.2046250000000023, 3.0442776666667064, 3.4867916666667043,
+              3.3059719999999593, 3.5116113333333487, 3.4054446666666536, 3.045958333333298
+            ]
+          },
+          "pairedRatio": {
+            "medianMs": 1.0026171289839367,
+            "iqrMs": [0.9706013924857448, 1.0321068469563772]
+          }
+        },
+        {
+          "id": "guarded-wrapped-mutation",
+          "source": "export function View(props) @{const env=globalThis as any;const method=props.method;(Reflect[method] as typeof Reflect.set)(env,'String',props.replacement);<section><output title={String(props.value$)}>{String(props.value$) as string}</output><input value={String(props.value$)}/></section>}",
+          "authoredSHA": "96ab2506350f3a6cf7eac6ab3412ff1fc2aa72fcc32038bd93b656810ac4dc19",
+          "sourceBytes": 291,
+          "baseline": {
+            "medianMs": 1.5057083333333594,
+            "iqrMs": [1.44921875, 1.5519409999999805],
+            "outputSHA": "a0ee98cc2b31e01d5d3c189257048057a5432a0ff6a9614289896cf39da84a19",
+            "samplesMs": [
+              1.5492916666666285, 1.4869306666666944, 1.5307083333333746, 1.4365000000000236,
+              1.487319333333365, 1.6246386666666695, 1.6170969999999822, 1.4361389999999876,
+              1.5240973333333538, 1.4534583333333255, 1.314833333333354, 1.5598890000000363
+            ]
+          },
+          "candidate": {
+            "medianMs": 1.6347986666666734,
+            "iqrMs": [1.5726943333333263, 1.6633262499999546],
+            "outputSHA": "2f50880dc4e735c27eac0c5a00f5e03499d96a2a3d7d446756bb788334151abb",
+            "samplesMs": [
+              1.652736333333299, 1.7648196666667293, 1.5177639999999428, 1.6595276666666148,
+              1.6747219999999743, 1.61870833333334, 1.5978750000000066, 1.7559583333333346,
+              1.510486333333347, 1.5191943333333409, 1.5905276666666548, 1.6508890000000065
+            ]
+          },
+          "pairedRatio": {
+            "medianMs": 1.0625532458058813,
+            "iqrMs": [0.9951482059358464, 1.163165181077721]
+          }
+        }
+      ],
+      "limitations": "One bounded compiler-only synthetic sample. Unknown callback/getter/ambient effects retain existing builtin assumptions. No runtime/browser/SSR CPU speed claim."
+    },
+    "computedKeyGap": {
+      "reportSHA": "85633f699c3ade3ed6880d27ae6fa7447e0928f32a9451600a13daa5181303b2",
+      "main40ffPasses": 0,
+      "published0843Passes": 0,
+      "executionsPerSource": 16,
+      "firstServerFailure": "TypeError: s.indexOf is not a function",
+      "clientFailure": "[object Object] instead of the live handle value"
+    }
+  }
+}
