@@ -183,6 +183,7 @@ async function measureMount(browser, url) {
 		const { ctx, page } = await freshPage(browser, url);
 		const dt = await page.evaluate(async () => {
 			(window.gc || (() => {}))();
+			void document.body?.offsetHeight;
 			const t0 = performance.now();
 			const result = window.__mount();
 			if (result && typeof result.then === 'function') await result;
@@ -210,6 +211,7 @@ async function measureLoop(browser, url, op) {
 			const out = [];
 			for (let i = 0; i < WARMUP + ITER; i++) {
 				gc();
+				void document.body?.offsetHeight;
 				const t0 = performance.now();
 				const r = fn();
 				if (r && typeof r.then === 'function') await r;
@@ -238,6 +240,7 @@ async function measureUnmount(browser, url) {
 				if (mounted && typeof mounted.then === 'function') await mounted;
 				await new Promise((r) => setTimeout(r, YIELD_MS));
 				gc();
+				void document.body?.offsetHeight;
 				const t0 = performance.now();
 				const unmounted = window.__unmount();
 				if (unmounted && typeof unmounted.then === 'function') await unmounted;
@@ -271,12 +274,14 @@ async function measurePartialUnmountRemount(browser, url) {
 			const r = [];
 			for (let i = 0; i < WARMUP + ITER; i++) {
 				gc();
+				void document.body?.offsetHeight;
 				let t0 = performance.now();
 				const ru = window.__partialUnmount();
 				if (ru && typeof ru.then === 'function') await ru;
 				const du = performance.now() - t0;
 				await new Promise((res) => setTimeout(res, YIELD_MS));
 				gc();
+				void document.body?.offsetHeight;
 				t0 = performance.now();
 				const rr = window.__partialRemount();
 				if (rr && typeof rr.then === 'function') await rr;

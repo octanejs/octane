@@ -13,12 +13,12 @@
  */
 
 import { CalendarDate } from '@internationalized/date';
-import {
+import type {
 	CalendarSelectionMode,
 	CalendarState,
 } from '../upstream-exports/react-stately/useCalendarState';
-import { Key } from '@react-types/shared';
-import { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
+import type { Key } from '@react-types/shared';
+import type { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
 import { useDateFormatter } from '../i18n/useDateFormatter';
 import { useLocale } from '../i18n/I18nProvider';
 import { useMemo } from '../compat/react';

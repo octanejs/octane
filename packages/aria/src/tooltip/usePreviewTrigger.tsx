@@ -12,13 +12,13 @@
  * governing permissions and limitations under the License.
  */
 
-import {
+import type {
 	KeyboardEvent as AriaKeyboardEvent,
 	DOMAttributes,
 	FocusableElement,
 	RefObject,
 } from '@react-types/shared';
-import { AriaPopoverProps } from '../overlays/usePopover';
+import type { AriaPopoverProps } from '../overlays/usePopover';
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import { getActiveElement } from '../utils/shadowdom/DOMFunctions';
 import { getFocusableTreeWalker } from '../focus/FocusScope';
@@ -31,7 +31,7 @@ import { getOwnerDocument } from '../utils/domHelpers';
 import intlMessages from '../intl/previewtrigger/index';
 import { mergeProps } from '../utils/mergeProps';
 import { nodeContains } from '../utils/shadowdom/DOMFunctions';
-import {
+import type {
 	TooltipTriggerProps,
 	TooltipTriggerState,
 } from '../upstream-exports/react-stately/useTooltipTriggerState';

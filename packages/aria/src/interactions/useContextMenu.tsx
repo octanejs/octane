@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import { HTMLAttributes, useRef } from '../compat/react';
+import { type HTMLAttributes, useRef } from '../compat/react';
 import { isIOS, isMac } from '../utils/platform';
 import { mergeProps } from '../utils/mergeProps';
 import { useLongPress } from './useLongPress';

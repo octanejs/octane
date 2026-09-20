@@ -4,7 +4,7 @@ import { shallow } from '@octanejs/zustand/shallow';
 import { useVisibleNodeIds } from '../../hooks/useVisibleNodeIds';
 import { useStore } from '../../hooks/useStore';
 import { containerStyle } from '../../styles/utils';
-import { GraphViewProps } from '../GraphView/index.tsrx';
+import type { GraphViewProps } from '../GraphView/index.tsrx';
 import { useResizeObserver } from './useResizeObserver';
 import NodeWrapper from '../../components/NodeWrapper/index.tsrx';
 import type { Node, ReactFlowState } from '../../types';

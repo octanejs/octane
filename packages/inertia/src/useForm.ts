@@ -1,23 +1,23 @@
 import {
-	CancelToken,
-	ErrorValue,
-	FormDataErrors,
-	FormDataKeys,
-	FormDataType,
-	FormDataValues,
-	Method,
-	OptimisticCallback,
-	Progress,
-	RequestPayload,
+	type CancelToken,
+	type ErrorValue,
+	type FormDataErrors,
+	type FormDataKeys,
+	type FormDataType,
+	type FormDataValues,
+	type Method,
+	type OptimisticCallback,
+	type Progress,
+	type RequestPayload,
 	router,
-	UrlMethodPair,
-	UseFormArguments,
-	UseFormSubmitArguments,
-	UseFormSubmitOptions,
-	UseFormTransformCallback,
+	type UrlMethodPair,
+	type UseFormArguments,
+	type UseFormSubmitArguments,
+	type UseFormSubmitOptions,
+	type UseFormTransformCallback,
 	UseFormUtils,
-	UseFormWithPrecognitionArguments,
-	VisitOptions,
+	type UseFormWithPrecognitionArguments,
+	type VisitOptions,
 } from '@inertiajs/core';
 import { cloneDeep } from 'es-toolkit';
 import type {
@@ -28,10 +28,10 @@ import type {
 } from 'laravel-precognition';
 import { useCallback, useMemo, useRef } from 'octane';
 import useFormState, {
-	SetDataAction,
-	SetDataByKeyValuePair,
-	SetDataByMethod,
-	SetDataByObject,
+	type SetDataAction,
+	type SetDataByKeyValuePair,
+	type SetDataByMethod,
+	type SetDataByObject,
 } from './useFormState';
 import useRemember from './useRemember';
 
@@ -42,7 +42,7 @@ const slots = Object.fromEntries(
 ) as Record<string, symbol>;
 
 // Re-export types that were moved to useFormState
-export { SetDataAction, SetDataByKeyValuePair, SetDataByMethod, SetDataByObject };
+export type { SetDataAction, SetDataByKeyValuePair, SetDataByMethod, SetDataByObject };
 
 type PrecognitionValidationConfig<TKeys> = ValidationConfig & {
 	only?: TKeys[] | Iterable<TKeys> | ArrayLike<TKeys>;

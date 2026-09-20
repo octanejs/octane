@@ -12,11 +12,11 @@
  * governing permissions and limitations under the License.
  */
 
-import { DragItem, DragPreviewRenderer } from '@react-types/shared';
+import type { DragItem, DragPreviewRenderer } from '@react-types/shared';
 import { flushSync } from 'octane';
 import React, {
-	ForwardedRef,
-	JSX,
+	type ForwardedRef,
+	type JSX,
 	useEffect,
 	useImperativeHandle,
 	useRef,

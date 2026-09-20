@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import { Key, Selection } from '@react-types/shared';
+import type { Key, Selection } from '@react-types/shared';
 import { useMemo, useState } from '../../compat/react';
 
 export interface ListOptions<T> {

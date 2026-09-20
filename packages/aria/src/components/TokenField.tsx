@@ -13,15 +13,15 @@
  */
 
 import { isChildrenBlock, type OctaneNode } from 'octane';
-import { AriaTokenFieldProps } from '../upstream-exports/react-aria/useTokenField';
+import type { AriaTokenFieldProps } from '../upstream-exports/react-aria/useTokenField';
 import {
-	ClassNameOrFunction,
-	ContextValue,
+	type ClassNameOrFunction,
+	type ContextValue,
 	dom,
 	Provider,
-	RenderProps,
-	SlotProps,
-	StyleRenderProps,
+	type RenderProps,
+	type SlotProps,
+	type StyleRenderProps,
 	useContextProps,
 	useRenderProps,
 	useSlot,
@@ -30,26 +30,26 @@ import {
 import { createHideableComponent } from '../collections/Hidden';
 import { FieldInputContext } from './Autocomplete';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
-import { forwardRefType, GlobalDOMAttributes } from '@react-types/shared';
-import { HoverProps, useHover } from '../upstream-exports/react-aria/useHover';
+import type { forwardRefType, GlobalDOMAttributes } from '@react-types/shared';
+import { type HoverProps, useHover } from '../upstream-exports/react-aria/useHover';
 import { LabelContext } from './Label';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
 import { mergeRefs } from '../upstream-exports/react-aria/mergeRefs';
 import React, {
 	createContext,
-	ForwardedRef,
+	type ForwardedRef,
 	forwardRef,
-	HTMLAttributes,
+	type HTMLAttributes,
 	memo,
-	RefObject,
+	type RefObject,
 	useContext,
 	useMemo,
 } from '../compat/react';
 import { TextContext } from './Text';
 import {
-	TokenFieldState,
+	type TokenFieldState,
 	TokenFieldValue,
-	TokenSegment,
+	type TokenSegment,
 	useTokenFieldState,
 } from '../upstream-exports/react-stately/useTokenFieldState';
 import { useFocusRing } from '../upstream-exports/react-aria/useFocusRing';
