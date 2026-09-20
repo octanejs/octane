@@ -476,13 +476,304 @@ export async function collectSourceFiles(root, out = [], depth = 0) {
 	return out;
 }
 
-// Strings, comments, and regex literals are not call/tag sites. A `/` begins a
-// regex when the previous token cannot end an operand (identifier, `)`, `]`,
-// `}`) or is a keyword that takes an expression operand.
-const NON_CODE_PATTERN =
-	/\/\/[^\n]*|\/\*[\s\S]*?\*\/|(?:(?<![\w$)\]}]\s*)|(?<=\b(?:return|case|throw|typeof|instanceof|in|of|void|delete|yield|await|do|else|new)\s))\/(?:\\[\s\S]|\[(?:\\[\s\S]|[^\]\\])*\]|[^/\\\n])+\/[a-z]*|'(?:\\[\s\S]|[^'\\\n])*'|"(?:\\[\s\S]|[^"\\\n])*"|`(?:\\[\s\S]|[^`\\])*`/g;
+const EXPRESSION_OPERAND_KEYWORDS = new Set([
+	'return',
+	'case',
+	'throw',
+	'typeof',
+	'instanceof',
+	'in',
+	'of',
+	'void',
+	'delete',
+	'yield',
+	'await',
+	'do',
+	'else',
+	'new',
+]);
+const JSX_OPENING_TAG = /<([A-Za-z_$\u0080-\uffff][\w$.:\-\u0080-\uffff]*)(?=[\s/>])|<>/y;
+const JSX_CLOSING_TAG = /\/([A-Za-z_$\u0080-\uffff][\w$.:\-\u0080-\uffff]*)?\s*>/y;
 
-export function scanSource(source) {
+// Mask literal text without hiding the code executed by `${...}`. A stack
+// handles nested templates without recursion. Kept spans also retain JSX tags:
+// the slash in `</Tag>` cannot open a regex that consumes the next element.
+function sourceCode(source, sourcePath) {
+	// Plain TypeScript has no JSX: angle assertions and type parameters cannot
+	// authorize a JSX closing slash. Unknown/raw source keeps JSX text semantics.
+	const jsxSource = !/\.(?:ts|mts|cts)$/.test(sourcePath ?? '');
+	const typedJsxSource = /\.tsx$/.test(sourcePath ?? '');
+	const chunks = [];
+	let keptFrom = 0;
+	const mask = (start, end) => {
+		chunks.push(source.slice(keptFrom, start), ' ');
+		keptFrom = end;
+	};
+	const codeFrame = (interpolation = false) => ({
+		kind: 'code',
+		interpolation,
+		braces: 0,
+		parens: 0,
+		jsxTagOpenings: [],
+		jsxElements: [],
+		jsxGenericCandidates: [],
+		operandExpected: true,
+		previous: '',
+	});
+	const frames = [codeFrame()];
+	let index = 0;
+	while (index < source.length) {
+		const frame = frames[frames.length - 1];
+		const char = source[index];
+		if (frame.kind === 'template') {
+			if (char === '\\') index += 2;
+			else if (char === '`') {
+				mask(frame.start, ++index);
+				frames.pop();
+			} else if (char === '$' && source[index + 1] === '{') {
+				mask(frame.start, index + 2);
+				index += 2;
+				frames.push(codeFrame(true));
+			} else index++;
+			continue;
+		}
+		if (/\s/.test(char)) {
+			index++;
+			continue;
+		}
+		if (char === '/' && ['/', '*'].includes(source[index + 1])) {
+			const block = source[index + 1] === '*';
+			const end = source.indexOf(block ? '*/' : '\n', index + 2);
+			const stop = end === -1 ? source.length : end + (block ? 2 : 0);
+			mask(index, stop);
+			index = stop;
+			continue;
+		}
+		const genericCandidate = frame.jsxGenericCandidates[frame.jsxGenericCandidates.length - 1];
+		if (genericCandidate?.phase === 'parameters-next') {
+			if (char === '(') genericCandidate.phase = 'parameters';
+			else frame.jsxGenericCandidates.pop();
+		} else if (
+			genericCandidate?.phase === 'arrow-next' ||
+			genericCandidate?.phase === 'return-type'
+		) {
+			if (
+				char === '=' &&
+				source[index + 1] === '>' &&
+				frame.braces === genericCandidate.element.braces &&
+				frame.parens === genericCandidate.parens &&
+				frame.jsxElements[frame.jsxElements.length - 1] === genericCandidate.element
+			) {
+				frame.jsxElements.pop();
+				frame.jsxGenericCandidates.pop();
+			} else if (char === ':' && genericCandidate.phase === 'arrow-next') {
+				genericCandidate.phase = 'return-type';
+			} else if (genericCandidate.phase === 'arrow-next') {
+				frame.jsxGenericCandidates.pop();
+			}
+		}
+		if (char === '"' || char === "'") {
+			let end = index + 1;
+			while (end < source.length && source[end] !== char && source[end] !== '\n') {
+				end += source[end] === '\\' ? 2 : 1;
+			}
+			if (source[end] === char) end++;
+			mask(index, Math.min(end, source.length));
+			index = end;
+			frame.operandExpected = false;
+			frame.previous = char;
+			continue;
+		}
+		if (char === '`') {
+			frame.operandExpected = false;
+			frame.previous = '`';
+			frames.push({ kind: 'template', start: index++ });
+			continue;
+		}
+		const jsxElement = frame.jsxElements[frame.jsxElements.length - 1];
+		const jsxText =
+			jsxElement?.braces === frame.braces &&
+			!(
+				genericCandidate?.element === jsxElement &&
+				(genericCandidate.phase === 'parameters' || genericCandidate.phase === 'return-type')
+			);
+		const jsxOpening = frame.jsxTagOpenings[frame.jsxTagOpenings.length - 1];
+		if (jsxOpening?.genericCandidate && jsxOpening.headStart) {
+			// A default immediately follows the type-parameter name. An
+			// intervening JSX attribute name rules out this head evidence.
+			jsxOpening.genericHead = char === '=';
+			jsxOpening.headStart = false;
+		}
+		if (char === '<' && jsxOpening?.genericCandidate && jsxOpening.braces === frame.braces) {
+			jsxOpening.angles++;
+			index++;
+			frame.operandExpected = true;
+			frame.previous = '<';
+			continue;
+		}
+		if (jsxSource && char === '<' && (frame.operandExpected || jsxText)) {
+			JSX_OPENING_TAG.lastIndex = index;
+			const tag = JSX_OPENING_TAG.exec(source);
+			if (tag) {
+				const opening = {
+					name: tag[1] ?? '',
+					braces: frame.braces,
+					parens: frame.parens,
+					angles: 1,
+					genericHead: false,
+					headStart: true,
+					genericCandidate:
+						typedJsxSource &&
+						!/[.:\-]/.test(tag[1] ?? '') &&
+						frame.operandExpected &&
+						(jsxElement?.braces !== frame.braces || genericCandidate?.phase === 'parameters'),
+				};
+				if (opening.name === '') frame.jsxElements.push(opening);
+				else frame.jsxTagOpenings.push(opening);
+				index += tag[0].length;
+				frame.operandExpected = false;
+				frame.previous = opening.name || '>';
+				continue;
+			}
+		}
+		if (
+			char === '>' &&
+			jsxOpening?.braces === frame.braces &&
+			!(jsxOpening.genericCandidate && frame.previous === '=')
+		) {
+			if (jsxOpening.genericCandidate && --jsxOpening.angles > 0) {
+				index++;
+				frame.operandExpected = false;
+				frame.previous = '>';
+				continue;
+			}
+			frame.jsxTagOpenings.pop();
+			if (frame.previous !== '/') {
+				frame.jsxElements.push(jsxOpening);
+				// In TSX, confirm a code-position `<T>(...) =>` while
+				// consuming parameters, without repeated lookahead. Raw/JSX source
+				// keeps parenthesized arrow-like text as JSX, even with a colon.
+				// Ordinary JSX tag names retain text semantics; a constraint or
+				// multiple-parameter head supplies provisional generic code context.
+				if (jsxOpening.genericCandidate && jsxOpening.genericHead) {
+					frame.jsxGenericCandidates.push({
+						element: jsxOpening,
+						parens: frame.parens,
+						phase: 'parameters-next',
+					});
+				}
+			}
+			index++;
+			frame.operandExpected = false;
+			frame.previous = '>';
+			continue;
+		}
+		// A comparison followed by `/Tag>/` is a regex, even inside a JSX
+		// expression hole. Only a matched element at its text brace level closes.
+		if (char === '/' && frame.previous === '<' && jsxText) {
+			JSX_CLOSING_TAG.lastIndex = index;
+			const tag = JSX_CLOSING_TAG.exec(source);
+			if (tag && (tag[1] ?? '') === jsxElement.name) {
+				frame.jsxElements.pop();
+				index += tag[0].length;
+				frame.operandExpected = false;
+				frame.previous = '>';
+				continue;
+			}
+		}
+		if (char === '/' && frame.operandExpected) {
+			let end = index + 1;
+			let inClass = false;
+			while (end < source.length && source[end] !== '\n') {
+				const next = source[end];
+				if (next === '\\') {
+					end += 2;
+					continue;
+				}
+				if (next === '[') inClass = true;
+				else if (next === ']') inClass = false;
+				else if (next === '/' && !inClass) break;
+				end++;
+			}
+			if (source[end] === '/') {
+				end++;
+				while (end < source.length && /[A-Za-z]/.test(source[end])) end++;
+				mask(index, end);
+			}
+			// Keep an unterminated candidate as code instead of hiding later APIs.
+			index = end;
+			frame.operandExpected = false;
+			frame.previous = '/';
+			continue;
+		}
+		if (/[A-Za-z_$\u0080-\uffff]/.test(char)) {
+			let end = index + 1;
+			while (end < source.length && /[\w$\u0080-\uffff]/.test(source[end])) end++;
+			frame.previous = source.slice(index, end);
+			if (
+				frame.previous === 'extends' &&
+				jsxOpening?.genericCandidate &&
+				jsxOpening.braces === frame.braces &&
+				jsxOpening.parens === frame.parens &&
+				jsxOpening.angles === 1
+			) {
+				jsxOpening.genericHead = true;
+			}
+			frame.operandExpected = EXPRESSION_OPERAND_KEYWORDS.has(frame.previous);
+			index = end;
+			continue;
+		}
+		if (/\d/.test(char)) {
+			index++;
+			while (index < source.length && /[\w.]/.test(source[index])) index++;
+			frame.operandExpected = false;
+			frame.previous = 'number';
+			continue;
+		}
+		if ((char === '+' || char === '-') && source[index + 1] === char) {
+			frame.operandExpected = false;
+			frame.previous = char + char;
+			index += 2;
+			continue;
+		}
+		if (char === '(') frame.parens++;
+		if (
+			char === ',' &&
+			jsxOpening?.genericCandidate &&
+			jsxOpening.braces === frame.braces &&
+			jsxOpening.parens === frame.parens &&
+			jsxOpening.angles === 1
+		) {
+			jsxOpening.genericHead = true;
+		}
+		if (char === ')') {
+			frame.parens--;
+			if (genericCandidate?.phase === 'parameters' && frame.parens === genericCandidate.parens) {
+				genericCandidate.phase = 'arrow-next';
+			}
+		}
+		if (char === '{') frame.braces++;
+		if (char === '}') {
+			if (frame.interpolation && frame.braces === 0) {
+				mask(index, ++index);
+				frames.pop();
+				frames[frames.length - 1].start = index;
+				continue;
+			}
+			frame.braces--;
+		}
+		frame.operandExpected =
+			![')', ']', '}', '.'].includes(char) && !(char === '>' && frame.previous === '/');
+		frame.previous = char;
+		index++;
+	}
+	const unfinished = frames[frames.length - 1];
+	if (unfinished.kind === 'template') mask(unfinished.start, source.length);
+	chunks.push(source.slice(keptFrom));
+	return chunks.join('');
+}
+
+export function scanSource(source, { sourcePath } = {}) {
 	const apis = new Map();
 	const symbolExports = new Map();
 	// Introspection libraries export element-kind symbols, not components.
@@ -500,7 +791,7 @@ export function scanSource(source) {
 	}
 	// Names inside strings or comments are display labels (fiber-tag tables,
 	// error text), not call/tag sites.
-	const code = source.replace(NON_CODE_PATTERN, ' ');
+	const code = sourceCode(source, sourcePath);
 	for (const name of Object.keys(REACT_API_MAP)) {
 		if (name === 'onChange') continue;
 		const matches = code.match(new RegExp(`\\b${name}\\b`, 'g'));
@@ -536,7 +827,7 @@ export async function scanPath(root) {
 		} catch {
 			continue;
 		}
-		const result = scanSource(source);
+		const result = scanSource(source, { sourcePath: file });
 		for (const [name, count] of result.apis) {
 			totals.set(name, (totals.get(name) ?? 0) + count);
 		}
@@ -634,8 +925,9 @@ export async function bridgeReport({ packageName, path, projectRoot }) {
 // Filesystem-free variant of bridgeReport for hosted/remote use: the caller
 // pastes source text instead of pointing at an installed package, so there is
 // no node_modules resolution, no version, and no file counting. Everything
-// else (API rows, verdict, plan) matches bridgeReport.
-export function bridgeReportFromSource(source, { packageName } = {}) {
+// else (API rows, verdict, plan) matches bridgeReport. An optional source path
+// supplies the same language context available when scanning authored files.
+export function bridgeReportFromSource(source, { packageName, sourcePath } = {}) {
 	const report = {
 		target: packageName ?? 'pasted-source',
 		existingBinding: packageName ? (KNOWN_BINDINGS[packageName] ?? null) : null,
@@ -643,7 +935,7 @@ export function bridgeReportFromSource(source, { packageName } = {}) {
 	if (packageName) {
 		report.vanillaCore = detectVanillaCore(packageName, null);
 	}
-	const scan = scanSource(source);
+	const scan = scanSource(source, { sourcePath });
 	const rows = apiRows(scan.apis, scan.symbolExports);
 	report.reactImports = [...scan.imports];
 	report.classComponents = scan.classComponent;

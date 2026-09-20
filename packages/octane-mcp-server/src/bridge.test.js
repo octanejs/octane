@@ -71,6 +71,147 @@ describe('scanSource', () => {
 		expect(report.verdict).toBe('bridgeable');
 	});
 
+	it.each([
+		[
+			'template interpolation',
+			'import React from "react"; export const html = `prefix ${renderToString(React.createElement(React.Profiler, { id: "work" }, null))}`;',
+		],
+		[
+			'nested template interpolation',
+			'import React from "react"; export const html = `prefix ${`nested ${renderToString(React.createElement(React.Profiler, { id: "work" }, null))}`}`;',
+		],
+		[
+			'template interpolation with nested braces and inert delimiters',
+			'import React from "react"; export const html = `prefix ${(() => { const config = { label: "}" }; const pattern = /[{}]/; /* } Profiler */ // } SuspenseList\nreturn renderToString(React.createElement(React.Profiler, { id: config.label }, null)); })()}`;',
+		],
+		[
+			'JSX following a closing element',
+			'import React from "react"; export const App = () => <div><span></span><React.Profiler id="work" /></div>;',
+		],
+		[
+			'JSX inside a template interpolation',
+			'import React from "react"; export const html = `<main>${renderToString(<div><span></span><React.Profiler id="work" /></div>)}</main>`;',
+		],
+		[
+			'JSX following postfix division',
+			'import React from "react"; const ratio = count++ / 2; export const App = () => <React.Profiler id="work" />;',
+		],
+		[
+			'JSX following a fragment and member closing tag',
+			'import React from "react"; export const App = () => <><UI.Panel></UI.Panel><React.Profiler /></>;',
+		],
+		[
+			'JSX following a self-closing element',
+			'import React from "react"; export const App = () => <><span /><React.Profiler /></>;',
+		],
+		[
+			'JSX with a nested element in an attribute expression',
+			'import React from "react"; export const App = () => <span data-label={<i></i>}><React.Profiler /></span>;',
+		],
+		[
+			'JSX rendered by a TypeScript generic arrow',
+			'import React from "react"; export const View = <T extends unknown>(value: T) => <React.Profiler />;',
+			'view.tsx',
+		],
+		[
+			'JSX following literal parenthesized text',
+			'import React from "react"; export const App = () => <span>(text)<React.Profiler /></span>;',
+		],
+		[
+			'JSX in a generic parameter default and arrow body',
+			'import React from "react"; export const View = <T extends unknown>(value: unknown = <span>(text)</span>) => <React.Profiler />;',
+			'view.tsx',
+		],
+		[
+			'JSX rendered by an annotated generic arrow',
+			'import React from "react"; export const View = <T extends unknown>(value: T): unknown => <React.Profiler />;',
+			'view.tsx',
+		],
+		[
+			'JSX rendered with a generic function-type constraint',
+			'import React from "react"; export const View = <T extends (...args: unknown[]) => unknown>(value: T) => <React.Profiler />;',
+			'view.tsx',
+		],
+		[
+			'JSX rendered with a generic parameter type argument',
+			'import React from "react"; export const View = <T extends unknown>(value: Array<T>) => <React.Profiler />;',
+			'view.tsx',
+		],
+		[
+			'JSX rendered with a nested generic constraint',
+			'import React from "react"; export const View = <T extends Array<string>>(value: T) => <React.Profiler />;',
+			'view.tsx',
+		],
+		[
+			'JSX after genuine parenthesized JSX text containing nested elements',
+			'import React from "react"; export const App = () => <span>(text<i></i>)</span>; export const View = () => <React.Profiler />;',
+			'app.tsx',
+		],
+		[
+			'JSX after attributes and genuine parenthesized JSX text',
+			'import React from "react"; export const App = () => <span title="safe">(text<i></i>)</span>; export const View = () => <React.Profiler />;',
+			'app.tsx',
+		],
+		[
+			'JSX rendered with a generic type-parameter default',
+			'import React from "react"; export const View = <T = unknown>(value: T) => <React.Profiler />;',
+			'view.tsx',
+		],
+		[
+			'JSX after parenthesized arrow-like text',
+			'import React from "react"; export const App = () => <span>(text) => text</span>; export const View = () => <React.Profiler />;',
+		],
+		[
+			'JSX after typed-looking arrow text',
+			'import React from "react"; export const App = () => <span>(value: T) => text</span>; export const View = () => <React.Profiler />;',
+		],
+	])('reports unsupported rendering in %s', (_, source, sourcePath) => {
+		const report = bridgeReportFromSource(source, { sourcePath });
+		expect(report.apis.find((row) => row.name === 'Profiler')?.status).toBe('unsupported');
+		expect(report.verdict).toBe('needs-rework');
+	});
+
+	it.each([
+		'export const labels = `Profiler ${`nested ${"SuspenseList"}`}`;',
+		'export const label = `prefix ${(() => { const config = { label: "} Profiler" }; const pattern = /[{}]SuspenseList/; /* } Profiler */ // } SuspenseList\nreturn config.label + pattern.source; })()}`;',
+		'export const label = `literal \\${React.Profiler}`;',
+		'export const pattern = /[\\/]Profiler|SuspenseList/gi;',
+		'import React from "react"; export const App = () => <span title="Profiler">text</span>;',
+		'export const match = 1 < /Profiler>/.test(value);',
+		'export const html = `prefix ${1 < /Profiler>/.test(value)}`;',
+		'import React from "react"; export const App = () => <span>{1 < /span>Profiler/.test(value)}</span>;',
+	])('keeps inert template, regex and attribute labels out of the report: %s', (source) => {
+		const report = bridgeReportFromSource(source);
+		expect(report.apis.find((row) => row.name === 'Profiler')).toBeUndefined();
+		expect(report.apis.find((row) => row.name === 'SuspenseList')).toBeUndefined();
+		expect(report.verdict).toBe('bridgeable');
+	});
+
+	it.each([
+		'export const match = <T>(value: T) => 1 < /T>Profiler/.test(value);',
+		'export const match = <T>(value: T) => 1</T>Profiler/.test(value);',
+		'export const match = (<T>value) < /T>Profiler/.test(value);',
+	])('keeps a typed angle expression comparison regex inert: %s', (source) => {
+		const report = bridgeReportFromSource(source, { sourcePath: 'match.ts' });
+		expect(report.apis.find((row) => row.name === 'Profiler')).toBeUndefined();
+		expect(report.verdict).toBe('bridgeable');
+	});
+
+	it.each([
+		'export const match = <T extends unknown>(value: T) => 1 < /T>Profiler/.source.length;',
+		'export const match = <T extends unknown>(value: T): boolean => 1 < /T>Profiler/.source.length;',
+		'export const match = <T extends (...args: unknown[]) => unknown>(value: T) => 1 < /T>Profiler/.source.length;',
+		'export const match = <T extends unknown>(value: Array<T>) => 1 < /T>Profiler/.source.length;',
+		'export const match = <T extends Array<string>>(value: T) => 1 < /T>Profiler/.source.length;',
+		'export const match = <T extends unknown>(value: boolean = 1 < /T>Profiler/.source.length) => value;',
+		'export const match = <T = unknown>(value: T) => 1 < /T>Profiler/.source.length;',
+		'export const match = <T /* default type */ = unknown>(value: T) => 1 < /T>Profiler/.source.length;',
+	])('keeps a generic code comparison regex inert in TSX: %s', (source) => {
+		const report = bridgeReportFromSource(source, { sourcePath: 'match.tsx' });
+		expect(report.apis.find((row) => row.name === 'Profiler')).toBeUndefined();
+		expect(report.verdict).toBe('bridgeable');
+	});
+
 	it('targets only React-style text-host onChange wiring', () => {
 		const source = `
 			function Demo(props) {
@@ -154,6 +295,61 @@ describe('bridgeReport', () => {
 		expect(report.apis.find((row) => row.name === 'useSyncExternalStore').status).toBe('same');
 		expect(report.plan.length).toBeGreaterThan(0);
 	});
+
+	it.each(['ts', 'mts', 'cts', 'tsx'])(
+		'keeps an authored .%s generic comparison regex inert',
+		async (extension) => {
+			const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));
+			const expression =
+				extension === 'tsx'
+					? '<T extends unknown>(value: T) => 1 < /T>Profiler/.source.length'
+					: '<T>(value: T) => 1</T>Profiler/.source.length';
+			await writeFakePackage(root, 'generic-regex', {
+				[`index.${extension}`]:
+					(extension === 'tsx' ? '' : 'type T = unknown; declare const value: unknown;') +
+					`export const match = ${expression};` +
+					(extension === 'tsx'
+						? 'export const annotated = <T extends unknown>(value: T): boolean => 1 < /T>Profiler/.source.length;' +
+							'export const constrained = <T extends (...args: unknown[]) => unknown>(value: T) => 1 < /T>Profiler/.source.length;' +
+							'export const parameterType = <T extends unknown>(value: Array<T>) => 1 < /T>Profiler/.source.length;' +
+							'export const nested = <T extends Array<string>>(value: T) => 1 < /T>Profiler/.source.length;' +
+							'export const defaulted = <T extends unknown>(value: boolean = 1 < /T>Profiler/.source.length) => value;' +
+							'export const typeDefault = <T /* default type */ = unknown>(value: T) => 1 < /T>Profiler/.source.length;'
+						: 'export const asserted = (<T>value) < /T>Profiler/.source.length;'),
+			});
+			const report = await bridgeReport({ packageName: 'generic-regex', projectRoot: root });
+			expect(report.filesScanned).toBe(1);
+			expect(report.apis.find((row) => row.name === 'Profiler')).toBeUndefined();
+			expect(report.verdict).toBe('bridgeable');
+		},
+	);
+
+	it('retains actual JSX rendering after typed-looking text in authored .jsx', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));
+		await writeFakePackage(root, 'jsx-text', {
+			'index.jsx':
+				'import React from "react"; export const App = () => <span>(value: T) => text</span>; export const View = () => <React.Profiler />;',
+		});
+		const report = await bridgeReport({ packageName: 'jsx-text', projectRoot: root });
+		expect(report.filesScanned).toBe(1);
+		expect(report.apis.find((row) => row.name === 'Profiler')?.status).toBe('unsupported');
+		expect(report.verdict).toBe('needs-rework');
+	});
+
+	it.each(['tsx', 'jsx'])(
+		'keeps a numeric comparison regex inert in authored .%s',
+		async (extension) => {
+			const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));
+			await writeFakePackage(root, 'safe-regex', {
+				[`index.${extension}`]:
+					'const safe = 1 < /Profiler>/.source.length; export default function View(){return null;}',
+			});
+			const report = await bridgeReport({ packageName: 'safe-regex', projectRoot: root });
+			expect(report.filesScanned).toBe(1);
+			expect(report.apis.find((row) => row.name === 'Profiler')).toBeUndefined();
+			expect(report.verdict).toBe('bridgeable');
+		},
+	);
 
 	it('reports forwardRef usage as bridgeable-with-rewrites', async () => {
 		const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));

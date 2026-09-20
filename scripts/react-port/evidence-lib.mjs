@@ -768,12 +768,20 @@ function resolveRelativeSource(fromFile, specifier) {
 	const base = path.resolve(path.dirname(fromFile), specifier);
 	// Mirror TypeScript's `.js`-to-source mapping: a `./foo.js` specifier resolves
 	// to `foo.ts`/`foo.tsx`/`foo.tsrx` when no literal `foo.js` file exists.
+	// Extension substitution maps `.mjs`→`.mts` and `.cjs`→`.cts`, rather
+	// than an unrelated `.ts` module. The append/index candidates below retain
+	// the existing Bundler-mode fallbacks, such as `foo.mjs.ts`.
+	const sourceExtensions = /\.mjs$/.test(base)
+		? ['.mts']
+		: /\.cjs$/.test(base)
+			? ['.cts']
+			: /\.(js|jsx)$/.test(base)
+				? ['.ts', '.tsx', '.tsrx']
+				: [];
 	const stripped = base.replace(/\.(js|jsx|mjs|cjs)$/, '');
 	const candidates = [
 		base,
-		...(stripped === base
-			? []
-			: SHIPPED_SOURCE_EXTENSIONS.map((extension) => `${stripped}${extension}`)),
+		...sourceExtensions.map((extension) => `${stripped}${extension}`),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => `${base}${extension}`),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => path.join(base, `index${extension}`)),
 	];

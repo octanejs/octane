@@ -613,6 +613,50 @@ describe('package and closure completion', () => {
 		assert.equal(result.status, 'passed', result.issues.join('\n'));
 	});
 
+	for (const [importExtension, sourceExtension, expected] of [
+		['.jsx', '.tsx', 'passed'],
+		['.mjs', '.mts', 'passed'],
+		['.cjs', '.cts', 'passed'],
+		['.mjs', '.mjs', 'passed'],
+		['.cjs', '.cjs', 'passed'],
+		['.mjs', '.mjs.ts', 'passed'],
+		['.cjs', '.cjs.ts', 'passed'],
+		['.mjs', '.mjs/index.ts', 'passed'],
+		['.cjs', '.cjs/index.ts', 'passed'],
+		['.mjs', '.ts', 'blocked'],
+		['.cjs', '.ts', 'blocked'],
+	]) {
+		test(`shipped ${importExtension} imports ${expected === 'passed' ? 'accept' : 'reject'} ${sourceExtension} sources`, async () => {
+			const packageDirectory = await mkdtemp(path.join(tmpdir(), 'react-port-source-format-'));
+			await mkdir(path.join(packageDirectory, 'src'));
+			await writeFile(
+				path.join(packageDirectory, 'package.json'),
+				JSON.stringify({ name: '@octanejs/widget', exports: { '.': './src/index.ts' } }),
+			);
+			const indexSource = `import { helper } from './helper${importExtension}';\nexport const widget = helper;\n`;
+			const helperSource = 'export const helper = true;\n';
+			const helperPath = `src/helper${sourceExtension}`;
+			await mkdir(path.dirname(path.join(packageDirectory, helperPath)), { recursive: true });
+			await writeFile(path.join(packageDirectory, 'src/index.ts'), indexSource);
+			await writeFile(path.join(packageDirectory, helperPath), helperSource);
+			const result = auditShippedClosure({
+				nodeId: 'pkg:widget',
+				graphNodes: { 'pkg:widget': { packageName: 'widget', dependsOn: [] } },
+				packageDirectory,
+				runtimeDependencies: [],
+				adaptedSources: [],
+				sourceLedger: [
+					{ path: 'src/index.ts', origin: 'authored', sha256: sha256(indexSource) },
+					{ path: helperPath, origin: 'authored', sha256: sha256(helperSource) },
+				],
+			});
+			assert.equal(result.status, expected, result.issues.join('\n'));
+			if (expected === 'blocked') {
+				assert.match(result.issues.join('\n'), /helper\.ts is not reachable/);
+			}
+		});
+	}
+
 	test('requires React-coupled dependency edges to use their planned binding', () => {
 		const result = auditShippedClosure({
 			nodeId: 'pkg:widget',
