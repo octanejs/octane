@@ -1,5 +1,29 @@
 # octane
 
+## 0.3.1
+
+### Patch Changes
+
+- c49ccb6: Skip dispatch and transaction snapshots for unchanged compiled native callback data while preserving ownership refresh, staged publication, and rollback for changed callbacks and captures.
+- eda8994: Production DOM compilation uses a smaller deferred hydration body for compiler-generated template children with no authored fallback. Boundaries with `split={false}` can omit generic returned-output and fallback rendering while retaining SSR adoption, interaction replay, suspension and cleanup. Descriptor children, spreads, explicit fallbacks, split loaders and development/HMR builds retain the general Hydrate path.
+- a44c082: Preserve matching server-rendered list ranges when hydration resumes a pending lazy child. First-fill adoption now starts inside the list's retained range, and only first-fill adoption discards extra server items. Genuine list mismatches still report recoverable errors and remove the extra items.
+- b819a83: Defer server-side signal identity serialization until an actual handle is read. Ordinary object-keyed lists no longer coerce reconciliation keys merely because opaque output might contain a handle. Actual handles retain the same nested-list and component-key identities across SSR, hydration and reordering.
+- a52d50f: Avoid redundant signal value adapters for immutable local values whose initializers are proven to return JavaScript primitives. Keep native read tracking, controlled input markers, and the existing potential signal capability for models imported after mount.
+- 805deef: Reduce production DOM bundles for private contexts whose complete usage is proven to stay in compiled template providers and canonical context reads. Both the context factory and provider call omit generic returned-element and descriptor-child rendering. Exported, escaped, reflected, aliased, and opaque contexts retain the callable context API and generic child support; provider identity, state, SSR adoption, and cleanup stay unchanged.
+- 17970fe: Avoid rewriting unchanged native event authority while preserving ordered staged publication, rollback, retired invocations, and owner changes.
+- 9291944: Skip repeated signal-binding policy and handle probes for stable scalar attributes. Continue evaluating authored expressions, reconciling undefined attributes during hydration, reading signal handles, and restoring controlled inputs.
+- 47d5d1d: Preserve the production compiler's closed Context lifetime proof through generated Hydrate capture slots, so private compiled providers can keep their existing void output path across code splitting. Exported contexts, authored capture overrides, opaque provider children, and unproven bindings retain the generic rendering path.
+- 068ead5: Reuse the whole-style rollback snapshot for consecutive fixed-key declaration updates within one render checkpoint. Preserve separate hosts, intervening writes, CSS value coercion order, and abandoned or staged render restoration.
+- 0b48d5d: Reduce production client bundles for compiler-extracted Hydrate templates without an authored fallback. Code-split boundaries reuse the compiled-child policy while preserving preload captures, native hydration, suspension, retry and cleanup. Authored overrides and opaque callers retain the general rendering path.
+- 40ff19f: Initialize potential SSR signal identity recipes in the component frame's initial
+  object shape, while keeping ordinary frames free of optional identity fields.
+- cc7a8c6: Release completed streamed signal channels after transport acknowledgement, count only live channels against the automatic stream limit, and drain ready channels without rescanning completed history. Reuse serialized frame byte counts without changing the wire format.
+
+  Treat streamed signal and NDJSON timeouts as inactivity limits rather than total response deadlines. Pause producer timeouts during backpressure and renew browser result timeouts on accepted progress, preserving cancellation, replay protection, and byte and mailbox limits.
+
+  Cancel abandoned injection producers when a streaming renderer fails or its consumer cancels, including producers paused while waiting for transport acknowledgement.
+- 3350a41: Preserve live signal values when visible global-constructor mutations invalidate inferred inline conversion results, including wrapped and extracted native mutators.
+
 ## 0.3.0
 
 ### Minor Changes
