@@ -113,6 +113,38 @@ const compositionCases = [
 ];
 
 describe.sequential('real-browser mobile input continuity', () => {
+	it.each([true, false])(
+		'restores the same focused editor after a native update reparents it (anchor=%s)',
+		async (anchor) => {
+			const current = await openCase(false, true);
+			await current.evaluate((anchor) => window.__mobileInput.mountDockingEditor(anchor), anchor);
+			const input = current.locator('#editor-home input');
+			await input.fill('Unsaved editing');
+			const editor = await current.locator('octane-docking-editor').elementHandle();
+			const originalInput = await input.elementHandle();
+			await input.evaluate((element: HTMLInputElement) => element.setSelectionRange(2, 8));
+
+			await current.evaluate(() => window.__mobileInput.dockEditor());
+
+			expect(
+				await editor!.evaluate((element) => ({
+					parent: element.parentElement?.id,
+					next: element.nextElementSibling?.id ?? null,
+				})),
+			).toEqual({ parent: 'editor-home', next: anchor ? 'editor-anchor' : null });
+			expect(await input.inputValue()).toBe('Unsaved editing');
+			expect(
+				await originalInput!.evaluate((element: HTMLInputElement) => ({
+					same: element === document.querySelector('#editor-home input'),
+					focused: document.activeElement === element,
+					selection: [element.selectionStart, element.selectionEnd],
+				})),
+			).toEqual({ same: true, focused: true, selection: [2, 8] });
+			expect(await current.locator('#editor-dock').textContent()).toBe('Dock toolbar');
+			expect(await current.locator('#editor-dock').locator('*').count()).toBe(0);
+		},
+	);
+
 	it.each(
 		(['first', 'last'] as const).flatMap((position) =>
 			[false, true].map((shadow) => ({ position, shadow })),

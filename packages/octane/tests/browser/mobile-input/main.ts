@@ -1,6 +1,7 @@
 import { createElement, createRoot, flushSync, type Root } from '../../../src/index.js';
 import { NestedConditionalList } from '../../_fixtures/for.tsrx';
 import { mountPresentationRows } from './presentation.tsrx';
+import { DockingEditorApp, registerDockingEditor } from '../../_fixtures/docking-editor.js';
 import { createRelocatingNativeEditors } from '../../_fixtures/relocating-native-editor.js';
 
 type ListKind = 'compiled' | 'descriptor' | 'presentation';
@@ -216,7 +217,36 @@ function cancelBodyTouch(name: TouchName, capture: boolean) {
 	return { observed, defaultPrevented: event.defaultPrevented };
 }
 
-window.__mobileInput = { mount, reverse, snapshot, cancelBodyTouch, restoreRelocatedEditor };
+let dockingAnchor = false;
+
+function mountDockingEditor(anchor: boolean): void {
+	root?.unmount();
+	presentation?.dispose();
+	presentation = undefined;
+	registerDockingEditor();
+	const dock = document.createElement('aside');
+	dock.id = 'editor-dock';
+	dock.textContent = 'Dock toolbar';
+	document.body.appendChild(dock);
+	dockingAnchor = anchor;
+	root = createRoot(document.querySelector('#root')!);
+	root.render(DockingEditorApp, { dock: '', anchor });
+	flushSync(() => {});
+}
+
+function dockEditor(): void {
+	flushSync(() => root!.render(DockingEditorApp, { dock: 'editor-dock', anchor: dockingAnchor }));
+}
+
+window.__mobileInput = {
+	mount,
+	reverse,
+	snapshot,
+	cancelBodyTouch,
+	restoreRelocatedEditor,
+	mountDockingEditor,
+	dockEditor,
+};
 
 declare global {
 	interface Window {
@@ -226,6 +256,8 @@ declare global {
 			snapshot: typeof snapshot;
 			cancelBodyTouch: typeof cancelBodyTouch;
 			restoreRelocatedEditor: typeof restoreRelocatedEditor;
+			mountDockingEditor: typeof mountDockingEditor;
+			dockEditor: typeof dockEditor;
 		};
 	}
 }

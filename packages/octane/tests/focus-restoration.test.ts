@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createElement, createRoot, flushSync, useLayoutEffect } from '../src/index.js';
 import { mount } from './_helpers';
+import { DockingEditorApp, registerDockingEditor } from './_fixtures/docking-editor';
 import { FastHostControlledList } from './_fixtures/for.tsrx';
 import { createRelocatingNativeEditors } from './_fixtures/relocating-native-editor.js';
 
@@ -72,6 +73,46 @@ function DescriptorInputRows(props: { items: FocusRow[] }) {
 }
 
 describe('focus and text selection survive DOM updates', () => {
+	it.each([true, false])(
+		'restores a focused editor moved into another container during its update (anchor=%s)',
+		(anchor) => {
+			registerDockingEditor();
+			const dock = document.createElement('aside');
+			dock.id = 'editor-dock';
+			const toolbar = document.createElement('button');
+			toolbar.textContent = 'Dock toolbar';
+			dock.appendChild(toolbar);
+			document.body.appendChild(dock);
+			const rendered = mount(DockingEditorApp, { dock: '', anchor });
+			try {
+				const parent = rendered.find('#editor-home');
+				Object.defineProperty(parent, 'moveBefore', { configurable: true, value: undefined });
+				const children = Array.from(parent.childNodes);
+				const editor = rendered.find('octane-docking-editor');
+				const input = rendered.find('input') as HTMLInputElement;
+				input.value = 'Unsaved editing';
+				input.focus();
+				input.setSelectionRange(2, 8, 'backward');
+
+				rendered.update(DockingEditorApp, { dock: dock.id, anchor });
+
+				expect(Array.from(parent.childNodes)).toEqual(children);
+				expect(Array.from(dock.childNodes)).toEqual([toolbar]);
+				expect(editor.parentNode).toBe(parent);
+				expect(rendered.find('input')).toBe(input);
+				expect(input.value).toBe('Unsaved editing');
+				expect(document.activeElement).toBe(input);
+				expect([input.selectionStart, input.selectionEnd]).toEqual([2, 8]);
+			} finally {
+				try {
+					rendered.unmount();
+				} finally {
+					dock.remove();
+				}
+			}
+		},
+	);
+
 	it.each([
 		{ position: 'first', focusedId: 2, order: [2, 1, 3, 4] },
 		{ position: 'last', focusedId: 1, order: [2, 3, 4, 1] },
