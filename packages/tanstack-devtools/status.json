@@ -1,7 +1,7 @@
 {
   "upstream": {
     "package": "@tanstack/react-devtools",
-    "version": "0.10.7"
+    "version": "0.10.12"
   },
   "surface": "Surface-present for the pinned adapter's runtime entrypoint, with additive framework-neutral core re-exports. A same-fixture differential covers mount, config synchronization, plugin/title/trigger portals, and teardown. Upstream has no runtime suite; its test:types source compile is recorded as present type evidence with required pristine/adapted type lanes. Provenance is verified; core-version drift and Octane-specific type names/core re-exports stay as explicit divergences.",
   "divergences": [
@@ -14,7 +14,8 @@
   "notes": [
     "The component module is authored as TSRX with a checked declaration companion (`devtools.tsrx.d.ts`).",
     "Upstream `@tanstack/react-devtools` ships no runtime test suite (`test:lib` allows no tests). Runtime evidence is a repo-authored same-fixture differential plus package/SSR coverage.",
-    "Upstream `test:types` compiles the complete adapter source; required pristine (tsc + React types) and adapted (tsrx-tsc) type lanes execute that evidence one-for-one."
+    "Upstream `test:types` compiles the complete adapter source; required pristine (tsc + React types) and adapted (tsrx-tsc) type lanes execute that evidence one-for-one.",
+    "Dependency compatibility update: 0.10.12; historical copied-source provenance remains 0.10.7. See audit/release-compatibility.json for exact artifact comparisons and scope."
   ],
-  "verified": "2026-08-03"
+  "verified": "2026-09-12"
 }

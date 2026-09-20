@@ -188,7 +188,7 @@ catalogs:
     dexie: 4.4.4
     fake-indexeddb: 6.2.5
     viem: 2.55.10
-    wagmi: 3.7.4
+    wagmi: 3.7.7
     '@graphql-typed-document-node/core': ^3.2.0
     '@inertiajs/core': 3.6.1
     '@inertiajs/react': 3.6.1
@@ -267,7 +267,7 @@ catalogs:
     '@tanstack/ai': 0.41.0
     '@tanstack/ai-client': 0.21.0
     '@tanstack/ai-react': 0.17.0
-    '@tanstack/devtools': 0.12.5
+    '@tanstack/devtools': 0.14.2
     '@tanstack/devtools-event-bus': 0.4.2
     '@tanstack/devtools-event-client': 0.5.0
     '@tanstack/history': 1.162.0
@@ -281,8 +281,8 @@ catalogs:
     '@tanstack/store': ^0.9.3
     '@tanstack/table-core': 8.21.3
     '@tanstack/virtual-core': 3.17.3
-    '@wagmi/connectors': 8.0.25
-    '@wagmi/core': 3.6.4
+    '@wagmi/connectors': 8.2.0
+    '@wagmi/core': 3.6.5
     '@tauri-apps/api': 2.11.1
     '@tauri-apps/cli': 2.11.4
     electron: 43.2.0
