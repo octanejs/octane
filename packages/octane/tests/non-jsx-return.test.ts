@@ -1,11 +1,11 @@
 import { loadCompiledFixtureSource } from './_server-fixture.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as ServerRT from 'octane/server';
 import { mount, act } from './_helpers';
-import { hydrateRoot, flushSync } from '../src/index.js';
+import { createElement, hydrateRoot, flushSync } from '../src/index.js';
 import {
 	App,
 	Mixed,
@@ -18,9 +18,20 @@ import {
 	NestedOutputless,
 	Outputless,
 	OutputlessTerminal,
+	OptionalTransition,
+	ReturnedContent,
+	ReturnedOutputWithSibling,
+	UndefinedBranch,
+	type OptionalReturnProps,
 } from './_fixtures/non-jsx-return.tsrx';
+import {
+	OptionalTransition as TSXOptionalTransition,
+	ReturnGuard,
+	UndefinedBranch as TSXUndefinedBranch,
+} from './_fixtures/jsx-return-branches.js';
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/non-jsx-return.tsrx');
+const TSX_FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/jsx-return-branches.tsx');
 function deferred<T>() {
 	let resolve!: (value: T) => void;
 	const promise = new Promise<T>((done) => {
@@ -28,9 +39,9 @@ function deferred<T>() {
 	});
 	return { promise, resolve };
 }
-function serverModule(): Record<string, any> {
-	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
-		id: 'non-jsx-return.tsrx',
+function serverModule(fixture = FIXTURE): Record<string, any> {
+	return loadCompiledFixtureSource(readFileSync(fixture, 'utf8'), {
+		id: basename(fixture),
 		mode: 'server',
 		compileOptions: { mode: 'server' },
 	});
@@ -271,6 +282,274 @@ describe('generic component return reconciliation', () => {
 		expect(updatedRows.map((row) => row.textContent)).toEqual(['second:one', 'second:two']);
 		r.unmount();
 	});
+});
+
+const undefinedReturns = [
+	{
+		name: 'TSRX undefined ternary',
+		body: UndefinedBranch,
+		fixture: FIXTURE,
+		export: 'UndefinedBranch',
+	},
+	{
+		name: 'TSX undefined ternary',
+		body: TSXUndefinedBranch,
+		fixture: TSX_FIXTURE,
+		export: 'UndefinedBranch',
+	},
+	{
+		name: 'TSX optional ViewTransition',
+		body: TSXOptionalTransition,
+		fixture: TSX_FIXTURE,
+		export: 'OptionalTransition',
+	},
+];
+const clientUndefinedReturns = [
+	...undefinedReturns,
+	{ name: 'TSRX optional ViewTransition', body: OptionalTransition },
+];
+
+function optionalProps(
+	shown: boolean,
+	label: string,
+	log: OptionalReturnProps['log'],
+	onRef: OptionalReturnProps['onRef'],
+	empty?: OptionalReturnProps['empty'],
+): OptionalReturnProps {
+	return { shown, item: shown ? { title: label } : undefined, label, log, onRef, empty };
+}
+
+describe('undefined component output', () => {
+	it('preserves its committed child when a later sibling suspends before empty output commits', async () => {
+		const log: string[] = [];
+		const record = (entry: string) => log.push(entry);
+		const onRef = vi.fn<(node: HTMLButtonElement | null) => void>();
+		const props = (shown: boolean, label: string, read = () => 'ready') => ({
+			...optionalProps(shown, label, record, onRef),
+			read,
+		});
+		const gate = deferred<void>();
+		const r = mount(ReturnedOutputWithSibling as any, props(true, 'accepted'));
+		try {
+			await act(() => {});
+			const button = r.find('.returned-content');
+			await act(() => r.click('.returned-content'));
+			expect(button.textContent).toBe('accepted:1:1');
+
+			await act(() =>
+				r.update(
+					ReturnedOutputWithSibling as any,
+					props(false, 'discarded', () => {
+						throw gate.promise;
+					}),
+				),
+			);
+			expect(r.find('.returned-content')).toBe(button);
+			expect(r.find('.returned-sibling').textContent).toBe('ready');
+			expect(button.textContent).toBe('accepted:1:1');
+			expect(onRef).toHaveBeenLastCalledWith(button);
+			expect(log).toEqual(['mount']);
+			await act(() => r.click('.returned-content'));
+			expect(button.textContent).toBe('accepted:2:2');
+
+			await act(() =>
+				r.update(
+					ReturnedOutputWithSibling as any,
+					props(false, 'hidden', () => 'latest'),
+				),
+			);
+			expect(r.findAll('.returned-content')).toEqual([]);
+			expect(button.isConnected).toBe(false);
+			expect(r.find('.returned-sibling').textContent).toBe('latest');
+			expect(onRef).toHaveBeenLastCalledWith(null);
+			expect(log).toEqual(['mount', 'cleanup']);
+			await act(() => gate.resolve());
+			expect(r.findAll('.returned-content')).toEqual([]);
+			expect(r.find('.returned-sibling').textContent).toBe('latest');
+			expect(log).toEqual(['mount', 'cleanup']);
+
+			await act(() => r.update(ReturnedOutputWithSibling as any, props(true, 'again')));
+			expect(r.find('.returned-content').textContent).toBe('again:2:0');
+			await act(() => r.click('.returned-content'));
+			expect(r.find('.returned-content').textContent).toBe('again:3:1');
+		} finally {
+			gate.resolve();
+			r.unmount();
+		}
+		expect(log).toEqual(['mount', 'cleanup', 'mount', 'cleanup']);
+	});
+
+	it('clears an ordinary createElement component returning undefined', async () => {
+		const log: string[] = [];
+		const record = (entry: string) => log.push(entry);
+		const onRef = vi.fn<(node: HTMLButtonElement | null) => void>();
+		const onIncrement = vi.fn();
+		const props = (shown: boolean, label: string) => optionalProps(shown, label, record, onRef);
+		const body = (props: OptionalReturnProps) =>
+			props.shown
+				? createElement(ReturnedContent, {
+						label: props.label,
+						count: 0,
+						onIncrement,
+						log: props.log,
+						onRef: props.onRef,
+					})
+				: undefined;
+		const r = mount(body as any, props(false, 'hidden'));
+		try {
+			await act(() => {});
+			expect(r.container.textContent).toBe('');
+			expect(log).toEqual([]);
+			for (const label of ['one', 'two']) {
+				await act(() => r.update(body as any, props(true, label)));
+				const button = r.find('.returned-content');
+				expect(button.textContent).toBe(`${label}:0:0`);
+				await act(() => r.click('.returned-content'));
+				expect(button.textContent).toBe(`${label}:0:1`);
+				await act(() => r.update(body as any, props(false, 'hidden')));
+				expect(r.container.textContent).toBe('');
+				expect(button.isConnected).toBe(false);
+				expect(onRef).toHaveBeenLastCalledWith(null);
+			}
+			expect(onIncrement).toHaveBeenCalledTimes(2);
+			expect(log).toEqual(['mount', 'cleanup', 'mount', 'cleanup']);
+		} finally {
+			r.unmount();
+		}
+		expect(log).toEqual(['mount', 'cleanup', 'mount', 'cleanup']);
+	});
+
+	it.each([
+		...clientUndefinedReturns,
+		{ name: 'TSX bare return', body: ReturnGuard, empty: 'bare' as const },
+		{ name: 'TSX fallthrough', body: ReturnGuard, empty: 'fallthrough' as const },
+	])('clears and remounts $name without retaining its child', async (testCase) => {
+		const log: string[] = [];
+		const record = (entry: string) => log.push(entry);
+		const onRef = vi.fn<(node: HTMLButtonElement | null) => void>();
+		const empty = 'empty' in testCase ? testCase.empty : undefined;
+		const props = (shown: boolean, label: string) =>
+			optionalProps(shown, label, record, onRef, empty);
+		const body = testCase.body as any;
+		const r = mount(body, props(false, 'hidden'));
+		try {
+			await act(() => {});
+			expect(r.container.textContent).toBe('');
+			expect(log).toEqual([]);
+
+			let parentCount = 0;
+			for (const label of ['one', 'two', 'three']) {
+				await act(() => r.update(body, props(true, label)));
+				const button = r.find('.returned-content') as HTMLButtonElement;
+				expect(button.textContent).toBe(`${label}:${parentCount}:0`);
+				expect(onRef).toHaveBeenLastCalledWith(button);
+
+				await act(() => r.click('.returned-content'));
+				parentCount++;
+				expect(button.textContent).toBe(`${label}:${parentCount}:1`);
+
+				await act(() => r.update(body, props(false, 'hidden')));
+				expect(r.container.textContent).toBe('');
+				expect(r.findAll('.returned-content')).toEqual([]);
+				expect(button.isConnected).toBe(false);
+				expect(onRef).toHaveBeenLastCalledWith(null);
+				expect(log).toEqual(Array.from({ length: parentCount }, () => ['mount', 'cleanup']).flat());
+
+				// Rendering empty again does not unmount an already removed child twice.
+				await act(() => r.update(body, props(false, 'still hidden')));
+				expect(log).toEqual(Array.from({ length: parentCount }, () => ['mount', 'cleanup']).flat());
+			}
+		} finally {
+			r.unmount();
+		}
+		expect(log).toEqual(['mount', 'cleanup', 'mount', 'cleanup', 'mount', 'cleanup']);
+	});
+
+	it.each(
+		undefinedReturns.flatMap((testCase) =>
+			[false, true].map((initialShown) => ({ ...testCase, initialShown })),
+		),
+	)(
+		'adopts, clears and remounts server-rendered $name (initial shown=$initialShown)',
+		async (testCase) => {
+			const log: string[] = [];
+			const record = (entry: string) => log.push(entry);
+			const onRef = vi.fn<(node: HTMLButtonElement | null) => void>();
+			const props = (shown: boolean, label: string) => optionalProps(shown, label, record, onRef);
+			const server = serverModule(testCase.fixture);
+			const { html } = await ServerRT.renderToString(
+				server[testCase.export],
+				props(testCase.initialShown, 'hydrated'),
+			);
+			const container = document.createElement('div');
+			container.innerHTML = html;
+			document.body.appendChild(container);
+			const serverButton = container.querySelector<HTMLButtonElement>('.returned-content');
+			const diagnostics: unknown[][] = [];
+			const error = vi
+				.spyOn(console, 'error')
+				.mockImplementation((...args) => diagnostics.push(args));
+			const warning = vi
+				.spyOn(console, 'warn')
+				.mockImplementation((...args) => diagnostics.push(args));
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				if (testCase.initialShown) expect(serverButton?.textContent).toBe('hydrated:0:0');
+				else expect(container.textContent).toBe('');
+				await act(() => {
+					root = hydrateRoot(
+						container,
+						testCase.body as any,
+						props(testCase.initialShown, 'hydrated'),
+						{
+							onRecoverableError: (error) => diagnostics.push(['recoverable', error]),
+						},
+					);
+				});
+				expect(diagnostics).toEqual([]);
+				if (testCase.initialShown) {
+					expect(container.querySelector('.returned-content')).toBe(serverButton);
+				} else {
+					expect(container.querySelector('.returned-content')).toBeNull();
+					expect(log).toEqual([]);
+					expect(onRef).not.toHaveBeenCalled();
+					await act(() =>
+						flushSync(() => root!.render(testCase.body as any, props(true, 'hydrated'))),
+					);
+				}
+				const button = container.querySelector<HTMLButtonElement>('.returned-content')!;
+				expect(button.textContent).toBe('hydrated:0:0');
+				expect(onRef).toHaveBeenLastCalledWith(button);
+				await act(() => button.click());
+				expect(button.textContent).toBe('hydrated:1:1');
+
+				await act(() =>
+					flushSync(() => root!.render(testCase.body as any, props(false, 'hidden'))),
+				);
+				expect(container.textContent).toBe('');
+				expect(button.isConnected).toBe(false);
+				expect(onRef).toHaveBeenLastCalledWith(null);
+				expect(log).toEqual(['mount', 'cleanup']);
+
+				await act(() => flushSync(() => root!.render(testCase.body as any, props(true, 'again'))));
+				const remounted = container.querySelector<HTMLButtonElement>('.returned-content')!;
+				expect(remounted.textContent).toBe('again:1:0');
+				await act(() => remounted.click());
+				expect(remounted.textContent).toBe('again:2:1');
+			} finally {
+				try {
+					root?.unmount();
+				} finally {
+					container.remove();
+					error.mockRestore();
+					warning.mockRestore();
+				}
+			}
+			expect(log).toEqual(['mount', 'cleanup', 'mount', 'cleanup']);
+			expect(onRef).toHaveBeenLastCalledWith(null);
+			expect(diagnostics).toEqual([]);
+		},
+	);
 });
 
 describe('compiled `@{}` value-return classification', () => {

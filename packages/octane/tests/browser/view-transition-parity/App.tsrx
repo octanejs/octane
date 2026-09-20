@@ -19,6 +19,7 @@ declare module 'octane/jsx-runtime' {
 
 export interface AppProps {
 	visible: boolean;
+	optional?: { title: string } | null;
 	generation: number;
 	text: string;
 	title: string;
@@ -42,6 +43,13 @@ export interface AppProps {
 	onPassive: (generation: number, kind: 'mount' | 'cleanup') => void;
 	onLayout: (generation: number) => void;
 	onMeasuredRef: (element: HTMLElement | null) => void;
+}
+
+function OptionalSidebar(props: { item?: { title: string } }) {
+	return props.item &&
+		<ViewTransition exit="auto" default="none">
+			<nav id="optional-sidebar">{props.item.title as string}</nav>
+		</ViewTransition>;
 }
 
 export function App(props: AppProps) @{
@@ -103,6 +111,9 @@ export function App(props: AppProps) @{
 					}
 				</section>
 			</ViewTransition>
+		}
+		@if (props.optional !== undefined) {
+			<OptionalSidebar item={props.optional ?? undefined} />
 		}
 	</>
 }

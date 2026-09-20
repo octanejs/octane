@@ -10656,7 +10656,15 @@ function renderBlockInner(block: Block): true | undefined {
 			renderRetry = true;
 			return true;
 		}
-		if (out !== undefined && block.outputHandler !== null) block.outputHandler(block, out);
+		// Undefined is also the compiled imperative-body ABI. Only an existing
+		// return-owned slot makes it an empty renderable on this path; a body
+		// which claimed that slot imperatively has already reconciled its output.
+		if (
+			block.outputHandler !== null &&
+			(out !== undefined || (block.slots[0] as any)?.returnedOutput === true)
+		) {
+			block.outputHandler(block, out ?? null);
+		}
 		finishEffectRender(block);
 		if (!block.mounted) block.mounted = true;
 		if (block.renderStatus === RENDER_RETRYING) block.renderStatus = RENDER_VALID;
@@ -10736,6 +10744,16 @@ function renderBlockInner(block: Block): true | undefined {
 // may return a renderable. Compiled-void Blocks carry a null handler, allowing
 // production bundles containing only `@{}` output to tree-shake this whole
 // return/descriptor/childSlot path.
+let RETURNED_OUTPUT_SCOPE: Scope | null = null;
+
+function setReturnedOutputOwner(state: any, returned: boolean): void {
+	if (state.returnedOutput === returned) return;
+	if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+		TRANSITION_JOURNAL.push(JOURNAL_PROP, state, 'returnedOutput', state.returnedOutput);
+	}
+	state.returnedOutput = returned;
+}
+
 function returnSlotTail(block: Block, state: any): Node | null {
 	const candidates = [
 		state?.end,
@@ -10758,104 +10776,129 @@ function returnSlotTail(block: Block, state: any): Node | null {
 }
 
 function renderReturnedValue(block: Block, out: unknown): void {
-	// A single-root fragment descriptor (its renderer is `$$singleRoot`) mounts
-	// MARKERLESS via componentSlot's singleRoot path — the element self-delimits,
-	// so the DOM is byte-identical to `@{}`'s inline render (no extra markers).
-	// Anything else (multi-root, arrays, strings, conditionals) → childSlot.
-	const isComponentDescriptor =
-		out !== null &&
-		(out as any).$$kind === ELEMENT_TAG &&
-		(out as any).key == null &&
-		typeof (out as any).type === 'function';
-	const existingRet = block.slots[0] as any;
-	let replacedStart: Node | null = null;
-	let replacedEnd: Node | null = null;
-	const useSingleRoot =
-		isComponentDescriptor &&
-		((out as any).type.$$singleRoot === true ||
-			activeHydration()?.passthroughRanges === true ||
-			// STICKY regime: a return slot mounted through the componentSlot route
-			// (most importantly by the passthrough-hydration branch above, whose
-			// condition is false again once hydration ends) keeps that route while
-			// the returned component identity is unchanged. Falling through to the
-			// childSlot route would dispose the slot for a mere kind flip — tearing
-			// down the very subtree hydration just adopted on its FIRST update. An
-			// identity change still disposes below (matching remount semantics).
-			(existingRet !== undefined &&
-				existingRet.__kind === 'componentSlotSlot' &&
-				existingRet.currentComp === (out as any).type));
-	// The private return slot holds EITHER a componentSlotSlot (singleRoot
-	// path) or a childSlot. A re-render can flip which applies: a body that
-	// returns `<SingleRootComp/>` one render and `null` / a portal / an array
-	// the next (a placeholder toggling on/off, a menu opening/closing). The two
-	// shapes are incompatible, so tear the old one down before the other path
-	// reads it as its own kind (else e.g. childSlot would touch a
-	// componentSlotSlot and crash).
-	if (
-		existingRet !== undefined &&
-		existingRet.__kind !== (useSingleRoot ? 'componentSlotSlot' : 'childSlot')
-	) {
-		const swapDriver = TRANSITION_SWAP_DRIVER;
-		const transitionMode = block.currentRenderMode === 'transition';
-		const committedSuspense =
-			swapDriver !== null && activeHydration() === null && preservesCommittedSuspense(block);
-		const transitionSwap =
-			ROOT_RENDER_TRANSACTION === null || committedSuspense ? swapDriver : null;
-		const suspenseSwap =
-			transitionSwap !== null && !transitionMode && activeHydration() === null && committedSuspense;
-		// A transition can cross the markerless-single-root optimization boundary
-		// (text/list → compiled host fragment, or the reverse). A fallback-capable
-		// committed Suspense primary needs the same probe for an urgent replacement.
-		// Probe the incoming returned value off-screen before disposing the committed
-		// slot; a suspend or error then leaves the old DOM/state intact.
-		if (transitionSwap !== null && activeHydration() === null && (transitionMode || suspenseSwap)) {
-			const tail = returnSlotTail(block, existingRet);
-			if (tail !== null) {
-				const probe = transitionSwap.render(
-					block,
-					block.parentNode,
-					tail,
-					ROOT_RENDERABLE_BODY,
-					out,
-					renderReturnedValue,
+	const previous = RETURNED_OUTPUT_SCOPE;
+	RETURNED_OUTPUT_SCOPE = block;
+	try {
+		// A single-root fragment descriptor (its renderer is `$$singleRoot`) mounts
+		// MARKERLESS via componentSlot's singleRoot path — the element self-delimits,
+		// so the DOM is byte-identical to `@{}`'s inline render (no extra markers).
+		// Anything else (multi-root, arrays, strings, conditionals) → childSlot.
+		const isComponentDescriptor =
+			out !== null &&
+			(out as any).$$kind === ELEMENT_TAG &&
+			(out as any).key == null &&
+			typeof (out as any).type === 'function';
+		const existingRet = block.slots[0] as any;
+		let replacedStart: Node | null = null;
+		let replacedEnd: Node | null = null;
+		const useSingleRoot =
+			isComponentDescriptor &&
+			((out as any).type.$$singleRoot === true ||
+				activeHydration()?.passthroughRanges === true ||
+				// STICKY regime: a return slot mounted through the componentSlot route
+				// (most importantly by the passthrough-hydration branch above, whose
+				// condition is false again once hydration ends) keeps that route while
+				// the returned component identity is unchanged. Falling through to the
+				// childSlot route would dispose the slot for a mere kind flip — tearing
+				// down the very subtree hydration just adopted on its FIRST update. An
+				// identity change still disposes below (matching remount semantics).
+				(existingRet !== undefined &&
+					existingRet.__kind === 'componentSlotSlot' &&
+					existingRet.currentComp === (out as any).type));
+		// The private return slot holds EITHER a componentSlotSlot (singleRoot
+		// path) or a childSlot. A re-render can flip which applies: a body that
+		// returns `<SingleRootComp/>` one render and `null` / a portal / an array
+		// the next (a placeholder toggling on/off, a menu opening/closing). The two
+		// shapes are incompatible, so tear the old one down before the other path
+		// reads it as its own kind (else e.g. childSlot would touch a
+		// componentSlotSlot and crash).
+		if (
+			existingRet !== undefined &&
+			existingRet.__kind !== (useSingleRoot ? 'componentSlotSlot' : 'childSlot')
+		) {
+			const swapDriver = TRANSITION_SWAP_DRIVER;
+			const transitionMode = block.currentRenderMode === 'transition';
+			const committedSuspense =
+				swapDriver !== null && activeHydration() === null && preservesCommittedSuspense(block);
+			const transitionSwap =
+				ROOT_RENDER_TRANSACTION === null || committedSuspense ? swapDriver : null;
+			const suspenseSwap =
+				transitionSwap !== null &&
+				!transitionMode &&
+				activeHydration() === null &&
+				committedSuspense;
+			// A transition can cross the markerless-single-root optimization boundary
+			// (text/list → compiled host fragment, or the reverse). A fallback-capable
+			// committed Suspense primary needs the same probe for an urgent replacement.
+			// Probe the incoming returned value off-screen before disposing the committed
+			// slot; a suspend or error then leaves the old DOM/state intact.
+			if (
+				transitionSwap !== null &&
+				activeHydration() === null &&
+				(transitionMode || suspenseSwap)
+			) {
+				const tail = returnSlotTail(block, existingRet);
+				if (tail !== null) {
+					const probe = transitionSwap.render(
+						block,
+						block.parentNode,
+						tail,
+						ROOT_RENDERABLE_BODY,
+						out,
+						renderReturnedValue,
+					);
+					transitionSwap.dispose(probe.wip);
+					if (probe.failed) throw probe.error;
+					if (probe.suspended) throw new SuspenseException(probe.suspended);
+				}
+			}
+			if (
+				ROOT_RENDER_TRANSACTION !== null &&
+				!existingRet.inherited &&
+				!existingRet.borrowed &&
+				existingRet.ownerHost == null
+			) {
+				const first =
+					existingRet.start ??
+					existingRet.hostNode ??
+					existingRet.text ??
+					existingRet.block?.startMarker ??
+					existingRet.end ??
+					null;
+				const last = existingRet.end ?? existingRet.block?.endMarker ?? first;
+				if (sharesBlockBoundary(block, first, last)) {
+					replacedStart = first;
+					replacedEnd = last;
+				}
+			}
+			disposeReturnSlot(block, existingRet);
+			// Slot teardown runs user cleanups. A synchronous owning-root unmount must
+			// not let this render publish a replacement into the disposed container.
+			if (block.disposed) return;
+		}
+		if (useSingleRoot) {
+			const d = out as ElementDescriptor;
+			if (
+				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+				__OCTANE_PROFILE_ENABLED__ &&
+				!__profileHasComponentMetadata(d.type as Function)
+			) {
+				withProfileComponentOverride(d.type as Function, null, () =>
+					componentSlot(
+						block,
+						0,
+						block.parentNode,
+						d.type as ComponentBody,
+						d.props,
+						block.endMarker,
+						d.key ?? undefined,
+						true,
+						undefined,
+						activeHydration() !== null && elementKeyWasProvided(d),
+						d.__octaneInvocationSite,
+					),
 				);
-				transitionSwap.dispose(probe.wip);
-				if (probe.failed) throw probe.error;
-				if (probe.suspended) throw new SuspenseException(probe.suspended);
-			}
-		}
-		if (
-			ROOT_RENDER_TRANSACTION !== null &&
-			!existingRet.inherited &&
-			!existingRet.borrowed &&
-			existingRet.ownerHost == null
-		) {
-			const first =
-				existingRet.start ??
-				existingRet.hostNode ??
-				existingRet.text ??
-				existingRet.block?.startMarker ??
-				existingRet.end ??
-				null;
-			const last = existingRet.end ?? existingRet.block?.endMarker ?? first;
-			if (sharesBlockBoundary(block, first, last)) {
-				replacedStart = first;
-				replacedEnd = last;
-			}
-		}
-		disposeReturnSlot(block, existingRet);
-		// Slot teardown runs user cleanups. A synchronous owning-root unmount must
-		// not let this render publish a replacement into the disposed container.
-		if (block.disposed) return;
-	}
-	if (useSingleRoot) {
-		const d = out as ElementDescriptor;
-		if (
-			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
-			__OCTANE_PROFILE_ENABLED__ &&
-			!__profileHasComponentMetadata(d.type as Function)
-		) {
-			withProfileComponentOverride(d.type as Function, null, () =>
+			} else {
 				componentSlot(
 					block,
 					0,
@@ -10868,76 +10911,66 @@ function renderReturnedValue(block: Block, out: unknown): void {
 					undefined,
 					activeHydration() !== null && elementKeyWasProvided(d),
 					d.__octaneInvocationSite,
-				),
-			);
+				);
+			}
 		} else {
-			componentSlot(
-				block,
-				0,
-				block.parentNode,
-				d.type as ComponentBody,
-				d.props,
-				block.endMarker,
-				d.key ?? undefined,
-				true,
-				undefined,
-				activeHydration() !== null && elementKeyWasProvided(d),
-				d.__octaneInvocationSite,
-			);
+			// A nested return-based component whose server output is EMPTY owns an
+			// adjacent `<!--[--><!--]-->` range with no inner child range to adopt.
+			// An unframed third-party SSR root receives an equivalent synthetic range.
+			// Borrow either component range for the return slot instead of letting
+			// childSlot mint an empty `<!---->` anchor during hydration. The return
+			// slot is the block's entire output, so it can safely reconcile future
+			// text/component values between the borrowed markers while the block
+			// remains their owner. This keeps hydration byte-preserving for `return
+			// null` / `false` / `''` components (including memo wrappers).
+			const returnHydration = activeHydration();
+			if (
+				returnHydration !== null &&
+				block.slots[0] === undefined &&
+				block.startMarker !== null &&
+				block.endMarker !== null &&
+				block.startMarker !== block.endMarker &&
+				block.startMarker.nodeType === 8 &&
+				block.endMarker.nodeType === 8 &&
+				(getNextSibling(block.startMarker) === block.endMarker ||
+					returnHydration.isUnframedRootRange(block.startMarker, block.endMarker))
+			) {
+				const borrowed: ChildSlot = {
+					__kind: 'childSlot',
+					start: block.startMarker as Comment,
+					end: block.endMarker as Comment,
+					ownerHost: null,
+					borrowed: true,
+					compactable: false,
+					block: null,
+					text: null,
+					currentComp: null,
+					currentIsBodyFn: false,
+					forSlot: null,
+					hostNode: null,
+					portal: null,
+				};
+				block.slots[0] = borrowed;
+				registerSlot(block, borrowed);
+			}
+			childSlot(block, 0, block.parentNode, out, block.endMarker);
 		}
-	} else {
-		// A nested return-based component whose server output is EMPTY owns an
-		// adjacent `<!--[--><!--]-->` range with no inner child range to adopt.
-		// An unframed third-party SSR root receives an equivalent synthetic range.
-		// Borrow either component range for the return slot instead of letting
-		// childSlot mint an empty `<!---->` anchor during hydration. The return
-		// slot is the block's entire output, so it can safely reconcile future
-		// text/component values between the borrowed markers while the block
-		// remains their owner. This keeps hydration byte-preserving for `return
-		// null` / `false` / `''` components (including memo wrappers).
-		const returnHydration = activeHydration();
-		if (
-			returnHydration !== null &&
-			block.slots[0] === undefined &&
-			block.startMarker !== null &&
-			block.endMarker !== null &&
-			block.startMarker !== block.endMarker &&
-			block.startMarker.nodeType === 8 &&
-			block.endMarker.nodeType === 8 &&
-			(getNextSibling(block.startMarker) === block.endMarker ||
-				returnHydration.isUnframedRootRange(block.startMarker, block.endMarker))
-		) {
-			const borrowed: ChildSlot = {
-				__kind: 'childSlot',
-				start: block.startMarker as Comment,
-				end: block.endMarker as Comment,
-				ownerHost: null,
-				borrowed: true,
-				compactable: false,
-				block: null,
-				text: null,
-				currentComp: null,
-				currentIsBodyFn: false,
-				forSlot: null,
-				hostNode: null,
-				portal: null,
-			};
-			block.slots[0] = borrowed;
-			registerSlot(block, borrowed);
+		if (replacedStart !== null) {
+			const incoming = block.slots[0] as any;
+			const first =
+				incoming.start ??
+				incoming.hostNode ??
+				incoming.text ??
+				incoming.block?.startMarker ??
+				incoming.end ??
+				null;
+			const last = incoming.end ?? incoming.block?.endMarker ?? first;
+			replaceSharedBlockBoundary(block, replacedStart, replacedEnd, first, last);
 		}
-		childSlot(block, 0, block.parentNode, out, block.endMarker);
-	}
-	if (replacedStart !== null) {
-		const incoming = block.slots[0] as any;
-		const first =
-			incoming.start ??
-			incoming.hostNode ??
-			incoming.text ??
-			incoming.block?.startMarker ??
-			incoming.end ??
-			null;
-		const last = incoming.end ?? incoming.block?.endMarker ?? first;
-		replaceSharedBlockBoundary(block, replacedStart, replacedEnd, first, last);
+		const state = block.slots[0];
+		if (!block.disposed && state !== undefined) setReturnedOutputOwner(state, true);
+	} finally {
+		RETURNED_OUTPUT_SCOPE = previous;
 	}
 }
 
@@ -13653,6 +13686,13 @@ function renderSharedBody(body: ComponentBody, props: any, scope: Scope, extra: 
 
 /** Body handoffs are cold; ordinary Provider updates keep their cache arrays. */
 function invalidateSharedBodyOutput(scope: Scope): void {
+	// The new body must either claim the old slot imperatively or reconcile its
+	// return, including undefined. The previous body's void completion does not
+	// establish the new body's output mode (lazy can even resolve a builtin).
+	const state = scope.slots[0] as any;
+	if (state?.__kind === 'childSlot' || state?.__kind === 'componentSlotSlot') {
+		setReturnedOutputOwner(state, true);
+	}
 	const first = scope.compilerMemo;
 	if (first === null) return;
 	invalidateSharedBodyMemoRegion(first);
@@ -29538,6 +29578,12 @@ function componentSlotImpl(
 	// Attribute expressions can schedule a self-update after the compiled
 	// setup checkpoint. Skip their discarded child before it owns any state.
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
+	if (slotKey === 0 && parentScope !== RETURNED_OUTPUT_SCOPE) {
+		const state = parentScope.slots[0] as any;
+		// Shared bodies (notably lazy) can reuse a previous return slot. Claim it
+		// before rendering so their legitimate void completion keeps the new DOM.
+		if (state?.returnedOutput === true) setReturnedOutputOwner(state, false);
+	}
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	// A component nested inside a client-built replacement range must mount as
@@ -33265,6 +33311,12 @@ export function childSlot(
 	bindingMarker?: string,
 ): void {
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
+	if (slotKey === 0 && parentScope !== RETURNED_OUTPUT_SCOPE) {
+		const state = parentScope.slots[0] as any;
+		// Shared bodies (notably lazy) can reuse a previous return slot. Claim it
+		// before rendering so their legitimate void completion keeps the new DOM.
+		if (state?.returnedOutput === true) setReturnedOutputOwner(state, false);
+	}
 	if (IMPLICIT_SIGNAL_CHILD_DEPTH === 0) {
 		const existing = parentScope.slots[slotKey] as ChildSlot | undefined;
 		const previous = existing?.implicitSignal;

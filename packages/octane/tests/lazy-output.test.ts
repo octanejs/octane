@@ -1,6 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { createElement, flushSync, hydrateRoot, lazy, memo } from '../src/index.js';
+import {
+	createElement,
+	flushSync,
+	hydrateRoot,
+	lazy,
+	memo,
+	ViewTransition,
+	type ComponentBody,
+} from '../src/index.js';
 import * as ServerRuntime from 'octane/server';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { act, mount } from './_helpers.js';
@@ -25,6 +33,33 @@ function immediate<T>(value: T): PromiseLike<T> {
 }
 
 describe('resolved lazy body ownership', () => {
+	it('keeps children when a returned lazy body switches to ViewTransition, then clears undefined output', () => {
+		let selected: ComponentBody<any> = () => createElement('span', { children: 'returned' });
+		const payload = {
+			get default() {
+				return selected;
+			},
+		};
+		const Lazy = lazy(() => immediate(payload));
+		const children = createElement('em', { children: 'transition child' });
+		const view = mount(Lazy, { children });
+		try {
+			expect(view.find('span').textContent).toBe('returned');
+			selected = ViewTransition;
+			view.update(Lazy, { children });
+			expect(view.findAll('span')).toEqual([]);
+			expect(view.find('em').textContent).toBe('transition child');
+			view.update(Lazy, { children });
+			expect(view.find('em').textContent).toBe('transition child');
+
+			selected = () => undefined;
+			view.update(Lazy, { children });
+			expect(view.container.textContent).toBe('');
+		} finally {
+			view.unmount();
+		}
+	});
+
 	for (const depth of [1, 2]) {
 		it.each([false, true])(
 			`checks bodies through ${depth} memo wrappers (custom comparator=%s)`,
