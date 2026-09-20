@@ -6,6 +6,7 @@ import {
 	hydrateRoot,
 	lazy,
 	memo,
+	textSlot,
 	ViewTransition,
 	type ComponentBody,
 } from '../src/index.js';
@@ -33,6 +34,49 @@ function immediate<T>(value: T): PromiseLike<T> {
 }
 
 describe('resolved lazy body ownership', () => {
+	it('keeps text-only output when a returned lazy body switches to a native body', () => {
+		const TextOnly: ComponentBody<{ text: string }> = (props, scope) => {
+			textSlot(scope, 0, scope.block.parentNode, props.text, scope.block.endMarker);
+		};
+		let selected: ComponentBody<any> = (props: { text: string }) => props.text;
+		const Lazy = lazy(() =>
+			immediate({
+				get default() {
+					return selected;
+				},
+			}),
+		);
+		const view = mount(Lazy, { text: 'returned' });
+		try {
+			expect(view.container.textContent).toBe('returned');
+			selected = TextOnly;
+			const unchanged = { text: 'native unchanged' };
+			for (const props of [
+				{ text: 'native first' },
+				unchanged,
+				unchanged,
+				{ text: 'native changed' },
+			]) {
+				view.update(Lazy, props);
+				expect(view.container.textContent).toBe(props.text);
+			}
+
+			selected = () => undefined;
+			view.update(Lazy, { text: 'hidden' });
+			expect(view.container.textContent).toBe('');
+			view.update(Lazy, { text: 'still hidden' });
+			expect(view.container.textContent).toBe('');
+
+			selected = TextOnly;
+			for (const text of ['after empty', 'live again', 'live again']) {
+				view.update(Lazy, { text });
+				expect(view.container.textContent).toBe(text);
+			}
+		} finally {
+			view.unmount();
+		}
+	});
+
 	it('keeps children when a returned lazy body switches to ViewTransition, then clears undefined output', () => {
 		let selected: ComponentBody<any> = () => createElement('span', { children: 'returned' });
 		const payload = {

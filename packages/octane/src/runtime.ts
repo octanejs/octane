@@ -10967,8 +10967,15 @@ function renderReturnedValue(block: Block, out: unknown): void {
 			const last = incoming.end ?? incoming.block?.endMarker ?? first;
 			replaceSharedBlockBoundary(block, replacedStart, replacedEnd, first, last);
 		}
-		const state = block.slots[0];
-		if (!block.disposed && state !== undefined) setReturnedOutputOwner(state, true);
+		const state = block.slots[0] as any;
+		if (!block.disposed && state !== undefined && state.returnedOutput !== true) {
+			// New returned children claim ownership on mount. Keep that common path
+			// inline; shared-body handoffs use the cold journal helper.
+			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+				TRANSITION_JOURNAL.push(JOURNAL_PROP, state, 'returnedOutput', state.returnedOutput);
+			}
+			state.returnedOutput = true;
+		}
 	} finally {
 		RETURNED_OUTPUT_SCOPE = previous;
 	}
@@ -34333,6 +34340,13 @@ export function textSlot(
 		childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, undefined, compactable);
 		return;
 	}
+	if (
+		slotKey === 0 &&
+		parentScope !== RETURNED_OUTPUT_SCOPE &&
+		(state as any).returnedOutput === true
+	) {
+		setReturnedOutputOwner(state, false);
+	}
 	// Hot path: primitive into a text/empty slot (markerless single Text node).
 	const str =
 		vt === 'string' ? (value as string) : vt === 'boolean' || value == null ? '' : String(value);
@@ -39336,6 +39350,13 @@ function renderBranchSlot(
 	// A condition/discriminant can queue a parent self-update while its call
 	// arguments are evaluated. Preserve the previous branch for the replay.
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
+	if (
+		slotKey === 0 &&
+		parentScope !== RETURNED_OUTPUT_SCOPE &&
+		(state as any).returnedOutput === true
+	) {
+		setReturnedOutputOwner(state, false);
+	}
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	if (next !== state.branch) {
@@ -40343,6 +40364,10 @@ export function activityBlock(
 	env?: any[],
 ): void {
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
+	if (slotKey === 0 && parentScope !== RETURNED_OUTPUT_SCOPE) {
+		const state = parentScope.slots[0] as any;
+		if (state?.returnedOutput === true) setReturnedOutputOwner(state, false);
+	}
 	if (mode === 'hidden') ensureScheduledVisibilityDriver();
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
@@ -41468,7 +41493,8 @@ export function fastMapSlot(
 		callback = native;
 		native = mapSlot(items, method) as boolean;
 	}
-	const state = ((scopeOrItems as Scope).slots[slotOrMethod] as ChildSlot | undefined)?.forSlot;
+	const slot = (scopeOrItems as Scope).slots[slotOrMethod] as ChildSlot | undefined;
+	const state = slot?.forSlot;
 	const parent = native === true ? fastHostListParent(state, items, flags) : null;
 	if (parent === null) {
 		return mapSlot(
@@ -41486,6 +41512,13 @@ export function fastMapSlot(
 			anchor,
 			ownEnd,
 		);
+	}
+	if (
+		slotOrMethod === 0 &&
+		scopeOrItems !== RETURNED_OUTPUT_SCOPE &&
+		(slot as any).returnedOutput === true
+	) {
+		setReturnedOutputOwner(slot, false);
 	}
 	mountFastHostItems(
 		scopeOrItems as Scope,
