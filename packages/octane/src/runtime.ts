@@ -1657,7 +1657,7 @@ const RENDER_VALID = 0;
 const RENDER_INVALID = 1;
 const RENDER_RETRYING = 2;
 
-type OutputHandler = (block: Block, value: unknown) => void;
+type OutputHandler = (block: Block, value: unknown, reset?: true) => void;
 
 interface RootIdState {
 	prefix: string;
@@ -10775,10 +10775,17 @@ function returnSlotTail(block: Block, state: any): Node | null {
 	return null;
 }
 
-function renderReturnedValue(block: Block, out: unknown): void {
+function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 	const previous = RETURNED_OUTPUT_SCOPE;
 	RETURNED_OUTPUT_SCOPE = block;
 	try {
+		// Shared imperative bodies request a fresh native slot through this
+		// injected handler, keeping disposal out of compiled-void consumers.
+		if (reset === true) {
+			const state = block.slots[0];
+			if (state !== undefined) disposeReturnSlot(block, state);
+			return;
+		}
 		// A single-root fragment descriptor (its renderer is `$$singleRoot`) mounts
 		// MARKERLESS via componentSlot's singleRoot path — the element self-delimits,
 		// so the DOM is byte-identical to `@{}`'s inline render (no extra markers).
@@ -10985,8 +10992,18 @@ function renderReturnedValue(block: Block, out: unknown): void {
 // between the singleRoot componentSlot shape and the general childSlot shape. Fires
 // the content's cleanups, removes its DOM + the slot's own markers, and drops the
 // registry entry so the newly-chosen path rebuilds (and unmountScope won't
-// double-process a now-stale slot of the wrong kind).
+// double-process a now-stale slot of the wrong kind). Shared-body handoffs
+// also use this path to replace native control-flow output with a different kind.
 function disposeReturnSlot(block: Block, state: any): void {
+	const kind = state.__kind;
+	// A nested sole-root branch can replace its host without refreshing the
+	// outer slot's cached tail. Snapshot/remove only the live owned range.
+	const end =
+		(kind === 'ifBlockSlot' || kind === 'switchBlockSlot') &&
+		state.start === null &&
+		state.block?.endMarker != null
+			? state.block.endMarker
+			: state.end;
 	const transaction = ROOT_RENDER_TRANSACTION;
 	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
 		const parent: Node = state.ownerHost ?? block.parentNode;
@@ -11000,17 +11017,17 @@ function disposeReturnSlot(block: Block, state: any): void {
 						state.hostNode ??
 						state.text ??
 						state.block?.startMarker ??
-						state.end ??
+						end ??
 						null);
-		if (borrowed && first === state.end) first = null;
+		if (borrowed && first === end) first = null;
 		const last: Node | null =
 			first === null
 				? null
-				: state.ownerHost != null || (borrowed && state.end === null)
+				: state.ownerHost != null || (borrowed && end === null)
 					? (STAGED_DOM?.view(parent) ?? parent).lastChild
 					: borrowed
-						? domNode(state.end).previousSibling
-						: (state.end ?? state.block?.endMarker ?? first);
+						? domNode(end).previousSibling
+						: (end ?? state.block?.endMarker ?? first);
 		journalRootSlot(
 			state,
 			parent,
@@ -11019,7 +11036,7 @@ function disposeReturnSlot(block: Block, state: any): void {
 				: first !== null
 					? (STAGED_DOM?.view(first) ?? first).previousSibling
 					: (STAGED_DOM?.view(parent) ?? parent).lastChild,
-			borrowed ? state.end : ((STAGED_DOM?.view(last) ?? last)?.nextSibling ?? null),
+			borrowed ? end : ((STAGED_DOM?.view(last) ?? last)?.nextSibling ?? null),
 		);
 		const retiredBlock = state.block ?? state.portal?.block;
 		if (retiredBlock != null) retireRootBlock(retiredBlock);
@@ -11044,7 +11061,7 @@ function disposeReturnSlot(block: Block, state: any): void {
 		block.slots[0] = undefined as any;
 		return;
 	}
-	if (state.__kind === 'childSlot') {
+	if (kind === 'childSlot') {
 		if (state.portal) {
 			teardownPortalState(state.portal);
 			state.portal = null;
@@ -11059,14 +11076,19 @@ function disposeReturnSlot(block: Block, state: any): void {
 		clearChildContent(state);
 		if (!state.borrowed) {
 			domNode(state.start as ChildNode | null)?.remove();
-			domNode(state.end as ChildNode | null)?.remove();
+			domNode(end as ChildNode | null)?.remove();
 		}
 	} else {
-		// componentSlotSlot — unmountBlock removes its DOM (incl. any owned markers).
-		if (state.block) unmountBlock(state.block, true);
-		if (!state.inherited) {
+		// Component and native control-flow slots release their child lifetime.
+		// An inherited/borrowed outer pair still belongs to its owning Block.
+		if (kind === 'componentSlotSlot') {
+			if (state.block) unmountBlock(state.block, true);
+		} else {
+			unmountSlot(state, true);
+		}
+		if (!state.inherited && !state.borrowed) {
 			domNode(state.start as ChildNode | null)?.remove?.();
-			domNode(state.end as ChildNode | null)?.remove?.();
+			domNode(end as ChildNode | null)?.remove?.();
 		}
 	}
 	const reg = block._slots;
@@ -13697,7 +13719,17 @@ function invalidateSharedBodyOutput(scope: Scope): void {
 	// return, including undefined. The previous body's void completion does not
 	// establish the new body's output mode (lazy can even resolve a builtin).
 	const state = scope.slots[0] as any;
-	if (state?.__kind === 'childSlot' || state?.__kind === 'componentSlotSlot') {
+	// Ownership belongs only to a return-capable Block's own Scope, never a
+	// lite/shared child Scope whose slot zero belongs to another Block.
+	if (
+		scope === scope.block &&
+		scope.block.outputHandler !== null &&
+		(state?.__kind === 'childSlot' ||
+			state?.__kind === 'componentSlotSlot' ||
+			state?.__kind === 'ifBlockSlot' ||
+			state?.__kind === 'switchBlockSlot' ||
+			state?.__kind === 'activityBlockSlot')
+	) {
 		setReturnedOutputOwner(state, true);
 	}
 	const first = scope.compilerMemo;
@@ -29587,9 +29619,15 @@ function componentSlotImpl(
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	if (slotKey === 0 && parentScope !== RETURNED_OUTPUT_SCOPE) {
 		const state = parentScope.slots[0] as any;
-		// Shared bodies (notably lazy) can reuse a previous return slot. Claim it
-		// before rendering so their legitimate void completion keeps the new DOM.
-		if (state?.returnedOutput === true) setReturnedOutputOwner(state, false);
+		if (state?.returnedOutput === true) {
+			if (state.__kind === 'componentSlotSlot') {
+				setReturnedOutputOwner(state, false);
+			} else {
+				const block = parentScope.block;
+				block.outputHandler!(block, null, true);
+				if (block.disposed) return;
+			}
+		}
 	}
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
@@ -33320,9 +33358,15 @@ export function childSlot(
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	if (slotKey === 0 && parentScope !== RETURNED_OUTPUT_SCOPE) {
 		const state = parentScope.slots[0] as any;
-		// Shared bodies (notably lazy) can reuse a previous return slot. Claim it
-		// before rendering so their legitimate void completion keeps the new DOM.
-		if (state?.returnedOutput === true) setReturnedOutputOwner(state, false);
+		if (state?.returnedOutput === true) {
+			if (state.__kind === 'childSlot') {
+				setReturnedOutputOwner(state, false);
+			} else {
+				const block = parentScope.block;
+				block.outputHandler!(block, null, true);
+				if (block.disposed) return;
+			}
+		}
 	}
 	if (IMPLICIT_SIGNAL_CHILD_DEPTH === 0) {
 		const existing = parentScope.slots[slotKey] as ChildSlot | undefined;
@@ -39350,13 +39394,6 @@ function renderBranchSlot(
 	// A condition/discriminant can queue a parent self-update while its call
 	// arguments are evaluated. Preserve the previous branch for the replay.
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
-	if (
-		slotKey === 0 &&
-		parentScope !== RETURNED_OUTPUT_SCOPE &&
-		(state as any).returnedOutput === true
-	) {
-		setReturnedOutputOwner(state, false);
-	}
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	if (next !== state.branch) {
@@ -39890,6 +39927,21 @@ export function ifBlock(
 	env?: any[],
 ): void {
 	let state = parentScope.slots[slotKey] as IfSlot | undefined;
+	if (
+		slotKey === 0 &&
+		parentScope !== RETURNED_OUTPUT_SCOPE &&
+		(state as any)?.returnedOutput === true
+	) {
+		if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
+		if (state!.__kind === 'ifBlockSlot') {
+			setReturnedOutputOwner(state, false);
+		} else {
+			const block = parentScope.block;
+			block.outputHandler!(block, null, true);
+			if (block.disposed) return;
+			state = undefined;
+		}
+	}
 	if (state === undefined) {
 		const hydration = activeHydration();
 		let start: Comment | null = null;
@@ -40366,7 +40418,15 @@ export function activityBlock(
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	if (slotKey === 0 && parentScope !== RETURNED_OUTPUT_SCOPE) {
 		const state = parentScope.slots[0] as any;
-		if (state?.returnedOutput === true) setReturnedOutputOwner(state, false);
+		if (state?.returnedOutput === true) {
+			if (state.__kind === 'activityBlockSlot') {
+				setReturnedOutputOwner(state, false);
+			} else {
+				const block = parentScope.block;
+				block.outputHandler!(block, null, true);
+				if (block.disposed) return;
+			}
+		}
 	}
 	if (mode === 'hidden') ensureScheduledVisibilityDriver();
 	const parentBlock = parentScope.block;
@@ -40809,6 +40869,21 @@ export function switchBlock(
 	env?: any[],
 ): void {
 	let state = parentScope.slots[slotKey] as SwitchSlot | undefined;
+	if (
+		slotKey === 0 &&
+		parentScope !== RETURNED_OUTPUT_SCOPE &&
+		(state as any)?.returnedOutput === true
+	) {
+		if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
+		if (state!.__kind === 'switchBlockSlot') {
+			setReturnedOutputOwner(state, false);
+		} else {
+			const block = parentScope.block;
+			block.outputHandler!(block, null, true);
+			if (block.disposed) return;
+			state = undefined;
+		}
+	}
 	if (state === undefined) {
 		const hydration = activeHydration();
 		let start: Comment | null = null;
