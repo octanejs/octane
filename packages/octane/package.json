@@ -65,6 +65,7 @@
     "./profiling": "./src/profiling.ts",
     "./universal": "./src/universal.ts",
     "./universal/native": "./src/universal-native.ts",
+    "./theme-tokens": "./src/theme-tokens.ts",
     "./compiler": {
       "types": "./src/compiler/index.d.ts",
       "default": "./src/compiler/index.js"
@@ -233,6 +234,10 @@
       "./universal/native": {
         "types": "./dist/universal-native.d.ts",
         "default": "./dist/universal-native.js"
+      },
+      "./theme-tokens": {
+        "types": "./dist/theme-tokens.d.ts",
+        "default": "./dist/theme-tokens.js"
       },
       "./compiler": {
         "types": "./dist/compiler/index.d.ts",
