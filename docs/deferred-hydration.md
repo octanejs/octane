@@ -831,6 +831,12 @@ Deferred hydration is a performance hint. An update outside a dormant boundary
 may open it early when Octane must reconcile the child to avoid stale server
 HTML. `never()` is the exception: its initial server subtree remains static.
 
+A strategy's own native signal refresh rechecks its condition without opening
+matching server HTML while the condition remains false. The condition keeps
+tracking its native reads so a later truthy value can activate the boundary.
+Parent capture and provider-context updates retain the early-activation behavior,
+including when a false native signal refresh is also pending.
+
 When a mounted parent updates a dormant boundary, activation uses the latest
 captures for child state, events, refs, and effects. Development attribute
 mismatch diagnostics compare the server HTML with the initial client captures,
