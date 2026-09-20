@@ -10780,6 +10780,22 @@ function boundaryErrorChunk(b: StreamBoundary, nonceAttr: string): string {
 	);
 }
 
+function createInjectionCanceler(
+	injection: StreamInjectionSource | undefined,
+): (error: unknown) => void {
+	if (injection === undefined) return NOOP;
+	let cancelled = false;
+	return (error) => {
+		if (cancelled) return;
+		cancelled = true;
+		try {
+			injection.cancel?.(error);
+		} catch {
+			// Producer cleanup cannot replace the render failure.
+		}
+	};
+}
+
 /** The shared streaming engine both public APIs drive. */
 async function runStream(
 	component: ServerComponent,
@@ -10787,6 +10803,7 @@ async function runStream(
 	options: StreamOptions | undefined,
 	sink: StreamSink,
 	resolved: ResolvedMap,
+	cancelInjection: (error: unknown) => void,
 ): Promise<void> {
 	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
 	const signal = options?.signal;
@@ -10895,27 +10912,31 @@ async function runStream(
 			injection.accepted?.();
 		});
 	};
-	const recoveryInjection: (() => Promise<string>) | undefined =
+	const recoveryInjection: ((error: unknown) => Promise<string>) | undefined =
 		injection === undefined
 			? undefined
-			: async () => {
+			: async (error) => {
+					let queued = '';
+					if (!injectionFailed) {
+						try {
+							queued = injection.take();
+						} catch {
+							// Preserve already-taken output even if the final pull fails.
+						}
+					}
+					// Preserve recovery bytes before releasing their producer. Cleanup
+					// must not wait for an aborted request's consumer to resume reading.
+					cancelInjection(error);
 					if (signal?.aborted) {
+						await writeChain;
 						// Pending notification writes can reject before web enqueue or
 						// Node dest.write. Replay each taken chunk through demand; only
 						// the final recovery markers bypass pressure.
-						await writeChain;
 						for (const html of unacceptedInjection!) {
 							const replay = write(html, 'recovery');
 							if (replay !== undefined) await replay;
 						}
 						unacceptedInjection!.length = 0;
-					}
-					if (injectionFailed) return '';
-					let queued: string;
-					try {
-						queued = injection.take();
-					} catch {
-						return '';
 					}
 					if (queued !== '' && signal?.aborted) {
 						const replay = write(queued, 'recovery');
@@ -11370,7 +11391,7 @@ async function runStream(
 		let tail = '';
 		if (recoveryInjection !== undefined) {
 			try {
-				tail = await recoveryInjection();
+				tail = await recoveryInjection(err);
 			} catch {
 				// A disconnected consumer cannot receive the remaining HTML.
 			}
@@ -11429,7 +11450,7 @@ async function runStream(
 			injectionUnsubscribe = undefined;
 			let terminal = '';
 			try {
-				terminal = await recoveryInjection!();
+				terminal = await recoveryInjection!(err);
 			} catch {
 				// A disconnected consumer cannot receive the remaining HTML.
 			}
@@ -11659,6 +11680,7 @@ export function renderToPipeableStream(
 	const beginRender = (preparedOptions: StreamOptions | undefined): void => {
 		const renderOptions = { ...preparedOptions, signal: controller.signal };
 		const resolved = newResolvedMap(renderOptions);
+		const cancelInjection = createInjectionCanceler(renderOptions.injection);
 		void runStream(
 			component,
 			props,
@@ -11671,6 +11693,7 @@ export function renderToPipeableStream(
 					options?.onShellReady?.();
 				},
 				shellError(err) {
+					cancelInjection(err);
 					releaseServerRenderResources(resolved);
 					shellFailure = { error: err };
 					options?.onShellError?.(err);
@@ -11681,14 +11704,17 @@ export function renderToPipeableStream(
 					options?.onAllReady?.();
 					flushEnd();
 				},
-				fatal() {
+				fatal(err) {
+					cancelInjection(err);
 					releaseServerRenderResources(resolved);
 					options?.onAllReady?.();
 					flushEnd();
 				},
 			},
 			resolved,
+			cancelInjection,
 		).catch((err) => {
+			cancelInjection(err);
 			releaseServerRenderResources(resolved);
 			options?.onError?.(err);
 			flushEnd();
@@ -11913,6 +11939,7 @@ export function renderToReadableStream(
 			};
 		}
 		const resolved = newResolvedMap(renderOptions);
+		const cancelInjection = createInjectionCanceler(renderOptions.injection);
 		const release = (): void => {
 			if (released) return;
 			released = true;
@@ -11921,6 +11948,7 @@ export function renderToReadableStream(
 		const settleFailure = (error: unknown): void => {
 			if (terminal) return;
 			terminal = true;
+			cancelInjection(error);
 			try {
 				release();
 			} catch (err) {
@@ -11974,6 +12002,7 @@ export function renderToReadableStream(
 				},
 			},
 			resolved,
+			cancelInjection,
 		).catch((err) => {
 			renderOptions.onError?.(err);
 			settleFailure(err);

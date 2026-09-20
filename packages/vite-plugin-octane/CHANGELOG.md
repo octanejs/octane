@@ -1,5 +1,13 @@
 # @octanejs/vite-plugin
 
+## 0.1.57
+
+### Patch Changes
+
+- 5f4b258: Share script-safe route hydration serialization between development and production, preserving field defaults and using the same key order when client-build metadata is present.
+- Updated dependencies [5f4b258]
+  - @octanejs/app-core@0.0.53
+
 ## 0.1.56
 
 ### Patch Changes
