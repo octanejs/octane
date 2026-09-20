@@ -1,5 +1,11 @@
 # @octanejs/inertia
 
+## 0.0.23
+
+### Patch Changes
+
+- dc8f3cd: Correct authored type-only imports and exports so compiled consumer builds do not request nonexistent runtime exports or a runtime entry from `@react-types/shared`.
+
 ## 0.0.22
 
 ### Patch Changes

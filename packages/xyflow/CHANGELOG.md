@@ -1,5 +1,12 @@
 # @octanejs/xyflow
 
+## 0.1.8
+
+### Patch Changes
+
+- dc8f3cd: Correct authored type-only imports and exports so compiled consumer builds do not request nonexistent runtime exports or a runtime entry from `@react-types/shared`.
+- @octanejs/zustand@0.1.54
+
 ## 0.1.7
 
 ### Patch Changes
