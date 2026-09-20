@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { executeHydrationFixture, renderHydrationFixture } from './_hydration-ssr';
 
@@ -78,28 +78,47 @@ function diagnosticLines(write: { mock: { calls: ReadonlyArray<ReadonlyArray<unk
 }
 
 describe('SSR hydration diagnostics', () => {
-	it('keeps provider output and value evaluation unchanged and successful renders quiet', () =>
-		diagnosticCase(async () => {
-			const write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
-			const results: Array<{ html: string; reads: number }> = [];
-			for (const tracing of ['0', '1']) {
-				vi.stubEnv('OCTANE_HYDRATION_SSR_TRACE', tracing);
-				let reads = 0;
-				const html = await executeHydrationFixture<string>('tanstack-query', fixture, 'render', {
-					provided: true,
-					get value() {
-						reads++;
-						return { label: 'provided' };
-					},
-				});
-				const container = document.createElement('div');
-				container.innerHTML = html;
-				expect(container.textContent).toBe('provided');
-				results.push({ html, reads });
-			}
-			expect(results[1]).toEqual(results[0]);
-			expect(diagnosticLines(write)).toEqual([]);
-		}));
+	describe('provider output with tracing', () => {
+		let write: Parameters<typeof diagnosticLines>[0];
+		let results: Array<{ html: string; reads: number }>;
+		let baselineLines: string[];
+
+		async function renderProvided() {
+			let reads = 0;
+			const html = await executeHydrationFixture<string>('tanstack-query', fixture, 'render', {
+				provided: true,
+				get value() {
+					reads++;
+					return { label: 'provided' };
+				},
+			});
+			return { html, reads };
+		}
+
+		beforeEach(() =>
+			diagnosticCase(async () => {
+				write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+				results = [];
+				vi.stubEnv('OCTANE_HYDRATION_SSR_TRACE', '0');
+				results.push(await renderProvided());
+				baselineLines = diagnosticLines(write);
+			}),
+		);
+
+		it('keeps provider output and value evaluation unchanged and successful renders quiet', () =>
+			diagnosticCase(async () => {
+				expect(baselineLines).toEqual([]);
+				vi.stubEnv('OCTANE_HYDRATION_SSR_TRACE', '1');
+				results.push(await renderProvided());
+				for (const { html } of results) {
+					const container = document.createElement('div');
+					container.innerHTML = html;
+					expect(container.textContent).toBe('provided');
+				}
+				expect(results[1]).toEqual(results[0]);
+				expect(diagnosticLines(write)).toEqual([]);
+			}));
+	});
 
 	it('buffers legitimate default Context reads without printing passing renders', () =>
 		diagnosticCase(async () => {
@@ -132,12 +151,37 @@ describe('SSR hydration diagnostics', () => {
 			).rejects.toBe(error);
 		}));
 
-	it('marks failed observations incomplete and retains the original public render error', () =>
-		diagnosticCase(async () => {
-			const write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
-			const error = new Error('original render error');
-			for (const tracing of ['0', '1']) {
-				vi.stubEnv('OCTANE_HYDRATION_SSR_TRACE', tracing);
+	describe('failed observations with tracing', () => {
+		let write: Parameters<typeof diagnosticLines>[0];
+		let error: Error;
+		let baselineError: unknown;
+		let baselineLines: string[];
+
+		beforeEach(() =>
+			diagnosticCase(async () => {
+				write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+				error = new Error('original render error');
+				baselineError = undefined;
+				vi.stubEnv('OCTANE_HYDRATION_SSR_TRACE', '0');
+				try {
+					await executeHydrationFixture('tanstack-query', fixture, 'render', {
+						provided: true,
+						value: { label: 'provided' },
+						error,
+						observerError: new Error('observer failure secret'),
+					});
+				} catch (failure) {
+					baselineError = failure;
+				}
+				baselineLines = diagnosticLines(write);
+			}),
+		);
+
+		it('marks failed observations incomplete and retains the original public render error', () =>
+			diagnosticCase(async () => {
+				expect(baselineError).toBe(error);
+				expect(baselineLines).toEqual([]);
+				vi.stubEnv('OCTANE_HYDRATION_SSR_TRACE', '1');
 				await expect(
 					executeHydrationFixture('tanstack-query', fixture, 'render', {
 						provided: true,
@@ -146,70 +190,92 @@ describe('SSR hydration diagnostics', () => {
 						observerError: new Error('observer failure secret'),
 					}),
 				).rejects.toBe(error);
-				if (tracing === '0') expect(diagnosticLines(write)).toEqual([]);
-			}
-			const lines = diagnosticLines(write);
-			expect(lines).toHaveLength(1);
-			expect(lines[0]).not.toContain('observer failure secret');
-			const diagnostic = JSON.parse(lines[0].slice('[OCTANE_HYDRATION_SSR_TRACE] '.length));
-			expect(diagnostic.incomplete).toBe(true);
-			expect(diagnostic.diagnosticErrors).toBeGreaterThan(0);
-		}));
+				const lines = diagnosticLines(write);
+				expect(lines).toHaveLength(1);
+				expect(lines[0]).not.toContain('observer failure secret');
+				const diagnostic = JSON.parse(lines[0].slice('[OCTANE_HYDRATION_SSR_TRACE] '.length));
+				expect(diagnostic.incomplete).toBe(true);
+				expect(diagnostic.diagnosticErrors).toBeGreaterThan(0);
+			}));
+	});
 
-	it('preserves a missing-provider error and reports Context, runtime and scope identities', () =>
-		diagnosticCase(async () => {
-			const write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
-			for (const tracing of ['0', '1']) {
-				vi.stubEnv('OCTANE_HYDRATION_SSR_TRACE', tracing);
+	describe('missing providers with tracing', () => {
+		let write: Parameters<typeof diagnosticLines>[0];
+		let baselineError: unknown;
+		let baselineLines: string[];
+
+		beforeEach(() =>
+			diagnosticCase(async () => {
+				write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+				baselineError = undefined;
+				vi.stubEnv('OCTANE_HYDRATION_SSR_TRACE', '0');
+				try {
+					await executeHydrationFixture('tanstack-query', fixture, 'render', {
+						provided: false,
+						value: { label: 'SSR_TRACE_SECRET' },
+					});
+				} catch (failure) {
+					baselineError = failure;
+				}
+				baselineLines = diagnosticLines(write);
+			}),
+		);
+
+		it('preserves a missing-provider error and reports Context, runtime and scope identities', () =>
+			diagnosticCase(async () => {
+				expect(() => {
+					throw baselineError;
+				}).toThrow('No QueryClient set, use QueryClientProvider to set one');
+				expect(baselineLines).toEqual([]);
+				vi.stubEnv('OCTANE_HYDRATION_SSR_TRACE', '1');
 				await expect(
 					executeHydrationFixture('tanstack-query', fixture, 'render', {
 						provided: false,
 						value: { label: 'SSR_TRACE_SECRET' },
 					}),
 				).rejects.toThrow('No QueryClient set, use QueryClientProvider to set one');
-				if (tracing === '0') expect(diagnosticLines(write)).toEqual([]);
-			}
-			const lines = diagnosticLines(write);
-			expect(lines).toHaveLength(1);
-			expect(lines[0]).not.toContain('SSR_TRACE_SECRET');
-			const diagnostic = JSON.parse(lines[0].slice('[OCTANE_HYDRATION_SSR_TRACE] '.length));
-			expect(diagnostic.invocation).toMatchObject({
-				binding: 'tanstack-query',
-				fixture,
-				exportName: 'render',
-			});
-			expect(diagnostic.phase).toBe('execute-fixture');
-			const query = diagnostic.events.find(
-				(event: { kind: string }) => event.kind === 'query-context-evaluation',
-			);
-			const miss = diagnostic.events.find(
-				(event: { kind: string; context: number }) =>
-					event.kind === 'read-miss' && event.context === query.context,
-			);
-			const provider = diagnostic.events.find(
-				(event: { kind: string }) => event.kind === 'provider-write',
-			);
-			expect(provider.nonNull).toBe(true);
-			expect(provider.context).not.toBe(query.context);
-			expect(miss.ancestry.truncated).toBe(false);
-			expect(miss.ancestry.cycle).toBe(false);
-			expect(
-				miss.ancestry.scopes.some((scope: { id: number }) => scope.id === provider.scope.id),
-			).toBe(true);
-			const runtime = diagnostic.events.find(
-				(event: { kind: string; runtime: number }) =>
-					event.kind === 'runtime-evaluation' && event.runtime === miss.runtime,
-			);
-			expect(runtime.moduleId).toMatch(/runtime\.server\.ts$/);
-			expect(query.moduleId).toMatch(/tanstack-query\/src\/context\.ts$/);
-			expect(diagnostic.transformed).toHaveLength(2);
-			expect(
-				diagnostic.graph.modules.some(
-					(module: { externalize: string | null }) => module.externalize !== null,
-				),
-			).toBe(true);
-			expect(diagnostic.graph.noExternal).toBeDefined();
-		}));
+				const lines = diagnosticLines(write);
+				expect(lines).toHaveLength(1);
+				expect(lines[0]).not.toContain('SSR_TRACE_SECRET');
+				const diagnostic = JSON.parse(lines[0].slice('[OCTANE_HYDRATION_SSR_TRACE] '.length));
+				expect(diagnostic.invocation).toMatchObject({
+					binding: 'tanstack-query',
+					fixture,
+					exportName: 'render',
+				});
+				expect(diagnostic.phase).toBe('execute-fixture');
+				const query = diagnostic.events.find(
+					(event: { kind: string }) => event.kind === 'query-context-evaluation',
+				);
+				const miss = diagnostic.events.find(
+					(event: { kind: string; context: number }) =>
+						event.kind === 'read-miss' && event.context === query.context,
+				);
+				const provider = diagnostic.events.find(
+					(event: { kind: string }) => event.kind === 'provider-write',
+				);
+				expect(provider.nonNull).toBe(true);
+				expect(provider.context).not.toBe(query.context);
+				expect(miss.ancestry.truncated).toBe(false);
+				expect(miss.ancestry.cycle).toBe(false);
+				expect(
+					miss.ancestry.scopes.some((scope: { id: number }) => scope.id === provider.scope.id),
+				).toBe(true);
+				const runtime = diagnostic.events.find(
+					(event: { kind: string; runtime: number }) =>
+						event.kind === 'runtime-evaluation' && event.runtime === miss.runtime,
+				);
+				expect(runtime.moduleId).toMatch(/runtime\.server\.ts$/);
+				expect(query.moduleId).toMatch(/tanstack-query\/src\/context\.ts$/);
+				expect(diagnostic.transformed).toHaveLength(2);
+				expect(
+					diagnostic.graph.modules.some(
+						(module: { externalize: string | null }) => module.externalize !== null,
+					),
+				).toBe(true);
+				expect(diagnostic.graph.noExternal).toBeDefined();
+			}));
+	});
 
 	it('reports a present provider with an undefined value without changing the error', () =>
 		diagnosticCase(async () => {
