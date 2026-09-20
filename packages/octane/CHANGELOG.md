@@ -1,5 +1,13 @@
 # octane
 
+## 0.3.4
+
+### Patch Changes
+
+- 87f19a8: Clear a component's previous returned subtree when its next output is undefined, including optional ViewTransition children and lazy body handoffs, while preserving compiled imperative output.
+- e855d68: Fix focused DOM moves between parents in browsers without native `moveBefore`, including staged commits. Cross-parent insertions no longer enter the sibling-rotation fallback or incorrectly skip appending a node, while same-parent reorders retain editing continuity.
+- 2a952b8: Keep deferred hydration dormant when an unchanged native signal refresh rechecks a false condition. Preserve native subscriptions and early activation for parent capture or provider-context updates.
+
 ## 0.3.3
 
 ### Patch Changes
