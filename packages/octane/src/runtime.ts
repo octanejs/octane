@@ -10588,7 +10588,20 @@ function renderBlockInner(block: Block): true | undefined {
 	// them (its own reads + descendant reads propagated up). Only memo/armed
 	// blocks ever hold a non-null map, so this is a no-op for the common case.
 	if (block.$$ctxReads !== null) block.$$ctxReads.clear();
-	if (block.$$ctxDirect !== null) block.$$ctxDirect.clear();
+	if (block.$$ctxDirect !== null) {
+		// Native refreshes retain Hydrate props. Save context invalidation before
+		// replacing its reads so memo-wrapped boundaries cannot preserve stale HTML.
+		const state = block.slots[0] as HydrateSlot | undefined;
+		if (
+			state?.__kind === 'hydrateBlockSlot' &&
+			state.parentBlock === block &&
+			!state.independent &&
+			!state.hydrated
+		) {
+			state.contextChanged = block.$$ctxDepsEpoch !== contextEpochNow() && ctxDirectChanged(block);
+		}
+		block.$$ctxDirect.clear();
+	}
 	// Stamp the dep maps' consistency epoch: entries written during this render
 	// record live versions, so while the global epoch still equals this sample
 	// no recorded dep can be stale. Sampling at the TOP is deliberate — a
@@ -14008,6 +14021,8 @@ interface HydrateSlot {
 	end: Comment | null;
 	parentBlock: Block;
 	props: InternalHydrateProps;
+	/** Changed direct context reads, retained before render dependency reset. */
+	contextChanged: boolean;
 	boundaryId: string;
 	intentBoundary: HydrationIntentBoundary;
 	delegatedDynamicIntent: boolean;
@@ -15247,6 +15262,7 @@ function createHydrateSlot(
 		end,
 		parentBlock,
 		props,
+		contextChanged: false,
 		boundaryId: (STAGED_DOM?.view(wrapper) ?? wrapper).getAttribute(HYDRATE_ID_ATTR) ?? boundaryId,
 		intentBoundary,
 		delegatedDynamicIntent: takeDelegatedDynamicHydrationIntent(wrapper),
@@ -15647,9 +15663,10 @@ function initializeHydrateComponent(
 				if (state.independent !== (props.__independent !== undefined)) {
 					throw new Error(formatClientError(66));
 				}
+				const surroundingUpdate = state.props !== props || state.contextChanged;
 				state.props = props;
-				// A surrounding update makes preserved server HTML potentially stale. Match
-				// the correctness-first contract by opening the boundary, except for never().
+				// Parent/capture or context updates can stale preserved HTML. An unchanged
+				// native refresh instead rechecks the strategy and retains its subscriptions.
 				if (!state.independent && !state.hydrated) {
 					const strategy = resolveHydrateStrategy(state);
 					if (strategy._t === 'never') {
@@ -15659,7 +15676,12 @@ function initializeHydrateComponent(
 						cleanupHydrateStrategy(state);
 						invalidateHydrateActivation(state);
 					} else if (!state.activationRequested) {
-						requestHydrateBoundary(state);
+						const shouldDefer = surroundingUpdate
+							? false
+							: strategy._d
+								? strategy._d()
+								: strategy._t !== 'load';
+						if (!shouldDefer) requestHydrateBoundary(state);
 					}
 				}
 			}
