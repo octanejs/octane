@@ -119,6 +119,25 @@ describe('compiler parser-AST immutability (frozen-AST enforcement)', () => {
 		});
 	}
 
+	it('collects deferred child capture witnesses without mutating authored expressions', () => {
+		const source = `
+			import { Hydrate } from 'octane';
+			function Child(props) @{ <p>{props.label as string}</p> }
+			export function App(props) @{
+				<Hydrate split={false} when={props.when}>
+					<Child label={props.label} />
+				</Hydrate>
+			}`;
+		const frozen = compile(source, 'deferred-captures-frozen.tsrx', { dev: true, hmr: false });
+		delete process.env.OCTANE_COMPILE_FROZEN_AST;
+		try {
+			const unfrozen = compile(source, 'deferred-captures-frozen.tsrx', { dev: true, hmr: false });
+			expect(frozen.code).toBe(unfrozen.code);
+		} finally {
+			process.env.OCTANE_COMPILE_FROZEN_AST = '1';
+		}
+	});
+
 	it('resolves descriptor children shadows without annotating authored JSX nodes', () => {
 		const source = `
 			import { descriptorChildren } from 'octane';

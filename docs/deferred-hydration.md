@@ -831,6 +831,13 @@ Deferred hydration is a performance hint. An update outside a dormant boundary
 may open it early when Octane must reconcile the child to avoid stale server
 HTML. `never()` is the exception: its initial server subtree remains static.
 
+When a mounted parent updates a dormant boundary, activation uses the latest
+captures for child state, events, refs, and effects. Development attribute
+mismatch diagnostics compare the server HTML with the initial client captures,
+so a legitimate later attribute update does not produce a hydration warning.
+An initial server/client attribute mismatch is still diagnosed, including when
+a later update corrects it before activation.
+
 Treat `when` as boundary configuration rather than a strategy state machine. If
 the intended meaning of a boundary changes, give `Hydrate` a new `key` to start
 a fresh lifecycle. Octane still reads a current direct strategy prop while the

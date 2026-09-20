@@ -53,6 +53,21 @@ const NATIVE_OPERATIONS = new Map(
 		captureFocusSelection: ['read:contentEditable'],
 		// Public imperative handles and notifications act on the currently visible DOM.
 		notifyHydrateBoundary: ['call:dispatchEvent'],
+		// Development Hydrate diagnostics render into a newly created inert
+		// document, never the live or prepared tree. Source serialization/selectors
+		// still use the projected receiver; these operations construct/read copies.
+		collectInitialHydrateAttributes: [
+			'call:createElement',
+			'write:innerHTML',
+			'call:adoptNode',
+			'read:firstElementChild',
+			'call:querySelectorAll',
+			'read:parentElement',
+			'read:firstChild',
+			'read:nextSibling',
+		],
+		// Historical portals are redirected to an inert diagnostic fragment.
+		renderPortalState: ['call:createDocumentFragment'],
 		// Parent-free island activation replays captured native intent against the
 		// surviving, already-adopted target, never against projected replacement DOM.
 		createIndependentHydrateActivator: ['call:contains', 'call:dispatchEvent'],
