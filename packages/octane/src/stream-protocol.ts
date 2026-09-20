@@ -3,7 +3,18 @@
  * pre-root hydration event capture. Keep this graph renderer-free: loading
  * interaction capture before the main runtime must not initialize DOM tables.
  */
-import { isBindingOpenComment } from './dom-binding-protocol.js';
+import {
+	BINDING_OPEN_PREFIX,
+	isBindingOpenComment,
+	isForBindingOpenComment,
+} from './dom-binding-protocol.js';
+import {
+	HYDRATION_END,
+	HYDRATION_FOR_EMPTY,
+	HYDRATION_FOR_ITEMS,
+	HYDRATION_FOR_PREFIX,
+	HYDRATION_START,
+} from './hydration-markers.js';
 
 /** Sentinel <template> attribute marking a pending streamed boundary. */
 export const STREAM_BOUNDARY_ATTR = 'data-oct-b';
@@ -18,10 +29,14 @@ export const STREAM_SCRIPT_ATTR = 'data-octane-stream';
 export const HYDRATE_STREAM_TOKEN_ATTR = 'data-octane-stream-token';
 
 function hydrationMarkerMultiplicity(data: string, open: boolean): number {
-	const marker = open ? '[' : ']';
+	const marker = open ? HYDRATION_START : HYDRATION_END;
 	if (data === marker) return 1;
-	if (open && (data === '[f0' || data === '[f1')) return 1;
-	if (open && (data.startsWith('[b;') || data.startsWith('[f')) && isBindingOpenComment(data))
+	if (open && (data === HYDRATION_FOR_EMPTY || data === HYDRATION_FOR_ITEMS)) return 1;
+	if (
+		open &&
+		(data.startsWith(BINDING_OPEN_PREFIX) || data.startsWith(HYDRATION_FOR_PREFIX)) &&
+		isBindingOpenComment(data)
+	)
 		return 1;
 	if (data.length < 2 || data.charCodeAt(0) !== marker.charCodeAt(0)) return 0;
 	const first = data.charCodeAt(1);
@@ -79,11 +94,9 @@ export function getLeadingHydrationListRange(host: Element): HydrationListRange 
 	while (start !== null && start.nodeType === 8) {
 		const data = (start as Comment).data;
 		const list =
-			data === '[f0' ||
-			data === '[f1' ||
-			((data.startsWith('[f0;b;') || data.startsWith('[f1;b;')) && isBindingOpenComment(data));
+			data === HYDRATION_FOR_EMPTY || data === HYDRATION_FOR_ITEMS || isForBindingOpenComment(data);
 		const wrapperMultiplicity =
-			data === '['
+			data === HYDRATION_START
 				? 1
 				: data.charCodeAt(1) >= 49 && data.charCodeAt(1) <= 57
 					? hydrationMarkerMultiplicity(data, true)
@@ -99,12 +112,12 @@ export function getLeadingHydrationListRange(host: Element): HydrationListRange 
 		if (hydrationMarkerMultiplicity(end.data, false) !== (list ? 1 : wrapperMultiplicity))
 			return null;
 		if (list) {
-			const suffix = data.slice(3);
+			const suffix = data.slice(HYDRATION_FOR_EMPTY.length);
 			return {
 				start: start as Comment,
 				end,
-				emptyMarker: '[f0' + suffix,
-				itemsMarker: '[f1' + suffix,
+				emptyMarker: HYDRATION_FOR_EMPTY + suffix,
+				itemsMarker: HYDRATION_FOR_ITEMS + suffix,
 			};
 		}
 		enclosingEnd = end;

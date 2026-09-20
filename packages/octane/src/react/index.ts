@@ -1,5 +1,7 @@
 'use client';
 
+import { RENDERER_REGION_OWNER_TAG as RENDERER_REGION_OWNER } from '../runtime-tags.js';
+
 export { ReactCompat } from './react-compat.js';
 export { bridgeReactContext } from './react-compat-shared.js';
 export type {
@@ -86,9 +88,6 @@ import { readNearestProviderValue } from './fiber-adapter.js';
 
 // Structural bench/test hook (§13): provider walks happen only at discovery.
 export { __hostContextFiberWalks } from './fiber-adapter.js';
-
-/** Shared registry key the Octane runtime reads the owner bridge from. */
-const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
 
 interface PendingEpisode {
 	relay: Promise<void>;

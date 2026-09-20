@@ -1,4 +1,10 @@
-import { HYDRATE_INDEPENDENT_ATTR, HYDRATE_INPUT_ATTR } from '../hydration-markers.js';
+import {
+	HYDRATE_ID_ATTR,
+	HYDRATE_INDEPENDENT_ATTR,
+	HYDRATE_INPUT_ATTR,
+	HYDRATE_MARKER_SELECTOR,
+	HYDRATE_WHEN_ATTR,
+} from '../hydration-markers.js';
 import {
 	EARLY_HYDRATION_INTENTS_KEY,
 	HYDRATE_INTERACTION_EVENTS_ATTR,
@@ -10,7 +16,6 @@ import {
 	readEarlyHydrationControlRevision,
 } from '../signals/early-values.js';
 
-const HYDRATE_MARKER_SELECTOR = '[data-octane-hydrate-id]';
 const HYDRATE_CONTROL_DOCUMENTS = /* @__PURE__ */ new WeakSet<Document>();
 
 /** @internal Shared inline mailbox record; its activation queue has one owner. */
@@ -37,8 +42,8 @@ export function isEarlyHydrationIntentCurrent(
 		target.ownerDocument === ownerDocument &&
 		boundary.ownerDocument === ownerDocument &&
 		target.closest(`[${HYDRATE_INDEPENDENT_ATTR}]`) === boundary &&
-		boundary.getAttribute('data-octane-hydrate-id') === id &&
-		boundary.getAttribute('data-octane-hydrate-when') === when &&
+		boundary.getAttribute(HYDRATE_ID_ATTR) === id &&
+		boundary.getAttribute(HYDRATE_WHEN_ATTR) === when &&
 		boundary.getAttribute(HYDRATE_INTERACTION_EVENTS_ATTR) === events
 	);
 }
@@ -209,8 +214,7 @@ export function captureHydrationControlCandidate(
 	return {
 		control,
 		bindingId: control.getAttribute(HYDRATE_INPUT_ATTR),
-		boundaryId:
-			control.closest(HYDRATE_MARKER_SELECTOR)?.getAttribute('data-octane-hydrate-id') ?? null,
+		boundaryId: control.closest(HYDRATE_MARKER_SELECTOR)?.getAttribute(HYDRATE_ID_ATTR) ?? null,
 		snapshot,
 	};
 }
@@ -237,7 +241,7 @@ export function applyHydrationControlCandidate(
 	if (
 		!control.isConnected ||
 		control.getAttribute(HYDRATE_INPUT_ATTR) !== candidate.bindingId ||
-		(control.closest(HYDRATE_MARKER_SELECTOR)?.getAttribute('data-octane-hydrate-id') ?? null) !==
+		(control.closest(HYDRATE_MARKER_SELECTOR)?.getAttribute(HYDRATE_ID_ATTR) ?? null) !==
 			candidate.boundaryId
 	) {
 		return false;

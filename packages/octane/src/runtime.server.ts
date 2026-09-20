@@ -27,7 +27,30 @@ export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.
 // ---------------------------------------------------------------------------
 
 import { resolveHookPath } from './hook-slot-cache.js';
-import { encodeBindingKey, isBindingOpenComment, type BindingKey } from './dom-binding-protocol.js';
+import {
+	bindingRootMarker,
+	encodeBindingKey,
+	isBindingOpenComment,
+	type BindingKey,
+} from './dom-binding-protocol.js';
+import { formatUseId } from './hydration-markers.js';
+import {
+	ACTIVITY_TAG,
+	// Children-block tagging shares the client's key so identity holds across
+	// mixed graphs; see markChildrenBlock below.
+	CHILDREN_BLOCK_TAG as CHILDREN_BLOCK,
+	CONTEXT_TAG,
+	// The createElement descriptor marker, so `ssrChild` can render a
+	// `<Comp/>`-as-value descriptor server-side too.
+	ELEMENT_TAG,
+	FRAGMENT_TAG,
+	LAZY_COMPONENT_TAG as LAZY_COMPONENT,
+	// The createPortal descriptor marker, so a portal flowing through
+	// props/children to `ssrChild` leaves its site anchor instead of tripping
+	// the plain-object child throw.
+	PORTAL_TAG,
+	SUSPENSE_TAG,
+} from './runtime-tags.js';
 
 import {
 	BLOCK_OPEN,
@@ -111,6 +134,8 @@ import {
 	mergeClass,
 	normalizeClass,
 	styleName,
+	VIEW_TRANSITION_SCOPE_CSS,
+	VIEW_TRANSITION_SCOPE_STYLE_ID,
 } from './css.js';
 import {
 	invalidHtmlNestingWithAncestor,
@@ -877,27 +902,19 @@ export function ssrNestingText(value: unknown): string {
 
 const NOOP = (): void => {};
 
-// Matches the client runtime's `ELEMENT_TAG` (createElement descriptor marker)
-// so `ssrChild` can render a `<Comp/>`-as-value descriptor server-side too.
-const ELEMENT_TAG = Symbol.for('octane.element');
-// Matches the client runtime's `PORTAL_TAG` (createPortal descriptor marker) so
-// a portal flowing through props/children to `ssrChild` leaves its site anchor
-// instead of tripping the plain-object child throw.
-const PORTAL_TAG = Symbol.for('octane.portal');
-
 /**
  * React-compatible Fragment sentinel. Value-position `<Fragment>` sites compile
  * to ordinary element descriptors in both modes; ssrChild recognizes this type
  * and flattens its children with the same wrapper/key rules as the client.
  */
-export const Fragment: unique symbol = Symbol.for('octane.Fragment');
+export const Fragment: typeof FRAGMENT_TAG = FRAGMENT_TAG;
 
 /**
  * React-19 `<Activity>` sentinel. Direct template sites lower to `ssrActivity`;
  * generic component and descriptor sites dispatch by this same symbol identity.
  * Its public type is component-shaped so aliases and JSX values type-check.
  */
-export const Activity = Symbol.for('octane.Activity') as unknown as (props: {
+export const Activity = ACTIVITY_TAG as unknown as (props: {
 	mode?: 'visible' | 'hidden';
 	children?: unknown;
 	name?: string;
@@ -1987,7 +2004,7 @@ const BINDING_HTML_ROOT = /* @__PURE__ */ Symbol.for('octane.binding.html');
 /** @internal Preserve the existing component range while identifying an authored binding view. */
 export function ssrBindingHtml(html: string, id: string): string {
 	const output = new ServerHtml(html) as ServerHtml & { [BINDING_HTML_ROOT]: string };
-	output[BINDING_HTML_ROOT] = '[b;' + id + ';root';
+	output[BINDING_HTML_ROOT] = bindingRootMarker(id);
 	return output as unknown as string;
 }
 
@@ -5359,7 +5376,7 @@ export const Suspense = /* @__PURE__ */ markComponentFlags(
 	},
 	COMPONENT_FLAG_BOUNDARY,
 	'Suspense',
-	Symbol.for('octane.suspense'),
+	SUSPENSE_TAG,
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5658,11 +5675,7 @@ function vtSsrAnnotateScope(html: string): string {
 		true,
 	);
 	const valid = roots === 1 && !sentinel && !text;
-	if (valid)
-		injectStyle(
-			'octane-view-transition-scope',
-			'[vt-scope="element"]{view-transition-scope:all!important}',
-		);
+	if (valid) injectStyle(VIEW_TRANSITION_SCOPE_STYLE_ID, VIEW_TRANSITION_SCOPE_CSS);
 	return vtSsrMapTags(
 		html,
 		(open) => vtSsrInject(open, [['vt-scope', valid ? 'element' : 'none']]),
@@ -5919,8 +5932,6 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 // ---------------------------------------------------------------------------
 // Context
 // ---------------------------------------------------------------------------
-
-const CONTEXT_TAG = Symbol.for('octane.context');
 
 // NOTE: unlike the client runtime's Context, there is no `$$version` here — that
 // field drives the client's provider-change invalidation machinery, which has no
@@ -6885,7 +6896,6 @@ export function warmChild(comp: any, props: any): void {
 // lives on the wrapper itself (module-level, like the client), so the key only
 // has to be unique per lazy() call — not per frame like use()'s data keys.
 let LAZY_ID = 0;
-const LAZY_COMPONENT = Symbol.for('octane.lazy');
 
 function resolveLazyModule(mod: any): ServerComponent {
 	let comp = mod;
@@ -7322,7 +7332,7 @@ export function requestFormReset(_form?: unknown): void {}
 
 export function useId(): string {
 	// Same root-local namespace/counter shape as the client hydration pass.
-	return ':' + ID_PREFIX + 'in-' + (ID_COUNTER++).toString(36) + ':';
+	return formatUseId(ID_PREFIX, ID_COUNTER++);
 }
 
 function throwOnServerEffectEventCall(): never {
@@ -7542,9 +7552,9 @@ export function flushSync<T>(fn: () => T): T {
 
 // Children-block tagging — same contract as the client runtime (runtime.ts):
 // the compiler tags element/text children lowered to a render function so
-// `isChildrenBlock` can tell them from a user render-prop child; both runtimes
-// use the SAME `Symbol.for` key so identity holds across mixed graphs.
-const CHILDREN_BLOCK: unique symbol = Symbol.for('octane.childrenBlock') as any;
+// `isChildrenBlock` can tell them from a user render-prop child. Both runtimes
+// read CHILDREN_BLOCK from runtime-tags.ts, so the identity holds across mixed
+// graphs.
 
 /**
  * Compiler-emitted: tag a children-block render function so `isChildrenBlock`

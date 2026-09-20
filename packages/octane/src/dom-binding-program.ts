@@ -12,7 +12,14 @@ import {
 	type BindingValue,
 	type CompiledBindings,
 } from './dom-bindings.js';
-import { encodeBindingKey, parseBindingMarker, type BindingKey } from './dom-binding-protocol.js';
+import {
+	bindingRootMarker,
+	BINDING_OPEN_PREFIX,
+	encodeBindingKey,
+	parseBindingMarker,
+	type BindingKey,
+} from './dom-binding-protocol.js';
+import { HYDRATION_FOR_PREFIX } from './hydration-markers.js';
 import { moveNativeNodeBefore } from './dom-focused-move.js';
 import { rendererRangeClose } from './stream-protocol.js';
 import {
@@ -900,7 +907,7 @@ function createFragment(
 	const template = document.createElement('template');
 	template.innerHTML = definition.ns === 1 ? `<svg>${definition.html}</svg>` : definition.html;
 	const content = document.createDocumentFragment();
-	const start = document.createComment(`[b;${id};root`);
+	const start = document.createComment(bindingRootMarker(id));
 	const end = document.createComment(']');
 	content.appendChild(start);
 	if (definition.ns === 1) {
@@ -1307,7 +1314,8 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 				transaction,
 			);
 	}
-	if (definition.kind === 'if') region.range.start.data = `[b;${id};${region.site};${plan.arm}`;
+	if (definition.kind === 'if')
+		region.range.start.data = `${BINDING_OPEN_PREFIX}${id};${region.site};${plan.arm}`;
 }
 
 function writeText(region: RegionInstance, value: string): void {
@@ -2062,13 +2070,13 @@ function commitList(plan: RegionPlan, id: string, transaction: Transaction): voi
 		}
 		let anchor: Node = region.range.end;
 		for (const [key, item] of [...plan.items].reverse()) {
-			item.instance.range.start.data = `[b;${id};${region.site};k;${key}`;
+			item.instance.range.start.data = `${BINDING_OPEN_PREFIX}${id};${region.site};k;${key}`;
 			moveRange(item.instance.range, region.range.end.parentNode!, anchor, transaction);
 			if (transaction.disposed) return;
 			anchor = item.instance.range.start;
 		}
 	}
-	region.range.start.data = `[f${plan.arm};b;${id};${region.site}`;
+	region.range.start.data = `${HYDRATION_FOR_PREFIX}${plan.arm};b;${id};${region.site}`;
 	return;
 }
 

@@ -22,9 +22,8 @@ import {
 	type UniversalRenderable,
 } from './universal-core.js';
 import { registerRendererContext, renderRendererContextProvider } from './renderer-bridge.js';
+import { CONTEXT_TAG } from './runtime-tags.js';
 import { registerContext } from './context-identity.js';
-
-const CONTEXT_TAG = Symbol.for('octane.context');
 
 export interface NativeUniversalContext<T> extends UniversalContext<T> {
 	(props: {

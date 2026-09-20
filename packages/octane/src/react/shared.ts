@@ -70,8 +70,7 @@ export type OctaneRenderedNode = React.ReactElement & {
  */
 export type OctaneReactComponent<P = Record<string, never>> = (props: P) => OctaneRenderedNode;
 
-/** React 19 context objects carry $$typeof: Symbol.for('react.context'). */
-export const REACT_CONTEXT_TAG = Symbol.for('react.context');
+export { REACT_CONTEXT_TAG } from '../runtime-tags.js';
 
 /** The client's stable opaque-host sentinel; the server writes real island HTML. */
 export const OPAQUE_HOST_SENTINEL_COMMENT = 'octane-compat-island';

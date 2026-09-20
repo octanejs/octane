@@ -10,18 +10,20 @@
  *
  * The server emit (runtime.server `ssrBlock` and friends) writes these markers
  * around every dynamic site, and the client `hydrateRoot` cursor scans for them
- * to align with the server output. This module is the shared home both import.
+ * to align with the server output. This module is the public home both import;
+ * the marker payloads and boundary attribute names themselves are declared in
+ * `hydration-markers.js`, which stays off the `dom-tables.js` graph so the
+ * pre-root capture bundle can share them, and are re-exported here unchanged.
  */
 
-/** Single-character payload of a block-open comment. */
-export const HYDRATION_START = '[';
-/** Single-character payload of a block-close comment. */
-export const HYDRATION_END = ']';
+import {
+	HYDRATION_START,
+	HYDRATION_END,
+	HYDRATION_FOR_EMPTY,
+	HYDRATION_FOR_ITEMS,
+} from './hydration-markers.js';
 
-/** @for outer-open payload: the server rendered its @empty arm. */
-export const HYDRATION_FOR_EMPTY = '[f0';
-/** @for outer-open payload: the server rendered one or more direct-host items. */
-export const HYDRATION_FOR_ITEMS = '[f1';
+export { HYDRATION_START, HYDRATION_END, HYDRATION_FOR_EMPTY, HYDRATION_FOR_ITEMS };
 
 /** Opens a hydratable block (component output / control-flow branch). */
 export const BLOCK_OPEN = `<!--${HYDRATION_START}-->`;
@@ -112,21 +114,17 @@ export const HYDRATION_RANGE_BOUNDARY: unique symbol = Symbol.for(
 export const HYDRATE_STATIC_ID_COUNT_PREFIX = 'octane-static-hydrate:';
 /** Closing comment for a wrapper-free permanent-static range. */
 export const HYDRATE_STATIC_END = '/octane-static-hydrate';
-/** Stable id of a server-rendered deferred hydration boundary. */
-export const HYDRATE_ID_ATTR = 'data-octane-hydrate-id';
-/** Serialized strategy kind (`visible`, `idle`, `dynamic`, …). */
-export const HYDRATE_WHEN_ATTR = 'data-octane-hydrate-when';
-/** Number of `useId()` slots consumed while rendering the deferred child. */
-export const HYDRATE_ID_COUNT_ATTR = 'data-octane-hydrate-id-count';
 /** Opaque renderer stream token authenticating pending descendants owned by this boundary. */
 export { HYDRATE_STREAM_TOKEN_ATTR } from './stream-protocol.js';
-/** Direct-child JSON script carrying this boundary's `use()` seed slice. */
-export const HYDRATE_SEED_ATTR = 'data-octane-hydrate-seed';
 export {
 	INDEPENDENT_HYDRATE_MANIFEST_ATTR,
 	HYDRATE_INDEPENDENT_ATTR,
 	HYDRATE_INPUT_ATTR,
 	SIGNAL_CONTROL_ATTR,
+	HYDRATE_ID_ATTR,
+	HYDRATE_WHEN_ATTR,
+	HYDRATE_ID_COUNT_ATTR,
+	HYDRATE_SEED_ATTR,
 } from './hydration-markers.js';
 
 // ── Streaming SSR protocol (renderToPipeableStream / renderToReadableStream) ──
