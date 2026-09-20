@@ -363,7 +363,7 @@ export async function readStreamedRendererResponse(
 				failure ??= new StreamedReceiverError('timeout', 'Streamed renderer response timed out.');
 				abort();
 			}, timeoutMs);
-			let next: ReadableStreamReadResult<Uint8Array>;
+			let next: Awaited<ReturnType<typeof reader.read>>;
 			try {
 				next = await reader.read();
 			} finally {
