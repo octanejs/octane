@@ -2,6 +2,7 @@ import {
 	consumeHydrationControl,
 	initializeHydrationControlCapture,
 	snapshotHydrationControl,
+	isRestoredHydrationTextarea,
 } from '../hydration/control-capture.js';
 import {
 	hasHydrationControlSignalWriter,
@@ -351,7 +352,12 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 						let snapshot;
 						do {
 							snapshot = snapshotHydrationControl(control)!;
-							if (snapshot.editRevision > 0 && isWritableSignal(active)) write(nativeValue());
+							if (
+								isWritableSignal(active) &&
+								(snapshot.editRevision > 0 ||
+									(channel === 'value' && isRestoredHydrationTextarea(control, read(active))))
+							)
+								write(nativeValue());
 							if (disposed) return;
 						} while (!consumeHydrationControl(control, snapshot.revision));
 					},

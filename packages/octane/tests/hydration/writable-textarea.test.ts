@@ -48,7 +48,14 @@ export function App(props) @{
 			if (hydrate) {
 				const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
 				container.innerHTML = renderToString(server.App, { mode: 'writable' }).html;
+				// Browser restoration can change the live value without an input event.
+				container.querySelector('textarea')!.value = 'restored draft';
 				root = hydrateRoot(container, client.App, { mode: 'writable' }, { signalOwner: owner });
+				await act(() => {});
+				expect(runWithSignalOwner(owner, () => client.draft$.get())).toBe('restored draft');
+				expect(container.querySelector('textarea')!.value).toBe('restored draft');
+				await act(() => runWithSignalOwner(owner, () => client.draft$.set('server')));
+				expect(container.querySelector('textarea')!.value).toBe('server');
 			} else {
 				root = createRoot(container, { signalOwner: owner });
 				root.render(client.App, { mode: 'writable' });
