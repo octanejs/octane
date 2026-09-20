@@ -111,3 +111,23 @@ fallback control is not a measurement of an edge runtime. Full-response hashes,
 frame counts, and wire bytes must match before attributing a change to sizing.
 Whole-message prefix retransmission, identity metadata, and one script per yield
 remain part of the supported protocol.
+
+## Result mailbox accounting
+
+`result-mailbox.mjs` measures the public result receiver with 64-frame ASCII and
+Unicode streams. One-frame partial drains exercise deferred consumers; full-drain
+and immediate-consumer controls detect work moved into admission or the common
+path. Each run checks the complete ordered payload against an independent copy.
+Separate untimed instrumentation counts result-frame JSON serialization and UTF-8
+allocation bytes. Warmed Node lifecycle samples exclude payload assertions; they
+do not measure browser latency or total allocation.
+
+```sh
+node benchmarks/conversation-streaming/result-mailbox.mjs --output-dir=/absolute/mailbox-baseline
+node benchmarks/conversation-streaming/result-mailbox.mjs --output-dir=/absolute/mailbox-candidate
+node benchmarks/conversation-streaming/result-mailbox.mjs --bundle=/absolute/mailbox-baseline/receiver.mjs --output-dir=/absolute/mailbox-baseline-repeat
+```
+
+Use matching warmup/iteration settings, fresh external directories and serial
+runs without competing benchmarks. Results record the probe/bundle hashes and
+checkout SHA; a reused bundle is identified by its hash, not the current checkout.
