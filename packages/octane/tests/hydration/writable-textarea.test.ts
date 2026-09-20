@@ -26,7 +26,7 @@ describe('writable textarea reset baselines', () => {
 			[false, true].flatMap((spread) => [false, true].map((hydrate) => ({ dev, spread, hydrate }))),
 		),
 	)(
-		'preserves writable textarea edits and mirrors only the winning read-only or sampled value (%j)',
+		'preserves textarea edits while keeping the winning value as the reset baseline (%j)',
 		async ({ dev, spread, hydrate }) => {
 			const source = `import { signal$, derived$ } from 'octane/signals';
 export const draft$ = signal$('server');
@@ -62,7 +62,7 @@ export function App(props) @{
 			await act(() => {});
 			expect(textarea.value).toBe('native edit');
 			expect(runWithSignalOwner(owner, () => client.draft$.get())).toBe('native edit');
-			expect(textarea.defaultValue).toBe('server');
+			expect(textarea.defaultValue).toBe('native edit');
 			expect([textarea.selectionStart, textarea.selectionEnd, textarea.selectionDirection]).toEqual(
 				[3, 6, 'backward'],
 			);
@@ -73,7 +73,7 @@ export function App(props) @{
 			textarea.dispatchEvent(new InputEvent('input', { bubbles: true }));
 			await act(() => requestFormReset(form));
 			expect(textarea.value).toBe('programmatic edited');
-			expect(textarea.defaultValue).toBe('programmatic');
+			expect(textarea.defaultValue).toBe('programmatic edited');
 			for (const mode of ['readonly', 'snapshot']) {
 				await act(() => root!.render(client.App, { mode }));
 				expect(container.querySelector('textarea')).toBe(textarea);
@@ -115,7 +115,7 @@ export function App() @{ <textarea ${spread ? '{...{value: draft$}}' : 'value={d
 			);
 			await act(() => {});
 			expect(textarea.value).toBe('server候補');
-			expect(textarea.defaultValue).toBe('server');
+			expect(textarea.defaultValue).toBe('server候補');
 			expect(textarea.selectionStart).toBe(textarea.value.length);
 			await act(() => runWithSignalOwner(owner, () => client.draft$.set('replacement')));
 			expect(textarea.value).toBe('replacement');
@@ -163,13 +163,13 @@ export function App(props) @{
 			);
 			expect(container.querySelector('textarea')).toBe(textarea);
 			expect(textarea.value).toBe('native edit');
-			expect(textarea.defaultValue).toBe('server');
+			expect(textarea.defaultValue).toBe('native edit');
 			textarea.value = 'after rollback';
 			textarea.dispatchEvent(new InputEvent('input', { bubbles: true }));
 			await act(() => {});
 			expect(runWithSignalOwner(owner, () => client.a$.get())).toBe('after rollback');
 			expect(runWithSignalOwner(owner, () => client.b$.get())).toBe('other');
-			expect(textarea.defaultValue).toBe('server');
+			expect(textarea.defaultValue).toBe('after rollback');
 			await act(() => runWithSignalOwner(owner, () => client.b$.set('other changed')));
 			expect(textarea.value).toBe('after rollback');
 			await act(() => root!.render(client.App, { next: false, finish: () => 'ready' }));
