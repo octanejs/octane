@@ -358,8 +358,20 @@ concurrently rather than awaiting `allReady` before reading. Same
 - `streamedSignals?: { buildId, documentId, selectionGeneration?, maxFrameBytes?, maxTotalBytes?, timeoutMs? }`
   — deliver observed query attempts to the browser's streamed-result receiver.
   Use matching build/document identities in the browser bootstrap. The optional
-  limits bound result delivery; its `timeoutMs` is separate from the render's
-  Suspense deadline. See [custom SSR hosts](#connect-signals-in-a-custom-ssr-host).
+  limits default to 4 MiB per serialized frame, 64 MiB per response, and 30 seconds
+  waiting for producer progress. The timeout pauses while data is queued or waiting
+  for the transport sink to accept it, and restarts for the next producer read.
+  It is separate from the render's Suspense deadline and does not limit total
+  response duration. Request cancellation still releases backpressured producers.
+  The automatic multiplexer permits 256 live channels, including an external
+  injection source; completed, drained channels release their slot. Repeated
+  observation of the same attempt does not replay its result.
+  Browser result receivers renew their inactivity timeout on accepted result
+  frames; an idle channel still expires even while siblings make progress.
+  NDJSON transports time each pending producer or network read, while browser
+  queue/placement waits retain their own timeout. Byte limits and the pre-module
+  mailbox's 256 selections / 512 result frames still apply: long streams need an
+  installed, consuming receiver. See [custom SSR hosts](#connect-signals-in-a-custom-ssr-host).
 - `signalOwner?: SignalOwner` — share a request-local signal owner across sibling
   SSR regions. A supplied owner is borrowed: the host retires it when its work
   ends. Do not share mutable owners across requests.

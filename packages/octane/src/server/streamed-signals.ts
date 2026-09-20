@@ -15,6 +15,7 @@ import { createServerSignalQueryAttemptObservations } from './signal-query-obser
 export interface StreamedRendererLimits {
 	readonly maxFrameBytes?: number;
 	readonly maxTotalBytes?: number;
+	/** Maximum wait for producer progress; queued data and sink backpressure pause it. */
 	readonly timeoutMs?: number;
 }
 
@@ -147,10 +148,7 @@ export function createStreamedRendererFrameStream(
 	let totalBytes = 0;
 	let finished = false;
 	let controller: ReadableStreamDefaultController<Uint8Array>;
-	const timer = setTimeout(
-		() => fail(new Error('Streamed renderer response timed out.')),
-		budget.timeoutMs,
-	);
+	let timer: ReturnType<typeof setTimeout> | undefined;
 	const cleanup = (): void => {
 		clearTimeout(timer);
 		options.signal?.removeEventListener('abort', abort);
@@ -180,8 +178,13 @@ export function createStreamedRendererFrameStream(
 			},
 			async pull() {
 				if (finished) return;
+				timer = setTimeout(
+					() => fail(new Error('Streamed renderer response timed out.')),
+					budget.timeoutMs,
+				);
 				try {
 					const next = await iterator.next();
+					clearTimeout(timer);
 					if (finished) return;
 					if (next.done) {
 						finished = true;
@@ -248,6 +251,15 @@ export function createStreamedSignalInjection(
 	result: unknown,
 	options: StreamedSignalResultOptions & { nonce?: string } = {},
 ): StreamInjectionSource {
+	return createSignalInjection(identity, result, options, 'Streamed renderer injection timed out.');
+}
+
+function createSignalInjection(
+	identity: StreamFrameIdentity,
+	result: unknown,
+	options: StreamedSignalResultOptions & { nonce?: string },
+	timeoutMessage: string,
+): StreamInjectionSource & { readonly queuedBytes: number } {
 	const budget = limits(options);
 	const iterator = createStreamedSignalResultFrames(identity, result, options)[
 		Symbol.asyncIterator
@@ -256,6 +268,8 @@ export function createStreamedSignalInjection(
 		? streamedSignalSelectionScript(identity, options.nonce)
 		: '';
 	let pending = false;
+	let awaitingAcceptance = false;
+	let queuedBytes = queued === '' ? 0 : new TextEncoder().encode(queued).byteLength;
 	let finished = false;
 	let subscribed = false;
 	let totalBytes = 0;
@@ -266,7 +280,7 @@ export function createStreamedSignalInjection(
 		resolveDone = resolve;
 		rejectDone = reject;
 	});
-	let timer: ReturnType<typeof setTimeout>;
+	let timer: ReturnType<typeof setTimeout> | undefined;
 	const cleanup = (): void => {
 		clearTimeout(timer);
 		options.signal?.removeEventListener('abort', abort);
@@ -286,11 +300,13 @@ export function createStreamedSignalInjection(
 		rejectDone(error);
 	};
 	const pump = (): void => {
-		if (!subscribed || pending || queued !== '' || finished) return;
+		if (!subscribed || pending || awaitingAcceptance || queued !== '' || finished) return;
 		pending = true;
+		timer = setTimeout(() => fail(new Error(timeoutMessage)), budget.timeoutMs);
 		void iterator.next().then(
 			(next) => {
 				pending = false;
+				clearTimeout(timer);
 				if (finished) return;
 				if (next.done) {
 					finished = true;
@@ -306,6 +322,7 @@ export function createStreamedSignalInjection(
 				}
 				totalBytes += bytes;
 				queued = html;
+				queuedBytes = bytes;
 				notify?.();
 			},
 			(error) => {
@@ -317,17 +334,17 @@ export function createStreamedSignalInjection(
 	const abort = (): void => {
 		fail(options.signal?.reason ?? new DOMException('Aborted', 'AbortError'));
 	};
-	timer = setTimeout(
-		() => fail(new Error('Streamed renderer injection timed out.')),
-		budget.timeoutMs,
-	);
 	options.signal?.addEventListener('abort', abort, { once: true });
 	if (options.signal?.aborted) abort();
 	return {
 		streamedRenderer: true,
+		get queuedBytes() {
+			return queuedBytes;
+		},
 		take() {
 			const html = queued;
 			queued = '';
+			if (html !== '') awaitingAcceptance = true;
 			return html;
 		},
 		subscribe(callback) {
@@ -339,6 +356,7 @@ export function createStreamedSignalInjection(
 			};
 		},
 		accepted() {
+			awaitingAcceptance = false;
 			pump();
 		},
 		cancel: fail,
@@ -366,24 +384,27 @@ export function createAutomaticStreamedSignalInjection(
 		throw new RangeError('selectionGeneration must be a nonnegative safe integer.');
 	}
 	type Child = {
-		source: StreamInjectionSource;
+		source: StreamInjectionSource & { readonly queuedBytes?: number };
 		release: () => void;
 		unsubscribe: () => void;
 		attempt?: ServerSignalQueryAttempt;
 		done: boolean;
 	};
-	const children: Child[] = [];
+	const children = new Set<Child>();
+	const ready = new Set<Child>();
 	const observedAttempts = new Set<string>();
 	let initialSelections:
 		Array<{ identity: StreamFrameIdentity; attempt: ServerSignalQueryAttempt }> | undefined = [];
 	let queued = '';
 	let active: Child | undefined;
+	let awaitingAcceptance = false;
+	let hasSignalAttempts = false;
+	let pumping = false;
 	let subscribed = false;
 	let renderComplete = false;
 	let finished = false;
 	let totalBytes = 0;
 	let notify: (() => void) | undefined;
-	let timer: ReturnType<typeof setTimeout> | undefined;
 	let resolveDone!: () => void;
 	let rejectDone!: (error: unknown) => void;
 	const done = new Promise<void>((resolve, reject) => {
@@ -391,6 +412,9 @@ export function createAutomaticStreamedSignalInjection(
 		rejectDone = reject;
 	});
 	const cleanupChild = (child: Child): void => {
+		// Retire before calling user cleanup, which may notify or abort reentrantly.
+		if (!children.delete(child)) return;
+		ready.delete(child);
 		try {
 			child.unsubscribe();
 		} catch {
@@ -405,7 +429,6 @@ export function createAutomaticStreamedSignalInjection(
 	const fail = (error: unknown): void => {
 		if (finished) return;
 		finished = true;
-		if (timer !== undefined) clearTimeout(timer);
 		for (const child of children) {
 			try {
 				child.source.cancel?.(error);
@@ -417,11 +440,16 @@ export function createAutomaticStreamedSignalInjection(
 		rejectDone(error);
 	};
 	const maybeDone = (): void => {
-		if (finished || !renderComplete || active !== undefined || queued !== '') return;
-		for (const child of children) if (!child.done) return;
+		if (
+			finished ||
+			!renderComplete ||
+			active !== undefined ||
+			awaitingAcceptance ||
+			queued !== '' ||
+			children.size !== 0
+		)
+			return;
 		finished = true;
-		if (timer !== undefined) clearTimeout(timer);
-		for (const child of children) cleanupChild(child);
 		resolveDone();
 	};
 	const takeInitialSelections = (): string => {
@@ -445,37 +473,59 @@ export function createAutomaticStreamedSignalInjection(
 		return html;
 	};
 	const pump = (): void => {
-		if (!subscribed || finished || active !== undefined || queued !== '') return;
-		if (initialSelections !== undefined) {
-			try {
-				queued = takeInitialSelections();
-			} catch {
-				// The producer's done promise already carries the budget failure.
-				return;
-			}
-			if (queued !== '') {
-				notify?.();
-				return;
-			}
-		}
-		for (const child of children) {
-			const html = child.source.take();
-			if (html === '') continue;
-			const bytes = new TextEncoder().encode(html).byteLength;
-			if (bytes > budget.maxFrameBytes || totalBytes + bytes > budget.maxTotalBytes) {
-				fail(new Error('Automatic streamed signals exceeded their byte budget.'));
-				return;
-			}
-			totalBytes += bytes;
-			active = child;
-			queued = html;
-			notify?.();
+		if (
+			pumping ||
+			!subscribed ||
+			finished ||
+			active !== undefined ||
+			awaitingAcceptance ||
+			queued !== ''
+		)
 			return;
+		// Cleanup and sink callbacks may synchronously queue work or acknowledge it.
+		// One drain owns the ready set until those callbacks return.
+		pumping = true;
+		try {
+			if (initialSelections !== undefined) {
+				try {
+					queued = takeInitialSelections();
+				} catch {
+					// The producer's done promise already carries the budget failure.
+					return;
+				}
+				if (queued !== '') notify?.();
+			}
+			for (const child of ready) {
+				if (finished || active !== undefined || awaitingAcceptance || queued !== '') return;
+				ready.delete(child);
+				const html = child.source.take();
+				if (finished) return;
+				if (html === '') {
+					// External producers retain their renderer-completion callback.
+					if (child.done && (child.attempt !== undefined || renderComplete)) cleanupChild(child);
+					continue;
+				}
+				// Only our signal source supplies a cached size; external HTML is measured here.
+				const bytes =
+					child.attempt === undefined
+						? new TextEncoder().encode(html).byteLength
+						: child.source.queuedBytes!;
+				if (bytes > budget.maxFrameBytes || totalBytes + bytes > budget.maxTotalBytes) {
+					fail(new Error('Automatic streamed signals exceeded their byte budget.'));
+					return;
+				}
+				totalBytes += bytes;
+				active = child;
+				queued = html;
+				notify?.();
+			}
+			maybeDone();
+		} finally {
+			pumping = false;
 		}
-		maybeDone();
 	};
 	const addChild = (
-		source: StreamInjectionSource,
+		source: StreamInjectionSource & { readonly queuedBytes?: number },
 		release: () => void,
 		attempt?: ServerSignalQueryAttempt,
 	): void => {
@@ -486,17 +536,24 @@ export function createAutomaticStreamedSignalInjection(
 			...(attempt === undefined ? {} : { attempt }),
 			done: false,
 		};
-		children.push(child);
-		child.unsubscribe = source.subscribe(pump);
+		children.add(child);
+		const available = (): void => {
+			if (finished || !children.has(child)) return;
+			ready.add(child);
+			pump();
+		};
+		// External sources may already have data without notifying on subscribe.
+		ready.add(child);
+		child.unsubscribe = source.subscribe(available);
 		source.done.then(
 			() => {
 				child.done = true;
-				pump();
+				available();
 			},
 			(error) => {
 				if (child.attempt !== undefined && !child.attempt.isCurrent()) {
 					child.done = true;
-					pump();
+					available();
 				} else fail(error);
 			},
 		);
@@ -506,10 +563,7 @@ export function createAutomaticStreamedSignalInjection(
 		takeInitialSelections,
 		createSignalAttemptObservations: createServerSignalQueryAttemptObservations,
 		get streamedRenderer() {
-			return external?.streamedRenderer === true ||
-				children.some((child) => child.attempt !== undefined)
-				? true
-				: undefined;
+			return external?.streamedRenderer === true || hasSignalAttempts ? true : undefined;
 		},
 		observeSignalAttempt(attempt, run) {
 			if (finished || !attempt.isCurrent()) {
@@ -527,18 +581,13 @@ export function createAutomaticStreamedSignalInjection(
 				attempt.release();
 				return;
 			}
-			if (children.length >= 256) {
+			if (children.size >= 256) {
 				attempt.release();
 				fail(new Error('Automatic streamed signals exceeded their channel budget.'));
 				return;
 			}
 			observedAttempts.add(attemptKey);
-			if (timer === undefined) {
-				timer = setTimeout(
-					() => fail(new Error('Automatic streamed signals timed out.')),
-					budget.timeoutMs,
-				);
-			}
+			hasSignalAttempts = true;
 			const identity: StreamFrameIdentity = {
 				protocol: 1,
 				buildId: options.buildId,
@@ -551,21 +600,27 @@ export function createAutomaticStreamedSignalInjection(
 				attempt: attempt.attempt,
 			};
 			initialSelections?.push({ identity, attempt });
-			const source = createStreamedSignalInjection(identity, attempt.result, {
-				signal: attempt.signal,
-				run,
-				nonce: options.nonce,
-				announceSelection: initialSelections === undefined,
-				maxFrameBytes: budget.maxFrameBytes,
-				maxTotalBytes: budget.maxTotalBytes,
-				timeoutMs: budget.timeoutMs,
-			});
+			const source = createSignalInjection(
+				identity,
+				attempt.result,
+				{
+					signal: attempt.signal,
+					run,
+					nonce: options.nonce,
+					announceSelection: initialSelections === undefined,
+					maxFrameBytes: budget.maxFrameBytes,
+					maxTotalBytes: budget.maxTotalBytes,
+					timeoutMs: budget.timeoutMs,
+				},
+				'Automatic streamed signals timed out.',
+			);
 			addChild(source, attempt.release, attempt);
 			pump();
 		},
 		take() {
 			const html = queued;
 			queued = '';
+			if (html !== '') awaitingAcceptance = true;
 			return html;
 		},
 		subscribe(callback) {
@@ -578,15 +633,24 @@ export function createAutomaticStreamedSignalInjection(
 		},
 		accepted() {
 			const child = active;
-			active = undefined;
+			// Keep ownership through reentrant producer notifications, then rotate.
 			child?.source.accepted?.();
+			if (child !== undefined && children.has(child)) ready.add(child);
+			active = undefined;
+			awaitingAcceptance = false;
 			pump();
 		},
 		cancel: fail,
 		done,
 		renderComplete() {
 			renderComplete = true;
-			for (const child of children) child.source.renderComplete?.();
+			// Forward even after failure has canceled and removed the external child.
+			external?.renderComplete?.();
+			for (const child of children) {
+				if (child.attempt !== undefined) child.source.renderComplete?.();
+				if (child.done) ready.add(child);
+			}
+			pump();
 			maybeDone();
 		},
 	};
