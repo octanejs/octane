@@ -200,6 +200,19 @@ export function snapshotHydrationControl(control: Element): HydrationControlSnap
 	};
 }
 
+/** @internal Only unchanged server state may yield to an eventless textarea restore. */
+export function isRestoredHydrationTextarea(control: Element, value: unknown): boolean {
+	if (
+		control.localName !== 'textarea' ||
+		typeof value !== 'string' ||
+		HYDRATE_CONTROL_RECORDS.get(control)?.composing === true
+	)
+		return false;
+	const textarea = control as HTMLTextAreaElement;
+	const baseline = textarea.defaultValue.replace(/\r\n?/g, '\n');
+	return value.replace(/\r\n?/g, '\n') === baseline && textarea.value !== baseline;
+}
+
 /**
  * Capture the exact DOM/edit authority an async storage read is allowed to replace.
  * A focus, selection, composition, input (including clear), node replacement, or

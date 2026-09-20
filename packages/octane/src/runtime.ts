@@ -158,6 +158,7 @@ import {
 	type HydrationIntentBoundaryStatus,
 	type HydrationReplayIntent,
 } from './hydration/event-capture.js';
+import { isRestoredHydrationTextarea } from './hydration/control-capture.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 import {
 	invalidHtmlNestingWithAncestor,
@@ -19429,6 +19430,14 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 				// captured owner. Never publish a stale writer over its successor.
 				if (!valid()) throw new Error(formatClientError(77));
 				const before = snapshotHydrationControl(element)!;
+				const priorValue = readSignalBinding(handle);
+				const restored =
+					lease === undefined
+						? isRestoredHydrationTextarea(element, priorValue)
+						: !before.composing &&
+							!lease.composing() &&
+							typeof priorValue === 'string' &&
+							before.value !== priorValue.replace(/\r\n?/g, '\n');
 				const ctrl = armControlled(element);
 				ctrl.composing = before.composing || lease?.composing() === true;
 				if (ctrl.composing) element.addEventListener('blur', onCtrlCompositionEnd);
@@ -19459,14 +19468,18 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 					// User cleanup may dispatch input or end composition. Sample again;
 					// the renderer's composition listeners were armed before cleanup.
 					const snapshot = snapshotHydrationControl(element)!;
-					binding.value = element.value;
+					binding.value = priorValue;
 					// The offered owner already published earlier input to the model.
-					// Only a new retirement edit can supersede its final model write.
+					// An eventless DOM restore may also transfer, unless retirement advances the model.
 					binding.pendingControl =
-						snapshot.editRevision > (lease === undefined ? 0 : before.editRevision);
+						snapshot.editRevision > (lease === undefined ? 0 : before.editRevision) || restored;
 					installDirectSignalControl(binding);
 					if (!binding.pendingControl) consumeHydrationControl(element, snapshot.revision);
-					if (binding.pendingControl) queueDirectSignalControlAdoption(binding);
+					if (binding.pendingControl)
+						queueDirectSignalControlAdoption(
+							binding,
+							lease === undefined ? 0 : before.editRevision,
+						);
 					else {
 						const current = readSignalBinding(handle);
 						ctrl.sawV = true;
@@ -20295,23 +20308,32 @@ function installDirectSignalControl(binding: DirectSignalBinding): void {
 	);
 }
 
-function queueDirectSignalControlAdoption(binding: DirectSignalBinding): void {
+function queueDirectSignalControlAdoption(
+	binding: DirectSignalBinding,
+	priorEditRevision = 0,
+): void {
 	// Use the render attempt's existing commit queue: failed/WIP attempts discard
 	// this publication, and committed actions run outside the native read guard.
+	// Ignore edits already published by an offered owner when fencing a restored value.
 	enqueueEffectEventCommitAction(() => {
 		if (binding.disposed || binding.scope.block.disposed || !binding.pendingControl) return;
 		withoutSignalCandidate(() =>
 			runWithBlockSignalOwner(binding.scope, () => {
 				const element = binding.target as Element;
 				const snapshot = snapshotHydrationControl(element)!;
-				if (snapshot.editRevision > 0 && isWritableSignal(binding.handle)) {
+				if (
+					isWritableSignal(binding.handle) &&
+					(snapshot.editRevision > priorEditRevision ||
+						(element.localName === 'textarea' &&
+							Object.is(readSignalBinding(binding.handle), binding.value)))
+				) {
 					binding.handle.set(directSignalControlValue(binding, snapshot));
 				}
 				if (binding.disposed || binding.scope.block.disposed) return;
 				// A synchronous subscriber can dispatch a newer native edit. Leave the
 				// DOM authoritative until that exact revision has also been published.
 				if (!consumeHydrationControl(element, snapshot.revision)) {
-					queueDirectSignalControlAdoption(binding);
+					queueDirectSignalControlAdoption(binding, priorEditRevision);
 					return;
 				}
 				binding.pendingControl = false;
@@ -20361,12 +20383,13 @@ function createDirectSignalBinding(
 	// it across capability changes; a raw SSR Text target still needs adoption.
 	if (text !== undefined) binding.text = text;
 	const controlSnapshot = policy.control?.snapshot(target, site) ?? null;
+	const initial = handle === null ? value : readSignalBinding(handle);
 	binding.pendingControl =
 		activeHydration() !== null &&
 		isWritableSignal(handle) &&
 		controlSnapshot !== null &&
-		controlSnapshot.editRevision > 0;
-	const initial = handle === null ? value : readSignalBinding(handle);
+		(controlSnapshot.editRevision > 0 || isRestoredHydrationTextarea(target as Element, initial));
+	if (binding.pendingControl) binding.value = initial;
 	if (!binding.pendingControl) writeDirectSignalBinding(binding, initial);
 	if (STAGED_COMMIT_CAPTURE !== null) {
 		DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
@@ -23348,9 +23371,14 @@ function queueSignalHostControlAdoption(binding: SignalHostPropSourcesBinding): 
 		withoutSignalCandidate(() =>
 			runWithBlockSignalOwner(binding.scope, () => {
 				const snapshot = snapshotHydrationControl(binding.element)!;
-				if (snapshot.editRevision > 0) {
+				const value = winningSignalHostControl(binding.sources, 'value');
+				if (
+					snapshot.editRevision > 0 ||
+					(binding.element.localName === 'textarea' &&
+						isWritableSignal(value) &&
+						Object.is(readSignalBinding(value), binding.resolved?.value))
+				) {
 					const checked = winningSignalHostControl(binding.sources, 'checked');
-					const value = winningSignalHostControl(binding.sources, 'value');
 					if (isWritableSignal(checked) && snapshot.checked !== undefined)
 						checked.set(snapshot.checked);
 					if (isWritableSignal(value)) value.set(snapshot.selectedValues ?? snapshot.value);
@@ -23545,7 +23573,11 @@ export function bindSignalHostPropSources(
 			: null;
 	if (controlSnapshot !== null) {
 		validateDirectSignalControl(element, site);
-		binding.pendingControl ||= activeHydration() !== null && controlSnapshot.editRevision > 0;
+		binding.pendingControl ||=
+			activeHydration() !== null &&
+			(controlSnapshot.editRevision > 0 ||
+				(isWritableSignal(valueControl) &&
+					isRestoredHydrationTextarea(element, readSignalBinding(valueControl))));
 	}
 	const next = resolveSignalHostPropSources(
 		sources,

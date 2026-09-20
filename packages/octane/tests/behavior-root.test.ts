@@ -449,13 +449,15 @@ export function EventHost(props) @{ 'use dom bindings';
 			const textarea = container.querySelector('textarea')!;
 			try {
 				expect(textarea.value).toBe('server draft');
+				textarea.value = 'restored draft';
 				const client = fixture.loadClient();
 				hydratedRoot = hydrateRoot(container, client.NativeControlPresentation, props, {
 					signalOwner: scope,
 				});
 				await act(() => {});
 				expect(container.querySelector('textarea')).toBe(textarea);
-				expect(textarea.value).toBe('server draft');
+				expect(textarea.value).toBe('restored draft');
+				expect(draft.get()).toBe('restored draft');
 				await act(() => draft.set('model update'));
 				expect(textarea.value).toBe('model update');
 				textarea.value = 'native edit';
@@ -575,12 +577,15 @@ export function NativeStylexControlLayout(props: NativeControlPresentationProps 
 				const form = container.querySelector('form');
 				const description = container.querySelector('p');
 				const textarea = container.querySelector('textarea')!;
+				textarea.value = 'restored before activation';
 				const control = runWithSignalOwner(scope, () =>
 					bindSignalControl(textarea, 'value', draft),
 				);
 				let binding: DomBindings.BindingHandle | undefined;
 				let layoutBinding: DomBindings.BindingHandle | undefined;
 				try {
+					expect(draft.get()).toBe('restored before activation');
+					expect(textarea.value).toBe('restored before activation');
 					if (layout) {
 						layoutBinding = layout.attach(form!, layout.state);
 						layout.publish({

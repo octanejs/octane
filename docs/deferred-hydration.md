@@ -674,6 +674,14 @@ composition survive takeover. A later call to the old cleanup cannot dispose the
 successor. Normal controlled-value semantics apply after takeover, including an
 explicit changed model value winning during composition.
 
+A browser-restored textarea value can differ from its server reset baseline
+without an `input` event. Initial writable binding or hydration adopts that live
+value while the model still equals the server baseline and composition is not
+active. During an offered control's takeover, a later restored value transfers
+through the accepted commit outside active composition; a newer model write or
+native edit during retirement keeps precedence. Subsequent explicit model
+updates continue to control the textarea normally.
+
 The successor's value subscription is prepared before either early owner
 retires. If acquiring it fails, the early presentation and control remain
 usable and hydration reports the error. Retirement cleanup must not dispose
