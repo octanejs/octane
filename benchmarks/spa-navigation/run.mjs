@@ -227,6 +227,7 @@ async function measureNav(browser, url, { from, to }, { throttle = 0 } = {}) {
 			const out = [];
 			for (let i = 0; i < WARMUP + ITER; i++) {
 				gc();
+				void document.body?.offsetHeight;
 				const t0 = performance.now();
 				await nav(to);
 				const dt = performance.now() - t0;

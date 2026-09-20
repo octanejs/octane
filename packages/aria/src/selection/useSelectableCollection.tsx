@@ -18,7 +18,7 @@ type DOMAttributes = Record<string, any>;
 import { CLEAR_FOCUS_EVENT, FOCUS_EVENT } from '../utils/constants';
 
 import { dispatchVirtualFocus, moveVirtualFocus } from '../focus/virtualFocus';
-import {
+import type {
 	FocusableElement,
 	FocusStrategy,
 	Key,
@@ -26,7 +26,7 @@ import {
 	RefObject,
 } from '@react-types/shared';
 import { flushSync, withSlot } from 'octane';
-import { FocusEvent, useEffect, useRef } from '../compat/react';
+import { type FocusEvent, useEffect, useRef } from '../compat/react';
 import { focusSafely } from '../interactions/focusSafely';
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import {
@@ -42,7 +42,7 @@ import { isCtrlKeyPressed } from '../utils/keyboard';
 import { isMac } from '../utils/platform';
 import { isTabbable } from '../utils/isFocusable';
 import { mergeProps } from '../utils/mergeProps';
-import { MultipleSelectionManager } from '../upstream-exports/react-stately/useMultipleSelectionState';
+import type { MultipleSelectionManager } from '../upstream-exports/react-stately/useMultipleSelectionState';
 import { scrollIntoView, scrollIntoViewport } from '../utils/scrollIntoView';
 import { useEvent } from '../utils/useEvent';
 import { useKeyboard } from '../interactions/useKeyboard';

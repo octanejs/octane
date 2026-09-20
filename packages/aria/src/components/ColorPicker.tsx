@@ -13,21 +13,21 @@
  */
 
 import {
-	ChildrenOrFunction,
+	type ChildrenOrFunction,
 	Provider,
-	SlotProps,
-	SlottedContextValue,
+	type SlotProps,
+	type SlottedContextValue,
 	useRenderProps,
 	useSlottedContext,
 } from './utils';
-import { Color } from '../upstream-exports/react-stately/Color';
+import type { Color } from '../upstream-exports/react-stately/Color';
 
 import { ColorAreaContext } from './ColorArea';
 
 import { ColorFieldContext } from './ColorField';
 import {
-	ColorPickerState,
-	ColorPickerProps as StatelyColorPickerProps,
+	type ColorPickerState,
+	type ColorPickerProps as StatelyColorPickerProps,
 	useColorPickerState,
 } from '../upstream-exports/react-stately/useColorPickerState';
 import { ColorSliderContext } from './ColorSlider';
@@ -35,7 +35,7 @@ import { ColorSwatchContext } from './ColorSwatch';
 import { ColorSwatchPickerContext } from './ColorSwatchPicker';
 import { ColorWheelContext } from './ColorWheel';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
-import React, { createContext, JSX } from '../compat/react';
+import React, { createContext, type JSX } from '../compat/react';
 
 export interface ColorPickerRenderProps {
 	/** The currently selected color. */

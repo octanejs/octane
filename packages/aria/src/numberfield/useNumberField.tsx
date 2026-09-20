@@ -25,8 +25,8 @@ type DOMAttributes = Record<string, any>;
  */
 
 import { announce } from '../live-announcer/LiveAnnouncer';
-import { AriaButtonProps } from '../button/useButton';
-import {
+import type { AriaButtonProps } from '../button/useButton';
+import type {
 	AriaLabelingProps,
 	DOMProps,
 	GroupDOMAttributes,
@@ -34,9 +34,9 @@ import {
 	ValidationResult,
 } from '@react-types/shared';
 import {
-	InputHTMLAttributes,
-	LabelHTMLAttributes,
-	RefObject,
+	type InputHTMLAttributes,
+	type LabelHTMLAttributes,
+	type RefObject,
 	useCallback,
 	useMemo,
 	useState,
@@ -47,7 +47,7 @@ import { getActiveElement, getEventTarget } from '../utils/shadowdom/DOMFunction
 import intlMessages from '../intl/numberfield/index';
 import { isAndroid, isIOS, isIPhone } from '../utils/platform';
 import { mergeProps } from '../utils/mergeProps';
-import {
+import type {
 	NumberFieldProps,
 	NumberFieldState,
 } from '../upstream-exports/react-stately/useNumberFieldState';
