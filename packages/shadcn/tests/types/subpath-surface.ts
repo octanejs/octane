@@ -252,3 +252,52 @@ import { cn as X77 } from '@octanejs/shadcn/cn';
 type _77 = Assert<NotAny<typeof X77>>;
 import { useIsMobile as X78 } from '@octanejs/shadcn/hooks/use-mobile';
 type _78 = Assert<NotAny<typeof X78>>;
+
+import {
+	Calendar as RadixCalendar,
+	CalendarDayButton as RadixCalendarDayButton,
+	type CalendarProps as RadixCalendarProps,
+	type CalendarDayButtonProps as RadixCalendarDayButtonProps,
+} from '@octanejs/shadcn/Calendar';
+import {
+	Calendar as BaseCalendar,
+	CalendarDayButton as BaseCalendarDayButton,
+	type CalendarProps as BaseCalendarProps,
+	type CalendarDayButtonProps as BaseCalendarDayButtonProps,
+} from '@octanejs/shadcn/base-ui/Calendar';
+
+type _RadixCalendar = Assert<NotAny<typeof RadixCalendar>>;
+type _RadixCalendarDayButton = Assert<NotAny<typeof RadixCalendarDayButton>>;
+type _RadixCalendarProps = Assert<NotAny<RadixCalendarProps>>;
+type _RadixCalendarDayButtonProps = Assert<NotAny<RadixCalendarDayButtonProps>>;
+type _BaseCalendar = Assert<NotAny<typeof BaseCalendar>>;
+type _BaseCalendarDayButton = Assert<NotAny<typeof BaseCalendarDayButton>>;
+type _BaseCalendarProps = Assert<NotAny<BaseCalendarProps>>;
+type _BaseCalendarDayButtonProps = Assert<NotAny<BaseCalendarDayButtonProps>>;
+type _RadixCalendarParameter = Assert<NotAny<Parameters<typeof RadixCalendar>[0]>>;
+type _BaseCalendarParameter = Assert<NotAny<Parameters<typeof BaseCalendar>[0]>>;
+type _RadixDayButtonParameter = Assert<NotAny<Parameters<typeof RadixCalendarDayButton>[0]>>;
+type _BaseDayButtonParameter = Assert<NotAny<Parameters<typeof BaseCalendarDayButton>[0]>>;
+
+// Both published bases retain day-picker's selection modes and the button's
+// variants. An unresolved/any or widened prop must not accept arbitrary values.
+type _RadixCalendarModes = Assert<
+	'single' | 'multiple' | 'range' extends RadixCalendarProps['mode'] ? true : false
+>;
+type _BaseCalendarModes = Assert<
+	'single' | 'multiple' | 'range' extends BaseCalendarProps['mode'] ? true : false
+>;
+type _RadixCalendarVariants = Assert<
+	'default' | 'outline' extends RadixCalendarProps['buttonVariant'] ? true : false
+>;
+type _BaseCalendarVariants = Assert<
+	'default' | 'outline' extends BaseCalendarProps['buttonVariant'] ? true : false
+>;
+type _RadixCalendarMode = Assert<'unsupported' extends RadixCalendarProps['mode'] ? false : true>;
+type _BaseCalendarMode = Assert<'unsupported' extends BaseCalendarProps['mode'] ? false : true>;
+type _RadixCalendarVariant = Assert<
+	'unsupported' extends RadixCalendarProps['buttonVariant'] ? false : true
+>;
+type _BaseCalendarVariant = Assert<
+	'unsupported' extends BaseCalendarProps['buttonVariant'] ? false : true
+>;

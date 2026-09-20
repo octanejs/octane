@@ -40358,6 +40358,10 @@ export function forBlock<T>(
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	}
+	// A pending child can replay its adopted slot with the cursor back on the
+	// outer open marker. First-fill adoption always starts inside that range,
+	// including a zero-item list that already has a retained slot.
+	if (hydration !== null && state.size === 0) hydration.node = getNextSibling(state.start);
 	// New direct-host list output carries its server-selected arm on the existing
 	// outer open comment. Legacy/general list ranges return -1 and retain the
 	// content-shape checks used before markerless SSR items existed.
@@ -40518,6 +40522,10 @@ export function forBlock<T>(
 			(f & 2) !== 0,
 			(f & 16) !== 0,
 		);
+		// Only first-fill adoption consumes unowned server items. Survivor
+		// reconciliation can leave the cursor inside an already-owned item and
+		// must not discard that range when a pending child replays hydration.
+		if (hydration !== null) discardLeftoverHydrationItems(state.end, hydration);
 	} else {
 		reconcileKeyed(
 			parentBlock,
@@ -40536,10 +40544,7 @@ export function forBlock<T>(
 	// clone() starts after this block — covers the zero-item, no-@empty case where
 	// reconcileKeyed mounts nothing and the cursor would otherwise stay on the
 	// inner close marker.
-	if (hydration !== null) {
-		discardLeftoverHydrationItems(state.end, hydration);
-		hydration.node = getNextSibling(state.end);
-	}
+	if (hydration !== null) hydration.node = getNextSibling(state.end);
 }
 
 /**
