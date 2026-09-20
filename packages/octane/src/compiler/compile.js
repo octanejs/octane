@@ -30634,7 +30634,7 @@ function autoMemoDependencyOrderKey(original) {
 	return astStructuralKey(node);
 }
 
-function collectAutoMemoDependencyExpressions(nodes) {
+function collectAutoMemoDependencyExpressions(nodes, templateControlFlow = false) {
 	const dependencies = new Set();
 	const dependencyNodes = new Map();
 	const dependencyOrder = new Map();
@@ -30693,6 +30693,19 @@ function collectAutoMemoDependencyExpressions(nodes) {
 			node.type === 'LogicalExpression' ||
 			node.type === 'ConditionalExpression' ||
 			node.type === 'ChainExpression' ||
+			(templateControlFlow &&
+				(node.type === 'JSXIfExpression' ||
+					node.type === 'JSXForExpression' ||
+					node.type === 'JSXSwitchExpression' ||
+					node.type === 'JSXTryExpression' ||
+					node.type === 'IfStatement' ||
+					node.type === 'ForStatement' ||
+					node.type === 'ForOfStatement' ||
+					node.type === 'ForInStatement' ||
+					node.type === 'SwitchStatement' ||
+					node.type === 'TryStatement' ||
+					node.type === 'WhileStatement' ||
+					node.type === 'DoWhileStatement')) ||
 			((node.type === 'MemberExpression' ||
 				node.type === 'OptionalMemberExpression' ||
 				node.type === 'CallExpression' ||
@@ -30767,6 +30780,38 @@ function requireCompiledHydrateAlias(ctx) {
 	}
 	ctx.runtimeNeeded.add(helper);
 	return alias;
+}
+
+function hydrateDiagnosticChildrenCaptures(node, children, ctx) {
+	if (!ctx.dev || ctx.mode === 'server') return undefined;
+	const tag = node.openingElement?.name ?? node.id;
+	if (tag?.type !== 'JSXIdentifier' || ctx.octaneImportLocals?.get(tag.name) !== 'Hydrate')
+		return undefined;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const binding = lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name);
+	if (binding?.scope !== lexical.rootScope || binding.importSource?.value !== 'octane')
+		return undefined;
+	const plan = collectAutoMemoDependencyExpressions(children, true);
+	if (!plan.safe || mapCallbackCapturesLexicalReceiver(children)) return null;
+	const free = collectFreeIdentifiers(children, []);
+	const local = collectSubtreeBindings(children, new Set());
+	// A child-local shadow with the same spelling cannot be read from the
+	// enclosing closure. Decline the certificate rather than invent a witness.
+	for (const name of free) if (local.has(name)) return null;
+	const captures = [];
+	const covered = new Set();
+	const dependencyNode = depNodeFor({ autoMemoDepNodes: plan.dependencyNodes });
+	for (const dependency of plan.dependencies) {
+		const expression = dependencyNode(dependency);
+		const roots = collectFreeIdentifiers(expression, []);
+		if (roots.size === 0 || [...roots].some((name) => !free.has(name))) continue;
+		captures.push(expression);
+		for (const name of roots) covered.add(name);
+	}
+	for (const name of free) if (!covered.has(name)) captures.push(b.id(name));
+	// Property reads stay deferred until activation; collecting diagnostic data
+	// must not evaluate a dormant child's getters or call its render function.
+	return inheritOriginLoc(b.arrow([], b.array(captures)), node);
 }
 
 function isPrivateSplitContextProvider(node, ctx) {
@@ -30958,7 +31003,8 @@ function makeCompCall(
 			ctx.runtimeNeeded.add('markChildrenBlock');
 			hasChildrenProp = true;
 			const childrenArgs = [b.id(childrenHelperName)];
-			if (ctx.autoMemo && ctx.mode !== 'server') {
+			const diagnosticCaptures = hydrateDiagnosticChildrenCaptures(node, children, ctx);
+			if ((ctx.autoMemo && ctx.mode !== 'server') || diagnosticCaptures !== undefined) {
 				// These functions close over parent locals and are recreated on every
 				// render. A module-owned token distinguishes a real Provider body
 				// handoff from fresh captures without invalidating ordinary cache hits.
@@ -30966,6 +31012,8 @@ function makeCompCall(
 				ctx.hoistedHelpers.push(inheritOriginLoc(b.const(bodyIdentity, b.object([])), node));
 				childrenArgs.push(b.id(bodyIdentity));
 			}
+			if (diagnosticCaptures !== undefined)
+				childrenArgs.push(diagnosticCaptures ?? b.literal(null));
 			let childrenValue = b.call('_$markChildrenBlock', ...childrenArgs);
 			if (ctx.presentationHydration?.structural && node._octaneBindingSite)
 				childrenValue = b.call(
