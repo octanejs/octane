@@ -100,9 +100,6 @@ allowBuilds:
   # Inferno's postinstall only prints OpenCollective funding information.
   inferno: false
 
-# Variables
-esrap_common: &esrap_common ^2.3.2
-
 overrides:
   # Browser parity tooling and its transitive consumers must share one runner
   # and Chromium revision. Direct dependencies reference the same catalog.
