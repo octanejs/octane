@@ -224,6 +224,14 @@ function escapeAttribute(value: string): string {
 		.replace(/>/g, '&gt;');
 }
 
+function byteLength(value: string): number {
+	// Node can measure UTF-8 without allocating bytes that the transport encodes again.
+	// Edge hosts retain the same TextEncoder accounting without a Node import.
+	return typeof globalThis.Buffer === 'function'
+		? globalThis.Buffer.byteLength(value, 'utf8')
+		: new TextEncoder().encode(value).byteLength;
+}
+
 /** Serialize one validated frame for an already-installed pre-module receiver. */
 export function streamedRendererFrameScript(frame: StreamedRendererFrame, nonce?: string): string {
 	const encoded = encodeStreamedRendererFrameForScript(frame);
@@ -269,7 +277,7 @@ function createSignalInjection(
 		: '';
 	let pending = false;
 	let awaitingAcceptance = false;
-	let queuedBytes = queued === '' ? 0 : new TextEncoder().encode(queued).byteLength;
+	let queuedBytes = queued === '' ? 0 : byteLength(queued);
 	let finished = false;
 	let subscribed = false;
 	let totalBytes = 0;
@@ -315,7 +323,7 @@ function createSignalInjection(
 					return;
 				}
 				const html = streamedRendererFrameScript(next.value, options.nonce);
-				const bytes = new TextEncoder().encode(html).byteLength;
+				const bytes = byteLength(html);
 				if (bytes > budget.maxFrameBytes || totalBytes + bytes > budget.maxTotalBytes) {
 					fail(new Error('Streamed renderer injection exceeded its byte budget.'));
 					return;
@@ -461,7 +469,7 @@ export function createAutomaticStreamedSignalInjection(
 			// unlike settlement, revokes the renderer's observation lease.
 			if (attempt.signal.aborted) continue;
 			const script = streamedSignalSelectionScript(identity, options.nonce);
-			const bytes = new TextEncoder().encode(script).byteLength;
+			const bytes = byteLength(script);
 			if (bytes > budget.maxFrameBytes || totalBytes + bytes > budget.maxTotalBytes) {
 				const error = new Error('Automatic streamed signals exceeded their byte budget.');
 				fail(error);
@@ -506,10 +514,7 @@ export function createAutomaticStreamedSignalInjection(
 					continue;
 				}
 				// Only our signal source supplies a cached size; external HTML is measured here.
-				const bytes =
-					child.attempt === undefined
-						? new TextEncoder().encode(html).byteLength
-						: child.source.queuedBytes!;
+				const bytes = child.attempt === undefined ? byteLength(html) : child.source.queuedBytes!;
 				if (bytes > budget.maxFrameBytes || totalBytes + bytes > budget.maxTotalBytes) {
 					fail(new Error('Automatic streamed signals exceeded their byte budget.'));
 					return;

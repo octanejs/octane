@@ -83,3 +83,31 @@ IME, and BFCache need separate measurements.
 
 The initial measured checkpoint and its limitations are recorded in
 [Async Signals performance follow-up](../../docs/async-signals-performance.md).
+
+## Stream delivery accounting
+
+The focused Node probe isolates whole-value result delivery through the public
+Web-stream renderer. It compares growing ASCII and Unicode answers, constant
+values, 128 independent channels, primitive values, explicit injection, producer
+failure, and a feature-free render. Every value, sequence, identity, completion,
+and nonce/escaping assertion runs outside timing. It reports JSON/UTF-8 operation
+counts, allocated UTF-8 bytes, raw/gzip/Brotli response bytes, and warmed response
+latency/process CPU samples. CPU includes the same-process producer and consumer;
+compression is for a complete response, not network streaming flushes.
+
+```sh
+node benchmarks/conversation-streaming/stream-delivery.mjs --output-dir=/absolute/baseline
+# After the source change, build the candidate and remeasure the saved baseline:
+node benchmarks/conversation-streaming/stream-delivery.mjs --output-dir=/absolute/candidate
+node benchmarks/conversation-streaming/stream-delivery.mjs --bundle=/absolute/baseline/server.mjs --output-dir=/absolute/baseline-repeat
+# Exercise the portable TextEncoder fallback under the same Node harness:
+node benchmarks/conversation-streaming/stream-delivery.mjs --without-buffer --output-dir=/absolute/fallback
+```
+
+Use fresh output directories outside the repository. Compare runs with the same
+probe, warmup, iteration count, and toolchain; run them without competing builds
+or tests. Recorded source and bundle hashes identify the compared code. The
+fallback control is not a measurement of an edge runtime. Full-response hashes,
+frame counts, and wire bytes must match before attributing a change to sizing.
+Whole-message prefix retransmission, identity metadata, and one script per yield
+remain part of the supported protocol.
