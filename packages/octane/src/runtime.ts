@@ -23365,7 +23365,10 @@ function disposeSignalHostPropSources(binding: SignalHostPropSourcesBinding): vo
 	queueOwnRefDetach(binding.resolved, binding.element);
 }
 
-function queueSignalHostControlAdoption(binding: SignalHostPropSourcesBinding): void {
+function queueSignalHostControlAdoption(
+	binding: SignalHostPropSourcesBinding,
+	priorValue: unknown,
+): void {
 	enqueueEffectEventCommitAction(() => {
 		if (binding.disposed || binding.scope.block.disposed || !binding.pendingControl) return;
 		withoutSignalCandidate(() =>
@@ -23376,7 +23379,7 @@ function queueSignalHostControlAdoption(binding: SignalHostPropSourcesBinding): 
 					snapshot.editRevision > 0 ||
 					(binding.element.localName === 'textarea' &&
 						isWritableSignal(value) &&
-						Object.is(readSignalBinding(value), binding.resolved?.value))
+						Object.is(readSignalBinding(value), priorValue))
 				) {
 					const checked = winningSignalHostControl(binding.sources, 'checked');
 					if (isWritableSignal(checked) && snapshot.checked !== undefined)
@@ -23385,7 +23388,7 @@ function queueSignalHostControlAdoption(binding: SignalHostPropSourcesBinding): 
 				}
 				if (binding.disposed || binding.scope.block.disposed) return;
 				if (!consumeHydrationControl(binding.element, snapshot.revision)) {
-					queueSignalHostControlAdoption(binding);
+					queueSignalHostControlAdoption(binding, priorValue);
 					return;
 				}
 				binding.pendingControl = false;
@@ -23615,7 +23618,7 @@ export function bindSignalHostPropSources(
 		if (!binding.pendingControl && controlSnapshot !== null)
 			consumeHydrationControl(element, controlSnapshot.revision);
 	}
-	if (binding.pendingControl) queueSignalHostControlAdoption(committed);
+	if (binding.pendingControl) queueSignalHostControlAdoption(committed, binding.resolved?.value);
 	return committed;
 }
 
