@@ -122,7 +122,7 @@
     },
     {
       "name": "@octanejs/better-auth",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "category": "Data",
       "upstream": { "package": "better-auth", "version": "1.7.4" },
       "surface": "The public framework-agnostic Better Auth client is reused unchanged. `createAuthClient` converts the built-in session atom and plugin-provided atoms into Octane hooks while preserving endpoint actions, `$fetch`, `$store`, `$ERROR_CODES`, `$Infer`, and plugin inference. The upstream-compatible `useStore` helper is also included.",
@@ -812,7 +812,7 @@
     },
     {
       "name": "@octanejs/rainbowkit",
-      "version": "0.0.35",
+      "version": "0.0.36",
       "category": "Web3",
       "upstream": { "package": "@rainbow-me/rainbowkit", "version": "2.2.11" },
       "surface": "Octane-native RainbowKitProvider, ConnectButton and ConnectButton.Custom, WalletButton, connect/account/chain modal hooks, connector selection, account/chain actions, native accessible dialogs, and light/dark/midnight themes.",
@@ -1212,7 +1212,7 @@
     },
     {
       "name": "@octanejs/tanstack-devtools",
-      "version": "0.0.47",
+      "version": "0.0.48",
       "category": "Developer Tools",
       "upstream": { "package": "@tanstack/react-devtools", "version": "0.10.12" },
       "surface": "Surface-present for the pinned adapter's runtime entrypoint, with additive framework-neutral core re-exports. A same-fixture differential covers mount, config synchronization, plugin/title/trigger portals, and teardown. Upstream has no runtime suite; its test:types source compile is recorded as present type evidence with required pristine/adapted type lanes. Provenance is verified; core-version drift and Octane-specific type names/core re-exports stay as explicit divergences.",
@@ -1532,7 +1532,7 @@
     },
     {
       "name": "@octanejs/wagmi",
-      "version": "0.0.35",
+      "version": "0.0.36",
       "category": "Web3",
       "upstream": { "package": "wagmi", "version": "3.7.7" },
       "surface": "WagmiProvider and createConfig over @wagmi/core 3.6.5, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks.",

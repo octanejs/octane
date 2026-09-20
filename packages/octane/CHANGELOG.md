@@ -1,5 +1,27 @@
 # octane
 
+## 0.3.2
+
+### Patch Changes
+
+- ec57015: Keep scalar binding caches coherent when hydration retains an early DOM binding's publication, so the next normal render can restore historical props after the early binding is released.
+- 167ee71: Adopt eventless restored textarea values into writable signals during initial binding, hydration, and accepted early-control takeover while preserving newer model and native-edit precedence.
+- 751d0de: Preserve native Undo/Redo grouping for controlled textarea edits by updating their existing baseline text node. Keep native form reset consistent with the current value for writable signals as well as ordinary controlled textareas.
+- 0724b1f: Preserve live signal values when a `satisfies`-wrapped assignment replaces a global conversion constructor before rendering.
+- 167dfe9: Give every hydration wire literal exactly one owning module. The `@for` arm
+  markers, the presentation-binding comment prefixes, the deferred-boundary
+  attribute names, the `useId` spelling, the element-scoped `<ViewTransition>`
+  stylesheet, and the cross-realm `Symbol.for` tags were each re-typed in two to
+  five modules, so a change on one side of a hydration boundary could diverge from
+  the other without any test noticing. They now live in `hydration-markers.js`
+  (which stays off the `dom-tables.js` graph so the pre-root capture bundle can
+  share them), `dom-binding-protocol.js`, `css.js`, and a new `runtime-tags.js`;
+  `octane/constants` re-exports the same names and values as before.
+
+  Adopting a presentation view whose range carries no view id is now rejected
+  outright instead of being compared against the string `"[b;undefined;root"`.
+- 27a37b6: Avoid allocating temporary UTF-8 buffers when checking streamed signal injection byte limits on Node hosts. Preserve the same frame bytes, limits, ordering, and backpressure, with unchanged TextEncoder accounting on hosts without Buffer.
+
 ## 0.3.1
 
 ### Patch Changes

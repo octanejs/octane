@@ -23,7 +23,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/auto-animate` | [`packages/auto-animate`](../packages/auto-animate) | framework binding | `0.0.9` | 3 |
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.54` | 79 |
 | `@octanejs/base-ui-utils` | [`packages/base-ui-utils`](../packages/base-ui-utils) | framework binding | `0.1.2` | 45 |
-| `@octanejs/better-auth` | [`packages/better-auth`](../packages/better-auth) | framework binding | `0.0.5` | 1 |
+| `@octanejs/better-auth` | [`packages/better-auth`](../packages/better-auth) | framework binding | `0.0.6` | 1 |
 | `@octanejs/calendar` | [`packages/calendar`](../packages/calendar) | framework binding | `0.0.10` | 4 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.0.11` | 2 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.38` | 1 |
@@ -71,7 +71,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/popper` | [`packages/popper`](../packages/popper) | framework binding | `0.0.19` | 2 |
 | `@octanejs/portabletext` | [`packages/portabletext`](../packages/portabletext) | framework binding | `0.1.3` | 2 |
 | `@octanejs/radix` | [`packages/radix`](../packages/radix) | framework binding | `0.1.54` | 1 |
-| `@octanejs/rainbowkit` | [`packages/rainbowkit`](../packages/rainbowkit) | framework binding | `0.0.35` | 2 |
+| `@octanejs/rainbowkit` | [`packages/rainbowkit`](../packages/rainbowkit) | framework binding | `0.0.36` | 2 |
 | `@octanejs/react-error-boundary` | [`packages/react-error-boundary`](../packages/react-error-boundary) | framework binding | `0.1.34` | 2 |
 | `@octanejs/react-map-gl` | [`packages/react-map-gl`](../packages/react-map-gl) | framework binding | `0.0.25` | 2 |
 | `@octanejs/recharts` | [`packages/recharts`](../packages/recharts) | framework binding | `0.1.53` | 1 |
@@ -99,7 +99,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/syntax-highlighter` | [`packages/syntax-highlighter`](../packages/syntax-highlighter) | framework binding | `0.0.19` | 2634 |
 | `@octanejs/tanstack-ai` | [`packages/tanstack-ai`](../packages/tanstack-ai) | framework binding | `0.0.47` | 1 |
 | `@octanejs/tanstack-db` | [`packages/tanstack-db`](../packages/tanstack-db) | framework binding | `0.0.16` | 1 |
-| `@octanejs/tanstack-devtools` | [`packages/tanstack-devtools`](../packages/tanstack-devtools) | framework binding | `0.0.47` | 1 |
+| `@octanejs/tanstack-devtools` | [`packages/tanstack-devtools`](../packages/tanstack-devtools) | framework binding | `0.0.48` | 1 |
 | `@octanejs/tanstack-form` | [`packages/tanstack-form`](../packages/tanstack-form) | framework binding | `0.0.50` | 1 |
 | `@octanejs/tanstack-hotkeys` | [`packages/tanstack-hotkeys`](../packages/tanstack-hotkeys) | framework binding | `0.0.45` | 1 |
 | `@octanejs/tanstack-pacer` | [`packages/tanstack-pacer`](../packages/tanstack-pacer) | framework binding | `0.0.45` | 15 |
@@ -123,7 +123,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/vaul` | [`packages/vaul`](../packages/vaul) | framework binding | `0.0.21` | 3 |
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.50` | 49 |
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.57` | 3 |
-| `@octanejs/wagmi` | [`packages/wagmi`](../packages/wagmi) | framework binding | `0.0.35` | 3 |
+| `@octanejs/wagmi` | [`packages/wagmi`](../packages/wagmi) | framework binding | `0.0.36` | 3 |
 | `@octanejs/waypoint` | [`packages/waypoint`](../packages/waypoint) | framework binding | `0.0.8` | 1 |
 | `@octanejs/window` | [`packages/window`](../packages/window) | framework binding | `0.0.20` | 1 |
 | `@octanejs/wouter` | [`packages/wouter`](../packages/wouter) | framework binding | `0.0.9` | 5 |
@@ -133,7 +133,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.20` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.54` | 6 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.11` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.3.1` | 40 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.3.2` | 40 |
 
 ## Private packages
 
