@@ -110,6 +110,23 @@ export interface CompileOptions {
 	 * unused/lazy component styles then retain their normal bundler ownership.
 	 */
 	preserveCssModuleReferences?: readonly string[];
+	/**
+	 * Host-facts seam for `defineThemeTokens` contract modules (octane/theme-tokens),
+	 * consulted once per authored relative import when the source contains
+	 * `var(--*)` references. Returns the facts the host extracted — a single
+	 * contract or one entry per contract for multi-declaration modules — `null`
+	 * for a contract-marked module it could not reduce (reported as an
+	 * `octane-style-token-contract-unresolved` warning), or `undefined` when the
+	 * request is not a contract (silent). A `var(--name)` reference is claimed
+	 * by a contract when `name` starts with `namespace`; an unprefixed contract's
+	 * `'--'` namespace claims nothing, preserving the raw-`var(--*)` legacy
+	 * channel. Undeclared claimed references are `octane-style-token-undeclared`
+	 * errors. Omit to skip token enforcement entirely.
+	 */
+	resolveTokenContract?: (
+		request: string,
+		importer: string,
+	) => TokenContractFacts | readonly TokenContractFacts[] | null | undefined;
 	renderer?: CompileRenderer;
 	rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, CompileRendererBoundary>>>>;
 	rendererRegistry?: Readonly<
@@ -121,6 +138,23 @@ export interface CompileOptions {
 	isDescriptorChildrenImport?: (request: string, imported: string) => boolean;
 	/** Preserve the compiler's existing experimental integration options. */
 	[option: string]: unknown;
+}
+
+/**
+ * Serializable facts a host extracted from a `defineThemeTokens` contract
+ * module without evaluating it: the literal custom-property namespace the
+ * contract claims and every custom-property name it declares.
+ */
+export interface TokenContractFacts {
+	/**
+	 * Claim prefix: `var(--x)` is checked against this contract iff `--x` starts
+	 * with `namespace` (`--app-` for `prefix: 'app'`). `'--'` (no prefix) is a
+	 * valid declaration but claims nothing — unprefixed contracts stay unenforced
+	 * so raw `var(--*)` references keep their legacy channel.
+	 */
+	namespace: string;
+	/** Every custom-property name the contract declares, e.g. `--app-colors-bg`. */
+	names: readonly string[];
 }
 
 export interface CompilePosition {
@@ -254,8 +288,21 @@ export function compileToVolarMappings(
 		renderers?: unknown;
 		strong?: boolean;
 		knownAttributeSpreads?: readonly KnownAttributeSpread[];
+		resolveTokenContract?: CompileOptions['resolveTokenContract'];
 	},
 ): VolarCompileResult;
+
+/**
+ * Build the synchronous filesystem-backed `resolveTokenContract` host callback
+ * used by `octane analyze`, MCP `octane_compile`, and tests: resolve each
+ * authored relative import against the importer's directory, read the contract
+ * module from disk, and reduce it to facts — memoized per resolved file. The
+ * `fs` surface is injected so `octane/compiler` stays browser-importable.
+ */
+export function createSyncTokenContractResolver(fs: {
+	existsSync(path: string): boolean;
+	readFileSync(path: string, encoding: 'utf8'): string;
+}): NonNullable<CompileOptions['resolveTokenContract']>;
 
 /** @internal Shared authored-JSX diagnostic analysis for compiler integrations. */
 export function __analyzeNativeChangeDiagnostics(

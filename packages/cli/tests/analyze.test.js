@@ -178,6 +178,67 @@ export function Hint({ value }) @{
 		).toHaveLength(1);
 	});
 
+	it('enforces a claimed token contract inside <style> blocks', async () => {
+		// The resolver reads the authored contract module synchronously, so the
+		// same typo that fails the bundler compile fails `analyze` (R5).
+		const { root } = project({
+			'src/tokens.ts':
+				"import { defineThemeTokens } from 'octane/theme-tokens';\n" +
+				"export const tokens = defineThemeTokens({ colors: { primary: '#00f' } }, { prefix: 'app' });\n",
+			'src/Badge.tsrx':
+				"import { tokens } from './tokens';\n" +
+				'export function Badge() @{\n' +
+				'\t<div>\n' +
+				'\t\t<style>.badge { color: var(--app-colors-primay); }</style>\n' +
+				'\t\t<span class="badge">hi</span>\n' +
+				'\t</div>\n' +
+				'}\n',
+		});
+		const result = await runCli([
+			'analyze',
+			'--cwd',
+			OCTANE,
+			path.join(root, 'src/Badge.tsrx'),
+			'--json',
+		]);
+
+		const [finding] = result.json().findings;
+		expect(finding.code).toBe('octane-style-token-undeclared');
+		expect(finding.severity).toBe('error');
+		expect(finding.message).toContain('--app-colors-primay');
+		expect(finding.message).toContain('./tokens');
+		expect(result.exitCode).toBe(3);
+	});
+
+	it('warns — without failing — when a claimed contract cannot be read', async () => {
+		const { root } = project({
+			'src/tokens.ts':
+				"import { defineThemeTokens } from 'octane/theme-tokens';\n" +
+				'declare const dynamic: Record<string, string>;\n' +
+				'export const tokens = defineThemeTokens(dynamic);\n',
+			'src/Badge.tsrx':
+				"import { tokens } from './tokens';\n" +
+				'export function Badge() @{\n' +
+				'\t<div>\n' +
+				'\t\t<style>.badge { color: var(--app-colors-primary); }</style>\n' +
+				'\t\t<span class="badge">hi</span>\n' +
+				'\t</div>\n' +
+				'}\n',
+		});
+		const result = await runCli([
+			'analyze',
+			'--cwd',
+			OCTANE,
+			path.join(root, 'src/Badge.tsrx'),
+			'--json',
+		]);
+
+		const [finding] = result.json().findings;
+		expect(finding.code).toBe('octane-style-token-contract-unresolved');
+		expect(finding.severity).toBe('warning');
+		expect(result.exitCode).toBe(0);
+	});
+
 	it('separates an unreadable file from an unparseable one', async () => {
 		const { root } = project({});
 		const result = await runCli(

@@ -34,6 +34,11 @@ import {
 	readCssModuleExports,
 	validateCssModuleConstants,
 } from './css-module-imports.js';
+import {
+	findTokenContractImportRequests,
+	readTokenContractModule,
+	sourceMayReferenceTokens,
+} from './token-contracts.js';
 
 export { discoverOctaneSourceDependencies };
 
@@ -505,6 +510,67 @@ async function isDescriptorChildrenExport(
 	return classification;
 }
 
+/**
+ * Read a resolved contract candidate from disk exactly once per build; the
+ * cache is cleared by `watchChange`/`resetCompiler` with the descriptor caches.
+ * Read failures and non-contract modules both settle `undefined` ("not a
+ * contract — silent"); only a marker-bearing module that cannot be reduced
+ * settles `null` so the compile pass warns instead of passing silently.
+ */
+async function readTokenContractAnalysis(id, tokenContractCache) {
+	const sourceId = cleanModuleId(id);
+	let analysis = tokenContractCache.get(sourceId);
+	if (analysis === undefined) {
+		analysis = nodeFs.promises
+			.readFile(sourceId, 'utf8')
+			.then((source) => readTokenContractModule(source, sourceId))
+			.catch(() => undefined);
+		tokenContractCache.set(sourceId, analysis);
+	}
+	return analysis;
+}
+
+/**
+ * Resolve the importer's candidate contract requests through the plugin
+ * context before the synchronous `compile()` runs — the bundler host-facts
+ * seam for `resolveTokenContract`. Returns `null` when nothing resolved to a
+ * contract claim, so the compile call stays byte-identical to before.
+ */
+async function loadTokenContracts(context, requests, importer, tokenContractCache) {
+	if (requests.length === 0 || typeof context.resolve !== 'function') return null;
+	const probes = new Map();
+	const watched = [];
+	await Promise.all(
+		requests.map(async (request) => {
+			let resolved;
+			try {
+				resolved = await context.resolve(request, importer, { skipSelf: true });
+			} catch {
+				return;
+			}
+			if (
+				resolved == null ||
+				resolved.external ||
+				typeof resolved.id !== 'string' ||
+				cleanModuleId(resolved.id) === cleanModuleId(importer)
+			) {
+				return;
+			}
+			const probe = await readTokenContractAnalysis(resolved.id, tokenContractCache);
+			if (probe === undefined) return;
+			watched.push(cleanModuleId(resolved.id));
+			probes.set(request, probe);
+		}),
+	);
+	if (probes.size === 0) return null;
+	return {
+		watched,
+		resolve(request) {
+			return probes.get(request);
+		},
+	};
+}
+
 async function loadDescriptorChildrenImports(
 	context,
 	imports,
@@ -674,6 +740,9 @@ export function octane(options = {}) {
 	const descriptorSourceCache = new Map();
 	const descriptorExportCache = new Map();
 	const descriptorGraphCache = new Map();
+	// Token-contract facts keyed by resolved contract file. Facts are
+	// environment-independent, so client and server transforms share the cache.
+	const tokenContractCache = new Map();
 	// Vite can share a plugin instance between client and server environments.
 	// CSS naming/virtual providers can differ between them, so never key a proof
 	// merely by its path or share a previous build's final-module snapshot.
@@ -771,6 +840,7 @@ export function octane(options = {}) {
 		descriptorExportCache.clear();
 		descriptorGraphCache.clear();
 		cssModuleProofStates.clear();
+		tokenContractCache.clear();
 		projectRoot = nodePath.resolve(root);
 		compiler = createOctaneCompiler({
 			_descriptorPreflightAuthority: DESCRIPTOR_PREFLIGHT_AUTHORITY,
@@ -858,6 +928,9 @@ export function octane(options = {}) {
 		buildStart() {
 			if (this.environment === undefined) cssModuleProofStates.clear();
 			else cssModuleProofStates.delete(this.environment);
+			// Client and server builds share this plugin instance; never carry a
+			// contract snapshot from one build's module graph into the next.
+			tokenContractCache.clear();
 		},
 		buildEnd(error) {
 			if (error) releaseTextTypeProject();
@@ -882,6 +955,7 @@ export function octane(options = {}) {
 			descriptorExportCache.clear();
 			descriptorGraphCache.clear();
 			cssModuleProofStates.clear();
+			tokenContractCache.clear();
 		},
 		closeBundle() {
 			releaseTextTypeProject();
@@ -959,11 +1033,18 @@ export function octane(options = {}) {
 						descriptorImports: [],
 						serverImportRequests: [],
 						voidImports: [],
+						tokenRequests: [],
 					};
 				}
 				return {
 					cssRequests: specializeCssModuleConstants
 						? compiler.findCssModuleImportRequests(code, id, environment, ast)
+						: [],
+					// The compile pass probes these only when the source can hold a
+					// `var(--*)` reference; mirror that gate so files without token
+					// references never pay for import resolution.
+					tokenRequests: sourceMayReferenceTokens(code)
+						? [...findTokenContractImportRequests(ast).keys()]
 						: [],
 					descriptorExportsProof: compiler._prepareDescriptorChildrenExports(
 						DESCRIPTOR_PREFLIGHT_AUTHORITY,
@@ -989,12 +1070,18 @@ export function octane(options = {}) {
 					options.cssModuleConstants,
 					cssModuleProofState(this, environment),
 				);
+			const loadTokenContractImports = () =>
+				loadTokenContracts(this, preflight.tokenRequests, id, tokenContractCache);
 			const transformWithProof = (
 				proven,
 				descriptorProven = new Set(),
 				clientOnlyImports = [],
 				cssImports = null,
+				tokenContracts = null,
 			) => {
+				for (const contractFile of tokenContracts?.watched ?? []) {
+					this.addWatchFile?.(contractFile);
+				}
 				const propagatedExports = [...descriptorProven]
 					.filter((key) => key.startsWith('export\0'))
 					.map((key) => key.slice('export\0'.length));
@@ -1034,6 +1121,7 @@ export function octane(options = {}) {
 								// an unused exported component newly eager.
 								preserveCssModuleReferences: cssImports.requests,
 							}),
+					...(tokenContracts === null ? null : { resolveTokenContract: tokenContracts.resolve }),
 				});
 				if (result === null) {
 					options.__onIndependentWidgets?.(id, environment, [], false);
@@ -1106,8 +1194,9 @@ export function octane(options = {}) {
 						allowDescriptorGraphLoad,
 					),
 					loadCssImports(),
-				]).then(([imports, descriptorProven, cssImports]) =>
-					transformWithProof(null, descriptorProven, imports, cssImports),
+					loadTokenContractImports(),
+				]).then(([imports, descriptorProven, cssImports, tokenContracts]) =>
+					transformWithProof(null, descriptorProven, imports, cssImports, tokenContracts),
 				);
 			}
 
@@ -1118,7 +1207,12 @@ export function octane(options = {}) {
 			const descriptorImports = preflight.descriptorImports.filter(
 				(candidate) => candidate.local !== undefined || !nodeFs.existsSync(cleanModuleId(id)),
 			);
-			if (voidImports.length === 0 && descriptorImports.length === 0 && cssRequests.length === 0) {
+			if (
+				voidImports.length === 0 &&
+				descriptorImports.length === 0 &&
+				cssRequests.length === 0 &&
+				preflight.tokenRequests.length === 0
+			) {
 				return transformWithProof(null);
 			}
 			return Promise.all([
@@ -1133,8 +1227,9 @@ export function octane(options = {}) {
 					allowDescriptorGraphLoad,
 				),
 				loadCssImports(),
-			]).then(([proven, descriptorProven, cssImports]) =>
-				transformWithProof(proven, descriptorProven, [], cssImports),
+				loadTokenContractImports(),
+			]).then(([proven, descriptorProven, cssImports, tokenContracts]) =>
+				transformWithProof(proven, descriptorProven, [], cssImports, tokenContracts),
 			);
 		},
 	};

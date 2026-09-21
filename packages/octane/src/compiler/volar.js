@@ -37,7 +37,7 @@ import { buildFatSegments, decodeSourceMappings } from './fat-segments.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { analyzeStrongMode } from './strong-mode.js';
 import { analyzeNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
-import { analyzeStyleCorrectness } from './style-correctness.js';
+import { analyzeStyleCorrectness, analyzeTokenContracts } from './style-correctness.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
 import { inheritHookMemoOrigin } from './inline-hook-memo.js';
 import { lowerNativeAttributeReads } from './native-attribute-reads.js';
@@ -458,7 +458,7 @@ function markNativeTemplateBodies(root) {
  * `intrinsics`; when present, the virtual TSX gets a file-local pragma so host
  * element types cannot leak into files owned by another renderer.
  *
- * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean, knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[] }} [options]
+ * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean, knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[], resolveTokenContract?: import('./index.js').CompileOptions['resolveTokenContract'] }} [options]
  * @returns {import('./index.js').VolarCompileResult}
  */
 export function compileToVolarMappings(source, filename, options) {
@@ -520,6 +520,10 @@ export function compileToVolarMappings(source, filename, options) {
 	// editor reports build-breaking problems identically.
 	const styleDiagnostics = analyzeStyleCorrectness(ast, source, filename, options);
 	diagnostics.push(...styleDiagnostics);
+	// U10 token contract enforcement: identical walk and diagnostics; silent
+	// unless the host passes resolveTokenContract (the editor does not).
+	const tokenDiagnostics = analyzeTokenContracts(ast, source, filename, options);
+	diagnostics.push(...tokenDiagnostics);
 	// The renderer pragma belongs to the semantic comment set consumed by
 	// @tsrx/core's type-only Program print. This keeps code and mappings in one
 	// coordinate system instead of prepending text and shifting every mapping.
@@ -590,12 +594,14 @@ export function compileToVolarMappings(source, filename, options) {
 	if (
 		strongDiagnostics !== null ||
 		nativeReadDiagnostics.length > 0 ||
-		styleDiagnostics.length > 0
+		styleDiagnostics.length > 0 ||
+		tokenDiagnostics.length > 0
 	) {
 		for (const diagnostic of [
 			...(strongDiagnostics ?? []),
 			...nativeReadDiagnostics,
 			...styleDiagnostics,
+			...tokenDiagnostics,
 		]) {
 			if (diagnostic.severity !== 'error') continue;
 			collectCompileError(

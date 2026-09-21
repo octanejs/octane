@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -26,7 +26,7 @@ import { SYMBOLS } from '../kernel/ui.js';
  * that builds the app.
  *
  * @param {string} root
- * @returns {Promise<(source: string, filename: string, options?: object) => { diagnostics: readonly any[] }>}
+ * @returns {Promise<typeof import('octane/compiler')>}
  */
 async function loadCompiler(root) {
 	const require = createRequire(path.join(root, 'noop.js'));
@@ -42,7 +42,7 @@ async function loadCompiler(root) {
 	if (typeof module.compile !== 'function') {
 		throw new CliError('The installed octane build exposes no compiler.');
 	}
-	return module.compile;
+	return module;
 }
 
 /**
@@ -149,7 +149,16 @@ export default defineCommand({
 
 	async run(ctx, input) {
 		const project = ctx.project();
-		const compile = await loadCompiler(project.root);
+		const compiler = await loadCompiler(project.root);
+		const compile = compiler.compile;
+		// Token-contract facts are host-supplied: analyze reads the same authored
+		// contract modules synchronously so undeclared `var(--*)` references fail
+		// here exactly like the bundler compile. An older octane without the
+		// export simply skips token enforcement (resolver absent = silent).
+		const resolveTokenContract =
+			typeof compiler.createSyncTokenContractResolver === 'function'
+				? compiler.createSyncTokenContractResolver({ existsSync, readFileSync })
+				: undefined;
 
 		const targets =
 			input.positionals.length > 0
@@ -179,7 +188,8 @@ export default defineCommand({
 			}
 
 			try {
-				for (const diagnostic of compile(source, absolute, {}).diagnostics ?? []) {
+				for (const diagnostic of compile(source, absolute, { resolveTokenContract }).diagnostics ??
+					[]) {
 					findings.push({
 						file,
 						line: diagnostic.start?.line ?? 1,

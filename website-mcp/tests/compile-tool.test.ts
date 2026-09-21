@@ -2,8 +2,14 @@
 // contract is (a) valid .tsrx compiles to runnable-looking octane output,
 // (b) invalid source comes back as a structured diagnostic with a usable
 // location — never a throw.
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { runCompile } from '../src/mcp/compile-tool.ts';
+
+// Real defineThemeTokens module shared with the compiler's own resolver tests.
+const TOKEN_FIXTURE_ROOT = fileURLToPath(
+	new URL('../../packages/octane/tests/_fixtures/token-contract', import.meta.url),
+);
 
 const COUNTER = `
 import { useState } from 'octane';
@@ -100,5 +106,53 @@ describe('runCompile', () => {
 		);
 		expect(result.ok).toBe(true);
 		if (result.ok) expect(result.warnings).toEqual([]);
+	});
+
+	it('warns unresolved — never silently passes — a claimed contract with no projectRoot', () => {
+		// The default filename is relative, so without projectRoot there is no
+		// directory to resolve './tokens' against: every candidate claim is
+		// unverifiable and must surface as a warning (R5 has no fallback).
+		const result = runCompile(
+			base(
+				`import { tokens } from './tokens';\nexport function Badge() @{\n\t<div>\n\t\t<style>.badge { color: var(--app-colors-primary); }</style>\n\t\t<span class="badge">hi</span>\n\t</div>\n}`,
+			),
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings[0]).toMatchObject({
+			code: 'octane-style-token-contract-unresolved',
+			severity: 'warning',
+		});
+		expect(result.warnings[0].message).toContain('./tokens');
+	});
+
+	it('verifies claimed token references when projectRoot anchors the import', () => {
+		const result = runCompile({
+			...base(
+				`import { tokens } from './tokens';\nexport function Badge() @{\n\t<div>\n\t\t<style>.badge { color: var(--app-colors-primay); }</style>\n\t\t<span class="badge">hi</span>\n\t</div>\n}`,
+			),
+			projectRoot: TOKEN_FIXTURE_ROOT,
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const undeclared = result.warnings.filter(
+			(warning) => warning.code === 'octane-style-token-undeclared',
+		);
+		expect(undeclared).toHaveLength(1);
+		expect(undeclared[0].severity).toBe('error');
+		expect(undeclared[0].message).toContain('--app-colors-primay');
+	});
+
+	it('resolves a contract beside an absolute filename without projectRoot', () => {
+		const result = runCompile({
+			...base(
+				`import { tokens } from './tokens';\nexport function Badge() @{\n\t<div>\n\t\t<style>.badge { color: var(--app-colors-primary); }</style>\n\t\t<span class="badge">hi</span>\n\t</div>\n}`,
+			),
+			filename: `${TOKEN_FIXTURE_ROOT}/Badge.tsrx`,
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.warnings).toEqual([]);
 	});
 });

@@ -1,7 +1,14 @@
 // The octane_compile tool's engine: run the REAL octane compiler on pasted
 // source and fold the thrown CompileError into a JSON-safe diagnostic. Pure
 // (source in, result out) so it is unit-testable without MCP plumbing.
-import { compile, type CompileDiagnostic as CompilerWarning } from 'octane/compiler';
+import { existsSync, readFileSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
+import {
+	compile,
+	createSyncTokenContractResolver,
+	type CompileDiagnostic as CompilerWarning,
+	type CompileOptions,
+} from 'octane/compiler';
 import octanePkg from '../../../packages/octane/package.json';
 
 export interface CompileToolInput {
@@ -11,6 +18,13 @@ export interface CompileToolInput {
 	dev: boolean;
 	autoMemo?: boolean;
 	parallelUse?: boolean;
+	/**
+	 * Absolute project root anchoring relative imports to theme-token contract
+	 * modules. Without it (or without an absolute `filename`) a claimed
+	 * contract cannot be verified and reports `unresolved` rather than
+	 * silently passing.
+	 */
+	projectRoot?: string;
 }
 
 export interface CompileDiagnostic {
@@ -77,8 +91,29 @@ function toDiagnostic(error: unknown, source: string): CompileDiagnostic {
 	return diagnostic;
 }
 
+/**
+ * The host-facts seam for theme-token contracts (U10, R5). With an anchor —
+ * an absolute filename or `projectRoot` — authored contract modules are read
+ * synchronously off disk. Without one there is no directory to resolve
+ * against, so every candidate contract claim returns `null`: the compiler
+ * reports `octane-style-token-contract-unresolved` and the references stay
+ * honestly unverified instead of silently passing.
+ */
+function tokenContractResolver(
+	projectRoot: string | undefined,
+): CompileOptions['resolveTokenContract'] {
+	const resolve = createSyncTokenContractResolver({ existsSync, readFileSync });
+	return (request, importer) => {
+		if (!isAbsolute(importer)) {
+			if (projectRoot === undefined) return null;
+			importer = join(projectRoot, importer);
+		}
+		return resolve(request, importer);
+	};
+}
+
 export function runCompile(input: CompileToolInput): CompileToolResult {
-	const { source, filename, mode, dev, autoMemo, parallelUse } = input;
+	const { source, filename, mode, dev, autoMemo, parallelUse, projectRoot } = input;
 	const base = { filename, mode, octaneVersion: octanePkg.version };
 	try {
 		const { code, diagnostics } = compile(source, filename, {
@@ -86,6 +121,7 @@ export function runCompile(input: CompileToolInput): CompileToolResult {
 			dev,
 			autoMemo,
 			parallelUse,
+			resolveTokenContract: tokenContractResolver(projectRoot),
 		});
 		return { ok: true, ...base, code, warnings: diagnostics };
 	} catch (error) {

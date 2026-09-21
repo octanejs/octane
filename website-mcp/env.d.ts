@@ -35,7 +35,7 @@ declare module 'octane/compiler' {
 	}
 	export interface CompileDiagnostic {
 		code: string;
-		severity: 'warning';
+		severity: 'warning' | 'error' | 'hint';
 		message: string;
 		filename: string;
 		start: CompileDiagnosticPosition;
@@ -43,18 +43,36 @@ declare module 'octane/compiler' {
 		suggestions: Array<{
 			start: CompileDiagnosticPosition;
 			end: CompileDiagnosticPosition;
-			attribute: 'onInput' | 'onInputCapture';
+			attribute: 'onInput' | 'onInputCapture' | string;
 		}>;
+	}
+	/** Serializable facts read from a `defineThemeTokens` module (U10, R5). */
+	export interface TokenContractFacts {
+		namespace: string;
+		names: readonly string[];
+	}
+	export interface CompileOptions {
+		mode?: 'client' | 'server';
+		hmr?: boolean;
+		dev?: boolean;
+		autoMemo?: boolean;
+		parallelUse?: boolean;
+		/**
+		 * facts = enforce; null = claimed but unreadable (unresolved warning);
+		 * undefined = not a contract (silent).
+		 */
+		resolveTokenContract?: (
+			request: string,
+			importer: string,
+		) => TokenContractFacts | readonly TokenContractFacts[] | null | undefined;
 	}
 	export function compile(
 		source: string,
 		id: string,
-		options?: {
-			mode?: 'client' | 'server';
-			hmr?: boolean;
-			dev?: boolean;
-			autoMemo?: boolean;
-			parallelUse?: boolean;
-		},
+		options?: CompileOptions,
 	): { code: string; map: unknown; diagnostics: CompileDiagnostic[] };
+	export function createSyncTokenContractResolver(fs: {
+		existsSync(path: string): boolean;
+		readFileSync(path: string, encoding: 'utf8'): string;
+	}): NonNullable<CompileOptions['resolveTokenContract']>;
 }

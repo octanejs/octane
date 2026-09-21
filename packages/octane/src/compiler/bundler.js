@@ -1240,6 +1240,12 @@ class OctaneBundlerCompiler {
 				...(typeof options.isDescriptorChildrenImport === 'function'
 					? { isDescriptorChildrenImport: options.isDescriptorChildrenImport }
 					: null),
+				// Host-resolved theme-token contract facts (U10, R5). Diagnostics-only —
+				// the option never reaches codegen, so omitting it keeps the compile
+				// call byte-identical for hosts without a resolver.
+				...(typeof options.resolveTokenContract === 'function'
+					? { resolveTokenContract: options.resolveTokenContract }
+					: null),
 				...(collectCssModuleConstants
 					? {
 							resolveCssModuleConstant: options.resolveCssModuleConstant,

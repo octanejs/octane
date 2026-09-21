@@ -29,6 +29,13 @@
  *   machinery the analyzer's `apply` resolution uses — so shadowing behaves
  *   identically; imported bindings have an import declaration as their initial
  *   and stay unresolved here by construction (KTD2 leaves them to typecheck).
+ * - `octane-style-token-undeclared` (error, `analyzeTokenContracts`): a
+ *   `var(--name)` reference inside a `<style>` sheet is claimed by a resolved
+ *   token contract — `--name` starts with the contract's `--{prefix}-`
+ *   namespace — but the contract does not declare it (R5). References outside
+ *   every namespace stay legal legacy; a contract the host resolves to `null`
+ *   (claimed but unreadable) warns `octane-style-token-contract-unresolved`
+ *   at the import specifier instead of checking silently.
  *
  * Pruning runs on analyzer-owned clones (the adopted AST may be frozen), using
  * the same `collectPrunableElements` + `analyzeCss` + `pruneCss` pipeline the
@@ -55,11 +62,18 @@ import {
 } from '@tsrx/core';
 import cssProperties from 'mdn-data/css/properties.json' with { type: 'json' };
 import { collectPrunableElements, isFloatStyleResource } from './style-scopes.js';
+import {
+	findTokenContractImportRequests,
+	sourceMayReferenceTokens,
+	TOKEN_REFERENCE_ALL,
+} from './token-contracts.js';
 
 export const UNKNOWN_PROPERTY = 'octane-css-unknown-property';
 export const SHORTHAND_LONGHAND_CLASH = 'octane-css-shorthand-longhand-clash';
 export const UNUSED_SELECTOR = 'octane-css-unused-selector';
 export const UNKNOWN_CLASS_KEY = 'octane-style-unknown-class-key';
+export const UNDECLARED_TOKEN = 'octane-style-token-undeclared';
+export const UNRESOLVED_TOKEN_CONTRACT = 'octane-style-token-contract-unresolved';
 
 // --- property registry --------------------------------------------------------
 
@@ -1097,6 +1111,148 @@ function checkClassMapKeys(ast, source, filename, diagnostics) {
 			}
 		}
 	}
+}
+
+// --- token contract enforcement (U10, R5) --------------------------------------
+
+/**
+ * Whether host-supplied facts describe one well-formed contract. A `'--'`
+ * namespace is well-formed but claims nothing (see the claim boundary note in
+ * token-contracts.js), so it is filtered at enforcement time, not here.
+ */
+function isTokenContractFacts(facts) {
+	return (
+		facts !== null &&
+		typeof facts === 'object' &&
+		typeof facts.namespace === 'string' &&
+		Array.isArray(facts.names)
+	);
+}
+
+/**
+ * Check `var(--name)` declarations of one sheet against the resolved
+ * contracts. `name` is claimed by the first contract whose namespace prefixes
+ * it; a claimed name missing from `names` is an undeclared-token error.
+ * Declaration `start`/`end` are `sheet.source`-relative; `sheetStart` maps
+ * them into file offsets (same on the authored and the Volar parse).
+ */
+function checkTokenReferences(source, filename, block, contracts, diagnostics) {
+	const sheet = block.sheet;
+	const checkDeclaration = (decl) => {
+		const value = decl.value;
+		if (typeof value !== 'string' || !value.includes('var(')) return;
+		// The value text sits inside the declaration's own slice; indexOf keeps
+		// offsets exact when the declaration carries `!important` or similar.
+		const localStart = sheet.source.slice(decl.start, decl.end).indexOf(value);
+		const valueStart = block.sheetStart + decl.start + Math.max(localStart, 0);
+		for (const match of value.matchAll(TOKEN_REFERENCE_ALL)) {
+			const name = match[1];
+			const contract = contracts.find((candidate) => name.startsWith(candidate.namespace));
+			if (contract === undefined || contract.names.has(name)) continue;
+			const start = valueStart + match.index + match[0].length - name.length;
+			const range = fileRange(source, start, start + name.length);
+			const suggestion = closestClassKey(name, contract.names);
+			diagnostics.push({
+				code: UNDECLARED_TOKEN,
+				severity: 'error',
+				filename,
+				start: range.start,
+				end: range.end,
+				message:
+					`[${UNDECLARED_TOKEN}] '${name}' is not declared by the token contract ` +
+					`${JSON.stringify(contract.request)} — it declares ${[...contract.names].join(', ')}.` +
+					(suggestion === null ? '' : ` Did you mean '${suggestion}'?`),
+				suggestions: suggestion === null ? [] : [{ ...range, attribute: suggestion }],
+			});
+		}
+	};
+	const visit = (children) => {
+		for (const child of children ?? []) {
+			if (child?.type === 'Declaration') checkDeclaration(child);
+			else visit(child?.block?.children);
+		}
+	};
+	visit(sheet.children);
+}
+
+/**
+ * In-`<style>` token enforcement: probe each authored relative import through
+ * the host's `resolveTokenContract` callback, then check claimed `var(--*)`
+ * references against the resolved namespaces. No callback → silent (there is
+ * no namespace table to claim against). A `null` probe warns that references
+ * are unverified rather than silently passing — R5 has no typecheck fallback.
+ *
+ * @param {any} ast analyzed parser AST (read-only; may be frozen)
+ * @param {string} source authored module source
+ * @param {string} filename
+ * @param {{ resolveTokenContract?: (request: string, importer: string) => unknown }} [options]
+ * @returns {any[]} collected diagnostics in `native-change-diagnostics` shape
+ */
+export function analyzeTokenContracts(ast, source, filename, options = {}) {
+	const resolve = options?.resolveTokenContract;
+	if (typeof resolve !== 'function' || !sourceMayReferenceTokens(source)) return [];
+	const requests = findTokenContractImportRequests(ast);
+	if (requests.size === 0) return [];
+
+	const diagnostics = [];
+	/** @type {{ namespace: string, names: Set<string>, request: string }[]} */
+	const contracts = [];
+	let discovered = null;
+	const blocksWithSheets = () => {
+		discovered ??= discoverStyle(ast);
+		return discovered.blocks.filter((block) => block.sheet);
+	};
+	const unresolved = (request, sourceNode) => {
+		const range = fileRange(source, sourceNode.start ?? 0, sourceNode.end ?? 0);
+		diagnostics.push({
+			code: UNRESOLVED_TOKEN_CONTRACT,
+			severity: 'warning',
+			filename,
+			start: range.start,
+			end: range.end,
+			message:
+				`[${UNRESOLVED_TOKEN_CONTRACT}] Token contract ${JSON.stringify(request)} could not ` +
+				`be resolved to facts — var(--*) token references in this file are unverified. ` +
+				`Fix the contract module or the host's resolveTokenContract so they can be checked.`,
+			suggestions: [],
+		});
+	};
+	for (const [request, sourceNode] of requests) {
+		const probe = resolve(request, filename);
+		if (probe === null) {
+			unresolved(request, sourceNode);
+			continue;
+		}
+		if (probe === undefined) continue;
+		let claimed = false;
+		for (const facts of Array.isArray(probe) ? probe : [probe]) {
+			if (!isTokenContractFacts(facts)) continue;
+			claimed = true;
+			// A '--' namespace would claim every var(--*) in the file, collapsing
+			// the legacy carve-out — unprefixed contracts stay unenforced.
+			if (facts.namespace.length > 2) {
+				contracts.push({ namespace: facts.namespace, names: new Set(facts.names), request });
+			}
+		}
+		// The host claimed the request but produced no usable facts — same
+		// "unresolved — unverified" surface as a `null` probe.
+		if (!claimed) unresolved(request, sourceNode);
+	}
+	if (contracts.length > 0) {
+		for (const block of blocksWithSheets()) {
+			checkTokenReferences(source, filename, block, contracts, diagnostics);
+		}
+	}
+	if (diagnostics.length > 0 && source.includes('octane-ignore')) {
+		const ranges = collectSuppressions(ast, source, blocksWithSheets());
+		if (ranges.length > 0) {
+			for (let i = diagnostics.length - 1; i >= 0; i--) {
+				if (isSuppressed(diagnostics[i], ranges)) diagnostics.splice(i, 1);
+			}
+		}
+	}
+	diagnostics.sort((a, b) => a.start.offset - b.start.offset);
+	return diagnostics;
 }
 
 // --- suppression --------------------------------------------------------------

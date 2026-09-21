@@ -111,6 +111,12 @@ export function registerRemoteTools(server: McpServer): void {
 				dev: z.boolean().default(false),
 				autoMemo: z.boolean().optional(),
 				parallelUse: z.boolean().optional(),
+				projectRoot: z
+					.string()
+					.optional()
+					.describe(
+						'Absolute project root anchoring relative imports to theme-token contract modules (defineThemeTokens). Without it — or without an absolute filename — claimed token contracts report an unresolved warning instead of being verified.',
+					),
 			},
 			annotations: READ_ONLY,
 		},

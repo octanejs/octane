@@ -8,6 +8,7 @@ export function compileToVolarMappings(
 		renderers?: unknown;
 		strong?: boolean;
 		knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[];
+		resolveTokenContract?: import('./index.js').CompileOptions['resolveTokenContract'];
 	},
 ): import('./index.js').VolarCompileResult;
 
