@@ -1862,6 +1862,63 @@ export const Indirect = indirect(Host);
 		}
 	});
 
+	it('classifies a linked package by its octane.source marker', () => {
+		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-bundler-marker-'));
+		try {
+			const root = join(fixtureRoot, 'app');
+			const modules = join(root, 'node_modules');
+			mkdirSync(modules, { recursive: true });
+			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
+
+			const createLinkedPackage = (name: string, extraManifest: Record<string, unknown>) => {
+				const packageRoot = join(fixtureRoot, name);
+				mkdirSync(join(packageRoot, 'src'), { recursive: true });
+				const manifest = join(packageRoot, 'package.json');
+				writeFileSync(manifest, JSON.stringify({ name, ...extraManifest }));
+				writeFileSync(
+					join(packageRoot, 'src/App.tsx'),
+					`export function App() { return <p>${name}</p>; }\n`,
+				);
+				symlinkSync(packageRoot, join(modules, name), 'dir');
+				return {
+					root: packageRoot,
+					manifest: realpathSync(manifest),
+					source: realpathSync(join(modules, name, 'src/App.tsx')),
+				};
+			};
+
+			// The repository pins Octane once elsewhere; this package only marks itself.
+			const marked = createLinkedPackage('linked-marked', { octane: { source: true } });
+			const unmarked = createLinkedPackage('linked-unmarked', {
+				dependencies: { lodash: '^4.0.0' },
+			});
+
+			const compiler = createOctaneCompiler({ root });
+
+			const compiled = compiler.transform(
+				`export function App() { return <p>marked</p>; }`,
+				marked.source,
+			);
+			expect(compiled?.kind).toBe('compile');
+			expect(compiled?.code).toContain('<p>marked</p>');
+			expect(compiled?.dependencies).toContain(marked.manifest);
+
+			expect(
+				compiler.transform(`export function App() { return <p>unmarked</p>; }`, unmarked.source),
+			).toMatchObject({ kind: 'none' });
+
+			// The recorded watch path is the real manifest path, so invalidating it
+			// drops the cached ownership decision instead of going stale.
+			writeFileSync(marked.manifest, JSON.stringify({ name: 'linked-marked' }));
+			compiler.invalidate(marked.manifest);
+			expect(
+				compiler.transform(`export function App() { return <p>marked</p>; }`, marked.source),
+			).toMatchObject({ kind: 'none' });
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
 	it('uses portable source names in profile metadata', () => {
 		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-profile-source-'));
 		try {
@@ -2013,6 +2070,39 @@ export const Indirect = indirect(Host);
 			expect(compiler.discoverSourceDependencies().packages).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('discovers a linked package reached through its symlink that marks itself Octane source', () => {
+		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-bundler-linked-discovery-'));
+		try {
+			const root = join(fixtureRoot, 'app');
+			const modules = join(root, 'node_modules');
+			mkdirSync(modules, { recursive: true });
+			writeFileSync(
+				join(root, 'package.json'),
+				JSON.stringify({ name: 'app', dependencies: { 'linked-marked': 'link:../linked' } }),
+			);
+
+			// A prepack-only `require` condition makes `require.resolve` fail, so
+			// discovery falls back to the manifest under the package's symlink path.
+			const packageRoot = join(fixtureRoot, 'linked');
+			mkdirSync(packageRoot, { recursive: true });
+			writeFileSync(
+				join(packageRoot, 'package.json'),
+				JSON.stringify({
+					name: 'linked-marked',
+					exports: { '.': { require: './dist/index.cjs', default: './src/index.tsx' } },
+					octane: { source: true },
+				}),
+			);
+			symlinkSync(packageRoot, join(modules, 'linked-marked'), 'dir');
+
+			expect(createOctaneCompiler({ root }).discoverSourceDependencies().packages).toContain(
+				'linked-marked',
+			);
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
 		}
 	});
 });
