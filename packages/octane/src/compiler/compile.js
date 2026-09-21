@@ -93,6 +93,7 @@ import {
 import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
+import { analyzeForKeyDiagnostics } from './for-key-diagnostics.js';
 import { assertStrongMode } from './strong-mode.js';
 import { applyStrongAutomaticMemo } from './strong-auto-memo.js';
 import {
@@ -9579,6 +9580,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	assertNativeReadDiagnostics(analyzedAst, source, cleanFilename, options);
 	const strongAnalysis = assertStrongMode(analyzedAst, source, cleanFilename, options);
 	const strongModeEnabled = strongAnalysis?.enabled === true;
+	const forKeyDiagnostics = analyzeForKeyDiagnostics(analyzedAst, source, cleanFilename, options);
 	analyzedAst = markKnownAttributeSpreads(analyzedAst, options?.knownAttributeSpreads);
 	if (analyzedAst.metadata?.octaneNativeAttributeProjection) {
 		options = { ...options, nativeReads: true };
@@ -9696,6 +9698,9 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	);
 	if (strongAnalysis?.diagnostics.length > 0) {
 		result.diagnostics = [...strongAnalysis.diagnostics, ...(result.diagnostics ?? [])];
+	}
+	if (forKeyDiagnostics.length > 0) {
+		result.diagnostics = [...forKeyDiagnostics, ...(result.diagnostics ?? [])];
 	}
 	if (bindingConstants !== undefined) result.bindingConstants = bindingConstants;
 	return result;
