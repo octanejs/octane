@@ -20,6 +20,13 @@ export const fx = {
 	h: 0,
 };
 
+// `renders` is the row-body invocation probe (memo-wall's __renders pattern):
+// every Row render() increments `row` as its first statement, and the harness
+// asserts the exact per-op count — a fixture that silently skips row bodies
+// fails the gate instead of posting a hollow fast-path number. Same rules as
+// the fx counters: plain field mutation, reset with the per-op resetFx.
+export const renders = { row: 0 };
+
 export function resetFx() {
 	fx.mounts = 0;
 	fx.cleanups = 0;
@@ -27,6 +34,7 @@ export function resetFx() {
 	fx.refCleanups = 0;
 	fx.layouts = 0;
 	fx.h = 0;
+	renders.row = 0;
 }
 
 export const rowRef = (el) => {
@@ -38,5 +46,6 @@ export const rowRef = (el) => {
 
 if (typeof window !== 'undefined') {
 	window.__fx = fx;
+	window.__renders = renders;
 	window.__resetFx = resetFx;
 }

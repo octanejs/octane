@@ -3,9 +3,10 @@ import Row from './Row.jsx';
 import { bindHandlers, initialItems } from './ops.js';
 import { flushPassiveWaiters } from './passive.js';
 
-// Preact parent — same keyed 1k-row table + unrelated `tick` state as the
-// octane apps. Bumping tick re-renders every (unmemo'd) Row with all effect
-// deps unchanged: the update_nodeps measurement.
+// Preact parent — same keyed 1k-row table + `tick` state as the octane apps.
+// tick is passed into every Row as a real prop, so bumping it re-invokes all
+// 1000 row bodies with all effect deps unchanged: the update_nodeps
+// measurement.
 
 export default function App() {
 	const [items, setItems] = useState(initialItems());
@@ -20,7 +21,7 @@ export default function App() {
 			<table className="test-data">
 				<tbody>
 					{items.map((item) => (
-						<Row key={item.id} item={item} />
+						<Row key={item.id} item={item} tick={tick} />
 					))}
 				</tbody>
 			</table>

@@ -13,8 +13,15 @@ import { fx, rowRef } from './fx.js';
 //     (every 10th) so a sample forces 100 reflows, not 1000.
 //   * ref={rowRef} — the SHARED module-level callback ref (stable identity,
 //     returns a cleanup) on every row root.
+//   * window.__renders.row++ — the body's first statement: the invocation
+//     probe the harness's renders gate asserts exact per-op counts on. The
+//     external mutation also makes this body autoMemoSafe-failing, so a
+//     memo-class skip can never swallow a row body silently.
+//   * props.tick — the parent's per-update state, passed in so each
+//     update_nodeps bump is a REAL props change; deliberately never rendered.
 
 export default function Row(props) @{
+	window.__renders.row++;
 	const item = props.item;
 	const cell = useRef(null);
 

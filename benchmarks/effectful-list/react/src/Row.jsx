@@ -12,8 +12,14 @@ import { fx, rowRef } from './fx.js';
 //   * ref={rowRef} — SHARED module-level callback ref returning a cleanup
 //     (React 19 ref-cleanup semantics; stable identity means re-renders must
 //     NOT re-invoke it).
+//   * window.__renders.row++ — the body's first statement: the invocation
+//     probe the harness's renders gate asserts exact per-op counts on. An
+//     element-cache skip that never invokes this body fails the gate.
+//   * props.tick — the parent's per-update state, passed in so each
+//     update_nodeps bump is a REAL props change; deliberately never rendered.
 
 export default function Row(props) {
+	window.__renders.row++;
 	const item = props.item;
 	const cell = useRef(null);
 

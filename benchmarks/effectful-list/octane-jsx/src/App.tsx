@@ -4,8 +4,9 @@ import { bindHandlers, initialItems } from './ops.js';
 
 // JSX twin of octane-tsrx's App.tsrx — same keyed 1k-row table over the same
 // octane core, authored React-style (`{items.map(... key=)}`, `className`).
-// The unrelated `tick` state drives update_nodeps (all Row bodies re-invoke,
-// every effect deps-array unchanged).
+// The `tick` state drives update_nodeps and is passed into every Row as a
+// real prop, so all 1,000 bodies re-invoke on the bump while every effect
+// deps-array stays unchanged.
 
 export default function App() {
 	const [items, setItems] = useState(initialItems());
@@ -18,7 +19,7 @@ export default function App() {
 			<table className="test-data">
 				<tbody>
 					{items.map((item) => (
-						<Row key={item.id} item={item} />
+						<Row key={item.id} item={item} tick={tick} />
 					))}
 				</tbody>
 			</table>

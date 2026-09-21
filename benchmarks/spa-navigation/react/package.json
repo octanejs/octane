@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.0.1",
-  "description": "spa-navigation bench fixture for React 19 - exposes window.__mount/__navigate/__unmount/__reset for the Playwright harness.",
+  "description": "spa-navigation bench fixture for React 19 + React Compiler - exposes window.__mount/__navigate/__unmount/__reset for the Playwright harness.",
   "scripts": {
     "dev": "vite --host --port 5312 --strictPort",
     "build": "vite build",
@@ -14,7 +14,9 @@
     "react-dom": "catalog:default"
   },
   "devDependencies": {
+    "@rolldown/plugin-babel": "catalog:default",
     "@vitejs/plugin-react": "catalog:default",
+    "babel-plugin-react-compiler": "catalog:default",
     "vite": "catalog:default"
   }
 }
