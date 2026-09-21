@@ -1126,6 +1126,41 @@ setPage(next); // If it suspends, show the pending fallback.
 startTransition(() => setPage(next)); // Keep the previous content while pending.
 ```
 
+Native `ResizeObserver` callbacks run inside the browser's resize delivery loop.
+An ordinary microtask commit that resizes an already-delivered target can trigger
+`ResizeObserver loop completed with undelivered notifications`, even when the
+layout eventually settles. `startTransition` does not change that scheduling.
+Use Octane's `createResizeObserver` when a callback updates state or writes DOM
+that can resize its observed targets:
+
+```ts
+import { createResizeObserver } from 'octane';
+
+const observer = createResizeObserver((entries) => {
+  setWidth(entries[0].contentRect.width);
+});
+observer.observe(element);
+// Cleanup also discards callbacks that have not been delivered yet.
+observer.disconnect();
+```
+
+The helper returns a native observer and delivers callbacks in a separate task,
+coalescing entries per target and retaining the latest native measurement.
+`unobserve` removes a target's queued entry; `disconnect` clears the batch and
+the observer can be used again. Changing an observed target's box option also
+discards its queued entry. Manage observation through the returned instance's
+methods so deferred cleanup takes effect. Pass a second constructor argument,
+such as `iframe.contentWindow.ResizeObserver`, to use another window's observer.
+
+The global constructor and ordinary microtask batching stay unchanged. Native
+observers in unmodified dependencies still need an adapter. Deferral moves
+geometry changes outside the current delivery loop; it does not make a cyclic
+resize calculation converge. Initial synchronous measurement can remain in a
+layout effect before installing the observer.
+
+See the [Core APIs resize measurement guide](https://octanejs.dev/docs/core-apis#createResizeObserver)
+for a complete component and cleanup example.
+
 Delegated events commit on React's `batchedUpdates` schedule. The outermost
 dispatch of a discrete event such as `click`, `keydown`, `input`, or `submit`
 flushes synchronously only when a controlled `value`/`checked` host armed a state

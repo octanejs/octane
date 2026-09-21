@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<style>
+			#popup {
+				height: var(--drawer-frontmost-height, 100px);
+			}
+			body[data-grow] #popup {
+				height: min(140px, calc(var(--drawer-frontmost-height, 100px) + 20px));
+			}
+		</style>
+	</head>
+	<body>
+		<div id="root"></div>
+		<script type="module" src="/main.ts"></script>
+	</body>
+</html>

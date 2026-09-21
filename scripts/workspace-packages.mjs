@@ -57,11 +57,13 @@ export const OCTANE_BETA_PEER_RANGE = 'workspace:^0.1.51 || ^0.2.0 || ^0.3.0';
 
 // These bindings use the compiler/runtime APIs first released with Octane 0.2.5.
 const OCTANE_025_CONSUMERS = new Set([
-	'@octanejs/base-ui',
 	'@octanejs/base-ui-utils',
 	'@octanejs/shadcn',
 	'@octanejs/testing-library',
 ]);
+
+// Deferred resize observers are first available in Octane 0.3.7.
+const OCTANE_037_CONSUMERS = new Set(['@octanejs/base-ui', '@octanejs/floating-ui']);
 
 // These packages consume compiler/runtime/server APIs from the coordinated core
 // release. pnpm publishes workspace:^ as ^<the released sibling version>,
@@ -79,6 +81,7 @@ const OCTANE_CURRENT_CORE_CONSUMERS = new Set([
 
 export function octanePeerRangeFor(packageName) {
 	if (OCTANE_CURRENT_CORE_CONSUMERS.has(packageName)) return 'workspace:^';
+	if (OCTANE_037_CONSUMERS.has(packageName)) return 'workspace:^0.3.7';
 	return OCTANE_025_CONSUMERS.has(packageName)
 		? 'workspace:^0.2.5 || ^0.3.0'
 		: OCTANE_BETA_PEER_RANGE;

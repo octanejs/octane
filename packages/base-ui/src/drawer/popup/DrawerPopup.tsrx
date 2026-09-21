@@ -234,7 +234,7 @@ export const DrawerPopup = function DrawerPopup(
 			return undefined;
 		}
 
-		const resizeObserver = new ResizeObserver(measureHeight);
+		const resizeObserver = React.createResizeObserver(measureHeight);
 
 		resizeObserver.observe(popupElement);
 		return () => {

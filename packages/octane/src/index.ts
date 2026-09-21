@@ -1,4 +1,5 @@
 export { trustHTML, type TrustedHTML } from './trusted-html.js';
+export { createResizeObserver } from './resize-observer.js';
 // Keep package metadata behind an isolated re-export: applications that do not
 // read `version` can tree-shake this module and the package.json payload in full.
 export { version } from './version.js';

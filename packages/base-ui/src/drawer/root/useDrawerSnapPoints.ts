@@ -109,7 +109,7 @@ export function useDrawerSnapPoints() {
 			return undefined;
 		}
 
-		const resizeObserver = new ResizeObserver(measureViewportHeight);
+		const resizeObserver = React.createResizeObserver(measureViewportHeight);
 		resizeObserver.observe(viewportElement);
 		return () => {
 			resizeObserver.disconnect();

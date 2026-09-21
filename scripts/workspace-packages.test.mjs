@@ -180,7 +180,7 @@ for (const name of [
 	});
 }
 
-for (const name of ['base-ui', 'base-ui-utils', 'shadcn', 'testing-library']) {
+for (const name of ['base-ui-utils', 'shadcn', 'testing-library']) {
 	test(`${name} excludes runtimes without its compiler and act prerequisites`, () => {
 		const manifest = JSON.parse(
 			readFileSync(new URL(`../packages/${name}/package.json`, import.meta.url)),
@@ -199,6 +199,33 @@ for (const name of ['base-ui', 'base-ui-utils', 'shadcn', 'testing-library']) {
 		assert.deepEqual(validateWorkspacePackages([workspacePackage('octane'), correct]), []);
 		const legacy = workspacePackage(manifest.name, {
 			peerDependencies: { octane: OCTANE_BETA_PEER_RANGE },
+		});
+		assert.ok(
+			validateWorkspacePackages([workspacePackage('octane'), legacy]).some((error) =>
+				error.includes('peerDependencies.octane'),
+			),
+		);
+	});
+}
+
+for (const name of ['base-ui', 'floating-ui']) {
+	test(`${name} excludes runtimes without deferred resize observers`, () => {
+		const manifest = JSON.parse(
+			readFileSync(new URL(`../packages/${name}/package.json`, import.meta.url)),
+		);
+		const range = manifest.peerDependencies.octane.replace(/^workspace:/, '');
+		assert.equal(publishedOctanePeerRangeFor(manifest.name, '0.3.7'), range);
+		for (const version of ['0.1.51', '0.2.5', '0.3.0', '0.3.6', '0.4.0']) {
+			assert.equal(semver.satisfies(version, range), false);
+		}
+		for (const version of ['0.3.7', '0.3.8']) {
+			assert.equal(semver.satisfies(version, range), true);
+		}
+		const correct = workspacePackage(manifest.name, manifest);
+		assert.deepEqual(validateWorkspacePackages([workspacePackage('octane'), correct]), []);
+		const legacy = workspacePackage(manifest.name, {
+			...manifest,
+			peerDependencies: { ...manifest.peerDependencies, octane: OCTANE_BETA_PEER_RANGE },
 		});
 		assert.ok(
 			validateWorkspacePackages([workspacePackage('octane'), legacy]).some((error) =>

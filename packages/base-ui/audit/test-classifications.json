@@ -12,6 +12,11 @@
       "reason": "Pins Octane keyed-array reconciliation diagnostics and is not counted as React parity."
     },
     {
+      "path": "packages/base-ui/tests/browser/resize-observer/resize-observer.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises convergent Octane callback-driven Drawer layout and native ResizeObserver error-free delivery; this is not counted as React parity."
+    },
+    {
       "path": "packages/base-ui/tests/collapsible-activity.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane Activity integration and is not counted as React parity."

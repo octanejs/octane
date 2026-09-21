@@ -23,32 +23,18 @@ export const ScrollAreaContent = function ScrollAreaContent(
 	const { render, className, style, ...elementProps } = componentProps;
 
 	const { computeThumbPosition } = useScrollAreaViewportContext();
-	const { hasMeasuredScrollbar, viewportState } = useScrollAreaRootContext();
+	const { viewportState } = useScrollAreaRootContext();
 
 	const contentWrapperRef = React.useRef<HTMLDivElement | null>(null);
-	const computeOnInitialResizeRef = React.useRef(hasMeasuredScrollbar);
 
 	useIsoLayoutEffect(() => {
 		if (typeof ResizeObserver === 'undefined') {
 			return undefined;
 		}
 
-		let hasInitialized = false;
-		const resizeObserver = new ResizeObserver(() => {
-			if (!hasInitialized) {
-				hasInitialized = true;
-
-				// ResizeObserver fires once upon observing. Skip that initial call to avoid
-				// double-calculating the thumb position on mount, unless the content mounted
-				// after the viewport's initial measurement (in which case this fire is what
-				// brings the overflow state in sync).
-				if (!computeOnInitialResizeRef.current) {
-					return;
-				}
-			}
-
-			computeThumbPosition();
-		});
+		// Deferred notifications can include a resize that happened after the mount
+		// measurement, so the first delivery must also recompute the current geometry.
+		const resizeObserver = React.createResizeObserver(computeThumbPosition);
 
 		if (contentWrapperRef.current) {
 			resizeObserver.observe(contentWrapperRef.current);

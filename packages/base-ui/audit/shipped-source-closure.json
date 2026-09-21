@@ -692,7 +692,7 @@
     {
       "path": "src/accordion/item/AccordionItem.tsrx",
       "origin": "adapted",
-      "sha256": "470a82e1287cb9e9cfe109109917760010698e8f4d711bee8b32033b37421070",
+      "sha256": "123b3aa657deaa3980cc61b1d0e91fa25cb788cd1cc3770420fe215fff525b01",
       "packageName": "@base-ui/react"
     },
     {
@@ -728,7 +728,7 @@
     {
       "path": "src/accordion/root/AccordionRoot.tsrx",
       "origin": "adapted",
-      "sha256": "f1e61e832ca09bfa7f8db29371bbe0e73ee951baaffa19609ab704d3a5be918d",
+      "sha256": "39f9328a368a766c93460e8995a9f3909f8bda579651c11bc4d7c7b116b5fc88",
       "packageName": "@base-ui/react"
     },
     {
@@ -854,7 +854,7 @@
     {
       "path": "src/avatar/root/AvatarRoot.tsrx",
       "origin": "adapted",
-      "sha256": "93d26587c9a2f9446505a4e2a35ad0f6bd52c31483704a22e2719e97496aaddd",
+      "sha256": "0972d4cb4fa25767f19600e8fa603529e1332da68f42694117313a814f212bef",
       "packageName": "@base-ui/react"
     },
     {
@@ -884,7 +884,7 @@
     {
       "path": "src/checkbox-group/CheckboxGroup.tsrx",
       "origin": "adapted",
-      "sha256": "b3ea48ee056b5f41f8f22505e9e774309a05a72fc4a14bc6ef8f825e3c8b4e2f",
+      "sha256": "2ce1f5a705b58b53fa2b1a11bcd2880f7163d2dd5c118b70438a4b83e01781ef",
       "packageName": "@base-ui/react"
     },
     {
@@ -926,7 +926,7 @@
     {
       "path": "src/checkbox/root/CheckboxRoot.tsrx",
       "origin": "adapted",
-      "sha256": "b784fe99249d077350ebb3b2c5b8efdf93ca8620cf6a46f5b73e6a5fa145a317",
+      "sha256": "dd2448ccc8fa78f763dbb80f8f322e4879a3110559cd3f88ef4f138f5a4c9374",
       "packageName": "@base-ui/react"
     },
     {
@@ -986,7 +986,7 @@
     {
       "path": "src/collapsible/root/CollapsibleRoot.tsrx",
       "origin": "adapted",
-      "sha256": "9360e3ed05efd93562d879428355da0478803d0e1f403e2c2ae0675337e5c4a1",
+      "sha256": "0f7ce2210532cd9777b80f3652ac8d9923e15f32f3f53587a948fc0a46591d5f",
       "packageName": "@base-ui/react"
     },
     {
@@ -1040,7 +1040,7 @@
     {
       "path": "src/combobox/chip/ComboboxChip.tsrx",
       "origin": "adapted",
-      "sha256": "1d29efc2cb0d55c3a0308bf7179e1ef8f982fc8fbcef863ee4a4dc1f7f6795d1",
+      "sha256": "958394cf062708bd4137bdba79e9b69dc8f609d4a4f1071a12e099239418973a",
       "packageName": "@base-ui/react"
     },
     {
@@ -1052,7 +1052,7 @@
     {
       "path": "src/combobox/chips/ComboboxChips.tsrx",
       "origin": "adapted",
-      "sha256": "50dc1b64081c3a205f881100df81b621bdc4b33a5d13b513691907c3c62280f4",
+      "sha256": "2afd93cb03ebf218c05f1622a5fe145031a13dadf802627f5f55349247418fa6",
       "packageName": "@base-ui/react"
     },
     {
@@ -1076,7 +1076,7 @@
     {
       "path": "src/combobox/collection/GroupCollectionContext.tsrx",
       "origin": "adapted",
-      "sha256": "a5bc33e783106d19ac65c67e39d0f42c2dcad69b4589b56095692bc32f81e582",
+      "sha256": "b0a4ec892d0c6236f559f37f6846be89efaa26534457d90f19892826ba5821ae",
       "packageName": "@base-ui/react"
     },
     {
@@ -1094,7 +1094,7 @@
     {
       "path": "src/combobox/group/ComboboxGroup.tsrx",
       "origin": "adapted",
-      "sha256": "1045c735926decf3cb91f677662db499058287b78adb3e510954210ced15b201",
+      "sha256": "65981eba222b86601783713d56fbce9c3988922dd7647bb9668cf83f1332b719",
       "packageName": "@base-ui/react"
     },
     {
@@ -1130,7 +1130,7 @@
     {
       "path": "src/combobox/input/ComboboxInput.tsrx",
       "origin": "adapted",
-      "sha256": "946557209737064bd058f8f48621d673d4fce39a30e0710ef8d8cef4ae8c23e9",
+      "sha256": "f21e0187671d8d4913343f1dcdbaf4e3427758598c87a6c68f7222fb73fb11d4",
       "packageName": "@base-ui/react"
     },
     {
@@ -1148,7 +1148,7 @@
     {
       "path": "src/combobox/item/ComboboxItem.tsrx",
       "origin": "adapted",
-      "sha256": "cc82c79da283e34c868dfb4d860718030eb6dce33936c7777fb13a352589feff",
+      "sha256": "1d70364599ba00b96fd2f29e9317471843bc78b1b19cf4b40c38e2cd2d6e80e1",
       "packageName": "@base-ui/react"
     },
     {
@@ -1190,7 +1190,7 @@
     {
       "path": "src/combobox/portal/ComboboxPortal.tsrx",
       "origin": "adapted",
-      "sha256": "7a17e56876b98e533fe7747f69b9828b0109f4af02dfc90dbce771ed72bbeea5",
+      "sha256": "fe58f60b038d6ccdfd28df119bba6ca67669d20c344391ad6261d004cf1802f3",
       "packageName": "@base-ui/react"
     },
     {
@@ -1202,7 +1202,7 @@
     {
       "path": "src/combobox/positioner/ComboboxPositioner.tsrx",
       "origin": "adapted",
-      "sha256": "ef7d8190b754bc6032fa687eade3e93857eb25a894f46f927c7a19d78388b88e",
+      "sha256": "03467eda82aa638ed1cdaf4ae14aa5ba8111b190ade1d82289b3af904c061d6f",
       "packageName": "@base-ui/react"
     },
     {
@@ -1214,7 +1214,7 @@
     {
       "path": "src/combobox/root/AriaCombobox.tsrx",
       "origin": "adapted",
-      "sha256": "013c86625dbbf46e589bb3ddd35cba903b8d64c22fb1b1de9cffd551dff07c29",
+      "sha256": "7b2130233471e9dab0023236d580e195f153e61d971caee04f3c530e38397e4f",
       "packageName": "@base-ui/react"
     },
     {
@@ -1256,7 +1256,7 @@
     {
       "path": "src/combobox/row/ComboboxRow.tsrx",
       "origin": "adapted",
-      "sha256": "8aee0eaeabf2c86bd44d1822bd13f2823fd76dda8de6f40d168188bed5beb55a",
+      "sha256": "b03bff3fe2fbcb9e32f209a0107111ba7e209ee120f54618d70d41d85f94d9fb",
       "packageName": "@base-ui/react"
     },
     {
@@ -1346,7 +1346,7 @@
     {
       "path": "src/context-menu/root/ContextMenuRoot.tsrx",
       "origin": "adapted",
-      "sha256": "fe57c20b689fbd6b3cb870e97de8a5191adb01bbbf10eb4ebe5eaee004f59f75",
+      "sha256": "ea33b8abd9e9e20b9bb58bc1467f36927df30994c272cf5c3c097b7edace8e0c",
       "packageName": "@base-ui/react"
     },
     {
@@ -1364,7 +1364,7 @@
     {
       "path": "src/csp-provider/CSPProvider.tsrx",
       "origin": "adapted",
-      "sha256": "459f21638d6c8a366e020c47ebfc6c495192af789082693ccdba4cf3f16c0d51",
+      "sha256": "50dc51deb1dd269b79215d580a315357f358ffdfb11e2b1821b466050d6bef49",
       "packageName": "@base-ui/react"
     },
     {
@@ -1430,7 +1430,7 @@
     {
       "path": "src/dialog/portal/DialogPortal.tsrx",
       "origin": "adapted",
-      "sha256": "cca393bd76cc1f5644a01181e63c9e7d62fff775044ee46f48aa846bf589b291",
+      "sha256": "1d04f5c19d71b3de15267d50a48722e3f9417ad9b4ab1cd21b6b03bb2bd49354",
       "packageName": "@base-ui/react"
     },
     {
@@ -1460,7 +1460,7 @@
     {
       "path": "src/dialog/root/useRenderDialogRoot.tsrx",
       "origin": "adapted",
-      "sha256": "b75ea353a463e20a9ba4e299259c8ae78b600d448f4d7d9022528b76bc5eb052",
+      "sha256": "b25f829fab7c96f086b1278583c5e2fcc20210a8bc8b62d079a847fd36cd926b",
       "packageName": "@base-ui/react"
     },
     {
@@ -1508,7 +1508,7 @@
     {
       "path": "src/direction-provider/DirectionProvider.tsrx",
       "origin": "adapted",
-      "sha256": "1a9f0e04938166db4a4125c6e4557952f62078d96291fcc4969801ea87c07b5a",
+      "sha256": "277846c4b3879611d54d9a17cfe00abbcd69638210f829ffb958412b9394ec61",
       "packageName": "@base-ui/react"
     },
     {
@@ -1592,7 +1592,7 @@
     {
       "path": "src/drawer/popup/DrawerPopup.tsrx",
       "origin": "adapted",
-      "sha256": "427662ca68ceaf10a935b0bfe8e03bdf054811a445b7f11c1eb0afcc0ef65613",
+      "sha256": "c0a72dc2aecf5157c462d9d3054708dd750459d301cdca9d5df53cc81003f8c4",
       "packageName": "@base-ui/react"
     },
     {
@@ -1616,7 +1616,7 @@
     {
       "path": "src/drawer/provider/DrawerProvider.tsrx",
       "origin": "adapted",
-      "sha256": "6eff10ac3aacef57f58f640ab5940a088b6370b9d3bb63df293dce8d058cbaae",
+      "sha256": "0af7b7c5ff952da55706c47e6d468b3eb4be060f39fa72530cf3baeb4b39b9da",
       "packageName": "@base-ui/react"
     },
     {
@@ -1628,7 +1628,7 @@
     {
       "path": "src/drawer/root/DrawerRoot.tsrx",
       "origin": "adapted",
-      "sha256": "73e988950ce07c0d6074b6276625dbfba2a95d494eb3911fd55e7e93d5b52a9c",
+      "sha256": "669afc863f4667d30052130a5dae68836b7d062c6b6e8f1d39776ac74da7b7f8",
       "packageName": "@base-ui/react"
     },
     {
@@ -1640,7 +1640,7 @@
     {
       "path": "src/drawer/root/useDrawerSnapPoints.ts",
       "origin": "adapted",
-      "sha256": "7f835fb5b44c156e68f12b071d774e143d02822aef97628cf4a0526b014c2506",
+      "sha256": "5a010f039da0c7cae8d26b8633686e332226e88bc5d746d1055c7bff6a6e7821",
       "packageName": "@base-ui/react"
     },
     {
@@ -1670,7 +1670,7 @@
     {
       "path": "src/drawer/viewport/DrawerViewport.tsrx",
       "origin": "adapted",
-      "sha256": "f55dd594342a9ce7303651a8a4597667f065f7a8b63a90b862b09e410015f91c",
+      "sha256": "97c3cca79512d61d47face027eb3b0a4c71c23676e42bcaece164db68d51e668",
       "packageName": "@base-ui/react"
     },
     {
@@ -1694,7 +1694,7 @@
     {
       "path": "src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.tsrx",
       "origin": "adapted",
-      "sha256": "cab272efa9e4f4be789b203c5a7a4c18a149d3f76d41b677fee63707a820488a",
+      "sha256": "868aca42bbfc8ed12a957187d54115b6c51fff32a8a6dc1b2c62b71b9d87c31a",
       "packageName": "@base-ui/react"
     },
     {
@@ -1736,7 +1736,7 @@
     {
       "path": "src/field/item/FieldItem.tsrx",
       "origin": "adapted",
-      "sha256": "9e6c8e957b902b1d49c6930d3dd372b5e036c33bfd942181f6060086b27939b2",
+      "sha256": "910bcc0231da2e743f451b8499d2c08b67935167ce523d158f0c6e068e7304bd",
       "packageName": "@base-ui/react"
     },
     {
@@ -1754,7 +1754,7 @@
     {
       "path": "src/field/root/FieldRoot.tsrx",
       "origin": "adapted",
-      "sha256": "f9e6a52e63531e59dabf508a0237d40164b56a665e23655e63a4bad6c8ad0354",
+      "sha256": "9f5e3e3247101bd0155f295ed6861688e6f03b6bea898fc68d18bb25b4006911",
       "packageName": "@base-ui/react"
     },
     {
@@ -1796,7 +1796,7 @@
     {
       "path": "src/fieldset/root/FieldsetRoot.tsrx",
       "origin": "adapted",
-      "sha256": "092a9ec22a7dc01f1d47169b7aa197f5fc34a265e9d60291da0d9007959bd7ab",
+      "sha256": "b82785e74a1809ba78363bc4d68d8a2a6117eb7f39d39f96385966fbac8d3995",
       "packageName": "@base-ui/react"
     },
     {
@@ -1808,7 +1808,7 @@
     {
       "path": "src/floating-ui-react/components/FloatingDelayGroup.tsrx",
       "origin": "adapted",
-      "sha256": "1ee4133fbe36897b16b43e04adc47b510858a6bfbbb882ecf6929b68fb2b9ef9",
+      "sha256": "acd049cec5d13ffdf495d64bd2529b416306c7af7f16cd3c10112d06c699a675",
       "packageName": "@base-ui/react"
     },
     {
@@ -1820,7 +1820,7 @@
     {
       "path": "src/floating-ui-react/components/FloatingPortal.tsrx",
       "origin": "adapted",
-      "sha256": "b80ab9506f8483b56e44a353e54c1ccd2cfc065c09ee75ef282d0dbccb4db32c",
+      "sha256": "725c21ccc7ca2459aeb3e895b1d9c49a584629b46bf1e499f6e54cff7bd532d9",
       "packageName": "@base-ui/react"
     },
     {
@@ -1832,7 +1832,7 @@
     {
       "path": "src/floating-ui-react/components/FloatingTree.tsrx",
       "origin": "adapted",
-      "sha256": "a4e81c6df4e1c6710608b8c30532ced6846051d0831e1806ed46d4038066fcd4",
+      "sha256": "20aa8a2e0fc7a8b146f88af9f1052d33ec43de8730b2907ae5a8bbbda2c7ddde",
       "packageName": "@base-ui/react"
     },
     {
@@ -2030,7 +2030,7 @@
     {
       "path": "src/form/Form.tsrx",
       "origin": "adapted",
-      "sha256": "b336e4ec9fc9078e1c681560656b098781eca5ecbd2ef27aac1e22f0a7a1e847",
+      "sha256": "708311ea39e0fa9447ac5b56cc524d149c86eae2ca6d17e76bc39648d729fc4f",
       "packageName": "@base-ui/react"
     },
     {
@@ -2114,7 +2114,7 @@
     {
       "path": "src/internals/composite/list/CompositeList.tsrx",
       "origin": "adapted",
-      "sha256": "918fca9c9e2cf78e9f44738962ee97cdd698f3906c2cf9d28736b41727b33cdc",
+      "sha256": "ddac00702186a67bb921547a5ecb8259a9c47f0268eecdd8ce006d9fbe6daef1",
       "packageName": "@base-ui/react"
     },
     {
@@ -2132,7 +2132,7 @@
     {
       "path": "src/internals/composite/root/CompositeRoot.tsrx",
       "origin": "adapted",
-      "sha256": "8c564545f96877b86e8bfe786f74100f530d791ecd535ac49cb0a07d1fa8b553",
+      "sha256": "4a7e1599513009b4132953481341039d267b59d46c62594c07e7899a3386b130",
       "packageName": "@base-ui/react"
     },
     {
@@ -2276,7 +2276,7 @@
     {
       "path": "src/internals/labelable-provider/LabelableProvider.tsrx",
       "origin": "adapted",
-      "sha256": "593ff55afae3302fc93e9ce1dc58025a90bbc7a6d8f111b1ee56530f811e0cbc",
+      "sha256": "dd54d83b0cdaa4ff8f679191b8a7f12418194d0341781fe46a377942183b8ed9",
       "packageName": "@base-ui/react"
     },
     {
@@ -2474,7 +2474,7 @@
     {
       "path": "src/menu/checkbox-item/MenuCheckboxItem.tsrx",
       "origin": "adapted",
-      "sha256": "9e6e3c5958f07e080a91a405028f223ac2e8cdc3fb3ff11439673af7abf999a0",
+      "sha256": "f998445e63890e2cb2ad2a3e8b98159bed642318fc8c10e424aed28d0ed0360b",
       "packageName": "@base-ui/react"
     },
     {
@@ -2498,7 +2498,7 @@
     {
       "path": "src/menu/group/MenuGroup.tsrx",
       "origin": "adapted",
-      "sha256": "7c0b8c179f7271ef3497bc6847fefc513fda3950edc2890e4a6edc99266ab90a",
+      "sha256": "a9b4efb528a1c5ad76f17cd1e7ed85c0a92710eabd9746b1b25ad3369e11fc12",
       "packageName": "@base-ui/react"
     },
     {
@@ -2552,7 +2552,7 @@
     {
       "path": "src/menu/portal/MenuPortal.tsrx",
       "origin": "adapted",
-      "sha256": "3821b2de3ab059023b33e9e2e5c7681073a82ab6cd2ee06d772a1a67af39d08e",
+      "sha256": "c069c3aebfb8a10f0922637f4b705dca956c3ad10dba320bec8ceef3a0fb52bb",
       "packageName": "@base-ui/react"
     },
     {
@@ -2564,7 +2564,7 @@
     {
       "path": "src/menu/positioner/MenuPositioner.tsrx",
       "origin": "adapted",
-      "sha256": "f612f2974503b1e8f53e1794c746d0fb2025832549038227dde05116979e8325",
+      "sha256": "4548d49ae53c5c49aeb97dacf875a019012155e9ff7681e35abdad2b5ee63c69",
       "packageName": "@base-ui/react"
     },
     {
@@ -2576,7 +2576,7 @@
     {
       "path": "src/menu/radio-group/MenuRadioGroup.tsrx",
       "origin": "adapted",
-      "sha256": "ee5a86b5a951541c8a64c753874d2078dee00f390df58fea51b119ce788d92b0",
+      "sha256": "ffd07f65e8c1d7022b07620a488b6a05e908586889261f137886b3934758be68",
       "packageName": "@base-ui/react"
     },
     {
@@ -2594,7 +2594,7 @@
     {
       "path": "src/menu/radio-item/MenuRadioItem.tsrx",
       "origin": "adapted",
-      "sha256": "97c405276fd6f8a078812a19eabb3de4a09e7d9c0f43afd9a22cf9614a6a5fad",
+      "sha256": "ddb5aeed053115a7a0b23c3b3866f3cb5844beb361b73886a258a5ea7cb7e5e4",
       "packageName": "@base-ui/react"
     },
     {
@@ -2606,7 +2606,7 @@
     {
       "path": "src/menu/root/MenuRoot.tsrx",
       "origin": "adapted",
-      "sha256": "eae577dfc1a78485038ccfe1f0705077154cad1a09ed9f784d4b1f54fd2cd691",
+      "sha256": "a9021aed6a1d57b08ab88767e23852927979fec6408b513c6f26ae1f23a61c05",
       "packageName": "@base-ui/react"
     },
     {
@@ -2630,7 +2630,7 @@
     {
       "path": "src/menu/submenu-root/MenuSubmenuRoot.tsrx",
       "origin": "adapted",
-      "sha256": "75207506aa890de7365e2151507e48b3c03b961194f788d6543935ed2ef17fca",
+      "sha256": "167bdcb1794a559508e9d25888007caa6d9b506811382dd854ce39905d25a062",
       "packageName": "@base-ui/react"
     },
     {
@@ -2672,7 +2672,7 @@
     {
       "path": "src/menubar/Menubar.tsrx",
       "origin": "adapted",
-      "sha256": "68a486a27c5e09f873eddc6f34543b43759cf7490b324d24be6673dbc6ef8f03",
+      "sha256": "ce94f2cf614a57b61db332aab985db6aa5f3bbd410415a1434007f87e22fba2e",
       "packageName": "@base-ui/react"
     },
     {
@@ -2732,7 +2732,7 @@
     {
       "path": "src/meter/root/MeterRoot.tsrx",
       "origin": "adapted",
-      "sha256": "8bd0c7d9e5c330c26c111124d0871c2e4099d74f99ad696ae52fa97196ad30a1",
+      "sha256": "0a62d8ef57705c4b84347d3b1cb4fb79a27157d9c671324e362c3246015a60eb",
       "packageName": "@base-ui/react"
     },
     {
@@ -2798,7 +2798,7 @@
     {
       "path": "src/navigation-menu/item/NavigationMenuItem.tsrx",
       "origin": "adapted",
-      "sha256": "1b9347c150c3d443ec246a1f000615c6e80fa845e2de9026af87f1b70797caed",
+      "sha256": "87fe95f75b62ccbab5747557f62736d4e6ea3796a326aabc71bb2df5c042462b",
       "packageName": "@base-ui/react"
     },
     {
@@ -2822,7 +2822,7 @@
     {
       "path": "src/navigation-menu/list/NavigationMenuList.tsrx",
       "origin": "adapted",
-      "sha256": "e3d6c9b152c9eae18fb0bad9cab865d5aa7ead229f75e3c6209b3dea82c17271",
+      "sha256": "738991d1d63c9cb64d23f02196262e6d9bca58e511281159f539106bd9a059d8",
       "packageName": "@base-ui/react"
     },
     {
@@ -2840,7 +2840,7 @@
     {
       "path": "src/navigation-menu/portal/NavigationMenuPortal.tsrx",
       "origin": "adapted",
-      "sha256": "37e21dff35cf99418396a8d25595d9d204af50d471fa068344c26dbe18af627d",
+      "sha256": "39f4aa9bffe99f5a0b47604f23869ee8f1c2e00bf0075a93388e7df062633d1b",
       "packageName": "@base-ui/react"
     },
     {
@@ -2852,7 +2852,7 @@
     {
       "path": "src/navigation-menu/positioner/NavigationMenuPositioner.tsrx",
       "origin": "adapted",
-      "sha256": "0c9a4b0dd372a19520e04339f08ed23c2923ab8f42a2c79e42ba2ae5eab069b0",
+      "sha256": "9ef9785e3f3f528c3f645fd904c1e36630d08221cb9a6bcbf60548f4c2b022de",
       "packageName": "@base-ui/react"
     },
     {
@@ -2870,7 +2870,7 @@
     {
       "path": "src/navigation-menu/root/NavigationMenuRoot.tsrx",
       "origin": "adapted",
-      "sha256": "87e4105e5d05f8d533c1afcc94c128a852da54219269ed4af8ca9c0c28399c31",
+      "sha256": "11e6c7195c32849cd7dcfc1cf6f272d471a82d1f7409d8a65da888d592025441",
       "packageName": "@base-ui/react"
     },
     {
@@ -2954,7 +2954,7 @@
     {
       "path": "src/number-field/root/NumberFieldRoot.tsrx",
       "origin": "adapted",
-      "sha256": "e0c250c64f48332630d56b255bbf0a8d24f183932cfd38338f81c06fa6e03dc7",
+      "sha256": "79cca10717e650f577c692064c0871c3ccf545127b294fc8faedf068b6f9c4f0",
       "packageName": "@base-ui/react"
     },
     {
@@ -2978,7 +2978,7 @@
     {
       "path": "src/number-field/scrub-area/NumberFieldScrubArea.tsrx",
       "origin": "adapted",
-      "sha256": "ffa1dc37aa957006f1a79b01c80e8c24e16ed9230452cc5b9d628296c47a9efb",
+      "sha256": "016d74442b37144d748e257da4e27b39210c291906d1a96cdc652d947be82803",
       "packageName": "@base-ui/react"
     },
     {
@@ -3032,7 +3032,7 @@
     {
       "path": "src/otp-field/root/OTPFieldRoot.tsrx",
       "origin": "adapted",
-      "sha256": "f57cf1eda0a01b0a6830014db1c57134eb7c6c73ed29473c3a2061feab9a2eb6",
+      "sha256": "68ba7fe075b4492f1c8825343e5cc64f09f516dc43db6a99ce331e804827936b",
       "packageName": "@base-ui/react"
     },
     {
@@ -3092,13 +3092,13 @@
     {
       "path": "src/popover/popup/PopoverPopup.tsrx",
       "origin": "adapted",
-      "sha256": "81a49d739243189abf249f61af347b7e5b7fb3d1a28f0d7f5c79279d789a10ec",
+      "sha256": "c0e177410a1800bc2a3e79946dc807e969a4bbe5f0682dd1d7902a135b5b9be2",
       "packageName": "@base-ui/react"
     },
     {
       "path": "src/popover/portal/PopoverPortal.tsrx",
       "origin": "adapted",
-      "sha256": "fee9e481a6b83c36fb7617afb590464f7eba9ffc41b46cc2093aba8246277fc9",
+      "sha256": "97390b03c02dd1948c5b1ba938598b02ce7cbcd6e820a6115921563b56f69271",
       "packageName": "@base-ui/react"
     },
     {
@@ -3110,7 +3110,7 @@
     {
       "path": "src/popover/positioner/PopoverPositioner.tsrx",
       "origin": "adapted",
-      "sha256": "c8bc1d1a44c09e07dc6dfc449cd4f43a4c23a4fa446cc276ab090c31f6caba74",
+      "sha256": "1f454be774cf0aac2e34bd9e652ba56f4127b07638d0e4505c8910518e1fe878",
       "packageName": "@base-ui/react"
     },
     {
@@ -3122,7 +3122,7 @@
     {
       "path": "src/popover/root/PopoverRoot.tsrx",
       "origin": "adapted",
-      "sha256": "03fbe2997a4ed171c2bbc343f7d7ed98a2f042c2a62bdf357fbe5ca696d43693",
+      "sha256": "bc487fcbc971ebac7f5afb4c80ae1bee479c448fa0d6ada720420d8e04554fef",
       "packageName": "@base-ui/react"
     },
     {
@@ -3200,7 +3200,7 @@
     {
       "path": "src/preview-card/portal/PreviewCardPortal.tsrx",
       "origin": "adapted",
-      "sha256": "c94fa371d79dfb4d305157c20b1aba4a279f777a53434d4a180412003e38458f",
+      "sha256": "372fa807d44d08b890f0d044c400cd5a431ca10447c8fd8017f4b377fd14011c",
       "packageName": "@base-ui/react"
     },
     {
@@ -3212,7 +3212,7 @@
     {
       "path": "src/preview-card/positioner/PreviewCardPositioner.tsrx",
       "origin": "adapted",
-      "sha256": "a2c4f1bd6d2981692f20dc2ed2d8fa328e5c8a96b77be0fda0758d559cf0e043",
+      "sha256": "030f7ef1194eeda02a3a743cc9cf6bf394ba46fd7179558a031fe0c7176dfb1c",
       "packageName": "@base-ui/react"
     },
     {
@@ -3230,7 +3230,7 @@
     {
       "path": "src/preview-card/root/PreviewCardRoot.tsrx",
       "origin": "adapted",
-      "sha256": "a3d87c2e251a03619e0889ee79ea0ed226a6ec84a2ea0d81fe96ed89949f7d19",
+      "sha256": "712c3befac6524dbe7c4cf5910fc5300465b41c91d7672f9a0d739b56d46f378",
       "packageName": "@base-ui/react"
     },
     {
@@ -3290,7 +3290,7 @@
     {
       "path": "src/progress/root/ProgressRoot.tsrx",
       "origin": "adapted",
-      "sha256": "8a98c0a361ba9476eb0edea2d7edaf38af4c93760c388b97378c373cc49eddc0",
+      "sha256": "012dc49534ca7d27c416f52a241bb80255ec86e5dec0a5bd8ba79572bc946205",
       "packageName": "@base-ui/react"
     },
     {
@@ -3326,7 +3326,7 @@
     {
       "path": "src/radio-group/RadioGroup.tsrx",
       "origin": "adapted",
-      "sha256": "6ecf0c0b219c98177e9c0d71742f7bb1b0d0498d8e853dd37b88d46f6e6840c7",
+      "sha256": "a6367386d3e10a36826fadbf3dc4ee822f1ecd22be16c722301e2d622123c203",
       "packageName": "@base-ui/react"
     },
     {
@@ -3362,7 +3362,7 @@
     {
       "path": "src/radio/root/RadioRoot.tsrx",
       "origin": "adapted",
-      "sha256": "0e74e039a477ec4c36942ebb9a61b6851159c8ce66846b0e4c6d1d0c98e965e2",
+      "sha256": "4c8fe4acca5e296261422c2d8265c4327d2221ef4cd0cc102b6de4695cbde3d6",
       "packageName": "@base-ui/react"
     },
     {
@@ -3392,7 +3392,7 @@
     {
       "path": "src/scroll-area/content/ScrollAreaContent.tsrx",
       "origin": "adapted",
-      "sha256": "a4c7004dc3e8b5797bdbb7b859ac860133661214ead72c3f934135d68cfe6edd",
+      "sha256": "67b34c7708e274b7cf606e2ea2e899412a6b33f29fd5a49b7daf8f9db00c5286",
       "packageName": "@base-ui/react"
     },
     {
@@ -3416,7 +3416,7 @@
     {
       "path": "src/scroll-area/root/ScrollAreaRoot.tsrx",
       "origin": "adapted",
-      "sha256": "adc46b4b3247651a38935c36b7b655ee226019aef2bb03337ccc23a49c1e70d2",
+      "sha256": "0d3c06f06eff7eeca2ae858156b8ca261aa67be6e549c5ddae33bcd33c5a3284",
       "packageName": "@base-ui/react"
     },
     {
@@ -3446,7 +3446,7 @@
     {
       "path": "src/scroll-area/scrollbar/ScrollAreaScrollbar.tsrx",
       "origin": "adapted",
-      "sha256": "807046d69d9bf4a4e51bdfc66b8412db223c22f69aafb58640360a6379e248d7",
+      "sha256": "0d809039ecd4640352a6df6f6bb9cb73fc3337b35f4379c07da510b5db0e1350",
       "packageName": "@base-ui/react"
     },
     {
@@ -3482,7 +3482,7 @@
     {
       "path": "src/scroll-area/viewport/ScrollAreaViewport.tsrx",
       "origin": "adapted",
-      "sha256": "43e4620686168a3e0939280ae9d5b96a14e844b6d1d53f93b24d4f6e3f62ad58",
+      "sha256": "5069747598f92fe74366d8976c393451102cd29e4cfd516106a764a7d3ba8d50",
       "packageName": "@base-ui/react"
     },
     {
@@ -3518,7 +3518,7 @@
     {
       "path": "src/select/group/SelectGroup.tsrx",
       "origin": "adapted",
-      "sha256": "86cae830e020a3133218b217611c1508c6e03160806cbc6552a2346993bf97b0",
+      "sha256": "1f263eb1efcb456139f6e6cbff2c0171eb10980ace3285ccd1c9fca272e852d6",
       "packageName": "@base-ui/react"
     },
     {
@@ -3560,7 +3560,7 @@
     {
       "path": "src/select/item/SelectItem.tsrx",
       "origin": "adapted",
-      "sha256": "74a6094250bf3b1abad3849523676d179d384bf94ebf45b847b4d0dcc35b48c2",
+      "sha256": "afed9e22cdc80b6640612952669a253e0e400c4ecde5aa247fd5c25248c0fe9d",
       "packageName": "@base-ui/react"
     },
     {
@@ -3602,7 +3602,7 @@
     {
       "path": "src/select/positioner/SelectPositioner.tsrx",
       "origin": "adapted",
-      "sha256": "ac0ab7228acad72862cd6a7a889324d9fa682068ca08e8c344af4c104b4f9198",
+      "sha256": "dcbf2e68bfd40e2e3d5bb3eb92e746a7f3df3ba751e2e4e3982d1ed546cb03fb",
       "packageName": "@base-ui/react"
     },
     {
@@ -3620,7 +3620,7 @@
     {
       "path": "src/select/root/SelectRoot.tsrx",
       "origin": "adapted",
-      "sha256": "2ffc33f32e335fd0fd094c091af8fa279d9b401cc42441a14aa2e3cca6ca18c4",
+      "sha256": "ac0c93478dfa5fde4d3387dccfa4f0237faa09a0947e856e563a1919c99c77b0",
       "packageName": "@base-ui/react"
     },
     {
@@ -3722,7 +3722,7 @@
     {
       "path": "src/slider/root/SliderRoot.tsrx",
       "origin": "adapted",
-      "sha256": "8a643230c7e92e09d61726ed18cead3fabd47c68bfaa0123a52f9253c748806c",
+      "sha256": "eabc17c1c1c00fedc4bba74fa1222598c0ae55e10f1667e67855f1e2d1e44d44",
       "packageName": "@base-ui/react"
     },
     {
@@ -3740,7 +3740,7 @@
     {
       "path": "src/slider/thumb/SliderThumb.tsrx",
       "origin": "adapted",
-      "sha256": "9b70872ef58bae155c521570e8fc1989261ba7238f173e167ecfb6a40285707f",
+      "sha256": "6cfb8cde17bb4349021aafedd7ad8aedb4256624877667b02161d0a8ea536ac1",
       "packageName": "@base-ui/react"
     },
     {
@@ -3824,7 +3824,7 @@
     {
       "path": "src/switch/root/SwitchRoot.tsrx",
       "origin": "adapted",
-      "sha256": "38a6316e0181b83fd3beb57820f683470aa58bd7bd703bab7bf797f623a34799",
+      "sha256": "a2f3a2355512f02cd174ad9960f469794d564cd49ea108be1582a5657b9b78a0",
       "packageName": "@base-ui/react"
     },
     {
@@ -3884,7 +3884,7 @@
     {
       "path": "src/tabs/list/TabsList.tsrx",
       "origin": "adapted",
-      "sha256": "73ed66998b6a58fde54b83ca81a72e008d7abcc70601e4efac8ef83f506fe8e3",
+      "sha256": "cb47648e5fa9bf759226b31742ebd19dfa91bdce0c0b1432eb949b4762774781",
       "packageName": "@base-ui/react"
     },
     {
@@ -3908,7 +3908,7 @@
     {
       "path": "src/tabs/root/TabsRoot.tsrx",
       "origin": "adapted",
-      "sha256": "4cdf78a68b34eb8d26acff45086e2adcdfbda7f4605cdb8bcf0a3a30bed50396",
+      "sha256": "43d9b4c1823415fddc8807282286e5cfa6f8656fda1bb601f8c081b48e6e5ddc",
       "packageName": "@base-ui/react"
     },
     {
@@ -3956,7 +3956,7 @@
     {
       "path": "src/toast/content/ToastContent.tsrx",
       "origin": "adapted",
-      "sha256": "c063ed85801433e8a2ea0bffe4c1dde4294c5941950f96af74f67875ff65169b",
+      "sha256": "292c9d77c7b9e5d468b15c207b713fdb6e8d62bed5f3f1dd0db419673e47c812",
       "packageName": "@base-ui/react"
     },
     {
@@ -3992,7 +3992,7 @@
     {
       "path": "src/toast/positioner/ToastPositioner.tsrx",
       "origin": "adapted",
-      "sha256": "d385c00ebdf7c482ec7eee4f2b9308a9198ba40f761087856228aac0371fdb33",
+      "sha256": "d7ea4919e900a92622a4a0dcd75b41c0f82c0221f818fa8b43986e4ec909c00c",
       "packageName": "@base-ui/react"
     },
     {
@@ -4004,7 +4004,7 @@
     {
       "path": "src/toast/provider/ToastProvider.tsrx",
       "origin": "adapted",
-      "sha256": "abd96a01adc421e924531aedbbfb56b87ebadd01295749f39ea3777d6f63fb89",
+      "sha256": "645775b26124bed58dd5f7775993a5105a035d0d3fd4026679a08eca0acf0e5c",
       "packageName": "@base-ui/react"
     },
     {
@@ -4016,7 +4016,7 @@
     {
       "path": "src/toast/root/ToastRoot.tsrx",
       "origin": "adapted",
-      "sha256": "db955fbcc6b7be4938ef6e8245e0076b226dafbeb66659004d8475e11a61024d",
+      "sha256": "28de7dec187ee683d0bfdecd43e0025d43f49e98c01b3fc45df4d517e40536ad",
       "packageName": "@base-ui/react"
     },
     {
@@ -4094,7 +4094,7 @@
     {
       "path": "src/toggle-group/ToggleGroup.tsrx",
       "origin": "adapted",
-      "sha256": "096048c88b1395fbd1f27a20687cdcd3fcf33a172282131fa2b472b262c38f53",
+      "sha256": "5ba48e7a05a5f5a413f1f77abebe46f7d763b78b8157a1593dafcf113a7fa114",
       "packageName": "@base-ui/react"
     },
     {
@@ -4130,7 +4130,7 @@
     {
       "path": "src/toolbar/group/ToolbarGroup.tsrx",
       "origin": "adapted",
-      "sha256": "8e09943704230a1e51295997187f39962dc66b12e6dd6a36da8669ad4fe786ae",
+      "sha256": "be840e2f45f4efa38a2c0609b5cfd77d6619f2ac75a2481073b0e2695263d011",
       "packageName": "@base-ui/react"
     },
     {
@@ -4166,7 +4166,7 @@
     {
       "path": "src/toolbar/root/ToolbarRoot.tsrx",
       "origin": "adapted",
-      "sha256": "29e0ab385a96bc4b69d10dca11b819eb76d05bb5eab83ff27404e62dccc02fc0",
+      "sha256": "fd950f8557c4e97b9a2a4478abb4a981d820319a1fbe7e6640c347d9c4bd9b42",
       "packageName": "@base-ui/react"
     },
     {
@@ -4208,7 +4208,7 @@
     {
       "path": "src/tooltip/portal/TooltipPortal.tsrx",
       "origin": "adapted",
-      "sha256": "333788ec3614e2fc8bd28e98092f0675de59c432b5b2b92c25e81c398ff39adb",
+      "sha256": "03c0e7f84dfc53c153108ac87c91475492b2105a56c92d35c832e07eee6b2ef7",
       "packageName": "@base-ui/react"
     },
     {
@@ -4220,7 +4220,7 @@
     {
       "path": "src/tooltip/positioner/TooltipPositioner.tsrx",
       "origin": "adapted",
-      "sha256": "155244a99b14088fce49d9ba82464f22e00ea88da4791669f007cc52e8d70fe5",
+      "sha256": "aa5f631fb7c0053d1f8dcac1426f30a8b9077628d72778f20b951feb4c5da34e",
       "packageName": "@base-ui/react"
     },
     {
@@ -4232,7 +4232,7 @@
     {
       "path": "src/tooltip/provider/TooltipProvider.tsrx",
       "origin": "adapted",
-      "sha256": "908a7d0544dba9b0daff9be83f23c1558d7cc9c1939f4d18ddea5fef2e373ee5",
+      "sha256": "c816a6e5ea80baaa85b9baba6da47685d3f94b5bf35c56542589621dae8460f2",
       "packageName": "@base-ui/react"
     },
     {
@@ -4244,7 +4244,7 @@
     {
       "path": "src/tooltip/root/TooltipRoot.tsrx",
       "origin": "adapted",
-      "sha256": "2018354a00cb1508b022198830d83857a8105b86674eb6d2f07dd557180d5764",
+      "sha256": "1e273c53f45b9d174f6c72db956095d2fc8fafc0be46596c5fc041ee46cacfd0",
       "packageName": "@base-ui/react"
     },
     {
