@@ -390,6 +390,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	],
 	'./static': ['prerender'],
 	'./testing': ['clampJsdomScrollTop'],
+	'./theme-tokens': ['defineThemeTokens'],
 	'./constants': [
 		'ATTRIBUTE_ALIASES',
 		'BLOCK_CLOSE',
