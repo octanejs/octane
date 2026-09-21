@@ -46,6 +46,20 @@ describe('runCompile', () => {
 		expect(result.error.message).toMatch(/declared `async`/);
 	});
 
+	it('keeps the thrown diagnostic code so agents can search it', () => {
+		// Style analyzer errors throw with `error.code` set; dropping it orphans
+		// the diagnostic from the docs table and the analyze --code filter.
+		const result = runCompile(
+			base(
+				`export function C() {\n\treturn <section><style>.a { color: red; }</style><div class="a" /></section>;\n}\n`,
+			),
+		);
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.code).toBe('tsrx-style-standalone-outside-template');
+		expect(result.error.line).toBe(2);
+	});
+
 	it('locates a parse error with line, column, and a caret frame', () => {
 		const result = runCompile(
 			base(`export function Broken() @{\n\t<div>\n}\n`), // unclosed <div>

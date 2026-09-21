@@ -89,14 +89,23 @@ const TRAILING_LOCATION = /\s*\(([^()\s]+):(\d+):(\d+)\)\s*$/;
  */
 function thrownFailure(error, file, code) {
 	const message = error instanceof Error ? error.message : String(error);
-	const loc = /** @type {any} */ (error)?.loc;
+	// Thrown diagnostics carry their real code (`tsrx-style-*`, `OCTANE_*`) —
+	// agents filter and search docs on it, so it must survive into the finding.
+	const thrownCode =
+		typeof (/** @type {any} */ (error)?.code) === 'string'
+			? /** @type {any} */ (error).code
+			: undefined;
+	// `loc` arrives acorn-style (`{start: {line, column}, …}`) on analyzer
+	// errors and flat (`{line, column}`) on Babel-style parse errors.
+	const rawLoc = /** @type {any} */ (error)?.loc;
+	const loc = rawLoc?.start ?? rawLoc;
 	if (loc) {
 		return {
 			file,
 			line: loc.line ?? 1,
 			column: (loc.column ?? 0) + 1,
 			severity: 'error',
-			code: code ?? 'OCTANE_PARSE_ERROR',
+			code: code ?? thrownCode ?? 'OCTANE_PARSE_ERROR',
 			message,
 			suggestions: [],
 		};
@@ -110,7 +119,7 @@ function thrownFailure(error, file, code) {
 		severity: 'error',
 		// Not every throw is a parse failure; saying so sends people looking for
 		// a syntax mistake that is not there.
-		code: code ?? 'OCTANE_COMPILE_ERROR',
+		code: code ?? thrownCode ?? 'OCTANE_COMPILE_ERROR',
 		// The position now has its own columns, so drop the duplicate tail.
 		message: trailing ? message.slice(0, trailing.index) : message,
 		suggestions: [],

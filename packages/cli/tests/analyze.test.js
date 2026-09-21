@@ -147,6 +147,22 @@ export function Hint({ value }) @{
 		expect(result.exitCode).toBe(3);
 	});
 
+	it('keeps a thrown style diagnostic code and its real position', async () => {
+		// The analyzer throws semantic style errors with `error.code` set and an
+		// acorn-style `loc.start`. Agents filter (`--code`) and search docs on the
+		// code; flattening it orphans the diagnostic.
+		const result = await analyze({
+			'src/Placement.tsrx':
+				'export function C() {\n\treturn <section><style>.a { color: red; }</style><div class="a" /></section>;\n}\n',
+		});
+
+		const [finding] = result.json().findings;
+		expect(finding.code).toBe('tsrx-style-standalone-outside-template');
+		expect(finding.severity).toBe('error');
+		expect(finding.line).toBe(2);
+		expect(result.exitCode).toBe(3);
+	});
+
 	it('separates an unreadable file from an unparseable one', async () => {
 		const { root } = project({});
 		const result = await runCli(

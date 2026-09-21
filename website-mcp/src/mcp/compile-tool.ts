@@ -15,6 +15,8 @@ export interface CompileToolInput {
 
 export interface CompileDiagnostic {
 	message: string;
+	/** The diagnostic code the failure was thrown with, e.g. `tsrx-style-*`. */
+	code?: string;
 	line?: number;
 	column?: number;
 	pos?: number;
@@ -55,6 +57,7 @@ function codeFrame(source: string, line: number, column: number): string {
 function toDiagnostic(error: unknown, source: string): CompileDiagnostic {
 	if (!(error instanceof Error)) return { message: String(error) };
 	const raw = error as Error & {
+		code?: string;
 		pos?: number;
 		loc?: { line?: number; column?: number; start?: { line: number; column: number } };
 	};
@@ -62,6 +65,9 @@ function toDiagnostic(error: unknown, source: string): CompileDiagnostic {
 	// column} } or a flat { line, column } depending on which layer raised it.
 	const loc = raw.loc?.start ?? raw.loc;
 	const diagnostic: CompileDiagnostic = { message: error.message };
+	// The code is the diagnostic's identity for agents (docs search, analyze's
+	// --code filter); dropping it orphans the error from both.
+	if (typeof raw.code === 'string') diagnostic.code = raw.code;
 	if (typeof raw.pos === 'number') diagnostic.pos = raw.pos;
 	if (typeof loc?.line === 'number') {
 		diagnostic.line = loc.line;
