@@ -4785,6 +4785,7 @@ export default defineConfig({
 						'packages/base-ui/tests/**/*.test.ts',
 						'packages/base-ui/tests/**/*.test.tsx',
 						'!packages/base-ui/tests/ssr/**/*.test.ts',
+						'!packages/base-ui/tests/browser/**',
 						'!packages/base-ui/tests/differential/**/*.test.ts',
 						'!packages/base-ui/tests/upstream/**',
 					],
@@ -4813,6 +4814,17 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
 						},
 					],
+				},
+			},
+			{
+				testExecution: { group: 'heavy-browser', browsers: ['chromium'] },
+				test: {
+					name: 'base-ui-browser',
+					include: ['packages/base-ui/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
 				},
 			},
 			{
