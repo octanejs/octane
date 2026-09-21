@@ -1,14 +1,16 @@
 # Octane user-apps v1
 
-This is a public training corpus of twenty-one realistic requests to build small
-Octane applications. It evaluates framework usage from a consumer's
+This is a public training corpus of twenty-four realistic requests to build or
+repair small Octane applications. It evaluates framework usage from a consumer's
 perspective—not changes to Octane's source repository.
 
 Each directory under `tasks/` contains a prompt, an incomplete starter
 `src/App.tsrx`, an observable behavior grader, and a passing reference
-implementation. The generated `manifest.jsonl` binds every starter and grader
-to immutable digests, exact package versions, the framework-base and effective
-evaluation-overlay lockfiles, and the container image. The generated
+implementation. The generated manifests bind every starter and grader to
+immutable digests, exact package versions, the framework-base and effective
+evaluation-overlay lockfiles, and the container image. `manifest.jsonl` covers
+the instruction-following tasks; `manifest-agentic.closed-book.jsonl` covers the
+agentic repair tasks whose workspaces carry a runnable toolchain. The generated
 `training.jsonl` exposes the same prompt, starter, and reference as
 ready-to-ingest chat conversations.
 
@@ -23,8 +25,9 @@ tasks. The corpus includes:
   native input, deliberate text commit handling, class composition, ref
   props/multi-ref, and parallel `use()` as intentional React divergences;
 - sibling-scoped `<style>` blocks across nested template and control-flow
-  scopes, exported themes applied with `apply`, theme composition, and
-  `$class`; and
+  scopes, exported themes applied with `apply`, theme composition, `$class`,
+  typed theme tokens, and diagnostic-driven repair of stale selectors and
+  shorthand/longhand clashes; and
 - consumer applications using Zustand, Hook Form, i18next, and TanStack Query.
 
 ```bash

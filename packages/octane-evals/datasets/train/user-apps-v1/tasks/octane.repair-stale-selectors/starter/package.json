@@ -1,0 +1,17 @@
+{
+  "name": "octane-repair-stale-selectors",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "octane analyze src/App.tsrx --strict",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "octane": "0.3.4"
+  },
+  "devDependencies": {
+    "@octanejs/cli": "0.0.11",
+    "@tsrx/typescript-plugin": "0.4.1",
+    "typescript": "5.9.3"
+  }
+}

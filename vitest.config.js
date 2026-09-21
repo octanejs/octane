@@ -185,6 +185,7 @@ const USER_APP_EVAL_ALLOWED_IMPORTS = new Map([
 	['@tanstack/query-core', null],
 	['i18next', null],
 	['octane', resolve(import.meta.dirname, 'packages/octane/src/index.ts')],
+	['octane/theme-tokens', resolve(import.meta.dirname, 'packages/octane/src/theme-tokens.ts')],
 	// Compiler helpers use a bounded bridge, not the export-all private runtime.
 	[
 		'octane/internal/client',

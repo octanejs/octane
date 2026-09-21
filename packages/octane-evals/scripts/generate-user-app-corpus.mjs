@@ -16,6 +16,9 @@ const trainingSystemPrompt =
 const packageVersions = {
 	octane: packageVersion('packages/octane/package.json'),
 	'@octanejs/testing-library': packageVersion('packages/testing-library/package.json'),
+	'@octanejs/cli': packageVersion('packages/cli/package.json'),
+	'@tsrx/typescript-plugin': packageVersion('node_modules/@tsrx/typescript-plugin/package.json'),
+	typescript: packageVersion('node_modules/typescript/package.json'),
 	'@octanejs/zustand': packageVersion('packages/zustand/package.json'),
 	'@octanejs/hook-form': packageVersion('packages/hook-form/package.json'),
 	'@octanejs/i18next': packageVersion('packages/i18next/package.json'),
@@ -92,6 +95,8 @@ const manifests = orderedTasks.map((task) => {
 	const prompt = readFileSync(join(taskRoot, 'prompt.md'), 'utf8').trim();
 	const graderPath = join(taskRoot, 'grader.test.ts');
 	const referencePath = join(taskRoot, 'reference', 'src', 'App.tsrx');
+	const executionMode = task.executionMode ?? 'instruction';
+	const contextMode = task.contextMode ?? 'framework-docs';
 	const selectedVersions = {
 		octane: packageVersions.octane,
 		'@octanejs/testing-library': packageVersions['@octanejs/testing-library'],
@@ -103,6 +108,27 @@ const manifests = orderedTasks.map((task) => {
 	if (task.packageName === '@octanejs/tanstack-query') {
 		selectedVersions['@tanstack/query-core'] = packageVersions['@tanstack/query-core'];
 	}
+	// Agentic workspaces carry a runnable toolchain (the starter's package.json
+	// installs it), so their manifests pin those versions too.
+	if (executionMode === 'agentic') {
+		selectedVersions['@octanejs/cli'] = packageVersions['@octanejs/cli'];
+		selectedVersions['@tsrx/typescript-plugin'] = packageVersions['@tsrx/typescript-plugin'];
+		selectedVersions.typescript = packageVersions.typescript;
+	}
+
+	const grade = `pnpm --filter @octanejs/evals grade:user-app -- --task ${task.taskId} --submission .`;
+	const publicCommands = [
+		{
+			id: 'behavior',
+			command:
+				executionMode === 'agentic'
+					? // The agentic workspace holds toolchain files beside src/, so the
+						// one-file submission is staged before the harness sees it.
+						`rm -rf .eval-submission && mkdir -p .eval-submission/src && cp src/App.tsrx .eval-submission/src/App.tsrx && cd .eval-submission && ${grade}`
+					: grade,
+		},
+		...(task.publicCommands ?? []),
+	];
 
 	return {
 		schemaVersion: '1.1',
@@ -110,10 +136,14 @@ const manifests = orderedTasks.map((task) => {
 		taskId: task.taskId,
 		familyId: task.taskId,
 		title: task.title,
-		prompt: { statement: prompt, outputType: 'completion', allowedPaths: ['src/App.tsrx'] },
+		prompt: {
+			statement: prompt,
+			outputType: task.outputType ?? 'completion',
+			allowedPaths: ['src/App.tsrx'],
+		},
 		suite: task.suite,
 		split: 'train',
-		executionMode: 'instruction',
+		executionMode,
 		capability: task.capability,
 		...(task.packageName ? { packageName: task.packageName } : {}),
 		...(task.portShape ? { portShape: task.portShape } : {}),
@@ -153,7 +183,10 @@ const manifests = orderedTasks.map((task) => {
 			referencePath: relative(packageRoot, referencePath).replaceAll('\\', '/'),
 			referenceDigest: sha256(readFileSync(referencePath)),
 		},
-		context: { mode: 'framework-docs', docsCommit: baseCommit },
+		context:
+			contextMode === 'closed-book'
+				? { mode: 'closed-book' }
+				: { mode: contextMode, docsCommit: baseCommit },
 		policy: {
 			network: 'none',
 			timeoutSeconds: 120,
@@ -171,12 +204,7 @@ const manifests = orderedTasks.map((task) => {
 			graderVersion: catalog.benchmarkVersion,
 			graderDigest: graderDigest(graderPath),
 			scoringPolicyDigest,
-			publicCommands: [
-				{
-					id: 'behavior',
-					command: `pnpm --filter @octanejs/evals grade:user-app -- --task ${task.taskId} --submission .`,
-				},
-			],
+			publicCommands,
 		},
 		tags: task.tags,
 	};
@@ -202,33 +230,56 @@ const trainingExamples = orderedTasks.map((task) => {
 			suite: task.suite,
 			capability: task.capability,
 			difficulty: task.difficulty,
+			executionMode: task.executionMode ?? 'instruction',
 			...(task.packageName ? { packageName: task.packageName } : {}),
 			tags: task.tags,
 		},
 	};
 });
 
+// The collection validator requires one execution mode and one context per
+// manifest file, so non-default modes land in their own files.
+const manifestFiles = new Map();
+for (const manifest of manifests) {
+	const key = `${manifest.executionMode}.${manifest.context.mode}`;
+	const fileName =
+		key === 'instruction.framework-docs' ? 'manifest.jsonl' : `manifest-${key}.jsonl`;
+	if (!manifestFiles.has(fileName)) manifestFiles.set(fileName, []);
+	manifestFiles.get(fileName).push(manifest);
+}
+
 const artifacts = [
-	{
-		path: join(corpusRoot, 'manifest.jsonl'),
-		content: `${manifests.map((manifest) => JSON.stringify(manifest)).join('\n')}\n`,
-	},
+	...[...manifestFiles.entries()].map(([fileName, entries]) => ({
+		path: join(corpusRoot, fileName),
+		content: `${entries.map((manifest) => JSON.stringify(manifest)).join('\n')}\n`,
+	})),
 	{
 		path: join(corpusRoot, 'training.jsonl'),
 		content: `${trainingExamples.map((example) => JSON.stringify(example)).join('\n')}\n`,
 	},
 ];
 if (process.argv.includes('--check')) {
+	let stale = false;
 	for (const artifact of artifacts) {
 		if (readFileSync(artifact.path, 'utf8') !== artifact.content) {
 			console.error(`${relative(repositoryRoot, artifact.path)} is stale; run the generator`);
-			process.exit(1);
+			stale = true;
 		}
 	}
+	for (const name of readdirSync(corpusRoot)) {
+		if (/^manifest.*\.jsonl$/.test(name) && !manifestFiles.has(name)) {
+			console.error(
+				`${relative(repositoryRoot, join(corpusRoot, name))} is not generated by the catalog; remove it`,
+			);
+			stale = true;
+		}
+	}
+	if (stale) process.exit(1);
 	console.log(`user-app corpus artifacts are current (${manifests.length} tasks)`);
 } else {
 	for (const artifact of artifacts) {
 		writeFileSync(artifact.path, artifact.content);
-		console.log(`wrote ${relative(repositoryRoot, artifact.path)} (${manifests.length} tasks)`);
+		const rows = artifact.content.trim().split('\n').length;
+		console.log(`wrote ${relative(repositoryRoot, artifact.path)} (${rows} rows)`);
 	}
 }

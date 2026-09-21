@@ -1,8 +1,8 @@
 {
   "benchmarkVersion": "user-apps-v1",
   "environment": {
-    "baseCommit": "4d7f96230df3c5af5df4f733135a08beeec00737",
-    "lockfileHash": "sha256:d3c1c7ee50a935f86a0131d9ff3c22232d5ea84bd0eb56ac0f3511280d77e51a"
+    "baseCommit": "0432298ffc9d187fedbe3918d6c242d25ba27a34",
+    "lockfileHash": "sha256:7ffbf08b4213615ccb8ac6d9be9d579a06cab105df94aa389090a1d4236f6d4c"
   },
   "coverage": {
     "codingPatterns": {
@@ -61,9 +61,12 @@
     "scopedStyles": {
       "nested-scopes": ["tsrx.nested-scope-styles"],
       "control-flow-scopes": ["tsrx.nested-scope-styles"],
-      "theme-apply": ["octane.theme-apply"],
+      "theme-apply": ["octane.theme-apply", "octane.repair-shorthand-clash"],
       "theme-composition": ["octane.theme-apply"],
-      "class-map": ["octane.theme-apply"]
+      "class-map": ["octane.theme-apply"],
+      "typed-tokens": ["octane.typed-theme-tokens"],
+      "stale-selector-repair": ["octane.repair-stale-selectors"],
+      "shorthand-longhand-clash": ["octane.repair-shorthand-clash"]
     }
   },
   "tasks": [
@@ -161,6 +164,71 @@
         "theme-composition",
         "class-map"
       ]
+    },
+    {
+      "taskId": "octane.typed-theme-tokens",
+      "title": "Author a typed theme-token contract",
+      "suite": "octane",
+      "capability": "authoring",
+      "difficulty": "standard",
+      "sourcePath": "packages/octane/src/theme-tokens.ts",
+      "createdAt": "2026-09-20",
+      "publishedAt": "2026-09-20",
+      "tags": ["scoped-styles", "typed-tokens", "theme-tokens", "custom-properties"]
+    },
+    {
+      "taskId": "octane.repair-stale-selectors",
+      "title": "Repair stale selectors after a style refactor",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "executionMode": "agentic",
+      "contextMode": "closed-book",
+      "outputType": "patch",
+      "sourcePath": "packages/octane/src/compiler/style-correctness.js",
+      "createdAt": "2026-09-20",
+      "publishedAt": "2026-09-20",
+      "publicCommands": [
+        {
+          "id": "diagnostics",
+          "command": "pnpm exec octane analyze src/App.tsrx --strict"
+        },
+        {
+          "id": "typecheck",
+          "command": "pnpm exec tsrx-tsc --noEmit -p tsconfig.json"
+        }
+      ],
+      "tags": [
+        "scoped-styles",
+        "stale-selector-repair",
+        "unused-selector",
+        "agentic",
+        "closed-book"
+      ]
+    },
+    {
+      "taskId": "octane.repair-shorthand-clash",
+      "title": "Repair a shorthand/longhand merge clash",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "executionMode": "agentic",
+      "contextMode": "closed-book",
+      "outputType": "patch",
+      "sourcePath": "packages/octane/src/compiler/style-correctness.js",
+      "createdAt": "2026-09-20",
+      "publishedAt": "2026-09-20",
+      "publicCommands": [
+        {
+          "id": "diagnostics",
+          "command": "pnpm exec octane analyze src/App.tsrx --strict"
+        },
+        {
+          "id": "typecheck",
+          "command": "pnpm exec tsrx-tsc --noEmit -p tsconfig.json"
+        }
+      ],
+      "tags": ["scoped-styles", "theme-apply", "shorthand-longhand-clash", "agentic", "closed-book"]
     },
     {
       "taskId": "octane.composed-team-board",

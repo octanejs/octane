@@ -177,6 +177,43 @@ function containsNode(container: AstNode, node: AstNode): boolean {
 	);
 }
 
+/** The parsed StyleSheet node inside a `<style>` block, when it has raw CSS. */
+function styleSheet(styleElement: AstNode | undefined): AstNode | undefined {
+	return (styleElement?.children as AstNode[] | undefined)?.find(
+		(child) => child.type === 'StyleSheet',
+	);
+}
+
+function sheetRules(styleElement: AstNode | undefined): AstNode[] {
+	return ((styleSheet(styleElement)?.children as AstNode[] | undefined) ?? []).filter(
+		(child) => child.type === 'Rule',
+	);
+}
+
+/** Whether any complex selector's subject (rightmost compound) carries the class. */
+function subjectHasClass(rule: AstNode, name: string): boolean {
+	const prelude = rule.prelude as AstNode | undefined;
+	return ((prelude?.children as AstNode[] | undefined) ?? []).some((complexSelector) => {
+		const relatives = (complexSelector.children as AstNode[] | undefined) ?? [];
+		const subject = relatives[relatives.length - 1];
+		return ((subject?.selectors as AstNode[] | undefined) ?? []).some(
+			(selector) => selector.type === 'ClassSelector' && selector.name === name,
+		);
+	});
+}
+
+function ruleDeclares(rule: AstNode, property: string): boolean {
+	const block = rule.block as AstNode | undefined;
+	return ((block?.children as AstNode[] | undefined) ?? []).some(
+		(child) => child.type === 'Declaration' && String(child.property).toLowerCase() === property,
+	);
+}
+
+/** `<style>` blocks that live inside a component template (scoped blocks), not assigned themes. */
+function scopedStyleElements(ast: AstNode, functionName: string): AstNode[] {
+	return nodes(functionNamed(ast, functionName), 'JSXStyleElement');
+}
+
 type Contract = (ast: AstNode, source: string) => void;
 
 const contracts: Record<string, Contract> = {
@@ -290,6 +327,115 @@ const contracts: Record<string, Contract> = {
 			),
 			'expected a class prop reading theme.$class',
 		).toBe(true);
+	},
+	'octane.typed-theme-tokens': (ast) => {
+		expectExports(ast, ['tokens', 'App']);
+		expect(importsFrom(ast, 'octane/theme-tokens')).toContain('defineThemeTokens');
+		const declarator = nodes(ast, 'VariableDeclarator').find(
+			(node) => identifierName(node.id) === 'tokens',
+		);
+		const init = declarator?.init as AstNode | undefined;
+		expect(
+			init?.type === 'CallExpression' && memberName(init.callee) === 'defineThemeTokens',
+			'expected tokens to be initialized by defineThemeTokens',
+		).toBe(true);
+
+		const app = functionNamed(ast, 'App');
+		expect(app, 'expected an App function').toBeDefined();
+		// The contract's emitted sheet ships through a plain <style> element.
+		const tokenSheets = jsxElements(app, 'style').filter((element) =>
+			(element.children as AstNode[] | undefined)?.some(
+				(child) =>
+					child.type === 'JSXExpressionContainer' &&
+					memberName(child.expression) === 'css' &&
+					identifierName((child.expression as AstNode).object) === 'tokens',
+			),
+		);
+		expect(tokenSheets, 'expected a <style>{tokens.css}</style> element').toHaveLength(1);
+		// The card styling lives in a scoped <style> block, not inline props alone.
+		expect(
+			scopedStyleElements(ast, 'App').length,
+			'expected a scoped <style> block in App',
+		).toBeGreaterThanOrEqual(1);
+		// The accent leaf is consumed as a typed reference, not a literal string.
+		const styleAttributes = jsxAttributes(app, 'style');
+		expect(
+			styleAttributes.some((attribute) =>
+				nodes(attributeExpression(attribute), 'MemberExpression').some(
+					(member) =>
+						memberName(member) === 'accent' &&
+						(member.object as AstNode | undefined)?.type === 'MemberExpression' &&
+						memberName(member.object) === 'colors' &&
+						identifierName((member.object as AstNode).object) === 'tokens',
+				),
+			),
+			'expected a style prop reading tokens.colors.accent',
+		).toBe(true);
+	},
+	'octane.repair-stale-selectors': (ast, source) => {
+		expectExports(ast, ['App']);
+		expect(source.includes('octane-ignore'), 'diagnostics must not be suppressed').toBe(false);
+		expect(
+			scopedStyleElements(ast, 'App').length,
+			'expected the scoped <style> block to remain',
+		).toBeGreaterThanOrEqual(1);
+		const literalClasses = jsxAttributes(ast, 'class')
+			.map((attribute) => attribute.value as AstNode | null | undefined)
+			.filter(
+				(value): value is AstNode =>
+					value !== null &&
+					value !== undefined &&
+					(value.type === 'Literal' || value.type === 'StringLiteral'),
+			)
+			.map((value) => String(value.value).split(/\s+/));
+		expect(
+			literalClasses.some((names) => names.includes('actions')),
+			'expected the refactored .actions markup to stay',
+		).toBe(true);
+		for (const names of literalClasses) {
+			expect(names, 'expected no .toolbar or .close elements').not.toContain('toolbar');
+			expect(names, 'expected no .toolbar or .close elements').not.toContain('close');
+		}
+	},
+	'octane.repair-shorthand-clash': (ast, source) => {
+		expectExports(ast, ['callout', 'App']);
+		expect(source.includes('octane-ignore'), 'diagnostics must not be suppressed').toBe(false);
+		const blocks = new Map(
+			nodes(ast, 'VariableDeclarator')
+				.filter(
+					(declarator) => (declarator.init as AstNode | undefined)?.type === 'JSXStyleElement',
+				)
+				.map((declarator) => [identifierName(declarator.id), declarator] as const),
+		);
+		const callout = blocks.get('callout');
+		expect(callout, 'expected callout to be an assigned <style> block').toBeDefined();
+		const themeRule = sheetRules(callout?.init as AstNode).find(
+			(rule) => subjectHasClass(rule, 'card') && ruleDeclares(rule, 'border-top-color'),
+		);
+		expect(
+			themeRule,
+			'expected the callout theme to keep its .card border-top-color declaration',
+		).toBeDefined();
+
+		const app = functionNamed(ast, 'App');
+		const scopedBlocks = scopedStyleElements(ast, 'App');
+		const applying = scopedBlocks.filter(
+			(block) =>
+				identifierName(attributeExpression(jsxAttributes(block, 'apply')[0])) === 'callout',
+		);
+		expect(
+			applying.length,
+			'expected a scoped <style apply={callout}> block to remain',
+		).toBeGreaterThanOrEqual(1);
+		for (const block of scopedBlocks) {
+			for (const rule of sheetRules(block)) {
+				if (!subjectHasClass(rule, 'card')) continue;
+				expect(
+					ruleDeclares(rule, 'border-top-color'),
+					'the scope must not restate the theme’s border-top-color',
+				).toBe(false);
+			}
+		}
 	},
 	'octane.composed-team-board': (ast) => {
 		expectExports(ast, ['Member', 'MemberCard', 'TeamSummary', 'App']);

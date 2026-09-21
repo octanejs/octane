@@ -50,8 +50,15 @@ const REQUIRED_COVERAGE = {
 		'theme-apply',
 		'theme-composition',
 		'class-map',
+		'typed-tokens',
+		'stale-selector-repair',
+		'shorthand-longhand-clash',
 	],
 } as const;
+
+// The collection validator requires homogeneous execution mode and context per
+// manifest file, so each mode pair publishes its own JSONL artifact.
+const MANIFEST_FILES = ['manifest.jsonl', 'manifest-agentic.closed-book.jsonl'];
 
 function readCatalog(): UserAppCatalog {
 	return JSON.parse(readFileSync(join(corpusRoot, 'catalog.json'), 'utf8'));
@@ -87,8 +94,8 @@ function readGrader(grader: string): WorkspaceDigestFile[] {
 describe('public user-app training corpus', () => {
 	it('contains real tasks across TSRX, Octane, and integrations', () => {
 		const catalog = readCatalog();
-		const tasks = parsePublicTaskManifestJsonl(
-			readFileSync(join(corpusRoot, 'manifest.jsonl'), 'utf8'),
+		const tasks = MANIFEST_FILES.flatMap((file) =>
+			parsePublicTaskManifestJsonl(readFileSync(join(corpusRoot, file), 'utf8')),
 		);
 		const overlayLockfileDigest = sha256Digest(
 			readFileSync(join(repositoryRoot, 'pnpm-lock.yaml')),
