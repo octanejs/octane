@@ -40,6 +40,14 @@ describe('docs search over the snapshot', () => {
 		expect(slugsFor('renderToPipeableStream')).toContain('ssr');
 	});
 
+	it('finds a style diagnostic under either code spelling', () => {
+		// Agents meet a code as emitted (kebab) and as documented (SCREAMING);
+		// both must land on the styling diagnostics section.
+		expect(slugsFor('octane-css-unknown-property')).toContain('styling');
+		expect(slugsFor('OCTANE_CSS_UNKNOWN_PROPERTY')).toContain('styling');
+		expect(slugsFor('tsrx-style-standalone-outside-template')).toContain('styling');
+	});
+
 	it('returns canonical community packages with their exact destinations', () => {
 		const result = search('markstream-octane')[0];
 		expect(result).toMatchObject({
