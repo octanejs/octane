@@ -436,6 +436,49 @@ describe('signal-valued DOM styles', () => {
 			scope.dispose();
 		}
 	});
+
+	it('still delivers typed input to a signal after its binding transition was superseded', async () => {
+		const scope = createScope({ scopeKey: 'control-supersede' });
+		const trans$ = scope.signal$('trans', 'trans-initial');
+		const urgent$ = scope.signal$('urgent', 'urgent-initial');
+		const initial = Promise.resolve('A') as any;
+		initial.status = 'fulfilled';
+		initial.value = 'A';
+		const transP = (() => {
+			let resolve!: (value: string) => void;
+			const promise = new Promise<string>((accept) => (resolve = accept));
+			return { promise, resolve };
+		})();
+		const urgentP = Promise.resolve('C') as any;
+		urgentP.status = 'fulfilled';
+		urgentP.value = 'C';
+		const rendered = mount(client.SignalControlSupersede, {
+			initialPromise: initial,
+			transitionPromise: transP.promise,
+			urgentPromise: urgentP,
+			initial: 'plain',
+			transition: trans$,
+			urgent: urgent$,
+		});
+		try {
+			await act(() => {});
+			const input = rendered.find('#control') as HTMLInputElement;
+			rendered.click('#swap-trans');
+			expect(rendered.find('#control')).toBe(input);
+			rendered.click('#swap-urgent');
+			expect(rendered.find('#value').textContent).toBe('C');
+			input.value = 'typed';
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			expect(urgent$.get()).toBe('typed');
+			await act(() => {
+				transP.resolve('B');
+			});
+			expect(rendered.find('#value').textContent).toBe('C');
+		} finally {
+			rendered.unmount();
+			scope.dispose();
+		}
+	});
 	it('keeps later spread styles authoritative and restores the signal when removed', () => {
 		const scope = createScope({ scopeKey: 'style-spread' });
 		const left$ = scope.signal$<number | null>('left', 1);

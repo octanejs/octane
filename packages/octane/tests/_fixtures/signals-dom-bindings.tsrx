@@ -1,4 +1,4 @@
-import { Activity } from 'octane';
+import { Activity, use, useState, useTransition } from 'octane';
 import { useSignal$ } from 'octane/signals/client';
 import type { CSSProperties, SignalCSSProperties } from 'octane/jsx-runtime';
 import { signal$, type SignalHandle } from 'octane/signals';
@@ -164,4 +164,47 @@ export function AbortableStyles(props: { left$: SignalHandle<number | null>; fai
 		<SignalStyles left$={props.left$} />
 		<MaybeError fail={props.fail} />
 	</section>
+}
+
+// A held transition binds a writable control signal, then an urgent render
+// supersedes it: the suspended attempt's binding mutation must roll back
+// cleanly, and the committed update must still leave the control live.
+function SuspendingValue(props: { promise: Promise<string> }) @{
+	const value = use(props.promise);
+	<span id="value">{value as string}</span>
+}
+
+export function SignalControlSupersede(props: {
+	initialPromise: Promise<string>;
+	transitionPromise: Promise<string>;
+	urgentPromise: Promise<string>;
+	initial: SignalHandle<string> | string;
+	transition: SignalHandle<string> | string;
+	urgent: SignalHandle<string> | string;
+}) @{
+	const [promise, setPromise] = useState(props.initialPromise);
+	const [draft, setDraft] = useState<SignalHandle<string> | string>(props.initial);
+	const [_isPending, start] = useTransition();
+	<div>
+		<button
+			id="swap-trans"
+			onClick={() => start(() => {
+				setPromise(props.transitionPromise);
+				setDraft(props.transition);
+			})}
+		>{'trans'}</button>
+		<button
+			id="swap-urgent"
+			onClick={() => {
+				setPromise(props.urgentPromise);
+				setDraft(props.urgent);
+			}}
+		>{'urgent'}</button>
+		<input id="control" {...{ value: draft }} />
+		@try {
+			<SuspendingValue promise={promise} />
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
 }

@@ -2946,7 +2946,16 @@ function endTransitionAttempt(attempt: TransitionAttempt | null): void {
 		for (let phase = 0; phase < 3; phase++) {
 			effects[phase].length = attempt.effects[phase];
 		}
-		(capture?.events ?? effectEventQueue).length = attempt.effectEvents;
+		const evQ = capture?.events ?? effectEventQueue;
+		// Same retention rule as the suspended-render unwind: payloads of renders
+		// that completed belong to their (possibly retained-hidden) subtree and
+		// must reach a reveal; only incomplete renders' payloads roll back.
+		let evW = attempt.effectEvents;
+		for (let i = attempt.effectEvents; i < evQ.length; i++) {
+			const e = evQ[i];
+			if (e.renderVersion === e.block.effectEventCompletedVersion) evQ[evW++] = e;
+		}
+		evQ.length = evW;
 		(capture?.eventActions ?? effectEventCommitActions).length = attempt.effectEventActions;
 		const stores = capture?.stores ?? storeSyncQueue;
 		for (let i = attempt.stores; i < stores.length; i++) {
@@ -4089,6 +4098,20 @@ function journalObjectOnce(obj: object): void {
 	TRANSITION_JOURNAL!.push(JOURNAL_BAG, obj, { ...obj }, Array.isArray(obj) ? obj.length : null);
 }
 
+/**
+ * Journal the fields a signal host-prop binding mutates per commit. Restoring
+ * by value is exact: `input`/`pendingControl` are tested by `!== undefined`,
+ * `disposed` is a boolean, and `sources`/`resolved` swap wholesale. Cheaper
+ * than journalObjectOnce's whole-record clone on this hot path.
+ */
+function journalSignalHostBinding(binding: SignalHostPropSourcesBinding): void {
+	TRANSITION_JOURNAL!.push(JOURNAL_PROP, binding, 'sources', binding.sources);
+	TRANSITION_JOURNAL!.push(JOURNAL_PROP, binding, 'resolved', binding.resolved);
+	TRANSITION_JOURNAL!.push(JOURNAL_PROP, binding, 'pendingControl', binding.pendingControl);
+	TRANSITION_JOURNAL!.push(JOURNAL_PROP, binding, 'input', binding.input);
+	TRANSITION_JOURNAL!.push(JOURNAL_PROP, binding, 'disposed', binding.disposed);
+}
+
 /** Defaults can move a pristine control's caret just like a live-value write. */
 function journalInputSelection(input: HTMLInputElement | HTMLTextAreaElement): void {
 	if (ROOT_RENDER_TRANSACTION !== null && input.ownerDocument.activeElement === input) {
@@ -4526,7 +4549,17 @@ function journalText(node: Text, previous: string | null): void {
 	journalBag();
 }
 
+/**
+ * True while a spread commit's write loop runs under a journaled transaction:
+ * the element's own replay entry supersedes per-attribute snapshots, so the
+ * writers below skip their getAttribute reads. Replaying writes (a rollback
+ * re-running a writer) never journal either — they only append dead entries
+ * to a log the rollback discards after replay.
+ */
+let JOURNAL_ATTR_SUPPRESS = false;
+
 function journalAttr(el: Element, name: string): void {
+	if (JOURNAL_ATTR_SUPPRESS || TRANSITION_JOURNAL_REPLAYING) return;
 	TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, (STAGED_DOM?.view(el) ?? el).getAttribute(name));
 	journalBag();
 }
@@ -10720,7 +10753,17 @@ function renderBlockInner(block: Block): true | undefined {
 				}
 				invalidateRender(block, owner);
 			}
-			effectEventTarget.length = effectEventCheckpoint;
+			// Entries queued by renders that COMPLETED may belong to a subtree a
+			// Suspense owner retains hidden — their payloads must follow the
+			// capture to its splice/discard fate like the effects beside them, or
+			// a reveal would publish the DOM without the matching impl. Only
+			// payloads of renders that did not complete are rolled back here.
+			let w = effectEventCheckpoint;
+			for (let i = effectEventCheckpoint; i < effectEventTarget.length; i++) {
+				const e = effectEventTarget[i];
+				if (e.renderVersion === e.block.effectEventCompletedVersion) effectEventTarget[w++] = e;
+			}
+			effectEventTarget.length = w;
 			effectEventActionTarget.length = effectEventActionCheckpoint;
 		}
 		EFFECT_EVENT_RENDER_TARGET = prevEffectEventTarget;
@@ -21491,6 +21534,19 @@ export function setDangerouslySetInnerHTMLSources(
 	}
 	const resolved = foundDanger && danger != null ? danger : null;
 	const resolvedChild = foundChild ? child : null;
+	commitResolvedDangerSourcesValues(el, resolved, resolvedChild);
+}
+
+/**
+ * The commit tail of setDangerouslySetInnerHTMLSources: validate, no-op check,
+ * journal, then write. Reached directly by the resolved-plan path, where the
+ * final danger/children values are already entries of the resolved record.
+ */
+function commitResolvedDangerSourcesValues(
+	el: Element,
+	resolved: unknown,
+	resolvedChild: unknown,
+): void {
 	if (VOID_ELEMENTS.has(el.localName) && (resolved !== null || resolvedChild != null)) {
 		throw new Error(formatClientError(8, el.localName));
 	}
@@ -21528,6 +21584,25 @@ export function setDangerouslySetInnerHTMLSources(
 	setDangerouslySetInnerHTML(el, resolved);
 	(STAGED_DOM?.view(el as any) ?? (el as any))[DANGER_HTML_RESOLVED_VALUE] = resolved;
 	(STAGED_DOM?.view(el as any) ?? (el as any))[DANGER_HTML_RESOLVED_CHILD] = resolvedChild;
+}
+
+/**
+ * Danger/children resolution for a record already produced by a committed
+ * plan: key presence in the record is exactly "a live source produced it",
+ * and the stored value is the last-writer winner — identical to the scan.
+ */
+function commitResolvedDangerSources(
+	el: Element,
+	resolved: Record<string, unknown>,
+	ignoreSourceChildren: boolean,
+): void {
+	commitResolvedDangerSourcesValues(
+		el,
+		'dangerouslySetInnerHTML' in resolved && resolved.dangerouslySetInnerHTML != null
+			? resolved.dangerouslySetInnerHTML
+			: null,
+		!ignoreSourceChildren && 'children' in resolved ? resolved.children : null,
+	);
 }
 
 /** Stamp a compiler-proven non-nullish child onto a potential raw-HTML host. */
@@ -22806,6 +22881,23 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 	const t = typeof value;
 	let next: string | null;
 	if (value == null || t === 'function' || t === 'symbol') {
+		// Match the generic router's dev diagnostic for dropped function/symbol
+		// values on standard elements (custom elements keep raw semantics — no
+		// warning — and nullish values are a plain absence, never an error).
+		if (
+			process.env.NODE_ENV !== 'production' &&
+			t !== 'undefined' &&
+			value !== null &&
+			(el as any).__oct_loc !== undefined &&
+			!isHtmlCustomElement(el)
+		) {
+			devWarnAttributeOnce(
+				el,
+				name,
+				`Invalid value for prop \`${name}\` on <${el.localName}> tag. ` +
+					'Either remove it from the element, or pass a string or number value to keep it in the DOM.',
+			);
+		}
 		next = null;
 	} else {
 		// Match the generic attribute path's useful DEV diagnostic without pulling
@@ -22821,6 +22913,21 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 				name,
 				`The provided \`${name}\` attribute is an object; it will stringify to ` +
 					'"[object Object]". Pass a string (or a value with a meaningful toString) instead.',
+			);
+		}
+		// The generic router's data-* arm warns on NaN in dev; the lean writer
+		// keeps the same diagnostic so spread-routed and compiled writes agree.
+		if (
+			process.env.NODE_ENV !== 'production' &&
+			t === 'number' &&
+			(el as any).__oct_loc !== undefined &&
+			Number.isNaN(value)
+		) {
+			devWarnAttributeOnce(
+				el,
+				name,
+				`Received NaN for the \`${name}\` attribute. ` +
+					'If this is expected, cast the value to a string.',
 			);
 		}
 		next = typeof value === 'string' ? value : String(value);
@@ -23281,13 +23388,69 @@ function applyStyleValue(
 	}
 }
 
+// Whether `style[name] = value` performs a real declaration write: the name is
+// a string-typed CSSStyleDeclaration IDL attribute (camelCase or a verified
+// vendor spelling the platform exposes). The IDL setter runs the same CSS
+// parse as setProperty but skips the kebab-case conversion and CSSOM's
+// property-name lookup — the direct write is the common case on this path.
+// Only a dashless name can be an IDL attribute: dashed keys (`font-size`,
+// `--custom`, `-webkit-x`) READ through the declaration's named getter, but
+// assigning them never reaches the declaration — a dead expando. `cssText` is
+// excluded by name: its IDL setter replaces the whole declaration, never a
+// per-property write. The typeof probe admits only settable string attributes
+// (methods are functions; `length`/`parentRule` are non-string), so miscased or
+// unsupported spellings fall back to setProperty rather than expanding onto
+// the object. Probed lazily once per property name against a detached element;
+// a DOM-less (SSR/headless) module never touches `document` and always keeps
+// the setProperty path.
+const styleIdlWritableCache = new Map<string, boolean>();
+let styleIdlProbe: CSSStyleDeclaration | null | undefined;
+// Per spec an IDL assignment is `setProperty(prop, value, '')` — a wholesale
+// declaration replace that clears a stale `!important` priority. Some CSSOM
+// implementations (jsdom) instead preserve the existing priority on a
+// camelCase write; on those the important→plain transition still needs
+// setProperty. Probed once alongside the declaration.
+let styleIdlKeepsPriority = false;
+
+function styleIdlWritable(name: string): boolean {
+	const cached = styleIdlWritableCache.get(name);
+	if (cached !== undefined) return cached;
+	let writable = false;
+	// The letter-first check keeps the typeof probe honest: index keys like '0'
+	// READ as strings through the declaration's indexed getter but can never be
+	// IDL attributes, and junk punctuation must fall through to setProperty.
+	const code = name.charCodeAt(0);
+	if (
+		name.indexOf('-') === -1 &&
+		name !== 'cssText' &&
+		((code >= 65 && code <= 90) || (code >= 97 && code <= 122))
+	) {
+		if (styleIdlProbe === undefined) {
+			if (typeof document === 'undefined') {
+				styleIdlProbe = null;
+			} else {
+				const probe = document.createElement('div').style;
+				probe.setProperty('color', 'red', 'important');
+				(probe as any).color = 'blue';
+				styleIdlKeepsPriority = probe.getPropertyPriority('color') === 'important';
+				// Leave the probe declaration empty again so its indexed getters
+				// stay undefined for every later name check.
+				probe.removeProperty('color');
+				styleIdlProbe = probe;
+			}
+		}
+		writable = styleIdlProbe !== null && typeof (styleIdlProbe as any)[name] === 'string';
+	}
+	styleIdlWritableCache.set(name, writable);
+	return writable;
+}
+
 function applyStyleProperty(
 	el: HTMLElement | SVGElement,
 	style: CSSStyleDeclaration,
 	name: string,
 	value: any,
 ): void {
-	const prop = styleName(name);
 	// React parity: a bare number gets `px` unless it's 0, a custom prop, or unitless.
 	let s: string;
 	if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
@@ -23307,12 +23470,24 @@ function applyStyleProperty(
 	const tail = s.trimEnd();
 	if (tail.endsWith(IMPORTANT_SUFFIX)) {
 		style.setProperty(
-			prop,
+			styleName(name),
 			tail.slice(0, tail.length - IMPORTANT_SUFFIX.length).trimEnd(),
 			'important',
 		);
+	} else if (styleIdlWritable(name)) {
+		if (styleIdlKeepsPriority) {
+			// Priority-preserving implementation: a declaration carrying
+			// `!important` keeps it through a plain assignment, so replacing the
+			// declaration (and dropping the flag) takes the explicit route.
+			const prop = styleName(name);
+			if (style.getPropertyPriority(prop) === 'important') {
+				style.setProperty(prop, s);
+				return;
+			}
+		}
+		(style as any)[name] = s;
 	} else {
-		style.setProperty(prop, s);
+		style.setProperty(styleName(name), s);
 	}
 }
 
@@ -23445,16 +23620,10 @@ function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 /** Snapshot a JSX spread with own-enumerable Object.assign semantics. */
 export function snapshotSpread(value: unknown): Record<string, unknown> | null {
 	if (value == null) return null;
-	const source = Object(value) as Record<PropertyKey, unknown>;
-	const snapshot: Record<string, unknown> = Object.create(null);
-	for (const key of Reflect.ownKeys(source)) {
-		if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue;
-		const next = source[key];
-		// JSX spread evaluates enumerable symbol getters, but DOM prop routing has
-		// no symbol-key surface. Preserve the observable read and discard the key.
-		if (typeof key === 'string') snapshot[key] = next;
-	}
-	return snapshot;
+	// `{...v}` is exactly own-enumerable Object.assign: symbol-keyed getters are
+	// still read (the JSX-observable part) and copied, then sit inert because
+	// every consumer enumerates string keys only.
+	return { ...(value as object) };
 }
 
 type HostPropSource = readonly [
@@ -23469,6 +23638,10 @@ interface HostPropWriter {
 	value: unknown;
 	firstOrder: number;
 	lastOrder: number;
+	/** Index of the producing source tuple in `sources`. */
+	src: number;
+	/** Index into the spread's enumerable string keys; -1 for named writers. */
+	skey: number;
 }
 
 function formActionAttributeName(el: Element, name: string): string | null {
@@ -23527,22 +23700,33 @@ function resolveHostPropSources(
 	sources: readonly HostPropSource[],
 	props: Map<string, HostPropWriter>,
 	readStyle: ((value: unknown) => unknown) | undefined,
+	winners?: HostPropWriter[],
 ): Record<string, unknown> {
 	let classMerges: Array<{ rawName: string; value: unknown; order: number }> | null = null;
 	let sourceOrder = 0;
-	function record(rawName: unknown, value: unknown): void {
+	function record(rawName: unknown, value: unknown, src: number, skey: number): void {
 		if (typeof rawName !== 'string') return;
 		const order = sourceOrder++;
 		const previous = props.get(rawName);
 		if (previous !== undefined) {
 			previous.value = value;
 			previous.lastOrder = order;
+			previous.src = src;
+			previous.skey = skey;
 		} else {
-			props.set(rawName, { name: rawName, value, firstOrder: order, lastOrder: order });
+			props.set(rawName, {
+				name: rawName,
+				value,
+				firstOrder: order,
+				lastOrder: order,
+				src,
+				skey,
+			});
 		}
 	}
 
-	for (const source of sources) {
+	for (let i = 0; i < sources.length; i++) {
+		const source = sources[i];
 		if (!source[0]) {
 			const rawName = source[1];
 			if (
@@ -23553,13 +23737,14 @@ function resolveHostPropSources(
 				(classMerges ??= []).push({ rawName, value: source[2], order: sourceOrder++ });
 				continue;
 			}
-			record(rawName, source[2]);
+			record(rawName, source[2], i, -1);
 			continue;
 		}
 		const spread = source[1];
 		if (spread == null || (typeof spread !== 'object' && typeof spread !== 'function')) continue;
+		let skey = 0;
 		for (const name of Object.keys(Object(spread))) {
-			record(name, (spread as Record<string, unknown>)[name]);
+			record(name, (spread as Record<string, unknown>)[name], i, skey++);
 		}
 	}
 
@@ -23598,6 +23783,8 @@ function resolveHostPropSources(
 					value: extra.value,
 					firstOrder: extra.order,
 					lastOrder: extra.order,
+					src: -1,
+					skey: -1,
 				});
 			}
 		}
@@ -23606,9 +23793,551 @@ function resolveHostPropSources(
 	const ordered = needsWinningOrderSort
 		? [...values.values()].sort((a, b) => a.firstOrder - b.firstOrder)
 		: values.values();
-	for (const { name, value } of ordered) resolved[name] = value;
+	for (const writer of ordered) {
+		resolved[writer.name] = writer.value;
+		winners?.push(writer);
+	}
 	if (readStyle !== undefined && 'style' in resolved) resolved.style = readStyle(resolved.style);
 	return resolved;
+}
+
+const SOURCES_PLAN = /* @__PURE__ */ Symbol('octane.host-prop-sources-plan');
+/**
+ * Consecutive failed plan verifications after which an element stops paying
+ * attachSourcesPlan's per-commit allocations — a source shape that never
+ * stabilizes reverts to the full path for good. ponytail: poisoned is
+ * permanent; a shape that stabilizes later keeps the full path (reviving it
+ * would take a decay or per-shape plans).
+ */
+const SOURCES_PLAN_MISSES = /* @__PURE__ */ Symbol('octane.host-prop-sources-plan-misses');
+const SOURCES_PLAN_MISS_LIMIT = 3;
+
+/**
+ * A committed source-shape descriptor letting the next commit rebuild the
+ * resolved record without the writer Maps. Valid only while every commit's
+ * `sources` tuple keeps the identical shape — same length, same writer names
+ * in the same positions, no merge flags, at most one spread, and that spread's
+ * enumerable string keys in the same order. `entries` replays the winning
+ * assignment in resolved order: `skey < 0` reads `sources[src][2]`, otherwise
+ * the spread's value for `spreadKeys[skey]`. Canonicalization is a pure
+ * function of (element, rawName), so a matching shape reproduces the exact
+ * resolved key set the full resolve would emit.
+ */
+interface ResolvedSourcesPlan {
+	readonly len: number;
+	readonly shape: readonly (string | 0)[];
+	readonly spreadKeys: readonly string[] | null;
+	readonly entries: readonly PlanEntry[];
+	/** entries[] index the scalar source at position i wins, or -1. */
+	readonly srcEntry: readonly number[];
+	/** entries[] index the spread key at index k wins, or -1. */
+	readonly spreadEntry: readonly number[];
+	/**
+	 * Scratch the scan fills with (entry index → new value) diffs and the build
+	 * consumes — reused across this element's commits so a changed commit
+	 * allocates only the resolved record itself.
+	 */
+	readonly diffIdx: number[];
+	readonly diffVal: unknown[];
+	diffLen: number;
+}
+
+/**
+ * Preclassified writer arm for one resolved key — the same dispatch
+ * setSpreadBody re-derives per key per commit. `extra` carries the arm's
+ * operand: the eventSlot record for W_EVENT, the canonical attribute name for
+ * W_ACTION.
+ */
+interface PlanEntry {
+	key: string;
+	src: number;
+	skey: number;
+	kind: number;
+	extra?: unknown;
+}
+
+const W_SKIP = 0;
+const W_REF = 1;
+const W_CLASS = 2;
+const W_STYLE = 3;
+const W_EVENT = 4;
+const W_ACTION = 5;
+const W_DATA = 6;
+const W_ATTR = 7;
+
+const SPREAD_SHAPE: 0 = 0;
+
+function planEntryKind(el: Element, key: string): PlanEntry['kind'] {
+	switch (key) {
+		case 'key':
+		case 'children':
+		case 'dangerouslySetInnerHTML':
+		case 'suppressHydrationWarning':
+		case 'suppressNativeChangeWarning':
+		case '__octaneNativeChangeDiagnostic':
+			return W_SKIP;
+		case 'ref':
+			return W_REF;
+		case 'class':
+		case 'className':
+			return W_CLASS;
+		case 'style':
+			return W_STYLE;
+		case 'autoFocus':
+			return isHtmlCustomElement(el) ? W_ATTR : W_SKIP;
+	}
+	const actionName = formActionAttributeName(el, key);
+	if (actionName !== null) return W_ACTION;
+	if (key.startsWith('data-') && VALID_ATTR_NAME.test(key)) return W_DATA;
+	if (eventSlot(key, el)) return W_EVENT;
+	return W_ATTR;
+}
+
+function attachSourcesPlan(
+	el: Element,
+	resolved: Record<string, unknown>,
+	sources: readonly HostPropSource[],
+	winners: HostPropWriter[],
+): void {
+	let spreadIndex = -1;
+	let spreadKeys: readonly string[] | null = null;
+	const shape: (string | 0)[] = new Array(sources.length);
+	for (let i = 0; i < sources.length; i++) {
+		const source = sources[i];
+		if (source[0]) {
+			if (spreadIndex !== -1) return;
+			spreadIndex = i;
+			const spread = source[1];
+			spreadKeys =
+				spread !== null && (typeof spread === 'object' || typeof spread === 'function')
+					? Object.keys(Object(spread))
+					: EMPTY_KEYS;
+			shape[i] = SPREAD_SHAPE;
+			continue;
+		}
+		if (source[3] === true) return;
+		shape[i] = source[1] as string;
+	}
+	const entries = new Array<PlanEntry>(winners.length);
+	const srcEntry = new Array<number>(sources.length).fill(-1);
+	const spreadEntry = new Array<number>(spreadKeys?.length ?? 0).fill(-1);
+	for (let i = 0; i < winners.length; i++) {
+		const writer = winners[i];
+		const kind = planEntryKind(el, writer.name);
+		entries[i] = {
+			key: writer.name,
+			src: writer.src,
+			skey: writer.skey,
+			kind,
+			extra:
+				kind === W_EVENT
+					? eventSlot(writer.name, el)
+					: kind === W_ACTION
+						? formActionAttributeName(el, writer.name)
+						: undefined,
+		};
+		if (writer.skey < 0) srcEntry[writer.src] = i;
+		else spreadEntry[writer.skey] = i;
+	}
+	Object.defineProperty(resolved, SOURCES_PLAN, {
+		// Configurable so an unchanged commit retaining `prev` can re-stamp the
+		// accurate plan over a stale one after a shape change.
+		configurable: true,
+		value: {
+			len: sources.length,
+			shape,
+			spreadKeys,
+			entries,
+			srcEntry,
+			spreadEntry,
+			diffIdx: new Array<number>(winners.length),
+			diffVal: new Array<unknown>(winners.length),
+			diffLen: 0,
+		} satisfies ResolvedSourcesPlan,
+	});
+}
+
+const EMPTY_KEYS: readonly string[] = [];
+
+/**
+ * One pass over `sources` verifying the committed shape and declining on live
+ * signal handles the same way resolveSignalHostPropSources detects them.
+ * `children` and `readStyle`-style values stay raw in both paths, so a handle
+ * there is intentionally not flagged. A false return means "shape changed or
+ * signals present": the caller takes the full path, which still produces a
+ * correct result either way.
+ */
+function scanSourcesForPlan(
+	sources: readonly HostPropSource[],
+	plan: ResolvedSourcesPlan,
+	prev: Record<string, unknown>,
+	readStyle: ((value: unknown) => unknown) | undefined,
+): boolean {
+	if (sources.length !== plan.len) return false;
+	plan.diffLen = 0;
+	const entries = plan.entries;
+	for (let i = 0; i < plan.len; i++) {
+		const source = sources[i];
+		const shape = plan.shape[i];
+		if (shape === SPREAD_SHAPE) {
+			if (!source[0]) return false;
+			const candidate = source[1];
+			const committed = plan.spreadKeys!;
+			if (
+				candidate !== null &&
+				(typeof candidate === 'object' || typeof candidate === 'function')
+			) {
+				// Emitted spreads always arrive as snapshotSpread records — plain
+				// data properties, no getters — so `for in` matches the full
+				// resolve's Object.keys order and re-reads are side-effect free.
+				// resolveSignalHostPropSources scans only object spreads; keep
+				// that quirk so function sources stay its problem, not ours.
+				const scanHandles = typeof candidate === 'object';
+				const record = candidate as Record<string, unknown>;
+				let k = 0;
+				for (const name in record) {
+					if (name !== committed[k]) return false;
+					const current = record[name];
+					const ei = plan.spreadEntry[k];
+					k++;
+					if (ei >= 0) {
+						const styled =
+							readStyle !== undefined && entries[ei].key === 'style' ? readStyle(current) : current;
+						if (!Object.is(styled, prev[entries[ei].key])) {
+							plan.diffIdx[plan.diffLen] = ei;
+							plan.diffVal[plan.diffLen] = styled;
+							plan.diffLen++;
+						}
+					}
+					if (!scanHandles || name === 'children') continue;
+					if (name === 'style' && readStyle !== undefined) continue;
+					if (isSignalHandle(current)) return false;
+					if (
+						name === 'style' &&
+						current !== null &&
+						typeof current === 'object' &&
+						!Array.isArray(current)
+					) {
+						for (const inner of Object.keys(current)) {
+							if (isSignalHandle((current as Record<string, unknown>)[inner])) return false;
+						}
+					}
+				}
+				if (k !== committed.length) return false;
+			} else if (committed.length !== 0) return false;
+			continue;
+		}
+		if (source[0] || source[1] !== shape || source[3] === true) return false;
+		const current = source[2];
+		const ei = plan.srcEntry[i];
+		if (ei >= 0) {
+			const styled =
+				readStyle !== undefined && entries[ei].key === 'style' ? readStyle(current) : current;
+			if (!Object.is(styled, prev[entries[ei].key])) {
+				plan.diffIdx[plan.diffLen] = ei;
+				plan.diffVal[plan.diffLen] = styled;
+				plan.diffLen++;
+			}
+		}
+		if (shape === 'children' || (shape === 'style' && readStyle !== undefined)) continue;
+		if (isSignalHandle(current)) return false;
+		if (
+			shape === 'style' &&
+			current !== null &&
+			typeof current === 'object' &&
+			!Array.isArray(current)
+		) {
+			for (const inner of Object.keys(current)) {
+				if (isSignalHandle((current as Record<string, unknown>)[inner])) return false;
+			}
+		}
+	}
+	return true;
+}
+
+/**
+ * Replay the committed plan's winner entries into the resolved record, using
+ * the diffs the scan already collected. Returns `prev` untouched when nothing
+ * changed — key sets are identical by plan verification — else a fresh record
+ * in winner order carrying the same plan for the next commit.
+ */
+function buildFromSourcesPlan(
+	plan: ResolvedSourcesPlan,
+	prev: Record<string, unknown>,
+): Record<string, unknown> {
+	if (plan.diffLen === 0) return prev;
+	const entries = plan.entries;
+	const next: Record<string, unknown> = Object.create(null);
+	for (const entry of entries) next[entry.key] = prev[entry.key];
+	for (let j = 0; j < plan.diffLen; j++) {
+		next[entries[plan.diffIdx[j]].key] = plan.diffVal[j];
+		plan.diffVal[j] = undefined;
+	}
+	plan.diffLen = 0;
+	Object.defineProperty(next, SOURCES_PLAN, { configurable: true, value: plan });
+	return next;
+}
+
+/**
+ * Write a changed resolved record through the plan's preclassified writer
+ * arms — the same per-key semantics setSpreadBody dispatches, minus the
+ * re-derived routing. Key sets are identical by shape verification, so no
+ * removal pass can ever run. `replay` marks a rollback restore: refs and
+ * listeners keep their own journal channels (queue truncation / JOURNAL_PROP)
+ * and are skipped.
+ */
+function writePlannedDiff(
+	el: Element,
+	next: Record<string, unknown>,
+	prev: Record<string, unknown>,
+	plan: ResolvedSourcesPlan,
+	scope: Scope,
+	replay = false,
+): void {
+	// Same journal contract as setSpread: one replay entry supersedes the
+	// per-attribute snapshots the writers below would otherwise take.
+	const journalReplay =
+		!replay &&
+		TRANSITION_JOURNAL !== null &&
+		!TRANSITION_JOURNAL_REPLAYING &&
+		activeHydration() === null;
+	if (journalReplay) {
+		journalUndo(() => writePlannedDiff(el, prev, next, plan, scope, true));
+		journalBag();
+		JOURNAL_ATTR_SUPPRESS = true;
+	}
+	try {
+		if (!replay) stampSpreadPropFlags(el, next);
+		for (const entry of plan.entries) {
+			const key = entry.key;
+			const v = next[key];
+			const pv = prev[key];
+			switch (entry.kind) {
+				case W_STYLE:
+					// setStyle diffs internally — always runs so hidden-display
+					// bookkeeping sees the commit.
+					setStyle(el as HTMLElement, v, pv);
+					continue;
+				case W_CLASS:
+					if (v === pv) continue;
+					setClassAttr(el, v);
+					continue;
+				case W_REF:
+					if (replay || v === pv) continue;
+					if (pv != null) queueRefDetach(pv, el);
+					queueRefAttach(scope, v, el);
+					continue;
+				case W_EVENT: {
+					if (replay || v === pv) continue;
+					const ev = entry.extra as ParsedEventSlot;
+					if (ev.capture) {
+						if (!_delegatedCapture.has(ev.type)) delegateCaptureEvents([ev.type]);
+					} else if (!_delegated.has(ev.type)) {
+						delegateEvents([ev.type]);
+					}
+					setEventHandler(
+						el,
+						ev.key,
+						process.env.NODE_ENV !== 'production' ? devEventListener(key, v) : v,
+					);
+					continue;
+				}
+				case W_ACTION:
+					if (v === pv) continue;
+					setFormAction(
+						el as HTMLFormElement | HTMLButtonElement | HTMLInputElement,
+						entry.extra as string,
+						v,
+						pv,
+					);
+					continue;
+				case W_DATA:
+					if (v === pv) continue;
+					setStringData(el, key, v);
+					continue;
+				case W_ATTR:
+					if (v === pv) continue;
+					setAttribute(el, key, v);
+					continue;
+				default:
+					continue; // W_SKIP
+			}
+		}
+		if (process.env.NODE_ENV !== 'production' && !replay) queueDevFormDiagnostic(el, scope);
+	} finally {
+		if (journalReplay) JOURNAL_ATTR_SUPPRESS = false;
+	}
+}
+
+/**
+ * Replay the committed sources plan against this commit's sources — one flat
+ * pass verifies the shape, then builds and writes only the diffs. Returns the
+ * record to commit (`prev` itself when nothing changed) or null when there is
+ * no plan, hydration is active, the shape changed, or signal handles appear —
+ * the caller then takes the full path. Failed verifications count toward
+ * SOURCES_PLAN_MISS_LIMIT, after which the element stops paying
+ * attachSourcesPlan's allocations entirely.
+ */
+function replaySourcesPlan(
+	el: Element,
+	sources: readonly HostPropSource[],
+	prev: Record<string, unknown>,
+	scope: Scope,
+	hasNestedChildren: boolean,
+	readStyle: ((value: unknown) => unknown) | undefined,
+): Record<string, unknown> | null {
+	if (activeHydration() !== null) return null;
+	const plan = (prev as Record<symbol, unknown>)[SOURCES_PLAN] as ResolvedSourcesPlan | undefined;
+	if (plan === undefined) return null;
+	if (!scanSourcesForPlan(sources, plan, prev, readStyle)) {
+		const tagged = el as any;
+		tagged[SOURCES_PLAN_MISSES] = ((tagged[SOURCES_PLAN_MISSES] as number | undefined) ?? 0) + 1;
+		return null;
+	}
+	(el as any)[SOURCES_PLAN_MISSES] = 0;
+	const next = buildFromSourcesPlan(plan, prev);
+	if (
+		next === prev &&
+		(hiddenStyleWriter === null || !('style' in next) || !HIDDEN_DISPLAYS.has(el as HTMLElement))
+	) {
+		stampSpreadPropFlags(el, prev);
+		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
+		return prev;
+	}
+	writePlannedDiff(el, next, prev, plan, scope);
+	commitResolvedDangerSources(el, next, hasNestedChildren);
+	return next;
+}
+
+/**
+ * Shallow equality over resolved host-prop records: identical own key sets with
+ * `Object.is` values. A key only `prev` still carries is a pending removal — a
+ * real DOM write — so both directions must agree before a commit may bail.
+ */
+function resolvedHostPropsEqual(
+	next: Record<string, unknown>,
+	prev: Record<string, unknown>,
+): boolean {
+	for (const k in next) {
+		if (!Object.prototype.propertyIsEnumerable.call(prev, k) || !Object.is(next[k], prev[k]))
+			return false;
+	}
+	for (const k in prev) {
+		if (!Object.prototype.propertyIsEnumerable.call(next, k)) return false;
+	}
+	return true;
+}
+
+// The writer-name rule from resolveHostPropSources, including the dev-only
+// spelling kept for tabIndex/htmlFor — the compare must name keys exactly as
+// the resolved record does.
+function resolvedHostSourceKey(el: Element, rawName: string): string {
+	return process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
+		? rawName
+		: isHostPropIdentityKey(rawName)
+			? rawName
+			: normalizedHostProp(el, rawName);
+}
+
+/**
+ * Single-spread fast bail for setHostPropSources: one spread object plus any
+ * number of plain named writers (no class-merge flag) can be compared against
+ * the committed record directly, skipping the writer Maps and resolved record
+ * resolveHostPropSources would allocate. Requiring EVERY writer to `Object.is`-
+ * match `prev` under its own resolved key makes writer ordering irrelevant —
+ * whichever writer wins an identity collision, its value already equals the
+ * committed one — and claiming every committed key rules out a pending
+ * removal. Anything unrecognized falls through to the full resolve: a pure
+ * fast path over the resolved-record bail below, never a semantic fork.
+ */
+function hostSourcesMatchCommitted(
+	el: Element,
+	sources: readonly HostPropSource[],
+	prev: Record<string, unknown>,
+	readStyle: ((value: unknown) => unknown) | undefined,
+): boolean {
+	let spread: Record<PropertyKey, unknown> | null = null;
+	let spreadSeen = false;
+	let sawStyle = false;
+	for (const source of sources) {
+		if (source[0]) {
+			if (spreadSeen) return false;
+			spreadSeen = true;
+			const candidate = source[1];
+			// resolveHostPropSources skips a nullish or primitive spread. A
+			// function source is legal there but too rare to keep off the full
+			// path.
+			if (candidate == null || (typeof candidate !== 'object' && typeof candidate !== 'function'))
+				continue;
+			if (typeof candidate === 'function') return false;
+			spread = candidate as Record<PropertyKey, unknown>;
+			continue;
+		}
+		const rawName = source[1];
+		// record() ignores non-string names; the resolve loop drops 'key'.
+		if (typeof rawName !== 'string' || rawName === 'key') continue;
+		if (source[3] === true) return false;
+		const key = resolvedHostSourceKey(el, rawName);
+		// readStyle rewrites resolved.style, so a raw source compare cannot
+		// prove it equal.
+		if (key === 'style' && readStyle !== undefined) return false;
+		if (!Object.prototype.propertyIsEnumerable.call(prev, key) || !Object.is(prev[key], source[2]))
+			return false;
+		sawStyle ||= key === 'style';
+	}
+	if (spread !== null) {
+		for (const key of Reflect.ownKeys(spread)) {
+			if (!Object.prototype.propertyIsEnumerable.call(spread, key)) continue;
+			const value = spread[key];
+			// snapshotSpread parity: symbol-keyed getters are still read, then
+			// discarded — DOM prop routing has no symbol surface.
+			if (typeof key !== 'string') continue;
+			if (key === 'key') continue;
+			// Identity keys carry routing a raw compare cannot prove, and an
+			// aliased name would need the identity fold — both stay on the full
+			// path.
+			if (isHostPropIdentityKey(key) || normalizedHostProp(el, key) !== key) return false;
+			if (key === 'style') {
+				if (readStyle !== undefined) return false;
+				sawStyle = true;
+			}
+			if (!Object.prototype.propertyIsEnumerable.call(prev, key) || !Object.is(prev[key], value))
+				return false;
+		}
+	}
+	// The resolved-record bail's hidden-display exclusion: hiddenStyleWriter
+	// bookkeeping is not visible to a raw compare either.
+	if (hiddenStyleWriter !== null && sawStyle && HIDDEN_DISPLAYS.has(el as HTMLElement))
+		return false;
+	// Coverage: every committed key must name a live writer. A key only prev
+	// still carries is a pending removal the bail would wrongly keep.
+	for (const pk in prev) {
+		if (!Object.prototype.propertyIsEnumerable.call(prev, pk)) continue;
+		if (
+			spread !== null &&
+			pk !== 'key' &&
+			!isHostPropIdentityKey(pk) &&
+			normalizedHostProp(el, pk) === pk &&
+			(pk !== 'style' || readStyle === undefined) &&
+			Object.prototype.propertyIsEnumerable.call(spread, pk)
+		)
+			continue;
+		let claimed = false;
+		for (const source of sources) {
+			if (
+				!source[0] &&
+				source[3] !== true &&
+				typeof source[1] === 'string' &&
+				source[1] !== 'key' &&
+				resolvedHostSourceKey(el, source[1]) === pk
+			) {
+				claimed = true;
+				break;
+			}
+		}
+		if (!claimed) return false;
+	}
+	return true;
 }
 
 export function setHostPropSources(
@@ -23620,12 +24349,62 @@ export function setHostPropSources(
 	readStyle?: (value: unknown) => unknown,
 	deferControl = false,
 ): Record<string, unknown> {
-	const props = new Map<string, HostPropWriter>();
-	const resolved = resolveHostPropSources(el, sources, props, readStyle);
 	const tag = el.localName;
 	const formHost = tag === 'input' || tag === 'textarea' || tag === 'select';
-	setSpread(el, resolved, prev, scope, true, formHost);
-	setDangerouslySetInnerHTMLSources(el, sources, hasNestedChildren);
+	const hydration = activeHydration();
+	// Shape-stable sources replay the committed plan directly — one flat pass
+	// over the winner entries rebuilds (or bails into) the resolved record
+	// without materializing either writer Map. Form hosts stay on the full
+	// path: their control reassertion below reads the raw writer Map.
+	if (prev !== undefined && !formHost) {
+		const replayed = replaySourcesPlan(el, sources, prev, scope, hasNestedChildren, readStyle);
+		if (replayed !== null) return replayed;
+	}
+	// Single-spread sources whose writers all match the committed record bail
+	// without materializing the writer Maps or resolved record at all — the
+	// same tail as the resolved-record bail below, minus the allocation. Form
+	// hosts stay on the full path: their control reassertion below reads the
+	// raw writer Map.
+	if (
+		prev !== undefined &&
+		!formHost &&
+		hydration === null &&
+		hostSourcesMatchCommitted(el, sources, prev, readStyle)
+	) {
+		stampSpreadPropFlags(el, prev);
+		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
+		return prev;
+	}
+	const props = new Map<string, HostPropWriter>();
+	const winners: HostPropWriter[] = [];
+	const resolved = resolveHostPropSources(el, sources, props, readStyle, winners);
+	// A commit whose fully-resolved record matches the last commit's has no write
+	// tail to run: every per-key writer already identity-skips, and the
+	// HTML-source reassert short-circuits on an equal resolved value, so the
+	// loops would be a pure re-scan. The compare must be on the RESOLVED record —
+	// `snapshotSpread` re-allocates each source every render, so source identity
+	// can never fire. `prev === undefined` mounts and hydration adoptions never
+	// reach this; hydration-active commits and hidden-display elements keep the
+	// full path because their writers carry extra bookkeeping the resolved
+	// record does not capture.
+	const unchanged =
+		prev !== undefined &&
+		hydration === null &&
+		(hiddenStyleWriter === null ||
+			!('style' in resolved) ||
+			!HIDDEN_DISPLAYS.has(el as HTMLElement)) &&
+		resolvedHostPropsEqual(resolved, prev);
+	if (unchanged) {
+		// Only the write tail is skipped — dev validation and the JS-only
+		// suppress/diagnostic stamps still run, so the element surface is
+		// identical to a full commit. Controlled-form reassertion below is
+		// outside the tail and still fires.
+		stampSpreadPropFlags(el, resolved);
+		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
+	} else {
+		setSpread(el, resolved, prev, scope, true, formHost);
+		setDangerouslySetInnerHTMLSources(el, sources, hasNestedChildren);
+	}
 	// Form writers use the exact JSX spelling, independently of DOM aliases:
 	// e.g. a later VALUE attribute must not replace the controlled value prop.
 	// The raw writer Map already resolved source precedence and getter reads.
@@ -23639,7 +24418,21 @@ export function setHostPropSources(
 			props.get('defaultChecked')?.value,
 			props.get('multiple')?.value,
 		);
-	return resolved;
+	const out = unchanged ? prev : resolved;
+	// Plan attach waits for the second commit: a mount's resolved record has no
+	// successor to replay for, so mount-only elements never pay the plan's
+	// allocations. The plan stamps the record actually retained — on an
+	// unchanged commit resolvedHostPropsEqual just proved `prev` carries the
+	// identical keys, so the plan replays correctly against it — rather than
+	// dying with a discarded `resolved`. Elements whose scans keep failing stop
+	// paying the attach once SOURCES_PLAN_MISS_LIMIT trips.
+	if (
+		!formHost &&
+		prev !== undefined &&
+		(((el as any)[SOURCES_PLAN_MISSES] as number | undefined) ?? 0) < SOURCES_PLAN_MISS_LIMIT
+	)
+		attachSourcesPlan(el, out!, sources, winners);
+	return out;
 }
 
 const SIGNAL_HOST_PROP_SOURCES = /* @__PURE__ */ Symbol('octane.signal-host-prop-sources');
@@ -23683,6 +24476,8 @@ function resolveSignalStyle(
 	return copy ?? value;
 }
 
+const EMPTY_SIGNAL_HANDLES: Set<SignalHandle<unknown>> = /* @__PURE__ */ new Set();
+
 function resolveSignalHostPropSources(
 	sources: readonly HostPropSource[],
 	readStyle?: (value: unknown) => unknown,
@@ -23693,22 +24488,24 @@ function resolveSignalHostPropSources(
 } {
 	// Children keep their handle for the separate child binding; resolving them
 	// here would subscribe only the host props and strand later child updates.
-	const handles = new Set<SignalHandle<unknown>>();
+	// The handles Set is allocated lazily: signal-free commits are the common
+	// case and must not pay an allocation per commit.
+	let handles: Set<SignalHandle<unknown>> | undefined;
 	let rows: HostPropSource[] | undefined;
 	for (let i = 0; i < sources.length; i++) {
 		const source = sources[i];
 		if (!source[0]) {
-			const value =
+			const next =
 				source[1] === 'children' || (source[1] === 'style' && readStyle !== undefined)
 					? source[2]
 					: source[1] === 'style'
-						? resolveSignalStyle(source[2], handles, read)
+						? resolveSignalStyle(source[2], (handles ??= new Set()), read)
 						: isSignalHandle(source[2])
-							? (handles.add(source[2]), read(source[2]))
+							? ((handles ??= new Set()).add(source[2]), read(source[2]))
 							: source[2];
-			if (value !== source[2]) {
+			if (next !== source[2]) {
 				rows ??= sources.slice() as HostPropSource[];
-				rows[i] = [false, source[1], value, source[3]];
+				rows[i] = [false, source[1], next, source[3]];
 			}
 			continue;
 		}
@@ -23717,17 +24514,17 @@ function resolveSignalHostPropSources(
 		let copy: Record<string, unknown> | undefined;
 		for (const name of Object.keys(spread)) {
 			const current = (spread as Record<string, unknown>)[name];
-			const value =
+			const next =
 				name === 'children' || (name === 'style' && readStyle !== undefined)
 					? current
 					: name === 'style'
-						? resolveSignalStyle(current, handles, read)
+						? resolveSignalStyle(current, (handles ??= new Set()), read)
 						: isSignalHandle(current)
-							? (handles.add(current), read(current))
+							? ((handles ??= new Set()).add(current), read(current))
 							: current;
-			if (value !== current) {
+			if (next !== current) {
 				copy ??= { ...(spread as Record<string, unknown>) };
-				copy[name] = value;
+				copy[name] = next;
 			}
 		}
 		if (copy !== undefined) {
@@ -23735,7 +24532,7 @@ function resolveSignalHostPropSources(
 			rows[i] = [true, copy];
 		}
 	}
-	return { sources: rows ?? sources, handles };
+	return { sources: rows ?? sources, handles: handles ?? EMPTY_SIGNAL_HANDLES };
 }
 
 function winningSignalHostControl(
@@ -23838,10 +24635,12 @@ function addSignalHostControlWriter(
 	return cleanup;
 }
 
-function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
+function syncSignalHostControl(
+	binding: SignalHostPropSourcesBinding,
+	value: unknown = winningSignalHostControl(binding.sources, 'value'),
+	checked: unknown = winningSignalHostControl(binding.sources, 'checked'),
+): void {
 	const element = binding.element;
-	const value = winningSignalHostControl(binding.sources, 'value');
-	const checked = winningSignalHostControl(binding.sources, 'checked');
 	const writable = isWritableSignal(value) || isWritableSignal(checked);
 	for (const [channel, cleanup] of binding.controlWriters) {
 		if (
@@ -24114,7 +24913,9 @@ export function bindSignalHostPropSources(
 	} else if (STAGED_COMMIT_CAPTURE === null) {
 		// The resolved props must roll back with the DOM; otherwise a retry
 		// mistakes discarded event/control writes for already committed values.
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
+		// The binding's shape is fixed at creation, so field entries restore it
+		// exactly — cheaper than cloning the whole record per commit.
+		if (TRANSITION_JOURNAL !== null) journalSignalHostBinding(binding);
 		binding.sources = sources;
 	}
 	const committed = binding;
@@ -24128,35 +24929,58 @@ export function bindSignalHostPropSources(
 			binding = { ...committed };
 			projections.set(committed, binding);
 			if (isRecordingTransitionJournal()) journalUndo(() => projections.delete(committed));
-		} else if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
+		} else if (TRANSITION_JOURNAL !== null) journalSignalHostBinding(binding);
 		binding.sources = sources;
 	}
-	const valueControl = winningSignalHostControl(sources, 'value');
-	if (valueControl !== null && scope.block.idState.renderOwner?.controlLeases?.has(element))
-		presentationMiss(false);
-	const checkedControl = winningSignalHostControl(sources, 'checked');
-	const controlSnapshot =
-		isWritableSignal(valueControl) || isWritableSignal(checkedControl)
-			? snapshotHydrationControl(element)
-			: null;
-	if (controlSnapshot !== null) {
-		validateDirectSignalControl(element, site);
-		binding.pendingControl ||=
-			activeHydration() !== null &&
-			(controlSnapshot.editRevision > 0 ||
-				(isWritableSignal(valueControl) &&
-					isRestoredHydrationTextarea(element, readSignalBinding(valueControl))));
+	// When the committed record carries a shape plan, one scan verifies the
+	// shape and detects signal handles at once. A clean scan means zero
+	// handles — winners can never be signals, so the whole control
+	// snapshot/validation ladder degenerates to its null case — and the commit
+	// replays the plan without a second pass. Form hosts never carry a plan,
+	// so their reassertion path is unreachable here.
+	const replayed =
+		binding.resolved === undefined
+			? null
+			: replaySourcesPlan(element, sources, binding.resolved, scope, hasNestedChildren, readStyle);
+	let handles: Set<SignalHandle<unknown>>;
+	let valueControl: SignalHandle<unknown> | null;
+	let checkedControl: SignalHandle<unknown> | null;
+	let controlSnapshot: ReturnType<typeof snapshotHydrationControl>;
+	if (replayed !== null) {
+		handles = EMPTY_SIGNAL_HANDLES;
+		valueControl = null;
+		checkedControl = null;
+		controlSnapshot = null;
+		binding.resolved = replayed;
+	} else {
+		valueControl = winningSignalHostControl(sources, 'value');
+		if (valueControl !== null && scope.block.idState.renderOwner?.controlLeases?.has(element))
+			presentationMiss(false);
+		checkedControl = winningSignalHostControl(sources, 'checked');
+		controlSnapshot =
+			isWritableSignal(valueControl) || isWritableSignal(checkedControl)
+				? snapshotHydrationControl(element)
+				: null;
+		if (controlSnapshot !== null) {
+			validateDirectSignalControl(element, site);
+			binding.pendingControl ||=
+				activeHydration() !== null &&
+				(controlSnapshot.editRevision > 0 ||
+					(isWritableSignal(valueControl) &&
+						isRestoredHydrationTextarea(element, readSignalBinding(valueControl))));
+		}
+		const next = resolveSignalHostPropSources(sources, readStyle);
+		handles = next.handles;
+		binding.resolved = setHostPropSources(
+			element,
+			next.sources,
+			binding.resolved,
+			scope,
+			hasNestedChildren,
+			readStyle,
+			binding.pendingControl,
+		);
 	}
-	const next = resolveSignalHostPropSources(sources, readStyle);
-	binding.resolved = setHostPropSources(
-		element,
-		next.sources,
-		binding.resolved,
-		scope,
-		hasNestedChildren,
-		readStyle,
-		binding.pendingControl,
-	);
 	if (STAGED_COMMIT_CAPTURE !== null) {
 		DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
 			if (committed.disposed) return;
@@ -24164,16 +24988,16 @@ export function bindSignalHostPropSources(
 			committed.resolved = binding.resolved;
 			committed.pendingControl = binding.pendingControl;
 			runWithBlockSignalOwner(scope, () => {
-				rebindSignalHostSubscriptions(committed, next.handles);
-				syncSignalHostControl(committed);
+				rebindSignalHostSubscriptions(committed, handles);
+				syncSignalHostControl(committed, valueControl, checkedControl);
 			});
 			if (!committed.pendingControl && controlSnapshot !== null)
 				consumeHydrationControl(element, controlSnapshot.revision);
 			updateSignalHostPropSources(committed);
 		});
 	} else {
-		rebindSignalHostSubscriptions(binding, next.handles);
-		syncSignalHostControl(binding);
+		rebindSignalHostSubscriptions(binding, handles);
+		syncSignalHostControl(binding, valueControl, checkedControl);
 		if (!binding.pendingControl && controlSnapshot !== null)
 			consumeHydrationControl(element, controlSnapshot.revision);
 	}
@@ -24198,23 +25022,18 @@ function isAggregatedFormControlProp(el: Element, name: string): boolean {
 	return false;
 }
 
-export function setSpread(
-	el: Element,
-	value: any,
-	prev: any,
-	mountScope?: Scope,
-	skipDangerouslySetInnerHTML = false,
-	skipFormControls = false,
-): void {
+/**
+ * The JS-only surface a spread commit stamps ahead of its write loops: dev prop
+ * validation plus the suppress/diagnostic flags the loops and later
+ * interactions consult. Shared with the resolved-record bail in
+ * setHostPropSources, so a commit whose write tail is skipped leaves the
+ * identical element surface.
+ */
+function stampSpreadPropFlags(el: Element, value: any): void {
 	if (process.env.NODE_ENV !== 'production' && value != null) {
 		devValidateAriaProps(el, Object(value) as Record<string, unknown>);
 		devValidateHostProps(el, Object(value) as Record<string, unknown>);
 	}
-	// `mountScope` is passed only on the mount call (not on updates). When present
-	// a spread-supplied ref attach is DEFERRED to commit so a callback ref sees a
-	// connected node — same React-19 timing as element/fragment refs. Updates
-	// defer too when the caller passes its scope (compiled output does), keeping
-	// every attach ordered after every queued detach within the commit.
 	// Stamp `suppressHydrationWarning` BEFORE either loop (order-independent, like React
 	// reading it off props ahead of the diff) so the attribute/class/style writes below
 	// see the flag no matter where the key sits in the spread object. A JS flag only —
@@ -24242,7 +25061,76 @@ export function setSpread(
 	) {
 		setNativeChangeDiagnosticMetadata(el, value.__octaneNativeChangeDiagnostic);
 	}
-	if (!skipDangerouslySetInnerHTML) {
+}
+
+export function setSpread(
+	el: Element,
+	value: any,
+	prev: any,
+	mountScope?: Scope,
+	skipDangerouslySetInnerHTML = false,
+	skipFormControls = false,
+	replay = false,
+): void {
+	// One journal entry restores every attribute-ish write this commit makes:
+	// the rollback re-runs the same dispatch with the committed records swapped,
+	// so no per-attribute getAttribute snapshot is needed. Refs, listeners,
+	// danger expandos and JS-only stamps keep their own rollback channels
+	// (ref-queue truncation, JOURNAL_PROP/JOURNAL_EVENT_OWNER, the danger
+	// journalRootProperty calls) — the replay pass skips those arms entirely.
+	// Hydration commits keep snapshots: replayed writers re-consult
+	// allowAttribute and could veto a restore the DOM genuinely needs.
+	const journalReplay =
+		!replay &&
+		TRANSITION_JOURNAL !== null &&
+		!TRANSITION_JOURNAL_REPLAYING &&
+		activeHydration() === null;
+	if (!journalReplay)
+		return setSpreadBody(
+			el,
+			value,
+			prev,
+			mountScope,
+			skipDangerouslySetInnerHTML,
+			skipFormControls,
+			replay,
+		);
+	journalUndo(() =>
+		setSpread(el, prev, value, mountScope, skipDangerouslySetInnerHTML, skipFormControls, true),
+	);
+	journalBag();
+	JOURNAL_ATTR_SUPPRESS = true;
+	try {
+		setSpreadBody(
+			el,
+			value,
+			prev,
+			mountScope,
+			skipDangerouslySetInnerHTML,
+			skipFormControls,
+			false,
+		);
+	} finally {
+		JOURNAL_ATTR_SUPPRESS = false;
+	}
+}
+
+function setSpreadBody(
+	el: Element,
+	value: any,
+	prev: any,
+	mountScope?: Scope,
+	skipDangerouslySetInnerHTML = false,
+	skipFormControls = false,
+	replay = false,
+): void {
+	// `mountScope` is passed only on the mount call (not on updates). When present
+	// a spread-supplied ref attach is DEFERRED to commit so a callback ref sees a
+	// connected node — same React-19 timing as element/fragment refs. Updates
+	// defer too when the caller passes its scope (compiled output does), keeping
+	// every attach ordered after every queued detach within the commit.
+	if (!replay) stampSpreadPropFlags(el, value);
+	if (!replay && !skipDangerouslySetInnerHTML) {
 		if (value != null && Object.prototype.propertyIsEnumerable.call(Object(value), 'children')) {
 			(STAGED_DOM?.view(el as any) ?? (el as any))[DANGER_HTML_SPREAD_CHILD] = value.children;
 			if (
@@ -24267,6 +25155,7 @@ export function setSpread(
 			if (skipDangerouslySetInnerHTML && k === 'dangerouslySetInnerHTML') continue;
 			if (skipFormControls && isAggregatedFormControlProp(el, k)) continue;
 			if (k === 'ref') {
+				if (replay) continue;
 				// Detach the prior ref when it's removed from the spread or its
 				// identity changed (the value loop re-attaches a changed ref).
 				// attachRef runs a callback's React-19 cleanup-return (or calls it
@@ -24281,16 +25170,24 @@ export function setSpread(
 				continue;
 			}
 			if (value != null && Object.prototype.propertyIsEnumerable.call(Object(value), k)) continue;
+			// Replay restores only attribute-ish writes: listeners roll back
+			// through their own JOURNAL_PROP entries and danger state through
+			// journalRootProperty.
+			if (replay && (k === 'dangerouslySetInnerHTML' || eventSlot(k, el))) continue;
 			removeHostProp(el, k, prev[k]);
 		}
 	}
 	if (value == null) {
-		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
+		if (process.env.NODE_ENV !== 'production' && !replay) queueDevFormDiagnostic(el, mountScope);
 		return;
 	}
 	// A fresh props cache is not a snapshot of attributes already present in SSR.
 	const hydration = prev === undefined ? activeHydration() : null;
 	const initialHydration = hydration !== null && !hydration.isFresh(el);
+	// The per-key routing in this loop is re-derived ahead-of-time by
+	// planEntryKind into writePlannedDiff's preclassified arms — any change to
+	// how a key is dispatched here must be mirrored there or plan replay
+	// misroutes the prop.
 	for (const k of Object.keys(Object(value))) {
 		if (k === 'key' || k === 'children') continue;
 		if (skipDangerouslySetInnerHTML && k === 'dangerouslySetInnerHTML') continue;
@@ -24298,7 +25195,7 @@ export function setSpread(
 		const v = value[k];
 		const pv = prev ? prev[k] : undefined;
 		if (k === 'ref') {
-			if (v === pv) continue;
+			if (replay || v === pv) continue;
 			// Route through attachRef for full parity: callback cleanup-return,
 			// object `.current`, and array refs. The prior ref (if any) was queued
 			// for detach in the removal loop above; queued detaches drain before
@@ -24331,7 +25228,7 @@ export function setSpread(
 		// explicitly disables an earlier JSX writer. It must not be identity-skipped
 		// against the absent previous value on mount.
 		if (k === 'dangerouslySetInnerHTML') {
-			setDangerouslySetInnerHTML(el, v);
+			if (!replay) setDangerouslySetInnerHTML(el, v);
 			continue;
 		}
 		const actionName = formActionAttributeName(el, k);
@@ -24349,9 +25246,23 @@ export function setSpread(
 		// Controlled fields reassert live DOM drift; other unchanged props need no
 		// event-name parsing or custom-element routing.
 		if (v === pv && !isControlledHostProp(el, k) && !initialHydration) continue;
+		// A `data-*` key is never a delegated event, form control, aliased name, or
+		// namespaced attribute, so it skips the generic router for the lean writer.
+		// setStringData applies the identical coercion the router's data-* arm
+		// computes (booleans stringify; nullish/function/symbol remove) and carries
+		// the same hydration allowAttribute consult and transition journal. Custom
+		// elements need no carve-out — a dashed name never aliases, so verbatim and
+		// aliased routes agree. A name failing VALID_ATTR_NAME stays on the generic
+		// skip-and-warn path: setStringData assumes a valid name and the platform
+		// would throw InvalidCharacterError.
+		if (k.startsWith('data-') && VALID_ATTR_NAME.test(k)) {
+			setStringData(el, k, v);
+			continue;
+		}
 		const ev = eventSlot(k, el);
 		if (ev) {
-			if (v === pv) continue;
+			// Listener slots roll back through their own JOURNAL_PROP entries.
+			if (replay || v === pv) continue;
 			// Lazy-delegate any event we haven't seen — the compiler can't predict
 			// event names that arrive dynamically through spread. Capture-phase
 			// handlers (`onXxxCapture`) register their own capture-phase listener.
@@ -24372,7 +25283,7 @@ export function setSpread(
 		if (prev !== undefined && k === 'autoFocus' && !isHtmlCustomElement(el)) continue;
 		setAttribute(el, k, v);
 	}
-	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
+	if (process.env.NODE_ENV !== 'production' && !replay) queueDevFormDiagnostic(el, mountScope);
 }
 
 // ---------------------------------------------------------------------------
