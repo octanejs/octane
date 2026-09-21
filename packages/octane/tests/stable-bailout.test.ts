@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lazy } from '../src/index.js';
+import { flushSync, lazy } from '../src/index.js';
 import { act, flushEffects, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 
@@ -192,6 +192,164 @@ describe('compiler-stable component bailout', () => {
 		flushEffects();
 		expect(renders).toEqual(['render']);
 		expect(root.find('#slot').textContent).toBe('fixed');
+		root.unmount();
+	});
+
+	it('replays a child store write after a sibling suspend aborted the drain', async () => {
+		const source = `
+			import { useState } from 'octane';
+			function Child() @{
+				const [n, setN] = useState(0);
+				<div>
+					<button id="inc" onClick={() => setN(n + 1)}>{'' + n}</button>
+				</div>
+			}
+			function Stable() @{
+				<section>
+					<Child />
+				</section>
+			}
+			export function App(props) @{
+				const [tick, setTick] = useState(0);
+				@try {
+					<div>
+						{props.ready ? <span id="ok">{'ok'}</span> : props.read()}
+						<button id="tick" onClick={() => setTick(tick + 1)}>{'' + tick}</button>
+						<Stable {...{}} />
+					</div>
+				} @pending {
+					<span id="pending">{'loading'}</span>
+				}
+			}
+		`;
+		const client = compileClient(source, 'stable-suppressed-child.tsrx');
+		let resolve!: () => void;
+		const promise = new Promise<void>((done) => {
+			resolve = done;
+		});
+		let ready = true;
+		const read = () => {
+			if (!ready) throw promise;
+			return 'ok';
+		};
+		const root = mount(client.App, { ready: true, read });
+		expect(root.find('#inc').textContent).toBe('0');
+
+		// Commit the first store write so the later aborted increment is a
+		// distinct pending cell value, not a journaled first paint.
+		root.click('#inc');
+		expect(root.find('#inc').textContent).toBe('1');
+
+		ready = false;
+		flushSync(() => {
+			(root.find('#inc') as HTMLButtonElement).click();
+			root.root.render(client.App, { ready: false, read });
+		});
+		expect(root.find('#inc').textContent).toBe('1');
+
+		ready = true;
+		await act(async () => {
+			resolve();
+			await promise;
+		});
+		expect(root.find('#inc').textContent).toBe('2');
+		root.click('#tick');
+		expect(root.find('#inc').textContent).toBe('2');
+		expect(root.find('#tick').textContent).toBe('1');
+		root.unmount();
+	});
+
+	it('re-renders an opaque local-tag child that reads module state', () => {
+		const source = `
+			import { useState } from 'octane';
+			let serial = 0;
+			export function bumpSerial() {
+				serial += 1;
+			}
+			function Opaque() @{
+				<span id="n">{'' + serial}</span>
+			}
+			function Parent(props) @{
+				const C = props.comp;
+				<C />
+			}
+			export function App() @{
+				const [tick, setTick] = useState(0);
+				<section>
+					<button id="tick" onClick={() => setTick(tick + 1)}>{'' + tick}</button>
+					<Parent {...{comp: Opaque}} />
+				</section>
+			}
+		`;
+		const client = compileClient(source, 'stable-opaque-local-tag.tsrx');
+		const root = mount(client.App);
+		expect(root.find('#n').textContent).toBe('0');
+		client.bumpSerial();
+		root.click('#tick');
+		expect(root.find('#n').textContent).toBe('1');
+		root.unmount();
+	});
+
+	it('re-renders a scoped child that reads module state', () => {
+		const source = `
+			import { useState } from 'octane';
+			let serial = 0;
+			export function bumpSerial() {
+				serial += 1;
+			}
+			function Stable() @{
+				<div>
+					@{
+						const n = serial;
+						<span id="n">{'' + n}</span>
+					}
+				</div>
+			}
+			export function App() @{
+				const [tick, setTick] = useState(0);
+				<section>
+					<button id="tick" onClick={() => setTick(tick + 1)}>{'' + tick}</button>
+					<Stable />
+				</section>
+			}
+		`;
+		const client = compileClient(source, 'stable-scoped-child.tsrx');
+		const root = mount(client.App);
+		expect(root.find('#n').textContent).toBe('0');
+		client.bumpSerial();
+		root.click('#tick');
+		expect(root.find('#n').textContent).toBe('1');
+		root.unmount();
+	});
+
+	it('runs a value-position custom compare when a stable ancestor would bail', () => {
+		const source = `
+			import { memo, useState } from 'octane';
+			let extra = 0;
+			export function bumpExtra() {
+				extra += 1;
+			}
+			function Inner(props) @{
+				<span id="v">{(props.label as string) + extra}</span>
+			}
+			const Wrapped = memo(Inner, () => extra === 0);
+			function Stable() @{
+				<div>{<Wrapped label="fixed" />}</div>
+			}
+			export function App() @{
+				const [tick, setTick] = useState(0);
+				<section>
+					<button id="tick" onClick={() => setTick(tick + 1)}>{'' + tick}</button>
+					<Stable />
+				</section>
+			}
+		`;
+		const client = compileClient(source, 'stable-value-compare.tsrx');
+		const root = mount(client.App);
+		expect(root.find('#v').textContent).toBe('fixed0');
+		client.bumpExtra();
+		root.click('#tick');
+		expect(root.find('#v').textContent).toBe('fixed1');
 		root.unmount();
 	});
 

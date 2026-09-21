@@ -2744,10 +2744,11 @@ function hasHeldTransitionUpdate(slot: TransitionActionSlot<unknown>, block: Blo
 }
 
 /**
- * True when a transition/urgent update targeted at this block was rolled back
- * and is still waiting to re-apply. Held entries re-apply inside the state hook
- * during render, so a memo/stable bail that skips the body would strand the
- * pending value while keeping the rolled-back DOM — the bail must decline.
+ * True when a transition/urgent update targeted at this block — or a descendant
+ * that owns the state cells — was rolled back and is still waiting to re-apply.
+ * Held entries re-apply inside the child's state hook during render, so a
+ * memo/stable ancestor bail that skips the body would strand the pending value
+ * while keeping the rolled-back DOM — the bail must decline.
  */
 function blockHasHeldUpdate(block: Block): boolean {
 	const rootHeld = block.idState.renderOwner?.transition;
@@ -2761,7 +2762,7 @@ function blockHasHeldUpdate(block: Block): boolean {
 		if (entries === undefined) return false;
 		for (const entry of entries) {
 			if (
-				entry.block === block &&
+				(entry.block === block || blockIsAncestorOf(block, entry.block)) &&
 				!entry.superseded &&
 				Object.is(entry.slot.value, entry.baseValue)
 			)
@@ -2774,6 +2775,20 @@ function blockHasHeldUpdate(block: Block): boolean {
 		if (pending(entries)) return true;
 	}
 	return false;
+}
+
+/**
+ * A queued update dropped by an aborted transaction must be consumed by a
+ * later body re-run. The store write lives on this block, but a $$stable /
+ * memo ancestor with clean props would otherwise keep the committed subtree
+ * and never re-enter here — mark the whole ancestor chain so those bails
+ * decline. Cleared per block at the top of renderBlockInner.
+ */
+function markSuppressedUpdate(block: Block): void {
+	for (let b: Block | null = block; b !== null; b = b.parentBlock) {
+		if (b.suppressedUpdate === true) break;
+		b.suppressedUpdate = true;
+	}
 }
 
 function cancelHeldTransitionUpdate(slot: TransitionActionSlot<unknown>, block: Block): boolean {
@@ -6786,9 +6801,10 @@ function drainQueue(): { err: any } | null {
 		// Once one suspends, later siblings must not publish a partial screen.
 		const rootTransaction = block.idState.renderOwner?.transaction;
 		if (rootTransaction?.aborted === true) {
-			// The update is deferred to the resolve pass — flag it so a memo/
-			// stable/implicit bail cannot skip the body that consumes it.
-			block.suppressedUpdate = true;
+			// The update is deferred to the resolve pass — flag this block and its
+			// ancestors so a memo/stable/implicit bail cannot skip the body that
+			// would re-enter the child and consume the store write.
+			markSuppressedUpdate(block);
 			continue;
 		}
 		const retired = rootTransaction?.retired;
@@ -6798,7 +6814,10 @@ function drainQueue(): { err: any } | null {
 			// roots with an actual deferred deletion pay this ancestor walk.
 			let current: Block | null = block;
 			while (current !== null && !retired.has(current)) current = current.parentBlock;
-			if (current !== null) continue;
+			if (current !== null) {
+				markSuppressedUpdate(block);
+				continue;
+			}
 		}
 		const crossRenderUpdate = block.crossRenderUpdate;
 		block.crossRenderUpdate = false;
@@ -6850,10 +6869,16 @@ function drainQueue(): { err: any } | null {
 			// retries the render; if it no longer suspends (an external store flipped
 			// before the suspending promise resolved), the boundary reveals now.
 			if (hiddenTry !== null) {
+				// The standalone body is dropped in favor of a boundary retry. Flag
+				// this block and its ancestors: the retry (or a later equal-props
+				// parent update) must not memo/stable/implicit-bail past the child
+				// that still holds the store write.
+				markSuppressedUpdate(block);
 				visibilityDriver!.reveal(hiddenTry, block.pendingMode ?? 'urgent');
 				continue;
 			}
 			if (hiddenActivity !== null && hiddenActivity.pendingThenable !== null) {
+				markSuppressedUpdate(block);
 				visibilityDriver!.retryActivity(hiddenActivity, true);
 				continue;
 			}
@@ -29766,12 +29791,7 @@ function componentSlotImpl(
 	// ancestor chain so those bails decline. `LAZY_BODY_CHECK` marks eagerly —
 	// the lazy wrapper's resolution-aware `__compare` is only installed once the
 	// module resolves, after ancestors may already have committed.
-	if ((body as any).__compare !== undefined || (body as any)[LAZY_BODY_CHECK] !== undefined) {
-		for (let b: Block | null = parentBlock; b !== null; b = b.parentBlock) {
-			if (b.$$compareInChain === true) break;
-			b.$$compareInChain = true;
-		}
-	}
+	markCompareInChain(parentBlock, body);
 	let state = parentScope.slots[slotKey] as CompSlot | undefined;
 	let hydrationCursor: Node | null = null;
 	if (state === undefined) {
@@ -34046,6 +34066,10 @@ export function childSlot(
 		componentHasKey = value.key != null;
 	}
 	if (comp !== null) {
+		// Same veto-compare taint as componentSlot: a value-position memo/lazy
+		// child must still flag ancestors, or a later $$stable/memo bail keeps
+		// this subtree without invoking `__compare`.
+		markCompareInChain(parentBlock, comp);
 		// A bare render-FUNCTION child (a `.tsrx` `{children}` body forwarded onto a `.ts`
 		// component's host element via createElement) is re-created every render, so its
 		// identity always differs — but it is the SAME slot child. Reconcile by SLOT like
@@ -34738,6 +34762,20 @@ function refreshContextConsumers(block: Block): void {
 				refreshBlockForContext(s.portal.block);
 			}
 		}
+	}
+}
+
+/**
+ * Flag ancestors when a callee's compare can veto on non-prop grounds (lazy
+ * re-resolution, custom comparators). Shared by componentSlot and childSlot so
+ * a value-position `{<Wrapped />}` still taints the chain. Sticky: a stale
+ * flag only costs a missed bail.
+ */
+function markCompareInChain(parentBlock: Block | null, body: any): void {
+	if ((body as any).__compare === undefined && (body as any)[LAZY_BODY_CHECK] === undefined) return;
+	for (let b: Block | null = parentBlock; b !== null; b = b.parentBlock) {
+		if (b.$$compareInChain === true) break;
+		b.$$compareInChain = true;
 	}
 }
 

@@ -3974,7 +3974,7 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 
 		// Block scope — hoist `var`/`function` + pre-collect `let`/`const` so
 		// forward references work the same way they do at runtime.
-		if (t === 'BlockStatement') {
+		if (t === 'BlockStatement' || t === 'JSXCodeBlock') {
 			const newScope = new Set(scope);
 			for (const stmt of n.body || []) {
 				if (stmt.type === 'VariableDeclaration') {
@@ -3984,6 +3984,7 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 				}
 			}
 			walk(n.body, newScope);
+			if (t === 'JSXCodeBlock') walk(n.render, newScope);
 			return;
 		}
 
@@ -6687,13 +6688,13 @@ function containsAutoMemoUnsafeStructure(
 			if (containsDeferredRefRead(n)) found = true;
 			return;
 		}
-		// An `@{ }` scoped child lowers to a nested function value invoked by the
-		// hole machinery — the same deferred shape as the explicit `() => @{ }`
-		// spelling — so `$$stable` classifies its internals as child-render work
-		// rather than this component's render. Non-stable callsites keep walking
-		// it: their region guard already skips the child with everything else.
-		if (stable && t === 'JSXCodeBlock') {
-			if (containsDeferredRefRead(n)) found = true;
+		// An `@{ }` scoped child is invoked by the hole machinery on every parent
+		// render. A bailed parent keeps the last hole output, so the nested body
+		// is render-position work for `$$stable` — walk it rather than treating
+		// it as a deferred callback. The explicit `() => @{ }` spelling stays
+		// deferred through the function-value arm above.
+		if (t === 'JSXCodeBlock' && containsDeferredRefRead(n)) {
+			found = true;
 			return;
 		}
 		if (
@@ -6882,6 +6883,24 @@ function containsAutoMemoUnsafeStructure(
 				return;
 			}
 			const name = tag?.name;
+			// A component tag bound from props or another local (`const C =
+			// props.comp`) is the same opacity as an import: it is not a free
+			// name, so the admission pass never sees it, and a stamp would keep
+			// an unproven callee. Fail closed unless the identifier is a
+			// same-module component, proven context, or memo() wall.
+			if (
+				stable &&
+				(tag?.type === 'Identifier' || tag?.type === 'JSXIdentifier') &&
+				typeof name === 'string' &&
+				!/^[a-z]/.test(name) &&
+				!name.includes('-') &&
+				!ctx?.componentInfo?.has(name) &&
+				!ctx?.defaultMemoBindings?.has(name) &&
+				!ctx?.provenContextBindings?.has(name)
+			) {
+				found = true;
+				return;
+			}
 			if (
 				name === 'Suspense' ||
 				name === 'ErrorBoundary' ||
@@ -6930,10 +6949,7 @@ function collectStableDeferredFunctions(stmts, ctx) {
 		if (
 			t === 'ArrowFunctionExpression' ||
 			t === 'FunctionExpression' ||
-			t === 'FunctionDeclaration' ||
-			// A nested `@{ }` scoped child is a deferred function value too — the
-			// lowering emits it as a sibling `__tsrx$N` passed to the hole machinery.
-			t === 'JSXCodeBlock'
+			t === 'FunctionDeclaration'
 		) {
 			deferred.add(n);
 			return;
@@ -10895,7 +10911,7 @@ function compileInternal(
 		info.stableBody = stableBody;
 		info.bailSafe = bailSafeBody;
 		info.stableComponentDeps = bailSafeBody ? [...new Set(stableComponentDeps)].sort() : [];
-		info.stable = false; // stamped only after the bailSafe fixed point below
+		info.stable = false; // stamped only after bailSafe reverse-edge propagation
 		// Hookless check.
 		// Return-JSX functions reconcile their returned descriptor through
 		// renderBlock. componentSlotLite intentionally ignores return values, so
@@ -11036,21 +11052,35 @@ function compileInternal(
 	// `$$stable` bail-safety is transitive over same-module component edges: a
 	// bailed parent keeps the child's committed subtree, which is only equivalent
 	// to re-rendering when the child is itself bail-safe — pure modulo
-	// runtime-tracked context reads. Iterate to a fixed point so declaration
-	// order cannot matter and recursive components fail closed, then stamp the
-	// strict bodies whose deps are all bail-safe.
-	let bailSafeChanged = true;
-	while (bailSafeChanged) {
-		bailSafeChanged = false;
-		for (const [, info] of ctx.componentInfo) {
-			if (!info.bailSafe) continue;
-			for (const name of info.stableComponentDeps) {
-				if (ctx.componentInfo.get(name)?.bailSafe !== true) {
-					info.bailSafe = false;
-					bailSafeChanged = true;
-					break;
-				}
+	// runtime-tracked context reads. Work flows from an unsafe callee to its
+	// dependents so declaration order cannot turn an A → B → C chain into one
+	// whole-map scan per edge, and already-unsafe seeds are not re-propagated.
+	const bailSafeDependents = new Map();
+	const bailSafeQueue = [];
+	for (const [name, info] of ctx.componentInfo) {
+		if (!info.bailSafe) {
+			bailSafeQueue.push(name);
+			continue;
+		}
+		for (const dependency of info.stableComponentDeps) {
+			let dependents = bailSafeDependents.get(dependency);
+			if (dependents === undefined) {
+				bailSafeDependents.set(dependency, (dependents = []));
 			}
+			dependents.push(name);
+			if (ctx.componentInfo.get(dependency)?.bailSafe !== true && info.bailSafe) {
+				info.bailSafe = false;
+				bailSafeQueue.push(name);
+			}
+		}
+	}
+	for (let index = 0; index < bailSafeQueue.length; index++) {
+		const name = bailSafeQueue[index];
+		for (const dependent of bailSafeDependents.get(name) ?? []) {
+			const info = ctx.componentInfo.get(dependent);
+			if (!info?.bailSafe) continue;
+			info.bailSafe = false;
+			bailSafeQueue.push(dependent);
 		}
 	}
 	for (const [, info] of ctx.componentInfo) {

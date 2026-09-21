@@ -135,6 +135,69 @@ describe('$$stable definition-site marker emission', () => {
 		expect(stableStampedNames(code).has('Stable')).toBe(false);
 	});
 
+	it('rejects a local tag aliased from props — the callee is as opaque as an import', () => {
+		const code = c(`
+			export function Stable(props) @{
+				const C = props.comp;
+				<C label={props.label} />
+			}
+		`);
+		expect(stableStampedNames(code).has('Stable')).toBe(false);
+	});
+
+	it('rejects a scoped child that reads unwitnessed module state', () => {
+		const code = c(`
+			let serial = 0;
+			export function Stable() @{
+				<div>
+					@{
+						const n = serial;
+						<span>{'' + n}</span>
+					}
+				</div>
+			}
+		`);
+		expect(stableStampedNames(code).has('Stable')).toBe(false);
+	});
+
+	it('rejects a scoped child that calls useFormStatus', () => {
+		const code = c(`
+			import { useFormStatus } from 'octane';
+			export function Stable() @{
+				<form>
+					@{
+						const status = useFormStatus();
+						<span>{status.pending ? 'busy' : 'idle'}</span>
+					}
+				</form>
+			}
+		`);
+		expect(stableStampedNames(code).has('Stable')).toBe(false);
+	});
+
+	it('does not stamp a long same-module chain whose leaf is not bail-safe', () => {
+		const code = c(`
+			export function A(props) @{
+				<section><B label={props.label} /></section>
+			}
+			function B(props) @{
+				<div><C label={props.label} /></div>
+			}
+			function C(props) @{
+				<span><D label={props.label} /></span>
+			}
+			function D(props) @{
+				const stamped = props.stamp();
+				<em>{stamped as string}</em>
+			}
+		`);
+		const stamped = stableStampedNames(code);
+		expect(stamped.has('D')).toBe(false);
+		expect(stamped.has('C')).toBe(false);
+		expect(stamped.has('B')).toBe(false);
+		expect(stamped.has('A')).toBe(false);
+	});
+
 	it('rejects a render-time useContext read', () => {
 		const code = c(`
 			import { createContext, useContext } from 'octane';
