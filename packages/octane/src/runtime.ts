@@ -37357,6 +37357,7 @@ function commitResume(state: TrySlot): void {
 
 function commitResumeInner(state: TrySlot): void {
 	if (state.parentBlock.disposed) return;
+	let deferredNativeAcceptance = false;
 	if (NATIVE_READ_DRIVER !== null && state.hiddenDom !== null) {
 		const staged = state.stagedCapture;
 		if (staged === null || !NATIVE_READ_DRIVER.validateCapture(staged)) {
@@ -37377,7 +37378,8 @@ function commitResumeInner(state: TrySlot): void {
 			}
 			return;
 		}
-		if (WIP_CAPTURE === null) acceptNativeCapture(staged, state.parentBlock.idState.renderOwner);
+		if (WIP_CAPTURE === null)
+			deferredNativeAcceptance = acceptNativeCapture(staged, state.parentBlock.idState.renderOwner);
 	}
 	const wasPending = state.branch === 2;
 	const hiddenActivity = findHiddenActivity(state.parentBlock);
@@ -37434,7 +37436,7 @@ function commitResumeInner(state: TrySlot): void {
 				// Ref attach closures captured by a hidden pass can be stale after a
 				// later same-node ref supersession. Reveal uses the current manifest.
 				if (state.detachedRefs !== null) stagedCapture.refs.length = 0;
-				spliceOffscreenCapture(stagedCapture);
+				spliceOffscreenCapture(stagedCapture, deferredNativeAcceptance);
 				state.hasResolved = true;
 			} else {
 				// Mark the replay window: useThenable's fresh-thenable reuse leniency
@@ -37465,7 +37467,10 @@ function commitResumeInner(state: TrySlot): void {
 					if (NATIVE_READ_DRIVER !== null) {
 						invalidNativeReads = !NATIVE_READ_DRIVER.validateCapture(resumeCapture);
 						if (!invalidNativeReads && previousCapture === null)
-							acceptNativeCapture(resumeCapture, state.parentBlock.idState.renderOwner);
+							deferredNativeAcceptance = acceptNativeCapture(
+								resumeCapture,
+								state.parentBlock.idState.renderOwner,
+							);
 					}
 				} catch (err) {
 					didThrow = true;
@@ -37502,7 +37507,7 @@ function commitResumeInner(state: TrySlot): void {
 						refDetachQueue.splice(refDetachCheckpoint);
 						resumeCapture.refs.length = 0;
 					}
-					spliceOffscreenCapture(resumeCapture);
+					spliceOffscreenCapture(resumeCapture, deferredNativeAcceptance);
 					state.hasResolved = true;
 				} else {
 					// The journal has to outlive handleSuspense, which is what replays it,
@@ -37936,6 +37941,7 @@ function attemptHiddenRevealInner(
 	// commit work even for urgent retries: a ref/effect can mount before a later
 	// sibling suspends, and must not leak while the fallback remains visible.
 	const hiddenCapture = createOffscreenCapture();
+	let deferredNativeAcceptance = false;
 	const previousCapture = WIP_CAPTURE;
 	const refDetachCheckpoint = refDetachQueue.length;
 	WIP_CAPTURE = hiddenCapture;
@@ -38018,7 +38024,10 @@ function attemptHiddenRevealInner(
 			return;
 		}
 		if (WIP_CAPTURE === null)
-			acceptNativeCapture(hiddenCapture, state.parentBlock.idState.renderOwner);
+			deferredNativeAcceptance = acceptNativeCapture(
+				hiddenCapture,
+				state.parentBlock.idState.renderOwner,
+			);
 	}
 	try {
 		// Success — reveal without the suspending promise ever resolving.
@@ -38042,7 +38051,7 @@ function attemptHiddenRevealInner(
 		// Invalidate the wired resume: when the original thenable eventually
 		// settles, its retry sees a mismatched pendingThenable and no-ops.
 		state.pendingThenable = null;
-		spliceOffscreenCapture(hiddenCapture);
+		spliceOffscreenCapture(hiddenCapture, deferredNativeAcceptance);
 		recordSuspenseCommit(state);
 		publishHiddenRevealActions(state);
 		queueCurrentHiddenRefs(state);
