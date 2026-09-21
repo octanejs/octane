@@ -1,5 +1,30 @@
 # @octanejs/floating-ui
 
+## 0.1.55
+
+### Patch Changes
+
+- 92227f6: Add `createResizeObserver` to deliver coalesced native resize notifications in a
+  separate task, with queued-entry cleanup on unobserve and disconnect. Ordinary
+  state updates keep their existing microtask batching.
+
+  Use deferred observer callbacks in Base UI measurement components and Floating
+  UI's element-resize adapter so geometry-affecting updates can settle without
+  ResizeObserver delivery-loop warnings. These bindings now require Octane 0.3.7
+  or newer in the 0.3 release line. Initial synchronous measurement and positioning
+  remain available, and the global ResizeObserver constructor is unchanged.
+- Updated dependencies [3a859dd]
+- Updated dependencies [620769b]
+- Updated dependencies [dbcabb2]
+- Updated dependencies [92227f6]
+- Updated dependencies [6580880]
+- Updated dependencies [db35ac1]
+- Updated dependencies [f209f7c]
+- Updated dependencies [a2c3e07]
+- Updated dependencies [a2c3e07]
+- Updated dependencies [34e83ce]
+  - octane@0.4.0
+
 ## 0.1.54
 
 ### Patch Changes

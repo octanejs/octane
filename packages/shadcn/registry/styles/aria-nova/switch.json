@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/aria@0.0.50",
+    "@octanejs/aria@0.0.51",
     "cn"
   ]
 }

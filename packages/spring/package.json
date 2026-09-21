@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/spring",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -48,7 +48,7 @@
     "@react-spring/rafz": "10.1.2"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0 || ^0.3.0"
+    "octane": "workspace:^0.4.0"
   },
   "devDependencies": {
     "@react-spring/animated": "10.1.2",

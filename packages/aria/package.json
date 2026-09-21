@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/aria",
-  "version": "0.0.50",
+  "version": "0.0.51",
   "license": "MIT AND Apache-2.0",
   "type": "module",
   "sideEffects": [
@@ -57,7 +57,7 @@
     "clsx": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0 || ^0.3.0"
+    "octane": "workspace:^0.4.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

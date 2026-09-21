@@ -1,5 +1,25 @@
 # @octanejs/vite-plugin
 
+## 0.1.58
+
+### Patch Changes
+
+- 3a859dd: Specialize DOM binding child programs for explicitly fixed primitive props so unused presentation branches do not ship. Caller propagation is opt-in through `domBindingFixedProps`; default child requests remain generic and shared. Dynamic values, literal defaults, DOM adoption, and renderer hydration handoff retain their existing behavior.
+
+  Expose the fixed-prop binding benchmark in the MCP benchmark tool alongside the unified runner.
+- Updated dependencies [3a859dd]
+- Updated dependencies [620769b]
+- Updated dependencies [dbcabb2]
+- Updated dependencies [92227f6]
+- Updated dependencies [6580880]
+- Updated dependencies [db35ac1]
+- Updated dependencies [f209f7c]
+- Updated dependencies [a2c3e07]
+- Updated dependencies [a2c3e07]
+- Updated dependencies [34e83ce]
+  - octane@0.4.0
+  - @octanejs/app-core@0.0.54
+
 ## 0.1.57
 
 ### Patch Changes

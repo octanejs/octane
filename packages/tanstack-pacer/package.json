@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-pacer",
-  "version": "0.0.45",
+  "version": "0.0.46",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -56,7 +56,7 @@
   },
   "peerDependencies": {
     "@octanejs/tanstack-store": "workspace:*",
-    "octane": "workspace:^0.1.51 || ^0.2.0 || ^0.3.0"
+    "octane": "workspace:^0.4.0"
   },
   "devDependencies": {
     "@octanejs/tanstack-store": "workspace:*",
