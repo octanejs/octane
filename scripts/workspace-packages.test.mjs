@@ -18,6 +18,7 @@ import {
 	getPublishablePackages,
 	getWorkspacePackages,
 	OCTANE_BETA_PEER_RANGE,
+	octanePeerRangeFor,
 	publishedOctanePeerRangeFor,
 	REPO_ROOT,
 	validateWorkspacePackages,
@@ -105,7 +106,7 @@ function workspacePackage(name, manifest = {}) {
 		private: true,
 		role: 'other package',
 		statusPath: '/fixture/status.json',
-		version: '0.0.0',
+		version: manifest.version ?? '0.0.0',
 	};
 }
 
@@ -185,8 +186,7 @@ for (const name of ['base-ui-utils', 'shadcn', 'testing-library']) {
 		const manifest = JSON.parse(
 			readFileSync(new URL(`../packages/${name}/package.json`, import.meta.url)),
 		);
-		const range = manifest.peerDependencies.octane.replace(/^workspace:/, '');
-		assert.equal(publishedOctanePeerRangeFor(manifest.name, '0.2.11'), range);
+		const range = publishedOctanePeerRangeFor(manifest.name, '0.2.11');
 		assert.equal(semver.satisfies('0.1.51', range), false);
 		assert.equal(semver.satisfies('0.2.3', range), false);
 		assert.equal(semver.satisfies('0.2.4', range), false);
@@ -194,7 +194,7 @@ for (const name of ['base-ui-utils', 'shadcn', 'testing-library']) {
 		assert.equal(semver.satisfies('0.3.0', range), true);
 		assert.equal(semver.satisfies('0.4.0', range), false);
 		const correct = workspacePackage(manifest.name, {
-			peerDependencies: { octane: manifest.peerDependencies.octane },
+			peerDependencies: { octane: `workspace:${range}` },
 		});
 		assert.deepEqual(validateWorkspacePackages([workspacePackage('octane'), correct]), []);
 		const legacy = workspacePackage(manifest.name, {
@@ -213,15 +213,17 @@ for (const name of ['base-ui', 'floating-ui']) {
 		const manifest = JSON.parse(
 			readFileSync(new URL(`../packages/${name}/package.json`, import.meta.url)),
 		);
-		const range = manifest.peerDependencies.octane.replace(/^workspace:/, '');
-		assert.equal(publishedOctanePeerRangeFor(manifest.name, '0.3.7'), range);
+		const range = publishedOctanePeerRangeFor(manifest.name, '0.3.7');
 		for (const version of ['0.1.51', '0.2.5', '0.3.0', '0.3.6', '0.4.0']) {
 			assert.equal(semver.satisfies(version, range), false);
 		}
 		for (const version of ['0.3.7', '0.3.8']) {
 			assert.equal(semver.satisfies(version, range), true);
 		}
-		const correct = workspacePackage(manifest.name, manifest);
+		const correct = workspacePackage(manifest.name, {
+			...manifest,
+			peerDependencies: { ...manifest.peerDependencies, octane: `workspace:${range}` },
+		});
 		assert.deepEqual(validateWorkspacePackages([workspacePackage('octane'), correct]), []);
 		const legacy = workspacePackage(manifest.name, {
 			...manifest,
@@ -232,5 +234,44 @@ for (const name of ['base-ui', 'floating-ui']) {
 				error.includes('peerDependencies.octane'),
 			),
 		);
+	});
+}
+
+test('live manifests obey the peer policy for their own core version', () => {
+	assert.deepEqual(validateWorkspacePackages(), []);
+});
+
+for (const [version, expected] of [
+	['0.4.0', 'workspace:^0.4.0'],
+	['0.4.12', 'workspace:^0.4.0'],
+	['0.5.0', 'workspace:^0.5.0'],
+	['0.12.3', 'workspace:^0.12.0'],
+	['1.0.0', 'workspace:^1.0.0'],
+	['1.2.3', 'workspace:^1.0.0'],
+	['2.0.0', 'workspace:^2.0.0'],
+]) {
+	test(`Octane ${version} uses its released compatibility line without relaxing peer checks`, () => {
+		for (const name of ['@octanejs/example', '@octanejs/base-ui-utils', '@octanejs/floating-ui']) {
+			assert.equal(octanePeerRangeFor(name, version), expected);
+			assert.equal(publishedOctanePeerRangeFor(name, version), expected.replace('workspace:', ''));
+			const core = workspacePackage('octane', { version });
+			const peer = (range) => workspacePackage(name, { peerDependencies: { octane: range } });
+			assert.deepEqual(validateWorkspacePackages([core, peer(expected)]), []);
+			for (const invalid of [
+				'workspace:*',
+				'workspace:>=0.1.0',
+				OCTANE_BETA_PEER_RANGE,
+				'workspace:^99.0.0',
+			]) {
+				assert.ok(
+					validateWorkspacePackages([core, peer(invalid)]).some((error) =>
+						error.includes('peerDependencies.octane'),
+					),
+					`${name} must reject ${invalid} at ${version}`,
+				);
+			}
+		}
+		assert.equal(octanePeerRangeFor('@octanejs/drei', version), 'workspace:^');
+		assert.equal(publishedOctanePeerRangeFor('@octanejs/drei', version), `^${version}`);
 	});
 }

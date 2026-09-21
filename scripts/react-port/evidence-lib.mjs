@@ -582,7 +582,12 @@ export function inspectBindingPackage(
 				}
 			}
 		}
-		const expectedOctanePeerRange = octanePeerRangeFor(manifest.name);
+		// Inspect the target workspace's release, not the checkout running this audit.
+		const coreManifestPath = path.resolve(packageDirectory, '../octane/package.json');
+		const coreManifest = existsSync(coreManifestPath)
+			? readJson(coreManifestPath, issues, 'octane/package.json')
+			: undefined;
+		const expectedOctanePeerRange = octanePeerRangeFor(manifest.name, coreManifest?.version);
 		if (manifest.peerDependencies?.octane !== expectedOctanePeerRange) {
 			issues.push(`octane peer must be ${expectedOctanePeerRange}`);
 		}
