@@ -222,6 +222,34 @@ export function NestedConditionalList(props: {
 	</ul>
 }
 
+// PURE conditional rows: the host-only @if leaves the item body free of parent
+// captures, so identical-identity survivors skip re-render entirely. The skip
+// is observed through the module-level CONDITIONAL_EXTERNAL the body reads — a
+// skipped body never re-reads it (the same probe DepPureList's EXTERNAL uses).
+let conditionalExternal = 'pulse0';
+export function setConditionalExternal(v: string) {
+	conditionalExternal = v;
+}
+
+interface PureConditionalRow {
+	id: number;
+	label: string;
+	flag?: boolean;
+}
+
+export function PureConditionalList(props: { items: PureConditionalRow[] }) @{
+	<ul id="pure-conditional-list">
+		@for (const item of props.items; key item.id) {
+			<li class="pc-row">
+				{item.label + ':' + conditionalExternal}
+				@if (item.flag) {
+					<span class="pc-flag" />
+				}
+			</li>
+		}
+	</ul>
+}
+
 const Activity = ActivitySentinel as unknown as
 	(props: {
 		mode: 'hidden' | 'visible';

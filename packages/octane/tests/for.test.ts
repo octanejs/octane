@@ -23,6 +23,7 @@ import {
 	NestedConditionalCallBodyList,
 	NestedConditionalList,
 	NestedConditionalTransition,
+	PureConditionalList,
 	PlainCalleeList,
 	KeyedSelectionList,
 	KeyedSelectionProjectionList,
@@ -51,6 +52,7 @@ import {
 	HostBindingList,
 	HostMappedBindingList,
 	setExternal,
+	setConditionalExternal,
 	setNestedConditionalActivityMode,
 } from './_fixtures/for.tsrx';
 import {
@@ -1115,6 +1117,72 @@ describe('keyed rows with nested conditional content', () => {
 		expect(rowLabels()).toEqual(['urgent:first', 'urgent:second', 'urgent:third']);
 		expect(r.find('.nested-transition-detail').textContent).toBe('urgent:first');
 		r.unmount();
+	});
+});
+
+describe('forBlock — pure host-conditional item bodies', () => {
+	it('skips identical-identity survivor bodies when siblings change', () => {
+		const items = [
+			{ id: 1, label: 'a', flag: true },
+			{ id: 2, label: 'b' },
+			{ id: 3, label: 'c', flag: true },
+		];
+		const r = mount(PureConditionalList, { items });
+		try {
+			expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual([
+				'a:pulse0',
+				'b:pulse0',
+				'c:pulse0',
+			]);
+			expect(r.findAll('.pc-flag')).toHaveLength(2);
+
+			// A new array carrying the SAME item objects for rows 1 and 3: only the
+			// replaced middle row's body may run again — the pure survivors skip, so
+			// they never re-read the mutated module binding (DepPureList's probe).
+			setConditionalExternal('pulse1');
+			r.update(PureConditionalList, {
+				items: [items[0]!, { id: 2, label: 'b2', flag: true }, items[2]!],
+			});
+			expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual([
+				'a:pulse0',
+				'b2:pulse1',
+				'c:pulse0',
+			]);
+			// The changed row re-ran its conditional arm too.
+			expect(r.findAll('.pc-flag')).toHaveLength(3);
+		} finally {
+			r.unmount();
+			setConditionalExternal('pulse0');
+		}
+	});
+
+	it('moves DOM on a keyed reorder without re-running survivor bodies', () => {
+		const items = [
+			{ id: 1, label: 'a', flag: true },
+			{ id: 2, label: 'b' },
+			{ id: 3, label: 'c' },
+		];
+		const r = mount(PureConditionalList, { items });
+		try {
+			const rows = r.findAll('li');
+			const flag = r.find('.pc-flag');
+
+			setConditionalExternal('pulse1');
+			r.update(PureConditionalList, { items: [items[2]!, items[0]!, items[1]!] });
+			expect(r.findAll('li')).toEqual([rows[2], rows[0], rows[1]]);
+			// Reordered identical-identity survivors skipped their bodies: the
+			// external mutation is not re-read even though positions changed, and
+			// the conditional DOM moved with its row.
+			expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual([
+				'c:pulse0',
+				'a:pulse0',
+				'b:pulse0',
+			]);
+			expect(r.find('.pc-flag')).toBe(flag);
+		} finally {
+			r.unmount();
+			setConditionalExternal('pulse0');
+		}
 	});
 });
 
