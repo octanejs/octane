@@ -1,0 +1,28 @@
+{
+  "name": "signal-chat-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A deterministic ChatGPT-style lab for streaming SSR signals, deferred adoption, cancellation, and delivery measurements.",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5237 --strictPort",
+    "build": "vite build",
+    "preview": "octane-preview --port 5237 --strictPort",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm test:capture && pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:capture": "node --test scripts/capture.test.mjs",
+    "test:e2e:dev": "playwright test --config e2e/playwright.config.ts",
+    "capture": "node scripts/capture.mjs"
+  },
+  "dependencies": {
+    "@octanejs/app-core": "workspace:*",
+    "@octanejs/vite-plugin": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@types/node": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

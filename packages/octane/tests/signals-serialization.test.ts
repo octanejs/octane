@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
 	createResource,
 	createScope,
+	derived$,
 	query,
+	query$,
+	runWithSignalOwner,
 	ScopeDisposedError,
 	SignalFrameError,
 	SignalSerializationError,
@@ -25,6 +28,100 @@ async function drain() {
 }
 
 describe('scoped signal serialization and adoption', () => {
+	it.each(['promise', 'stream'] as const)(
+		'tracks live selections when a %s query is first resolved during historical adoption',
+		async (kind) => {
+			const load = (selection: number) =>
+				kind === 'promise'
+					? Promise.resolve(`result:${selection}`)
+					: (async function* () {
+							yield `result:${selection}`;
+						})();
+			const server = createScope({ scopeKey: `late-adopted-${kind}-query` });
+			const serverSelection$ = server.signal$('selected', 1);
+			const serverResult$ = query$(() => serverSelection$.get(), load, { key: 'result', kind });
+			runWithSignalOwner(server, () => serverResult$.snapshot());
+			await drain();
+			const seed = server.serialize();
+			const client = createScope({ scopeKey: server.scopeKey, seed });
+			const selection$ = client.signal$('selected', 1);
+			const loads: number[] = [];
+			const result$ = query$(
+				() => selection$.get(),
+				(selection) => {
+					loads.push(selection);
+					return load(selection);
+				},
+				{ key: 'result', kind },
+			);
+			const frame = client.beginAdoption(seed);
+			try {
+				expect(frame.run(() => runWithSignalOwner(client, () => result$.get()))).toBe('result:1');
+				expect(loads).toEqual([]);
+				frame.release();
+				selection$.set(2);
+				await drain();
+				expect(runWithSignalOwner(client, () => result$.get())).toBe('result:2');
+				expect(loads).toEqual([2]);
+			} finally {
+				frame.release();
+				client.dispose();
+				server.dispose();
+			}
+		},
+	);
+
+	it.each(['promise', 'stream'] as const)(
+		'keeps an early edited derived selection live during first-use %s query adoption',
+		async (kind) => {
+			const load = (selection: number) =>
+				kind === 'promise'
+					? Promise.resolve(`result:${selection}`)
+					: (async function* () {
+							yield `result:${selection}`;
+						})();
+			const server = createScope({ scopeKey: `early-adopted-${kind}-query` });
+			const serverSelection$ = server.signal$('selected', 1);
+			const serverDerived$ = derived$(() => serverSelection$.get(), { key: 'derived-selection' });
+			const serverResult$ = query$(() => serverDerived$.get(), load, { key: 'result', kind });
+			runWithSignalOwner(server, () => serverResult$.snapshot());
+			await drain();
+			const seed = server.serialize();
+			const client = createScope({ scopeKey: server.scopeKey, seed });
+			const selection$ = client.signal$('selected', 1);
+			selection$.set(2);
+			const derivedSelection$ = derived$(() => selection$.get(), { key: 'derived-selection' });
+			const loads: number[] = [];
+			const result$ = query$(
+				() => derivedSelection$.get(),
+				(selection) => {
+					loads.push(selection);
+					return load(selection);
+				},
+				{ key: 'result', kind },
+			);
+			const frame = client.beginAdoption(seed);
+			try {
+				expect(frame.run(() => runWithSignalOwner(client, () => result$.get()))).toBe('result:1');
+				frame.release();
+				await drain();
+				expect(selection$.get()).toBe(2);
+				expect(runWithSignalOwner(client, () => [derivedSelection$.get(), result$.get()])).toEqual([
+					2,
+					'result:2',
+				]);
+				selection$.set(3);
+				await drain();
+				expect(runWithSignalOwner(client, () => result$.get())).toBe('result:3');
+				expect(loads).toEqual([2, 3]);
+			} finally {
+				frame.release();
+				client.dispose();
+				server.dispose();
+			}
+		},
+	);
+
 	it('does not expose retained request metadata through an editable serialized seed', async () => {
 		const first = deferred<string>();
 		const pending = deferred<string>();
