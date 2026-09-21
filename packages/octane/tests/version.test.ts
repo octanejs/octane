@@ -46,7 +46,7 @@ describe('version', () => {
 		expect(retainedManifest).toBe(false);
 	});
 
-	it('rejects a stale generated version and does not rewrite unchanged source', () => {
+	it('tracks successive releases, rejects stale versions and leaves unchanged source untouched', async () => {
 		const directory = mkdtempSync(join(tmpdir(), 'octane-version-'));
 		const sourceFile = join(directory, 'src', 'version.ts');
 		const generator = join(directory, 'scripts', 'generate-version.mjs');
@@ -54,19 +54,32 @@ describe('version', () => {
 		try {
 			mkdirSync(join(directory, 'src'));
 			mkdirSync(join(directory, 'scripts'));
-			writeFileSync(join(directory, 'package.json'), JSON.stringify({ version: '1.2.3-test.4' }));
 			writeFileSync(sourceFile, `export const version = '0.0.0';\n`);
 			copyFileSync(resolve(import.meta.dirname, '../scripts/generate-version.mjs'), generator);
 
-			const stale = spawnSync(process.execPath, [generator, '--check'], { encoding: 'utf8' });
-			expect(stale.status).toBe(1);
-			expect(stale.stderr).toContain('pnpm sync');
+			for (const nextVersion of ['0.0.1', '0.1.0', '1.0.0', '1.2.3-test.4']) {
+				writeFileSync(join(directory, 'package.json'), JSON.stringify({ version: nextVersion }));
+				const stale = spawnSync(process.execPath, [generator, '--check'], { encoding: 'utf8' });
+				expect(stale.status).toBe(1);
+				expect(stale.stderr).toContain('pnpm sync');
 
-			execFileSync(process.execPath, [generator]);
-			execFileSync(process.execPath, [generator, '--check']);
-			const modifiedAt = statSync(sourceFile, { bigint: true }).mtimeNs;
-			execFileSync(process.execPath, [generator]);
-			expect(statSync(sourceFile, { bigint: true }).mtimeNs).toBe(modifiedAt);
+				execFileSync(process.execPath, [generator]);
+				execFileSync(process.execPath, [generator, '--check']);
+				const result = await build({
+					entryPoints: [sourceFile],
+					bundle: true,
+					format: 'esm',
+					write: false,
+				});
+				const generated = (await import(
+					`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].contents).toString('base64')}`
+				)) as { version: string };
+				expect(generated.version).toBe(nextVersion);
+
+				const modifiedAt = statSync(sourceFile, { bigint: true }).mtimeNs;
+				execFileSync(process.execPath, [generator]);
+				expect(statSync(sourceFile, { bigint: true }).mtimeNs).toBe(modifiedAt);
+			}
 		} finally {
 			rmSync(directory, { recursive: true, force: true });
 		}

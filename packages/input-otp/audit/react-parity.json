@@ -184,7 +184,7 @@
         {
           "path": "packages/input-otp/audit/adapted-runtime-browser.json",
           "role": "support",
-          "sha256": "752861cc4de3f4ea5c4e255c6169dbea9d7d4087ae16943c57690012bbb9d319"
+          "sha256": "c22a8cabc71b7f6a61074754ff1df098eeae0d0605303d15fec67d4adbadad60"
         }
       ]
     },

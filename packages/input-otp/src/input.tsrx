@@ -186,14 +186,9 @@ export function OTPInput(props: OTPInputProps) {
 		const timeoutIds = syncTimeouts(() => {
 			const input = inputRef.current;
 			input?.dispatchEvent(new Event('input'));
-			const start = input?.selectionStart;
-			const end = input?.selectionEnd;
-			const direction = input?.selectionDirection ?? null;
-			if (start != null && end != null) {
-				setMirrorSelectionStart(start);
-				setMirrorSelectionEnd(end);
-				inputMetadataRef.current.prev = [start, end, direction];
-			}
+			// Autofill timers can precede the native selectionchange task. Normalize
+			// the caret before recording it so arrow-key direction is not lost.
+			syncSelectionRef.current?.();
 		});
 		return () => timeoutIds.forEach(clearTimeout);
 	}, [value, isFocused]);
