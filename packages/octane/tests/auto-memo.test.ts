@@ -3321,11 +3321,15 @@ describe('compiler-owned component-region memoization', () => {
 
 	it('reruns effects in unmemoized returned-JSX provider component rows', () => {
 		const source = `
-			import { createContext, useEffect, useState } from 'octane';
+			import { createContext, useContext, useEffect, useState } from 'octane';
 
 			const Theme = createContext(null);
 
 			function Row(props) {
+				// useContext keeps Row off the compiler's $$stable stamp so the row
+				// stays genuinely unmemoized — a stable Row would bail on equal
+				// props and strand its every-render effect.
+				useContext(Theme);
 				useEffect(() => {
 					props.onEffect('effect:' + props.label);
 					return () => props.onEffect('cleanup:' + props.label);
@@ -3334,6 +3338,8 @@ describe('compiler-owned component-region memoization', () => {
 			}
 
 			function Rows(props) {
+				// Same: a stable Rows would bail before reaching the Row callsites.
+				useContext(Theme);
 				return (
 					<div id="provider-component-plain-rows">
 						{props.items.map((item) => (
@@ -4745,13 +4751,16 @@ describe('compiler-owned component-region memoization', () => {
 		}).code;
 
 		expectCompilerRegion(defaultBuild);
-		expect(defaultBuild).toContain('componentSlotVoid as');
+		// Rows is hookless, void, and context-free: its memo region wraps the
+		// markerless lite lowering. Returned reconciles a JSX descriptor, so it
+		// keeps the full componentSlot.
+		expect(defaultBuild).toContain('componentSlotLite as');
 		expect(defaultBuild).toContain('componentSlot as');
 		expect(defaultBuild).toMatch(/const __memoDep[\w$]* = \(?props\.items\)?;/);
 		expect(defaultBuild).toMatch(/const __memoDep[\w$]* = \(?props\.label\)?;/);
 		expect(defaultBuild).not.toMatch(/const __memoDep[\w$]* = \(?props\)?;/);
 		expect(defaultBuild).toMatch(
-			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlotVoid\([^;]*, Rows,/,
+			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlotLite\([^;]*, Rows,/,
 		);
 		expect(defaultBuild).toMatch(
 			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot\([^;]*, Returned,/,
@@ -5317,7 +5326,9 @@ describe('compiler-owned component-region memoization', () => {
 			{ hmr: false, autoMemo: true },
 		).code;
 		expect(code).toContain('__memoCommitted');
-		expect(code).toMatch(/Icon\.__memo !== true \|\| Icon\.__compare !== undefined/);
+		expect(code).toMatch(
+			/Icon\.__memo !== true && Icon\.\$\$stable !== true \|\| Icon\.__compare !== undefined/,
+		);
 	});
 
 	it('rejects a callback that reads a ref through a binding pattern', () => {
