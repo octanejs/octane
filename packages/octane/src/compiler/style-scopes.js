@@ -585,7 +585,7 @@ function collectOwnBlocks(nodes) {
  * @param {any[]} path
  * @returns {any[]}
  */
-function collectPrunableElements(value, elements, path) {
+export function collectPrunableElements(value, elements, path) {
 	if (Array.isArray(value)) {
 		for (const item of value) collectPrunableElements(item, elements, path);
 		return elements;
@@ -625,7 +625,7 @@ function collectPrunableElements(value, elements, path) {
  * @param {any} node
  * @returns {boolean}
  */
-function isFloatStyleResource(node) {
+export function isFloatStyleResource(node) {
 	let hasHref = false;
 	let hasPrecedence = false;
 	for (const attr of node.openingElement?.attributes || []) {

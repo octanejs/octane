@@ -360,8 +360,10 @@ describe('U1 spike — token contract seam', () => {
 	});
 
 	it('keeps raw var(--*) outside the contract namespace legal', () => {
+		// `class="x"` keeps `.x` matched so the run carries no U2 unused-selector
+		// warning: this test asserts only on the token diagnostics surface.
 		const source = `import { tokens } from './tokens';
-export function Badge() @{ <div><style>.x { margin: var(--legacy-gutter); border-color: var(--other-x); }</style><span /></div> }`;
+export function Badge() @{ <div><style>.x { margin: var(--legacy-gutter); border-color: var(--other-x); }</style><span class="x" /></div> }`;
 		const { resolve } = createSyncTokenContractResolver();
 		expect(
 			compileWithTokenContract(source, CONSUMER_FILE, { resolveTokenContract: resolve })
