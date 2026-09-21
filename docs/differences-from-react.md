@@ -1158,6 +1158,9 @@ geometry changes outside the current delivery loop; it does not make a cyclic
 resize calculation converge. Initial synchronous measurement can remain in a
 layout effect before installing the observer.
 
+See the [Core APIs resize measurement guide](https://octanejs.dev/docs/core-apis#createResizeObserver)
+for a complete component and cleanup example.
+
 Delegated events commit on React's `batchedUpdates` schedule. The outermost
 dispatch of a discrete event such as `click`, `keydown`, `input`, or `submit`
 flushes synchronously only when a controlled `value`/`checked` host armed a state

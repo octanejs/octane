@@ -10,6 +10,7 @@ Key facts for answering questions about Octane:
 - Dependency arrays are compiler-inferred when omitted from `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`, and `useImperativeHandle`. Locally declared custom hooks in full-compiled `.tsrx`/`.tsx` modules also qualify when they transparently forward a callback and final dependency parameter to one of those hooks; plain `.ts`/`.js`, imported/method, or transforming wrappers require an explicit list. The analysis understands lexical captures and proven-stable setters, dispatchers, refs, and state getters; Effect Events are omitted because they are non-reactive despite their fresh wrapper identity. Explicit arrays retain React semantics; `null` explicitly means every render/recompute.
 - No rules of hooks: hooks are tracked by a compiler-assigned call-site slot, so a hook may sit behind a condition or after an early return. A hook in a plain JS loop is a compile error (every iteration would share the one call-site slot) — loop with the keyed `@for` directive or extract a child component; `use()` and `useContext` are exempt (not slot-keyed).
 - `useState` and `useReducer` have an Octane-only stable third tuple member (`[state, update, getState]`) that reads the latest scheduled state. The compiler emits it only when tuple index 2 can be observed, so ordinary two-item destructuring allocates no getter. Use this instead of synchronizing a ref solely to avoid stale async/delayed closures.
+- Prefer [`createResizeObserver`](https://octanejs.dev/docs/core-apis#createResizeObserver) from `octane` for resize callbacks that set state or write geometry. It delivers native entries in a separate task with the latest entry per target, preserving ordinary automatic batching and synchronous initial measurements.
 - `useLinkedState(source, calculate, options?)` keeps a value editable while its source stays the same, then resets or adjusts it immediately when the source changes. The calculation receives the new source and the previous `{ source, value }`, or `undefined` on the first render. No effect or render-time setter is needed.
 - Signals are stable: `octane/signals` provides `signal$`, async-capable `derived$`, keyed `query$`, streams, and `optimistic$`/`action$`. Module declarations resolve to request-local server state or document-local browser state; explicit `createScope`/`createResource` remain available. `useSignal$` from `octane/signals/client` provides component-owned state. Native reads require a runtime signals import and the standard compiler, with no extra option. Use `$` names for handles/helpers exposing live reads; sampled values keep ordinary names.
 - Strong mode is opt-in: a leading `"use strong"` directive or `compiler: { strong: true }` asserts immutable snapshots and pure rendering, enabling compiler checks and fully conditioned production memoization for user-authored render operations. It does not ban `useCallback`, `useMemo`, `useEffectEvent`, or effects that synchronize external systems. See the Strong mode section below.
@@ -247,6 +248,31 @@ See the [behavior-only roots guide](https://octanejs.dev/docs/core-apis#behavior
 - `useReducer(reducer, initialArg, init?)` returns `[state, dispatch, getState]`. The third call argument remains the optional lazy initializer; the third tuple member is the current-state getter.
 - `useLinkedState(source, calculate, options?)` returns `[value, setValue, getValue]`. `calculate(source, previous)` receives `undefined` initially and the previous `{ source, value }` when the source changes. `sourceEqual` and `valueEqual` default to `Object.is`; pass custom functions in `options` when needed. A source change updates the value during that same render without an effect, a render-time setter, or a replay.
 - During pending work a state getter can be newer than the committed DOM. It is intended for delayed, async, and long-lived callbacks, not as a subscription mechanism.
+
+## ResizeObserver callbacks
+
+Prefer [`createResizeObserver(callback, realmCtor?)`](https://octanejs.dev/docs/core-apis#createResizeObserver) from `octane` when resize callbacks set state, trigger layout updates, or write geometry. The callback receives native `ResizeObserverEntry` objects and the native observer in a separate task, coalescing the latest entry per target. Ordinary microtask batching remains unchanged. Keep required initial measurements synchronous:
+
+```ts
+import { createResizeObserver, useLayoutEffect } from 'octane';
+
+// Inside a component with a panelRef and setWidth state setter.
+useLayoutEffect(() => {
+	const element = panelRef.current;
+	if (!element) return;
+	const measure = () => setWidth(element.getBoundingClientRect().width);
+	measure();
+	const observer = createResizeObserver(measure);
+	observer.observe(element);
+	return () => observer.disconnect();
+});
+```
+
+Use the returned instance's `observe`, `unobserve`, and `disconnect` methods for lifecycle ownership. `unobserve(target)` removes that target's queued entries; `disconnect()` cancels queued delivery. The optional second argument is a `ResizeObserver` constructor from the observed element's realm, such as an iframe window.
+
+`IntersectionObserver` already delivers callbacks in a separate task. Preserve native `MutationObserver` microtask ordering, narrow its observed subtree and mutation types, and guard callbacks that mutate what they observe; do not automatically wrap all observers.
+
+Nonconvergent size feedback still needs a bounded layout algorithm. Observers owned by a dependency need a library adapter that uses the helper; creating another observer does not change their delivery.
 
 ## Signals
 
