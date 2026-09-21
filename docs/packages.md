@@ -50,7 +50,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/image-crop` | [`packages/image-crop`](../packages/image-crop) | framework binding | `0.0.10` | 5 |
 | `@octanejs/inertia` | [`packages/inertia`](../packages/inertia) | framework binding | `0.0.23` | 3 |
 | `@octanejs/ink` | [`packages/ink`](../packages/ink) | framework binding | `0.0.16` | 5 |
-| `@octanejs/input-otp` | [`packages/input-otp`](../packages/input-otp) | framework binding | `0.0.20` | 1 |
+| `@octanejs/input-otp` | [`packages/input-otp`](../packages/input-otp) | framework binding | `0.0.21` | 1 |
 | `@octanejs/intersection-observer` | [`packages/intersection-observer`](../packages/intersection-observer) | framework binding | `0.0.19` | 2 |
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.51` | 7 |
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.1.54` | 42 |
@@ -133,7 +133,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.20` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.54` | 6 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.11` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.3.5` | 40 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.3.6` | 40 |
 
 ## Private packages
 
