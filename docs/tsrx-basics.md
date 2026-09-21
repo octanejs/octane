@@ -283,12 +283,10 @@ export function Feed(props) @{
 ```
 
 Put a row's reconciliation key in the `@for` header: `; key item.id`.
-An explicit `key` attribute on an intrinsic DOM root of a `@for` arm is accepted
-as legacy row-key syntax, but can prevent native template compilation. Octane
-reports `OCTANE_FOR_ROOT_KEY` at that attribute; move the key expression into
-the header and remove the root attribute. Keys on nested descendants retain
-their own subtree identity and do not produce this warning.
-Component root keys do not produce this warning.
+An explicit `key` attribute on the first direct root is also accepted as legacy
+row-key syntax and takes precedence over a header key. Eligible intrinsic rows
+retain native template compilation with either spelling. Component and nested
+child keys retain their reconciliation boundaries.
 
 ```jsx
 export function Greeting(props) @{

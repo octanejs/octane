@@ -470,3 +470,357 @@ describe('authored host JSX', () => {
 		}
 	});
 });
+
+describe('explicit keys in @for rows', () => {
+	it('keeps child key reads live when a later prop changes another row key', () => {
+		const keyState = {
+			version: 0,
+			active: false,
+			touch(item: { id: string }) {
+				if (this.active && item.id === 'a') this.version++;
+				return this.version;
+			},
+		};
+		const { App } = loadCompiledFixtureSource(
+			`import { keyState } from '@test/key-state';
+			export function App({items}) @{ <section>
+				@for (const item of items) {
+					<input key={keyState.version + ':' + item.id} data-id={item.id} data-touch={keyState.touch(item)} defaultValue="seed"/>
+				}
+				<span>tail</span>
+			</section> }`,
+			{
+				id: 'compiler-authored-hosts.tsrx',
+				mode: 'client',
+				compileOptions: { dev: mode === 'dev', hmr: false },
+				runtimeModules: { '@test/key-state': { keyState } },
+			},
+		);
+		const r = mount(App, { items: ['a', 'b', 'c'].map((id) => ({ id })) });
+		try {
+			const originals = new Map(
+				['a', 'b', 'c'].map((id) => {
+					const input = r.find(`input[data-id="${id}"]`) as HTMLInputElement;
+					input.value = `typed ${id}`;
+					return [id, input];
+				}),
+			);
+			const tail = r.find('span');
+			keyState.active = true;
+			r.update(App, { items: ['c', 'b', 'a'].map((id) => ({ id })) });
+			expect(keyState.version).toBe(1);
+			expect(r.find('input[data-id="a"]')).toBe(originals.get('a'));
+			expect(originals.get('a')!.value).toBe('typed a');
+			for (const id of ['b', 'c']) {
+				const input = r.find(`input[data-id="${id}"]`) as HTMLInputElement;
+				expect(input).not.toBe(originals.get(id));
+				expect(originals.get(id)!.isConnected).toBe(false);
+				expect(input.value).toBe('seed');
+			}
+			expect(r.find('span')).toBe(tail);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	function inputSource(header: string) {
+		return `export function App({items, onPick}) @{ <section>
+			@for (const item of items${header}) {
+				<input key={item.reset} data-id={item.id} defaultValue={item.label} onClick={() => onPick(item.id)}/>
+			}
+			<span>tail</span>
+		</section> }`;
+	}
+
+	it('resets a child key changed by an earlier prop while preserving its keyed row', () => {
+		const { App } = fixture(`export function App({items, reset}) @{ <section>
+			@for (const item of items; key item.id) {
+				<input data-mutated={item.key = reset} key={item.key} defaultValue="seed"/>
+			}
+			<span>tail</span>
+		</section> }`);
+		const item = { id: 'a', key: 0 };
+		const items = [item];
+		const r = mount(App, { items, reset: 0 });
+		try {
+			const input = r.find('input') as HTMLInputElement;
+			const tail = r.find('span');
+			input.value = 'typed';
+			r.update(App, { items, reset: 0 });
+			expect(r.find('input')).toBe(input);
+			expect(input.value).toBe('typed');
+
+			// The row reads its unchanged key before this prop gives the child a new key.
+			r.update(App, { items, reset: 1 });
+			const replacement = r.find('input') as HTMLInputElement;
+			expect(item.key).toBe(1);
+			expect(replacement).not.toBe(input);
+			expect(input.isConnected).toBe(false);
+			expect(replacement.value).toBe('seed');
+			expect(r.find('span')).toBe(tail);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('refreshes imported mutable row keys when the items and props retain their identity', () => {
+		const keyState = { reset: 0 };
+		const { App } = loadCompiledFixtureSource(
+			`import { keyState } from '@test/key-state';
+			export function App({items}) @{ <section>
+				@for (const item of items; key item.id) {
+					<input key={keyState.reset + ':' + item.id} defaultValue={item.label}/>
+				}
+			</section> }`,
+			{
+				id: 'compiler-authored-hosts.tsrx',
+				mode: 'client',
+				compileOptions: { dev: mode === 'dev', hmr: false },
+				runtimeModules: { '@test/key-state': { keyState } },
+			},
+		);
+		const props = { items: [{ id: 'a', label: 'Alpha' }] };
+		const r = mount(App, props);
+		try {
+			const input = r.find('input') as HTMLInputElement;
+			input.value = 'typed Alpha';
+			r.update(App, props);
+			expect(r.find('input')).toBe(input);
+			expect(input.value).toBe('typed Alpha');
+			keyState.reset = 1;
+			r.update(App, props);
+			const replacement = r.find('input') as HTMLInputElement;
+			expect(replacement).not.toBe(input);
+			expect(input.isConnected).toBe(false);
+			expect(replacement.value).toBe('Alpha');
+			r.update(App, props);
+			expect(r.find('input')).toBe(replacement);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('refreshes captured row keys for an unchanged items array and releases each callback ref once', () => {
+		const { App } = fixture(`export function App({items, reset, onRef}) @{ <section>
+			@for (const item of items; key item.id) {
+				<input key={reset + ':' + item.id} ref={onRef} data-id={item.id} defaultValue={item.label}/>
+			}
+		</section> }`);
+		const items = [
+			{ id: 'a', label: 'Alpha' },
+			{ id: 'b', label: 'Beta' },
+		];
+		const attached: HTMLInputElement[] = [];
+		const cleaned: HTMLInputElement[] = [];
+		const onRef = (input: HTMLInputElement | null) => {
+			if (input === null) return;
+			expect(input.isConnected).toBe(true);
+			attached.push(input);
+			return () => cleaned.push(input);
+		};
+		const r = mount(App, { items, reset: 0, onRef });
+		try {
+			const inputs = r.findAll('input') as HTMLInputElement[];
+			inputs[0].value = 'typed Alpha';
+			inputs[1].value = 'typed Beta';
+			expect(new Set(attached)).toEqual(new Set(inputs));
+			expect(attached).toHaveLength(2);
+			r.update(App, { items, reset: 0, onRef });
+			expect(r.findAll('input')).toEqual(inputs);
+			r.update(App, { items: items.toReversed(), reset: 0, onRef });
+			expect(r.findAll('input')).toEqual(inputs.toReversed());
+			r.update(App, { items, reset: 0, onRef });
+			expect(r.findAll('input')).toEqual(inputs);
+			expect(inputs.map((input) => input.value)).toEqual(['typed Alpha', 'typed Beta']);
+			expect(attached).toHaveLength(2);
+			expect(cleaned).toEqual([]);
+
+			// Reusing the exact iterable must still observe the parent's new key capture.
+			r.update(App, { items, reset: 1, onRef });
+			const replacements = r.findAll('input') as HTMLInputElement[];
+			for (let index = 0; index < replacements.length; index++) {
+				expect(replacements[index]).not.toBe(inputs[index]);
+				expect(inputs[index].isConnected).toBe(false);
+			}
+			expect(replacements.map((input) => input.value)).toEqual(['Alpha', 'Beta']);
+			expect(attached).toHaveLength(4);
+			expect(cleaned).toHaveLength(2);
+			expect(new Set(cleaned)).toEqual(new Set(inputs));
+			r.update(App, { items, reset: 1, onRef });
+			expect(r.findAll('input')).toEqual(replacements);
+			expect(attached).toHaveLength(4);
+			expect(cleaned).toHaveLength(2);
+		} finally {
+			r.unmount();
+		}
+		expect(cleaned).toHaveLength(4);
+		expect(new Set(cleaned)).toEqual(new Set(attached));
+		expect(cleaned.every((input) => !input.isConnected)).toBe(true);
+	});
+
+	it.each(['', '; key item.id'])(
+		'retains edited input rows and resets only changed explicit keys with header %s',
+		(header) => {
+			const { App } = fixture(inputSource(header));
+			const items = [
+				{ id: 'a', reset: 'a:0', label: 'Alpha' },
+				{ id: 'b', reset: 'b:0', label: 'Beta' },
+			];
+			const onPick = vi.fn();
+			const r = mount(App, { items, onPick });
+			try {
+				const inputs = r.findAll('input') as HTMLInputElement[];
+				const tail = r.find('span');
+				inputs[0].value = 'typed Alpha';
+				inputs[1].value = 'typed Beta';
+				r.update(App, { items: items.toReversed(), onPick });
+				expect(r.findAll('input')).toEqual(inputs.toReversed());
+				expect(inputs.map((input) => input.value)).toEqual(['typed Alpha', 'typed Beta']);
+
+				const changed = [{ ...items[1], label: 'Updated Beta' }, items[0]];
+				r.update(App, { items: changed, onPick });
+				expect(r.findAll('input')).toEqual(inputs.toReversed());
+				expect(inputs[1].value).toBe('typed Beta');
+
+				r.update(App, { items: [{ ...changed[0], reset: 'b:1' }, changed[1]], onPick });
+				const replacement = r.find('input[data-id="b"]') as HTMLInputElement;
+				expect(replacement).not.toBe(inputs[1]);
+				expect(inputs[1].isConnected).toBe(false);
+				expect(replacement.value).toBe('Updated Beta');
+				expect(r.find('input[data-id="a"]')).toBe(inputs[0]);
+				expect(inputs[0].value).toBe('typed Alpha');
+				expect(r.find('span')).toBe(tail);
+				r.click('input[data-id="b"]');
+				expect(onPick).toHaveBeenCalledExactlyOnceWith('b');
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it.each(['', '; key item.id'])(
+		'adopts edited server input rows and preserves explicit key replacement with header %s',
+		(header) => {
+			const source = inputSource(header);
+			const { App } = fixture(source);
+			const server = fixture(source, true);
+			const items = [
+				{ id: 'a', reset: 'a:0', label: 'Alpha' },
+				{ id: 'b', reset: 'b:0', label: 'Beta' },
+			];
+			const onPick = vi.fn();
+			const container = document.createElement('div');
+			container.innerHTML = renderToString(server.App, { items, onPick }).html;
+			document.body.append(container);
+			const inputs = [...container.querySelectorAll('input')];
+			const tail = container.querySelector('span');
+			inputs[0].value = 'typed Alpha';
+			inputs[1].value = 'typed Beta';
+			const recovered: unknown[] = [];
+			const root = hydrateRoot(
+				container,
+				App,
+				{ items, onPick },
+				{
+					onRecoverableError: (error) => recovered.push(error),
+				},
+			);
+			try {
+				flushSync(() => {});
+				expect([...container.querySelectorAll('input')]).toEqual(inputs);
+				expect(inputs.map((input) => input.value)).toEqual(['typed Alpha', 'typed Beta']);
+				flushSync(() => root.render(App, { items: items.toReversed(), onPick }));
+				expect([...container.querySelectorAll('input')]).toEqual(inputs.toReversed());
+				flushSync(() =>
+					root.render(App, {
+						items: [{ ...items[1], reset: 'b:1', label: 'Updated Beta' }, items[0]],
+						onPick,
+					}),
+				);
+				const replacement = container.querySelector<HTMLInputElement>('input[data-id="b"]')!;
+				expect(replacement).not.toBe(inputs[1]);
+				expect(inputs[1].isConnected).toBe(false);
+				expect(replacement.value).toBe('Updated Beta');
+				expect(container.querySelector('input[data-id="a"]')).toBe(inputs[0]);
+				expect(inputs[0].value).toBe('typed Alpha');
+				expect(container.querySelector('span')).toBe(tail);
+				flushSync(() => replacement.click());
+				expect(onPick).toHaveBeenCalledExactlyOnceWith('b');
+				expect(recovered).toEqual([]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	const componentSource = `import { useState } from 'octane';
+		function Row({item}) @{ const [count, setCount] = useState(0);
+			<button data-id={item.id} onClick={() => setCount(count + 1)}>{item.label + ':' + count}</button>
+		}
+		export function App({items}) @{ <section>
+			@for (const item of items; key item.id) {
+				<Row key={item.id + ':' + item.version} item={item}/>
+			}
+			<span>tail</span>
+		</section> }`;
+
+	it.each(['mount', 'hydrate'])(
+		'preserves component state through reorder and resets changed child key suffixes after %s',
+		(kind) => {
+			const { App } = fixture(componentSource);
+			const items = [
+				{ id: 'a', version: 0, label: 'Alpha' },
+				{ id: 'b', version: 0, label: 'Beta' },
+			];
+			const r = kind === 'mount' ? mount(App, { items }) : null;
+			const container = r?.container ?? document.createElement('div');
+			if (kind === 'hydrate') {
+				document.body.append(container);
+				container.innerHTML = renderToString(fixture(componentSource, true).App, { items }).html;
+			}
+			const adopted = [...container.querySelectorAll('button')];
+			const recovered: unknown[] = [];
+			const root =
+				kind === 'hydrate'
+					? hydrateRoot(
+							container,
+							App,
+							{ items },
+							{
+								onRecoverableError: (error) => recovered.push(error),
+							},
+						)
+					: null;
+			const update = (next: typeof items) => {
+				if (r) r.update(App, { items: next });
+				else flushSync(() => root!.render(App, { items: next }));
+			};
+			try {
+				flushSync(() => {});
+				const buttons = [...container.querySelectorAll('button')];
+				const tail = container.querySelector('span');
+				if (kind === 'hydrate') expect(buttons).toEqual(adopted);
+				flushSync(() => buttons[1].click());
+				expect(buttons[1].textContent).toBe('Beta:1');
+				update(items.toReversed());
+				expect([...container.querySelectorAll('button')]).toEqual(buttons.toReversed());
+				expect(buttons[1].textContent).toBe('Beta:1');
+				update([{ ...items[1], version: 1 }, items[0]]);
+				const replacement = container.querySelector<HTMLButtonElement>('button[data-id="b"]')!;
+				expect(replacement).not.toBe(buttons[1]);
+				expect(buttons[1].isConnected).toBe(false);
+				expect(replacement.textContent).toBe('Beta:0');
+				expect(container.querySelector('button[data-id="a"]')).toBe(buttons[0]);
+				expect(container.querySelector('span')).toBe(tail);
+				flushSync(() => replacement.click());
+				expect(replacement.textContent).toBe('Beta:1');
+				expect(recovered).toEqual([]);
+			} finally {
+				r?.unmount();
+				root?.unmount();
+				container.remove();
+			}
+		},
+	);
+});

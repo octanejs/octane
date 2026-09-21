@@ -93,7 +93,6 @@ import {
 import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
-import { analyzeForKeyDiagnostics } from './for-key-diagnostics.js';
 import { assertStrongMode } from './strong-mode.js';
 import { applyStrongAutomaticMemo } from './strong-auto-memo.js';
 import {
@@ -9580,7 +9579,6 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	assertNativeReadDiagnostics(analyzedAst, source, cleanFilename, options);
 	const strongAnalysis = assertStrongMode(analyzedAst, source, cleanFilename, options);
 	const strongModeEnabled = strongAnalysis?.enabled === true;
-	const forKeyDiagnostics = analyzeForKeyDiagnostics(analyzedAst, source, cleanFilename, options);
 	analyzedAst = markKnownAttributeSpreads(analyzedAst, options?.knownAttributeSpreads);
 	if (analyzedAst.metadata?.octaneNativeAttributeProjection) {
 		options = { ...options, nativeReads: true };
@@ -9698,9 +9696,6 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	);
 	if (strongAnalysis?.diagnostics.length > 0) {
 		result.diagnostics = [...strongAnalysis.diagnostics, ...(result.diagnostics ?? [])];
-	}
-	if (forKeyDiagnostics.length > 0) {
-		result.diagnostics = [...forKeyDiagnostics, ...(result.diagnostics ?? [])];
 	}
 	if (bindingConstants !== undefined) result.bindingConstants = bindingConstants;
 	return result;
@@ -14371,6 +14366,7 @@ function ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash, compon
 
 function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const bindingSite = node._octaneBindingSite;
+	const itemBody = forItemTemplateBody(node, ctx);
 	// rewriteHookCalls: key any `use(thenable)` in the @for iterable expression.
 	const itemsExpr = rewriteHookCalls(node.right, ctx, name);
 	const mapCall = node.nativeArrayMap || null;
@@ -14378,7 +14374,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	const params = [itemId];
 	if (node.index) params.push(node.index);
 	const itemSub = ssrCompileSub(
-		node.body.body,
+		itemBody,
 		ctx,
 		'__sitem',
 		params,
@@ -14466,8 +14462,8 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	// attribute serialization stay on the allocation-free path, matching the
 	// client forBlock's existing PURE-body proof.
 	const itemNeedsIdentity =
-		containsComponentCallOrControlFlow(node.body.body) ||
-		containsRenderCall(node.body.body) ||
+		containsComponentCallOrControlFlow(itemBody) ||
+		containsRenderCall(itemBody) ||
 		ssrAstCallsAny(itemSub.fn, ['_$ssrChild', '_$ssrComponent']);
 	const itemCall = ssrSubCall(
 		itemSub.fnName,
@@ -31585,6 +31581,79 @@ function keyedSelectionDepIndex(itemName, keyBody, subStmts, runtimeDepNames, ct
 	return runtimeDepNames.indexOf(selected.name);
 }
 
+// The first root's legacy key already owns the entire row through keyFn.
+// Avoid a second descriptor boundary for that same key. Only consume a host
+// key when the row cannot change a collected key before a later child reads it.
+// Opaque rendering, spreads and duplicate keys retain the existing boundary.
+// Component keys and nested host keys retain their own reconciliation ranges.
+function forItemTemplateBody(node, ctx) {
+	const body = node.body.body;
+	if (ctx._universalRuntimeUnit != null || body.length !== 1) return body;
+	const root = body[0];
+	if (!isPlainHostRoot(root) || isActivityLongForm(root, ctx) || isFragmentLongForm(root, ctx))
+		return body;
+	const attrs = root.attributes || root.openingElement?.attributes || [];
+	let keyIndex = -1;
+	for (let i = 0; i < attrs.length; i++) {
+		const attr = attrs[i];
+		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') return body;
+		if (jsxAttrRawName(attr) !== 'key') continue;
+		if (keyIndex !== -1 || attr.value == null) return body;
+		keyIndex = i;
+	}
+	if (keyIndex === -1) return body;
+	const value = attrs[keyIndex].value;
+	const key = value.type === 'JSXExpressionContainer' ? value.expression : value;
+	if (!isDeferralSafeBundleArg(key)) return body;
+	// Destructuring must not invoke defaults, computed reads or an iterator.
+	if (!isAutoMemoPropsParam(node.left.declarations[0].id)) return body;
+	function stableHost(host) {
+		if (!isPlainHostRoot(host) || isActivityLongForm(host, ctx) || isFragmentLongForm(host, ctx))
+			return false;
+		const tag = host.id?.name ?? host.openingElement?.name?.name;
+		if (tag.includes('-') || tag === 'script') return false;
+		const attributes = host.attributes || host.openingElement?.attributes || [];
+		if (
+			attributes.some(
+				(attr) =>
+					attr.type === 'SpreadAttribute' ||
+					attr.type === 'JSXSpreadAttribute' ||
+					jsxAttrRawName(attr) === 'is' ||
+					jsxAttrRawName(attr) === 'children',
+			)
+		)
+			return false;
+		// Inspect values so deferred event/ref callbacks remain eligible.
+		const values = attributes.map((attr) => attr.value);
+		if (containsRenderCall(values) || containsAutoMemoUnsafeStructure(values)) return false;
+		for (const child of host.children || []) {
+			if (child.type === 'JSXText') continue;
+			if (child.type === 'Text' || child.type === 'JSXExpressionContainer') {
+				const expr = child.expression;
+				if (!expr || expr.type === 'JSXEmptyExpression') continue;
+				if (
+					!isKnownTextChildExpression(expr) ||
+					containsRenderCall([expr]) ||
+					containsAutoMemoUnsafeStructure([expr])
+				)
+					return false;
+			} else if (!stableHost(child)) return false;
+		}
+		return true;
+	}
+	if (!stableHost(root)) return body;
+	const kept = attrs.filter((_, index) => index !== keyIndex);
+	return [
+		root.openingElement
+			? {
+					...root,
+					...(root.attributes === undefined ? {} : { attributes: kept }),
+					openingElement: { ...root.openingElement, attributes: kept },
+				}
+			: { ...root, attributes: kept },
+	];
+}
+
 function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	// `@for await (...)` (async iteration) has no meaning for the runtime's
 	// synchronous keyed reconciler. The TSRX parser currently rejects the surface
@@ -31618,7 +31687,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// we synthesize a fresh name and emit the destructuring inside the body so
 	// the keyFn still gets the whole item and the body still sees the fields.
 	const itemName = isDestructured ? '_item' : leftDeclId.name;
-	const subStmts = node.body.body;
+	const subStmts = forItemTemplateBody(node, ctx);
 
 	// Key resolution priority (matches @tsrx/core's build_hoisted_for_of_with_hooks):
 	//   1. `key={…}` attribute on the first Element child (legacy / explicit).
@@ -31643,7 +31712,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// body for the first Element and pull its `key=` attr if any. Accept both
 	// the old `Element` IR and the raw new `JSXElement` shape that's reached
 	// here when the body wasn't routed through normalizeChildren.
-	const firstEl = subStmts.find((n) => n.type === 'Element' || n.type === 'JSXElement');
+	const firstEl = node.body.body.find((n) => n.type === 'Element' || n.type === 'JSXElement');
 	if (firstEl) {
 		const keyAttr = (firstEl.attributes || firstEl.openingElement?.attributes || []).find(
 			(a) => (a.name?.name || a.name) === 'key',
@@ -31853,18 +31922,17 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		const regionStmts = emptyStmts ? [...subStmts, ...emptyStmts] : subStmts;
 		const regionAst = b.block(regionStmts);
 		const regionFree = collectFreeIdentifiers(regionAst, bodyScope);
-		if (node.key) {
-			for (const name of collectFreeIdentifiers(node.key, bodyScope)) regionFree.add(name);
-		}
+		for (const name of collectFreeIdentifiers(keyBody, bodyScope)) regionFree.add(name);
 		let listSafe =
 			ctx.autoMemo === true &&
 			!hasPerItemEventClosure &&
 			isAutoMemoCalculationDependency(node.right) &&
 			!hasHook &&
 			!containsRenderCall(regionStmts, ctx) &&
-			!containsRenderCall(node.key ? [node.key] : [], ctx) &&
+			!containsRenderCall([keyBody], ctx) &&
 			!containsAutoMemoUnsafeStructure(regionStmts, ctx) &&
-			!containsAutoMemoUnsafeStructure(node.key ? [node.key] : [], ctx) &&
+			!containsAutoMemoUnsafeStructure([keyBody], ctx) &&
+			!containsImportedMemberRead(keyBody, ctx.importedNames) &&
 			!containsImportedMemberRead(regionAst, ctx.importedNames);
 		const listDeps = new Set();
 		const witnesses = collectImportedComponentReferences(regionAst, ctx.importedNames);

@@ -35,7 +35,6 @@ import {
 } from '@tsrx/core';
 import { buildFatSegments, decodeSourceMappings } from './fat-segments.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
-import { analyzeForKeyDiagnostics } from './for-key-diagnostics.js';
 import { analyzeStrongMode } from './strong-mode.js';
 import { analyzeNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
@@ -515,13 +514,6 @@ export function compileToVolarMappings(source, filename, options) {
 		}),
 	);
 	diagnostics.push(...nativeReadDiagnostics);
-	diagnostics.push(
-		...analyzeForKeyDiagnostics(ast, source, filename, {
-			renderer,
-			rendererBoundaries: rendererConfig.boundaries,
-			rendererRegistry: rendererConfig.registry,
-		}),
-	);
 	// The renderer pragma belongs to the semantic comment set consumed by
 	// @tsrx/core's type-only Program print. This keeps code and mappings in one
 	// coordinate system instead of prepending text and shifting every mapping.
