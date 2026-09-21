@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/waypoint",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "license": "MIT",
   "type": "module",
   "octane": {
@@ -43,7 +43,7 @@
     "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0 || ^0.3.0"
+    "octane": "workspace:^0.4.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

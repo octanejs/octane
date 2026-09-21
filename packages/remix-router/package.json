@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/remix-router",
-  "version": "0.1.49",
+  "version": "0.1.50",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -44,7 +44,7 @@
     "cookie-es": "^3.1.1"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0 || ^0.3.0"
+    "octane": "workspace:^0.4.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

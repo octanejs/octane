@@ -1,5 +1,48 @@
 # octane
 
+## 0.4.0
+
+### Minor Changes
+
+- 34e83ce: Recognize an `octane.source` manifest marker on linked and workspace packages. A package outside `node_modules` that receives Octane transitively from a shared toolkit can now declare `"octane": { "source": true }` instead of re-adding an `octane` version range it does not own, purely as a compiler marker. Installed packages under `node_modules` still require a declared `octane` dependency, and ownership stays explicit per package.
+
+### Patch Changes
+
+- 3a859dd: Specialize DOM binding child programs for explicitly fixed primitive props so unused presentation branches do not ship. Caller propagation is opt-in through `domBindingFixedProps`; default child requests remain generic and shared. Dynamic values, literal defaults, DOM adoption, and renderer hydration handoff retain their existing behavior.
+
+  Expose the fixed-prop binding benchmark in the MCP benchmark tool alongside the unified runner.
+- 620769b: Admit keyed `@for` item bodies whose only nested structure is host-only
+  conditional content to the `forBlock` PURE fast path: an `@if` arm that renders
+  only host output (including a narrowly proven nested keyed `@for`) carries
+  nothing opaque, so with no parent captures the body is a pure function of the
+  item and unchanged-identity survivors skip re-render entirely. The admission
+  fails closed — a component tag inside the conditional, one hidden behind a
+  function boundary such as a memoizable call's `t => <Tag />` callback argument,
+  a render-time hazard like an assignment in the `@if` test, or a live imported
+  member read keeps the body off the pure path.
+- dbcabb2: Store signal-instance identity directly on scope and block fields instead of a
+  per-mount `WeakMap` record, so stamping a component's scope costs a handful of
+  stores rather than an allocation plus a map entry. Lite components resolve their
+  signal owner without allocating a per-mount closure when the owner is already
+  current, and dormant blocks — no registered effects, no root-transaction capture
+  — skip the render bookkeeping those subsystems only need once armed. Effect
+  Event payloads queued under a hidden Suspense boundary now park on the boundary
+  and publish at reveal, so a rolled-back render never installs a stale impl.
+- 92227f6: Add `createResizeObserver` to deliver coalesced native resize notifications in a
+  separate task, with queued-entry cleanup on unobserve and disconnect. Ordinary
+  state updates keep their existing microtask batching.
+
+  Use deferred observer callbacks in Base UI measurement components and Floating
+  UI's element-resize adapter so geometry-affecting updates can settle without
+  ResizeObserver delivery-loop warnings. These bindings now require Octane 0.3.7
+  or newer in the 0.3 release line. Initial synchronous measurement and positioning
+  remain available, and the global ResizeObserver constructor is unchanged.
+- 6580880: Preserve following server-rendered components and bind their events when a completed `@try` boundary hydrates, catches a client error, or waits for a client retry.
+- db35ac1: Preserve pending native query streams when a parent rerenders with unchanged captured inputs, avoiding duplicate browser producers during streamed hydration. Changed inputs still replace the pending primary.
+- f209f7c: Preserve the root signal namespace when hydrating streamed Suspense arms, so queries adopt server results instead of starting duplicate browser producers.
+- a2c3e07: Replay captured independent-island interactions after the adopted primary commits, so controlled input adoption cannot restore text cleared by an early command. Pending or removed islands retain or cancel their captured interactions until their owning lifecycle can replay them safely.
+- a2c3e07: Keep query and derived computations attached to live signal inputs when their declarations are first resolved during historical hydration. Queries now reselect after later input changes without repeating a completed initial server request.
+
 ## 0.3.6
 
 ### Patch Changes

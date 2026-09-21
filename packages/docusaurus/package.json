@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/docusaurus",
-  "version": "0.0.40",
+  "version": "0.0.41",
   "description": "Docusaurus content and MDX integration for Octane",
   "license": "MIT",
   "type": "module",
@@ -80,7 +80,7 @@
   },
   "peerDependencies": {
     "@docusaurus/core": "3.10.1",
-    "octane": "workspace:^0.1.51 || ^0.2.0 || ^0.3.0",
+    "octane": "workspace:^0.4.0",
     "vite": ">=7.0.0"
   },
   "peerDependenciesMeta": {
