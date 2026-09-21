@@ -80,7 +80,10 @@ describe('@octanejs/testing-library Octane peer minimum', function () {
 	it('excludes published Octane 0.2.4, which has no isInActScope export', function () {
 		const range = publishedOctanePeerRange();
 		expect(satisfies(INCOMPATIBLE_PUBLISHED_VERSION, range)).toBe(false);
-		expect(satisfies('0.2.5', range)).toBe(true);
+		const { version } = JSON.parse(
+			readFileSync(resolve(packageDirectory, '../octane/package.json'), 'utf8'),
+		) as { version: string };
+		expect(satisfies(version, range)).toBe(true);
 	});
 
 	it('fails to bundle the pure entry against the published npm 0.2.4 tarball', async function () {
