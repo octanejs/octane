@@ -21,6 +21,13 @@
   "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
   "journeys": [
     {
+      "id": "configured-run-evidence",
+      "title": "Configure deferred and eager workloads through the native form and download matching captures",
+      "kind": "golden",
+      "spec": "e2e/signal-chat.spec.ts",
+      "critical": true
+    },
+    {
       "id": "early-send-command",
       "title": "Replay an early Send command with its native composer value after client code arrives",
       "kind": "ssr-hydration",

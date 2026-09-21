@@ -105,7 +105,9 @@ recorded checkout, so rebuild and restart it before measuring changes.
 The production Playwright journeys separately verify independent streaming,
 initial first-value HTML, deferred catch-up without duplicate initial calls,
 early composer focus/caret/value and node preservation, eager Unicode results,
-fault recovery, superseded submissions, and cancellation cleanup. Diagnostics
+fault recovery, superseded submissions, and cancellation cleanup. The journeys
+also cover configuring equivalent deferred/eager workloads through the native
+form and downloading evidence for each generated run. Diagnostics
 are captured before navigation through the final interaction; warnings, console
 errors, page errors, and hydration mismatches fail the journey.
 
