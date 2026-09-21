@@ -29,16 +29,32 @@
 // effects over- or under-fire would otherwise silently measure the wrong
 // workload. Any mismatch → exit 1 (BENCH_JSON still written, with `failed`).
 //
-// Ops (expected __fx deltas from a reset, per 1k rows):
-//   mount_1k     empty → 1000 rows        mounts 1000, refs 1000, layouts 100, h>0
-//   update_nodeps bump unrelated tick     all counters 0 (rows re-render in the
-//                                         VDOM targets; every deps unchanged)
+// On the declared VDOM targets (VDOM_TARGETS in contract.mjs) the gate also
+// reads window.__renders — every Row body increments `row` as its first
+// statement and __resetFx resets it alongside __fx — and asserts the exact
+// per-op invocation count. This is what makes the hollow path loud: a
+// compiler element cache or equal-props bail that skips all 1,000 row bodies
+// on update_nodeps fails the gate instead of posting a ~4µs "win". A declared
+// VDOM target missing the probe is a fixture defect, not an exemption.
+// The fine-grained targets are uninstrumented by design — they never
+// re-invoke row bodies.
+//
+// Ops (expected __fx deltas from a reset, per 1k rows; renders = __renders.row
+// on the VDOM targets):
+//   mount_1k     empty → 1000 rows        mounts 1000, refs 1000, layouts 100, h>0;
+//                                         renders.row 1000
+//   update_nodeps bump the tick prop      all counters 0; renders.row 1000 on
+//                                         VDOM targets (every body re-invokes;
+//                                         every deps-array unchanged)
 //   update_deps  bump every item.value    layouts 100 (1000 layout refires,
-//                                         100 probe reads), h>0, others 0
-//   clear        1000 → 0                 cleanups 1000, refCleanups 1000
+//                                         100 probe reads), h>0, others 0;
+//                                         renders.row 1000
+//   clear        1000 → 0                 cleanups 1000, refCleanups 1000;
+//                                         renders.row 0
 //   remount      all-new keys             mounts+cleanups 1000, refs+refCleanups 1000,
-//                                         layouts 100, h>0
-//   remove_100_scattered  drop every 10th cleanups 100, refCleanups 100
+//                                         layouts 100, h>0; renders.row 1000
+//   remove_100_scattered  drop every 10th cleanups 100, refCleanups 100;
+//                                         renders deliberately ungated
 //
 // Servers must be running first (production preview recommended):
 //   pnpm --filter octane-tsrx-effectful-list-bench preview   # :5201
@@ -54,7 +70,7 @@
 //         BENCH_JSON=/path/out.json   # machine-readable results
 
 import { chromium } from 'playwright';
-import { OPS, effectGateErrors } from './contract.mjs';
+import { OPS, VDOM_TARGETS, effectGateErrors } from './contract.mjs';
 import { writeFileSync } from 'node:fs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
@@ -97,7 +113,9 @@ async function freshPage(browser, url) {
 // keeps going so ONE broken (target, op) can't blank out every other number —
 // the run still exits non-zero with a top-level `failed` field (BENCH_JSON
 // contract), and every failed op is flagged per-target in meta.fxGate.
-async function gateCheck(page, op) {
+// checkRenders (VDOM targets only) folds the __renders row-invocation
+// assertion into the same gate — including the missing-probe defect check.
+async function gateCheck(page, op, checkRenders) {
 	await page.evaluate((pre) => window[pre](), op.pre);
 	await sleep(50);
 	await page.evaluate(() => window.__resetFx());
@@ -105,9 +123,10 @@ async function gateCheck(page, op) {
 	await sleep(50);
 	const got = await page.evaluate(() => ({
 		fx: { ...window.__fx },
+		renders: window.__renders ? { ...window.__renders } : undefined,
 		rows: document.querySelectorAll('tbody tr').length,
 	}));
-	return effectGateErrors(got, op);
+	return effectGateErrors(got, op, checkRenders);
 }
 
 // Timed loop, entirely in-page: (optional per-sample pre) → gc() → inner×op →
@@ -173,6 +192,19 @@ async function runTarget(t) {
 				'  ! window.gc unavailable (need --js-flags=--expose-gc) — results will be noisier',
 			);
 		}
+		const checkRenders = VDOM_TARGETS.has(t.name);
+		if (checkRenders && !(await page.evaluate(() => window.__renders != null))) {
+			// A declared VDOM target without the probe is a fixture defect: Row's
+			// first statement would throw inside __mount before any per-op gate
+			// could run. Record the failure on every op (gate-failure semantics,
+			// not an exemption) so BENCH_JSON is still written with `failed`.
+			const errs = ['renders: window.__renders probe missing on a declared VDOM target'];
+			console.error(`  ✗ GATE FAIL: ${errs[0]}`);
+			return {
+				ops: {},
+				gateFailures: OPS.map((op) => ({ op: op.name, errs })),
+			};
+		}
 		await page.evaluate(() => window.__mount());
 		await sleep(50);
 
@@ -180,7 +212,7 @@ async function runTarget(t) {
 		const gateFailures = [];
 		for (const op of OPS) {
 			console.error(`  → ${op.name} (gate)`);
-			const errs = await gateCheck(page, op);
+			const errs = await gateCheck(page, op, checkRenders);
 			if (errs.length > 0) {
 				console.error(`    ✗ GATE FAIL: ${errs.join('; ')}`);
 				gateFailures.push({ op: op.name, errs });

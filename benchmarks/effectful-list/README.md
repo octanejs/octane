@@ -15,10 +15,14 @@ row is a CROSS-MODULE `Row` component carrying:
   (`rowRef = (el) => { fx.refs++; return () => { fx.refCleanups++; }; }`) —
   one function identity across all 1000 rows, React-19-style ref-cleanup
   semantics;
-- one text hole per cell (`{item.label as string}` / `{item.value}`).
+- one text hole per cell (`{item.label as string}` / `{item.value}`);
+- a `window.__renders.row++` invocation probe as the body's **first
+  statement** — the render-count channel the correctness gate asserts on
+  (VDOM fixtures only; see the gate section below).
 
-The parent holds `items` plus an **unrelated `tick` state**, so one op can
-re-render every row body while every effect deps-array stays unchanged.
+The parent holds `items` plus a `tick` state that is passed into every `Row`
+as a real prop, so one op can re-invoke every row body on a changed input
+while every effect deps-array stays unchanged.
 
 ## Why these numbers are actionable
 
@@ -67,14 +71,14 @@ byte-identical content for the same op sequence.
 
 ## Ops and the correctness gate
 
-| op                     | transition                    | expected `__fx` delta (gate)                                 |
-| ---------------------- | ----------------------------- | ------------------------------------------------------------ |
-| `mount_1k`             | empty → 1000 fresh rows       | mounts 1000, refs 1000, layouts 100, h > 0                    |
-| `update_nodeps`        | bump unrelated `tick`         | **all zero** — rows re-render (VDOM targets), no effect fires |
-| `update_deps`          | bump every `item.value`       | layouts 100 (1000 layout refires, 100 probe reads), h > 0     |
-| `clear`                | 1000 → 0                      | cleanups 1000, refCleanups 1000                               |
-| `remount`              | 1000 → 1000 all-new keys      | mounts+cleanups 1000, refs+refCleanups 1000, layouts 100      |
-| `remove_100_scattered` | drop every 10th row           | cleanups 100, refCleanups 100                                 |
+| op                     | transition                    | expected `__fx` delta (gate)                                 | `__renders.row` (VDOM gate)              |
+| ---------------------- | ----------------------------- | ------------------------------------------------------------ | ---------------------------------------- |
+| `mount_1k`             | empty → 1000 fresh rows       | mounts 1000, refs 1000, layouts 100, h > 0                    | 1000                                     |
+| `update_nodeps`        | bump the `tick` prop          | **all zero** — rows re-render (VDOM targets), no effect fires | 1000                                     |
+| `update_deps`          | bump every `item.value`       | layouts 100 (1000 layout refires, 100 probe reads), h > 0     | 1000                                     |
+| `clear`                | 1000 → 0                      | cleanups 1000, refCleanups 1000                               | 0                                        |
+| `remount`              | 1000 → 1000 all-new keys      | mounts+cleanups 1000, refs+refCleanups 1000, layouts 100      | 1000                                     |
+| `remove_100_scattered` | drop every 10th row           | cleanups 100, refCleanups 100                                 | ungated (survivor skips are legitimate)  |
 
 The gate is **load-bearing**: before timing each op the harness resets the
 counters, applies the op once, and requires the exact deltas above (plus the
@@ -85,6 +89,20 @@ flagged (`GATE FAIL` in the table, `meta.fxGate: "fail"` + `fxGateFailures` in
 produces numbers — so one broken transition can't blank out the whole run. If
 ANY gate failed the harness still exits 1 and writes `BENCH_JSON` with a
 top-level `failed` reason (the contract). Counters are reset between ops.
+
+The second gate column is the **row-invocation gate**. The VDOM targets —
+`octane-tsrx`, `octane-jsx`, `react`, `preact`, `inferno` (`VDOM_TARGETS` in
+`contract.mjs`) — install `window.__renders.row`, incremented as each `Row`
+body's first statement and reset by the same `__resetFx` channel. Asserting the
+exact per-op count is what makes the previously-observed hollow path loud: a
+compiler element cache or equal-props bail that skips all 1,000 row bodies on
+`update_nodeps` fails the gate instead of posting a ~4µs "win". A declared
+VDOM target that lacks the probe fails every op's gate — a missing probe is a
+fixture defect, not an exemption. `remove_100_scattered` is deliberately
+ungated: an equal-props skip on the 900 surviving rows is legitimate
+divergence between targets, not measurement fraud. The fine-grained targets
+(solid, ripple, vue-vapor, svelte) are uninstrumented by design — they never
+re-invoke row bodies, so there is no invocation count to assert.
 
 The earlier batch-clear cleanup defect no longer reproduces on the frozen
 `8a45222ab` baseline or the current effects/scheduling candidate. The production
@@ -109,11 +127,12 @@ cleanup **and** a ref cleanup.
   `flushSync` — inside the timed window — to keep the comparison like-for-like
   and the gates deterministic. Solid ops call `flush()`; ripple ops go through
   `flushSync`.
-- `update_nodeps` is **meaningfully octane-vs-react only**: fine-grained
-  frameworks (solid, ripple, vue-vapor) don't re-render row bodies on an
-  unrelated parent signal, so their column is ~the cost of one text-node
-  update. It's kept for all eight targets because the gate (zero effect fires)
-  is still a correctness statement about each framework.
+- `update_nodeps` is **meaningful on the VDOM targets only**: fine-grained
+  frameworks (solid, ripple, vue-vapor, svelte) don't re-render row bodies on
+  a parent signal, so their column is ~the cost of the tick text update. It's
+  kept for every target because the gate (zero effect fires) is still a
+  correctness statement about each framework — and on the VDOM targets the
+  `__renders.row` gate proves the 1,000 row bodies really did re-invoke.
 - Sub-millisecond ops (`update_nodeps`, `update_deps`) run a ×10 inner loop
   inside the timed window and divide, to beat timer quantization.
 - Framework-equivalence adaptations (all preserve the analytic counter

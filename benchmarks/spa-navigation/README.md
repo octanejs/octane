@@ -125,13 +125,23 @@ The `work.mjs` gates hold BOTH dialects at **zero** de-opt-renderer calls on
 every navigation, and `benchmarks/baselines/ratios.json` guards `nav_teardown`,
 `nav_deep`, and `nav_mount` against solid so neither fix can silently regress.
 
+### Fixture correction: the React column now runs React Compiler
+
+The `react/` fixture is the suite's React-19-with-Compiler column, but its Vite
+config never applied the plugin — the 2026-08-09 React medians above measured
+ordinary uncompiled React. Since 2026-09-20 the fixture applies
+`reactCompiler()` from `benchmarks/react-compiler.mjs`, the same helper
+`memo-wall/react-compiler` and the other React benchmark columns use. Until a
+fresh run replaces them, read the React medians above as the uncompiled
+baseline; `memo-wall/react/` remains the deliberate uncompiled control.
+
 ## Fixtures
 
 | dir | port | notes |
 | --- | --- | --- |
 | `octane-tsrx/` | 5310 | directive syntax (`@if`/`@switch`, `class`) |
 | `octane-jsx/` | 5311 | same app, React-style `.tsx`, same octane core |
-| `react/` | 5312 | React 19, `flushSync` per navigation |
+| `react/` | 5312 | React 19 + React Compiler, `flushSync` per navigation |
 | `solid/` | 5313 | Solid 2.0, `flush()` per navigation |
 | `vue-vapor/` | 5314 | Vue 3.6 Vapor, returns `nextTick()` (no public sync flush) |
 

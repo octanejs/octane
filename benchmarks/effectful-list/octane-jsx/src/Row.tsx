@@ -10,8 +10,15 @@ import { fx, rowRef } from './fx.js';
 //   * useLayoutEffect deps [item.value] — refires per value change; layout
 //     read (offsetHeight) only on probe rows (every 10th).
 //   * ref={rowRef} — SHARED module-level callback ref returning a cleanup.
+//   * window.__renders.row++ — the body's first statement: the invocation
+//     probe the harness's renders gate asserts exact per-op counts on. The
+//     external mutation also makes this body autoMemoSafe-failing, so a
+//     memo-class skip can never swallow a row body silently.
+//   * props.tick — the parent's per-update state, passed in so each
+//     update_nodeps bump is a REAL props change; deliberately never rendered.
 
 export default function Row(props) {
+	window.__renders.row++;
 	const item = props.item;
 	const cell = useRef(null);
 

@@ -5,6 +5,9 @@ import { fx, rowRef } from './fx.js';
 // reaches all 1000 row instances. Mount/unmount lifecycles model the row
 // resource, componentDidUpdate performs the value-dependent layout read, and
 // the shared rowRef callback's returned cleanup is retained until unmount.
+// render() opens with window.__renders.row++ — the invocation probe the
+// harness's renders gate asserts exact per-op counts on. this.props.tick is
+// the parent's per-update prop change, carried but never rendered.
 
 export default class Row extends Component {
 	setCell = (cell) => {
@@ -38,6 +41,7 @@ export default class Row extends Component {
 	}
 
 	render() {
+		window.__renders.row++;
 		const { item } = this.props;
 		return (
 			<tr ref={this.setRow}>

@@ -9,8 +9,9 @@
 //   toFresh1k    → __opMount1k (pre: empty) and __opRemount (pre: 1000 rows —
 //                  every id is new, so all rows unmount + a fresh set mounts)
 //   toEmpty      → __opClear (1000 → 0: cleanup-bearing bulk teardown)
-//   updateNodeps → __opUpdateNodeps (bump the unrelated `tick` — all rows
-//                  re-render in the VDOM targets, every effect dep unchanged)
+//   updateNodeps → __opUpdateNodeps (bump `tick` — a real prop on every row
+//                  in the VDOM fixtures, so all row bodies re-invoke with
+//                  every effect dep unchanged)
 //   updateDeps   → __opUpdateDeps (bump every item.value with stable ids —
 //                  1000 layout-effect refires; mount effects stay quiet)
 //   remove100    → __opRemove100 (drop every 10th row — 100 scattered unmounts)
@@ -47,9 +48,12 @@ export function toFresh1k() {
 	apply(buildItems(1000, _idBase));
 }
 
-// Bump the unrelated parent `tick` state. Row identities, props, and every
-// effect deps-array stay unchanged — this isolates the per-row re-render +
-// deps-diff (Object.is churn) cost with zero effect bodies actually firing.
+// Bump the parent `tick` state — a real prop on every Row in the VDOM
+// fixtures, so the bump re-invokes all 1000 row bodies on a changed input
+// (no equal-props or element-cache bail is possible). Row identities and
+// every effect deps-array stay unchanged — this isolates the per-row
+// re-render + deps-diff (Object.is churn) cost with zero effect bodies
+// actually firing.
 export function updateNodeps() {
 	if (_setTick) _setTick((t) => t + 1);
 }
