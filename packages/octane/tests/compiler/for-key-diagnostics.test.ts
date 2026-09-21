@@ -60,12 +60,78 @@ describe('@for root key diagnostic', () => {
 		).toHaveLength(1);
 	});
 
-	it('warns for component roots and static or valueless root keys', () => {
+	it('warns for static or valueless intrinsic root keys', () => {
 		for (const attribute of ['key={row.index}', 'key="row"', 'key']) {
 			expect(warnings(SOURCE.replace('key={row.index}', attribute)), attribute).toHaveLength(1);
 		}
-		const source = `function Row(props) @{ <div /> }\n${SOURCE.replace('<div key=', '<Row key=')}`;
+	});
+
+	it('allows a component root key alongside the row header key', () => {
+		const source = `function Component() @{ <video /> }
+export function App(props) @{
+  @for (const item of props.items; key item.k) {
+    <Component key={item.k + 'video'} />
+  }
+}`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(warnings(source, { mode })).toEqual([]);
+		}
+		expect(compileToVolarMappings(source, FILENAME).diagnostics).toEqual([]);
+	});
+
+	it('keeps component roots quiet without a row header key', () => {
+		for (const tag of ['Component', '_Component', '$Component', 'ui.Component', '{Component}']) {
+			const source = `function Component() @{ <div /> }
+const _Component = Component;
+const $Component = Component;
+const ui = { Component };
+export function App(props) @{
+  @for (const item of props.items) { <${tag} key={item.k} /> }
+}`;
+			expect(warnings(source), tag).toEqual([]);
+		}
+	});
+
+	it('warns for intrinsic SVG and custom-element roots', () => {
+		for (const tag of ['svg', 'my-video']) {
+			expect(warnings(SOURCE.replace('<div key=', `<${tag} key=`)), tag).toHaveLength(1);
+		}
+	});
+
+	it('keeps builtin component spellings and lowercase aliases quiet', () => {
+		for (const [imported, local] of [
+			['Activity', 'activity'],
+			['unstable_Activity', 'activity'],
+			['Fragment', 'fragment'],
+		]) {
+			const source = `import { ${imported} as ${local} } from 'octane';
+export function App(props) @{
+  @for (const item of props.items; key item.k) {
+    <${local} key={item.k}><div /></${local}>
+  }
+}`;
+			expect(warnings(source), imported).toEqual([]);
+			expect(compileToVolarMappings(source, FILENAME).diagnostics, imported).toEqual([]);
+		}
+		const source = `export function App(props) @{
+  @for (const item of props.items; key item.k) { <unstable_Activity key={item.k} /> }
+}`;
+		expect(warnings(source)).toEqual([]);
+	});
+
+	it('still warns for intrinsic roots that shadow lowercase builtin aliases', () => {
+		const source = `import { Activity as activity } from 'octane';
+export function App(props, activity) @{
+  @for (const item of props.items; key item.k) { <activity key={item.k} /> }
+}`;
 		expect(warnings(source)).toHaveLength(1);
+		expect(
+			warnings(
+				source
+					.replace('Activity as activity', "'Activity' as activity")
+					.replace('props, activity', 'props'),
+			),
+		).toHaveLength(1);
 	});
 
 	it('recognizes escaped key names at their authored source range', () => {
