@@ -499,3 +499,138 @@ test('a narrow viewport preserves an escaped Unicode prompt and the complete str
 	);
 	await expect(page.locator('[data-current-answer]')).toContainText('Generation 0 complete.');
 });
+
+test('configured deferred and eager runs download evidence for the selected workload', async ({
+	page,
+	request,
+}, testInfo) => {
+	const settings = {
+		scenario: 'unicode',
+		auth: '70',
+		answer: '60',
+		history: '180',
+		interval: '25',
+		waves: '5',
+		turns: '2',
+		hydrateDelay: '0',
+		q: 'Compare 東京 · 👩🏽‍💻 · café & "quoted" <script>text</script>',
+	};
+	const { path } = configuration({ auth: 0, answer: 0, history: 0, interval: 0, waves: 1 });
+	await open(page, path);
+	const runs: string[] = [];
+	for (const eager of [false, true]) {
+		const form = page.getByRole('region', { name: 'Run configuration', exact: true });
+		await form.getByLabel(/^Scenario/).selectOption(settings.scenario);
+		for (const [label, value] of [
+			[/^Session delay/, settings.auth],
+			[/^Answer delay/, settings.answer],
+			[/^History delay/, settings.history],
+			[/^Between yields/, settings.interval],
+			[/^Stream snapshots/, settings.waves],
+			[/^Total turns/, settings.turns],
+			[/^Shell hydration delay/, settings.hydrateDelay],
+			[/^Initial prompt/, settings.q],
+		] as const) {
+			await form.getByLabel(label).fill(value);
+		}
+		await Promise.all([
+			page.waitForEvent('framenavigated', { predicate: (frame) => frame === page.mainFrame() }),
+			form.getByRole('button', { name: eager ? 'Run eager' : 'Run deferred', exact: true }).click(),
+		]);
+		const url = new URL(page.url());
+		expect(url.pathname).toBe(eager ? '/eager' : '/');
+		for (const [name, value] of Object.entries(settings)) {
+			expect(url.searchParams.get(name), `${name} survives the native form submission`).toBe(value);
+		}
+		await expect(page.locator('[data-lab-shell]')).toHaveAttribute(
+			'data-activation',
+			eager ? 'eager' : 'interaction',
+		);
+		const producerLink = page.getByRole('link', { name: /^Producer trace/ });
+		const href = await producerLink.getAttribute('href');
+		if (href === null) throw new Error('The configured run has no producer trace link');
+		const run = new URL(href, page.url()).searchParams.get('run');
+		if (run === null) throw new Error('The configured run has no diagnostic ID');
+		runs.push(run);
+		await expect
+			.poll(async () => {
+				const events = await trace(request, run);
+				return ['answer', 'history', 'tools'].every((channel) =>
+					events.some((event) => event.channel === channel && event.type === 'complete'),
+				);
+			})
+			.toBe(true);
+		if (!eager) {
+			for (const selector of ['[data-answer]', '[data-history]', '[data-tools]']) {
+				await expect(page.locator(selector)).toHaveAttribute('data-revision', '1');
+			}
+			for (const name of ['Activate conversation', 'Activate history', 'Activate tools']) {
+				await page.getByRole('button', { name, exact: true }).click();
+			}
+		}
+		await completedAnswer(page, Number(settings.waves));
+		await expect(page.locator('[data-history]')).toHaveAttribute('data-revision', settings.waves);
+		await expect(page.locator('[data-tools]')).toHaveAttribute('data-revision', settings.waves);
+		const conversation = page.getByRole('region', { name: 'Conversation', exact: true });
+		await expect(
+			conversation.getByText('Explain streaming observation 1.', { exact: true }),
+		).toBeVisible();
+		await expect(
+			conversation.getByText('Explain streaming observation 2.', { exact: true }),
+		).toHaveCount(0);
+		await expect(page.locator('[data-current-prompt]')).toHaveText(settings.q);
+		await expect(page.locator('[data-current-answer]')).toContainText(settings.q);
+		await expect(page.locator('[data-current-answer]')).toContainText('Grapheme stress: 👨‍👩‍👧‍👦');
+		await expect(page.locator('[data-current-answer]')).toContainText('Generation 0 complete.');
+		await settleBrowserFrames(page);
+		const downloadReady = page.waitForEvent('download');
+		await page.getByRole('button', { name: 'Export browser trace', exact: true }).click();
+		const download = await downloadReady;
+		expect(download.suggestedFilename()).toBe(`signal-chat-${run}.json`);
+		const output = testInfo.outputPath(`${eager ? 'eager' : 'deferred'}-capture.json`);
+		await download.saveAs(output);
+		const capture = JSON.parse(await readFile(output, 'utf8')) as {
+			url: string;
+			browser: {
+				enabled: boolean;
+				truncated: boolean;
+				observations: {
+					event: string;
+					region?: string;
+					revision?: number;
+					generation?: number;
+				}[];
+			};
+			server: { run: string; scenario: string; truncated: boolean; events: TraceEvent[] };
+		};
+		expect(capture.url).toBe(page.url());
+		expect(capture.browser.enabled).toBe(true);
+		expect(capture.browser.truncated).toBe(false);
+		expect(capture.server.run).toBe(run);
+		expect(capture.server.scenario).toBe(settings.scenario);
+		expect(capture.server.truncated).toBe(false);
+		expect(capture.browser.observations).toContainEqual(
+			expect.objectContaining({
+				event: 'dom-observed',
+				region: 'answer',
+				revision: Number(settings.waves),
+				generation: 0,
+			}),
+		);
+		for (const channel of ['answer', 'history', 'tools']) {
+			const events = capture.server.events.filter((event) => event.channel === channel);
+			expect(
+				events.filter((event) => event.type === 'start').map((event) => event.transport),
+			).toEqual(['document']);
+			expect(
+				events.filter((event) => event.type === 'yield').map((event) => event.revision),
+			).toEqual([1, 2, 3, 4, 5]);
+			expect(
+				events
+					.filter((event) => event.type !== 'start' && event.type !== 'yield')
+					.map((event) => event.type),
+			).toEqual(['complete', 'finally']);
+		}
+	}
+	expect(runs[0]).not.toBe(runs[1]);
+});
