@@ -89,6 +89,8 @@ export interface OctaneVitePluginOptions {
 	strong?: boolean;
 	/** Trusted adapter output shapes; imported calls keep one evaluation per native host. */
 	knownAttributeSpreads?: readonly KnownAttributeSpread[];
+	/** Opt in to fixed primitive child props by name. Keep text and IDs live to share extracted programs. */
+	domBindingFixedProps?: readonly string[];
 	/**
 	 * @experimental Infer primitive child text from a TypeScript project in
 	 * one-shot production builds. Serve and watched builds retain syntax

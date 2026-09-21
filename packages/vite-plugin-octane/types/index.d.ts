@@ -21,6 +21,8 @@ export interface OctanePluginOptions {
 	textTypes?: OctaneVitePluginOptions['textTypes'];
 	/** Fixed native attribute factories and optional JSX shorthand providers. */
 	knownAttributeSpreads?: OctaneVitePluginOptions['knownAttributeSpreads'];
+	/** Opt in to fixed primitive child props by name; keep text and IDs live for sharing. */
+	domBindingFixedProps?: OctaneVitePluginOptions['domBindingFixedProps'];
 	/**
 	 * Path fragments the compiler's plain `.ts`/`.js` hook-slotting pass must
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.

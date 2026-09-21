@@ -30,6 +30,7 @@ export function parseDomBindingRequest(id) {
 		error(id, `invalid ${DOM_BINDINGS_QUERY} export query`);
 	}
 	let props = null;
+	let fixedProps = null;
 	if (shapes.length === 1) {
 		let shape;
 		try {
@@ -39,8 +40,7 @@ export function parseDomBindingRequest(id) {
 		}
 		if (
 			!Array.isArray(shape) ||
-			shape.length !== 2 ||
-			shape[0] !== 1 ||
+			!((shape.length === 2 && shape[0] === 1) || (shape.length === 3 && shape[0] === 2)) ||
 			!Array.isArray(shape[1]) ||
 			shape[1].some((key) => typeof key !== 'string') ||
 			new Set(shape[1]).size !== shape[1].length
@@ -48,10 +48,37 @@ export function parseDomBindingRequest(id) {
 			error(id, `invalid ${DOM_BINDINGS_PROPS_QUERY} shape query`);
 		}
 		props = shape[1];
+		if (shape[0] === 2) {
+			const fixed = shape[2];
+			if (
+				!Array.isArray(fixed) ||
+				fixed.length === 0 ||
+				fixed.some(
+					(entry) =>
+						!Array.isArray(entry) ||
+						![1, 2].includes(entry.length) ||
+						!props.includes(entry[0]) ||
+						(entry.length === 2 &&
+							!(
+								entry[1] === null ||
+								['string', 'boolean'].includes(typeof entry[1]) ||
+								(typeof entry[1] === 'number' &&
+									Number.isFinite(entry[1]) &&
+									!Object.is(entry[1], -0))
+							)),
+				) ||
+				new Set(fixed.map((entry) => entry[0])).size !== fixed.length
+			)
+				error(id, `invalid ${DOM_BINDINGS_PROPS_QUERY} fixed values`);
+			fixedProps = fixed;
+		}
 	}
-	return { exportName: values[0], mount: mounting.length === 1, props };
+	return { exportName: values[0], mount: mounting.length === 1, props, fixedProps };
 }
 
-export function formatDomBindingRequest(source, { exportName, mount = false, props = null }) {
-	return `${source}?${DOM_BINDINGS_QUERY}=${encodeURIComponent(exportName)}${mount ? `&${DOM_BINDINGS_MOUNT_QUERY}=1` : ''}${props === null ? '' : `&${DOM_BINDINGS_PROPS_QUERY}=${encodeURIComponent(JSON.stringify([1, props]))}`}`;
+export function formatDomBindingRequest(
+	source,
+	{ exportName, mount = false, props = null, fixedProps = null },
+) {
+	return `${source}?${DOM_BINDINGS_QUERY}=${encodeURIComponent(exportName)}${mount ? `&${DOM_BINDINGS_MOUNT_QUERY}=1` : ''}${props === null ? '' : `&${DOM_BINDINGS_PROPS_QUERY}=${encodeURIComponent(JSON.stringify(fixedProps?.length ? [2, props, fixedProps] : [1, props]))}`}`;
 }

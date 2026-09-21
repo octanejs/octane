@@ -152,6 +152,48 @@ function isChildrenBlock(code: string, value: any): boolean {
 }
 
 describe('octane/compiler/vite public options', () => {
+	it('keeps fixed child facts opt-in and shared across compiler resets', async () => {
+		const source = `import { FixedChild } from './FixedChild.tsrx';
+export function Pair(props) @{ 'use dom bindings'; <section>
+ <FixedChild variant="ghost" radius="full" label="First" title={props.title} />
+ <FixedChild variant="ghost" radius="full" label="Second" title={props.title} />
+</section> }`;
+		const keys = ['variant', 'radius', 'label', 'title'];
+		for (const domBindingFixedProps of [undefined, ['variant', 'radius']]) {
+			const plugin = octane({ hmr: false, domBindingFixedProps });
+			for (const command of [null, 'build', 'serve'] as const) {
+				if (command !== null) configure(plugin, command);
+				const output = await transform(
+					plugin,
+					source,
+					`${ROOT}/src/Pair.tsrx?octane-bindings=Pair`,
+				);
+				const requests = parseModule(output!.code, 'Pair.js').body.filter(
+					(node) =>
+						node.type === 'ImportDeclaration' && node.source.value.startsWith('./FixedChild.tsrx?'),
+				);
+				expect(requests).toHaveLength(1);
+				const shape = JSON.parse(
+					new URL(requests[0].source.value, 'https://fixture.test/').searchParams.get(
+						'octane-props',
+					)!,
+				);
+				expect(shape).toEqual(
+					domBindingFixedProps === undefined
+						? [1, keys]
+						: [
+								2,
+								keys,
+								[
+									['variant', 'ghost'],
+									['radius', 'full'],
+								],
+							],
+				);
+			}
+		}
+	});
+
 	it('emits independent hydration entries with their complete activation CSS closure', () => {
 		const plugin = octane({ hmr: false });
 		const emitted: any[] = [];

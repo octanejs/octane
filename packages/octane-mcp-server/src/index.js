@@ -133,6 +133,7 @@ export const BENCHMARK_SUITES = [
 	'lynx-table-web',
 	'lynx-bundle-size',
 	'codegen-size',
+	'dom-binding-fixed-props',
 	'hook-memo',
 	'body-ownership',
 	'dom-attributes',

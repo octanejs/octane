@@ -11,6 +11,7 @@ export const options = {
 	profile: false,
 	requireDirective: true,
 	exclude: ['/host-owned/'],
+	domBindingFixedProps: ['variant', 'radius'],
 	renderers: {
 		registry: {
 			object: {
