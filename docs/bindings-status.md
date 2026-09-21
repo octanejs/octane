@@ -694,7 +694,7 @@ Scope/evidence last checked: 2026-08-10.
 
 ## @octanejs/input-otp
 
-[`packages/input-otp`](../packages/input-otp) `0.0.20` — ports `input-otp@1.5.0`. Status data: [`packages/input-otp/status.json`](../packages/input-otp/status.json).
+[`packages/input-otp`](../packages/input-otp) `0.0.21` — ports `input-otp@1.5.0`. Status data: [`packages/input-otp/status.json`](../packages/input-otp/status.json).
 
 Complete against input-otp@1.5.0: OTPInput, OTPInputContext, the three exported regexp patterns, public props and slot types including nonce, controlled and uncontrolled values, one-input accessibility and mobile-autofill markup, default spellcheck off, translation opt-out, render/context projection, keyboard selection and deletion, paste transformation, completion callbacks, overflow-aware password-manager displacement, SSR, and hydration.
 

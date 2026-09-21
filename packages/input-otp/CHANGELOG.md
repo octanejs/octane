@@ -1,5 +1,11 @@
 # @octanejs/input-otp
 
+## 0.0.21
+
+### Patch Changes
+
+- fa3b350: Preserve arrow-key slot navigation when delayed autofill synchronization runs before the browser delivers a selection change.
+
 ## 0.0.20
 
 ### Patch Changes

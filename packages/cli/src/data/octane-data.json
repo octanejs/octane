@@ -517,7 +517,7 @@
     },
     {
       "name": "@octanejs/input-otp",
-      "version": "0.0.20",
+      "version": "0.0.21",
       "category": "Forms",
       "upstream": { "package": "input-otp", "version": "1.5.0" },
       "surface": "Complete against input-otp@1.5.0: OTPInput, OTPInputContext, the three exported regexp patterns, public props and slot types including nonce, controlled and uncontrolled values, one-input accessibility and mobile-autofill markup, default spellcheck off, translation opt-out, render/context projection, keyboard selection and deletion, paste transformation, completion callbacks, overflow-aware password-manager displacement, SSR, and hydration.",
