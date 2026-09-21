@@ -8,7 +8,8 @@
       "vite.config.ts",
       "src/App.tsrx",
       "src/main.ts",
-      "src/styles.css"
+      "src/styles.css",
+      "src/tokens.ts"
     ],
     "fullstack": [
       ".prettierrc",
@@ -21,6 +22,7 @@
       "src/Counter.tsrx",
       "src/Layout.tsrx",
       "src/styles.css",
+      "src/tokens.ts",
       "src/server/health.ts"
     ]
   }

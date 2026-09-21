@@ -38,7 +38,8 @@ package.json
 src/
   main.ts        mounts App into #root
   App.tsrx       the landing page
-  styles.css     the reset and the theme tokens
+  styles.css     the reset
+  tokens.ts      the typed theme tokens
 ```
 
 <!-- /scaffold:spa -->
@@ -60,7 +61,8 @@ src/
   App.tsrx            /
   Counter.tsrx        /counter — server-rendered, then hydrated
   Layout.tsrx         the frame both pages share
-  styles.css          the reset and the theme tokens
+  styles.css          the reset
+  tokens.ts           the typed theme tokens
   server/health.ts    GET /api/health
 ```
 
@@ -69,8 +71,8 @@ src/
 Both open on a page that links back into the documentation, and both are a
 working starting point rather than a directory of things to delete. The palette,
 typography and card styling are [octanejs.dev](https://octanejs.dev)'s own, so a
-new app and the documentation look like one thing; `src/styles.css` holds the
-tokens and both colour schemes, and each component carries its own scoped
+new app and the documentation look like one thing; `src/tokens.ts` declares the
+typed theme tokens and both colour schemes, and each component carries its own scoped
 `<style>`. The documentation cards' styles are a theme, an assigned `<style>`
 that the landing page's own block applies with `apply={linkTheme}`, so the
 same rules reach that scope without being pasted into it. There is no CSS
