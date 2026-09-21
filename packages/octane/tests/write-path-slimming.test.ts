@@ -246,6 +246,45 @@ describe('compiled spread/style commits', () => {
 		}
 	});
 
+	it('planned host-prop commits do not assign own properties onto the live host', () => {
+		const r = mount(WritePathSpread, {
+			tick: 'a',
+			spread: { 'data-x': '1' },
+		});
+		try {
+			const el = r.find('#wp-spread');
+			// Second commit attaches the sources plan on the resolved record.
+			r.update(WritePathSpread, {
+				tick: 'b',
+				spread: { 'data-x': '2' },
+			});
+			expect(el.getAttribute('data-x')).toBe('2');
+			const names = Object.getOwnPropertyNames(el);
+			const symbols = Object.getOwnPropertySymbols(el);
+			// Planned hit: same source shape, changed value. Planning state must
+			// stay on the resolved record, not as a DOM expando on the element.
+			r.update(WritePathSpread, {
+				tick: 'c',
+				spread: { 'data-x': '3' },
+			});
+			expect(el.getAttribute('data-x')).toBe('3');
+			expect(Object.getOwnPropertyNames(el)).toEqual(names);
+			expect(Object.getOwnPropertySymbols(el)).toEqual(symbols);
+			// Shape miss: a new key set takes the full path. Same rule — the miss
+			// count rides the plan, so the host's own-property set stays put.
+			r.update(WritePathSpread, {
+				tick: 'd',
+				spread: { 'data-y': '4' },
+			});
+			expect(el.getAttribute('data-y')).toBe('4');
+			expect(el.hasAttribute('data-x')).toBe(false);
+			expect(Object.getOwnPropertyNames(el)).toEqual(names);
+			expect(Object.getOwnPropertySymbols(el)).toEqual(symbols);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('an unchanged spread record commits no writes; a changed data-* key commits', () => {
 		const r = mount(WritePathSpread, {
 			tick: 'a',

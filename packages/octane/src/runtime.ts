@@ -4550,16 +4550,19 @@ function journalText(node: Text, previous: string | null): void {
 }
 
 /**
- * True while a spread commit's write loop runs under a journaled transaction:
- * the element's own replay entry supersedes per-attribute snapshots, so the
- * writers below skip their getAttribute reads. Replaying writes (a rollback
- * re-running a writer) never journal either — they only append dead entries
- * to a log the rollback discards after replay.
+ * Host whose in-flight spread/planned write owns the journal window: that
+ * element's replay entry supersedes per-attribute snapshots, so its writers
+ * skip getAttribute reads. Other hosts keep snapshotting — a nested
+ * custom-element callback or flushSync can write them, and those writes are
+ * not covered by the outer undo. Nested dispatches save/restore this slot so
+ * an inner finally cannot unmute the outer write. Replaying writes never
+ * journal either — they only append dead entries to a log the rollback
+ * discards after replay.
  */
-let JOURNAL_ATTR_SUPPRESS = false;
+let JOURNAL_ATTR_SUPPRESS_EL: Element | null = null;
 
 function journalAttr(el: Element, name: string): void {
-	if (JOURNAL_ATTR_SUPPRESS || TRANSITION_JOURNAL_REPLAYING) return;
+	if (el === JOURNAL_ATTR_SUPPRESS_EL || TRANSITION_JOURNAL_REPLAYING) return;
 	TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, (STAGED_DOM?.view(el) ?? el).getAttribute(name));
 	journalBag();
 }
@@ -23807,9 +23810,9 @@ const SOURCES_PLAN = /* @__PURE__ */ Symbol('octane.host-prop-sources-plan');
  * attachSourcesPlan's per-commit allocations — a source shape that never
  * stabilizes reverts to the full path for good. ponytail: poisoned is
  * permanent; a shape that stabilizes later keeps the full path (reviving it
- * would take a decay or per-shape plans).
+ * would take a decay or per-shape plans). Count lives on the plan (`misses`),
+ * not on the host.
  */
-const SOURCES_PLAN_MISSES = /* @__PURE__ */ Symbol('octane.host-prop-sources-plan-misses');
 const SOURCES_PLAN_MISS_LIMIT = 3;
 
 /**
@@ -23840,6 +23843,12 @@ interface ResolvedSourcesPlan {
 	readonly diffIdx: number[];
 	readonly diffVal: unknown[];
 	diffLen: number;
+	/**
+	 * Consecutive failed verifications. Lives on the plan, not the host: a DOM
+	 * expando on the committed write path is banned, and the plan is already
+	 * the per-element planning record.
+	 */
+	misses: number;
 }
 
 /**
@@ -23898,6 +23907,7 @@ function attachSourcesPlan(
 	resolved: Record<string, unknown>,
 	sources: readonly HostPropSource[],
 	winners: HostPropWriter[],
+	misses = 0,
 ): void {
 	let spreadIndex = -1;
 	let spreadKeys: readonly string[] | null = null;
@@ -23953,6 +23963,7 @@ function attachSourcesPlan(
 			diffIdx: new Array<number>(winners.length),
 			diffVal: new Array<unknown>(winners.length),
 			diffLen: 0,
+			misses,
 		} satisfies ResolvedSourcesPlan,
 	});
 }
@@ -24101,10 +24112,11 @@ function writePlannedDiff(
 		TRANSITION_JOURNAL !== null &&
 		!TRANSITION_JOURNAL_REPLAYING &&
 		activeHydration() === null;
+	const prevSuppress = JOURNAL_ATTR_SUPPRESS_EL;
 	if (journalReplay) {
 		journalUndo(() => writePlannedDiff(el, prev, next, plan, scope, true));
 		journalBag();
-		JOURNAL_ATTR_SUPPRESS = true;
+		JOURNAL_ATTR_SUPPRESS_EL = el;
 	}
 	try {
 		if (!replay) stampSpreadPropFlags(el, next);
@@ -24165,7 +24177,7 @@ function writePlannedDiff(
 		}
 		if (process.env.NODE_ENV !== 'production' && !replay) queueDevFormDiagnostic(el, scope);
 	} finally {
-		if (journalReplay) JOURNAL_ATTR_SUPPRESS = false;
+		if (journalReplay) JOURNAL_ATTR_SUPPRESS_EL = prevSuppress;
 	}
 }
 
@@ -24190,11 +24202,10 @@ function replaySourcesPlan(
 	const plan = (prev as Record<symbol, unknown>)[SOURCES_PLAN] as ResolvedSourcesPlan | undefined;
 	if (plan === undefined) return null;
 	if (!scanSourcesForPlan(sources, plan, prev, readStyle)) {
-		const tagged = el as any;
-		tagged[SOURCES_PLAN_MISSES] = ((tagged[SOURCES_PLAN_MISSES] as number | undefined) ?? 0) + 1;
+		plan.misses++;
 		return null;
 	}
-	(el as any)[SOURCES_PLAN_MISSES] = 0;
+	if (plan.misses !== 0) plan.misses = 0;
 	const next = buildFromSourcesPlan(plan, prev);
 	if (
 		next === prev &&
@@ -24424,14 +24435,15 @@ export function setHostPropSources(
 	// allocations. The plan stamps the record actually retained — on an
 	// unchanged commit resolvedHostPropsEqual just proved `prev` carries the
 	// identical keys, so the plan replays correctly against it — rather than
-	// dying with a discarded `resolved`. Elements whose scans keep failing stop
-	// paying the attach once SOURCES_PLAN_MISS_LIMIT trips.
-	if (
-		!formHost &&
-		prev !== undefined &&
-		(((el as any)[SOURCES_PLAN_MISSES] as number | undefined) ?? 0) < SOURCES_PLAN_MISS_LIMIT
-	)
-		attachSourcesPlan(el, out!, sources, winners);
+	// dying with a discarded `resolved`. Consecutive scan misses live on the
+	// previous plan; once SOURCES_PLAN_MISS_LIMIT trips, attach stops.
+	const prevPlan =
+		prev === undefined
+			? undefined
+			: ((prev as Record<symbol, unknown>)[SOURCES_PLAN] as ResolvedSourcesPlan | undefined);
+	const planMisses = prevPlan?.misses ?? 0;
+	if (!formHost && prev !== undefined && planMisses < SOURCES_PLAN_MISS_LIMIT)
+		attachSourcesPlan(el, out!, sources, winners, planMisses);
 	return out;
 }
 
@@ -25099,7 +25111,8 @@ export function setSpread(
 		setSpread(el, prev, value, mountScope, skipDangerouslySetInnerHTML, skipFormControls, true),
 	);
 	journalBag();
-	JOURNAL_ATTR_SUPPRESS = true;
+	const prevSuppress = JOURNAL_ATTR_SUPPRESS_EL;
+	JOURNAL_ATTR_SUPPRESS_EL = el;
 	try {
 		setSpreadBody(
 			el,
@@ -25111,7 +25124,7 @@ export function setSpread(
 			false,
 		);
 	} finally {
-		JOURNAL_ATTR_SUPPRESS = false;
+		JOURNAL_ATTR_SUPPRESS_EL = prevSuppress;
 	}
 }
 
