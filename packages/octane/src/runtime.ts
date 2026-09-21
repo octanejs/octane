@@ -36699,7 +36699,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		setNativeAdoptionResolver(previousNative);
 		WIP_CAPTURE = previousCapture;
 		currentHydration = previousHydration;
-		if (previousHydration !== null) previousHydration.node = state.end;
+		if (previousHydration !== null) previousHydration.node = getNextSibling(state.end);
 	}
 	if (!failed) {
 		if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
@@ -36752,7 +36752,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 			});
 	} finally {
 		currentHydration = outerHydration;
-		if (outerHydration !== null) outerHydration.node = state.end;
+		if (outerHydration !== null) outerHydration.node = getNextSibling(state.end);
 	}
 }
 
