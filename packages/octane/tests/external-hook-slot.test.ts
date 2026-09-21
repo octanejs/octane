@@ -537,19 +537,29 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 		}
 	});
 
-	it('aliases bare Octane imports to the server runtime for SSR', async () => {
+	it('aliases bare Octane imports for SSR without losing resolution metadata', async () => {
 		const plugin = octane();
 		const resolved = await (plugin.resolveId as any).call(
 			{
 				resolve(source: string) {
-					return { id: '/consumer/node_modules/' + source + '/index.js' };
+					return {
+						id: '/consumer/node_modules/' + source + '/index.js',
+						external: true,
+						moduleSideEffects: false,
+						meta: { consumer: true },
+					};
 				},
 			},
 			'octane',
 			'/consumer/node_modules/@octanejs/hook-form/src/useForm.ts',
 			{ ssr: true },
 		);
-		expect(resolved).toBe('/consumer/node_modules/octane/server/index.js');
+		expect(resolved).toEqual({
+			id: '/consumer/node_modules/octane/server/index.js',
+			external: true,
+			moduleSideEffects: false,
+			meta: { consumer: true },
+		});
 	});
 
 	it('follows resolved and virtual module output when specializing production roots', async () => {
