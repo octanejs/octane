@@ -94,7 +94,9 @@ export function Landing() @{
 				<code>POST https://mcp.octanejs.dev/v1/mcp</code>
 				:
 			</p>
-			<pre>claude mcp add --transport http octane https://mcp.octanejs.dev/v1/mcp</pre>
+			<pre>
+				<code>claude mcp add --transport http octane https://mcp.octanejs.dev/v1/mcp</code>
+			</pre>
 
 			<h2>Tools</h2>
 			<dl>

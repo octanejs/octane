@@ -123,6 +123,75 @@ const LOGO = `<svg class="mark" viewBox="0 0 84 108" fill="none" aria-hidden="tr
       </svg>`;
 
 /**
+ * The theme-token contract every component reads.
+ *
+ * `defineThemeTokens` is the typed form of a custom-property theme: one plain
+ * `.ts` declaration returns the same tree with every leaf a
+ * `var(--name, fallback)` string, plus `vars` (the bare `--name`s), `raw` (the
+ * declared values), and `css` (the emitted `:root` sheet, variant blocks
+ * included). `prefix: "app"` namespaces every name `--app-*`; importing this
+ * module is what makes the compiler check a file's `var(--app-*)` references
+ * in scoped `<style>` blocks against the contract, so a misspelled token is a
+ * compile diagnostic instead of a silently empty value. Variant keys are
+ * checked against the declared tree, so a variant cannot invent or misspell a
+ * token either.
+ *
+ * The names are flat on purpose — `--app-bg`, `--app-text-secondary` — so the
+ * scaffolded CSS reads like the custom properties it replaces. Nested groups
+ * (`colors: { bg }` → `--app-colors-bg`) are equally legal.
+ */
+export const tokensModule = `import { defineThemeTokens } from "octane/theme-tokens";
+
+// The theme tokens, typed. The contract is the single source of truth: a
+// component emits the sheet with <style>{tokens.css}</style>, its scoped
+// <style> blocks read the custom properties as var(--app-*), and JavaScript
+// reads leaves (tokens.text is "var(--app-text, #f4eee8)") for style={{ }}
+// props. Importing this module is what makes the compiler check a file's
+// var(--app-*) references against the contract — a misspelled token, or a
+// variant key the contract never declared, fails the compile.
+export const tokens = defineThemeTokens(
+  {
+    bg: "#23272f",
+    panel: "#2b3138",
+    text: "#f4eee8",
+    "text-secondary": "#99a1b3",
+    accent: "#ff415a",
+    "accent-hover": "#ff5d72",
+    "accent-text": "#ff5d72",
+    "on-accent": "#16181d",
+    border: "rgba(255, 255, 255, 0.1)",
+    surface: "rgba(255, 255, 255, 0.06)",
+    "surface-subtle": "rgba(255, 255, 255, 0.03)",
+    "header-bg": "rgba(35, 39, 47, 0.85)",
+    // Accent tints for the card hover, the same in both themes.
+    "card-hover-border": "rgba(255, 93, 114, 0.4)",
+    "card-hover-bg": "rgba(255, 65, 90, 0.07)",
+  },
+  {
+    prefix: "app",
+    variants: {
+      light: {
+        media: "(prefers-color-scheme: light)",
+        values: {
+          bg: "#ffffff",
+          panel: "#f4f5f7",
+          text: "#1c2027",
+          "text-secondary": "#5c6473",
+          "accent-hover": "#c81e37",
+          "accent-text": "#d81f38",
+          "on-accent": "#ffffff",
+          border: "rgba(0, 0, 0, 0.12)",
+          surface: "rgba(0, 0, 0, 0.04)",
+          "surface-subtle": "rgba(0, 0, 0, 0.025)",
+          "header-bg": "rgba(255, 255, 255, 0.85)",
+        },
+      },
+    },
+  },
+);
+`;
+
+/**
  * The documentation cards, matching the card treatment on octanejs.dev: the
  * same radius, the same subtle surface, and the same accent-tinted hover rather
  * than a plain border swap.
@@ -155,10 +224,10 @@ const linkTheme = <style>
   .link {
     display: block;
     padding: 1rem;
-    border: 1px solid var(--border);
+    border: 1px solid var(--app-border);
     border-radius: 0.9rem;
-    background: var(--surface-subtle);
-    color: var(--text);
+    background: var(--app-surface-subtle);
+    color: var(--app-text);
     text-align: left;
     text-decoration: none;
     transition:
@@ -167,8 +236,8 @@ const linkTheme = <style>
       transform 0.15s;
   }
   .link:hover {
-    border-color: var(--card-hover-border);
-    background: var(--card-hover-bg);
+    border-color: var(--app-card-hover-border);
+    background: var(--app-card-hover-bg);
     transform: translateY(-1px);
   }
   .link-title {
@@ -178,8 +247,8 @@ const linkTheme = <style>
   }
   .link-body {
     display: block;
-    margin-top: 0.15rem;
-    color: var(--text-secondary);
+    margin: 0.15rem 0 0;
+    color: var(--app-text-secondary);
     font-size: 0.82rem;
     line-height: 1.4;
   }
@@ -221,6 +290,7 @@ const DOC_LINKS = `const LINKS = [
 export const appComponent = (mode) =>
 	mode === 'fullstack'
 		? `import { Layout } from "./Layout.tsrx";
+import { tokens } from "./tokens";
 
 ${DOC_LINKS}
 
@@ -247,6 +317,9 @@ export function App() @{
       </ul>
     </section>
 
+    {/* The token contract's emitted sheet: a plain <style> element, not a
+        scoped block, so its :root and variant rules apply page-wide. */}
+    <style>{tokens.css}</style>
     <style apply={linkTheme}>
       .hero {
         display: flex;
@@ -268,19 +341,24 @@ export function App() @{
       .lede {
         max-width: 34rem;
         margin: 0;
-        color: var(--text-secondary);
+        color: var(--app-text-secondary);
         font-size: 1.25rem;
       }
     </style>
   </Layout>
 }
 `
-		: `${DOC_LINKS}
+		: `import { tokens } from "./tokens";
+
+${DOC_LINKS}
 
 ${LINK_THEME}
 
 export function App() @{
   <>
+    {/* The token contract's emitted sheet: a plain <style> element, not a
+        scoped block, so its :root and variant rules apply page-wide. */}
+    <style>{tokens.css}</style>
     <style apply={linkTheme}>
       .page {
         display: flex;
@@ -305,7 +383,7 @@ export function App() @{
       .lede {
         max-width: 34rem;
         margin: 0;
-        color: var(--text-secondary);
+        color: var(--app-text-secondary);
         font-size: 1.25rem;
       }
     </style>
@@ -336,6 +414,7 @@ export function App() @{
  * `OctaneNode` — the renderable type, never React's `ReactNode`.
  */
 export const layoutComponent = `import type { OctaneNode } from "octane";
+import { tokens } from "./tokens";
 
 interface LayoutProps {
   children: OctaneNode;
@@ -343,6 +422,9 @@ interface LayoutProps {
 
 export function Layout(props: LayoutProps) @{
   <>
+    {/* The token contract's emitted sheet: a plain <style> element, not a
+        scoped block, so its :root and variant rules apply page-wide. */}
+    <style>{tokens.css}</style>
     <style>
       .shell {
         display: flex;
@@ -360,17 +442,17 @@ export function Layout(props: LayoutProps) @{
         gap: 1.25rem;
         height: 60px;
         padding: 0 1.5rem;
-        border-bottom: 1px solid var(--border);
-        background: var(--header-bg);
+        border-bottom: 1px solid var(--app-border);
+        background: var(--app-header-bg);
         backdrop-filter: blur(8px);
       }
       .nav-link {
-        color: var(--text-secondary);
+        color: var(--app-text-secondary);
         font-size: 0.9rem;
         font-weight: 500;
       }
       .nav-link:hover {
-        color: var(--accent-text);
+        color: var(--app-accent-text);
       }
       .nav-endpoint {
         font-family: "SF Mono", SFMono-Regular, ui-monospace, Menlo, Consolas,
@@ -406,11 +488,13 @@ export function Layout(props: LayoutProps) @{
  */
 export const counterComponent = `import { useState } from "octane";
 import { Layout } from "./Layout.tsrx";
+import { tokens } from "./tokens";
 
 export function Counter() @{
   const [count, setCount] = useState(0);
 
   <Layout>
+    <style>{tokens.css}</style>
     <style>
       .counter {
         display: flex;
@@ -428,7 +512,7 @@ export function Counter() @{
       .lede {
         max-width: 34rem;
         margin: 0;
-        color: var(--text-secondary);
+        color: var(--app-text-secondary);
         font-size: 1.25rem;
       }
       /* The site's primary action: an accent pill. */
@@ -436,15 +520,17 @@ export function Counter() @{
         padding: 0.7rem 1.4rem;
         border: none;
         border-radius: 9999px;
-        background: var(--accent);
-        color: var(--on-accent);
-        font: inherit;
+        background: var(--app-accent);
+        color: var(--app-on-accent);
+        font-family: inherit;
+        font-size: inherit;
+        line-height: inherit;
         font-weight: 600;
         cursor: pointer;
         transition: background 0.15s;
       }
       .button:hover {
-        background: var(--accent-hover);
+        background: var(--app-accent-hover);
       }
     </style>
     <section class="counter">
@@ -478,56 +564,33 @@ export function health(): Response {
 `;
 
 /**
- * The reset and the theme tokens every component reads, taken from
- * octanejs.dev so a scaffolded app and the documentation look like one thing.
+ * The reset every component relies on, taken from octanejs.dev so a scaffolded
+ * app and the documentation look like one thing. The theme tokens it reads —
+ * `var(--app-*)` — are declared by `src/tokens.ts` and emitted into the page
+ * by the shell component's plain `<style>{tokens.css}</style>` element.
  *
  * A stylesheet rather than a `<style>` in the shell. A `<style>` in a component
  * styles only the items beside it and everything below them — the compiler
  * rewrites its selectors with a scope hash — and a theme such as `linkTheme`
- * reaches only the scopes that apply it, so neither can style `body`, and these custom
- * properties have to resolve for every component at once. Keeping them in a
+ * reaches only the scopes that apply it, so neither can style `body`, and these
+ * rules have to resolve for every component at once. Keeping them in a
  * file the shell links, rather than inline in the shell, means `init` still has
  * something to point at when the project brought its own `index.html` and kept
  * it.
  *
  * Linked from the shell rather than imported by a component on purpose: a CSS
- * import is injected by JavaScript in dev, so the tokens would arrive after the
- * server-rendered markup that reads them and the first paint would flash.
+ * import is injected by JavaScript in dev, so the reset would arrive after the
+ * server-rendered markup and the first paint would flash.
  */
-export const globalStyles = `:root {
-  --bg: #23272f;
-  --panel: #2b3138;
-  --text: #f4eee8;
-  --text-secondary: #99a1b3;
-  --accent: #ff415a;
-  --accent-hover: #ff5d72;
-  --accent-text: #ff5d72;
-  --on-accent: #16181d;
-  --border: rgba(255, 255, 255, 0.1);
-  --surface: rgba(255, 255, 255, 0.06);
-  --surface-subtle: rgba(255, 255, 255, 0.03);
-  --header-bg: rgba(35, 39, 47, 0.85);
-  /* Accent tints for the card hover, the same in both themes. */
-  --card-hover-border: rgba(255, 93, 114, 0.4);
-  --card-hover-bg: rgba(255, 65, 90, 0.07);
+export const globalStyles = `/* color-scheme is a real property, not a custom property, so it stays in the
+   linked sheet rather than the token contract. octanejs.dev defaults to dark
+   and offers a toggle; a scaffold has no toggle to offer, so it follows the
+   operating system instead — the values on both sides are the site's own. */
+:root {
   color-scheme: dark;
 }
-/* octanejs.dev defaults to dark and offers a toggle. A scaffold has no
-   toggle to offer, so the same palette follows the operating system
-   instead — and the values on both sides are the site's own. */
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #ffffff;
-    --panel: #f4f5f7;
-    --text: #1c2027;
-    --text-secondary: #5c6473;
-    --accent-hover: #c81e37;
-    --accent-text: #d81f38;
-    --on-accent: #ffffff;
-    --border: rgba(0, 0, 0, 0.12);
-    --surface: rgba(0, 0, 0, 0.04);
-    --surface-subtle: rgba(0, 0, 0, 0.025);
-    --header-bg: rgba(255, 255, 255, 0.85);
     color-scheme: light;
   }
 }
@@ -536,8 +599,8 @@ export const globalStyles = `:root {
 }
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--app-bg);
+  color: var(--app-text);
   font-family:
     Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
@@ -553,11 +616,11 @@ samp {
     monospace;
 }
 a {
-  color: var(--accent-text);
+  color: var(--app-accent-text);
   text-decoration: none;
 }
 a:hover {
-  color: var(--accent-hover);
+  color: var(--app-accent-hover);
 }
 ::selection {
   background: rgba(255, 65, 90, 0.45);

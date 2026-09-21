@@ -79,10 +79,13 @@ describe('octane create', () => {
 		expect(read(app, 'src/App.tsrx')).toMatch(
 			/const linkTheme = <style>[\s\S]*export function App\(\)[\s\S]*<style apply=\{linkTheme\}>/,
 		);
-		// The theme tokens the page reads, and the shell tag that resolves them.
-		// Linked rather than imported: a CSS import is injected by JavaScript in
-		// dev, so the tokens would land after the markup that reads them.
-		expect(read(app, 'src/styles.css')).toContain('--accent');
+		// The typed theme-token contract the page reads, and the reset the shell
+		// links. The token sheet rides the markup itself — the page's plain
+		// <style>{tokens.css}</style> element — while the reset stays a link so
+		// it cannot be JavaScript-injected late.
+		expect(read(app, 'src/tokens.ts')).toContain('defineThemeTokens');
+		expect(read(app, 'src/App.tsrx')).toContain('<style>{tokens.css}</style>');
+		expect(read(app, 'src/styles.css')).toContain('--app-accent');
 		expect(read(app, 'index.html')).toContain('<link rel="stylesheet" href="/src/styles.css" />');
 		// The SSR files belong to the other template.
 		expect(existsSync(path.join(app, 'octane.config.ts'))).toBe(false);
@@ -138,7 +141,14 @@ describe('octane create', () => {
 			/const linkTheme = <style>[\s\S]*export function App\(\)[\s\S]*<style apply=\{linkTheme\}>/,
 		);
 
-		expect(read(app, 'src/styles.css')).toContain('--accent');
+		// The typed contract ships once and every styled file imports it: the
+		// pages emit its sheet and the frame's nav reads the same var(--app-*)
+		// names the contract declares.
+		expect(read(app, 'src/tokens.ts')).toContain('defineThemeTokens');
+		for (const page of ['src/App.tsrx', 'src/Counter.tsrx', 'src/Layout.tsrx']) {
+			expect(read(app, page)).toContain('<style>{tokens.css}</style>');
+		}
+		expect(read(app, 'src/styles.css')).toContain('--app-accent');
 		expect(html).toContain('<link rel="stylesheet" href="/src/styles.css" />');
 	});
 

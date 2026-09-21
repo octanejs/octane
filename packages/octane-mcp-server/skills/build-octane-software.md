@@ -38,7 +38,13 @@ details but do not replace these gates.
   (`<><style>…</style><div>…</div></>`), inside `@{ … }` and directive bodies
   too. Keep block CSS static and pass runtime values through custom
   properties. A block inside a control-flow branch ships its CSS whichever
-  branch renders, so keep branch-only rules small.
+  branch renders, so keep branch-only rules small. Declare design tokens with
+  `defineThemeTokens` from `octane/theme-tokens` in a plain `.ts` module
+  (`{ prefix: 'app' }` names them `--app-*`); emit `tokens.css` once via the
+  plain element `<style>{tokens.css}</style>` and read leaves in scoped CSS as
+  `var(--app-*)` — importing the contract makes the compile gate check every
+  claimed `var(--app-*)` reference (`octane-style-token-undeclared`), while
+  unprefixed vars stay legal.
 - For SSR, avoid client/server data divergence and duplicate fetches. Exercise
   hydration with production-compiled output and preserve abort/error behavior.
 - Treat bundle size and dependency cost as performance. Check for an official

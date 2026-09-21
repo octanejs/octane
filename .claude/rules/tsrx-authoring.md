@@ -190,6 +190,39 @@ export function Panel() @{
 `<style href precedence>` is a Float resource (plain CSS shipped by href
 identity, never scoped) and stays outside this model.
 
+Typed theme tokens come from `defineThemeTokens` (`octane/theme-tokens`),
+declared in a plain `.ts` module:
+
+```ts
+import { defineThemeTokens } from 'octane/theme-tokens';
+
+export const tokens = defineThemeTokens(
+	{ colors: { bg: '#fff', fg: '#111' }, space: { sm: '0.25rem' } },
+	{
+		prefix: 'app',
+		variants: { dark: { selector: '.dark', values: { colors: { bg: '#000' } } } },
+	},
+);
+```
+
+The call returns the declared shape with each leaf replaced by a
+`var(--name, fallback)` string — `tokens.colors.bg` reads
+`var(--app-colors-bg, #fff)` — so leaves drop into `style={{ … }}` and into
+scoped CSS (`color: var(--app-colors-bg)`). `tokens.css` is the stylesheet
+(a `:root` block plus one block per variant selector); emit it once with a
+plain `<style>{tokens.css}</style>` — an ordinary unscoped element, never the
+template syntax. `tokens.vars` exposes the bare `--app-*` names and
+`tokens.raw` the original values. Variant `values` are typechecked against
+the declared token shape; `raw`, `vars`, and `css` are reserved top-level
+keys.
+
+Importing a contract module into a `.tsrx` file claims its namespace:
+`var(--app-*)` references inside that module's scoped `<style>` sheets are
+checked against the contract, and a misspelling is
+`octane-style-token-undeclared`. Contracts without a `prefix` claim nothing,
+and `var(--*)` names outside every claimed namespace stay legal unvalidated
+legacy usage — so a plain `--tone` prop-fed variable needs no contract.
+
 Style diagnostics come from `@tsrx/core` and surface through the compile
 result's `diagnostics` like `OCTANE_NATIVE_TEXT_ONCHANGE` does:
 `STYLE_APPLY_VALUE` (`apply` without an expression value), `STYLE_APPLY_TARGET`
@@ -203,6 +236,42 @@ block outside every `@{ … }` or directive body),
 `STYLE_STANDALONE_NEEDS_FRAGMENT` (a block as the lone output of a body),
 `STYLE_UNKNOWN_ATTRIBUTE`, and `CSS_GLOBAL_PLACEMENT` (`:global` where the
 scoping rules do not allow it).
+
+Two gates check styling. The **compile gate** inspects the CSS and the class
+maps on the compile/analyze path:
+
+- `octane-css-unknown-property` (error): a declaration property mdn-data does
+  not know — vendor-prefixed and custom properties are fine.
+- `octane-css-shorthand-longhand-clash` (error or warning): a shorthand
+  resets a longhand set by a rule whose selectors can co-match the same
+  element. Equal or subsuming subjects in the same conditional context
+  (`@media`/`@supports`) are errors; distinct class combinations that only
+  *may* share an element are warnings. A deliberate reset (a media-query
+  `padding` overriding base `padding-top`) is suppressed per site.
+- `octane-css-unused-selector` (warning): a selector matches no element in its
+  scope. `:global` rules, theme sheets, and dynamic `<{expr}>` maybe-matches
+  never warn.
+- `octane-style-unknown-class-key` (error): `map.key` reads a key the
+  same-module class map does not provide (imported maps are left to the
+  typecheck gate).
+- `octane-style-token-undeclared` (error): a `var(--prefix-*)` reference inside
+  scoped CSS names a token the claimed contract does not declare.
+- `octane-style-token-contract-unresolved` (warning): a contract import was
+  claimed but the module could not be resolved or reduced to token facts, so
+  its namespace goes unchecked.
+
+The **typecheck gate** (`tsrx-tsc --noEmit`) owns the typed surfaces the
+compile gate cannot see: literal theme/class-map member types, imported
+bindings' `$class` and class keys, `defineThemeTokens` argument shapes, and
+variant `values` matching the declared token shape.
+
+Suppress a compile-gate diagnostic with a comment: `/* octane-ignore */`
+suppresses every applicable diagnostic at the next node, and
+`/* octane-ignore octane-css-unused-selector */` suppresses only the named
+code(s). A `//` or `/* */` JavaScript comment applies to the next AST node —
+put it above the `<style>` block (or a containing element) — while a
+`/* octane-ignore … */` comment inside a sheet applies to the next rule,
+at-rule, or declaration.
 
 ## Types
 

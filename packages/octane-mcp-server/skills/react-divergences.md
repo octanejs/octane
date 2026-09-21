@@ -156,6 +156,18 @@ the branch. A raw-CSS block is allowed only inside a `@{ … }` or
 `<style href precedence>` keeps React's Float semantics. Do not port this to
 CSS Modules or a CSS-in-JS runtime.
 
+Design tokens are typed contracts, not context theme objects:
+`defineThemeTokens({ colors: { bg: '#fff' } }, { prefix: 'app' })` (from
+`octane/theme-tokens`, in a plain `.ts` module) returns the shape with leaves
+as `var(--app-colors-bg, #fff)` strings plus `.vars`, `.raw`, and `.css` —
+emit `tokens.css` once with the pass-through `<style>{tokens.css}</style>` and
+read `var(--app-*)` in scoped sheets. Importing the contract into a `.tsrx`
+module claims its namespace, so the compile gate flags undeclared
+`--app-*` references (`octane-style-token-undeclared`); token and variant
+shapes are checked by `tsrx-tsc`, and unprefixed `var(--*)` stays legal.
+Compile-gate findings are suppressible with `/* octane-ignore <code> */`
+above a block or before a rule inside one.
+
 ## class / className composes clsx-style
 
 Strings, numbers, arrays, objects, and nesting compose into a class string;

@@ -616,8 +616,9 @@ depends on the runtime:
 
 Bundlers do not see this CSS: it travels inside the compiled JavaScript, not in a
 virtual CSS module, so CSS plugins, PostCSS, and `build.cssMinify` never touch it.
-Global stylesheets that every component reads, such as design tokens, belong in a
-`.css` file the page links.
+Global stylesheets that every component reads belong in a `.css` file the page
+links — or, for design tokens, in a typed `defineThemeTokens` contract whose
+`tokens.css` the app emits once ([below](#tokens)).
 
 <h2 id="float">
 	A style with <code>href</code> is a head resource, not a scoped block
@@ -626,6 +627,67 @@ Global stylesheets that every component reads, such as design tokens, belong in 
 A `<style href="…" precedence="…">` is a Float resource: the runtime moves it into
 `<head>` and keeps one copy per `href`. It accepts no `apply`, gets no hash class, and
 adds no class to any element. The same is true of a `<style>` rendered inside `<head>`.
+
+<h2 id="tokens">Typed theme tokens</h2>
+
+Design tokens live in a plain `.ts` module declared with `defineThemeTokens` from
+`octane/theme-tokens` — the typed counterpart of a hand-written token sheet:
+
+```ts
+import { defineThemeTokens } from 'octane/theme-tokens';
+
+export const tokens = defineThemeTokens(
+	{
+		colors: { bg: '#ffffff', fg: '#111111', accent: '#3b82f6' },
+		space: { sm: '0.25rem', md: '0.5rem' },
+	},
+	{
+		prefix: 'app',
+		variants: {
+			dark: { selector: '.dark', values: { colors: { bg: '#000000' } } },
+		},
+	},
+);
+```
+
+The call returns the declared shape with every leaf replaced by a
+`var(--name, fallback)` reference — `tokens.colors.bg` is the string
+`var(--app-colors-bg, #ffffff)` — plus three fields: `tokens.vars` holds the bare
+custom-property names (`--app-colors-bg`), `tokens.raw` the original values, and
+`tokens.css` the full sheet as CSS (one base-selector block, `:root` unless
+`selector` says otherwise, plus one block per variant, each under its own
+`selector` and/or `media`). `raw`, `vars`, and `css` are reserved top-level keys,
+and variant `values` are typechecked against the declared shape.
+
+Emit the sheet once near the app root with an ordinary style element — it is
+TSX pass-through markup, not a scoped block — and read the tokens anywhere a
+custom property is legal, in scoped CSS and inline styles alike:
+
+```tsrx
+import { tokens } from './tokens';
+
+export function Layout() @{
+	<>
+		<style>{tokens.css}</style>
+		<style>
+			.shell {
+				background: var(--app-colors-bg);
+				color: var(--app-colors-fg);
+				padding: var(--app-space-md);
+			}
+		</style>
+		<div class="shell">{props.children}</div>
+	</>
+}
+```
+
+Importing a contract module into a `.tsrx` file claims its namespace for that
+module: every `var(--app-*)` reference inside its scoped `<style>` sheets is
+checked against the contract, so a misspelled `--app-colrs-bg` is an
+`octane-style-token-undeclared` error. A contract without `prefix` claims
+nothing, and `var(--*)` names outside every claimed namespace — a one-off
+`--tone` fed by `style={{ '--tone': tone }}`, a third-party sheet's variables —
+stay legal unvalidated usage.
 
 <h2 id="diagnostics">Diagnostics</h2>
 
@@ -658,6 +720,60 @@ prints under the message and the bundler plugins surface in their own error outp
   `ref` and `apply` on a scoped block.
 - `CSS_GLOBAL_PLACEMENT` (`tsrx-css-global-placement`): `:global(…)` used where the
   scoping rules do not allow it.
+
+A second group of codes checks the CSS itself and the class maps a style block
+produces; warnings report but do not stop the compile:
+
+- `octane-css-unknown-property` (error): a declaration uses a property the CSS
+  data does not know. Vendor-prefixed and custom (`--*`) properties are exempt.
+- `octane-css-shorthand-longhand-clash` (error or warning): a shorthand
+  (`margin`, `font`, `border`, …) resets a longhand another rule sets, and the
+  two selectors can match the same element. When co-match is provable — equal
+  or subsuming subjects inside the same conditional context — the finding is
+  an error; distinct class combinations that only _may_ share an element are
+  warnings. A deliberate reset (a media-query `padding` overriding base
+  `padding-top`) can be suppressed per site or restructured.
+- `octane-css-unused-selector` (warning): a selector matches nothing in its
+  scope — usually a stale rule after markup changed. `:global` rules, theme
+  sheets, and selectors that could match a dynamic `<{expr}>` element never
+  warn.
+- `octane-style-unknown-class-key` (error): `theme.mispelled` reads a key the
+  same-module class map does not provide (the map has `$class` plus one key per
+  standalone class selector). Reads off imported maps are the typecheck gate's
+  job instead.
+- `octane-style-token-undeclared` (error): a `var(--prefix-*)` reference names a
+  token the imported contract does not declare — see
+  [Typed theme tokens](#tokens).
+- `octane-style-token-contract-unresolved` (warning): a module imports a token
+  contract but it could not be resolved or read statically, so its namespace
+  goes unchecked rather than silently passing.
+
+Styling is checked by two gates, and a clean result needs both: the **compile
+gate** (above — the compiler, `octane analyze`, the bundler plugins, and the
+MCP `octane_compile` tool) inspects CSS and same-module class maps, while the
+**typecheck gate** (`tsrx-tsc --noEmit`) owns the typed surfaces the compiler
+cannot see — theme and class-map member types, keys read off imported maps, and
+`defineThemeTokens` argument and variant shapes.
+
+Suppress a compile-gate finding with a comment. `/* octane-ignore */` applies
+to every diagnostic at the next node; `/* octane-ignore <code> … */` applies to
+the named code(s) only. A JavaScript comment applies to the AST node that
+follows it — put it above the `<style>` block or a containing element — and a
+CSS comment inside a sheet applies to the next rule, at-rule, or declaration:
+
+```tsrx
+function Panel() @{
+	<>
+		{/* octane-ignore octane-css-unused-selector */}
+		<style>
+			.wip {
+				color: red;
+			}
+		</style>
+		<div>In progress</div>
+	</>
+}
+```
 
 <h2 id="next">Next</h2>
 

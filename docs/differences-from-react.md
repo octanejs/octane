@@ -991,6 +991,16 @@ The compiler reports these as compile errors, each carrying its code:
 - `CSS_GLOBAL_PLACEMENT` — `:global(...)` in the middle of a selector sequence
   or nested inside a pseudo-class.
 
+A second diagnostic group checks the CSS itself — `octane-css-unknown-property`,
+`octane-css-shorthand-longhand-clash`, `octane-css-unused-selector` (warning),
+`octane-style-unknown-class-key`, `octane-style-token-undeclared`, and
+`octane-style-token-contract-unresolved` (warning) — suppressible with
+`/* octane-ignore [codes] */`. Typed design tokens are declared with
+`defineThemeTokens` (`octane/theme-tokens`) in a plain `.ts` module; importing
+one claims its `--prefix-*` namespace so scoped `var(--*)` references are
+checked at compile time, while unprefixed variables stay legal unvalidated
+usage. See the [styling docs](https://octanejs.dev/docs/styling).
+
 ## Context: direct provider component, no Provider or Consumer
 
 `createContext` returns a context that is itself the provider component —

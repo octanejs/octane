@@ -726,6 +726,21 @@ resource, or on a `<style>` inside `<head>`, is an error
 (`STYLE_APPLY_UNSUPPORTED_HOST`). Resource semantics are in
 [differences-from-react.md](./differences-from-react.md#document-metadata-and-float-resources).
 
+### Typed theme tokens
+
+Design tokens are declared in a plain `.ts` module with `defineThemeTokens`
+from `octane/theme-tokens`: `defineThemeTokens({ colors: { bg: '#fff' } },
+{ prefix: 'app' })` returns the same shape with each leaf as a
+`var(--app-colors-bg, #fff)` string, plus `tokens.vars` (bare names),
+`tokens.raw` (values), and `tokens.css` (the `:root` sheet plus variant
+blocks). Emit the sheet once with the pass-through `<style>{tokens.css}</style>`
+and read leaves as `var(--app-*)` in scoped CSS or in `style={{ … }}`.
+Importing the contract into a `.tsrx` module claims its namespace, so a
+misspelled `var(--app-*)` is `octane-style-token-undeclared` at compile time;
+`tsrx-tsc` checks the contract's shape. Unprefixed `var(--*)` stays legal
+unvalidated usage. The [styling docs](https://octanejs.dev/docs/styling)
+have the full contract.
+
 ## Strong mode
 
 See the [Strong compiler check reference](./strong-compiler-checks.md) for

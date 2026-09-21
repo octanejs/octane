@@ -27,7 +27,12 @@ const { html, css } = await prerender(App, props, {
 - `css`: deduped `<style data-octane>` tags from scoped styles, one per hash;
   a component contributes one per style scope (nested `@{ … }` and
   control-flow bodies have their own) plus one per assigned theme block. Place
-  them inside `<head>`.
+  them inside `<head>`. Token contracts are the typed companion: declare
+  `defineThemeTokens({…}, { prefix: 'app' })` from `octane/theme-tokens` in a
+  plain `.ts` module and emit `tokens.css` with the ordinary element
+  `<style>{tokens.css}</style>` — it renders inline in `html` at its authored
+  position, not through `css`, while scoped sheets keep reading the checked
+  `var(--app-*)` references.
 - Use `renderToString` (from `octane/server`) for a single synchronous pass that
   leaves `@pending` fallbacks in place; use `prerender` to await the data.
 - Options are optional: `nonce` stamps CSP nonces on the emitted inline tags (all

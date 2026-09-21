@@ -172,14 +172,15 @@ describe('octane init', () => {
 		});
 
 		expect(read(root, 'index.html')).toContain('/src/styles.css');
-		expect(read(root, 'src/styles.css')).toContain('--accent');
+		expect(read(root, 'src/styles.css')).toContain('--app-accent');
 	});
 
 	// The whole invariant rather than another single case: every scaffolded
-	// component reads the theme tokens, so whenever `init` writes one of them the
-	// stylesheet has to land too. The cases below vary which files the project
-	// already owns, which is what decides the subset `init` still writes — and
-	// each subset has been a separate escape at some point.
+	// component imports the token contract and reads its `var(--app-*)`
+	// references, so whenever `init` writes one of them the contract module and
+	// the reset stylesheet have to land too. The cases below vary which files
+	// the project already owns, which is what decides the subset `init` still
+	// writes — and each subset has been a separate escape at some point.
 	it.each([
 		{ name: 'an empty project', mode: 'fullstack', files: {} },
 		{ name: 'an empty spa project', mode: 'spa', files: {} },
@@ -214,15 +215,18 @@ describe('octane init', () => {
 			// The scenario has to actually scaffold something, or it proves nothing.
 			expect(components.length, 'scaffolded no component').toBeGreaterThan(0);
 			expect(existsSync(path.join(root, 'src/styles.css')), components.join(', ')).toBe(true);
+			// Every scaffolded component imports ./tokens — the contract must land
+			// with them or the import and every var(--app-*) read resolve to nothing.
+			expect(existsSync(path.join(root, 'src/tokens.ts')), components.join(', ')).toBe(true);
 		},
 	);
 
 	it('states the stylesheet tag to add when the project keeps its own page', async () => {
 		// fullstack writes its entry component whether or not it writes the shell,
 		// so on a project that already has an index.html the scaffolded page would
-		// otherwise read theme tokens that nothing declares — every colour, border
-		// and surface on it resolving to nothing. The stylesheet is still written;
-		// only the tag linking it is the project's own file to edit.
+		// otherwise ship without the reset it is written against. The stylesheet
+		// is still written; only the tag linking it is the project's own file to
+		// edit.
 		const { root } = fixture({
 			'index.html':
 				'<!doctype html>\n<html>\n\t<head>\n\t\t<!--ssr-head-->\n\t</head>\n' +
@@ -234,7 +238,7 @@ describe('octane init', () => {
 			{ exec: gitExec() },
 		);
 
-		expect(read(root, 'src/styles.css')).toContain('--accent');
+		expect(read(root, 'src/styles.css')).toContain('--app-accent');
 		expect(read(root, 'index.html')).not.toContain('stylesheet');
 		expect(result.json().manual.join(' ')).toContain(
 			'<link rel="stylesheet" href="/src/styles.css" />',

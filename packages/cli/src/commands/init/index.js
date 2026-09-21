@@ -20,6 +20,7 @@ import {
 	layoutComponent,
 	octaneConfig,
 	prettierConfig,
+	tokensModule,
 	tsconfig,
 	viteConfig,
 } from './templates.js';
@@ -326,6 +327,18 @@ function plan(project, mode, integration) {
 			});
 		}
 
+		// The token contract the pages import: its `var(--app-*)` references in
+		// scoped styles only resolve against a contract when this module exists,
+		// so it ships whenever a page does. A project with its own pages keeps
+		// its own theming; nothing else imports it.
+		if (pages.length > 0 && !existsSync(at('src/tokens.ts'))) {
+			changes.push({
+				file: 'src/tokens.ts',
+				summary: 'create the theme-token contract',
+				apply: writeFile(at('src/tokens.ts'), tokensModule),
+			});
+		}
+
 		// Not a page: it renders nothing and reads no tokens, so it is deliberately
 		// outside the list above.
 		if (scaffoldsRoutes && !existsSync(at('src/server/health.ts'))) {
@@ -335,18 +348,18 @@ function plan(project, mode, integration) {
 				apply: writeFile(at('src/server/health.ts'), healthRoute),
 			});
 		}
-		// The reset and theme tokens, which two separate things depend on: the
-		// shell links the file, and every component above reads the tokens in it.
-		// Either one alone is enough to need it, and they do not imply each other —
-		// this command writes pages without a shell when the project has its own
+		// The reset stylesheet, which two separate things depend on: the shell
+		// links the file, and every component above reads its rules. Either one
+		// alone is enough to need it, and they do not imply each other — this
+		// command writes pages without a shell when the project has its own
 		// `index.html`, and writes a shell without pages when the project has its
 		// own routing. Tying the stylesheet to just one of them leaves the other
-		// side broken: a page whose every colour, border and surface resolves to
-		// nothing, or a shell linking a file that was never created.
+		// side broken: a page with no reset or base typography, or a shell
+		// linking a file that was never created.
 		if ((writesShell || pages.length > 0) && !existsSync(at('src/styles.css'))) {
 			changes.push({
 				file: 'src/styles.css',
-				summary: 'create the reset and the theme tokens',
+				summary: 'create the reset stylesheet',
 				apply: writeFile(at('src/styles.css'), globalStyles),
 			});
 			// The shell this command writes carries the tag. When the project
@@ -354,7 +367,7 @@ function plan(project, mode, integration) {
 			// rewriting their bundler config, so state the line instead.
 			if (!writesShell) {
 				manual.push(
-					'In index.html, add <link rel="stylesheet" href="/src/styles.css" />: the scaffolded pages read their theme tokens from it.',
+					'In index.html, add <link rel="stylesheet" href="/src/styles.css" />: the scaffolded pages read their reset and base styles from it.',
 				);
 			}
 		}

@@ -304,6 +304,19 @@ export const docsMeta: DocMeta[] = [
 			},
 			{ id: 'float', title: 'A style with href is a head resource, not a scoped block' },
 			{
+				id: 'tokens',
+				title: 'Typed theme tokens',
+				searchTerms: [
+					'defineThemeTokens',
+					'theme tokens',
+					'design tokens',
+					'tokens.css',
+					'tokens.vars',
+					'tokens.raw',
+					'octane/theme-tokens',
+				],
+			},
+			{
 				id: 'diagnostics',
 				title: 'Diagnostics',
 				// Every code is registered under both spellings: the kebab form the
