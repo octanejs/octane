@@ -224,33 +224,43 @@ describe('streamed region receiver', () => {
 
 	it('buffers a result before code and rejects out-of-order frames', async () => {
 		for (const createReceiver of [createStreamedRegionReceiver, createStreamedResultReceiver]) {
-			const receiver = createReceiver({
-				buildId: 'build-1',
-				documentId: 'document-1',
-				ownerKey: 'account-1',
-			});
 			const selected = identity();
-			receiver.registerSelection(selected);
-			await receiver.receive({
+			const open = {
 				identity: selected,
 				sequence: 0,
 				channel: 'result',
 				kind: 'open',
-				resource: 'promise',
-			} satisfies StreamedSignalResultFrame);
-			await receiver.receive({
+				resource: 'stream',
+			} satisfies StreamedSignalResultFrame;
+			const value = {
 				identity: selected,
 				sequence: 1,
 				channel: 'result',
 				kind: 'value',
-				value: ['string', 'ready'],
-			} satisfies StreamedSignalResultFrame);
+				value: ['string', 'ready 😀'],
+			} satisfies StreamedSignalResultFrame;
+			const nextValue = {
+				...value,
+				sequence: 2,
+				value: ['number', 42],
+			} satisfies StreamedSignalResultFrame;
+			const receiver = createReceiver({
+				buildId: 'build-1',
+				documentId: 'document-1',
+				ownerKey: 'account-1',
+				maxPendingBytes: new TextEncoder().encode(JSON.stringify(value) + JSON.stringify(nextValue))
+					.byteLength,
+			});
+			receiver.registerSelection(selected);
+			await receiver.receive(open);
+			await receiver.receive(value);
 
 			const accepted: string[] = [];
-			let ready = false;
+			let available = 0;
 			const consumer = {
 				accept(frame) {
-					if (!ready) return false as const;
+					if (available === 0) return false as const;
+					available--;
 					accepted.push(frame.kind);
 				},
 				fail(error) {
@@ -259,13 +269,19 @@ describe('streamed region receiver', () => {
 			} satisfies StreamedResultConsumer;
 			receiver.attachResult(selected, consumer);
 			expect(accepted).toEqual([]);
-			ready = true;
+			available = 1;
 			receiver.attachResult(selected, consumer);
-			expect(accepted).toEqual(['open', 'value']);
+			expect(accepted).toEqual(['open']);
+			// A partial drain frees byte capacity without overtaking the deferred value.
+			await expect(receiver.receive(nextValue)).resolves.toBe('accepted');
+			expect(accepted).toEqual(['open']);
+			available = 2;
+			receiver.attachResult(selected, consumer);
+			expect(accepted).toEqual(['open', 'value', 'value']);
 			await expect(
 				receiver.receive({
 					identity: selected,
-					sequence: 3,
+					sequence: 4,
 					channel: 'result',
 					kind: 'complete',
 				} satisfies StreamedSignalResultFrame),

@@ -56,6 +56,7 @@ interface ResultState {
 	values: number;
 	terminal: boolean;
 	frames: StreamedSignalResultFrame[];
+	frameSizes: number[];
 	bytes: number;
 	consumer?: StreamedResultConsumer;
 	timer?: ReturnType<typeof setTimeout>;
@@ -81,6 +82,7 @@ function retainCompletedResult(result: ResultState): void {
 		// Transfer ownership, not a copy. Incomplete channels never cross this
 		// boundary and still expire under the receiver's normal lifetime.
 		result.frames = [];
+		result.frameSizes.length = 0;
 		result.bytes = 0;
 	}
 }
@@ -161,6 +163,7 @@ export function createStreamedResultReceiverState(
 					// Consumer rejection callbacks cannot prevent receiver cleanup.
 				}
 				state.result.frames.length = 0;
+				state.result.frameSizes.length = 0;
 				state.result.bytes = 0;
 			}
 			if (state.result.timer !== undefined) clearTimeout(state.result.timer);
@@ -218,7 +221,15 @@ export function createStreamedResultReceiverState(
 		}
 		const state: StreamedSelectionState = {
 			identity,
-			result: { sequence: 0, opened: false, values: 0, terminal: false, frames: [], bytes: 0 },
+			result: {
+				sequence: 0,
+				opened: false,
+				values: 0,
+				terminal: false,
+				frames: [],
+				frameSizes: [],
+				bytes: 0,
+			},
 			placementSequence: 0,
 			contentRevision,
 		};
@@ -255,10 +266,11 @@ export function createStreamedResultReceiverState(
 			if (accepted === state.result.frames.length) state.result.bytes = 0;
 			else {
 				for (let index = 0; index < accepted; index++) {
-					state.result.bytes -= frameBytes(state.result.frames[index]!);
+					state.result.bytes -= state.result.frameSizes[index]!;
 				}
 			}
 			state.result.frames.splice(0, accepted);
+			state.result.frameSizes.splice(0, accepted);
 		}
 		retainCompletedResult(state.result);
 		return () => {
@@ -311,6 +323,8 @@ export function createStreamedResultReceiverState(
 				throw new StreamedReceiverError('overflow', 'Streamed result mailbox exceeded its bound.');
 			}
 			result.frames.push(frame);
+			// Release the original byte charge on drain without serializing the frame again.
+			result.frameSizes.push(bytes);
 			result.bytes += bytes;
 		}
 		if (frame.kind === 'complete' || frame.kind === 'error') {
