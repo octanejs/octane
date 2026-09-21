@@ -476,7 +476,9 @@ export function planBindingProgram(fn, render, context) {
 						fail(attr, 'binding child program props cannot be repeated');
 					const value = attrValue(attr);
 					validate(value);
-					const primitive = bindingPrimitive(context.fixed.fold(value));
+					const primitive = context.fixedChildProps?.has(name)
+						? bindingPrimitive(context.fixed.fold(value))
+						: null;
 					if (primitive)
 						fixedProps.push(primitive.value === undefined ? [name] : [name, primitive.value]);
 					propNames.push(name);

@@ -1889,6 +1889,14 @@ function lowerAdoptions(ast, filename) {
 
 /** Annotate normal SSR/client output, or select a pure adoption descriptor Program. */
 export function prepareDomBindings(ast, source, filename, selectedExport, helpers) {
+	if (
+		helpers.fixedPropNames !== null &&
+		helpers.fixedPropNames !== undefined &&
+		(!Array.isArray(helpers.fixedPropNames) ||
+			helpers.fixedPropNames.some((name) => typeof name !== 'string'))
+	)
+		throw new Error('Octane domBindingFixedProps must be an array of child prop names.');
+	const fixedChildProps = helpers.fixedPropNames?.length ? new Set(helpers.fixedPropNames) : null;
 	const imports = importedBindings(ast);
 	const lexical = createLexicalAnalysis(ast);
 	lexical.domBindingConstants = new Map(
@@ -2056,6 +2064,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			projectionBody,
 			annotationsOnly,
 			fixed,
+			fixedChildProps,
 			restSites: rest.sites,
 			parameterNames: bindingParameterNames(fn.params[0], filename),
 			refDependencies: (expression) => {

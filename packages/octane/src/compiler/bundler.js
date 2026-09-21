@@ -559,6 +559,7 @@ class OctaneBundlerCompiler {
 			inlineHookMemo: options.inlineHookMemo !== false,
 			strong: options.strong === true,
 			knownAttributeSpreads: options.knownAttributeSpreads,
+			domBindingFixedProps: options.domBindingFixedProps,
 			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
@@ -1249,6 +1250,13 @@ class OctaneBundlerCompiler {
 					: null),
 				...(renderer.target === 'dom' && options.textTypeFacts !== undefined
 					? { textTypeFacts: options.textTypeFacts }
+					: null),
+				...(renderer.target === 'dom' &&
+				(options.domBindingFixedProps ?? this.defaults.domBindingFixedProps) !== undefined
+					? {
+							domBindingFixedProps:
+								options.domBindingFixedProps ?? this.defaults.domBindingFixedProps,
+						}
 					: null),
 				profile,
 				profileFilename,

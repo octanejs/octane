@@ -716,6 +716,60 @@ export function Styled(props) @{ 'use dom bindings'; <div sx={${expression}}/> }
 		);
 	});
 
+	it('shares literal-label child requests by default and bounds opted-in facts', () => {
+		const source = `import { FixedChild } from './FixedChild.tsrx';
+export function Pair(props) @{ 'use dom bindings'; <section>
+ <FixedChild variant="ghost" radius="full" label="First" title={props.title} />
+ <FixedChild variant="ghost" radius="full" label="Second" title={props.title} />
+</section> }`;
+		const id = '/src/Pair.tsrx?octane-bindings=Pair';
+		const keys = ['variant', 'radius', 'label', 'title'];
+		for (const dev of [false, true]) {
+			const options = { mode: 'client' as const, hmr: false, dev };
+			const generic = compile(source, id, options).code;
+			expect(compile(source, id, { ...options, domBindingFixedProps: [] }).code).toBe(generic);
+			for (const [code, shape] of [
+				[generic, [1, keys]],
+				[createOctaneCompiler({ hmr: false }).transform(source, id, { dev })!.code, [1, keys]],
+				[
+					compile(source, id, { ...options, domBindingFixedProps: ['variant', 'radius'] }).code,
+					[
+						2,
+						keys,
+						[
+							['variant', 'ghost'],
+							['radius', 'full'],
+						],
+					],
+				],
+				[
+					createOctaneCompiler({
+						hmr: false,
+						domBindingFixedProps: ['variant', 'radius'],
+					}).transform(source, id, { dev })!.code,
+					[
+						2,
+						keys,
+						[
+							['variant', 'ghost'],
+							['radius', 'full'],
+						],
+					],
+				],
+			] as const) {
+				const requests = parseModule(code, 'Pair.js').body.filter(
+					(node) =>
+						node.type === 'ImportDeclaration' && node.source.value.startsWith('./FixedChild.tsrx?'),
+				);
+				expect(requests).toHaveLength(1);
+				expect(requests[0].source.value).toBe(
+					'./FixedChild.tsrx?octane-bindings=FixedChild&octane-mount=1&octane-props=' +
+						encodeURIComponent(JSON.stringify(shape)),
+				);
+			}
+		}
+	});
+
 	it('rejects malformed fixed child values before transforming a binding view', () => {
 		const compiler = createOctaneCompiler({ hmr: false });
 		const source = `export function Fixed({ value }) @{ 'use dom bindings'; <span title={value} /> }`;

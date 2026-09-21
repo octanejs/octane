@@ -2,13 +2,23 @@
 
 `dom-binding-fixed-props.mjs` runs a public child-program comparison outside the
 fixed codegen corpus. Both targets use the same imported presentation, compiler
-options, and live title, class, event, and ref channels. The generic control
-retains only ordered caller keys; the candidate also carries caller-authored
-primitive values in the extraction request.
+options other than the explicit propagation allowlist, and live title, class,
+event, and ref channels. The default generic control retains only ordered
+caller keys; the candidate opts into `domBindingFixedProps: ['variant', 'radius']`.
+Direct version-2 requests can also carry proven caller-authored primitive values.
+
+Propagation is off by default. The imported child body is not available during
+parent planning, so the compiler cannot safely infer which literal fields are
+worth specializing. Select repeated presentation fields explicitly; keep text,
+IDs, and other values that vary per instance live to share extracted programs.
+The option is exposed by `compile`, `createOctaneCompiler`,
+`octane/compiler/vite`, and `@octanejs/vite-plugin`.
 
 The child module and complete production runtime bundle have separate raw,
 minified, and gzip ratios in `benchmarks/baselines/ratios.json`. The child target
-must remove at least 5% in each metric; the complete bundle must not grow.
+must remove at least 5% in each metric; the complete bundle must not grow. The
+bundle contains seven children with different literal labels and asserts one
+shared child module in both profiles, guarding against specialization bloat.
 Adopted and mounted runs must produce identical content and live updates,
 preserve the adopted button, deliver native clicks, and release subscriptions
 and listeners on disposal. Reports include semantic and source hashes plus the

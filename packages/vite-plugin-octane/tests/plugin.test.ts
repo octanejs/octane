@@ -195,6 +195,40 @@ describe('isViteOwnedUrl', () => {
 });
 
 describe('octane() plugin factory', () => {
+	it('forwards bounded fixed child props without specializing distinct labels', async () => {
+		const source = `import { FixedChild } from './FixedChild.tsrx';
+export function Pair(props) @{ 'use dom bindings'; <section>
+ <FixedChild variant="ghost" radius="full" label="First" title={props.title} />
+ <FixedChild variant="ghost" radius="full" label="Second" title={props.title} />
+</section> }`;
+		for (const domBindingFixedProps of [undefined, ['variant', 'radius']]) {
+			const [compiler] = await configuredOctane({ hmr: false, domBindingFixedProps });
+			const output = await (compiler.transform as any).call(
+				{},
+				source,
+				'/repo/src/Pair.tsrx?octane-bindings=Pair',
+			);
+			const requests = [...output.code.matchAll(/from\s+["'](\.\/FixedChild\.tsrx\?[^"']+)["']/g)];
+			expect(requests).toHaveLength(1);
+			const shape = JSON.parse(
+				new URL(requests[0][1], 'https://fixture.test/').searchParams.get('octane-props')!,
+			);
+			const keys = ['variant', 'radius', 'label', 'title'];
+			expect(shape).toEqual(
+				domBindingFixedProps === undefined
+					? [1, keys]
+					: [
+							2,
+							keys,
+							[
+								['variant', 'ghost'],
+								['radius', 'full'],
+							],
+						],
+			);
+		}
+	});
+
 	it('forwards typed-text and native attribute provider options to the compiler', async () => {
 		expect(() => octane({ textTypes: { tsconfig: ' tsconfig.json ' } })).toThrow(
 			'`textTypes` requires { tsconfig: string }.',

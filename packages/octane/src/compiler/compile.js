@@ -9624,6 +9624,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 					mount: bindingRequest?.mount ?? false,
 					props: bindingRequest?.props ?? null,
 					fixedProps: bindingRequest?.fixedProps ?? null,
+					fixedPropNames: options?.domBindingFixedProps ?? null,
 					...(mode === 'client' &&
 					!options?.dev &&
 					!options?.hmr &&

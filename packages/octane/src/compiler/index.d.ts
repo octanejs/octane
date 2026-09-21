@@ -91,6 +91,8 @@ export interface CompileOptions {
 	textTypeFacts?: TextTypeFacts;
 	/** Trusted provider contracts for pure, fixed-shape native attribute factories. */
 	knownAttributeSpreads?: readonly KnownAttributeSpread[];
+	/** Opt in to fixed primitive child props by name. Keep text and IDs live to share extracted programs. */
+	domBindingFixedProps?: readonly string[];
 	/** Optional exact attribute-expression proofs; used only by the Valdi target. */
 	valdiWriterFacts?: ValdiWriterFacts;
 	/**

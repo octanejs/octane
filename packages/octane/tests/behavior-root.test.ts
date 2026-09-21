@@ -6549,6 +6549,7 @@ export function FixedParent(props) @{ 'use dom bindings';
 					dev,
 					source,
 					modules,
+					{ domBindingFixedProps: ['variant', 'radius', 'label'] },
 				);
 				const host = document.createElement('div');
 				container.append(host);

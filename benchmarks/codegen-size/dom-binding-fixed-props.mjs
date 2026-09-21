@@ -22,11 +22,10 @@ const keys = ['variant', 'radius', 'label', 'title', 'active', 'onClick', 'ref']
 const fixed = [
 	['variant', 'ghost'],
 	['radius', 'full'],
-	['label', 'Go'],
 ];
 const presentation = `import { FixedChild } from './dom-presentation-fixed-child.tsrx';
 export function Presentation(props) @{ 'use dom bindings';
-<section><FixedChild variant="ghost" radius="full" label="Go" title={props.title} active={props.active} onClick={props.onClick} ref={props.ref} /></section> }`;
+<section>${Array.from({ length: 7 }, (_, index) => `<FixedChild variant="ghost" radius="full" label="Go${index}" title={props.title} active={props.active} onClick={props.onClick} ref={props.ref} />`).join('')}</section> }`;
 const activation = `import { adoptBindings, mountBindings } from 'octane/behavior';
 import { Presentation } from './fixed-primitives-presentation.tsrx';
 export function attach(root, source) { return adoptBindings(root, Presentation, source); }
@@ -50,6 +49,7 @@ function childSize(specialized) {
 
 async function bundle(directory, name, mode, specialized) {
 	const outfile = path.join(directory, name + '.mjs');
+	let childModules = 0;
 	await build({
 		stdin: {
 			contents:
@@ -78,17 +78,12 @@ async function bundle(directory, name, mode, specialized) {
 					}));
 					plugin.onLoad({ filter: /.*/, namespace: 'binding-fixture' }, (args) => {
 						const file = args.path.split('?')[0];
-						let id = args.path;
-						if (!specialized && file === CHILD && id.includes('?')) {
-							const query = new URLSearchParams(id.slice(id.indexOf('?') + 1));
-							const shape = JSON.parse(query.get('octane-props'));
-							query.set('octane-props', JSON.stringify([1, shape[1]]));
-							id = file + '?' + query;
-						}
+						if (file === CHILD && args.path.includes('?')) childModules++;
 						return {
-							contents: compile(file === PRESENTATION ? presentation : source, id, {
+							contents: compile(file === PRESENTATION ? presentation : source, args.path, {
 								...options,
 								mode,
+								...(specialized ? { domBindingFixedProps: ['variant', 'radius'] } : null),
 							}).code,
 							loader: 'js',
 							resolveDir: DIR,
@@ -101,6 +96,7 @@ async function bundle(directory, name, mode, specialized) {
 	return {
 		module: await import(pathToFileURL(outfile)),
 		bytes: bytes(readFileSync(outfile, 'utf8')),
+		childModules,
 	};
 }
 
@@ -136,6 +132,11 @@ export async function measureFixedChildPrograms() {
 		for (const specialized of [false, true]) {
 			const name = specialized ? 'fixed-child' : 'generic-child';
 			const client = await bundle(directory, name, 'client', specialized);
+			assert.equal(
+				client.childModules,
+				1,
+				'Different labels must share one extracted child module',
+			);
 			const states = [];
 			for (const mount of [false, true]) {
 				let click = 0,
@@ -157,26 +158,31 @@ export async function measureFixedChildPrograms() {
 				const host = document.createElement('div');
 				document.body.append(host);
 				if (!mount) host.innerHTML = server.module.html(props);
-				const adopted = host.querySelector('button');
+				const adopted = [...host.querySelectorAll('button')];
 				const handle = mount
 					? client.module.mount(host, source)
 					: client.module.attach(host.firstElementChild, source);
-				const button = host.querySelector('button');
-				if (!mount) assert.equal(button, adopted);
-				assert.equal(button.textContent, 'Go');
-				assert.equal(button.className, 'base ghost rounded');
+				const buttons = [...host.querySelectorAll('button')];
+				assert.equal(buttons.length, 7);
+				if (!mount) assert.deepEqual(buttons, adopted);
+				for (const [index, button] of buttons.entries()) {
+					assert.equal(button.textContent, 'Go' + index);
+					assert.equal(button.className, 'base ghost rounded');
+				}
 				props = { ...props, title: 'Changed', active: true };
 				for (const notify of subscriptions) notify();
-				assert.equal(host.querySelector('button'), button);
-				assert.equal(button.title, 'Changed');
-				assert.equal(button.className, 'base ghost rounded active');
-				button.click();
-				assert.equal(click, 1);
-				states.push([button.textContent, button.title, button.className, click]);
+				assert.deepEqual([...host.querySelectorAll('button')], buttons);
+				for (const button of buttons) {
+					assert.equal(button.title, 'Changed');
+					assert.equal(button.className, 'base ghost rounded active');
+					button.click();
+					states.push([button.textContent, button.title, button.className]);
+				}
+				assert.equal(click, 7);
 				handle.dispose();
 				assert.equal(subscriptions.size, 0);
-				button.click();
-				assert.equal(click, 1);
+				for (const button of buttons) button.click();
+				assert.equal(click, 7);
 				host.remove();
 			}
 			outputs.push(states);
