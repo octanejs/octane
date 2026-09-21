@@ -49,7 +49,7 @@ export const SelectValue = function SelectValue(
 		placeholder: !hasSelectedValue,
 	};
 
-	let children = null;
+	let children: React.OctaneNode = null;
 	if (typeof childrenProp === 'function' && !React.isChildrenBlock(childrenProp)) {
 		children = childrenProp(value);
 	} else if (childrenProp != null) {
