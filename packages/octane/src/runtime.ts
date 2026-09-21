@@ -36249,6 +36249,7 @@ export function tryBlock(
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	let state = parentScope.slots[slotKey] as TrySlot | undefined;
+	let supersedesInputs = false;
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;
@@ -36310,11 +36311,10 @@ export function tryBlock(
 		registerSlot(parentScope, newState);
 		state = newState;
 	} else {
-		if (
-			state.retrySignalOwners !== undefined &&
-			(state.tryBody !== tryBody || (state.env !== env && depsChanged(state.env, env)))
-		)
-			clearSignalRetryOwners(state);
+		supersedesInputs =
+			(state.branch === 2 || state.retrySignalOwners !== undefined) &&
+			(state.tryBody !== tryBody || (state.env !== env && depsChanged(state.env, env)));
+		if (state.retrySignalOwners !== undefined && supersedesInputs) clearSignalRetryOwners(state);
 		state.tryBody = tryBody;
 		state.catchBody = catchBody;
 		state.pendingBody = pendingBody;
@@ -36348,10 +36348,9 @@ export function tryBlock(
 		s.block!.extra = s.env;
 		renderBlock(s.block!);
 	} else if (s.branch === 2 && s.tryBlock && !s.tryBlock.disposed && s.hiddenDom) {
-		// Parent props can supersede the promise that originally hid this body.
-		// Retry the preserved tree now so already-ready replacement data reveals
-		// immediately and a different suspension refreshes the resume listener.
-		attemptHiddenReveal(s, undefined, 'parent');
+		// Changed parent inputs replace an uncommitted primary; unchanged inputs
+		// retry its preserved tree and native query owners without restarting them.
+		attemptHiddenReveal(s, undefined, supersedesInputs ? 'parent' : 'update');
 		// The fresh attempt may still be pending. Keep the already-mounted fallback
 		// block (and its local state/focus), but render it with the latest helper and
 		// captured environment so fallback text and actions cannot lag the request.

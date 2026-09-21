@@ -101,8 +101,8 @@ For multiple public entry points, map every subpath to its source entry:
 
 The consuming application must declare your package in its dependencies. Octane’s
 bundler integrations discover installed source packages that depend on or peer-depend
-on `octane`, follow their runtime dependencies recursively, and keep them in the
-compiler pipeline. Applications do not need package-specific build aliases or
+on `octane` (or, outside `node_modules`, set `octane.source`), follow their runtime
+dependencies recursively, and keep them in the compiler pipeline. Applications do not need package-specific build aliases or
 `node_modules` include rules.
 
 <h2 id="authoring-and-types">Authoring and types</h2>
@@ -142,6 +142,21 @@ dependency is enough. In particular, do not copy this setting from another bindi
 `hookSlots.manual` disables automatic hook slotting under those directories. It is only
 for a library that deliberately implements and verifies slot forwarding itself. Leaving
 it out is the correct default for normal `.ts` and `.js` custom hooks.
+
+`source` is the one marker a workspace or linked package may need. A repository that
+pins Octane once in a shared toolkit manifest and consumes it transitively can claim a
+package as Octane source without re-declaring a version range it does not own:
+
+```json
+{
+	"octane": {
+		"source": true
+	}
+}
+```
+
+It applies only to packages outside `node_modules`; a published package installed under
+`node_modules` is recognized by its declared `octane` dependency as before.
 
 The Vite-specific `octane.vite.optimizeDeps.exclude` metadata is similarly narrow: use
 it only when an identity-sensitive dependency must stay outside Vite’s dependency

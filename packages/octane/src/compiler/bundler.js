@@ -146,13 +146,34 @@ export function resolveOctaneRuntimeRequest(request, environment) {
 		: OCTANE_RUNTIME_REQUESTS[environment];
 }
 
-function packageUsesOctane(pkg) {
+function packageDeclaresOctane(pkg) {
 	return (
 		pkg.name === 'octane' ||
 		['dependencies', 'optionalDependencies', 'peerDependencies'].some(
 			(field) => typeof pkg[field]?.octane === 'string',
 		)
 	);
+}
+
+/**
+ * Does this package compile as Octane source?
+ *
+ * A declared `octane` dependency is the fast path and the only signal accepted
+ * for an installed package, whose real path lies under `node_modules`, where a
+ * hoisted copy of Octane says nothing about the package's own intent.
+ *
+ * A workspace or linked package outside `node_modules` may instead set
+ * `octane.source` in its manifest. Such a repository pins Octane once in a
+ * shared toolkit manifest and receives it transitively, so a version range in
+ * every consumer was a compiler marker for a dependency the consumer does not
+ * own the version of. The marker carries no version and stays an explicit
+ * per-package decision, which is what exempts these packages from the
+ * requireDirective ownership gate.
+ */
+function packageUsesOctane(pkg, dir) {
+	if (packageDeclaresOctane(pkg)) return true;
+	if (pkg.octane?.source !== true) return false;
+	return !/(?:^|[\\/])node_modules(?:[\\/]|$)/.test(realPathOrSelf(dir));
 }
 
 function packageViteOptimizeDepsExclusions(pkg) {
@@ -206,6 +227,14 @@ function resolveInstalledPackageManifest(name, issuerRoot, collected) {
 		const parent = nodePath.dirname(candidateRoot);
 		if (parent === candidateRoot) return null;
 		candidateRoot = parent;
+	}
+}
+
+function realPathOrSelf(dir) {
+	try {
+		return nodeFs.realpathSync(dir);
+	} catch {
+		return nodePath.resolve(dir);
 	}
 }
 
@@ -607,6 +636,7 @@ class OctaneBundlerCompiler {
 		let result;
 		if (pkg !== null) {
 			const manual = pkg.octane?.hookSlots?.manual;
+			const usesOctane = packageUsesOctane(pkg, dir);
 			result = {
 				rule: {
 					name: typeof pkg.name === 'string' ? pkg.name : null,
@@ -617,7 +647,7 @@ class OctaneBundlerCompiler {
 						...Object.keys(pkg.optionalDependencies ?? {}),
 					],
 					viteOptimizeDepsExclusions: packageViteOptimizeDepsExclusions(pkg),
-					usesOctane: packageUsesOctane(pkg),
+					usesOctane,
 				},
 				...metadata([manifest]),
 			};
@@ -725,8 +755,10 @@ class OctaneBundlerCompiler {
 	 * the plain `.ts`/`.js` hook-slotting branch of `transform` applies the same
 	 * pragma rule inline.
 	 * Two carve-outs: installed and linked packages are exempt (their
-	 * manifest `usesOctane` rule is already the explicit per-package
-	 * decision), and `exclude` path fragments are never Octane's — tsrx
+	 * manifest `usesOctane` rule — a declared `octane` dependency, or
+	 * `octane.source` for a package outside `node_modules` — is already the
+	 * explicit per-package decision), and `exclude` path fragments are never
+	 * Octane's — tsrx
 	 * syntax can target other renderers (e.g. `@tsrx/react`), so a project
 	 * routing part of its `.tsrx` through a different tsrx compiler lists
 	 * those paths in `exclude`, and the exclusion wins even over an
