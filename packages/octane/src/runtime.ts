@@ -35642,7 +35642,8 @@ interface TrySlot {
 	parentBlock: Block;
 	/**
 	 * useId state shared by every arm. Streamed boundaries replace the inherited
-	 * root state with an opaque boundary namespace during hydration.
+	 * root state with an opaque boundary namespace during hydration, preserving
+	 * the inherited signal namespace independently of the DOM ID prefix.
 	 */
 	idState: RootIdState;
 	/** Logical boundary above a selected hydration-container owner. */
@@ -36449,6 +36450,7 @@ function takeInitialSuspenseHydration(
 			prefix: state.parentBlock.idState.prefix + 'b' + boundaryId + '-',
 			next: 0,
 			renderOwner: state.parentBlock.idState.renderOwner,
+			signalState: state.parentBlock.idState.signalState,
 		};
 		return {
 			metadata: [marker as ChildNode],
@@ -36738,6 +36740,7 @@ function mountTry(state: TrySlot): void {
 			prefix: state.parentBlock.idState.prefix + 'b' + streamedBoundaryId + '-',
 			next: 0,
 			renderOwner: state.parentBlock.idState.renderOwner,
+			signalState: state.parentBlock.idState.signalState,
 		};
 	}
 	const freshIds = takeNativeFreshArm(hydration, adoptCursor, state.end, state.idState);
