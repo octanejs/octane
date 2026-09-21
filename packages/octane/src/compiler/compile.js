@@ -93,6 +93,7 @@ import {
 import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
+import { analyzeStyleCorrectness } from './style-correctness.js';
 import { assertStrongMode } from './strong-mode.js';
 import { applyStrongAutomaticMemo } from './strong-auto-memo.js';
 import {
@@ -9143,7 +9144,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, strong?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, dataCallbackHooks?: readonly string[], valdiWriterFacts?: import('./compile-valdi.js').ValdiWriterFacts, textTypeFacts?: { version: 1, filename: string, sourceVersion: string, projectVersion: string, stringChildRanges: readonly (readonly [number, number])[], primitiveTextChildRanges?: readonly (readonly [number, number])[] }, renderer?: { id: string, module: string, target: 'dom' | 'universal' | 'valdi', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal' | 'valdi', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, strong?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, dataCallbackHooks?: readonly string[], valdiWriterFacts?: import('./compile-valdi.js').ValdiWriterFacts, textTypeFacts?: { version: 1, filename: string, sourceVersion: string, projectVersion: string, stringChildRanges: readonly (readonly [number, number])[], primitiveTextChildRanges?: readonly (readonly [number, number])[] }, renderer?: { id: string, module: string, target: 'dom' | 'universal' | 'valdi', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal' | 'valdi', server?: string }>>, clientOnlyImports?: readonly unknown[], styleCorrectness?: boolean, __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -9537,6 +9538,10 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	assertNoLegacyContextProviders(analyzedAst, source, cleanFilename);
 	options = nativeReadOptions(analyzedAst, options);
 	assertNativeReadDiagnostics(analyzedAst, source, cleanFilename, options);
+	// CSS correctness (U2) runs on the adopted authored AST, before the
+	// copy-on-write lowering chain; it prunes on analyzer-owned clones so the
+	// frozen parser AST is never mutated and codegen output is unchanged.
+	const styleDiagnostics = analyzeStyleCorrectness(analyzedAst, source, cleanFilename, options);
 	const strongAnalysis = assertStrongMode(analyzedAst, source, cleanFilename, options);
 	const strongModeEnabled = strongAnalysis?.enabled === true;
 	analyzedAst = markKnownAttributeSpreads(analyzedAst, options?.knownAttributeSpreads);
@@ -9654,6 +9659,11 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	);
 	if (strongAnalysis?.diagnostics.length > 0) {
 		result.diagnostics = [...strongAnalysis.diagnostics, ...(result.diagnostics ?? [])];
+	}
+	if (styleDiagnostics.length > 0) {
+		result.diagnostics = [...(result.diagnostics ?? []), ...styleDiagnostics].sort(
+			(a, b) => a.start.offset - b.start.offset,
+		);
 	}
 	if (bindingConstants !== undefined) result.bindingConstants = bindingConstants;
 	return result;

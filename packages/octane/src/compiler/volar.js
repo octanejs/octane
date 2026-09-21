@@ -37,6 +37,7 @@ import { buildFatSegments, decodeSourceMappings } from './fat-segments.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { analyzeStrongMode } from './strong-mode.js';
 import { analyzeNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
+import { analyzeStyleCorrectness } from './style-correctness.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
 import { inheritHookMemoOrigin } from './inline-hook-memo.js';
 import { lowerNativeAttributeReads } from './native-attribute-reads.js';
@@ -514,6 +515,11 @@ export function compileToVolarMappings(source, filename, options) {
 		}),
 	);
 	diagnostics.push(...nativeReadDiagnostics);
+	// U2 CSS correctness: same analyzer, same collected diagnostics as
+	// compile(); error-severity findings are promoted to `errors` below so the
+	// editor reports build-breaking problems identically.
+	const styleDiagnostics = analyzeStyleCorrectness(ast, source, filename, options);
+	diagnostics.push(...styleDiagnostics);
 	// The renderer pragma belongs to the semantic comment set consumed by
 	// @tsrx/core's type-only Program print. This keeps code and mappings in one
 	// coordinate system instead of prepending text and shifting every mapping.
@@ -581,8 +587,16 @@ export function compileToVolarMappings(source, filename, options) {
 			comments: printComments,
 		},
 	);
-	if (strongDiagnostics !== null || nativeReadDiagnostics.length > 0) {
-		for (const diagnostic of [...(strongDiagnostics ?? []), ...nativeReadDiagnostics]) {
+	if (
+		strongDiagnostics !== null ||
+		nativeReadDiagnostics.length > 0 ||
+		styleDiagnostics.length > 0
+	) {
+		for (const diagnostic of [
+			...(strongDiagnostics ?? []),
+			...nativeReadDiagnostics,
+			...styleDiagnostics,
+		]) {
 			if (diagnostic.severity !== 'error') continue;
 			collectCompileError(
 				diagnostic.message,
