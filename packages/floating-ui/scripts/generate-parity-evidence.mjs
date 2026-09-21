@@ -413,6 +413,12 @@ const typeParity = {
 
 const ordinaryClassifications = [
 	{
+		path: 'packages/floating-ui/tests/auto-update.test.ts',
+		disposition: 'octane-only-framework-contract',
+		reason:
+			'Authored autoUpdate adapter coverage for synchronous initial positioning, deferred element resizes, options, virtual references, animation-frame tracking, and cleanup.',
+	},
+	{
 		path: 'packages/floating-ui/tests/browser/positioning.browser.test.ts',
 		disposition: 'octane-only-framework-contract',
 		reason:
@@ -730,7 +736,21 @@ const manifest = {
 						fullName:
 							'@octanejs/floating-ui real-browser positioning uses real layout geometry and auto-updates after the reference moves',
 					},
+					{
+						id: 'browser:floating-ui-resize-state',
+						testName: 'settles resize-driven state updates without undelivered observation errors',
+						fullName:
+							'@octanejs/floating-ui real-browser positioning settles resize-driven state updates without undelivered observation errors',
+					},
+					{
+						id: 'browser:floating-ui-resize-size-middleware',
+						testName: 'settles size middleware after reference and floating geometry change',
+						fullName:
+							'@octanejs/floating-ui real-browser positioning settles size middleware after reference and floating geometry change',
+					},
 				]),
+				evidenceFile('packages/floating-ui/tests/browser/harness/main.tsrx'),
+				evidenceFile('packages/floating-ui/tests/browser/harness/index.html'),
 			],
 		},
 	],

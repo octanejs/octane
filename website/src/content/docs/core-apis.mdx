@@ -610,6 +610,66 @@ callback that an effect can call without reconnecting when its captures change. 
 wrapper identity is fresh on each render, but a wrapper registered by a committed effect
 always calls the latest committed body; do not add Effect Events to dependency arrays.
 
+<h3 id="createResizeObserver">
+	Measure resizes with <code>createResizeObserver</code>
+</h3>
+
+Use `createResizeObserver` from `octane` for resize callbacks that update state or
+write DOM that can affect the observed layout. It delivers native measurements in
+a separate task, after the browser's resize delivery loop has finished. This avoids
+`ResizeObserver loop completed with undelivered notifications` caused by publishing
+those measurements inside the loop, while ordinary state updates keep their
+microtask batching.
+
+Install the observer in an effect and disconnect it during cleanup:
+
+```tsrx
+import { createResizeObserver, useEffect, useRef, useState } from 'octane';
+
+export function MeasuredPanel() @{
+	const panelRef = useRef<HTMLDivElement | null>(null);
+	const [width, setWidth] = useState(0);
+
+	useEffect(() => {
+		const panel = panelRef.current;
+		if (!panel) return;
+		const observer = createResizeObserver((entries) => {
+			setWidth(entries[0].contentRect.width);
+		});
+		observer.observe(panel);
+		return () => observer.disconnect();
+	});
+
+	<div ref={panelRef} style={{ width: '100%' }}>
+		Width:
+		{String(width) as string}px
+	</div>
+}
+```
+
+The return value is a native `ResizeObserver`. Its callback receives native entries
+and the observer, with the latest entry retained per target when notifications are
+coalesced. Call the returned instance's `unobserve` or `disconnect` to discard
+pending entries during cleanup; changing a target's box option also discards its
+queued entry. The observer can be reused after disconnect. Pass an owning window's
+constructor as the second argument when needed, for example
+`createResizeObserver(callback, iframe.contentWindow.ResizeObserver)`.
+
+If the first measurement must happen before paint, measure synchronously in
+`useLayoutEffect` before installing the observer. Effects do not run during SSR,
+and importing the helper does not initialize browser resources. The helper uses
+the native observer available in that window; it does not polyfill missing
+`ResizeObserver` support.
+
+Deferral does not make a cyclic resize calculation converge. Observers inside
+unmodified dependencies still need an adapter; the global constructor is unchanged.
+
+This recommendation is specific to resize delivery. `IntersectionObserver` already
+delivers callbacks in a separate task. `MutationObserver` delivers in a microtask;
+keep its native ordering and guard callbacks against reacting to their own writes
+by narrowing observations and skipping unchanged updates. Consider task deferral
+only for a reproduced feedback problem, since it does not make a cycle converge.
+
 <h2 id="async-ui">Loading data and code</h2>
 
 The `use` API reads a Promise during rendering. While it is pending, the closest
@@ -1392,6 +1452,10 @@ handlers; return here when you have a specific problem to solve.
 			<li>
 				<code>useLayoutEffect</code>
 				<span>Measure or adjust layout before paint.</span>
+			</li>
+			<li>
+				<code>createResizeObserver</code>
+				<span>Publish resize measurements outside the browser's delivery loop.</span>
 			</li>
 			<li>
 				<code>useInsertionEffect</code>

@@ -45,7 +45,7 @@ export const TabsList = function TabsList(
 			return undefined;
 		}
 
-		const resizeObserver = new ResizeObserver(() => {
+		const resizeObserver = React.createResizeObserver(() => {
 			indicatorUpdateListenersRef.current.forEach((listener) => {
 				listener();
 			});

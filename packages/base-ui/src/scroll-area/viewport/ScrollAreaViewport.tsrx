@@ -313,7 +313,7 @@ export const ScrollAreaViewport = function ScrollAreaViewport(
 		}
 
 		let hasInitialized = false;
-		const resizeObserver = new ResizeObserver(() => {
+		const resizeObserver = React.createResizeObserver(() => {
 			// Avoid duplicate mount-time recompute when observer data matches what the mount
 			// scheduling pass already measured. If dimensions changed before the first observer
 			// delivery, keep the recompute so overflow transitions stay in sync.

@@ -266,6 +266,20 @@ The useful transition behavior remains: when a slower replacement suspends, the
 current screen can stay visible and `isPending` can explain the wait. `flushSync`
 drains the full update queue, while passive effects still run after paint.
 
+For resize callbacks that update state or write DOM that can resize observed
+elements, use [createResizeObserver](/docs/core-apis#createResizeObserver) from
+`octane`. Native observer callbacks run inside the browser's resize delivery loop,
+where a microtask commit that changes an observed size can report
+`ResizeObserver loop completed with undelivered notifications`, even if the layout
+eventually settles. `startTransition` does not move that commit out of the loop.
+
+The helper returns a native observer and delivers coalesced measurements in a
+separate task. Use its instance methods for observation and cleanup so unobserve
+and disconnect discard pending entries. Initial measurement can remain synchronous
+in a layout effect. Ordinary microtask batching and the global constructor stay
+unchanged; observers inside unmodified dependencies still need an adapter, and a
+cyclic resize calculation must still be fixed.
+
 Octane always applies its compiler transform for avoidable `use()` waterfalls.
 Requests it can prove independent can start together; a request that needs an
 earlier result remains sequential:

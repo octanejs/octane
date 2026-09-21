@@ -142,10 +142,19 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'strong-mode', title: 'Enforce render snapshots with Strong mode', level: 3 },
 			{ id: 'lists-and-conditions', title: 'Lists and conditions' },
 			{ id: 'context', title: 'Sharing data with context' },
-			{ id: 'refs-and-effects', title: 'Refs and effects' },
+			{
+				id: 'refs-and-effects',
+				title: 'Refs and effects',
+				searchTerms: ['createResizeObserver', 'ResizeObserver', 'resize', 'measure', 'layout'],
+			},
 			{
 				id: 'use-sync-external-store',
 				title: 'Subscribe to external state with useSyncExternalStore',
+				level: 3,
+			},
+			{
+				id: 'createResizeObserver',
+				title: 'Measure resizes with createResizeObserver',
 				level: 3,
 			},
 			{ id: 'async-ui', title: 'Loading data and code' },

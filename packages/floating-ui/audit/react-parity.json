@@ -292,7 +292,7 @@
         {
           "path": "packages/floating-ui/scripts/generate-parity-evidence.mjs",
           "role": "support",
-          "sha256": "eca41d24d80cbc572c607b94a2fc32295bcf96ab813b4876cff0eba637b5d12a"
+          "sha256": "cd7f0542f711ca695d00f27f2060309b0582618a98520d92ed1b4a6176875d6a"
         },
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react-dom/index.test-d.tsx.patch",
@@ -313,6 +313,11 @@
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/FloatingFocusManager.test.tsx.patch",
           "role": "support",
           "sha256": "e07c042816362682f9eeb0ad6d45a4e222c6280ac60968fe2ef813cc12a11201"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/FloatingList.test.tsx.patch",
+          "role": "support",
+          "sha256": "7a59583d38f95671d5560a3bbda61932d140fb813a839344434a3228323fb786"
         },
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/NextFloatingDelayGroup.test.tsx.patch",
@@ -340,6 +345,11 @@
           "sha256": "785f0e66161b3e45b4a0825751be6ba6e19c1426f3c00ef81cbf6c30a3ac0b7e"
         },
         {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/ListboxFocus.tsx.patch",
+          "role": "support",
+          "sha256": "ea71186a060b56bad7cef5fe28d9a1dc5fc370005193e9729fe52c7d26707c26"
+        },
+        {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/Menu.tsx.patch",
           "role": "support",
           "sha256": "32807451729ae47fdb29bcdaba24f4e5556b6e95cd4ecc34cbeeeb5c30e7e195"
@@ -358,6 +368,16 @@
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/Navigation.tsx.patch",
           "role": "support",
           "sha256": "a909c48e5e4ed5e91a450ecc5870635f908f6e913fd543ec9d29bd38eb2fd5c3"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/Omnibox.tsx.patch",
+          "role": "support",
+          "sha256": "a4b3920315864f201602cc3b7c3680d4ed2e55011c6ede1b6ba9d49a83998629"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/Select.tsx.patch",
+          "role": "support",
+          "sha256": "479b7f65a1539a49d26f5c9d7442da9f8e32c81df9d1240c9e6b6048c9d6d2bc"
         },
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/lib/Button.tsx.patch",
@@ -532,14 +552,34 @@
         {
           "path": "packages/floating-ui/tests/browser/positioning.browser.test.ts",
           "role": "test",
-          "sha256": "f421f0c201e6252212636f1f5668fd9e94582a2e696a5c2e037d41c11716cdd3",
+          "sha256": "f3b3a5aecfff7070399b461472483cea0d2da3b87d776cd1eaf10df78ecf3d4a",
           "cases": [
             {
               "id": "browser:floating-ui-real-layout",
               "testName": "uses real layout geometry and auto-updates after the reference moves",
               "fullName": "@octanejs/floating-ui real-browser positioning uses real layout geometry and auto-updates after the reference moves"
+            },
+            {
+              "id": "browser:floating-ui-resize-state",
+              "testName": "settles resize-driven state updates without undelivered observation errors",
+              "fullName": "@octanejs/floating-ui real-browser positioning settles resize-driven state updates without undelivered observation errors"
+            },
+            {
+              "id": "browser:floating-ui-resize-size-middleware",
+              "testName": "settles size middleware after reference and floating geometry change",
+              "fullName": "@octanejs/floating-ui real-browser positioning settles size middleware after reference and floating geometry change"
             }
           ]
+        },
+        {
+          "path": "packages/floating-ui/tests/browser/harness/main.tsrx",
+          "role": "support",
+          "sha256": "ef68dd96be946c6d27ac46057495600e52bfd8917adeca1d620117a08501f929"
+        },
+        {
+          "path": "packages/floating-ui/tests/browser/harness/index.html",
+          "role": "support",
+          "sha256": "5c4bf02833285eecda4511cd40dfac3751384941367cf6b124089d4e377dfd0b"
         }
       ]
     }

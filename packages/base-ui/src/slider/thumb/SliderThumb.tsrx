@@ -259,7 +259,7 @@ export const SliderThumb = function SliderThumb(
 			return undefined;
 		}
 
-		const resizeObserver = new ResizeObserverCtor(getInsetPosition);
+		const resizeObserver = React.createResizeObserver(getInsetPosition, ResizeObserverCtor);
 
 		resizeObserver.observe(control);
 		resizeObserver.observe(thumb);
