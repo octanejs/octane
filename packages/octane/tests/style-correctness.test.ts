@@ -121,7 +121,39 @@ describe('octane-css-shorthand-longhand-clash', () => {
 }`;
 		const found = octaneDiagnostics(source);
 		expect(found).toHaveLength(1);
-		expect(found[0].code).toBe(CLASH);
+		// Distinct classes only *may* co-match — markup could carry `a b` — so
+		// the pair is reported as a warning, not an error.
+		expect(found[0]).toMatchObject({ code: CLASH, severity: 'warning' });
+	});
+
+	it('errors when the same subject is redeclared across merged sheets', () => {
+		const source = `const theme = <style>
+  .a { border-top-color: red; }
+</style>;
+export function App() @{
+  <div>
+    <style apply={theme}>.a { border: 1px solid blue; }</style>
+    <span class="a">hi</span>
+  </div>
+}`;
+		const found = octaneDiagnostics(source);
+		expect(found).toHaveLength(1);
+		expect(found[0]).toMatchObject({ code: CLASH, severity: 'error' });
+	});
+
+	it('downgrades clashes split across a condition boundary to warning', () => {
+		const source = `export function App() @{
+  <div>
+    <style>
+      .a { border-top-color: red; }
+      @media (min-width: 600px) { .a { border: 1px solid blue; } }
+    </style>
+    <span class="a">hi</span>
+  </div>
+}`;
+		const found = octaneDiagnostics(source);
+		expect(found).toHaveLength(1);
+		expect(found[0]).toMatchObject({ code: CLASH, severity: 'warning' });
 	});
 
 	it('does not flag merged rules when the longhand wins by specificity', () => {
@@ -188,6 +220,90 @@ export function App() @{
   </div>
 }`;
 		expect(codes(source)).toEqual([CLASH]);
+	});
+
+	it('still flags a same-rule !important shorthand even though a longhand follows', () => {
+		// The restitute check must not count the losing declaration itself.
+		const source = `export function App() @{
+  <div>
+    <style>.a { border: 1px solid blue !important; border-top-color: red; }</style>
+    <span class="a">hi</span>
+  </div>
+}`;
+		const found = octaneDiagnostics(source);
+		expect(found).toHaveLength(1);
+		expect(found[0]).toMatchObject({ code: CLASH, severity: 'error' });
+	});
+
+	it('does not flag a shorthand whose own rule restates the longhand', () => {
+		// Reset-then-restitute: the :hover rule resets background-clip via the
+		// `background` shorthand but redeclares it immediately — nothing is lost.
+		const source = `export function App() @{
+  <div>
+    <style>
+      .thumb { background: rgba(0,0,0,0.2); background-clip: padding-box; }
+      .thumb:hover { background: rgba(0,0,0,0.4); background-clip: padding-box; }
+    </style>
+    <span class="thumb">hi</span>
+  </div>
+}`;
+		expect(codes(source)).toEqual([]);
+	});
+
+	it('does not flag declarations on different pseudo-elements', () => {
+		const source = `export function App() @{
+  <div>
+    <style>
+      .x::view-transition-group(hero) { animation-duration: 0.4s; }
+      .x::view-transition-old(.pop) { animation: pop 0.3s ease both; }
+    </style>
+    <span class="x">hi</span>
+  </div>
+}`;
+		expect(codes(source)).toEqual([]);
+	});
+
+	it('does not flag a pseudo-element box against its originating element', () => {
+		const source = `export function App() @{
+  <div>
+    <style>
+      .a::before { border-top-color: red; }
+      .a { border: 1px solid blue; }
+    </style>
+    <span class="a">hi</span>
+  </div>
+}`;
+		expect(codes(source)).toEqual([]);
+	});
+
+	it('does not flag same-name pseudo-elements with different qualifier args', () => {
+		// `::view-transition-old(.a)` and `::view-transition-old(.b)` are
+		// snapshots of different named transitions — distinct boxes.
+		const source = `export function App() @{
+  <div>
+    <style>
+      .x::view-transition-old(.a) { animation-duration: 0.4s; }
+      .x::view-transition-old(.b) { animation: pop 0.3s ease both; }
+    </style>
+    <span class="x">hi</span>
+  </div>
+}`;
+		expect(codes(source)).toEqual([]);
+	});
+
+	it('still flags identical pseudo-element subjects', () => {
+		const source = `export function App() @{
+  <div>
+    <style>
+      .a::before { border-top-color: red; }
+      .a::before { border: 1px solid blue; }
+    </style>
+    <span class="a">hi</span>
+  </div>
+}`;
+		const found = octaneDiagnostics(source);
+		expect(found).toHaveLength(1);
+		expect(found[0]).toMatchObject({ code: CLASH, severity: 'error' });
 	});
 });
 
@@ -318,7 +434,7 @@ describe('integration', () => {
 export function App() @{
   <div>
     <style apply={theme}>
-      .b { border: 1px solid blue; colorr: red; }
+      .a { border: 1px solid blue; colorr: red; }
       .gone { color: pink; }
     </style>
     <span class="a b">hi</span>

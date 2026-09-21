@@ -7,15 +7,20 @@
  *   in the `mdn-data` registry. Custom properties (`--*`) and vendor-prefixed
  *   names are exempt. Declarations that are at-rule descriptors (`@font-face`,
  *   `@property`, …) are not checked — they are not property declarations.
- * - `octane-css-shorthand-longhand-clash` (error): two declarations whose write
- *   sets overlap such that one declaration silently resets everything the
- *   other sets wherever both can apply to the same element — the merged-styles
- *   `border` vs `border-top-color` failure. Cascade direction is honored: the
- *   idiomatic longhand-after-shorthand refinement is not a clash, and
- *   specificity/`!important`/`@layer` differences decide the real winner rather
- *   than source order alone. Pairs are evaluated inside one block, between
- *   rules of one sheet, and across statically resolved same-module `apply`
- *   edges and nested scope chains.
+ * - `octane-css-shorthand-longhand-clash` (error when the co-match is
+ *   provable — equal or subsuming subjects in the same condition context —
+ *   warning otherwise): two declarations whose write sets overlap such that
+ *   one declaration silently resets everything the other sets wherever both
+ *   can apply to the same element — the merged-styles `border` vs
+ *   `border-top-color` failure. Cascade direction is honored: the idiomatic
+ *   longhand-after-shorthand refinement is not a clash, and
+ *   specificity/`!important`/`@layer` differences decide the real winner
+ *   rather than source order alone. Pairs are evaluated inside one block,
+ *   between rules of one sheet, and across statically resolved same-module
+ *   `apply` edges and nested scope chains. Speculative co-matches (distinct
+ *   classes that markup *could* combine) and pairs split across conditional
+ *   at-rules (`@media`/`@supports` resets are usually deliberate) downgrade
+ *   to warning.
  * - `octane-css-unused-selector` (warning): a selector `pruneCss` marks as
  *   matching no element in its scope — the compile-time surface for the
  *   `(unused)` comments render emits. `:global` selectors and blocks, theme
@@ -406,10 +411,10 @@ function deadRuleMap(clone) {
  * subjects contradict on tag, id, or a positive/negated name — combinators and
  * pseudo-states do not disprove co-matching.
  */
-function complexSelectorContexts(complexSelector, parentContexts) {
+function complexSelectorContexts(complexSelector, parentContexts, sheetSource) {
 	const last = complexSelector.children[complexSelector.children.length - 1];
 	const ownSpec = chainSpecificity(complexSelector.children);
-	const ownSubject = readSubject(last);
+	const ownSubject = readSubject(last, sheetSource);
 	const hasNesting = last?.selectors?.some((s) => s.type === 'NestingSelector') === true;
 	if (!parentContexts?.length) {
 		return [{ spec: ownSpec, subject: ownSubject }];
@@ -433,6 +438,7 @@ function emptySubject() {
 		negTypes: new Set(),
 		negIds: new Set(),
 		negClasses: new Set(),
+		pseudos: new Set(),
 	};
 }
 
@@ -444,14 +450,31 @@ function mergeSubject(a, b) {
 		negTypes: new Set([...a.negTypes, ...b.negTypes]),
 		negIds: new Set([...a.negIds, ...b.negIds]),
 		negClasses: new Set([...a.negClasses, ...b.negClasses]),
+		pseudos: new Set([...a.pseudos, ...b.pseudos]),
 	};
 }
 
-function readSubject(relativeSelector) {
+function readSubject(relativeSelector, sheetSource) {
 	const subject = emptySubject();
 	if (!relativeSelector) return subject;
 	for (const selector of relativeSelector.selectors ?? []) {
 		switch (selector.type) {
+			case 'PseudoElementSelector': {
+				// Distinct pseudo-elements are distinct boxes — `::before` never
+				// co-matches `::after`, and `::view-transition-old(.a)` never
+				// co-matches `::view-transition-old(.b)`. The AST drops the arg
+				// list, so recover it from the source span between this
+				// selector's end and the relative selector's end; a bare `*`
+				// (or no arg at all) is the universal key.
+				let arg = '';
+				if (sheetSource) {
+					const rest = sheetSource.slice(selector.end ?? 0, relativeSelector.end ?? 0);
+					const match = /^\s*\(([^)]*)\)/.exec(rest);
+					arg = match ? match[1].trim().replace(/\s+/g, ' ') : '';
+				}
+				subject.pseudos.add(`${selector.name}:${arg === '*' ? '' : arg}`);
+				break;
+			}
 			case 'TypeSelector':
 				if (selector.name !== '*') subject.types.add(selector.name.toLowerCase());
 				break;
@@ -465,7 +488,7 @@ function readSubject(relativeSelector) {
 				if (selector.name === 'global' && selector.args) {
 					for (const arg of selector.args.children ?? []) {
 						const inner = arg.children?.[arg.children.length - 1];
-						if (inner) mergeInto(subject, readSubject(inner));
+						if (inner) mergeInto(subject, readSubject(inner, sheetSource));
 					}
 				} else if (selector.name === 'not' && selector.args) {
 					for (const arg of selector.args.children ?? []) {
@@ -487,7 +510,7 @@ function readSubject(relativeSelector) {
 }
 
 function mergeInto(target, extra) {
-	for (const key of ['types', 'ids', 'classes', 'negTypes', 'negIds', 'negClasses']) {
+	for (const key of ['types', 'ids', 'classes', 'negTypes', 'negIds', 'negClasses', 'pseudos']) {
 		for (const value of extra[key]) target[key].add(value);
 	}
 }
@@ -506,7 +529,65 @@ function subjectsCanCoMatch(a, b) {
 	if (intersects(a.types, b.negTypes) || intersects(b.types, a.negTypes)) return false;
 	if (intersects(a.ids, b.negIds) || intersects(b.ids, a.negIds)) return false;
 	if (intersects(a.classes, b.negClasses) || intersects(b.classes, a.negClasses)) return false;
+	// A pseudo-element box and a real element (or two different pseudo boxes)
+	// are never the same node.
+	if ((a.pseudos.size === 0) !== (b.pseudos.size === 0)) return false;
+	if (a.pseudos.size > 0) {
+		const compatible = [...a.pseudos].some((pa) =>
+			[...b.pseudos].some((pb) => pseudosCompatible(pa, pb)),
+		);
+		if (!compatible) return false;
+	}
 	return true;
+}
+
+/**
+ * Two `name:arg` pseudo keys may select the same box: same name and equal
+ * args, or either arg universal (`::before`, `::part()`, `group(*)` key as
+ * `name:`). Different names or different specific args are distinct boxes.
+ */
+function pseudosCompatible(a, b) {
+	const [na, ...ra] = a.split(':');
+	const [nb, ...rb] = b.split(':');
+	const aa = ra.join(':');
+	const bb = rb.join(':');
+	return na === nb && (aa === bb || aa === '' || bb === '');
+}
+
+/** Every box matching `narrower`'s pseudo key also matches `wider`'s. */
+function pseudoCovers(narrower, wider) {
+	const [na, ...ra] = narrower.split(':');
+	const [nb, ...rb] = wider.split(':');
+	const aa = ra.join(':');
+	const bb = rb.join(':');
+	return na === nb && (bb === '' || aa === bb);
+}
+
+function subsetOf(a, b) {
+	return [...a].every((x) => b.has(x));
+}
+
+/** Every element matching `narrow` also matches `wide` (wide's constraints ⊆ narrow's). */
+function subjectSubsumes(narrow, wide) {
+	for (const key of ['types', 'ids', 'classes', 'negTypes', 'negIds', 'negClasses']) {
+		if (!subsetOf(wide[key], narrow[key])) return false;
+	}
+	// Pseudo keys are directional: `group:hero` is narrower than `group:`.
+	for (const wp of wide.pseudos) {
+		if (![...narrow.pseudos].some((np) => pseudoCovers(np, wp))) return false;
+	}
+	return true;
+}
+
+/**
+ * Provable co-match: the same element *always* receives both declarations —
+ * equal subjects, or one subject strictly narrowing the other (`.a` vs
+ * `div.a`, `.a` vs `.a:not(.b)`). Distinct classes (`.card` vs `.extra`) are
+ * only *possible* co-matches via markup composition (`class="card extra"`),
+ * which is reported at warning severity instead.
+ */
+function subjectsMustCoMatch(a, b) {
+	return subjectSubsumes(a, b) || subjectSubsumes(b, a);
 }
 
 /** Standard a/b/c specificity over one complex selector (authored form). */
@@ -596,32 +677,38 @@ const IMPORTANT = /!\s*important\s*$/i;
  */
 function collectDeclarations(sheet, deadRules) {
 	const entries = [];
-	const visit = (children, parentContexts, layerKey) => {
+	const visit = (children, parentContexts, layerKey, condKey) => {
 		for (const child of children ?? []) {
 			if (child?.type === 'Rule') {
 				const contexts = (child.prelude?.children ?? []).flatMap((cs) =>
-					complexSelectorContexts(cs, parentContexts),
+					complexSelectorContexts(cs, parentContexts, sheet?.source),
 				);
 				const dead = deadRules?.get(child.start) === true;
 				const nested = [];
 				for (const item of child.block?.children ?? []) {
 					if (item?.type === 'Declaration') {
-						entries.push({ node: item, contexts, dead, layerKey });
+						entries.push({ node: item, contexts, dead, layerKey, condKey, rule: child });
 					} else if (item?.type === 'Rule' || item?.type === 'Atrule') {
 						nested.push(item);
 					}
 				}
-				visit(nested, contexts, layerKey);
+				visit(nested, contexts, layerKey, condKey);
 			} else if (child?.type === 'Atrule') {
 				const name = (child.name ?? '').replace(/^-[a-z]+-/i, '').toLowerCase();
 				if (NON_RULE_ATRULES.has(name)) continue;
 				const innerKey =
 					name === 'layer' ? `${layerKey}|${(child.prelude ?? '').trim()}` : layerKey;
-				visit(child.block?.children, parentContexts, innerKey);
+				// Conditional at-rules (@media/@supports/@container…) gate the whole
+				// block: a pair split across different conditions only clashes when
+				// both conditions hold, which is usually deliberate — warning, not
+				// error.
+				const innerCond =
+					name === 'layer' ? condKey : `${condKey}|${name}:${(child.prelude ?? '').trim()}`;
+				visit(child.block?.children, parentContexts, innerKey, innerCond);
 			}
 		}
 	};
-	visit(sheet.children, null, '');
+	visit(sheet.children, null, '', '');
 	return entries;
 }
 
@@ -779,14 +866,34 @@ function evaluatePair(earlier, later, source, filename, diagnostics) {
 			}
 			const loser = winner === earlier ? later : earlier;
 			if (winner.prop !== loser.prop && coversWrites(winner, loser)) {
-				reportClash(winner, loser, source, filename, diagnostics);
+				// Reset-then-restitute is harmless: when the winning rule itself
+				// redeclares the losing property after the shorthand (`:hover {
+				// background: …; background-clip: padding-box; }`), nothing is
+				// silently lost where the winner applies.
+				const restated = (winner.rule?.block?.children ?? []).some(
+					(item) =>
+						item !== loser.node &&
+						item?.type === 'Declaration' &&
+						item.start > winner.node.start &&
+						item.property?.toLowerCase() === loser.prop &&
+						(!winner.important || IMPORTANT.test(item.value ?? '')),
+				);
+				if (restated) return;
+				reportClash(
+					winner,
+					loser,
+					subjectsMustCoMatch(s1.subject, s2.subject) && winner.condKey === loser.condKey,
+					source,
+					filename,
+					diagnostics,
+				);
 				return; // one diagnostic per declaration pair
 			}
 		}
 	}
 }
 
-function reportClash(winner, loser, source, filename, diagnostics) {
+function reportClash(winner, loser, provable, source, filename, diagnostics) {
 	const winnerRange = cssRange(
 		source,
 		winner.sheetStart,
@@ -796,14 +903,19 @@ function reportClash(winner, loser, source, filename, diagnostics) {
 	const loserRange = cssRange(source, loser.sheetStart, loser.node.start, loser.node.end);
 	diagnostics.push({
 		code: SHORTHAND_LONGHAND_CLASH,
-		severity: 'error',
+		severity: provable ? 'error' : 'warning',
 		filename,
 		start: winnerRange.start,
 		end: winnerRange.end,
 		message:
 			`[${SHORTHAND_LONGHAND_CLASH}] '${winner.node.property}' shadows '${loser.node.property}' ` +
-			`(line ${loserRange.start.line}) wherever both selectors match — the shorthand ` +
-			`resets every value '${loser.node.property}' sets. Remove it or narrow it to a longhand.`,
+			`(line ${loserRange.start.line})` +
+			(provable
+				? ` on every element both declarations reach — the shorthand ` +
+					`resets every value '${loser.node.property}' sets. Remove it or narrow it to a longhand.`
+				: ` wherever both selectors match — possible on elements carrying both ` +
+					`classes or under a matching condition. If intentional, suppress with ` +
+					`/* octane-ignore ${SHORTHAND_LONGHAND_CLASH} */.`),
 		suggestions: [{ ...loserRange, attribute: loser.node.property }],
 	});
 }

@@ -310,12 +310,16 @@ function compileWithTokenContract(
 	filename: string,
 	options: { resolveTokenContract?: ResolveTokenContract } & Record<string, unknown> = {},
 ) {
-	const result = compile(source, filename, options);
+	// The option is the spike's own input — since U10 shipped, compile() runs
+	// the real check itself when it sees resolveTokenContract, which would
+	// double-count against the spike collector this file exists to prove.
+	const { resolveTokenContract, ...compileOptions } = options;
+	const result = compile(source, filename, compileOptions);
 	const diagnostics = collectTokenDiagnostics(
 		parseModule(source, filename),
 		source,
 		filename,
-		options.resolveTokenContract,
+		resolveTokenContract,
 	);
 	return { ...result, diagnostics: [...result.diagnostics, ...diagnostics] };
 }

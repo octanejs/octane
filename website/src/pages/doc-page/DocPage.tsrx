@@ -299,7 +299,7 @@ export function DocPage() @{
 				border-radius: 0.9rem;
 				background: var(--surface-subtle);
 				color: var(--text);
-				text-decoration: none;
+				text-decoration-line: none;
 				transition:
 					background 0.15s,
 					border-color 0.15s,
@@ -372,12 +372,14 @@ export function DocPage() @{
 				margin: 0 0 0.85rem;
 				font-size: 1rem;
 			}
+			/* octane-ignore octane-css-shorthand-longhand-clash */
 			.prose :global(.api-index-card ul),
 			.prose :global(.doc-card ul) {
 				list-style: none;
 				margin: 0;
 				padding: 0;
 			}
+			/* octane-ignore octane-css-shorthand-longhand-clash */
 			.prose :global(.api-index-card li),
 			.prose :global(.doc-card li) {
 				display: block;
@@ -404,7 +406,7 @@ export function DocPage() @{
 			.prose :global(.doc-card li > a) {
 				display: inline-block;
 				margin: 0 0 0.2rem;
-				text-decoration: none;
+				text-decoration-line: none;
 			}
 			.prose :global(.api-index-card li > a code),
 			.prose :global(.doc-card li > a code) {
@@ -474,7 +476,7 @@ export function DocPage() @{
 				border-radius: 0.85rem;
 				background: var(--surface-subtle);
 				color: var(--text);
-				text-decoration: none;
+				text-decoration-line: none;
 			}
 			.doc-pagination :global(a.pagination-link:hover) {
 				border-color: rgba(255, 93, 114, 0.4);
