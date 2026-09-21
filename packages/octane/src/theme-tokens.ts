@@ -187,7 +187,9 @@ export function defineThemeTokens<const T extends TokenTree>(
 			}
 		}
 	}
-	const prefix = options?.prefix === undefined ? '' : `${options.prefix}-`;
+	// Empty prefix is unprefixed, not a literal '-' — the contract extractor in
+	// the compiler treats `prefix: ''` the same way, so names must agree.
+	const prefix = options?.prefix ? `${options.prefix}-` : '';
 	const baseSelector = options?.selector ?? ':root';
 
 	const refs = mapLeaves(tokens, [], (path, value) => {

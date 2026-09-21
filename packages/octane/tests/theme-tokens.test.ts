@@ -139,6 +139,14 @@ describe('defineThemeTokens', () => {
 		expect(tokens.css).toBe(':host {\n\t--app-accent-DEFAULT: blue;\n}\n');
 	});
 
+	it('treats an empty prefix as unprefixed, matching the contract extractor', () => {
+		// `prefix: ''` used to emit `---colors-bg` while the compiler read the
+		// same option as unprefixed — runtime names and enforced names disagreed.
+		const tokens = defineThemeTokens({ colors: { bg: '#fff' } }, { prefix: '' });
+		expect(tokens.colors.bg).toBe('var(--colors-bg, #fff)');
+		expect(tokens.vars.colors.bg).toBe('--colors-bg');
+	});
+
 	it('rejects contract violations at the typecheck gate (R3/R4)', () => {
 		expect(
 			tokenContractFixture(`import { defineThemeTokens } from '../src/theme-tokens.js';

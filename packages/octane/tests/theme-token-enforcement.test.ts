@@ -271,6 +271,36 @@ describe('createSyncTokenContractResolver', () => {
 		expect(resolver('./broken', importer)).toBeNull();
 	});
 
+	it('keeps scanning past a directory hit to the index file', () => {
+		// existsSync is true for `./tokens` when it is a directory; the resolution
+		// is only final once a candidate reads as a file (`./tokens/index.ts`).
+		// The resolver keeps `./` segments literal, so the stub matches on suffix.
+		const stub = createSyncTokenContractResolver({
+			existsSync: (p: string) => p.endsWith('/tokendir') || p.endsWith('/tokendir/index.ts'),
+			readFileSync: (p: string) => {
+				if (p.endsWith('/tokendir')) throw new Error('EISDIR');
+				return `import { defineThemeTokens } from 'octane/theme-tokens';
+export const tokens = defineThemeTokens({ colors: { bg: '#fff' } }, { prefix: 'app' });`;
+			},
+		});
+		expect(stub('./tokendir', importer)).toEqual({
+			namespace: '--app-',
+			names: ['--app-colors-bg'],
+		});
+	});
+
+	it('peels non-null assertions off the call and its options', () => {
+		const stub = createSyncTokenContractResolver({
+			existsSync: (p: string) => p.endsWith('/tokens.ts'),
+			readFileSync: () => `import { defineThemeTokens } from 'octane/theme-tokens';
+export const tokens = defineThemeTokens({ colors: { bg: '#fff' } }, { prefix: 'app' as const })!;`,
+		});
+		expect(stub('./tokens', importer)).toEqual({
+			namespace: '--app-',
+			names: ['--app-colors-bg'],
+		});
+	});
+
 	it('memoizes reads per resolved file', () => {
 		let reads = 0;
 		const counting = createSyncTokenContractResolver({

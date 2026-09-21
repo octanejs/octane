@@ -81,6 +81,7 @@ function unwrapTs(node) {
 		node?.type === 'TSAsExpression' ||
 		node?.type === 'TSSatisfiesExpression' ||
 		node?.type === 'TSTypeAssertion' ||
+		node?.type === 'TSNonNullExpression' ||
 		node?.type === 'ParenthesizedExpression'
 	) {
 		node = node.expression;
@@ -253,17 +254,21 @@ export function createSyncTokenContractResolver(fs) {
 	return function resolveTokenContract(request, importer) {
 		if (typeof request !== 'string' || !RELATIVE_REQUEST.test(request)) return undefined;
 		const base = `${dirname(importer)}/${request}`;
-		const file = CONTRACT_CANDIDATES(base).find((candidate) => fs.existsSync(candidate));
-		if (file === undefined) return undefined;
-		if (!cache.has(file)) {
+		for (const candidate of CONTRACT_CANDIDATES(base)) {
+			if (!fs.existsSync(candidate)) continue;
+			if (cache.has(candidate)) return cache.get(candidate);
 			let source;
 			try {
-				source = fs.readFileSync(file, 'utf8');
+				source = fs.readFileSync(candidate, 'utf8');
 			} catch {
-				source = null;
+				// existsSync is true for directories — an unreadable hit is a miss,
+				// not the resolved module (`./tokens/` then `./tokens/index.ts`).
+				continue;
 			}
-			cache.set(file, source === null ? undefined : readTokenContractModule(source, file));
+			const facts = readTokenContractModule(source, candidate);
+			cache.set(candidate, facts);
+			return facts;
 		}
-		return cache.get(file);
+		return undefined;
 	};
 }

@@ -566,8 +566,11 @@ export function health(): Response {
 /**
  * The reset every component relies on, taken from octanejs.dev so a scaffolded
  * app and the documentation look like one thing. The theme tokens it reads —
- * `var(--app-*)` — are declared by `src/tokens.ts` and emitted into the page
- * by the shell component's plain `<style>{tokens.css}</style>` element.
+ * `var(--app-*)` — are declared by `src/tokens.ts`, which is the source of
+ * truth: the shell component re-emits them with `<style>{tokens.css}</style>`,
+ * and the `:root`/`@media` blocks at the top of this sheet mirror that output
+ * so first paint resolves before JavaScript mounts (the SPA shell cannot
+ * deliver them earlier). Edit the tokens there and update this mirror.
  *
  * A stylesheet rather than a `<style>` in the shell. A `<style>` in a component
  * styles only the items beside it and everything below them — the compiler
@@ -582,7 +585,41 @@ export function health(): Response {
  * import is injected by JavaScript in dev, so the reset would arrive after the
  * server-rendered markup and the first paint would flash.
  */
-export const globalStyles = `/* color-scheme is a real property, not a custom property, so it stays in the
+export const globalStyles = `/* Mirror of the sheet src/tokens.ts emits as tokens.css — the linked file
+   reaches first paint before the JS-mounted <style> re-declares the same
+   custom properties. Keep it in sync when editing the contract. */
+:root {
+	--app-bg: #23272f;
+	--app-panel: #2b3138;
+	--app-text: #f4eee8;
+	--app-text-secondary: #99a1b3;
+	--app-accent: #ff415a;
+	--app-accent-hover: #ff5d72;
+	--app-accent-text: #ff5d72;
+	--app-on-accent: #16181d;
+	--app-border: rgba(255, 255, 255, 0.1);
+	--app-surface: rgba(255, 255, 255, 0.06);
+	--app-surface-subtle: rgba(255, 255, 255, 0.03);
+	--app-header-bg: rgba(35, 39, 47, 0.85);
+	--app-card-hover-border: rgba(255, 93, 114, 0.4);
+	--app-card-hover-bg: rgba(255, 65, 90, 0.07);
+}
+@media (prefers-color-scheme: light) {
+	:root {
+		--app-bg: #ffffff;
+		--app-panel: #f4f5f7;
+		--app-text: #1c2027;
+		--app-text-secondary: #5c6473;
+		--app-accent-hover: #c81e37;
+		--app-accent-text: #d81f38;
+		--app-on-accent: #ffffff;
+		--app-border: rgba(0, 0, 0, 0.12);
+		--app-surface: rgba(0, 0, 0, 0.04);
+		--app-surface-subtle: rgba(0, 0, 0, 0.025);
+		--app-header-bg: rgba(255, 255, 255, 0.85);
+	}
+}
+/* color-scheme is a real property, not a custom property, so it stays in the
    linked sheet rather than the token contract. octanejs.dev defaults to dark
    and offers a toggle; a scaffold has no toggle to offer, so it follows the
    operating system instead — the values on both sides are the site's own. */
