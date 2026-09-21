@@ -136,6 +136,9 @@ export default function octaneLoader(source, inputSourceMap) {
 				: { requireDirective: options.requireDirective }),
 			// Ownership diagnostics surface through Rspack's own module warnings.
 			warn: (message) => this.emitWarning?.(new Error(message)),
+			// Error-severity diagnostics fail the compilation without throwing —
+			// webpack/rspack collect emitError entries and fail the build.
+			error: (message) => this.emitError(new Error(message)),
 		});
 		const id = realModuleId(this.resource ?? this.resourcePath);
 		const authoredSource = String(source);

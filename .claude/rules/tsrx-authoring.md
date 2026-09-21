@@ -238,7 +238,8 @@ block outside every `@{ … }` or directive body),
 scoping rules do not allow it).
 
 Two gates check styling. The **compile gate** inspects the CSS and the class
-maps on the compile/analyze path:
+maps on the compile/analyze path — error-severity findings fail `vite build`,
+rspack/rsbuild, and `octane analyze`; warnings report but do not fail:
 
 - `octane-css-unknown-property` (error): a declaration property mdn-data does
   not know — vendor-prefixed and custom properties are fine.

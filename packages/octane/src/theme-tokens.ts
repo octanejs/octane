@@ -170,9 +170,23 @@ function emitBlock(selector: string, declarations: string, indent: string): stri
  * ```
  */
 export function defineThemeTokens<const T extends TokenTree>(
-	tokens: T,
+	// `raw`, `vars`, and `css` are reserved output fields — a group with one of
+	// those names would be silently overwritten by the emission artifacts, so
+	// the signature rejects it (`never` fails the property, not the whole call).
+	tokens: T & { readonly raw?: never; readonly vars?: never; readonly css?: never },
 	options?: ThemeTokensOptions<T>,
 ): ThemeTokens<T> {
+	if (process.env.NODE_ENV !== 'production') {
+		// The type gate above covers TypeScript callers; plain JS gets the same
+		// boundary as a warning instead of a silently shadowed token group.
+		for (const reserved of ['raw', 'vars', 'css'] as const) {
+			if (Object.hasOwn(tokens, reserved)) {
+				console.warn(
+					`defineThemeTokens: "${reserved}" is a reserved output field — rename that token group; its value is unreachable on the returned object`,
+				);
+			}
+		}
+	}
 	const prefix = options?.prefix === undefined ? '' : `${options.prefix}-`;
 	const baseSelector = options?.selector ?? ':root';
 

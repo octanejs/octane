@@ -82,6 +82,8 @@ defineThemeTokens(contract, {
 defineThemeTokens({ colors: { bg: true } });
 // @ts-expect-error an explicitly declared contract makes a missing token a type error (R3)
 defineThemeTokens<{ colors: { bg: string; fg: string } }>({ colors: { bg: '#fff' } });
+// @ts-expect-error `css` is a reserved output field — a group with that name would shadow the emitted sheet
+defineThemeTokens({ css: { bg: '#fff' } });
 
 describe('defineThemeTokens', () => {
 	it('maps every leaf to a var(--name, fallback) reference and exposes bare names via vars', () => {

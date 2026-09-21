@@ -22,6 +22,7 @@ import {
 	type CompileOptions,
 	type TokenContractFacts,
 } from '../src/compiler/index.js';
+import { createOctaneCompiler } from '../src/compiler/bundler.js';
 import { octane } from '../src/compiler/vite.js';
 
 const FILE = '/src/App.tsrx';
@@ -112,6 +113,18 @@ describe('octane-style-token-undeclared', () => {
 		const found = tokenDiagnostics(bad, { resolveTokenContract: forTokens(both()) });
 		expect(found).toHaveLength(1);
 		expect(found[0].message).toContain('--admin-colors-bgg');
+	});
+
+	it('claims a name by the longest matching namespace, not the first contract', () => {
+		// Nested prefixes: `--app-admin-x` belongs to the `--app-admin-` contract,
+		// not the coarser `--app-` one listed first — a false "undeclared" error
+		// here would break the build on a valid reference.
+		const nested = () => [
+			{ namespace: '--app-', names: ['--app-colors-fg'] },
+			{ namespace: '--app-admin-', names: ['--app-admin-colors-bg'] },
+		];
+		const source = consumer('.badge { background: var(--app-admin-colors-bg); }');
+		expect(tokenDiagnostics(source, { resolveTokenContract: forTokens(nested()) })).toEqual([]);
 	});
 
 	it('probes only authored value imports, not type-only or bare ones', () => {
@@ -321,12 +334,13 @@ describe('vite host plumbing', () => {
 		const plugin = octane({ hmr: false });
 		await (plugin.config as any)({ root: FIXTURE }, { command: 'build' });
 		await (plugin.configResolved as any)(pluginConfig);
-		const result = await (plugin.transform as any).call(context, BAD, importer, { ssr: false });
-		expect(typeof result?.code).toBe('string');
-		// The resolved contract file is watched so edits invalidate its facts.
+		// Error-severity diagnostics promote to a transform failure (KTD3), not a
+		// logger warning — the build fails on an undeclared token reference.
+		await expect(async () =>
+			(plugin.transform as any).call(context, BAD, importer, { ssr: false }),
+		).rejects.toThrow(UNDECLARED);
+		// The resolved contract file was watched before the compile threw.
 		expect(watched).toContain(join(FIXTURE, 'tokens.ts'));
-		// Diagnostics reach the host through the plugin's logger channel.
-		expect(warn.mock.calls.flat().map(String).join('\n')).toContain(UNDECLARED);
 	});
 
 	it('warns unresolved for a claimed contract that fails extraction', async () => {
@@ -351,5 +365,49 @@ describe('vite host plumbing', () => {
 		const result = await (plugin.transform as any).call(context, BAD, importer, { ssr: false });
 		expect(typeof result?.code).toBe('string');
 		expect(warn.mock.calls.flat().map(String).join('\n')).not.toContain('octane-style-token');
+	});
+});
+
+describe('bundler diagnostic promotion (KTD3)', () => {
+	// A provable same-subject clash is error-severity — no resolver needed.
+	const CLASH = `export function Badge() @{
+	<div>
+		<style>
+			.badge { border-top-color: red; border: 1px solid; }
+		</style>
+		<span class="badge">hi</span>
+	</div>
+}`;
+	const FILE_ID = '/project/src/Badge.tsrx';
+
+	it('throws on error diagnostics when the host wires no error channel', () => {
+		const compiler = createOctaneCompiler({ root: '/project' });
+		expect(() => compiler.transform(CLASH, FILE_ID, {})).toThrow(
+			'octane-css-shorthand-longhand-clash',
+		);
+	});
+
+	it('emits through the host error channel instead of throwing (emitError adapters)', () => {
+		const emitted: string[] = [];
+		const warned: string[] = [];
+		const compiler = createOctaneCompiler({
+			root: '/project',
+			error: (message: string) => emitted.push(message),
+			warn: (message: string) => warned.push(message),
+		});
+		const out = compiler.transform(CLASH, FILE_ID, {});
+		expect(typeof out?.code).toBe('string');
+		expect(emitted.join('\n')).toContain('octane-css-shorthand-longhand-clash');
+		expect(warned.join('\n')).not.toContain('octane-css-shorthand-longhand-clash');
+	});
+
+	it('rethrows the same diagnostic on a repeated transform (errors bypass dedup)', () => {
+		const compiler = createOctaneCompiler({ root: '/project' });
+		expect(() => compiler.transform(CLASH, FILE_ID, {})).toThrow(
+			'octane-css-shorthand-longhand-clash',
+		);
+		expect(() => compiler.transform(CLASH, FILE_ID, {})).toThrow(
+			'octane-css-shorthand-longhand-clash',
+		);
 	});
 });

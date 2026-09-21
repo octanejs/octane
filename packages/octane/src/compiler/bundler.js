@@ -552,6 +552,11 @@ class OctaneBundlerCompiler {
 			if (renderer.intrinsics !== undefined) this.pragmaOwnedModules.add(renderer.intrinsics);
 		}
 		this.warn = typeof options.warn === 'function' ? options.warn : null;
+		// Fatal-diagnostic channel (KTD3): error-severity collected diagnostics
+		// are contract violations, so they promote to build failures. Adapters
+		// that emit without throwing (Rspack's emitError) wire this; adapters
+		// without one get the thrown-Error fallback in _forwardCompileDiagnostics.
+		this.error = typeof options.error === 'function' ? options.error : null;
 		descriptorChildrenExportAuthorities.set(this, options._descriptorPreflightAuthority ?? null);
 		this.warnedOwnership = new Set();
 		this.warnedCompileDiagnostics = new Set();
@@ -776,12 +781,22 @@ class OctaneBundlerCompiler {
 	}
 
 	_forwardCompileDiagnostics(diagnostics) {
-		if (this.warn === null) return;
 		for (const diagnostic of diagnostics ?? []) {
+			const formatted = formatCompileDiagnostic(diagnostic);
+			// Errors bypass the dedup set: a rebuild of a still-broken module
+			// must fail again, not scroll past the already-reported key.
+			if (diagnostic.severity === 'error') {
+				if (this.error !== null) {
+					this.error(formatted);
+					continue;
+				}
+				throw new Error(formatted);
+			}
+			if (this.warn === null) continue;
 			const key = `${diagnostic.code}\0${diagnostic.filename}\0${diagnostic.start.offset}\0${diagnostic.end.offset}`;
 			if (this.warnedCompileDiagnostics.has(key)) continue;
 			this.warnedCompileDiagnostics.add(key);
-			this.warn(formatCompileDiagnostic(diagnostic));
+			this.warn(formatted);
 		}
 	}
 

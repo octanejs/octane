@@ -833,12 +833,20 @@ function checkClashes(source, filename, blocks, scopes, diagnostics) {
 			}
 			decls.push(...block.decls);
 		}
+		// ponytail: O(d²) pair scan per cascade context — a scope block holds
+		// tens of declarations, so this stays cheap. If a generated sheet ever
+		// reaches thousands, bucket decls by subject class before pairing.
 		for (let i = 0; i < decls.length; i++) {
 			const earlier = decls[i];
 			if (earlier.dead || earlier.prop.startsWith('--')) continue;
 			for (let j = i + 1; j < decls.length; j++) {
 				const later = decls[j];
 				if (later.dead || later.prop.startsWith('--') || earlier.prop === later.prop) continue;
+				// ponytail: cross-@layer pairs are skipped entirely — layer order is
+				// defined by statement position, which this pass does not track, so
+				// no winner can be picked (unlayered declarations actually beat all
+				// layered ones). Upgrade: record layer rank alongside layerKey and
+				// evaluate the pair under the winning layer's order.
 				if (earlier.layerKey !== later.layerKey) continue;
 				// Node starts are sheet-relative; file offsets make the pair unique.
 				const pairKey = `${earlier.sheetStart + earlier.node.start}:${later.sheetStart + later.node.start}`;
@@ -1259,7 +1267,17 @@ function checkTokenReferences(source, filename, block, contracts, diagnostics) {
 		const valueStart = block.sheetStart + decl.start + Math.max(localStart, 0);
 		for (const match of value.matchAll(TOKEN_REFERENCE_ALL)) {
 			const name = match[1];
-			const contract = contracts.find((candidate) => name.startsWith(candidate.namespace));
+			// The longest matching namespace owns the name: `--app-extra-` claims
+			// `--app-extra-x`, not a coarser `--app-` contract imported first.
+			let contract;
+			for (const candidate of contracts) {
+				if (
+					name.startsWith(candidate.namespace) &&
+					(contract === undefined || candidate.namespace.length > contract.namespace.length)
+				) {
+					contract = candidate;
+				}
+			}
 			if (contract === undefined || contract.names.has(name)) continue;
 			const start = valueStart + match.index + match[0].length - name.length;
 			const range = fileRange(source, start, start + name.length);

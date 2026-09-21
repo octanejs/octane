@@ -31,6 +31,8 @@ export interface CompileDiagnostic {
 	message: string;
 	/** The diagnostic code the failure was thrown with, e.g. `tsrx-style-*`. */
 	code?: string;
+	/** Collected diagnostics carry severity — `'error'` findings fail builds. */
+	severity?: string;
 	line?: number;
 	column?: number;
 	pos?: number;
