@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import semver from 'semver';
 import { confinedRepositoryPath, readRepositoryJson } from './repository-files.mjs';
 
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -79,16 +80,25 @@ const OCTANE_CURRENT_CORE_CONSUMERS = new Set([
 	'@octanejs/vite-plugin',
 ]);
 
-export function octanePeerRangeFor(packageName) {
+export function octanePeerRangeFor(packageName, octaneVersion) {
 	if (OCTANE_CURRENT_CORE_CONSUMERS.has(packageName)) return 'workspace:^';
-	if (OCTANE_037_CONSUMERS.has(packageName)) return 'workspace:^0.3.7';
-	return OCTANE_025_CONSUMERS.has(packageName)
-		? 'workspace:^0.2.5 || ^0.3.0'
-		: OCTANE_BETA_PEER_RANGE;
+	const historicalRange = OCTANE_037_CONSUMERS.has(packageName)
+		? 'workspace:^0.3.7'
+		: OCTANE_025_CONSUMERS.has(packageName)
+			? 'workspace:^0.2.5 || ^0.3.0'
+			: OCTANE_BETA_PEER_RANGE;
+	// Changesets replaces an out-of-range peer with the next core caret range.
+	// Keep existing compatibility floors until that transition, then follow the
+	// released compatibility line (not every patch), just as Changesets does.
+	if (octaneVersion && semver.gtr(octaneVersion, historicalRange.replace('workspace:', ''))) {
+		const { major, minor, patch } = semver.parse(octaneVersion);
+		return `workspace:^${major}.${major === 0 ? minor : 0}.${major === 0 && minor === 0 ? patch : 0}`;
+	}
+	return historicalRange;
 }
 
 export function publishedOctanePeerRangeFor(packageName, octaneVersion) {
-	const range = octanePeerRangeFor(packageName).replace(/^workspace:/, '');
+	const range = octanePeerRangeFor(packageName, octaneVersion).replace(/^workspace:/, '');
 	return range === '^' ? `^${octaneVersion}` : range;
 }
 
@@ -424,6 +434,7 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 	const errors = [];
 	const names = new Set();
 	const workspaceNames = new Set(packages.map((pkg) => pkg.name).filter(Boolean));
+	const octaneVersion = packages.find((pkg) => pkg.name === 'octane')?.version;
 	const rootManifest = readJson(path.join(REPO_ROOT, 'package.json'));
 	if (rootManifest.engines?.node !== '>=22.22.2') {
 		errors.push('root package.json must declare engines.node ">=22.22.2"');
@@ -484,7 +495,7 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 		}
 
 		const octanePeerRange = pkg.manifest.peerDependencies?.octane;
-		const expectedOctanePeerRange = octanePeerRangeFor(pkg.name);
+		const expectedOctanePeerRange = octanePeerRangeFor(pkg.name, octaneVersion);
 		if (octanePeerRange !== undefined && octanePeerRange !== expectedOctanePeerRange) {
 			errors.push(
 				`${label} peerDependencies.octane must be ${JSON.stringify(expectedOctanePeerRange)} (received ${JSON.stringify(octanePeerRange)})`,

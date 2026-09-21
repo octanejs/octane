@@ -405,6 +405,35 @@ describe('package and closure completion', () => {
 			expectedNoticeHashes: [sha256('Fixture attribution\n')],
 		});
 		assert.equal(result.status, 'passed', result.issues.join('\n'));
+		const originalManifest = await readFile(path.join(packageDirectory, 'package.json'), 'utf8');
+		await mkdir(path.join(root, 'packages/octane'));
+		await writeFile(
+			path.join(root, 'packages/octane/package.json'),
+			JSON.stringify({ name: 'octane', version: '0.4.2' }),
+		);
+		const inspectPeer = () =>
+			inspectBindingPackage(packageDirectory, {
+				expectedPackageName: '@octanejs/widget',
+				expectedDirectory: 'packages/widget',
+				identity: { packageName: 'widget', version: '1.0.0', commit: 'a'.repeat(40) },
+				expectedLicenseHashes: [sha256(MIT_TEXT)],
+				expectedNoticeHashes: [sha256('Fixture attribution\n')],
+			});
+		assert.match(inspectPeer().issues.join('\n'), /octane peer must be workspace:\^0\.4\.0/);
+		await writeFile(
+			path.join(packageDirectory, 'package.json'),
+			JSON.stringify({
+				...JSON.parse(originalManifest),
+				peerDependencies: { octane: 'workspace:^0.4.0' },
+			}),
+		);
+		const released = inspectPeer();
+		assert.equal(released.status, 'passed', released.issues.join('\n'));
+		await writeFile(path.join(packageDirectory, 'package.json'), originalManifest);
+		await writeFile(
+			path.join(root, 'packages/octane/package.json'),
+			JSON.stringify({ name: 'octane', version: '0.3.6' }),
+		);
 		await unlink(path.join(packageDirectory, 'tests/widget.test.ts'));
 		await writeFile(
 			path.join(packageDirectory, 'src/widget.spec.ts'),
