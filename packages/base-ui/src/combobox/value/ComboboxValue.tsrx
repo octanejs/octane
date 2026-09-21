@@ -26,7 +26,7 @@ export function ComboboxValue(props: ComboboxValue.Props): React.ReactElement {
 	const shouldCheckNullItemLabel = !hasSelectedValue && placeholder != null && childrenProp == null;
 	const hasNullLabel = store.useState('hasNullItemLabel', shouldCheckNullItemLabel);
 
-	let children = null;
+	let children: React.OctaneNode = null;
 	if (typeof childrenProp === 'function' && !React.isChildrenBlock(childrenProp)) {
 		children = childrenProp(selectedValue);
 	} else if (childrenProp != null) {

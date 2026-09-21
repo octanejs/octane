@@ -375,7 +375,7 @@ export const SliderThumb = function SliderThumb(
 					event.stopPropagation();
 				}
 
-				let newValue = null;
+				let newValue: number | null = null;
 				let direction = 0;
 				let increment = event.shiftKey ? largeStep : step;
 				const roundedValue = roundValueToStep(thumbValue, step, min);
