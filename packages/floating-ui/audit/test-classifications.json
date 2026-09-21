@@ -12,6 +12,11 @@
       "oracle": "Runs the one-for-one adapted suite with the pinned Vitest 3.0.9 toolchain and checks all 301 registered identities."
     },
     {
+      "path": "packages/floating-ui/tests/auto-update.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authored autoUpdate adapter coverage for synchronous initial positioning, deferred element resizes, options, virtual references, animation-frame tracking, and cleanup."
+    },
+    {
       "path": "packages/floating-ui/tests/browser/positioning.browser.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Real-Chromium positioning and autoUpdate observation for the Octane binding; supplemental environment evidence, not an upstream-suite identity."

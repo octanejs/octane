@@ -9,7 +9,6 @@
 // Agnostic positioning core, re-exported from @floating-ui/dom.
 export {
 	autoPlacement,
-	autoUpdate,
 	computePosition,
 	detectOverflow,
 	flip,
@@ -22,6 +21,7 @@ export {
 	shift,
 	size,
 } from '@floating-ui/dom';
+export { autoUpdate } from './autoUpdate';
 
 // Positioning types, re-exported from @floating-ui/dom (mirrors upstream
 // @floating-ui/react's type re-export surface).

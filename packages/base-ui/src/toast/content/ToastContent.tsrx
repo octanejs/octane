@@ -31,7 +31,7 @@ export const ToastContent = function ToastContent(
 			return undefined;
 		}
 
-		const resizeObserver = new ResizeObserver(() => recalculateHeight(true));
+		const resizeObserver = React.createResizeObserver(() => recalculateHeight(true));
 		const mutationObserver = new MutationObserver(() => recalculateHeight(true));
 
 		resizeObserver.observe(node);

@@ -65,4 +65,36 @@ describe('@octanejs/floating-ui real-browser positioning', () => {
 		});
 		await expect.poll(async () => (await floating.boundingBox())?.x).toBeCloseTo(180, 0);
 	});
+
+	// @parity-case browser:floating-ui-resize-state
+	it('settles resize-driven state updates without undelivered observation errors', async () => {
+		await expect.poll(() => page.locator('#resize-measured').textContent()).toBe('100');
+		await page.locator('#resize-start').click();
+		await expect.poll(() => page.locator('#resize-measured').textContent()).toBe('200');
+		expect((await page.locator('#resize-reference').boundingBox())?.width).toBe(200);
+		expect(
+			await page.evaluate(() => (window as unknown as { resizeErrors: string[] }).resizeErrors),
+		).toEqual([]);
+	});
+
+	// @parity-case browser:floating-ui-resize-size-middleware
+	it('settles size middleware after reference and floating geometry change', async () => {
+		const floating = page.locator('#middleware-floating');
+		await expect.poll(async () => (await floating.boundingBox())?.width).toBe(100);
+		await page.locator('#middleware-resize').click();
+		await expect.poll(async () => (await floating.boundingBox())?.width).toBe(180);
+		await page.evaluate(
+			() =>
+				new Promise<void>((resolve) => {
+					requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+				}),
+		);
+		await floating.evaluate((element) => {
+			(element as HTMLElement).style.width = '240px';
+		});
+		await expect.poll(async () => (await floating.boundingBox())?.width).toBe(180);
+		expect(
+			await page.evaluate(() => (window as unknown as { resizeErrors: string[] }).resizeErrors),
+		).toEqual([]);
+	});
 });
