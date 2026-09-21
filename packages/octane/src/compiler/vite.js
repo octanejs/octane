@@ -931,7 +931,7 @@ export function octane(options = {}) {
 			const runtimeRequest = compiler.resolveRuntimeRequest(source, 'server');
 			if (runtimeRequest === null || runtimeRequest === source) return null;
 			const resolved = await this.resolve(runtimeRequest, importer, { skipSelf: true });
-			return resolved?.id ?? null;
+			return resolved ?? null;
 		},
 		transform(code, id, transformOptions) {
 			const server =
