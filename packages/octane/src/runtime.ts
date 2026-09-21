@@ -454,6 +454,19 @@ export interface Scope {
 	/** Lazy compiler-owned memo regions, independent of the dense DOM/control slots. */
 	compilerMemo: CompilerMemoRegion | null;
 	/**
+	 * Signal-instance key recipe, split across fields so stamping a scope costs
+	 * five stores instead of a record allocation plus a WeakMap entry. Last
+	 * writer wins: a recipe stamp clears `signalInstanceResolved`, and a direct
+	 * resolved-key stamp leaves the recipe fields alone (the resolved check runs
+	 * first). A scope is unstamped iff `signalInstanceParent === null` and
+	 * `signalInstanceResolved === undefined`.
+	 */
+	signalInstanceParent: Scope | null;
+	signalInstanceSite: string | undefined;
+	signalInstanceValue: unknown;
+	signalInstanceHasKey: boolean;
+	signalInstanceResolved: string | undefined;
+	/**
 	 * DEV ONLY (set by `dev`-compiled bodies; `undefined` in production): a structured
 	 * hydration source-location table — `{ slotIndex: [line, column] }` — plus `locFile`,
 	 * the module's source file name. Read by hydration-mismatch warnings (`siteLoc`) to
@@ -527,8 +540,9 @@ type SignalInstanceKey =
 	| { parentScope: Scope; invocationSite: string | undefined; key: unknown; hasKey: boolean };
 // Parent links, root namespaces, and keyed item identities are lifetime-stable.
 // Keep their recipe until a real owner is needed: scalar-only components avoid
-// ancestor walks, visited sets, key coercion, and JSON strings altogether.
-const SCOPE_SIGNAL_INSTANCE_KEYS = /* @__PURE__ */ new WeakMap<Scope, SignalInstanceKey>();
+// ancestor walks, visited sets, key coercion, and JSON strings altogether. The
+// recipe lives on the scope's signalInstance* fields — no per-mount record or
+// WeakMap entry.
 interface SignalRetryNode {
 	children?: Map<unknown, SignalRetryNode>;
 	owner?: SignalRendererOwnerIdentity;
@@ -805,16 +819,31 @@ function rootSignalInstanceKey(ids: RootIdState): string {
 }
 
 function resolveSignalInstanceKey(scope: Scope): string | undefined {
-	const identity = SCOPE_SIGNAL_INSTANCE_KEYS.get(scope);
-	if (identity === undefined || typeof identity === 'string') return identity;
+	const resolved = scope.signalInstanceResolved;
+	if (resolved !== undefined) return resolved;
+	const parent = scope.signalInstanceParent;
+	if (parent === null) return undefined;
 	const key = structuralSignalInstanceKey(
-		identity.parentScope,
-		identity.invocationSite,
-		identity.key,
-		identity.hasKey,
+		parent,
+		scope.signalInstanceSite,
+		scope.signalInstanceValue,
+		scope.signalInstanceHasKey,
 	);
-	SCOPE_SIGNAL_INSTANCE_KEYS.set(scope, key);
+	scope.signalInstanceResolved = key;
 	return key;
+}
+
+/** Last-writer-wins stamp matching the recipe/resolved union the key carries. */
+function stampSignalInstanceKey(scope: Scope, key: SignalInstanceKey): void {
+	if (typeof key === 'string') {
+		scope.signalInstanceResolved = key;
+		return;
+	}
+	scope.signalInstanceParent = key.parentScope;
+	scope.signalInstanceSite = key.invocationSite;
+	scope.signalInstanceValue = key.key;
+	scope.signalInstanceHasKey = key.hasKey;
+	scope.signalInstanceResolved = undefined;
 }
 
 function structuralSignalInstanceKey(
@@ -864,7 +893,11 @@ function stampSignalInstance(
 	hasKey: boolean,
 ): void {
 	if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
-		SCOPE_SIGNAL_INSTANCE_KEYS.set(scope, { parentScope, invocationSite, key, hasKey });
+		scope.signalInstanceParent = parentScope;
+		scope.signalInstanceSite = invocationSite;
+		scope.signalInstanceValue = key;
+		scope.signalInstanceHasKey = hasKey;
+		scope.signalInstanceResolved = undefined;
 	}
 }
 
@@ -9418,18 +9451,43 @@ function drainEffectEventUpdates(): void {
 		if (
 			!entry.cell.active ||
 			NATIVE_READ_DRIVER?.publicationCurrent(entry) === false ||
-			blockSubtreeDisposed(block) ||
-			// Independently scheduled siblings may complete before another child
-			// suspends their shared boundary. That boundary hides the try
-			// subtree, so its completed payload is still uncommitted. Do not use the
-			// broader inactive check: hidden Activity renders intentionally publish
-			// fresh Effect Event bodies while their DOM/effects stay preserved.
-			findSuspenseHiddenTry(block) !== null ||
-			block.effectEventRenderVersion !== entry.renderVersion ||
-			block.effectEventCompletedVersion !== entry.renderVersion
-		) {
+			blockSubtreeDisposed(block)
+		)
+			continue;
+		const hiddenOwner = findScheduledVisibilityOwner(block, true);
+		// A rolled-back render's payload must never publish: the journal/invalidate
+		// path restored the earlier committed output, so the earlier impl stays
+		// correct and the block re-renders when it next commits. Hidden-owner
+		// descendants stay VALID-less while retained, so only the active tree is
+		// gated on status here.
+		if (block.renderStatus !== RENDER_VALID && hiddenOwner === null) continue;
+		// Independently scheduled siblings may complete before another child
+		// suspends their shared boundary. That boundary hides the try
+		// subtree, so its completed payload is still uncommitted. Do not use the
+		// broader inactive check: hidden Activity renders intentionally publish
+		// fresh Effect Event bodies while their DOM/effects stay preserved.
+		if (hiddenOwner !== null && hiddenOwner.__kind === 'trySlotSlot') {
+			const hiddenTry = hiddenOwner;
+			// Park the update on the hidden boundary instead of dropping it: the
+			// reveal publishes the retained subtree's DOM without re-invoking the
+			// bodies that queued this impl, so nothing else would ever re-apply
+			// it. The version guard still rules out a newer committed impl.
+			deferHiddenRevealAction(hiddenTry, () => {
+				if (
+					entry.cell.active &&
+					!blockSubtreeDisposed(block) &&
+					block.effectEventRenderVersion === entry.renderVersion &&
+					block.effectEventCompletedVersion === entry.renderVersion
+				)
+					entry.cell.impl = entry.nextImpl;
+			});
 			continue;
 		}
+		if (
+			block.effectEventRenderVersion !== entry.renderVersion ||
+			block.effectEventCompletedVersion !== entry.renderVersion
+		)
+			continue;
 		entry.cell.impl = entry.nextImpl;
 	}
 }
@@ -10069,6 +10127,11 @@ class BlockImpl {
 	declare children: ChildScope[] | null;
 	declare _slots: any[] | null;
 	declare refFields: string[] | null;
+	declare signalInstanceParent: Scope | null;
+	declare signalInstanceSite: string | undefined;
+	declare signalInstanceValue: unknown;
+	declare signalInstanceHasKey: boolean;
+	declare signalInstanceResolved: string | undefined;
 	declare $$ctxValues: Map<Context<any>, any> | null;
 	// Contexts whose value this block's subtree consumes — stamped on this block
 	// AND its memo ancestors by useContextInternal. The TRANSITIVE signal: a
@@ -10218,6 +10281,11 @@ class BlockImpl {
 		this.__activitySlot = undefined;
 		this.__warmCache = undefined;
 		this.__warmCacheEpisode = undefined;
+		this.signalInstanceParent = null;
+		this.signalInstanceSite = undefined;
+		this.signalInstanceValue = undefined;
+		this.signalInstanceHasKey = false;
+		this.signalInstanceResolved = undefined;
 	}
 }
 
@@ -10250,6 +10318,11 @@ class ScopeImpl {
 	// indexed by compile-time slot index. Keeps the scope shape monomorphic.
 	declare slots: any[];
 	declare compilerMemo: CompilerMemoRegion | null;
+	declare signalInstanceParent: Scope | null;
+	declare signalInstanceSite: string | undefined;
+	declare signalInstanceValue: unknown;
+	declare signalInstanceHasKey: boolean;
+	declare signalInstanceResolved: string | undefined;
 
 	constructor(parent: Scope, block: Block) {
 		this.block = block;
@@ -10267,6 +10340,11 @@ class ScopeImpl {
 		this.mounted = false;
 		this.slots = [];
 		this.compilerMemo = null;
+		this.signalInstanceParent = null;
+		this.signalInstanceSite = undefined;
+		this.signalInstanceValue = undefined;
+		this.signalInstanceHasKey = false;
+		this.signalInstanceResolved = undefined;
 	}
 }
 
@@ -10497,7 +10575,13 @@ function renderBlockInner(block: Block): true | undefined {
 	// fresh invalidation during this attempt replaces RETRYING, so successful
 	// hidden renders cannot erase work still waiting for their reveal.
 	if (block.renderStatus === RENDER_INVALID) block.renderStatus = RENDER_RETRYING;
-	if (WIP_CAPTURE !== null) recordCapturedRender(WIP_CAPTURE, block);
+	// Root-transaction captures already learn rendered blocks from their
+	// JOURNAL_RENDER entries; recordCapturedRender early-returns on this same
+	// predicate, so skip the call outright on the dominant scheduled-update path.
+	// `rootTransaction` is write-once at capture creation (beginRootRender), so a
+	// non-root capture armed mid-render still takes the full path on entry.
+	if (WIP_CAPTURE !== null && WIP_CAPTURE.rootTransaction !== true)
+		recordCapturedRender(WIP_CAPTURE, block);
 	// A held in-place attempt has no capture. Its completed bodies must lose
 	// bailout validity with their rolled-back DOM. Record both owners: a nested
 	// journal can roll back even while its enclosing capture survives.
@@ -10665,7 +10749,12 @@ function renderBlockInner(block: Block): true | undefined {
 		) {
 			block.outputHandler(block, out ?? null);
 		}
-		finishEffectRender(block);
+		// finishEffectRender exists to invalidate registered effect slots this
+		// render never reached; it early-returns on `effectSlots === null` (the
+		// render version it also checks is 0 exactly then — see above). effectSlots
+		// is populated mid-body by enqueueEffect, so a block's first useEffect
+		// still lands the full path on the render that registered it.
+		if (block.effectSlots !== null) finishEffectRender(block);
 		if (!block.mounted) block.mounted = true;
 		if (block.renderStatus === RENDER_RETRYING) block.renderStatus = RENDER_VALID;
 		if (block.effectEventRenderVersion !== 0) {
@@ -11134,6 +11223,14 @@ class LiteBlockImpl {
 	declare parentBlock: Block;
 	declare $$ctxValues: Map<Context<any>, any> | null;
 	declare idState: RootIdState;
+	// Signal-instance fields exist on every Block stand-in: lite blocks are
+	// never stamped, but structuralSignalInstanceKey walks scope.block chains
+	// and reads them polymorphically, so they must be present (and null).
+	declare signalInstanceParent: Scope | null;
+	declare signalInstanceSite: string | undefined;
+	declare signalInstanceValue: unknown;
+	declare signalInstanceHasKey: boolean;
+	declare signalInstanceResolved: string | undefined;
 
 	constructor(parentNode: Node, endMarker: Node | null, parentBlock: Block) {
 		this.parentNode = parentNode;
@@ -11141,6 +11238,11 @@ class LiteBlockImpl {
 		this.parentBlock = parentBlock;
 		this.$$ctxValues = null;
 		this.idState = parentBlock.idState;
+		this.signalInstanceParent = null;
+		this.signalInstanceSite = undefined;
+		this.signalInstanceValue = undefined;
+		this.signalInstanceHasKey = false;
+		this.signalInstanceResolved = undefined;
 	}
 }
 
@@ -11248,9 +11350,19 @@ export function componentSlotLite<P>(
 	let profileThrown: unknown;
 	const nativeToken = NATIVE_READ_DRIVER === null ? -1 : beginActiveNativeReadScope(scope);
 	try {
-		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined)
-			runWithBlockSignalOwner(scope, () => comp(props, scope, undefined));
-		else comp(props, scope, undefined);
+		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined) {
+			// Same owner-resolution order as runWithBlockSignalOwner, but the
+			// per-mount closure only exists when the owner actually changes.
+			const owner = scopeSignalOwner(scope);
+			if (
+				owner !== undefined &&
+				(process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
+			)
+				STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+			if (owner === undefined || currentSignalOwner() === owner) {
+				comp(props, scope, undefined);
+			} else runWithSignalOwner(owner, () => comp(props, scope, undefined));
+		} else comp(props, scope, undefined);
 		if (!scope.mounted) scope.mounted = true;
 	} catch (error) {
 		profileDidThrow = true;
@@ -30102,7 +30214,7 @@ function componentSlotImpl(
 				undefined,
 				outputHandler,
 			);
-			if (signalInstanceKey !== undefined) SCOPE_SIGNAL_INSTANCE_KEYS.set(b, signalInstanceKey);
+			if (signalInstanceKey !== undefined) stampSignalInstanceKey(b, signalInstanceKey);
 			if (
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 				__OCTANE_PROFILE_ENABLED__ &&
@@ -30146,7 +30258,7 @@ function componentSlotImpl(
 				undefined,
 				outputHandler,
 			);
-			if (signalInstanceKey !== undefined) SCOPE_SIGNAL_INSTANCE_KEYS.set(b, signalInstanceKey);
+			if (signalInstanceKey !== undefined) stampSignalInstanceKey(b, signalInstanceKey);
 			if (
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 				__OCTANE_PROFILE_ENABLED__ &&
@@ -30332,7 +30444,7 @@ function renderOffscreen(
 		env,
 		outputHandler,
 	);
-	if (signalInstanceKey !== undefined) SCOPE_SIGNAL_INSTANCE_KEYS.set(block, signalInstanceKey);
+	if (signalInstanceKey !== undefined) stampSignalInstanceKey(block, signalInstanceKey);
 	if (retryLocation !== undefined) SIGNAL_RETRY_LOCATIONS.set(block, retryLocation);
 	if (implicitBail) {
 		block.$$implicitBail = true;
@@ -34139,7 +34251,7 @@ export function childSlot(
 				undefined,
 				renderReturnedValue,
 			);
-			if (signalInstanceKey !== undefined) SCOPE_SIGNAL_INSTANCE_KEYS.set(b, signalInstanceKey);
+			if (signalInstanceKey !== undefined) stampSignalInstanceKey(b, signalInstanceKey);
 			preserveRootCreatedDom(b);
 			if (state.borrowed) b.exclusiveMarkers = true;
 			b.$$implicitBail = true;
@@ -34275,7 +34387,7 @@ export function childSlot(
 			undefined,
 			renderReturnedValue,
 		);
-		if (signalInstanceKey !== undefined) SCOPE_SIGNAL_INSTANCE_KEYS.set(b, signalInstanceKey);
+		if (signalInstanceKey !== undefined) stampSignalInstanceKey(b, signalInstanceKey);
 		if (
 			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 			__OCTANE_PROFILE_ENABLED__ &&
