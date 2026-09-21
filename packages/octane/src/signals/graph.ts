@@ -32,6 +32,7 @@ import {
 	getNativeAdoptionResolver,
 	isNativeWriteGuarded,
 	reportNativeRead,
+	setNativeAdoptionResolver,
 	setNativeReadObserver,
 	type NativeReadInspection,
 	type NativeReadSource,
@@ -709,6 +710,7 @@ function evaluate(node: ScopedNode): boolean {
 		node.flags = ReactiveFlags.Mutable | ReactiveFlags.Watching;
 		return true;
 	}
+	if (historicalReader || getNativeAdoptionResolver()) return evaluateLiveNode(node);
 	const previousNode = activeNode;
 	const previousOwners = activeOwners;
 	const previousObserver = setNativeReadObserver(null);
@@ -757,6 +759,20 @@ function evaluate(node: ScopedNode): boolean {
 	if (sameState(node.state, next)) return false;
 	commitState(node, next);
 	return true;
+}
+
+function evaluateLiveNode(node: ScopedNode): boolean {
+	// First-use declarations can create live graph nodes while the renderer is
+	// presenting a historical seed. Their computations still need live inputs
+	// and dependency edges; the enclosing read retains its historical channel.
+	const previousReader = setHistoricalReader(undefined);
+	const previousAdoption = setNativeAdoptionResolver(null);
+	try {
+		return evaluate(node);
+	} finally {
+		setNativeAdoptionResolver(previousAdoption);
+		setHistoricalReader(previousReader);
+	}
 }
 
 function commitState<T>(node: ScopedNode<T>, next: NodeState<T>): void {

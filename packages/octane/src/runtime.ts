@@ -44924,10 +44924,60 @@ export function createIndependentHydrateActivator(
 	body: ComponentBody,
 ): IndependentHydrateActivator {
 	return (context: IndependentHydrateActivationContext) => {
+		const { captures, element, manifest, signalOwner } = context;
+		let intents: readonly HydrationReplayIntent[] | null =
+			context.intents.length === 0 ? null : context.intents;
+		const notify =
+			intents === null
+				? null
+				: (scope: Scope): void => {
+						if (intents === null || scope.block.disposed) return;
+						const retryBatch = suspenseRetryBatchForSubtree(scope.block);
+						if (retryBatch !== null) {
+							// A pending arm can commit before the adopted primary. Keep captured
+							// commands with the reveal, after its controls, refs and effects publish.
+							const effect = scope.effectSlots!.find((entry) => entry.connectedFn === notify)!;
+							(retryBatch.afterCommit ??= []).push(() => {
+								if (intents === null || scope.block.disposed || !effect.active) return;
+								effectQueues[PASSIVE].push({
+									scope,
+									slot: effect.slot,
+									fn: effect.connectedFn!,
+									order: effect.order,
+									revision: effect.revision,
+									args: effect.connectedArgs,
+									phase: PASSIVE,
+									seq: commitSeq++,
+								});
+								if (!passiveScheduled) schedulePassiveFlush();
+							});
+							return;
+						}
+						const replays = intents;
+						intents = null;
+						for (const replay of replays) {
+							// A preceding replay may have changed this control's selection meaning.
+							if (!isHydrationSelectionIntentCurrent(replay)) continue;
+							const originalTarget = replay.event.target;
+							// A matching DOM path is not matching intent: a replaced button may
+							// represent a different action even when its markup is identical.
+							if (
+								originalTarget === null ||
+								(originalTarget as Node).nodeType !== 1 ||
+								!element.contains(originalTarget as Node)
+							)
+								continue;
+							const target = originalTarget as Element;
+							target.dispatchEvent(cloneHydrationReplayEvent(replay.event, target));
+						}
+					};
 		// SSR Hydrate owns an outer frame and a try/content pair. Recreate those
 		// owners before the extracted body adopts its own host or authored ranges.
 		const content: ComponentBody = (_props, scope, extra) => {
-			body(context.captures, scope, extra);
+			body(captures, scope, extra);
+			// Control adoption runs in the commit queue. Replaying here immediately
+			// after hydrateRoot could let that adoption undo a command's clear.
+			if (notify !== null) useEffect(notify as EffectFn, [scope], HYDRATE_NOTIFY_SLOT);
 		};
 		const framed: ComponentBody = (_props, scope) => {
 			tryBlock(scope, 0, scope.block.parentNode, content, null, null, scope.block.endMarker);
@@ -44935,26 +44985,18 @@ export function createIndependentHydrateActivator(
 		const adapter: ComponentBody = (_props, scope) => {
 			componentSlotVoid(scope, 0, scope.block.parentNode, framed, undefined, scope.block.endMarker);
 		};
-		const root = hydrateRoot(context.element, adapter, context.captures, {
-			identifierPrefix: context.manifest.boundaryId + '-',
-			identifierSeed: context.manifest.idSeed,
-			signalInstancePrefix: context.manifest.boundaryId,
-			...(context.signalOwner === undefined ? {} : { signalOwner: context.signalOwner }),
+		const root = hydrateRoot(element, adapter, captures, {
+			identifierPrefix: manifest.boundaryId + '-',
+			identifierSeed: manifest.idSeed,
+			signalInstancePrefix: manifest.boundaryId,
+			...(signalOwner === undefined ? {} : { signalOwner }),
 		});
-		for (const replay of context.intents) {
-			// A preceding replay may have changed this control's selection meaning.
-			if (!isHydrationSelectionIntentCurrent(replay)) continue;
-			const originalTarget = replay.event.target;
-			// A matching DOM path is not matching intent: a replaced button may
-			// represent a different action even when its markup is identical.
-			if (
-				originalTarget === null ||
-				(originalTarget as Node).nodeType !== 1 ||
-				!context.element.contains(originalTarget as Node)
-			)
-				continue;
-			const target = originalTarget as Element;
-			target.dispatchEvent(cloneHydrationReplayEvent(replay.event, target));
+		if (notify !== null) {
+			const unmount = root.unmount;
+			root.unmount = () => {
+				intents = null;
+				unmount();
+			};
 		}
 		return root;
 	};

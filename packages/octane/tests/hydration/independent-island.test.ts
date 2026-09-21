@@ -5,6 +5,7 @@ import {
 	type IndependentHydrateActivationContext,
 } from '../../src/hydration/independent-island.js';
 import { renderToString } from '../../src/runtime.server.js';
+import { createScope } from 'octane/signals';
 import { evaluateCompiledFixtureCode } from '../_server-fixture.js';
 import {
 	createIndependentHydrateManifest,
@@ -50,6 +51,133 @@ async function settle(): Promise<void> {
 }
 
 describe('independent hydration bootstrap', () => {
+	it.each(
+		[false, true].flatMap((dev) =>
+			['ready', 'pending', 'removed'].map((primary) => ({ dev, primary })),
+		),
+	)('replays commands after the controlled primary commits (%j)', async ({ dev, primary }) => {
+		const source = `import { Hydrate, useLayoutEffect } from 'octane';
+import { interaction } from 'octane/hydration';
+import { draft$, send, wait, layout } from './actions';
+export function App() @{
+  <Hydrate independent when={interaction({ events: 'click' })}>
+    <Content />
+  </Hydrate>
+}
+function Content() @{
+  wait();
+  useLayoutEffect(layout, []);
+    <section>
+      <textarea data-draft value={draft$} />
+      <button type="button" onClick={send}>Send</button>
+      <output>{draft$}</output>
+    </section>
+}`;
+		const file = '/project/src/ControlledWidget.tsrx';
+		const scope = createScope({ scopeKey: 'controlled-widget-' + dev + '-' + primary });
+		const draft$ = scope.signal$('draft', '');
+		const sent: string[] = [];
+		const sentAfterLayout: boolean[] = [];
+		let committed = false;
+		let waiting = primary !== 'ready';
+		let waitStarted = false;
+		let resume!: () => void;
+		const ready = new Promise<void>((resolve) => {
+			resume = resolve;
+		});
+		const actions = {
+			draft$,
+			wait() {},
+			layout() {
+				committed = true;
+			},
+			send() {
+				sent.push(scope.get(draft$));
+				sentAfterLayout.push(committed);
+				scope.set(draft$, '');
+			},
+		};
+		const server = evaluateCompiledFixtureCode(
+			compile(source, file, { mode: 'server', dev }).code,
+			file,
+			'server',
+			{ './actions': actions },
+		);
+		const widget = evaluateCompiledFixtureCode(
+			compile(source, file + '?octane-hydrate=0', { mode: 'client', dev }).code,
+			file,
+			'client',
+			{
+				'./actions': {
+					...actions,
+					wait() {
+						waitStarted = true;
+						if (waiting) throw ready;
+					},
+				},
+			},
+		);
+		const host = document.createElement('main');
+		host.innerHTML = renderToString(server.App, undefined, {
+			signalOwner: scope,
+			independentHydration: {
+				buildId: 'controlled-widget-build',
+				resolve: (moduleId) => ({ moduleId, styles: [] }),
+			},
+		}).html;
+		document.body.append(host);
+		let release!: () => void;
+		const loaded = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const errors: unknown[] = [];
+		const cleanup = bootstrapIndependentHydration(host, {
+			buildId: 'controlled-widget-build',
+			signalOwner: scope,
+			loadStyles() {},
+			async loadModule() {
+				await loaded;
+				return widget;
+			},
+			onError: (error) => errors.push(error),
+		});
+		try {
+			const input = host.querySelector('textarea')!;
+			input.value = 'entered before activation';
+			scope.set(draft$, input.value);
+			input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+			host.querySelector('button')!.click();
+			release();
+			await vi.waitFor(() => expect(waitStarted).toBe(true));
+			if (primary !== 'ready') {
+				expect(sent).toEqual([]);
+				expect(committed).toBe(false);
+				if (primary === 'removed') cleanup();
+				waiting = false;
+				resume();
+				if (primary === 'removed') {
+					await settle();
+					expect(sent).toEqual([]);
+					expect(committed).toBe(false);
+					expect(errors).toEqual([]);
+					return;
+				}
+			}
+			await vi.waitFor(() => expect(sent).toEqual(['entered before activation']));
+			await settle();
+			expect(scope.get(draft$)).toBe('');
+			expect(input.value).toBe('');
+			expect(host.querySelector('textarea')).toBe(input);
+			expect(host.querySelector('output')!.textContent).toBe('');
+			expect(sentAfterLayout).toEqual([true]);
+			expect(errors).toEqual([]);
+		} finally {
+			cleanup();
+			scope.dispose();
+			host.remove();
+		}
+	});
+
 	it.each(
 		[false, true].flatMap((dev) =>
 			['template', 'tsx', 'return-tsrx'].map((authoring) => ({ dev, authoring })),

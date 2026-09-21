@@ -1,0 +1,109 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "signal-chat",
+  "title": "Signal Chat",
+  "summary": "A ChatGPT-style streaming SSR signal lab with independent data channels, deferred catch-up, failure recovery, and reproducible captures.",
+  "status": "active",
+  "renderModes": ["streaming-ssr", "ssr", "hydration"],
+  "dialects": ["tsrx"],
+  "bindings": [],
+  "octaneFeatures": [
+    "streaming-signals",
+    "streaming-ssr",
+    "deferred-hydration",
+    "independent-hydration",
+    "native-events",
+    "keyed-reconciliation",
+    "tsrx-control-flow",
+    "server-functions"
+  ],
+  "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+  "journeys": [
+    {
+      "id": "early-send-command",
+      "title": "Replay an early Send command with its native composer value after client code arrives",
+      "kind": "ssr-hydration",
+      "spec": "e2e/signal-chat.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "refresh-and-reset",
+      "title": "Keep usable content during quiet refresh and show pending output during reset",
+      "kind": "resilience",
+      "spec": "e2e/signal-chat.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "generation-capture",
+      "title": "Export distinct visible revisions and producer terminals for superseded generations",
+      "kind": "golden",
+      "spec": "e2e/signal-chat.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "mobile-escaping",
+      "title": "Stream the full escaped Unicode prompt and answer in a mobile viewport",
+      "kind": "golden",
+      "spec": "e2e/signal-chat.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "independent-streams",
+      "title": "Deliver the public shell and first HTML snapshots independently",
+      "kind": "ssr-hydration",
+      "spec": "e2e/signal-chat.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "early-input-and-adoption",
+      "title": "Preserve early native input and adopt deferred nodes without duplicate initial loading",
+      "kind": "ssr-hydration",
+      "spec": "e2e/signal-chat.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "eager-unicode",
+      "title": "Display complete Unicode results through eager independent regions",
+      "kind": "golden",
+      "spec": "e2e/signal-chat.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "producer-recovery",
+      "title": "Recover failures before and after a first value and empty completion",
+      "kind": "resilience",
+      "spec": "e2e/signal-chat.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "supersession-and-cancellation",
+      "title": "Fence superseded responses and close stopped producers before resuming",
+      "kind": "resilience",
+      "spec": "e2e/signal-chat.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "fail-before",
+      "description": "The answer fails before its first value while history and tools continue independently."
+    },
+    {
+      "id": "fail-after",
+      "description": "The answer fails after a partial cumulative value; the last accepted text remains inspectable and retry recovers."
+    },
+    {
+      "id": "empty",
+      "description": "The answer producer completes without yielding, exercising the resource error contract."
+    },
+    {
+      "id": "delayed-hydration",
+      "description": "Composed shell hydration can be delayed up to five seconds while independent widgets activate, the server streams, and native input is captured."
+    },
+    {
+      "id": "superseded-response",
+      "description": "Submitting another prompt or stopping an active generation cancels obsolete work before it can publish."
+    }
+  ]
+}
