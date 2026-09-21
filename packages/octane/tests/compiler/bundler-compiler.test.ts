@@ -716,6 +716,34 @@ export function Styled(props) @{ 'use dom bindings'; <div sx={${expression}}/> }
 		);
 	});
 
+	it('rejects malformed fixed child values before transforming a binding view', () => {
+		const compiler = createOctaneCompiler({ hmr: false });
+		const source = `export function Fixed({ value }) @{ 'use dom bindings'; <span title={value} /> }`;
+		for (const shape of [
+			[2, ['value'], []],
+			[2, ['value'], [['missing', 'x']]],
+			[2, ['value'], [['value', {}]]],
+			[2, ['value'], [['value', ['x']]]],
+			[
+				2,
+				['value'],
+				[
+					['value', 'x'],
+					['value', false],
+				],
+			],
+			[2, ['value'], [['value', 1, 2]]],
+		]) {
+			const id =
+				'/src/fixed.tsrx?octane-bindings=Fixed&octane-props=' +
+				encodeURIComponent(JSON.stringify(shape));
+			expect(() => compile(source, id, { mode: 'client', hmr: false })).toThrow(/fixed values/);
+			expect(() => compiler.transform(source, id, { environment: 'client' })).toThrow(
+				/fixed values/,
+			);
+		}
+	});
+
 	it('applies Strong mode to project-owned custom hooks without restricting deferred callbacks', () => {
 		const compiler = createOctaneCompiler({ root: '/project', strong: true });
 		const eagerHook =

@@ -9623,6 +9623,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 					escapeHtml,
 					mount: bindingRequest?.mount ?? false,
 					props: bindingRequest?.props ?? null,
+					fixedProps: bindingRequest?.fixedProps ?? null,
 					...(mode === 'client' &&
 					!options?.dev &&
 					!options?.hmr &&

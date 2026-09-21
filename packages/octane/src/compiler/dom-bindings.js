@@ -17,6 +17,7 @@ import {
 	invalidHtmlNestingWithParent,
 } from '../html-tree-validation.js';
 import { shouldSanitizeURLAttribute } from '../sanitize-url.js';
+import { fixedBindingProps } from './dom-binding-fixed-props.js';
 import { needsBindingProgram, planBindingProgram } from './dom-binding-program.js';
 import {
 	parseDomBindingRequest,
@@ -1975,8 +1976,10 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				lexical.rootScope
 		);
 	};
-	const programFor = (fn, render, props = null, annotationsOnly = false) => {
-		const key = annotationsOnly ? 'annotations' : JSON.stringify(props);
+	const programFor = (fn, render, props = null, annotationsOnly = false, fixedProps = null) => {
+		const key = annotationsOnly
+			? 'annotations'
+			: JSON.stringify(fixedProps?.length ? [props, fixedProps] : props);
 		if (programPlans.get(fn)?.has(key)) return programPlans.get(fn).get(key);
 		if (inProgress.has(fn))
 			error(filename, fn, 'recursive binding child programs are not supported');
@@ -2006,7 +2009,9 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				},
 			]),
 		);
+		const fixed = fixedBindingProps(fn, fixedProps, lexical, localDeclaration, isRuntimeReference);
 		const projectionBody = (value, expressions, temporaries = []) => {
+			value = fixed.fold(value);
 			const required = new Set();
 			const visit = (expression) =>
 				walk(expression, (node, parent, key) => {
@@ -2020,7 +2025,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 							: undefined;
 					if (!declaration || required.has(declaration)) return;
 					required.add(declaration);
-					visit(declaration.init);
+					visit(fixed.fold(declaration.init));
 				});
 			visit(value);
 			for (const temporary of temporaries) {
@@ -2030,10 +2035,10 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			}
 			if (required.size === 0 && temporaries.length === 0) return value;
 			const declarations = setup.filter((declaration) => required.has(declaration));
-			expressions.push(...declarations.map((declaration) => declaration.init));
+			expressions.push(...declarations.map((declaration) => fixed.fold(declaration.init)));
 			return b.block([
 				...declarations.map((declaration) =>
-					inheritHookMemoOrigin(b.const(declaration.id, declaration.init), declaration),
+					inheritHookMemoOrigin(b.const(declaration.id, fixed.fold(declaration.init)), declaration),
 				),
 				...temporaries,
 				b.return(value),
@@ -2050,6 +2055,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			allocateProgramName,
 			projectionBody,
 			annotationsOnly,
+			fixed,
 			restSites: rest.sites,
 			parameterNames: bindingParameterNames(fn.params[0], filename),
 			refDependencies: (expression) => {
@@ -2105,10 +2111,16 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				});
 				return !renderable;
 			},
-			localProgram: (name, props, annotationsOnly = false) => {
+			localProgram: (name, props, annotationsOnly = false, fixedProps = null) => {
 				const child = localFunctions.get(name);
 				return child
-					? programFor(child, bindingRender(child, filename, false), props, annotationsOnly)
+					? programFor(
+							child,
+							bindingRender(child, filename, false),
+							props,
+							annotationsOnly,
+							fixedProps,
+						)
 					: null;
 			},
 			nativePlan: (element, namespace, ancestors) =>
@@ -2258,7 +2270,13 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			needsBindingProgram(render, isUnbound) ||
 			statements(node).some((statement) => statement.type === 'VariableDeclaration');
 		if (structural || (helpers.mount && selectedExport === node.id.name)) {
-			const plan = programFor(node, render, selectedExport === node.id.name ? helpers.props : null);
+			const plan = programFor(
+				node,
+				render,
+				selectedExport === node.id.name ? helpers.props : null,
+				false,
+				selectedExport === node.id.name ? helpers.fixedProps : null,
+			);
 			if (!structural) plan.scalar = planView(node, filename, source, imports, lexical);
 			plans.set(node.id.name, plan);
 			return false;

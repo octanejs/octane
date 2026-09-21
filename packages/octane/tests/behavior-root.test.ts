@@ -49,6 +49,11 @@ import * as staticClient from './hydration/_fixtures/deferred-hydration-static.t
 
 const STATIC_FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration-static.tsrx';
 const staticServer = loadServerFixture<typeof staticClient>(STATIC_FIXTURE);
+const fixedButtonSource = readFileSync(
+	'packages/octane/tests/_fixtures/dom-presentation-fixed-child.tsrx',
+	'utf8',
+);
+
 const presentationSource = readFileSync(
 	'packages/octane/tests/_fixtures/dom-presentation.tsrx',
 	'utf8',
@@ -62,6 +67,7 @@ function authoredPresentation<Props extends object>(
 	modules: Readonly<Record<string, Record<string, unknown>>> = {},
 	compileOptions: Record<string, unknown> = {},
 	bindingProps?: readonly string[],
+	fixedProps?: readonly (readonly unknown[])[],
 ) {
 	const id = '/src/dom-presentation.tsrx';
 	const options = {
@@ -91,7 +97,10 @@ function authoredPresentation<Props extends object>(
 				(mount ? '&octane-mount=1' : '') +
 				(bindingProps === undefined
 					? ''
-					: '&octane-props=' + encodeURIComponent(JSON.stringify([1, bindingProps]))),
+					: '&octane-props=' +
+						encodeURIComponent(
+							JSON.stringify(fixedProps ? [2, bindingProps, fixedProps] : [1, bindingProps]),
+						)),
 			mode: 'client',
 		});
 	const client = loadCompiledFixtureSource(
@@ -6479,6 +6488,295 @@ export function NestedParent(props) @{ 'use dom bindings';
 			}
 		});
 
+		it(`preserves fixed child primitives and live neighbours through ownership changes (${dev ? 'dev' : 'prod'})`, () => {
+			const fixedKeys = ['variant', 'radius', 'label', 'title', 'active', 'onClick', 'ref'];
+			const dynamicKeys = ['variant', 'radius', 'label', 'title', 'active', 'onClick', 'ref'];
+			const fixed = [
+				['variant', 'ghost'],
+				['radius', 'full'],
+				['label', 'Go'],
+			];
+			const runtimeModules = {
+				'octane/dom-binding-program': DomBindingPrograms,
+				'octane/dom-binding-signals': DomBindingSignals,
+				'octane/dom-binding-classes': DomBindingClasses,
+			};
+			const childOptions = { compileOptions: { dev, hmr: false } };
+			const fixedQuery =
+				'?octane-bindings=FixedChild&octane-mount=1&octane-props=' +
+				encodeURIComponent(JSON.stringify([2, fixedKeys, fixed]));
+			const dynamicQuery =
+				'?octane-bindings=FixedChild&octane-mount=1&octane-props=' +
+				encodeURIComponent(JSON.stringify([1, dynamicKeys]));
+			const modules = {
+				'./fixed-child.tsrx': loadCompiledFixtureSource(fixedButtonSource, {
+					...childOptions,
+					id: '/src/fixed-child.tsrx',
+					mode: 'server',
+				}),
+				['./fixed-child.tsrx' + fixedQuery]: loadCompiledFixtureSource(fixedButtonSource, {
+					...childOptions,
+					id: '/src/fixed-child.tsrx' + fixedQuery,
+					mode: 'client',
+					runtimeModules,
+				}),
+				['./fixed-child.tsrx' + dynamicQuery]: loadCompiledFixtureSource(fixedButtonSource, {
+					...childOptions,
+					id: '/src/fixed-child.tsrx' + dynamicQuery,
+					mode: 'client',
+					runtimeModules,
+				}),
+			};
+			const source = `import { FixedChild } from './fixed-child.tsrx';
+export function FixedParent(props) @{ 'use dom bindings';
+<section><FixedChild variant="ghost" radius="full" label="Go" title={props.title} active={props.active} onClick={props.onClick} ref={props.ref} /><FixedChild variant={props.variant} radius={props.radius} label={props.label} title={props.title} active={props.active} onClick={props.onClick} ref={props.dynamicRef} /></section> }`;
+			for (const mount of [false, true]) {
+				const click = vi.fn(),
+					ref = vi.fn(),
+					dynamicRef = vi.fn();
+				const fixture = authoredPresentation(
+					'FixedParent',
+					{
+						title: 'Initial',
+						active: false,
+						variant: 'primary',
+						radius: 'square',
+						label: 'Dynamic',
+						onClick: click,
+						ref,
+						dynamicRef,
+					},
+					dev,
+					source,
+					modules,
+				);
+				const host = document.createElement('div');
+				container.append(host);
+				host.innerHTML = mount ? '' : fixture.html;
+				const serverButtons = [...host.querySelectorAll('button')];
+				const binding = mount
+					? fixture.mount({ parent: host }, fixture.state)
+					: fixture.attach(host.firstElementChild!, fixture.state);
+				const [button, dynamic] = [...host.querySelectorAll('button')];
+				if (!mount) expect([button, dynamic]).toEqual(serverButtons);
+				expect([
+					button.textContent,
+					button.className,
+					dynamic.textContent,
+					dynamic.className,
+				]).toEqual(['Go', 'base ghost rounded', 'Dynamic', 'base primary square']);
+				fixture.publish({
+					title: 'Changed',
+					active: true,
+					variant: 'secondary',
+					radius: 'full',
+					label: 'Next',
+				});
+				expect([button.title, button.className, dynamic.textContent, dynamic.className]).toEqual([
+					'Changed',
+					'base ghost rounded active',
+					'Next',
+					'base secondary rounded active',
+				]);
+				button.click();
+				dynamic.click();
+				expect(click).toHaveBeenCalledTimes(2);
+				expect(ref).toHaveBeenCalledExactlyOnceWith(button);
+				expect(dynamicRef).toHaveBeenCalledExactlyOnceWith(dynamic);
+				if (!mount) {
+					const renderedChild = loadCompiledFixtureSource(fixedButtonSource, {
+						...childOptions,
+						id: '/src/fixed-child.tsrx',
+						mode: 'client',
+					});
+					const renderedParent = loadCompiledFixtureSource(source, {
+						...childOptions,
+						id: '/src/dom-presentation.tsrx',
+						mode: 'client',
+						runtimeModules: { './fixed-child.tsrx': renderedChild },
+					});
+					button.focus();
+					hydratedRoot = hydrateRoot(
+						host,
+						renderedParent.FixedParent,
+						fixture.state.getSnapshot(),
+						{ bindingLeases: [binding] },
+					);
+					flushSync(() => {});
+					flushEffects();
+					expect([...host.querySelectorAll('button')]).toEqual([button, dynamic]);
+					expect(document.activeElement).toBe(button);
+					flushSync(() =>
+						hydratedRoot!.render(renderedParent.FixedParent, {
+							...fixture.state.getSnapshot(),
+							label: 'Hydrated',
+							active: false,
+						}),
+					);
+					expect([button.textContent, button.className, dynamic.textContent]).toEqual([
+						'Go',
+						'base ghost rounded',
+						'Hydrated',
+					]);
+					hydratedRoot.unmount();
+					hydratedRoot = undefined;
+				}
+				binding.dispose();
+				fixture.publish({ title: 'Disposed' });
+				button.click();
+				expect(click).toHaveBeenCalledTimes(2);
+				host.remove();
+			}
+		});
+
+		it(`retains live prototype values and callback shadows beside fixed literals (${dev ? 'dev' : 'prod'})`, () => {
+			const calls = vi.fn();
+			let inherited = 'Initial';
+			const props = Object.create({
+				get inherited() {
+					return inherited;
+				},
+			});
+			props.fixed = 'Fixed';
+			props.onAction = calls;
+			const fixture = authoredPresentation(
+				'Shadowed',
+				props,
+				dev,
+				`export function Shadowed({ fixed, inherited, onAction }) @{ 'use dom bindings'; const bag = { fixed }; const ready = (fixed) => onAction(fixed.type); <button title={bag.fixed + ':' + inherited} onClick={ready}>{fixed as string}</button> }`,
+				{},
+				{},
+				['fixed', 'onAction'],
+				[['fixed', 'Fixed']],
+			);
+			const host = document.createElement('div');
+			container.append(host);
+			host.innerHTML = fixture.html;
+			const handle = fixture.attach(host.firstElementChild!, fixture.state);
+			const button = host.querySelector('button')!;
+			expect(button.title).toBe('Fixed:Initial');
+			inherited = 'Changed';
+			handle.refresh();
+			expect(button.title).toBe('Fixed:Changed');
+			button.click();
+			expect(calls).toHaveBeenCalledExactlyOnceWith('click');
+			handle.dispose();
+			host.remove();
+		});
+
+		it(`preserves native adapter writes and callback execution order beside fixed props (${dev ? 'dev' : 'prod'})`, () => {
+			const calls = vi.fn();
+			const fixture = authoredPresentation(
+				'WritableAdapters',
+				{ variant: 'ghost', count: 1, onAction: calls },
+				dev,
+				`export function WritableAdapters({ variant, count, onAction }) @{ 'use dom bindings';
+ const ordered = function () {
+  try { onAction(alias); const alias = variant; }
+  catch (error) { onAction(error.name); }
+ };
+ <div>
+  <button onClick={() => { variant = 'changed'; count++; onAction(variant, count); }}>Write</button>
+  <button onClick={ordered}>Order</button>
+ </div>
+}`,
+				{},
+				{},
+				['variant', 'count', 'onAction'],
+				[
+					['variant', 'ghost'],
+					['count', 1],
+				],
+			);
+			const host = document.createElement('div');
+			container.append(host);
+			host.innerHTML = fixture.html;
+			const handle = fixture.attach(host.firstElementChild!, fixture.state);
+			const [write, order] = [...host.querySelectorAll('button')];
+			write.click();
+			order.click();
+			expect(calls.mock.calls).toEqual([['changed', 2], ['ReferenceError']]);
+			handle.dispose();
+			host.remove();
+		});
+
+		it(`retains non-finite literal defaults for explicit undefined props (${dev ? 'dev' : 'prod'})`, () => {
+			const fixture = authoredPresentation(
+				'InfiniteDefault',
+				{ value: undefined },
+				dev,
+				`export function InfiniteDefault({ value = 1e999 }) @{ 'use dom bindings'; <span title={'n:' + value}>{(value > 0 ? 'positive' : 'other') as string}</span> }`,
+				{},
+				{},
+				['value'],
+				[['value']],
+			);
+			const host = document.createElement('div');
+			container.append(host);
+			host.innerHTML = fixture.html;
+			const handle = fixture.attach(host.firstElementChild!, fixture.state);
+			expect([host.firstElementChild!.getAttribute('title'), host.textContent]).toEqual([
+				'n:Infinity',
+				'positive',
+			]);
+			handle.dispose();
+			host.remove();
+		});
+
+		it(`reads fixed destructured defaults once and retains uncertain getters (${dev ? 'dev' : 'prod'})`, () => {
+			for (const supplied of [undefined, false, null, '']) {
+				let reads = 0,
+					live = 'Initial';
+				const click = vi.fn();
+				const props = {
+					supplied,
+					onClick: click,
+					get live() {
+						reads++;
+						return live;
+					},
+				};
+				const fixed = supplied === undefined ? [['supplied']] : [['supplied', supplied]];
+				const fixture = authoredPresentation(
+					'Defaults',
+					props,
+					dev,
+					`export function Defaults({ supplied: value = 'Fallback', live, onClick }) @{ 'use dom bindings'; const label = value == null ? 'Null' : value === false ? 'False' : value; <button onClick={onClick} title={live}>{label as string}</button> }`,
+					{},
+					{},
+					['supplied', 'live', 'onClick'],
+					fixed,
+				);
+				const host = document.createElement('div');
+				container.append(host);
+				host.innerHTML = fixture.html;
+				reads = 0;
+				const handle = fixture.attach(host.firstElementChild!, fixture.state);
+				const button = host.querySelector('button')!;
+				expect(reads).toBe(1);
+				expect(button.textContent).toBe(
+					supplied === undefined
+						? 'Fallback'
+						: supplied === null
+							? 'Null'
+							: supplied === false
+								? 'False'
+								: '',
+				);
+				live = 'Changed';
+				handle.refresh();
+				expect(button.title).toBe('Changed');
+				expect(reads).toBe(2);
+				button.click();
+				expect(click).toHaveBeenCalledOnce();
+				fixture.publish({ supplied: 'Wrong' }, false);
+				expect(() => handle.refresh()).toThrow(/fixed primitive props/);
+				expect(button.title).toBe('Changed');
+				handle.dispose();
+				host.remove();
+			}
+		});
+
 		it(`preserves closed child rest props across placement and ownership changes (${dev ? 'dev' : 'prod'})`, () => {
 			for (const reversed of [false, true]) {
 				for (const imported of [false, true]) {
@@ -6522,6 +6820,26 @@ export function NestedParent(props) @{ 'use dom bindings';
 							},
 						});
 					}
+					const repeatedQuery = `?octane-bindings=ClosedChild&octane-mount=1&octane-props=${encodeURIComponent(
+						JSON.stringify([
+							2,
+							firstKeys,
+							[
+								['active', false],
+								['data-first', 'repeated'],
+							],
+						]),
+					)}`;
+					modules['./closed-child.tsrx' + repeatedQuery] = loadCompiledFixtureSource(childSource, {
+						id: '/src/closed-child.tsrx' + repeatedQuery,
+						mode: 'client',
+						compileOptions: { dev, hmr: false },
+						runtimeModules: {
+							'octane/dom-binding-program': DomBindingPrograms,
+							'octane/dom-binding-signals': DomBindingSignals,
+							'octane/dom-binding-classes': DomBindingClasses,
+						},
+					});
 					const calls = vi.fn();
 					const firstRef = vi.fn();
 					const secondRef = vi.fn();

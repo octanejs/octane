@@ -8962,5 +8962,53 @@
     "reference": "changed",
     "maxRatio": 0.01,
     "note": "Identical styles reuse the replay generation, while changing CSS must still replace it. The 128-row fixture preserves complete HTML/CSS and request isolation."
+  },
+  {
+    "suite": "dom-binding-fixed-props",
+    "op": "raw",
+    "target": "fixed-child",
+    "reference": "generic-child",
+    "maxRatio": 0.95,
+    "note": "Explicit primitive caller props remove unreachable generated child branches while public adoption, mount, updates, native events and disposal retain identical results."
+  },
+  {
+    "suite": "dom-binding-fixed-props",
+    "op": "minified",
+    "target": "fixed-child",
+    "reference": "generic-child",
+    "maxRatio": 0.95,
+    "note": "Explicit primitive caller props remove unreachable generated child branches while public adoption, mount, updates, native events and disposal retain identical results."
+  },
+  {
+    "suite": "dom-binding-fixed-props",
+    "op": "gzip",
+    "target": "fixed-child",
+    "reference": "generic-child",
+    "maxRatio": 0.95,
+    "note": "Explicit primitive caller props remove unreachable generated child branches while public adoption, mount, updates, native events and disposal retain identical results."
+  },
+  {
+    "suite": "dom-binding-fixed-props",
+    "op": "raw",
+    "target": "fixed-child-bundle",
+    "reference": "generic-child-bundle",
+    "maxRatio": 1,
+    "note": "Fixed child specialization must not increase complete production runtime bundle cost for the same imported presentation and semantic controls."
+  },
+  {
+    "suite": "dom-binding-fixed-props",
+    "op": "minified",
+    "target": "fixed-child-bundle",
+    "reference": "generic-child-bundle",
+    "maxRatio": 1,
+    "note": "Fixed child specialization must not increase complete production runtime bundle cost for the same imported presentation and semantic controls."
+  },
+  {
+    "suite": "dom-binding-fixed-props",
+    "op": "gzip",
+    "target": "fixed-child-bundle",
+    "reference": "generic-child-bundle",
+    "maxRatio": 1,
+    "note": "Fixed child specialization must not increase complete production runtime bundle cost for the same imported presentation and semantic controls."
   }
 ]

@@ -17,6 +17,7 @@ import {
 	isUnitlessStyleProp,
 } from '../dom-tables.js';
 import { shouldSanitizeURLAttribute } from '../sanitize-url.js';
+import { bindingPrimitive } from './dom-binding-fixed-props.js';
 import { formatDomBindingRequest } from './dom-binding-request.js';
 
 function unwrap(node) {
@@ -246,6 +247,7 @@ export function planBindingProgram(fn, render, context) {
 			),
 		);
 	const project = (names, value, node = fn, temporaries = []) => {
+		value = context.fixed.fold(value);
 		expressions.push(value);
 		return origin(
 			b.arrow([environment(names)], projectionBody(value, expressions, temporaries)),
@@ -369,6 +371,9 @@ export function planBindingProgram(fn, render, context) {
 					compileFragment(thenNodes, names, ns, parents).fragment,
 					compileFragment(elseNodes, names, ns, parents).fragment,
 				];
+				const selected = context.fixed.known(node.test);
+				if (!context.annotationsOnly && selected !== context.fixed.unknown)
+					arms[selected ? 1 : 0] = compileFragment([], names, ns, parents).fragment;
 				const index = nodes.length;
 				appendNode([parent, 'region', String(site)]);
 				regions.push(
@@ -460,6 +465,7 @@ export function planBindingProgram(fn, render, context) {
 				}
 				const props = [];
 				const propNames = [];
+				const fixedProps = [];
 				for (const attr of node.attributes ?? []) {
 					if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute')
 						fail(attr, 'binding child program props must be explicit');
@@ -470,12 +476,15 @@ export function planBindingProgram(fn, render, context) {
 						fail(attr, 'binding child program props cannot be repeated');
 					const value = attrValue(attr);
 					validate(value);
+					const primitive = bindingPrimitive(context.fixed.fold(value));
+					if (primitive)
+						fixedProps.push(primitive.value === undefined ? [name] : [name, primitive.value]);
 					propNames.push(name);
 					props.push(b.prop('init', b.literal(name), value));
 				}
 				if ((node.children ?? []).some(significant)) propNames.push('children');
 				const imported = imports.get(tag);
-				const child = !imported ? localProgram(tag, propNames) : null;
+				const child = !imported ? localProgram(tag, propNames, false, fixedProps) : null;
 				if (
 					!child &&
 					(!imported?.imported ||
@@ -489,6 +498,7 @@ export function planBindingProgram(fn, render, context) {
 							exportName: imported.imported,
 							mount: true,
 							props: propNames,
+							fixedProps,
 						});
 				let local = importedPrograms.get(request);
 				if (local === undefined && !child) {
@@ -944,8 +954,29 @@ export function planBindingProgram(fn, render, context) {
 		// projection and committed adapter. Replaying it in each projector would
 		// repeat getters and create different rest objects within one preparation.
 		prepareProps:
-			fn.params[0]?.type === 'ObjectPattern'
-				? origin(b.arrow(fn.params, b.array(parameterNames.map((name) => b.id(name)))), fn)
+			fn.params[0]?.type === 'ObjectPattern' || context.fixed.checks.length
+				? origin(
+						b.arrow(
+							fn.params,
+							context.fixed.checks.length
+								? b.block([
+										...context.fixed.checks.map(([read, value]) =>
+											origin(
+												b.if(
+													b.binary('!==', read, context.fixed.literal(value, read)),
+													b.throw_error(
+														'A DOM binding child must retain its fixed primitive props.',
+													),
+												),
+												read,
+											),
+										),
+										b.return(b.array(parameterNames.map((name) => b.id(name)))),
+									])
+								: b.array(parameterNames.map((name) => b.id(name))),
+						),
+						fn,
+					)
 				: null,
 		expressions,
 		dependencies,

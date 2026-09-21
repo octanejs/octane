@@ -1102,6 +1102,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: () => [] }],
 	},
 	{
+		// Fixed primitive child programs keep their semantic controls and byte
+		// guards independently runnable from the general codegen corpus.
+		name: 'dom-binding-fixed-props',
+		cwd: 'codegen-size',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'dom-binding-fixed-props.mjs', args: () => [] }],
+	},
+	{
 		// Hook memoization's production compiler A/B: execute identical clean
 		// programs, then count function/array creation expressions in separate
 		// observed bundles. Deterministic; no timing or browser server required.
