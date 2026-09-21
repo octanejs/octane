@@ -7,16 +7,16 @@
       "fixture": "packages/octane/tests/_fixtures/styling-failures/stale-scoped-styles.tsrx",
       "failure": "A refactoring agent renamed a markup class but left the old rule in the component's scoped <style> block; the compiler pruned the dead selector into a `/* (unused) */` comment with no diagnostic, so the stale style shipped silently.",
       "expectedCode": "octane-css-unused-selector",
-      "disposition": "prose:website/src/content/docs/styling.mdx",
-      "notes": "Re-triage to diagnostic:octane-css-unused-selector once the unused-selector check ships, or to an eval task covering stale-refactor repair."
+      "disposition": "diagnostic:octane-css-unused-selector",
+      "notes": "Triaged to diagnostic:octane-css-unused-selector — the check now ships; the eval task octane.repair-stale-selectors also covers this failure."
     },
     {
       "id": "SFL-002",
       "fixture": "packages/octane/tests/_fixtures/styling-failures/shorthand-longhand-merge-clash.tsrx",
       "failure": "An agent wrote the `border` shorthand in a theme applied over a base theme that set `border-top-color`; the merged classes put the shorthand after the longhand in the emitted sheet order, silently clobbering the longhand at runtime.",
       "expectedCode": "octane-css-shorthand-longhand-clash",
-      "disposition": "prose:website/src/content/docs/styling.mdx",
-      "notes": "Re-triage to diagnostic:octane-css-shorthand-longhand-clash once the shorthand/longhand clash check ships, or to an eval task covering merge-clash repair."
+      "disposition": "diagnostic:octane-css-shorthand-longhand-clash",
+      "notes": "Triaged to diagnostic:octane-css-shorthand-longhand-clash — the check now ships; the eval task octane.repair-shorthand-clash also covers this failure."
     }
   ]
 }
