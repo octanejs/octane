@@ -1,5 +1,11 @@
 # octane
 
+## 0.3.5
+
+### Patch Changes
+
+- 8b95363: Reuse buffered streamed-result frame sizes when partially draining the browser mailbox, avoiding repeated serialization and UTF-8 encoding while preserving its byte limit.
+
 ## 0.3.4
 
 ### Patch Changes
