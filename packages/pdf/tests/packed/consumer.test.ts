@@ -51,8 +51,10 @@ describe('@octanejs/pdf packed consumer', () => {
 			'make-event-props': '2.0.0',
 			'pdfjs-dist': '5.4.296',
 		});
+		const sourceManifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'));
+		expect(sourceManifest.peerDependencies.octane).toMatch(/^workspace:\^/);
 		expect(publishedManifest.peerDependencies).toEqual({
-			octane: '^0.1.51 || ^0.2.0 || ^0.3.0',
+			octane: sourceManifest.peerDependencies.octane.replace(/^workspace:/, ''),
 		});
 		expect([
 			...Object.keys(publishedManifest.dependencies ?? {}),

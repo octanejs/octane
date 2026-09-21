@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { satisfies } from 'semver';
 import { describe, expect, it } from 'vitest';
 import * as root from '@octanejs/livestore';
 import * as experimental from '@octanejs/livestore/experimental';
@@ -39,9 +40,14 @@ describe('published package contract', () => {
 			'@livestore/utils',
 			'@opentelemetry/api',
 		]);
-		expect(manifest.peerDependencies).toEqual({
-			octane: 'workspace:^0.1.51 || ^0.2.0 || ^0.3.0',
-		});
+		expect(Object.keys(manifest.peerDependencies)).toEqual(['octane']);
+		expect(manifest.peerDependencies.octane).toMatch(/^workspace:\^/);
+		const { version } = JSON.parse(
+			await readFile(resolve(process.cwd(), 'packages/octane/package.json'), 'utf8'),
+		) as { version: string };
+		const range = manifest.peerDependencies.octane.replace(/^workspace:/, '');
+		expect(satisfies(version, range)).toBe(true);
+		expect(satisfies('0.1.50', range)).toBe(false);
 		expect(manifest.dependencies).not.toHaveProperty('react');
 		expect(manifest.devDependencies.react).toBe('catalog:livestore-react-oracle');
 		expect(manifest.devDependencies['@types/react']).toBe('catalog:livestore-react-oracle');

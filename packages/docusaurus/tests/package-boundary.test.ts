@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { satisfies } from 'semver';
 import { describe, expect, it } from 'vitest';
 
 describe('@octanejs/docusaurus package boundary', () => {
@@ -10,7 +11,13 @@ describe('@octanejs/docusaurus package boundary', () => {
 
 		expect(manifest.peerDependencies['@docusaurus/core']).toBe('3.10.1');
 		expect(manifest.devDependencies['@docusaurus/core']).toBe('3.10.1');
-		expect(manifest.peerDependencies.octane).toBe('workspace:^0.1.51 || ^0.2.0 || ^0.3.0');
+		const { version } = JSON.parse(
+			readFileSync(path.resolve(import.meta.dirname, '../../octane/package.json'), 'utf8'),
+		);
+		expect(manifest.peerDependencies.octane).toMatch(/^workspace:\^/);
+		const range = manifest.peerDependencies.octane.replace(/^workspace:/, '');
+		expect(satisfies(version, range)).toBe(true);
+		expect(satisfies('0.1.50', range)).toBe(false);
 		expect(manifest.devDependencies.octane).toBe('workspace:*');
 		expect(manifest.dependencies?.octane).toBeUndefined();
 		expect(manifest.exports).toEqual(
