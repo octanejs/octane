@@ -21,6 +21,14 @@
  *   `(unused)` comments render emits. `:global` selectors and blocks, theme
  *   sheets, and designed class-map pruning never warn; dynamic `<{expr}>`
  *   maybe-matches count as matches.
+ * - `octane-style-unknown-class-key` (error): a member read pulls a key off a
+ *   binding that resolves to a same-module `<style>` block, and the built
+ *   class map (`$class` plus the standalone class selectors) has no such key —
+ *   the compile-gate half of R1 (`tsrx-tsc` already rejects the same read via
+ *   the literal-key emit). Bindings resolve through `createScopes` — the same
+ *   machinery the analyzer's `apply` resolution uses — so shadowing behaves
+ *   identically; imported bindings have an import declaration as their initial
+ *   and stay unresolved here by construction (KTD2 leaves them to typecheck).
  *
  * Pruning runs on analyzer-owned clones (the adopted AST may be frozen), using
  * the same `collectPrunableElements` + `analyzeCss` + `pruneCss` pipeline the
@@ -28,7 +36,7 @@
  * identical results. Nothing here feeds codegen; output bytes are unaffected.
  *
  * Suppression: `octane-ignore <code…>` in a comment suppresses the named
- * diagnostics of this pass (a bare `octane-ignore` suppresses all three). A
+ * diagnostics of this pass (a bare `octane-ignore` suppresses them all). A
  * `//` or `/* *\/` JS comment applies to the next AST node after it — put it
  * above a `<style>` block (or any containing element/statement) to suppress
  * that range. A `/* octane-ignore … *\/` comment inside a sheet's CSS applies
@@ -39,8 +47,11 @@ import {
 	analyzeCss,
 	clone_ast_node as cloneAstNode,
 	createScopeRoot,
+	createScopes,
+	createStyleClassMapFromStylesheet,
 	prepareStylesheetForRender,
 	pruneCss,
+	ScopeRoot,
 } from '@tsrx/core';
 import cssProperties from 'mdn-data/css/properties.json' with { type: 'json' };
 import { collectPrunableElements, isFloatStyleResource } from './style-scopes.js';
@@ -48,6 +59,7 @@ import { collectPrunableElements, isFloatStyleResource } from './style-scopes.js
 export const UNKNOWN_PROPERTY = 'octane-css-unknown-property';
 export const SHORTHAND_LONGHAND_CLASH = 'octane-css-shorthand-longhand-clash';
 export const UNUSED_SELECTOR = 'octane-css-unused-selector';
+export const UNKNOWN_CLASS_KEY = 'octane-style-unknown-class-key';
 
 // --- property registry --------------------------------------------------------
 
@@ -868,6 +880,225 @@ function sheetSourceText(sheet, node) {
 	return `'${sheet.source.slice(node.start, node.end).trim()}'`;
 }
 
+// --- class-map key reads --------------------------------------------------------
+
+/**
+ * Wrappers a member chain may sit inside without changing what it reads —
+ * `(theme).dark`, `theme?.dark`, `(theme as T).dark`.
+ */
+const TRANSPARENT_WRAPPERS = new Set([
+	'ChainExpression',
+	'ParenthesizedExpression',
+	'TSAsExpression',
+	'TSNonNullExpression',
+	'TSSatisfiesExpression',
+	'TSTypeAssertion',
+]);
+
+/**
+ * Whether `path` (a binding reference's ancestors, root-first) passes through
+ * a `<style>` element's `apply` attribute: keys read there resolve through the
+ * analyzer's own `apply` machinery, which reports `tsrx-style-apply-target`
+ * for anything that is not a style block — a second opinion here would only
+ * double-report. An `apply` attribute on a non-style element is just markup;
+ * reads inside it are still checked.
+ */
+function isApplyRead(path) {
+	for (let i = 2; i < path.length; i++) {
+		const attribute = path[i];
+		if (
+			attribute?.type === 'JSXAttribute' &&
+			attribute.name?.type === 'JSXIdentifier' &&
+			attribute.name.name === 'apply' &&
+			path[i - 2]?.type === 'JSXStyleElement'
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/** The key a member expression reads, or `null` for a dynamic/unnamed read. */
+function memberReadKey(member) {
+	if (!member.computed && member.property?.type === 'Identifier') return member.property.name;
+	if (
+		member.computed &&
+		member.property?.type === 'Literal' &&
+		typeof member.property.value === 'string'
+	) {
+		return member.property.value;
+	}
+	return null;
+}
+
+/**
+ * The `name` property's value of a module-local object literal — the same
+ * lookup the analyzer's `resolve_local_member` performs for `apply={obj.name}`.
+ */
+function objectPropertyValue(object, name) {
+	for (const property of object.properties ?? []) {
+		if (property?.type !== 'Property' || property.computed) continue;
+		const key = property.key;
+		if (
+			(key?.type === 'Identifier' && key.name === name) ||
+			(key?.type === 'Literal' && key.value === name)
+		) {
+			return property.value;
+		}
+	}
+	return undefined;
+}
+
+/**
+ * The keys a style block's class map exposes, read off the ObjectExpression
+ * `createStyleClassMapFromStylesheet` builds — `$class` first, then the
+ * standalone class selectors — mirroring `lowerAssignedStyle`'s clone pipeline
+ * exactly (`get_style_class_map_names` is not exported from @tsrx/core, and
+ * its exports map blocks deep imports). A body-less `<style apply={…} />`
+ * bundle maps to `$class` alone. Returns `null` for a sheet that fails to
+ * analyze (loose-parse recovery — codegen owns reporting it).
+ */
+function classMapKeysOf(styleNode, cache) {
+	let keys = cache.get(styleNode);
+	if (keys !== undefined) return keys;
+	keys = null;
+	const sheet = (styleNode.children || []).find((child) => child?.type === 'StyleSheet');
+	if (!sheet) {
+		keys = new Set(['$class']);
+	} else {
+		const clone = cloneAstNode(sheet);
+		clone.hash = styleNode.metadata?.styleScopeHash || sheet.hash;
+		try {
+			analyzeCss(clone);
+			prepareStylesheetForRender(
+				clone,
+				styleNode.metadata?.styleKind === 'theme' ? 'theme' : 'class-map',
+			);
+			keys = new Set();
+			for (const property of createStyleClassMapFromStylesheet(clone, {}).properties) {
+				const key = property.key?.value ?? property.key?.name;
+				if (typeof key === 'string') keys.add(key);
+			}
+		} catch {
+			keys = null;
+		}
+	}
+	cache.set(styleNode, keys);
+	return keys;
+}
+
+function closestClassKey(key, keys) {
+	let best = null;
+	let bestDistance = Math.max(2, Math.floor(key.length / 3));
+	for (const candidate of keys) {
+		if (candidate[0] !== key[0]) continue;
+		const distance = levenshtein(key, candidate);
+		if (distance <= bestDistance && (best === null || distance < bestDistance)) {
+			best = candidate;
+			bestDistance = distance;
+		}
+	}
+	return best;
+}
+
+/**
+ * Walk the member chain above a bound identifier (`theme` of `theme.dark`).
+ * `value` is what the expression resolves to: a style block makes the next
+ * member read a class-map key read; a module-local object literal descends
+ * into the named property (`maps.dark.$class` reads a key off `maps.dark`'s
+ * block). Anything else — strings, calls, unresolvable initials — ends the
+ * chain silently.
+ */
+function checkKeyReadChain(node, path, initial, keyCache, source, filename, diagnostics) {
+	if (isApplyRead(path)) return;
+	let value = initial;
+	let child = node;
+	let i = path.length - 1;
+	for (;;) {
+		while (i >= 0 && TRANSPARENT_WRAPPERS.has(path[i].type)) {
+			child = path[i];
+			i--;
+		}
+		const member = i >= 0 ? path[i] : null;
+		if (member?.type !== 'MemberExpression' || member.object !== child) return;
+		const key = memberReadKey(member);
+		if (key === null || typeof member.property?.start !== 'number') return;
+		if (value.type === 'JSXStyleElement') {
+			const keys = classMapKeysOf(value, keyCache);
+			if (keys === null || keys.has(key)) return;
+			reportUnknownClassKey(member, key, keys, source, filename, diagnostics);
+			return;
+		}
+		const next = objectPropertyValue(value, key);
+		if (next?.type !== 'JSXStyleElement' && next?.type !== 'ObjectExpression') return;
+		value = next;
+		child = member;
+		i--;
+	}
+}
+
+function reportUnknownClassKey(member, key, keys, source, filename, diagnostics) {
+	const objectText =
+		typeof member.object.start === 'number'
+			? source.slice(member.object.start, member.object.end)
+			: 'style map';
+	const range = fileRange(source, member.property.start, member.property.end);
+	const suggestion = closestClassKey(key, keys);
+	const provided = [...keys].map((name) => `'${name}'`).join(', ');
+	diagnostics.push({
+		code: UNKNOWN_CLASS_KEY,
+		severity: 'error',
+		filename,
+		start: range.start,
+		end: range.end,
+		message:
+			`[${UNKNOWN_CLASS_KEY}] '${key}' is not a key of the class map '${objectText}' — ` +
+			`the map provides ${provided}.` +
+			(suggestion ? ` Did you mean '${suggestion}'?` : ''),
+		suggestions: suggestion ? [{ ...range, attribute: suggestion }] : [],
+	});
+}
+
+/**
+ * R1's compile-gate half: a member expression reading a key off a binding that
+ * resolves to a same-module `<style>` block is checked against the keys the
+ * emitted class map provides. `createScopes` is the same scope machinery the
+ * analyzer's `apply` resolution runs on, so lexical shadowing behaves
+ * identically; imported bindings carry the import declaration as their
+ * `initial`, so they never reach a key check here — the typecheck gate owns
+ * them (KTD2).
+ */
+function checkClassMapKeys(ast, source, filename, diagnostics) {
+	let scopes;
+	try {
+		scopes = createScopes(ast, new ScopeRoot(), null, {
+			filename,
+			collect: true,
+			errors: [],
+			comments: [],
+		}).scopes;
+	} catch {
+		return; // a half-typed file in loose mode must not break diagnostics
+	}
+	// `scopes` maps every scope-opening node to its scope; a scope can appear
+	// twice (a submodule and its body share one) — dedupe before iterating.
+	const keyCache = new Map();
+	for (const scope of new Set(scopes.values())) {
+		for (const binding of scope.declarations.values()) {
+			const initial = binding.initial;
+			if (
+				(initial?.type !== 'JSXStyleElement' && initial?.type !== 'ObjectExpression') ||
+				isFloatStyleResource(initial)
+			) {
+				continue;
+			}
+			for (const { node, path } of binding.references) {
+				checkKeyReadChain(node, path, initial, keyCache, source, filename, diagnostics);
+			}
+		}
+	}
+}
+
 // --- suppression --------------------------------------------------------------
 
 const PRAGMA = /^\s*\*?\s*octane-ignore\b(.*)$/;
@@ -1003,6 +1234,11 @@ export function analyzeStyleCorrectness(ast, source, filename, options = {}) {
 		if (block.kind === 'scope' && block.sheet) {
 			checkUnusedSelectors(source, filename, block, diagnostics);
 		}
+	}
+	// Class-map key reads need a bound style block; standalone scope blocks
+	// open no binding, so skip the scope walk when only they exist.
+	if (blocks.some((block) => block.kind !== 'scope')) {
+		checkClassMapKeys(ast, source, filename, diagnostics);
 	}
 
 	if (diagnostics.length > 0 && source.includes('octane-ignore')) {
