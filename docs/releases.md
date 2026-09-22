@@ -11,6 +11,12 @@ one atomic transaction, then creates missing GitHub releases sequentially. This
 avoids GitHub ref-hook failures during large releases, when the upstream action
 would otherwise push one tag per package concurrently.
 
+Only `octane` itself is announced as a GitHub release. Every published package
+still gets its annotated `<name>@<version>` tag, and its notes stay in the
+package `CHANGELOG.md`, but the community bindings are versioned on nearly every
+`octane` patch, so releasing each one makes the Releases feed unreadable and its
+notifications unusable.
+
 This is deliberately a reconciliation loop rather than a one-shot tied to the
 Version Packages commit. If that commit's CI fails, a later fix on `main` can
 publish the stranded versions after it passes the same required checks.
@@ -69,8 +75,8 @@ validated publish attempt, including partial failures, and repairs metadata for
 every current version that npm confirms is published. If release creation fails
 after the atomic tag push, the next successful main run or manual recovery
 retries only the missing GitHub release. GitHub API availability cannot block
-tag repair, and a package without a matching changelog entry is reported as
-skipped so later releases can still be created.
+tag repair, and an announced package without a matching changelog entry is
+reported as skipped so later releases can still be created.
 
 After upload, reconciliation allows fifteen minutes of retry delays for npm to
 make the versions available. It succeeds only when every current version can
