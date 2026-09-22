@@ -226,6 +226,40 @@ among 2,049 ordinary elements uses zero JavaScript child collections instead of
 The candidate's adapter hash identifies the measured working tree exactly;
 `workingTree` distinguishes it from a selected commit snapshot.
 
+### Controlled multi-select preparation
+
+`select-projection.mjs` compiles the public `SelectStateApp` fixture for production
+and completes native Chromium transitions with 128 and 512 keyed options. Each
+size has synchronous, select-one, and select-all controls. An unobserved warmup
+and two instrumented runs verify the exact selected set, original option and
+input identity, user draft, capture count, and unmount. Instrumentation delegates
+unchanged to native `importNode` and `option.selected` getters, and is removed
+before assertions and teardown.
+
+```sh
+node benchmarks/view-transitions/select-projection.mjs --octane-revision=4efa520b9cc17d3bee163825e4c8c2d026f49234
+node benchmarks/view-transitions/select-projection.mjs
+node benchmarks/bench.mjs --quick --ratios view-transition-select
+```
+
+The ratio guards allow at most 5× work for 4× as many options. Counting selected
+reads as well as copies catches a cached projection that still scans every
+option after every write. On Node 24.19.0 / Chromium 149.0.7827.55, repeated
+measurements were identical:
+
+| Select-all update | Before, 128 | Before, 512 | After, 128 | After, 512 |
+| --- | ---: | ---: | ---: | ---: |
+| Native option copies | 16,768 | 263,680 | 384 | 1,536 |
+| Native selected reads | 50,562 | 792,066 | 1,792 | 7,168 |
+
+The candidate copies `3N` options; synchronous copies remain zero. Select-one
+copies fall from `4N` to `3N`. Counts cover the scheduled update through native
+transition completion, excluding mount; they measure work rather than latency,
+paint, or memory. Result metadata identifies the adapter, compiled asset and
+fixture hashes. The correctness suites separately cover staged reads,
+publication isolation, urgent interruption, hydration, native reset, mode
+changes, fresh options, and insertion/removal within disabled groups.
+
 ## Ordinary effect cleanup after a transition
 
 `effect-cleanup.mjs` reuses the authored JSX and TSRX effectful-list applications
