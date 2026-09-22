@@ -282,6 +282,12 @@ export function Feed(props) @{
 }
 ```
 
+Put a row's reconciliation key in the `@for` header: `; key item.id`.
+An explicit `key` attribute on the first direct root is also accepted as legacy
+row-key syntax and takes precedence over a header key. Eligible intrinsic rows
+retain native template compilation with either spelling. Component and nested
+child keys retain their reconciliation boundaries.
+
 ```jsx
 export function Greeting(props) @{
 	@if (props.name) {
