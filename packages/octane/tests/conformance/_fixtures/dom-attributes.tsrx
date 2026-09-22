@@ -44,7 +44,12 @@ export function DownloadAttr(props) @{
 
 // Boolean attribute spelled camelCase (HTML lowercases the DOM name).
 export function AllowFullScreen(props) @{
-	<iframe id="ifs" allowFullScreen={props.v} />
+	<iframe
+		id="ifs"
+		src={props.src}
+		sandbox="allow-scripts allow-same-origin"
+		allowFullScreen={props.v}
+	/>
 }
 
 // data-* custom attribute.
