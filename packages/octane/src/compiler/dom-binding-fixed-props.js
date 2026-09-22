@@ -239,8 +239,18 @@ export function fixedBindingProps(fn, fixed, lexical, localDeclaration, isRefere
 			result.type === 'Property' &&
 			result.shorthand &&
 			result.value !== node.value
-		)
+		) {
+			// Expanding this shorthand must retain an own data property, not
+			// introduce the object-literal prototype setter syntax.
+			if (!node.computed && node.key.name === '__proto__')
+				return {
+					...result,
+					key: literal('__proto__', node.key),
+					computed: true,
+					shorthand: false,
+				};
 			return { ...result, shorthand: false };
+		}
 		return result;
 	};
 	return { fold, known, unknown: UNKNOWN, checks, literal };
