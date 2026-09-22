@@ -9154,5 +9154,37 @@
     "reference": "generic-child-bundle",
     "maxRatio": 1,
     "note": "Fixed child specialization must not increase complete production runtime bundle cost for the same imported presentation and semantic controls."
+  },
+  {
+    "suite": "view-transition-select",
+    "op": "option_copies",
+    "target": "transition-all-512",
+    "reference": "transition-all-128",
+    "maxRatio": 5,
+    "note": "Four times as many controlled options may perform at most five times the deterministic native work. Exact selection, host identity, user draft and native capture count are verified in both unobserved and observed production Chromium runs."
+  },
+  {
+    "suite": "view-transition-select",
+    "op": "selected_reads",
+    "target": "transition-all-512",
+    "reference": "transition-all-128",
+    "maxRatio": 5,
+    "note": "Four times as many controlled options may perform at most five times the deterministic native work. Exact selection, host identity, user draft and native capture count are verified in both unobserved and observed production Chromium runs."
+  },
+  {
+    "suite": "view-transition-select",
+    "op": "option_copies",
+    "target": "transition-one-512",
+    "reference": "transition-one-128",
+    "maxRatio": 5,
+    "note": "Four times as many controlled options may perform at most five times the deterministic native work. Exact selection, host identity, user draft and native capture count are verified in both unobserved and observed production Chromium runs."
+  },
+  {
+    "suite": "view-transition-select",
+    "op": "selected_reads",
+    "target": "transition-one-512",
+    "reference": "transition-one-128",
+    "maxRatio": 5,
+    "note": "Four times as many controlled options may perform at most five times the deterministic native work. Exact selection, host identity, user draft and native capture count are verified in both unobserved and observed production Chromium runs."
   }
 ]

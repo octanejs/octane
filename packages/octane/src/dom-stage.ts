@@ -653,20 +653,28 @@ export class DOMStage {
 		} else if (node.localName !== 'select' || (key !== 'value' && key !== 'selectedIndex'))
 			return false;
 		if (select === null) return false;
-		const projected = this.projection(select);
-		let target = projected.node;
-		if (node !== select)
-			for (const [copy, original] of projected.originals) {
-				if (original === node) {
-					target = copy;
-					break;
+		if (node !== select && this.get(select, 'multiple')) {
+			// Multiple selections do not change their siblings. Keep each write
+			// independent, including fresh options with earlier queued select writes.
+			const state = this.state(node) as HTMLOptionElement;
+			state.selected = value as boolean;
+			this.value(node, 'selected', state.selected);
+		} else {
+			const projected = this.projection(select);
+			let target = projected.node;
+			if (node !== select)
+				for (const [copy, original] of projected.originals) {
+					if (original === node) {
+						target = copy;
+						break;
+					}
 				}
+			Reflect.set(target, key, value);
+			for (const option of Array.from((projected.node as HTMLSelectElement).options)) {
+				const original = projected.originals.get(option)! as HTMLOptionElement;
+				(this.state(original) as HTMLOptionElement).selected = option.selected;
+				this.value(original, 'selected', option.selected);
 			}
-		Reflect.set(target, key, value);
-		for (const option of Array.from((projected.node as HTMLSelectElement).options)) {
-			const original = projected.originals.get(option)! as HTMLOptionElement;
-			(this.state(original) as HTMLOptionElement).selected = option.selected;
-			this.value(original, 'selected', option.selected);
 		}
 		this.enqueue(() => {
 			Reflect.set(node, key, value, node);

@@ -758,6 +758,14 @@ const SUITES = [
 		],
 	},
 	{
+		// Native form projection work while a controlled select awaits capture.
+		name: 'view-transition-select',
+		cwd: 'view-transitions',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'select-projection.mjs', args: () => [] }],
+	},
+	{
 		// Raw streaming API over REAL HTTP, cold and warm: fresh-process import
 		// cost, spawn→listen→first-byte cold TTFB, and warm shell/total/throughput
 		// for octane renderToPipeableStream vs React Fizz behind one identical

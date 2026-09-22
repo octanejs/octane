@@ -1,5 +1,18 @@
 import { ViewTransition } from 'octane';
 
+export function SelectStateApp(props: { rows: string[]; values: string[]; label: string }) @{
+	<ViewTransition>
+		<section data-label={props.label}>
+			<select multiple value={props.values} onChange={() => {}}>
+				@for (const row of props.rows; key row) {
+					<option value={row}>{row as string}</option>
+				}
+			</select>
+			<input defaultValue="draft" />
+		</section>
+	</ViewTransition>
+}
+
 export function HostStateApp(props: {
 	rows: string[];
 	choice: string;
