@@ -6630,6 +6630,101 @@ export function FixedParent(props) @{ 'use dom bindings';
 			}
 		});
 
+		for (const specialize of [false, true]) {
+			for (const mount of [false, true]) {
+				it(`preserves shorthand prototype-named data properties (${dev ? 'dev' : 'prod'}, fixed=${specialize}, mount=${mount})`, () => {
+					const fixture = authoredPresentation(
+						'View',
+						{ suffix: '' },
+						dev,
+						`function Child({ label: __proto__, suffix }) @{
+ const bag = { __proto__ };
+ <span title={bag.__proto__ + suffix}>{bag.__proto__ as string}</span>
+}
+export function View(props) @{ 'use dom bindings';
+ <section><Child label="Expected" suffix={props.suffix} /></section>
+}`,
+						{},
+						specialize ? { domBindingFixedProps: ['label'] } : {},
+					);
+					const host = document.createElement('div');
+					container.append(host);
+					host.innerHTML = fixture.html;
+					const serverSpan = host.querySelector('span')!;
+					expect([serverSpan.textContent, serverSpan.title]).toEqual(['Expected', 'Expected']);
+					if (mount) host.innerHTML = '';
+					const handle = mount
+						? fixture.mount({ parent: host }, fixture.state)
+						: fixture.attach(host.firstElementChild!, fixture.state);
+					try {
+						const span = host.querySelector('span')!;
+						if (!mount) expect(span).toBe(serverSpan);
+						expect([span.textContent, span.title]).toEqual(['Expected', 'Expected']);
+						fixture.publish({ suffix: ':Changed' });
+						expect([span.textContent, span.title]).toEqual(['Expected', 'Expected:Changed']);
+					} finally {
+						handle.dispose();
+					}
+					fixture.publish({ suffix: ':Disposed' });
+					expect(host.querySelector('span')!.title).toBe('Expected:Changed');
+					expect(fixture.cleanup).toHaveBeenCalledOnce();
+					host.remove();
+				});
+			}
+		}
+
+		it(`distinguishes prototype-named data properties from authored prototype setters (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `function Child({ label: __proto__ }) @{
+ const value = __proto__;
+ const shorthand = { __proto__ };
+ const computed = { ['__proto__']: __proto__ };
+ const setter = { __proto__: value };
+ const quotedSetter = { '__proto__': value };
+ const mixed = { __proto__: null, __proto__ };
+ const nested = { bag: { __proto__ } };
+ <div>
+  <span title={shorthand.__proto__ === null ? 'null' : 'wrong'}>{(shorthand.__proto__ === null ? 'null' : 'wrong') as string}</span>
+  <span title={computed.__proto__ === null ? 'null' : 'wrong'}>{(computed.__proto__ === null ? 'null' : 'wrong') as string}</span>
+  <span title={setter.__proto__ === undefined ? 'undefined' : 'wrong'}>{(setter.__proto__ === undefined ? 'undefined' : 'wrong') as string}</span>
+  <span title={quotedSetter.__proto__ === undefined ? 'undefined' : 'wrong'}>{(quotedSetter.__proto__ === undefined ? 'undefined' : 'wrong') as string}</span>
+  <span title={mixed.__proto__ === null ? 'null' : 'wrong'}>{(mixed.__proto__ === null ? 'null' : 'wrong') as string}</span>
+  <span title={nested.bag.__proto__ === null ? 'null' : 'wrong'}>{(nested.bag.__proto__ === null ? 'null' : 'wrong') as string}</span>
+ </div>
+}
+export function View(props) @{ 'use dom bindings'; <section><Child label={null} /></section> }`;
+			const expected = ['null', 'null', 'undefined', 'undefined', 'null', 'null'];
+			for (const specialize of [false, true]) {
+				for (const mount of [false, true]) {
+					const fixture = authoredPresentation(
+						'View',
+						{},
+						dev,
+						source,
+						{},
+						specialize ? { domBindingFixedProps: ['label'] } : {},
+					);
+					const host = document.createElement('div');
+					container.append(host);
+					host.innerHTML = fixture.html;
+					const rendered = () =>
+						[...host.querySelectorAll('span')].map((span) => [span.textContent, span.title]);
+					expect(rendered()).toEqual(expected.map((label) => [label, label]));
+					if (mount) host.innerHTML = '';
+					const handle = mount
+						? fixture.mount({ parent: host }, fixture.state)
+						: fixture.attach(host.firstElementChild!, fixture.state);
+					try {
+						expect(rendered()).toEqual(expected.map((label) => [label, label]));
+						handle.refresh();
+						expect(rendered()).toEqual(expected.map((label) => [label, label]));
+					} finally {
+						handle.dispose();
+					}
+					host.remove();
+				}
+			}
+		});
+
 		it(`retains live prototype values and callback shadows beside fixed literals (${dev ? 'dev' : 'prod'})`, () => {
 			const calls = vi.fn();
 			let inherited = 'Initial';
