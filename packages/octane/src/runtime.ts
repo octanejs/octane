@@ -810,14 +810,59 @@ export function enableSignalBindings(abi = 1, potentialOnly = false): void {
 	if (!potentialOnly) enableSignalDocument(abi);
 }
 
-function signalIdentityKey(value: unknown): string {
+type SignalIdentityToken = string | { value: object | symbol; position?: number };
+
+interface OpaqueSignalKeys {
+	objects: WeakMap<object, number>;
+	symbols: Map<symbol, number>;
+	used: Set<number>;
+	next: number;
+}
+
+function signalIdentityToken(value: unknown, position?: number): SignalIdentityToken {
 	if (value === null) return 'null';
 	const kind = typeof value;
 	return kind === 'string' || kind === 'number' || kind === 'bigint' || kind === 'boolean'
 		? kind.charCodeAt(0).toString(36) + ':' + String(value)
 		: kind === 'undefined'
 			? 'u:'
-			: 'o:' + String(value);
+			: { value: value as object | symbol, position };
+}
+
+function signalIdentityKey(
+	token: SignalIdentityToken,
+	base: string,
+	site: string | undefined,
+	parents: readonly string[],
+	componentKey: boolean,
+	ids: RootIdState,
+): string {
+	if (typeof token === 'string') return token;
+	// Opaque identities are local to this structural segment. Skipped hydration
+	// boundaries and unrelated call sites must not consume one another's ids.
+	const namespace = base + JSON.stringify([site ?? 'legacy', parents, componentKey]);
+	const state = (ids.signalState ??= { prefix: ids.prefix, next: 0 });
+	const namespaces = (state.opaqueKeys ??= new Map());
+	let keys = namespaces.get(namespace);
+	if (keys === undefined) {
+		keys = { objects: new WeakMap(), symbols: new Map(), used: new Set(), next: 0 };
+		namespaces.set(namespace, keys);
+	}
+	const value = token.value;
+	let id = typeof value === 'symbol' ? keys.symbols.get(value) : keys.objects.get(value);
+	if (id === undefined) {
+		// A late read can visit rows out of order. Their initial list positions
+		// still agree with SSR; subsequent keys cannot reuse a survivor's id.
+		id = token.position;
+		if (id === undefined || keys.used.has(id)) {
+			while (keys.used.has(keys.next)) keys.next++;
+			id = keys.next++;
+		}
+		keys.used.add(id);
+		if (typeof value === 'symbol') keys.symbols.set(value, id);
+		else keys.objects.set(value, id);
+	}
+	return 'o:' + id.toString(36);
 }
 
 function rootSignalInstanceKey(ids: RootIdState): string {
@@ -859,14 +904,14 @@ function structuralSignalInstanceKey(
 	hasKey: boolean,
 ): string {
 	let base = resolveSignalInstanceKey(parentScope);
-	const itemKeys: string[] = [];
+	const itemTokens: SignalIdentityToken[] = [];
 	const visited = new Set<Block>();
 	let scope: Scope | null = parentScope;
 	while (base === undefined && scope !== null) {
 		const block = scope.block;
 		if (!visited.has(block)) {
 			visited.add(block);
-			if (block.forSlot !== null) itemKeys.push(signalIdentityKey(block.key));
+			if (block.forSlot !== null) itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
 			base = resolveSignalInstanceKey(block);
 		}
 		scope = scope.parent;
@@ -876,18 +921,34 @@ function structuralSignalInstanceKey(
 	while (base === undefined && block !== null) {
 		if (!visited.has(block)) {
 			visited.add(block);
-			if (block.forSlot !== null) itemKeys.push(signalIdentityKey(block.key));
+			if (block.forSlot !== null) itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
 		}
 		base = resolveSignalInstanceKey(block);
 		block = block.parentBlock;
 	}
 	base ??= rootSignalInstanceKey(parentScope.block.idState);
-	itemKeys.reverse();
+	itemTokens.reverse();
+	const ids = parentScope.block.idState;
+	let itemKeys = itemTokens as string[];
+	for (const token of itemTokens) {
+		if (typeof token === 'string') continue;
+		itemKeys = [];
+		for (const entry of itemTokens) {
+			itemKeys.push(signalIdentityKey(entry, base, invocationSite, itemKeys, false, ids));
+		}
+		break;
+	}
 	// Encode only the new segment: re-encoding the ancestor JSON doubles its
 	// escaping at every level and exhausts string limits on deeply nested trees.
 	return (
 		base +
-		JSON.stringify([invocationSite ?? 'legacy', itemKeys, hasKey ? signalIdentityKey(key) : ''])
+		JSON.stringify([
+			invocationSite ?? 'legacy',
+			itemKeys,
+			hasKey
+				? signalIdentityKey(signalIdentityToken(key), base, invocationSite, itemKeys, true, ids)
+				: '',
+		])
 	);
 }
 
@@ -1704,7 +1765,7 @@ interface RootIdState {
 	prefix: string;
 	next: number;
 	/** Shared deterministic namespace for lazily used module-signal instances. */
-	signalState?: { prefix: string; next: number };
+	signalState?: { prefix: string; next: number; opaqueKeys?: Map<string, OpaqueSignalKeys> };
 	/** Shared render ownership; descendants already carry this root-local record. */
 	renderOwner?: RootRenderOwner;
 	/** Exclusive end of an SSR-reserved deferred-boundary range. */
@@ -44709,6 +44770,7 @@ function makeRoot(
 			} finally {
 				// An unresolved wakeable may retain its ping indefinitely. Leave it
 				// only the disposed owner token, not a tree, hydration closure or props.
+				idState.signalState?.opaqueKeys?.clear();
 				NATIVE_READ_DRIVER?.clearDeferredRefs(renderOwner);
 				renderOwner.current = null;
 				renderOwner.retry = noop;
