@@ -232,8 +232,14 @@ import {
 	runNativeBatch,
 	setNativeCandidateResolver,
 	setNativeAdoptionResolver,
+	beginNativeWriteGuard,
+	endNativeWriteGuard,
 } from './signals/read-protocol.js';
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
+import {
+	isNativeSignalDiagnosticInitializer,
+	type DiagnosticSignalInitializer,
+} from './signals/diagnostic-local-hook.js';
 import {
 	createNativeAdoptionState,
 	NATIVE_SIGNAL_SEED_ATTR,
@@ -1156,14 +1162,14 @@ function nativePresentationBinding(
 /** @internal Enable invocation collection before an opted-in module renders. */
 export function enableNativeReadCollection(abi = 1): void {
 	if (abi !== 1) throw new Error(formatClientError(58));
+	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	ensureNativeReadDriver();
 }
 
 /** @internal Compiler/runtime native-read capability version 1. */
 export function beginNativeReadScope(scope: Scope | undefined, abi = 1): number {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null)
-		throw new PresentationAdoptionMiss(undefined, false);
 	if (abi !== 1) throw new Error(formatClientError(58));
+	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return -1;
 	const block = CURRENT_BLOCK;
 	const owner = scope ?? CURRENT_SCOPE;
 	if (block === null || owner === null) return -1;
@@ -1320,6 +1326,7 @@ export function endNativeReadScope(token: number, _completed: boolean): void {
 
 /** @internal Automatic caches preserve read evidence without changing useMemo. */
 export function beginNativeReadWitness(detached = false): number {
+	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return -1;
 	return detached
 		? ensureNativeReadDriver().beginWitness(true)
 		: (NATIVE_READ_DRIVER?.beginWitness() ?? -1);
@@ -1335,6 +1342,7 @@ export function finishNativeReadWitness(
 
 /** @internal A cache hit reattaches its native dependencies to this attempt. */
 export function replayNativeReadWitness(witness: NativeReadWitness | null | undefined): void {
+	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	NATIVE_READ_DRIVER?.replay(witness);
 }
 
@@ -10721,7 +10729,8 @@ function renderBlockInner(block: Block): true | undefined {
 	let profileThrown: unknown;
 	let renderCompleted = false;
 	let renderRetry = false;
-	NATIVE_READ_DRIVER?.beginRender(block);
+	if (process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
+		NATIVE_READ_DRIVER?.beginRender(block);
 	NATIVE_BLOCK_RETRIES?.get(block)?.clear();
 	try {
 		if (urgentTransitionRender !== null)
@@ -10821,7 +10830,8 @@ function renderBlockInner(block: Block): true | undefined {
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
 		try {
-			NATIVE_READ_DRIVER?.endRender(block, renderCompleted, isSuspenseException(profileThrown));
+			if (process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
+				NATIVE_READ_DRIVER?.endRender(block, renderCompleted, isSuspenseException(profileThrown));
 		} finally {
 			if (urgentTransitionRender !== null)
 				urgentTransitionDriver!.endUrgent(block, urgentTransitionRender);
@@ -11900,21 +11910,38 @@ function resolveSlot(slot: HookSlot | undefined): HookSlot | undefined {
 		: resolved;
 }
 
+/** @internal Built-in adapters are allocated only during historical comparison. */
+export function isNativeSignalDiagnosticProbe(): boolean {
+	return process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null;
+}
+
 /** @internal Optional native hooks use the existing compiler slot and Scope lifetime. */
 export function nativeLocalHook<T>(
 	name: string,
 	initialize: () => T,
 	dispose: (value: T) => void,
 	slot?: HookSlot,
+	diagnosticInitialize?: DiagnosticSignalInitializer<T>,
 ): T {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null)
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		hydrateAttributeProbe !== null &&
+		(name !== 'useSignal$' ||
+			diagnosticInitialize === undefined ||
+			!isNativeSignalDiagnosticInitializer(diagnosticInitialize))
+	)
 		throw new PresentationAdoptionMiss(undefined, false);
 	slot = resolveSlot(slot);
 	if (slot === undefined || CURRENT_SCOPE === null) missingSlot(name);
 	const scope = CURRENT_SCOPE!;
 	let cell = scope.hooks?.get(slot) as { nativeValue: T } | undefined;
 	if (cell === undefined) {
-		cell = { nativeValue: initialize() };
+		cell = {
+			nativeValue:
+				process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null
+					? diagnosticInitialize!()
+					: initialize(),
+		};
 		ensureHooks(scope).set(slot, cell);
 		const value = cell.nativeValue;
 		registerHookCleanup(scope, () => dispose(value));
@@ -14508,6 +14535,10 @@ function collectInitialHydrateAttributes(
 	if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
 	hydration.protectRootAnchor(end);
 	const capture = createOffscreenCapture();
+	const diagnosticNative =
+		state.nativeSeedRaw === undefined
+			? undefined
+			: createNativeAdoptionState(parseNativeSignalManifest(state.nativeSeedRaw));
 	const previousHydration = currentHydration;
 	const previousCapture = WIP_CAPTURE;
 	const previousProbe = hydrateAttributeProbe;
@@ -14527,7 +14558,12 @@ function collectInitialHydrateAttributes(
 	const previousSelectDefaultSyncs = SELECT_DEFAULT_SYNCS;
 	const previousFormChecks = DEV_FORM_CHECKS;
 	const previousAutofocus = AUTOFOCUS_QUEUE;
-	const previousNative = setNativeAdoptionResolver(null);
+	// Historical reads must not enter the parent invocation or memo witness.
+	// Keep render purity while the native collection/publication driver is paused.
+	const diagnosticDriver = NATIVE_READ_DRIVER;
+	const nativeProbeToken = diagnosticDriver?.pauseLifecycle() ?? -1;
+	const previousWriteGuard = beginNativeWriteGuard();
+	const previousNative = setNativeAdoptionResolver(diagnosticNative?.resolve ?? null);
 	const refDetachCheckpoint = refDetachQueue.length;
 	currentHydration = hydration;
 	WIP_CAPTURE = capture;
@@ -14559,27 +14595,36 @@ function collectInitialHydrateAttributes(
 			disposeWip({ block, start, end, capture, domParent: wrapper, refDetachCheckpoint });
 			drainHydrationRenderPhaseUpdates(block);
 		} finally {
-			setNativeAdoptionResolver(previousNative);
-			currentHydration = previousHydration;
-			WIP_CAPTURE = previousCapture;
-			hydrateAttributeProbe = previousProbe;
-			ROOT_RENDER_TRANSACTION = previousTransaction;
-			TRANSITION_JOURNAL = previousJournal;
-			ACTIVE_TRANSITION_ATTEMPT = previousAttempt;
-			SCOPED_READ_TRACKING = previousScopedReadTracking;
-			SCOPED_READS = previousScopedReads;
-			CURRENT_WARM = previousWarm;
-			CURRENT_WARM_CLAIMS = previousWarmClaims;
-			CURRENT_WARM_EPISODE = previousWarmEpisode;
-			ACTIVE_WARM_PLANS.length = 0;
-			ACTIVE_WARM_PLANS.push(...previousWarmPlans);
-			STAGED_DOM = previousStagedDom;
-			STAGED_COMMIT_CAPTURE = previousStagedCapture;
-			PRESENTATION_HYDRATION = previousPresentation;
-			SELECT_SYNCS = previousSelectSyncs;
-			SELECT_DEFAULT_SYNCS = previousSelectDefaultSyncs;
-			DEV_FORM_CHECKS = previousFormChecks;
-			AUTOFOCUS_QUEUE = previousAutofocus;
+			try {
+				diagnosticNative?.release();
+			} finally {
+				try {
+					setNativeAdoptionResolver(previousNative);
+					endNativeWriteGuard(previousWriteGuard);
+					if (nativeProbeToken >= 0) diagnosticDriver!.resumeLifecycle(nativeProbeToken);
+				} finally {
+					currentHydration = previousHydration;
+					WIP_CAPTURE = previousCapture;
+					hydrateAttributeProbe = previousProbe;
+					ROOT_RENDER_TRANSACTION = previousTransaction;
+					TRANSITION_JOURNAL = previousJournal;
+					ACTIVE_TRANSITION_ATTEMPT = previousAttempt;
+					SCOPED_READ_TRACKING = previousScopedReadTracking;
+					SCOPED_READS = previousScopedReads;
+					CURRENT_WARM = previousWarm;
+					CURRENT_WARM_CLAIMS = previousWarmClaims;
+					CURRENT_WARM_EPISODE = previousWarmEpisode;
+					ACTIVE_WARM_PLANS.length = 0;
+					ACTIVE_WARM_PLANS.push(...previousWarmPlans);
+					STAGED_DOM = previousStagedDom;
+					STAGED_COMMIT_CAPTURE = previousStagedCapture;
+					PRESENTATION_HYDRATION = previousPresentation;
+					SELECT_SYNCS = previousSelectSyncs;
+					SELECT_DEFAULT_SYNCS = previousSelectDefaultSyncs;
+					DEV_FORM_CHECKS = previousFormChecks;
+					AUTOFOCUS_QUEUE = previousAutofocus;
+				}
+			}
 		}
 	}
 	return probe;
