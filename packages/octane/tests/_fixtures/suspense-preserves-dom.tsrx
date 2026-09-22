@@ -172,6 +172,31 @@ export function RootSuspensionAfterSiblingApp(props: {
 	</section>
 }
 
+function ConditionalArmExpandButton(props: { click: () => void }) @{
+	<button id="conditional-arm-expand" onClick={props.click}>{'expand'}</button>
+}
+
+export function ConditionalArmRootSuspensionApp(props: {
+	active: boolean;
+	promise: PromiseLike<string>;
+}) @{
+	const [expanded, setExpanded] = useState(false);
+	<section id="conditional-arm-root-shell">
+		<div id="conditional-arm-content">
+			@if (props.active) {
+				<>
+					<ConditionalArmExpandButton click={() => setExpanded(!expanded)} />
+					@if (expanded) {
+						<p id="conditional-arm-detail">{'detail'}</p>
+					}
+				</>
+			}
+			<span id="conditional-arm-replacement">{'replacement'}</span>
+		</div>
+		<RootSuspensionReader promise={props.promise} />
+	</section>
+}
+
 function AsyncRoute(props) @{
 	const value = use(props.promise);
 	<main id="preserved-route">{'route:' + value}</main>
