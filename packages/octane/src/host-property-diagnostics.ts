@@ -128,6 +128,24 @@ for (const name of [
 	KNOWN_SVG_PROPERTY_SPELLINGS.set(name.toLowerCase(), name);
 }
 
+// JSX's NonNativeLowercaseProps operations and SVG-only names do not have
+// equivalent native lowercase HTML spellings.
+const NON_NATIVE_LOWERCASE_PROPERTIES = new Set([
+	'autoFocus',
+	'defaultValue',
+	'defaultChecked',
+	'dangerouslySetInnerHTML',
+	'className',
+	'suppressContentEditableWarning',
+	'suppressHydrationWarning',
+	'suppressNativeChangeWarning',
+	'__octaneNativeChangeDiagnostic',
+	'acceptCharset',
+	'htmlFor',
+	'httpEquiv',
+	'viewBox',
+]);
+
 /** Development-only host-name/value diagnostics shared by DOM and SSR. */
 export function hostPropertyWarning(
 	name: string,
@@ -159,6 +177,16 @@ export function hostPropertyWarning(
 		KNOWN_PROPERTY_SPELLINGS.get(lower) ??
 		(isSvg ? KNOWN_SVG_PROPERTY_SPELLINGS.get(lower) : undefined);
 	if (known !== undefined) {
+		if (
+			!isSvg &&
+			name === lower &&
+			// Hyphenated/namespaced presentation aliases belong to SVG, not HTML.
+			!name.includes('-') &&
+			!name.includes(':') &&
+			!NON_NATIVE_LOWERCASE_PROPERTIES.has(known) &&
+			(ATTRIBUTE_ALIASES.get(known) ?? lower) === lower
+		)
+			return null;
 		if (isSvg && ATTRIBUTE_ALIASES.get(known) === name) return null;
 		return name !== known ? `Invalid DOM property \`${name}\`. Did you mean \`${known}\`?` : null;
 	}

@@ -127,6 +127,29 @@ function expectSpreadMarkup(html: string, prefix: string): void {
 	expect(html).not.toContain(` on${prefix}click`);
 }
 
+const nativeImageAttributes = {
+	fetchpriority: 'low',
+	srcset: '/synthetic.svg 1x, /synthetic.svg 2x',
+	referrerpolicy: 'no-referrer',
+} as const;
+
+function expectNativeImageMarkup(html: string): void {
+	const container = document.createElement('div');
+	container.innerHTML = html;
+	for (const id of [
+		'static-native-image',
+		'dynamic-native-image',
+		'canonical-image',
+		'spread-native-image',
+	]) {
+		const image = container.querySelector(`#${id}`);
+		expect(image).not.toBeNull();
+		for (const [name, value] of Object.entries(nativeImageAttributes)) {
+			expect(image!.getAttribute(name)).toBe(value);
+		}
+	}
+}
+
 afterEach(() => {
 	vi.restoreAllMocks();
 });
@@ -155,6 +178,64 @@ it.each([
 
 	expectSpreadMarkup(html, prefix);
 	expect(messages(error)).toEqual(spreadWarnings(prefix));
+});
+
+// OCTANE DIVERGENCE: HTML accepts equivalent native lowercase spellings
+// alongside the React-shaped JSX properties on every public server API.
+it.each(renderers)(
+	'accepts native and canonical image attributes without DEV diagnostics through $name',
+	async ({ render }) => {
+		const error = errors();
+		const html = await render(dev, 'NativeImageAttributes', {
+			...nativeImageAttributes,
+			attributes: nativeImageAttributes,
+		});
+
+		expectNativeImageMarkup(html);
+		expect(messages(error)).toEqual([]);
+	},
+);
+
+it('retains diagnostics for casing mistakes and lowercase framework-only properties', () => {
+	const error = errors();
+	const attributes = {
+		srcSET: '/synthetic.svg 1x',
+		autofocus: 'true',
+		defaultvalue: 'draft',
+		defaultchecked: 'true',
+		classname: 'raw-class',
+		acceptcharset: 'utf-8',
+		htmlfor: 'synthetic-input',
+		httpequiv: 'refresh',
+		suppressnativechangewarning: 'true',
+	};
+	const html = renderToString(dev.SpreadAttributeDiagnostics, { attributes }).html;
+
+	expect(html).toContain('srcSET="/synthetic.svg 1x"');
+	expect(html).toContain('defaultvalue="draft"');
+	expect(html).toContain('classname="raw-class"');
+	expect(messages(error)).toEqual([
+		'Invalid DOM property `srcSET`. Did you mean `srcSet`?',
+		'Invalid DOM property `autofocus`. Did you mean `autoFocus`?',
+		'Invalid DOM property `defaultvalue`. Did you mean `defaultValue`?',
+		'Invalid DOM property `defaultchecked`. Did you mean `defaultChecked`?',
+		'Invalid DOM property `classname`. Did you mean `className`?',
+		'Invalid DOM property `acceptcharset`. Did you mean `acceptCharset`?',
+		'Invalid DOM property `htmlfor`. Did you mean `htmlFor`?',
+		'Invalid DOM property `httpequiv`. Did you mean `httpEquiv`?',
+		'Invalid DOM property `suppressnativechangewarning`. Did you mean `suppressNativeChangeWarning`?',
+	]);
+});
+
+it('keeps SVG casing diagnostics and native presentation aliases', () => {
+	const error = errors();
+	const html = renderToString(dev.SvgAttributeDiagnostics, {
+		attributes: { viewbox: '0 0 1 1', 'stroke-width': '2' },
+	}).html;
+
+	expect(html).toContain('viewbox="0 0 1 1"');
+	expect(html).toContain('stroke-width="2"');
+	expect(messages(error)).toEqual(['Invalid DOM property `viewbox`. Did you mean `viewBox`?']);
 });
 
 // Per ReactDOMUnknownPropertyHook.js:371-374: custom elements bypass shared
@@ -223,6 +304,11 @@ it('keeps production SSR silent across buffered and streaming APIs', async () =>
 				attributes: spreadAttributes(prefix),
 			});
 			expectSpreadMarkup(html, prefix);
+			const nativeImageHtml = await renderers[i].render(prod, 'NativeImageAttributes', {
+				...nativeImageAttributes,
+				attributes: nativeImageAttributes,
+			});
+			expectNativeImageMarkup(nativeImageHtml);
 		}
 	} finally {
 		if (originalNodeEnv === undefined) delete process.env.NODE_ENV;

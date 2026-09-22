@@ -50,6 +50,46 @@ export function CanonicalAliasedProperties() @{
 	<label id="canonical-aliased-properties" htmlFor="canonical-input" tabIndex={-1} />
 }
 
+export function StaticNativeImageProperties() @{
+	<img
+		id="native-image-properties"
+		fetchpriority="low"
+		srcset="/image.svg 1x, /image-large.svg 2x"
+		referrerpolicy="no-referrer"
+		crossorigin="anonymous"
+	/>
+}
+
+export function DynamicNativeImageProperties(props: {
+	fetchpriority: 'high' | 'low';
+	srcset: string;
+	referrerpolicy: 'no-referrer' | 'origin';
+}) @{
+	<img
+		id="native-image-properties"
+		fetchpriority={props.fetchpriority}
+		srcset={props.srcset}
+		referrerpolicy={props.referrerpolicy}
+	/>
+}
+
+export function SpreadImageProperties(props: AttributeProps) @{
+	<img id="native-image-properties" {...props.attributes} />
+}
+
+export function NativeInputProperties() @{
+	<input
+		id="native-input-properties"
+		maxlength="12"
+		minlength="4"
+		tabindex="2"
+		enterkeyhint="done"
+		inputmode="numeric"
+		autocapitalize="none"
+		autocorrect="off"
+	/>
+}
+
 export function NativeLabelFor(props: { target: string }) @{
 	<label id="native-label-for" for={props.target} />
 }

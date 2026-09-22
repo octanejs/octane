@@ -50,6 +50,39 @@ export function SpreadAttributeDiagnostics(props: { attributes: Record<string, u
 	<div id="spread-attribute-diagnostics" {...props.attributes} />
 }
 
+export function NativeImageAttributes(props: {
+	fetchpriority: 'high' | 'low' | 'auto';
+	srcset: string;
+	referrerpolicy: 'no-referrer' | 'origin';
+	attributes: Record<string, unknown>;
+}) @{
+	<main>
+		<img
+			id="static-native-image"
+			fetchpriority="low"
+			srcset="/synthetic.svg 1x, /synthetic.svg 2x"
+			referrerpolicy="no-referrer"
+		/>
+		<img
+			id="dynamic-native-image"
+			fetchpriority={props.fetchpriority}
+			srcset={props.srcset}
+			referrerpolicy={props.referrerpolicy}
+		/>
+		<img
+			id="canonical-image"
+			fetchPriority={props.fetchpriority}
+			srcSet={props.srcset}
+			referrerPolicy={props.referrerpolicy}
+		/>
+		<img id="spread-native-image" {...props.attributes} />
+	</main>
+}
+
+export function SvgAttributeDiagnostics(props: { attributes: Record<string, unknown> }) @{
+	<svg id="svg-attribute-diagnostics" {...props.attributes} />
+}
+
 export function HeadAttributeDiagnostics(props: { handler: () => void; truthy: boolean }) @{
 	<>
 		<meta
