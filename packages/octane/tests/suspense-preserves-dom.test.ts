@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, mount, nextPaint } from './_helpers';
 import {
+	ConditionalArmRootSuspensionApp,
 	DescriptorRootSuspensionAfterSiblingApp,
 	HiddenPrimaryRefCatchApp,
 	HiddenInsertionCleanupApp,
@@ -132,6 +133,55 @@ function setupNestedPortal(onDetach?: (mounted: ReturnType<typeof mount>) => voi
 }
 
 describe('Suspense preserves committed host DOM', () => {
+	it('abandons a suspended new conditional arm before growing and replacing the accepted arm', async () => {
+		const pending = deferred<string>();
+		const initial = fulfilled('A');
+		const accepted = fulfilled('C');
+		const root = mount(ConditionalArmRootSuspensionApp, { active: false, promise: initial });
+		try {
+			const shell = root.find('#conditional-arm-root-shell');
+			const content = root.find('#conditional-arm-content');
+			const replacement = root.find('#conditional-arm-replacement');
+			const reader = root.find('#root-suspension-reader');
+
+			root.update(ConditionalArmRootSuspensionApp, { active: true, promise: pending.promise });
+			expect(root.find('#conditional-arm-root-shell')).toBe(shell);
+			expect(root.find('#conditional-arm-content')).toBe(content);
+			expect(root.find('#conditional-arm-replacement')).toBe(replacement);
+			expect(root.findAll('#conditional-arm-expand')).toHaveLength(0);
+			expect(root.findAll('#conditional-arm-detail')).toHaveLength(0);
+			expect(root.find('#root-suspension-reader')).toBe(reader);
+			expect(reader.textContent).toBe('resource:A');
+
+			root.update(ConditionalArmRootSuspensionApp, { active: true, promise: accepted });
+			const expand = root.find('#conditional-arm-expand');
+			expect(content.textContent).toBe('expandreplacement');
+			expect(root.find('#root-suspension-reader')).toBe(reader);
+			expect(reader.textContent).toBe('resource:C');
+			root.click('#conditional-arm-expand');
+			expect(root.find('#conditional-arm-expand')).toBe(expand);
+			expect(root.findAll('#conditional-arm-detail')).toHaveLength(1);
+			expect(content.textContent).toBe('expanddetailreplacement');
+
+			root.update(ConditionalArmRootSuspensionApp, { active: false, promise: accepted });
+			expect(root.find('#conditional-arm-replacement')).toBe(replacement);
+			expect(root.findAll('#conditional-arm-expand')).toHaveLength(0);
+			expect(root.findAll('#conditional-arm-detail')).toHaveLength(0);
+			expect(content.textContent).toBe('replacement');
+
+			await act(() => pending.resolve('B'));
+			expect(root.find('#conditional-arm-root-shell')).toBe(shell);
+			expect(root.find('#conditional-arm-content')).toBe(content);
+			expect(root.find('#conditional-arm-replacement')).toBe(replacement);
+			expect(root.findAll('#conditional-arm-expand')).toHaveLength(0);
+			expect(root.findAll('#conditional-arm-detail')).toHaveLength(0);
+			expect(root.find('#root-suspension-reader')).toBe(reader);
+			expect(reader.textContent).toBe('resource:C');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('restores externally edited descriptor text when a later sibling suspends', async () => {
 		const pending = deferred<string>();
 		let value: string | null = 'A';

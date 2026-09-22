@@ -1,16 +1,127 @@
 import { useState, useId } from 'octane';
 
+function ExpandButton({ click }: { click: () => void }) @{
+	<button class="shown" onClick={click}>{'expand'}</button>
+}
+
 export function Toggle() @{
-	const [on, setOn] = useState(false);
+	const [on, setOn] = useState(true);
+	const [expanded, setExpanded] = useState(false);
 	<div>
-		<button onClick={() => setOn(!on)}>
-			{on ? 'on' : 'off'}
-		</button>
+		<button id="swap" onClick={() => setOn(!on)}>{'swap'}</button>
 		<section>
 			@if (on) {
-				<p class="shown">{'shown'}</p>
+				<>
+					<ExpandButton click={() => setExpanded(!expanded)} />
+					@if (expanded) {
+						<p class="detail">{'detail'}</p>
+					}
+				</>
 			} @else {
-				<p class="hidden">{'hidden'}</p>
+				<span class="hidden">{'replacement'}</span>
+			}
+		</section>
+	</div>
+}
+
+export function SwitchToggle() @{
+	const [on, setOn] = useState(true);
+	const [expanded, setExpanded] = useState(false);
+	<div>
+		<button id="swap" onClick={() => setOn(!on)}>{'swap'}</button>
+		<section>
+			@switch (on) {
+				@case true: {
+					<>
+						<ExpandButton click={() => setExpanded(!expanded)} />
+						@if (expanded) {
+							<p class="detail">{'detail'}</p>
+						}
+					</>
+				}
+				@default: {
+					<span class="hidden">{'replacement'}</span>
+				}
+			}
+		</section>
+	</div>
+}
+
+export function MaybeDetail({ show }: { show: boolean }) @{
+	<>
+		@if (show) {
+			<p class="detail">{'detail'}</p>
+		}
+	</>
+}
+
+export function LiteToggle() @{
+	const [on, setOn] = useState(true);
+	const [expanded, setExpanded] = useState(false);
+	<div>
+		<button id="swap" onClick={() => setOn(!on)}>{'swap'}</button>
+		<section>
+			@if (on) {
+				<>
+					<ExpandButton click={() => setExpanded(!expanded)} />
+					<MaybeDetail show={expanded} />
+				</>
+			} @else {
+				<span class="hidden">{'replacement'}</span>
+			}
+		</section>
+	</div>
+}
+
+function SwapButton({ click }: { click: () => void }) @{
+	<button id="swap" onClick={click}>{'swap'}</button>
+}
+
+export function NestedLiteToggle() @{
+	const [on, setOn] = useState(true);
+	const [expanded, setExpanded] = useState(false);
+	<>
+		@if (on) {
+			<section class="nested">
+				<SwapButton click={() => setOn(!on)} />
+				<ExpandButton click={() => setExpanded(!expanded)} />
+				<MaybeDetail show={expanded} />
+			</section>
+		} @else {
+			<section>
+				<SwapButton click={() => setOn(!on)} />
+				<span class="hidden">{'replacement'}</span>
+			</section>
+		}
+	</>
+}
+
+export function NestedDetail({ show }: { show: boolean }) @{
+	<p class="detail">
+		{show ? 'detail' : ''}
+	</p>
+}
+
+export function ReplacementDetail({ show }: { show: boolean }) @{
+	<span class="detail">
+		{show ? 'detail' : ''}
+	</span>
+}
+
+export function NestedComponentToggle({ UnknownComp }: { UnknownComp: typeof NestedDetail }) @{
+	const [on, setOn] = useState(true);
+	const [expanded, setExpanded] = useState(false);
+	<div>
+		<button id="swap" onClick={() => setOn(!on)}>{'swap'}</button>
+		<button id="expand" onClick={() => setExpanded(!expanded)}>{'expand'}</button>
+		<section>
+			@if (on) {
+				<div class="nested">
+					<UnknownComp show={expanded} />
+					<UnknownComp show={expanded} />
+				</div>
+			} @else {
+				<span class="hidden">{'replacement'}</span>
 			}
 		</section>
 	</div>

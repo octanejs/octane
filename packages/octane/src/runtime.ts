@@ -39420,6 +39420,54 @@ function preservesCommittedSuspense(block: Block): boolean {
 	return false;
 }
 
+/** Count direct root slots, or retarget their provisional anchors to a durable end. */
+function markerlessBranchRoots(
+	scope: Scope,
+	domParent: Node,
+	after: Node | null,
+	end: Comment | null = null,
+): number {
+	let roots = 0;
+	const slots = scope._slots;
+	if (slots !== null) {
+		// Nested template directives have distinct anchors. Appended component
+		// children can share null anchors, so also check their owning host.
+		for (let i = 0; i < slots.length; i++) {
+			const slot = slots[i];
+			if (
+				slot.anchor === after &&
+				(slot.__kind === 'ifBlockSlot' ||
+					slot.__kind === 'switchBlockSlot' ||
+					(slot.__kind === 'componentSlotSlot' && slot.block?.parentNode === domParent))
+			) {
+				roots++;
+				if (end !== null) {
+					journalRootProperty(slot, 'anchor', slot.anchor);
+					slot.anchor = end;
+				}
+			}
+		}
+	}
+	// Lite components retain their insertion context and may themselves contain
+	// empty root slots. Nested host children have a different parent, even when
+	// both insertion anchors are null, and must keep that host's context.
+	const children = scope.children;
+	if (children !== null) {
+		for (let i = 0; i < children.length; i++) {
+			const child = children[i].scope;
+			const block = child.block;
+			if (block !== scope.block && block.parentNode === domParent && block.endMarker === after) {
+				roots += markerlessBranchRoots(child, domParent, after, end) || 1;
+				if (end !== null) {
+					journalRootProperty(block, 'endMarker', block.endMarker);
+					block.endMarker = end;
+				}
+			}
+		}
+	}
+	return roots;
+}
+
 /** Publish the DOM boundary of a markerless arm after its body finally completes. */
 function finalizeMarkerlessBranch(
 	state: BranchSlot,
@@ -39435,7 +39483,14 @@ function finalizeMarkerlessBranch(
 	const last = after
 		? (STAGED_DOM?.view(after) ?? after).previousSibling
 		: (STAGED_DOM?.view(domParent) ?? domParent).lastChild;
-	if (last !== null && first === last && first.nodeType === 1) {
+	// One current element is not a sole root when an empty sibling slot can
+	// later produce more output at the same provisional insertion anchor.
+	if (
+		last !== null &&
+		first === last &&
+		first.nodeType === 1 &&
+		markerlessBranchRoots(block, domParent, after) <= 1
+	) {
 		block.startMarker = first;
 		block.endMarker = first;
 		state.end = first;
@@ -39449,6 +39504,7 @@ function finalizeMarkerlessBranch(
 		block.exclusiveMarkers = true;
 		state.start = start;
 		state.end = end;
+		markerlessBranchRoots(block, domParent, after, end);
 	}
 }
 

@@ -2,6 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
 import {
 	Toggle,
+	SwitchToggle,
+	LiteToggle,
+	NestedLiteToggle,
+	NestedComponentToggle,
+	NestedDetail,
+	ReplacementDetail,
 	IfOnly,
 	HookInIf,
 	IdInComponent,
@@ -10,18 +16,132 @@ import {
 	WhitespaceInIf,
 } from './_fixtures/control.tsrx';
 
+function expectExpandedArmReplacement(body: typeof Toggle) {
+	const r = mount(body);
+	try {
+		const section = r.find('section');
+		expect(section.textContent).toBe('expand');
+		expect(r.findAll('.detail')).toHaveLength(0);
+		expect(r.findAll('.hidden')).toHaveLength(0);
+
+		for (let cycle = 0; cycle < 2; cycle++) {
+			const button = r.find('.shown');
+			r.click('.shown');
+			expect(r.findAll('.detail')).toHaveLength(1);
+			expect(section.textContent).toBe('expanddetail');
+			expect(r.find('.shown')).toBe(button);
+
+			r.click('.shown');
+			expect(r.findAll('.detail')).toHaveLength(0);
+			expect(section.textContent).toBe('expand');
+			expect(r.find('.shown')).toBe(button);
+
+			r.click('.shown');
+			expect(r.findAll('.detail')).toHaveLength(1);
+			expect(r.find('.shown')).toBe(button);
+			r.click('#swap');
+			expect(r.findAll('.shown')).toHaveLength(0);
+			expect(r.findAll('.detail')).toHaveLength(0);
+			expect(r.findAll('.hidden')).toHaveLength(1);
+			expect(section.textContent).toBe('replacement');
+
+			r.click('#swap');
+			expect(r.findAll('.shown')).toHaveLength(1);
+			expect(r.findAll('.detail')).toHaveLength(1);
+			expect(r.findAll('.hidden')).toHaveLength(0);
+			expect(section.textContent).toBe('expanddetail');
+			r.click('.shown');
+			expect(r.findAll('.detail')).toHaveLength(0);
+			expect(section.textContent).toBe('expand');
+		}
+	} finally {
+		r.unmount();
+	}
+}
+
 describe('ifBlock', () => {
 	it('swaps then/else branches', () => {
-		const r = mount(Toggle);
-		expect(r.findAll('.shown')).toHaveLength(0);
-		expect(r.findAll('.hidden')).toHaveLength(1);
-		r.click('button');
-		expect(r.findAll('.shown')).toHaveLength(1);
-		expect(r.findAll('.hidden')).toHaveLength(0);
-		r.click('button');
-		expect(r.findAll('.shown')).toHaveLength(0);
-		expect(r.findAll('.hidden')).toHaveLength(1);
-		r.unmount();
+		expectExpandedArmReplacement(Toggle);
+	});
+
+	it('swaps branches after initially empty component siblings grow', () => {
+		expectExpandedArmReplacement(LiteToggle);
+	});
+
+	it('keeps nested component sibling growth inside its host', () => {
+		const r = mount(NestedLiteToggle);
+		try {
+			const nested = r.find('.nested');
+			const button = r.find('.shown');
+			expect(nested.textContent).toBe('swapexpand');
+			expect(r.findAll('.detail')).toHaveLength(0);
+
+			r.click('.shown');
+			expect(r.find('.shown')).toBe(button);
+			expect(r.findAll('.nested .detail')).toHaveLength(1);
+			expect(nested.textContent).toBe('swapexpanddetail');
+			r.click('.shown');
+			expect(r.find('.shown')).toBe(button);
+			expect(r.findAll('.detail')).toHaveLength(0);
+			expect(nested.textContent).toBe('swapexpand');
+			r.click('.shown');
+			expect(r.find('.shown')).toBe(button);
+			expect(r.findAll('.nested .detail')).toHaveLength(1);
+
+			r.click('#swap');
+			expect(r.findAll('.nested')).toHaveLength(0);
+			expect(r.findAll('.detail')).toHaveLength(0);
+			expect(r.find('.hidden').textContent).toBe('replacement');
+			expect(r.find('section').textContent).toBe('swapreplacement');
+			r.click('#swap');
+			expect(r.findAll('.hidden')).toHaveLength(0);
+			expect(r.findAll('.nested .detail')).toHaveLength(1);
+			expect(r.find('.nested').textContent).toBe('swapexpanddetail');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('keeps component replacements inside their nested host', () => {
+		let UnknownComp = NestedDetail;
+		const r = mount(NestedComponentToggle, { UnknownComp });
+		try {
+			const section = r.find('section');
+			expect(section.textContent).toBe('');
+			expect(r.findAll('.nested .detail')).toHaveLength(2);
+			for (let cycle = 0; cycle < 2; cycle++) {
+				const nested = r.find('.nested');
+				r.click('#expand');
+				expect(r.find('.nested')).toBe(nested);
+				expect(r.findAll('.nested .detail')).toHaveLength(2);
+				expect(nested.textContent).toBe('detaildetail');
+				expect(section.textContent).toBe('detaildetail');
+
+				const oldDetails = r.findAll('.nested .detail');
+				UnknownComp = UnknownComp === NestedDetail ? ReplacementDetail : NestedDetail;
+				r.update(NestedComponentToggle, { UnknownComp });
+				expect(r.find('.nested')).toBe(nested);
+				expect(r.findAll('.nested .detail')).toHaveLength(2);
+				expect(r.findAll('.detail')).toHaveLength(2);
+				expect(nested.textContent).toBe('detaildetail');
+				for (const oldDetail of oldDetails) {
+					expect(oldDetail.isConnected).toBe(false);
+				}
+
+				r.click('#swap');
+				expect(r.findAll('.nested')).toHaveLength(0);
+				expect(r.findAll('.detail')).toHaveLength(0);
+				expect(section.textContent).toBe('replacement');
+				r.click('#swap');
+				expect(r.findAll('.nested .detail')).toHaveLength(2);
+				expect(section.textContent).toBe('detaildetail');
+				r.click('#expand');
+				expect(r.findAll('.nested .detail')).toHaveLength(2);
+				expect(section.textContent).toBe('');
+			}
+		} finally {
+			r.unmount();
+		}
 	});
 
 	it('handles if without else (mount + unmount nothing on false)', () => {
@@ -45,6 +165,12 @@ describe('ifBlock', () => {
 		r.click('#top'); // show again — fresh state
 		expect(r.find('#inner').textContent).toBe('0');
 		r.unmount();
+	});
+});
+
+describe('switchBlock', () => {
+	it('swaps cases after the active case grows', () => {
+		expectExpandedArmReplacement(SwitchToggle);
 	});
 });
 
