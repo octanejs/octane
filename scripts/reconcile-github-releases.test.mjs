@@ -173,7 +173,7 @@ describe('GitHub release reconciliation', () => {
 		assert.ok(elapsed >= 900_000 && elapsed <= 930_000);
 	});
 
-	test('pushes annotated missing tags atomically without repository identity and creates every missing release sequentially', async () => {
+	test('pushes annotated missing tags atomically without repository identity and announces only octane sequentially', async () => {
 		const { expectedSha, remote, repository, root } = await createRepositoryFixture();
 		try {
 			const packages = await Promise.all([
@@ -220,13 +220,12 @@ describe('GitHub release reconciliation', () => {
 				result.missingTagPackages.map(releaseTag),
 				packages.slice(1).map(releaseTag),
 			);
-			assert.deepEqual(
-				created,
-				packages.map((pkg) => ({
-					body: `### Patch Changes\n\n- current ${pkg.name}`,
-					tag: releaseTag(pkg),
-				})),
-			);
+			assert.deepEqual(created, [
+				{
+					body: '### Patch Changes\n\n- current octane',
+					tag: releaseTag(packages[2]),
+				},
+			]);
 
 			const remoteTags = await listRemoteTags({ cwd: repository });
 			assert.deepEqual([...remoteTags].sort(), packages.map(releaseTag).sort());
@@ -258,7 +257,7 @@ describe('GitHub release reconciliation', () => {
 	test('repairs tags before querying GitHub releases', async () => {
 		const { expectedSha, repository, root } = await createRepositoryFixture();
 		try {
-			const pkg = await writePackage(repository, '@octanejs/alpha', '0.1.2', '0.1.1');
+			const pkg = await writePackage(repository, 'octane', '0.1.2', '0.1.1');
 			await assert.rejects(
 				reconcileGithubReleases([pkg], {
 					cwd: repository,
@@ -277,25 +276,54 @@ describe('GitHub release reconciliation', () => {
 		}
 	});
 
-	test('skips an incomplete changelog and continues creating later releases', async () => {
+	test('skips an incomplete changelog instead of announcing a release', async () => {
 		const { expectedSha, repository, root } = await createRepositoryFixture();
 		try {
-			const incomplete = await writePackage(repository, '@octanejs/incomplete', '0.1.2', '0.1.1');
+			const incomplete = await writePackage(repository, 'octane', '0.1.2', '0.1.1');
 			await writeFile(
 				path.join(incomplete.directory, 'CHANGELOG.md'),
-				'# @octanejs/incomplete\n\n## 0.1.1\n\n- previous\n',
+				'# octane\n\n## 0.1.1\n\n- previous\n',
 			);
-			const later = await writePackage(repository, '@octanejs/later', '0.2.3', '0.2.2');
 			const created = [];
-			const result = await reconcileGithubReleases([incomplete, later], {
+			const result = await reconcileGithubReleases([incomplete], {
 				createRelease: async (pkg) => created.push(releaseTag(pkg)),
 				cwd: repository,
 				expectedSha,
 				getReleaseTags: async () => new Set(),
 			});
 
-			assert.deepEqual(created, [releaseTag(later)]);
+			assert.deepEqual(created, []);
 			assert.deepEqual(result.skippedReleases.map(releaseTag), [releaseTag(incomplete)]);
+		} finally {
+			await rm(root, { force: true, recursive: true });
+		}
+	});
+
+	test('tags every published package but announces only octane', async () => {
+		const { expectedSha, repository, root } = await createRepositoryFixture();
+		try {
+			const packages = await Promise.all([
+				writePackage(repository, '@octanejs/alpha', '0.1.2', '0.1.1'),
+				writePackage(repository, '@octanejs/beta', '0.2.3', '0.2.2'),
+			]);
+			const queried = [];
+			const created = [];
+			const result = await reconcileGithubReleases(packages, {
+				createRelease: async (pkg) => created.push(releaseTag(pkg)),
+				cwd: repository,
+				expectedSha,
+				getReleaseTags: async (announced) => {
+					queried.push(...announced.map(releaseTag));
+					return new Set();
+				},
+			});
+
+			assert.deepEqual(queried, []);
+			assert.deepEqual(created, []);
+			assert.deepEqual(result.announcedPackages, []);
+			assert.deepEqual(result.missingTagPackages.map(releaseTag), packages.map(releaseTag));
+			const remoteTags = await listRemoteTags({ cwd: repository });
+			assert.deepEqual([...remoteTags].sort(), packages.map(releaseTag).sort());
 		} finally {
 			await rm(root, { force: true, recursive: true });
 		}

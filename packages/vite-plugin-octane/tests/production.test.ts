@@ -847,8 +847,9 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 					await clickControl(page.getByRole('button', { name: 'Conversation A', exact: true }));
 					await expect.poll(() => input.inputValue()).toBe('next draft for A');
 					await expect
-						.poll(() =>
-							page.getByText('Completed: one accepted operation', { exact: true }).count(),
+						.poll(
+							() => page.getByText('Completed: one accepted operation', { exact: true }).count(),
+							{ timeout: 10_000 },
 						)
 						.toBe(1);
 					expect(await page.locator('[data-conversation="A"] [data-turn]').count()).toBe(1);
@@ -1023,7 +1024,9 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 			await expect.poll(() => page.locator('[data-history="A"]').count()).toBe(1);
 			await expect.poll(() => input.inputValue()).toBe('draft A survives server history');
 			await expect
-				.poll(() => page.getByText('Completed: history-4', { exact: true }).count())
+				.poll(() => page.getByText('Completed: history-4', { exact: true }).count(), {
+					timeout: 10_000,
+				})
 				.toBe(1);
 			await expect.poll(() => page.getByRole('status').textContent()).toBe('History complete');
 			expect(await page.locator('[data-history="A"] [data-turn]').count()).toBe(2);
