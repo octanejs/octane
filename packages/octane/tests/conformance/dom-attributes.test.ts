@@ -458,7 +458,7 @@ describe('DOMPropertyOperations — attributes and reflected properties', () => 
 
 	// Per DOMPropertyOperations-test.js:154 — should remove for falsey boolean
 	// properties (+ the true half for symmetry).
-	it('initializes iframe src before connection and removes false allowFullScreen', () => {
+	it('allowFullScreen={false} never lands in the DOM', () => {
 		const src = 'https://widget.example/';
 		const nextSrc = 'https://widget.example/updated';
 		const connectedSources: (string | null)[] = [];
