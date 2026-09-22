@@ -1,5 +1,14 @@
 # octane
 
+## 0.4.1
+
+### Patch Changes
+
+- 36d5f5e: Initialize dynamic iframe sources before connecting the frame to the document, avoiding a transient sandbox warning for foreign URLs while preserving source updates.
+- 3da41d5: Accept supported native lowercase HTML attribute names in development host-property diagnostics while preserving guidance for casing mistakes, framework-only props, and SVG attributes.
+- 4ac71d2: Keep roots added by initially empty sibling slots inside conditional and switch arms so replacing an arm removes all of its content.
+- 4efa520: Keep eligible intrinsic `@for` row roots on the native template path when an explicit root `key` supplies the row key. This preserves keyed reordering, uncontrolled input state, and hydration adoption without the redundant descriptor boundary. Existing key precedence and component key boundaries remain unchanged.
+
 ## 0.4.0
 
 ### Minor Changes
