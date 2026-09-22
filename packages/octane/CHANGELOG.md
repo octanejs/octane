@@ -1,5 +1,11 @@
 # octane
 
+## 0.4.2
+
+### Patch Changes
+
+- 4b0eac4: Compare deferred hydration attributes with historical native signal values in development diagnostics. Keep local signal comparison state disposable and isolated from live subscriptions, writes, refs, and effects.
+
 ## 0.4.1
 
 ### Patch Changes
