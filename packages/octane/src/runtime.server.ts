@@ -472,7 +472,8 @@ interface ServerSignalListKeys {
 	parent: ServerSignalListKeys | null;
 	key: unknown;
 	mapped: boolean;
-	values: readonly string[] | null;
+	position: number;
+	values: readonly ServerSignalIdentityToken[] | null;
 }
 // Potential bindings keep raw keys until a real read needs their wire identity.
 // The recipe is persistent because a descendant frame can outlive its list arm.
@@ -2788,7 +2789,13 @@ function enterAsyncArm(armKey: unknown, mapped = false): void {
 			? previous + '|@arm-position:' + occurrence
 			: undefined;
 	if (SERVER_SIGNAL_BINDINGS_POTENTIAL && SIGNAL_CONTROL_SITE.charCodeAt(0) === 102) {
-		SIGNAL_LIST_KEYS = { parent: SIGNAL_LIST_KEYS, key: armKey, mapped, values: null };
+		SIGNAL_LIST_KEYS = {
+			parent: SIGNAL_LIST_KEYS,
+			key: armKey,
+			mapped,
+			position: occurrence,
+			values: null,
+		};
 	}
 	ASYNC_SCOPE = previous + '|@arm:' + asyncIdentityKey(armKey, false, fallbackPosition);
 }
@@ -4548,14 +4555,84 @@ function replayUpdatedComponentBody(
 	return out;
 }
 
-function signalIdentityKey(value: unknown): string {
+type ServerSignalIdentityToken = string | { value: object | symbol; position?: number };
+
+interface ServerOpaqueSignalKeys {
+	ids: Map<string, number>;
+	used: Set<number>;
+	next: number;
+}
+
+function signalIdentityToken(value: unknown, position?: number): ServerSignalIdentityToken {
 	if (value === null) return 'null';
 	const kind = typeof value;
 	return kind === 'string' || kind === 'number' || kind === 'bigint' || kind === 'boolean'
 		? kind.charCodeAt(0).toString(36) + ':' + String(value)
 		: kind === 'undefined'
 			? 'u:'
-			: 'o:' + String(value);
+			: { value: value as object | symbol, position };
+}
+
+function signalIdentityKey(
+	token: ServerSignalIdentityToken,
+	base: string,
+	site: string | undefined,
+	parents: readonly string[],
+	componentKey: boolean,
+): string {
+	if (typeof token === 'string') return token;
+	const resolved = RESOLVED!;
+	const namespace = base + JSON.stringify([site ?? 'legacy', parents, componentKey]);
+	const namespaces = (resolved.signalIdentityKeys ??= new Map());
+	let keys = namespaces.get(namespace);
+	if (keys === undefined) {
+		keys = { ids: new Map(), used: new Set(), next: 0 };
+		namespaces.set(namespace, keys);
+	}
+	// The request's async identity already aliases fresh object keys to their
+	// lexical position across retries. Keep that alias without sharing its id
+	// allocator with the client/server signal namespace.
+	const value = asyncIdentityKey(token.value, false);
+	let id = keys.ids.get(value);
+	if (id === undefined) {
+		id = token.position;
+		if (id === undefined || keys.used.has(id)) {
+			while (keys.used.has(keys.next)) keys.next++;
+			id = keys.next++;
+		}
+		keys.used.add(id);
+		keys.ids.set(value, id);
+	}
+	return 'o:' + id.toString(36);
+}
+
+function serverSignalSegmentKey(
+	base: string,
+	invocationSite: string | undefined,
+	listKeys: ServerSignalListKeys | null,
+	key: unknown,
+): string {
+	const tokens = resolveServerSignalListKeys(listKeys);
+	let itemKeys = tokens as readonly string[];
+	for (const token of tokens) {
+		if (typeof token === 'string') continue;
+		const values: string[] = [];
+		for (const entry of tokens) {
+			values.push(signalIdentityKey(entry, base, invocationSite, values, false));
+		}
+		itemKeys = values;
+		break;
+	}
+	return (
+		base +
+		JSON.stringify([
+			invocationSite ?? 'legacy',
+			itemKeys,
+			key != null
+				? signalIdentityKey(signalIdentityToken(key), base, invocationSite, itemKeys, true)
+				: '',
+		])
+	);
 }
 
 function serverStructuralSignalInstanceKey(
@@ -4564,17 +4641,17 @@ function serverStructuralSignalInstanceKey(
 ): string {
 	// Match the client's concatenated JSON segments without re-escaping the
 	// complete ancestor path at every component invocation.
-	return (
-		resolveServerSignalInstanceKey(SIGNAL_COMPONENT_INSTANCE_KEY) +
-		JSON.stringify([
-			invocationSite ?? 'legacy',
-			resolveServerSignalListKeys(SIGNAL_LIST_KEYS),
-			key != null ? signalIdentityKey(key) : '',
-		])
+	return serverSignalSegmentKey(
+		resolveServerSignalInstanceKey(SIGNAL_COMPONENT_INSTANCE_KEY),
+		invocationSite,
+		SIGNAL_LIST_KEYS,
+		key,
 	);
 }
 
-function resolveServerSignalListKeys(keys: ServerSignalListKeys | null): readonly string[] {
+function resolveServerSignalListKeys(
+	keys: ServerSignalListKeys | null,
+): readonly ServerSignalIdentityToken[] {
 	if (keys === null) return EMPTY_SIGNAL_LIST_KEYS;
 	if (keys.values !== null) return keys.values;
 	const pending: ServerSignalListKeys[] = [];
@@ -4583,10 +4660,13 @@ function resolveServerSignalListKeys(keys: ServerSignalListKeys | null): readonl
 		pending.push(parent);
 		parent = parent.parent;
 	}
-	let values = parent?.values ?? EMPTY_SIGNAL_LIST_KEYS;
+	let values: readonly ServerSignalIdentityToken[] = parent?.values ?? EMPTY_SIGNAL_LIST_KEYS;
 	for (let index = pending.length - 1; index >= 0; index--) {
 		const entry = pending[index]!;
-		values = [...values, signalIdentityKey(entry.mapped ? 'k' + String(entry.key) : entry.key)];
+		values = [
+			...values,
+			signalIdentityToken(entry.mapped ? 'k' + String(entry.key) : entry.key, entry.position),
+		];
 		entry.values = values;
 	}
 	return values;
@@ -4608,11 +4688,12 @@ function resolveServerSignalInstanceKey(identity: ServerSignalInstanceKey): stri
 	}
 	for (let index = pending.length - 1; index >= 0; index--) {
 		const frame = pending[index]!;
-		identity += JSON.stringify([
-			frame.signalInvocationSite ?? 'legacy',
-			resolveServerSignalListKeys(frame.signalListKeys ?? null),
-			frame.signalKey != null ? signalIdentityKey(frame.signalKey) : '',
-		]);
+		identity = serverSignalSegmentKey(
+			identity,
+			frame.signalInvocationSite,
+			frame.signalListKeys ?? null,
+			frame.signalKey,
+		);
 		frame.signalInstanceKey = identity;
 	}
 	return identity;
@@ -4880,9 +4961,10 @@ export function ssrComponent(
 	// this small string-rendering wrapper does not retain the client Activity engine.
 	const activity = comp === Activity;
 	if (activity && key === undefined) key = props?.key;
-	let signalInstanceKey: ServerSignalInstanceKey | undefined = SERVER_SIGNAL_BINDINGS_ENABLED
-		? serverStructuralSignalInstanceKey(invocationSite, key)
-		: undefined;
+	let signalInstanceKey: ServerSignalInstanceKey | undefined =
+		SERVER_SIGNAL_BINDINGS_ENABLED && RESOLVED !== null
+			? serverStructuralSignalInstanceKey(invocationSite, key)
+			: undefined;
 	// Component recursion is one of SSR's hottest and deepest paths. Install the
 	// same async-identity membrane inline instead of recursing back through
 	// ssrComponent from two wrapper callbacks. Besides avoiding callback overhead,
@@ -8011,6 +8093,7 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 	signalOwner?: SignalOwner;
 	ownedSignalOwner?: boolean;
 	signalInstances?: Map<string, SignalRendererOwnerIdentity>;
+	signalIdentityKeys?: Map<string, ServerOpaqueSignalKeys>;
 	hasSignalControls?: boolean;
 	/** Render-local stable ids for non-primitive and long string control/list keys. */
 	asyncIdentities: Map<unknown, number>;
@@ -8148,6 +8231,7 @@ function releaseServerRenderResources(resolved: ResolvedMap): void {
 		for (const owner of resolved.signalInstances.values()) retireSignalOwnerIdentity(owner);
 		resolved.signalInstances.clear();
 	}
+	resolved.signalIdentityKeys?.clear();
 	if (resolved.ownedSignalOwner && resolved.signalOwner !== undefined) {
 		retireSignalOwnerIdentity(resolved.signalOwner);
 	}

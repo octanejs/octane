@@ -143,7 +143,7 @@ export function renderStatic(items,produce){return renderToStaticMarkup(List,{it
 			key: {
 				[Symbol.toPrimitive]() {
 					coercions++;
-					return 'key ' + index;
+					throw new Error('Object-key signal identities must not coerce user keys.');
 				},
 			},
 		}));
@@ -176,22 +176,19 @@ export function renderStatic(items,produce){return renderToStaticMarkup(List,{it
 			widths: [...globalThis.__serverFrameWork.widths],
 		};
 		if (potential) {
-			let identities;
 			for (const order of [items, items.toReversed()]) {
 				const response = api.render(order, (label) =>
 					api.__signalAt('i:server-frame-value', label),
 				);
 				const controls = capture(response, order);
-				const next = Object.fromEntries(
-					controls.map((input) => [input.value, input.getAttribute('data-octane-signal-control')]),
+				const identities = controls.map((input) =>
+					input.getAttribute('data-octane-signal-control'),
 				);
-				assert.ok(Object.values(next).every((identity) => identity !== null));
-				assert.equal(new Set(Object.values(next)).size, rows);
-				if (identities) assert.deepEqual(next, identities);
-				identities = next;
+				assert.ok(identities.every((identity) => identity !== null));
+				assert.equal(new Set(identities).size, rows);
 				snapshots.push(response.html);
 			}
-			assert.ok(coercions > 0, 'The late first-handle control must materialize keyed identities.');
+			assert.equal(coercions, 0, 'Late first-handle reads must preserve opaque object keys.');
 			const twins = api.renderTwins(items, (label) =>
 				api.__signalAt('i:server-frame-value', label),
 			);

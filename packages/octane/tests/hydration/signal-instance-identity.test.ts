@@ -31,6 +31,108 @@ describe('signal component instance identity', () => {
 		await import('../_server-fixture.js');
 	});
 
+	it.each(
+		[false, true].flatMap((dev) =>
+			['object', 'opaque', 'function', 'symbol', 'primitive'].map((kind) => ({ dev, kind })),
+		),
+	)(
+		'keeps keyed row signals independent through SSR, hydration, edits and reorder (%j)',
+		async ({ dev, kind }) => {
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const client = await import('../../src/runtime.js');
+			const signals = await import('../../src/signals/index.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const { collectPipeableStream, collectReadableStream } = await import('../_server-stream.js');
+			const source = `import { signal$ } from 'octane/signals';
+function Row(props) @{
+ const value$ = signal$(props.label);
+ <section><output>{String(value$.get())}</output><input value={value$}/></section>
+}
+export function App(props) @{
+ <main>@for (const item of props.items; key item.key) { <Row label={item.label}/> }</main>
+}`;
+			const options = {
+				id: '/src/keyed-row-signals.tsrx',
+				compileOptions: { dev, hmr: false },
+				runtimeModules: { 'octane/signals': signals },
+			};
+			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const items = ['first', 'second'].map((label, index) => ({
+				label,
+				key:
+					kind === 'object'
+						? { id: label }
+						: kind === 'opaque'
+							? {
+									[Symbol.toPrimitive]() {
+										throw new Error('A reconciliation key is not rendered text.');
+									},
+								}
+							: kind === 'function'
+								? () => undefined
+								: kind === 'symbol'
+									? Symbol('row')
+									: index === 0
+										? 1
+										: '1',
+			}));
+			const container = document.createElement('div');
+			const expected = items.map((item) => item.label);
+			const outputs: { html: string }[] = [
+				server.renderToString(serverModule.App, { items }),
+				server.renderToStaticMarkup(serverModule.App, { items }),
+				await server.prerender(serverModule.App, { items }),
+				server.renderToString(serverModule.App, { items: items.toReversed() }),
+			];
+			for (const collect of [collectPipeableStream, collectReadableStream]) {
+				const output = await collect(serverModule.App, { items });
+				expect(output.errors).toEqual([]);
+				outputs.push(output);
+			}
+			for (const [index, output] of outputs.entries()) {
+				container.innerHTML = output.html;
+				const labels = index === 3 ? expected.toReversed() : expected;
+				expect([...container.querySelectorAll('output')].map((node) => node.textContent)).toEqual(
+					labels,
+				);
+				expect([...container.querySelectorAll('input')].map((node) => node.value)).toEqual(labels);
+			}
+			container.innerHTML = outputs[0]!.html;
+			document.body.append(container);
+			const controls = [...container.querySelectorAll('input')];
+			const errors: unknown[] = [];
+			const root = client.hydrateRoot(
+				container,
+				clientModule.App,
+				{ items },
+				{ onRecoverableError: (error) => errors.push(error) },
+			);
+			try {
+				expect([...container.querySelectorAll('input')]).toEqual(controls);
+				expect(controls.map((node) => node.value)).toEqual(expected);
+				expect(errors).toEqual([]);
+				controls[0]!.value = 'edited first';
+				client.flushSync(() => controls[0]!.dispatchEvent(new Event('input', { bubbles: true })));
+				expect([...container.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
+					'edited first',
+					'second',
+				]);
+				client.flushSync(() => root.render(clientModule.App, { items: items.toReversed() }));
+				expect([...container.querySelectorAll('input')]).toEqual(controls.toReversed());
+				expect([...container.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
+					'second',
+					'edited first',
+				]);
+			} finally {
+				root.unmount();
+				expect(container.childNodes).toHaveLength(0);
+				container.remove();
+			}
+		},
+	);
+
 	it.each([false, true])(
 		'renders an ordinary object-keyed list without stringifying its keys (development: %s)',
 		async (dev) => {
@@ -79,19 +181,28 @@ export function App(props) @{
 
 	it.each(
 		[false, true].flatMap((dev) =>
-			[false, true].flatMap((mapped) => [false, true].map((framed) => ({ dev, mapped, framed }))),
+			[false, true].flatMap((mapped) =>
+				[false, true].flatMap((framed) =>
+					(mapped ? [false] : [false, true]).map((objectKeys) => ({
+						dev,
+						mapped,
+						framed,
+						objectKeys,
+					})),
+				),
+			),
 		),
 	)(
 		'keeps late handle values separate in nested keyed lists through hydration and reorder (%j)',
-		async ({ dev, mapped, framed }) => {
+		async ({ dev, mapped, framed, objectKeys }) => {
 			vi.resetModules();
 			const server = await import('../../src/runtime.server.js');
 			const client = await import('../../src/runtime.js');
 			const signals = await import('../../src/signals/index.js');
 			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
 			const rows = mapped
-				? '{props.group.items.map(item => <Row key={item.id} label={props.group.id + item.label} produce={props.produce} pending={props.pending}/>)}'
-				: '@for (const item of props.group.items; key item.id) { <Row label={props.group.id + item.label} produce={props.produce} pending={props.pending}/> }';
+				? '{props.group.items.map(item => <Row key={item.key} label={props.group.id + item.label} produce={props.produce} pending={props.pending}/>)}'
+				: '@for (const item of props.group.items; key item.key) { <Row label={props.group.id + item.label} produce={props.produce} pending={props.pending}/> }';
 			const groupBody = framed ? `function Group(props) @{ <article>${rows}</article> }` : '';
 			const group = framed
 				? '<Group group={group} produce={props.produce} pending={props.pending}/>'
@@ -104,7 +215,7 @@ function Row(props) @{
 }
 ${groupBody}
 export function App(props) @{
- <main>@for (const group of props.groups; key group.id) { ${group} }</main>
+ <main>@for (const group of props.groups; key group.key) { ${group} }</main>
 }`;
 			const options = {
 				id: '/src/nested-keyed-server-output.tsrx',
@@ -114,9 +225,10 @@ export function App(props) @{
 			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
 			const groups = ['left|', '右:'].map((id) => ({
 				id,
+				key: objectKeys ? {} : id,
 				items: [
-					{ id: 'same|', label: 'red' },
-					{ id: 'same:', label: 'blue' },
+					{ key: objectKeys ? {} : 'same|', label: 'red' },
+					{ key: objectKeys ? {} : 'same:', label: 'blue' },
 				],
 			}));
 			const scalar = (label: string) => label;
@@ -471,4 +583,219 @@ export function App(props) @{ <main>@for (const item of props.items; key item) {
 		expect(clientKeys.a).not.toBe(clientKeys.b);
 		root.unmount();
 	});
+});
+
+describe('opaque keyed signals across hydration and retries', () => {
+	beforeAll(async () => {
+		await import('../_server-fixture.js');
+	});
+
+	it.each([false, true])(
+		'preserves separate keyed state when a sibling hydrates before a deferred boundary (dev=%s)',
+		async (dev) => {
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const client = await import('../../src/runtime.js');
+			const signals = await import('../../src/signals/index.js');
+			const { condition } = await import('../../src/hydration/index.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const source = `import { Hydrate, useState } from 'octane';
+import { signal$ } from 'octane/signals';
+function Row(props) @{
+ props.remember(props.label);
+ const value$ = signal$(props.label);
+ <section><output>{value$ as string}</output><input value={value$}/></section>
+}
+function Group(props) @{
+ const [ready] = useState(true);
+ <article data-ready={ready ? 'yes' : 'no'}>@for (const item of props.items; key item.key) { <Row label={item.label} remember={props.remember}/> }</article>
+}
+export function App(props) @{
+ <main><Hydrate when={props.when} split={false}><Group items={props.deferred} remember={props.remember}/></Hydrate><Group items={props.live} remember={props.remember}/></main>
+}`;
+			const options = {
+				id: '/src/deferred-opaque-keyed-signals.tsrx',
+				compileOptions: { dev, hmr: false },
+				runtimeModules: { 'octane/signals': signals },
+			};
+			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const serverKeys: Record<string, string | undefined> = {};
+			const clientKeys: Record<string, string | undefined> = {};
+			const remember = (keys: Record<string, string | undefined>, label: string) => {
+				keys[label] = (signals.currentSignalOwner() as { instanceKey?: string } | null)
+					?.instanceKey;
+			};
+			const serverProps = {
+				when: condition(false),
+				deferred: [{ key: {}, label: 'deferred server value' }],
+				live: [{ key: {}, label: 'live server value' }],
+				remember: (label: string) => remember(serverKeys, label),
+			};
+			const clientProps = {
+				when: condition(false),
+				deferred: [{ key: {}, label: 'deferred server value' }],
+				live: [{ key: {}, label: 'live server value' }],
+				remember: (label: string) => remember(clientKeys, label),
+			};
+			const container = document.createElement('div');
+			container.innerHTML = server.renderToString(serverModule.App, serverProps).html;
+			document.body.append(container);
+			const inputs = [...container.querySelectorAll('input')];
+			const errors: unknown[] = [];
+			const root = client.hydrateRoot(container, clientModule.App, clientProps, {
+				onRecoverableError: (error) => errors.push(error),
+			});
+			try {
+				expect(clientKeys['live server value']).toBe(serverKeys['live server value']);
+				expect([...container.querySelectorAll('input')]).toEqual(inputs);
+				expect(inputs.map((input) => input.value)).toEqual([
+					'deferred server value',
+					'live server value',
+				]);
+				inputs[1]!.value = 'live edited before reveal';
+				client.flushSync(() => inputs[1]!.dispatchEvent(new Event('input', { bubbles: true })));
+				await client.act(() =>
+					root.render(clientModule.App, { ...clientProps, when: condition(true) }),
+				);
+				expect([...container.querySelectorAll('input')]).toEqual(inputs);
+				expect(inputs.map((input) => input.value)).toEqual([
+					'deferred server value',
+					'live edited before reveal',
+				]);
+				expect(clientKeys).toEqual(serverKeys);
+				inputs[0]!.value = 'deferred edited after reveal';
+				client.flushSync(() => inputs[0]!.dispatchEvent(new Event('input', { bubbles: true })));
+				expect([...container.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
+					'deferred edited after reveal',
+					'live edited before reveal',
+				]);
+				expect(errors).toEqual([]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'reuses pending row queries when server passes recreate object keys (dev=%s)',
+		async (dev) => {
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const signals = await import('../../src/signals/index.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const source = `import { query$ } from 'octane/signals';
+function Row(props) @{
+ const value$ = query$(() => props.label, props.load);
+ <output>{value$.get() as string}</output>
+}
+export function App(props) @{
+ <main>@for (const item of props.items; key props.makeKey()) { <Row label={item} load={props.load}/> }</main>
+}`;
+			const serverModule = loadCompiledFixtureSource(source, {
+				id: '/src/transient-opaque-keyed-query.tsrx',
+				mode: 'server',
+				compileOptions: { dev, hmr: false },
+				runtimeModules: { 'octane/signals': signals },
+			});
+			const started: string[] = [];
+			const output = await server.prerender(serverModule.App, {
+				items: ['row'],
+				makeKey: () => ({}),
+				load(label: string) {
+					started.push(label);
+					if (started.length > 1) throw new Error('The pending row request was restarted.');
+					return Promise.resolve(label + ' ready');
+				},
+			});
+			const container = document.createElement('div');
+			container.innerHTML = output.html;
+			expect(container.querySelector('output')?.textContent).toBe('row ready');
+			expect(started).toEqual(['row']);
+		},
+	);
+
+	it.each([false, true])(
+		'joins keyed native values when independent rows reveal in reverse order (dev=%s)',
+		async (dev) => {
+			vi.resetModules();
+			const client = await import('../../src/runtime.js');
+			const signals = await import('../../src/signals/index.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const { activateStreamedMarkup, collectReadableStream, deferred, resetStreamRuntimeGlobals } =
+				await import('../_server-stream.js');
+			const source = `import { use } from 'octane';
+function Row(props) @{
+ if (props.pending) use(props.pending);
+ const value = props.produce(props.label);
+ <section><output>{value as string}</output><input value={value}/></section>
+}
+export function App(props) @{
+ <main>@for (const item of props.items; key item.key) {
+  <article>@try { <Row label={item.label} pending={item.pending} produce={props.produce}/> } @pending { <i>waiting</i> }</article>
+ }</main>
+}`;
+			const options = {
+				id: '/src/reverse-reveal-opaque-keyed-signals.tsrx',
+				compileOptions: { dev, hmr: false },
+			};
+			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const first = deferred<void>();
+			const second = deferred<void>();
+			const secondProduced = deferred<void>();
+			const rendering = collectReadableStream(serverModule.App, {
+				items: [
+					{ key: {}, label: 'first', pending: first.promise },
+					{ key: {}, label: 'second', pending: second.promise },
+				],
+				produce(label: string) {
+					if (label === 'second') secondProduced.resolve();
+					return signals.__signalAt('i:reverse-reveal-value', 'server ' + label);
+				},
+			});
+			second.resolve();
+			await secondProduced.promise;
+			first.resolve();
+			const output = await rendering;
+			expect(output.errors).toEqual([]);
+			const container = document.createElement('div');
+			container.innerHTML = output.html;
+			document.body.append(container);
+			activateStreamedMarkup(container);
+			const inputs = [...container.querySelectorAll('input')];
+			expect(inputs.map((input) => input.value)).toEqual(['server first', 'server second']);
+			const errors: unknown[] = [];
+			const root = client.hydrateRoot(
+				container,
+				clientModule.App,
+				{
+					items: [
+						{ key: {}, label: 'first' },
+						{ key: {}, label: 'second' },
+					],
+					produce(label: string) {
+						return signals.__signalAt('i:reverse-reveal-value', 'server ' + label);
+					},
+				},
+				{ onRecoverableError: (error) => errors.push(error) },
+			);
+			try {
+				expect([...container.querySelectorAll('input')]).toEqual(inputs);
+				expect(inputs.map((input) => input.value)).toEqual(['server first', 'server second']);
+				inputs[0]!.value = 'first edited';
+				client.flushSync(() => inputs[0]!.dispatchEvent(new Event('input', { bubbles: true })));
+				expect([...container.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
+					'first edited',
+					'server second',
+				]);
+				expect(errors).toEqual([]);
+			} finally {
+				root.unmount();
+				container.remove();
+				resetStreamRuntimeGlobals();
+			}
+		},
+	);
 });
