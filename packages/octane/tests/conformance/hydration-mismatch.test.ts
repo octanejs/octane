@@ -263,9 +263,42 @@ describe('conformance: hydration mismatch (ReactDOMHydrationDiff + ReactDOMServe
 
 		// Per Reconnecting:144 "can explicitly ignore errors reconnecting different attribute values".
 		it('suppressHydrationWarning on an attribute keeps the server value + no warning (Per :144)', async () => {
-			await reconnect('SuppressedAttr', { isClient: false }, { isClient: true });
-			expect(container.querySelector('#supa')!.getAttribute('class')).toBe('server');
-			expect(warns()).toEqual([]);
+			const serverSrc = 'about:blank#server';
+			const stableSrc = 'about:blank#stable';
+			const { html } = await ServerRT.renderToString(server.SuppressedAttr, {
+				isClient: false,
+				src: serverSrc,
+				stableSrc,
+			});
+			container.innerHTML = html;
+			const frames = Array.from(container.querySelectorAll('iframe'));
+			const root = hydrateRoot(container, client.SuppressedAttr, {
+				isClient: true,
+				src: 'about:blank#client',
+				stableSrc,
+			});
+			try {
+				flushSync(() => {});
+				expect(container.querySelector('#supa')!.getAttribute('class')).toBe('server');
+				for (const frame of frames) expect(container.querySelector(`#${frame.id}`)).toBe(frame);
+				// Either authored prop order must retain the server source.
+				expect(frames[0].getAttribute('src')).toBe(serverSrc);
+				expect(frames[1].getAttribute('src')).toBe(serverSrc);
+				expect(frames[2].getAttribute('src')).toBe(stableSrc);
+				expect(warns()).toEqual([]);
+
+				const nextSrc = 'about:blank#updated';
+				flushSync(() =>
+					root.render(client.SuppressedAttr, { isClient: true, src: nextSrc, stableSrc: nextSrc }),
+				);
+				for (const frame of frames) {
+					expect(container.querySelector(`#${frame.id}`)).toBe(frame);
+					expect(frame.getAttribute('src')).toBe(nextSrc);
+				}
+				expect(warns()).toEqual([]);
+			} finally {
+				root.unmount();
+			}
 		});
 
 		// Per Reconnecting:85 (Pure↔Pure) — the same function component reconnects clean.

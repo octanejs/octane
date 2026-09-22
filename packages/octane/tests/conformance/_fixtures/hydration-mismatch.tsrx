@@ -198,11 +198,12 @@ export function DetachedTextRenderReplay() @{
 
 // suppressHydrationWarning on an element with a divergent ATTRIBUTE (Per Reconnecting:144).
 export function SuppressedAttr(props) @{
-	<div
-		id="supa"
-		class={props.isClient ? 'client' : 'server'}
-		suppressHydrationWarning
-	>{'x' as string}</div>
+	<div id="supa" class={props.isClient ? 'client' : 'server'} suppressHydrationWarning>
+		{'x' as string}
+		<iframe id="src-before-suppression" src={props.src} suppressHydrationWarning />
+		<iframe id="src-after-suppression" suppressHydrationWarning src={props.src} />
+		<iframe id="stable-frame" src={props.stableSrc} />
+	</div>
 }
 
 // Component form vs bare-element form of the SAME markup — reconnect clean

@@ -25142,6 +25142,7 @@ function planJsx(
 		b.deferred =
 			DEFERRABLE_MOUNT_KINDS.has(b.kind) &&
 			!sharesSpreadHost &&
+			!b.beforeConnect &&
 			b.name !== 'dangerouslySetInnerHTML';
 	}
 
@@ -25214,7 +25215,9 @@ function planJsx(
 	// these text mounts and flush them AFTER every walk has been emitted, so all navigation
 	// happens on the intact template. (Regression: StoryRow's `.meta` interleaves text holes
 	// with `<Link>` components.)
-	const deferredTextMounts = [];
+	// Connection-sensitive attributes also wait for every mount flag (including
+	// suppressHydrationWarning) before writing, but still run before insertion.
+	const postWalkMounts = [];
 	let nativeStyleSlots = 0;
 	// Emit per-binding mount code.
 	for (const b of elementBindings) {
@@ -25330,7 +25333,7 @@ function planJsx(
 		// `htextSwap` (sibling text hole) detaches its `<!>`; defer it past all walks (see above).
 		const mountEmit = emitBindingMount(b, elVar, bag);
 		if (mountEmit !== null) {
-			const target = b.kind === 'text' ? deferredTextMounts : mountLines;
+			const target = b.kind === 'text' || b.beforeConnect ? postWalkMounts : mountLines;
 			if (Array.isArray(mountEmit)) target.push(...mountEmit);
 			else target.push(mountEmit);
 		}
@@ -25396,9 +25399,9 @@ function planJsx(
 		anchorKey: 'portalAnchor',
 		stampLoc: false,
 	});
-	// Flush the deferred sibling-text-hole mounts now that every element walk is emitted —
-	// `htextSwap` can safely detach its `<!>` placeholder without breaking later navigation.
-	for (const line of deferredTextMounts) mountLines.push(line);
+	// Every element walk and mount flag is ready: text holes can replace their
+	// placeholders and iframe sources can initialize before the root is inserted.
+	for (const line of postWalkMounts) mountLines.push(line);
 
 	if (!noTemplate) {
 		// Allocate + insert + commit in ONE shared-factory call, LAST — see the
@@ -29350,6 +29353,9 @@ function emitElementHtml(
 						id: bindings.length,
 						kind: 'attr',
 						attributeHelper: writer?.helper,
+						// Connecting an iframe without its source creates an initial
+						// document before the intended navigation and sandbox checks.
+						beforeConnect: tag === 'iframe' && attrName.toLowerCase() === 'src',
 						name:
 							ctx.dev && (rawAttrName === 'tabIndex' || rawAttrName === 'htmlFor')
 								? rawAttrName

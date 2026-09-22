@@ -458,15 +458,37 @@ describe('DOMPropertyOperations — attributes and reflected properties', () => 
 
 	// Per DOMPropertyOperations-test.js:154 — should remove for falsey boolean
 	// properties (+ the true half for symmetry).
-	it('allowFullScreen={false} never lands in the DOM', () => {
-		const r = mount(AllowFullScreen, { v: false });
-		const el = r.find('#ifs');
-		expect(el.hasAttribute('allowFullScreen')).toBe(false);
-		r.update(AllowFullScreen, { v: true });
-		expect(el.getAttribute('allowfullscreen')).toBe('');
-		r.update(AllowFullScreen, { v: false });
-		expect(el.hasAttribute('allowFullScreen')).toBe(false);
-		r.unmount();
+	it('initializes iframe src before connection and removes false allowFullScreen', () => {
+		const src = 'https://widget.example/';
+		const nextSrc = 'https://widget.example/updated';
+		const connectedSources: (string | null)[] = [];
+		const insertBefore = Node.prototype.insertBefore;
+		const insert = vi.spyOn(Node.prototype, 'insertBefore').mockImplementation(function <
+			T extends Node,
+		>(this: Node, node: T, before: Node | null): T {
+			if (this.isConnected && node instanceof HTMLIFrameElement) {
+				connectedSources.push(node.getAttribute('src'));
+			}
+			return insertBefore.call(this, node, before) as T;
+		});
+		let r: ReturnType<typeof mount> | undefined;
+		try {
+			r = mount(AllowFullScreen, { v: false, src });
+			const el = r.find('#ifs');
+			expect(connectedSources).toEqual([src]);
+			expect(el.hasAttribute('allowFullScreen')).toBe(false);
+			r.update(AllowFullScreen, { v: true, src: nextSrc });
+			expect(r.find('#ifs')).toBe(el);
+			expect(el.getAttribute('src')).toBe(nextSrc);
+			expect(el.getAttribute('allowfullscreen')).toBe('');
+			r.update(AllowFullScreen, { v: false, src: nextSrc });
+			expect(el.hasAttribute('allowFullScreen')).toBe(false);
+			r.update(AllowFullScreen, { v: false, src: null });
+			expect(el.hasAttribute('src')).toBe(false);
+		} finally {
+			insert.mockRestore();
+			r?.unmount();
+		}
 	});
 
 	// Per DOMPropertyOperations-test.js:163 — should remove when setting custom
