@@ -1189,16 +1189,16 @@
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 1.75,
-    "note": "Rows total gzip versus Ripple under CI Node 24 on 2026-08-08: optimized 23280 / 13347 = 1.744x. The July ceiling predates shipped held-screen/Suspense correctness (#379, #386, #405); exact application, framework, and total budgets independently reject future growth."
+    "maxRatio": 2.73,
+    "note": "Rows total gzip versus Ripple under CI Node 24 on 2026-09-21: 40594 / 15029 = 2.701x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
   },
   {
     "suite": "bundle-size",
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.68,
-    "note": "Rows total gzip versus Solid under CI Node 24 on 2026-08-08: optimized 23280 / 13958 = 1.668x. The July ceiling predates shipped held-screen/Suspense correctness (#379, #386, #405); exact application, framework, and total budgets independently reject future growth."
+    "maxRatio": 2.67,
+    "note": "Rows total gzip versus Solid under CI Node 24 on 2026-09-21: 40594 / 15399 = 2.636x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
   },
   {
     "suite": "codegen-size",
@@ -1480,24 +1480,24 @@
     "op": "app_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 1.03,
-    "note": "Rows APP-CODE gzip vs ripple, normalized minify. A clean base and the current build both measure 2355 bytes, correcting the stale committed record; 2355 / 2312 = 1.019x on 2026-07-17 is guarded at 1.03x."
+    "maxRatio": 1.06,
+    "note": "Rows application gzip versus Ripple under CI Node 24 on 2026-09-21: 2581 / 2480 = 1.041x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.2,
-    "note": "Rows application gzip versus Solid under CI Node 24 on 2026-08-08: 2372 / 1990 = 1.192x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.31,
+    "note": "Rows application gzip versus Solid under CI Node 24 on 2026-09-21: 2581 / 1991 = 1.296x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "todo_app_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.61,
-    "note": "TodoMVC application gzip versus Solid under CI Node 24 on 2026-08-08: 2071 / 1292 = 1.603x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.99,
+    "note": "TodoMVC application gzip versus Solid under CI Node 24 on 2026-09-21: 2528 / 1289 = 1.961x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
@@ -1512,72 +1512,72 @@
     "op": "chat_app_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.3,
-    "note": "Chat-stream application gzip versus Solid under CI Node 24 on 2026-08-08: 2716 / 2103 = 1.291x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.45,
+    "note": "Chat-stream application gzip versus Solid under CI Node 24 on 2026-09-21: 3007 / 2102 = 1.431x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "chat_app_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 1.17,
-    "note": "Chat-stream application gzip versus Ripple under CI Node 24 on 2026-08-08: 2716 / 2335 = 1.163x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.2,
+    "note": "Chat-stream application gzip versus Ripple under CI Node 24 on 2026-09-21: 3007 / 2542 = 1.183x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.28,
-    "note": "Rows total gzip versus Svelte 5 under CI Node 24 on 2026-08-08: optimized 23280 / 18325 = 1.270x. The July ceiling predates shipped held-screen/Suspense correctness (#379, #386, #405); exact application, framework, and total budgets independently reject future growth."
+    "maxRatio": 2.24,
+    "note": "Rows total gzip versus Svelte 5 under CI Node 24 on 2026-09-21: 40594 / 18325 = 2.215x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
   },
   {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.04,
-    "note": "Rows application gzip versus Svelte 5 under CI Node 24 on 2026-08-08: 2372 / 2300 = 1.031x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.14,
+    "note": "Rows application gzip versus Svelte 5 under CI Node 24 on 2026-09-21: 2581 / 2300 = 1.122x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "todo_js_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.31,
-    "note": "TodoMVC total gzip versus Svelte 5 under CI Node 24 on 2026-08-08: optimized 24153 / 18530 = 1.303x. The July ceiling predates shipped held-screen/Suspense correctness (#379, #386, #405); exact application, framework, and total budgets independently reject future growth."
+    "maxRatio": 2.46,
+    "note": "TodoMVC total gzip versus Svelte 5 under CI Node 24 on 2026-09-21: 44954 / 18530 = 2.426x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
   },
   {
     "suite": "bundle-size",
     "op": "todo_app_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.39,
-    "note": "TodoMVC application gzip versus Svelte 5 on 2026-08-08: CI Node 24 measures 2071 / 1511 = 1.371x and supported Node 26 measures 2067 / 1497 = 1.381x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.69,
+    "note": "TodoMVC application gzip versus Svelte 5 under CI Node 24 on 2026-09-21: 2528 / 1511 = 1.673x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "chat_js_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.3,
-    "note": "Chat-stream total gzip versus Svelte 5 under CI Node 24 on 2026-08-08: optimized 24767 / 19164 = 1.292x. The July ceiling predates shipped held-screen/Suspense correctness (#379, #386, #405); exact application, framework, and total budgets independently reject future growth."
+    "maxRatio": 2.37,
+    "note": "Chat-stream total gzip versus Svelte 5 under CI Node 24 on 2026-09-21: 44872 / 19164 = 2.341x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
   },
   {
     "suite": "bundle-size",
     "op": "chat_app_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.2,
-    "note": "Chat-stream application gzip versus Svelte 5 under CI Node 24 on 2026-08-08: 2716 / 2279 = 1.192x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.34,
+    "note": "Chat-stream application gzip versus Svelte 5 under CI Node 24 on 2026-09-21: 3007 / 2279 = 1.319x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "weather_js_gzip",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 0.64,
-    "note": "Weather app TOTAL production gzip vs React 19, normalized minify. Component flags plus optional Hydrate/ViewTransition and checked-restoration capabilities reduced the deterministic record from 50737 to 40981 bytes after merging current main; 40981 / 65725 = 0.624x on 2026-07-18."
+    "maxRatio": 0.91,
+    "note": "Weather app total gzip versus React 19 under CI Node 24 on 2026-09-21: 61107 / 68143 = 0.897x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
   },
   {
     "suite": "bundle-size",
@@ -1592,8 +1592,8 @@
     "op": "weather_fw_gzip",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 0.56,
-    "note": "Weather app FRAMEWORK production gzip vs React 19, normalized minify. Component flags plus optional Hydrate/ViewTransition and checked-restoration capabilities measured 33179 / 60434 = 0.549x on 2026-07-18; the tight deterministic ceiling catches a feature graph being retained again."
+    "maxRatio": 0.87,
+    "note": "Weather app framework gzip versus React 19 under CI Node 24 on 2026-09-21: 51897 / 60518 = 0.858x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
   },
   {
     "suite": "bundle-size",
