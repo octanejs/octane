@@ -1,7 +1,15 @@
 import type { IncomingMessage, ServerResponse, Server } from 'node:http';
 
-/** Convert a Node.js IncomingMessage to a Web Request. */
-export function nodeRequestToWebRequest(nodeRequest: IncomingMessage): Request;
+/**
+ * Convert a Node.js IncomingMessage to a Web Request. Pass its response to
+ * cancel request.signal on a disconnect until the response finishes, including
+ * after the request body has been consumed. Without a response, cancellation
+ * only covers interrupted request uploads.
+ */
+export function nodeRequestToWebRequest(
+	nodeRequest: IncomingMessage,
+	nodeResponse?: ServerResponse,
+): Request;
 
 /**
  * Pipe a Web Response to a Node.js ServerResponse, streaming chunk-by-chunk

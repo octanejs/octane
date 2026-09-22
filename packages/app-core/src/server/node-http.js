@@ -129,11 +129,14 @@ function shouldGzip(request, status, headers, hasBody) {
 }
 
 /**
- * Convert a Node.js IncomingMessage to a Web Request.
+ * Convert a Node.js IncomingMessage to a Web Request. Passing its response
+ * keeps request.signal active through streaming and cancels it on disconnect.
+ * Without a response, cancellation only covers interrupted request uploads.
  * @param {import('node:http').IncomingMessage} nodeRequest
+ * @param {import('node:http').ServerResponse} [nodeResponse]
  * @returns {Request}
  */
-export function nodeRequestToWebRequest(nodeRequest) {
+export function nodeRequestToWebRequest(nodeRequest, nodeResponse) {
 	const host = nodeRequest.headers.host || 'localhost';
 	const url = new URL(nodeRequest.url || '/', `http://${host}`);
 
@@ -151,29 +154,60 @@ export function nodeRequestToWebRequest(nodeRequest) {
 	/** @type {RequestInit & { duplex?: 'half' }} */
 	const init = { method, headers };
 	const abortController = new AbortController();
-	const abortRequest = () => {
-		if (!abortController.signal.aborted) {
-			abortController.abort(new Error('The client disconnected before the request completed.'));
-		}
-	};
-	if (nodeRequest.aborted || (nodeRequest.destroyed && !nodeRequest.complete)) {
-		abortRequest();
-	} else {
-		nodeRequest.once('aborted', abortRequest);
-		nodeRequest.once('close', () => {
-			if (!nodeRequest.complete) abortRequest();
-		});
+	const disconnected =
+		nodeRequest.aborted ||
+		(nodeRequest.destroyed && !nodeRequest.complete) ||
+		(nodeResponse?.destroyed && !nodeResponse.writableFinished);
+	if (disconnected) {
+		abortController.abort(new Error('The client disconnected before the request completed.'));
 	}
 	init.signal = abortController.signal;
 	if (method !== 'GET' && method !== 'HEAD') {
-		// node:stream/web's ReadableStream and the DOM lib's are structurally the
-		// same at runtime; the lib types disagree on BYOB details.
-		init.body = /** @type {ReadableStream} */ (
-			/** @type {unknown} */ (Readable.toWeb(nodeRequest))
-		);
+		// A destroyed upload is already disturbed and cannot become a Request body.
+		// Keep its read failure observable when dev middleware converts it late.
+		if (disconnected) {
+			init.body = new ReadableStream({
+				start(controller) {
+					controller.error(abortController.signal.reason);
+				},
+			});
+		} else {
+			// node:stream/web's ReadableStream and the DOM lib's are structurally the
+			// same at runtime; the lib types disagree on BYOB details.
+			init.body = /** @type {ReadableStream} */ (
+				/** @type {unknown} */ (Readable.toWeb(nodeRequest))
+			);
+		}
 		init.duplex = 'half';
 	}
-	return new Request(url, init);
+	const request = new Request(url, init);
+	const cleanup = () => {
+		nodeRequest.off('aborted', abortRequest);
+		nodeRequest.off('close', onRequestClose);
+		nodeResponse?.off('close', onResponseClose);
+		nodeResponse?.off('finish', cleanup);
+	};
+	const abortRequest = () => {
+		cleanup();
+		abortController.abort(new Error('The client disconnected before the request completed.'));
+	};
+	const onRequestClose = () => {
+		if (!nodeRequest.complete) abortRequest();
+		else if (nodeResponse === undefined) cleanup();
+	};
+	const onResponseClose = () => {
+		if (nodeResponse?.writableFinished) cleanup();
+		else abortRequest();
+	};
+	// IncomingMessage closes when its body is consumed. The response owns the
+	// remaining lifetime, including async handler work and streaming output.
+	if (!disconnected && !nodeResponse?.writableFinished) {
+		nodeRequest.once('aborted', abortRequest);
+		nodeRequest.once('close', onRequestClose);
+		nodeResponse?.once('close', onResponseClose);
+		nodeResponse?.once('finish', cleanup);
+	}
+	return request;
 }
 
 /**
@@ -452,7 +486,7 @@ export function createNodeServer(handler, options = {}) {
 			) {
 				return;
 			}
-			const response = await handler(nodeRequestToWebRequest(req));
+			const response = await handler(nodeRequestToWebRequest(req, res));
 			await sendWebResponseForRequest(res, response, req);
 		})().catch((error) => {
 			console.error('[octane] Request error:', error);

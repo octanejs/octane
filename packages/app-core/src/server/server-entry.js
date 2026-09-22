@@ -471,7 +471,7 @@ export const handler = createHandler(
  */
 export async function nodeHandler(req, res) {
 	try {
-		const response = await handler(nodeRequestToWebRequest(req));
+		const response = await handler(nodeRequestToWebRequest(req, res));
 		await sendWebResponse(res, response);
 	} catch (error) {
 		console.error('[octane] Request error:', error);
