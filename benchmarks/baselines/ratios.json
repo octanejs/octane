@@ -6764,6 +6764,102 @@
     "note": "After cold observer-validated traversal, unchanged committed subtrees reuse feature unions across 64 state updates while retaining host identity and labels."
   },
   {
+    "suite": "universal-retention",
+    "op": "range_node_visits",
+    "target": "suspense-ready-0",
+    "reference": "suspense-work",
+    "maxRatio": 0,
+    "note": "Committed Suspense arms reuse their ranges without root searches. Clean production controls verify hidden primary identity, fallback visibility, recovery, and cleanup; retention entry counts keep the measured path active."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "range_node_visits",
+    "target": "suspense-ready-32",
+    "reference": "suspense-work",
+    "maxRatio": 0,
+    "note": "Committed Suspense arms reuse their ranges without root searches. Clean production controls verify hidden primary identity, fallback visibility, recovery, and cleanup; retention entry counts keep the measured path active."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "range_node_visits",
+    "target": "suspense-ready-128",
+    "reference": "suspense-work",
+    "maxRatio": 0,
+    "note": "Committed Suspense arms reuse their ranges without root searches. Clean production controls verify hidden primary identity, fallback visibility, recovery, and cleanup; retention entry counts keep the measured path active."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "range_node_visits",
+    "target": "suspense-ready-512",
+    "reference": "suspense-work",
+    "maxRatio": 0,
+    "note": "Committed Suspense arms reuse their ranges without root searches. Clean production controls verify hidden primary identity, fallback visibility, recovery, and cleanup; retention entry counts keep the measured path active."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "range_node_visits",
+    "target": "suspense-last-0",
+    "reference": "suspense-work",
+    "maxRatio": 0,
+    "note": "Committed Suspense arms reuse their ranges without root searches. Clean production controls verify hidden primary identity, fallback visibility, recovery, and cleanup; retention entry counts keep the measured path active."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "range_node_visits",
+    "target": "suspense-last-32",
+    "reference": "suspense-work",
+    "maxRatio": 0,
+    "note": "Committed Suspense arms reuse their ranges without root searches. Clean production controls verify hidden primary identity, fallback visibility, recovery, and cleanup; retention entry counts keep the measured path active."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "range_node_visits",
+    "target": "suspense-last-128",
+    "reference": "suspense-work",
+    "maxRatio": 0,
+    "note": "Committed Suspense arms reuse their ranges without root searches. Clean production controls verify hidden primary identity, fallback visibility, recovery, and cleanup; retention entry counts keep the measured path active."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "range_node_visits",
+    "target": "suspense-last-512",
+    "reference": "suspense-work",
+    "maxRatio": 0,
+    "note": "Committed Suspense arms reuse their ranges without root searches. Clean production controls verify hidden primary identity, fallback visibility, recovery, and cleanup; retention entry counts keep the measured path active."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "range_node_visits",
+    "target": "suspense-all-0",
+    "reference": "suspense-work",
+    "maxRatio": 0,
+    "note": "Committed Suspense arms reuse their ranges without root searches. Clean production controls verify hidden primary identity, fallback visibility, recovery, and cleanup; retention entry counts keep the measured path active."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "range_node_visits",
+    "target": "suspense-all-32",
+    "reference": "suspense-work",
+    "maxRatio": 0,
+    "note": "Committed Suspense arms reuse their ranges without root searches. Clean production controls verify hidden primary identity, fallback visibility, recovery, and cleanup; retention entry counts keep the measured path active."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "range_node_visits",
+    "target": "suspense-all-128",
+    "reference": "suspense-work",
+    "maxRatio": 0,
+    "note": "Committed Suspense arms reuse their ranges without root searches. Clean production controls verify hidden primary identity, fallback visibility, recovery, and cleanup; retention entry counts keep the measured path active."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "range_node_visits",
+    "target": "suspense-all-512",
+    "reference": "suspense-work",
+    "maxRatio": 0,
+    "note": "Committed Suspense arms reuse their ranges without root searches. Clean production controls verify hidden primary identity, fallback visibility, recovery, and cleanup; retention entry counts keep the measured path active."
+  },
+  {
     "suite": "universal-materialization",
     "op": "update_materializeArrays",
     "target": "static-128",

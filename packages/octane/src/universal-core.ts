@@ -2956,7 +2956,9 @@ function retainCommittedTryArm(owner: DraftOwner): BlueprintNode[] | null {
 	if (!owner.record.mounted) return null;
 	const childRecord = owner.record.children.find((child) => Object.is(child.key, 'try'));
 	if (childRecord === undefined) return null;
-	const range = findLogicalRange(owner.record.root.rootRecordForRetention(), childRecord.rangeKey);
+	const range =
+		childRecord.range ??
+		findLogicalRange(owner.record.root.rootRecordForRetention(), childRecord.rangeKey);
 	if (range === null) return null;
 	resetDraftChildren(owner);
 	const child = draftOwner(childRecord, owner, null);

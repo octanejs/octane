@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
+import { suspenseWorkload } from './suspense.mjs';
 process.env.NODE_ENV = 'production';
 const repo = path.resolve(import.meta.dirname, '../..');
 const sourceRoot = path.resolve(process.env.UNIVERSAL_SOURCE_ROOT || repo);
@@ -26,7 +27,21 @@ function instrument(source) {
 		: 'let features = 0;';
 	assert.equal(fn.split(marker).length, 2);
 	fn = fn.replace(marker, marker + '\n globalThis.__universalFeatureVisits++;');
-	return source.slice(0, start) + fn + source.slice(end);
+	source = source.slice(0, start) + fn + source.slice(end);
+	for (const [marker, counter] of [
+		[
+			'function findLogicalRange(record: LogicalRecord, key: UniversalKey): LogicalRecord | null {',
+			'__universalRangeVisits',
+		],
+		[
+			'function retainCommittedTryArm(owner: DraftOwner): BlueprintNode[] | null {',
+			'__universalRetainedArms',
+		],
+	]) {
+		assert.equal(source.split(marker).length, 2);
+		source = source.replace(marker, `${marker}\n globalThis.${counter}++;`);
+	}
+	return source;
 }
 async function bundle(observed) {
 	const output = await build({
@@ -145,6 +160,32 @@ try {
 			});
 		}
 	targets.push({ name: 'update-work', ops: { feature_node_visits: stat(64) } });
+	for (const mode of ['ready', 'last', 'all']) {
+		for (const size of [0, 32, 128, 512]) {
+			// One untimed warmup followed by repeated deterministic samples.
+			await suspenseWorkload(clean.runtime, size, mode);
+			await suspenseWorkload(observed.runtime, size, mode);
+			const samples = [];
+			for (let iteration = 0; iteration < 3; iteration++) {
+				const expected = await suspenseWorkload(clean.runtime, size, mode);
+				const result = await suspenseWorkload(observed.runtime, size, mode);
+				assert.equal(result.outputHash, expected.outputHash);
+				assert.equal(
+					result.retainedArms,
+					result.pendingCount,
+					'retention must execute for each pending boundary',
+				);
+				samples.push(result);
+			}
+			assert.ok(samples.every((sample) => sample.visits === samples[0].visits));
+			targets.push({
+				name: `suspense-${mode}-${size}`,
+				ops: { range_node_visits: { ...stat(samples[0].visits), samples: samples.length } },
+				meta: { size, mode, samples },
+			});
+		}
+	}
+	targets.push({ name: 'suspense-work', ops: { range_node_visits: stat(1) } });
 	const payload = {
 		suite: 'universal-retention',
 		iterations: 1,

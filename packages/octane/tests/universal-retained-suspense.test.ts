@@ -5,6 +5,7 @@ import {
 	createObjectDriver,
 	createUniversalRoot,
 	defineUniversalComponent,
+	universalFor,
 	universalPlan,
 	universalProps,
 	universalTry,
@@ -37,7 +38,159 @@ async function flushUniversalWork(count = 4) {
 	for (let index = 0; index < count; index++) await Promise.resolve();
 }
 
+function expectHostOrder(actual: ObjectHostInstance[], expected: ObjectHostInstance[]) {
+	expect(actual).toHaveLength(expected.length);
+	for (const [index, host] of expected.entries()) expect(actual[index]).toBe(host);
+}
+
 describe('universal retained Suspense visibility', () => {
+	it('preserves keyed primary hosts through aborted reorders, suspension, and removal', async () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		let resolveA!: (value: string) => void;
+		let resolveB!: (value: string) => void;
+		const a = new Promise<string>((resolve) => {
+			resolveA = resolve;
+		});
+		const b = new Promise<string>((resolve) => {
+			resolveB = resolve;
+		});
+		const resources = new Map<string, Promise<string>>([
+			['a', a],
+			['b', b],
+		]);
+		const Scene = defineUniversalComponent('object', (props: { ids: string[]; pending: boolean }) =>
+			universalFor(
+				props.ids,
+				(id) => id,
+				(id) =>
+					universalTry(
+						() =>
+							universalValue(primaryPlan, [
+								universalProps([
+									['set', 'id', id],
+									[
+										'set',
+										'value',
+										props.pending && resources.has(id) ? use(resources.get(id)!) : id,
+									],
+								]),
+							]),
+						() => universalValue(fallbackPlan, [universalProps([['set', 'id', id]])]),
+					),
+			),
+		);
+		root.render(Scene, { ids: ['a', 'b', 'c'], pending: false });
+		const [primaryA, primaryB, primaryC] = container.children;
+		root.prepare(Scene, { ids: ['c', 'a', 'b'], pending: true }).abort();
+		expectHostOrder(container.children, [primaryA, primaryB, primaryC]);
+		expect(container.children.every((node) => node.visible)).toBe(true);
+
+		root.render(Scene, { ids: ['c', 'a', 'b'], pending: true });
+		expectHostOrder(
+			container.children.filter((node) => node.type === 'primary'),
+			[primaryC, primaryA, primaryB],
+		);
+		expect([primaryC.visible, primaryA.visible, primaryB.visible]).toEqual([true, false, false]);
+		expect(
+			container.children.filter((node) => node.type === 'fallback').map((node) => node.props.id),
+		).toEqual(['a', 'b']);
+
+		resolveA('resolved a');
+		await a;
+		await flushUniversalWork();
+		expect(primaryA.visible).toBe(true);
+		expect(primaryA.props.value).toBe('resolved a');
+		expect(primaryB.visible).toBe(false);
+		root.render(Scene, { ids: ['d', 'a', 'c'], pending: true });
+		const primaryD = container.children[0];
+		expectHostOrder(container.children, [primaryD, primaryA, primaryC]);
+		expect(primaryD.props.id).toBe('d');
+		expect(primaryD).not.toBe(primaryB);
+
+		resolveB('removed b');
+		await b;
+		await flushUniversalWork();
+		expectHostOrder(container.children, [primaryD, primaryA, primaryC]);
+		expect(container.children.every((node) => node.visible)).toBe(true);
+		root.unmount();
+		expect(container.children).toEqual([]);
+		expect(container.instanceCount).toBe(0);
+	});
+
+	it('restores nested primary hosts without revealing an independently pending child', async () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		let outer: Promise<string> | null = null;
+		let inner: Promise<string> | null = null;
+		let resolveOuter!: (value: string) => void;
+		let resolveInner!: (value: string) => void;
+		const node = (id: string, value: string) =>
+			universalValue(primaryPlan, [
+				universalProps([
+					['set', 'id', id],
+					['set', 'value', value],
+				]),
+			]);
+		const fallback = (id: string) =>
+			universalValue(fallbackPlan, [universalProps([['set', 'id', id]])]);
+		const Scene = defineUniversalComponent('object', () =>
+			universalTry(
+				() => [
+					node('outer', outer === null ? 'ready' : use(outer)),
+					universalTry(
+						() => node('inner', inner === null ? 'ready' : use(inner)),
+						() => fallback('inner'),
+					),
+				],
+				() => fallback('outer'),
+			),
+		);
+		root.render(Scene, undefined);
+		const [outerHost, innerHost] = container.children;
+		inner = new Promise<string>((resolve) => {
+			resolveInner = resolve;
+		});
+		root.render(Scene, undefined);
+		expect(outerHost.visible).toBe(true);
+		expect(innerHost.visible).toBe(false);
+		const innerFallback = container.children[2];
+		outer = new Promise<string>((resolve) => {
+			resolveOuter = resolve;
+		});
+		root.render(Scene, undefined);
+		expect([outerHost.visible, innerHost.visible, innerFallback.visible]).toEqual([
+			false,
+			false,
+			false,
+		]);
+		expect(container.children.at(-1)).toMatchObject({
+			type: 'fallback',
+			props: { id: 'outer' },
+			visible: true,
+		});
+
+		resolveOuter('outer resolved');
+		await outer;
+		await flushUniversalWork();
+		expectHostOrder(container.children, [outerHost, innerHost, innerFallback]);
+		expect([outerHost.visible, innerHost.visible, innerFallback.visible]).toEqual([
+			true,
+			false,
+			true,
+		]);
+		expect(outerHost.props.value).toBe('outer resolved');
+		resolveInner('inner resolved');
+		await inner;
+		await flushUniversalWork();
+		expectHostOrder(container.children, [outerHost, innerHost]);
+		expect(innerHost.visible).toBe(true);
+		expect(innerHost.props.value).toBe('inner resolved');
+		root.unmount();
+		expect(container.children).toEqual([]);
+		expect(container.instanceCount).toBe(0);
+	});
+
 	it('keeps one hidden primary beside one active fallback across pending rerenders', async () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());
