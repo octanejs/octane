@@ -221,16 +221,20 @@ describe('SVG attributes — namespace-aware property diagnostics', () => {
 	it('preserves HTML spelling diagnostics inside an SVG foreignObject', () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const root = mount(SvgForeignObjectDiagnosticAttributes, {
-			attrs: { 'word-spacing': '2' },
+			attrs: { 'word-spacing': '2', viewbox: '0 0 1 1' },
 		});
 		try {
 			expect(root.find('#foreign-object-html-host').namespaceURI).toBe(
 				'http://www.w3.org/1999/xhtml',
 			);
+			expect(root.find('#foreign-object-html-host').getAttribute('viewbox')).toBe('0 0 1 1');
 			expect(error.mock.calls.map(([message]) => message)).toEqual(
 				PRODUCTION_COMPILE
 					? []
-					: ['Invalid DOM property `word-spacing`. Did you mean `wordSpacing`?'],
+					: [
+							'Invalid DOM property `word-spacing`. Did you mean `wordSpacing`?',
+							'Invalid DOM property `viewbox`. Did you mean `viewBox`?',
+						],
 			);
 		} finally {
 			root.unmount();
@@ -272,11 +276,13 @@ describe('SVG attributes — namespace-aware property diagnostics', () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		try {
 			const html = Server.renderToString(server.SvgForeignObjectDiagnosticAttributes, {
-				attrs: { 'word-spacing': '2' },
+				attrs: { 'word-spacing': '2', viewbox: '0 0 1 1' },
 			}).html;
 			expect(html).toContain('word-spacing="2"');
+			expect(html).toContain('viewbox="0 0 1 1"');
 			expect(error.mock.calls.map(([message]) => message)).toEqual([
 				'Invalid DOM property `word-spacing`. Did you mean `wordSpacing`?',
+				'Invalid DOM property `viewbox`. Did you mean `viewBox`?',
 			]);
 		} finally {
 			error.mockRestore();

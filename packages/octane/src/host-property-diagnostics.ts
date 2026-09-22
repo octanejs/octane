@@ -128,7 +128,8 @@ for (const name of [
 	KNOWN_SVG_PROPERTY_SPELLINGS.set(name.toLowerCase(), name);
 }
 
-// Keep JSX's NonNativeLowercaseProps operations distinct from native attributes.
+// JSX's NonNativeLowercaseProps operations and SVG-only names do not have
+// equivalent native lowercase HTML spellings.
 const NON_NATIVE_LOWERCASE_PROPERTIES = new Set([
 	'autoFocus',
 	'defaultValue',
@@ -142,6 +143,7 @@ const NON_NATIVE_LOWERCASE_PROPERTIES = new Set([
 	'acceptCharset',
 	'htmlFor',
 	'httpEquiv',
+	'viewBox',
 ]);
 
 /** Development-only host-name/value diagnostics shared by DOM and SSR. */
