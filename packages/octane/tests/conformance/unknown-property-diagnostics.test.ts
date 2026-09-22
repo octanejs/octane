@@ -11,6 +11,12 @@ const FIXTURE = 'packages/octane/tests/conformance/_fixtures/unknown-property-di
 const devServer = loadServerFixture<typeof client>(FIXTURE, { compileOptions: { dev: true } });
 const prodServer = loadServerFixture<typeof client>(FIXTURE, { compileOptions: { dev: false } });
 
+const nativeImageProperties = {
+	fetchpriority: 'low',
+	srcset: '/image.svg 1x, /image-large.svg 2x',
+	referrerpolicy: 'no-referrer',
+} as const;
+
 function captureErrors() {
 	return vi.spyOn(console, 'error').mockImplementation(() => {});
 }
@@ -209,10 +215,102 @@ describe('React DOM unknown-property diagnostics', () => {
 	// their supported authored spelling rather than generic custom-prop advice.
 	it('suggests the supported spelling for a miscased known host property', () => {
 		const error = captureErrors();
-		const root = mount(client.SpreadUnknownProperties, { attributes: { tabindex: '2' } });
+		const root = mount(client.SpreadUnknownProperties, { attributes: { tabINDEX: '2' } });
 		try {
 			expect(root.find('#unknown-properties').getAttribute('tabindex')).toBe('2');
-			expectClientWarnings(error, ['Invalid DOM property `tabindex`. Did you mean `tabIndex`?']);
+			expectClientWarnings(error, ['Invalid DOM property `tabINDEX`. Did you mean `tabIndex`?']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// OCTANE DIVERGENCE: equivalent native HTML names are supported alongside camelCase aliases.
+	it.each([
+		{ name: 'static attributes', render: () => mount(client.StaticNativeImageProperties) },
+		{
+			name: 'dynamic attributes',
+			render: () => mount(client.DynamicNativeImageProperties, nativeImageProperties),
+		},
+		{
+			name: 'spread attributes',
+			render: () => mount(client.SpreadImageProperties, { attributes: nativeImageProperties }),
+		},
+	])('accepts native image names from $name without diagnostics', ({ render }) => {
+		const error = captureErrors();
+		const root = render();
+		try {
+			const image = root.find('#native-image-properties');
+			expect(image.getAttribute('fetchpriority')).toBe('low');
+			expect(image.getAttribute('srcset')).toBe('/image.svg 1x, /image-large.svg 2x');
+			expect(image.getAttribute('referrerpolicy')).toBe('no-referrer');
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('updates native image attributes without spelling diagnostics', () => {
+		const error = captureErrors();
+		const root = mount(client.DynamicNativeImageProperties, {
+			fetchpriority: 'low',
+			srcset: '/image.svg 1x',
+			referrerpolicy: 'no-referrer',
+		});
+		try {
+			root.update(client.DynamicNativeImageProperties, {
+				fetchpriority: 'high',
+				srcset: '/updated.svg 1x, /updated-large.svg 2x',
+				referrerpolicy: 'origin',
+			});
+			const image = root.find('#native-image-properties');
+			expect(image.getAttribute('fetchpriority')).toBe('high');
+			expect(image.getAttribute('srcset')).toBe('/updated.svg 1x, /updated-large.svg 2x');
+			expect(image.getAttribute('referrerpolicy')).toBe('origin');
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('accepts native input names and numeric attribute text without diagnostics', () => {
+		const error = captureErrors();
+		const root = mount(client.NativeInputProperties);
+		try {
+			const input = root.find('#native-input-properties') as HTMLInputElement;
+			expect(input.maxLength).toBe(12);
+			expect(input.minLength).toBe(4);
+			expect(input.tabIndex).toBe(2);
+			expect(input.getAttribute('enterkeyhint')).toBe('done');
+			expect(input.getAttribute('inputmode')).toBe('numeric');
+			expect(input.getAttribute('autocapitalize')).toBe('none');
+			expect(input.getAttribute('autocorrect')).toBe('off');
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it.each([
+		['srcSET', 'srcSet'],
+		['autofocus', 'autoFocus'],
+		['defaultvalue', 'defaultValue'],
+		['defaultchecked', 'defaultChecked'],
+		['dangerouslysetinnerhtml', 'dangerouslySetInnerHTML'],
+		['classname', 'className'],
+		['suppresscontenteditablewarning', 'suppressContentEditableWarning'],
+		['suppresshydrationwarning', 'suppressHydrationWarning'],
+		['suppressnativechangewarning', 'suppressNativeChangeWarning'],
+		['acceptcharset', 'acceptCharset'],
+		['htmlfor', 'htmlFor'],
+		['httpequiv', 'httpEquiv'],
+	])('preserves spelling guidance for %s', (name, canonical) => {
+		const error = captureErrors();
+		const root = mount(client.SpreadUnknownProperties, { attributes: { [name]: 'visible' } });
+		try {
+			expect(root.find('#unknown-properties').getAttribute(name.toLowerCase())).toBe('visible');
+			expectClientWarnings(error, [
+				`Invalid DOM property \`${name}\`. Did you mean \`${canonical}\`?`,
+			]);
 		} finally {
 			root.unmount();
 		}
@@ -641,6 +739,50 @@ describe('React DOM unknown-property diagnostics', () => {
 });
 
 describe('server and hydration unknown-property diagnostics', () => {
+	it.each([
+		{
+			name: 'static attributes',
+			render: () => Server.renderToString(devServer.StaticNativeImageProperties).html,
+			hydrate: (container: HTMLElement) =>
+				hydrateRoot(container, client.StaticNativeImageProperties),
+		},
+		{
+			name: 'dynamic attributes',
+			render: () =>
+				Server.renderToString(devServer.DynamicNativeImageProperties, nativeImageProperties).html,
+			hydrate: (container: HTMLElement) =>
+				hydrateRoot(container, client.DynamicNativeImageProperties, nativeImageProperties),
+		},
+		{
+			name: 'spread attributes',
+			render: () =>
+				Server.renderToString(devServer.SpreadImageProperties, {
+					attributes: nativeImageProperties,
+				}).html,
+			hydrate: (container: HTMLElement) =>
+				hydrateRoot(container, client.SpreadImageProperties, { attributes: nativeImageProperties }),
+		},
+	])('adopts native image $name without diagnostics', ({ render, hydrate }) => {
+		const error = captureErrors();
+		const html = render();
+		expect(messages(error)).toEqual([]);
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		const original = container.querySelector('#native-image-properties');
+		const root = hydrate(container);
+		try {
+			flushSync(() => {});
+			const image = container.querySelector('#native-image-properties');
+			expect(image).toBe(original);
+			expect(image?.getAttribute('fetchpriority')).toBe('low');
+			expect(image?.getAttribute('srcset')).toBe('/image.svg 1x, /image-large.svg 2x');
+			expect(image?.getAttribute('referrerpolicy')).toBe('no-referrer');
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	// Per ReactDOMComponent-test.js:206 — SSR final host snapshots aggregate
 	// unsupported values once while preserving all remaining host attributes.
 	it('groups multiple unsupported property values into one server warning', () => {
