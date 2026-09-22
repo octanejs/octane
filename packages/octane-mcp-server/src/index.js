@@ -104,6 +104,7 @@ export const BENCHMARK_SUITES = [
 	'ssr-final-replay',
 	'audit-981-coverage',
 	'view-transitions',
+	'view-transition-select',
 	'ssr-http',
 	'streaming-backpressure',
 	'ssr-workerd',
