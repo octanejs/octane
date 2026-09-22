@@ -15,6 +15,9 @@ const DEFAULT_GITHUB_API_URL = 'https://api.github.com';
 const NPM_PROPAGATION_RETRY_DELAYS_MS = [5_000, 10_000, 15_000, ...Array(29).fill(30_000)];
 const RELEASE_TAGGER_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
 const RELEASE_TAGGER_NAME = 'github-actions[bot]';
+// Community bindings are versioned on nearly every octane patch, so announcing
+// each one buries octane's own notes and makes Releases notifications unusable.
+const GITHUB_RELEASE_PACKAGES = new Set(['octane']);
 
 function identity(pkg) {
 	return `${pkg.name}@${pkg.version}`;
@@ -22,6 +25,10 @@ function identity(pkg) {
 
 export function releaseTag(pkg) {
 	return identity(pkg);
+}
+
+function announcesGithubRelease(pkg) {
+	return GITHUB_RELEASE_PACKAGES.has(pkg.name);
 }
 
 export function changelogEntry(changelog, version) {
@@ -289,8 +296,11 @@ export async function reconcileGithubReleases(
 		}
 	}
 
-	const githubReleaseTags = await getReleaseTags(packages);
-	const missingReleasePackages = packages.filter((pkg) => !githubReleaseTags.has(releaseTag(pkg)));
+	const announcedPackages = packages.filter(announcesGithubRelease);
+	const githubReleaseTags = await getReleaseTags(announcedPackages);
+	const missingReleasePackages = announcedPackages.filter(
+		(pkg) => !githubReleaseTags.has(releaseTag(pkg)),
+	);
 	const createdReleases = [];
 	const skippedReleases = [];
 	for (const pkg of missingReleasePackages) {
@@ -303,7 +313,12 @@ export async function reconcileGithubReleases(
 		createdReleases.push(pkg);
 	}
 
-	return { createdReleases, missingTagPackages, skippedReleases };
+	return {
+		announcedPackages,
+		createdReleases,
+		missingTagPackages,
+		skippedReleases,
+	};
 }
 
 function renderReconciliationSummary(result) {
@@ -313,6 +328,7 @@ function renderReconciliationSummary(result) {
 		`- Tags created: ${result.missingTagPackages.length}`,
 		`- Releases created: ${result.createdReleases.length}`,
 		`- Releases skipped (no matching changelog entry): ${result.skippedReleases.length}`,
+		`- Packages announced as GitHub releases: ${result.announcedPackages.length}`,
 	].join('\n')}\n`;
 }
 
