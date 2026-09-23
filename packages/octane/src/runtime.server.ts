@@ -2061,6 +2061,18 @@ export function ssrText(v: unknown): string {
 }
 
 /**
+ * A dynamic text hole that shares its parent with sibling nodes. The client
+ * reserves one `<!>` position for it and walks later siblings from there, so
+ * an empty value must still occupy one server node: the HTML parser produces
+ * no Text node for '', which would shift every later sibling onto the wrong
+ * server node. The empty anchor comment stands in and hydration swaps it for
+ * the hole's empty Text node. Non-empty values pay nothing.
+ */
+export function ssrTextSlot(text: string): string {
+	return text === '' ? EMPTY_COMMENT : text;
+}
+
+/**
  * A dynamic text hole in FIRST-CHILD position of a newline-eating element
  * (`<pre>`/`<textarea>`/`<listing>`): the HTML parser discards a newline that
  * immediately follows the opening tag, so a value starting with '\n' gets an

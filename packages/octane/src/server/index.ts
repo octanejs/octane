@@ -185,6 +185,7 @@ export {
 	escapeAttr,
 	ssrText,
 	ssrTextPre,
+	ssrTextSlot,
 	ssrNestingText,
 	ssrChild,
 	ssrChildText,
