@@ -3,7 +3,9 @@ import { renderToStaticMarkup } from 'octane/server';
 import { attachRouterServerSsrUtils } from '@tanstack/router-core/ssr/server';
 import { getScrollRestorationScriptForRouter } from '@tanstack/router-core/scroll-restoration-script';
 import { RouterServer, renderRouterToStream, renderRouterToString } from '../../src/ssr/server';
-import { makeSsrRouter } from '../_fixtures/ssr.tsrx';
+import { ManagedHeadOwners, makeSsrRouter } from '../_fixtures/ssr.tsrx';
+import { renderReactHeadContent } from './_react-head-oracle.js';
+import type { ServerManifest } from '@tanstack/router-core';
 
 describe('@octanejs/tanstack-router SSR', () => {
 	// Per TanStack/router PR #7847 snapshot 753f919e,
@@ -95,6 +97,57 @@ describe('@octanejs/tanstack-router SSR', () => {
 		} finally {
 			router.serverSsr.cleanup();
 		}
+	});
+
+	// Upstream @tanstack/react-router@1.170.18 headContentUtils.tsx:140-151
+	// emits one script preload per matched route's manifest `preloads`, after
+	// meta and before route links. The oracle is real react-router rendering
+	// the same routes and manifest through react-dom/server.
+	it('emits manifest modulepreload links in the head as react-router does', async () => {
+		const manifest: ServerManifest = {
+			routes: {
+				__root__: {
+					preloads: ['/assets/entry.js', { href: '/assets/shared.js', crossOrigin: 'anonymous' }],
+				},
+				'/': { preloads: ['/assets/index.js'] },
+			},
+		};
+		const head = () => ({
+			meta: [{ title: 'Preloads' }],
+			links: [{ rel: 'icon', href: '/favicon.ico' }],
+		});
+
+		const octaneRouter = makeSsrRouter();
+		octaneRouter.routeTree.options.head = head;
+		attachRouterServerSsrUtils({ router: octaneRouter, manifest });
+		await octaneRouter.load();
+		let octaneHtml: string;
+		try {
+			octaneHtml = renderToStaticMarkup(
+				ManagedHeadOwners as any,
+				{ router: octaneRouter, secondary: false },
+				{ nonce: 'octane-csp' },
+			).html;
+		} finally {
+			octaneRouter.serverSsr!.cleanup();
+		}
+
+		const reactHtml = await renderReactHeadContent({ head, manifest, nonce: 'octane-csp' });
+
+		const headTags = (html: string) =>
+			Array.from(html.matchAll(/<(title|meta|link)\b[^>]*>/g), ([tag]) =>
+				tag
+					.replace(/\s+data-tsr-managed-key="[^"]*"/, '')
+					.replace(/\s*\/?>$/, '>')
+					.replace(/crossorigin=/, 'crossOrigin='),
+			);
+
+		expect(headTags(octaneHtml)).toEqual(headTags(reactHtml));
+		expect(headTags(octaneHtml).filter((tag) => tag.includes('modulepreload'))).toEqual([
+			'<link rel="modulepreload" href="/assets/entry.js" nonce="octane-csp">',
+			'<link rel="modulepreload" href="/assets/shared.js" crossOrigin="anonymous" nonce="octane-csp">',
+			'<link rel="modulepreload" href="/assets/index.js" nonce="octane-csp">',
+		]);
 	});
 
 	// Per TanStack/router PR #7847 snapshot 753f919e,

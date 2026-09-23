@@ -1,4 +1,5 @@
-import { Body, Head, HeadContent, Html, Scripts, createRootRoute } from '@octanejs/tanstack-router';
+import { Body, Head, Html, Scripts, createRootRoute } from '@octanejs/tanstack-router';
+import { SiteHeadContent } from '../components/SiteHeadContent.tsrx';
 import { MainLayout } from '../layouts/MainLayout.tsrx';
 import { NotFound } from '../pages/not-found/NotFound.tsrx';
 import { DEFAULT_TITLE } from '../hooks/use-title.ts';
@@ -149,7 +150,7 @@ const THEME_INIT = `(function(){var s=null;try{s=localStorage.getItem('octane-th
 function RootDocument(props: { children?: unknown }) @{
 	<Html lang="en">
 		<Head>
-			<HeadContent />
+			<SiteHeadContent />
 			{/* theme-color is owned by the client (the pre-paint script and toggle
     mutate it), so it lives here in the shell — NOT in the route head()
     config. A router-managed tag is recreated from head() on every client
