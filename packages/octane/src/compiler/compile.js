@@ -11535,7 +11535,19 @@ function compileInternal(
 		vtHintNodes.push(inheritOriginLoc(b.stmt(b.call(rtAlias('__vtSeen'))), moduleOrigin));
 	}
 	const signalBindingNodes = [];
-	if (ctx.signalBindingsUsed) {
+	if (ctx.signalBindingsUsed && ctx.signalBindingsEager && !doesRendererWork(ctx)) {
+		// Declarations alone own document signal state, not renderer work. Every
+		// module that renders their reads imports octane/signals and activates the
+		// renderer itself, so this module must not load it (see slot-hooks.js).
+		const enableDocument = allocCompilerName(ctx, '_$__enableSignalDocument');
+		signalBindingNodes.push(
+			inheritOriginLoc(
+				b.imports([['__enableSignalDocument', enableDocument]], 'octane/signals'),
+				moduleOrigin,
+			),
+			inheritOriginLoc(b.stmt(b.call(enableDocument, b.literal(1))), moduleOrigin),
+		);
+	} else if (ctx.signalBindingsUsed) {
 		ctx.runtimeNeeded.add('enableSignalBindings');
 		signalBindingNodes.push(
 			inheritOriginLoc(
@@ -24687,27 +24699,31 @@ function stripTsOnlyWrappers(node, env, topLevel = false) {
 	return out ?? node;
 }
 
+// A module renders when it needs generated runtime helpers or imports a
+// renderer directly (hand-authored createElement/root calls). Mirrors the
+// plain-module policy in slot-hooks.js.
+function doesRendererWork(ctx) {
+	return (
+		ctx.runtimeNeeded.size !== 0 ||
+		ctx.activityModuleAst.body.some(
+			(node) =>
+				node.type === 'ImportDeclaration' &&
+				node.importKind !== 'type' &&
+				['octane', 'octane/server', 'octane/signals/client', 'octane/signals/server'].includes(
+					node.source?.value,
+				) &&
+				(node.specifiers.length === 0 ||
+					node.specifiers.some((specifier) => specifier.importKind !== 'type')),
+		)
+	);
+}
+
 function nativeReadActivationNodes(ctx, origin) {
 	// Install the graph-free driver before any authored root invocation, not
 	// after parameter evaluation inside a syntactically recognized component.
 	// Binding-only activation modules use their selected native adapters, not
-	// this renderer driver. Retain the plain-module renderer-import policy for
-	// hand-authored createElement/root calls without generated runtime helpers.
-	if (
-		!ctx.nativeReads ||
-		(ctx.runtimeNeeded.size === 0 &&
-			!ctx.activityModuleAst.body.some(
-				(node) =>
-					node.type === 'ImportDeclaration' &&
-					node.importKind !== 'type' &&
-					['octane', 'octane/server', 'octane/signals/client', 'octane/signals/server'].includes(
-						node.source?.value,
-					) &&
-					(node.specifiers.length === 0 ||
-						node.specifiers.some((specifier) => specifier.importKind !== 'type')),
-			))
-	)
-		return [];
+	// this renderer driver.
+	if (!ctx.nativeReads || !doesRendererWork(ctx)) return [];
 	return [
 		inheritOriginLoc(
 			b.stmt(b.call(requireRuntimeForContext(ctx, 'enableNativeReadCollection'), b.literal(1))),

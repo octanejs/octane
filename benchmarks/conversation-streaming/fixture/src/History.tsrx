@@ -1,3 +1,4 @@
+import 'octane/signals';
 import { history$, selectedHistory$ } from './State.tsrx';
 import { recordEvaluation } from './evaluation.ts';
 
