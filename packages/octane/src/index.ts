@@ -122,6 +122,7 @@ export {
 	__useReducerWithGetter,
 	__createVoidRoot,
 	__hydrateVoidRoot,
+	__voidRootProps,
 	bindRendererRegionOwner,
 	EXTERNAL_HYDRATION_PROMISE,
 	HYDRATION_RANGE_BOUNDARY,

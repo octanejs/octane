@@ -122,6 +122,30 @@
   {
     "suite": "bundle-reachability",
     "op": "raw",
+    "target": "root-chained-jsx",
+    "reference": "root-chained-jsx-budget",
+    "maxRatio": 1,
+    "note": "The Vite-template chained createRoot(...).render(<Component />) entry with an imported void component must keep compiler-proven root specialization; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "root-chained-jsx",
+    "reference": "root-chained-jsx-budget",
+    "maxRatio": 1,
+    "note": "The Vite-template chained createRoot(...).render(<Component />) entry with an imported void component must keep compiler-proven root specialization; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "root-chained-jsx",
+    "reference": "root-chained-jsx-budget",
+    "maxRatio": 1,
+    "note": "The Vite-template chained createRoot(...).render(<Component />) entry with an imported void component must keep compiler-proven root specialization; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
     "target": "root-static",
     "reference": "root-static-budget",
     "maxRatio": 1,

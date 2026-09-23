@@ -1609,7 +1609,7 @@ export default interface ErasedShape { value: string }
 				"import { Unknown } from './Unknown.js';\n" +
 				'createRoot(document.body).render(Main);\n' +
 				'createRoot(document.documentElement).render(Unknown);\n' +
-				'const retained = createRoot(document.body);\n' +
+				'export const retained = createRoot(document.body);\n' +
 				'retained.render(Main);\n';
 			const mixed = compiler.transform(mixedEntry, entry, {
 				isVoidComponentImport: (request, imported) =>
@@ -1618,7 +1618,19 @@ export default interface ErasedShape { value: string }
 			expect(mixed?.kind).toBe('slots');
 			expect(mixed?.code.match(/_\$createVoidRoot\(/g)).toHaveLength(1);
 			expect(mixed?.code).toContain('createRoot(document.documentElement).render(Unknown)');
-			expect(mixed?.code).toContain('const retained = createRoot(document.body)');
+			expect(mixed?.code).toContain('export const retained = createRoot(document.body)');
+
+			// A module-private root whose every use is proven has a closed lifetime.
+			const privateRoot = compiler.transform(
+				mixedEntry.replace('export const retained', 'const retained'),
+				entry,
+				{
+					isVoidComponentImport: (request: string, imported: string) =>
+						request === './Main.tsrx' && imported === 'Main',
+				},
+			);
+			expect(privateRoot?.code.match(/_\$createVoidRoot\(/g)).toHaveLength(2);
+			expect(privateRoot?.code).toContain('createRoot(document.documentElement).render(Unknown)');
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

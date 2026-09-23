@@ -366,3 +366,124 @@ export function run(){const host=document.querySelector('#host');host.innerHTML=
 			expect(await consume(source, dev)).toEqual({ text: 'authored', cleaned: true });
 	});
 });
+
+describe('chained, module-scope and element-form void roots', () => {
+	const specialized = (source: string) =>
+		compile(source, 'consumer.tsrx', { dev: false, hmr: false }).code;
+
+	it('renders a chained element target with its props and live defaultProps', async () => {
+		const source = `import {createRoot} from 'octane';
+function View(props) @{ <main>{props.label + ':' + String(props.flag) + ':' + props.extra as string}</main> }
+View.defaultProps = { extra: 'default', label: 'unused' };
+const label = 'first';
+createRoot(document.querySelector('#host')).render(<View label={label} flag />);
+export function run() { const host=document.querySelector('#host'); return {text:host.textContent}; }`;
+		const code = specialized(source);
+		expect(code).toContain('__createVoidRoot as');
+		expect(code).toContain('__voidRootProps as');
+		expect(code).not.toContain('createElementFromConfig');
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({ text: 'first:true:default' });
+	});
+
+	it('keeps a __proto__ attribute on the element path', async () => {
+		const source = `import {createRoot} from 'octane';
+function View(props) @{ <main>{String(Object.hasOwn(props, '__proto__')) + ':' + String(props.inherited) as string}</main> }
+const base = { inherited: 'leaked' };
+createRoot(document.querySelector('#host')).render(<View __proto__={base} />);
+export function run() { return {text: document.querySelector('#host').textContent}; }`;
+		expect(specialized(source)).toContain('createElementFromConfig');
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({ text: 'false:undefined' });
+	});
+
+	it('keeps keys, children and effectful values on the element path', async () => {
+		const source = `import {createRoot,flushSync} from 'octane';
+function View(props) @{ <main>{props.label as string}<input /></main> }
+const order = [];
+const compute = () => { order.push('props'); return 'dynamic'; };
+const host = document.querySelector('#host');
+const root = createRoot(host);
+root.render(<View label={compute()} />);
+flushSync(() => {});
+const input = host.querySelector('input'); input.value = 'typed';
+root.render(<View key="one" label="keyed" />);
+flushSync(() => {});
+const keyed = { text: host.textContent, replaced: input !== host.querySelector('input') };
+root.render(<View key="one" label="same" />);
+flushSync(() => {});
+const same = { text: host.textContent, retained: host.querySelector('input').value === '' };
+root.unmount();
+const cleaned = host.childNodes.length === 0;
+export function run() { return {order, keyed, same, cleaned}; }`;
+		const code = specialized(source);
+		// A module-private root with only proven uses is a closed lifetime.
+		expect(code).toContain('__createVoidRoot as');
+		expect(code.match(/createElementFromConfig\(/g)).toHaveLength(3);
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				order: ['props'],
+				keyed: { text: 'keyed', replaced: true },
+				same: { text: 'same', retained: true },
+				cleaned: true,
+			});
+	});
+
+	it('hydrates a chained element target by adopting server nodes', async () => {
+		const source = `import {hydrateRoot} from 'octane';
+function View(props) @{ <main><span>{props.label as string}</span><input /></main> }
+const host = document.querySelector('#host');
+host.innerHTML = '<main><span>server</span><input></main>';
+const main = host.firstElementChild;
+host.querySelector('input').value = 'typed';
+hydrateRoot(host, <View label="server" />).render(<View label="client" />);
+const adopted = main === host.firstElementChild;
+export async function run() { await Promise.resolve();
+ return {adopted, text: host.textContent, draft: host.querySelector('input').value}; }`;
+		const code = specialized(source);
+		expect(code).toContain('__hydrateVoidRoot as');
+		expect(code).not.toContain('createElementFromConfig');
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				adopted: true,
+				text: 'client',
+				draft: 'typed',
+			});
+	});
+
+	it.each([
+		['exported', 'export const root=createRoot(host); root.render(View,{label:"first"});'],
+		[
+			'closure',
+			'const root=createRoot(host); root.render(View,{label:"first"}); export const later=()=>root;',
+		],
+		['non-render member', 'const root=createRoot(host).render; void root;'],
+		['host tag', 'createRoot(host).render(<main>first</main>);'],
+		[
+			'returned-value target',
+			'function Plain() { return "first"; } createRoot(host).render(<Plain />);',
+		],
+		[
+			'eval-reachable named',
+			'const root=createRoot(host); root.render(View,{label:"first"}); eval("root");',
+		],
+	])('leaves %s roots generic', (_label, body) => {
+		const code = specialized(
+			`import {createRoot} from 'octane';\nfunction View(props) @{ <main>{props.label as string}</main> }\nconst host=document.body;\n${body}`,
+		);
+		expect(code).not.toContain('__createVoidRoot');
+	});
+
+	it('keeps an unnamed chained root of an import specialized beside direct eval', () => {
+		// Strict module eval cannot create a binding and nothing names this root,
+		// but it can still reassign a same-file function declaration.
+		const entry = (component: string) =>
+			compile(
+				`import {createRoot} from 'octane';\n${component}\ncreateRoot(document.body).render(<View />);\neval('1');`,
+				'consumer.tsrx',
+				{ dev: false, hmr: false, isVoidComponentImport: () => true },
+			).code;
+		expect(entry("import View from './View.tsrx';")).toContain('__createVoidRoot as');
+		expect(entry('function View() @{ <main>first</main> }')).not.toContain('__createVoidRoot');
+	});
+});
