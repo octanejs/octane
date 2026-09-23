@@ -846,12 +846,22 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 					await input.fill('separate draft for B');
 					await clickControl(page.getByRole('button', { name: 'Conversation A', exact: true }));
 					await expect.poll(() => input.inputValue()).toBe('next draft for A');
+					// Preserve the rendered frame and browser errors in a failed poll,
+					// rather than reporting only a missing completion-node count.
 					await expect
 						.poll(
-							() => page.getByText('Completed: one accepted operation', { exact: true }).count(),
+							async () => ({
+								completed: await page
+									.getByText('Completed: one accepted operation', { exact: true })
+									.count(),
+								history: await page
+									.getByRole('region', { name: 'Conversation history' })
+									.textContent(),
+								errors,
+							}),
 							{ timeout: 10_000 },
 						)
-						.toBe(1);
+						.toMatchObject({ completed: 1 });
 					expect(await page.locator('[data-conversation="A"] [data-turn]').count()).toBe(1);
 					await clickControl(page.getByRole('button', { name: 'Check last operation' }));
 					await expect
