@@ -12,9 +12,11 @@
     "test:app-workloads": "node --test app-workloads/verify.test.mjs"
   },
   "dependencies": {
+    "@tsrx/core": "catalog:default",
     "miniflare": "catalog:default",
-    "vite": "catalog:default",
+    "octane": "workspace:*",
     "react": "catalog:default",
-    "react-dom": "catalog:default"
+    "react-dom": "catalog:default",
+    "vite": "catalog:default"
   }
 }

@@ -164,7 +164,9 @@ test('folds stage instrumentation out of a default production bundle', async () 
 		entry,
 		[
 			"import { lynxWireProfile } from '" +
-				path.resolve('packages/lynx/src/core/profiling.ts').replaceAll('\\', '/') +
+				path
+					.resolve(import.meta.dirname, '../../../packages/lynx/src/core/profiling.ts')
+					.replaceAll('\\', '/') +
 				"';",
 			'if (__OCTANE_LYNX_PROFILE__) {',
 			"\tconst profile = lynxWireProfile(); profile['octane-stage-profile-marker'] = 1;",

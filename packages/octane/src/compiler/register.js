@@ -131,9 +131,12 @@ function registerBunPlugin() {
 							? 'ts'
 							: 'js';
 				if (result === null || result.kind === 'none') return { contents: source, loader };
+				// Compiled `.ts`/`.tsx` output keeps TypeScript with runtime semantics
+				// (`enum`, value namespaces), exactly as Vite's own TS transform then
+				// consumes it, so it keeps its source loader. `.tsrx` output is JavaScript.
 				return {
 					contents: result.code,
-					loader: result.kind === 'slots' || result.kind === 'runtime-requests' ? loader : 'js',
+					loader: result.kind === 'compile' && path.endsWith('.tsrx') ? 'js' : loader,
 				};
 			});
 		},

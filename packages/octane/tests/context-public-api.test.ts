@@ -13,7 +13,17 @@ describe('context public API', () => {
 			const context = factory('default');
 			expect(typeof context).toBe('function');
 			expect(context.defaultValue).toBe('default');
-			expect('Provider' in context).toBe(false);
+			const descriptor = Object.getOwnPropertyDescriptor(context, 'Provider');
+			if (renderer === 'native') {
+				expect('Provider' in context).toBe(false);
+				return;
+			}
+			// DOM and server contexts carry a development-only accessor that throws
+			// the migration error; it never holds a value and never enumerates.
+			expect(descriptor?.get).toBeTypeOf('function');
+			expect(descriptor).not.toHaveProperty('value');
+			expect(descriptor?.enumerable).toBe(false);
+			expect(() => (context as any).Provider).toThrow(/OCTANE_CONTEXT_PROVIDER/);
 		});
 	}
 
