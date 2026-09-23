@@ -302,6 +302,45 @@ describe('@for item-body purity with module and global reads', () => {
 		expect(flags[0]! & (PURE | DEP_ELIGIBLE)).toBe(expected);
 	});
 
+	// The whole-list cache skips the forBlock call itself while the iterable and
+	// its witnessed captures are unchanged, so a header default or computed key
+	// reading module or global state must keep that cache off as well.
+	it.each([
+		['a module let default', '{ label = mode }'],
+		['a global default', '{ label = location.hash }'],
+		['a module let computed key', '{ [mode]: label }'],
+	])('keeps the whole-list cache off for a header with %s', (_name, header) => {
+		const code = compile(
+			`
+			let mode = 'a';
+			export function App(props) @{
+				<ul>@for (const ${header} of props.items; index i; key i) {
+					<li>{label as string}</li>
+				}</ul>
+			}
+		`,
+			'App.tsrx',
+			{ hmr: false, dev: false },
+		).code;
+		expect(code).toMatch(/_\$forBlock\(__s, \d+, _b\.\w+, props\.items,/);
+		expect(code).not.toContain('_$compilerMemoRegion');
+	});
+
+	it('caches the whole list for a plain header (control)', () => {
+		const code = compile(
+			`
+			export function App(props) @{
+				<ul>@for (const item of props.items; index i; key i) {
+					<li>{item.label as string}</li>
+				}</ul>
+			}
+		`,
+			'App.tsrx',
+			{ hmr: false, dev: false },
+		).code;
+		expect(code).toContain('_$compilerMemoRegion');
+	});
+
 	it('keeps PURE for a destructured header whose fields the body reads', () => {
 		const flags = appListFlags(
 			compile(
