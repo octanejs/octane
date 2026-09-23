@@ -31004,8 +31004,8 @@ function requireCompiledHydrateAlias(ctx) {
 	return alias;
 }
 
-function hydrateDiagnosticChildrenCaptures(node, children, ctx) {
-	if (!ctx.dev || ctx.mode === 'server') return undefined;
+function hydrateChildrenCaptures(node, children, ctx) {
+	if (ctx.mode === 'server') return undefined;
 	const tag = node.openingElement?.name ?? node.id;
 	if (tag?.type !== 'JSXIdentifier' || ctx.octaneImportLocals?.get(tag.name) !== 'Hydrate')
 		return undefined;
@@ -31031,7 +31031,7 @@ function hydrateDiagnosticChildrenCaptures(node, children, ctx) {
 		for (const name of roots) covered.add(name);
 	}
 	for (const name of free) if (!covered.has(name)) captures.push(b.id(name));
-	// Property reads stay deferred until activation; collecting diagnostic data
+	// Property reads stay deferred until activation; comparing captures
 	// must not evaluate a dormant child's getters or call its render function.
 	return inheritOriginLoc(b.arrow([], b.array(captures)), node);
 }
@@ -31225,8 +31225,8 @@ function makeCompCall(
 			ctx.runtimeNeeded.add('markChildrenBlock');
 			hasChildrenProp = true;
 			const childrenArgs = [b.id(childrenHelperName)];
-			const diagnosticCaptures = hydrateDiagnosticChildrenCaptures(node, children, ctx);
-			if ((ctx.autoMemo && ctx.mode !== 'server') || diagnosticCaptures !== undefined) {
+			const hydrateCaptures = hydrateChildrenCaptures(node, children, ctx);
+			if ((ctx.autoMemo && ctx.mode !== 'server') || hydrateCaptures !== undefined) {
 				// These functions close over parent locals and are recreated on every
 				// render. A module-owned token distinguishes a real Provider body
 				// handoff from fresh captures without invalidating ordinary cache hits.
@@ -31234,8 +31234,7 @@ function makeCompCall(
 				ctx.hoistedHelpers.push(inheritOriginLoc(b.const(bodyIdentity, b.object([])), node));
 				childrenArgs.push(b.id(bodyIdentity));
 			}
-			if (diagnosticCaptures !== undefined)
-				childrenArgs.push(diagnosticCaptures ?? b.literal(null));
+			if (hydrateCaptures !== undefined) childrenArgs.push(hydrateCaptures ?? b.literal(null));
 			let childrenValue = b.call('_$markChildrenBlock', ...childrenArgs);
 			if (ctx.presentationHydration?.structural && node._octaneBindingSite)
 				childrenValue = b.call(
