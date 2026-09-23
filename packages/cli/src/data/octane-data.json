@@ -2221,6 +2221,11 @@
       "message": "Unsupported native signal transition.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "80": {
+      "message": "Independent Hydrate cannot activate a `%s` strategy because its lexical parent never runs on the client. Use load(), idle(), visible(), media(), interaction(), or never(), or remove `independent`.",
+      "runtime": ["server"],
+      "status": "active"
     }
   }
 }

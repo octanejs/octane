@@ -44,6 +44,7 @@ type ServerErrorArguments = {
 	70: [];
 	71: [];
 	73: [];
+	80: [unknown];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -200,6 +201,11 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				return formatDevErrorMessage('Unsupported Octane server signal binding ABI.', args);
 			case 73:
 				return formatDevErrorMessage('Octane DOM bindings require unique list keys.', args);
+			case 80:
+				return formatDevErrorMessage(
+					'Independent Hydrate cannot activate a `%s` strategy because its lexical parent never runs on the client. Use load(), idle(), visible(), media(), interaction(), or never(), or remove `independent`.',
+					args,
+				);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

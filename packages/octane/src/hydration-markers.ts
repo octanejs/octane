@@ -17,6 +17,14 @@ export const SIGNAL_CONTROL_ATTR = 'data-octane-signal-control';
 export const HYDRATE_ID_ATTR = 'data-octane-hydrate-id';
 /** Serialized strategy kind (`visible`, `idle`, `dynamic`, …). */
 export const HYDRATE_WHEN_ATTR = 'data-octane-hydrate-when';
+/**
+ * Serialized built-in strategy parameters. An independent island reads these
+ * because its lexical parent (which evaluated `when`) never runs on the client.
+ */
+export const HYDRATE_IDLE_TIMEOUT_ATTR = 'data-octane-hydrate-timeout';
+export const HYDRATE_VISIBLE_MARGIN_ATTR = 'data-octane-hydrate-root-margin';
+export const HYDRATE_VISIBLE_THRESHOLD_ATTR = 'data-octane-hydrate-threshold';
+export const HYDRATE_MEDIA_ATTR = 'data-octane-hydrate-media';
 /** Number of `useId()` slots consumed while rendering the deferred child. */
 export const HYDRATE_ID_COUNT_ATTR = 'data-octane-hydrate-id-count';
 /** Direct-child JSON script carrying this boundary's `use()` seed slice. */
