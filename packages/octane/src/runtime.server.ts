@@ -151,7 +151,7 @@ import {
 import { formatServerError } from './error-codes.server.generated.js';
 import { formAuthoringDiagnostics } from './form-diagnostics.js';
 import { isRendererContext, registerServerRendererContextProvider } from './renderer-bridge.js';
-import { registerContext } from './context-identity.js';
+import { defineRemovedContextMembers, registerContext } from './context-identity.js';
 import {
 	validateNativeReadWitness,
 	type NativeReadWitness,
@@ -6032,23 +6032,8 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	ctx.defaultValue = defaultValue;
 	registerContext(ctx);
 	if (process.env.NODE_ENV !== 'production') {
-		// Mirror of the client's Consumer diagnostic (see runtime.ts): warn once
-		// per context on access, return undefined so probes behave as in prod.
-		let consumerWarned = false;
-		Object.defineProperty(ctx, 'Consumer', {
-			configurable: true,
-			get() {
-				if (!consumerWarned) {
-					consumerWarned = true;
-					console.error(
-						'Octane has no Context.Consumer. Read the context directly with use(Context) or ' +
-							'useContext(Context) in the child component — Octane hooks are call-site keyed, ' +
-							'so the read is legal behind any condition the render-prop form was working around.',
-					);
-				}
-				return undefined;
-			},
-		});
+		// Mirror of the client's removed-member diagnostics (see runtime.ts).
+		defineRemovedContextMembers(ctx);
 	}
 	return ctx;
 }

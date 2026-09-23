@@ -18,6 +18,23 @@ const sourceFiles = [
 	'packages/lynx/src/main-renderer.ts',
 	'packages/lynx/src/main-thread.ts',
 ];
+// The copied sources live in a temporary directory with no node_modules. Resolve
+// their bare package imports (such as `octane/internal/context`) from the real
+// Lynx package, so the bundle uses the workspace's own export maps.
+const lynxPackageDirectory = path.join(repositoryRoot, 'packages/lynx');
+const resolveBareImportsFromLynx = {
+	name: 'resolve-bare-imports-from-lynx',
+	setup(pluginBuild) {
+		pluginBuild.onResolve({ filter: /^[^./]/ }, (args) => {
+			if (args.pluginData === resolveBareImportsFromLynx) return undefined;
+			return pluginBuild.resolve(args.path, {
+				kind: args.kind,
+				resolveDir: lynxPackageDirectory,
+				pluginData: resolveBareImportsFromLynx,
+			});
+		});
+	},
+};
 const destroyRunProfileFields = [
 	'destroyRunExpandMs',
 	'denseValidateMs',
@@ -122,6 +139,7 @@ test('profiled first-screen rendering works without a stage-harness slice hook',
 			logLevel: 'silent',
 			outfile: output,
 			platform: 'node',
+			plugins: [resolveBareImportsFromLynx],
 		});
 
 		const { run } = await import(`${pathToFileURL(output).href}?profile-first-screen`);

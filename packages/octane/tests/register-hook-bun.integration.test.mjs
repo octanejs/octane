@@ -29,3 +29,15 @@ test('Bun targets the server runtime inside pass-through manual-slot packages', 
 	assert.equal(result.status, 0);
 	assert.equal(result.stdout, '<main>Hello from a package, Octane!</main>');
 });
+
+test('Bun loads compiled TypeScript that keeps runtime enum declarations', () => {
+	assert.ok(bun, 'BUN_BINARY must name the Bun executable used for this integration test');
+	const result = spawnSync(bun, ['--preload', 'octane/compiler/register', 'entry-enum.ts'], {
+		cwd: fixtureDirectory,
+		encoding: 'utf8',
+	});
+
+	assert.equal(result.stderr, '');
+	assert.equal(result.status, 0);
+	assert.equal(result.stdout, '<main data-tone="loud">HELLO</main>');
+});

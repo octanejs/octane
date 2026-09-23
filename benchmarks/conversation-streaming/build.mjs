@@ -34,10 +34,19 @@ export function measurementEnvironment() {
 
 function toolchainProvenance() {
 	const result = {};
-	for (const name of ['vite', 'esbuild', '@tsrx/core', '@tsrx/runtime', 'alien-signals']) {
-		const entry = fs.realpathSync(
-			require.resolve(name === '@tsrx/runtime' ? '@tsrx/runtime/ref' : name),
-		);
+	// This suite has no manifest of its own. Resolve each toolchain package through
+	// the package that actually depends on it, not through hoisting at the root.
+	const requireFromOctane = createRequire(path.join(REPO, 'packages/octane/package.json'));
+	const requireFromTsrx = createRequire(requireFromOctane.resolve('@tsrx/core'));
+	const resolvers = {
+		vite: () => require.resolve('vite'),
+		esbuild: () => require.resolve('esbuild'),
+		'@tsrx/core': () => requireFromOctane.resolve('@tsrx/core'),
+		'@tsrx/runtime': () => requireFromTsrx.resolve('@tsrx/runtime/ref'),
+		'alien-signals': () => requireFromOctane.resolve('alien-signals'),
+	};
+	for (const [name, resolveEntry] of Object.entries(resolvers)) {
+		const entry = fs.realpathSync(resolveEntry());
 		const root = packageRoot(entry, name);
 		const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json')));
 		const implementation = (directory) =>

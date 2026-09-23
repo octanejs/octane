@@ -204,7 +204,7 @@ import {
 	rendererRangeClose,
 } from './stream-protocol.js';
 import { isRendererContext, registerClientRendererBridge } from './renderer-bridge.js';
-import { registerContext } from './context-identity.js';
+import { defineRemovedContextMembers, registerContext } from './context-identity.js';
 import { createNativeReadDriver, type NativeReadDriver } from './signals/native-read-client.js';
 import {
 	validateNativeReadWitness,
@@ -13808,26 +13808,10 @@ function initializeContext<T>(ctx: Context<T>, defaultValue: T): Context<T> {
 	ctx.$$version = 0;
 	registerContext(ctx);
 	if (process.env.NODE_ENV !== 'production') {
-		// Octane deliberately has no render-prop Consumer (slot-keyed hooks make
-		// use()/useContext legal behind any condition — the pattern Consumer
-		// existed to work around). Accessing it warns once per context and still
-		// returns undefined, so behavior matches production and feature probes
-		// (`Ctx.Consumer || fallback`) keep working.
-		let consumerWarned = false;
-		Object.defineProperty(ctx, 'Consumer', {
-			configurable: true,
-			get() {
-				if (!consumerWarned) {
-					consumerWarned = true;
-					console.error(
-						'Octane has no Context.Consumer. Read the context directly with use(Context) or ' +
-							'useContext(Context) in the child component — Octane hooks are call-site keyed, ' +
-							'so the read is legal behind any condition the render-prop form was working around.',
-					);
-				}
-				return undefined;
-			},
-		});
+		// Octane has no render-prop Consumer (slot-keyed hooks make use()/useContext
+		// legal behind any condition) and no `.Provider` (the context is the
+		// provider). See defineRemovedContextMembers for each member's behavior.
+		defineRemovedContextMembers(ctx);
 	}
 	return ctx;
 }

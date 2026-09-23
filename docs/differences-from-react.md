@@ -995,8 +995,11 @@ The compiler reports these as compile errors, each carrying its code:
 
 `createContext` returns a context that is itself the provider component —
 React 19's `<MyContext value={…}>` form is the supported shape.
-`MyContext.Provider` does not exist; known legacy `.Provider` access reports
-the `OCTANE_CONTEXT_PROVIDER` compiler error. Replace
+`MyContext.Provider` does not exist. The compiler reports
+`OCTANE_CONTEXT_PROVIDER` when the context is created in the same module; for an
+imported context, reading `.Provider` in development throws the same
+`OCTANE_CONTEXT_PROVIDER` error on client and server (production bundles carry
+no check and the property is `undefined`). Replace
 `<MyContext.Provider value={value}>` with `<MyContext value={value}>`, and pass
 `MyContext` directly to `createElement`
 or `root.render`. The render-prop `<MyContext.Consumer>` does not exist and

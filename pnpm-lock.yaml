@@ -3129,9 +3129,15 @@ importers:
 
   benchmarks/ssr-workerd:
     dependencies:
+      '@tsrx/core':
+        specifier: catalog:default
+        version: 0.2.0
       miniflare:
         specifier: catalog:default
         version: 4.20260714.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
       react:
         specifier: catalog:default
         version: 19.2.7
