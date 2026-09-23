@@ -13721,13 +13721,12 @@ export function __createCompiledContext<T>(defaultValue: T): Context<T> {
 		provideContext(scope, ctx, props.value);
 		const children = props.children as ComponentBody | null | undefined;
 		if (children == null) return;
+		// Children are always compiled bodies here, so unlike
+		// renderClientContextProvider there is no descriptor dialect to flip to.
 		const dialect = (children as any)[CHILDREN_BODY] ?? children;
 		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
 		if (previous !== dialect) {
-			if (previous !== undefined && (previous === 2 || dialect === 2)) {
-				resetScopeChildren(scope);
-				if (scope.block.disposed) return;
-			} else if (previous !== undefined) {
+			if (previous !== undefined) {
 				invalidateSharedBodyOutput(scope);
 				if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
 					const hooks = scope.hooks!;

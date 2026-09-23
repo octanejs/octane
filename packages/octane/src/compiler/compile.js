@@ -9976,6 +9976,15 @@ function compileInternal(
 	// rebuilt with builders/spreads (locations carried via setLocation) and
 	// untouched subtrees stay shared with the parse by reference.
 	let ast = parsedAst;
+	// Void roots, private compiled contexts and compiled split Hydrate are
+	// same-module proofs over the authored DOM tree. Renderer participation is
+	// decided per module: `rendererBoundaryPreparation` is non-null exactly when
+	// this module renders a configured boundary tag, and nested renderer compiles
+	// carry `__rendererBoundariesLowered`/`__universal`. The project-wide
+	// `rendererBoundaries`/`rendererRegistry` options alone do not disqualify a
+	// module — bundlers pass them to every module once any boundary exists, and
+	// the specialized runtime entries share the public Context/root shapes that
+	// renderer bridges read.
 	const localVoidRootsEnabled =
 		!options?.dev &&
 		!options?.hmr &&
@@ -9984,9 +9993,7 @@ function compileInternal(
 		options?.universalRuntime == null &&
 		options?.__universal == null &&
 		!options?.__rendererBoundariesLowered &&
-		rendererBoundaryPreparation === null &&
-		options?.rendererBoundaries == null &&
-		options?.rendererRegistry == null;
+		rendererBoundaryPreparation === null;
 	const authoredVoidRootIds = new Set();
 	const privateCompiledContexts = localVoidRootsEnabled
 		? findPrivateCompiledContexts(ast)

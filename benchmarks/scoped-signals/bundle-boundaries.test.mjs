@@ -125,6 +125,18 @@ export function mount(parent, items) {
 	assert.equal(serializedIdentities, 0, 'Scalar values must not serialize signal instance paths.');
 });
 
+const SCENE_BOUNDARY_OPTIONS = {
+	rendererRegistry: { scene: { target: 'universal', module: 'octane/universal' } },
+	rendererBoundaries: {
+		'@scene/bridge': {
+			Canvas: { ownerRenderer: 'dom', childRenderer: 'scene', prop: 'children' },
+		},
+	},
+};
+// Render a `<Canvas>` renderer boundary beside `output` in the same module.
+const withSceneBoundary = (source, output) =>
+	"import {Canvas} from '@scene/bridge';\n" +
+	source.replace(output, `<><Canvas><mesh /></Canvas>${output}</>`);
 const scenario = (id) => BUNDLE_CASES.find((entry) => entry.id === id);
 const source = (name) => ({ path: `packages/octane/src/${name}` });
 const alien = (version = '3.2.0') => ({
@@ -2288,11 +2300,25 @@ test('same-file root optimization proves complete lifetimes across bindings and 
 			{ profile: true },
 			{ mode: 'server' },
 			{ renderer: { id: 'dom', module: 'octane', target: 'dom' } },
-			{ rendererBoundaries: { rules: [] } },
 		]) {
 			check(createPrefix + createBody, '__createVoidRoot', false, options);
 			check(hydratePrefix + hydrateBody, '__hydrateVoidRoot', false, options);
 		}
+		// Renderer boundaries gate per module: project-wide boundary options keep a
+		// module that renders no boundary tag specialized, while a module that does
+		// render one keeps the public factories.
+		check(createPrefix + createBody, '__createVoidRoot', true, SCENE_BOUNDARY_OPTIONS);
+		check(hydratePrefix + hydrateBody, '__hydrateVoidRoot', true, SCENE_BOUNDARY_OPTIONS);
+		for (const [prefix, body, helper] of [
+			[createPrefix, createBody, '__createVoidRoot'],
+			[hydratePrefix, hydrateBody, '__hydrateVoidRoot'],
+		])
+			check(
+				withSceneBoundary(prefix, '<main>first</main>') + body,
+				helper,
+				false,
+				SCENE_BOUNDARY_OPTIONS,
+			);
 		check(
 			createPrefix + 'function unrelated(View){View=()=>1;}\n' + createBody,
 			'__createVoidRoot',
@@ -2533,24 +2559,30 @@ test('private context specialization preserves factory source ranges and deploym
 	const authored =
 		"import {createContext as context,useContext} from 'octane';\nconst Theme=context('default');\nfunction Reader() @{<span>{useContext(Theme) as string}</span>}\nexport function App() @{<Theme value=\"provided\"><Reader/></Theme>}";
 	const options = [
-		{},
+		{ specialize: true },
 		{ dev: true },
 		{ hmr: 'vite' },
 		{ hmr: 'webpack' },
 		{ profile: true },
 		{ mode: 'server' },
 		{ renderer: { id: 'dom', module: 'octane', target: 'dom' } },
-		{ rendererBoundaries: { rules: [] } },
+		// Only a module that renders a renderer boundary tag loses the
+		// specialization; project-wide boundary options alone do not.
+		{ ...SCENE_BOUNDARY_OPTIONS, specialize: true },
+		{
+			...SCENE_BOUNDARY_OPTIONS,
+			source: withSceneBoundary(authored, '<Theme value="provided"><Reader/></Theme>'),
+		},
 	];
-	for (const settings of options) {
-		const result = compile(authored, 'private-context.tsrx', {
+	for (const { source = authored, specialize = false, ...settings } of options) {
+		const result = compile(source, 'private-context.tsrx', {
 			dev: false,
 			hmr: false,
 			mode: 'client',
 			...settings,
 			inspect: true,
 		});
-		const start = authored.indexOf("context('default')");
+		const start = source.indexOf("context('default')");
 		assert.ok(
 			result.inspect.segments.some(
 				(segment) => segment.srcStart === start && segment.srcEnd === start + 'context'.length,
@@ -2563,7 +2595,7 @@ test('private context specialization preserves factory source ranges and deploym
 				node.source.value === 'octane/internal/client' &&
 				node.specifiers.some((specifier) => specifier.imported?.name === '__createCompiledContext'),
 		);
-		assert.equal(specialized, Object.keys(settings).length === 0, JSON.stringify(settings));
+		assert.equal(specialized, specialize, JSON.stringify(settings) + source);
 	}
 	for (const importSource of ['octane/server', 'octane/native', 'octane/lynx']) {
 		const source = authored.replace("from 'octane'", "from '" + importSource + "'");
