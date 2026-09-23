@@ -1232,6 +1232,20 @@ function literalData(value) {
 	return Array.isArray(value) ? b.array(value.map(literalData)) : b.literal(value);
 }
 
+// Mirrors the runtime's fixed scalar channels. Richer kinds, addressed targets,
+// host handoff and grouped projections keep the general fixed-layout adopter.
+const FIXED_SCALAR_CHANNELS = new Set(['attr', 'boolean', 'aria', 'class', 'text']);
+
+function scalarAdopter(plan) {
+	return !plan.addressed &&
+		!plan.hostHandoff &&
+		plan.styleIndices.length === 0 &&
+		plan.projectionGroups.length === 0 &&
+		plan.bindings.every((binding) => FIXED_SCALAR_CHANNELS.has(binding[1]))
+		? '__adoptScalarBindings'
+		: '__adoptBindings';
+}
+
 function scalarProperties(
 	plan,
 	project,
@@ -1595,7 +1609,7 @@ function projectProgram(ast, plan, filename, lexical) {
 				...(adoptScalar
 					? [
 							inheritHookMemoOrigin(
-								b.imports([['__adoptBindings', adoptScalar]], 'octane/dom-bindings'),
+								b.imports([[scalarAdopter(plan.scalar), adoptScalar]], 'octane/dom-bindings'),
 								plan.fn,
 							),
 						]
@@ -1695,7 +1709,10 @@ function projectProgram(ast, plan, filename, lexical) {
 	}
 	const adopt = lexical.domBindingAllocateName('_$adoptBindings');
 	importNodes.push(
-		inheritHookMemoOrigin(b.imports([['__adoptBindings', adopt]], 'octane/dom-bindings'), plan.fn),
+		inheritHookMemoOrigin(
+			b.imports([[scalarAdopter(plan), adopt]], 'octane/dom-bindings'),
+			plan.fn,
+		),
 	);
 	return {
 		...ast,

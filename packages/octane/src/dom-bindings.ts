@@ -212,7 +212,7 @@ export function __releaseBinding(node: Element, name: string): void {
 	}
 }
 
-function resolveNodes(root: Element, descriptor: CompiledBindings<unknown>): Element[] {
+function assertBindingRoot(root: Element, descriptor: CompiledBindings<unknown>): Element {
 	if (
 		root?.nodeType !== 1 ||
 		root.getAttribute('data-octane-bindings') !== descriptor.id ||
@@ -220,7 +220,11 @@ function resolveNodes(root: Element, descriptor: CompiledBindings<unknown>): Ele
 	) {
 		throw new Error('DOM bindings require the matching compiler-stamped root.');
 	}
-	if (descriptor.addressed) return resolveAddressedNodes(root, descriptor);
+	return root;
+}
+
+function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>): Element[] {
+	assertBindingRoot(root, descriptor);
 	const nodes: Element[] = [];
 	const childIndices: number[] = [];
 	for (let i = 0; i < descriptor.nodes.length; i++) {
@@ -325,7 +329,18 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 	return nodes;
 }
 
-function normalize(binding: BindingOperation, value: unknown): BindingValue {
+/**
+ * Fixed scalar channels need no capability, restoration, or sanitization. The
+ * scalar adopter retains only these; every richer kind extends them below.
+ */
+function isFixedScalarChannel(binding: BindingOperation): boolean {
+	const kind = binding[1];
+	return (
+		kind === 'attr' || kind === 'boolean' || kind === 'aria' || kind === 'class' || kind === 'text'
+	);
+}
+
+function normalizeFixedScalar(binding: BindingOperation, value: unknown): string | null {
 	const type = typeof value;
 	switch (binding[1]) {
 		case 'text':
@@ -333,10 +348,39 @@ function normalize(binding: BindingOperation, value: unknown): BindingValue {
 			if (type !== 'string' && type !== 'number' && type !== 'bigint' && type !== 'boolean')
 				throw new TypeError('DOM binding text must be a synchronous scalar.');
 			return String(value);
-		case 'styleObject':
-			return value as BindingValue;
 		case 'class':
 			return value == null || value === false ? null : normalizeClass(value);
+		case 'boolean':
+			return !value || type === 'function' || type === 'symbol' ? null : '';
+		default:
+			return value == null ||
+				type === 'function' ||
+				type === 'symbol' ||
+				(binding[1] === 'attr' && type === 'boolean')
+				? null
+				: String(value);
+	}
+}
+
+function writeFixedScalar(node: Element, binding: BindingOperation, value: string | null): void {
+	const name = binding[2];
+	if (binding[1] === 'text') {
+		const text = node.firstChild;
+		if (text === null) node.appendChild(node.ownerDocument.createTextNode(value!));
+		else if (text.nodeValue !== value) text.nodeValue = value;
+	} else if (value === null) {
+		if (node.hasAttribute(name)) node.removeAttribute(name);
+	} else if (node.getAttribute(name) !== value) {
+		// Native boolean/type attributes reflect synchronously to their properties.
+		node.setAttribute(name, value);
+	}
+}
+
+function normalize(binding: BindingOperation, value: unknown): BindingValue {
+	const type = typeof value;
+	switch (binding[1]) {
+		case 'styleObject':
+			return value as BindingValue;
 		case 'classGroup':
 			return value == null || value === false ? '' : normalizeClass(value);
 		case 'styleAttribute':
@@ -350,8 +394,6 @@ function normalize(binding: BindingOperation, value: unknown): BindingValue {
 			return value == null || type === 'boolean' || type === 'function' || type === 'symbol'
 				? null
 				: sanitizeURL(String(value));
-		case 'boolean':
-			return !value || type === 'function' || type === 'symbol' ? null : '';
 		case 'styleProperty': {
 			if (value == null || type === 'boolean') return null;
 			return type === 'number' && value !== 0 && !binding[3]
@@ -361,22 +403,13 @@ function normalize(binding: BindingOperation, value: unknown): BindingValue {
 					: '' + (value as any);
 		}
 		default:
-			return value == null ||
-				type === 'function' ||
-				type === 'symbol' ||
-				(binding[1] === 'attr' && type === 'boolean')
-				? null
-				: String(value);
+			return normalizeFixedScalar(binding, value);
 	}
 }
 
 function write(node: Element, binding: BindingOperation, value: string | null): void {
 	const name = binding[2];
-	if (binding[1] === 'text') {
-		const text = node.firstChild;
-		if (text === null) node.appendChild(node.ownerDocument.createTextNode(value!));
-		else if (text.nodeValue !== value) text.nodeValue = value;
-	} else if (binding[1] === 'classToken') {
+	if (binding[1] === 'classToken') {
 		node.classList.toggle(name, value !== null);
 	} else if (binding[1] === 'url') {
 		if (value === '' && !(name === 'href' && node.localName === 'a')) value = null;
@@ -399,12 +432,7 @@ function write(node: Element, binding: BindingOperation, value: string | null): 
 			if (style.getPropertyValue(name) !== text || style.getPropertyPriority(name) !== priority)
 				style.setProperty(name, text, priority);
 		}
-	} else if (value === null) {
-		if (node.hasAttribute(name)) node.removeAttribute(name);
-	} else if (node.getAttribute(name) !== value) {
-		// Native boolean/type attributes reflect synchronously to their properties.
-		node.setAttribute(name, value);
-	}
+	} else writeFixedScalar(node, binding, value);
 }
 
 export { normalize as __normalizeBinding, write as __writeBinding };
@@ -488,7 +516,9 @@ export function __adoptBindings<Props>(
 	if ('root' in descriptor) return descriptor.adopt(root, descriptor, source, options);
 	if (!source || typeof source.getSnapshot !== 'function' || typeof source.subscribe !== 'function')
 		throw new TypeError('DOM bindings require synchronous getSnapshot() and subscribe() methods.');
-	const nodes = resolveNodes(root as Element, descriptor);
+	const nodes = descriptor.addressed
+		? resolveAddressedNodes(assertBindingRoot(root as Element, descriptor), descriptor)
+		: resolveFixedNodes(root as Element, descriptor);
 	const bindings = descriptor.bindings;
 	const owned: Array<readonly [Element, string]> = [];
 	const previous: Array<BindingValue | undefined> = [];
@@ -1056,6 +1086,277 @@ export function __adoptBindings<Props>(
 				groups ??= new Map();
 				groups.set(index, descriptor.createClassGroup!(node, binding[2], binding[3] as number));
 			}
+		}
+		signal?.addEventListener('abort', dispose, { once: true });
+		const stop = source.subscribe(refresh);
+		if (typeof stop !== 'function')
+			throw new TypeError('A DOM binding subscription must return a cleanup function.');
+		if (disposed) stop();
+		else unsubscribe = stop;
+		busy = false;
+		refresh();
+		return handle;
+	} catch (error) {
+		try {
+			dispose();
+		} catch {
+			// Initialization failure remains primary over application cleanup errors.
+		}
+		throw error;
+	}
+}
+
+/**
+ * @internal Compiler-selected adopter for fixed nodes whose every channel is a
+ * fixed scalar. It shares node resolution, channel claims, legacy claim
+ * publication, signal connections and native transition preview with
+ * `__adoptBindings`, but retains none of the projection, control, class-group,
+ * style-restoration, host-handoff or addressed-topology integrations.
+ */
+export function __adoptScalarBindings<Props>(
+	root: Element,
+	descriptor: CompiledBindings<Props>,
+	source: BindingSource<Props>,
+	options?: BindingOptions,
+): BindingHandle {
+	// The compiler selects this entry only with proof. Refuse a richer artifact
+	// rather than silently dropping its sanitization or ownership behavior.
+	if (
+		descriptor.addressed ||
+		descriptor.handoff ||
+		descriptor.connectProjection ||
+		!descriptor.bindings.every(isFixedScalarChannel)
+	)
+		throw new TypeError('This DOM binding view requires the general adopter.');
+	if (!source || typeof source.getSnapshot !== 'function' || typeof source.subscribe !== 'function')
+		throw new TypeError('DOM bindings require synchronous getSnapshot() and subscribe() methods.');
+	const nodes = resolveFixedNodes(root, descriptor);
+	const bindings = descriptor.bindings;
+	const owned: Array<readonly [Element, string]> = [];
+	const previous: Array<string | null | undefined> = [];
+	const signalFactory = descriptor.connectSignal?.();
+	const signalConnections = signalFactory ? new Map<number, BindingSignalConnection>() : undefined;
+	const signalUpdates = signalFactory ? new Set<number>() : undefined;
+	let disposed = false;
+	let busy = true;
+	let dirty = false;
+	let revision = 0;
+	let unsubscribe: (() => void) | undefined;
+	const signal = options?.signal;
+	const dispose = (): void => {
+		if (disposed) return;
+		disposed = true;
+		signal?.removeEventListener('abort', dispose);
+		let failed = false;
+		let failure: unknown;
+		for (const connection of signalConnections?.values() ?? []) {
+			try {
+				connection.dispose();
+			} catch (error) {
+				if (!failed) {
+					failed = true;
+					failure = error;
+				}
+			}
+		}
+		signalConnections?.clear();
+		signalUpdates?.clear();
+		for (let i = 0; i < owned.length; i++) __releaseBinding(owned[i]![0], owned[i]![1]);
+		owned.length = nodes.length = previous.length = 0;
+		const stop = unsubscribe;
+		unsubscribe = undefined;
+		try {
+			stop?.();
+		} catch (error) {
+			if (!failed) throw error;
+		}
+		if (failed) throw failure;
+	};
+	const writePrepared = (next: Array<string | null>, indices: number[] | undefined): void => {
+		for (
+			let position = 0;
+			position < (indices?.length ?? bindings.length) && !dirty && !disposed;
+			position++
+		) {
+			const i = indices ? indices[position]! : position;
+			if (next[i] === previous[i]) continue;
+			const binding = bindings[i]!;
+			writeFixedScalar(nodes[binding[0]]!, binding, next[i]!);
+			if (!disposed) {
+				previous[i] = next[i];
+				const node = owned[i]![0];
+				let claims = domBindingClaims.get(node);
+				if (claims === undefined) domBindingClaims.set(node, (claims = new Map()));
+				claims.set(owned[i]![1], next[i]!);
+			}
+		}
+	};
+	const drain = (preview = false): void | NativeTransitionPresentation => {
+		if (disposed) return;
+		if (busy) return preview ? { validate: () => false, commit() {}, discard() {} } : undefined;
+		const version = revision;
+		const previousDirty = dirty;
+		const previousUpdates = preview && signalUpdates ? [...signalUpdates] : undefined;
+		const preparedSignals =
+			preview && signalConnections ? new Map(signalConnections) : signalConnections;
+		const receipts: BindingPreparedValue[] | undefined = preview ? [] : undefined;
+		let accepted = false;
+		let retired = false;
+		const discard = preview
+			? (): void => {
+					if (accepted || retired) return;
+					retired = true;
+					for (const receipt of receipts!) receipt.discard();
+					for (const [index, connection] of preparedSignals ?? [])
+						if (connection !== signalConnections?.get(index)) connection.dispose();
+				}
+			: undefined;
+		if (preview) dirty = true;
+		busy = true;
+		try {
+			while ((dirty || signalUpdates?.size) && !disposed) {
+				let next: Array<string | null>;
+				let indices: number[] | undefined;
+				if (dirty) {
+					dirty = false;
+					signalUpdates?.clear();
+					const snapshot = source.getSnapshot();
+					if (dirty || disposed) continue;
+					if (
+						snapshot !== null &&
+						(typeof snapshot === 'object' || typeof snapshot === 'function') &&
+						typeof (snapshot as { then?: unknown }).then === 'function' &&
+						!dirty &&
+						!disposed
+					)
+						throw new TypeError('DOM bindings require a synchronous snapshot, not a thenable.');
+					if (dirty || disposed) continue;
+					const values = descriptor.project(snapshot);
+					if (dirty || disposed) continue;
+					if (!Array.isArray(values) || values.length !== bindings.length)
+						throw new TypeError(
+							'A DOM binding projection must return its synchronous scalar values.',
+						);
+					let resolved = values;
+					if (signalFactory && descriptor.signalIndices) {
+						for (const index of descriptor.signalIndices) {
+							if (disposed || dirty) break;
+							let connection = preparedSignals!.get(index);
+							if (!connection && signalFactory.isSignal(values[index])) {
+								connection = signalFactory.connect(
+									forwardNativeTransitionConsumer(refresh, () => {
+										if (!disposed) {
+											revision++;
+											signalUpdates!.add(index);
+											drain();
+										}
+									}),
+								);
+								preparedSignals!.set(index, connection);
+							}
+							if (connection) {
+								if (resolved === values) resolved = [...values];
+								const receipt = preview ? connection.preview(values[index]) : undefined;
+								if (receipt) receipts!.push(receipt);
+								(resolved as unknown[])[index] = receipt
+									? receipt.value
+									: connection.read(values[index]);
+							}
+						}
+					}
+					next = resolved.map((value, index) => normalizeFixedScalar(bindings[index]!, value));
+				} else {
+					indices = [...signalUpdates!];
+					signalUpdates!.clear();
+					next = [];
+					for (const index of indices)
+						next[index] = normalizeFixedScalar(
+							bindings[index]!,
+							signalConnections!.get(index)!.get(),
+						);
+				}
+				// Invalidation during another channel's coercion settles only connected
+				// values, without fetching or projecting the application source again.
+				while (!preview && signalUpdates?.size && !dirty && !disposed) {
+					const pending = [...signalUpdates];
+					signalUpdates.clear();
+					for (const index of pending) {
+						next[index] = normalizeFixedScalar(
+							bindings[index]!,
+							signalConnections!.get(index)!.get(),
+						);
+						if (indices && !indices.includes(index)) indices.push(index);
+					}
+				}
+				// A getter/coercion may synchronously notify or end the owner lifetime.
+				// Never publish an obsolete prepared snapshot or mutate after disposal.
+				if (preview)
+					return {
+						validate: () =>
+							!retired &&
+							!disposed &&
+							revision === version &&
+							receipts!.every((receipt) => receipt.validate()),
+						discard: discard!,
+						commit() {
+							if (disposed || retired || accepted) return;
+							accepted = true;
+							busy = true;
+							try {
+								for (const [index, connection] of preparedSignals ?? [])
+									signalConnections!.set(index, connection);
+								for (const receipt of receipts!) receipt.commit();
+								writePrepared(next, indices);
+							} finally {
+								busy = false;
+							}
+						},
+					};
+				if (dirty || disposed) continue;
+				writePrepared(next, indices);
+			}
+		} catch (error) {
+			if (preview) {
+				discard!();
+				throw error;
+			}
+			try {
+				dispose();
+			} catch {
+				// Preserve the projection failure if application cleanup also throws.
+			}
+			throw error;
+		} finally {
+			if (preview) {
+				dirty ||= previousDirty;
+				for (const index of previousUpdates ?? []) signalUpdates!.add(index);
+			}
+			busy = false;
+		}
+	};
+	const refresh: NativeTransitionNotify = (): void => {
+		if (disposed) return;
+		revision++;
+		dirty = true;
+		drain();
+	};
+	const owner = currentSignalOwner();
+	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
+	refresh[NATIVE_TRANSITION_CONSUMER] = {
+		active: () => !disposed,
+		prepare: () => run(() => drain(true)),
+	};
+	const handle: BindingHandle = { refresh, dispose };
+	if (signal?.aborted) {
+		dispose();
+		return handle;
+	}
+	try {
+		// Claim all channels before invoking source callbacks or mutating any node.
+		for (let index = 0; index < bindings.length; index++) {
+			const node = nodes[bindings[index]![0]];
+			if (node === undefined) throw new TypeError('A DOM binding targets an unknown element.');
+			owned.push([node, __claimBinding(node, bindings[index]!)]);
 		}
 		signal?.addEventListener('abort', dispose, { once: true });
 		const stop = source.subscribe(refresh);
