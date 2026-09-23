@@ -857,11 +857,19 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 								history: await page
 									.getByRole('region', { name: 'Conversation history' })
 									.textContent(),
+								turnStatuses: await page
+									.locator('[data-conversation="A"] [data-turn] p:last-of-type')
+									.allTextContents(),
 								errors,
 							}),
 							{ timeout: 10_000 },
 						)
-						.toMatchObject({ completed: 1 });
+						.toMatchObject({
+							completed: 1,
+							history: expect.stringContaining('Completed: one accepted operation'),
+							turnStatuses: ['complete'],
+							errors: [],
+						});
 					expect(await page.locator('[data-conversation="A"] [data-turn]').count()).toBe(1);
 					await clickControl(page.getByRole('button', { name: 'Check last operation' }));
 					await expect
