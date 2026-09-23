@@ -1,5 +1,6 @@
 import {
 	type __adoptBindings,
+	type __adoptScalarBindings,
 	__claimBinding,
 	__createBindingStyleRestoration,
 	__normalizeBinding,
@@ -363,7 +364,7 @@ export interface CompiledBindingProgram<Props> {
 	readonly root: BindingFragment;
 	prepareProps?(props: Props): readonly unknown[];
 	readonly scalar?: CompiledBindings<Props>;
-	readonly adoptScalar?: typeof __adoptBindings;
+	readonly adoptScalar?: typeof __adoptBindings | typeof __adoptScalarBindings;
 	readonly connectSignal?: typeof __createBindingSignals;
 	readonly connectStyle?: typeof __createBindingStyles;
 	readonly connectProjection?: typeof __createBindingProjections;

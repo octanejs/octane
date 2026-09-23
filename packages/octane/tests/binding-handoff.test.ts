@@ -5,13 +5,16 @@ import * as DomBindings from '../src/dom-bindings.js';
 import * as DomBindingSignals from '../src/dom-binding-signals.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 
-function fixture(dev: boolean, text = false, handlers = false) {
+// A style channel needs the general fixed-layout adopter. Without it, every
+// channel is a fixed scalar and the compiler selects the scalar adopter
+// (guarded by benchmarks/scoped-signals/bundle-boundaries.test.mjs).
+function fixture(dev: boolean, style: boolean, text = false, handlers = false) {
 	const id = '/src/binding-handoff.tsrx';
 	const source = `import { unbound } from 'octane/behavior';
   export function Status(props) @{
     'use dom bindings';
     <button type={props.type} disabled={props.disabled} aria-label={props.label} tabIndex={props.tabIndex}
-      class={props.classes} style={{ opacity: props.opacity }} ${handlers ? 'onClick={unbound(props.onClick)}' : ''}>
+      class={props.classes} ${style ? 'style={{ opacity: props.opacity }}' : ''} ${handlers ? 'onClick={unbound(props.onClick)}' : ''}>
       <span hidden={props.hidden}>${text ? '{props.message as string}' : ''}</span>
     </button>
   }`;
@@ -89,7 +92,12 @@ function fixture(dev: boolean, text = false, handlers = false) {
 	};
 }
 
-describe.each([false, true])('compiled early binding handoff (dev=%s)', (dev) => {
+describe.each([
+	{ dev: false, style: true },
+	{ dev: false, style: false },
+	{ dev: true, style: true },
+	{ dev: true, style: false },
+])('compiled early binding handoff (dev=$dev, style=$style)', ({ dev, style }) => {
 	let binding: DomBindings.BindingHandle | undefined;
 	let root: ReturnType<typeof hydrateRoot> | undefined;
 	afterEach(() => {
@@ -100,7 +108,7 @@ describe.each([false, true])('compiled early binding handoff (dev=%s)', (dev) =>
 	});
 
 	it('leaves explicitly unbound handlers to normal application rendering', () => {
-		const view = fixture(dev, true, true);
+		const view = fixture(dev, style, true, true);
 		document.body.innerHTML = view.html;
 		const button = document.body.querySelector('button')!;
 		binding = view.attach(button, view.state);
@@ -118,7 +126,7 @@ describe.each([false, true])('compiled early binding handoff (dev=%s)', (dev) =>
 	});
 
 	it('adopts active attribute, class and style values through historical hydration and then updates normally', () => {
-		const view = fixture(dev);
+		const view = fixture(dev, style);
 		document.body.innerHTML = view.html;
 		const button = document.body.querySelector('button')!;
 		const span = button.firstElementChild!;
@@ -142,7 +150,7 @@ describe.each([false, true])('compiled early binding handoff (dev=%s)', (dev) =>
 		expect(button.disabled).toBe(true);
 		expect(button.getAttribute('aria-label')).toBe('Stop');
 		expect(button.className).toBe('busy');
-		expect(button.style.opacity).toBe('0.5');
+		expect(button.style.opacity).toBe(style ? '0.5' : '');
 		expect(span.hasAttribute('hidden')).toBe(false);
 		expect(button.tabIndex).toBe(-1);
 		expect(warn).not.toHaveBeenCalled();
@@ -154,7 +162,7 @@ describe.each([false, true])('compiled early binding handoff (dev=%s)', (dev) =>
 		expect(button.disabled).toBe(false);
 		expect(button.getAttribute('aria-label')).toBe('Send');
 		expect(button.className).toBe('ready');
-		expect(button.style.opacity).toBe('1');
+		expect(button.style.opacity).toBe(style ? '1' : '');
 		expect(span.hasAttribute('hidden')).toBe(true);
 		expect(button.tabIndex).toBe(0);
 		const unchanged = new MutationObserver(() => {});
@@ -177,14 +185,14 @@ describe.each([false, true])('compiled early binding handoff (dev=%s)', (dev) =>
 		);
 		expect(button.getAttribute('aria-label')).toBe('Retry');
 		expect(button.className).toBe('retry');
-		expect(button.style.opacity).toBe('0.75');
+		expect(button.style.opacity).toBe(style ? '0.75' : '');
 		expect(button.type).toBe('submit');
 		expect(button.disabled).toBe(false);
 		expect(view.cleanup).toHaveBeenCalledOnce();
 	});
 
 	it('renders scalar status text before hydration, retains its identity and releases on abort', () => {
-		const view = fixture(dev, true);
+		const view = fixture(dev, style, true);
 		document.body.innerHTML = view.html;
 		const button = document.body.querySelector('button')!;
 		const span = button.firstElementChild!;
@@ -221,7 +229,7 @@ describe.each([false, true])('compiled early binding handoff (dev=%s)', (dev) =>
 	});
 
 	it('keeps ordinary hydration diagnostics when DOM no longer matches the binding publication', () => {
-		const view = fixture(dev);
+		const view = fixture(dev, style);
 		document.body.innerHTML = view.html;
 		const button = document.body.querySelector('button')!;
 		binding = view.attach(button, view.state);
@@ -237,7 +245,7 @@ describe.each([false, true])('compiled early binding handoff (dev=%s)', (dev) =>
 	});
 
 	it('rejects non-scalar text before any publication and releases every binding claim', () => {
-		const view = fixture(dev, true);
+		const view = fixture(dev, style, true);
 		document.body.innerHTML = view.html;
 		const button = document.body.querySelector('button')!;
 		const span = button.firstElementChild!;
@@ -260,7 +268,7 @@ describe.each([false, true])('compiled early binding handoff (dev=%s)', (dev) =>
 	});
 
 	it('preserves text-hole scalar semantics, including true, zero and empty values', () => {
-		const view = fixture(dev, true);
+		const view = fixture(dev, style, true);
 		document.body.innerHTML = view.html;
 		const button = document.body.querySelector('button')!;
 		const span = button.firstElementChild!;

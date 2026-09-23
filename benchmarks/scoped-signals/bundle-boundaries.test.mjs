@@ -1279,6 +1279,210 @@ export default {...current, hostOperations: undefined, adopt: __adoptSelectedBin
 		}
 });
 
+test('fixed scalar views select the scalar adopter and match the general adopter', async (t) => {
+	const directory = path.resolve('packages/octane');
+	const views = {
+		// Every channel is a fixed scalar: attr, boolean, aria, class and text.
+		Scalar: `import { unbound } from 'octane/behavior';
+export function Scalar(props) @{ 'use dom bindings';
+ <button type={props.type} disabled={props.disabled} aria-label={props.label} class={props.classes}
+  hidden={unbound(props.initiallyHidden)}>
+  <span hidden={!props.showStatus}><b>{props.status as string}</b></span>
+ </button>
+}`,
+		// A URL channel needs sanitization, so the general adopter stays selected.
+		Link: `export function Link(props) @{ 'use dom bindings';
+ <a href={props.href} class={props.classes}><b>{props.status as string}</b></a>
+}`,
+	};
+	// An adopt-only scalar artifact omits these. The general adopter retains URL
+	// sanitization and the host-handoff sidecar protocol in every artifact.
+	const generalOnly =
+		/\/src\/(?:sanitize-url\.js|stream-protocol\.ts|signals\/(?:native-read-seeds|control-handoff)\.ts)$/;
+	const bundle = async (view, mode, legacy = false, mount = false) => {
+		const entry =
+			mode === 'server'
+				? `import {${view}} from './${view}.tsrx'; import {renderToString} from 'octane/server';
+export function render(props) { return renderToString(${view}, props).html; }`
+				: `import view from './${view}.tsrx?octane-bindings=${view}${mount ? '&octane-mount=1' : ''}';
+export function adopt(root, source, options) { return view.adopt(root, view, source, options); }`;
+		const result = await build({
+			stdin: { contents: entry, resolveDir: directory },
+			bundle: true,
+			write: false,
+			minify: true,
+			metafile: true,
+			format: 'esm',
+			platform: mode === 'server' ? 'node' : 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			plugins: [
+				{
+					name: 'fixed-scalar-artifacts',
+					setup(plugin) {
+						plugin.onResolve({ filter: /(?:Scalar|Link)\.tsrx(?:\?.*)?$/ }, ({ path: id }) => ({
+							path: id,
+							namespace: 'fixed-scalar',
+						}));
+						plugin.onLoad({ filter: /.*/, namespace: 'fixed-scalar' }, ({ path: id }) => {
+							const current = id.startsWith('current:');
+							const request = current ? id.slice('current:'.length) : id;
+							// Earlier compiler output imported the general adopter for every
+							// fixed view, and it remains the compatibility entry for them.
+							return {
+								contents:
+									!current && legacy && request.includes('?')
+										? `import current from ${JSON.stringify('current:' + request)};
+import {__adoptBindings} from 'octane/dom-bindings';
+export default {...current, ${mount ? 'adoptScalar' : 'adopt'}: __adoptBindings};`
+										: compile(
+												views[path.basename(request.split('?')[0], '.tsrx')],
+												path.join(directory, request),
+												{ mode, dev: false, hmr: false },
+											).code,
+								loader: 'js',
+								resolveDir: directory,
+							};
+						});
+					},
+				},
+			],
+		});
+		const code = result.outputFiles[0].text;
+		const [output] = Object.values(result.metafile.outputs);
+		return {
+			api: await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64')),
+			gzip: gzipSync(code, { level: 9 }).length,
+			resolved: Object.keys(result.metafile.inputs),
+			generalBytes: Object.entries(output.inputs)
+				.filter(([id]) => generalOnly.test(id.replaceAll('\\', '/')))
+				.reduce((total, [, input]) => total + input.bytesInOutput, 0),
+		};
+	};
+	const window = new Window();
+	const globals = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+	// Adopt server output, publish every channel, then release. Return the
+	// observable DOM trace so both adopters can be compared exactly.
+	const exercise = (server, client, props, updates) => {
+		const host = window.document.createElement('div');
+		window.document.body.append(host);
+		host.innerHTML = server.api.render(props);
+		const root = host.firstElementChild;
+		const text = host.querySelector('b').firstChild;
+		let snapshot = props;
+		const listeners = new Set();
+		const controller = new AbortController();
+		const handle = client.api.adopt(
+			root,
+			{
+				getSnapshot: () => snapshot,
+				subscribe(notify) {
+					listeners.add(notify);
+					return () => listeners.delete(notify);
+				},
+			},
+			{ signal: controller.signal },
+		);
+		const trace = [host.innerHTML];
+		try {
+			for (const update of updates) {
+				snapshot = { ...snapshot, ...update };
+				for (const notify of [...listeners]) notify();
+				// Identity checks avoid assert's deep inspection of DOM graphs.
+				assert.ok(host.firstElementChild === root, 'the adopted root was replaced');
+				assert.ok(host.querySelector('b').firstChild === text, 'the text node was replaced');
+				trace.push(host.innerHTML);
+			}
+			controller.abort();
+			assert.equal(listeners.size, 0);
+			snapshot = { ...snapshot, status: 'After abort' };
+			trace.push(host.innerHTML);
+		} finally {
+			handle.dispose();
+			host.remove();
+		}
+		return trace;
+	};
+	const cases = {
+		Scalar: [
+			{
+				type: 'submit',
+				disabled: false,
+				label: 'Send',
+				classes: 'ready',
+				initiallyHidden: false,
+				showStatus: false,
+				status: 'Idle',
+			},
+			[
+				{ type: 'button', disabled: true, label: 'Stop', classes: ['busy', false && 'x'] },
+				{ showStatus: true, status: 'Sending <draft> & more' },
+				{ disabled: false, label: null, classes: null, status: 0 },
+			],
+		],
+		Link: [
+			{ href: '/start', classes: 'nav', status: 'Start' },
+			[
+				{ href: 'javascript:alert(1)', status: 'Blocked' },
+				{ href: '/next', classes: null },
+			],
+		],
+	};
+	for (const [view, [props, updates]] of Object.entries(cases)) {
+		const server = await bundle(view, 'server');
+		for (const mount of [false, true]) {
+			const selected = await bundle(view, 'client', false, mount);
+			const legacy = await bundle(view, 'client', true, mount);
+			for (const client of [selected, legacy])
+				assert.ok(
+					!client.resolved.some((id) =>
+						/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
+							id,
+						),
+					),
+					`${view}: fixed bindings reached the renderer or signal graph`,
+				);
+			assert.deepEqual(
+				exercise(server, selected, props, updates),
+				exercise(server, legacy, props, updates),
+				`${view}: selected and general adopters diverged`,
+			);
+			assert.ok(legacy.generalBytes > 0, `${view}: the general adopter control lost its leaves`);
+			if (view === 'Link') {
+				assert.ok(selected.generalBytes > 0, 'URL views must keep the general adopter');
+				continue;
+			}
+			// A mountable artifact's structural program writes these channels itself.
+			if (!mount)
+				assert.equal(selected.generalBytes, 0, 'The scalar adopter retained general-only leaves');
+			t.diagnostic(
+				JSON.stringify({ view, mount, selectedGzip: selected.gzip, generalGzip: legacy.gzip }),
+			);
+			// Measured 0.50 for the adopt-only artifact and 0.83 with mounting.
+			assert.ok(
+				selected.gzip / legacy.gzip < (mount ? 0.88 : 0.6),
+				`selected/general gzip ratio: ${selected.gzip}/${legacy.gzip}`,
+			);
+		}
+	}
+});
+
 test('early whole-style bindings exclude later renderer attribute tables', async (t) => {
 	const directory = await mkdtemp(path.join(tmpdir(), 'octane-style-boundary-'));
 	t.after(() => rm(directory, { recursive: true, force: true }));

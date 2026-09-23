@@ -214,7 +214,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'installSignalDocumentLifecycle',
 	],
 	'./behavior': ['adoptBindings', 'mountBindings', 'attachBehaviorRoot', 'unbound'],
-	'./dom-bindings': ['__adoptBindings', '__mountBindings'],
+	'./dom-bindings': ['__adoptBindings', '__adoptScalarBindings', '__mountBindings'],
 	'./dom-binding-program': [
 		'__adoptBindingProgram',
 		'__mountBindingProgram',
