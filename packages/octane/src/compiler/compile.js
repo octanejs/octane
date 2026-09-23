@@ -128,6 +128,11 @@ import { assertNoLegacyContextProviders } from './context-provider.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 import { findLocalVoidRootCallees } from './local-void-roots.js';
+import {
+	lowerParameterProperties,
+	lowerTypeScriptStatements,
+	needsTypeScriptStatementLowering,
+} from './typescript-lowering.js';
 import { findPrivateCompiledContexts } from './private-context.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
@@ -8246,7 +8251,8 @@ function normalizeArrowComponents(ast) {
 // `.tsrx` module. This is RUNTIME-ONLY: the Volar/TS-server path (volar.js) is a
 // separate pipeline that intentionally PRESERVES all types for the language
 // service, so it never calls this. Enums and value namespaces have runtime
-// semantics and are deliberately NOT treated as type-only.
+// semantics and are deliberately NOT treated as type-only: the print lowers
+// them to plain JavaScript instead (typescript-lowering.js).
 function isTypeOnlyStatement(node) {
 	if (node == null) return false;
 	if (
@@ -8270,8 +8276,13 @@ function isTypeOnlyStatement(node) {
 			);
 		}
 	}
-	// `import type { … } from …`
-	if (node.type === 'ImportDeclaration' && node.importKind === 'type') return true;
+	// `import type { … } from …` / `import type X = require('…')`
+	if (
+		(node.type === 'ImportDeclaration' || node.type === 'TSImportEqualsDeclaration') &&
+		node.importKind === 'type'
+	) {
+		return true;
+	}
 	// `export type { … }`, `export type X = …`, `export interface I {}`
 	if (node.type === 'ExportNamedDeclaration') {
 		if (node.exportKind === 'type') return true;
@@ -24438,18 +24449,62 @@ const TS_TYPE_PROPS = [
 	'declare', // `declare` modifier
 	'override', // class member `override`
 	'implements', // `class X implements I` list
+	'abstract', // `abstract class X`
 ];
+
+// Class members with no runtime existence: index signatures, abstract members,
+// and method/constructor overload signatures (a body-less function value).
+// The native parser has TSAbstract* node types and TSEmptyBodyFunctionExpression
+// values; the JavaScript parser flags ordinary members `abstract` and gives
+// overloads a TSDeclareMethod value.
+function isTypeOnlyClassElement(node) {
+	if (node == null) return false;
+	switch (node.type) {
+		case 'TSIndexSignature':
+		case 'TSAbstractMethodDefinition':
+		case 'TSAbstractPropertyDefinition':
+		case 'TSAbstractAccessorProperty':
+			return true;
+		case 'MethodDefinition':
+			return (
+				node.abstract === true ||
+				node.value?.type === 'TSEmptyBodyFunctionExpression' ||
+				node.value?.type === 'TSDeclareMethod'
+			);
+		case 'PropertyDefinition':
+		case 'AccessorProperty':
+			return node.abstract === true;
+	}
+	return false;
+}
 
 // Copy-on-write: stripped shapes are shallow copies; nodes with no TS-only
 // surface are returned by reference, so printing an already-plain subtree
 // allocates nothing and the (possibly parser-owned, frozen-under-tests) input
-// is never written to.
-function stripTsOnlyWrappers(node) {
+// is never written to. TypeScript declarations with runtime semantics (enums,
+// value namespaces, import aliases, parameter properties) are lowered here too,
+// so every emitted module is plain JavaScript (see typescript-lowering.js).
+// `env` is `{ filename, enums }`: the filename for diagnostics and the enum
+// values visible from enclosing statement lists (for constant folding);
+// `topLevel` marks the Program body.
+function stripTsOnlyWrappers(node, env, topLevel = false) {
 	if (node === null || typeof node !== 'object') return node;
 	if (Array.isArray(node)) {
 		let out = null;
 		for (let i = 0; i < node.length; i++) {
 			const item = node[i];
+			// A statement list holding an enum/namespace/import alias is lowered as
+			// a whole: declaration merging and namespace exports span its items.
+			if (needsTypeScriptStatementLowering(item)) {
+				return lowerTypeScriptStatements(node, {
+					topLevel,
+					filename: env.filename,
+					enums: env.enums,
+					isTypeOnlyStatement,
+					strip: (statement, enums) =>
+						stripTsOnlyWrappers(statement, { filename: env.filename, enums }),
+				});
+			}
 			// Type-only STATEMENTS nested below module scope (a `type X = …` or
 			// `interface I {}` inside a function body) never hit the top-level
 			// `ast.body` filter, and stripping their annotations below would
@@ -24458,11 +24513,11 @@ function stripTsOnlyWrappers(node) {
 			// statement-only, so pruning from any AST array is safe (sparse
 			// ArrayExpression holes are `null` and isTypeOnlyStatement keeps
 			// them). Checked BEFORE the per-node strip so `declare` is intact.
-			if (isTypeOnlyStatement(item)) {
+			if (isTypeOnlyStatement(item) || isTypeOnlyClassElement(item)) {
 				if (out === null) out = node.slice(0, i);
 				continue;
 			}
-			const mapped = stripTsOnlyWrappers(item);
+			const mapped = stripTsOnlyWrappers(item, env);
 			if (out === null && mapped !== item) out = node.slice(0, i);
 			if (out !== null) out.push(mapped);
 		}
@@ -24475,7 +24530,10 @@ function stripTsOnlyWrappers(node) {
 		node.type === 'TSSatisfiesExpression' ||
 		node.type === 'TSInstantiationExpression'
 	) {
-		return stripTsOnlyWrappers(node.expression);
+		return stripTsOnlyWrappers(node.expression, env);
+	}
+	if (node.type === 'ClassDeclaration' || node.type === 'ClassExpression') {
+		node = lowerParameterProperties(node, env.filename);
 	}
 	let out = null;
 	// A TS `this` parameter (`function f(this: Foo, …)`) is type-only and is
@@ -24522,7 +24580,7 @@ function stripTsOnlyWrappers(node) {
 			continue;
 		const child = (out ?? node)[key];
 		if (child === null || typeof child !== 'object') continue;
-		const mapped = stripTsOnlyWrappers(child);
+		const mapped = stripTsOnlyWrappers(child, env, key === 'body' && node.type === 'Program');
 		if (mapped !== child) {
 			if (out === null) out = { ...node };
 			out[key] = mapped;
@@ -33180,7 +33238,10 @@ const esrapCommentOptions = {
  * literal raws are re-derived centrally before the print.
  */
 function printNodeWithMap(node, ctx) {
-	const printable = stripTsOnlyWrappers(escapeMultilineStringLiterals(node));
+	const printable = stripTsOnlyWrappers(escapeMultilineStringLiterals(node), {
+		filename: ctx.mapSourceName,
+		enums: null,
+	});
 	if (assertPrintedLocs()) assertNodeLocs(printable);
 	const { code, map } = esrapPrint(printable, withDeferredImports(esrapTsx(esrapCommentOptions)), {
 		sourceMapSource: ctx.mapSourceName,
