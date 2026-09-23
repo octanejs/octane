@@ -128,6 +128,11 @@ import { assertNoLegacyContextProviders } from './context-provider.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 import { findLocalVoidRootCallees } from './local-void-roots.js';
+import {
+	lowerParameterProperties,
+	lowerTypeScriptStatements,
+	needsTypeScriptStatementLowering,
+} from './typescript-lowering.js';
 import { findPrivateCompiledContexts } from './private-context.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
@@ -5560,6 +5565,99 @@ function collectImmutableModuleFunctions(body) {
 	return declared;
 }
 
+/**
+ * Top-level module bindings, split by whether their identity can change after
+ * evaluation. `mutable` holds `let`/`var` declarations, class declarations, and
+ * function declarations that collectImmutableModuleFunctions demoted: an
+ * identity-only survivor skip cannot witness them, so a region reading one
+ * must re-render. `all` adds consts, unreassigned functions, enums, and
+ * imports; a free name outside it (and outside every enclosing local) is a
+ * global. Only top-level declarations count — a same-named parameter or local
+ * elsewhere in the module never shadows the global a region actually reads.
+ */
+function collectModuleTopLevelBindings(body, immutableFunctions) {
+	const all = new Set();
+	const mutable = new Set();
+	for (const statement of body) {
+		if (statement.type === 'ImportDeclaration') {
+			for (const specifier of statement.specifiers || []) {
+				if (specifier.local) all.add(specifier.local.name);
+			}
+			continue;
+		}
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: statement;
+		if (!declaration) continue;
+		if (declaration.type === 'VariableDeclaration') {
+			const names = new Set();
+			for (const d of declaration.declarations || []) collectBindings(d.id, names);
+			for (const name of names) {
+				all.add(name);
+				if (declaration.kind !== 'const') mutable.add(name);
+			}
+		} else if (declaration.type === 'ClassDeclaration' && declaration.id) {
+			all.add(declaration.id.name);
+			mutable.add(declaration.id.name);
+		} else if (
+			declaration.type === 'FunctionDeclaration' &&
+			declaration.id?.type === 'Identifier'
+		) {
+			all.add(declaration.id.name);
+			if (!immutableFunctions.has(declaration.id.name)) mutable.add(declaration.id.name);
+		} else if (
+			(declaration.type === 'TSEnumDeclaration' ||
+				declaration.type === 'TSModuleDeclaration' ||
+				declaration.type === 'TSImportEqualsDeclaration') &&
+			declaration.id?.type === 'Identifier'
+		) {
+			all.add(declaration.id.name);
+		}
+	}
+	return { all, mutable };
+}
+
+// Globals a render-time read may treat as fixed: the value constants and the
+// standard ECMAScript namespaces and constructors. Any other unbound name
+// (`location`, `window`, `document`, `globalThis`, an app-installed global) is
+// host or application state that no compiler witness observes.
+const IMMUTABLE_AMBIENT_GLOBALS = new Set([
+	'undefined',
+	'NaN',
+	'Infinity',
+	...SETUP_PURE_GLOBAL_CALLEES,
+	...SETUP_PURE_NAMESPACE_MEMBERS.keys(),
+	'Error',
+	'TypeError',
+	'RangeError',
+	'RegExp',
+	'Map',
+	'Set',
+	'WeakMap',
+	'WeakSet',
+	'Promise',
+	'Reflect',
+	'Intl',
+]);
+
+/**
+ * Does `name`, a free read of a memo region that is neither an enclosing local
+ * (ctx.currentComponentLocals, extended through every hoisted helper) nor an
+ * import, resolve to state that can change without any witness the compiler
+ * compares? True for mutable top-level module bindings and for non-intrinsic
+ * globals. An enclosing binding the local set misses reads as a global and
+ * fails closed — a lost fast path, never a stale row.
+ */
+function isUnwitnessedAmbientRead(name, ctx) {
+	// `_$…` names are runtime helpers the compiler itself imports.
+	if (name.startsWith('_$')) return false;
+	const module = ctx.moduleTopLevelBindings;
+	if (module === undefined) return false;
+	if (module.mutable.has(name)) return true;
+	return !module.all.has(name) && !IMMUTABLE_AMBIENT_GLOBALS.has(name);
+}
+
 // A component whose synchronous proof reads its props is safe only at JSX
 // edges that construct every read property as an own data field. Missing keys
 // can reach an inherited getter, and `__proto__` changes an object literal's
@@ -8143,7 +8241,8 @@ function normalizeArrowComponents(ast) {
 // `.tsrx` module. This is RUNTIME-ONLY: the Volar/TS-server path (volar.js) is a
 // separate pipeline that intentionally PRESERVES all types for the language
 // service, so it never calls this. Enums and value namespaces have runtime
-// semantics and are deliberately NOT treated as type-only.
+// semantics and are deliberately NOT treated as type-only: the print lowers
+// them to plain JavaScript instead (typescript-lowering.js).
 function isTypeOnlyStatement(node) {
 	if (node == null) return false;
 	if (
@@ -8167,8 +8266,13 @@ function isTypeOnlyStatement(node) {
 			);
 		}
 	}
-	// `import type { … } from …`
-	if (node.type === 'ImportDeclaration' && node.importKind === 'type') return true;
+	// `import type { … } from …` / `import type X = require('…')`
+	if (
+		(node.type === 'ImportDeclaration' || node.type === 'TSImportEqualsDeclaration') &&
+		node.importKind === 'type'
+	) {
+		return true;
+	}
 	// `export type { … }`, `export type X = …`, `export interface I {}`
 	if (node.type === 'ExportNamedDeclaration') {
 		if (node.exportKind === 'type') return true;
@@ -9966,6 +10070,15 @@ function compileInternal(
 	// rebuilt with builders/spreads (locations carried via setLocation) and
 	// untouched subtrees stay shared with the parse by reference.
 	let ast = parsedAst;
+	// Void roots, private compiled contexts and compiled split Hydrate are
+	// same-module proofs over the authored DOM tree. Renderer participation is
+	// decided per module: `rendererBoundaryPreparation` is non-null exactly when
+	// this module renders a configured boundary tag, and nested renderer compiles
+	// carry `__rendererBoundariesLowered`/`__universal`. The project-wide
+	// `rendererBoundaries`/`rendererRegistry` options alone do not disqualify a
+	// module — bundlers pass them to every module once any boundary exists, and
+	// the specialized runtime entries share the public Context/root shapes that
+	// renderer bridges read.
 	const localVoidRootsEnabled =
 		!options?.dev &&
 		!options?.hmr &&
@@ -9974,9 +10087,7 @@ function compileInternal(
 		options?.universalRuntime == null &&
 		options?.__universal == null &&
 		!options?.__rendererBoundariesLowered &&
-		rendererBoundaryPreparation === null &&
-		options?.rendererBoundaries == null &&
-		options?.rendererRegistry == null;
+		rendererBoundaryPreparation === null;
 	const authoredVoidRootIds = new Set();
 	const privateCompiledContexts = localVoidRootsEnabled
 		? findPrivateCompiledContexts(ast)
@@ -10400,6 +10511,13 @@ function compileInternal(
 	// that are ever assigned (`foo = bar`) are excluded: their identity is then
 	// as mutable as a module `let`, which fails closed.
 	ctx.moduleFunctionDeclarations = collectImmutableModuleFunctions(ast.body);
+	// Top-level module bindings (and the mutable subset): identity-only survivor
+	// skips (forBlock PURE / DEP-PURE) fail closed when a row reads a mutable
+	// one or a global (see isUnwitnessedAmbientRead).
+	ctx.moduleTopLevelBindings = collectModuleTopLevelBindings(
+		ast.body,
+		ctx.moduleFunctionDeclarations,
+	);
 	// Global namespaces are only trusted by the setup checkpoint analysis when
 	// no module binding shadows them (see setupCanScheduleSelfUpdate).
 	ctx._moduleBoundNames = collectModuleBoundNames(ast);
@@ -12502,12 +12620,22 @@ function ssrEmitNodes(
 	// adjacency. The client counterpart is the hole-aware `sibling()` walk in
 	// runtime.ts, which treats separators as protocol nodes. Keep the comment
 	// payload in sync with HYDRATION_TEXT_SEP (constants.ts).
+	//
+	// A dynamic hole with siblings is a `<!>` position the client walks from
+	// (htextSwap), so an empty value must still serialize ONE node: wrap it in
+	// ssrTextSlot, which emits an empty anchor comment for ''. A sole child
+	// needs no stand-in: the client mounts it with htext (element) or it ends
+	// its block range (root/arm), and no later walk starts from it.
 	let prevText = null; // 'static' | 'dyn' | null — last emitted part's text kind
 	for (const n of nodes) {
 		const kind = textAdjacencyKind(n, ctx);
 		if (kind === 'empty') continue; // serializes nothing — skip, adjacency-transparent
 		const nlGuard = nlGuardFirst && parts.length === 0;
-		const p = ssrEmitNode(n, ctx, name, inlinedSubs, parentNs, cssHash, componentNs, nlGuard);
+		let p = ssrEmitNode(n, ctx, name, inlinedSubs, parentNs, cssHash, componentNs, nlGuard);
+		if (p && kind === 'dyn' && nodes.length > 1) {
+			ctx.runtimeNeeded.add('ssrTextSlot');
+			p = ssrCall('ssrTextSlot', [p], n);
+		}
 		if (p) {
 			if (kind !== 'other' && prevText !== null && (kind === 'dyn' || prevText === 'dyn')) {
 				parts.push('<!-- -->');
@@ -24319,18 +24447,62 @@ const TS_TYPE_PROPS = [
 	'declare', // `declare` modifier
 	'override', // class member `override`
 	'implements', // `class X implements I` list
+	'abstract', // `abstract class X`
 ];
+
+// Class members with no runtime existence: index signatures, abstract members,
+// and method/constructor overload signatures (a body-less function value).
+// The native parser has TSAbstract* node types and TSEmptyBodyFunctionExpression
+// values; the JavaScript parser flags ordinary members `abstract` and gives
+// overloads a TSDeclareMethod value.
+function isTypeOnlyClassElement(node) {
+	if (node == null) return false;
+	switch (node.type) {
+		case 'TSIndexSignature':
+		case 'TSAbstractMethodDefinition':
+		case 'TSAbstractPropertyDefinition':
+		case 'TSAbstractAccessorProperty':
+			return true;
+		case 'MethodDefinition':
+			return (
+				node.abstract === true ||
+				node.value?.type === 'TSEmptyBodyFunctionExpression' ||
+				node.value?.type === 'TSDeclareMethod'
+			);
+		case 'PropertyDefinition':
+		case 'AccessorProperty':
+			return node.abstract === true;
+	}
+	return false;
+}
 
 // Copy-on-write: stripped shapes are shallow copies; nodes with no TS-only
 // surface are returned by reference, so printing an already-plain subtree
 // allocates nothing and the (possibly parser-owned, frozen-under-tests) input
-// is never written to.
-function stripTsOnlyWrappers(node) {
+// is never written to. TypeScript declarations with runtime semantics (enums,
+// value namespaces, import aliases, parameter properties) are lowered here too,
+// so every emitted module is plain JavaScript (see typescript-lowering.js).
+// `env` is `{ filename, enums }`: the filename for diagnostics and the enum
+// values visible from enclosing statement lists (for constant folding);
+// `topLevel` marks the Program body.
+function stripTsOnlyWrappers(node, env, topLevel = false) {
 	if (node === null || typeof node !== 'object') return node;
 	if (Array.isArray(node)) {
 		let out = null;
 		for (let i = 0; i < node.length; i++) {
 			const item = node[i];
+			// A statement list holding an enum/namespace/import alias is lowered as
+			// a whole: declaration merging and namespace exports span its items.
+			if (needsTypeScriptStatementLowering(item)) {
+				return lowerTypeScriptStatements(node, {
+					topLevel,
+					filename: env.filename,
+					enums: env.enums,
+					isTypeOnlyStatement,
+					strip: (statement, enums) =>
+						stripTsOnlyWrappers(statement, { filename: env.filename, enums }),
+				});
+			}
 			// Type-only STATEMENTS nested below module scope (a `type X = …` or
 			// `interface I {}` inside a function body) never hit the top-level
 			// `ast.body` filter, and stripping their annotations below would
@@ -24339,11 +24511,11 @@ function stripTsOnlyWrappers(node) {
 			// statement-only, so pruning from any AST array is safe (sparse
 			// ArrayExpression holes are `null` and isTypeOnlyStatement keeps
 			// them). Checked BEFORE the per-node strip so `declare` is intact.
-			if (isTypeOnlyStatement(item)) {
+			if (isTypeOnlyStatement(item) || isTypeOnlyClassElement(item)) {
 				if (out === null) out = node.slice(0, i);
 				continue;
 			}
-			const mapped = stripTsOnlyWrappers(item);
+			const mapped = stripTsOnlyWrappers(item, env);
 			if (out === null && mapped !== item) out = node.slice(0, i);
 			if (out !== null) out.push(mapped);
 		}
@@ -24356,7 +24528,10 @@ function stripTsOnlyWrappers(node) {
 		node.type === 'TSSatisfiesExpression' ||
 		node.type === 'TSInstantiationExpression'
 	) {
-		return stripTsOnlyWrappers(node.expression);
+		return stripTsOnlyWrappers(node.expression, env);
+	}
+	if (node.type === 'ClassDeclaration' || node.type === 'ClassExpression') {
+		node = lowerParameterProperties(node, env.filename);
 	}
 	let out = null;
 	// A TS `this` parameter (`function f(this: Foo, …)`) is type-only and is
@@ -24403,7 +24578,7 @@ function stripTsOnlyWrappers(node) {
 			continue;
 		const child = (out ?? node)[key];
 		if (child === null || typeof child !== 'object') continue;
-		const mapped = stripTsOnlyWrappers(child);
+		const mapped = stripTsOnlyWrappers(child, env, key === 'body' && node.type === 'Program');
 		if (mapped !== child) {
 			if (out === null) out = { ...node };
 			out[key] = mapped;
@@ -31833,10 +32008,21 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	if (ctx.currentComponentLocals) {
 		const bodyScope = new Set([itemName]);
 		if (node.index) bodyScope.add(node.index.name);
-		const bodyAst = b.block(subStmts);
+		// A destructured header runs in the item helper's synthesized prologue, so
+		// its defaults and computed keys are row reads too, and its fields bind
+		// there rather than reading as free.
+		const analyzedStmts =
+			destructureInjection.length > 0 ? [...destructureInjection, ...subStmts] : subStmts;
+		const bodyAst = b.block(analyzedStmts);
 		const free = collectFreeIdentifiers(bodyAst, bodyScope);
 		let hasParentClosure = false;
 		let hasHook = false;
+		// PURE and DEP-PURE skip a survivor on item identity (plus the deps
+		// tuple). A module `let` or a mutable global (`location.pathname`) can
+		// change between parent renders with neither moving, so a row reading one
+		// must re-render, exactly as the item-memo and whole-list proofs fail closed.
+		let hasAmbientRead = false;
+		let ambientCandidates = null;
 		const seenDeps = new Set();
 		for (const name of free) {
 			if (HOOK_NAMES.has(name) || name === 'use' || name === 'useContext') {
@@ -31848,7 +32034,19 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					seenDeps.add(name);
 					depNames.push(name);
 				}
+			} else if (!ctx.importedNames.has(name) && isUnwitnessedAmbientRead(name, ctx)) {
+				(ambientCandidates ??= []).push(name);
 			}
+		}
+		if (ambientCandidates !== null) {
+			// An inline event handler runs after commit, so a read confined to one
+			// (`onClick={() => window.open(item.url)}`) never reaches row output.
+			const renderFree = collectFreeIdentifiers(
+				bodyAst,
+				bodyScope,
+				collectEventHandlerClosures(bodyAst),
+			);
+			hasAmbientRead = ambientCandidates.some((name) => renderFree.has(name));
 		}
 		const hasNestedComp = containsComponentCallOrControlFlow(subStmts);
 		// Compatibility mode keeps method calls live: an unchanged receiver can
@@ -31857,7 +32055,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// and admit every user-authored call shape. Both modes still witness every
 		// capture, including callbacks that need the latest parent state. Actual
 		// setup hooks remain outside this item-region proof.
-		const hasRenderCall = containsRenderCall(subStmts, ctx);
+		const hasRenderCall = containsRenderCall(analyzedStmts, ctx);
 		itemMemo =
 			ctx.autoMemo === true &&
 			hasNestedComp &&
@@ -32006,7 +32204,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			!containsAutoMemoUnsafeStructure(subStmts, ctx) &&
 			!containsImportedMemberRead(bodyAst, ctx.importedNames);
 		const hostPure =
-			!hasParentClosure && !hasHook && !hasRenderCall && (!hasNestedComp || hostConditionalPure);
+			!hasParentClosure &&
+			!hasHook &&
+			!hasRenderCall &&
+			!hasAmbientRead &&
+			(!hasNestedComp || hostConditionalPure);
 		const structuredHostDepEligible =
 			ctx.autoMemo === true &&
 			hasNestedComp &&
@@ -32031,6 +32233,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		const hostDepEligible =
 			!hostPure &&
 			!hasHook &&
+			!hasAmbientRead &&
 			hasParentClosure &&
 			(!hasNestedComp || structuredHostDepEligible) &&
 			!hasRenderCall;
@@ -32273,6 +32476,39 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		emptyKeyword: node.emptyKeyword ?? null,
 		hostPath: null,
 	};
+}
+
+// Inline `onXxx={() => …}` / `onXxx={function () {…}}` handler closures under
+// `root`, as a node set for collectFreeIdentifiers' ignoreNodes.
+function collectEventHandlerClosures(root) {
+	const closures = new Set();
+	const stack = [root];
+	while (stack.length > 0) {
+		const node = stack.pop();
+		if (!node || typeof node !== 'object') continue;
+		if (Array.isArray(node)) {
+			stack.push(...node);
+			continue;
+		}
+		if (node.type === 'JSXAttribute' || node.type === 'Attribute') {
+			const name = node.name?.name || node.name;
+			const expression =
+				node.value?.type === 'JSXExpressionContainer' ? node.value.expression : node.value;
+			if (
+				typeof name === 'string' &&
+				/^on[A-Z]/.test(name) &&
+				(expression?.type === 'ArrowFunctionExpression' ||
+					expression?.type === 'FunctionExpression')
+			) {
+				closures.add(expression);
+				continue;
+			}
+		}
+		for (const key in node) {
+			if (!AST_WALK_SKIP_KEYS.has(key)) stack.push(node[key]);
+		}
+	}
+	return closures;
 }
 
 function mapCallbackHasEventClosure(callback) {
@@ -33000,7 +33236,10 @@ const esrapCommentOptions = {
  * literal raws are re-derived centrally before the print.
  */
 function printNodeWithMap(node, ctx) {
-	const printable = stripTsOnlyWrappers(escapeMultilineStringLiterals(node));
+	const printable = stripTsOnlyWrappers(escapeMultilineStringLiterals(node), {
+		filename: ctx.mapSourceName,
+		enums: null,
+	});
 	if (assertPrintedLocs()) assertNodeLocs(printable);
 	const { code, map } = esrapPrint(printable, withDeferredImports(esrapTsx(esrapCommentOptions)), {
 		sourceMapSource: ctx.mapSourceName,
