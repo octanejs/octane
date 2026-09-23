@@ -1,5 +1,5 @@
 import { useCallback } from 'octane';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, subSlot } from './slot';
 import { shallow } from '@octanejs/zustand/shallow';
 import { getNodesInside } from '@xyflow/system';
 
@@ -27,9 +27,9 @@ const selector = (onlyRenderVisible: boolean) => (s: ReactFlowState) => {
 export function useVisibleNodeIds(onlyRenderVisible: boolean, ...rest: [slot?: symbol]) {
 	const slot = resolveHookSlot(rest);
 	const nodeIds = useStore(
-		useCallback(selector(onlyRenderVisible), [onlyRenderVisible]),
+		useCallback(selector(onlyRenderVisible), [onlyRenderVisible], subSlot(slot, 'selector')),
 		shallow,
-		slot,
+		subSlot(slot, 'ids'),
 	);
 
 	return nodeIds;

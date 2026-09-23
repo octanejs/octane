@@ -1,5 +1,5 @@
 import { shallow } from '@octanejs/zustand/shallow';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, withoutSlot } from './slot';
 import { ConnectionState, pointToRendererPoint } from '@xyflow/system';
 
 import { useStore } from './useStore';
@@ -62,8 +62,19 @@ export function useConnection<
 >(
 	connectionSelector?: (connection: ConnectionState<InternalNode<NodeType>>) => SelectorReturn,
 	...rest: [slot?: symbol]
+): SelectorReturn;
+export function useConnection<
+	NodeType extends Node = Node,
+	SelectorReturn = ConnectionState<InternalNode<NodeType>>,
+>(
+	connectionSelectorArg?:
+		((connection: ConnectionState<InternalNode<NodeType>>) => SelectorReturn) | symbol,
+	...rest: [slot?: symbol]
 ): SelectorReturn {
-	const slot = resolveHookSlot(rest);
+	const slot =
+		resolveHookSlot(rest) ??
+		(typeof connectionSelectorArg === 'symbol' ? connectionSelectorArg : undefined);
+	const connectionSelector = withoutSlot(connectionSelectorArg);
 	const combinedSelector = getSelector<NodeType, SelectorReturn>(connectionSelector);
 	return useStore(combinedSelector, shallow, slot) as SelectorReturn;
 }

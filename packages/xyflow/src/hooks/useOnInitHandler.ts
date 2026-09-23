@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'octane';
 
 import { useReactFlow } from './useReactFlow';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, subSlot } from './slot';
 import type { OnInit, Node, Edge } from '../types';
 
 export function useOnInitHandler<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
@@ -9,8 +9,8 @@ export function useOnInitHandler<NodeType extends Node = Node, EdgeType extends 
 	...rest: [slot?: symbol]
 ) {
 	const slot = resolveHookSlot(rest);
-	const rfInstance = useReactFlow<NodeType, EdgeType>(slot);
-	const isInitialized = useRef<boolean>(false, slot);
+	const rfInstance = useReactFlow<NodeType, EdgeType>(subSlot(slot, 'flow'));
+	const isInitialized = useRef<boolean>(false, subSlot(slot, 'initialized'));
 
 	useEffect(
 		function onInitEffect() {
@@ -22,6 +22,6 @@ export function useOnInitHandler<NodeType extends Node = Node, EdgeType extends 
 			}
 		},
 		[onInit, rfInstance.viewportInitialized],
-		slot,
+		subSlot(slot, 'init'),
 	);
 }

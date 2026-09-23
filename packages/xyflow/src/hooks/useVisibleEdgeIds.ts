@@ -3,7 +3,7 @@ import { shallow } from '@octanejs/zustand/shallow';
 import { isEdgeVisible } from '@xyflow/system';
 
 import { useStore } from './useStore';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, subSlot } from './slot';
 import { type ReactFlowState } from '../types';
 
 export function useVisibleEdgeIds(onlyRenderVisible: boolean, ...rest: [slot?: symbol]): string[] {
@@ -43,9 +43,10 @@ export function useVisibleEdgeIds(onlyRenderVisible: boolean, ...rest: [slot?: s
 				return visibleEdgeIds;
 			},
 			[onlyRenderVisible],
+			subSlot(slot, 'selector'),
 		),
 		shallow,
-		slot,
+		subSlot(slot, 'ids'),
 	);
 
 	return edgeIds;

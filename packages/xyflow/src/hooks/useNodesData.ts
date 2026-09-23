@@ -1,5 +1,5 @@
 import { useCallback } from 'octane';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, subSlot } from './slot';
 import { DistributivePick, shallowNodeData } from '@xyflow/system';
 
 import { useStore } from '../hooks/useStore';
@@ -57,9 +57,10 @@ export function useNodesData(nodeIds: any, ...rest: [slot?: symbol]): any {
 				return isArrayOfIds ? data : (data[0] ?? null);
 			},
 			[nodeIds],
+			subSlot(slot, 'selector'),
 		),
 		shallowNodeData,
-		slot,
+		subSlot(slot, 'data'),
 	);
 
 	return nodesData;

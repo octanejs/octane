@@ -1,6 +1,6 @@
 import { useEffect } from 'octane';
 import type { RefObject } from '../react-shim.js';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, subSlot } from './slot';
 import { errorMessages, getDimensions } from '@xyflow/system';
 
 import { useStoreApi } from '../hooks/useStore';
@@ -15,7 +15,7 @@ export function useResizeHandler(
 	...rest: [slot?: symbol]
 ): void {
 	const slot = resolveHookSlot(rest);
-	const store = useStoreApi(slot);
+	const store = useStoreApi(subSlot(slot, 'store'));
 
 	useEffect(
 		function observeResize() {
@@ -49,6 +49,6 @@ export function useResizeHandler(
 			}
 		},
 		[],
-		slot,
+		subSlot(slot, 'observe'),
 	);
 }

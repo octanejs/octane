@@ -39,7 +39,7 @@ export function useNodeConnections(
 	params: UseNodeConnectionsParams | symbol = {},
 	...rest: [slot?: symbol]
 ): NodeConnection[] {
-	let slot = resolveHookSlot(rest);
+	const slot = resolveHookSlot(rest) ?? (typeof params === 'symbol' ? params : undefined);
 	const resolved = withoutSlot(params) ?? {};
 	const { id, handleType, handleId, onConnect, onDisconnect } = resolved;
 	const nodeId = useNodeId();

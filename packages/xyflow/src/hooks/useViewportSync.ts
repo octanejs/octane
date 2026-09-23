@@ -1,5 +1,5 @@
 import { useEffect } from 'octane';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, subSlot, withoutSlot } from './slot';
 import type { Viewport } from '@xyflow/system';
 
 import { useStore, useStoreApi } from './useStore';
@@ -13,10 +13,11 @@ const selector = (state: ReactFlowState) => state.panZoom?.syncViewport;
  * @internal
  * @param viewport
  */
-export function useViewportSync(viewport?: Viewport, ...rest: [slot?: symbol]) {
-	const slot = resolveHookSlot(rest);
-	const syncViewport = useStore(selector, undefined, slot);
-	const store = useStoreApi(slot);
+export function useViewportSync(viewportArg?: Viewport | symbol, ...rest: [slot?: symbol]) {
+	const slot = resolveHookSlot(rest) ?? (typeof viewportArg === 'symbol' ? viewportArg : undefined);
+	const viewport = withoutSlot(viewportArg);
+	const syncViewport = useStore(selector, undefined, subSlot(slot, 'sync'));
+	const store = useStoreApi(subSlot(slot, 'store'));
 
 	useEffect(
 		function syncViewportEffect() {
@@ -26,7 +27,7 @@ export function useViewportSync(viewport?: Viewport, ...rest: [slot?: symbol]) {
 			}
 		},
 		[viewport, syncViewport],
-		slot,
+		subSlot(slot, 'effect'),
 	);
 
 	return null;

@@ -58,6 +58,7 @@
   "devDependencies": {
     "@octanejs/zustand": "workspace:*",
     "@tsrx/react": "catalog:default",
+    "@types/jsdom": "catalog:default",
     "@types/react": "catalog:default",
     "@types/react-dom": "catalog:default",
     "@xyflow/react": "catalog:default",
