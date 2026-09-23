@@ -5571,34 +5571,56 @@ function collectImmutableModuleFunctions(body) {
 }
 
 /**
- * Top-level module bindings whose identity can change after evaluation: `let`
- * and `var` declarations, class declarations, and function declarations that
- * collectImmutableModuleFunctions demoted. An identity-only survivor skip
- * cannot witness them, so a region reading one must re-render. `const`,
- * non-reassigned functions, and imports (witnessed separately) stay out.
+ * Top-level module bindings, split by whether their identity can change after
+ * evaluation. `mutable` holds `let`/`var` declarations, class declarations, and
+ * function declarations that collectImmutableModuleFunctions demoted: an
+ * identity-only survivor skip cannot witness them, so a region reading one
+ * must re-render. `all` adds consts, unreassigned functions, enums, and
+ * imports; a free name outside it (and outside every enclosing local) is a
+ * global. Only top-level declarations count — a same-named parameter or local
+ * elsewhere in the module never shadows the global a region actually reads.
  */
-function collectMutableModuleBindings(body, immutableFunctions) {
-	const names = new Set();
+function collectModuleTopLevelBindings(body, immutableFunctions) {
+	const all = new Set();
+	const mutable = new Set();
 	for (const statement of body) {
+		if (statement.type === 'ImportDeclaration') {
+			for (const specifier of statement.specifiers || []) {
+				if (specifier.local) all.add(specifier.local.name);
+			}
+			continue;
+		}
 		const declaration =
 			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
 				? statement.declaration
 				: statement;
 		if (!declaration) continue;
 		if (declaration.type === 'VariableDeclaration') {
-			if (declaration.kind === 'const') continue;
+			const names = new Set();
 			for (const d of declaration.declarations || []) collectBindings(d.id, names);
+			for (const name of names) {
+				all.add(name);
+				if (declaration.kind !== 'const') mutable.add(name);
+			}
 		} else if (declaration.type === 'ClassDeclaration' && declaration.id) {
-			names.add(declaration.id.name);
+			all.add(declaration.id.name);
+			mutable.add(declaration.id.name);
 		} else if (
 			declaration.type === 'FunctionDeclaration' &&
-			declaration.id?.type === 'Identifier' &&
-			!immutableFunctions.has(declaration.id.name)
+			declaration.id?.type === 'Identifier'
 		) {
-			names.add(declaration.id.name);
+			all.add(declaration.id.name);
+			if (!immutableFunctions.has(declaration.id.name)) mutable.add(declaration.id.name);
+		} else if (
+			(declaration.type === 'TSEnumDeclaration' ||
+				declaration.type === 'TSModuleDeclaration' ||
+				declaration.type === 'TSImportEqualsDeclaration') &&
+			declaration.id?.type === 'Identifier'
+		) {
+			all.add(declaration.id.name);
 		}
 	}
-	return names;
+	return { all, mutable };
 }
 
 // Globals a render-time read may treat as fixed: the value constants and the
@@ -5625,18 +5647,20 @@ const IMMUTABLE_AMBIENT_GLOBALS = new Set([
 ]);
 
 /**
- * Does `name`, a free read of a memo region that is neither a component local
- * nor an import, resolve to state that can change without any witness the
- * compiler compares? True for mutable top-level module bindings and for
- * non-intrinsic globals. Names bound in an enclosing non-module scope are
- * lexical captures owned by the caller's own classification.
+ * Does `name`, a free read of a memo region that is neither an enclosing local
+ * (ctx.currentComponentLocals, extended through every hoisted helper) nor an
+ * import, resolve to state that can change without any witness the compiler
+ * compares? True for mutable top-level module bindings and for non-intrinsic
+ * globals. An enclosing binding the local set misses reads as a global and
+ * fails closed — a lost fast path, never a stale row.
  */
 function isUnwitnessedAmbientRead(name, ctx) {
 	// `_$…` names are runtime helpers the compiler itself imports.
 	if (name.startsWith('_$')) return false;
-	if (ctx.mutableModuleBindings?.has(name)) return true;
-	const bound = ctx._moduleBoundNames;
-	return bound !== undefined && !bound.has(name) && !IMMUTABLE_AMBIENT_GLOBALS.has(name);
+	const module = ctx.moduleTopLevelBindings;
+	if (module === undefined) return false;
+	if (module.mutable.has(name)) return true;
+	return !module.all.has(name) && !IMMUTABLE_AMBIENT_GLOBALS.has(name);
 }
 
 // A component whose synchronous proof reads its props is safe only at JSX
@@ -10471,9 +10495,10 @@ function compileInternal(
 	// that are ever assigned (`foo = bar`) are excluded: their identity is then
 	// as mutable as a module `let`, which fails closed.
 	ctx.moduleFunctionDeclarations = collectImmutableModuleFunctions(ast.body);
-	// Module `let`/`var`/class bindings and demoted functions: identity-only
-	// survivor skips (forBlock PURE / DEP-PURE) fail closed when a row reads one.
-	ctx.mutableModuleBindings = collectMutableModuleBindings(
+	// Top-level module bindings (and the mutable subset): identity-only survivor
+	// skips (forBlock PURE / DEP-PURE) fail closed when a row reads a mutable
+	// one or a global (see isUnwitnessedAmbientRead).
+	ctx.moduleTopLevelBindings = collectModuleTopLevelBindings(
 		ast.body,
 		ctx.moduleFunctionDeclarations,
 	);
@@ -31920,6 +31945,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// must re-render, exactly as the item-memo and whole-list proofs fail closed.
 		let hasAmbientRead = false;
 		let ambientCandidates = null;
+		// A destructured header (`const { id } of …`) binds its fields in the
+		// body's synthesized prologue, so they read as free here.
+		let headerBindings = null;
+		if (isDestructured) collectBindings(leftDeclId, (headerBindings = new Set()));
 		const seenDeps = new Set();
 		for (const name of free) {
 			if (HOOK_NAMES.has(name) || name === 'use' || name === 'useContext') {
@@ -31931,7 +31960,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					seenDeps.add(name);
 					depNames.push(name);
 				}
-			} else if (!ctx.importedNames.has(name) && isUnwitnessedAmbientRead(name, ctx)) {
+			} else if (
+				!ctx.importedNames.has(name) &&
+				headerBindings?.has(name) !== true &&
+				isUnwitnessedAmbientRead(name, ctx)
+			) {
 				(ambientCandidates ??= []).push(name);
 			}
 		}

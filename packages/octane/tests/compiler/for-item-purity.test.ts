@@ -214,6 +214,16 @@ describe('@for item-body purity with module and global reads', () => {
 		],
 		['location in an @if test', '', '<li>@if (location.hash === item.href) {<b />}</li>'],
 		['a globalThis property', '', '<li>@if ((globalThis as any).flag) {<b />}</li>'],
+		[
+			'a global that an unrelated parameter elsewhere shares a name with',
+			'function other(location) { return location; }',
+			'<li>@if (location.hash === item.href) {<b />}</li>',
+		],
+		[
+			'a global that an unrelated component local shares a name with',
+			'export function Other() @{ const window = 1; <p>{window as number}</p> }',
+			'<li class={window.innerWidth > item.min ? "wide" : ""} />',
+		],
 	])('declines a body reading %s', (_name, prelude, body) => {
 		const flags = compileList(body, prelude);
 		expect(flags).toHaveLength(1);
@@ -249,6 +259,8 @@ describe('@for item-body purity with module and global reads', () => {
 		],
 		['a standard global namespace', '', '<li>@if (Math.PI > item.n) {<b />}</li>'],
 		['undefined', '', '<li>@if (item.x === undefined) {<b />}</li>'],
+		['an imported binding', "import { PREFIX } from './c';", '<li class={PREFIX + item.id} />'],
+		['a module enum', 'enum Tone { Warm, Cool }', '<li>@if (item.tone === Tone.Warm) {<b />}</li>'],
 		[
 			'a global only inside an event handler',
 			'',
@@ -256,6 +268,24 @@ describe('@for item-body purity with module and global reads', () => {
 		],
 	])('keeps PURE for a body reading %s', (_name, prelude, body) => {
 		const flags = compileList(body, prelude);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & PURE).toBe(PURE);
+	});
+
+	it('keeps PURE for a destructured header whose fields the body reads', () => {
+		const flags = appListFlags(
+			compile(
+				`
+				export function App(props) @{
+					<ul>@for (const { id, label } of props.items; key id) {
+						<li data-id={id}>{label as string}</li>
+					}</ul>
+				}
+			`,
+				'App.tsrx',
+				{ hmr: false, dev: false },
+			).code,
+		);
 		expect(flags).toHaveLength(1);
 		expect(flags[0]! & PURE).toBe(PURE);
 	});
