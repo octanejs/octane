@@ -386,6 +386,17 @@ export function run() { const host=document.querySelector('#host'); return {text
 			expect(await consume(source, dev)).toEqual({ text: 'first:true:default' });
 	});
 
+	it('keeps a __proto__ attribute on the element path', async () => {
+		const source = `import {createRoot} from 'octane';
+function View(props) @{ <main>{String(Object.hasOwn(props, '__proto__')) + ':' + String(props.inherited) as string}</main> }
+const base = { inherited: 'leaked' };
+createRoot(document.querySelector('#host')).render(<View __proto__={base} />);
+export function run() { return {text: document.querySelector('#host').textContent}; }`;
+		expect(specialized(source)).toContain('createElementFromConfig');
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({ text: 'false:undefined' });
+	});
+
 	it('keeps keys, children and effectful values on the element path', async () => {
 		const source = `import {createRoot,flushSync} from 'octane';
 function View(props) @{ <main>{props.label as string}<input /></main> }

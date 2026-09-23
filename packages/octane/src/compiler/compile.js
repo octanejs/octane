@@ -33428,7 +33428,10 @@ function voidRootElementProps(element) {
 		if (
 			attribute.type !== 'JSXAttribute' ||
 			attribute.name?.type !== 'JSXIdentifier' ||
-			attribute.name.name === 'key'
+			attribute.name.name === 'key' ||
+			// In a literal, `__proto__` sets the prototype, which the element path
+			// then drops by copying own keys only. Keep that path's semantics.
+			attribute.name.name === '__proto__'
 		)
 			return null;
 		const value = attribute.value;
@@ -33449,11 +33452,7 @@ function voidRootElementProps(element) {
 		const name = attribute.name.name;
 		properties.push(
 			inheritOriginLoc(
-				b.prop(
-					'init',
-					/^[A-Za-z_$][\w$]*$/.test(name) && name !== '__proto__' ? b.id(name) : b.literal(name),
-					expression,
-				),
+				b.prop('init', /^[A-Za-z_$][\w$]*$/.test(name) ? b.id(name) : b.literal(name), expression),
 				attribute,
 			),
 		);
