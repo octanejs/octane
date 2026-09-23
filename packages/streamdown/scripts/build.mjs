@@ -41,7 +41,7 @@ function octaneSource(environment) {
 				const transformed = result?.kind === 'compile' || result?.kind === 'slots';
 				return {
 					contents: transformed ? result.code : source,
-					loader: result?.kind === 'compile' ? 'js' : 'ts',
+					loader: args.path.endsWith('.tsrx') ? 'js' : 'ts',
 					resolveDir: dirname(args.path),
 				};
 			});

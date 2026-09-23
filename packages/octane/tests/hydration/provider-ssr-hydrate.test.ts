@@ -1,9 +1,10 @@
-import { loadCompiledFixtureSource } from '../_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
 	createElement,
+	createRoot,
 	flushSync,
 	hydrateRoot,
 	useContext as useClientContext,
@@ -13,6 +14,7 @@ import * as ServerRT from 'octane/server';
 import { App } from '../_fixtures/ssr-provider.tsx';
 import { ProviderApp } from '../_fixtures/jsx-context-children.tsx';
 import { hydrationMarkerSummary } from './_marker-summary.js';
+import { LateProviderApp } from './_fixtures/late-provider.tsrx';
 
 // Round-trip SSR→hydrate for `.tsx` `<Ctx>` with descriptor children.
 // Regression for two server bugs:
@@ -122,4 +124,82 @@ describe('hydration — .tsx <Context> descriptor children', () => {
 		expect(after.countedPairs).toBeGreaterThanOrEqual(1);
 		root.unmount();
 	});
+});
+
+describe('context providers with initially empty children', () => {
+	const fixture = 'packages/octane/tests/hydration/_fixtures/late-provider.tsrx';
+	const modes = [
+		{ name: 'client-only', server: null },
+		{
+			name: 'development SSR',
+			server: loadServerFixture(fixture, { compileOptions: { dev: true } }),
+		},
+		{
+			name: 'production SSR',
+			server: loadServerFixture(fixture, { compileOptions: { dev: false } }),
+		},
+	];
+	const variants = {
+		a: 'direct provider with plain late content',
+		b: 'late provider without an outer provider',
+		c: 'provider around children with a late provider',
+		d: 'provider around children with plain late content',
+	};
+
+	for (const { name, server } of modes) {
+		const hydrate = server !== null;
+		for (const [variant, label] of Object.entries(variants)) {
+			it(`${name}: ${label} survives repeated opens and closes`, async () => {
+				const container = document.createElement('div');
+				document.body.appendChild(container);
+				if (hydrate) {
+					container.innerHTML = ServerRT.renderToString(server.LateProviderApp).html;
+				}
+				const serverSections = [...container.querySelectorAll('section')];
+				const serverButtons = [...container.querySelectorAll('button')];
+				const recoveries: unknown[] = [];
+				const root = hydrate
+					? hydrateRoot(container, LateProviderApp, undefined, {
+							onRecoverableError: (error) => recoveries.push(error),
+						})
+					: createRoot(container);
+				try {
+					if (!hydrate) root.render(LateProviderApp);
+					flushSync(() => {});
+					await Promise.resolve();
+					expect(recoveries).toEqual([]);
+					if (hydrate) {
+						const sections = [...container.querySelectorAll('section')];
+						const buttons = [...container.querySelectorAll('button')];
+						expect(sections).toHaveLength(serverSections.length);
+						expect(buttons).toHaveLength(serverButtons.length);
+						sections.forEach((section, index) => expect(section).toBe(serverSections[index]));
+						buttons.forEach((button, index) => expect(button).toBe(serverButtons[index]));
+					}
+					const section = container.querySelector(`#${variant}`)!;
+					const button = section.querySelector('button')!;
+					expect(section.querySelector('.late')).toBeNull();
+					for (let cycle = 0; cycle < 3; cycle++) {
+						flushSync(() => button.click());
+						expect(section.querySelector('.late')?.textContent).toBe('late content');
+						expect(button.textContent).toBe('close');
+						expect(container.querySelectorAll('.late')).toHaveLength(1);
+						flushSync(() => button.click());
+						expect(section.querySelector('.late')).toBeNull();
+						expect(button.textContent).toBe('open');
+					}
+					flushSync(() => button.click());
+					const late = section.querySelector('.late');
+					expect(late?.textContent).toBe('late content');
+					root.unmount();
+					expect(late?.isConnected).toBe(false);
+					expect(container.innerHTML).toBe('');
+				} finally {
+					root.unmount();
+					expect(container.innerHTML).toBe('');
+					container.remove();
+				}
+			});
+		}
+	}
 });

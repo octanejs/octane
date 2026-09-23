@@ -43845,7 +43845,7 @@ function coalesceHydratedRanges(
 		}
 	}
 
-	function visitSlot(state: any): void {
+	function visitSlot(state: any, scope: Scope): void {
 		const kind = state.__kind;
 		if (kind === 'componentSlotSlot') {
 			if (state.block !== null) visitBlock(state.block, state as CompSlot);
@@ -43854,6 +43854,13 @@ function coalesceHydratedRanges(
 		if (kind === 'childSlot') {
 			const child = state as ChildSlot;
 			if (child.block !== null) visitBlock(child.block, child);
+			else if (child.borrowed) {
+				// Empty returns borrow their component's pair before a child Block
+				// exists. Redirect that borrower too if the component range compacts.
+				const own = blockGroups.get(scope.block);
+				if (own !== undefined && child.start === own.start && child.end === own.end)
+					attachOwner(own, child);
+			}
 			if (child.forSlot !== null) visitForSlot(child.forSlot);
 			if (child.portal?.block != null) visitBlock(child.portal.block);
 			return;
@@ -43888,7 +43895,7 @@ function coalesceHydratedRanges(
 			for (let i = 0; i < children.length; i++) visitNestedScope(children[i].scope);
 		const registered = scope._slots;
 		if (registered === null) return;
-		for (let i = 0; i < registered.length; i++) visitSlot(registered[i]);
+		for (let i = 0; i < registered.length; i++) visitSlot(registered[i], scope);
 	}
 
 	visitBlock(rootBlock);
