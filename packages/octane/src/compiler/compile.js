@@ -153,6 +153,11 @@ import {
 	hyphenateStyleName,
 } from '../dom-tables.js';
 import { isDelegatedEventProp } from '../event-names.js';
+import {
+	collectPureFactoryLocals,
+	isPureFactoryCall,
+	octanePureFactoryNames,
+} from './pure-factories.js';
 import { sanitizeURLAttribute, shouldSanitizeURLAttribute } from '../sanitize-url.js';
 import {
 	invalidHtmlNestingWithAncestor,
@@ -1615,7 +1620,7 @@ function collectOctaneImportBindings(astBody) {
 	return { locals, namespaces, foreignLocals };
 }
 
-function collectNestedBindingNames(root) {
+export function collectNestedBindingNames(root) {
 	const names = new Set();
 	const seen = new WeakSet();
 	const walk = (value) => {
@@ -1726,40 +1731,25 @@ function errorBoundaryFallback(node, fallbackAttribute) {
 }
 
 /**
- * Annotate direct calls to octane's `lazy` with `@__PURE__` so bundlers can
- * tree-shake unused lazy-component declarations. Creating a lazy descriptor
- * has no side effects, and React builds get the same effect (an unused
- * `React.lazy(() => import('./x.client'))` const disappears from the server
- * bundle, which Start's import-protection tree-shake verification relies on
- * for `*.client.*` modules). Locals shadowed anywhere below module scope are
- * skipped wholesale — same conservatism as lowerImportedErrorBoundaries.
+ * Annotate direct calls to octane's side-effect-free factories with
+ * `@__PURE__` so bundlers can tree-shake unused declarations (see
+ * pure-factories.js for why the declaration-side `@__NO_SIDE_EFFECTS__` is not
+ * enough under esbuild). Creating a lazy descriptor has no side effects, and
+ * React builds get the same effect (an unused `React.lazy(() =>
+ * import('./x.client'))` const disappears from the server bundle, which Start's
+ * import-protection tree-shake verification relies on for `*.client.*`
+ * modules). Locals shadowed anywhere below module scope are skipped wholesale —
+ * same conservatism as lowerImportedErrorBoundaries.
  */
-function annotatePureLazyCalls(ast) {
-	const lazyLocals = new Set();
-	for (const node of ast.body || []) {
-		if (node.type !== 'ImportDeclaration' || node.source?.value !== 'octane') continue;
-		for (const specifier of node.specifiers || []) {
-			if (
-				specifier.type === 'ImportSpecifier' &&
-				(specifier.imported?.name ?? specifier.imported?.value) === 'lazy' &&
-				specifier.local?.name
-			) {
-				lazyLocals.add(specifier.local.name);
-			}
-		}
-	}
-	if (lazyLocals.size === 0) return ast;
-	for (const name of collectNestedBindingNames(ast.body)) lazyLocals.delete(name);
-	if (lazyLocals.size === 0) return ast;
+function annotatePureFactoryCalls(ast, names) {
+	const pureLocals = collectPureFactoryLocals(ast.body, names);
+	if (pureLocals.size === 0) return ast;
+	for (const name of collectNestedBindingNames(ast.body)) pureLocals.delete(name);
+	if (pureLocals.size === 0) return ast;
 	// COW: the @__PURE__ mark rides on a shallow copy of the call node (marker
 	// props are compiler-owned annotations and may only live on rebuilt nodes).
 	const body = mapAst(ast.body, (node) => {
-		if (
-			node.type === 'CallExpression' &&
-			node.callee?.type === 'Identifier' &&
-			lazyLocals.has(node.callee.name) &&
-			node.__octanePure !== true
-		) {
+		if (isPureFactoryCall(node, pureLocals) && node.__octanePure !== true) {
 			return { ...node, __octanePure: true };
 		}
 		return null;
@@ -10138,7 +10128,15 @@ function compileInternal(
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
 	ast = normalizeArrowComponents(ast);
-	ast = annotatePureLazyCalls(ast);
+	ast = annotatePureFactoryCalls(
+		ast,
+		octanePureFactoryNames({
+			clientDom:
+				(options?.renderer?.target ?? 'dom') === 'dom' &&
+				universalRuntime === undefined &&
+				options?.__universal == null,
+		}),
+	);
 	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
 	ast = errorBoundaryLowering.ast;
 	const consumedRuntimeLocals = errorBoundaryLowering.consumed;
@@ -11612,7 +11610,7 @@ function compileServer(
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
 	ast = normalizeArrowComponents(ast);
-	ast = annotatePureLazyCalls(ast);
+	ast = annotatePureFactoryCalls(ast, octanePureFactoryNames({ clientDom: false }));
 	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
 	ast = errorBoundaryLowering.ast;
 	const consumedRuntimeLocals = errorBoundaryLowering.consumed;

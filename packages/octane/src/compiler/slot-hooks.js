@@ -20,7 +20,7 @@ import {
 	forEachRuntimeAstChild,
 	isIdentifierReference,
 } from './compile-universal.js';
-import { HOOK_NAMES, hookSlotHash } from './compile.js';
+import { HOOK_NAMES, collectNestedBindingNames, hookSlotHash } from './compile.js';
 import { NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 import { METHOD_DEP_IMPORT, annotateHookCalls, analyzeStrongMemoCandidates } from './hook-deps.js';
 import { inlinePlainHookMemos } from './plain-hook-memo.js';
@@ -33,6 +33,12 @@ import { findLeadingJsxImportSourcePragma } from './pragma.js';
 import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
 import { assertNoLegacyContextProviders } from './context-provider.js';
 import { signalDeclarationSourceEdits } from './signal-declarations.js';
+import {
+	collectPureFactoryLocals,
+	hasAuthoredPureAnnotation,
+	isPureFactoryCall,
+	octanePureFactoryNames,
+} from './pure-factories.js';
 import {
 	hookMethodName,
 	hasHookMethods,
@@ -1419,6 +1425,38 @@ function collectManualHookEdits(ast, providers, st) {
 	visit(ast);
 }
 
+/**
+ * Direct calls to Octane's side-effect-free factories that still need a
+ * call-site `@__PURE__` (see pure-factories.js), as start → end offsets.
+ * Locals shadowed anywhere below module scope are skipped wholesale, matching
+ * the compiled-module pass.
+ */
+function collectPureFactoryCalls(ast, source, names) {
+	const calls = new Map();
+	const locals = collectPureFactoryLocals(ast.body, names);
+	if (locals.size === 0) return calls;
+	for (const name of collectNestedBindingNames(ast.body)) locals.delete(name);
+	if (locals.size === 0) return calls;
+	function visit(node) {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const item of node) visit(item);
+			return;
+		}
+		if (isPureFactoryCall(node, locals) && !hasAuthoredPureAnnotation(source, node.start)) {
+			calls.set(node.start, node.end);
+		}
+		for (const key in node) {
+			if (key === 'loc' || key === 'metadata' || key === 'parent' || key.startsWith('_octane'))
+				continue;
+			const value = node[key];
+			if (value && typeof value === 'object') visit(value);
+		}
+	}
+	visit(ast.body);
+	return calls;
+}
+
 function parseHookSource(source, id) {
 	try {
 		return { ast: parseModule(source, id), canPrint: true };
@@ -1496,6 +1534,16 @@ export function slotHooks(source, id, options) {
 	const manualProviders = options?.manualSlots ? findManualHookProviders(ast) : new Map();
 	const nativeReadActivation = options?.nativeReads === true && importsNativeRenderer(ast);
 	const signalLowering = signalDeclarationSourceEdits(ast, id, source);
+	const pureCalls = collectPureFactoryCalls(
+		ast,
+		source,
+		octanePureFactoryNames({
+			clientDom:
+				environment === 'client' &&
+				(options?.renderer?.target ?? 'dom') === 'dom' &&
+				options?.universalRuntime == null,
+		}),
+	);
 	const canSpecializeRoot =
 		!options?.manualSlots &&
 		!options?.hmr &&
@@ -1507,7 +1555,8 @@ export function slotHooks(source, id, options) {
 		!canSpecializeRoot &&
 		!nativeReadActivation &&
 		!signalLowering.usesSignals &&
-		!manualProviders.size
+		!manualProviders.size &&
+		pureCalls.size === 0
 	) {
 		return strongAnalysis?.diagnostics.length ? { code: source, map: null, ...strongHints } : null;
 	}
@@ -1557,6 +1606,7 @@ export function slotHooks(source, id, options) {
 			inferred,
 			getterCalls,
 			stateGetterHelpers: STATE_GETTER_HELPERS,
+			pureCalls,
 		});
 		if (inlined !== null) return { ...inlined, ...strongHints };
 	}
@@ -1602,6 +1652,17 @@ export function slotHooks(source, id, options) {
 	}
 	if (canSpecializeRoot) {
 		collectVoidRootEdits(ast, st, options.isVoidComponentImport);
+	}
+	if (pureCalls.size) {
+		// A replacement covering the call's start owns that text, so its own
+		// output decides the annotation. Otherwise the mark goes first in the
+		// list: among same-offset insertions it lands last, next to the call.
+		const pureEdits = [];
+		for (const start of pureCalls.keys()) {
+			if (!st.edits.some((edit) => edit.end !== undefined && edit.pos <= start && start < edit.end))
+				pureEdits.push({ pos: start, text: '/* @__PURE__ */ ' });
+		}
+		st.edits.unshift(...pureEdits);
 	}
 	if (st.edits.length === 0 && !nativeReadActivation && !signalLowering.usesSignals)
 		return strongAnalysis?.diagnostics.length ? { code: source, map: null, ...strongHints } : null;
