@@ -1499,6 +1499,12 @@ importers:
 
   benchmarks/bundle-size:
     dependencies:
+      '@apollo/client':
+        specifier: catalog:default
+        version: 4.2.6(graphql@16.14.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rxjs@7.8.2)
+      '@octanejs/apollo-client':
+        specifier: workspace:*
+        version: link:../../packages/apollo-client
       '@octanejs/aria':
         specifier: workspace:*
         version: link:../../packages/aria
@@ -1526,12 +1532,18 @@ importers:
       esbuild:
         specifier: catalog:default
         version: 0.28.1
+      graphql:
+        specifier: catalog:default
+        version: 16.14.2
       jsdom:
         specifier: catalog:default
         version: 30.0.1(@noble/hashes@2.2.0)
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
+      rxjs:
+        specifier: catalog:default
+        version: 7.8.2
       vite:
         specifier: catalog:default
         version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)

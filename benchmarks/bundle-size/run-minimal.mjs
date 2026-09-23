@@ -87,6 +87,13 @@ const bindingScenarios = [
 		forbidden: /\/packages\/mantine-hooks\/src\/use-(?:local|session)-storage\//,
 	},
 	{
+		id: 'binding-apollo-client',
+		extension: 'tsrx',
+		package: '@octanejs/apollo-client',
+		forbidden:
+			/\/packages\/apollo-client\/src\/react\/hooks\/use(?:Query|Mutation|SuspenseQuery)\.js$/,
+	},
+	{
 		id: 'binding-usehooks-ts',
 		extension: 'tsrx',
 		package: '@octanejs/usehooks-ts',
@@ -415,7 +422,8 @@ try {
 		if (
 			id === 'root-static-specialized' ||
 			id === 'root-static-local' ||
-			id === 'cli-spa-starter'
+			id === 'cli-spa-starter' ||
+			(id === 'binding-apollo-client' && scenario.bundler === 'vite')
 		) {
 			assert.equal(
 				runtimeExports.includes('__createVoidRoot'),

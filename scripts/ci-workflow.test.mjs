@@ -177,6 +177,13 @@ describe('CI workflow aggregation', () => {
 		);
 	});
 
+	test('gates binding reachability into the octane namespace once per full CI run', () => {
+		assert.match(
+			jobSource('test_shard'),
+			/- name: Verify Apollo binding keeps octane tree-shakeable\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs binding-apollo-client/,
+		);
+	});
+
 	test('runs and reports tests only on Node 24 while retaining the Node 22 engine baseline', () => {
 		const shard = jobSource('test_shard');
 		assert.match(shard, /name: test shard \(Node 24, \$\{\{ matrix\.shard \}\}\)/);

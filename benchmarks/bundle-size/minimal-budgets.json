@@ -144,6 +144,16 @@
     "gzip": 37376,
     "brotli": 32864
   },
+  "binding-apollo-client-vite": {
+    "raw": 352640,
+    "gzip": 110272,
+    "brotli": 96064
+  },
+  "binding-apollo-client-esbuild": {
+    "raw": 355712,
+    "gzip": 112448,
+    "brotli": 98048
+  },
   "binding-usehooks-ts-vite": {
     "raw": 113696,
     "gzip": 37280,

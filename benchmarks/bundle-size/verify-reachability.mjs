@@ -131,6 +131,10 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		after: '3',
 		cleaned: true,
 	},
+	'binding-apollo-client': {
+		text: 'provided',
+		cleaned: true,
+	},
 	'binding-usehooks-ts': {
 		before: '4',
 		after: '5',
