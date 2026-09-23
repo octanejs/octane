@@ -978,6 +978,27 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 	}
 	if (documentOwner === undefined) return;
 	let owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	if (
+		(owner === undefined || owner === false) &&
+		scope.block.forSlot === null &&
+		scope.signalInstanceParent === null &&
+		scope.signalInstanceResolved === undefined
+	) {
+		// Host control fragments borrow the enclosing row's declaration owner.
+		// Do not cache it on the fragment: deleting that fragment must not retire
+		// the row's cells, and a retired fragment must never reacquire them.
+		let parent = scope.parent ?? scope.block.parentBlock;
+		while (parent !== null) {
+			if (parent instanceof LiteBlockImpl) break;
+			if (parent.signalInstanceParent !== null || parent.signalInstanceResolved !== undefined)
+				break;
+			if (parent.block.forSlot?.signalSite !== undefined) {
+				SCOPE_SIGNAL_OWNERS.set(scope, false);
+				return scopeSignalOwner(parent);
+			}
+			parent = parent.parent ?? parent.block.parentBlock;
+		}
+	}
 	const retired = owner === null;
 	if (!owner || owner.documentOwner !== documentOwner) {
 		const ids = scope.block.idState;
@@ -999,7 +1020,11 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 				scopeKey: documentOwner.scopeKey,
 				documentOwner,
 				instanceOwner: scope as object,
-				instanceKey: resolveSignalInstanceKey(scope) ?? rootSignalInstanceKey(ids),
+				instanceKey:
+					resolveSignalInstanceKey(scope) ??
+					(scope.block.forSlot?.signalSite !== undefined
+						? structuralSignalInstanceKey(scope, scope.block.forSlot.signalSite, undefined, false)
+						: rootSignalInstanceKey(ids)),
 			};
 			// A retry owner must not keep an abandoned renderer tree alive. This
 			// existing opaque identity object is also its own facade-state token.
@@ -21262,9 +21287,11 @@ function bindDirectSignal(
 		// Enter its already-stamped scope for both the initial read and subscribe;
 		// the ambient render frame may have started before document activation.
 		if (!signalDocumentEnabled) enableSignalBindings();
-		return runWithBlockSignalOwner(scope, () =>
-			bindDirectSignal(scope, previous, target, value, site, policy, name, attributeKind),
-		);
+		if (currentSignalOwner() !== scopeSignalOwner(scope)) {
+			return runWithBlockSignalOwner(scope, () =>
+				bindDirectSignal(scope, previous, target, value, site, policy, name, attributeKind),
+			);
+		}
 	}
 	if (handle === null && prior === null) {
 		if (kind === 'attribute' && previous === value) {
@@ -33247,6 +33274,7 @@ function renderPreparedChildList(
 			plainDeopt: false,
 			mappedNative: undefined,
 			selectionItems: undefined,
+			signalSite: undefined,
 		};
 		if (upgradeArmed) {
 			state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start, state.end!);
@@ -41271,6 +41299,9 @@ export function switchBlock(
 
 interface ForSlot {
 	__kind: 'forBlockSlot';
+	// Inline row owners need a call-site namespace without consuming the list
+	// keys that independently compiled child components still inherit.
+	signalSite: string | undefined;
 	start: Comment;
 	end: Comment;
 	items: Map<any, Block>; // key → item Block (O(1) survivor lookup)
@@ -41338,6 +41369,7 @@ export function forBlock<T>(
 	// placeholder. Reuse it as the durable closing boundary instead of keeping
 	// both that placeholder and a newly-created `/for` comment.
 	ownEnd?: boolean,
+	signalSite?: string,
 ): void {
 	// The iterable expression can queue a self-update before this call starts.
 	// Do not mount or remove items from an output the owner will replay.
@@ -41411,6 +41443,7 @@ export function forBlock<T>(
 			plainDeopt: false,
 			mappedNative: undefined,
 			selectionItems: undefined,
+			signalSite,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -41622,6 +41655,7 @@ export function keyedForBlock<T>(
 	anchor?: Node | null,
 	ownEnd?: boolean,
 	selectionBody?: ComponentBody<T, any[]>,
+	signalSite?: string,
 ): void {
 	// forBlock may skip discarded output before it creates the list slot.
 	// Skip selection bookkeeping with the same owner check.
@@ -41666,6 +41700,7 @@ export function keyedForBlock<T>(
 		emptyBody,
 		anchor,
 		ownEnd,
+		signalSite,
 	);
 	if (TRANSITION_JOURNAL === null || ROOT_RENDER_TRANSACTION !== null) {
 		const rendered = parentScope.slots[slotKey] as ForSlot;
