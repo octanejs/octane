@@ -276,6 +276,24 @@ export function verifyBundleInputs(scenario, inputs) {
 			);
 		}
 	}
+	if (
+		scenario.id === 'engine' ||
+		scenario.id === 'native-client' ||
+		scenario.id === 'native-server' ||
+		scenario.id === 'compiled-plain-signals'
+	) {
+		// Only stream ingress creates a scope's stream capability. An entry that
+		// never binds a streamed selection must not emit any of its bookkeeping.
+		for (const input of inputs.filter((input) =>
+			/\/src\/signals\/scope-streams\.[jt]s$/.test(input.path.replaceAll('\\', '/')),
+		)) {
+			assert.equal(
+				input.bytesInOutput,
+				0,
+				`${scenario.id}: stream-free entry retained the scope stream capability`,
+			);
+		}
+	}
 	if (scenario.id === 'compiled-plain-signals') {
 		// This fixture has a compiler-proven scalar derivation and a real async
 		// query. Neither the query nor an unused async declaration may force the

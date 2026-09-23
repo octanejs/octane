@@ -410,6 +410,17 @@ export function mount(parent) { const root = createRoot(parent); root.render(Vie
 		),
 		'The compiled signal Action control must retain its transition coordinator.',
 	);
+	for (const [label, closure] of [
+		['independent engine', engine],
+		['native client', native],
+	])
+		assert.ok(
+			closure.inputs.every(
+				(input) =>
+					!input.path.endsWith('/src/signals/scope-streams.ts') || input.bytesInOutput === 0,
+			),
+			`The ${label} retained the scope stream capability without stream ingress.`,
+		);
 	const window = new Window();
 	const globals = new Map();
 	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
@@ -522,6 +533,18 @@ test('independent engine rejects rendering, compiler, DevTools, and the old Alie
 	);
 	assert.throws(() => verifyBundleInputs(scenario('engine'), [alien('1.0.4')]), /wrong Alien/);
 	assert.throws(() => verifyBundleInputs(scenario('engine'), []), /dependency is missing/);
+	verifyBundleInputs(scenario('engine'), [
+		...independent,
+		{ ...source('signals/scope-streams.ts'), bytesInOutput: 0 },
+	]);
+	assert.throws(
+		() =>
+			verifyBundleInputs(scenario('engine'), [
+				...independent,
+				{ ...source('signals/scope-streams.ts'), bytesInOutput: 1 },
+			]),
+		/retained the scope stream capability/,
+	);
 });
 
 test('native entries require their actual runtime and pinned engine', () => {

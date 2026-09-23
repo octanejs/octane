@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+	acceptStreamedSignalResult,
+	bindStreamedSignalSelection,
 	createResource,
 	createScope,
 	query,
@@ -646,5 +648,78 @@ describe('scoped stream resources', () => {
 		third.emit('current c');
 		await ready;
 		expect(resource$.get()).toBe('current c');
+	});
+});
+
+describe('optional scope capabilities', () => {
+	it('activates streams, resources, adoption and tracing after ordinary signals are live', async () => {
+		const scope = createScope({ scopeKey: 'late-capabilities', debug: { traceLimit: 64 } });
+		owners.push(scope);
+		const count$ = scope.signal$('count', 1);
+		const double$ = scope.derived$('double', () => count$.get() * 2);
+		const notified: number[] = [];
+		const stop = double$.subscribe(() => notified.push(scope.get(double$)));
+		expect(scope.get(double$)).toBe(2);
+		expect(scope.inspect()).toMatchObject({ activeRequests: 0, adoptionLeases: 0 });
+
+		// A receiver selects and delivers a result before its declaration runs.
+		let starts = 0;
+		const load = query('late-stream', (_id: string) => {
+			starts++;
+			return Promise.resolve('browser');
+		});
+		const identity = {
+			protocol: 1 as const,
+			buildId: 'test-build',
+			documentId: 'test-document',
+			ownerKey: 'late-capabilities',
+			instanceKey: 'late',
+			nodeKey: 'resource',
+			selectionKey: JSON.stringify(['late-stream', ['string', 'one']]),
+			selectionGeneration: 1,
+			attempt: 1,
+		};
+		expect(bindStreamedSignalSelection(scope, identity)).toBe(true);
+		const frames: Parameters<typeof acceptStreamedSignalResult>[1][] = [
+			{ identity, sequence: 0, channel: 'result', kind: 'open', resource: 'promise' },
+			{ identity, sequence: 1, channel: 'result', kind: 'value', value: ['string', 'server'] },
+			{ identity, sequence: 2, channel: 'result', kind: 'complete' },
+		];
+		for (const frame of frames) expect(acceptStreamedSignalResult(scope, frame)).toBe(true);
+		const resource$ = createResource(scope, 'resource', () => load('one'));
+		expect(resource$.get()).toBe('server');
+		expect(starts).toBe(0);
+
+		const lease = scope.beginAdoption(scope.serialize());
+		expect(scope.inspect().adoptionLeases).toBe(1);
+		scope.batch(() => count$.set(5));
+		expect(notified).toEqual([10]);
+		expect(lease.run(() => count$.get())).toBe(1);
+		expect(scope.inspect().trace.map((event) => event.type)).toContain('select');
+
+		scope.dispose();
+		scope.dispose();
+		expect(scope.inspect()).toMatchObject({
+			retired: true,
+			activeRequests: 0,
+			adoptionLeases: 0,
+			nodes: [],
+		});
+		expect(lease.released).toBe(true);
+		expect(
+			acceptStreamedSignalResult(scope, {
+				identity,
+				sequence: 3,
+				channel: 'result',
+				kind: 'complete',
+			}),
+		).toBe(false);
+		expect(bindStreamedSignalSelection(scope, identity)).toBe(false);
+		expect(() => resource$.get()).toThrow(ScopeDisposedError);
+		expect(() => count$.get()).toThrow(ScopeDisposedError);
+		stop();
+		lease.release();
+		await drainProducers();
+		expect(starts).toBe(0);
 	});
 });

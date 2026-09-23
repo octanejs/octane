@@ -8,6 +8,7 @@ import {
 } from './engine.js';
 import { createDeclaredScalarCell } from './scalar-computations.js';
 import { ScopeDisposedError, SignalStreamError } from './errors.js';
+import { scopeStreams } from './scope-streams.js';
 import { isThenable, readSignalBinding as readBinding, untrack } from './graph.js';
 import { readEarlySignalValue } from './early-values.js';
 import { NATIVE_DOM_VALUE, forwardNativeTransitionConsumer } from './read-protocol.js';
@@ -554,8 +555,9 @@ export function attachStreamedSignalResult(
 	identity: StreamFrameIdentity,
 ): () => void {
 	const scope = streamedScope(owner, identity, true);
-	if (!(scope instanceof ScopeImpl) || !scope.bindStreamedSelection(identity))
+	if (!(scope instanceof ScopeImpl) || !bindScopeStreamedSelection(scope, identity))
 		throw new SignalStreamError('identity');
+	const streams = scopeStreams(scope);
 	const fail = (error: unknown): void => {
 		failStreamedSignalResult(owner, identity, receiverErrorCode(error));
 	};
@@ -564,18 +566,18 @@ export function attachStreamedSignalResult(
 			if (acceptStreamedSignalResult(owner, frame)) return;
 			// Only a still-authorized selector waiting on its dependencies may
 			// defer. Bad sequence/resource/attempt frames still fail closed.
-			if (scope.isStreamedSelectionPending(frame.identity)) return false;
+			if (streams.isPending(frame.identity)) return false;
 			fail(new SignalStreamError('identity'));
 			throw new SignalStreamError('identity');
 		},
 		retainCompleted(frames: StreamedSignalResultFrame[]): boolean {
-			return scope.retainCompletedStreamedResult(identity, frames);
+			return streams.retainCompleted(identity, frames);
 		},
 		fail,
 	};
 	try {
 		let detach = receiver.attachResult(identity, consumer);
-		const stopWaiting = scope.whenStreamedSelectionReady(identity, () => {
+		const stopWaiting = streams.whenReady(identity, () => {
 			detach = receiver.attachResult(identity, consumer);
 		});
 		return () => {
