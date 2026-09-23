@@ -362,12 +362,23 @@ concurrently rather than awaiting `allReady` before reading. Same
   waiting for producer progress. The timeout pauses while data is queued or waiting
   for the transport sink to accept it, and restarts for the next producer read.
   It is separate from the render's Suspense deadline and does not limit total
-  response duration. Request cancellation still releases backpressured producers.
+  response duration. Request cancellation, the inactivity timeout, and a
+  cancelled reader release producers immediately, including one parked on an
+  idle async iterator: the iterator's `return()` runs without waiting for its
+  pending `next()`. An `async function*` upstream queues that `return()` behind
+  its own pending `await`, so an idle source it wraps should also observe the
+  request's abort signal.
   The automatic multiplexer permits 256 live channels, including an external
-  injection source; completed, drained channels release their slot. Repeated
-  observation of the same attempt does not replay its result.
+  injection source; completed, drained channels release their slot. An attempt
+  observed while every slot is live is not streamed or announced, so the browser
+  loads it itself; the other channels are unaffected. Repeated observation of
+  the same attempt does not replay its result.
   Browser result receivers renew their inactivity timeout on accepted result
   frames; an idle channel still expires even while siblings make progress.
+  Unlike the server's timeout, the browser's cannot see transport backpressure:
+  it measures wall time between accepted frames, including the time a frame
+  spends in transit. Give the browser bootstrap a `timeoutMs` that covers the
+  server's plus the slowest expected transfer of one `maxFrameBytes` frame.
   NDJSON transports time each pending producer or network read, while browser
   queue/placement waits retain their own timeout. Byte limits and the pre-module
   mailbox's 256 selections / 512 result frames still apply: long streams need an
