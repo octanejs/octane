@@ -6,7 +6,9 @@ const client = new ApolloClient({ cache: new InMemoryCache(), link: ApolloLink.e
 
 function ClientProbe() @{
 	const observed = useApolloClient();
-	<output id="minimal-apollo-client">{observed === client ? 'provided' : 'missing'}</output>
+	<output id="minimal-apollo-client">
+		{observed === client ? 'provided' : 'missing'}
+	</output>
 }
 
 function ApolloRoot() @{
