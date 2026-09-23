@@ -2076,14 +2076,14 @@ test('local void root specialization needs every lexical use and the loaded expo
 			checked++;
 		}
 
-	// JSX entries use the full compiler, so they remain a generic-root control.
-	for (const [label, body] of sources) {
+	// JSX entries use the full compiler, which shares the same lifetime proof.
+	for (const [label, body, eligible] of sources) {
 		const transformed = compiler.transform(imports + body, id.replace(/ts$/, 'tsx'), {
 			isVoidComponentImport: proves,
 		});
 		assert.equal(
 			transformed?.code.includes('__createVoidRoot') === true,
-			false,
+			eligible,
 			`full JSX compiler: ${label}`,
 		);
 		checked++;
@@ -2219,8 +2219,19 @@ test('same-file root optimization proves complete lifetimes across bindings and 
 	try {
 		check(createPrefix + createBody, '__createVoidRoot', true);
 		check(hydratePrefix + hydrateBody, '__hydrateVoidRoot', true);
+		// A non-exported module root has the same closed lifetime as a local one.
+		check(
+			createPrefix + 'const root=createRoot(el); root.render(View); root.unmount();',
+			'__createVoidRoot',
+			true,
+		);
+		check(
+			hydratePrefix +
+				'export function mount(el){const root=hydrateRoot(el,<View/>);root.render(View);root.unmount();}',
+			'__hydrateVoidRoot',
+			true,
+		);
 		for (const body of [
-			'const root=createRoot(el); root.render(View); root.unmount();',
 			'namespace N { export const root=createRoot(el); root.render(View); root.unmount(); }',
 			'class C { static { const root=createRoot(el); root.render(View); root.unmount(); } }',
 			'export function mount(el) { const root=createRoot(el); root.render(View); return root; }',
@@ -2245,7 +2256,9 @@ test('same-file root optimization proves complete lifetimes across bindings and 
 				false,
 			);
 		for (const args of [
-			'el,<View/>',
+			'el,<View key="k"/>,{},{}',
+			'el,<view/>',
+			'el,<View.Part/>',
 			'el,"returned"',
 			'el,null',
 			'el',
@@ -2313,8 +2326,14 @@ test('root optimization fails closed on unscoped runtime AST references', async 
 	const { parseModule, builders: b } = createRequire(
 		new URL('../../packages/octane/package.json', import.meta.url),
 	)('@tsrx/core');
-	const { findLocalVoidRootCallees } =
-		await import('../../packages/octane/src/compiler/local-void-roots.js');
+	const { findRootFactoryImports, proveVoidRoots } =
+		await import('../../packages/octane/src/compiler/void-roots.js');
+	const findLocalVoidRootCallees = (ast, definitions, components) =>
+		proveVoidRoots(ast, {
+			factories: findRootFactoryImports(ast),
+			component: (name) => ([...definitions].some((id) => id.name === name) ? true : undefined),
+			skip: (node) => components.has(node),
+		});
 	for (const factory of ['createRoot(el)', 'hydrateRoot(el,View)']) {
 		const ast = parseModule(
 			`import {createRoot,hydrateRoot} from 'octane';function View() @{<main>server</main>}function mount(el){const root=${factory};root.render(View);function decorated(){}root.unmount();}`,
@@ -2350,12 +2369,12 @@ test('root optimization fails closed on unscoped runtime AST references', async 
 		freeze(supplied);
 		freeze(ast);
 		assert.equal(
-			findLocalVoidRootCallees(ast, new Set([view.id]), new Set([view])).size,
+			findLocalVoidRootCallees(ast, new Set([view.id]), new Set([view])).length,
 			1,
 			factory + ' positive control',
 		);
 		assert.equal(
-			findLocalVoidRootCallees(supplied, new Set([view.id]), new Set([view])).size,
+			findLocalVoidRootCallees(supplied, new Set([view.id]), new Set([view])).length,
 			0,
 			factory + ' unscoped reference',
 		);

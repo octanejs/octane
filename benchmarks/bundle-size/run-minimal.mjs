@@ -24,6 +24,7 @@ const existingScenarios = [
 	['capture-only', 'ts'],
 	['cli-spa-starter', 'ts'],
 	['root-static-specialized', 'ts'],
+	['root-chained-jsx', 'tsx'],
 	['root-static', 'tsrx'],
 	['root-static-local', 'tsrx'],
 	['hooks-state', 'tsrx'],
@@ -40,6 +41,7 @@ const existingScenarios = [
 const signalFreeClientScenarios = new Set([
 	'cli-spa-starter',
 	'root-static-specialized',
+	'root-chained-jsx',
 	'root-static',
 	'root-static-local',
 	'hooks-state',
@@ -414,6 +416,7 @@ try {
 		}
 		if (
 			id === 'root-static-specialized' ||
+			id === 'root-chained-jsx' ||
 			id === 'root-static-local' ||
 			id === 'cli-spa-starter'
 		) {

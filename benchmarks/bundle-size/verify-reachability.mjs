@@ -40,6 +40,9 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 	'root-static-specialized': {
 		text: 'Octane',
 	},
+	'root-chained-jsx': {
+		text: 'Octane',
+	},
 	'hooks-state': {
 		before: '0',
 		after: '1',

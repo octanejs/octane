@@ -432,7 +432,7 @@ escaped generic contract.
 ceilings for every feature. Budgets leave about 3% deterministic headroom, with
 small byte-aligned allowances for tiny isolated entries. Each scenario publishes
 its committed ceiling as a
-same-run `*-budget` reference target, so ninety-three `maxRatio: 1` entries in
+same-run `*-budget` reference target, so ninety-six `maxRatio: 1` entries in
 `baselines/ratios.json` enforce all three metrics in the existing weekly/manual
 Bench CI workflow. The behavior fixture runner also enforces its ceilings directly.
 Full PR and main CI run both behavior builds once in test shard 1/4, so changes
@@ -443,7 +443,7 @@ enforces the unchanged committed raw, gzip, and brotli ceilings for the recovere
 same-file static-root, hooks, and local Context fixtures:
 
 ```bash
-node benchmarks/bundle-size/run-minimal.mjs --budgets root-static-local hooks-state context
+node benchmarks/bundle-size/run-minimal.mjs --budgets root-static-local root-chained-jsx hooks-state context
 ```
 
 `--budgets` applies direct byte enforcement to the selected scenarios (or all

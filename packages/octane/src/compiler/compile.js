@@ -127,7 +127,7 @@ import { collectProvenContextBindings, isProvenContextUse } from './context-use.
 import { assertNoLegacyContextProviders } from './context-provider.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
-import { findLocalVoidRootCallees } from './local-void-roots.js';
+import { findRootFactoryImports, proveVoidRoots } from './void-roots.js';
 import { findPrivateCompiledContexts } from './private-context.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
@@ -9987,6 +9987,7 @@ function compileInternal(
 		rendererBoundaryPreparation === null &&
 		options?.rendererBoundaries == null &&
 		options?.rendererRegistry == null;
+	const rootFactories = localVoidRootsEnabled ? findRootFactoryImports(ast) : new Map();
 	const authoredVoidRootIds = new Set();
 	const privateCompiledContexts = localVoidRootsEnabled
 		? findPrivateCompiledContexts(ast)
@@ -9994,21 +9995,7 @@ function compileInternal(
 	const splitPrivateContexts = localVoidRootsEnabled
 		? privateCompiledContextsForHydrateAst(parsedAst)
 		: null;
-	if (
-		localVoidRootsEnabled &&
-		ast.body.some(
-			(node) =>
-				node.type === 'ImportDeclaration' &&
-				node.source?.value === 'octane' &&
-				node.specifiers.some(
-					(specifier) =>
-						specifier.type === 'ImportSpecifier' &&
-						['createRoot', 'hydrateRoot'].includes(
-							specifier.imported.name ?? specifier.imported.value,
-						),
-				),
-		)
-	) {
+	if (rootFactories.size > 0) {
 		for (const statement of ast.body) {
 			const node =
 				statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
@@ -10505,25 +10492,71 @@ function compileInternal(
 			});
 		}
 	}
-	if (authoredVoidRootIds.size > 0) {
-		const definitions = new Set(
-			[...ctx.componentInfo.values()]
-				.filter((info) => info.voidOutput && authoredVoidRootIds.has(info.node.id))
-				.map((info) => info.node.id),
-		);
+	if (
+		rootFactories.size > 0 &&
+		(authoredVoidRootIds.size > 0 ||
+			(ctx.isVoidComponentImport !== null && ctx.importedComponentBindings.size > 0))
+	) {
+		// Definition IDs come from the authored, exact shorthand declarations:
+		// arrow normalization and return-JSX lowering cannot manufacture this
+		// evidence. Imports rely on the adapter's proof of the loaded export ABI.
+		const writes = authoredVoidRootIds.size > 0 ? collectReassignedBindings(ast) : null;
+		const stableComponents = new Set();
+		for (const info of ctx.componentInfo.values())
+			if (info.voidOutput && authoredVoidRootIds.has(info.node.id) && !writes.has(info.node.id))
+				stableComponents.add(info.node.id.name);
 		const components = new Set([...ctx.componentInfo.values()].map((info) => info.node));
-		const callees = findLocalVoidRootCallees(ast, definitions, components);
+		const callees = new Map();
+		let loweredElements = null;
+		for (const root of proveVoidRoots(ast, {
+			factories: rootFactories,
+			component(name) {
+				if (stableComponents.has(name)) return true;
+				const imported = ctx.importedComponentBindings.get(name);
+				return imported !== undefined &&
+					ctx.isVoidComponentImport?.(imported.request, imported.imported) === true
+					? true
+					: undefined;
+			},
+			// Roots created while a component renders stay on the generic path.
+			skip: (node) => node.type === 'JSXCodeBlock' || components.has(node),
+		})) {
+			callees.set(root.callee, root.helper);
+			// Native reads keep their scoped element resolver around `$` reads.
+			for (const { call, index } of ctx.nativeReads ? [] : root.elements) {
+				const props = voidRootElementProps(call.arguments[index]);
+				if (props !== null) (loweredElements ??= new Map()).set(call, { index, props });
+			}
+		}
 		if (callees.size > 0) {
 			const aliases = new Map();
-			for (const helper of new Set(callees.values())) {
+			const helpers = new Set(callees.values());
+			if (loweredElements !== null) helpers.add('__voidRootProps');
+			for (const helper of helpers) {
 				const alias = allocCompilerName(ctx, rtAlias(helper));
 				(ctx.privateRuntimeAliases ??= new Map()).set(helper, alias);
 				ctx.runtimeNeeded.add(helper);
 				aliases.set(helper, alias);
 			}
-			ast = mapAst(ast, (node) =>
-				callees.has(node) ? { ...node, name: aliases.get(callees.get(node)) } : null,
-			);
+			const rewrite = (node) => {
+				if (callees.has(node)) return { ...node, name: aliases.get(callees.get(node)) };
+				const lowered = loweredElements?.get(node);
+				if (lowered === undefined) return null;
+				// `root.render(<C .../>)` → `root.render(C, props)`: the root unwraps
+				// the element to exactly this body/props pair, with a null key.
+				const element = node.arguments[lowered.index];
+				const name = element.openingElement.name;
+				const tag = () => inheritOriginLoc(b.id(name.name), name);
+				const args = [...node.arguments];
+				args.splice(
+					lowered.index,
+					1,
+					tag(),
+					inheritOriginLoc(b.call(aliases.get('__voidRootProps'), tag(), lowered.props), element),
+				);
+				return mapAst({ ...node, arguments: args }, rewrite);
+			};
+			ast = mapAst(ast, rewrite);
 		}
 	}
 	if (privateCompiledContexts.size > 0 || splitPrivateContexts?.callees.size > 0) {
@@ -33029,6 +33062,47 @@ function escapeMultilineStringLiterals(node) {
 		}
 		return null;
 	});
+}
+
+// Props for a proven void root's `<C ... />` target, or null when the element
+// needs the general descriptor path: a `key` (or a spread that may carry one)
+// changes root identity, children need descriptor lowering, and a value that
+// can run user code must keep its deferred render-scope evaluation. The literal
+// is fresh, so it already has the descriptor's own-props copy shape.
+function voidRootElementProps(element) {
+	if (element.children?.length > 0) return null;
+	const properties = [];
+	for (const attribute of element.openingElement.attributes) {
+		if (
+			attribute.type !== 'JSXAttribute' ||
+			attribute.name?.type !== 'JSXIdentifier' ||
+			attribute.name.name === 'key'
+		)
+			return null;
+		const value = attribute.value;
+		let expression;
+		if (value == null) expression = inheritOriginLoc(b.literal(true), attribute);
+		else if (
+			(value.type === 'Literal' || value.type === 'StringLiteral') &&
+			typeof value.value === 'string'
+		)
+			expression = inheritOriginLoc(b.literal(value.value), value);
+		else if (
+			value.type === 'JSXExpressionContainer' &&
+			(isStaticJsxValueExpression(value.expression) ||
+				unwrapTsExpr(value.expression)?.type === 'Identifier')
+		)
+			expression = value.expression;
+		else return null;
+		const name = attribute.name.name;
+		properties.push(
+			inheritOriginLoc(
+				b.prop('init', /^[A-Za-z_$][\w$]*$/.test(name) ? b.id(name) : b.literal(name), expression),
+				attribute,
+			),
+		);
+	}
+	return inheritOriginLoc(b.object(properties), element);
 }
 
 // Identity-preserving copy-on-write map: `mutate` returns a replacement node

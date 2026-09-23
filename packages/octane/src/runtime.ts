@@ -44840,6 +44840,17 @@ export function __createVoidRoot(container: RootContainer, options?: RootOptions
 }
 
 /**
+ * Compiler-only props for a proven void root's keyless, childless
+ * `<Component ... />` target. `root.render(Component, props)` then matches the
+ * descriptor the element would build, including live `defaultProps`, without
+ * the general element constructor's renderer-context graph.
+ */
+export function __voidRootProps(type: ComponentBody, props: any): any {
+	applyElementDefaultProps(type, props);
+	return props;
+}
+
+/**
  * Hydrate a server-rendered container and return a live {@link Root} — the
  * React-18 `hydrateRoot(container, element)` shape (container FIRST). Instead of
  * clearing the container and cloning fresh DOM, the compiled mount ADOPTS the
