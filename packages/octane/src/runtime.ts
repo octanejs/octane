@@ -1278,6 +1278,7 @@ function nativePresentationBinding(
 		const block = createBlock('control-flow', owner.block, el, null, null, body, props);
 		block.parent = owner;
 		if (binding.el === el) block.slots[0] = binding.style;
+		journalRootProperty(binding, 'block', binding.block);
 		binding.block = block;
 	} else {
 		const block = binding.block!;
