@@ -10,6 +10,7 @@
 import { builders as b, clone_ast_node, parseModule } from '@tsrx/core';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
 import { createContextSourceFacts } from './context-provider.js';
+import { inheritGeneratedOrigin } from './generated-origin.js';
 
 // Keep this catalogue in the compiler, never in generated application code. It
 // is the union of actual constructor exports from Three r156, r172, and r183,
@@ -400,28 +401,6 @@ function withPlanOrigin(value, origin) {
 		});
 	}
 	return value;
-}
-
-function inheritGeneratedOrigin(root, origin) {
-	const seen = new WeakSet();
-	const visit = (value) => {
-		if (!value || typeof value !== 'object' || seen.has(value)) return;
-		seen.add(value);
-		if (Array.isArray(value)) {
-			for (const item of value) visit(item);
-			return;
-		}
-		if (typeof value.type === 'string' && value.loc == null && origin?.loc != null) {
-			value.start = origin.start;
-			value.end = origin.end;
-			value.loc = origin.loc;
-		}
-		for (const [key, child] of Object.entries(value)) {
-			if (!AST_SKIP_KEYS.has(key)) visit(child);
-		}
-	};
-	visit(root);
-	return root;
 }
 
 function jsonValueToAst(value, origin) {

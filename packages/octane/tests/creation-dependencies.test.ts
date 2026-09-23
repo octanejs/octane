@@ -132,17 +132,61 @@ const cases = [
 		name: 'hoisted callback binding',
 		expression: 'props.load(() => { local = props.id; return local; var local; })',
 	},
+	// Deps evaluate on every render. Reads the authored render never performs
+	// (callbacks, unreplayable guards) must not throw there.
+	{
+		name: 'uncalled callback global',
+		expression: 'props.load(props.id, () => creationAbsentGlobal.scrollTo(0, 0))',
+	},
+	{
+		name: 'try-guarded callback global',
+		expression:
+			'props.load(() => { try { return creationAbsentGlobal.value; } catch { return props.id; } })',
+	},
+	{
+		name: 'switch-typeof callback global',
+		expression:
+			"props.load(() => { switch (typeof creationAbsentGlobal) { case 'object': return creationAbsentGlobal.value; default: return props.id; } })",
+	},
+	{
+		name: 'in-operator guarded global',
+		expression:
+			"props.load('creationAbsentGlobal' in globalThis ? creationAbsentGlobal.value : props.id)",
+	},
+	{
+		name: 'nullish-guarded global',
+		expression: 'props.load(props.id ?? creationAbsentGlobal.value)',
+	},
+	{
+		name: 'uninstantiated class field',
+		expression: 'props.load((class { value = creationAbsentGlobal.value; }, props.id))',
+	},
+	{
+		name: 'function-owned arguments',
+		expression:
+			"props.load(function () { return arguments.length === 0 ? props.id : 'unexpected'; })",
+	},
+	{
+		name: 'nullable local read only in a callback',
+		setup: 'const missing = props.missing ?? null;',
+		expression: 'props.load(props.id, () => missing.value)',
+	},
+	{
+		name: 'nullable local behind an unreplayable guard',
+		setup: 'const missing = props.missing ?? null;',
+		expression: 'props.load(missing !== null ? missing.value : props.id)',
+	},
 ];
 
-function sourceFor(expression: string, ext: string, site: string) {
+function sourceFor(expression: string, ext: string, site: string, setup = '') {
 	const reader =
 		ext === 'tsrx'
 			? 'function Reader(props) @{ const value = use(props.request); <p>{value as string}</p> }'
 			: 'function Reader(props) { const value = use(props.request); return <p>{value as string}</p>; }';
 	const body =
 		site === 'argument'
-			? `const value = use(${expression}); ${ext === 'tsrx' ? '' : 'return '}<p>{value as string}</p>${ext === 'tsrx' ? '' : ';'}`
-			: `${ext === 'tsrx' ? '' : 'return '}<Reader request={${expression}} />${ext === 'tsrx' ? '' : ';'}`;
+			? `${setup} const value = use(${expression}); ${ext === 'tsrx' ? '' : 'return '}<p>{value as string}</p>${ext === 'tsrx' ? '' : ';'}`
+			: `${setup} ${ext === 'tsrx' ? '' : 'return '}<Reader request={${expression}} />${ext === 'tsrx' ? '' : ';'}`;
 	return `import { use } from 'octane';
 type UserId = string;
 ${reader}
@@ -168,7 +212,12 @@ async function renderedText(source: string, ext: string, mode: 'client' | 'serve
 		mode,
 		compileOptions: { hmr: false, dev },
 	});
-	const load = requestLoader();
+	const request = requestLoader();
+	let loads = 0;
+	const load = (argument: unknown) => {
+		loads++;
+		return request(argument);
+	};
 	const props = { id: 'first', key: 'label', load };
 	if (mode === 'server') {
 		expect((await prerender(Page, props)).html).toContain('<p>first</p>');
@@ -179,8 +228,11 @@ async function renderedText(source: string, ext: string, mode: 'client' | 'serve
 	try {
 		await act(async () => {});
 		expect(rendered.find('p').textContent).toBe('first');
+		const settledLoads = loads;
 		await act(() => rendered.update(Page, { ...props }));
 		expect(rendered.find('p').textContent).toBe('first');
+		// Equal member deps keep the template creation across a fresh props object.
+		if (ext === 'tsrx') expect(loads).toBe(settledLoads);
 		await act(() => rendered.update(Page, { ...props, id: 'second' }));
 		expect(rendered.find('p').textContent).toBe('second');
 	} finally {
@@ -201,7 +253,7 @@ describe('async creation dependencies', () => {
 		),
 	)('renders $name in a $site creation ($mode, $ext, dev=$dev)', async (entry) => {
 		await renderedText(
-			sourceFor(entry.expression, entry.ext, entry.site),
+			sourceFor(entry.expression, entry.ext, entry.site, entry.setup),
 			entry.ext,
 			entry.mode,
 			entry.dev,
