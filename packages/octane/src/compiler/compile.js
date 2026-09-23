@@ -16816,9 +16816,12 @@ function depPathKey(node) {
 // authored render performs. A read inside a nested function (which may never
 // run during render) or behind a condition that cannot be replayed is
 // deferred: a module-bound root keeps its precise path as `root?.prop`, and an
-// ambient global (absent from `moduleBoundNames`) contributes no dep at all,
-// because it may not exist in this environment (`window` under SSR).
-function collectDepPaths(expr, coarsenDepRoots = null, moduleBoundNames = null) {
+// ambient global (not bound in the enclosing scope chain) contributes no dep at
+// all, because it may not exist in this environment (`window` under SSR).
+// `isModuleBound` is a scope-aware `(name) => boolean` from
+// `moduleBoundCheckForDeps`, resolving through the expression's enclosing scope
+// chain so that sibling-function parameters never leak into the decision.
+function collectDepPaths(expr, coarsenDepRoots = null, isModuleBound = null) {
 	const deps = [];
 	const seen = new Set();
 	const lexical = createLexicalAnalysis(expr);
@@ -16831,7 +16834,7 @@ function collectDepPaths(expr, coarsenDepRoots = null, moduleBoundNames = null) 
 		!lexical.isBound(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name) &&
 		!(ownArguments > 0 && node.name === 'arguments');
 	const deferredAmbient = (name) =>
-		deferred > 0 && (moduleBoundNames === null || !moduleBoundNames.has(name));
+		deferred > 0 && (isModuleBound === null || !isModuleBound(name));
 	const push = (node, key) => {
 		if (coarsenDepRoots !== null) {
 			const member = depPathMember(node);
@@ -17029,12 +17032,17 @@ function collectDepPaths(expr, coarsenDepRoots = null, moduleBoundNames = null) 
 	}
 }
 
-// Every name any authored scope binds; a free name outside it is ambient.
-function moduleBoundNamesForDeps(ctx) {
-	if (ctx._moduleBoundNames !== undefined) return ctx._moduleBoundNames;
-	if (ctx._depModuleBoundNames !== undefined) return ctx._depModuleBoundNames;
-	return (ctx._depModuleBoundNames =
-		ctx.activityModuleAst == null ? null : collectModuleBoundNames(ctx.activityModuleAst));
+// Scope-aware module-bound check: returns a function `(name) => boolean` that
+// resolves through the scope chain at `exprNode`'s position in the module AST.
+// Nested parameters and catch bindings from unrelated functions are invisible,
+// so a shadowed global (e.g. `function fmt(document)`) does not trick
+// deferred-ambient into emitting an eager dep for an undeclared name.
+function moduleBoundCheckForDeps(ctx, exprNode) {
+	if (ctx.activityModuleAst == null) return null;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope = lexical.nodeScopes.get(exprNode);
+	if (scope === undefined) return null;
+	return (name) => lexical.isBound(scope, name);
 }
 
 // A `use()` argument that needs no memoization: already-stable references
@@ -17272,7 +17280,7 @@ function makeCreationMemoCall(
 	// promise — and the derived creation would never refresh when its upstream
 	// promise does. Coarsen member deps rooted at render-created locals to the
 	// bare identifier (dedup follows).
-	const deps = collectDepPaths(expr, coarsenDepRoots, moduleBoundNamesForDeps(ctx));
+	const deps = collectDepPaths(expr, coarsenDepRoots, moduleBoundCheckForDeps(ctx, expr));
 	// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
 	// SSRScope per pass makes client useMemo semantics useless there).
 	const memoHelper = ctx.nativeReads
@@ -17982,7 +17990,7 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 				kind: 'useMemo',
 				node: expr,
 			});
-			const deps = collectDepPaths(expr, null, moduleBoundNamesForDeps(ctx));
+			const deps = collectDepPaths(expr, null, moduleBoundCheckForDeps(ctx, expr));
 			const memoAlias = requireRuntimeForContext(ctx, ctx.nativeReads ? 'nativePuMemo' : 'puMemo');
 			changed = true;
 			// The minted prop-memo wrapper maps to the authored prop expression.
