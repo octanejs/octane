@@ -144,7 +144,7 @@ const alien = (version = '3.2.0') => ({
 	package: { name: 'alien-signals', version },
 });
 
-test('ordinary server lists defer key serialization until a real handle is read', async (t) => {
+test('ordinary server lists defer signal identity work and real handles preserve opaque keys', async (t) => {
 	const directory = path.resolve('packages/octane');
 	const app = `function Row(props) @{
  const value = props.produce(props.item.label);
@@ -184,7 +184,7 @@ import {renderToString} from 'octane/server';`;
 		key: {
 			[Symbol.toPrimitive]() {
 				coercions++;
-				return 'key ' + index;
+				throw new Error('Object-key signal identities must not coerce user keys.');
 			},
 		},
 	}));
@@ -205,11 +205,14 @@ import {renderToString} from 'octane/server';`;
 		assert.equal(scalar.signals, undefined);
 	}
 	assert.equal(coercions, 0, 'Ordinary rows must not serialize optional signal list identities.');
-	let previousIdentities;
 	for (const rows of [items, items.toReversed()]) {
 		const used = api.render(rows, (label) => api.__signalAt('i:keyed-server-output', label));
 		fragment.innerHTML = used.html;
 		const controls = [...fragment.content.querySelectorAll('input')];
+		assert.deepEqual(
+			[...fragment.content.querySelectorAll('output')].map((node) => node.textContent),
+			rows.map((item) => item.label),
+		);
 		assert.deepEqual(
 			controls.map((node) => node.value),
 			rows.map((item) => item.label),
@@ -217,13 +220,12 @@ import {renderToString} from 'octane/server';`;
 		const identities = controls.map((node) => node.getAttribute('data-octane-signal-control'));
 		assert.ok(identities.every((identity) => identity !== null));
 		assert.equal(new Set(identities).size, items.length);
-		const byLabel = Object.fromEntries(
-			controls.map((node, index) => [node.value, identities[index]]),
-		);
-		if (previousIdentities) assert.deepEqual(byLabel, previousIdentities);
-		previousIdentities = byLabel;
 	}
-	assert.ok(coercions > 0, 'The actual-handle control must exercise identity serialization.');
+	assert.equal(
+		coercions,
+		0,
+		'Actual signal handles must preserve object identity without coercion.',
+	);
 	t.diagnostic(
 		JSON.stringify({ scalarRows: 200, scalarKeyCoercions: 0, usedKeyCoercions: coercions }),
 	);

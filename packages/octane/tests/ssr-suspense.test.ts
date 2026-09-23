@@ -364,6 +364,36 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 		expect(out.html).not.toContain('async-component-loading');
 	});
 
+	it.each([false, true])(
+		'renders opaque keyed children after an async component awaits (dev=%s)',
+		async (dev) => {
+			const fixture = loadCompiledFixtureSource(
+				`import { enableServerSignalBindings } from 'octane/server';
+enableServerSignalBindings();
+function Row(props) @{
+ <output>{props.label as string}</output>
+}
+export function App(props) @{
+ <main><Row key={props.rowKey} label="async ready"/></main>
+}`,
+				{
+					id: '/src/async-opaque-keyed-child.tsrx',
+					mode: 'server',
+					compileOptions: { dev, hmr: false },
+				},
+			);
+			const out = await prerender(m.AsyncComponentBoundary, {
+				component: async () => {
+					await Promise.resolve();
+					return fixture.App({ rowKey: {} });
+				},
+			});
+			const container = document.createElement('div');
+			container.innerHTML = out.html;
+			expect(container.textContent).toContain('async ready');
+		},
+	);
+
 	it('routes plain async component rejection to @catch without an unhandled replay rejection', async () => {
 		const reason = new Error('async-component-nope');
 		const caught: unknown[] = [];

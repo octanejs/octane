@@ -9,8 +9,8 @@ an empty materialized-identity cache slot. The untimed observer counts subsequen
 frames, restore envelopes and cache-slot appends. These are source-work counts, not V8 heap bytes.
 
 Each observed build must match its clean build's HTML exactly. The controls check
-text and input values, reordered real-handle control identities after ordinary
-renders, deferred raw object-key coercion, nested rendering and static output. The
+text and input values, real-handle control identities in reordered responses after
+ordinary renders, object keys without coercion, nested rendering and static output. The
 observer restores an existing global property descriptor. This gate runs through
 `ci:workflow:test`; it does not establish a runtime CPU improvement or remove the
 per-component restore envelope.
@@ -25,8 +25,8 @@ The server-list case in `bundle-boundaries.test.mjs` compiles an opaque text and
 control consumer through the production SSR compiler. Across two orders of a
 100-row object-keyed list, ordinary scalar output must serialize no optional
 signal keys. Its actual-handle control must preserve distinct serialized control
-identities across both orders and exercise key serialization. Both lanes check
-the resulting text and input values.
+identities within each response in both orders without coercing object keys. Both
+lanes check the resulting text and input values.
 
 ```bash
 node --test --test-name-pattern='ordinary server lists defer' benchmarks/scoped-signals/bundle-boundaries.test.mjs
@@ -34,7 +34,7 @@ node --test --test-name-pattern='ordinary server lists defer' benchmarks/scoped-
 
 This is a deterministic work guard, not a timing or heap claim. Potential list
 arms still allocate a persistent raw-key recipe; actual handles resolve and cache
-the original wire keys. The owning hydration regression also checks nested
+opaque object-key identities. The owning hydration regression also checks nested
 directive and mapped lists, adopted native controls, native edits and cleanup.
 
 ## Compiled native presentation channels

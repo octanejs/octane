@@ -28,6 +28,7 @@ import {
 	StagingSignalControls,
 } from './_fixtures/view-transition-signal-controls.tsrx';
 import { condition } from 'octane/hydration';
+import { SelectStateApp } from './_fixtures/view-transition-host-state.tsrx';
 import { renderToString } from 'octane/server';
 import { loadServerFixture } from './_server-fixture.js';
 
@@ -88,6 +89,75 @@ describe('ViewTransition staged commits', () => {
 		container.remove();
 		mocks.restore();
 	});
+
+	it.each([
+		[false, false],
+		[false, true],
+		[true, false],
+		[true, true],
+	])(
+		'isolates a controlled multi-select until publication (hydrate=%s, cancel=%s)',
+		async (hydrate, cancel) => {
+			const initial = { rows: ['a', 'b', 'c'], values: ['a'], label: 'before' };
+			if (hydrate) {
+				root.unmount();
+				const server = loadServerFixture<
+					typeof import('./_fixtures/view-transition-host-state.tsrx')
+				>('packages/octane/tests/_fixtures/view-transition-host-state.tsrx');
+				container.innerHTML = renderToString(server.SelectStateApp, initial).html;
+				const serverSelect = container.querySelector('select');
+				await act(() => {
+					root = hydrateRoot(container, SelectStateApp, initial);
+				});
+				expect(container.querySelector('select')).toBe(serverSelect);
+			} else await act(() => root.render(SelectStateApp, initial));
+			const select = container.querySelector('select')!;
+			const options = [...select.options];
+			const expectSelection = (expected: HTMLOptionElement[]) => {
+				expect(select.selectedOptions).toHaveLength(expected.length);
+				expected.forEach((option, index) => expect(select.selectedOptions[index]).toBe(option));
+			};
+			const input = container.querySelector('input')!;
+			input.value = 'user draft';
+			startTransition(() =>
+				root.render(SelectStateApp, {
+					rows: ['d', 'b', 'c'],
+					values: ['b', 'c'],
+					label: 'after',
+				}),
+			);
+			await vi.waitFor(() => expect(handles.length).toBe(1));
+			expectSelection([options[0]!]);
+			expect(select.options).toHaveLength(options.length);
+			options.forEach((option, index) => expect(select.options[index]).toBe(option));
+			expect(input.value).toBe('user draft');
+			if (cancel) {
+				flushSync(() =>
+					root.render(SelectStateApp, {
+						rows: ['a', 'b', 'c'],
+						values: ['c'],
+						label: 'urgent',
+					}),
+				);
+				expectSelection([options[2]!]);
+			}
+			await handles[0]!.update();
+			handles[0]!.ready.resolve();
+			handles[0]!.finished.resolve();
+			await act(async () => {});
+			if (cancel) {
+				expect(container.querySelector('section')!.dataset.label).toBe('urgent');
+				expectSelection([options[2]!]);
+			} else {
+				expect(container.querySelector('select')).toBe(select);
+				expect([...select.options].map((option) => option.value)).toEqual(['d', 'b', 'c']);
+				expectSelection([options[1]!, options[2]!]);
+				expect(container.querySelector('input')).toBe(input);
+			}
+			expect(input.value).toBe('user draft');
+			expect(recoverable).toEqual([]);
+		},
+	);
 
 	it('animates repeated updates with callback-only native implementations', async () => {
 		let optionsAttempts = 0;

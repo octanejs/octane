@@ -738,7 +738,7 @@ export function octane(inlineOptions = {}) {
 							return;
 						}
 
-						const request = nodeRequestToWebRequest(req);
+						const request = nodeRequestToWebRequest(req, res);
 						const context = createContext(request, freshMatch.params);
 						Object.defineProperty(context, 'clientBuild', { get: () => clientBuild.metadata() });
 						const globalMiddlewares = octaneConfig.middlewares;
@@ -1195,7 +1195,7 @@ export function defineConfig(/** @type {OctaneConfigOptions} */ options) {
  */
 async function handleRpcRequest(req, res, vite, trustProxy, config) {
 	try {
-		const webRequest = nodeRequestToWebRequest(req);
+		const webRequest = nodeRequestToWebRequest(req, res);
 		const asyncContext = getDevAsyncContext(config);
 		const signalOwners = await loadDevSignalRequestHooks(vite);
 
