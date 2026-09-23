@@ -22,7 +22,7 @@ import { EventEmitter, once } from 'node:events';
 import { createServer as createHttpServer, type IncomingMessage, type Server } from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build, createServer, type ViteDevServer } from 'vite';
-import type { Locator } from 'playwright';
+import type { ElementHandle, Locator, Request as BrowserRequest } from 'playwright';
 import { createTempProject } from '../../octane/tests/_temp-project.js';
 import { createNodeServer } from '../../app-core/src/server/node-http.js';
 
@@ -731,8 +731,13 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 
 	for (const engine of ['chromium', 'webkit'] as const) {
 		it(`preserves early composer input through independent activation and conversation navigation in ${engine}`, async () => {
-			const playwright = await import('playwright');
-			const browser = await playwright[engine].launch({ headless: true });
+			// WebKit needs the fetch-stream fix in 1.63 without changing the shared
+			// Chromium parity baseline: https://bugs.webkit.org/show_bug.cgi?id=322545
+			const browserType =
+				engine === 'webkit'
+					? (await import('playwright-webkit')).webkit
+					: (await import('playwright')).chromium;
+			const browser = await browserType.launch({ headless: true });
 			try {
 				const parentAsset = findBuiltAsset(
 					path.join(distDir, 'client'),
@@ -744,7 +749,9 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 				// WebKit can pause animation frames while the streamed document is
 				// still loading. Check actionability without its rAF-based locator
 				// stability wait, then send a real pointer event to the visible control.
-				const clickControl = async (control: Locator) => {
+				const clickControl = async (
+					control: Pick<Locator, 'waitFor' | 'isEnabled' | 'boundingBox' | 'evaluate'>,
+				) => {
 					await control.waitFor({ state: 'visible' });
 					await expect.poll(() => control.isEnabled()).toBe(true);
 					let previous: { x: number; y: number; width: number; height: number } | undefined;
@@ -794,7 +801,8 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 					await page.goto(productionOrigin + '/conversations', { waitUntil: 'commit' });
 					const input = page.getByRole('textbox', { name: 'Message' });
 					await input.waitFor();
-					const original = await input.elementHandle();
+					const original: Pick<ElementHandle, 'evaluate'> | null = await input.elementHandle();
+					const inputObservation: Pick<Locator, 'evaluate'> = input;
 					await clickControl(input);
 					await input.fill('draft typed before the parent');
 					await expect.poll(() => input.inputValue()).toBe('draft typed before the parent');
@@ -821,7 +829,9 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 						await original!.evaluate((node) => node === document.querySelector('textarea')),
 					).toBe(true);
 					expect(await input.inputValue()).toBe('');
-					expect(await input.evaluate((node) => document.activeElement === node)).toBe(true);
+					expect(await inputObservation.evaluate((node) => document.activeElement === node)).toBe(
+						true,
+					);
 
 					const startHash = createHash('sha256')
 						.update('/src/conversation/Calls.tsrx#startConversation')
@@ -829,7 +839,13 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 						.slice(0, 8);
 					const starts: string[] = [];
 					const batches: string[] = [];
-					page.on('request', (request) => {
+					const requestEvents: {
+						on(
+							event: 'request',
+							listener: (request: Pick<BrowserRequest, 'method' | 'url' | 'headers'>) => void,
+						): unknown;
+					} = page;
+					requestEvents.on('request', (request) => {
 						if (request.method() === 'POST' && request.url().endsWith('/' + startHash))
 							starts.push(request.url());
 						if (request.headers()['accept'] === 'application/x-octane-rpc-batch+ndjson')
@@ -889,7 +905,7 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 	}
 
 	it('accepts protected POSTs, adopts read-only URL receipts, and pages fetched SSR in webkit', async () => {
-		const { webkit } = await import('playwright');
+		const { webkit } = await import('playwright-webkit');
 		const browser = await webkit.launch({ headless: true });
 		const viewer = 'fetched-history-webkit';
 		const releaseRevalidation = () =>

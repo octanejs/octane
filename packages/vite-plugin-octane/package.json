@@ -58,6 +58,7 @@
     "@types/node": "catalog:default",
     "octane": "workspace:*",
     "playwright": "catalog:default",
+    "playwright-webkit": "1.63.0",
     "vite": "catalog:default"
   }
 }

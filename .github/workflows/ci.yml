@@ -712,7 +712,10 @@ jobs:
         if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
         run: |
           bash scripts/ci-apt-https.sh
-          pnpm --filter website exec playwright install --with-deps chromium webkit
+          pnpm --filter website exec playwright install --with-deps chromium
+          # Install WebKit from its dedicated package, not the Chromium runner's
+          # older WebKit revision (which can strand the last streaming fetch chunk).
+          pnpm --filter @octanejs/vite-plugin exec node node_modules/playwright-webkit/cli.js install --with-deps webkit
 
       # Keep each former lane as a named step, and let independent suites run
       # after a sibling failure when their own prerequisites are still valid.
