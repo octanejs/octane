@@ -48,9 +48,11 @@ const after = {
 	opacity: 0.8,
 	token: 'after',
 };
-function fixture(dev: boolean, mode: 'client' | 'server' = 'client') {
-	return loadCompiledFixtureSource(SOURCE, {
-		id: `style-transaction-${dev}.tsrx`,
+// A signals import turns these opaque style literals into native style bindings.
+// Their scalar values take the direct writer, so rollback must restore its cache.
+function fixture(dev: boolean, native: boolean, mode: 'client' | 'server' = 'client') {
+	return loadCompiledFixtureSource(native ? `import 'octane/signals';\n${SOURCE}` : SOURCE, {
+		id: `style-transaction-${dev}-${native}.tsrx`,
 		mode,
 		compileOptions: { dev, hmr: false },
 	});
@@ -73,9 +75,14 @@ function style(element: HTMLElement) {
 	];
 }
 
-describe.each([false, true])('style transactions dev=%s', (dev) => {
+describe.each([
+	[false, false],
+	[true, false],
+	[false, true],
+	[true, true],
+])('style transactions dev=%s native=%s', (dev, native) => {
 	it('restores the browser style and draft while a root render waits, then accepts its retry', async () => {
-		const client = fixture(dev);
+		const client = fixture(dev, native);
 		const pending = deferred();
 		let ready = true;
 		const read = () => {
@@ -115,7 +122,7 @@ describe.each([false, true])('style transactions dev=%s', (dev) => {
 	});
 
 	it('restores each host when a later CSS value throws after earlier declarations changed', () => {
-		const client = fixture(dev);
+		const client = fixture(dev, native);
 		const root = mount(client.Siblings, { color: 'red', width: 10, last: 10 });
 		const first = root.find('#first') as HTMLElement;
 		const second = root.find('#second') as HTMLElement;
@@ -142,7 +149,7 @@ describe.each([false, true])('style transactions dev=%s', (dev) => {
 	});
 
 	it('keeps the accepted style through nested suspensions and a second retry savepoint', async () => {
-		const client = fixture(dev);
+		const client = fixture(dev, native);
 		const inner = deferred(),
 			tail = deferred();
 		let innerReady = true,
@@ -186,7 +193,7 @@ describe.each([false, true])('style transactions dev=%s', (dev) => {
 	});
 
 	it('preserves CSS coercion order when a value synchronously refreshes another root', () => {
-		const client = fixture(dev);
+		const client = fixture(dev, native);
 		const other = mount(client.App, { ...before, read: () => 'other' });
 		const root = mount(client.App, { ...before, read: () => 'main' });
 		const element = root.find('#target') as HTMLElement;
@@ -215,8 +222,8 @@ describe.each([false, true])('style transactions dev=%s', (dev) => {
 	});
 
 	it('adopts styled SSR nodes and preserves an uncontrolled draft on updates', () => {
-		const client = fixture(dev),
-			server = fixture(dev, 'server');
+		const client = fixture(dev, native),
+			server = fixture(dev, native, 'server');
 		const props = { ...before, read: () => 'ready' };
 		const host = document.createElement('div');
 		document.body.append(host);
@@ -243,7 +250,7 @@ describe.each([false, true])('style transactions dev=%s', (dev) => {
 	});
 
 	it('discards a suspended native preparation before a later accepted style is published', async () => {
-		const client = fixture(dev);
+		const client = fixture(dev, native);
 		const mocks = installViewTransitionMocks();
 		const pending = deferred(),
 			finished = deferred();

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { act, createRoot, flushSync, hydrateRoot, startTransition } from 'octane';
 import { renderToString } from 'octane/server';
 import { createResource, createScope, query } from 'octane/signals';
@@ -168,6 +168,55 @@ describe('plain styles alongside native signal reads', () => {
 					else expect((root.find('div') as HTMLElement).style.marginTop).toBe('15px');
 				} finally {
 					root.unmount();
+					scope.dispose();
+				}
+			}
+		});
+
+		it(`moves opaque style literals between scalar values and handles in ${JSON.stringify(compileOptions)}`, () => {
+			for (const hydration of [false, true]) {
+				const scope = createScope({ scopeKey: `opaque-style-${hydration}` });
+				const first$ = scope.signal$('first', 8);
+				const next$ = scope.signal$('next', 20);
+				const container = document.createElement('div');
+				document.body.appendChild(container);
+				const initial = { color: 'red', offset: 5 as unknown };
+				if (hydration)
+					container.innerHTML = renderToString(renderedServer.OpaqueStyles, initial).html;
+				const serverHost = container.querySelector('div');
+				const root = hydration
+					? hydrateRoot(container, compiled.OpaqueStyles, initial)
+					: createRoot(container);
+				if (!hydration) root.render(compiled.OpaqueStyles, initial);
+				const host = container.querySelector('div')!;
+				const child = container.querySelector('span');
+				const read = () => [host.style.display, host.style.color, host.style.marginTop];
+				try {
+					if (hydration) expect(host).toBe(serverHost);
+					expect(read()).toEqual(['flex', 'red', '5px']);
+					flushSync(() => root.render(compiled.OpaqueStyles, { color: 'blue', offset: 6 }));
+					expect(read()).toEqual(['flex', 'blue', '6px']);
+					// The first handle upgrades the scalar writer without losing its style.
+					flushSync(() => root.render(compiled.OpaqueStyles, { color: 'blue', offset: first$ }));
+					expect(read()).toEqual(['flex', 'blue', '8px']);
+					flushSync(() => first$.set(9));
+					expect(read()).toEqual(['flex', 'blue', '9px']);
+					flushSync(() => root.render(compiled.OpaqueStyles, { color: 'green', offset: 3 }));
+					expect(read()).toEqual(['flex', 'green', '3px']);
+					flushSync(() => first$.set(40));
+					expect(host.style.marginTop).toBe('3px');
+					flushSync(() => root.render(compiled.OpaqueStyles, { color: '', offset: next$ }));
+					expect(read()).toEqual(['flex', '', '20px']);
+					flushSync(() => next$.set(21));
+					expect(host.style.marginTop).toBe('21px');
+					expect(container.querySelector('div')).toBe(host);
+					expect(container.querySelector('span')).toBe(child);
+					root.unmount();
+					flushSync(() => next$.set(50));
+					expect(host.style.marginTop).toBe('21px');
+				} finally {
+					root.unmount();
+					container.remove();
 					scope.dispose();
 				}
 			}
@@ -698,4 +747,77 @@ export function Guarded(props) @{ @try { <Styled height$={props.height$} variant
 			}
 		}
 	});
+});
+
+describe('prop-driven attribute writers', () => {
+	const source = `
+export function Link(props) @{
+	<a title={props.label} href={props.href} data-id={props.id} aria-label={props.label} hidden={props.hidden} class={props.tone}>{'x'}</a>
+}
+`;
+	for (const dev of [true, false]) {
+		const compiled = loadCompiledFixtureSource<{ Link: (props: any) => unknown }>(source, {
+			id: `/attribute-writers-${dev}.tsrx`,
+			mode: 'client',
+			compileOptions: { dev, hmr: false },
+		});
+		const read = (link: HTMLAnchorElement) => [
+			link.getAttribute('title'),
+			link.getAttribute('href'),
+			link.getAttribute('data-id'),
+			link.getAttribute('aria-label'),
+			link.hasAttribute('hidden'),
+			link.getAttribute('class'),
+		];
+
+		it(`writes scalars and handles through the selected writer with dev=${dev}`, () => {
+			// The narrow writers delegate to setAttribute outside a production runtime.
+			if (!dev) vi.stubEnv('NODE_ENV', 'production');
+			const scope = createScope({ scopeKey: `attribute-writers-${dev}` });
+			const label$ = scope.signal$('label', 'first');
+			const href$ = scope.signal$('href', '/first');
+			const id$ = scope.signal$('id', 1 as unknown);
+			const hidden$ = scope.signal$('hidden', false);
+			const tone$ = scope.signal$('tone', ['a', { b: true }] as unknown);
+			const scalars = { label: 'plain', href: '/plain', id: 7, hidden: true, tone: 'c' };
+			const rendered = mount(compiled.Link, scalars);
+			const link = rendered.find('a') as HTMLAnchorElement;
+			const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+			try {
+				expect(read(link)).toEqual(['plain', '/plain', '7', 'plain', true, 'c']);
+				flushSync(() =>
+					rendered.root.render(compiled.Link, {
+						label: label$,
+						href: href$,
+						id: id$,
+						hidden: hidden$,
+						tone: tone$,
+					}),
+				);
+				expect(read(link)).toEqual(['first', '/first', '1', 'first', false, 'a b']);
+				flushSync(() => {
+					label$.set('second');
+					href$.set('javascript:alert(1)');
+					id$.set(null);
+					hidden$.set(true);
+					tone$.set(null);
+				});
+				const [title, href, id, aria, hidden, tone] = read(link);
+				expect([title, id, aria, hidden, tone]).toEqual(['second', null, 'second', true, null]);
+				expect(href).not.toContain('alert(1)');
+				flushSync(() =>
+					rendered.root.render(compiled.Link, { ...scalars, label: undefined, href: '' }),
+				);
+				expect(read(link)).toEqual([null, '', '7', null, true, 'c']);
+				flushSync(() => label$.set('stale'));
+				expect(link.hasAttribute('title')).toBe(false);
+				expect(rendered.find('a')).toBe(link);
+			} finally {
+				errors.mockRestore();
+				rendered.unmount();
+				scope.dispose();
+				vi.unstubAllEnvs();
+			}
+		});
+	}
 });

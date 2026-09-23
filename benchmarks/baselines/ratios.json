@@ -194,6 +194,30 @@
   {
     "suite": "bundle-reachability",
     "op": "raw",
+    "target": "prop-attributes",
+    "reference": "prop-attributes-budget",
+    "maxRatio": 1,
+    "note": "Prop-driven attributes and text in a signal-free module; they must keep the narrow scalar writers, not the generic control writers. Deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "prop-attributes",
+    "reference": "prop-attributes-budget",
+    "maxRatio": 1,
+    "note": "Prop-driven attributes and text in a signal-free module; they must keep the narrow scalar writers, not the generic control writers. Deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "prop-attributes",
+    "reference": "prop-attributes-budget",
+    "maxRatio": 1,
+    "note": "Prop-driven attributes and text in a signal-free module; they must keep the narrow scalar writers, not the generic control writers. Deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
     "target": "context",
     "reference": "context-budget",
     "maxRatio": 1,

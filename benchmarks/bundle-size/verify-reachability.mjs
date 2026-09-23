@@ -48,6 +48,15 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		cleanups: 1,
 		cleaned: true,
 	},
+	'prop-attributes': {
+		sanitized: true,
+		title: 'Docs',
+		href: '/docs',
+		text: 'Docs',
+		count: '1',
+		clicks: 1,
+		cleaned: true,
+	},
 	context: {
 		before: 'light',
 		after: 'dark',
