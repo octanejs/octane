@@ -1,5 +1,13 @@
 # @octanejs/vite-plugin
 
+## 0.1.59
+
+### Patch Changes
+
+- 2554d85: Cancel Node request signals when clients disconnect after their upload completes, including while an async handler or streaming response is still running. The Node request helper accepts the corresponding response so custom hosts can preserve the same cancellation lifetime.
+- Updated dependencies [2554d85]
+  - @octanejs/app-core@0.0.55
+
 ## 0.1.58
 
 ### Patch Changes

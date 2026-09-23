@@ -1,5 +1,14 @@
 # @octanejs/rsbuild-plugin
 
+## 0.1.54
+
+### Patch Changes
+
+- 2554d85: Cancel Node request signals when clients disconnect after their upload completes, including while an async handler or streaming response is still running. The Node request helper accepts the corresponding response so custom hosts can preserve the same cancellation lifetime.
+- Updated dependencies [2554d85]
+  - @octanejs/app-core@0.0.55
+  - @octanejs/rspack-plugin@0.1.52
+
 ## 0.1.53
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @octanejs/xyflow
 
+## 0.1.10
+
+### Patch Changes
+
+- 601a8a2: Isolate the inner hook slots used by flow measurement, node and edge update queues, viewport helpers, and interactions. Preserve optional hook arguments so compiled consumers can measure visible nodes, call `fitView`, and use independent keyboard and connection subscriptions.
+- @octanejs/zustand@0.1.55
+
 ## 0.1.9
 
 ### Patch Changes

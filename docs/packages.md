@@ -12,12 +12,12 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
 | Package | Directory | Role | Version | Exported entry points |
 | --- | --- | --- | --- | --- |
-| `@octanejs/adapter-cloudflare` | [`packages/adapter-cloudflare`](../packages/adapter-cloudflare) | deployment adapter | `0.0.48` | 1 |
-| `@octanejs/adapter-vercel` | [`packages/adapter-vercel`](../packages/adapter-vercel) | deployment adapter | `0.0.55` | 1 |
+| `@octanejs/adapter-cloudflare` | [`packages/adapter-cloudflare`](../packages/adapter-cloudflare) | deployment adapter | `0.0.49` | 1 |
+| `@octanejs/adapter-vercel` | [`packages/adapter-vercel`](../packages/adapter-vercel) | deployment adapter | `0.0.56` | 1 |
 | `@octanejs/alien-signals` | [`packages/alien-signals`](../packages/alien-signals) | framework binding | `0.0.20` | 1 |
 | `@octanejs/animejs` | [`packages/animejs`](../packages/animejs) | framework binding | `0.0.25` | 2 |
-| `@octanejs/apollo-client` | [`packages/apollo-client`](../packages/apollo-client) | framework binding | `0.1.49` | 6 |
-| `@octanejs/app-core` | [`packages/app-core`](../packages/app-core) | metaframework core | `0.0.54` | 9 |
+| `@octanejs/apollo-client` | [`packages/apollo-client`](../packages/apollo-client) | framework binding | `0.1.50` | 6 |
+| `@octanejs/app-core` | [`packages/app-core`](../packages/app-core) | metaframework core | `0.0.55` | 9 |
 | `@octanejs/aria` | [`packages/aria`](../packages/aria) | framework binding | `0.0.51` | 3 |
 | `@octanejs/astro` | [`packages/astro`](../packages/astro) | framework integration | `0.0.33` | 5 |
 | `@octanejs/auto-animate` | [`packages/auto-animate`](../packages/auto-animate) | framework binding | `0.0.10` | 3 |
@@ -58,7 +58,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.49` | 4 |
 | `@octanejs/mantine-hooks` | [`packages/mantine-hooks`](../packages/mantine-hooks) | framework binding | `0.1.35` | 1 |
 | `@octanejs/markdown` | [`packages/markdown`](../packages/markdown) | framework binding | `0.0.20` | 1 |
-| `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.2.32` | 2 |
+| `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.2.33` | 2 |
 | `@octanejs/mdx` | [`packages/mdx`](../packages/mdx) | framework binding | `0.1.52` | 4 |
 | `@octanejs/mobx` | [`packages/mobx`](../packages/mobx) | framework binding | `0.1.35` | 1 |
 | `@octanejs/monaco-editor` | [`packages/monaco-editor`](../packages/monaco-editor) | framework binding | `0.0.22` | 1 |
@@ -79,7 +79,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/redux-toolkit` | [`packages/redux-toolkit`](../packages/redux-toolkit) | framework binding | `0.1.50` | 4 |
 | `@octanejs/remix-router` | [`packages/remix-router`](../packages/remix-router) | framework binding | `0.1.50` | 2 |
 | `@octanejs/resizable-panels` | [`packages/resizable-panels`](../packages/resizable-panels) | framework binding | `0.0.13` | 1 |
-| `@octanejs/rsbuild-plugin` | [`packages/rsbuild-plugin-octane`](../packages/rsbuild-plugin-octane) | metaframework | `0.1.53` | 3 |
+| `@octanejs/rsbuild-plugin` | [`packages/rsbuild-plugin-octane`](../packages/rsbuild-plugin-octane) | metaframework | `0.1.54` | 3 |
 | `@octanejs/rspack-plugin` | [`packages/rspack-plugin-octane`](../packages/rspack-plugin-octane) | compiler integration | `0.1.52` | 2 |
 | `@octanejs/rxjs` | [`packages/rxjs`](../packages/rxjs) | framework binding | `0.1.34` | 2 |
 | `@octanejs/sanity-icons` | [`packages/sanity-icons`](../packages/sanity-icons) | framework binding | `0.1.4` | 238 |
@@ -92,7 +92,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.50` | 2 |
 | `@octanejs/spring` | [`packages/spring`](../packages/spring) | framework binding | `0.0.20` | 2 |
 | `@octanejs/stick-to-bottom` | [`packages/stick-to-bottom`](../packages/stick-to-bottom) | framework binding | `0.0.10` | 2 |
-| `@octanejs/streamdown` | [`packages/streamdown`](../packages/streamdown) | framework binding | `0.1.33` | 6 |
+| `@octanejs/streamdown` | [`packages/streamdown`](../packages/streamdown) | framework binding | `0.1.34` | 6 |
 | `@octanejs/styled-components` | [`packages/styled-components`](../packages/styled-components) | framework binding | `0.1.46` | 1 |
 | `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.54` | 4 |
 | `@octanejs/swr` | [`packages/swr`](../packages/swr) | framework binding | `0.0.20` | 7 |
@@ -104,9 +104,9 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/tanstack-hotkeys` | [`packages/tanstack-hotkeys`](../packages/tanstack-hotkeys) | framework binding | `0.0.46` | 1 |
 | `@octanejs/tanstack-pacer` | [`packages/tanstack-pacer`](../packages/tanstack-pacer) | framework binding | `0.0.46` | 15 |
 | `@octanejs/tanstack-query` | [`packages/tanstack-query`](../packages/tanstack-query) | framework binding | `0.1.55` | 1 |
-| `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.1.56` | 6 |
-| `@octanejs/tanstack-router-ssr-query` | [`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) | framework binding | `0.0.47` | 1 |
-| `@octanejs/tanstack-start` | [`packages/tanstack-start`](../packages/tanstack-start) | framework integration | `0.1.48` | 13 |
+| `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.1.57` | 6 |
+| `@octanejs/tanstack-router-ssr-query` | [`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) | framework binding | `0.0.48` | 1 |
+| `@octanejs/tanstack-start` | [`packages/tanstack-start`](../packages/tanstack-start) | framework integration | `0.1.49` | 13 |
 | `@octanejs/tanstack-store` | [`packages/tanstack-store`](../packages/tanstack-store) | framework binding | `0.0.51` | 1 |
 | `@octanejs/tanstack-table` | [`packages/tanstack-table`](../packages/tanstack-table) | framework binding | `0.1.54` | 6 |
 | `@octanejs/tanstack-virtual` | [`packages/tanstack-virtual`](../packages/tanstack-virtual) | framework binding | `0.1.52` | 1 |
@@ -122,18 +122,18 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/valtio` | [`packages/valtio`](../packages/valtio) | framework binding | `0.1.37` | 5 |
 | `@octanejs/vaul` | [`packages/vaul`](../packages/vaul) | framework binding | `0.0.22` | 3 |
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.51` | 49 |
-| `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.58` | 3 |
+| `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.59` | 3 |
 | `@octanejs/wagmi` | [`packages/wagmi`](../packages/wagmi) | framework binding | `0.0.37` | 3 |
 | `@octanejs/waypoint` | [`packages/waypoint`](../packages/waypoint) | framework binding | `0.0.9` | 1 |
 | `@octanejs/window` | [`packages/window`](../packages/window) | framework binding | `0.0.21` | 1 |
 | `@octanejs/wouter` | [`packages/wouter`](../packages/wouter) | framework binding | `0.0.10` | 5 |
 | `@octanejs/xstate` | [`packages/xstate`](../packages/xstate) | framework binding | `0.0.12` | 2 |
 | `@octanejs/xstate-store` | [`packages/xstate-store`](../packages/xstate-store) | framework binding | `0.0.12` | 2 |
-| `@octanejs/xyflow` | [`packages/xyflow`](../packages/xyflow) | framework binding | `0.1.9` | 3 |
+| `@octanejs/xyflow` | [`packages/xyflow`](../packages/xyflow) | framework binding | `0.1.10` | 3 |
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.21` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.55` | 6 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.11` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.4.2` | 40 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.4.3` | 40 |
 
 ## Private packages
 
