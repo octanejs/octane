@@ -45257,6 +45257,10 @@ export function createIndependentHydrateActivator(
 			if (notify !== null) useEffect(notify as EffectFn, [scope], HYDRATE_NOTIFY_SLOT);
 		};
 		const framed: ComponentBody = (_props, scope) => {
+			// This frame stands in for the server's Hydrate instance, whose children
+			// render directly under the island's `[prefix, 'root']` signal identity.
+			// Resolve it to that root key so it contributes no invocation segment.
+			stampSignalInstanceKey(scope, rootSignalInstanceKey(scope.block.idState));
 			tryBlock(scope, 0, scope.block.parentNode, content, null, null, scope.block.endMarker);
 		};
 		const adapter: ComponentBody = (_props, scope) => {
