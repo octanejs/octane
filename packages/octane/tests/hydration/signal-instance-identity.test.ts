@@ -252,6 +252,72 @@ export function App(props) @{
 		},
 	);
 
+	it('keeps late child handles separate across row and component call sites', async () => {
+		vi.resetModules();
+		const server = await import('../../src/runtime.server.js');
+		const client = await import('../../src/runtime.js');
+		const signals = await import('../../src/signals/index.js');
+		const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+		const source = `function Row(props) @{ <output>{props.value as string}</output> }
+export function App(props) @{
+ const prefix = props.prefix ?? '';
+ <main>@for (const item of props.items; key item.id) {
+  <section><Row value={props.produce(prefix + item.label + ' left')}/><Row value={props.produce(prefix + item.label + ' right')}/></section>
+ }</main>
+}`;
+		const options = {
+			id: '/src/late-child-row-handles.tsrx',
+			compileOptions: { dev: false, hmr: false },
+		};
+		const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+		const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+		const items = [
+			{ id: 'a', label: 'first' },
+			{ id: 'b', label: 'second' },
+		];
+		const seen: Array<SignalOwner | null> = [];
+		const produce = (label: string) => {
+			seen.push(signals.currentSignalOwner());
+			return signals.__signalAt('i:late-child-row', label);
+		};
+		const container = document.createElement('div');
+		const expected = ['first left', 'first right', 'second left', 'second right'];
+		const texts = () => [...container.querySelectorAll('output')].map((node) => node.textContent);
+		const mounted = client.createRoot(container);
+		try {
+			mounted.render(clientModule.App, { items, produce });
+			// Potential bindings stamp component identities before the first handle
+			// activates a document owner during the child's render.
+			expect(seen[0]).toBeNull();
+			expect(texts()).toEqual(expected);
+		} finally {
+			mounted.unmount();
+		}
+		container.innerHTML = server.renderToString(serverModule.App, { items, produce }).html;
+		const rows = [...container.querySelectorAll('section')];
+		const errors: unknown[] = [];
+		const root = client.hydrateRoot(
+			container,
+			clientModule.App,
+			{ items, produce },
+			{
+				onRecoverableError: (error) => errors.push(error),
+			},
+		);
+		try {
+			expect([...container.querySelectorAll('section')]).toEqual(rows);
+			expect(texts()).toEqual(expected);
+			expect(errors).toEqual([]);
+			client.flushSync(() =>
+				root.render(clientModule.App, { items: items.toReversed(), produce, prefix: 'changed ' }),
+			);
+			expect([...container.querySelectorAll('section')]).toEqual(rows.toReversed());
+			expect(texts()).toEqual([...expected.slice(2), ...expected.slice(0, 2)]);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('preserves inline row owners when Strong selection changes', async () => {
 		vi.resetModules();
 		const client = await import('../../src/runtime.js');
