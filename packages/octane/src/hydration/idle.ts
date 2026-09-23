@@ -14,6 +14,7 @@ export function idle(
 
 	return {
 		_t: idleType,
+		_p: options,
 		_s: ({ gate, prefetch }) => {
 			const schedule = globalThis as typeof globalThis & {
 				requestIdleCallback?: (

@@ -1254,6 +1254,7 @@ overrides:
 packageExtensionsChecksum: sha256-kfm1FmKj+dGJ1mbVor30ucTdX3Yg+IVGhIkuq6dFEI0=
 
 patchedDependencies:
+  '@tsrx/core@0.2.0': bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300
   '@vitest/browser@4.1.10': d32609637593fc211ed808df6fbea6cb1da80adb049c0b0752bda8e1586d0ae0
   '@vitest/mocker@4.1.10': 538740e541a5a8ef50611b521995775cac3031548f696745eb4b90a7bd659ca4
 
@@ -3131,7 +3132,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.2.0
+        version: 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       miniflare:
         specifier: catalog:default
         version: 4.20260714.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -7107,7 +7108,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.2.0
+        version: 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/oxc':
         specifier: catalog:default
         version: 0.13.0(svelte@5.56.7)
@@ -7183,7 +7184,7 @@ importers:
     devDependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.2.0
+        version: 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -10815,7 +10816,7 @@ importers:
         version: 3.23.0
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.2.0
+        version: 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/prettier-plugin':
         specifier: catalog:default
         version: 0.4.1(prettier@3.9.6)
@@ -44941,7 +44942,7 @@ snapshots:
   '@ripple-ts/vite-plugin@0.4.0(typescript@7.0.2)':
     dependencies:
       '@ripple-ts/adapter': 0.4.0
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/ripple': 0.2.0(typescript@7.0.2)
     transitivePeerDependencies:
       - '@typescript-eslint/types'
@@ -48860,7 +48861,7 @@ snapshots:
       minimatch: 10.2.5
       path-browserify: 1.0.1
 
-  '@tsrx/core@0.2.0':
+  '@tsrx/core@0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
@@ -48923,7 +48924,7 @@ snapshots:
 
   '@tsrx/prettier-plugin@0.4.1(prettier@3.9.6)':
     dependencies:
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       prettier: 3.9.6
     transitivePeerDependencies:
       - '@typescript-eslint/types'
@@ -48955,7 +48956,7 @@ snapshots:
 
   '@tsrx/react@0.3.0(react@18.2.0)':
     dependencies:
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/react-runtime': 0.1.8(react@18.2.0)
       esrap: 2.3.2
       react: 18.2.0
@@ -48965,7 +48966,7 @@ snapshots:
 
   '@tsrx/react@0.3.0(react@19.0.0)':
     dependencies:
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/react-runtime': 0.1.8(react@19.0.0)
       esrap: 2.3.2
       react: 19.0.0
@@ -48975,7 +48976,7 @@ snapshots:
 
   '@tsrx/react@0.3.0(react@19.2.3)':
     dependencies:
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/react-runtime': 0.1.8(react@19.2.3)
       esrap: 2.3.2
       react: 19.2.3
@@ -48985,7 +48986,7 @@ snapshots:
 
   '@tsrx/react@0.3.0(react@19.2.7)':
     dependencies:
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/react-runtime': 0.1.8(react@19.2.7)
       esrap: 2.3.2
       react: 19.2.7
@@ -48995,7 +48996,7 @@ snapshots:
 
   '@tsrx/react@0.3.0(react@19.2.8)':
     dependencies:
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/react-runtime': 0.1.8(react@19.2.8)
       esrap: 2.3.2
       react: 19.2.8
@@ -49005,7 +49006,7 @@ snapshots:
 
   '@tsrx/ripple@0.2.0(typescript@5.9.3)':
     dependencies:
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       esrap: 2.3.2
       is-reference: 3.0.3
       source-map: 0.7.6
@@ -49018,7 +49019,7 @@ snapshots:
 
   '@tsrx/ripple@0.2.0(typescript@7.0.2)':
     dependencies:
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       esrap: 2.3.2
       is-reference: 3.0.3
       source-map: 0.7.6
@@ -49046,7 +49047,7 @@ snapshots:
   '@tsrx/solid@0.2.0(@solidjs/web@2.0.0-beta.20(solid-js@2.0.0-beta.20))(solid-js@2.0.0-beta.20)':
     dependencies:
       '@solidjs/web': 2.0.0-beta.20(solid-js@2.0.0-beta.20)
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/solid-runtime': 0.1.8(@solidjs/web@2.0.0-beta.20(solid-js@2.0.0-beta.20))(solid-js@2.0.0-beta.20)
       esrap: 2.3.2
       solid-js: 2.0.0-beta.20
@@ -49057,7 +49058,7 @@ snapshots:
   '@tsrx/solid@0.2.0(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3)':
     dependencies:
       '@solidjs/web': 2.0.0-rc.3(solid-js@2.0.0-rc.3)
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/solid-runtime': 0.1.8(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3)
       esrap: 2.3.2
       solid-js: 2.0.0-rc.3
@@ -49079,7 +49080,7 @@ snapshots:
 
   '@tsrx/vite-plugin-react@0.0.105(react@19.2.7)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/react': 0.3.0(react@19.2.7)
       vite: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
     transitivePeerDependencies:
@@ -49088,7 +49089,7 @@ snapshots:
 
   '@tsrx/vite-plugin-solid@0.0.102(@solidjs/web@2.0.0-beta.20(solid-js@2.0.0-beta.20))(solid-js@2.0.0-beta.20)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/solid': 0.2.0(@solidjs/web@2.0.0-beta.20(solid-js@2.0.0-beta.20))(solid-js@2.0.0-beta.20)
       vite: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
     transitivePeerDependencies:
@@ -64825,7 +64826,7 @@ snapshots:
 
   ripple@0.4.0(typescript@7.0.2):
     dependencies:
-      '@tsrx/core': 0.2.0
+      '@tsrx/core': 0.2.0(patch_hash=bece1facf9a602609930622648fbbe9314bde79391f1e539dda6bb9f2df24300)
       '@tsrx/ripple': 0.2.0(typescript@7.0.2)
       clsx: 2.1.1
       devalue: 5.9.2
