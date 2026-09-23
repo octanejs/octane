@@ -33449,7 +33449,11 @@ function voidRootElementProps(element) {
 		const name = attribute.name.name;
 		properties.push(
 			inheritOriginLoc(
-				b.prop('init', /^[A-Za-z_$][\w$]*$/.test(name) ? b.id(name) : b.literal(name), expression),
+				b.prop(
+					'init',
+					/^[A-Za-z_$][\w$]*$/.test(name) && name !== '__proto__' ? b.id(name) : b.literal(name),
+					expression,
+				),
 				attribute,
 			),
 		);
