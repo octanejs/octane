@@ -27,6 +27,7 @@ const existingScenarios = [
 	['root-static', 'tsrx'],
 	['root-static-local', 'tsrx'],
 	['hooks-state', 'tsrx'],
+	['prop-attributes', 'tsrx'],
 	['context', 'tsrx'],
 	['hydrate-root', 'tsrx'],
 	['deferred-hydration', 'tsrx'],
@@ -43,6 +44,7 @@ const signalFreeClientScenarios = new Set([
 	'root-static',
 	'root-static-local',
 	'hooks-state',
+	'prop-attributes',
 	'context',
 	'hydrate-root',
 	'deferred-hydration',
@@ -378,6 +380,17 @@ try {
 				),
 				[],
 				`${name}: signal-free client retained the concrete native transition implementation`,
+			);
+		}
+		if (id === 'prop-attributes') {
+			assert.deepEqual(
+				emittedModules.filter((module) =>
+					/\/packages\/octane\/src\/(?:dom-tables\.js|hydration\/control-capture\.ts)$/.test(
+						module,
+					),
+				),
+				[],
+				`${name}: statically named attribute bindings retained the generic attribute or control-restore writers`,
 			);
 		}
 		const hasRuntime = modules.some((module) => module.endsWith('/packages/octane/src/runtime.ts'));

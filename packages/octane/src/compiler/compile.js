@@ -2427,6 +2427,71 @@ function styleObjectNeedsNativeBinding(node) {
 	});
 }
 
+const STATIC_HOST_COMPONENT_NODES = new Set([
+	'JSXElement',
+	'JSXOpeningElement',
+	'JSXClosingElement',
+	'JSXFragment',
+	'JSXOpeningFragment',
+	'JSXClosingFragment',
+	'JSXAttribute',
+	'JSXIdentifier',
+	'JSXNamespacedName',
+	'JSXText',
+	'JSXExpressionContainer',
+	'JSXEmptyExpression',
+	'Literal',
+	'TemplateLiteral',
+	'TemplateElement',
+]);
+
+/**
+ * A component that evaluates no authored expression cannot perform a native
+ * read, so a native-read module need not bracket its render. The proof is an
+ * allowlist: no setup statements, no destructured or defaulted parameters, only
+ * lowercase host elements (component tags invoke authored code), and only
+ * literal attribute and child values. Any other node keeps the bracket.
+ */
+function isStaticHostComponent(node) {
+	if (node?.body?.type !== 'JSXCodeBlock' || (node.body.body?.length ?? 0) !== 0) return false;
+	if (!(node.params ?? []).every((param) => param.type === 'Identifier')) return false;
+	const visit = (value) => {
+		if (value === null || typeof value !== 'object') return true;
+		if (Array.isArray(value)) return value.every(visit);
+		// Plain records such as a template quasi's { raw, cooked } hold no code.
+		if (value.type === undefined)
+			return Object.values(value).every((item) => item === null || typeof item !== 'object');
+		if (!STATIC_HOST_COMPONENT_NODES.has(value.type)) return false;
+		if (value.type === 'JSXOpeningElement' && !/^[a-z]/.test(value.name?.name ?? '')) return false;
+		if (value.type === 'Literal' && value.regex !== undefined) return false;
+		if (value.type === 'TemplateLiteral' && value.expressions.length !== 0) return false;
+		for (const key in value) {
+			if (key === 'loc' || key === 'metadata' || key === 'parent' || key === 'range') continue;
+			const child = value[key];
+			if (child !== null && typeof child === 'object' && !visit(child)) return false;
+		}
+		return true;
+	};
+	return node.body.render != null && visit(node.body.render);
+}
+
+// A fresh object literal whose properties are all plain data: enumerating it
+// runs no accessor, and nothing else can mutate it. nativeStyleBinding can then
+// check its values at runtime and skip the owning Block while all are scalar.
+function isPlainStyleObjectLiteral(node) {
+	return (
+		node?.type === 'ObjectExpression' &&
+		(node.properties ?? []).every(
+			(property) =>
+				(property.type === 'Property' || property.type === 'ObjectProperty') &&
+				!property.computed &&
+				!property.method &&
+				(property.kind === undefined || property.kind === 'init') &&
+				(property.key?.name ?? property.key?.value) !== '__proto__',
+		)
+	);
+}
+
 // DEV must send invalid literal declarations through the same style helpers as
 // dynamic objects. Keep valid literals and all production output fully baked.
 function staticStyleObjectNeedsDevValidation(obj) {
@@ -16255,7 +16320,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		b.id(name, node.id ?? node),
 		fnParams,
 		b.block(
-			ctx.nativeReads
+			ctx.nativeReads && !isStaticHostComponent(node)
 				? wrapNativeReadScope(presentationBody, b.id('__s'), nativeReadNames(ctx))
 				: presentationBody,
 		),
@@ -25237,6 +25302,8 @@ function planJsx(
 		if (signalHelper !== null) {
 			ctx.runtimeNeeded.add(signalHelper);
 			registerAttrLoweringOrigin(ctx, b.nameOrigin, signalHelper, b.name);
+			if (signalHelper === 'bindSignalAttribute' && b.kind !== 'class')
+				ctx.runtimeNeeded.add(attrBindingHelper(b));
 		}
 		if (!b.signalDirect && (b.kind === 'text' || b.kind === 'textOnlyChild')) {
 			ctx.runtimeNeeded.add('setText');
@@ -26951,8 +27018,17 @@ function directSignalBindingArgs(bind, host, previous, value = bind.expr, previo
 		attrLoweringToken(b.literal(bind.name), bind),
 		bind.expr,
 		b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
-		b.literal(bind.kind, JSON.stringify(bind.kind)),
+		directSignalAttributeWriter(bind),
 	];
+}
+
+// Class composition selects its writer from the element's namespace at runtime.
+// Every other attribute passes the writer its ordinary binding would call, so a
+// statically admitted name never retains the generic setAttribute route.
+function directSignalAttributeWriter(bind) {
+	return bind.kind === 'class'
+		? b.literal('class', JSON.stringify('class'))
+		: b.id(`_$${attrBindingHelper(bind)}`);
 }
 
 function emitBindingMount(bind, elVar, bag) {
@@ -27073,7 +27149,16 @@ function emitBindingMount(bind, elVar, bag) {
 			return st(
 				b.block([
 					...mountHost(),
-					b.stmt(b.call(bind.helper, b.id('__s'), b.literal(bind.slotIndex), el(), bind.expr)),
+					b.stmt(
+						b.call(
+							bind.helper,
+							b.id('__s'),
+							b.literal(bind.slotIndex),
+							el(),
+							bind.expr,
+							...(bind.literal ? [b.literal(1)] : []),
+						),
+					),
 				]),
 			);
 		}
@@ -27571,7 +27656,16 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 		}
 		case 'nativeStyle': {
 			return st(
-				b.stmt(b.call(bind.helper, b.id('__s'), b.literal(bind.slotIndex), F('_el'), bind.expr)),
+				b.stmt(
+					b.call(
+						bind.helper,
+						b.id('__s'),
+						b.literal(bind.slotIndex),
+						F('_el'),
+						bind.expr,
+						...(bind.literal ? [b.literal(1)] : []),
+					),
+				),
 			);
 		}
 		case 'nativeChangeRuntime': {
@@ -29033,6 +29127,7 @@ function emitElementHtml(
 				bindings.push({
 					id: bindings.length,
 					kind: 'nativeStyle',
+					literal: isPlainStyleObjectLiteral(inner),
 					expr: tsrxExprNode(inner, ctx, componentName, inlinedSubs),
 					path,
 					ns: hostNs,

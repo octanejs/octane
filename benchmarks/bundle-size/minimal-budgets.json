@@ -39,6 +39,11 @@
     "gzip": 37712,
     "brotli": 33120
   },
+  "prop-attributes": {
+    "raw": 98032,
+    "gzip": 32528,
+    "brotli": 28880
+  },
   "context": {
     "raw": 117296,
     "gzip": 38400,
