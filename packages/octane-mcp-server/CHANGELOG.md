@@ -1,5 +1,13 @@
 # @octanejs/mcp-server
 
+## 0.2.33
+
+### Patch Changes
+
+- 3f43780: Avoid quadratic option copying when preparing controlled multi-select updates for View Transitions, while preserving native selection behavior and commit isolation.
+
+  Expose the controlled select projection benchmark through the MCP benchmark tool.
+
 ## 0.2.32
 
 ### Patch Changes

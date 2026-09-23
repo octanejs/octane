@@ -165,7 +165,7 @@ Scope/evidence last checked: 2026-07-30.
 
 ## @octanejs/apollo-client
 
-[`packages/apollo-client`](../packages/apollo-client) `0.1.49` — ports `@apollo/client@4.2.6`. Status data: [`packages/apollo-client/status.json`](../packages/apollo-client/status.json).
+[`packages/apollo-client`](../packages/apollo-client) `0.1.50` — ports `@apollo/client@4.2.6`. Status data: [`packages/apollo-client/status.json`](../packages/apollo-client/status.json).
 
 Complete published client adapter surface: all 18 @apollo/client/react runtime exports and their Apollo 4.2.6 TypeScript declarations, framework-neutral root/testing exports, an Octane MockedProvider, and the Octane-native /react/ssr prerenderStatic entry.
 
@@ -1412,7 +1412,7 @@ Scope/evidence last checked: 2026-08-20.
 
 ## @octanejs/streamdown
 
-[`packages/streamdown`](../packages/streamdown) `0.1.33` — ports `streamdown@2.5.0`. Status data: [`packages/streamdown/status.json`](../packages/streamdown/status.json).
+[`packages/streamdown`](../packages/streamdown) `0.1.34` — ports `streamdown@2.5.0`. Status data: [`packages/streamdown/status.json`](../packages/streamdown/status.json).
 
 Complete Streamdown 2.5.0 root runtime and public type surface, plus the official code 1.1.1, math 1.0.2, Mermaid 1.0.2, and CJK 1.0.3 plugins exposed through ./code, ./math, ./mermaid, and ./cjk.
 
@@ -1648,7 +1648,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router
 
-[`packages/tanstack-router`](../packages/tanstack-router) `0.1.56` — ports `@tanstack/react-router@1.170.18`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
+[`packages/tanstack-router`](../packages/tanstack-router) `0.1.57` — ports `@tanstack/react-router@1.170.18`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
 
 Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.
 
@@ -1671,7 +1671,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router-ssr-query
 
-[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.0.47` — ports `@tanstack/react-router-ssr-query@1.167.1`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
+[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.0.48` — ports `@tanstack/react-router-ssr-query@1.167.1`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
 
 Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.
 
@@ -2072,7 +2072,7 @@ Scope/evidence last checked: 2026-08-15.
 
 ## @octanejs/xyflow
 
-[`packages/xyflow`](../packages/xyflow) `0.1.9` — ports `@xyflow/react@12.11.2`. Status data: [`packages/xyflow/status.json`](../packages/xyflow/status.json).
+[`packages/xyflow`](../packages/xyflow) `0.1.10` — ports `@xyflow/react@12.11.2`. Status data: [`packages/xyflow/status.json`](../packages/xyflow/status.json).
 
 ReactFlow, ReactFlowProvider, Handle, hooks (useReactFlow, useNodes, useEdges, …), change helpers, and node/edge utilities from @xyflow/react@12.11.2.
 

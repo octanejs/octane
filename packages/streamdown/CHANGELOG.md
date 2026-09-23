@@ -1,5 +1,11 @@
 # @octanejs/streamdown
 
+## 0.1.34
+
+### Patch Changes
+
+- 4467583: Keep TypeScript loading for plain modules after Octane transforms so factory-annotated context modules build correctly.
+
 ## 0.1.33
 
 ### Patch Changes

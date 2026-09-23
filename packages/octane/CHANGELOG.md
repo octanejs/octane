@@ -1,5 +1,192 @@
 # octane
 
+## 0.4.3
+
+### Patch Changes
+
+- d9ed0f4: Load compiled `.ts` and `.tsx` modules with Bun's TypeScript loader in
+  `octane/compiler/register`.
+
+  Compiled output for a `.ts` or `.tsx` source keeps the TypeScript constructs that
+  have runtime semantics, such as `enum`. Vite's TypeScript transform consumes the
+  same output. The Bun preload used to hand this output to Bun as plain
+  JavaScript, so a component module that declared an `enum` failed with a syntax
+  error. It now keeps the source file's loader. Compiled `.tsrx` output is still
+  loaded as JavaScript.
+- 3fbe5b5: Specialize the common app-entry root shapes in production builds, not only
+  `createRoot(target).render(App)` in a plain `.ts` module.
+
+  A root whose whole lifetime renders compiled `@{}` components skips the
+  returned-value reconciler and its bundle graph. That proof now covers:
+  - `createRoot(el).render(<App />)` and `hydrateRoot(el, <App />)` in `.tsx`
+    and `.tsrx` entries;
+  - the documented module-level `const root = createRoot(el); root.render(App)`
+    when `root` is not exported; and
+  - `hydrateRoot(el, App, props)` in plain modules.
+
+  A one-component Vite entry that renders `<App />` drops from about 70 KB to
+  28 KB gzip, and a direct `hydrateRoot` entry from about 88 KB to 50 KB. On a
+  proven root, `<App a={x} />` with literal, function, or identifier attribute
+  values is passed to the root as `App` plus its props, with live `defaultProps`
+  applied as before. Keys, children, spreads, and other attribute expressions
+  keep the element path.
+- ae7f970: Close four compiler soundness gaps in inferred proofs and generated code.
+
+  - Builtin text-conversion proofs (`{String(x) as string}` and primitive locals)
+    now share one mutation check. A replacement of `String`, `Number`, `BigInt`,
+    or `Date` reached through a `let` alias, a parameter, `globalThis.globalThis`,
+    or a returned global object no longer keeps the builtin proof, so SSR renders
+    the live value instead of throwing. Computed reads and application `.set()`
+    calls on ordinary receivers no longer decline primitive-local proofs.
+  - Independent `<Hydrate>` boundaries reject captures initialized by
+    destructuring or parameter defaults (`const { value = useRef(null) } = props`)
+    and by function or class declarations with
+    `OCTANE_HYDRATE_INDEPENDENT_OWNER_CAPTURE`, instead of serializing them as
+    JSON.
+  - Automatic `use()` creation dependencies no longer read ambient globals that
+    appear only inside callbacks or behind guards the compiler cannot replay
+    (`try`/`catch`, `switch (typeof x)`, `'x' in globalThis`, `??`). Nullable
+    locals read in those positions become optional reads (`value?.prop`). A
+    non-arrow callback's `arguments` no longer becomes a component dependency.
+  - Generated source origins are applied copy-on-write everywhere, so a scoped
+    `<style>` inside a reverse renderer region (`<Html>` in an object scene)
+    compiles the same way whether or not parser ASTs are frozen.
+- d9ed0f4: Throw a migration error in development when code reads `Context.Provider`.
+
+  `Context.Provider` was removed in favor of rendering the context itself as the
+  provider (`<Ctx value={…}>`). The compiler already rejects `<Ctx.Provider>` when
+  `createContext` is in the same module. When the context is imported from another
+  module, however, the client used to fail with "Element type is invalid … got:
+  undefined" and the server with "comp is not a function". Neither message
+  mentioned the migration.
+
+  In development, reading `.Provider` on a context from `octane` or `octane/server`
+  now throws `[OCTANE_CONTEXT_PROVIDER] Context.Provider was removed. Render the
+  context itself as the provider: <Context value={...}>...</Context>.` The
+  `.Consumer` warning now shares the same development-only helper. Production
+  bundles are byte-identical, and `.Provider` there is still `undefined`.
+- 08d9a82: Stop rendering a dormant `Hydrate` boundary's earlier captures in development. When a mounted parent changes a dormant boundary's captures or provided context before it activates, Octane now repairs the server HTML's attributes, class, style, and text without a hydration warning or `onRecoverableError`, in development and production. Before this, a legitimately changed text hole reported a recoverable text mismatch. Mismatches in a boundary that activates with unchanged captures are still reported.
+- 57072e7: Fix hydration of an empty `{x as string}` text hole that shares its parent with other nodes, such as `<p>{b as string}<After /></p>` with `b = ''`. The server now emits a one-node `<!---->` stand-in for the empty hole, so later siblings are claimed at the right position. Previously the following component was rebuilt or duplicated, and in some shapes the whole root was left empty. Hydration recovery also no longer removes nodes outside the block being recovered, so a misaligned claim cannot blank its host.
+- 0df8be7: Keep keyed `@for` rows live when they read module state or mutable globals.
+
+  A row that reads a module `let`/`var`, a reassigned module function, or a
+  host or application global such as `location` or `window` no longer takes the
+  PURE or DEP-PURE survivor skip. Neither item identity nor the deps tuple can
+  witness those reads, so an unchanged row stayed stale after the value changed.
+  For example, `@if (location.pathname === item.href)` never moved the active
+  row. Since #1213 this also affected rows whose only control flow is a
+  host-only `@if`. Rows reading module `const`s, unreassigned functions, and
+  standard language globals such as `Math` keep the fast path.
+- bfbba3f: Independent `<Hydrate>` widgets now activate on `idle()`, `visible()`, and
+  `media()`.
+
+  Before this change only `load()` and captured interactions activated an
+  independent island. A widget with `when={idle()}`, `visible()`, or `media(q)`
+  compiled cleanly and server-rendered its strategy, but the island bootstrap
+  never installed a trigger, so the widget stayed inert until it was clicked.
+  Its effects, timers, and subscriptions never started.
+
+  The server now writes each of these strategies' non-default parameters on the
+  independent boundary. The bootstrap installs the same idle callback,
+  `IntersectionObserver`, or `matchMedia` listener that ordinary boundaries use.
+  It removes a pending trigger on pause and dispose, and re-installs it on resume.
+
+  `condition()` and a function-form `when` need the lexical parent to re-evaluate
+  them, so they cannot drive an independent widget. The compiler rejects either
+  form when written directly (`OCTANE_HYDRATE_INDEPENDENT_WHEN`). An opaque `when`
+  value that resolves to either one makes server rendering throw instead of
+  shipping a widget that never activates.
+- 8a3a1e7: Adopt instance-keyed server signal state inside independent `<Hydrate>` islands.
+
+  The client island adapter recreates the server's Hydrate frame as a component
+  scope, and that scope added its own invocation segment to every descendant's
+  signal instance key. The server renders island children directly under the
+  island's root key, so a component inside `<Hydrate independent>` computed a
+  different key on each side. Instance-keyed server state, such as a `query$`
+  result, was then never adopted: activation ran the browser producer again. The
+  frame now resolves to the island's root key, so client and server keys match
+  with or without an `@try` around the component.
+- 8620e76: Keep signal declarations inside keyed `@for` rows independent during SSR, and match their row identities during hydration, edits, and reordering.
+- 4467583: Keep initially empty provider children anchored to the surviving hydration range so opening nested provider content after hydration does not throw `NotFoundError`.
+- b353a67: Fix memo skipping updates when an own prop matching an inherited Object.prototype value is replaced by another prop.
+- b27e99a: Keep same-module root, private Context and compiled `Hydrate` specializations in production builds that configure renderer boundaries. Only a module that renders a boundary tag now falls back to the generic paths, instead of every module in the project.
+- 78da1e4: Preserve `__proto__` shorthand data properties when specializing DOM binding
+  child programs with fixed primitive props. Adoption and mounting now retain the
+  authored text and attributes without introducing object-literal prototype setters.
+- e4bb4e0: Let esbuild tree-shake unused `createContext`, `memo`, `lazy`, and `createPortal`
+  results.
+
+  Octane declares these factories `/* @__NO_SIDE_EFFECTS__ */`. Rollup and Vite
+  apply that annotation to calls in other modules, but esbuild never does: it
+  decides tree-shaking per file. Under esbuild, an unused module-scope
+  `const Ctx = createContext(…)` therefore counted as a side effect and pulled in
+  the whole client runtime through the context's provider body.
+
+  The compiler now marks direct calls to these imports with `/* @__PURE__ */`, the
+  call-site convention every bundler honors. It does this for compiled
+  `.tsrx`/`.tsx` modules and for plain `.ts`/`.js` modules, including modules with
+  no hooks. Server output still marks only `lazy()`, because the server
+  `createContext` registers the context it creates. Calls through a local that
+  shadows the import are left alone.
+
+  In the `@octanejs/aria` minimal-import bundle, which imports only
+  `useSeparator`, esbuild output drops from 197,180 to 8,667 bytes raw (63,197 to
+  3,349 gzip). Vite output is unchanged.
+- 3f43780: Avoid quadratic option copying when preparing controlled multi-select updates for View Transitions, while preserving native selection behavior and commit isolation.
+
+  Expose the controlled select projection benchmark through the MCP benchmark tool.
+- 3249c9a: Reduce the cost of potential signal bindings in ordinary code. A prop-driven attribute such as `title={props.label}` now passes its statically selected scalar writer to the binding, so production bundles no longer retain the generic attribute route with its form-control writers and DOM routing tables (−5.1 KB gzip for a one-component counter). Text and attribute bindings no longer retain the restored-textarea hydration helper. In modules that import `octane/signals`, an object-literal `style` with scalar values is written directly and allocates its owning Block only once a signal handle appears, and components that evaluate no authored code skip the native-read bracket.
+- 1871491: Keep component-local SSR signals independent for distinct object, function, and symbol list keys, without coercing opaque reconciliation keys. Preserve their identity through retries, hydration, and row reordering.
+- ea4e8be: Release an idle streamed-signal upstream as soon as its response is abandoned.
+
+  `createStreamedSignalResultFrames` ran as an async generator that awaited the
+  upstream iterator's `next()`. Cancelling the generator queued its `return()`
+  behind that pending read, so an idle but open source such as an LLM token
+  stream, WebSocket, or SSE feed was only returned once it produced another
+  value. A client disconnect, request abort, or inactivity timeout could leave
+  it open indefinitely. Every producer wait is now interruptible. The consumer's
+  `return()` and the request signal settle the pending wait immediately, and the
+  upstream's `return()` runs then. Backpressure, the inactivity-timeout rules,
+  and the result frame grammar are unchanged.
+
+  Automatic streamed signals now degrade per channel at the 256-live-channel
+  budget. Previously the 257th concurrently live attempt failed the entire
+  multiplexer and threw away every in-flight result. Now only the overflowing
+  attempt is refused: it is neither streamed nor announced, so the browser loads
+  it itself.
+- 93ddb5a: Preserve child nodes when unchanged trusted HTML is rendered after hydration or on the client, including fresh `trustHTML()` wrappers.
+- 929f1a6: Compile TypeScript enums, value namespaces, import aliases, and class parameter
+  properties in `.tsrx` modules to plain JavaScript.
+
+  Vite does not run its TypeScript transform on `.tsrx`, so the compiler's output
+  has to be JavaScript already. Before this change an `enum` or value `namespace`
+  was printed as written, and `vite build` stopped with `[PARSE_ERROR] Unexpected
+  token`. A `constructor(private x)` parameter property lost its assignment
+  without any error.
+
+  These declarations now compile to the same JavaScript tsc produces for an
+  ES2022 target:
+
+  - Enums get numeric auto-increment, reverse mappings for non-string members,
+    constant folding and self-references, `export enum`, and declaration merging.
+    A `const enum` is emitted as a regular enum, which is what `preserveConstEnums`
+    and isolated-module builds do.
+  - Value namespaces cover exported variables, functions, classes, and nested
+    enums and namespaces, dotted names such as `namespace A.B`, and merging across
+    blocks and with functions or classes.
+  - `import X = A.B` becomes a variable, and it is dropped when nothing reads it.
+  - Parameter properties are declared as class fields and assigned in the
+    constructor, after `super(…)` in a derived class.
+
+  Abstract members, index signatures, and method overload signatures are no longer
+  printed into the output either.
+
+  Some constructs have no ES-module equivalent and now fail with a compiler
+  diagnostic instead of a bundler parse error: `export =`, `import x =
+  require(…)`, a destructured export inside a namespace, and an enum member without
+  an initializer when the member before it is not a constant number.
+- d57f1b4: Reuse committed universal Suspense primary ranges when retaining pending content, avoiding repeated root-wide searches while preserving host identity and visibility.
+
 ## 0.4.2
 
 ### Patch Changes
