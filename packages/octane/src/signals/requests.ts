@@ -56,12 +56,15 @@ interface RetainedRequestIdentity {
 	readonly argument: unknown;
 }
 
+/** The owner allocates each map on first use; streams exist only after ingress binds one. */
 interface RequestOwner extends GraphOwner {
-	readonly requests: Map<string, RequestEntry>;
-	readonly queryDefinitions: Map<string, QueryDefinition>;
-	readonly streamedSelections?: Map<string, StreamFrameIdentity>;
-	streamedSelectionReady?(binding: ResourceBinding): void;
-	discardCompletedStreamedSelection?(identity: StreamFrameIdentity): void;
+	requests: Map<string, RequestEntry> | undefined;
+	queryDefinitions: Map<string, QueryDefinition> | undefined;
+	readonly streams?: {
+		readonly selections: Map<string, StreamFrameIdentity>;
+		selectionReady(binding: ResourceBinding): void;
+		discardCompleted(identity: StreamFrameIdentity): void;
+	};
 }
 
 class Request<T> implements QueryRequest<T> {
@@ -215,7 +218,7 @@ export class RequestEntry {
 			generation !== this.generation ||
 			this.owner.readBarrier !== undefined ||
 			this.owner.retired ||
-			this.owner.requests.get(this.request.identity) !== this ||
+			this.owner.requests?.get(this.request.identity) !== this ||
 			!this.consumers.size
 		)
 			return;
@@ -279,7 +282,7 @@ export class RequestEntry {
 			this.generation !== identity.attempt ||
 			this.owner.readBarrier !== undefined ||
 			this.owner.retired ||
-			this.owner.requests.get(this.request.identity) !== this ||
+			this.owner.requests?.get(this.request.identity) !== this ||
 			!this.consumers.size
 		) {
 			return false;
@@ -367,8 +370,8 @@ export class RequestEntry {
 	remove(consumer: ResourceBinding): void {
 		this.consumers.delete(consumer);
 		if (this.consumers.size) return;
-		if (this.owner.requests.get(this.request.identity) === this) {
-			this.owner.requests.delete(this.request.identity);
+		if (this.owner.requests?.get(this.request.identity) === this) {
+			this.owner.requests?.delete(this.request.identity);
 		}
 		this.stopAttempt();
 	}
@@ -595,7 +598,7 @@ export class ResourceBinding<T = any> {
 	}
 
 	forkCandidate(target: ScopedNode<T>): CandidateProducer {
-		if (this.streamedSelection || this.owner.streamedSelections?.has(this.node.key)) {
+		if (this.streamedSelection || this.owner.streams?.selections.has(this.node.key)) {
 			throw new CandidateUnsupportedError(
 				'Streamed candidates are not supported by this prototype.',
 			);
@@ -608,7 +611,7 @@ export class ResourceBinding<T = any> {
 		return {
 			dispose: () => fork.dispose(),
 			prepare: () => {
-				if (this.streamedSelection || this.owner.streamedSelections?.has(this.node.key))
+				if (this.streamedSelection || this.owner.streams?.selections.has(this.node.key))
 					return { status: 'invalid' };
 				const entry = fork.selected;
 				const attempt = entry?.attempt;
@@ -645,7 +648,7 @@ export class ResourceBinding<T = any> {
 					receipt: {
 						validate: () =>
 							!this.streamedSelection &&
-							!this.owner.streamedSelections?.has(this.node.key) &&
+							!this.owner.streams?.selections.has(this.node.key) &&
 							this.selectionAuthority === authority &&
 							fork.selectionAuthority === forkAuthority &&
 							fork.selected === entry &&
@@ -693,7 +696,7 @@ export class ResourceBinding<T = any> {
 				return idleState();
 			}
 			request = described;
-			const previousDefinition = this.owner.queryDefinitions.get(request.queryKey);
+			const previousDefinition = this.owner.queryDefinitions?.get(request.queryKey);
 			if (
 				previousDefinition &&
 				(previousDefinition.load !== request.definition.load ||
@@ -703,7 +706,7 @@ export class ResourceBinding<T = any> {
 					`Incompatible query definitions use the same key "${request.queryKey}".`,
 				);
 			}
-			this.owner.queryDefinitions.set(request.queryKey, request.definition);
+			(this.owner.queryDefinitions ??= new Map()).set(request.queryKey, request.definition);
 		} catch (error) {
 			if (isThenable(error)) {
 				this.pendingObserver = captureCurrentServerSignalQueryAttemptObserver(this.owner.scopeKey);
@@ -732,13 +735,13 @@ export class ResourceBinding<T = any> {
 				this.retainedRequest = undefined;
 				releaseRetention(this.node);
 			}
-			let entry = this.owner.requests.get(request.identity);
+			let entry = this.owner.requests?.get(request.identity);
 			let start = false;
 			if (!entry) {
 				const seed =
 					this.seeded && matchesSeed(request, this.seeded.entry) ? this.seeded : undefined;
 				entry = new RequestEntry(this.owner, request, seed);
-				this.owner.requests.set(request.identity, entry);
+				(this.owner.requests ??= new Map()).set(request.identity, entry);
 				start = !seed || !seed.entry.complete;
 			}
 			this.seeded = undefined;
@@ -747,15 +750,15 @@ export class ResourceBinding<T = any> {
 			this.owner.trace('select', this.node);
 			const streamed = this.candidate
 				? undefined
-				: this.owner.streamedSelections?.get(this.node.key);
+				: this.owner.streams?.selections.get(this.node.key);
 			if (streamed && streamed.selectionKey !== request.identity) {
 				// A completed historical request cannot become live if restoration
 				// selects another key, nor if that old key is visited again later.
-				this.owner.discardCompletedStreamedSelection?.(streamed);
+				this.owner.streams?.discardCompleted(streamed);
 			}
 			if (streamed?.selectionKey === request.identity && entry.startStreamed(streamed)) {
 				this.streamedSelection = streamed;
-				this.owner.streamedSelectionReady?.(this);
+				this.owner.streams?.selectionReady(this);
 				entry.deliver();
 			} else if (start) {
 				entry.start(entry.state.snapshot.status !== 'ready');
@@ -806,9 +809,9 @@ export class ResourceBinding<T = any> {
 		// the same key later starts a browser attempt, not the abandoned channel.
 		if (
 			!this.candidate &&
-			this.streamedSelection === this.owner.streamedSelections?.get(this.node.key)
+			this.streamedSelection === this.owner.streams?.selections.get(this.node.key)
 		) {
-			this.owner.streamedSelections?.delete(this.node.key);
+			this.owner.streams?.selections.delete(this.node.key);
 		}
 		this.selected = undefined;
 		this.selectedIdentity = undefined;
