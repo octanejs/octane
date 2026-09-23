@@ -35165,11 +35165,10 @@ const OBJ_PROTO = Object.prototype;
 // so the common plain-object case is a zero-allocation for-in compare — no
 // Object.keys arrays. Semantics match React's shallowEqual exactly: Object.is
 // on values (NaN equal, ±0 differ), own-enumerable string keys only, key-SET
-// equality (loop 1 checks values, loop 2's count balances the key sets), and
-// an explicit-`undefined` prop still differs from a missing key (the hasOwn
-// guard). Non-plain prototypes (class instances / Object.create props can
-// arrive raw through createElement's props pass-through) take the exact
-// Object.keys slow path, where for-in would also see inherited keys.
+// equality (loop 1 checks ownership and values, loop 2's count balances the
+// key sets). Inherited values must not stand in for removed own props, even
+// when they compare equal. Non-plain prototypes take the exact Object.keys
+// slow path, where for-in would also see inherited keys.
 function shallowEqualProps(a: any, b: any): boolean {
 	if (a === b) return true;
 	if (a == null || b == null) return false;
@@ -35181,7 +35180,7 @@ function shallowEqualProps(a: any, b: any): boolean {
 	let count = 0;
 	for (const k in a) {
 		const v = a[k];
-		if (!Object.is(v, b[k]) || (v === undefined && !hasOwnProp.call(b, k))) return false;
+		if (!hasOwnProp.call(b, k) || !Object.is(v, b[k])) return false;
 		count++;
 	}
 	for (const _k in b) count--;
