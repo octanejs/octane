@@ -1743,7 +1743,9 @@ export const Indirect = indirect(Host);
 			/Stable\s*=\s*(?:\/\*[^*]*\*\/\s*)?_\$__s\((?:\/\*[^*]*\*\/\s*)?remember\(Host\)\)/,
 		);
 		expect(production?.code).toMatch(/Nullable\s*=\s*(?:\/\*[^*]*\*\/\s*)?remember\(Optional\)/);
-		expect(production?.code).toMatch(/Compared\s*=\s*(?:\/\*[^*]*\*\/\s*)?remember\(Host,\s*\(\)\s*=>\s*true\)/);
+		expect(production?.code).toMatch(
+			/Compared\s*=\s*(?:\/\*[^*]*\*\/\s*)?remember\(Host,\s*\(\)\s*=>\s*true\)/,
+		);
 		expect(production?.code).toMatch(/Imported\s*=\s*(?:\/\*[^*]*\*\/\s*)?remember\(External\)/);
 		expect(production?.code).toMatch(/Indirect\s*=\s*indirect\(Host\)/);
 
