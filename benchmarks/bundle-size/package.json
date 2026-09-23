@@ -8,6 +8,8 @@
     "bench": "node run.mjs"
   },
   "dependencies": {
+    "@apollo/client": "catalog:default",
+    "@octanejs/apollo-client": "workspace:*",
     "@octanejs/aria": "workspace:*",
     "@octanejs/base-ui": "workspace:*",
     "@octanejs/floating-ui": "workspace:*",
@@ -17,8 +19,10 @@
     "@octanejs/usehooks-ts": "workspace:*",
     "@octanejs/zustand": "workspace:*",
     "esbuild": "catalog:default",
+    "graphql": "catalog:default",
     "jsdom": "catalog:default",
     "octane": "workspace:*",
+    "rxjs": "catalog:default",
     "vite": "catalog:default"
   }
 }
