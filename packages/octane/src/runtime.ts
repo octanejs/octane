@@ -21584,7 +21584,15 @@ export function setHTML(el: Element, value: any): void {
 			el.localName === 'script'
 				? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
 				: normalizeHTMLForHydration(el, next);
-		if (server === expected || isHydrationSuppressed(el)) return;
+		if (server === expected) {
+			if (el.localName !== 'script') {
+				const host = STAGED_DOM?.view(el as any) ?? (el as any);
+				journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+				host[DANGER_HTML_VALUE] = next;
+			}
+			return;
+		}
+		if (isHydrationSuppressed(el)) return;
 		warnHydrationKeptServerValue(
 			(el as any).__oct_loc,
 			'`dangerouslySetInnerHTML` content',
@@ -21593,8 +21601,16 @@ export function setHTML(el: Element, value: any): void {
 		);
 		return;
 	}
-	if (el.localName === 'script') setScriptText(el, next);
-	else if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
+	if (el.localName === 'script') {
+		setScriptText(el, next);
+		return;
+	}
+	// Fresh wrappers must not replace identical children. Compare accepted authored
+	// HTML, including successful hydration adoption, before entering DOM staging.
+	const host = STAGED_DOM?.view(el as any) ?? (el as any);
+	if (host[DANGER_HTML_VALUE] === next) return;
+	journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
 		journalBag();
 		journalRootRange(el, null, null);
 		// Raw HTML is a leaf: stage its genuine new nodes next to the outgoing
@@ -21605,8 +21621,10 @@ export function setHTML(el: Element, value: any): void {
 		while (getFirstChild(fresh) !== null)
 			(STAGED_DOM?.view(el) ?? el).appendChild(getFirstChild(fresh)!);
 	} else (STAGED_DOM?.view(el) ?? el).innerHTML = next;
+	host[DANGER_HTML_VALUE] = next;
 }
 
+const DANGER_HTML_VALUE = /* @__PURE__ */ Symbol('octane.dangerHTMLValue');
 const DANGER_HTML_ACTIVE = '__oct_dangerHTML';
 // Latched the first time any host actually takes ownership of its children via
 // dangerouslySetInnerHTML. Every childSlot call has to ask whether raw HTML owns
@@ -21641,7 +21659,15 @@ export function setDangerouslySetInnerHTML(el: Element, value: any): void {
 		// A nullish writer on a never-raw host is semantically absent and must not
 		// erase ordinary children. Transitioning away from an active writer clears
 		// the raw content it owned.
-		if (wasActive) setHTML(el, null);
+		if (wasActive) {
+			setHTML(el, null);
+			const host = STAGED_DOM?.view(el as any) ?? (el as any);
+			// Ordinary children can now replace the cached empty HTML.
+			if (host[DANGER_HTML_VALUE] !== undefined) {
+				journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+				host[DANGER_HTML_VALUE] = undefined;
+			}
+		}
 		return;
 	}
 	if (value != null && VOID_ELEMENTS.has(el.localName)) {
