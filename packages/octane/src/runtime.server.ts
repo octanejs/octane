@@ -117,6 +117,14 @@ import {
 	unsupportedAttributeCoercionWarning,
 } from './host-property-diagnostics.js';
 import type { HydrateProps, HydrationStrategy } from './hydration/types.js';
+import type { IdleHydrationOptions } from './hydration/idle.js';
+import type { VisibleHydrationOptions } from './hydration/visible.js';
+import {
+	HYDRATE_IDLE_TIMEOUT_ATTR,
+	HYDRATE_MEDIA_ATTR,
+	HYDRATE_VISIBLE_MARGIN_ATTR,
+	HYDRATE_VISIBLE_THRESHOLD_ATTR,
+} from './hydration-markers.js';
 import { streamedSignalBootstrapJs } from './server/early-signals.js';
 import {
 	applyElementDefaultProps,
@@ -2058,6 +2066,18 @@ export function ssrText(v: unknown): string {
 	if (probingDangerHtmlChild(v)) return '';
 	if (v == null || v === false) return '';
 	return escapeHtml(v);
+}
+
+/**
+ * A dynamic text hole that shares its parent with sibling nodes. The client
+ * reserves one `<!>` position for it and walks later siblings from there, so
+ * an empty value must still occupy one server node: the HTML parser produces
+ * no Text node for '', which would shift every later sibling onto the wrong
+ * server node. The empty anchor comment stands in and hydration swaps it for
+ * the hole's empty Text node. Non-empty values pay nothing.
+ */
+export function ssrTextSlot(text: string): string {
+	return text === '' ? EMPTY_COMMENT : text;
 }
 
 /**
@@ -5163,6 +5183,12 @@ type InternalHydrateProps = HydrateProps & {
 function ssrIndependentHydrateSidecar(props: InternalHydrateProps, instanceId: string): string {
 	const independent = props.__independent;
 	if (independent === undefined) return '';
+	// The island bootstrap rebuilds only serializable built-in strategies. A
+	// function-form `when` or `condition()` needs the parent to re-evaluate it.
+	const when = typeof props.when === 'function' ? 'dynamic' : props.when?._t;
+	if (when === 'dynamic' || when === 'condition') {
+		throw new Error(formatServerError(80, when));
+	}
 	const registry = RESOLVED?.resourceOptions?.independentHydration;
 	if (registry === undefined) {
 		throw new Error(formatServerError(69));
@@ -5215,6 +5241,33 @@ function withServerIndependentIdentity<T>(prefix: string, idSeed: number, render
 	}
 }
 
+/**
+ * An independent island rebuilds its automatic strategy from the wrapper
+ * because its lexical parent never re-evaluates `when` on the client. Only
+ * non-default parameters are written; ordinary boundaries write none.
+ */
+function ssrIndependentStrategyAttrs(strategy: HydrationStrategy): string {
+	const params = strategy._p;
+	if (strategy._t === 'media') return ssrAttr(HYDRATE_MEDIA_ATTR, params, 'div');
+	if (params === null || typeof params !== 'object') return '';
+	if (strategy._t === 'idle') {
+		const { timeout } = params as IdleHydrationOptions;
+		return timeout === undefined ? '' : ssrAttr(HYDRATE_IDLE_TIMEOUT_ATTR, timeout, 'div');
+	}
+	if (strategy._t !== 'visible') return '';
+	const { rootMargin, threshold } = params as VisibleHydrationOptions;
+	return (
+		(rootMargin === undefined ? '' : ssrAttr(HYDRATE_VISIBLE_MARGIN_ATTR, rootMargin, 'div')) +
+		(threshold === undefined
+			? ''
+			: ssrAttr(
+					HYDRATE_VISIBLE_THRESHOLD_ATTR,
+					Array.isArray(threshold) ? threshold.join(',') : threshold,
+					'div',
+				))
+	);
+}
+
 /** Serialize runtime-owned and strategy-supplied attributes for `<Hydrate>`. */
 function ssrHydrateAttrs(
 	id: string,
@@ -5222,6 +5275,7 @@ function ssrHydrateAttrs(
 	idCount: number,
 	permanentStaticAncestor: boolean = false,
 	streamToken: string | null = null,
+	independent: boolean = false,
 ): string {
 	const direct = typeof when !== 'function' && when !== null ? when : null;
 	let attrs =
@@ -5234,6 +5288,7 @@ function ssrHydrateAttrs(
 		ssrAttr(HYDRATE_ID_COUNT_ATTR, idCount, 'div');
 	if (streamToken !== null) attrs += ssrAttr(HYDRATE_STREAM_TOKEN_ATTR, streamToken, 'div');
 	if (permanentStaticAncestor) return attrs;
+	if (independent && direct !== null) attrs += ssrIndependentStrategyAttrs(direct);
 	const strategyAttrs = direct?._a?.();
 	if (strategyAttrs === undefined) return attrs;
 
@@ -5376,6 +5431,7 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 							idCount,
 							permanentStaticAncestor,
 							streamTokenForPendingHtml(children),
+							props.__independent !== undefined,
 						);
 						const seedJson =
 							permanentStaticAncestor || childSeeds.length === 0

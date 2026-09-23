@@ -2,6 +2,10 @@ import { decodeSignalValue } from '../data-encoding.js';
 import type { SignalOwner } from '../signals/types.js';
 import {
 	HYDRATE_ID_ATTR,
+	HYDRATE_IDLE_TIMEOUT_ATTR,
+	HYDRATE_MEDIA_ATTR,
+	HYDRATE_VISIBLE_MARGIN_ATTR,
+	HYDRATE_VISIBLE_THRESHOLD_ATTR,
 	HYDRATE_WHEN_ATTR,
 	HYDRATE_INDEPENDENT_ATTR,
 	INDEPENDENT_HYDRATE_MANIFEST_ATTR,
@@ -21,6 +25,10 @@ import {
 	type HydrationIntentBoundary,
 	type HydrationReplayIntent,
 } from './event-capture.js';
+import { idle } from './idle.js';
+import { media } from './media.js';
+import type { HydrationStrategy } from './types.js';
+import { visible } from './visible.js';
 
 export interface IndependentHydrateActivationContext {
 	readonly element: Element;
@@ -48,6 +56,30 @@ export interface IndependentHydrateBootstrapOptions {
 	readonly loadStyles: (styles: readonly string[]) => void | Promise<void>;
 	readonly signalOwner?: SignalOwner;
 	readonly onError?: (error: unknown) => void;
+}
+
+/**
+ * Rebuild the built-in automatic strategy the server serialized for this
+ * boundary. The lexical parent that evaluated `when` never runs here, so the
+ * server encodes each strategy's `_p` parameters on the wrapper. `interaction` is
+ * owned by pre-root capture and `never` stays inert; the server and compiler
+ * reject `condition` and function-form `when` for independent boundaries.
+ */
+function automaticStrategy(element: Element, when: string | null): HydrationStrategy | null {
+	if (when === 'idle') {
+		const timeout = element.getAttribute(HYDRATE_IDLE_TIMEOUT_ATTR);
+		return idle(timeout === null ? {} : { timeout: Number(timeout) });
+	}
+	if (when === 'visible') {
+		const rootMargin = element.getAttribute(HYDRATE_VISIBLE_MARGIN_ATTR);
+		const threshold = element.getAttribute(HYDRATE_VISIBLE_THRESHOLD_ATTR);
+		return visible({
+			...(rootMargin === null ? {} : { rootMargin }),
+			...(threshold === null ? {} : { threshold: threshold.split(',').map(Number) }),
+		});
+	}
+	if (when === 'media') return media(element.getAttribute(HYDRATE_MEDIA_ATTR) ?? '');
+	return null;
 }
 
 export interface IndependentHydrateLifecycle {
@@ -81,6 +113,32 @@ export function registerIndependentHydrationIsland(
 	let paused = false;
 	let root: { unmount(): void } | undefined;
 	const intents: HydrationReplayIntent[] = takePendingHydrationIntents(element) ?? [];
+	const when = element.getAttribute(HYDRATE_WHEN_ATTR);
+	const strategy = automaticStrategy(element, when);
+	// A fired automatic strategy is a standing activation request, like a
+	// retained intent: pause defers it and resume honors it without re-arming.
+	let triggered = when === 'load';
+	let disarm: void | (() => void);
+	const fire = (): void => {
+		triggered = true;
+		disarm?.();
+		disarm = undefined;
+		activate();
+	};
+	const arm = (): void => {
+		if (triggered || disarm !== undefined || strategy?._s === undefined) return;
+		const cleanup = strategy._s({
+			element,
+			gate: { resolved: false, resolve: fire },
+		});
+		// A strategy may resolve synchronously (a matching query, no observer).
+		if (triggered) cleanup?.();
+		else disarm = cleanup ?? (() => {});
+	};
+	const unarm = (): void => {
+		disarm?.();
+		disarm = undefined;
+	};
 	const activate = (): void => {
 		if (disposed || paused || active || hydrated) return;
 		active = true;
@@ -141,12 +199,14 @@ export function registerIndependentHydrationIsland(
 		return status;
 	};
 	registerHydrationIntentBoundary(element, boundary);
-	if (intents.length !== 0 || element.getAttribute(HYDRATE_WHEN_ATTR) === 'load') activate();
+	arm();
+	if (intents.length !== 0 || triggered) activate();
 	return Object.assign(
 		() => {
 			if (disposed) return;
 			disposed = true;
 			generation++;
+			unarm();
 			unregisterHydrationIntentBoundary(element, boundary);
 			root?.unmount();
 		},
@@ -154,6 +214,7 @@ export function registerIndependentHydrationIsland(
 			pause() {
 				if (disposed || paused) return;
 				paused = true;
+				unarm();
 				// Once an activator has entered, its live DOM belongs to that root.
 				// Freeze read work separately; do not unmount a persisted widget.
 				if (!replayReady) {
@@ -164,7 +225,8 @@ export function registerIndependentHydrationIsland(
 			resume() {
 				if (disposed || !paused) return;
 				paused = false;
-				if (intents.length || element.getAttribute(HYDRATE_WHEN_ATTR) === 'load') activate();
+				arm();
+				if (intents.length || triggered) activate();
 			},
 		},
 	);

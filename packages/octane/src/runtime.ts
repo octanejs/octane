@@ -13782,13 +13782,12 @@ export function __createCompiledContext<T>(defaultValue: T): Context<T> {
 		provideContext(scope, ctx, props.value);
 		const children = props.children as ComponentBody | null | undefined;
 		if (children == null) return;
+		// Children are always compiled bodies here, so unlike
+		// renderClientContextProvider there is no descriptor dialect to flip to.
 		const dialect = (children as any)[CHILDREN_BODY] ?? children;
 		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
 		if (previous !== dialect) {
-			if (previous !== undefined && (previous === 2 || dialect === 2)) {
-				resetScopeChildren(scope);
-				if (scope.block.disposed) return;
-			} else if (previous !== undefined) {
+			if (previous !== undefined) {
 				invalidateSharedBodyOutput(scope);
 				if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
 					const hooks = scope.hooks!;
@@ -18901,6 +18900,17 @@ class HydrationCapability {
 					describeHydrationNode(cursor),
 				);
 			if (isBlockClose(cursor)) return this.freshClone(template);
+			// Recovery discards only a node this block renders into. A cursor left
+			// outside that parent (an earlier claim ran off the end of its host) is
+			// an ancestor's adopted content, possibly the host itself; removing it
+			// would blank the region the block is about to be inserted into.
+			const target = CURRENT_BLOCK?.parentNode;
+			if (
+				!claimsRoot &&
+				target != null &&
+				(STAGED_DOM?.view(cursor) ?? cursor).parentNode !== target
+			)
+				return this.freshClone(template);
 			if (isBlockOpen(cursor)) {
 				const close = this.close(cursor);
 				this.node = getNextSibling(close);
@@ -19002,6 +19012,15 @@ class HydrationCapability {
 	}
 
 	htextSwap(posNode: Node | null, text: string): Text {
+		// The server's stand-in for an empty sibling hole (ssrTextSlot). Swap it for
+		// the hole's Text node, then compare against the server's '' like any text.
+		// Every compiled walk has already resolved its positions (htextSwap mounts
+		// run after them), so replacing the comment moves no later claim.
+		if (isEmptyTextSlot(posNode)) {
+			const empty = (STAGED_DOM?.view(document) ?? document).createTextNode('');
+			domNode((STAGED_DOM?.view(posNode) ?? posNode).parentNode!)!.replaceChild(empty, posNode);
+			posNode = empty;
+		}
 		if (posNode !== null && posNode.nodeType === 3) {
 			const server = (STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue;
 			if (server !== text && !isTextParserNormalizedMatch(server, text)) {
@@ -19049,7 +19068,11 @@ class HydrationCapability {
 			cursor = getNextSibling(cursor!);
 			if (isTextSeparator(cursor)) {
 				const after: Node | null = getNextSibling(cursor!);
-				if (after !== null && (after.nodeType === 3 || isTextSeparator(after))) cursor = after;
+				if (
+					after !== null &&
+					(after.nodeType === 3 || isTextSeparator(after) || isEmptyTextSlot(after))
+				)
+					cursor = after;
 			}
 		}
 		return cursor;
@@ -20591,6 +20614,15 @@ function isTextSeparator(node: Node | null): node is Comment {
 		node !== null &&
 		node.nodeType === 8 &&
 		(STAGED_DOM?.view(node as Comment) ?? (node as Comment)).data === HYDRATION_TEXT_SEP
+	);
+}
+
+/** The server's `<!---->` stand-in for an empty sibling-position text hole (ssrTextSlot). */
+function isEmptyTextSlot(node: Node | null): node is Comment {
+	return (
+		node !== null &&
+		node.nodeType === 8 &&
+		(STAGED_DOM?.view(node as Comment) ?? (node as Comment)).data === ''
 	);
 }
 
