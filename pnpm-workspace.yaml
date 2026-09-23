@@ -103,8 +103,10 @@ allowBuilds:
 overrides:
   # Browser parity tooling and its transitive consumers must share one runner
   # and Chromium revision. Direct dependencies reference the same catalog.
-  '@playwright/test': ^1.61.1
-  playwright: ^1.61.1
+  # WebKit in Playwright <1.63 can strand the final fetch-stream chunk:
+  # https://bugs.webkit.org/show_bug.cgi?id=322545
+  '@playwright/test': ^1.63.0
+  playwright: ^1.63.0
   # esrap <2.3.2 printed `declare` on every bodyless function, corrupting the
   # virtual TSX for plain overload signatures (TS2384). See issue #736.
   esrap: ^2.3.2
@@ -247,7 +249,7 @@ catalogs:
     '@tiptap/pm': 3.28.0
     '@tiptap/react': 3.28.0
     '@tiptap/starter-kit': 3.28.0
-    '@playwright/test': ^1.61.1
+    '@playwright/test': ^1.63.0
     '@portabletext/react': 8.0.1
     '@portabletext/toolkit': 6.0.0
     '@portabletext/types': 4.0.2
@@ -379,7 +381,7 @@ catalogs:
     miniflare: 4.20260714.0
     nuqs: 2.9.1
     '@standard-schema/spec': 1.1.0
-    playwright: ^1.61.1
+    playwright: ^1.63.0
     picocolors: ^1.1.1
     '@clack/prompts': ^1.7.0
     prettier: ^3.9.6
