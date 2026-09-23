@@ -227,12 +227,16 @@ does not qualify. Component-local callees, hooks (including `unstable_use*`),
 `new Foo()`, and tagged templates also keep their region unmemoized. This
 changes only the optimization—the region safely re-runs.
 
-A region *is* allowed to memoize past a mutable module-level variable, whether
-read directly or returned by an imported helper; module state that must drive
-rendering belongs in state or context. Octane cannot read across a module
-boundary, so an imported helper is taken at its word — that is the one place
-this analysis trusts rather than proves, and it matches React Compiler's own
-assumption.
+A direct render-time read of a mutable module binding (`let`, `var`, or a
+reassigned function) or of a host or application global such as `location`,
+`window`, or `globalThis.flag` keeps its region live. That includes keyed
+`@for` rows, which otherwise skip unchanged survivors. Module `const`s,
+unreassigned functions, and standard language globals such as `Math` and
+`JSON` do not. A region *is* allowed to memoize past module state returned by
+an imported helper; module state that must drive rendering belongs in state or
+context. Octane cannot read across a module boundary, so an imported helper is
+taken at its word — that is the one place this analysis trusts rather than
+proves, and it matches React Compiler's own assumption.
 
 This preserves ordinary React rendering for live receivers; it is not a promise
 to reproduce every React Compiler optimization. React Compiler also identifies

@@ -301,7 +301,11 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 	if (!hasMemo || hasUse) return null;
 	const visitors = esrapTsx({
 		comments: collectComments(ast),
-		getLeadingComments: (node) => (node.__octanePure ? PURE_COMMENTS : undefined),
+		getLeadingComments: (node) =>
+			node.__octanePure ||
+			(node.type === 'CallExpression' && options.pureCalls?.get(node.start) === node.end)
+				? PURE_COMMENTS
+				: undefined,
 	});
 	if (!canPrintProgram(ast, visitors)) return null;
 	const state = {

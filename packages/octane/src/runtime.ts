@@ -13782,13 +13782,12 @@ export function __createCompiledContext<T>(defaultValue: T): Context<T> {
 		provideContext(scope, ctx, props.value);
 		const children = props.children as ComponentBody | null | undefined;
 		if (children == null) return;
+		// Children are always compiled bodies here, so unlike
+		// renderClientContextProvider there is no descriptor dialect to flip to.
 		const dialect = (children as any)[CHILDREN_BODY] ?? children;
 		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
 		if (previous !== dialect) {
-			if (previous !== undefined && (previous === 2 || dialect === 2)) {
-				resetScopeChildren(scope);
-				if (scope.block.disposed) return;
-			} else if (previous !== undefined) {
+			if (previous !== undefined) {
 				invalidateSharedBodyOutput(scope);
 				if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
 					const hooks = scope.hooks!;
@@ -18885,6 +18884,17 @@ class HydrationCapability {
 					describeHydrationNode(cursor),
 				);
 			if (isBlockClose(cursor)) return this.freshClone(template);
+			// Recovery discards only a node this block renders into. A cursor left
+			// outside that parent (an earlier claim ran off the end of its host) is
+			// an ancestor's adopted content, possibly the host itself; removing it
+			// would blank the region the block is about to be inserted into.
+			const target = CURRENT_BLOCK?.parentNode;
+			if (
+				!claimsRoot &&
+				target != null &&
+				(STAGED_DOM?.view(cursor) ?? cursor).parentNode !== target
+			)
+				return this.freshClone(template);
 			if (isBlockOpen(cursor)) {
 				const close = this.close(cursor);
 				this.node = getNextSibling(close);
@@ -18986,6 +18996,15 @@ class HydrationCapability {
 	}
 
 	htextSwap(posNode: Node | null, text: string): Text {
+		// The server's stand-in for an empty sibling hole (ssrTextSlot). Swap it for
+		// the hole's Text node, then compare against the server's '' like any text.
+		// Every compiled walk has already resolved its positions (htextSwap mounts
+		// run after them), so replacing the comment moves no later claim.
+		if (isEmptyTextSlot(posNode)) {
+			const empty = (STAGED_DOM?.view(document) ?? document).createTextNode('');
+			domNode((STAGED_DOM?.view(posNode) ?? posNode).parentNode!)!.replaceChild(empty, posNode);
+			posNode = empty;
+		}
 		if (posNode !== null && posNode.nodeType === 3) {
 			const server = (STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue;
 			if (server !== text && !isTextParserNormalizedMatch(server, text)) {
@@ -19033,7 +19052,11 @@ class HydrationCapability {
 			cursor = getNextSibling(cursor!);
 			if (isTextSeparator(cursor)) {
 				const after: Node | null = getNextSibling(cursor!);
-				if (after !== null && (after.nodeType === 3 || isTextSeparator(after))) cursor = after;
+				if (
+					after !== null &&
+					(after.nodeType === 3 || isTextSeparator(after) || isEmptyTextSlot(after))
+				)
+					cursor = after;
 			}
 		}
 		return cursor;
@@ -20578,6 +20601,15 @@ function isTextSeparator(node: Node | null): node is Comment {
 	);
 }
 
+/** The server's `<!---->` stand-in for an empty sibling-position text hole (ssrTextSlot). */
+function isEmptyTextSlot(node: Node | null): node is Comment {
+	return (
+		node !== null &&
+		node.nodeType === 8 &&
+		(STAGED_DOM?.view(node as Comment) ?? (node as Comment)).data === ''
+	);
+}
+
 /**
  * Resolve the server `<!--[-->` a control-flow slot (try / if / for / switch /
  * Activity / component) should ADOPT during hydration.
@@ -21568,7 +21600,15 @@ export function setHTML(el: Element, value: any): void {
 			el.localName === 'script'
 				? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
 				: normalizeHTMLForHydration(el, next);
-		if (server === expected || isHydrationSuppressed(el)) return;
+		if (server === expected) {
+			if (el.localName !== 'script') {
+				const host = STAGED_DOM?.view(el as any) ?? (el as any);
+				journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+				host[DANGER_HTML_VALUE] = next;
+			}
+			return;
+		}
+		if (isHydrationSuppressed(el)) return;
 		warnHydrationKeptServerValue(
 			(el as any).__oct_loc,
 			'`dangerouslySetInnerHTML` content',
@@ -21577,8 +21617,16 @@ export function setHTML(el: Element, value: any): void {
 		);
 		return;
 	}
-	if (el.localName === 'script') setScriptText(el, next);
-	else if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
+	if (el.localName === 'script') {
+		setScriptText(el, next);
+		return;
+	}
+	// Fresh wrappers must not replace identical children. Compare accepted authored
+	// HTML, including successful hydration adoption, before entering DOM staging.
+	const host = STAGED_DOM?.view(el as any) ?? (el as any);
+	if (host[DANGER_HTML_VALUE] === next) return;
+	journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
 		journalBag();
 		journalRootRange(el, null, null);
 		// Raw HTML is a leaf: stage its genuine new nodes next to the outgoing
@@ -21589,8 +21637,10 @@ export function setHTML(el: Element, value: any): void {
 		while (getFirstChild(fresh) !== null)
 			(STAGED_DOM?.view(el) ?? el).appendChild(getFirstChild(fresh)!);
 	} else (STAGED_DOM?.view(el) ?? el).innerHTML = next;
+	host[DANGER_HTML_VALUE] = next;
 }
 
+const DANGER_HTML_VALUE = /* @__PURE__ */ Symbol('octane.dangerHTMLValue');
 const DANGER_HTML_ACTIVE = '__oct_dangerHTML';
 // Latched the first time any host actually takes ownership of its children via
 // dangerouslySetInnerHTML. Every childSlot call has to ask whether raw HTML owns
@@ -21625,7 +21675,15 @@ export function setDangerouslySetInnerHTML(el: Element, value: any): void {
 		// A nullish writer on a never-raw host is semantically absent and must not
 		// erase ordinary children. Transitioning away from an active writer clears
 		// the raw content it owned.
-		if (wasActive) setHTML(el, null);
+		if (wasActive) {
+			setHTML(el, null);
+			const host = STAGED_DOM?.view(el as any) ?? (el as any);
+			// Ordinary children can now replace the cached empty HTML.
+			if (host[DANGER_HTML_VALUE] !== undefined) {
+				journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+				host[DANGER_HTML_VALUE] = undefined;
+			}
+		}
 		return;
 	}
 	if (value != null && VOID_ELEMENTS.has(el.localName)) {
@@ -35091,11 +35149,10 @@ const OBJ_PROTO = Object.prototype;
 // so the common plain-object case is a zero-allocation for-in compare — no
 // Object.keys arrays. Semantics match React's shallowEqual exactly: Object.is
 // on values (NaN equal, ±0 differ), own-enumerable string keys only, key-SET
-// equality (loop 1 checks values, loop 2's count balances the key sets), and
-// an explicit-`undefined` prop still differs from a missing key (the hasOwn
-// guard). Non-plain prototypes (class instances / Object.create props can
-// arrive raw through createElement's props pass-through) take the exact
-// Object.keys slow path, where for-in would also see inherited keys.
+// equality (loop 1 checks ownership and values, loop 2's count balances the
+// key sets). Inherited values must not stand in for removed own props, even
+// when they compare equal. Non-plain prototypes take the exact Object.keys
+// slow path, where for-in would also see inherited keys.
 function shallowEqualProps(a: any, b: any): boolean {
 	if (a === b) return true;
 	if (a == null || b == null) return false;
@@ -35107,7 +35164,7 @@ function shallowEqualProps(a: any, b: any): boolean {
 	let count = 0;
 	for (const k in a) {
 		const v = a[k];
-		if (!Object.is(v, b[k]) || (v === undefined && !hasOwnProp.call(b, k))) return false;
+		if (!hasOwnProp.call(b, k) || !Object.is(v, b[k])) return false;
 		count++;
 	}
 	for (const _k in b) count--;
@@ -43737,7 +43794,7 @@ function coalesceHydratedRanges(
 		}
 	}
 
-	function visitSlot(state: any): void {
+	function visitSlot(state: any, scope: Scope): void {
 		const kind = state.__kind;
 		if (kind === 'componentSlotSlot') {
 			if (state.block !== null) visitBlock(state.block, state as CompSlot);
@@ -43746,6 +43803,13 @@ function coalesceHydratedRanges(
 		if (kind === 'childSlot') {
 			const child = state as ChildSlot;
 			if (child.block !== null) visitBlock(child.block, child);
+			else if (child.borrowed) {
+				// Empty returns borrow their component's pair before a child Block
+				// exists. Redirect that borrower too if the component range compacts.
+				const own = blockGroups.get(scope.block);
+				if (own !== undefined && child.start === own.start && child.end === own.end)
+					attachOwner(own, child);
+			}
 			if (child.forSlot !== null) visitForSlot(child.forSlot);
 			if (child.portal?.block != null) visitBlock(child.portal.block);
 			return;
@@ -43780,7 +43844,7 @@ function coalesceHydratedRanges(
 			for (let i = 0; i < children.length; i++) visitNestedScope(children[i].scope);
 		const registered = scope._slots;
 		if (registered === null) return;
-		for (let i = 0; i < registered.length; i++) visitSlot(registered[i]);
+		for (let i = 0; i < registered.length; i++) visitSlot(registered[i], scope);
 	}
 
 	visitBlock(rootBlock);
@@ -45241,6 +45305,10 @@ export function createIndependentHydrateActivator(
 			if (notify !== null) useEffect(notify as EffectFn, [scope], HYDRATE_NOTIFY_SLOT);
 		};
 		const framed: ComponentBody = (_props, scope) => {
+			// This frame stands in for the server's Hydrate instance, whose children
+			// render directly under the island's `[prefix, 'root']` signal identity.
+			// Resolve it to that root key so it contributes no invocation segment.
+			stampSignalInstanceKey(scope, rootSignalInstanceKey(scope.block.idState));
 			tryBlock(scope, 0, scope.block.parentNode, content, null, null, scope.block.endMarker);
 		};
 		const adapter: ComponentBody = (_props, scope) => {
