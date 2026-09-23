@@ -1216,6 +1216,49 @@ describe.each([false, true])('forBlock — rows reading module or global state (
 		}
 	});
 
+	it('re-evaluates a destructured header default on survivors', async () => {
+		const header = loadCompiledFixtureSource(
+			`
+			let fallbackLabel = 'module-a';
+			export function setFallbackLabel(value) { fallbackLabel = value; }
+			export function ModuleDefault(props) @{
+				<ul>@for (const { id, label = fallbackLabel } of props.items; key id) {
+					<li>{label as string}</li>
+				}</ul>
+			}
+			export function LocalDefault(props) @{
+				const fallback = props.fallback;
+				<ul>@for (const { id, label = fallback } of props.items; key id) {
+					<li>{label as string}</li>
+				}</ul>
+			}
+		`,
+			{ id: '/project/HeaderDefault.tsrx', mode: 'client', compileOptions: { dev, hmr: false } },
+		);
+		const rows = [{ id: 1 }, { id: 2, label: 'own' }];
+		const byModule = mount(header.ModuleDefault as ComponentBody, { items: rows, n: 0 });
+		const byLocal = mount(header.LocalDefault as ComponentBody, {
+			items: rows,
+			fallback: 'local-a',
+		});
+		try {
+			expect(byModule.container.textContent).toBe('module-aown');
+			expect(byLocal.container.textContent).toBe('local-aown');
+			header.setFallbackLabel('module-b');
+			await act(() =>
+				byModule.update(header.ModuleDefault as ComponentBody, { items: rows, n: 1 }),
+			);
+			await act(() =>
+				byLocal.update(header.LocalDefault as ComponentBody, { items: rows, fallback: 'local-b' }),
+			);
+			expect(byModule.container.textContent).toBe('module-bown');
+			expect(byLocal.container.textContent).toBe('local-bown');
+		} finally {
+			byModule.unmount();
+			byLocal.unmount();
+		}
+	});
+
 	it('re-evaluates an @if over a mutable global', async () => {
 		const List = fixture.LocationHashList as ComponentBody;
 		const previous = location.hash;

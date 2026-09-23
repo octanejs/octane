@@ -31935,7 +31935,12 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	if (ctx.currentComponentLocals) {
 		const bodyScope = new Set([itemName]);
 		if (node.index) bodyScope.add(node.index.name);
-		const bodyAst = b.block(subStmts);
+		// A destructured header runs in the item helper's synthesized prologue, so
+		// its defaults and computed keys are row reads too, and its fields bind
+		// there rather than reading as free.
+		const analyzedStmts =
+			destructureInjection.length > 0 ? [...destructureInjection, ...subStmts] : subStmts;
+		const bodyAst = b.block(analyzedStmts);
 		const free = collectFreeIdentifiers(bodyAst, bodyScope);
 		let hasParentClosure = false;
 		let hasHook = false;
@@ -31945,10 +31950,6 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// must re-render, exactly as the item-memo and whole-list proofs fail closed.
 		let hasAmbientRead = false;
 		let ambientCandidates = null;
-		// A destructured header (`const { id } of …`) binds its fields in the
-		// body's synthesized prologue, so they read as free here.
-		let headerBindings = null;
-		if (isDestructured) collectBindings(leftDeclId, (headerBindings = new Set()));
 		const seenDeps = new Set();
 		for (const name of free) {
 			if (HOOK_NAMES.has(name) || name === 'use' || name === 'useContext') {
@@ -31960,11 +31961,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					seenDeps.add(name);
 					depNames.push(name);
 				}
-			} else if (
-				!ctx.importedNames.has(name) &&
-				headerBindings?.has(name) !== true &&
-				isUnwitnessedAmbientRead(name, ctx)
-			) {
+			} else if (!ctx.importedNames.has(name) && isUnwitnessedAmbientRead(name, ctx)) {
 				(ambientCandidates ??= []).push(name);
 			}
 		}
@@ -31985,7 +31982,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// and admit every user-authored call shape. Both modes still witness every
 		// capture, including callbacks that need the latest parent state. Actual
 		// setup hooks remain outside this item-region proof.
-		const hasRenderCall = containsRenderCall(subStmts, ctx);
+		const hasRenderCall = containsRenderCall(analyzedStmts, ctx);
 		itemMemo =
 			ctx.autoMemo === true &&
 			hasNestedComp &&

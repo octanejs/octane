@@ -272,6 +272,36 @@ describe('@for item-body purity with module and global reads', () => {
 		expect(flags[0]! & PURE).toBe(PURE);
 	});
 
+	it.each<[string, string, number]>([
+		['a module let', 'let fallback = "x";', 0],
+		['a mutable global', '', 0],
+		['a component local', '', DEP_ELIGIBLE],
+	])('witnesses a destructured header default reading %s', (name, prelude, expected) => {
+		const fallback =
+			name === 'a mutable global'
+				? 'location.hash'
+				: name === 'a component local'
+					? 'local'
+					: 'fallback';
+		const flags = appListFlags(
+			compile(
+				`
+				${prelude}
+				export function App(props) @{
+					const local = props.local;
+					<ul>@for (const { id, label = ${fallback} } of props.items; key id) {
+						<li>{label as string}</li>
+					}</ul>
+				}
+			`,
+				'App.tsrx',
+				{ hmr: false, dev: false },
+			).code,
+		);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & (PURE | DEP_ELIGIBLE)).toBe(expected);
+	});
+
 	it('keeps PURE for a destructured header whose fields the body reads', () => {
 		const flags = appListFlags(
 			compile(
