@@ -1093,12 +1093,6 @@ export function nativeStyleBinding(
 	if (literal === 1) {
 		const binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
 		if ((binding === undefined || binding.block === null) && isScalarStyleLiteral(value)) {
-			if (
-				process.env.NODE_ENV !== 'production' &&
-				hydrateAttributeProbe !== null &&
-				el.ownerDocument !== hydrateAttributeProbe.document
-			)
-				throw new PresentationAdoptionMiss(undefined, false);
 			writeScalarNativeStyle(owner, slotIndex, binding, el, value);
 			return;
 		}
