@@ -394,8 +394,8 @@ comparison. Ceilings retain at least 32 bytes of headroom and are rounded to
 application or runtime growth. Refresh a ceiling only with a reviewed explanation
 and a production measurement using the pinned CI Node version.
 
-`bundle-reachability` builds twenty-three independent public-entry feature fixtures
-across thirty-one production builds with the production Octane compiler,
+`bundle-reachability` builds twenty-four independent public-entry feature fixtures
+across thirty-two production builds with the production Octane compiler,
 disabled HMR/profiling, and normalized esbuild minification. The seven package
 side-effect fixtures and the behavior-only fixture each run through both Vite
 and esbuild. Each measured IIFE
@@ -426,13 +426,17 @@ component, and verifies `unmount`; its broader reachable runtime is
 real and must not be disguised as the specialized entry. `root-static-local`
 keeps the original same-file compiled render/unmount control and its existing
 static-root ceiling, so losing that specialization fails independently of the
-escaped generic contract.
+escaped generic contract. `prop-attributes` binds opaque props to named
+attributes and text in a module with no signals import. Those opaque values are
+potential signal bindings, so the fixture pins that they keep the narrow scalar
+writers and never retain the generic attribute route with its form-control
+writers and DOM routing tables.
 
 `bundle-size/minimal-budgets.json` supplies explicit raw, gzip, and brotli byte
 ceilings for every feature. Budgets leave about 3% deterministic headroom, with
 small byte-aligned allowances for tiny isolated entries. Each scenario publishes
 its committed ceiling as a
-same-run `*-budget` reference target, so ninety-three `maxRatio: 1` entries in
+same-run `*-budget` reference target, so ninety-nine `maxRatio: 1` entries in
 `baselines/ratios.json` enforce all three metrics in the existing weekly/manual
 Bench CI workflow. The behavior fixture runner also enforces its ceilings directly.
 Full PR and main CI run both behavior builds once in test shard 1/4, so changes
@@ -440,10 +444,10 @@ that grow this renderer-free closure fail before merge. Run that focused gate
 with `node benchmarks/bundle-size/run-minimal.mjs behavior-root`; an unknown or
 empty scenario name fails instead of skipping the builds. The same shard also
 enforces the unchanged committed raw, gzip, and brotli ceilings for the recovered
-same-file static-root, hooks, and local Context fixtures:
+same-file static-root, hooks, prop-driven attribute, and local Context fixtures:
 
 ```bash
-node benchmarks/bundle-size/run-minimal.mjs --budgets root-static-local hooks-state context
+node benchmarks/bundle-size/run-minimal.mjs --budgets root-static-local root-chained-jsx hooks-state prop-attributes context
 ```
 
 `--budgets` applies direct byte enforcement to the selected scenarios (or all

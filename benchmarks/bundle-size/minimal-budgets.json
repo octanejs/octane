@@ -24,6 +24,11 @@
     "gzip": 25504,
     "brotli": 22752
   },
+  "root-chained-jsx": {
+    "raw": 85728,
+    "gzip": 28384,
+    "brotli": 25248
+  },
   "root-static": {
     "raw": 201472,
     "gzip": 64032,
@@ -38,6 +43,11 @@
     "raw": 115248,
     "gzip": 37712,
     "brotli": 33120
+  },
+  "prop-attributes": {
+    "raw": 98032,
+    "gzip": 32528,
+    "brotli": 28880
   },
   "context": {
     "raw": 117296,
@@ -143,6 +153,16 @@
     "raw": 112944,
     "gzip": 37376,
     "brotli": 32864
+  },
+  "binding-apollo-client-vite": {
+    "raw": 354304,
+    "gzip": 110592,
+    "brotli": 97280
+  },
+  "binding-apollo-client-esbuild": {
+    "raw": 357376,
+    "gzip": 113664,
+    "brotli": 99328
   },
   "binding-usehooks-ts-vite": {
     "raw": 113696,

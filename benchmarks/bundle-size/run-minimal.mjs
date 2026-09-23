@@ -24,9 +24,11 @@ const existingScenarios = [
 	['capture-only', 'ts'],
 	['cli-spa-starter', 'ts'],
 	['root-static-specialized', 'ts'],
+	['root-chained-jsx', 'tsx'],
 	['root-static', 'tsrx'],
 	['root-static-local', 'tsrx'],
 	['hooks-state', 'tsrx'],
+	['prop-attributes', 'tsrx'],
 	['context', 'tsrx'],
 	['hydrate-root', 'tsrx'],
 	['deferred-hydration', 'tsrx'],
@@ -40,9 +42,11 @@ const existingScenarios = [
 const signalFreeClientScenarios = new Set([
 	'cli-spa-starter',
 	'root-static-specialized',
+	'root-chained-jsx',
 	'root-static',
 	'root-static-local',
 	'hooks-state',
+	'prop-attributes',
 	'context',
 	'hydrate-root',
 	'deferred-hydration',
@@ -85,6 +89,13 @@ const bindingScenarios = [
 		extension: 'tsrx',
 		package: '@octanejs/mantine-hooks',
 		forbidden: /\/packages\/mantine-hooks\/src\/use-(?:local|session)-storage\//,
+	},
+	{
+		id: 'binding-apollo-client',
+		extension: 'tsrx',
+		package: '@octanejs/apollo-client',
+		forbidden:
+			/\/packages\/apollo-client\/src\/react\/hooks\/use(?:Query|Mutation|SuspenseQuery)\.js$/,
 	},
 	{
 		id: 'binding-usehooks-ts',
@@ -383,6 +394,17 @@ try {
 				`${name}: signal-free client retained the concrete native transition implementation`,
 			);
 		}
+		if (id === 'prop-attributes') {
+			assert.deepEqual(
+				emittedModules.filter((module) =>
+					/\/packages\/octane\/src\/(?:dom-tables\.js|hydration\/control-capture\.ts)$/.test(
+						module,
+					),
+				),
+				[],
+				`${name}: statically named attribute bindings retained the generic attribute or control-restore writers`,
+			);
+		}
 		const hasRuntime = modules.some((module) => module.endsWith('/packages/octane/src/runtime.ts'));
 		const hasServerRuntime = modules.some((module) =>
 			module.endsWith('/packages/octane/src/runtime.server.ts'),
@@ -417,8 +439,10 @@ try {
 		}
 		if (
 			id === 'root-static-specialized' ||
+			id === 'root-chained-jsx' ||
 			id === 'root-static-local' ||
-			id === 'cli-spa-starter'
+			id === 'cli-spa-starter' ||
+			(id === 'binding-apollo-client' && scenario.bundler === 'vite')
 		) {
 			assert.equal(
 				runtimeExports.includes('__createVoidRoot'),

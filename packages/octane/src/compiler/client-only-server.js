@@ -9,6 +9,7 @@
  * diagnostic before a sentinel can affect server behavior.
  */
 import { builders as b, parseModule } from '@tsrx/core';
+import { inheritGeneratedOrigin } from './generated-origin.js';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 
@@ -258,34 +259,6 @@ function collectRuntimeExports(ast, filename) {
 	return [...exports]
 		.map(([name, origin]) => ({ name, origin }))
 		.sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
-}
-
-/**
- * Generated stub scaffolding has no authored syntax of its own, but every
- * printed node still inherits a source origin so the auxiliary module carries
- * a useful esrap map. The tree is compiler-owned; parsed nodes are never
- * embedded or mutated.
- */
-function inheritGeneratedOrigin(root, origin) {
-	const seen = new WeakSet();
-	const visit = (value) => {
-		if (!value || typeof value !== 'object' || seen.has(value)) return;
-		seen.add(value);
-		if (Array.isArray(value)) {
-			for (const item of value) visit(item);
-			return;
-		}
-		if (typeof value.type === 'string' && value.loc == null && origin?.loc != null) {
-			value.start = origin.start;
-			value.end = origin.end;
-			value.loc = origin.loc;
-		}
-		for (const [key, child] of Object.entries(value)) {
-			if (key !== 'loc' && key !== 'metadata') visit(child);
-		}
-	};
-	visit(root);
-	return root;
 }
 
 function createProgram(body, origin) {

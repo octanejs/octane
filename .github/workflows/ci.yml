@@ -430,7 +430,13 @@ jobs:
 
       - name: Verify signal-free application bundle budgets
         if: matrix.shard == '1/4'
-        run: node benchmarks/bundle-size/run-minimal.mjs --budgets root-static-local hooks-state context
+        run: node benchmarks/bundle-size/run-minimal.mjs --budgets root-static-local root-chained-jsx hooks-state prop-attributes context
+
+      # A binding that tests `in` against, or indexes, the `octane` namespace
+      # materializes every public export and undoes root specialization.
+      - name: Verify Apollo binding keeps octane tree-shakeable
+        if: matrix.shard == '1/4'
+        run: node benchmarks/bundle-size/run-minimal.mjs binding-apollo-client
 
       - name: Run tests
         # WEBSITE_DOCS_SPEC is excluded through the environment, not `--exclude`:

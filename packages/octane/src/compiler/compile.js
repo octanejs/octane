@@ -127,7 +127,7 @@ import { collectProvenContextBindings, isProvenContextUse } from './context-use.
 import { assertNoLegacyContextProviders } from './context-provider.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
-import { findLocalVoidRootCallees } from './local-void-roots.js';
+import { findRootFactoryImports, proveVoidRoots } from './void-roots.js';
 import {
 	lowerParameterProperties,
 	lowerTypeScriptStatements,
@@ -2420,6 +2420,71 @@ function styleObjectNeedsNativeBinding(node) {
 		// Only primitive operations or existing value proofs rule that out.
 		return canCarryDirectSignalHandle(property.value, true);
 	});
+}
+
+const STATIC_HOST_COMPONENT_NODES = new Set([
+	'JSXElement',
+	'JSXOpeningElement',
+	'JSXClosingElement',
+	'JSXFragment',
+	'JSXOpeningFragment',
+	'JSXClosingFragment',
+	'JSXAttribute',
+	'JSXIdentifier',
+	'JSXNamespacedName',
+	'JSXText',
+	'JSXExpressionContainer',
+	'JSXEmptyExpression',
+	'Literal',
+	'TemplateLiteral',
+	'TemplateElement',
+]);
+
+/**
+ * A component that evaluates no authored expression cannot perform a native
+ * read, so a native-read module need not bracket its render. The proof is an
+ * allowlist: no setup statements, no destructured or defaulted parameters, only
+ * lowercase host elements (component tags invoke authored code), and only
+ * literal attribute and child values. Any other node keeps the bracket.
+ */
+function isStaticHostComponent(node) {
+	if (node?.body?.type !== 'JSXCodeBlock' || (node.body.body?.length ?? 0) !== 0) return false;
+	if (!(node.params ?? []).every((param) => param.type === 'Identifier')) return false;
+	const visit = (value) => {
+		if (value === null || typeof value !== 'object') return true;
+		if (Array.isArray(value)) return value.every(visit);
+		// Plain records such as a template quasi's { raw, cooked } hold no code.
+		if (value.type === undefined)
+			return Object.values(value).every((item) => item === null || typeof item !== 'object');
+		if (!STATIC_HOST_COMPONENT_NODES.has(value.type)) return false;
+		if (value.type === 'JSXOpeningElement' && !/^[a-z]/.test(value.name?.name ?? '')) return false;
+		if (value.type === 'Literal' && value.regex !== undefined) return false;
+		if (value.type === 'TemplateLiteral' && value.expressions.length !== 0) return false;
+		for (const key in value) {
+			if (key === 'loc' || key === 'metadata' || key === 'parent' || key === 'range') continue;
+			const child = value[key];
+			if (child !== null && typeof child === 'object' && !visit(child)) return false;
+		}
+		return true;
+	};
+	return node.body.render != null && visit(node.body.render);
+}
+
+// A fresh object literal whose properties are all plain data: enumerating it
+// runs no accessor, and nothing else can mutate it. nativeStyleBinding can then
+// check its values at runtime and skip the owning Block while all are scalar.
+function isPlainStyleObjectLiteral(node) {
+	return (
+		node?.type === 'ObjectExpression' &&
+		(node.properties ?? []).every(
+			(property) =>
+				(property.type === 'Property' || property.type === 'ObjectProperty') &&
+				!property.computed &&
+				!property.method &&
+				(property.kind === undefined || property.kind === 'init') &&
+				(property.key?.name ?? property.key?.value) !== '__proto__',
+		)
+	);
 }
 
 // DEV must send invalid literal declarations through the same style helpers as
@@ -10088,6 +10153,7 @@ function compileInternal(
 		options?.__universal == null &&
 		!options?.__rendererBoundariesLowered &&
 		rendererBoundaryPreparation === null;
+	const rootFactories = localVoidRootsEnabled ? findRootFactoryImports(ast) : new Map();
 	const authoredVoidRootIds = new Set();
 	const privateCompiledContexts = localVoidRootsEnabled
 		? findPrivateCompiledContexts(ast)
@@ -10095,21 +10161,7 @@ function compileInternal(
 	const splitPrivateContexts = localVoidRootsEnabled
 		? privateCompiledContextsForHydrateAst(parsedAst)
 		: null;
-	if (
-		localVoidRootsEnabled &&
-		ast.body.some(
-			(node) =>
-				node.type === 'ImportDeclaration' &&
-				node.source?.value === 'octane' &&
-				node.specifiers.some(
-					(specifier) =>
-						specifier.type === 'ImportSpecifier' &&
-						['createRoot', 'hydrateRoot'].includes(
-							specifier.imported.name ?? specifier.imported.value,
-						),
-				),
-		)
-	) {
+	if (rootFactories.size > 0) {
 		for (const statement of ast.body) {
 			const node =
 				statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
@@ -10621,25 +10673,71 @@ function compileInternal(
 			});
 		}
 	}
-	if (authoredVoidRootIds.size > 0) {
-		const definitions = new Set(
-			[...ctx.componentInfo.values()]
-				.filter((info) => info.voidOutput && authoredVoidRootIds.has(info.node.id))
-				.map((info) => info.node.id),
-		);
+	if (
+		rootFactories.size > 0 &&
+		(authoredVoidRootIds.size > 0 ||
+			(ctx.isVoidComponentImport !== null && ctx.importedComponentBindings.size > 0))
+	) {
+		// Definition IDs come from the authored, exact shorthand declarations:
+		// arrow normalization and return-JSX lowering cannot manufacture this
+		// evidence. Imports rely on the adapter's proof of the loaded export ABI.
+		const writes = authoredVoidRootIds.size > 0 ? collectReassignedBindings(ast) : null;
+		const stableComponents = new Set();
+		for (const info of ctx.componentInfo.values())
+			if (info.voidOutput && authoredVoidRootIds.has(info.node.id) && !writes.has(info.node.id))
+				stableComponents.add(info.node.id.name);
 		const components = new Set([...ctx.componentInfo.values()].map((info) => info.node));
-		const callees = findLocalVoidRootCallees(ast, definitions, components);
+		const callees = new Map();
+		let loweredElements = null;
+		for (const root of proveVoidRoots(ast, {
+			factories: rootFactories,
+			component(name) {
+				if (stableComponents.has(name)) return true;
+				const imported = ctx.importedComponentBindings.get(name);
+				return imported !== undefined &&
+					ctx.isVoidComponentImport?.(imported.request, imported.imported) === true
+					? true
+					: undefined;
+			},
+			// Roots created while a component renders stay on the generic path.
+			skip: (node) => node.type === 'JSXCodeBlock' || components.has(node),
+		})) {
+			callees.set(root.callee, root.helper);
+			// Native reads keep their scoped element resolver around `$` reads.
+			for (const { call, index } of ctx.nativeReads ? [] : root.elements) {
+				const props = voidRootElementProps(call.arguments[index]);
+				if (props !== null) (loweredElements ??= new Map()).set(call, { index, props });
+			}
+		}
 		if (callees.size > 0) {
 			const aliases = new Map();
-			for (const helper of new Set(callees.values())) {
+			const helpers = new Set(callees.values());
+			if (loweredElements !== null) helpers.add('__voidRootProps');
+			for (const helper of helpers) {
 				const alias = allocCompilerName(ctx, rtAlias(helper));
 				(ctx.privateRuntimeAliases ??= new Map()).set(helper, alias);
 				ctx.runtimeNeeded.add(helper);
 				aliases.set(helper, alias);
 			}
-			ast = mapAst(ast, (node) =>
-				callees.has(node) ? { ...node, name: aliases.get(callees.get(node)) } : null,
-			);
+			const rewrite = (node) => {
+				if (callees.has(node)) return { ...node, name: aliases.get(callees.get(node)) };
+				const lowered = loweredElements?.get(node);
+				if (lowered === undefined) return null;
+				// `root.render(<C .../>)` → `root.render(C, props)`: the root unwraps
+				// the element to exactly this body/props pair, with a null key.
+				const element = node.arguments[lowered.index];
+				const name = element.openingElement.name;
+				const tag = () => inheritOriginLoc(b.id(name.name), name);
+				const args = [...node.arguments];
+				args.splice(
+					lowered.index,
+					1,
+					tag(),
+					inheritOriginLoc(b.call(aliases.get('__voidRootProps'), tag(), lowered.props), element),
+				);
+				return mapAst({ ...node, arguments: args }, rewrite);
+			};
+			ast = mapAst(ast, rewrite);
 		}
 	}
 	if (privateCompiledContexts.size > 0 || splitPrivateContexts?.callees.size > 0) {
@@ -16389,7 +16487,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		b.id(name, node.id ?? node),
 		fnParams,
 		b.block(
-			ctx.nativeReads
+			ctx.nativeReads && !isStaticHostComponent(node)
 				? wrapNativeReadScope(presentationBody, b.id('__s'), nativeReadNames(ctx))
 				: presentationBody,
 		),
@@ -16945,15 +17043,30 @@ function depPathKey(node) {
 // props OBJECT with unchanged fields doesn't refetch), bare identifiers
 // otherwise. Only outer runtime references become deps; locally declared
 // bindings and erased syntax do not.
-function collectDepPaths(expr, coarsenDepRoots = null) {
+//
+// Deps evaluate eagerly on every render, so they may only perform reads the
+// authored render performs. A read inside a nested function (which may never
+// run during render) or behind a condition that cannot be replayed is
+// deferred: a module-bound root keeps its precise path as `root?.prop`, and an
+// ambient global (not bound in the enclosing scope chain) contributes no dep at
+// all, because it may not exist in this environment (`window` under SSR).
+// `isModuleBound` is a scope-aware `(name) => boolean` from
+// `moduleBoundCheckForDeps`, resolving through the expression's enclosing scope
+// chain so that sibling-function parameters never leak into the decision.
+function collectDepPaths(expr, coarsenDepRoots = null, isModuleBound = null) {
 	const deps = [];
 	const seen = new Set();
 	const lexical = createLexicalAnalysis(expr);
 	let guards = null;
 	let nextGuard = 0;
+	let deferred = 0;
+	let ownArguments = 0;
 	const isFree = (node, parent, key) =>
 		isIdentifierReference(node, parent, key, lexical) &&
-		!lexical.isBound(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name);
+		!lexical.isBound(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name) &&
+		!(ownArguments > 0 && node.name === 'arguments');
+	const deferredAmbient = (name) =>
+		deferred > 0 && (isModuleBound === null || !isModuleBound(name));
 	const push = (node, key) => {
 		if (coarsenDepRoots !== null) {
 			const member = depPathMember(node);
@@ -17026,10 +17139,16 @@ function collectDepPaths(expr, coarsenDepRoots = null) {
 		return null;
 	}
 
+	function walkDeferred(node, parent, key) {
+		deferred++;
+		walk(node, parent, key);
+		deferred--;
+	}
+
 	function walkGuarded(node, test, truthy) {
 		const guard = necessaryTypeofGuard(test, truthy);
 		if (guard === null) {
-			walk(node, null, null);
+			walkDeferred(node, null, null);
 			return;
 		}
 		const previous = guards;
@@ -17078,15 +17197,33 @@ function collectDepPaths(expr, coarsenDepRoots = null) {
 				if (n.operator === '&&' || n.operator === '||') {
 					walkGuarded(n.right, n.left, n.operator === '&&');
 				} else {
-					walk(n.right, n, 'right');
+					walkDeferred(n.right, n, 'right');
 				}
+				return;
+			case 'FunctionExpression':
+			case 'FunctionDeclaration':
+			case 'ArrowFunctionExpression': {
+				// A non-arrow function owns `arguments`; it is never the component's.
+				const own = n.type !== 'ArrowFunctionExpression';
+				if (own) ownArguments++;
+				deferred++;
+				forEachRuntimeAstChild(n, (child, childKey) => walk(child, n, childKey));
+				deferred--;
+				if (own) ownArguments--;
+				return;
+			}
+			case 'PropertyDefinition':
+				// Instance field initializers run per construction, not at render.
+				if (n.computed) walk(n.key, n, 'key');
+				if (n.static) walk(n.value, n, 'value');
+				else walkDeferred(n.value, n, 'value');
 				return;
 			case 'MetaProperty':
 				// `import.meta` and `new.target` contain syntax tokens, not free
 				// bindings. Visiting their Identifier children creates invalid deps.
 				return;
 			case 'Identifier':
-				if (isFree(n, parent, key)) push(b.id(n.name), depPathKey(n));
+				if (isFree(n, parent, key) && !deferredAmbient(n.name)) push(b.id(n.name), depPathKey(n));
 				return;
 			case 'UnaryExpression': {
 				const argument = unwrapTsExpr(n.argument);
@@ -17103,14 +17240,14 @@ function collectDepPaths(expr, coarsenDepRoots = null) {
 			case 'MemberExpression': {
 				const propertyName = staticDepMemberName(n);
 				if (n.object.type === 'Identifier' && propertyName !== null) {
-					if (isFree(n.object, n, 'object')) {
+					if (isFree(n.object, n, 'object') && !deferredAmbient(n.object.name)) {
 						const member = b.member(
 							b.id(n.object.name),
 							n.computed
 								? b.literal(propertyName, JSON.stringify(propertyName))
 								: b.id(propertyName),
 							n.computed,
-							n.optional === true,
+							n.optional === true || deferred > 0,
 						);
 						// Optional MemberExpressions must remain inside a ChainExpression.
 						// Besides keeping the synthesized tree valid ESTree, the wrapper
@@ -17125,6 +17262,19 @@ function collectDepPaths(expr, coarsenDepRoots = null) {
 		}
 		forEachRuntimeAstChild(n, (child, childKey) => walk(child, n, childKey));
 	}
+}
+
+// Scope-aware module-bound check: returns a function `(name) => boolean` that
+// resolves through the scope chain at `exprNode`'s position in the module AST.
+// Nested parameters and catch bindings from unrelated functions are invisible,
+// so a shadowed global (e.g. `function fmt(document)`) does not trick
+// deferred-ambient into emitting an eager dep for an undeclared name.
+function moduleBoundCheckForDeps(ctx, exprNode) {
+	if (ctx.activityModuleAst == null) return null;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope = lexical.nodeScopes.get(exprNode);
+	if (scope === undefined) return null;
+	return (name) => lexical.isBound(scope, name);
 }
 
 // A `use()` argument that needs no memoization: already-stable references
@@ -17362,7 +17512,7 @@ function makeCreationMemoCall(
 	// promise — and the derived creation would never refresh when its upstream
 	// promise does. Coarsen member deps rooted at render-created locals to the
 	// bare identifier (dedup follows).
-	const deps = collectDepPaths(expr, coarsenDepRoots);
+	const deps = collectDepPaths(expr, coarsenDepRoots, moduleBoundCheckForDeps(ctx, expr));
 	// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
 	// SSRScope per pass makes client useMemo semantics useless there).
 	const memoHelper = ctx.nativeReads
@@ -18072,7 +18222,7 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 				kind: 'useMemo',
 				node: expr,
 			});
-			const deps = collectDepPaths(expr);
+			const deps = collectDepPaths(expr, null, moduleBoundCheckForDeps(ctx, expr));
 			const memoAlias = requireRuntimeForContext(ctx, ctx.nativeReads ? 'nativePuMemo' : 'puMemo');
 			changed = true;
 			// The minted prop-memo wrapper maps to the authored prop expression.
@@ -23646,9 +23796,10 @@ function applyStringChildProofs(ast, source, filename, facts) {
 	const primitiveProofs = new Set();
 	const intrinsicCalls = [];
 	const writes = [];
-	let intrinsicMutationReference = false;
-	const intrinsicMutationReferences = [];
-	const intrinsicAliases = [];
+	const mutatorReferences = [];
+	const destructuredMutators = new WeakSet();
+	const globalValueUses = [];
+	let globalValueDestructured = false;
 	const ambientIntrinsicValues = new Set();
 	const constantDeclarations = [];
 	const references = [];
@@ -23691,38 +23842,38 @@ function applyStringChildProofs(ast, source, filename, facts) {
 			if (primitiveRanges?.delete(range)) primitiveProofs.add(expr);
 		}
 		if (inspectIntrinsicCalls) {
-			if (
-				node.type === 'MemberExpression' ||
-				(node.type === 'Property' && parent?.type === 'ObjectPattern')
-			) {
-				const property = node.type === 'MemberExpression' ? node.property : node.key;
-				const method = node.computed ? property?.value : (property?.name ?? property?.value);
-				if (
-					INTRINSIC_MUTATION_METHODS.has(method) ||
-					(node.computed && property?.type !== 'Literal')
-				) {
-					// Unknown computed references may extract a mutator or sit under a
-					// TypeScript/optional-chain wrapper before invocation. Decline the new
-					// intrinsic-local proof even for unrelated dynamic property reads;
-					// this is rejection only, not built-in name admission.
-					intrinsicMutationReference = true;
-				}
-			}
-			if (
-				node.type === 'VariableDeclarator' &&
-				parent?.type === 'VariableDeclaration' &&
-				parent.kind === 'const' &&
-				node.id?.type === 'Identifier' &&
-				node.init
-			) {
-				intrinsicAliases.push(node);
-			}
+			// Mutator references: `Reflect.set`, `obj[key]`, `const { set } = R`.
+			// The receiver decides later whether one can reach a text intrinsic.
 			if (node.type === 'MemberExpression' && isPossibleIntrinsicMutator(node)) {
-				intrinsicMutationReferences.push([node.object, node, parent]);
+				mutatorReferences.push({ reference: node, receiver: node.object, parent });
 			} else if (node.type === 'VariableDeclarator' && node.id?.type === 'ObjectPattern') {
 				for (const property of node.id.properties || []) {
 					if (property.type === 'Property' && isPossibleIntrinsicMutator(property)) {
-						intrinsicMutationReferences.push([node.init, property]);
+						destructuredMutators.add(property);
+						mutatorReferences.push({ reference: property, receiver: node.init, parent: null });
+					}
+				}
+			} else if (
+				node.type === 'Property' &&
+				parent?.type === 'ObjectPattern' &&
+				!destructuredMutators.has(node)
+			) {
+				// Parameter/assignment patterns hide their source: fail closed.
+				if (isPossibleIntrinsicMutator(node)) {
+					mutatorReferences.push({ reference: node, receiver: null, parent: null });
+				}
+				if (GLOBAL_VALUE_MEMBERS.has(staticPropertyKeyName(node))) globalValueDestructured = true;
+			}
+			// Where a global object, Object, or Reflect flows as a value, a later
+			// alias can reach it; wrapper parents defer to the outermost wrapper.
+			if (!TRANSPARENT_VALUE_WRAPPERS.has(parent?.type)) {
+				const value = unwrapValueExpression(node);
+				if (
+					(value?.type === 'Identifier' && GLOBAL_VALUE_NAMES.has(value.name)) ||
+					(value?.type === 'MemberExpression' && GLOBAL_VALUE_NAMES.has(staticMemberName(value)))
+				) {
+					if (!isNonEscapingValueUse(parent, key)) {
+						globalValueUses.push({ node, value, parent, key });
 					}
 				}
 			}
@@ -23771,163 +23922,50 @@ function applyStringChildProofs(ast, source, filename, facts) {
 		);
 	}
 	let lexical = null;
+	// One decision guards every intrinsic-derived proof: inline calls, supplied
+	// type facts, and primitive locals. TypeScript keeps a built-in's declared
+	// primitive return type after an asserted replacement, so once a mutation
+	// is visible none of those proofs survive. A write naming a text intrinsic
+	// is always visible; mutator and computed references are visible when
+	// their receiver is a global object, Object, or Reflect, or whenever such a
+	// value escapes into a binding, argument, return, or property where an
+	// alias could reach it. Values from other modules stay outside this proof.
+	let mutationVisible = false;
 	if (
-		intrinsicCalls.length > 0 ||
-		((stringProofs.size > 0 || primitiveProofs.size > 0) &&
-			(writes.length > 0 || intrinsicMutationReferences.length > 0))
+		(intrinsicCalls.length > 0 || stringProofs.size > 0 || primitiveProofs.size > 0) &&
+		(writes.length > 0 || mutatorReferences.length > 0)
 	) {
-		// The existing scope analysis understands var hoisting, parameter defaults,
-		// imports, catch bindings, and TSRX @for/@try scopes. Pay for it only when
-		// an intrinsic candidate or a possible proof-invalidating write needs it.
 		lexical = createLexicalAnalysis(ast);
-		if (writes.some((target) => writesGlobalTextIntrinsic(target, lexical))) {
-			// TypeScript still uses a built-in constructor's declared primitive
-			// return type after an asserted replacement. Decline all new proofs in this
-			// rare module rather than attempting incomplete value-taint analysis.
-			// Supplied ranges were still validated above; explicit text syntax keeps
-			// its existing coercion meaning through isKnownStringExpression.
-			return ast;
-		}
+		mutationVisible = isTextIntrinsicMutationVisible(
+			writes,
+			mutatorReferences,
+			globalValueDestructured ||
+				globalValueUses.some(
+					({ node, value, parent, key }) =>
+						isGlobalValue(value, lexical) &&
+						(value !== node ||
+							value.type !== 'Identifier' ||
+							isIdentifierReference(node, parent, key, lexical)),
+				),
+			lexical,
+		);
 	}
-	if (lexical !== null) {
-		const aliases = new WeakMap();
-		for (const declaration of intrinsicAliases) {
-			const scope = lexical.resolveBinding(
-				lexical.nodeScopes.get(declaration.id),
-				declaration.id.name,
-			)?.scope;
-			if (scope === undefined) continue;
-			let values = aliases.get(scope);
-			if (values === undefined) aliases.set(scope, (values = new Map()));
-			values.set(declaration.id.name, declaration.init);
-		}
-		const initializer = (node) => {
-			const scope = lexical.resolveBinding(lexical.nodeScopes.get(node), node.name)?.scope;
-			return scope === undefined ? undefined : aliases.get(scope)?.get(node.name);
-		};
-		const intrinsicMemberName = (node) => {
-			const property = node.computed ? unwrapTsExpr(node.property) : node.property;
-			return node.computed
-				? property?.type === 'Literal' && typeof property.value === 'string'
-					? property.value
-					: null
-				: property?.type === 'Identifier'
-					? property.name
-					: null;
-		};
-		const globalOrigin = (expression, seen = new Set(), constructors = false) => {
-			const node = unwrapTsExpr(expression);
-			if (!node || seen.has(node)) return null;
-			seen.add(node);
-			if (node.type === 'Identifier') {
-				const scope = lexical.nodeScopes.get(node);
-				if (scope === undefined) return null;
-				if (!lexical.isBound(scope, node.name)) {
-					return INLINE_INTRINSIC_MUTATION_GLOBALS.has(node.name) ||
-						(constructors && TEXT_INTRINSICS.has(node.name))
-						? node.name
-						: null;
-				}
-				return globalOrigin(initializer(node), seen, constructors);
-			}
-			if (node.type === 'ChainExpression') return globalOrigin(node.expression, seen, constructors);
-			if (node.type === 'MemberExpression') {
-				const name = intrinsicMemberName(node);
-				if (name !== 'Object' && name !== 'Reflect' && !(constructors && TEXT_INTRINSICS.has(name)))
-					return null;
-				const origin = globalOrigin(node.object, seen);
-				return origin !== null && INLINE_INTRINSIC_GLOBAL_RECEIVERS.has(origin) ? name : null;
-			}
-			return null;
-		};
-		const freshTarget = (expression, seen = new Set()) => {
-			const node = unwrapTsExpr(expression);
-			if (!node || seen.has(node)) return false;
-			seen.add(node);
-			if (node.type === 'ObjectExpression' || node.type === 'ArrayExpression') return true;
-			return node.type === 'Identifier' && freshTarget(initializer(node), seen);
-		};
-		const visibleMutation =
-			intrinsicMutationReferences.some(([receiver, reference, parent]) => {
-				const origin = globalOrigin(receiver);
-				const key = reference.type === 'Property' ? reference.key : reference.property;
-				const property = reference.computed ? unwrapTsExpr(key) : key;
-				const method = reference.computed ? property?.value : (property?.name ?? property?.value);
-				if (origin === 'Object' || origin === 'Reflect') {
-					// A normal native call targeting a fresh literal cannot directly write
-					// a global constructor. Unknown getter/callback effects retain the
-					// existing builtin assumptions; wrapped/extracted calls fail closed.
-					const target = parent?.arguments?.[0];
-					return !(
-						parent?.type === 'CallExpression' &&
-						parent.optional !== true &&
-						parent.callee === reference &&
-						reference.optional !== true &&
-						INLINE_INTRINSIC_MUTATION_METHODS.has(method) &&
-						freshTarget(target)
-					);
-				}
-				return (
-					origin !== null &&
-					INLINE_INTRINSIC_GLOBAL_RECEIVERS.has(origin) &&
-					(method === '__defineGetter__' ||
-						method === '__defineSetter__' ||
-						(reference.computed && property?.type !== 'Literal'))
-				);
-			}) ||
-			writes.some((target) => {
-				const node = unwrapTsExpr(target);
-				if (node?.type !== 'MemberExpression') return false;
-				const name = node.computed ? node.property?.value : node.property?.name;
-				if (!TEXT_INTRINSICS.has(name) && !(node.computed && node.property?.type !== 'Literal'))
-					return false;
-				const origin = globalOrigin(node.object);
-				return origin !== null && INLINE_INTRINSIC_GLOBAL_RECEIVERS.has(origin);
-			});
-		const unsafeCalls = new WeakSet();
+	if (mutationVisible) {
+		// Supplied ranges were still validated above; explicit text syntax keeps
+		// its existing coercion meaning through isKnownStringExpression.
+		stringProofs.clear();
+		primitiveProofs.clear();
+	} else if (intrinsicCalls.length > 0) {
+		// The existing scope analysis understands var hoisting, parameter defaults,
+		// imports, catch bindings, and TSRX @for/@try scopes.
+		lexical ??= createLexicalAnalysis(ast);
 		for (const call of intrinsicCalls) {
 			const name = call.callee.name;
-			if (ambientIntrinsicValues.has(name)) continue;
+			if (ambientIntrinsicValues.has(name) || call.optional === true) continue;
 			const scope = lexical.nodeScopes.get(call);
 			if (scope !== undefined && !lexical.isBound(scope, name)) {
-				if (visibleMutation) {
-					unsafeCalls.add(call);
-					continue;
-				}
-				if (call.optional === true) continue;
 				if (name === 'String' || name === 'Date') stringProofs.add(call);
 				else primitiveProofs.add(call);
-			}
-		}
-		if (visibleMutation) {
-			// TypeScript still describes the built-in return type after an asserted
-			// replacement. Drop only supplied proofs that depend on these calls;
-			// unrelated typed scalars and JavaScript's own coercion guarantees survive.
-			const unsafeProof = (node, seen = new WeakSet()) => {
-				if (!node || typeof node !== 'object' || seen.has(node)) return false;
-				seen.add(node);
-				if (unsafeCalls.has(node)) return true;
-				if (node.type === 'CallExpression') {
-					let callee = unwrapTsExpr(node.callee);
-					while (callee?.type === 'ChainExpression') callee = unwrapTsExpr(callee.expression);
-					if (callee?.type === 'MemberExpression') {
-						const method = intrinsicMemberName(callee);
-						if (method === 'call' || method === 'apply') callee = callee.object;
-					}
-					// Supplied facts may describe a saved constructor or its Function
-					// call/apply result. Invalidation grants no new primitive admission.
-					if (TEXT_INTRINSICS.has(globalOrigin(callee, new Set(), true))) return true;
-				}
-				if (node.type === 'Identifier' && unsafeProof(initializer(node), seen)) return true;
-				if (Array.isArray(node)) return node.some((child) => unsafeProof(child, seen));
-				for (const key in node) {
-					if (AST_WALK_SKIP_KEYS.has(key)) continue;
-					if (unsafeProof(node[key], seen)) return true;
-				}
-				return false;
-			};
-			for (const proofs of [stringProofs, primitiveProofs]) {
-				for (const proof of proofs) if (unsafeProof(proof)) proofs.delete(proof);
 			}
 		}
 	}
@@ -23939,11 +23977,8 @@ function applyStringChildProofs(ast, source, filename, facts) {
 			constantDeclarations.some((declaration) => isPrimitiveValueExpression(declaration.init)))
 	) {
 		lexical ??= createLexicalAnalysis(ast);
-		// A local alias can mutate a global constructor without spelling its
-		// global receiver. This check only declines new local intrinsic facts;
-		// operator/template primitives and existing child proofs remain.
-		const intrinsicLocalResultsSafe =
-			!intrinsicMutationReference && !writes.some(mayWriteTextIntrinsicMember);
+		// Operator/template primitives stay provable after a visible mutation.
+		const intrinsicLocalResultsSafe = !mutationVisible;
 		const reassigned = collectReassignedBindings(ast);
 		const declarationsByScope = new Map();
 		for (const declaration of constantDeclarations) {
@@ -24049,94 +24084,151 @@ const INTRINSIC_MUTATION_METHODS = new Set([
 	'setPrototypeOf',
 	'deleteProperty',
 ]);
+// Unbound names that may hold the global object, Object, or Reflect. Member
+// reads of these names reach the same values only through a global receiver
+// (`window.top`), except for the unambiguous names below (`x.Reflect`).
+const GLOBAL_OBJECT_NAMES = new Set([
+	'globalThis',
+	'window',
+	'self',
+	'global',
+	'frames',
+	'parent',
+	'top',
+]);
+const GLOBAL_VALUE_NAMES = new Set([...GLOBAL_OBJECT_NAMES, 'Object', 'Reflect']);
+const GLOBAL_VALUE_MEMBERS = new Set(['globalThis', 'window', 'Object', 'Reflect']);
+const TRANSPARENT_VALUE_WRAPPERS = new Set([
+	'TSAsExpression',
+	'TSNonNullExpression',
+	'TSTypeAssertion',
+	'TSSatisfiesExpression',
+	'ParenthesizedExpression',
+	'ChainExpression',
+]);
 
-function mayWriteTextIntrinsicMember(target) {
-	target = unwrapTsExpr(target);
-	if (!target || typeof target !== 'object') return false;
-	if (target.type === 'AssignmentPattern') return mayWriteTextIntrinsicMember(target.left);
-	if (target.type === 'MemberExpression') {
-		return target.computed
-			? target.property?.type !== 'Literal' || TEXT_INTRINSICS.has(target.property.value)
-			: TEXT_INTRINSICS.has(target.property?.name);
-	}
-	if (target.type === 'RestElement') return mayWriteTextIntrinsicMember(target.argument);
-	if (target.type === 'ArrayPattern') {
-		return (target.elements || []).some(mayWriteTextIntrinsicMember);
-	}
-	if (target.type === 'ObjectPattern') {
-		return (target.properties || []).some((property) =>
-			mayWriteTextIntrinsicMember(property.argument ?? property.value),
-		);
-	}
-	return false;
+function unwrapValueExpression(node) {
+	while (node && TRANSPARENT_VALUE_WRAPPERS.has(node.type)) node = node.expression;
+	return node;
 }
 
-const INLINE_INTRINSIC_MUTATION_METHODS = new Set([
-	'assign',
-	'defineProperty',
-	'defineProperties',
-	'set',
-	'__defineGetter__',
-	'__defineSetter__',
-	'setPrototypeOf',
-	'deleteProperty',
-]);
-const INLINE_INTRINSIC_GLOBAL_RECEIVERS = new Set(['globalThis', 'window', 'self', 'global']);
-const INLINE_INTRINSIC_MUTATION_GLOBALS = new Set([
-	'Object',
-	'Reflect',
-	...INLINE_INTRINSIC_GLOBAL_RECEIVERS,
-]);
+function staticMemberName(node) {
+	const property = node.computed ? unwrapTsExpr(node.property) : node.property;
+	if (node.computed) {
+		return property?.type === 'Literal' && typeof property.value === 'string'
+			? property.value
+			: null;
+	}
+	return property?.type === 'Identifier' ? property.name : null;
+}
+
+function staticPropertyKeyName(property) {
+	const key = property.computed ? unwrapTsExpr(property.key) : property.key;
+	if (key?.type === 'Identifier' && !property.computed) return key.name;
+	return key?.type === 'Literal' && typeof key.value === 'string' ? key.value : null;
+}
+
+// A use that reads through, tests, or discards a value cannot alias it.
+function isNonEscapingValueUse(parent, key) {
+	switch (parent?.type) {
+		case 'MemberExpression':
+			return key === 'object';
+		case 'UnaryExpression':
+		case 'BinaryExpression':
+		case 'ExpressionStatement':
+			return true;
+		case 'CallExpression':
+		case 'NewExpression':
+			return key === 'callee';
+		case 'IfStatement':
+		case 'ConditionalExpression':
+		case 'WhileStatement':
+		case 'DoWhileStatement':
+		case 'ForStatement':
+			return key === 'test';
+		default:
+			return false;
+	}
+}
+
+function isGlobalValue(expression, lexical) {
+	const node = unwrapValueExpression(expression);
+	if (node?.type === 'Identifier') {
+		if (!GLOBAL_VALUE_NAMES.has(node.name)) return false;
+		const scope = lexical.nodeScopes.get(node);
+		return scope !== undefined && !lexical.isBound(scope, node.name);
+	}
+	if (node?.type !== 'MemberExpression') return false;
+	const name = staticMemberName(node);
+	return (
+		GLOBAL_VALUE_MEMBERS.has(name) ||
+		(GLOBAL_VALUE_NAMES.has(name) && isGlobalValue(node.object, lexical))
+	);
+}
 
 // Inspect the reference itself: TS/optional wrappers and extracted methods may
-// hide its eventual call. Lexical receiver checks keep ordinary computed reads
-// and application .set methods from invalidating intrinsic-result proofs.
+// hide its eventual call.
 function isPossibleIntrinsicMutator(node) {
 	const key = node.type === 'Property' ? node.key : node.property;
 	const property = node.computed ? unwrapTsExpr(key) : key;
 	const name = node.computed ? property?.value : (property?.name ?? property?.value);
-	return (
-		INLINE_INTRINSIC_MUTATION_METHODS.has(name) || (node.computed && property?.type !== 'Literal')
-	);
+	return INTRINSIC_MUTATION_METHODS.has(name) || (node.computed && property?.type !== 'Literal');
 }
 
-// A visible replacement of a global constructor invalidates inferred text
-// proofs for the module. Calls still evaluate the authored callee: a replacement
-// may return an element rather than the built-in's primitive result.
-function writesGlobalTextIntrinsic(target, lexical) {
-	target = unwrapTsExpr(target);
-	if (!target || typeof target !== 'object') return false;
-	const unbound = (node, name) => {
+function isTextIntrinsicMutationVisible(writes, mutatorReferences, globalValueEscapes, lexical) {
+	const unboundIntrinsic = (node) => {
 		const scope = lexical.nodeScopes.get(node);
-		return scope !== undefined && !lexical.isBound(scope, name);
-	};
-	if (target.type === 'Identifier') {
-		return TEXT_INTRINSICS.has(target.name) && unbound(target, target.name);
-	}
-	if (target.type === 'MemberExpression') {
-		const name = target.computed ? target.property?.value : target.property?.name;
-		const object = target.object;
 		return (
-			TEXT_INTRINSICS.has(name) &&
-			object?.type === 'Identifier' &&
-			(object.name === 'globalThis' ||
-				object.name === 'window' ||
-				object.name === 'self' ||
-				object.name === 'global') &&
-			unbound(object, object.name)
+			TEXT_INTRINSICS.has(node.name) && scope !== undefined && !lexical.isBound(scope, node.name)
 		);
-	}
-	if (target.type === 'AssignmentPattern') return writesGlobalTextIntrinsic(target.left, lexical);
-	if (target.type === 'RestElement') return writesGlobalTextIntrinsic(target.argument, lexical);
-	if (target.type === 'ArrayPattern') {
-		return (target.elements || []).some((element) => writesGlobalTextIntrinsic(element, lexical));
-	}
-	if (target.type === 'ObjectPattern') {
-		return (target.properties || []).some((property) =>
-			writesGlobalTextIntrinsic(property.argument ?? property.value, lexical),
+	};
+	const mayReachIntrinsic = (receiver) =>
+		receiver == null || globalValueEscapes || isGlobalValue(receiver, lexical);
+	const writesIntrinsic = (target) => {
+		target = unwrapTsExpr(target);
+		if (!target || typeof target !== 'object') return false;
+		if (target.type === 'Identifier') return unboundIntrinsic(target);
+		if (target.type === 'MemberExpression') {
+			// A named write is visible on any receiver; a computed key only when
+			// its receiver can be a global object.
+			const property = target.computed ? unwrapTsExpr(target.property) : target.property;
+			if (!target.computed) return TEXT_INTRINSICS.has(property?.name);
+			if (property?.type === 'Literal') return TEXT_INTRINSICS.has(property.value);
+			return mayReachIntrinsic(target.object);
+		}
+		if (target.type === 'AssignmentPattern') return writesIntrinsic(target.left);
+		if (target.type === 'RestElement') return writesIntrinsic(target.argument);
+		if (target.type === 'ArrayPattern') return (target.elements || []).some(writesIntrinsic);
+		if (target.type === 'ObjectPattern') {
+			return (target.properties || []).some((property) =>
+				writesIntrinsic(property.argument ?? property.value),
+			);
+		}
+		return false;
+	};
+	if (writes.some(writesIntrinsic)) return true;
+	return mutatorReferences.some(({ reference, receiver, parent }) => {
+		const key = reference.type === 'Property' ? reference.key : reference.property;
+		const property = reference.computed ? unwrapTsExpr(key) : key;
+		const method = reference.computed ? property?.value : (property?.name ?? property?.value);
+		// These install accessors on whichever object receives them.
+		if (method === '__defineGetter__' || method === '__defineSetter__') return true;
+		if (!mayReachIntrinsic(receiver)) return false;
+		if (globalValueEscapes || receiver == null) return true;
+		const target = unwrapValueExpression(receiver);
+		const receiverName = target.type === 'Identifier' ? target.name : staticMemberName(target);
+		if (receiverName !== 'Object' && receiverName !== 'Reflect') return true;
+		// A direct native call whose arguments hold no global value (any such
+		// argument escapes) cannot target a global object. Wrapped, optional,
+		// and extracted methods hide their eventual target.
+		return !(
+			parent?.type === 'CallExpression' &&
+			parent.callee === reference &&
+			parent.optional !== true &&
+			reference.optional !== true &&
+			INTRINSIC_MUTATION_METHODS.has(method)
 		);
-	}
-	return false;
+	});
 }
 
 // Syntax/annotation proof shared by text bindings and non-text optimizations.
@@ -25418,6 +25510,8 @@ function planJsx(
 		if (signalHelper !== null) {
 			ctx.runtimeNeeded.add(signalHelper);
 			registerAttrLoweringOrigin(ctx, b.nameOrigin, signalHelper, b.name);
+			if (signalHelper === 'bindSignalAttribute' && b.kind !== 'class')
+				ctx.runtimeNeeded.add(attrBindingHelper(b));
 		}
 		if (!b.signalDirect && (b.kind === 'text' || b.kind === 'textOnlyChild')) {
 			ctx.runtimeNeeded.add('setText');
@@ -27138,8 +27232,17 @@ function directSignalBindingArgs(bind, host, previous, value = bind.expr, previo
 		attrLoweringToken(b.literal(bind.name), bind),
 		bind.expr,
 		b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
-		b.literal(bind.kind, JSON.stringify(bind.kind)),
+		directSignalAttributeWriter(bind),
 	];
+}
+
+// Class composition selects its writer from the element's namespace at runtime.
+// Every other attribute passes the writer its ordinary binding would call, so a
+// statically admitted name never retains the generic setAttribute route.
+function directSignalAttributeWriter(bind) {
+	return bind.kind === 'class'
+		? b.literal('class', JSON.stringify('class'))
+		: b.id(`_$${attrBindingHelper(bind)}`);
 }
 
 function emitBindingMount(bind, elVar, bag) {
@@ -27260,7 +27363,16 @@ function emitBindingMount(bind, elVar, bag) {
 			return st(
 				b.block([
 					...mountHost(),
-					b.stmt(b.call(bind.helper, b.id('__s'), b.literal(bind.slotIndex), el(), bind.expr)),
+					b.stmt(
+						b.call(
+							bind.helper,
+							b.id('__s'),
+							b.literal(bind.slotIndex),
+							el(),
+							bind.expr,
+							...(bind.literal ? [b.literal(1)] : []),
+						),
+					),
 				]),
 			);
 		}
@@ -27758,7 +27870,16 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 		}
 		case 'nativeStyle': {
 			return st(
-				b.stmt(b.call(bind.helper, b.id('__s'), b.literal(bind.slotIndex), F('_el'), bind.expr)),
+				b.stmt(
+					b.call(
+						bind.helper,
+						b.id('__s'),
+						b.literal(bind.slotIndex),
+						F('_el'),
+						bind.expr,
+						...(bind.literal ? [b.literal(1)] : []),
+					),
+				),
 			);
 		}
 		case 'nativeChangeRuntime': {
@@ -29220,6 +29341,7 @@ function emitElementHtml(
 				bindings.push({
 					id: bindings.length,
 					kind: 'nativeStyle',
+					literal: isPlainStyleObjectLiteral(inner),
 					expr: tsrxExprNode(inner, ctx, componentName, inlinedSubs),
 					path,
 					ns: hostNs,
@@ -33286,6 +33408,50 @@ function escapeMultilineStringLiterals(node) {
 		}
 		return null;
 	});
+}
+
+// Props for a proven void root's `<C ... />` target, or null when the element
+// needs the general descriptor path: a `key` (or a spread that may carry one)
+// changes root identity, children need descriptor lowering, and a value that
+// can run user code must keep its deferred render-scope evaluation. The literal
+// is fresh, so it already has the descriptor's own-props copy shape.
+function voidRootElementProps(element) {
+	if (element.children?.length > 0) return null;
+	const properties = [];
+	for (const attribute of element.openingElement.attributes) {
+		if (
+			attribute.type !== 'JSXAttribute' ||
+			attribute.name?.type !== 'JSXIdentifier' ||
+			attribute.name.name === 'key' ||
+			// In a literal, `__proto__` sets the prototype, which the element path
+			// then drops by copying own keys only. Keep that path's semantics.
+			attribute.name.name === '__proto__'
+		)
+			return null;
+		const value = attribute.value;
+		let expression;
+		if (value == null) expression = inheritOriginLoc(b.literal(true), attribute);
+		else if (
+			(value.type === 'Literal' || value.type === 'StringLiteral') &&
+			typeof value.value === 'string'
+		)
+			expression = inheritOriginLoc(b.literal(value.value), value);
+		else if (
+			value.type === 'JSXExpressionContainer' &&
+			(isStaticJsxValueExpression(value.expression) ||
+				unwrapTsExpr(value.expression)?.type === 'Identifier')
+		)
+			expression = value.expression;
+		else return null;
+		const name = attribute.name.name;
+		properties.push(
+			inheritOriginLoc(
+				b.prop('init', /^[A-Za-z_$][\w$]*$/.test(name) ? b.id(name) : b.literal(name), expression),
+				attribute,
+			),
+		);
+	}
+	return inheritOriginLoc(b.object(properties), element);
 }
 
 // Identity-preserving copy-on-write map: `mutate` returns a replacement node

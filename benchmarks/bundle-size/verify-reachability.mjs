@@ -40,12 +40,24 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 	'root-static-specialized': {
 		text: 'Octane',
 	},
+	'root-chained-jsx': {
+		text: 'Octane',
+	},
 	'hooks-state': {
 		before: '0',
 		after: '1',
 		clicks: 1,
 		effects: 1,
 		cleanups: 1,
+		cleaned: true,
+	},
+	'prop-attributes': {
+		sanitized: true,
+		title: 'Docs',
+		href: '/docs',
+		text: 'Docs',
+		count: '1',
+		clicks: 1,
 		cleaned: true,
 	},
 	context: {
@@ -129,6 +141,10 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 	'binding-mantine-hooks': {
 		before: '2',
 		after: '3',
+		cleaned: true,
+	},
+	'binding-apollo-client': {
+		text: 'provided',
 		cleaned: true,
 	},
 	'binding-usehooks-ts': {

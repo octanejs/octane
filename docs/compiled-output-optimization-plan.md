@@ -533,6 +533,20 @@ Independent, individually-measurable items, roughly by value:
   trusted proof; Rspack's available `importModule` route was rejected because
   it would evaluate user code during the build. Evaluation order and the public
   `Root` object remain unchanged.
+
+  One lifetime proof (`compiler/void-roots.js`) now serves both the plain-module
+  transform and the full `.tsx`/`.tsrx` compiler, for `createRoot` and
+  `hydrateRoot` alike. It accepts a chained `factory(target).render(...)`
+  anywhere, a discarded `hydrateRoot(...)` statement, and a `const` root in a
+  function body or a non-exported module scope whose every reference is a
+  direct `render`/`unmount` call. Targets are same-file void definitions or
+  adapter-proven imports, spelled as a bare identifier or a sole `<Component />`
+  element. On a proven root, a keyless, childless element whose attribute
+  values are literals, functions, or identifiers lowers to
+  `render(Component, __voidRootProps(Component, props))`, which applies live
+  `defaultProps` exactly as the element path does. Keys, children, spreads, and
+  values that can run user code keep the element descriptor and its deferred
+  evaluation.
 - **3n. Narrow expression and DOM helper proofs — LANDED 2026-07-15.** A
   conditional expression is now a known string only when both arms are known
   strings, allowing the string-hole path without widening the existing type

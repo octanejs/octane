@@ -222,6 +222,37 @@ export const value$ = scope.signal$('value', 0);`;
 		});
 	});
 
+	it.each(modes.filter((options) => !('mode' in options)))(
+		'brackets only components that can evaluate authored code in %j',
+		(options) => {
+			const { code } = compile(
+				`${PREFIX}
+function Child() @{ <b>{'child'}</b> }
+export function Static(props) @{ <div class="a" title={'b'}>{'static'}<span>{\`t\`}</span></div> }
+export function WithChild() @{ <div><Child /></div> }
+export function Destructured({ label }) @{ <div>{'static'}</div> }
+export function Setup() @{
+	const label = 'x';
+	<div>{'static'}</div>
+}
+export function Dynamic(props) @{ <div title={props.label} /> }`,
+				FILENAME,
+				options,
+			);
+			const bracketed = (name: string) => {
+				const start = code.indexOf(`function ${name}(`);
+				const end = code.indexOf('\nexport const', start + 1);
+				return code.slice(start, end === -1 ? undefined : end).includes('beginNativeReadScope');
+			};
+			expect(bracketed('Static')).toBe(false);
+			// Component tags, parameter patterns and setup statements run authored code.
+			expect(bracketed('WithChild')).toBe(true);
+			expect(bracketed('Destructured')).toBe(true);
+			expect(bracketed('Setup')).toBe(true);
+			expect(bracketed('Dynamic')).toBe(true);
+		},
+	);
+
 	it('slots plain local hooks without configuration', () => {
 		const source = `import { useSignal$ } from 'octane/signals/client';
 export function useCounter$() { return useSignal$(0); }`;
