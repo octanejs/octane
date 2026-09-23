@@ -1050,6 +1050,10 @@ interface NativeStyleBinding {
 	__flags: number;
 	__teardown: typeof disposeNativeStyleBinding;
 	block: Block | null;
+	// Scalar-literal writes before any Block exists: the host and the last
+	// applied style, which seeds the Block's cache if a handle arrives later.
+	el: HTMLElement | SVGElement | null;
+	style: unknown;
 }
 
 function disposeNativeStyleBinding(binding: NativeStyleBinding): void {
@@ -1080,8 +1084,64 @@ export function nativeStyleBinding(
 	slotIndex: number,
 	el: HTMLElement | SVGElement,
 	value: any,
+	literal?: 1,
 ): void {
+	// The compiler passes `literal` for a fresh object literal of plain data
+	// properties, so enumerating it runs no accessor. When every value is a
+	// scalar there is no native protocol to read: write it like an ordinary style
+	// binding and allocate the owning Block only once a structured value appears.
+	if (literal === 1) {
+		const binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
+		if ((binding === undefined || binding.block === null) && isScalarStyleLiteral(value)) {
+			writeScalarNativeStyle(owner, slotIndex, binding, el, value);
+			return;
+		}
+	}
 	nativePresentationBinding(owner, slotIndex, el, nativeStyleBody, { el, value });
+}
+
+function isScalarStyleLiteral(value: Record<string, unknown>): boolean {
+	for (const name in value) {
+		const item = value[name];
+		if (item !== null && (typeof item === 'object' || typeof item === 'function')) return false;
+	}
+	return true;
+}
+
+function writeScalarNativeStyle(
+	owner: Scope,
+	slotIndex: number,
+	binding: NativeStyleBinding | undefined,
+	el: HTMLElement | SVGElement,
+	value: Record<string, unknown>,
+): void {
+	if (binding === undefined) {
+		binding = {
+			__kind: 'nativeStyleBinding',
+			__flags: SLOT_FLAG_TEARDOWN,
+			__teardown: disposeNativeStyleBinding,
+			block: null,
+			el,
+			style: undefined,
+		};
+		if (owner.slots.length === 0) owner.slots.push(undefined);
+		owner.slots[slotIndex] = binding;
+		registerSlot(owner, binding);
+	} else if (binding.el !== el) {
+		// An incomplete template mount retries with a fresh clone, which must be
+		// written in full even when its values match the abandoned host.
+		if (TRANSITION_JOURNAL !== null) {
+			TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'el', binding.el);
+			TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
+		}
+		binding.el = el;
+		binding.style = undefined;
+	}
+	setStyle(el, value, binding.style);
+	if (TRANSITION_JOURNAL !== null)
+		TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
+	// A compiler literal is fresh per render and never escapes, so it is its own snapshot.
+	binding.style = value;
 }
 
 interface NativeProjectionProps {
@@ -1207,12 +1267,22 @@ function nativePresentationBinding(
 			__flags: SLOT_FLAG_TEARDOWN,
 			__teardown: disposeNativeStyleBinding,
 			block,
+			el: null,
+			style: undefined,
 		};
 		// The template bag commits after its bindings. Reserve its first index
 		// to keep the array packed, and publish ownership before a read can suspend.
 		if (owner.slots.length === 0) owner.slots.push(undefined);
 		owner.slots[slotIndex] = binding;
 		registerSlot(owner, binding);
+	} else if (binding.block === null) {
+		// A scalar style literal was written directly. Its first structured value
+		// needs an owning Block, seeded with the style that host already carries.
+		const block = createBlock('control-flow', owner.block, el, null, null, body, props);
+		block.parent = owner;
+		if (binding.el === el) block.slots[0] = binding.style;
+		journalRootProperty(binding, 'block', binding.block);
+		binding.block = block;
 	} else {
 		const block = binding.block!;
 		if (block.parentNode !== el) {
@@ -19697,10 +19767,10 @@ function preparedPresentationAttribute(
 	el: Element,
 	name: string,
 	value: unknown,
-	kind: string,
+	kind: 'attr' | 'booleanAttr' | DirectSignalAttributeKind,
 ): unknown {
 	if (kind === 'class') return value == null || value === false ? null : normalizeClass(value);
-	if (kind === 'booleanAttr')
+	if (kind === 'booleanAttr' || kind === setBooleanAttribute)
 		return !!value && typeof value !== 'function' && typeof value !== 'symbol';
 	const result = coerceAttrValue(el, name, value);
 	// Generic boolean writers require truthiness, not their normalized empty string.
@@ -19716,7 +19786,7 @@ function preparePresentationSignalBinding(
 	const name = text ? undefined : (args[3] as string);
 	const value = args[text ? 3 : 4];
 	const site = args[text ? 4 : 5] as string;
-	const attributeKind = text ? undefined : ((args[6] ?? 'attr') as DirectSignalAttributeKind);
+	const attributeKind = text ? undefined : (args[6] as DirectSignalAttributeKind);
 	const policy = text
 		? args[5]
 			? DIRECT_SIGNAL_TEXT_ONLY_POLICY
@@ -20516,7 +20586,12 @@ export function hydrateClaimedBindingCaches(
 }
 
 type DirectSignalBindingKind = 'text' | 'textOnlyChild' | 'attribute' | 'value' | 'checked';
-type DirectSignalAttributeKind = 'attr' | 'class' | 'booleanAttr' | 'ariaAttr' | 'stringData';
+// The compiler names the concrete scalar writer (setPlainAttribute,
+// setURLAttribute, setStringData, setBooleanAttribute, setAriaAttribute, or the
+// generic setAttribute) so an ordinary binding retains only that writer's graph.
+// Class composition is the one namespace-dependent writer, so it stays a tag.
+type DirectSignalAttributeWriter = (el: Element, name: string, value: unknown) => void;
+type DirectSignalAttributeKind = 'class' | DirectSignalAttributeWriter;
 
 // Shared renderer policies keep the subscription/lifetime path independent of
 // control adoption. Scalar bindings still use their existing cache tokens.
@@ -20534,6 +20609,7 @@ interface DirectSignalBindingPolicy {
 	readonly control?: {
 		validateNew: (scope: Scope, target: Node, kind: DirectSignalBindingKind) => void;
 		snapshot: (target: Node, site: string) => ReturnType<typeof snapshotHydrationControl>;
+		restored: (target: Node, value: unknown) => boolean;
 		activate: (binding: DirectSignalBinding, revision: number) => void;
 		adopt: (binding: DirectSignalBinding) => void;
 	};
@@ -20690,23 +20766,10 @@ function writeDirectSignalAttribute(
 	attributeKind?: DirectSignalAttributeKind,
 ): unknown {
 	const element = target as Element;
-	switch (attributeKind) {
-		case 'class':
-			if (element.namespaceURI === HTML_NS) setClassName(element, value);
-			else setClassAttr(element, value);
-			break;
-		case 'booleanAttr':
-			setBooleanAttribute(element, name!, value);
-			break;
-		case 'ariaAttr':
-			setAriaAttribute(element, name!, value);
-			break;
-		case 'stringData':
-			setStringData(element, name!, value);
-			break;
-		default:
-			setAttribute(element, name!, value);
-	}
+	if (attributeKind === 'class') {
+		if (element.namespaceURI === HTML_NS) setClassName(element, value);
+		else setClassAttr(element, value);
+	} else attributeKind!(element, name!, value);
 	return value;
 }
 
@@ -20754,6 +20817,7 @@ const DIRECT_SIGNAL_CONTROL_POLICY: NonNullable<DirectSignalBindingPolicy['contr
 		if (snapshot !== null) validateDirectSignalControl(target as Element, site);
 		return snapshot;
 	},
+	restored: (target, value) => isRestoredHydrationTextarea(target as Element, value),
 	activate(binding, revision) {
 		installDirectSignalControl(binding);
 		if (!binding.pendingControl) consumeHydrationControl(binding.target as Element, revision);
@@ -20911,7 +20975,9 @@ function createDirectSignalBinding(
 		activeHydration() !== null &&
 		isWritableSignal(handle) &&
 		controlSnapshot !== null &&
-		(controlSnapshot.editRevision > 0 || isRestoredHydrationTextarea(target as Element, initial));
+		// Only control policies snapshot, so text/attribute bindings never retain
+		// the restored-textarea adoption graph.
+		(controlSnapshot.editRevision > 0 || policy.control!.restored(target, initial));
 	if (binding.pendingControl) binding.value = initial;
 	if (!binding.pendingControl) writeDirectSignalBinding(binding, initial);
 	if (STAGED_COMMIT_CAPTURE !== null) {
@@ -21091,7 +21157,7 @@ export function bindSignalAttribute(
 	name: string,
 	value: unknown,
 	site: string,
-	attributeKind: DirectSignalAttributeKind = 'attr',
+	attributeKind: DirectSignalAttributeKind,
 ): unknown {
 	// Defined scalar equality needs no binding token/handle probe. Undefined
 	// still reconciles hydration; stable objects/functions can reveal handles.

@@ -3,7 +3,7 @@ import { createRoot, flushSync, hydrateRoot } from 'octane';
 import { renderToString } from 'octane/server';
 import { createScope } from 'octane/signals';
 import * as client from './_fixtures/inline-value-conversions.tsrx';
-import { loadServerFixture } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 
 const server = loadServerFixture<typeof client>(
 	'packages/octane/tests/_fixtures/inline-value-conversions.tsrx',
@@ -89,3 +89,56 @@ describe.each(mutations)('inline conversion after visible %s mutation', (mutatio
 		}
 	});
 });
+
+// Each replacement reaches the global object through an alias no receiver
+// pattern names: a mutable binding, a parameter, a self-reference, a returned
+// value, or an array element. None of them may keep a builtin text proof.
+const aliasedMutations: Record<string, string> = {
+	letAlias: 'let g: any = globalThis; g.String = props.replacement;',
+	parameterAlias:
+		'const install = (g: any) => { g.String = props.replacement; }; install(globalThis);',
+	selfReference: '(globalThis as any).globalThis.String = props.replacement;',
+	returnedGlobal: 'const getG = () => globalThis as any; getG().String = props.replacement;',
+	escapedTarget:
+		"const target = [globalThis][0]; Reflect.set(target, 'String', props.replacement);",
+	letNamespace:
+		"let R: any = Reflect; const g = globalThis; R.set(g, 'String', props.replacement);",
+};
+
+describe.each(Object.entries(aliasedMutations))(
+	'inline conversion after %s mutation',
+	(_, code) => {
+		it.each([
+			['inline', '<output>{String(props.value$) as string}</output>'],
+			['local', '<output>{local}</output>'],
+		])('renders the real handle on the server (%s)', (_, use) => {
+			const source = `import type { SignalHandle } from 'octane/signals';
+export function View(props: { value$: SignalHandle<string>; replacement: any }) @{
+	${code}
+	const local = String(props.value$);
+	${use}
+}`;
+			for (const dev of [false, true]) {
+				const { View } = loadCompiledFixtureSource<{ View: any }>(source, {
+					id: '/project/AliasedIntrinsicMutation.tsrx',
+					mode: 'server',
+					compileOptions: { dev, hmr: false },
+				});
+				const scope = createScope({ scopeKey: 'aliased-inline-conversion' });
+				const value$ = scope.signal$('value', 'first');
+				const builtin = String;
+				const replacement = (value: unknown) => (value === value$ ? value : builtin(value));
+				Object.setPrototypeOf(replacement, builtin);
+				let html = '';
+				try {
+					restoreGlobals(() => {
+						html = renderToString(View, { value$, replacement }).html;
+					});
+				} finally {
+					scope.dispose();
+				}
+				expect(html).toMatch(/<output>(?:<!--\[-->)?first(?:<!--\]-->)?<\/output>/);
+			}
+		});
+	},
+);
