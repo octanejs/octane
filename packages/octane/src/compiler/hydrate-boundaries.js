@@ -8,6 +8,7 @@
  * intentionally instantiated afresh for every resource query.
  */
 import { builders as b, parseModule, strongHash } from '@tsrx/core';
+import { inheritGeneratedOrigin } from './generated-origin.js';
 import {
 	createLexicalAnalysis,
 	forEachRuntimeAstChild,
@@ -127,45 +128,6 @@ const TRANSPARENT_TS_EXPRESSIONS = new Set([
 	'TSSatisfiesExpression',
 	'TSTypeAssertion',
 ]);
-
-function inheritGeneratedOrigin(root, origin) {
-	const seen = new WeakMap();
-	const visit = (value) => {
-		if (!value || typeof value !== 'object') return value;
-		// Stylesheet descendants use offsets into their own CSS source and do
-		// not carry JavaScript locations. Keep that adopted grammar intact.
-		if (value.type === 'StyleSheet') return value;
-		if (seen.has(value)) return seen.get(value);
-		seen.set(value, value);
-		if (Array.isArray(value)) {
-			let output = null;
-			for (let index = 0; index < value.length; index++) {
-				const mapped = visit(value[index]);
-				if (output === null && mapped !== value[index]) output = value.slice(0, index);
-				if (output !== null) output.push(mapped);
-			}
-			const result = output ?? value;
-			seen.set(value, result);
-			return result;
-		}
-		let output = null;
-		if (typeof value.type === 'string' && value.loc == null && origin?.loc != null) {
-			output = { ...value, start: origin.start, end: origin.end, loc: origin.loc };
-		}
-		for (const [key, child] of Object.entries(value)) {
-			if (SKIP_KEYS.has(key)) continue;
-			const mapped = visit(child);
-			if (mapped !== child) {
-				if (output === null) output = { ...value };
-				output[key] = mapped;
-			}
-		}
-		const result = output ?? value;
-		seen.set(value, result);
-		return result;
-	};
-	return visit(root);
-}
 
 function mapAstCow(value, replace) {
 	if (!value || typeof value !== 'object') return value;
@@ -1278,9 +1240,41 @@ function captureBindingScope(lexical, node, name) {
 	);
 }
 
+// A pattern binding's value is its declarator initializer or, when that part is
+// undefined, any default on the path to it (`const { value = new Map() } = props`).
+function recordPatternInitializers(pattern, scopeNode, values, record) {
+	if (!pattern) return;
+	if (pattern.type === 'TSParameterProperty') {
+		recordPatternInitializers(pattern.parameter, scopeNode, values, record);
+	} else if (pattern.type === 'Identifier') {
+		for (const value of values) record(pattern.name, scopeNode, value);
+		if (values.length === 0) record(pattern.name, scopeNode, null);
+	} else if (pattern.type === 'AssignmentPattern') {
+		recordPatternInitializers(pattern.left, scopeNode, [...values, pattern.right], record);
+	} else if (pattern.type === 'RestElement') {
+		recordPatternInitializers(pattern.argument, scopeNode, values, record);
+	} else if (pattern.type === 'ArrayPattern') {
+		for (const element of pattern.elements ?? []) {
+			recordPatternInitializers(element, scopeNode, values, record);
+		}
+	} else if (pattern.type === 'ObjectPattern') {
+		for (const property of pattern.properties ?? []) {
+			recordPatternInitializers(property.argument ?? property.value, scopeNode, values, record);
+		}
+	}
+}
+
 function bindingInitializers(ast, lexical) {
 	const initializers = new WeakMap();
 	const seen = new WeakSet();
+	const record = (name, node, value) => {
+		const scope = captureBindingScope(lexical, node, name);
+		let bindings = initializers.get(scope);
+		if (bindings === undefined) initializers.set(scope, (bindings = new Map()));
+		let values = bindings.get(name);
+		if (values === undefined) bindings.set(name, (values = []));
+		values.push(value);
+	};
 	const visit = (node) => {
 		if (!node || typeof node !== 'object' || seen.has(node)) return;
 		seen.add(node);
@@ -1289,16 +1283,18 @@ function bindingInitializers(ast, lexical) {
 			return;
 		}
 		if (node.type === 'VariableDeclarator') {
-			const names = new Set();
-			collectBindingNames(node.id, names);
-			for (const name of names) {
-				const scope = captureBindingScope(lexical, node, name);
-				let bindings = initializers.get(scope);
-				if (bindings === undefined) initializers.set(scope, (bindings = new Map()));
-				let values = bindings.get(name);
-				if (values === undefined) bindings.set(name, (values = []));
-				values.push(node.init ?? null);
-			}
+			recordPatternInitializers(node.id, node, [node.init ?? null], record);
+		} else if (
+			(node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') &&
+			node.id?.type === 'Identifier'
+		) {
+			// A declaration is its own initializer: the parent creates that identity.
+			record(node.id.name, node, node);
+		}
+		if (isFunction(node)) {
+			// Parameter defaults run in the owner when the caller omits the value.
+			for (const param of node.params ?? [])
+				recordPatternInitializers(param, node.body, [], record);
 		}
 		for (const [key, child] of Object.entries(node)) {
 			if (!SKIP_KEYS.has(key)) visit(child);
@@ -1356,6 +1352,7 @@ function unsupportedIndependentInitializer(node, lexical, initializers, assigned
 		if (
 			isFunction(node) ||
 			node.type === 'ClassExpression' ||
+			node.type === 'ClassDeclaration' ||
 			node.type === 'NewExpression' ||
 			node.type === 'CallExpression' ||
 			node.type === 'OptionalCallExpression'

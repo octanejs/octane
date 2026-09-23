@@ -118,9 +118,11 @@ test('immutable primitive locals omit optional value adapters in client and SSR 
 			setup: `const env=globalThis;${mutation}const value=String(props.value);`,
 			primitive: false,
 		})),
+		// A computed read on an application receiver cannot reach a global
+		// constructor, so the builtin result stays provable beside it.
 		{
 			setup: 'const observed=props.values[props.index];const value=String(observed);',
-			primitive: false,
+			primitive: true,
 		},
 		{
 			setup: 'const observed=props.values[props.index];const value=observed+1;',

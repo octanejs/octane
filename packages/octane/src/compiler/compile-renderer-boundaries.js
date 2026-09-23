@@ -5,6 +5,7 @@ import {
 } from './renderer-boundaries.js';
 import { lowerUniversalRendererRegionAst } from './compile-universal.js';
 import { builders as b, clone_ast_node, parseModule } from '@tsrx/core';
+import { inheritGeneratedOrigin } from './generated-origin.js';
 
 const DOM_RENDERER = Object.freeze({ id: 'dom', module: 'octane', target: 'dom' });
 const AUTO_RUNTIME_HOOKS = new Set([
@@ -31,28 +32,6 @@ const AUTO_RUNTIME_HOOKS = new Set([
 	'useContext',
 ]);
 const AST_SKIP_KEYS = new Set(['end', 'loc', 'metadata', 'parent', 'range', 'start']);
-
-function inheritGeneratedOrigin(root, origin) {
-	const seen = new WeakSet();
-	const visit = (value) => {
-		if (!value || typeof value !== 'object' || seen.has(value)) return;
-		seen.add(value);
-		if (Array.isArray(value)) {
-			for (const item of value) visit(item);
-			return;
-		}
-		if (typeof value.type === 'string' && value.loc == null && origin?.loc != null) {
-			value.start = origin.start;
-			value.end = origin.end;
-			value.loc = origin.loc;
-		}
-		for (const [key, child] of Object.entries(value)) {
-			if (!AST_SKIP_KEYS.has(key)) visit(child);
-		}
-	};
-	visit(root);
-	return root;
-}
 
 function mapAstCow(value, replace) {
 	if (!value || typeof value !== 'object') return value;

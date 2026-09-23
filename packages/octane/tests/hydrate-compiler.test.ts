@@ -1258,6 +1258,30 @@ export function App(props) @{
 		expect(() => compiler().transform(serializable, FILE, { environment: 'client' })).not.toThrow();
 	});
 
+	it('checks component parameter defaults as owner initializers', () => {
+		const source = (params: string) => `
+import { Hydrate, useRef } from 'octane';
+import { interaction } from 'octane/hydration';
+import { choose } from './actions';
+export function App(${params}) @{
+  <Hydrate independent when={interaction()}><button onClick={() => choose(value)}>Choose</button></Hydrate>
+}
+`;
+		for (const params of ['{ value = useRef(null) }', 'value = new Map()']) {
+			expect(() =>
+				compiler().transform(source(params), FILE, { environment: 'client' }),
+			).toThrowError(expect.objectContaining({ code: 'OCTANE_HYDRATE_INDEPENDENT_OWNER_CAPTURE' }));
+		}
+		const result = compiler().transform(source("{ value = 'Allowed' }"), FILE, {
+			environment: 'client',
+		});
+		if (!result || !('independentWidgets' in result))
+			throw new Error('Missing independent widget metadata');
+		expect(result.independentWidgets?.[0]?.captureSchema).toEqual([
+			{ name: 'value', type: 'json' },
+		]);
+	});
+
 	for (const authoring of ['template', 'jsx'] as const) {
 		for (const dev of [false, true]) {
 			for (const environment of ['client', 'server'] as const) {
@@ -1351,6 +1375,8 @@ export function App() ${authoring === 'template' ? '@{' : '{'}
 							"const data = 'Allowed'; const value = { label: data };",
 							"const owner = useRef(null); const value = { owner: 'Allowed' };",
 							"type Data = { label: string }; const value = { label: 'Allowed' } as Data;",
+							"const { value = 'Allowed' } = props;",
+							"const [value = { label: 'Allowed' }] = props.list;",
 						]) {
 							const result = createOctaneCompiler({ root: ROOT, hmr: false, dev }).transform(
 								sourceWithCapture(setup, unrelated),
@@ -1375,6 +1401,14 @@ export function App() ${authoring === 'template' ? '@{' : '{'}
 						'const value = useRef(null).current;',
 						'const [owner] = useState(0); const value = owner;',
 						"let value = 'Allowed'; value = 'Changed';",
+						// Pattern defaults and declarations are initializers too.
+						'const { value = useRef(null) } = props;',
+						'const { value = new Map() } = props;',
+						'const [value = useState(0)] = props.list;',
+						'const owner = useRef(null); const { value = owner } = props;',
+						'const { nested: { value = useRef(null) } = {} } = props;',
+						'function value() { return 1; }',
+						'class value {}',
 					]) {
 						expect(() =>
 							createOctaneCompiler({ root: ROOT, hmr: false, dev }).transform(

@@ -39,6 +39,7 @@ import {
 	MixedBoundaryApp,
 } from './_fixtures/universal-mixed-boundaries.tsrx';
 import { ReverseScene } from './_fixtures/universal-mixed-scene.object.tsrx';
+import { StyledReverseScene } from './_fixtures/universal-styled-region.object.tsrx';
 import { ReverseOwnerDom } from './_fixtures/universal-reverse-owner.tsrx';
 import { OwnedCanvasApp } from './_fixtures/universal-owned-canvas-app.tsrx';
 import { getOwnedCanvasContainer } from './_fixtures/universal-owned-canvas.tsrx';
@@ -907,6 +908,23 @@ describe('compiler-owned renderer child regions', () => {
 		const dom = mount(typed.component as ComponentBody<{ render: () => unknown }>, typed.props);
 		expect(dom.html()).toBe('<!----><section class="overlay">overlay</section><!---->');
 
+		dom.unmount();
+		root.unmount();
+	});
+
+	it('embeds a scoped stylesheet in a reverse Html region without rewriting it', () => {
+		const { container, root } = objectRoot();
+		root.render(StyledReverseScene, { label: 'styled' });
+		const region = container.children[0].props.region as RendererRegion<{
+			render: () => unknown;
+		}>;
+		const dom = mount(region.component as ComponentBody<{ render: () => unknown }>, region.props);
+		const section = dom.find('section');
+		expect(section.textContent).toBe('styled');
+		const scope = [...section.classList].find((name) => name !== 'overlay');
+		expect(scope).toBeTruthy();
+		const css = [...document.querySelectorAll('style')].map((style) => style.textContent).join('');
+		expect(css).toContain(`.overlay.${scope}`);
 		dom.unmount();
 		root.unmount();
 	});
