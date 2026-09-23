@@ -2,6 +2,11 @@
   "schemaVersion": 1,
   "tests": [
     {
+      "path": "packages/streamdown/tests/build.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane package build and published client/server artifacts without a pinned React build oracle; not counted as React-parity evidence."
+    },
+    {
       "path": "packages/streamdown/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
       "oracle": "Runs eight exact same-fixture scenarios against the pinned published Streamdown and plugin packages on React."

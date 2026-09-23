@@ -10359,6 +10359,9 @@ importers:
       '@tsrx/react':
         specifier: catalog:default
         version: 0.3.0(react@19.2.7)
+      '@types/jsdom':
+        specifier: catalog:default
+        version: 30.0.0
       '@types/react':
         specifier: catalog:default
         version: 19.2.18

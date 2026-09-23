@@ -480,6 +480,7 @@ interface ServerSignalListKeys {
 	parent: ServerSignalListKeys | null;
 	key: unknown;
 	mapped: boolean;
+	signalSite: string | undefined;
 	position: number;
 	values: readonly ServerSignalIdentityToken[] | null;
 }
@@ -2790,7 +2791,7 @@ export function ssrControl<T>(siteKey: string, fn: () => T): T {
 	}
 }
 
-function enterAsyncArm(armKey: unknown, mapped = false): void {
+function enterAsyncArm(armKey: unknown, mapped = false, signalSite?: string): void {
 	const previous = ASYNC_SCOPE;
 	const frame = FRAME;
 	// The counter key already carries the frame-relative scope suffix; embedding
@@ -2813,6 +2814,7 @@ function enterAsyncArm(armKey: unknown, mapped = false): void {
 			parent: SIGNAL_LIST_KEYS,
 			key: armKey,
 			mapped,
+			signalSite,
 			position: occurrence,
 			values: null,
 		};
@@ -2842,19 +2844,68 @@ export function ssrForItem(
 	scope: SSRScope,
 	block: boolean,
 	mapped = false,
+	signalSite?: string,
 ): string {
 	const previous = ASYNC_SCOPE;
 	const previousSignalKeys = SIGNAL_LIST_KEYS;
+	const previousSignalOwnerActive = SERVER_SIGNAL_OWNER_ACTIVE;
+	let previousOwner: SignalOwner | null | undefined;
 	try {
-		enterAsyncArm(armKey, mapped);
+		enterAsyncArm(armKey, mapped, signalSite);
+		// Inline declarations belong to the row, while child components and
+		// discovery retries still inherit the enclosing component's identity.
+		const owner =
+			signalSite !== undefined &&
+			RESOLVED !== null &&
+			(SERVER_SIGNAL_BINDINGS_ENABLED || RESOLVED.signalOwner !== undefined)
+				? serverSignalOwner(FRAME, serverStructuralSignalInstanceKey(signalSite, undefined))
+				: undefined;
 		// Preserve the authored body's parameter/default evaluation and exact
 		// argument count, including an @for that declares no index binding.
-		const html = index === undefined ? fn(item, scope) : fn(item, index, scope);
+		let html: string;
+		if (owner === undefined) {
+			html = index === undefined ? fn(item, scope) : fn(item, index, scope);
+		} else {
+			SERVER_SIGNAL_OWNER_ACTIVE = true;
+			const injection = (RESOLVED?.resourceOptions as StreamOptions | undefined)?.injection;
+			if (
+				injection?.observeSignalAttempt !== undefined ||
+				(previousOwner = enterSynchronousSignalOwner(owner)) === undefined
+			) {
+				html = invokeServerSignalForItem(owner, fn, item, index, scope);
+			} else {
+				html = index === undefined ? fn(item, scope) : fn(item, index, scope);
+			}
+		}
 		return block ? ssrBlock(html) : html;
 	} finally {
+		if (previousOwner !== undefined) restoreSynchronousSignalOwner(previousOwner);
+		SERVER_SIGNAL_OWNER_ACTIVE = previousSignalOwnerActive;
 		ASYNC_SCOPE = previous;
 		SIGNAL_LIST_KEYS = previousSignalKeys;
 	}
+}
+
+// Keep callback allocation on the host-carrier / query-observer path.
+function invokeServerSignalForItem(
+	owner: SignalRendererOwnerIdentity,
+	fn: (...args: any[]) => string,
+	item: unknown,
+	index: number | undefined,
+	scope: SSRScope,
+): string {
+	const invoke = () => (index === undefined ? fn(item, scope) : fn(item, index, scope));
+	const injection = (RESOLVED?.resourceOptions as StreamOptions | undefined)?.injection;
+	return runWithSignalOwner(owner, () =>
+		injection?.observeSignalAttempt === undefined
+			? invoke()
+			: runWithServerSignalQueryAttemptObserver(
+					owner,
+					(attempt) => injection.observeSignalAttempt!(attempt, captureSignalOwner(owner)),
+					injection.createSignalAttemptObservations!,
+					invoke,
+				),
+	);
 }
 
 /**
@@ -4719,7 +4770,10 @@ function resolveServerSignalInstanceKey(identity: ServerSignalInstanceKey): stri
 	return identity;
 }
 
-function serverSignalOwner(_frame: Frame | null): SignalRendererOwnerIdentity | undefined {
+function serverSignalOwner(
+	_frame: Frame | null,
+	rowInstanceKey?: string,
+): SignalRendererOwnerIdentity | undefined {
 	// An async continuation can compose cached compiled HTML outside a render pass.
 	// Only an active pass may assign a request-owned signal instance.
 	const resolved = RESOLVED;
@@ -4732,8 +4786,13 @@ function serverSignalOwner(_frame: Frame | null): SignalRendererOwnerIdentity | 
 		resolved.signalInstances === undefined
 	)
 		return;
+	// The first opaque handle can activate bindings inside a potential-only row.
+	// Its lazy owner must match the owner entered on subsequent discovery passes.
+	if (rowInstanceKey === undefined && SIGNAL_LIST_KEYS?.signalSite !== undefined) {
+		rowInstanceKey = serverStructuralSignalInstanceKey(SIGNAL_LIST_KEYS.signalSite, undefined);
+	}
 	const instanceKey =
-		resolveServerSignalInstanceKey(SIGNAL_COMPONENT_INSTANCE_KEY) ||
+		(rowInstanceKey ?? resolveServerSignalInstanceKey(SIGNAL_COMPONENT_INSTANCE_KEY)) ||
 		JSON.stringify([SIGNAL_INSTANCE_PREFIX, 'root']);
 	let owner = resolved.signalInstances.get(instanceKey);
 	if (owner === undefined) {

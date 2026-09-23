@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'octane';
-import { resolveHookSlot, subSlot } from './slot';
+import { resolveHookSlot, subSlot, withoutSlot } from './slot';
 import { isInputDOMNode, type KeyCode } from '@xyflow/system';
 
 type Keys = Array<string>;
@@ -47,6 +47,11 @@ const defaultDoc = typeof document !== 'undefined' ? document : null;
  *```
  */
 export function useKeyPress(
+	keyCode?: KeyCode | null,
+	options?: UseKeyPressOptions,
+	...rest: [slot?: symbol]
+): boolean;
+export function useKeyPress(
 	/**
 	 * The key code (string or array of strings) specifies which key(s) should trigger
 	 * an action.
@@ -59,11 +64,26 @@ export function useKeyPress(
 	 * means the user can press either the single key `'a'` or the combination of `'d'` and `'s'`.
 	 * @default null
 	 */
-	keyCode: KeyCode | null = null,
-	options: UseKeyPressOptions = { target: defaultDoc, actInsideInputWithModifier: true },
+	keyCodeArg: KeyCode | null | symbol = null,
+	optionsArg: UseKeyPressOptions | symbol = {
+		target: defaultDoc,
+		actInsideInputWithModifier: true,
+	},
 	...rest: [slot?: symbol]
 ): boolean {
-	const slot = resolveHookSlot(rest);
+	// The trailing slot can occupy an omitted key or options argument.
+	const slot =
+		resolveHookSlot(rest) ??
+		(typeof optionsArg === 'symbol'
+			? optionsArg
+			: typeof keyCodeArg === 'symbol'
+				? keyCodeArg
+				: undefined);
+	const keyCode = withoutSlot(keyCodeArg) ?? null;
+	const options = withoutSlot(optionsArg) ?? {
+		target: defaultDoc,
+		actInsideInputWithModifier: true,
+	};
 	const [keyPressed, setKeyPressed] = useState(false, subSlot(slot, 'pressed'));
 
 	// we need to remember if a modifier key is pressed in order to track it

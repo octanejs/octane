@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "5f24b95f8318f0b5f5406fdfdbe0350bbb7aa04bffdd72724ead0492cc227fa7"
+      "lockfileSha256": "15cce1f22afeea6a1309ce5c476797eb252a8af6e2a2f60173332bf70984153f"
     }
   },
   "lanes": [
@@ -111,7 +111,7 @@
         {
           "path": "packages/streamdown/audit/test-classifications.json",
           "role": "support",
-          "sha256": "18104fdd01f394934602244761ac0b736488a54786b5063cc9bca6e78be78464"
+          "sha256": "639f5aa856ff9bce0c96781b8a1442a865842fd619506b1611910e8387271a70"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",

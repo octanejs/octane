@@ -1,9 +1,7 @@
-declare const process: { env: { NODE_ENV?: string } };
 /** Optional component hooks for the native-read DOM compiler mode. */
 export * from './index.js';
-import { isNativeSignalDiagnosticProbe, nativeLocalHook } from '../runtime.js';
-import { createNativeSignalDiagnosticInitializer } from './diagnostic-local-hook.js';
-import { createDiagnosticLocalScope, createLocalScope } from './engine.js';
+import { nativeLocalHook } from '../runtime.js';
+import { createLocalScope } from './engine.js';
 import type { Scope, WritableSignal } from './types.js';
 
 interface LocalSignalCell<T> {
@@ -27,14 +25,6 @@ export function useSignal$<T>(initial: T | (() => T), slot?: symbol | number): W
 		},
 		disposeLocalSignal,
 		slot,
-		process.env.NODE_ENV === 'production' ||
-			typeof initial === 'function' ||
-			!isNativeSignalDiagnosticProbe()
-			? undefined
-			: createNativeSignalDiagnosticInitializer(() => {
-					const scope = createDiagnosticLocalScope('octane/useSignal$');
-					return { scope, signal$: scope.signal$('value', initial) };
-				}),
 	);
 	return cell.signal$;
 }
