@@ -73,7 +73,7 @@ function bundle(dev: boolean) {
 			stdin: {
 				contents:
 					compile(authored, filename, { dev, hmr: false, strong: true }).code +
-					'\nexport { hydrateRoot, act, flushSync } from "octane";\nexport { beginNativeReadScope, enableNativeReadCollection } from "octane/internal/client";' +
+					'\nexport { hydrateRoot, act, flushSync } from "octane";' +
 					'\nexport { condition, load } from "octane/hydration";' +
 					'\nexport { getNativeReadObserver, isNativeWriteGuarded } from ' +
 					JSON.stringify(resolve(packageRoot, 'src/signals/read-protocol.ts')) +
@@ -123,7 +123,7 @@ async function consumer(dev: boolean) {
 	};
 }
 
-async function scenario(dev: boolean, split: boolean, name: string, throwHistorical = false) {
+async function scenario(dev: boolean, split: boolean, name: string) {
 	const view = await consumer(dev);
 	let root: any;
 	const external = name.startsWith('external');
@@ -134,9 +134,6 @@ async function scenario(dev: boolean, split: boolean, name: string, throwHistori
 		[];
 	const refs: any[] = [];
 	const effects: string[] = [];
-	let historicalThrows = 0;
-	let rejectedAbi = 0;
-	let rejectedWrites = 0;
 	const Component = split ? view.api.SplitBoundary : view.api.Boundary;
 	try {
 		view.host.innerHTML = view.server.renderToString(
@@ -160,28 +157,6 @@ async function scenario(dev: boolean, split: boolean, name: string, throwHistori
 						inspection?.nodes.reduce((sum: number, node: any) => sum + node.subscribers, 0) ?? 0,
 					leases: inspection?.adoptionLeases ?? 0,
 				});
-				if (!observer) {
-					if (model) {
-						try {
-							model.hidden$.set(true);
-						} catch {
-							rejectedWrites++;
-						}
-					}
-					for (const call of [
-						() => view.api.beginNativeReadScope(undefined, 2),
-						() => view.api.enableNativeReadCollection(2),
-					])
-						try {
-							call();
-						} catch {
-							rejectedAbi++;
-						}
-					if (throwHistorical) {
-						historicalThrows++;
-						throw new Error('Historical resource unavailable');
-					}
-				}
 			},
 			onRef: (node: any) => refs.push(node),
 			onEffect: (phase: string) => effects.push(phase),
@@ -201,15 +176,6 @@ async function scenario(dev: boolean, split: boolean, name: string, throwHistori
 			hidden: false,
 		};
 		await view.api.act(() => root.render(Component, latest));
-		const attributes = view.diagnostics.filter(({ args }) =>
-			args.some((arg) => typeof arg === 'string' && arg.includes('attribute')),
-		);
-		const identity = attributes.filter(({ args }) =>
-			args.some((arg) => typeof arg === 'string' && arg.includes('data-identity')),
-		);
-		const hidden = attributes.filter(({ args }) =>
-			args.some((arg) => typeof arg === 'string' && arg.includes('hidden')),
-		);
 		expect(view.host.querySelector('#synthetic-control')).toBe(control);
 		expect(control.getAttribute('data-identity')).toBe(latest.identity);
 		expect(control.hidden).toBe(false);
@@ -217,24 +183,13 @@ async function scenario(dev: boolean, split: boolean, name: string, throwHistori
 		expect(refs.filter(Boolean)).toEqual([control]);
 		expect(refs.filter((node) => node && node.ownerDocument !== view.window.document)).toEqual([]);
 		expect(effects).toEqual(['layout-mount', 'passive-mount']);
-		expect(renders.every((render) => render.guarded)).toBe(true);
-		if (dev) {
-			const probes = renders.filter((render) => !render.observer);
-			if (name !== 'external-only' || throwHistorical) expect(probes.length).toBeGreaterThan(0);
-			expect(probes.every((render) => render.subscribers === 0)).toBe(true);
-			expect(rejectedAbi).toBe(probes.length * 2);
-			expect(rejectedWrites).toBe(model ? probes.length : 0);
-		}
-		if (throwHistorical) {
-			expect(historicalThrows).toBe(1);
-			expect(identity).toHaveLength(1);
-			// The primitive site was not visited; native adoption still uses its SSR seed.
-			expect(hidden).toHaveLength(0);
-		} else if (dev && initialMismatch) {
-			expect(identity).toHaveLength(1);
-			expect(hidden).toHaveLength(0);
-			expect(attributes).toHaveLength(1);
-		} else expect(view.diagnostics).toEqual([]);
+		// Dev and prod render the child only live, inside native read collection:
+		// there is no side render of the dormant boundary's earlier captures.
+		expect(renders.length).toBeGreaterThan(0);
+		expect(renders.every((render) => render.guarded && render.observer)).toBe(true);
+		// Every activation here follows changed captures or a changed native value,
+		// so the server HTML is repaired without reporting a mismatch.
+		expect(view.diagnostics).toEqual([]);
 		if (model) {
 			await view.api.act(() => model.hidden$.set(true));
 			expect(control.hidden).toBe(true);
@@ -275,6 +230,3 @@ for (const dev of [false, true])
 			])
 				it(`${split ? 'split' : 'unsplit'} ${name}`, () => scenario(dev, split, name));
 	});
-for (const split of [false, true])
-	it(`restores collection and lifecycle after a throwing ${split ? 'split' : 'unsplit'} historical probe`, () =>
-		scenario(true, split, 'external-before-activation', true));

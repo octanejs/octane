@@ -10,6 +10,7 @@ import {
 	useId,
 	useMemo,
 	useState,
+	useSyncExternalStore,
 	type HydrationPrefetchFunction,
 	type HydrateProps,
 } from 'octane';
@@ -282,6 +283,64 @@ export function start(
 		recoverable,
 		settle: () => act(() => {}),
 		update: (next: Props) => act(() => root.render(View, next)),
+		unmount: () => flushSync(() => root.unmount()),
+	};
+}
+
+type LoggedProps = {
+	when: HydrateProps['when'];
+	label: string;
+	log: string[];
+	store: { subscribe: (notify: () => void) => () => void; get: () => string };
+};
+
+// Every render-time user callback logs the label it saw. A dormant boundary
+// must never run any of them with captures that are no longer current.
+function LoggedChild({ label, log, store }: Omit<LoggedProps, 'when'>) @{
+	log.push('render:' + label);
+	const [initial] = useState(() => {
+		log.push('init:' + label);
+		return label;
+	});
+	const memo = useMemo(() => {
+		log.push('memo:' + label);
+		return label;
+	}, [label]);
+	const snapshot = useSyncExternalStore(store.subscribe, () => {
+		log.push('snapshot:' + label);
+		return store.get();
+	});
+	<p
+		id="logged-child"
+		title={label}
+		data-initial={initial}
+		data-memo={memo}
+		data-snapshot={snapshot}
+	>{label}</p>
+}
+
+export function LoggedBoundary({ when, label, log, store }: LoggedProps) @{
+	<Hydrate when={when}>
+		<LoggedChild label={label} log={log} store={store} />
+	</Hydrate>
+}
+
+export function UnsplitLoggedBoundary({ when, label, log, store }: LoggedProps) @{
+	<Hydrate when={when} split={false}>
+		<LoggedChild label={label} log={log} store={store} />
+	</Hydrate>
+}
+
+export function startLogged(host: HTMLElement, props: LoggedProps, split: boolean) {
+	const recoverable: unknown[] = [];
+	const View = split ? LoggedBoundary : UnsplitLoggedBoundary;
+	const root = hydrateRoot(host, View, props, {
+		onRecoverableError: (error) => recoverable.push(error),
+	});
+	return {
+		recoverable,
+		settle: () => act(() => {}),
+		update: (next: LoggedProps) => act(() => root.render(View, next)),
 		unmount: () => flushSync(() => root.unmount()),
 	};
 }

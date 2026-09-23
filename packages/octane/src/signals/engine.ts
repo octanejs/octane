@@ -1,4 +1,3 @@
-declare const process: { env: { NODE_ENV?: string } };
 import { decodeSignalValue, encodeSignalValue, snapshotSignalValue } from './encoding.js';
 import {
 	ScopeDisposedError,
@@ -37,8 +36,6 @@ import {
 	beginNativeWriteGuard,
 	endNativeWriteGuard,
 	getNativeAdoptionResolver,
-	getNativeReadObserver,
-	isNativeWriteGuarded,
 	registerNativeBatchHooks,
 	reportNativeRead,
 	type NativeReadSource,
@@ -197,9 +194,6 @@ function decodeSeed(scopeKey: string, seed: ScopeSeed): Map<string, DecodedSeedE
 	}
 	return entries;
 }
-
-// Only disposable historical local-hook scopes can retire under render purity.
-const DIAGNOSTIC_LOCAL_SCOPES = /* @__PURE__ */ new WeakSet<ScopeImpl>();
 
 export class ScopeImpl implements Scope, GraphOwner {
 	readonly nodes = new Map<string, ScopedNode>();
@@ -794,8 +788,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 
 	dispose(): void {
 		if (this.disposed) return;
-		if (process.env.NODE_ENV === 'production' || !DIAGNOSTIC_LOCAL_SCOPES.has(this))
-			assertWritable();
+		assertWritable();
 		signalBatch(() => {
 			this.disposed = true;
 			this.lifetime++;
@@ -963,19 +956,6 @@ export function createScope(options: ScopeOptions): Scope {
 /** Only the native hook adapter may create a component-owned, non-serializable scope. */
 export function createLocalScope(scopeKey: string): Scope {
 	return new ScopeImpl(scopeKey, { scopeKey }, false);
-}
-
-/** @internal Isolated historical useSignal$ state, never a live presentation cell. */
-export function createDiagnosticLocalScope(scopeKey: string): Scope {
-	if (
-		process.env.NODE_ENV === 'production' ||
-		!isNativeWriteGuarded() ||
-		getNativeReadObserver() !== null
-	)
-		throw new SignalFrameError('Diagnostic local scopes require an isolated historical read.');
-	const scope = new ScopeImpl(scopeKey, { scopeKey }, false);
-	DIAGNOSTIC_LOCAL_SCOPES.add(scope);
-	return scope;
 }
 
 export function createDeclaredSignalCell<T>(

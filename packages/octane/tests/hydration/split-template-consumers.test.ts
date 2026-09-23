@@ -260,7 +260,7 @@ for (const dev of [false, true]) {
 			}
 		});
 
-		it('still diagnoses an initial attribute mismatch after an unrelated mounted parent update', async () => {
+		it('still diagnoses an initial attribute mismatch after a mounted parent update with identical captures', async () => {
 			const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
 			const serverProps = { when: condition(false), identity: null, hidden: true };
 			const initialClientProps = { ...serverProps, identity: 'initial-client-mismatch' };
@@ -272,12 +272,10 @@ for (const dev of [false, true]) {
 				const section = view.host.querySelector<HTMLElement>('#updated-capture-controls')!;
 				const root = view.api.start(view.host, initialClientProps);
 				await root.settle();
-				await root.update({ ...initialClientProps, hidden: false, when: load() });
+				// Keep `when` as well: Controls receives it, so it is a child capture.
+				await root.update({ ...initialClientProps });
 				expect(view.host.querySelector('#updated-capture-controls')).toBe(section);
 				expect(section.getAttribute('data-probe-id')).toBe('initial-client-mismatch');
-				expect(view.host.querySelector('#updated-capture-action')!.hasAttribute('hidden')).toBe(
-					false,
-				);
 				expect(root.recoverable).toEqual([]);
 				root.unmount();
 				if (dev) {
@@ -296,7 +294,9 @@ for (const dev of [false, true]) {
 		});
 
 		for (const split of [true, false]) {
-			it(`diagnoses an initial attribute mismatch even after it is corrected in a ${split ? 'split' : 'unsplit'} boundary`, async () => {
+			// Server HTML cannot be compared with captures the client no longer holds
+			// without rendering them, so once captures change the repair is silent.
+			it(`repairs an attribute without diagnostics once a mounted parent changes ${split ? 'split' : 'unsplit'} captures`, async () => {
 				const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
 				const serverProps = { when: condition(false), identity: null, hidden: true };
 				const initialClientProps = { ...serverProps, identity: 'initial-client-mismatch' };
@@ -313,16 +313,7 @@ for (const dev of [false, true]) {
 					expect(section.getAttribute('data-probe-id')).toBeNull();
 					expect(root.recoverable).toEqual([]);
 					root.unmount();
-					if (dev) {
-						expect(
-							view.diagnostics.some(
-								({ level, args }) =>
-									level === 'error' && String(args[0]).includes('attribute `data-probe-id`'),
-							),
-						).toBe(true);
-					} else {
-						expect(view.diagnostics).toEqual([]);
-					}
+					expect(view.diagnostics).toEqual([]);
 				} finally {
 					view.close();
 				}
@@ -330,7 +321,7 @@ for (const dev of [false, true]) {
 		}
 
 		for (const split of [true, false]) {
-			it(`diagnoses initial class and style mismatches corrected before a ${split ? 'split' : 'unsplit'} boundary activates`, async () => {
+			it(`repairs class and style without diagnostics once a mounted parent changes ${split ? 'split' : 'unsplit'} captures`, async () => {
 				const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
 				const serverProps = { when: condition(false), identity: null, hidden: true };
 				const initialClientProps = { ...serverProps, identity: 'initial-class', hidden: false };
@@ -348,22 +339,7 @@ for (const dev of [false, true]) {
 					expect(section.style.opacity).toBe('0.5');
 					expect(root.recoverable).toEqual([]);
 					root.unmount();
-					if (dev) {
-						expect(
-							view.diagnostics.some(
-								({ level, args }) =>
-									level === 'error' && String(args[0]).includes('attribute `class`'),
-							),
-						).toBe(true);
-						expect(
-							view.diagnostics.some(
-								({ level, args }) =>
-									level === 'error' && String(args[0]).includes('server rendered style'),
-							),
-						).toBe(true);
-					} else {
-						expect(view.diagnostics).toEqual([]);
-					}
+					expect(view.diagnostics).toEqual([]);
 				} finally {
 					view.close();
 				}
@@ -372,7 +348,7 @@ for (const dev of [false, true]) {
 
 		for (const split of [true, false]) {
 			for (const initialSuppressed of [true, false]) {
-				it(`uses initial suppression for attribute, class and style diagnostics in a ${split ? 'split' : 'unsplit'} boundary after suppression ${initialSuppressed ? 'is removed' : 'is enabled'}`, async () => {
+				it(`repairs a ${split ? 'split' : 'unsplit'} boundary without diagnostics after suppression ${initialSuppressed ? 'is removed' : 'is enabled'} by changed captures`, async () => {
 					const view = await consumer<typeof updatedAttributesClient>(
 						dev,
 						updatedAttributesFilename,
@@ -408,21 +384,7 @@ for (const dev of [false, true]) {
 						expect(section.style.opacity).toBe('0.5');
 						expect(root.recoverable).toEqual([]);
 						root.unmount();
-						if (dev && !initialSuppressed) {
-							for (const diagnostic of [
-								'attribute `data-probe-id`',
-								'attribute `class`',
-								'server rendered style',
-							]) {
-								expect(
-									view.diagnostics.some(
-										({ level, args }) => level === 'error' && String(args[0]).includes(diagnostic),
-									),
-								).toBe(true);
-							}
-						} else {
-							expect(view.diagnostics).toEqual([]);
-						}
+						expect(view.diagnostics).toEqual([]);
 					} finally {
 						view.close();
 					}
@@ -430,8 +392,8 @@ for (const dev of [false, true]) {
 			}
 		}
 
-		for (const initialMismatch of [false, true]) {
-			it(`${initialMismatch ? 'diagnoses the initial context mismatch' : 'accepts a surrounding context update'} while preserving hydrated IDs`, async () => {
+		for (const contextOnly of [false, true]) {
+			it(`accepts a surrounding ${contextOnly ? 'context-only' : 'context and capture'} update without diagnostics while preserving hydrated IDs`, async () => {
 				const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
 				const serverProps = {
 					when: condition(false),
@@ -439,10 +401,7 @@ for (const dev of [false, true]) {
 					hidden: true,
 					contextValue: 'server-context',
 				};
-				const clientProps = {
-					...serverProps,
-					contextValue: initialMismatch ? 'initial-client-context' : 'server-context',
-				};
+				const clientProps = serverProps;
 				try {
 					view.host.innerHTML = renderToString(
 						updatedAttributesServer.ContextUpdatedAttributesBoundary,
@@ -457,14 +416,20 @@ for (const dev of [false, true]) {
 					expect(runtimeId).not.toBe(siblingId);
 					const root = view.api.start(view.host, clientProps, true, false, false, true);
 					await root.settle();
-					const activationContext = initialMismatch ? 'server-context' : 'latest-context';
-					await root.update({
-						...clientProps,
-						identity: 'committed-id',
-						hidden: false,
-						contextValue: activationContext,
-						when: load(),
-					});
+					const activationContext = 'latest-context';
+					// The context-only case keeps every child capture, including `when`, and
+					// activates through the surrounding update itself.
+					await root.update(
+						contextOnly
+							? { ...clientProps, contextValue: activationContext }
+							: {
+									...clientProps,
+									identity: 'committed-id',
+									hidden: false,
+									contextValue: activationContext,
+									when: load(),
+								},
+					);
 					expect(view.host.querySelector('#updated-capture-controls')).toBe(section);
 					expect(section.getAttribute('data-runtime-id')).toBe(runtimeId);
 					expect(section.getAttribute('data-context')).toBe(activationContext);
@@ -481,18 +446,7 @@ for (const dev of [false, true]) {
 					expect(section.getAttribute('data-runtime-id')).toBe(runtimeId);
 					expect(root.recoverable).toEqual([]);
 					root.unmount();
-					if (dev && initialMismatch) {
-						expect(
-							view.diagnostics.some(
-								({ level, args }) =>
-									level === 'error' &&
-									String(args[0]).includes('attribute `data-context`') &&
-									String(args[0]).includes('initial-client-context'),
-							),
-						).toBe(true);
-					} else {
-						expect(view.diagnostics).toEqual([]);
-					}
+					expect(view.diagnostics).toEqual([]);
 				} finally {
 					view.close();
 				}
@@ -603,8 +557,86 @@ for (const dev of [false, true]) {
 			}
 		});
 
+		for (const split of [true, false]) {
+			const boundary = split ? 'split' : 'unsplit';
+			const store = { subscribe: () => () => {}, get: () => 'store' };
+
+			it(`activates a ${boundary} boundary updated while dormant without rendering stale captures or reporting its changed text`, async () => {
+				const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
+				const View = split
+					? updatedAttributesServer.LoggedBoundary
+					: updatedAttributesServer.UnsplitLoggedBoundary;
+				const log: string[] = [];
+				const props = { when: condition(false), label: 'first', log, store };
+				try {
+					view.host.innerHTML = renderToString(View, { ...props, log: [] }).html;
+					const child = view.host.querySelector<HTMLElement>('#logged-child')!;
+					const root = view.api.startLogged(view.host, props, split);
+					await root.settle();
+					expect(log).toEqual([]);
+					await root.update({ ...props, label: 'latest', when: load() });
+					expect(view.host.querySelector('#logged-child')).toBe(child);
+					expect(child.textContent).toBe('latest');
+					expect(child.title).toBe('latest');
+					expect(child.dataset.initial).toBe('latest');
+					expect(child.dataset.memo).toBe('latest');
+					// Dev and prod run user render code with the current captures only.
+					expect(log).toContain('render:latest');
+					expect(log).toContain('init:latest');
+					expect(log.filter((entry) => entry.endsWith(':first'))).toEqual([]);
+					expect(root.recoverable).toEqual([]);
+					root.unmount();
+					expect(view.diagnostics).toEqual([]);
+				} finally {
+					view.close();
+				}
+			});
+		}
+
+		for (const split of [true, false]) {
+			it(`still reports a genuine initial text and attribute mismatch after a mounted parent update with identical ${split ? 'split' : 'unsplit'} captures`, async () => {
+				const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
+				const View = split
+					? updatedAttributesServer.LoggedBoundary
+					: updatedAttributesServer.UnsplitLoggedBoundary;
+				const store = { subscribe: () => () => {}, get: () => 'store' };
+				const log: string[] = [];
+				const clientProps = { when: condition(false), label: 'client', log, store };
+				try {
+					view.host.innerHTML = renderToString(View, {
+						...clientProps,
+						label: 'server',
+						log: [],
+					}).html;
+					const child = view.host.querySelector<HTMLElement>('#logged-child')!;
+					const root = view.api.startLogged(view.host, clientProps, split);
+					await root.settle();
+					// A mounted parent update activates the boundary early, with unchanged captures.
+					await root.update({ ...clientProps });
+					expect(view.host.querySelector('#logged-child')).toBe(child);
+					expect(child.textContent).toBe('client');
+					expect(child.title).toBe('client');
+					expect(root.recoverable).toHaveLength(1);
+					root.unmount();
+					if (dev) {
+						for (const diagnostic of ['text', 'attribute `title`']) {
+							expect(
+								view.diagnostics.some(
+									({ level, args }) => level === 'error' && String(args[0]).includes(diagnostic),
+								),
+							).toBe(true);
+						}
+					} else {
+						expect(view.diagnostics).toEqual([]);
+					}
+				} finally {
+					view.close();
+				}
+			});
+		}
+
 		for (const initialMismatch of [false, true]) {
-			it(`${initialMismatch ? 'diagnoses the initial client mismatch' : 'accepts mounted parent updates'} when nested dormant boundaries activate separately`, async () => {
+			it(`${initialMismatch ? 'repairs an initial client mismatch' : 'accepts mounted parent updates'} without diagnostics when nested dormant boundaries activate separately`, async () => {
 				const view = await consumer<typeof updatedAttributesClient>(dev, updatedAttributesFilename);
 				const effects: [string, string | null, boolean][] = [];
 				const refs: (HTMLButtonElement | null)[] = [];
@@ -640,7 +672,9 @@ for (const dev of [false, true]) {
 					expect(effects).toEqual([]);
 					expect(refs).toEqual([]);
 					expect(section.getAttribute('data-probe-id')).toBeNull();
-					await root.update({ ...outerProps, innerWhen: load() });
+					// Identical inner captures: the parent update alone activates the inner
+					// boundary, whose server HTML predates the outer boundary's new captures.
+					await root.update({ ...outerProps });
 					expect(view.host.querySelector('#updated-capture-controls')).toBe(section);
 					expect(view.host.querySelector('#updated-capture-action')).toBe(button);
 					expect(section.getAttribute('data-probe-id')).toBe('outer-committed');
@@ -656,16 +690,9 @@ for (const dev of [false, true]) {
 						['mount', 'outer-committed', false],
 						['cleanup', 'outer-committed', false],
 					]);
-					if (dev && initialMismatch) {
-						expect(
-							view.diagnostics.some(
-								({ level, args }) =>
-									level === 'error' && String(args[0]).includes('attribute `data-probe-id`'),
-							),
-						).toBe(true);
-					} else {
-						expect(view.diagnostics).toEqual([]);
-					}
+					// The inner boundary is claimed while its enclosing boundary activates
+					// with changed captures, so it inherits the stale server values.
+					expect(view.diagnostics).toEqual([]);
 				} finally {
 					view.close();
 				}
