@@ -5570,6 +5570,75 @@ function collectImmutableModuleFunctions(body) {
 	return declared;
 }
 
+/**
+ * Top-level module bindings whose identity can change after evaluation: `let`
+ * and `var` declarations, class declarations, and function declarations that
+ * collectImmutableModuleFunctions demoted. An identity-only survivor skip
+ * cannot witness them, so a region reading one must re-render. `const`,
+ * non-reassigned functions, and imports (witnessed separately) stay out.
+ */
+function collectMutableModuleBindings(body, immutableFunctions) {
+	const names = new Set();
+	for (const statement of body) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: statement;
+		if (!declaration) continue;
+		if (declaration.type === 'VariableDeclaration') {
+			if (declaration.kind === 'const') continue;
+			for (const d of declaration.declarations || []) collectBindings(d.id, names);
+		} else if (declaration.type === 'ClassDeclaration' && declaration.id) {
+			names.add(declaration.id.name);
+		} else if (
+			declaration.type === 'FunctionDeclaration' &&
+			declaration.id?.type === 'Identifier' &&
+			!immutableFunctions.has(declaration.id.name)
+		) {
+			names.add(declaration.id.name);
+		}
+	}
+	return names;
+}
+
+// Globals a render-time read may treat as fixed: the value constants and the
+// standard ECMAScript namespaces and constructors. Any other unbound name
+// (`location`, `window`, `document`, `globalThis`, an app-installed global) is
+// host or application state that no compiler witness observes.
+const IMMUTABLE_AMBIENT_GLOBALS = new Set([
+	'undefined',
+	'NaN',
+	'Infinity',
+	...SETUP_PURE_GLOBAL_CALLEES,
+	...SETUP_PURE_NAMESPACE_MEMBERS.keys(),
+	'Error',
+	'TypeError',
+	'RangeError',
+	'RegExp',
+	'Map',
+	'Set',
+	'WeakMap',
+	'WeakSet',
+	'Promise',
+	'Reflect',
+	'Intl',
+]);
+
+/**
+ * Does `name`, a free read of a memo region that is neither a component local
+ * nor an import, resolve to state that can change without any witness the
+ * compiler compares? True for mutable top-level module bindings and for
+ * non-intrinsic globals. Names bound in an enclosing non-module scope are
+ * lexical captures owned by the caller's own classification.
+ */
+function isUnwitnessedAmbientRead(name, ctx) {
+	// `_$…` names are runtime helpers the compiler itself imports.
+	if (name.startsWith('_$')) return false;
+	if (ctx.mutableModuleBindings?.has(name)) return true;
+	const bound = ctx._moduleBoundNames;
+	return bound !== undefined && !bound.has(name) && !IMMUTABLE_AMBIENT_GLOBALS.has(name);
+}
+
 // A component whose synchronous proof reads its props is safe only at JSX
 // edges that construct every read property as an own data field. Missing keys
 // can reach an inherited getter, and `__proto__` changes an object literal's
@@ -10402,6 +10471,12 @@ function compileInternal(
 	// that are ever assigned (`foo = bar`) are excluded: their identity is then
 	// as mutable as a module `let`, which fails closed.
 	ctx.moduleFunctionDeclarations = collectImmutableModuleFunctions(ast.body);
+	// Module `let`/`var`/class bindings and demoted functions: identity-only
+	// survivor skips (forBlock PURE / DEP-PURE) fail closed when a row reads one.
+	ctx.mutableModuleBindings = collectMutableModuleBindings(
+		ast.body,
+		ctx.moduleFunctionDeclarations,
+	);
 	// Global namespaces are only trusted by the setup checkpoint analysis when
 	// no module binding shadows them (see setupCanScheduleSelfUpdate).
 	ctx._moduleBoundNames = collectModuleBoundNames(ast);
@@ -31839,6 +31914,12 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		const free = collectFreeIdentifiers(bodyAst, bodyScope);
 		let hasParentClosure = false;
 		let hasHook = false;
+		// PURE and DEP-PURE skip a survivor on item identity (plus the deps
+		// tuple). A module `let` or a mutable global (`location.pathname`) can
+		// change between parent renders with neither moving, so a row reading one
+		// must re-render, exactly as the item-memo and whole-list proofs fail closed.
+		let hasAmbientRead = false;
+		let ambientCandidates = null;
 		const seenDeps = new Set();
 		for (const name of free) {
 			if (HOOK_NAMES.has(name) || name === 'use' || name === 'useContext') {
@@ -31850,7 +31931,19 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					seenDeps.add(name);
 					depNames.push(name);
 				}
+			} else if (!ctx.importedNames.has(name) && isUnwitnessedAmbientRead(name, ctx)) {
+				(ambientCandidates ??= []).push(name);
 			}
+		}
+		if (ambientCandidates !== null) {
+			// An inline event handler runs after commit, so a read confined to one
+			// (`onClick={() => window.open(item.url)}`) never reaches row output.
+			const renderFree = collectFreeIdentifiers(
+				bodyAst,
+				bodyScope,
+				collectEventHandlerClosures(bodyAst),
+			);
+			hasAmbientRead = ambientCandidates.some((name) => renderFree.has(name));
 		}
 		const hasNestedComp = containsComponentCallOrControlFlow(subStmts);
 		// Compatibility mode keeps method calls live: an unchanged receiver can
@@ -32008,7 +32101,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			!containsAutoMemoUnsafeStructure(subStmts, ctx) &&
 			!containsImportedMemberRead(bodyAst, ctx.importedNames);
 		const hostPure =
-			!hasParentClosure && !hasHook && !hasRenderCall && (!hasNestedComp || hostConditionalPure);
+			!hasParentClosure &&
+			!hasHook &&
+			!hasRenderCall &&
+			!hasAmbientRead &&
+			(!hasNestedComp || hostConditionalPure);
 		const structuredHostDepEligible =
 			ctx.autoMemo === true &&
 			hasNestedComp &&
@@ -32033,6 +32130,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		const hostDepEligible =
 			!hostPure &&
 			!hasHook &&
+			!hasAmbientRead &&
 			hasParentClosure &&
 			(!hasNestedComp || structuredHostDepEligible) &&
 			!hasRenderCall;
@@ -32275,6 +32373,39 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		emptyKeyword: node.emptyKeyword ?? null,
 		hostPath: null,
 	};
+}
+
+// Inline `onXxx={() => …}` / `onXxx={function () {…}}` handler closures under
+// `root`, as a node set for collectFreeIdentifiers' ignoreNodes.
+function collectEventHandlerClosures(root) {
+	const closures = new Set();
+	const stack = [root];
+	while (stack.length > 0) {
+		const node = stack.pop();
+		if (!node || typeof node !== 'object') continue;
+		if (Array.isArray(node)) {
+			stack.push(...node);
+			continue;
+		}
+		if (node.type === 'JSXAttribute' || node.type === 'Attribute') {
+			const name = node.name?.name || node.name;
+			const expression =
+				node.value?.type === 'JSXExpressionContainer' ? node.value.expression : node.value;
+			if (
+				typeof name === 'string' &&
+				/^on[A-Z]/.test(name) &&
+				(expression?.type === 'ArrowFunctionExpression' ||
+					expression?.type === 'FunctionExpression')
+			) {
+				closures.add(expression);
+				continue;
+			}
+		}
+		for (const key in node) {
+			if (!AST_WALK_SKIP_KEYS.has(key)) stack.push(node[key]);
+		}
+	}
+	return closures;
 }
 
 function mapCallbackHasEventClosure(callback) {

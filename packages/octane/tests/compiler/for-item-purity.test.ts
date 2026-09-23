@@ -197,3 +197,66 @@ describe('@for item-body purity with host-only conditional content', () => {
 		expect(flags[0]! & PURE).toBe(0);
 	});
 });
+
+// PURE (and DEP-PURE) skip a survivor on item identity plus the deps tuple. A
+// module `let` or a mutable global changes with neither, so a row reading one
+// must stay live — the same fail-closed rule the item-memo and whole-list
+// proofs apply. Immutable module and language bindings keep the fast path.
+describe('@for item-body purity with module and global reads', () => {
+	it.each<[string, string, string]>([
+		['a module let in an @if test', "let mode = 'a';", "<li>@if (mode === 'a') {<b />}</li>"],
+		['a module let in a text hole', "let mode = 'a';", '<li>{mode + item.id}</li>'],
+		['a module var', 'var mode = 1;', '<li class={mode === 1 ? "on" : ""} />'],
+		[
+			'a reassigned module function',
+			'function pick() { return 1; } export function swap() { pick = () => 2; }',
+			'<li data-pick={pick} />',
+		],
+		['location in an @if test', '', '<li>@if (location.hash === item.href) {<b />}</li>'],
+		['a globalThis property', '', '<li>@if ((globalThis as any).flag) {<b />}</li>'],
+	])('declines a body reading %s', (_name, prelude, body) => {
+		const flags = compileList(body, prelude);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & PURE).toBe(0);
+	});
+
+	it('declines DEP-PURE for a body that captures a parent local and reads a module let', () => {
+		const flags = appListFlags(
+			compile(
+				`
+				let active = 1;
+				export function App(props) @{
+					const prefix = props.prefix;
+					<ul>@for (const item of props.items; key item.id) {
+						<li class={active === item.id ? 'on' : ''}>{prefix + item.label}</li>
+					}</ul>
+				}
+			`,
+				'App.tsrx',
+				{ hmr: false, dev: false },
+			).code,
+		);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & (PURE | DEP_ELIGIBLE)).toBe(0);
+	});
+
+	it.each<[string, string, string]>([
+		['a module const', "const PREFIX = 'row-';", '<li class={PREFIX + item.id} />'],
+		[
+			'an unreassigned module function',
+			'function label(x) { return x; }',
+			'<li data-label={label} />',
+		],
+		['a standard global namespace', '', '<li>@if (Math.PI > item.n) {<b />}</li>'],
+		['undefined', '', '<li>@if (item.x === undefined) {<b />}</li>'],
+		[
+			'a global only inside an event handler',
+			'',
+			'<li onClick={() => window.open(item.url)}>{item.label as string}</li>',
+		],
+	])('keeps PURE for a body reading %s', (_name, prelude, body) => {
+		const flags = compileList(body, prelude);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & PURE).toBe(PURE);
+	});
+});
