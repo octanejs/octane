@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import {
@@ -11,7 +13,7 @@ import {
 	type OctaneNode,
 } from '../src/index.js';
 import { act, mount } from './_helpers';
-import { loadServerFixture } from './_server-fixture';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
 import {
 	List,
 	MutableList,
@@ -51,8 +53,8 @@ import {
 	NestedKeyedReorderTransition,
 	HostBindingList,
 	HostMappedBindingList,
+	countedRow,
 	setExternal,
-	setConditionalExternal,
 	setNestedConditionalActivityMode,
 } from './_fixtures/for.tsrx';
 import {
@@ -914,20 +916,19 @@ describe('Strong memoization preserves dependency and setup semantics', () => {
 describe('forBlock — DEP-PURE promotion compares deps with Object.is', () => {
 	it('a NaN dep still promotes stable survivors to pure (bodies skipped)', () => {
 		const r = mount(DepPureList);
-		expect(r.findAll('.dp-row').map((li) => li.textContent)).toEqual(['row1:tick0', 'row2:tick0']);
+		expect(r.findAll('.dp-row').map((li) => li.textContent)).toEqual(['row1:1', 'row2:1']);
 
 		// Make the captured dep NaN (deps changed → this render's bodies re-run).
 		r.click('#nanify');
-		// Mutate the non-dep external, then re-render with UNCHANGED deps ([NaN]).
-		setExternal('tick1');
+		expect(r.findAll('.dp-row').map((li) => li.textContent)).toEqual(['row1:2', 'row2:2']);
+		// Re-render with UNCHANGED deps ([NaN]).
 		r.click('#rerender');
 		// Object.is(NaN, NaN) → the pure promotion holds: survivor bodies are SKIPPED,
-		// so the changed external is NOT re-read — identical to any other stable dep.
-		// (Under a `!==` compare, a NaN dep permanently defeated the promotion and the
-		// re-run bodies would show tick1.)
-		expect(r.findAll('.dp-row').map((li) => li.textContent)).toEqual(['row1:tick0', 'row2:tick0']);
+		// so no row re-reads its label — identical to any other stable dep. (Under a
+		// `!==` compare, a NaN dep permanently defeated the promotion and the re-run
+		// bodies would show :3.)
+		expect(r.findAll('.dp-row').map((li) => li.textContent)).toEqual(['row1:2', 'row2:2']);
 		r.unmount();
-		setExternal('tick0'); // reset the module-level fixture state
 	});
 });
 
@@ -1122,66 +1123,155 @@ describe('keyed rows with nested conditional content', () => {
 
 describe('forBlock — pure host-conditional item bodies', () => {
 	it('skips identical-identity survivor bodies when siblings change', () => {
-		const items = [
-			{ id: 1, label: 'a', flag: true },
-			{ id: 2, label: 'b' },
-			{ id: 3, label: 'c', flag: true },
-		];
+		const items = [countedRow(1, 'a', true), countedRow(2, 'b'), countedRow(3, 'c', true)];
 		const r = mount(PureConditionalList, { items });
 		try {
-			expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual([
-				'a:pulse0',
-				'b:pulse0',
-				'c:pulse0',
-			]);
+			expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual(['a:1', 'b:1', 'c:1']);
 			expect(r.findAll('.pc-flag')).toHaveLength(2);
 
 			// A new array carrying the SAME item objects for rows 1 and 3: only the
 			// replaced middle row's body may run again — the pure survivors skip, so
-			// they never re-read the mutated module binding (DepPureList's probe).
-			setConditionalExternal('pulse1');
+			// they never re-read their labels (DepPureList's probe).
 			r.update(PureConditionalList, {
-				items: [items[0]!, { id: 2, label: 'b2', flag: true }, items[2]!],
+				items: [items[0]!, countedRow(2, 'b2', true), items[2]!],
 			});
-			expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual([
-				'a:pulse0',
-				'b2:pulse1',
-				'c:pulse0',
-			]);
+			expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual(['a:1', 'b2:1', 'c:1']);
 			// The changed row re-ran its conditional arm too.
 			expect(r.findAll('.pc-flag')).toHaveLength(3);
 		} finally {
 			r.unmount();
-			setConditionalExternal('pulse0');
 		}
 	});
 
 	it('moves DOM on a keyed reorder without re-running survivor bodies', () => {
-		const items = [
-			{ id: 1, label: 'a', flag: true },
-			{ id: 2, label: 'b' },
-			{ id: 3, label: 'c' },
-		];
+		const items = [countedRow(1, 'a', true), countedRow(2, 'b'), countedRow(3, 'c')];
 		const r = mount(PureConditionalList, { items });
 		try {
 			const rows = r.findAll('li');
 			const flag = r.find('.pc-flag');
 
-			setConditionalExternal('pulse1');
 			r.update(PureConditionalList, { items: [items[2]!, items[0]!, items[1]!] });
 			expect(r.findAll('li')).toEqual([rows[2], rows[0], rows[1]]);
-			// Reordered identical-identity survivors skipped their bodies: the
-			// external mutation is not re-read even though positions changed, and
-			// the conditional DOM moved with its row.
-			expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual([
-				'c:pulse0',
-				'a:pulse0',
-				'b:pulse0',
-			]);
+			// Reordered identical-identity survivors skipped their bodies: no label
+			// is re-read even though positions changed, and the conditional DOM
+			// moved with its row.
+			expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual(['c:1', 'a:1', 'b:1']);
 			expect(r.find('.pc-flag')).toBe(flag);
 		} finally {
 			r.unmount();
-			setConditionalExternal('pulse0');
+		}
+	});
+});
+
+// A keyed row that reads a module `let` or a mutable global has no witness the
+// survivor skip compares: item identity and the deps tuple both stay fixed while
+// the read changes. Such rows must re-render on every parent render, in dev and
+// production builds alike.
+describe.each([false, true])('forBlock — rows reading module or global state (dev=%s)', (dev) => {
+	const fixture = loadCompiledFixtureSource(
+		readFileSync(resolve(process.cwd(), 'packages/octane/tests/_fixtures/for.tsrx'), 'utf8'),
+		{
+			id: '/packages/octane/tests/_fixtures/for.tsrx',
+			mode: 'client',
+			compileOptions: { dev, hmr: false },
+		},
+	);
+	const items = [
+		{ href: '/a', label: 'A' },
+		{ href: '/b', label: 'B' },
+		{ href: '#c', label: 'C' },
+	];
+	const active = (r: ReturnType<typeof mount>) =>
+		r.findAll('li.active').map((li) => li.textContent);
+
+	it.each(['ModuleLetConditionalList', 'ModuleLetTextList'])(
+		'%s moves the active row when the module binding changes',
+		async (name) => {
+			const List = fixture[name] as ComponentBody;
+			const r = mount(List, { items, n: 0 });
+			try {
+				expect(active(r)).toEqual(['A']);
+				fixture.setActiveHref('/b');
+				await act(() => r.update(List, { items, n: 1 }));
+				expect(active(r)).toEqual(['B']);
+			} finally {
+				r.unmount();
+				fixture.setActiveHref('/a');
+			}
+		},
+	);
+
+	it('re-evaluates a module read in a row that also captures a parent local', async () => {
+		const List = fixture.ModuleLetDepList as ComponentBody;
+		const r = mount(List, { items, prefix: '>' });
+		try {
+			expect(active(r)).toEqual(['>A']);
+			fixture.setActiveHref('/b');
+			// Same deps ([prefix]) and same item identities.
+			await act(() => r.update(List, { items, prefix: '>' }));
+			expect(active(r)).toEqual(['>B']);
+		} finally {
+			r.unmount();
+			fixture.setActiveHref('/a');
+		}
+	});
+
+	it('re-evaluates a destructured header default on survivors', async () => {
+		const header = loadCompiledFixtureSource(
+			`
+			let fallbackLabel = 'module-a';
+			export function setFallbackLabel(value) { fallbackLabel = value; }
+			export function ModuleDefault(props) @{
+				<ul>@for (const { id, label = fallbackLabel } of props.items; key id) {
+					<li>{label as string}</li>
+				}</ul>
+			}
+			export function LocalDefault(props) @{
+				const fallback = props.fallback;
+				<ul>@for (const { id, label = fallback } of props.items; key id) {
+					<li>{label as string}</li>
+				}</ul>
+			}
+		`,
+			{ id: '/project/HeaderDefault.tsrx', mode: 'client', compileOptions: { dev, hmr: false } },
+		);
+		const rows = [{ id: 1 }, { id: 2, label: 'own' }];
+		const byModule = mount(header.ModuleDefault as ComponentBody, { items: rows, n: 0 });
+		const byLocal = mount(header.LocalDefault as ComponentBody, {
+			items: rows,
+			fallback: 'local-a',
+		});
+		try {
+			expect(byModule.container.textContent).toBe('module-aown');
+			expect(byLocal.container.textContent).toBe('local-aown');
+			header.setFallbackLabel('module-b');
+			await act(() =>
+				byModule.update(header.ModuleDefault as ComponentBody, { items: rows, n: 1 }),
+			);
+			await act(() =>
+				byLocal.update(header.LocalDefault as ComponentBody, { items: rows, fallback: 'local-b' }),
+			);
+			expect(byModule.container.textContent).toBe('module-bown');
+			expect(byLocal.container.textContent).toBe('local-bown');
+		} finally {
+			byModule.unmount();
+			byLocal.unmount();
+		}
+	});
+
+	it('re-evaluates an @if over a mutable global', async () => {
+		const List = fixture.LocationHashList as ComponentBody;
+		const previous = location.hash;
+		location.hash = '';
+		const r = mount(List, { items, n: 0 });
+		try {
+			expect(active(r)).toEqual([]);
+			location.hash = '#c';
+			await act(() => r.update(List, { items, n: 1 }));
+			expect(active(r)).toEqual(['C']);
+		} finally {
+			r.unmount();
+			location.hash = previous;
 		}
 	});
 });

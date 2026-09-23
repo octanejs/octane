@@ -291,9 +291,12 @@ async function buildScenario(scenario, entry) {
 								);
 							}
 							if (result === null || result.kind === 'none') return null;
+							// Match Vite: compiled `.ts`/`.tsx` output keeps TypeScript with
+							// runtime semantics (`enum`), which the TS loader then lowers.
+							// Compiled `.tsrx` output is JavaScript.
 							return {
 								contents: result.code,
-								loader: result.kind === 'compile' ? 'js' : path.extname(filename).slice(1),
+								loader: template ? 'js' : path.extname(filename).slice(1),
 							};
 						});
 					},

@@ -1740,11 +1740,13 @@ export const Indirect = indirect(Host);
 		const id = '/project/src/MemoRoots.tsrx';
 		const production = compiler.transform(source, id, { hmr: false, dev: false });
 		expect(production?.code).toMatch(
-			/Stable\s*=\s*(?:\/\*[^*]*\*\/\s*)?_\$__s\(remember\(Host\)\)/,
+			/Stable\s*=\s*(?:\/\*[^*]*\*\/\s*)?_\$__s\((?:\/\*[^*]*\*\/\s*)?remember\(Host\)\)/,
 		);
-		expect(production?.code).toMatch(/Nullable\s*=\s*remember\(Optional\)/);
-		expect(production?.code).toMatch(/Compared\s*=\s*remember\(Host,\s*\(\)\s*=>\s*true\)/);
-		expect(production?.code).toMatch(/Imported\s*=\s*remember\(External\)/);
+		expect(production?.code).toMatch(/Nullable\s*=\s*(?:\/\*[^*]*\*\/\s*)?remember\(Optional\)/);
+		expect(production?.code).toMatch(
+			/Compared\s*=\s*(?:\/\*[^*]*\*\/\s*)?remember\(Host,\s*\(\)\s*=>\s*true\)/,
+		);
+		expect(production?.code).toMatch(/Imported\s*=\s*(?:\/\*[^*]*\*\/\s*)?remember\(External\)/);
 		expect(production?.code).toMatch(/Indirect\s*=\s*indirect\(Host\)/);
 
 		for (const options of [
@@ -1754,7 +1756,7 @@ export const Indirect = indirect(Host);
 			{ environment: 'server' as const, hmr: false, dev: false },
 		]) {
 			const output = compiler.transform(source, id, options);
-			expect(output?.code).not.toMatch(/_\$__s\(remember\(Host\)\)/);
+			expect(output?.code).not.toMatch(/_\$__s\((?:\/\*[^*]*\*\/\s*)?remember\(Host\)\)/);
 		}
 	});
 

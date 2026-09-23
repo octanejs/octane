@@ -691,8 +691,9 @@ export function App() @{
 		expect(client.code).toContain('export { StaticShell as PublicStaticShell }');
 	});
 
+	// `export = …` has no ES-module lowering; the compiler rejects it outright
+	// (typescript-runtime-lowering.test.ts), so it cannot retain a declaration.
 	it.each([
-		['a TypeScript export assignment', 'export = StaticShell;'],
 		['a runtime enum initializer', 'export enum RuntimeValue { value = StaticShell() }'],
 		[
 			'a runtime namespace initializer',
