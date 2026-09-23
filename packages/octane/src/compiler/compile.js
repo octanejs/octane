@@ -14591,6 +14591,10 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		containsComponentCallOrControlFlow(itemBody) ||
 		containsRenderCall(itemBody) ||
 		ssrAstCallsAny(itemSub.fn, ['_$ssrChild', '_$ssrComponent']);
+	const signalSite =
+		mapCall === null && (ctx.signalBindingsUsed || ctx.nativeReads) && containsRenderCall(itemBody)
+			? ssrControlKey('for', node)
+			: null;
 	const itemCall = ssrSubCall(
 		itemSub.fnName,
 		node.index ? [b.id('__it'), b.id('__i')] : [b.id('__it')],
@@ -14610,7 +14614,11 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 					node.index ? b.id('__i') : ssrVoid(node),
 					b.id('__s'),
 					b.literal(!sharedItemRange && !bindingSite),
-					...(mapCall === null ? [] : [b.literal(true)]),
+					...(signalSite !== null
+						? [b.literal(false), b.literal(signalSite)]
+						: mapCall === null
+							? []
+							: [b.literal(true)]),
 				],
 				node,
 			)
@@ -25891,10 +25899,10 @@ function planJsx(
 				? 'fastMapSlot'
 				: 'mapSlot'
 			: fc.keyedSelectionIndex >= 0
-				? fc.hostMountSafe
+				? fc.hostMountSafe && fc.signalSite === null
 					? 'fastKeyedForBlock'
 					: 'keyedForBlock'
-				: fc.hostMountSafe
+				: fc.hostMountSafe && fc.signalSite === null
 					? 'fastForBlock'
 					: 'forBlock';
 		ctx.runtimeNeeded.add(forHelper);
@@ -26004,6 +26012,12 @@ function planJsx(
 			// ownEnd before supplying the selection updater as argument 12.
 			while (tailArgs.length < 7) tailArgs.push(undefinedNode());
 			tailArgs.push(helperRefNode(fc.selectionHelper));
+		}
+		if (fc.signalSite !== null) {
+			while (tailArgs.length < (fc.keyedSelectionIndex >= 0 ? 8 : 7)) {
+				tailArgs.push(undefinedNode());
+			}
+			tailArgs.push(b.literal(fc.signalSite));
 		}
 		if (isMappedList) {
 			const nativeName = allocCompilerName(ctx, '__mapNative');
@@ -31004,8 +31018,8 @@ function requireCompiledHydrateAlias(ctx) {
 	return alias;
 }
 
-function hydrateDiagnosticChildrenCaptures(node, children, ctx) {
-	if (!ctx.dev || ctx.mode === 'server') return undefined;
+function hydrateChildrenCaptures(node, children, ctx) {
+	if (ctx.mode === 'server') return undefined;
 	const tag = node.openingElement?.name ?? node.id;
 	if (tag?.type !== 'JSXIdentifier' || ctx.octaneImportLocals?.get(tag.name) !== 'Hydrate')
 		return undefined;
@@ -31031,7 +31045,7 @@ function hydrateDiagnosticChildrenCaptures(node, children, ctx) {
 		for (const name of roots) covered.add(name);
 	}
 	for (const name of free) if (!covered.has(name)) captures.push(b.id(name));
-	// Property reads stay deferred until activation; collecting diagnostic data
+	// Property reads stay deferred until activation; comparing captures
 	// must not evaluate a dormant child's getters or call its render function.
 	return inheritOriginLoc(b.arrow([], b.array(captures)), node);
 }
@@ -31225,8 +31239,8 @@ function makeCompCall(
 			ctx.runtimeNeeded.add('markChildrenBlock');
 			hasChildrenProp = true;
 			const childrenArgs = [b.id(childrenHelperName)];
-			const diagnosticCaptures = hydrateDiagnosticChildrenCaptures(node, children, ctx);
-			if ((ctx.autoMemo && ctx.mode !== 'server') || diagnosticCaptures !== undefined) {
+			const hydrateCaptures = hydrateChildrenCaptures(node, children, ctx);
+			if ((ctx.autoMemo && ctx.mode !== 'server') || hydrateCaptures !== undefined) {
 				// These functions close over parent locals and are recreated on every
 				// render. A module-owned token distinguishes a real Provider body
 				// handoff from fresh captures without invalidating ordinary cache hits.
@@ -31234,8 +31248,7 @@ function makeCompCall(
 				ctx.hoistedHelpers.push(inheritOriginLoc(b.const(bodyIdentity, b.object([])), node));
 				childrenArgs.push(b.id(bodyIdentity));
 			}
-			if (diagnosticCaptures !== undefined)
-				childrenArgs.push(diagnosticCaptures ?? b.literal(null));
+			if (hydrateCaptures !== undefined) childrenArgs.push(hydrateCaptures ?? b.literal(null));
 			let childrenValue = b.call('_$markChildrenBlock', ...childrenArgs);
 			if (ctx.presentationHydration?.structural && node._octaneBindingSite)
 				childrenValue = b.call(
@@ -32411,6 +32424,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	);
 
 	const mapCall = node.nativeArrayMap || null;
+	const signalSite =
+		mapCall === null && (ctx.signalBindingsUsed || ctx.nativeReads) && containsRenderCall(subStmts)
+			? ssrControlKey('for', node)
+			: null;
 	if (keyCapturesParent) autoMemoDeps = null;
 	return {
 		id: ctx.nextHelperId++,
@@ -32441,7 +32458,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		keyHelper,
 		inlineKey: inlineKey ? keyFn : null,
 		bodyHelper: itemHelperName,
-		selectionHelper: keyedSelection?.helper ?? null,
+		signalSite,
+		selectionHelper: signalSite === null ? (keyedSelection?.helper ?? null) : null,
 		hasPerItemEventClosure,
 		pure,
 		singleRoot,
@@ -32454,13 +32472,15 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// Component-local entries remain the tuple prefix the helpers destructure;
 		// any appended import witnesses are comparison-only.
 		depEligible,
-		requiresScope,
+		// Inline signals need their row owner on every survivor update, including
+		// dependency changes that could otherwise use the lite selection path.
+		requiresScope: requiresScope || signalSite !== null,
 		itemMemoWitnesses,
 		itemMemoFlags,
 		autoMemoDeps,
 		autoMemoWitnesses,
 		autoMemoContextAware,
-		keyedSelectionIndex,
+		keyedSelectionIndex: signalSite === null ? keyedSelectionIndex : -1,
 		depNames: runtimeDepNames,
 		// True only when the header binds NO `index <name>` — the body then can't
 		// observe an item's position, so a pure reorder (same item ref, position

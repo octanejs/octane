@@ -76,12 +76,8 @@ function bundle(dev: boolean) {
 			stdin: {
 				contents:
 					compile(authored, filename, { dev, hmr: false, strong: true }).code +
-					'\nexport { hydrateRoot, act, flushSync } from "octane";\nexport { beginNativeReadScope, enableNativeReadCollection } from "octane/internal/client";' +
+					'\nexport { hydrateRoot, act, flushSync } from "octane";' +
 					'\nexport { condition, load } from "octane/hydration";' +
-					'\nexport * as compilerABI from "octane/internal/client"; export * as signalABI from "octane/signals/client";' +
-					'\nexport {nativeLocalHook} from ' +
-					JSON.stringify(packageRoot + '/src/runtime.ts') +
-					';' +
 					'\nexport { getNativeReadObserver, isNativeWriteGuarded } from ' +
 					JSON.stringify(resolve(packageRoot, 'src/signals/read-protocol.ts')) +
 					';',
@@ -130,23 +126,16 @@ async function consumer(dev: boolean) {
 	};
 }
 
-async function scenario(dev: boolean, split: boolean, name: string, throwHistorical = false) {
+async function scenario(dev: boolean, split: boolean, name: string) {
 	const view = await consumer(dev);
-	expect('createNativeSignalDiagnosticInitializer' in view.api.compilerABI).toBe(false);
-	expect('createNativeSignalDiagnosticInitializer' in view.api.signalABI).toBe(false);
-	expect('createDiagnosticLocalScope' in view.api.signalABI).toBe(false);
 	let root: any;
 	const external = name.startsWith('external');
 	const serverModel = external ? view.server.createModel$(true) : undefined;
 	const model = external ? view.api.createModel$(true) : undefined;
 	const recoverable: unknown[] = [];
-	const renders: { observer: boolean; guarded: boolean; subscribers: number; leases: number }[] =
-		[];
+	const renders: { observer: boolean; guarded: boolean }[] = [];
 	const refs: any[] = [];
 	const effects: string[] = [];
-	let historicalThrows = 0;
-	let rejectedAbi = 0;
-	let rejectedWrites = 0;
 	const Component = split ? view.api.SplitBoundary : view.api.Boundary;
 	try {
 		view.host.innerHTML = view.server.renderToString(
@@ -161,37 +150,10 @@ async function scenario(dev: boolean, split: boolean, name: string, throwHistori
 			hidden: true,
 			model,
 			onRender() {
-				const observer = view.api.getNativeReadObserver() !== null;
-				const inspection = model?.inspect();
 				renders.push({
-					observer,
+					observer: view.api.getNativeReadObserver() !== null,
 					guarded: view.api.isNativeWriteGuarded(),
-					subscribers:
-						inspection?.nodes.reduce((sum: number, node: any) => sum + node.subscribers, 0) ?? 0,
-					leases: inspection?.adoptionLeases ?? 0,
 				});
-				if (!observer) {
-					if (model) {
-						try {
-							model.hidden$.set(true);
-						} catch {
-							rejectedWrites++;
-						}
-					}
-					for (const call of [
-						() => view.api.beginNativeReadScope(undefined, 2),
-						() => view.api.enableNativeReadCollection(2),
-					])
-						try {
-							call();
-						} catch {
-							rejectedAbi++;
-						}
-					if (throwHistorical) {
-						historicalThrows++;
-						throw new Error('Historical resource unavailable');
-					}
-				}
 			},
 			onRef: (node: any) => refs.push(node),
 			onEffect: (phase: string) => effects.push(phase),
@@ -201,6 +163,7 @@ async function scenario(dev: boolean, split: boolean, name: string, throwHistori
 		});
 		await view.api.act(() => {});
 		expect(control.hidden).toBe(true);
+		expect(renders).toEqual([]);
 		expect(refs).toEqual([]);
 		expect(effects).toEqual([]);
 		if (model) await view.api.act(() => model.hidden$.set(false));
@@ -211,20 +174,6 @@ async function scenario(dev: boolean, split: boolean, name: string, throwHistori
 			hidden: false,
 		};
 		await view.api.act(() => root.render(Component, latest));
-		const attributes = view.diagnostics.filter(({ args }) =>
-			args.some((arg) => typeof arg === 'string' && arg.includes('attribute')),
-		);
-		const identity = attributes.filter(({ args }) =>
-			args.some((arg) => typeof arg === 'string' && arg.includes('data-identity')),
-		);
-		const hidden = attributes.filter(({ args }) =>
-			args.some(
-				(arg) =>
-					typeof arg === 'string' &&
-					arg.includes('hidden') &&
-					!arg.includes('synthetic-local-status'),
-			),
-		);
 		expect(view.host.querySelector('#synthetic-control')).toBe(control);
 		expect(control.getAttribute('data-identity')).toBe(latest.identity);
 		expect(control.hidden).toBe(false);
@@ -232,34 +181,11 @@ async function scenario(dev: boolean, split: boolean, name: string, throwHistori
 		expect(refs.filter(Boolean)).toEqual([control]);
 		expect(refs.filter((node) => node && node.ownerDocument !== view.window.document)).toEqual([]);
 		expect(effects).toEqual(['layout-mount', 'passive-mount']);
-		expect(renders.every((render) => render.guarded)).toBe(true);
-		if (dev) {
-			const probes = renders.filter((render) => !render.observer);
-			if (name !== 'external-only' || throwHistorical) expect(probes.length).toBeGreaterThan(0);
-			expect(probes.every((render) => render.subscribers === 0)).toBe(true);
-			expect(rejectedAbi).toBe(probes.length * 2);
-			expect(rejectedWrites).toBe(model ? probes.length : 0);
-		}
-		if (throwHistorical) {
-			expect(historicalThrows).toBe(1);
-			expect(
-				identity.length,
-				JSON.stringify({ identity: identity.length, hidden: hidden.length }),
-			).toBe(1);
-			// The primitive site was not visited; native adoption still uses its SSR seed.
-			expect(hidden).toHaveLength(0);
-		} else if (dev && initialMismatch) {
-			expect(identity).toHaveLength(1);
-			expect(hidden).toHaveLength(0);
-			expect(attributes).toHaveLength(1);
-		} else {
-			const classified = {
-				count: view.diagnostics.length,
-				hidden: hidden.length,
-				identity: identity.length,
-			};
-			expect(view.diagnostics.length, JSON.stringify(classified)).toBe(0);
-		}
+		// Dev and prod render the child only live, inside native read collection.
+		expect(renders.length).toBeGreaterThan(0);
+		expect(renders.every((render) => render.guarded && render.observer)).toBe(true);
+		// Changed captures or native values make the server HTML stale: repair it silently.
+		expect(view.diagnostics).toEqual([]);
 		if (model) {
 			await view.api.act(() => model.hidden$.set(true));
 			expect(control.hidden).toBe(true);
@@ -300,9 +226,6 @@ for (const dev of [false, true])
 			])
 				it(`${split ? 'split' : 'unsplit'} ${name}`, () => scenario(dev, split, name));
 	});
-for (const split of [false, true])
-	it(`restores collection and lifecycle after a throwing ${split ? 'split' : 'unsplit'} historical probe`, () =>
-		scenario(true, split, 'external-before-activation', true));
 
 for (const dev of [true, false])
 	for (const split of [true, false])
@@ -310,13 +233,11 @@ for (const dev of [true, false])
 			it(`isolates local signal state dev=${dev} split=${split} ${name}`, async () => {
 				const view = await consumer(dev);
 				let root: any;
-				const cells: { cell: any; probe: boolean }[] = [];
+				const cells: any[] = [];
 				const refs: any[] = [];
 				const effects: string[] = [];
 				let rejectedWrites = 0,
 					rejectedSubscriptions = 0,
-					rejectedUnknown = 0,
-					unknownInitializations = 0,
 					publications = 0;
 				try {
 					view.host.innerHTML = view.server.renderToString(
@@ -338,47 +259,9 @@ for (const dev of [true, false])
 						localInitial: name === 'local-corrected',
 						onRef: (node: any) => refs.push(node),
 						onEffect: (phase: string) => effects.push(phase),
-						onRender() {
-							if (view.api.getNativeReadObserver() === null) {
-								for (const [hook, optional] of [
-									['custom-native-resource', undefined],
-									[
-										'custom-native-resource',
-										() => {
-											unknownInitializations++;
-											return {};
-										},
-									],
-									[
-										'useSignal$',
-										() => {
-											unknownInitializations++;
-											return {};
-										},
-									],
-								]) {
-									try {
-										view.api.nativeLocalHook(
-											hook,
-											() => {
-												unknownInitializations++;
-												return {};
-											},
-											() => {
-												publications++;
-											},
-											Symbol.for('unsupported:' + hook + String(optional)),
-											optional,
-										);
-									} catch {
-										rejectedUnknown++;
-									}
-								}
-							}
-						},
 						onLocal(cell: any) {
-							const probe = view.api.getNativeReadObserver() === null;
-							cells.push({ cell, probe });
+							expect(view.api.getNativeReadObserver()).not.toBe(null);
+							cells.push(cell);
 							try {
 								cell.set(true);
 							} catch {
@@ -389,10 +272,6 @@ for (const dev of [true, false])
 							} catch {
 								rejectedSubscriptions++;
 							}
-							if (probe)
-								expect(
-									cell.owner.inspect().nodes.every((node: any) => node.subscribers === 0),
-								).toBe(true);
 							expect(cell.owner.inspect().adoptionLeases).toBe(0);
 						},
 					};
@@ -410,32 +289,17 @@ for (const dev of [true, false])
 					await view.api.act(() => root.render(Component, latest));
 					expect(view.host.querySelector('#synthetic-control')).toBe(control);
 					expect(view.host.querySelector('#synthetic-local-status')).toBe(status);
-					const probes = cells.filter((event) => event.probe),
-						live = cells.filter((event) => !event.probe);
-					expect(live.length).toBeGreaterThan(0);
-					if (dev) expect(probes.length).toBeGreaterThan(0);
-					else expect(probes).toEqual([]);
-					expect(probes.every(({ cell }) => cell.owner.retired)).toBe(true);
-					for (const { cell } of probes) expect(() => cell.set(false)).toThrow();
-					const actual = live[0].cell;
-					expect(live.every((event) => event.cell === actual)).toBe(true);
+					// Only the live cell exists: no side render initializes a second one.
+					expect(cells.length).toBeGreaterThan(0);
+					const actual = cells[0];
+					expect(cells.every((cell) => cell === actual)).toBe(true);
 					expect(actual.owner.retired).toBe(false);
 					expect(actual.get()).toBe(latest.localInitial);
 					expect(status.hidden).toBe(!latest.localInitial);
 					expect(rejectedWrites).toBe(cells.length);
 					expect(rejectedSubscriptions).toBe(cells.length);
-					expect(unknownInitializations).toBe(0);
 					expect(publications).toBe(0);
-					expect(rejectedUnknown).toBe(probes.length * 3);
-					const identity = view.diagnostics.filter(({ args }) =>
-							args.some((a) => typeof a === 'string' && a.includes('data-identity')),
-						),
-						hidden = view.diagnostics.filter(({ args }) =>
-							args.some((a) => typeof a === 'string' && a.includes('hidden')),
-						);
-					expect(identity.length).toBe(dev && name === 'primitive-corrected' ? 1 : 0);
-					expect(hidden.length).toBe(dev && name === 'local-corrected' ? 1 : 0);
-					expect(view.diagnostics.length).toBe(dev && name !== 'later-state' ? 1 : 0);
+					expect(view.diagnostics).toEqual([]);
 					expect(refs.filter(Boolean)).toEqual([control]);
 					expect(effects).toEqual(['layout-mount', 'passive-mount']);
 					await view.api.act(() => control.click());
@@ -444,15 +308,13 @@ for (const dev of [true, false])
 					await view.api.act(() =>
 						root.render(Component, { ...latest, localInitial: !latest.localInitial }),
 					);
-					expect(
-						cells.filter((event) => !event.probe).every((event) => event.cell === actual),
-					).toBe(true);
+					expect(cells.every((cell) => cell === actual)).toBe(true);
 					expect(actual.get()).toBe(!latest.localInitial);
 					expect(status.hidden).toBe(latest.localInitial);
 					view.api.flushSync(() => root.unmount());
 					root = null;
 					await view.api.act(() => {});
-					expect(cells.every((event) => event.cell.owner.retired)).toBe(true);
+					expect(actual.owner.retired).toBe(true);
 					expect(actual.owner.inspect().nodes).toEqual([]);
 					expect(() => actual.get()).toThrow();
 					expect(effects).toEqual([
@@ -477,7 +339,7 @@ for (const dev of [true, false])
 			let serverInitializations = 0,
 				initializations = 0,
 				subsequentInitializations = 0,
-				probes = 0;
+				unobservedRenders = 0;
 			const cells: any[] = [];
 			const refs: any[] = [];
 			const effects: string[] = [];
@@ -505,7 +367,7 @@ for (const dev of [true, false])
 						return false;
 					},
 					onRender() {
-						if (view.api.getNativeReadObserver() === null) probes++;
+						if (view.api.getNativeReadObserver() === null) unobservedRenders++;
 					},
 					onLocal(cell: any) {
 						expect(view.api.getNativeReadObserver()).not.toBe(null);
@@ -521,7 +383,7 @@ for (const dev of [true, false])
 				const latest = { ...initial, when: view.api.load(), identity: 'later-client' };
 				await view.api.act(() => root.render(Component, latest));
 				expect(initializations).toBe(1);
-				expect(probes).toBe(dev ? 1 : 0);
+				expect(unobservedRenders).toBe(0);
 				expect(cells.length).toBeGreaterThan(0);
 				const actual = cells[0];
 				expect(cells.every((cell) => cell === actual)).toBe(true);
@@ -531,11 +393,7 @@ for (const dev of [true, false])
 				expect(view.host.querySelector('#synthetic-control')).toBe(control);
 				expect(refs.filter(Boolean)).toEqual([control]);
 				expect(effects).toEqual(['layout-mount', 'passive-mount']);
-				const identity = view.diagnostics.filter(({ args }) =>
-					args.some((a) => typeof a === 'string' && a.includes('data-identity')),
-				);
-				expect(identity.length).toBe(dev ? 1 : 0);
-				expect(view.diagnostics.length).toBe(dev ? 1 : 0);
+				expect(view.diagnostics).toEqual([]);
 				await view.api.act(() => control.click());
 				expect(actual.get()).toBe(true);
 				expect(status.hidden).toBe(false);
