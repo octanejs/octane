@@ -49,7 +49,7 @@ The complete component surface is:
 | --- | --- | --- |
 | `when` | `HydrationStrategy \| (() => HydrationStrategy)` | Required hydration trigger. The function form runs only on the client and must return synchronously. |
 | `split` | `boolean` | Compiler-split the direct children into a deferred chunk. Defaults to `true`. |
-| `independent` | `boolean` | Require a compiler-proven standalone widget. Unsupported ownership or captures fail compilation instead of falling back. |
+| `independent` | `boolean` | Require a compiler-proven standalone widget. Unsupported ownership, captures, or `when` forms (`condition()`, function-form) fail compilation instead of falling back. |
 | `prefetch` | `HydrationPrefetchStrategy \| HydrationPrefetchFunction` | Start loading the split chunk or run custom preparation before hydration. |
 | `fallback` | renderable | Client-only loading UI for a later client mount or suspension. |
 | `onHydrated` | `() => void` | Called once after the child successfully commits on the client. |
@@ -220,6 +220,23 @@ An independent widget with `when={load()}` activates when the document bootstrap
 registers its SSR sidecar, without waiting for interaction or evaluating its
 lexical parent. Its styles load before its activation module. A paused document
 resumes an unfinished load activation when it becomes active again.
+
+`idle()`, `visible()`, and `media()` work the same way. The server writes their
+non-default parameters (`timeout`, `rootMargin`, `threshold`, the media query) on
+the boundary, and the bootstrap installs the same idle callback, shared
+`IntersectionObserver`, or `matchMedia` listener that an ordinary boundary uses.
+The widget activates when that trigger fires. As with an ordinary boundary, a
+click on an `idle`, `visible`, or `media` widget does not force it to activate.
+Pausing the document removes a pending trigger. Resuming re-installs it, or
+activates at once if the strategy already fired. `interaction()` activates on
+its captured events, and `never()` stays inert.
+
+An independent boundary cannot use `condition()` or a function-form `when`.
+Both need the lexical parent to re-evaluate them on the client, which an
+independent widget never does. The compiler rejects either form when written
+directly (`OCTANE_HYDRATE_INDEPENDENT_WHEN`). An opaque `when` value that
+resolves to either one at render time makes server rendering throw. Use
+`condition()` with an ordinary `<Hydrate>` instead.
 Activation adopts the matching server DOM in template and JSX-returning
 components, preserving edits made to uncontrolled inputs before activation.
 

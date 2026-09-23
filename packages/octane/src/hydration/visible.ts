@@ -32,6 +32,7 @@ export function visible(
 
 	return {
 		_t: visibleType,
+		_p: options,
 		_s: ({ element, gate, prefetch }) => {
 			const callback = prefetch ?? gate?.resolve;
 			if (!callback) return;

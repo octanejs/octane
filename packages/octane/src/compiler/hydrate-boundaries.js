@@ -416,6 +416,7 @@ function collectImports(ast) {
 	const hydrateNames = new Set();
 	const hookNames = new Set();
 	const neverNames = new Set();
+	const conditionNames = new Set();
 	const importBindings = new Set();
 	const declarations = [];
 	for (const statement of ast.body ?? []) {
@@ -448,14 +449,16 @@ function collectImports(ast) {
 				statement.importKind !== 'type' &&
 				specifier.type === 'ImportSpecifier' &&
 				specifier.importKind !== 'type' &&
-				nameOf(specifier.imported) === 'never' &&
+				(nameOf(specifier.imported) === 'never' || nameOf(specifier.imported) === 'condition') &&
 				specifier.local?.name
 			) {
-				neverNames.add(specifier.local.name);
+				(nameOf(specifier.imported) === 'never' ? neverNames : conditionNames).add(
+					specifier.local.name,
+				);
 			}
 		}
 	}
-	return { declarations, hookNames, hydrateNames, neverNames, importBindings };
+	return { declarations, hookNames, hydrateNames, neverNames, conditionNames, importBindings };
 }
 
 function addRelevantBindings(pattern, shadowed, relevant) {
@@ -544,6 +547,41 @@ function literalIndependentEnabled(node, filename) {
 		);
 	}
 	return enabled;
+}
+
+/**
+ * An independent island activates without its lexical parent, so the client
+ * cannot re-evaluate `when`. The server serializes each built-in automatic
+ * strategy's parameters; reject the authored forms that need the parent:
+ * function-form `when` and `condition()`. Opaque values are checked at SSR.
+ */
+function assertIndependentWhen(node, conditionNames, shadowedImports, filename) {
+	for (const attribute of node.openingElement?.attributes ?? []) {
+		if (jsxAttributeName(attribute) !== 'when') continue;
+		const raw =
+			attribute.value?.type === 'JSXExpressionContainer'
+				? attribute.value.expression
+				: attribute.value;
+		const expression = unwrapExpression(raw);
+		const callee =
+			expression?.type === 'CallExpression' ? unwrapExpression(expression.callee) : null;
+		const kind =
+			expression?.type === 'ArrowFunctionExpression' || expression?.type === 'FunctionExpression'
+				? 'a function-form `when`'
+				: callee?.type === 'Identifier' &&
+					  conditionNames.has(callee.name) &&
+					  !shadowedImports.has(callee.name)
+					? '`condition()`'
+					: null;
+		if (kind !== null) {
+			throw extractionError(
+				'OCTANE_HYDRATE_INDEPENDENT_WHEN',
+				filename,
+				attribute,
+				`an independent boundary cannot use ${kind} because its lexical parent never runs on the client to re-evaluate it. Use load(), idle(), visible(), media(), interaction(), or never(), or remove \`independent\``,
+			);
+		}
+	}
 }
 
 /**
@@ -926,6 +964,7 @@ export function analyzeHydrateBoundaries(source, filename = 'unknown.tsrx', pars
 				const index = siblings.length;
 				const path = parentBoundary === null ? String(index) : `${parentBoundary.path}.${index}`;
 				const independent = literalIndependentEnabled(node, filename);
+				if (independent) assertIndependentWhen(node, imports.conditionNames, shadowed, filename);
 				boundary = {
 					children: [],
 					disabled: literalSplitDisabled(node),

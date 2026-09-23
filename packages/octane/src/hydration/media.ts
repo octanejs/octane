@@ -6,6 +6,7 @@ const mediaType = 'media';
 export function media(query: string): HydrationPrefetchStrategy<typeof mediaType> {
 	return {
 		_t: mediaType,
+		_p: query,
 		_s: ({ gate, prefetch }) => {
 			if (!query) return;
 			const callback = prefetch ?? gate?.resolve;

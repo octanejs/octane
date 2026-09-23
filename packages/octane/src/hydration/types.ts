@@ -72,6 +72,11 @@ export type HydrationStrategy<
 	_s?: (context: HydrationRuntimeContext) => void | (() => void);
 	_o?: (id: string) => void;
 	_a?: () => HydrationMarkerAttributes | undefined;
+	/**
+	 * Authored parameters of a built-in automatic strategy. The server encodes
+	 * them for an independent boundary, whose parent never re-evaluates `when`.
+	 */
+	_p?: unknown;
 };
 
 export type HydrationPrefetchWhen = Exclude<HydrationWhen, 'condition' | 'never' | 'dynamic'>;

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 80,
+  "nextCode": 81,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -474,6 +474,12 @@
       "message": "Unsupported native signal transition.",
       "argumentCount": 0,
       "runtime": ["client"],
+      "status": "active"
+    },
+    "80": {
+      "message": "Independent Hydrate cannot activate a `%s` strategy because its lexical parent never runs on the client. Use load(), idle(), visible(), media(), interaction(), or never(), or remove `independent`.",
+      "argumentCount": 1,
+      "runtime": ["server"],
       "status": "active"
     }
   }
