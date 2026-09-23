@@ -672,6 +672,117 @@ export const result$ = ${factory}(${callback}${options});`;
 	}
 });
 
+// Each module that renders native reads imports octane/signals and activates
+// them itself (docs/signals.md). A .tsrx module that only declares signals must
+// stay as renderer-free as the same declarations in a plain .ts module.
+test('compiled .tsrx signal declarations stay renderer-free', async (t) => {
+	const directory = path.resolve('packages/octane');
+	const modules = {
+		'state.tsrx': `import { signal$, derived$ } from 'octane/signals';
+export const count$ = signal$(1);
+export const double$ = derived$(() => count$.get() * 2);`,
+		// A parameter default reads before the component body, so only the
+		// reader module's own activation can collect it.
+		'Reader.tsrx': `import 'octane/signals';
+import { count$ } from './state.tsrx';
+export function Reader({ value = count$.get() }) @{ <b>{value as number}</b> }`,
+	};
+	const bundle = async (entry) => {
+		const result = await build({
+			stdin: { contents: entry, resolveDir: directory },
+			bundle: true,
+			write: false,
+			minify: true,
+			metafile: true,
+			format: 'esm',
+			platform: 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			plugins: [
+				{
+					name: 'tsrx-signal-modules',
+					setup(plugin) {
+						plugin.onResolve({ filter: /^\.\/(?:state|Reader)\.tsrx$/ }, ({ path: id }) => ({
+							path: id.slice(2),
+							namespace: 'tsrx-signal-modules',
+						}));
+						plugin.onLoad({ filter: /.*/, namespace: 'tsrx-signal-modules' }, ({ path: id }) => ({
+							contents: compile(modules[id], path.join(directory, id), {
+								mode: 'client',
+								dev: false,
+								hmr: false,
+							}).code,
+							loader: 'js',
+							resolveDir: directory,
+						}));
+					},
+				},
+			],
+		});
+		return {
+			api: await import(
+				'data:text/javascript;base64,' + Buffer.from(result.outputFiles[0].text).toString('base64')
+			),
+			resolved: Object.keys(result.metafile.inputs),
+		};
+	};
+	const renderer = /packages\/octane\/src\/(?:runtime\.ts|internal\/client\.ts)$/;
+	const window = new Window();
+	const globals = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+
+	const standalone = await bundle(`import { count$, double$ } from './state.tsrx';
+import { runWithSignalOwner, retireSignalOwnerIdentity } from 'octane/signals';
+export function exercise() {
+  const owner = { scopeKey: 'tsrx-declarations' };
+  const read = (callback) => runWithSignalOwner(owner, callback);
+  try {
+    const initial = read(() => double$.get());
+    read(() => count$.set(4));
+    return [initial, read(() => double$.get())];
+  } finally { retireSignalOwnerIdentity(owner); }
+}`);
+	assert.deepEqual(standalone.api.exercise(), [2, 8]);
+	assert.deepEqual(
+		standalone.resolved.filter((id) => renderer.test(id)),
+		[],
+		'Signal declarations reached the renderer.',
+	);
+
+	// Control: the documented reader import still activates native reads.
+	const rendered = await bundle(`import { createRoot, flushSync } from 'octane';
+import { Reader } from './Reader.tsrx';
+export { count$ } from './state.tsrx';
+export { flushSync };
+export function mount(parent) { const root = createRoot(parent); root.render(Reader, {}); return root; }`);
+	const host = window.document.createElement('div');
+	window.document.body.append(host);
+	const root = rendered.api.mount(host);
+	try {
+		assert.equal(host.textContent, '1');
+		rendered.api.flushSync(() => rendered.api.count$.set(5));
+		assert.equal(host.textContent, '5');
+	} finally {
+		root.unmount();
+		host.remove();
+	}
+});
+
 test('compiled structural adoption costs only its selected implementation', async (t) => {
 	const directory = import.meta.dirname;
 	const filename = path.join(directory, 'structural-boundary.tsrx');

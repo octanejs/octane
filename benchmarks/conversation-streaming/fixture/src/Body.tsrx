@@ -1,3 +1,4 @@
+import 'octane/signals';
 import { body$, selectedTurn$ } from './State.tsrx';
 import { recordEvaluation } from './evaluation.ts';
 
