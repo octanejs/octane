@@ -24337,15 +24337,28 @@ const TS_TYPE_PROPS = [
 
 // Class members with no runtime existence: index signatures, abstract members,
 // and method/constructor overload signatures (a body-less function value).
+// The native parser has TSAbstract* node types and TSEmptyBodyFunctionExpression
+// values; the JavaScript parser flags ordinary members `abstract` and gives
+// overloads a TSDeclareMethod value.
 function isTypeOnlyClassElement(node) {
 	if (node == null) return false;
-	return (
-		node.type === 'TSIndexSignature' ||
-		node.type === 'TSAbstractMethodDefinition' ||
-		node.type === 'TSAbstractPropertyDefinition' ||
-		node.type === 'TSAbstractAccessorProperty' ||
-		(node.type === 'MethodDefinition' && node.value?.type === 'TSEmptyBodyFunctionExpression')
-	);
+	switch (node.type) {
+		case 'TSIndexSignature':
+		case 'TSAbstractMethodDefinition':
+		case 'TSAbstractPropertyDefinition':
+		case 'TSAbstractAccessorProperty':
+			return true;
+		case 'MethodDefinition':
+			return (
+				node.abstract === true ||
+				node.value?.type === 'TSEmptyBodyFunctionExpression' ||
+				node.value?.type === 'TSDeclareMethod'
+			);
+		case 'PropertyDefinition':
+		case 'AccessorProperty':
+			return node.abstract === true;
+	}
+	return false;
 }
 
 // Copy-on-write: stripped shapes are shallow copies; nodes with no TS-only

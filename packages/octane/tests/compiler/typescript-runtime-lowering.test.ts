@@ -1,8 +1,30 @@
-import { describe, expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
 import { parseAst } from 'vite';
 import { compile } from 'octane/compiler';
 import { evaluateCompiledFixtureCode } from '../_server-fixture.js';
+
+// Octane parses with the native `@tsrx/oxc` parser and falls back to the
+// JavaScript parser (also the browser compiler's only parser). They spell
+// dotted namespaces and `export import` differently, so every case runs
+// through both.
+const parser = vi.hoisted(() => ({ javascript: false }));
+vi.mock('../../src/compiler/parser.node.js', async (importOriginal) => {
+	const native = await importOriginal<typeof import('../../src/compiler/parser.node.js')>();
+	const javascript = await import('../../src/compiler/parser.browser.js');
+	return {
+		...native,
+		parseModule: (...args: Parameters<typeof native.parseModule>) =>
+			(parser.javascript ? javascript.parseModule : native.parseModule)(...args),
+	};
+});
+afterEach(() => {
+	parser.javascript = false;
+});
+
+const PARSERS = ['native', 'javascript'] as const;
+const MODES = ['client', 'server'] as const;
 
 // `.tsrx` output is never TS-transformed after Octane, so TypeScript
 // declarations with runtime semantics (enum, value namespace, import alias,
@@ -12,11 +34,16 @@ import { evaluateCompiledFixtureCode } from '../_server-fixture.js';
 
 const ID = '/src/Lowering.tsrx';
 
-function octaneResult(source: string, mode: 'client' | 'server') {
+function octaneCode(source: string, mode: 'client' | 'server', parserName: string) {
+	parser.javascript = parserName === 'javascript';
 	const { code } = compile(source, ID, { mode, hmr: false });
 	// Rolldown's parser is what rejected `enum` in a real `vite build`.
 	expect(() => parseAst(code, { lang: 'js' })).not.toThrow();
-	return evaluateCompiledFixtureCode(code, ID, mode, undefined).result;
+	return code;
+}
+
+function octaneExports(source: string, mode: 'client' | 'server', parserName: string) {
+	return evaluateCompiledFixtureCode(octaneCode(source, mode, parserName), ID, mode, undefined);
 }
 
 function tscResult(source: string) {
@@ -133,6 +160,11 @@ const CASES: Record<string, string> = {
 		import Shape = TypesOnly.Shape;
 		export const result = Alias.value;
 	`,
+	'export import aliases inside a namespace': `
+		namespace Source { export const value = 'source'; }
+		namespace Re { export import Value = Source.value; export const read = () => Value; }
+		export const result = { value: Re.Value, read: Re.read() };
+	`,
 	'parameter properties in base and derived classes': `
 		class Base {
 			constructor(public readonly name: string, protected count = 2) {}
@@ -141,7 +173,7 @@ const CASES: Record<string, string> = {
 		class Derived extends Base {
 			extra: string;
 			constructor(name: string, private suffix: string) {
-				'use strict';
+				'a directive';
 				super(name, 5);
 				this.extra = this.suffix + '!';
 			}
@@ -173,11 +205,49 @@ const CASES: Record<string, string> = {
 
 describe('TypeScript runtime declarations lower to plain JavaScript', () => {
 	for (const [name, source] of Object.entries(CASES)) {
-		for (const mode of ['client', 'server'] as const) {
-			it(`${name} (${mode})`, () => {
-				expect(snapshot(octaneResult(source, mode))).toEqual(snapshot(tscResult(source)));
-			});
+		for (const parserName of PARSERS) {
+			for (const mode of MODES) {
+				it(`${name} (${parserName} parser, ${mode})`, () => {
+					expect(snapshot(octaneExports(source, mode, parserName).result)).toEqual(
+						snapshot(tscResult(source)),
+					);
+				});
+			}
 		}
+	}
+
+	for (const parserName of PARSERS) {
+		it(`exports a top-level export-import alias (${parserName} parser)`, () => {
+			const exports = octaneExports(
+				`namespace Source { export const value = 'aliased'; }
+				export import Alias = Source.value;`,
+				'client',
+				parserName,
+			);
+			expect(exports.Alias).toBe('aliased');
+		});
+
+		// The compiled module is evaluated as real ESM: a namespace merged into a
+		// default-exported class must reuse the class binding, not redeclare it.
+		it(`merges a namespace into a default-exported class (${parserName} parser)`, () => {
+			const code = octaneCode(
+				`export default class Shape { static sides = 4; }
+				namespace Shape { export const label = 'shape'; }`,
+				'client',
+				parserName,
+			);
+			const run = spawnSync(
+				process.execPath,
+				[
+					'--input-type=module',
+					'-e',
+					`${code}\nconsole.log(JSON.stringify([Shape.sides, Shape.label]));`,
+				],
+				{ encoding: 'utf8' },
+			);
+			expect(run.stderr).toBe('');
+			expect(JSON.parse(run.stdout)).toEqual([4, 'shape']);
+		});
 	}
 });
 
@@ -209,17 +279,20 @@ describe('TypeScript runtime declarations without an ES module lowering', () => 
 		],
 	];
 	for (const [name, source, code, line] of cases) {
-		for (const mode of ['client', 'server'] as const) {
-			it(`rejects ${name} (${mode})`, () => {
-				let error: any;
-				try {
-					compile(source, '/src/Rejected.tsrx', { mode, hmr: false });
-				} catch (cause) {
-					error = cause;
-				}
-				expect(error).toMatchObject({ code, loc: { line } });
-				expect(error.message).toContain('Rejected.tsrx');
-			});
+		for (const parserName of PARSERS) {
+			for (const mode of MODES) {
+				it(`rejects ${name} (${parserName} parser, ${mode})`, () => {
+					parser.javascript = parserName === 'javascript';
+					let error: any;
+					try {
+						compile(source, '/src/Rejected.tsrx', { mode, hmr: false });
+					} catch (cause) {
+						error = cause;
+					}
+					expect(error).toMatchObject({ code, loc: { line } });
+					expect(error.message).toContain('Rejected.tsrx');
+				});
+			}
 		}
 	}
 });

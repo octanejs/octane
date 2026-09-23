@@ -274,10 +274,15 @@ function qualifyReferences(root, names, qualifier) {
 	return visit(root, null, null);
 }
 
+// The exported declaration of `export <declaration>`, else null. The
+// JavaScript parser marks `export import X = …` with `isExport` on the alias
+// itself rather than wrapping it.
 function exportedDeclaration(statement) {
-	return statement?.type === 'ExportNamedDeclaration' && statement.declaration != null
-		? statement.declaration
-		: null;
+	if (statement?.type === 'ExportNamedDeclaration') return statement.declaration ?? null;
+	if (statement?.type === 'TSImportEqualsDeclaration' && statement.isExport === true) {
+		return statement;
+	}
+	return null;
 }
 
 function isValueNamespace(node, isTypeOnlyStatement) {
@@ -289,7 +294,9 @@ function isValueNamespace(node, isTypeOnlyStatement) {
 	);
 }
 
-// `namespace A.B.C {…}` → [A, B, C]
+// `namespace A.B.C {…}` → [A, B, C]. The native parser spells the dotted id
+// as a TSQualifiedName; the JavaScript parser nests one TSModuleDeclaration
+// per segment instead.
 function namespacePath(node) {
 	const names = [];
 	let current = node.id;
@@ -298,11 +305,14 @@ function namespacePath(node) {
 		current = current.left;
 	}
 	if (current?.type === 'Identifier') names.unshift(current.name);
+	if (node.body?.type === 'TSModuleDeclaration') names.push(...namespacePath(node.body));
 	return names;
 }
 
 function namespaceBody(node) {
-	return node.body?.type === 'TSModuleBlock' ? node.body.body : [];
+	let body = node.body;
+	while (body?.type === 'TSModuleDeclaration') body = body.body;
+	return body?.type === 'TSModuleBlock' ? body.body : [];
 }
 
 function valueDeclarationNames(declaration, out) {
@@ -405,7 +415,10 @@ function lowerList(statements, options, scope) {
 	// instead of redeclaring (tsc: `function f(){}` + `namespace f {}`).
 	const bound = new Set();
 	for (const statement of statements) {
-		const declaration = exportedDeclaration(statement) ?? statement;
+		const declaration =
+			statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: (exportedDeclaration(statement) ?? statement);
 		if (
 			(declaration.type === 'FunctionDeclaration' || declaration.type === 'ClassDeclaration') &&
 			declaration.id != null
