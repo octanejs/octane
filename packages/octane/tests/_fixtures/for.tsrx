@@ -97,12 +97,33 @@ export function MutableList() @{
 	</div>
 }
 
+// Survivor-skip probe: every read of `label` bumps a per-row counter, so the
+// rendered `label:N` records how many times that row's body has run. A skipped
+// survivor keeps its old text. The probe lives on the item itself because a
+// row that reads module state or a mutable global is never skipped.
+export interface CountedRow {
+	id: number;
+	readonly label: string;
+	flag?: boolean;
+}
+
+export function countedRow(id: number, label: string, flag?: boolean): CountedRow {
+	let reads = 0;
+	return {
+		id,
+		flag,
+		get label() {
+			reads++;
+			return label + ':' + reads;
+		},
+	};
+}
+
 // DEP-PURE @for with a possibly-NaN dep. The body closes over `marker` (a component
-// local → the compiler emits `[marker]` as the forBlock deps array, flags bit 4) and
-// reads the module-level EXTERNAL (mutable, NOT a dep — module vars don't affect the
-// purity analysis). The reconciler's depsEqual must compare with Object.is so a NaN
-// dep still promotes stable survivors to pure — the test observes the promotion via
-// EXTERNAL: a promoted (skipped) body never re-reads it.
+// local → the compiler emits `[marker]` as the forBlock deps array, flags bit 4).
+// The reconciler's depsEqual must compare with Object.is so a NaN dep still
+// promotes stable survivors to pure — the test observes the promotion through
+// countedRow: a promoted (skipped) body never re-reads `label`.
 let EXTERNAL = 'tick0';
 export function setExternal(v: string) {
 	EXTERNAL = v;
@@ -112,9 +133,9 @@ export function setExternal(v: string) {
 // entirely: `item.read()` reads mutable state through a STABLE item ref (the
 // TanStack Table header pattern — `header.column.getIsSorted()` flips while the
 // header object stays memoized), so compatibility mode re-runs the body on parent
-// renders, like ordinary React without its compiler. Contrast DepPureList: a bare module-var READ stays
-// eligible (documented at-your-own-risk), and so does a call through a plain
-// identifier callee (PlainCalleeList) — the receiver is what carries the hazard.
+// renders, like ordinary React without its compiler. Contrast PlainCalleeList: a
+// call through a plain identifier callee stays eligible — the receiver is what
+// carries the hazard. (EXTERNAL is read inside the method, invisible to the row.)
 const callItems = [
 	{ id: 1, read: () => 'r1:' + EXTERNAL },
 	{ id: 2, read: () => 'r2:' + EXTERNAL },
@@ -151,14 +172,14 @@ export function NestedConditionalCallBodyList() @{
 
 export function DepPureList() @{
 	const [marker, setMarker] = useState(0);
-	const [items] = useState([{ id: 1 }, { id: 2 }]);
+	const [items] = useState(() => [countedRow(1, 'row1'), countedRow(2, 'row2')]);
 	const [, setN] = useState(0);
 	<div>
 		<button id="nanify" onClick={() => setMarker(NaN)}>{'nan'}</button>
 		<button id="rerender" onClick={() => setN((n) => n + 1)}>{'go'}</button>
 		<ul>
 			@for (const item of items; key item.id) {
-				<li class="dp-row" data-m={marker}>{'row' + item.id + ':' + EXTERNAL}</li>
+				<li class="dp-row" data-m={marker}>{item.label}</li>
 			}
 		</ul>
 	</div>
@@ -224,28 +245,70 @@ export function NestedConditionalList(props: {
 
 // PURE conditional rows: the host-only @if leaves the item body free of parent
 // captures, so identical-identity survivors skip re-render entirely. The skip
-// is observed through the module-level CONDITIONAL_EXTERNAL the body reads — a
-// skipped body never re-reads it (the same probe DepPureList's EXTERNAL uses).
-let conditionalExternal = 'pulse0';
-export function setConditionalExternal(v: string) {
-	conditionalExternal = v;
-}
-
-interface PureConditionalRow {
-	id: number;
-	label: string;
-	flag?: boolean;
-}
-
-export function PureConditionalList(props: { items: PureConditionalRow[] }) @{
+// is observed through countedRow items (the same probe DepPureList uses).
+export function PureConditionalList(props: { items: CountedRow[] }) @{
 	<ul id="pure-conditional-list">
 		@for (const item of props.items; key item.id) {
 			<li class="pc-row">
-				{item.label + ':' + conditionalExternal}
+				{item.label}
 				@if (item.flag) {
 					<span class="pc-flag" />
 				}
 			</li>
+		}
+	</ul>
+}
+
+// Rows whose output reads a module `let` or a mutable global. Item identity and
+// the deps tuple cannot witness either, so no survivor may skip its body: each
+// parent render must re-evaluate the read (the keyed nav-menu active row).
+let activeHref = '/a';
+export function setActiveHref(href: string) {
+	activeHref = href;
+}
+
+interface NavRow {
+	href: string;
+	label: string;
+}
+
+export function ModuleLetConditionalList(props: { items: NavRow[]; n: number }) @{
+	<ul id="module-let-conditional-list">
+		@for (const item of props.items; key item.href) {
+			@if (activeHref === item.href) {
+				<li class="active">{item.label}</li>
+			} @else {
+				<li>{item.label}</li>
+			}
+		}
+	</ul>
+}
+
+export function ModuleLetTextList(props: { items: NavRow[]; n: number }) @{
+	<ul id="module-let-text-list">
+		@for (const item of props.items; key item.href) {
+			<li class={activeHref === item.href ? 'active' : ''}>{item.label}</li>
+		}
+	</ul>
+}
+
+export function ModuleLetDepList(props: { items: NavRow[]; prefix: string }) @{
+	const prefix = props.prefix;
+	<ul id="module-let-dep-list">
+		@for (const item of props.items; key item.href) {
+			<li class={activeHref === item.href ? 'active' : ''}>{prefix + item.label}</li>
+		}
+	</ul>
+}
+
+export function LocationHashList(props: { items: NavRow[]; n: number }) @{
+	<ul id="location-hash-list">
+		@for (const item of props.items; key item.href) {
+			@if (location.hash === item.href) {
+				<li class="active">{item.label}</li>
+			} @else {
+				<li>{item.label}</li>
+			}
 		}
 	</ul>
 }
