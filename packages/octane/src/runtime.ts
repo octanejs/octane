@@ -232,14 +232,8 @@ import {
 	runNativeBatch,
 	setNativeCandidateResolver,
 	setNativeAdoptionResolver,
-	beginNativeWriteGuard,
-	endNativeWriteGuard,
 } from './signals/read-protocol.js';
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
-import {
-	isNativeSignalDiagnosticInitializer,
-	type DiagnosticSignalInitializer,
-} from './signals/diagnostic-local-hook.js';
 import {
 	createNativeAdoptionState,
 	NATIVE_SIGNAL_SEED_ATTR,
@@ -978,6 +972,27 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 	}
 	if (documentOwner === undefined) return;
 	let owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	if (
+		(owner === undefined || owner === false) &&
+		scope.block.forSlot === null &&
+		scope.signalInstanceParent === null &&
+		scope.signalInstanceResolved === undefined
+	) {
+		// Host control fragments borrow the enclosing row's declaration owner.
+		// Do not cache it on the fragment: deleting that fragment must not retire
+		// the row's cells, and a retired fragment must never reacquire them.
+		let parent = scope.parent ?? scope.block.parentBlock;
+		while (parent !== null) {
+			if (parent instanceof LiteBlockImpl) break;
+			if (parent.signalInstanceParent !== null || parent.signalInstanceResolved !== undefined)
+				break;
+			if (parent.block.forSlot?.signalSite !== undefined) {
+				SCOPE_SIGNAL_OWNERS.set(scope, false);
+				return scopeSignalOwner(parent);
+			}
+			parent = parent.parent ?? parent.block.parentBlock;
+		}
+	}
 	const retired = owner === null;
 	if (!owner || owner.documentOwner !== documentOwner) {
 		const ids = scope.block.idState;
@@ -999,7 +1014,11 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 				scopeKey: documentOwner.scopeKey,
 				documentOwner,
 				instanceOwner: scope as object,
-				instanceKey: resolveSignalInstanceKey(scope) ?? rootSignalInstanceKey(ids),
+				instanceKey:
+					resolveSignalInstanceKey(scope) ??
+					(scope.block.forSlot?.signalSite !== undefined
+						? structuralSignalInstanceKey(scope, scope.block.forSlot.signalSite, undefined, false)
+						: rootSignalInstanceKey(ids)),
 			};
 			// A retry owner must not keep an abandoned renderer tree alive. This
 			// existing opaque identity object is also its own facade-state token.
@@ -1018,11 +1037,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 
 function runWithBlockSignalOwner<T>(scope: Scope | null, callback: () => T): T {
 	const owner = scopeSignalOwner(scope);
-	if (
-		owner !== undefined &&
-		(process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
-	)
-		STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+	if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
 	return owner === undefined || currentSignalOwner() === owner
 		? callback()
 		: runWithSignalOwner(owner, callback);
@@ -1035,6 +1050,10 @@ interface NativeStyleBinding {
 	__flags: number;
 	__teardown: typeof disposeNativeStyleBinding;
 	block: Block | null;
+	// Scalar-literal writes before any Block exists: the host and the last
+	// applied style, which seeds the Block's cache if a handle arrives later.
+	el: HTMLElement | SVGElement | null;
+	style: unknown;
 }
 
 function disposeNativeStyleBinding(binding: NativeStyleBinding): void {
@@ -1065,8 +1084,70 @@ export function nativeStyleBinding(
 	slotIndex: number,
 	el: HTMLElement | SVGElement,
 	value: any,
+	literal?: 1,
 ): void {
+	// The compiler passes `literal` for a fresh object literal of plain data
+	// properties, so enumerating it runs no accessor. When every value is a
+	// scalar there is no native protocol to read: write it like an ordinary style
+	// binding and allocate the owning Block only once a structured value appears.
+	if (literal === 1) {
+		const binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
+		if ((binding === undefined || binding.block === null) && isScalarStyleLiteral(value)) {
+			if (
+				process.env.NODE_ENV !== 'production' &&
+				hydrateAttributeProbe !== null &&
+				el.ownerDocument !== hydrateAttributeProbe.document
+			)
+				throw new PresentationAdoptionMiss(undefined, false);
+			writeScalarNativeStyle(owner, slotIndex, binding, el, value);
+			return;
+		}
+	}
 	nativePresentationBinding(owner, slotIndex, el, nativeStyleBody, { el, value });
+}
+
+function isScalarStyleLiteral(value: Record<string, unknown>): boolean {
+	for (const name in value) {
+		const item = value[name];
+		if (item !== null && (typeof item === 'object' || typeof item === 'function')) return false;
+	}
+	return true;
+}
+
+function writeScalarNativeStyle(
+	owner: Scope,
+	slotIndex: number,
+	binding: NativeStyleBinding | undefined,
+	el: HTMLElement | SVGElement,
+	value: Record<string, unknown>,
+): void {
+	if (binding === undefined) {
+		binding = {
+			__kind: 'nativeStyleBinding',
+			__flags: SLOT_FLAG_TEARDOWN,
+			__teardown: disposeNativeStyleBinding,
+			block: null,
+			el,
+			style: undefined,
+		};
+		if (owner.slots.length === 0) owner.slots.push(undefined);
+		owner.slots[slotIndex] = binding;
+		registerSlot(owner, binding);
+	} else if (binding.el !== el) {
+		// An incomplete template mount retries with a fresh clone, which must be
+		// written in full even when its values match the abandoned host.
+		if (TRANSITION_JOURNAL !== null) {
+			TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'el', binding.el);
+			TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
+		}
+		binding.el = el;
+		binding.style = undefined;
+	}
+	setStyle(el, value, binding.style);
+	if (TRANSITION_JOURNAL !== null)
+		TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
+	// A compiler literal is fresh per render and never escapes, so it is its own snapshot.
+	binding.style = value;
 }
 
 interface NativeProjectionProps {
@@ -1183,12 +1264,6 @@ function nativePresentationBinding(
 	body: Block['body'],
 	props: any,
 ): void {
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		hydrateAttributeProbe !== null &&
-		el.ownerDocument !== hydrateAttributeProbe.document
-	)
-		throw new PresentationAdoptionMiss(undefined, false);
 	let binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
 	if (binding === undefined) {
 		const block = createBlock('control-flow', owner.block, el, null, null, body, props);
@@ -1198,12 +1273,22 @@ function nativePresentationBinding(
 			__flags: SLOT_FLAG_TEARDOWN,
 			__teardown: disposeNativeStyleBinding,
 			block,
+			el: null,
+			style: undefined,
 		};
 		// The template bag commits after its bindings. Reserve its first index
 		// to keep the array packed, and publish ownership before a read can suspend.
 		if (owner.slots.length === 0) owner.slots.push(undefined);
 		owner.slots[slotIndex] = binding;
 		registerSlot(owner, binding);
+	} else if (binding.block === null) {
+		// A scalar style literal was written directly. Its first structured value
+		// needs an owning Block, seeded with the style that host already carries.
+		const block = createBlock('control-flow', owner.block, el, null, null, body, props);
+		block.parent = owner;
+		if (binding.el === el) block.slots[0] = binding.style;
+		journalRootProperty(binding, 'block', binding.block);
+		binding.block = block;
 	} else {
 		const block = binding.block!;
 		if (block.parentNode !== el) {
@@ -1223,14 +1308,12 @@ function nativePresentationBinding(
 /** @internal Enable invocation collection before an opted-in module renders. */
 export function enableNativeReadCollection(abi = 1): void {
 	if (abi !== 1) throw new Error(formatClientError(58));
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	ensureNativeReadDriver();
 }
 
 /** @internal Compiler/runtime native-read capability version 1. */
 export function beginNativeReadScope(scope: Scope | undefined, abi = 1): number {
 	if (abi !== 1) throw new Error(formatClientError(58));
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return -1;
 	const block = CURRENT_BLOCK;
 	const owner = scope ?? CURRENT_SCOPE;
 	if (block === null || owner === null) return -1;
@@ -1240,7 +1323,6 @@ export function beginNativeReadScope(scope: Scope | undefined, abi = 1): number 
 // Renderer calls have already checked the driver. Keep them separate from the
 // initializing compiler ABI so ordinary entries can discard the native adapter.
 function beginActiveNativeReadScope(scope: Scope): number {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return -1;
 	const block = CURRENT_BLOCK;
 	return block === null ? -1 : NATIVE_READ_DRIVER!.beginScope(scope, block);
 }
@@ -1387,7 +1469,6 @@ export function endNativeReadScope(token: number, _completed: boolean): void {
 
 /** @internal Automatic caches preserve read evidence without changing useMemo. */
 export function beginNativeReadWitness(detached = false): number {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return -1;
 	return detached
 		? ensureNativeReadDriver().beginWitness(true)
 		: (NATIVE_READ_DRIVER?.beginWitness() ?? -1);
@@ -1403,7 +1484,6 @@ export function finishNativeReadWitness(
 
 /** @internal A cache hit reattaches its native dependencies to this attempt. */
 export function replayNativeReadWitness(witness: NativeReadWitness | null | undefined): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	NATIVE_READ_DRIVER?.replay(witness);
 }
 
@@ -1603,7 +1683,7 @@ function warnHydrationValueMismatch(
 	clientVal: unknown,
 ): void {
 	if (process.env.NODE_ENV === 'production') return; // build-time stripped
-	if (!loc || hydrateAttributeProbe !== null) return;
+	if (!loc) return;
 	console.error(
 		`Octane hydration mismatch at ${loc}: server rendered ${what} ` +
 			`${JSON.stringify(serverVal)} but the client rendered ${JSON.stringify(clientVal)}. ` +
@@ -1618,7 +1698,7 @@ function warnHydrationKeptServerValue(
 	serverVal: unknown,
 	clientVal: unknown,
 ): void {
-	if (process.env.NODE_ENV === 'production' || !loc || hydrateAttributeProbe !== null) return;
+	if (process.env.NODE_ENV === 'production' || !loc) return;
 	console.error(
 		`Octane hydration mismatch at ${loc}: server rendered ${what} ` +
 			`${JSON.stringify(serverVal)} but the client rendered ${JSON.stringify(clientVal)}. ` +
@@ -1653,7 +1733,7 @@ function warnHydrationStructuralMismatch(
 	actual: string,
 ): void {
 	if (process.env.NODE_ENV === 'production') return; // build-time stripped
-	if (!loc || hydrateAttributeProbe !== null) return;
+	if (!loc) return;
 	console.error(
 		`Octane hydration mismatch at ${loc}: the client expected ${expected} but the server ` +
 			`rendered ${actual}. The mismatched subtree was rebuilt on the client.`,
@@ -10466,11 +10546,7 @@ function captureRenderPhaseUpdate(cell: RenderPhaseCell, key: RenderPhaseSnapsho
 export function renderBlock(block: Block): void {
 	if (signalDocumentEnabled || block.idState.renderOwner?.signalOwner !== undefined) {
 		const owner = scopeSignalOwner(block);
-		if (
-			owner !== undefined &&
-			(process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
-		)
-			STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+		if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
 		if (owner !== undefined && currentSignalOwner() !== owner) {
 			runWithSignalOwner(owner, () => renderBlock(block));
 			return;
@@ -10790,8 +10866,7 @@ function renderBlockInner(block: Block): true | undefined {
 	let profileThrown: unknown;
 	let renderCompleted = false;
 	let renderRetry = false;
-	if (process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
-		NATIVE_READ_DRIVER?.beginRender(block);
+	NATIVE_READ_DRIVER?.beginRender(block);
 	NATIVE_BLOCK_RETRIES?.get(block)?.clear();
 	try {
 		if (urgentTransitionRender !== null)
@@ -10891,8 +10966,7 @@ function renderBlockInner(block: Block): true | undefined {
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
 		try {
-			if (process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
-				NATIVE_READ_DRIVER?.endRender(block, renderCompleted, isSuspenseException(profileThrown));
+			NATIVE_READ_DRIVER?.endRender(block, renderCompleted, isSuspenseException(profileThrown));
 		} finally {
 			if (urgentTransitionRender !== null)
 				urgentTransitionDriver!.endUrgent(block, urgentTransitionRender);
@@ -11425,11 +11499,7 @@ export function componentSlotLite<P>(
 			// Same owner-resolution order as runWithBlockSignalOwner, but the
 			// per-mount closure only exists when the owner actually changes.
 			const owner = scopeSignalOwner(scope);
-			if (
-				owner !== undefined &&
-				(process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
-			)
-				STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+			if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
 			if (owner === undefined || currentSignalOwner() === owner) {
 				comp(props, scope, undefined);
 			} else runWithSignalOwner(owner, () => comp(props, scope, undefined));
@@ -11971,38 +12041,19 @@ function resolveSlot(slot: HookSlot | undefined): HookSlot | undefined {
 		: resolved;
 }
 
-/** @internal Built-in adapters are allocated only during historical comparison. */
-export function isNativeSignalDiagnosticProbe(): boolean {
-	return process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null;
-}
-
 /** @internal Optional native hooks use the existing compiler slot and Scope lifetime. */
 export function nativeLocalHook<T>(
 	name: string,
 	initialize: () => T,
 	dispose: (value: T) => void,
 	slot?: HookSlot,
-	diagnosticInitialize?: DiagnosticSignalInitializer<T>,
 ): T {
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		hydrateAttributeProbe !== null &&
-		(name !== 'useSignal$' ||
-			diagnosticInitialize === undefined ||
-			!isNativeSignalDiagnosticInitializer(diagnosticInitialize))
-	)
-		throw new PresentationAdoptionMiss(undefined, false);
 	slot = resolveSlot(slot);
 	if (slot === undefined || CURRENT_SCOPE === null) missingSlot(name);
 	const scope = CURRENT_SCOPE!;
 	let cell = scope.hooks?.get(slot) as { nativeValue: T } | undefined;
 	if (cell === undefined) {
-		cell = {
-			nativeValue:
-				process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null
-					? diagnosticInitialize!()
-					: initialize(),
-		};
+		cell = { nativeValue: initialize() };
 		ensureHooks(scope).set(slot, cell);
 		const value = cell.nativeValue;
 		registerHookCleanup(scope, () => dispose(value));
@@ -13782,13 +13833,12 @@ export function __createCompiledContext<T>(defaultValue: T): Context<T> {
 		provideContext(scope, ctx, props.value);
 		const children = props.children as ComponentBody | null | undefined;
 		if (children == null) return;
+		// Children are always compiled bodies here, so unlike
+		// renderClientContextProvider there is no descriptor dialect to flip to.
 		const dialect = (children as any)[CHILDREN_BODY] ?? children;
 		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
 		if (previous !== dialect) {
-			if (previous !== undefined && (previous === 2 || dialect === 2)) {
-				resetScopeChildren(scope);
-				if (scope.block.disposed) return;
-			} else if (previous !== undefined) {
+			if (previous !== undefined) {
 				invalidateSharedBodyOutput(scope);
 				if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
 					const hooks = scope.hooks!;
@@ -13972,7 +14022,7 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 		});
 	// Local values roll back with their screen; the global invalidation epoch
 	// stays monotone so another root's committed Provider is never rewound.
-	if (had && (process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)) {
+	if (had) {
 		context.$$version++;
 		bumpContextEpoch();
 	}
@@ -13988,9 +14038,10 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 // `Symbol.for` keys so the identity survives multiple runtime copies (e.g. a binding bundled
 // against its own octane); CHILDREN_BLOCK itself is shared with SSR through runtime-tags.ts.
 const CHILDREN_BODY: unique symbol = Symbol.for('octane.childrenBody') as any;
-const CHILDREN_DIAGNOSTIC_CAPTURES: unique symbol = Symbol.for(
-	'octane.childrenDiagnosticCaptures',
-) as any;
+// Compiler certificate for `<Hydrate>` children: the values the body reads from
+// its enclosing closure, so a dormant boundary can tell a changed capture from a
+// fresh function with the same captures without calling the body.
+const CHILDREN_CAPTURES: unique symbol = Symbol.for('octane.childrenCaptures') as any;
 
 /**
  * Compiler-emitted: attach markerless single-host-root metadata while a fresh
@@ -14012,17 +14063,13 @@ export function markChildrenBlock<T>(
 	fn: T,
 	body?: object,
 	captures?: (() => readonly unknown[]) | null,
-): T;
-export function markChildrenBlock<T>(fn: T, body?: object): T {
+): T {
 	if (typeof fn === 'function') {
 		(fn as any)[CHILDREN_BLOCK] = true;
 		// Keep the boolean ABI for consumers using another runtime copy. Compiled
-		// client output supplies a source-body token for auto-memo or dev captures.
+		// client output supplies a source-body token for auto-memo or Hydrate captures.
 		if (body !== undefined) (fn as any)[CHILDREN_BODY] = body;
-		if (process.env.NODE_ENV !== 'production') {
-			const captures = arguments[2] as (() => readonly unknown[]) | null | undefined;
-			if (captures !== undefined) (fn as any)[CHILDREN_DIAGNOSTIC_CAPTURES] = captures;
-		}
+		if (captures !== undefined) (fn as any)[CHILDREN_CAPTURES] = captures;
 	}
 	return fn;
 }
@@ -14336,6 +14383,8 @@ interface HydrateSlot {
 	error: unknown;
 	replays: HydrationReplayIntent[];
 	independent: boolean;
+	/** Server-claim captures, retained only until a preserved boundary activates. */
+	initialCaptures: HydrateInitialCaptures | null;
 }
 
 // Created only for the rare activation that races a renderer stream. Keep the
@@ -14357,44 +14406,23 @@ interface PreservedHydrateActivation {
 let preservedHydrateActivations: WeakMap<HydrateSlot, PreservedHydrateActivation> | null = null;
 let preservedHydrateActivationCount = 0;
 
-interface HydrateAttributeSnapshot {
+/**
+ * What a dormant server-preserved boundary was first claimed with. The server
+ * HTML is the output of exactly these captures, so while the boundary activates
+ * with equal captures a value mismatch is a genuine server/client divergence.
+ * Once a mounted parent legitimately changes them, the server HTML predates the
+ * client's own state: activation repairs attributes and text without reporting
+ * them. Deciding this compares values and never runs a child render.
+ */
+interface HydrateInitialCaptures {
 	props: InternalHydrateProps;
-	ids: RootIdState;
 	contexts: Map<Context<any>, any> | null;
+	contextEpoch: number;
+	/** The enclosing boundary had already activated with changed captures. */
+	stale: boolean;
 }
 
-interface InitialHydrateAttribute {
-	server: string | null;
-	next: string | null;
-	suppressed: boolean;
-	checked: boolean;
-}
-
-interface HydrateAttributeProbe {
-	document: Document;
-	originals: WeakMap<Element, Element>;
-	attributes: WeakMap<Element, Map<string, InitialHydrateAttribute>>;
-	boundaries: WeakMap<Element, HydrateAttributeSnapshot>;
-}
-
-// Initial captures are diagnostic data, never the props of the live child. Pay
-// their retention and the disposable validation pass only in development.
-let initialHydrateAttributes: WeakMap<HydrateSlot, HydrateAttributeSnapshot> | null = null;
-let hydrateAttributeProbe: HydrateAttributeProbe | null = null;
-
-function copyHydrateDiagnosticIds(ids: RootIdState): RootIdState {
-	const first: RootIdState = { prefix: ids.prefix, next: ids.next };
-	let copy = first;
-	while (true) {
-		if (ids.limit !== undefined) copy.limit = ids.limit;
-		if (ids.signalState !== undefined) copy.signalState = { ...ids.signalState };
-		if (ids.overflow === undefined) return first;
-		ids = ids.overflow;
-		copy = copy.overflow = { prefix: ids.prefix, next: ids.next };
-	}
-}
-
-function copyHydrateDiagnosticContexts(scope: Scope): Map<Context<any>, any> | null {
+function collectHydrateContexts(scope: Scope): Map<Context<any>, any> | null {
 	let contexts: Map<Context<any>, any> | null = null;
 	const add = (values: Map<Context<any>, any> | null) => {
 		if (values === null) return;
@@ -14410,7 +14438,7 @@ function copyHydrateDiagnosticContexts(scope: Scope): Map<Context<any>, any> | n
 	return contexts;
 }
 
-function changedHydrateDiagnosticContexts(
+function changedHydrateContexts(
 	initial: Map<Context<any>, any> | null,
 	next: Map<Context<any>, any> | null,
 ): boolean {
@@ -14423,12 +14451,13 @@ function changedHydrateDiagnosticContexts(
 	return false;
 }
 
-function changedHydrateDiagnosticCaptures(
+function changedHydrateCaptures(
 	initial: InternalHydrateProps,
 	next: InternalHydrateProps,
 ): boolean {
+	if (initial === next) return false;
 	if (initial.__data === undefined || next.__data === undefined)
-		return changedHydrateDiagnosticChildren(initial.children, next.children);
+		return changedHydrateChildren(initial.children, next.children);
 	if (initial.__data.length !== next.__data.length) return true;
 	for (let i = 0; i < initial.__data.length; i++) {
 		if (!Object.is(initial.__data[i], next.__data[i])) return true;
@@ -14436,24 +14465,17 @@ function changedHydrateDiagnosticCaptures(
 	return false;
 }
 
-function changedHydrateDiagnosticChildren(initial: unknown, next: unknown): boolean {
+function changedHydrateChildren(initial: unknown, next: unknown): boolean {
 	if (initial === next) return false;
 	if (typeof initial !== 'function' || typeof next !== 'function') return true;
 	try {
 		const body = (initial as any)[CHILDREN_BODY];
-		const initialCaptures = (initial as any)[CHILDREN_DIAGNOSTIC_CAPTURES] as
+		const initialCaptures = (initial as any)[CHILDREN_CAPTURES] as
 			(() => readonly unknown[]) | null | undefined;
-		const nextCaptures = (next as any)[CHILDREN_DIAGNOSTIC_CAPTURES] as
+		const nextCaptures = (next as any)[CHILDREN_CAPTURES] as
 			(() => readonly unknown[]) | null | undefined;
-		// Compiler-owned absence means this output has no dev diagnostic metadata.
-		// A null certificate explicitly preserves the conservative opaque-dev path.
-		if (
-			initialCaptures === undefined &&
-			nextCaptures === undefined &&
-			isChildrenBlock(initial) &&
-			isChildrenBlock(next)
-		)
-			return false;
+		// Without the compiler's capture certificate for the same source body,
+		// equal output cannot be proven. Treat the server values as stale.
 		if (
 			body === undefined ||
 			body !== (next as any)[CHILDREN_BODY] ||
@@ -14473,222 +14495,21 @@ function changedHydrateDiagnosticChildren(initial: unknown, next: unknown): bool
 	}
 }
 
-function recordInitialHydrateAttribute(
-	el: Element,
-	name: string,
-	server: string | null,
-	next: string | null,
-): void {
-	const probe = hydrateAttributeProbe;
-	const original = probe?.originals.get(el);
-	if (original === undefined) return;
-	let values = probe!.attributes.get(original);
-	if (values === undefined) probe!.attributes.set(original, (values = new Map()));
-	const previous = values.get(name);
-	values.set(name, {
-		server: previous === undefined ? server : previous.server,
-		next,
-		suppressed: isHydrationSuppressed(el),
-		checked: false,
-	});
-}
-
-function checkInitialHydrateAttribute(
-	hydration: HydrationCapability,
-	el: Element,
-	name: string,
-	server: string | null,
-): boolean {
-	const initial = hydration.attributeBaselines?.attributes.get(el)?.get(name);
-	if (initial === undefined) return false;
-	if (initial.checked) return true;
-	initial.checked = true;
-	if (
-		!initial.suppressed &&
-		initial.server !== initial.next &&
-		!(
-			name !== 'class' &&
-			name !== 'style' &&
-			initial.next !== null &&
-			isAttributeParserNormalizedMatch(initial.server, initial.next)
-		) &&
-		domBindingClaims.get(el)?.get(name) !== server
-	) {
-		warnHydrationValueMismatch(
-			(el as any).__oct_loc,
-			name === 'style' ? 'style' : `attribute \`${name}\``,
-			name === 'style' ? (initial.server ?? '') : initial.server,
-			name === 'style' ? (initial.next ?? '') : initial.next,
-		);
-	}
-	return true;
-}
-
-/** Validate historical attributes without ever mounting historical hook state. */
-function probeInitialHydrateAttributes(state: HydrateSlot): HydrateAttributeProbe | undefined {
-	const snapshot = initialHydrateAttributes?.get(state);
-	if (
-		snapshot === undefined ||
-		(!changedHydrateDiagnosticCaptures(snapshot.props, state.props) &&
-			!changedHydrateDiagnosticContexts(
-				snapshot.contexts,
-				copyHydrateDiagnosticContexts(
-					CURRENT_SCOPE?.block === state.parentBlock ? CURRENT_SCOPE : state.parentBlock,
-				),
-			))
-	)
-		return;
-	try {
-		return collectInitialHydrateAttributes(state, snapshot);
-	} catch {
-		return;
-	}
-}
-
-function collectInitialHydrateAttributes(
-	state: HydrateSlot,
-	snapshot: HydrateAttributeSnapshot,
-): HydrateAttributeProbe | undefined {
-	const ownerDocument = document.implementation.createHTMLDocument('');
-	const originalWrapper = state.wrapper;
-	const source = STAGED_DOM?.view(originalWrapper) ?? originalWrapper;
-	const template = ownerDocument.createElement('template');
-	template.innerHTML = source.outerHTML;
-	const wrapper = ownerDocument.adoptNode(template.content.firstElementChild!) as HTMLDivElement;
-	const probe: HydrateAttributeProbe = {
-		document: ownerDocument,
-		originals: new WeakMap(),
-		attributes: new WeakMap(),
-		boundaries: new WeakMap(),
-	};
-	probe.originals.set(wrapper, originalWrapper);
-	const originals = source.querySelectorAll('*');
-	const copies = wrapper.querySelectorAll('*');
-	if (originals.length !== copies.length) return;
-	for (let i = 0; i < originals.length; i++) {
-		const original = originals[i];
-		const copy = copies[i];
-		if (
-			copy.localName !== original.localName ||
-			copy.namespaceURI !== original.namespaceURI ||
-			probe.originals.get(copy.parentElement!) !==
-				(STAGED_DOM?.view(original) ?? original).parentElement
+function hydrateServerValuesStale(state: HydrateSlot): boolean {
+	const initial = state.initialCaptures;
+	if (initial === null) return false;
+	if (initial.stale || changedHydrateCaptures(initial.props, state.props)) return true;
+	// Every provider value change moves the epoch, so an unmoved epoch proves
+	// the inherited context values are the ones the server HTML was claimed with.
+	return (
+		initial.contextEpoch !== contextEpochNow() &&
+		changedHydrateContexts(
+			initial.contexts,
+			collectHydrateContexts(
+				CURRENT_SCOPE?.block === state.parentBlock ? CURRENT_SCOPE : state.parentBlock,
+			),
 		)
-			return;
-		probe.originals.set(copy, original);
-	}
-	const start = wrapper.firstChild as Comment | null;
-	if (start === null || !isBlockOpen(start)) return;
-	const end = findMatchingClose(start, new WeakMap());
-	const initialChild: ComponentBody = (_props, scope, extra) => {
-		if (state.loadedBody !== null) state.loadedBody(snapshot.props.__data, scope, extra);
-		else childrenAsBody(snapshot.props.children)(undefined, scope, extra);
-	};
-	const body: ComponentBody = (_props, scope) => {
-		tryBlock(scope, 0, wrapper, initialChild, null, null, end);
-	};
-	const block = createBlock('control-flow', null, wrapper, start, end, body, undefined);
-	block.idState = copyHydrateDiagnosticIds(snapshot.ids);
-	// Context is initial diagnostic data too. Give the isolated root its own
-	// provider values without live ancestry, caches, or memo dependencies to stamp.
-	block.$$ctxValues = snapshot.contexts === null ? null : new Map(snapshot.contexts);
-	const hydration = new HydrationCapability(block, start.nextSibling, null);
-	if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
-	hydration.protectRootAnchor(end);
-	const capture = createOffscreenCapture();
-	const diagnosticNative =
-		state.nativeSeedRaw === undefined
-			? undefined
-			: createNativeAdoptionState(parseNativeSignalManifest(state.nativeSeedRaw));
-	const previousHydration = currentHydration;
-	const previousCapture = WIP_CAPTURE;
-	const previousProbe = hydrateAttributeProbe;
-	const previousTransaction = ROOT_RENDER_TRANSACTION;
-	const previousJournal = TRANSITION_JOURNAL;
-	const previousAttempt = ACTIVE_TRANSITION_ATTEMPT;
-	const previousScopedReadTracking = SCOPED_READ_TRACKING;
-	const previousScopedReads = SCOPED_READS;
-	const previousWarm = CURRENT_WARM;
-	const previousWarmClaims = CURRENT_WARM_CLAIMS;
-	const previousWarmEpisode = CURRENT_WARM_EPISODE;
-	const previousWarmPlans = ACTIVE_WARM_PLANS.splice(0);
-	const previousStagedDom = STAGED_DOM;
-	const previousStagedCapture = STAGED_COMMIT_CAPTURE;
-	const previousPresentation = PRESENTATION_HYDRATION;
-	const previousSelectSyncs = SELECT_SYNCS;
-	const previousSelectDefaultSyncs = SELECT_DEFAULT_SYNCS;
-	const previousFormChecks = DEV_FORM_CHECKS;
-	const previousAutofocus = AUTOFOCUS_QUEUE;
-	// Historical reads must not enter the parent invocation or memo witness.
-	// Keep render purity while the native collection/publication driver is paused.
-	const diagnosticDriver = NATIVE_READ_DRIVER;
-	const nativeProbeToken = diagnosticDriver?.pauseLifecycle() ?? -1;
-	const previousWriteGuard = beginNativeWriteGuard();
-	const previousNative = setNativeAdoptionResolver(diagnosticNative?.resolve ?? null);
-	const refDetachCheckpoint = refDetachQueue.length;
-	currentHydration = hydration;
-	WIP_CAPTURE = capture;
-	hydrateAttributeProbe = probe;
-	ROOT_RENDER_TRANSACTION = null;
-	TRANSITION_JOURNAL = null;
-	ACTIVE_TRANSITION_ATTEMPT = null;
-	SCOPED_READ_TRACKING = false;
-	SCOPED_READS = null;
-	CURRENT_WARM = null;
-	CURRENT_WARM_CLAIMS = null;
-	CURRENT_WARM_EPISODE = 0;
-	STAGED_DOM = null;
-	STAGED_COMMIT_CAPTURE = null;
-	PRESENTATION_HYDRATION = null;
-	SELECT_SYNCS = [];
-	SELECT_DEFAULT_SYNCS = [];
-	DEV_FORM_CHECKS = [];
-	AUTOFOCUS_QUEUE = [];
-	try {
-		renderBlock(block);
-		drainHydrationRenderPhaseUpdates(block);
-		hydration.flushClassWrites();
-	} catch {
-		// Historical resources may no longer be available. Never wait for them or
-		// send their errors into the live tree; unvisited sites retain normal checks.
-	} finally {
-		try {
-			disposeWip({ block, start, end, capture, domParent: wrapper, refDetachCheckpoint });
-			drainHydrationRenderPhaseUpdates(block);
-		} finally {
-			try {
-				diagnosticNative?.release();
-			} finally {
-				try {
-					setNativeAdoptionResolver(previousNative);
-					endNativeWriteGuard(previousWriteGuard);
-					if (nativeProbeToken >= 0) diagnosticDriver!.resumeLifecycle(nativeProbeToken);
-				} finally {
-					currentHydration = previousHydration;
-					WIP_CAPTURE = previousCapture;
-					hydrateAttributeProbe = previousProbe;
-					ROOT_RENDER_TRANSACTION = previousTransaction;
-					TRANSITION_JOURNAL = previousJournal;
-					ACTIVE_TRANSITION_ATTEMPT = previousAttempt;
-					SCOPED_READ_TRACKING = previousScopedReadTracking;
-					SCOPED_READS = previousScopedReads;
-					CURRENT_WARM = previousWarm;
-					CURRENT_WARM_CLAIMS = previousWarmClaims;
-					CURRENT_WARM_EPISODE = previousWarmEpisode;
-					ACTIVE_WARM_PLANS.length = 0;
-					ACTIVE_WARM_PLANS.push(...previousWarmPlans);
-					STAGED_DOM = previousStagedDom;
-					STAGED_COMMIT_CAPTURE = previousStagedCapture;
-					PRESENTATION_HYDRATION = previousPresentation;
-					SELECT_SYNCS = previousSelectSyncs;
-					SELECT_DEFAULT_SYNCS = previousSelectDefaultSyncs;
-					DEV_FORM_CHECKS = previousFormChecks;
-					AUTOFOCUS_QUEUE = previousAutofocus;
-				}
-			}
-		}
-	}
-	return probe;
+	);
 }
 
 function releasePreservedHydrateActivation(state: HydrateSlot): void {
@@ -14950,7 +14771,7 @@ function createHydrateBoundaryBody(
 
 function failHydrateBoundary(state: HydrateSlot, error: unknown): void {
 	if (state.hasError || state.block.disposed) return;
-	if (process.env.NODE_ENV !== 'production') initialHydrateAttributes?.delete(state);
+	state.initialCaptures = null;
 	cleanupHydrateStreamWait(state);
 	state.hasError = true;
 	state.error = error;
@@ -15096,7 +14917,7 @@ function teardownHydrateBoundary(state: HydrateSlot): void {
 	// abandoned preparation must keep them alive with the still-visible server DOM.
 	if (DEFERRED_LAYOUT_DRIVER?.stageAction(() => teardownHydrateBoundary(state), true) === true)
 		return;
-	if (process.env.NODE_ENV !== 'production') initialHydrateAttributes?.delete(state);
+	state.initialCaptures = null;
 	cleanupHydrateInstallers(state);
 	cleanupHydrateStreamWait(state);
 	if (preserved !== undefined) {
@@ -15587,24 +15408,21 @@ function createHydrateSlot(
 		error: undefined,
 		replays: [],
 		independent: props.__independent !== undefined,
+		initialCaptures: null,
 	};
 	if (nativeSeedRaw !== null) state.nativeSeedRaw = nativeSeedRaw;
-	if (process.env.NODE_ENV !== 'production' && serverPreserved && !state.independent) {
-		const original = hydrateAttributeProbe?.originals.get(wrapper);
-		const inherited = hydration?.attributeBaselines?.boundaries.get(wrapper);
-		const snapshot = inherited ?? {
+	if (serverPreserved && !state.independent) {
+		state.initialCaptures = {
 			props,
-			ids: copyHydrateDiagnosticIds(idState),
-			contexts: copyHydrateDiagnosticContexts(scope),
+			contexts: collectHydrateContexts(scope),
+			contextEpoch: contextEpochNow(),
+			stale: hydration!.staleServerValues,
 		};
-		(initialHydrateAttributes ??= new WeakMap()).set(state, snapshot);
-		if (original !== undefined) hydrateAttributeProbe!.boundaries.set(original, snapshot);
 	}
 	scope.slots[0] = state;
 	registerSlot(scope, state);
 	if (!state.independent) registerHydrationIntentBoundary(wrapper, intentBoundary);
 	block.body = boundaryBody(state);
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return state;
 	const initialStrategy = resolveHydrateStrategy(state);
 	const pendingIntents = state.independent ? undefined : takePendingHydrationIntents(wrapper);
 	if (state.independent) {
@@ -15638,9 +15456,10 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	}
 	const hydration =
 		preserved?.hydration ?? new HydrationCapability(block, getNextSibling(state.start), null);
+	// A suspended first attempt keeps its capability, so re-check each attempt.
+	if (!hydration.staleServerValues && hydrateServerValuesStale(state))
+		hydration.staleServerValues = true;
 	if (preserved === undefined) {
-		if (process.env.NODE_ENV !== 'production')
-			hydration.attributeBaselines = probeInitialHydrateAttributes(state);
 		if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
 		hydration.protectRootAnchor(state.end);
 	}
@@ -15732,7 +15551,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		// island live; an application @catch must never receive this control flow.
 		noteRecoverableHydrationError(() => nativeRecovery!, block);
 		state.serverPreserved = false;
-		if (process.env.NODE_ENV !== 'production') initialHydrateAttributes?.delete(state);
+		state.initialCaptures = null;
 		state.serverActivationStarted = false;
 		state.seedRaw = null;
 		state.nativeSeedRaw = undefined;
@@ -15763,7 +15582,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		return;
 	}
 	if (completed) {
-		if (process.env.NODE_ENV !== 'production') initialHydrateAttributes?.delete(state);
+		state.initialCaptures = null;
 		releasePreservedHydrateActivation(state);
 		spliceOffscreenCapture(capture);
 	}
@@ -15900,7 +15719,7 @@ function notifyHydrateBoundary(state: HydrateSlot, scope: Scope): void {
 		return;
 	}
 	state.didNotify = true;
-	if (process.env.NODE_ENV !== 'production') initialHydrateAttributes?.delete(state);
+	state.initialCaptures = null;
 	// Keep intent capture alive while an asynchronously split child loads. A
 	// pointerdown commonly requests hydration before the browser dispatches the
 	// corresponding click; removing listeners at request time would lose that
@@ -18511,7 +18330,8 @@ function isRendererHydrationStyle(node: Node): boolean {
  * discard its methods together with the marker/mismatch/seed helper graph.
  */
 class HydrationCapability {
-	declare attributeBaselines?: HydrateAttributeProbe;
+	/** Parent captures changed before this dormant boundary activated. */
+	staleServerValues = false;
 	depth = 0;
 	seedCursor = 0;
 	hasAdjacentRangePair = false;
@@ -18606,6 +18426,8 @@ class HydrationCapability {
 	}
 
 	recordTextMismatch(node: Text, loc: string | undefined, server: string | null): void {
+		// Text already repaired from newer captures is not a server/client mismatch.
+		if (this.staleServerValues) return;
 		if (process.env.NODE_ENV === 'production' && ROOT_ERROR_HANDLERS === null) return;
 		if (!this.textWarnings.has(node)) this.textWarnings.set(node, { loc, server });
 	}
@@ -18901,6 +18723,17 @@ class HydrationCapability {
 					describeHydrationNode(cursor),
 				);
 			if (isBlockClose(cursor)) return this.freshClone(template);
+			// Recovery discards only a node this block renders into. A cursor left
+			// outside that parent (an earlier claim ran off the end of its host) is
+			// an ancestor's adopted content, possibly the host itself; removing it
+			// would blank the region the block is about to be inserted into.
+			const target = CURRENT_BLOCK?.parentNode;
+			if (
+				!claimsRoot &&
+				target != null &&
+				(STAGED_DOM?.view(cursor) ?? cursor).parentNode !== target
+			)
+				return this.freshClone(template);
 			if (isBlockOpen(cursor)) {
 				const close = this.close(cursor);
 				this.node = getNextSibling(close);
@@ -19002,6 +18835,15 @@ class HydrationCapability {
 	}
 
 	htextSwap(posNode: Node | null, text: string): Text {
+		// The server's stand-in for an empty sibling hole (ssrTextSlot). Swap it for
+		// the hole's Text node, then compare against the server's '' like any text.
+		// Every compiled walk has already resolved its positions (htextSwap mounts
+		// run after them), so replacing the comment moves no later claim.
+		if (isEmptyTextSlot(posNode)) {
+			const empty = (STAGED_DOM?.view(document) ?? document).createTextNode('');
+			domNode((STAGED_DOM?.view(posNode) ?? posNode).parentNode!)!.replaceChild(empty, posNode);
+			posNode = empty;
+		}
 		if (posNode !== null && posNode.nodeType === 3) {
 			const server = (STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue;
 			if (server !== text && !isTextParserNormalizedMatch(server, text)) {
@@ -19049,7 +18891,11 @@ class HydrationCapability {
 			cursor = getNextSibling(cursor!);
 			if (isTextSeparator(cursor)) {
 				const after: Node | null = getNextSibling(cursor!);
-				if (after !== null && (after.nodeType === 3 || isTextSeparator(after))) cursor = after;
+				if (
+					after !== null &&
+					(after.nodeType === 3 || isTextSeparator(after) || isEmptyTextSlot(after))
+				)
+					cursor = after;
 			}
 		}
 		return cursor;
@@ -19066,13 +18912,6 @@ class HydrationCapability {
 					name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name,
 				)
 			: (STAGED_DOM?.view(el) ?? el).getAttribute(name);
-		if (process.env.NODE_ENV !== 'production') {
-			if (hydrateAttributeProbe !== null) {
-				recordInitialHydrateAttribute(el, name, server, next);
-			} else {
-				checkInitialHydrateAttribute(this, el, name, server);
-			}
-		}
 		// Adoption already owns the desired value, including an absent attribute.
 		// Keep the ordinary setter from repeating a same-value DOM mutation.
 		if (server === next) return false;
@@ -19081,10 +18920,7 @@ class HydrationCapability {
 		const mode = hydrationMismatchMode(el);
 		if (mode === 0) return true;
 		if (mode === 1) return false;
-		if (
-			process.env.NODE_ENV !== 'production' &&
-			!checkInitialHydrateAttribute(this, el, name, server)
-		)
+		if (process.env.NODE_ENV !== 'production' && !this.staleServerValues)
 			warnHydrationValueMismatch((el as any).__oct_loc, `attribute \`${name}\``, server, next);
 		return true;
 	}
@@ -19093,18 +18929,11 @@ class HydrationCapability {
 		const mode = hydrationMismatchMode(el);
 		const rawServer = (STAGED_DOM?.view(el) ?? el).getAttribute('class');
 		const server = absentIsEmpty && rawServer === null ? '' : rawServer;
-		if (process.env.NODE_ENV !== 'production') {
-			if (hydrateAttributeProbe !== null) recordInitialHydrateAttribute(el, 'class', server, next);
-			else checkInitialHydrateAttribute(this, el, 'class', rawServer);
-		}
 		if (server === next) return true;
 		if (domBindingClaims.get(el)?.get('class') === rawServer) return false;
 		if (mode === 0) return true;
 		if (mode === 1) return false;
-		if (
-			process.env.NODE_ENV !== 'production' &&
-			!checkInitialHydrateAttribute(this, el, 'class', rawServer)
-		)
+		if (process.env.NODE_ENV !== 'production' && !this.staleServerValues)
 			warnHydrationValueMismatch((el as any).__oct_loc, 'attribute `class`', server, next);
 		return true;
 	}
@@ -19130,11 +18959,7 @@ class HydrationCapability {
 				// The common hydration-parity path performs no DOM write at all. Besides
 				// avoiding work, this keeps MutationObserver consumers from seeing a class
 				// value that never existed in either the server or final client output.
-				if ((STAGED_DOM?.view(el) ?? el).getAttribute('class') === rawTarget) {
-					if (process.env.NODE_ENV !== 'production')
-						this.allowClass(el, write.next, write.absentIsEmpty);
-					continue;
-				}
+				if ((STAGED_DOM?.view(el) ?? el).getAttribute('class') === rawTarget) continue;
 				if (!this.allowClass(el, write.next, write.absentIsEmpty)) continue;
 				if (write.remove) (STAGED_DOM?.view(el) ?? el).removeAttribute('class');
 				else if (write.useAttribute)
@@ -19154,21 +18979,7 @@ class HydrationCapability {
 		entries?: readonly unknown[],
 	): boolean {
 		const mode = hydrationMismatchMode(el);
-		if (mode === 1) {
-			if (process.env.NODE_ENV !== 'production') {
-				if (hydrateAttributeProbe !== null) recordInitialHydrateAttribute(el, 'style', null, null);
-				else {
-					const current = STAGED_DOM?.view(el) ?? el;
-					checkInitialHydrateAttribute(
-						this,
-						el,
-						'style',
-						current.hasAttribute('style') ? current.style.cssText : null,
-					);
-				}
-			}
-			return true;
-		}
+		if (mode === 1) return true;
 		const style = (STAGED_DOM?.view(el as HTMLElement) ?? (el as HTMLElement)).style;
 		const hadStyleAttribute = (STAGED_DOM?.view(el) ?? el).hasAttribute('style');
 		const before = style.cssText;
@@ -19194,11 +19005,7 @@ class HydrationCapability {
 		}
 		// Preserve only the actual last publication of a live scalar binding.
 		// External mutations still follow normal hydration diagnostics and repair.
-		let claims = domBindingClaims.get(el);
-		if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) {
-			const original = hydrateAttributeProbe.originals.get(el);
-			if (original !== undefined) claims = domBindingClaims.get(original);
-		}
+		const claims = domBindingClaims.get(el);
 		if (claims !== undefined) {
 			for (const [channel, published] of claims) {
 				if (!channel.startsWith('style:')) continue;
@@ -19212,25 +19019,11 @@ class HydrationCapability {
 		}
 		const expected = expectedStyle.cssText;
 		const expectsStyleAttribute = expected !== '';
-		if (process.env.NODE_ENV !== 'production') {
-			if (hydrateAttributeProbe !== null)
-				recordInitialHydrateAttribute(
-					el,
-					'style',
-					hadStyleAttribute ? before : null,
-					expectsStyleAttribute ? expected : null,
-				);
-			else checkInitialHydrateAttribute(this, el, 'style', hadStyleAttribute ? before : null);
-		}
 		if (before === expected && hadStyleAttribute === expectsStyleAttribute) return true;
 
 		if (expectsStyleAttribute) style.cssText = expected;
 		else (STAGED_DOM?.view(el) ?? el).removeAttribute('style');
-		if (
-			mode === 2 &&
-			process.env.NODE_ENV !== 'production' &&
-			!checkInitialHydrateAttribute(this, el, 'style', hadStyleAttribute ? before : null)
-		) {
+		if (mode === 2 && process.env.NODE_ENV !== 'production' && !this.staleServerValues) {
 			warnHydrationValueMismatch((el as any).__oct_loc, 'style', before, expected);
 		}
 		return true;
@@ -19980,10 +19773,10 @@ function preparedPresentationAttribute(
 	el: Element,
 	name: string,
 	value: unknown,
-	kind: string,
+	kind: 'attr' | 'booleanAttr' | DirectSignalAttributeKind,
 ): unknown {
 	if (kind === 'class') return value == null || value === false ? null : normalizeClass(value);
-	if (kind === 'booleanAttr')
+	if (kind === 'booleanAttr' || kind === setBooleanAttribute)
 		return !!value && typeof value !== 'function' && typeof value !== 'symbol';
 	const result = coerceAttrValue(el, name, value);
 	// Generic boolean writers require truthiness, not their normalized empty string.
@@ -19999,7 +19792,7 @@ function preparePresentationSignalBinding(
 	const name = text ? undefined : (args[3] as string);
 	const value = args[text ? 3 : 4];
 	const site = args[text ? 4 : 5] as string;
-	const attributeKind = text ? undefined : ((args[6] ?? 'attr') as DirectSignalAttributeKind);
+	const attributeKind = text ? undefined : (args[6] as DirectSignalAttributeKind);
 	const policy = text
 		? args[5]
 			? DIRECT_SIGNAL_TEXT_ONLY_POLICY
@@ -20594,6 +20387,15 @@ function isTextSeparator(node: Node | null): node is Comment {
 	);
 }
 
+/** The server's `<!---->` stand-in for an empty sibling-position text hole (ssrTextSlot). */
+function isEmptyTextSlot(node: Node | null): node is Comment {
+	return (
+		node !== null &&
+		node.nodeType === 8 &&
+		(STAGED_DOM?.view(node as Comment) ?? (node as Comment)).data === ''
+	);
+}
+
 /**
  * Resolve the server `<!--[-->` a control-flow slot (try / if / for / switch /
  * Activity / component) should ADOPT during hydration.
@@ -20790,7 +20592,12 @@ export function hydrateClaimedBindingCaches(
 }
 
 type DirectSignalBindingKind = 'text' | 'textOnlyChild' | 'attribute' | 'value' | 'checked';
-type DirectSignalAttributeKind = 'attr' | 'class' | 'booleanAttr' | 'ariaAttr' | 'stringData';
+// The compiler names the concrete scalar writer (setPlainAttribute,
+// setURLAttribute, setStringData, setBooleanAttribute, setAriaAttribute, or the
+// generic setAttribute) so an ordinary binding retains only that writer's graph.
+// Class composition is the one namespace-dependent writer, so it stays a tag.
+type DirectSignalAttributeWriter = (el: Element, name: string, value: unknown) => void;
+type DirectSignalAttributeKind = 'class' | DirectSignalAttributeWriter;
 
 // Shared renderer policies keep the subscription/lifetime path independent of
 // control adoption. Scalar bindings still use their existing cache tokens.
@@ -20808,6 +20615,7 @@ interface DirectSignalBindingPolicy {
 	readonly control?: {
 		validateNew: (scope: Scope, target: Node, kind: DirectSignalBindingKind) => void;
 		snapshot: (target: Node, site: string) => ReturnType<typeof snapshotHydrationControl>;
+		restored: (target: Node, value: unknown) => boolean;
 		activate: (binding: DirectSignalBinding, revision: number) => void;
 		adopt: (binding: DirectSignalBinding) => void;
 	};
@@ -20964,23 +20772,10 @@ function writeDirectSignalAttribute(
 	attributeKind?: DirectSignalAttributeKind,
 ): unknown {
 	const element = target as Element;
-	switch (attributeKind) {
-		case 'class':
-			if (element.namespaceURI === HTML_NS) setClassName(element, value);
-			else setClassAttr(element, value);
-			break;
-		case 'booleanAttr':
-			setBooleanAttribute(element, name!, value);
-			break;
-		case 'ariaAttr':
-			setAriaAttribute(element, name!, value);
-			break;
-		case 'stringData':
-			setStringData(element, name!, value);
-			break;
-		default:
-			setAttribute(element, name!, value);
-	}
+	if (attributeKind === 'class') {
+		if (element.namespaceURI === HTML_NS) setClassName(element, value);
+		else setClassAttr(element, value);
+	} else attributeKind!(element, name!, value);
 	return value;
 }
 
@@ -21028,6 +20823,7 @@ const DIRECT_SIGNAL_CONTROL_POLICY: NonNullable<DirectSignalBindingPolicy['contr
 		if (snapshot !== null) validateDirectSignalControl(target as Element, site);
 		return snapshot;
 	},
+	restored: (target, value) => isRestoredHydrationTextarea(target as Element, value),
 	activate(binding, revision) {
 		installDirectSignalControl(binding);
 		if (!binding.pendingControl) consumeHydrationControl(binding.target as Element, revision);
@@ -21185,7 +20981,9 @@ function createDirectSignalBinding(
 		activeHydration() !== null &&
 		isWritableSignal(handle) &&
 		controlSnapshot !== null &&
-		(controlSnapshot.editRevision > 0 || isRestoredHydrationTextarea(target as Element, initial));
+		// Only control policies snapshot, so text/attribute bindings never retain
+		// the restored-textarea adoption graph.
+		(controlSnapshot.editRevision > 0 || policy.control!.restored(target, initial));
 	if (binding.pendingControl) binding.value = initial;
 	if (!binding.pendingControl) writeDirectSignalBinding(binding, initial);
 	if (STAGED_COMMIT_CAPTURE !== null) {
@@ -21220,8 +21018,6 @@ function bindDirectSignal(
 			? (previous as DirectSignalBinding)
 			: null;
 	const handle = isSignalHandle(value) ? value : null;
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null && handle !== null)
-		throw new PresentationAdoptionMiss(undefined, false);
 	if (
 		handle !== null &&
 		(!signalDocumentEnabled || currentSignalOwner() !== SCOPE_SIGNAL_OWNERS.get(scope))
@@ -21230,9 +21026,11 @@ function bindDirectSignal(
 		// Enter its already-stamped scope for both the initial read and subscribe;
 		// the ambient render frame may have started before document activation.
 		if (!signalDocumentEnabled) enableSignalBindings();
-		return runWithBlockSignalOwner(scope, () =>
-			bindDirectSignal(scope, previous, target, value, site, policy, name, attributeKind),
-		);
+		if (currentSignalOwner() !== scopeSignalOwner(scope)) {
+			return runWithBlockSignalOwner(scope, () =>
+				bindDirectSignal(scope, previous, target, value, site, policy, name, attributeKind),
+			);
+		}
 	}
 	if (handle === null && prior === null) {
 		if (kind === 'attribute' && previous === value) {
@@ -21365,7 +21163,7 @@ export function bindSignalAttribute(
 	name: string,
 	value: unknown,
 	site: string,
-	attributeKind: DirectSignalAttributeKind = 'attr',
+	attributeKind: DirectSignalAttributeKind,
 ): unknown {
 	// Defined scalar equality needs no binding token/handle probe. Undefined
 	// still reconciles hydration; stable objects/functions can reveal handles.
@@ -21584,7 +21382,15 @@ export function setHTML(el: Element, value: any): void {
 			el.localName === 'script'
 				? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
 				: normalizeHTMLForHydration(el, next);
-		if (server === expected || isHydrationSuppressed(el)) return;
+		if (server === expected) {
+			if (el.localName !== 'script') {
+				const host = STAGED_DOM?.view(el as any) ?? (el as any);
+				journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+				host[DANGER_HTML_VALUE] = next;
+			}
+			return;
+		}
+		if (isHydrationSuppressed(el)) return;
 		warnHydrationKeptServerValue(
 			(el as any).__oct_loc,
 			'`dangerouslySetInnerHTML` content',
@@ -21593,8 +21399,16 @@ export function setHTML(el: Element, value: any): void {
 		);
 		return;
 	}
-	if (el.localName === 'script') setScriptText(el, next);
-	else if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
+	if (el.localName === 'script') {
+		setScriptText(el, next);
+		return;
+	}
+	// Fresh wrappers must not replace identical children. Compare accepted authored
+	// HTML, including successful hydration adoption, before entering DOM staging.
+	const host = STAGED_DOM?.view(el as any) ?? (el as any);
+	if (host[DANGER_HTML_VALUE] === next) return;
+	journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
 		journalBag();
 		journalRootRange(el, null, null);
 		// Raw HTML is a leaf: stage its genuine new nodes next to the outgoing
@@ -21605,8 +21419,10 @@ export function setHTML(el: Element, value: any): void {
 		while (getFirstChild(fresh) !== null)
 			(STAGED_DOM?.view(el) ?? el).appendChild(getFirstChild(fresh)!);
 	} else (STAGED_DOM?.view(el) ?? el).innerHTML = next;
+	host[DANGER_HTML_VALUE] = next;
 }
 
+const DANGER_HTML_VALUE = /* @__PURE__ */ Symbol('octane.dangerHTMLValue');
 const DANGER_HTML_ACTIVE = '__oct_dangerHTML';
 // Latched the first time any host actually takes ownership of its children via
 // dangerouslySetInnerHTML. Every childSlot call has to ask whether raw HTML owns
@@ -21641,7 +21457,15 @@ export function setDangerouslySetInnerHTML(el: Element, value: any): void {
 		// A nullish writer on a never-raw host is semantically absent and must not
 		// erase ordinary children. Transitioning away from an active writer clears
 		// the raw content it owned.
-		if (wasActive) setHTML(el, null);
+		if (wasActive) {
+			setHTML(el, null);
+			const host = STAGED_DOM?.view(el as any) ?? (el as any);
+			// Ordinary children can now replace the cached empty HTML.
+			if (host[DANGER_HTML_VALUE] !== undefined) {
+				journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+				host[DANGER_HTML_VALUE] = undefined;
+			}
+		}
 		return;
 	}
 	if (value != null && VOID_ELEMENTS.has(el.localName)) {
@@ -24916,7 +24740,6 @@ export function namespaceHeadElement(
 }
 
 export function injectStyle(id: string, css: string, nonce?: string): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	if (typeof document === 'undefined') {
 		_injectedStyles.add(id);
 		return;
@@ -28614,12 +28437,6 @@ function renderPortalState(
 	env?: any[],
 	key: string | null = null,
 ): PortalSlot {
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		hydrateAttributeProbe !== null &&
-		target.ownerDocument !== hydrateAttributeProbe.document
-	)
-		target = hydrateAttributeProbe.document.createDocumentFragment();
 	const hydration = activeHydration();
 	if (hydration !== null) {
 		return hydration.suspend(() =>
@@ -33189,6 +33006,7 @@ function renderPreparedChildList(
 			plainDeopt: false,
 			mappedNative: undefined,
 			selectionItems: undefined,
+			signalSite: undefined,
 		};
 		if (upgradeArmed) {
 			state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start, state.end!);
@@ -35107,11 +34925,10 @@ const OBJ_PROTO = Object.prototype;
 // so the common plain-object case is a zero-allocation for-in compare — no
 // Object.keys arrays. Semantics match React's shallowEqual exactly: Object.is
 // on values (NaN equal, ±0 differ), own-enumerable string keys only, key-SET
-// equality (loop 1 checks values, loop 2's count balances the key sets), and
-// an explicit-`undefined` prop still differs from a missing key (the hasOwn
-// guard). Non-plain prototypes (class instances / Object.create props can
-// arrive raw through createElement's props pass-through) take the exact
-// Object.keys slow path, where for-in would also see inherited keys.
+// equality (loop 1 checks ownership and values, loop 2's count balances the
+// key sets). Inherited values must not stand in for removed own props, even
+// when they compare equal. Non-plain prototypes take the exact Object.keys
+// slow path, where for-in would also see inherited keys.
 function shallowEqualProps(a: any, b: any): boolean {
 	if (a === b) return true;
 	if (a == null || b == null) return false;
@@ -35123,7 +34940,7 @@ function shallowEqualProps(a: any, b: any): boolean {
 	let count = 0;
 	for (const k in a) {
 		const v = a[k];
-		if (!Object.is(v, b[k]) || (v === undefined && !hasOwnProp.call(b, k))) return false;
+		if (!hasOwnProp.call(b, k) || !Object.is(v, b[k])) return false;
 		count++;
 	}
 	for (const _k in b) count--;
@@ -35328,11 +35145,7 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 		// the owning block, which re-runs the direct call against the swapped-in
 		// body. Registering the AMBIENT block instead would let update() repoint
 		// that block's body at this wrapper, miswiring the caller.
-		if (
-			scope !== undefined &&
-			(process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
-		)
-			meta.liveBlocks.add(scope.block);
+		if (scope !== undefined) meta.liveBlocks.add(scope.block);
 		// Propagate the wrapped body's return — a return-based (folded) component
 		// hands back a renderable descriptor that renderBlock must still mount.
 		return meta.fn(props as any, scope, extra);
@@ -36005,8 +35818,7 @@ function mountPassthroughPending(state: TrySlot, thenable: TrackedThenable<unkno
 		setTryBranch(state, -1);
 		scheduleRender(state.parentBlock);
 	};
-	if (process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
-		thenable.then(retry, retry);
+	thenable.then(retry, retry);
 }
 
 function renderPassthroughTry(state: TrySlot): void {
@@ -36650,16 +36462,12 @@ function takeInitialSuspenseHydration(
 			payload = {
 				seedRaw: typeof stash?.[boundaryId] === 'string' ? stash[boundaryId] : null,
 				nativeRaw:
-					(process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null) &&
 					typeof stash?.[boundaryId + '$signals'] === 'string'
 						? stash[boundaryId + '$signals']
 						: null,
 			};
 			(initialStreamedPayloads ??= new WeakMap()).set(owner, payload);
-			if (
-				stash !== undefined &&
-				(process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
-			) {
+			if (stash !== undefined) {
 				delete stash[boundaryId];
 				delete stash[boundaryId + '$signals'];
 			}
@@ -36701,8 +36509,7 @@ function takeInitialSuspenseHydration(
 			continue;
 		if (attr === SUSPENSE_RESOLVED_SEED_ATTR)
 			seedRaw = (STAGED_DOM?.view(script) ?? script).textContent;
-		else if (process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
-			nativeRaw = (STAGED_DOM?.view(script) ?? script).textContent;
+		else nativeRaw = (STAGED_DOM?.view(script) ?? script).textContent;
 		sidecars.push(script);
 		cursor = getNextSibling(script);
 	}
@@ -36749,8 +36556,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 	hydration.claimRootRemainder(initial.end);
 	hydration.protectRootAnchor(initial.end);
 	const previousHydration = currentHydration;
-	if (process.env.NODE_ENV !== 'production')
-		hydration.attributeBaselines = previousHydration?.attributeBaselines;
+	if (previousHydration?.staleServerValues) hydration.staleServerValues = true;
 	if (previousHydration?.retryPresentation !== undefined)
 		hydration.retryPresentation = previousHydration.retryPresentation;
 	const previousCapture = WIP_CAPTURE;
@@ -36829,8 +36635,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 				return;
 			scheduleRender(state.parentBlock);
 		};
-		if (process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
-			suspended.then(resume, resume);
+		suspended.then(resume, resume);
 		return;
 	}
 	initialSuspenseHydrations?.delete(state);
@@ -36920,11 +36725,7 @@ function mountTry(state: TrySlot): void {
 		const raw = stash !== undefined ? stash[streamedBoundaryId] : undefined;
 		if (typeof raw === 'string') scopedSeeds = hydration.parseSeeds(raw);
 		const nativeRaw = stash?.[streamedBoundaryId + '$signals'];
-		if (
-			typeof nativeRaw === 'string' &&
-			(process.env.NODE_ENV === 'production' || hydrateAttributeProbe === null)
-		)
-			scopedNativeRaw = nativeRaw;
+		if (typeof nativeRaw === 'string') scopedNativeRaw = nativeRaw;
 		adoptCursor = getNextSibling(adoptCursor);
 	} else if (
 		// A shell hydrated before its streamed segment swaps still has the
@@ -38425,7 +38226,6 @@ function flushStagedReveals(): void {
  * don't queue two retries.
  */
 function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	if (state.pendingThenable === thenable) return;
 	state.pendingThenable = thenable;
 	const retry = () => {
@@ -40582,7 +40382,6 @@ function queueCurrentActivityRefs(activity: ActivitySlot): void {
 }
 
 function suspendHiddenActivity(state: ActivitySlot, thenable: TrackedThenable<unknown>): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	if (state.pendingThenable === thenable) return;
 	state.pendingThenable = thenable;
 	const block = state.block!;
@@ -41214,6 +41013,9 @@ export function switchBlock(
 
 interface ForSlot {
 	__kind: 'forBlockSlot';
+	// Inline row owners need a call-site namespace without consuming the list
+	// keys that independently compiled child components still inherit.
+	signalSite: string | undefined;
 	start: Comment;
 	end: Comment;
 	items: Map<any, Block>; // key → item Block (O(1) survivor lookup)
@@ -41281,6 +41083,7 @@ export function forBlock<T>(
 	// placeholder. Reuse it as the durable closing boundary instead of keeping
 	// both that placeholder and a newly-created `/for` comment.
 	ownEnd?: boolean,
+	signalSite?: string,
 ): void {
 	// The iterable expression can queue a self-update before this call starts.
 	// Do not mount or remove items from an output the owner will replay.
@@ -41354,6 +41157,7 @@ export function forBlock<T>(
 			plainDeopt: false,
 			mappedNative: undefined,
 			selectionItems: undefined,
+			signalSite,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -41565,6 +41369,7 @@ export function keyedForBlock<T>(
 	anchor?: Node | null,
 	ownEnd?: boolean,
 	selectionBody?: ComponentBody<T, any[]>,
+	signalSite?: string,
 ): void {
 	// forBlock may skip discarded output before it creates the list slot.
 	// Skip selection bookkeeping with the same owner check.
@@ -41609,6 +41414,7 @@ export function keyedForBlock<T>(
 		emptyBody,
 		anchor,
 		ownEnd,
+		signalSite,
 	);
 	if (TRANSITION_JOURNAL === null || ROOT_RENDER_TRANSACTION !== null) {
 		const rendered = parentScope.slots[slotKey] as ForSlot;
@@ -43753,7 +43559,7 @@ function coalesceHydratedRanges(
 		}
 	}
 
-	function visitSlot(state: any): void {
+	function visitSlot(state: any, scope: Scope): void {
 		const kind = state.__kind;
 		if (kind === 'componentSlotSlot') {
 			if (state.block !== null) visitBlock(state.block, state as CompSlot);
@@ -43762,6 +43568,13 @@ function coalesceHydratedRanges(
 		if (kind === 'childSlot') {
 			const child = state as ChildSlot;
 			if (child.block !== null) visitBlock(child.block, child);
+			else if (child.borrowed) {
+				// Empty returns borrow their component's pair before a child Block
+				// exists. Redirect that borrower too if the component range compacts.
+				const own = blockGroups.get(scope.block);
+				if (own !== undefined && child.start === own.start && child.end === own.end)
+					attachOwner(own, child);
+			}
 			if (child.forSlot !== null) visitForSlot(child.forSlot);
 			if (child.portal?.block != null) visitBlock(child.portal.block);
 			return;
@@ -43796,7 +43609,7 @@ function coalesceHydratedRanges(
 			for (let i = 0; i < children.length; i++) visitNestedScope(children[i].scope);
 		const registered = scope._slots;
 		if (registered === null) return;
-		for (let i = 0; i < registered.length; i++) visitSlot(registered[i]);
+		for (let i = 0; i < registered.length; i++) visitSlot(registered[i], scope);
 	}
 
 	visitBlock(rootBlock);
@@ -45268,6 +45081,10 @@ export function createIndependentHydrateActivator(
 			if (notify !== null) useEffect(notify as EffectFn, [scope], HYDRATE_NOTIFY_SLOT);
 		};
 		const framed: ComponentBody = (_props, scope) => {
+			// This frame stands in for the server's Hydrate instance, whose children
+			// render directly under the island's `[prefix, 'root']` signal identity.
+			// Resolve it to that root key so it contributes no invocation segment.
+			stampSignalInstanceKey(scope, rootSignalInstanceKey(scope.block.idState));
 			tryBlock(scope, 0, scope.block.parentNode, content, null, null, scope.block.endMarker);
 		};
 		const adapter: ComponentBody = (_props, scope) => {
@@ -45394,7 +45211,6 @@ function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined):
 
 /** React DOM `preload(href, {as, …})` — `<link rel="preload">`. */
 export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preload', href, options);
 		if (warning !== null) console.error(warning);
@@ -45463,7 +45279,6 @@ export function preload(href: string, options: { as: string } & Record<string, u
  * dedupes against `<script async src>`.
  */
 export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preinit', href, options);
 		if (warning !== null) console.error(warning);
@@ -45490,7 +45305,6 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 
 /** React DOM `preconnect(href, {crossOrigin?})` — `<link rel="preconnect">`. */
 export function preconnect(href: string, options?: { crossOrigin?: string }): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preconnect', href, options);
 		if (warning !== null) console.error(warning);
@@ -45515,7 +45329,6 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 
 /** React DOM `prefetchDNS(href)` — `<link rel="dns-prefetch">`. */
 export function prefetchDNS(href: string): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('prefetchDNS', href, arguments[1], arguments.length > 1);
 		if (warning !== null) console.error(warning);
@@ -45537,7 +45350,6 @@ export function prefetchDNS(href: string): void {
  * options apply as attributes through the shared lenient pass-through.
  */
 export function preloadModule(href: string, options?: Record<string, unknown>): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preloadModule', href, options);
 		if (warning !== null) console.error(warning);
@@ -45569,7 +45381,6 @@ export function preinitModule(
 	href: string,
 	options?: { as?: string } & Record<string, unknown>,
 ): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preinitModule', href, options);
 		if (warning !== null) console.error(warning);
@@ -45735,7 +45546,6 @@ export function stylesheetResource(
 	attrs: Record<string, unknown> | null,
 	invalidReason?: string,
 ): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	if (process.env.NODE_ENV !== 'production' && invalidReason !== undefined) {
 		warnInvalidStylesheetResource(invalidReason);
 		return;
@@ -45768,7 +45578,6 @@ export function styleResource(
 	css: string,
 	development?: boolean,
 ): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	if (typeof document === 'undefined' || attrs == null) return;
 	const href = attrs.href;
 	if (typeof href !== 'string' || href === '') return;
@@ -45818,7 +45627,6 @@ export function resetFloatResourceState(): void {
 
 /** Compiler target for `<script async src>` resources (React Float). */
 export function scriptResource(attrs: Record<string, unknown> | null): void {
-	if (process.env.NODE_ENV !== 'production' && hydrateAttributeProbe !== null) return;
 	if (typeof document === 'undefined' || attrs == null) return;
 	const src = attrs.src;
 	if (typeof src !== 'string' || src === '') return;

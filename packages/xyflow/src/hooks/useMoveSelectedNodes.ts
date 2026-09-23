@@ -1,5 +1,5 @@
 import { useCallback } from 'octane';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, subSlot } from './slot';
 import { calculateNodePosition, snapPosition, type XYPosition } from '@xyflow/system';
 
 import { type Node } from '../types';
@@ -16,7 +16,7 @@ const selectedAndDraggable = (nodesDraggable: boolean) => (n: Node) =>
  */
 export function useMoveSelectedNodes(...rest: [slot?: symbol]) {
 	const slot = resolveHookSlot(rest);
-	const store = useStoreApi(slot);
+	const store = useStoreApi(subSlot(slot, 'store'));
 
 	const moveSelectedNodes = useCallback(
 		function moveSelectedNodes(params: { direction: XYPosition; factor: number }) {
@@ -75,7 +75,7 @@ export function useMoveSelectedNodes(...rest: [slot?: symbol]) {
 			updateNodePositions(nodeUpdates);
 		},
 		[],
-		slot,
+		subSlot(slot, 'move'),
 	);
 
 	return moveSelectedNodes;

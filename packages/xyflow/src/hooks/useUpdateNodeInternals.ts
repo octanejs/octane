@@ -1,5 +1,5 @@
 import { useCallback } from 'octane';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, subSlot } from './slot';
 import type { UpdateNodeInternals, InternalNodeUpdate } from '@xyflow/system';
 
 import { useStoreApi } from '../hooks/useStore';
@@ -51,23 +51,27 @@ import { useStoreApi } from '../hooks/useStore';
  */
 export function useUpdateNodeInternals(...rest: [slot?: symbol]): UpdateNodeInternals {
 	const slot = resolveHookSlot(rest);
-	const store = useStoreApi(slot);
+	const store = useStoreApi(subSlot(slot, 'store'));
 
-	return useCallback<UpdateNodeInternals>((id: string | string[]) => {
-		const { domNode, updateNodeInternals } = store.getState();
-		const updateIds = Array.isArray(id) ? id : [id];
-		const updates = new Map<string, InternalNodeUpdate>();
+	return useCallback<UpdateNodeInternals>(
+		(id: string | string[]) => {
+			const { domNode, updateNodeInternals } = store.getState();
+			const updateIds = Array.isArray(id) ? id : [id];
+			const updates = new Map<string, InternalNodeUpdate>();
 
-		updateIds.forEach((updateId) => {
-			const nodeElement = domNode?.querySelector(
-				`.react-flow__node[data-id="${updateId}"]`,
-			) as HTMLDivElement;
+			updateIds.forEach((updateId) => {
+				const nodeElement = domNode?.querySelector(
+					`.react-flow__node[data-id="${updateId}"]`,
+				) as HTMLDivElement;
 
-			if (nodeElement) {
-				updates.set(updateId, { id: updateId, nodeElement, force: true });
-			}
-		});
+				if (nodeElement) {
+					updates.set(updateId, { id: updateId, nodeElement, force: true });
+				}
+			});
 
-		requestAnimationFrame(() => updateNodeInternals(updates, { triggerFitView: false }));
-	}, []);
+			requestAnimationFrame(() => updateNodeInternals(updates, { triggerFitView: false }));
+		},
+		[],
+		subSlot(slot, 'update'),
+	);
 }

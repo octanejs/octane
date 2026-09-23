@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "4c15348bad5ce7249addbe62d8ab44e46b16b6cd24b4195351d328cb2e16e6f0"
+      "lockfileSha256": "2096e0c04e9e931c772292926b572eedb9d70709ccf412c69a566ace23de0106"
     }
   },
   "lanes": [
@@ -71,6 +71,11 @@
           "path": "packages/xyflow/tests/_fixtures/connection-slots.tsrx",
           "role": "support",
           "sha256": "02dfe8e94ed3986e59be313526483c1f7ae297f3de0052ad25eadd180382b517"
+        },
+        {
+          "path": "packages/xyflow/tests/_setup.ts",
+          "role": "support",
+          "sha256": "586107d9ab8fda02b33fb99de136d6b484b10af0b78aa491446804df28f1e8cb"
         }
       ]
     },
@@ -197,19 +202,44 @@
       "available": true,
       "environment": "workspace-node",
       "project": "xyflow-package-consumption",
-      "notes": "Repo-authored regression that compiles the complete authored public entry with the production Octane Vite plugin, verifies component exports, and executes node/edge helpers.",
+      "notes": "Repo-authored regressions compile the authored public entry and consumers with the production Octane Vite plugin, verify component exports and helpers, and execute queued mutations, keyboard optional arguments, store equality arguments, and connection defaults.",
       "files": [
         {
           "path": "packages/xyflow/tests/package-consumption.test.ts",
           "role": "test",
-          "sha256": "ebe3b4f663c50757e8875243c4dc6c45af85dbf26388968d96369e5f2764b930",
+          "sha256": "f33d59079dcd1ff3e0f02c0df09fc9a610d8223f8d6b8c7c2a921c62c402178f",
           "cases": [
             {
               "id": "adapted:package-consumption",
               "testName": "preserves flow components and change helpers in a production consumer bundle",
               "fullName": "preserves flow components and change helpers in a production consumer bundle"
+            },
+            {
+              "id": "adapted:queue-consumer",
+              "testName": "applies successive node and edge mutations through the public instance",
+              "fullName": "production flow consumers applies successive node and edge mutations through the public instance"
+            },
+            {
+              "id": "adapted:key-press-options",
+              "testName": "keeps key subscriptions independent across supported optional argument shapes",
+              "fullName": "production flow consumers keeps key subscriptions independent across supported optional argument shapes"
+            },
+            {
+              "id": "adapted:store-equality-options",
+              "testName": "subscribes to store updates with omitted, default and explicit equality",
+              "fullName": "production flow consumers subscribes to store updates with omitted, default and explicit equality"
+            },
+            {
+              "id": "adapted:connection-default-options",
+              "testName": "supports connection selectors and node initialization with default options",
+              "fullName": "production flow consumers supports connection selectors and node initialization with default options"
             }
           ]
+        },
+        {
+          "path": "packages/xyflow/tests/_fixtures/public-hooks-consumer.tsrx",
+          "role": "support",
+          "sha256": "fbb7767b59bb33380b0e20d961a92e04c108422a771c2a43a83539829fb1a56c"
         }
       ]
     }

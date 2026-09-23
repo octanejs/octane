@@ -66,28 +66,79 @@ function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
 	);
 }
 
+/** Marks a producer wait interrupted by its consumer, which owes no terminal frame. */
+const CANCELLED: unique symbol = Symbol('octane.streamedSignalResultCancelled');
+
+interface ProducerWaits {
+	/** Settle with `value`, or reject as soon as the consumer or request abandons it. */
+	wait<T>(value: T | PromiseLike<T>): Promise<T>;
+	interrupt(reason: unknown): void;
+}
+
 /** Produce the authoritative result-channel grammar without exposing server errors. */
-export async function* createStreamedSignalResultFrames(
+export function createStreamedSignalResultFrames(
 	identity: StreamFrameIdentity,
 	result: unknown,
 	options: Pick<StreamedSignalResultOptions, 'signal' | 'run'> = {},
+): AsyncGenerator<StreamedSignalResultFrame> {
+	// An async generator's return() queues behind a running body, and the body
+	// spends an idle upstream's lifetime parked on its next(). Every producer
+	// wait is therefore interruptible, so the consumer's return() (or the request
+	// signal) releases the upstream iterator now rather than after its next value.
+	let cancelled = false;
+	// One slot rather than Promise.race: racing a long-lived promise would retain
+	// a reaction per upstream value. Rejecting an already-settled wait is a no-op.
+	let reject: ((reason: unknown) => void) | undefined;
+	const waits: ProducerWaits = {
+		wait<T>(value: T | PromiseLike<T>): Promise<T> {
+			if (cancelled) return Promise.reject(CANCELLED);
+			return new Promise<T>((resolve, fail) => {
+				reject = fail;
+				Promise.resolve(value).then(resolve, fail);
+			});
+		},
+		interrupt(reason) {
+			const fail = reject;
+			reject = undefined;
+			fail?.(reason);
+		},
+	};
+	const frames = produceStreamedSignalResultFrames(identity, result, options, waits);
+	const returnFrames = frames.return;
+	frames.return = (value) => {
+		cancelled = true;
+		waits.interrupt(CANCELLED);
+		return returnFrames.call(frames, value);
+	};
+	return frames;
+}
+
+async function* produceStreamedSignalResultFrames(
+	identity: StreamFrameIdentity,
+	result: unknown,
+	options: Pick<StreamedSignalResultOptions, 'signal' | 'run'>,
+	waits: ProducerWaits,
 ): AsyncGenerator<StreamedSignalResultFrame> {
 	if (!isStreamFrameIdentity(identity)) throw new TypeError('Invalid streamed signal identity.');
 	let sequence = 0;
 	let resource: 'promise' | 'stream' = 'promise';
 	let iterator: AsyncIterator<unknown> | undefined;
 	const run = options.run ?? ((callback) => callback());
+	const signal = options.signal;
+	const abort = (): void => waits.interrupt(signal!.reason);
+	signal?.addEventListener('abort', abort, { once: true });
 	try {
-		const resolved = await result;
-		options.signal?.throwIfAborted();
+		signal?.throwIfAborted();
+		const resolved = await waits.wait(result);
+		signal?.throwIfAborted();
 		if (isAsyncIterable(resolved)) {
 			resource = 'stream';
 			iterator = run(() => resolved[Symbol.asyncIterator]());
 			yield { identity, sequence: sequence++, channel: 'result', kind: 'open', resource: 'stream' };
 			for (;;) {
-				options.signal?.throwIfAborted();
-				const next = await run(() => iterator!.next());
-				options.signal?.throwIfAborted();
+				signal?.throwIfAborted();
+				const next = await waits.wait(run(() => iterator!.next()));
+				signal?.throwIfAborted();
 				if (next.done) break;
 				yield {
 					identity,
@@ -115,7 +166,9 @@ export async function* createStreamedSignalResultFrames(
 			};
 		}
 		yield { identity, sequence, channel: 'result', kind: 'complete' };
-	} catch {
+	} catch (error) {
+		// A departed consumer reads nothing further, so it is owed no terminal frame.
+		if (error === CANCELLED) return;
 		// Rejection or iterator construction can fail before the normal open.
 		// Keep the same grammar so consumers observe the sanitized result error.
 		if (sequence === 0) {
@@ -123,6 +176,7 @@ export async function* createStreamedSignalResultFrames(
 		}
 		yield { identity, sequence, channel: 'result', kind: 'error', code: 'SERVER_RESULT_FAILED' };
 	} finally {
+		signal?.removeEventListener('abort', abort);
 		if (iterator !== undefined) {
 			try {
 				await run(() => iterator!.return?.());
@@ -586,12 +640,14 @@ export function createAutomaticStreamedSignalInjection(
 				attempt.release();
 				return;
 			}
+			observedAttempts.add(attemptKey);
 			if (children.size >= 256) {
+				// Refuse only the overflow: it is never announced, so the browser loads
+				// it itself, while live channels keep their server work. Remembering the
+				// key keeps a later observation from announcing it once slots free.
 				attempt.release();
-				fail(new Error('Automatic streamed signals exceeded their channel budget.'));
 				return;
 			}
-			observedAttempts.add(attemptKey);
 			hasSignalAttempts = true;
 			const identity: StreamFrameIdentity = {
 				protocol: 1,

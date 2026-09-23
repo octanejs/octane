@@ -244,6 +244,22 @@ export function App() @{ <input value={draft$.get()} /> }`,
 		expect(code).not.toContain('enableSignalBindings(1)');
 	});
 
+	it('passes each prop-driven attribute binding its statically selected writer', () => {
+		const source = `export function Link(props) @{
+			<a title={props.label} href={props.href} data-id={props.id} aria-label={props.label} hidden={props.hidden}>{'x'}</a>
+		}`;
+		const prod = compile(source, '/src/signal-writer.tsrx', { dev: false, hmr: false }).code;
+		expect(prod).toMatch(/'title',[^)]*_\$setPlainAttribute\)/);
+		expect(prod).toMatch(/'href',[^)]*_\$setURLAttribute\)/);
+		expect(prod).toMatch(/'data-id',[^)]*_\$setStringData\)/);
+		expect(prod).toMatch(/'aria-label',[^)]*_\$setAriaAttribute\)/);
+		expect(prod).toMatch(/'hidden',[^)]*_\$setBooleanAttribute\)/);
+		// Production never reaches the generic writer for a statically admitted name.
+		expect(prod).not.toContain('_$setAttribute');
+		const dev = compile(source, '/src/signal-writer.tsrx', { dev: true, hmr: false }).code;
+		expect(dev).toMatch(/'title',[^)]*_\$setAttribute\)/);
+	});
+
 	it('routes a non-suffixed writable alias through runtime capability validation', () => {
 		const { code } = compile(
 			`import { signal$ } from 'octane/signals';

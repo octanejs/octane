@@ -108,3 +108,9 @@ export function GuardedReadStyles(props: { source$: SignalHandle<number> }) @{
 export function PlainSvgStyles(props: { offset: number }) @{
 	<svg style={{ opacity: props.offset / 10, '--position': props.offset + 0 }} />
 }
+
+export function OpaqueStyles(props: { color: string; offset: unknown }) @{
+	<div style={{ display: 'flex', color: props.color, marginTop: props.offset as number }}>
+		<span>{'styled'}</span>
+	</div>
+}

@@ -1,5 +1,5 @@
 import { useEffect } from 'octane';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, subSlot } from './slot';
 import type { KeyCode } from '@xyflow/system';
 
 import { useStoreApi } from '../hooks/useStore';
@@ -27,11 +27,19 @@ export function useGlobalKeyHandler(
 	...rest: [slot?: symbol]
 ): void {
 	const slot = resolveHookSlot(rest);
-	const store = useStoreApi(slot);
-	const { deleteElements } = useReactFlow(slot);
+	const store = useStoreApi(subSlot(slot, 'store'));
+	const { deleteElements } = useReactFlow(subSlot(slot, 'flow'));
 
-	const deleteKeyPressed = useKeyPress(deleteKeyCode, { actInsideInputWithModifier: false }, slot);
-	const multiSelectionKeyPressed = useKeyPress(multiSelectionKeyCode, { target: win }, slot);
+	const deleteKeyPressed = useKeyPress(
+		deleteKeyCode,
+		{ actInsideInputWithModifier: false },
+		subSlot(slot, 'delete-key'),
+	);
+	const multiSelectionKeyPressed = useKeyPress(
+		multiSelectionKeyCode,
+		{ target: win },
+		subSlot(slot, 'multi-selection-key'),
+	);
 
 	useEffect(
 		function handleDeleteKey() {
@@ -42,7 +50,7 @@ export function useGlobalKeyHandler(
 			}
 		},
 		[deleteKeyPressed],
-		slot,
+		subSlot(slot, 'delete-effect'),
 	);
 
 	useEffect(
@@ -50,6 +58,6 @@ export function useGlobalKeyHandler(
 			store.setState({ multiSelectionActive: multiSelectionKeyPressed });
 		},
 		[multiSelectionKeyPressed],
-		slot,
+		subSlot(slot, 'multi-selection-effect'),
 	);
 }

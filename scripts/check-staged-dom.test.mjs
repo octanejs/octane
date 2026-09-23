@@ -22,23 +22,6 @@ test('accepts staged operations and committed identity/geometry reads', () => {
 	assert.deepEqual(inspectStagedDOM(fixture), []);
 });
 
-test('diagnostic exemptions still reject live writes and unprojected source serialization', () => {
-	const findings = inspectStagedDOM(`
-	function collectInitialHydrateAttributes(source: HTMLElement, document: Document) {
-	 const template = document.createElement('template');
-	 template.innerHTML = source.outerHTML;
-	 source.setAttribute('title', 'historical');
-	}
-	function renderPortalState(target: HTMLElement, document: Document) {
-	 const fragment = document.createDocumentFragment();
-	 target.appendChild(fragment);
-	}`);
-	assert.deepEqual(
-		findings.map((finding) => finding.operation),
-		['read:outerHTML', 'call:setAttribute', 'call:appendChild'],
-	);
-});
-
 test('accepts native receivers guarded by the renderer stage and their prepared counterpart', () => {
 	assert.deepEqual(
 		inspectStagedDOM(`

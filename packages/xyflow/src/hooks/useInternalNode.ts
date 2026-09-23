@@ -1,5 +1,5 @@
 import { useCallback } from 'octane';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, subSlot } from './slot';
 import { shallow } from '@octanejs/zustand/shallow';
 
 import { useStore } from './useStore';
@@ -38,9 +38,13 @@ export function useInternalNode<NodeType extends Node = Node>(
 ): InternalNode<NodeType> | undefined {
 	const slot = resolveHookSlot(rest);
 	const node = useStore(
-		useCallback((s) => s.nodeLookup.get(id) as InternalNode<NodeType> | undefined, [id]),
+		useCallback(
+			(s) => s.nodeLookup.get(id) as InternalNode<NodeType> | undefined,
+			[id],
+			subSlot(slot, 'selector'),
+		),
 		shallow,
-		slot,
+		subSlot(slot, 'node'),
 	);
 
 	return node;

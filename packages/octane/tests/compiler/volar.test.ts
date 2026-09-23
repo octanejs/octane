@@ -1559,6 +1559,80 @@ export const ordinaryResult: string = ordinary('draft', { count: 1 });
 		}
 	});
 
+	it('maps TypeScript-only class members into checkable virtual TSX', () => {
+		// @tsrx/core's mapping walker threw "Unhandled AST node type" on
+		// constructor parameter properties (TSParameterProperty) and bodyless
+		// methods (TSDeclareMethod: overloads, abstract, optional), so tsrx-tsc
+		// fell back to raw text and reported bogus TS1144/TS1005/TS1128.
+		const src =
+			'class Base {\n' +
+			'\tconstructor(public n: number) {}\n' +
+			'}\n' +
+			'abstract class Shape extends Base {\n' +
+			'\tconstructor(override readonly n: number, protected tag?: string) {\n' +
+			'\t\tsuper(n);\n' +
+			'\t}\n' +
+			'\tabstract area(scale: number): number;\n' +
+			'\tabstract readonly name: string;\n' +
+			'\tdescribe?(): string;\n' +
+			'}\n' +
+			'class Stepper extends Shape {\n' +
+			"\treadonly name = 'stepper';\n" +
+			'\tconstructor(private readonly start: number, public step = 1) {\n' +
+			'\t\tsuper(start);\n' +
+			'\t}\n' +
+			'\tarea(scale: number): number {\n' +
+			'\t\treturn this.start * scale;\n' +
+			'\t}\n' +
+			'\tformat(value: string): string;\n' +
+			'\tformat(value: number): string;\n' +
+			'\tformat(value: string | number): string {\n' +
+			'\t\treturn String(value) + this.step;\n' +
+			'\t}\n' +
+			'}\n' +
+			'\n' +
+			'export function Steps() @{\n' +
+			'\t<p>{new Stepper(1).format(2)}</p>\n' +
+			'}\n';
+		const result = compileToVolarMappings(src, '/src/Steps.tsrx');
+		expect(result.errors).toEqual([]);
+
+		// The walker ran over the parameter properties: their names map back.
+		const startOffset = src.indexOf('start: number');
+		expect(
+			result.mappings.some(
+				(mapping) => mapping.sourceOffsets[0] === startOffset && mapping.lengths[0] === 5,
+			),
+		).toBe(true);
+
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-class-members-'));
+		try {
+			writeOctaneJsxRuntimeStub(root, '\t\tp: { children?: unknown };');
+			const file = join(root, 'Steps.tsx');
+			writeFileSync(file, result.code);
+			const program = ts.createProgram({
+				rootNames: [file],
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					noImplicitOverride: true,
+					skipLibCheck: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+				},
+			});
+			expect(
+				ts
+					.getPreEmitDiagnostics(program)
+					.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n')),
+			).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('exposes both authored and generated ASTs for editor and playground integrations', () => {
 		const src = "export function Foo() @{ <p>{'x'}</p> }\n";
 		const result = compileToVolarMappings(src, 'foo.tsrx');

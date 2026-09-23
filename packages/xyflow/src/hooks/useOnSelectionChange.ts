@@ -1,5 +1,5 @@
 import { useEffect } from 'octane';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, subSlot } from './slot';
 
 import { useStoreApi } from './useStore';
 import type { OnSelectionChangeFunc, Node, Edge } from '../types';
@@ -53,7 +53,7 @@ export function useOnSelectionChange<NodeType extends Node = Node, EdgeType exte
 	...rest: [slot?: symbol]
 ) {
 	const slot = resolveHookSlot(rest);
-	const store = useStoreApi<NodeType, EdgeType>(slot);
+	const store = useStoreApi<NodeType, EdgeType>(subSlot(slot, 'store'));
 
 	useEffect(
 		function registerSelectionChange() {
@@ -73,6 +73,6 @@ export function useOnSelectionChange<NodeType extends Node = Node, EdgeType exte
 			};
 		},
 		[onChange],
-		slot,
+		subSlot(slot, 'register'),
 	);
 }

@@ -5066,8 +5066,10 @@ export default defineConfig({
 				test: {
 					name: 'xyflow',
 					include: ['packages/xyflow/tests/**/*.test.ts'],
+					setupFiles: ['packages/xyflow/tests/_setup.ts'],
 					exclude: [
 						...configDefaults.exclude,
+						'packages/xyflow/tests/browser/**/*.test.ts',
 						'packages/xyflow/tests/differential/**/*.test.ts',
 						'packages/xyflow/tests/package-consumption.test.ts',
 					],
@@ -5132,6 +5134,17 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
 						},
 					],
+				},
+			},
+			{
+				testExecution: { group: 'heavy-browser', browsers: ['chromium'] },
+				test: {
+					name: 'xyflow-browser',
+					include: ['packages/xyflow/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
 				},
 			},
 			{

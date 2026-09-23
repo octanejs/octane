@@ -44,6 +44,11 @@
     "gzip": 37712,
     "brotli": 33120
   },
+  "prop-attributes": {
+    "raw": 98032,
+    "gzip": 32528,
+    "brotli": 28880
+  },
   "context": {
     "raw": 117296,
     "gzip": 38400,
@@ -105,9 +110,9 @@
     "brotli": 2848
   },
   "binding-aria-esbuild": {
-    "raw": 113168,
-    "gzip": 37216,
-    "brotli": 32672
+    "raw": 8960,
+    "gzip": 3472,
+    "brotli": 3104
   },
   "binding-motion-vite": {
     "raw": 64272,

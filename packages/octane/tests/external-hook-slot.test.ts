@@ -119,9 +119,11 @@ describe('slotHooks surgical pass', () => {
 
 	it('returns null (untouched) for modules with no octane base hook', () => {
 		expect(slotHooks(`const x = 1; export { x };`, 'a.ts')).toBeNull(); // no octane import
+		// A hook-free factory call is not untouched: it gains a call-site
+		// `@__PURE__` (see compiler/pure-factory-annotation.test.ts).
 		expect(
 			slotHooks(
-				`import { createContext } from 'octane';\nexport const c = createContext(0);`,
+				`import { createContext } from 'octane';\nexport const c = /* @__PURE__ */ createContext(0);`,
 				'b.ts',
 			),
 		).toBeNull();

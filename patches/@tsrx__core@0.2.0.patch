@@ -1,0 +1,69 @@
+diff --git a/src/transform/jsx/helpers.js b/src/transform/jsx/helpers.js
+index 3a5db9c7afe896de8f5a8e6d2a3520378bd15593..9662c3de53aca584dcc3ec66a4bcc064f43a241a 100644
+--- a/src/transform/jsx/helpers.js
++++ b/src/transform/jsx/helpers.js
+@@ -230,6 +230,22 @@ export function tsx_with_ts_locations(boundary_tokens = false, comments = undefi
+ 				context.visit(node.typeParameters);
+ 			}
+ 		},
++		// esrap's TSParameterProperty printer drops `override`, so
++		// `constructor(override readonly n: number)` typechecks as TS4115
++		// ("must have an 'override' modifier") under `noImplicitOverride`.
++		// TypeScript's modifier order is accessibility, override, readonly.
++		TSParameterProperty: (node, context) => {
++			if (node.accessibility) {
++				context.write(node.accessibility + ' ');
++			}
++			if (node.override) {
++				context.write('override ');
++			}
++			if (node.readonly) {
++				context.write('readonly ');
++			}
++			context.visit(node.parameter);
++		},
+ 		TSModuleDeclaration: (node, context) => {
+ 			// `declare global` is represented as a TSModuleDeclaration whose id is
+ 			// `global`; adding `module` changes it into an unrelated named module.
+diff --git a/src/transform/segments.js b/src/transform/segments.js
+index 06fd499cfe30c3501b72dd853228d496301aa9ba..185ccfd3763047858ffd89f4f736c34b0dfcc0bf 100644
+--- a/src/transform/segments.js
++++ b/src/transform/segments.js
+@@ -2283,6 +2283,37 @@ export function convert_source_map_to_mappings(
+ 					visit(node.typeArguments);
+ 				}
+ 				return;
++			} else if (node.type === 'TSParameterProperty') {
++				// Constructor parameter property: `private readonly x: T` / `public y = 1`.
++				// The modifiers have no child nodes. The parameter is an Identifier
++				// (annotation on it) or an AssignmentPattern (which visits its own
++				// left-hand annotation).
++				const parameter = /** @type {AST.Pattern} */ (/** @type {unknown} */ (node.parameter));
++				visit(parameter);
++				if (parameter.type === 'Identifier' && parameter.typeAnnotation) {
++					visit(parameter.typeAnnotation);
++				}
++				return;
++			} else if (/** @type {string} */ (node.type) === 'TSDeclareMethod') {
++				// Bodyless class method value: an overload signature, `abstract m(): T;`,
++				// or optional `m?(): T;`. The key was visited by MethodDefinition.
++				// Visit in source order: typeParameters, params, returnType
++				const method = /** @type {AST.TSDeclareFunction} */ (/** @type {unknown} */ (node));
++				if (method.typeParameters) {
++					visit(method.typeParameters);
++				}
++				for (const param of method.params) {
++					visit(param);
++					const annotation = /** @type {Exclude<AST.Parameter, AST.TSParameterProperty>} */ (param)
++						.typeAnnotation;
++					if (annotation) {
++						visit(annotation);
++					}
++				}
++				if (method.returnType) {
++					visit(method.returnType);
++				}
++				return;
+ 			} else if (node.type === 'TSTypePredicate') {
+ 				// Type predicate: `x is T` / `asserts x is T` / `asserts x`
+ 				if (node.parameterName) {
