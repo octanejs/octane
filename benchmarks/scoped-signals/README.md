@@ -536,13 +536,17 @@ client/server, development/production, TSRX/returned-JSX output using frozen
 parser ASTs. Immutable lexical values derived from proven primitives omit the
 optional value adapters; authored casts, opaque calls and members, mutable
 bindings, shadowed intrinsics, and invalidating writes keep their adapters.
-Constructor-name member writes and unknown computed member writes also decline
-new intrinsic-result local facts, even through aliases. References to mutating
-member methods such as `Object.assign`, `Object.defineProperty`, `Reflect.set`,
-`__defineGetter__`/`__defineSetter__`, `setPrototypeOf`, and `deleteProperty`
-(including optional and TypeScript-wrapped calls) also conservatively decline
-these facts. Every unknown computed member reference declines new intrinsic-local
-facts, including extracted mutators and unrelated dynamic property reads.
+Local facts and inline builtin-call proofs share one mutation decision.
+Constructor-name member writes decline them on any receiver, even through
+aliases. `__defineGetter__`/`__defineSetter__` references always decline.
+Mutating member methods such as `Object.assign`, `Object.defineProperty`,
+`Reflect.set`, `setPrototypeOf`, and `deleteProperty`, and unknown computed
+member references, decline them when their receiver is a global object, or when
+an `Object`/`Reflect` method is extracted, optional, or TypeScript-wrapped
+instead of called directly. Once a global object, `Object`, or `Reflect` value
+escapes into a binding, argument, return, element, or property, every such
+reference declines regardless of receiver. Computed reads and application
+setters on other receivers keep the facts.
 JavaScript operator and template guarantees remain eligible; preexisting child
 proofs remain intact.
 
