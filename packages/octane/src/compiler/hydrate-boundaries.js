@@ -27,6 +27,14 @@ export function compiledSplitHydrateTagsForAst(ast) {
 	return compiledSplitHydrateTags.get(ast);
 }
 
+// Query captures keep module-owned identities, but their generated const
+// bindings no longer look like imports or same-module declarations. Keep that
+// provenance on the prepared tree, outside parser metadata and authored props.
+const splitModuleCaptures = new WeakMap();
+export function moduleCapturesForHydrateAst(ast) {
+	return splitModuleCaptures.get(ast);
+}
+
 function isCompiledSplitHydrateBoundary(boundary) {
 	if (boundary.disabled || boundary.independent || boundary.permanentStatic) return false;
 	const opening = boundary.node.openingElement;
@@ -2297,6 +2305,7 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null, 
 			? createPermanentStaticRemovalPlanAst(analysis, request, moduleMovePlan)
 			: [];
 	let ast;
+	let queriedBoundary;
 	if (boundaryPath === null) {
 		ast = transformHydrateAst(analysis.ast, analysis, request, moduleMovePlan.bindingsByPath, [
 			...moduleMovePlan.movedRecords,
@@ -2313,6 +2322,7 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null, 
 				`boundary ${JSON.stringify(boundaryPath)} does not exist`,
 			);
 		}
+		queriedBoundary = boundary;
 		ast = extractedModuleAst(
 			source,
 			analysis,
@@ -2322,6 +2332,32 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null, 
 			moduleMovePlan.declarationsByPath,
 			captureBindings,
 		);
+	}
+	if (captureBindings.size > 0) {
+		const moduleFunctions = new Map();
+		for (const statement of analysis.ast.body) {
+			const declaration =
+				statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+					? statement.declaration
+					: statement;
+			if (declaration?.type === 'FunctionDeclaration' && declaration.id?.type === 'Identifier')
+				moduleFunctions.set(declaration.id.name, declaration.id);
+		}
+		const candidates = [...captureBindings].filter(([name]) => moduleFunctions.has(name));
+		if (candidates.length > 0) {
+			const lexical = createLexicalAnalysis(analysis.ast);
+			const bindings = new Map(
+				candidates
+					.filter(
+						([name]) =>
+							lexical.resolveBinding(lexical.nodeScopes.get(queriedBoundary.node), name)?.scope ===
+							lexical.rootScope,
+					)
+					.map(([name, binding]) => [name, { binding, moduleBinding: moduleFunctions.get(name) }]),
+			);
+			if (bindings.size > 0)
+				splitModuleCaptures.set(ast, { moduleBody: analysis.ast.body, bindings });
+		}
 	}
 	const templateTags = new Set(
 		analysis.boundaries

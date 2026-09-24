@@ -10547,7 +10547,12 @@ export function renderBlock(block: Block): void {
 		}
 	}
 	const hydration = activeHydration();
-	if (hydration !== null && !hydration.owns(block)) {
+	// A replacement range owns client DOM even while its parent continues
+	// adopting server siblings. Its fresh close marker is an insertion anchor.
+	if (
+		hydration !== null &&
+		(!hydration.owns(block) || (block.endMarker !== null && hydration.isFresh(block.endMarker)))
+	) {
 		hydration.suspend(() => renderBlock(block));
 		return;
 	}
@@ -11425,8 +11430,15 @@ export function componentSlotLite<P>(
 		hydration !== null &&
 		((anchor != null && hydration.isFresh(anchor)) || hydration.isFresh(host))
 	) {
-		hydration.suspend(() =>
-			componentSlotLite(parentScope, slotKey, host, comp, props, anchor, invocationSite),
+		suspendFreshLiteComponent(
+			hydration,
+			parentScope,
+			slotKey,
+			host,
+			comp,
+			props,
+			anchor,
+			invocationSite,
 		);
 		return;
 	}
@@ -11529,6 +11541,22 @@ export function componentSlotLite<P>(
 	// its commitBag insert MOVES the previous sibling's root to the shared
 	// anchor. Mirrors componentSlot's post-render advance.
 	if (hydration !== null && adoptedClose !== null) hydration.node = getNextSibling(adoptedClose);
+}
+
+// Keep the fresh-subtree callback's extra captures out of ordinary lite dispatch.
+function suspendFreshLiteComponent<P>(
+	hydration: HydrationCapability,
+	parentScope: Scope,
+	slotKey: number,
+	host: Node,
+	comp: ComponentBody<P>,
+	props: P,
+	anchor?: Node,
+	invocationSite?: string,
+): void {
+	hydration.suspend(() =>
+		componentSlotLite(parentScope, slotKey, host, comp, props, anchor, invocationSite),
+	);
 }
 
 // ── Teardown error routing (React's captureCommitPhaseError for deletions) ──

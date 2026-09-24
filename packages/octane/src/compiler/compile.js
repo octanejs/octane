@@ -85,6 +85,7 @@ import {
 } from './compile-renderer-boundaries.js';
 import {
 	compiledSplitHydrateTagsForAst,
+	moduleCapturesForHydrateAst,
 	privateCompiledContextsForHydrateAst,
 	hydrateBoundaryPathFromId,
 	prepareHydrateBoundaries,
@@ -10161,6 +10162,16 @@ function compileInternal(
 	const splitPrivateContexts = localVoidRootsEnabled
 		? privateCompiledContextsForHydrateAst(parsedAst)
 		: null;
+	const splitModuleCaptures = moduleCapturesForHydrateAst(parsedAst);
+	let splitModuleFunctions;
+	if (splitModuleCaptures !== undefined) {
+		const functions = collectImmutableModuleFunctions(splitModuleCaptures.moduleBody);
+		splitModuleFunctions = new Map(
+			[...splitModuleCaptures.bindings]
+				.filter(([name, capture]) => functions.get(name)?.id === capture.moduleBinding)
+				.map(([name, capture]) => [name, capture.binding]),
+		);
+	}
 	if (rootFactories.size > 0) {
 		for (const statement of ast.body) {
 			const node =
@@ -10303,6 +10314,7 @@ function compileInternal(
 		compiledHydrateTemplates: localVoidRootsEnabled,
 		compiledSplitHydrateTags: compiledSplitHydrateTagsForAst(parsedAst),
 		privateSplitContextProviders: splitPrivateContexts?.providers,
+		splitModuleFunctions,
 		autoMemo: autoMemoEnabled,
 		strongMemo: strongMemoEnabled,
 		nativeReads: options?.nativeReads === true,
@@ -31202,6 +31214,19 @@ function isPrivateSplitContextProvider(node, ctx) {
 	);
 }
 
+function isImmutableSplitComponentTag(tag, ctx) {
+	if (tag?.type !== 'JSXIdentifier' && tag?.type !== 'Identifier') return false;
+	const binding = ctx.splitModuleFunctions?.get(tag.name);
+	if (binding === undefined) return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	if (!lexical.bindingNodes.has(binding)) return false;
+	const owner = lexical.resolveBinding(lexical.nodeScopes.get(binding), binding.name);
+	return (
+		owner !== null &&
+		lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name)?.scope === owner.scope
+	);
+}
+
 function isCompiledHydrateTemplate(node, ctx, attrs) {
 	if (!ctx.compiledHydrateTemplates || ctx._universalRuntimeUnit != null) return false;
 	const tag = node.openingElement?.name ?? node.id;
@@ -31559,13 +31584,12 @@ function makeCompCall(
 			}
 		} else if (
 			keyExpr == null &&
-			ctx.importedNames !== undefined &&
-			ctx.importedNames.has(compName)
+			(ctx.importedNames?.has(compName) ||
+				isImmutableSplitComponentTag(node.openingElement?.name ?? node.id, ctx))
 		) {
-			// IMPORTED bindings only: immutable identity for the slot's whole
-			// life. A local variable callee (`const Comp = cond ? A : B`) can
-			// change identity per render — the markerless regime must not be
-			// pinned to whichever component happened to mount first.
+			// Imports and certified module-function captures keep one identity for
+			// the slot's whole life. Other local callees can change each render,
+			// so their marker regime cannot follow the first identity's stamp.
 			maybeSingleRoot = callSiteOk;
 		}
 		const importedBinding = ctx.importedComponentBindings?.get(compName);
@@ -32500,7 +32524,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					const compName = tagName.name;
 					const local = ctx.componentInfo?.get(compName);
 					if (local?.singleRoot === true) singleRoot = true;
-					else if (ctx.importedNames?.has(compName)) singleRootExpr = compName;
+					else if (ctx.importedNames?.has(compName) || isImmutableSplitComponentTag(tagName, ctx))
+						singleRootExpr = compName;
 				}
 			}
 		}

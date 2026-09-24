@@ -192,10 +192,26 @@ export function DirectBoundary(props: Props) @{
 	</Region>
 }
 
+export function ReplacementBoundary(props: Props) @{
+	const View = props.general ? GeneralRow : LiteRow;
+	<Region value={props.label}>
+		<main>
+			<Hydrate when={props.when}>
+				@if (props.show) {
+					<View {...props} row="replacement-row" />
+				} @else {
+					<div data-server-host>{props.label as string}</div>
+				}
+			</Hydrate>
+			<input id="fragment-outside" defaultValue="server outside draft" />
+		</main>
+	</Region>
+}
+
 export function start(
 	host: HTMLElement,
 	props: Props,
-	mode: 'row' | 'root' | 'sole' | 'direct' = 'row',
+	mode: 'row' | 'root' | 'sole' | 'direct' | 'replacement' = 'row',
 	hydrate = true,
 ) {
 	const View =
@@ -205,9 +221,11 @@ export function start(
 				? SoleRootBoundary
 				: mode === 'direct'
 					? DirectBoundary
-					: props.general
-						? GeneralBoundary
-						: LiteBoundary;
+					: mode === 'replacement'
+						? ReplacementBoundary
+						: props.general
+							? GeneralBoundary
+							: LiteBoundary;
 	const recoverable: unknown[] = [];
 	const root =
 		hydrate
