@@ -236,6 +236,8 @@ import {
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
 import {
 	createNativeAdoptionState,
+	captureInitialDocumentSignals,
+	materializeNativeSignalManifest,
 	NATIVE_SIGNAL_SEED_ATTR,
 	NATIVE_SIGNAL_FRESH_COMMENT,
 	parseNativeSignalManifest,
@@ -271,6 +273,7 @@ import {
 	SIGNAL_HANDLE,
 	type SignalHandle,
 	type SignalOwner,
+	type ScopeSeed,
 	type SignalOwnerIdentity,
 	type SignalRendererOwnerIdentity,
 	type WritableSignal,
@@ -1536,7 +1539,10 @@ function ownNativeAdoption(
 	manifest: NativeSignalManifest,
 	consume?: () => void,
 ): NativeAdoptionState {
-	const adoption = createNativeAdoptionState(manifest);
+	const adoption = createNativeAdoptionState(
+		manifest,
+		scope.block.idState.renderOwner?.initialDocumentSignals,
+	);
 	registerHookCleanup(scope, () => {
 		adoption.release();
 		if (!ROOT_RENDER_ROLLBACK || scope.block.idState.renderOwner?.disposed) consume?.();
@@ -3504,6 +3510,8 @@ interface RootRenderOwner {
 	current: Block | null;
 	/** Shared document/account data owner; distinct from this root's presentation owner. */
 	signalOwner?: SignalOwner;
+	/** Immutable initial-response history, borrowed by deferred and streamed adoptions. */
+	initialDocumentSignals?: ScopeSeed;
 	bindingLeases?: Set<BindingHandoff>;
 	controlLeases?: Map<Element, ControlHandoff | undefined>;
 	preservePresentation?: boolean;
@@ -43655,6 +43663,12 @@ export interface RootOptions {
 	 */
 	signalOwner?: SignalOwner;
 	/**
+	 * Hydration only: the initial document seed also supplied to the server renderer.
+	 * Snapshotted once; referenced boundary reads adopt it without initializing or
+	 * rewinding live state. Deferred/streamed boundaries borrow the root's snapshot.
+	 */
+	initialDocumentSignals?: ScopeSeed;
+	/**
 	 * Caller-controlled useId prefix. createRoot composes it with an automatic
 	 * client-root namespace; hydrateRoot uses it verbatim to match server output.
 	 */
@@ -44566,6 +44580,7 @@ function makeRoot(
 				renderOwner.current = null;
 				renderOwner.retry = noop;
 				renderOwner.adopt = undefined;
+				renderOwner.initialDocumentSignals = undefined;
 				renderOwner.retryKey = null;
 				renderOwner.transaction = null;
 				unregisterDelegationTarget(container, true);
@@ -44763,12 +44778,26 @@ function hydrateRootWithOutputHandler(
 		new Set(controlLeases.map((lease) => lease.control)).size !== controlLeases.length
 	)
 		throw new Error(formatClientError(78));
+	const signalOwner =
+		rootOptions?.signalOwner ??
+		(signalDocumentEnabled ? documentSignalOwner(container) : undefined);
+	const initialDocumentSignals =
+		rootOptions?.initialDocumentSignals === undefined
+			? undefined
+			: captureInitialDocumentSignals(
+					rootOptions.initialDocumentSignals,
+					((signalOwner as SignalRendererOwnerIdentity | undefined)?.documentOwner ?? signalOwner)
+						?.scopeKey ?? 'octane:document',
+				);
 	const nativeSidecar = findHydrateSeedSidecar(container, NATIVE_SIGNAL_SEED_ATTR);
 	const nativeManifest =
 		nativeSidecar === null
 			? undefined
-			: parseNativeSignalManifest(
-					(STAGED_DOM?.view(nativeSidecar) ?? nativeSidecar).textContent || '',
+			: materializeNativeSignalManifest(
+					parseNativeSignalManifest(
+						(STAGED_DOM?.view(nativeSidecar) ?? nativeSidecar).textContent || '',
+					),
+					initialDocumentSignals,
 				);
 	(STAGED_DOM?.view(nativeSidecar) ?? nativeSidecar)?.remove();
 	const ownerToken = claimRootContainer(container);
@@ -44834,11 +44863,18 @@ function hydrateRootWithOutputHandler(
 		idState,
 		outputHandler,
 		ownerToken,
-		rootOptions?.signalOwner ??
-			(signalDocumentEnabled ? documentSignalOwner(container) : undefined),
-		rootOptions,
+		signalOwner,
+		// Retained public render handles need callbacks, not a second seed alias.
+		initialDocumentSignals === undefined
+			? rootOptions
+			: {
+					onCaughtError: rootOptions?.onCaughtError,
+					onUncaughtError: rootOptions?.onUncaughtError,
+					onRecoverableError: rootOptions?.onRecoverableError,
+				},
 	);
 	const owner = idState.renderOwner!;
+	if (initialDocumentSignals !== undefined) owner.initialDocumentSignals = initialDocumentSignals;
 	if (controlLeases !== undefined) {
 		owner.controlLeases = new Map(controlLeases.map((lease) => [lease.control, lease]));
 		for (const lease of controlLeases) lease.owner = owner;
@@ -45003,7 +45039,7 @@ export function createIndependentHydrateActivator(
 	body: ComponentBody,
 ): IndependentHydrateActivator {
 	return (context: IndependentHydrateActivationContext) => {
-		const { captures, element, manifest, signalOwner } = context;
+		const { captures, element, manifest, signalOwner, initialDocumentSignals } = context;
 		let intents: readonly HydrationReplayIntent[] | null =
 			context.intents.length === 0 ? null : context.intents;
 		const notify =
@@ -45073,6 +45109,7 @@ export function createIndependentHydrateActivator(
 			identifierSeed: manifest.idSeed,
 			signalInstancePrefix: manifest.boundaryId,
 			...(signalOwner === undefined ? {} : { signalOwner }),
+			...(initialDocumentSignals === undefined ? {} : { initialDocumentSignals }),
 		});
 		if (notify !== null) {
 			const unmount = root.unmount;

@@ -7,6 +7,7 @@ export const signalsNodeTests = [
 	'packages/octane/tests/signals-streams.test.ts',
 	'packages/octane/tests/signals-model.test.ts',
 	'packages/octane/tests/signals-serialization.test.ts',
+	'packages/octane/tests/signals-native-seeds.test.ts',
 	'packages/octane/tests/signals-inspection.test.ts',
 ];
 export const signalsProfileTests = [
@@ -17,6 +18,7 @@ export const signalsRuntimeTests = [
 	'packages/octane/tests/signals-*.test.ts',
 	'packages/octane/tests/signals-*.test.tsrx',
 	'packages/octane/tests/hydration/signals-*.test.ts',
+	'packages/octane/tests/hydration/initial-document-signals.test.ts',
 ];
 export const signalsBrowserTests = ['packages/octane/tests/browser/signals*/**/*.test.ts'];
 

@@ -10,7 +10,7 @@ import {
 	parseNativeSignalManifest,
 	type NativeSignalManifest,
 } from '../signals/native-read-seeds.js';
-export type { NativeSignalManifest } from '../signals/native-read-seeds.js';
+export type { NativeSignalManifest, NativeSignalReference } from '../signals/native-read-seeds.js';
 import type {
 	SignalOwner,
 	SignalOwnerIdentity,
@@ -58,7 +58,7 @@ export interface StreamedSignalHydrationOptions extends StreamedRendererDelivery
 	/** Custom authority; pass it to hydrateRoot or use runWithSignalOwner in behavior callbacks. */
 	readonly signalOwner?: SignalOwnerIdentity;
 	/**
-	 * Initial-response data only. Install once, before live signal access or stream
+	 * Full version 1 initial-response data only. Install once, before live access or stream
 	 * attachment. Only the document scope is initialized; instance snapshots stay
 	 * historical. A failed join retires newly initialized authority rather than
 	 * rolling state back. The caller supplies the matching build/document identity.
@@ -196,6 +196,8 @@ function bootstrapStreamedSignals<Receiver extends StreamedResultReceiver>(
 		});
 		if (options.initialSignals !== undefined) {
 			const manifest = parseNativeSignalManifest(JSON.stringify(options.initialSignals));
+			if (manifest.version !== 1)
+				throw new TypeError('Document initialization requires full initial signal scopes.');
 			initializeDocumentSignalOwner(
 				signalOwner,
 				manifest.scopes.find((scope) => scope.scopeKey === signalOwner.scopeKey) ?? {

@@ -30,6 +30,7 @@ test('engine fixtures run only under Node, without a DOM/compiler plugin', () =>
 		'streams',
 		'model',
 		'serialization',
+		'native-seeds',
 		'inspection',
 	]) {
 		assert.deepEqual(selected(`packages/octane/tests/signals-${feature}.test.ts`), [
@@ -48,6 +49,7 @@ test('mounting and hydration fixtures exercise development, production, and Stro
 		'packages/octane/tests/signals-native-collection.test.ts',
 		'packages/octane/tests/signals-ownership.test.tsrx',
 		'packages/octane/tests/hydration/signals-hydrate.test.ts',
+		'packages/octane/tests/hydration/initial-document-signals.test.ts',
 	]) {
 		assert.deepEqual(selected(file), [
 			'octane-signals',
