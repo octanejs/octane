@@ -28,13 +28,16 @@ export type EarlyHydrationIntent = readonly [
 	string | null,
 	Element?,
 	string?,
+	boolean?,
+	number?,
 ];
 
 /** @internal Captured control state and activation require the same DOM authority. */
 export function isEarlyHydrationIntentCurrent(
-	[event, target, boundary, id, when, events]: EarlyHydrationIntent,
+	[event, target, boundary, id, when, events, , , formSubmission]: EarlyHydrationIntent,
 	ownerDocument: Document,
 ): boolean {
+	if (formSubmission) return false;
 	return (
 		event.target === target &&
 		target.isConnected &&

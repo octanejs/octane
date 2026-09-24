@@ -1,16 +1,19 @@
 import {
 	attachBehaviorRoot,
+	captureFormSubmissions,
 	type BehaviorCleanup,
 	type BehaviorContext,
 	type BehaviorEntry,
 	type BehaviorRegistration,
 	type BehaviorRoot,
+	type CapturedFormSubmission,
 	type ExternalRange,
 } from 'octane';
 import {
 	adoptBindings,
 	mountBindings,
 	attachBehaviorRoot as attachFocusedBehaviorRoot,
+	captureFormSubmissions as captureFocusedFormSubmissions,
 	type BindingHandle,
 	type BindingOptions,
 	type BindingSource,
@@ -22,8 +25,14 @@ const container = document.createElement('main');
 const owner = Symbol('external stream');
 const lifetime = new AbortController();
 
-const root: BehaviorRoot = attachBehaviorRoot(container, { signal: lifetime.signal });
-const focusedRoot: BehaviorRoot = attachFocusedBehaviorRoot(container, { replace: true });
+const root: BehaviorRoot = attachBehaviorRoot(container, {
+	signal: lifetime.signal,
+	formSubmissions: captureFormSubmissions(),
+});
+const focusedRoot: BehaviorRoot = attachFocusedBehaviorRoot(container, {
+	replace: true,
+	formSubmissions: captureFocusedFormSubmissions(),
+});
 const range: ExternalRange = focusedRoot.registerExternalRange(container, {
 	owner,
 	ready: Promise.resolve(),
@@ -57,12 +66,41 @@ const rangeReady: Promise<void> = range.ready;
 const behaviorReady: Promise<void> = registration.ready;
 const rootReady: Promise<void> = focusedRoot.ready;
 
+focusedRoot.registerBehavior({
+	id: 'save',
+	target: 'form[data-octane-capture-submit="save"]',
+	events: ['submit'],
+	captureEvent(event, element, submission) {
+		const accepted: CapturedFormSubmission | undefined = submission;
+		const fields: readonly (readonly [string, string | File])[] | undefined = accepted?.fields;
+		const native: Event = event;
+		const target: Element = element;
+		native.preventDefault();
+		target.matches('form');
+		if (accepted) {
+			// @ts-expect-error Accepted fields are immutable.
+			accepted.fields.push(['draft', 'edited']);
+			// @ts-expect-error Accepted metadata is immutable.
+			accepted.form.action = '/edited';
+		}
+		return { text: String(fields?.find(([name]) => name === 'draft')?.[1] ?? '') };
+	},
+	adopt() {},
+	handleEvent(_event, _element, _context, payload) {
+		const text: string = payload.text;
+		text.toUpperCase();
+	},
+});
+
 registration.dispose();
 range.dispose();
 root.dispose({ preserveDOM: true });
 
 // @ts-expect-error — a behavior root adopts an element, not an arbitrary node.
 attachBehaviorRoot(document.createTextNode('not a container'));
+
+// @ts-expect-error — importing the capture factory makes this root opt in explicitly.
+attachBehaviorRoot(container, { formSubmissions: true });
 
 // @ts-expect-error — every externally owned range declares its owner.
 focusedRoot.registerExternalRange(container, {});

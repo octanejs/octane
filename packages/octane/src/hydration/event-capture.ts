@@ -9,6 +9,11 @@ import {
 import { HYDRATE_INDEPENDENT_ATTR } from '../hydration-markers.js';
 import { hasBindingHandoffEvent } from '../dom-binding-handoff.js';
 import {
+	getNativeHydrationCapture,
+	getNativeHydrationDocument,
+	getNativeHydrationDOM,
+} from './native-intent.js';
+import {
 	initializeHydrationControlCapture,
 	isEarlyHydrationIntentCurrent,
 	type EarlyHydrationIntent,
@@ -50,6 +55,7 @@ export function shouldPreventHydrationInteractionDefault(event: Event): boolean 
 interface EarlyHydrationIntentMailbox {
 	version: 1;
 	q: EarlyHydrationIntent[];
+	capture?: (intent: EarlyHydrationIntent) => void;
 	stop?: () => void;
 	claimed?: boolean;
 	overflow?: boolean;
@@ -58,6 +64,8 @@ interface EarlyHydrationIntentMailbox {
 export interface HydrationReplayIntent {
 	event: Event;
 	path: number[];
+	/** @internal Optional native custody must remain valid until activation consumes it. */
+	current?: () => boolean;
 	/** An explicitly leased native listener receives the original event, never a replay. */
 	earlyBinding?: true;
 	/** Captured author opt-in; never inferred again from a later DOM version. */
@@ -74,7 +82,9 @@ interface HydrationSelectionIntent {
 let independentIntentSequences: WeakMap<Document, number> | undefined;
 
 function advanceIndependentIntentSequence(ownerDocument: Document): number {
-	const sequence = (independentIntentSequences?.get(ownerDocument) ?? 0) + 1;
+	const sequence =
+		getNativeHydrationCapture(ownerDocument)?.next?.() ??
+		(independentIntentSequences?.get(ownerDocument) ?? 0) + 1;
 	(independentIntentSequences ??= new WeakMap()).set(ownerDocument, sequence);
 	return sequence;
 }
@@ -222,6 +232,10 @@ function handleEarlyHydrationIntent(
 ): void {
 	const target = event.target;
 	if (!isHydrationElement(target)) return;
+	if (getNativeHydrationCapture(target.ownerDocument)?.skip(event)) {
+		HYDRATE_HANDLED_INTENT_EVENTS.add(event);
+		return;
+	}
 	if (
 		(event.type === 'pointerenter' || event.type === 'mouseenter') &&
 		independentHydrationDocuments?.has(target.ownerDocument)
@@ -315,7 +329,8 @@ function handleEarlyHydrationIntent(
 		// The native listener must finish before activation can retire its lease.
 		// Boundary-local capture observes the handled mark and also leaves it alone.
 		const activate = () => {
-			if (candidateBoundary !== undefined) candidateBoundary(event.type, intent);
+			const boundary = HYDRATE_BOUNDARIES.get(candidate!);
+			if (boundary !== undefined) boundary(event.type, intent);
 			else {
 				const pending = HYDRATE_PENDING_INTENTS.get(candidate!) ?? [];
 				appendHydrationReplayIntent(pending, intent);
@@ -341,6 +356,54 @@ function handleEarlyHydrationIntent(
 	}
 }
 
+/** @internal Optional native ingress supplies its own captured authority. */
+export function captureNativeHydrationIntent(
+	marker: Element,
+	event: Event,
+	isCurrent: () => boolean,
+): void {
+	if (!isCurrent()) return;
+	const ownerDocument = getNativeHydrationDocument(marker);
+	if (ownerDocument === null) return;
+	const dom = getNativeHydrationDOM(ownerDocument);
+	const streamToken = dom.attribute(marker, HYDRATE_STREAM_TOKEN_ATTR);
+	const path: number[] = [];
+	let node = dom.target(event);
+	if (node === null) return;
+	while (node !== marker) {
+		const parent = dom.parent(node);
+		if (parent === null) return;
+		let index = 0;
+		let found = false;
+		for (const child of dom.children(parent)) {
+			if (child === node) {
+				found = true;
+				break;
+			}
+			if (!isRendererStreamBoundaryTemplate(child, streamToken)) index++;
+		}
+		if (!found) return;
+		path.push(index);
+		node = parent;
+	}
+	path.reverse();
+	const intent: HydrationReplayIntent = { event, path, earlyBinding: true, current: isCurrent };
+	HYDRATE_HANDLED_INTENT_EVENTS.add(event);
+	const activate = () => {
+		if (!isCurrent()) return;
+		// Trusted native work can finish before independent registration arrives.
+		const boundary = HYDRATE_BOUNDARIES.get(marker);
+		if (boundary !== undefined) boundary(event.type, intent);
+		else {
+			const pending = HYDRATE_PENDING_INTENTS.get(marker) ?? [];
+			appendHydrationReplayIntent(pending, intent);
+			HYDRATE_PENDING_INTENTS.set(marker, pending);
+		}
+	};
+	if (event.isTrusted) setTimeout(activate, 0);
+	else queueMicrotask(activate);
+}
+
 /**
  * Install document-level capture for deferred-hydration interaction intent.
  * Calling this function more than once for the same document is a no-op.
@@ -359,7 +422,19 @@ export function initializeHydrationEventCapture(ownerDocument?: Document): void 
 	mailbox?.stop?.();
 	initializeHydrationControlCapture(targetDocument);
 	const queued = mailbox?.q.splice(0);
-	host[EARLY_HYDRATION_INTENTS_KEY] = { version: 1, q: [], claimed: true };
+	const claimed = {
+		version: 1 as const,
+		q: [] as EarlyHydrationIntent[],
+		claimed: true,
+		capture(intent: EarlyHydrationIntent) {
+			// Native ingress reserves its ordinal before payload capture. Routing or
+			// parking this packet preserves its original sequence position.
+			const capture = getNativeHydrationCapture(targetDocument)?.push;
+			if (capture !== undefined) capture(intent);
+			else claimed.q.push(intent);
+		},
+	};
+	host[EARLY_HYDRATION_INTENTS_KEY] = claimed;
 	if (mailbox?.overflow) {
 		throw new RangeError('Early independent Hydrate intent queue overflow; reload the document.');
 	}
@@ -374,9 +449,13 @@ export function initializeHydrationEventCapture(ownerDocument?: Document): void 
 	if (queued !== undefined) {
 		for (const entry of queued) {
 			const [event, , boundary, , , , control, group] = entry;
-			// Even a stale queued command remains an adjacency barrier. The inline
-			// mailbox already coalesced its selections before distributing queues.
-			const sequence = advanceIndependentIntentSequence(targetDocument);
+			// The opted parser's ordinal survives removed command packets, including
+			// a trailing command before the first live selection.
+			if (entry[8]) {
+				claimed.capture(entry);
+				continue;
+			}
+			const sequence = entry[9] ?? advanceIndependentIntentSequence(targetDocument);
 			if (!isEarlyHydrationIntentCurrent(entry, targetDocument)) continue;
 			const selection =
 				control === undefined || group === undefined
@@ -415,7 +494,17 @@ export function unregisterHydrationIntentBoundary(
 export function takePendingHydrationIntents(marker: Element): HydrationReplayIntent[] | undefined {
 	const intents = HYDRATE_PENDING_INTENTS.get(marker);
 	HYDRATE_PENDING_INTENTS.delete(marker);
+	if (intents !== undefined) {
+		for (let index = intents.length - 1; index >= 0; index--) {
+			if (!isNativeHydrationIntentCurrent(intents[index])) intents.splice(index, 1);
+		}
+	}
 	return intents;
+}
+
+/** @internal Native authority can expire while a marker or its module arrives. */
+export function isNativeHydrationIntentCurrent(intent: HydrationReplayIntent): boolean {
+	return intent.current?.() !== false;
 }
 
 /** @internal Consume conservative nested-dynamic intent recorded before registration. */
