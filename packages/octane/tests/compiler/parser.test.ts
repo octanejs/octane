@@ -191,3 +191,36 @@ describe('TSRX destructuring syntax', () => {
 		expect(compileToVolarMappings(source, 'ordinary.tsrx').errors).toEqual([]);
 	});
 });
+
+describe('@switch arm scopes', () => {
+	// Each arm is its own block scope (tsrx-org/tsrx#148): arms may declare the
+	// same local, and each arm's `apply` resolves to its own style block.
+	const source = `export function Badge({ kind }: { kind: string }) @{
+		@switch (kind) {
+			@case 'a': {
+				const label = 'Alpha';
+				const theme = <style>.tone { color: red; }</style>;
+				<><style apply={theme} /><p>{label}</p></>
+			}
+			@case 'b': {
+				const label = 'Beta';
+				const theme = <style>.tone { color: blue; }</style>;
+				<><style apply={theme} /><p>{label}</p></>
+			}
+		}
+	}`;
+
+	it('parses same-name arm locals in native and editor parsing', () => {
+		expect(parseModule(source, 'badge.tsrx').body).not.toHaveLength(0);
+		expect(parseJavaScriptModule(source, 'badge.tsrx').body).not.toHaveLength(0);
+		expect(compileToVolarMappings(source, 'badge.tsrx').errors).toEqual([]);
+	});
+
+	it.each([
+		{ mode: 'client' as const, dev: true, hmr: true },
+		{ mode: 'client' as const, dev: false, hmr: false },
+		{ mode: 'server' as const, dev: false, hmr: false },
+	])('compiles same-name arm locals and themes with %j', (options) => {
+		expect(() => compile(source, 'badge.tsrx', options)).not.toThrow();
+	});
+});
