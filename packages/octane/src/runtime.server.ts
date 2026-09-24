@@ -169,8 +169,10 @@ import {
 	NATIVE_SIGNAL_SEED_ATTR,
 	NATIVE_SIGNAL_FRESH_COMMENT,
 	mergeNativeSeedReads,
+	captureInitialDocumentSignals,
 	type NativeSeedReads,
 	type NativeSignalManifest,
+	type NativeSignalReference,
 } from './signals/native-read-seeds.js';
 import {
 	captureSignalOwner,
@@ -191,11 +193,12 @@ import {
 	type SignalBindingIdentity,
 	type SignalHandle,
 	type SignalOwner,
+	type ScopeSeed,
 	type SignalRendererOwnerIdentity,
 } from './signals/types.js';
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
 export { validateNativeReadWitness };
-export type { NativeSignalManifest };
+export type { NativeSignalManifest, NativeSignalReference };
 
 function isSignalHandle(value: unknown): value is SignalHandle<unknown> {
 	return (
@@ -5507,7 +5510,7 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 									'</script>';
 						const nativeSeeds = permanentStaticAncestor
 							? undefined
-							: NATIVE_READ_COLLECTOR?.serialize(nativeReads);
+							: NATIVE_READ_COLLECTOR?.serialize(nativeReads, RESOLVED?.initialDocumentSignals);
 						const nativeSidecar =
 							nativeSeeds === undefined ? '' : serializeNativeSignalSeeds(nativeSeeds, NONCE_ATTR);
 						const independentSidecar = permanentStaticAncestor
@@ -7963,6 +7966,12 @@ export interface RenderOptions {
 	earlySignalBootstrap?: 'external';
 	/** Shared request/account data owner borrowed across sibling SSR regions. */
 	signalOwner?: SignalOwner;
+	/**
+	 * Immutable initial document seed emitted once by the host. Matching historical
+	 * reads reference it; differing root, deferred and streamed reads keep their own
+	 * entries. Pass this same initial seed to hydrateRoot, not a later live snapshot.
+	 */
+	initialDocumentSignals?: ScopeSeed;
 	/** Automatically publish query attempts into the pre-module streamed receiver. */
 	streamedSignals?: {
 		readonly buildId: string;
@@ -8191,6 +8200,7 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 	resources?: ServerRenderResources;
 	/** One request/account owner shared by every pass and streamed region. */
 	signalOwner?: SignalOwner;
+	initialDocumentSignals?: ScopeSeed;
 	ownedSignalOwner?: boolean;
 	signalInstances?: Map<string, SignalRendererOwnerIdentity>;
 	signalIdentityKeys?: Map<string, ServerOpaqueSignalKeys>;
@@ -8245,7 +8255,11 @@ function isRendererSignalOwner(owner: SignalOwner): owner is SignalRendererOwner
 function newResolvedMap(resourceOptions?: RenderOptions | null): ResolvedMap {
 	const m = new Map() as ResolvedMap;
 	if (resourceOptions !== undefined) m.resourceOptions = resourceOptions;
-	if (SERVER_SIGNAL_BINDINGS_ENABLED || resourceOptions?.signalOwner !== undefined) {
+	if (
+		SERVER_SIGNAL_BINDINGS_ENABLED ||
+		resourceOptions?.signalOwner !== undefined ||
+		resourceOptions?.initialDocumentSignals !== undefined
+	) {
 		const ambient = currentSignalOwner();
 		const configured = resourceOptions?.signalOwner ?? ambient;
 		m.signalOwner =
@@ -8257,6 +8271,11 @@ function newResolvedMap(resourceOptions?: RenderOptions | null): ResolvedMap {
 		m.ownedSignalOwner = configured === undefined || configured === null;
 		m.signalInstances = new Map();
 	}
+	if (resourceOptions?.initialDocumentSignals !== undefined)
+		m.initialDocumentSignals = captureInitialDocumentSignals(
+			resourceOptions.initialDocumentSignals,
+			m.signalOwner!.scopeKey,
+		);
 	m.asyncIdentities = new Map();
 	m.asyncPositionIdentities = new Map();
 	m.nextAsyncIdentity = 0;
@@ -8327,6 +8346,7 @@ function releaseServerRenderResources(resolved: ResolvedMap): void {
 	// Native thenable settlement callbacks can retain this cache after an abort.
 	// They must not also keep a completed request's options or foreign resources.
 	resolved.resourceOptions = undefined;
+	resolved.initialDocumentSignals = undefined;
 	if (resolved.signalInstances !== undefined) {
 		for (const owner of resolved.signalInstances.values()) retireSignalOwnerIdentity(owner);
 		resolved.signalInstances.clear();
@@ -8625,7 +8645,10 @@ function runFullFramedPass(
 		try {
 			if (nativeToken >= 0) NATIVE_READ_COLLECTOR!.endScope(nativeToken, nativePassCompleted);
 			if (markers && nativePassCompleted)
-				signals = NATIVE_READ_COLLECTOR?.serialize(NATIVE_SERVER_READS);
+				signals = NATIVE_READ_COLLECTOR?.serialize(
+					NATIVE_SERVER_READS,
+					RESOLVED?.initialDocumentSignals,
+				);
 		} finally {
 			try {
 				restoreAmbient(saved);
@@ -10139,7 +10162,10 @@ export function ssrTry(
 				// keeps seeing the pending form so the shell shape stays stable.
 				if (entry.state === 'pending') {
 					if (!entry.serverOwnedStatic)
-						entry.signals = NATIVE_READ_COLLECTOR?.serialize(nativeReads);
+						entry.signals = NATIVE_READ_COLLECTOR?.serialize(
+							nativeReads,
+							RESOLVED?.initialDocumentSignals,
+						);
 					entry.state = 'done';
 					entry.rawHtml = VT_SSR_HAS_RAW_HTML;
 					entry.html =
@@ -10171,7 +10197,10 @@ export function ssrTry(
 				// A client-owned promise can suspend even though the server resolved it.
 				const idCount = ID_COUNTER - outerIdCounter;
 				const seeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
-				const native = NATIVE_READ_COLLECTOR?.serialize(nativeReads);
+				const native = NATIVE_READ_COLLECTOR?.serialize(
+					nativeReads,
+					RESOLVED?.initialDocumentSignals,
+				);
 				return ssrBlock(
 					`<!--${SUSPENSE_RESOLVED_COMMENT}${idCount}-->` +
 						(seeds.length === 0
@@ -10244,7 +10273,10 @@ export function ssrTry(
 				if (entry !== undefined) {
 					if (entry.state !== 'done') {
 						if (!entry.serverOwnedStatic && !nativeFresh)
-							entry.signals = NATIVE_READ_COLLECTOR?.serialize(catchReads);
+							entry.signals = NATIVE_READ_COLLECTOR?.serialize(
+								catchReads,
+								RESOLVED?.initialDocumentSignals,
+							);
 						if (SERIAL !== null) {
 							if (!entry.serverOwnedStatic) {
 								caughtSeeds.push(...SERIAL.slice(serialStart));
@@ -11863,8 +11895,24 @@ export function renderToPipeableStream(
 	let started = false;
 	const beginRender = (preparedOptions: StreamOptions | undefined): void => {
 		const renderOptions = { ...preparedOptions, signal: controller.signal };
-		const resolved = newResolvedMap(renderOptions);
 		const cancelInjection = createInjectionCanceler(renderOptions.injection);
+		let resolved: ResolvedMap;
+		try {
+			resolved = newResolvedMap(renderOptions);
+		} catch (err) {
+			cancelInjection(err);
+			shellFailure = { error: err };
+			try {
+				options?.onError?.(err);
+			} finally {
+				try {
+					options?.onShellError?.(err);
+				} finally {
+					flushEnd();
+				}
+			}
+			return;
+		}
 		void runStream(
 			component,
 			props,
@@ -12122,12 +12170,12 @@ export function renderToReadableStream(
 				}
 			};
 		}
-		const resolved = newResolvedMap(renderOptions);
 		const cancelInjection = createInjectionCanceler(renderOptions.injection);
+		let resolved: ResolvedMap | undefined;
 		const release = (): void => {
 			if (released) return;
 			released = true;
-			releaseServerRenderResources(resolved);
+			if (resolved !== undefined) releaseServerRenderResources(resolved);
 		};
 		const settleFailure = (error: unknown): void => {
 			if (terminal) return;
@@ -12143,6 +12191,19 @@ export function renderToReadableStream(
 			allReadyReject(reason);
 			closeReadable();
 		};
+		try {
+			resolved = newResolvedMap(renderOptions);
+		} catch (err) {
+			renderOptions.onError?.(err);
+			try {
+				options?.onShellError?.(err);
+			} catch (callbackError) {
+				settleFailure(callbackError);
+				return;
+			}
+			settleFailure(err);
+			return;
+		}
 		runStream(
 			component,
 			props,

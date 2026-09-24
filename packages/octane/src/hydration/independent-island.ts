@@ -1,5 +1,6 @@
 import { decodeSignalValue } from '../data-encoding.js';
-import type { SignalOwner } from '../signals/types.js';
+import type { ScopeSeed, SignalOwner, SignalRendererOwnerIdentity } from '../signals/types.js';
+import { captureInitialDocumentSignals } from '../signals/native-read-seeds.js';
 import {
 	HYDRATE_ID_ATTR,
 	HYDRATE_IDLE_TIMEOUT_ATTR,
@@ -36,6 +37,8 @@ export interface IndependentHydrateActivationContext {
 	readonly captures: readonly unknown[];
 	readonly intents: readonly HydrationReplayIntent[];
 	readonly signalOwner?: SignalOwner;
+	/** Initial document history shared with the matching server renderer. */
+	readonly initialDocumentSignals?: ScopeSeed;
 }
 
 export type IndependentHydrateActivator = (
@@ -46,6 +49,8 @@ export interface IndependentHydrateRegistration {
 	readonly load: () => Promise<Record<string, unknown>>;
 	readonly loadStyles: (styles: readonly string[]) => void | Promise<void>;
 	readonly signalOwner?: SignalOwner;
+	/** Initial document history shared with the matching server renderer. */
+	readonly initialDocumentSignals?: ScopeSeed;
 	readonly onError?: (error: unknown) => void;
 }
 
@@ -55,6 +60,8 @@ export interface IndependentHydrateBootstrapOptions {
 	readonly loadModule: (moduleId: string) => Promise<Record<string, unknown>>;
 	readonly loadStyles: (styles: readonly string[]) => void | Promise<void>;
 	readonly signalOwner?: SignalOwner;
+	/** Initial document history shared with the matching server renderer. */
+	readonly initialDocumentSignals?: ScopeSeed;
 	readonly onError?: (error: unknown) => void;
 }
 
@@ -103,6 +110,15 @@ export function registerIndependentHydrationIsland(
 	if (element.getAttribute(HYDRATE_ID_ATTR) !== manifest.boundaryId) {
 		throw new Error('Independent Hydrate boundary identity mismatch.');
 	}
+	const { load, loadStyles, signalOwner, onError } = registration;
+	let initialDocumentSignals =
+		registration.initialDocumentSignals === undefined
+			? undefined
+			: captureInitialDocumentSignals(
+					registration.initialDocumentSignals,
+					((signalOwner as SignalRendererOwnerIdentity | undefined)?.documentOwner ?? signalOwner)
+						?.scopeKey ?? 'octane:document',
+				);
 	element.setAttribute(HYDRATE_INDEPENDENT_ATTR, '');
 	initializeIndependentHydrationEventCapture(element.ownerDocument);
 	let generation = 0;
@@ -145,10 +161,10 @@ export function registerIndependentHydrationIsland(
 		const attempt = ++generation;
 		void Promise.resolve()
 			.then(() => {
-				if (!disposed && generation === attempt) return registration.loadStyles(manifest.styles);
+				if (!disposed && generation === attempt) return loadStyles(manifest.styles);
 			})
 			.then(() => {
-				if (!disposed && generation === attempt) return registration.load();
+				if (!disposed && generation === attempt) return load();
 			})
 			.then((module) => {
 				if (disposed || generation !== attempt || module === undefined) return;
@@ -166,9 +182,8 @@ export function registerIndependentHydrationIsland(
 					manifest,
 					captures: manifest.captures.map((value) => decodeSignalValue(value)),
 					intents: replays,
-					...(registration.signalOwner === undefined
-						? {}
-						: { signalOwner: registration.signalOwner }),
+					...(signalOwner === undefined ? {} : { signalOwner }),
+					...(initialDocumentSignals === undefined ? {} : { initialDocumentSignals }),
 				});
 			})
 			.then((value) => {
@@ -184,7 +199,7 @@ export function registerIndependentHydrationIsland(
 				if (disposed || generation !== attempt) return;
 				active = false;
 				replayReady = false;
-				registration.onError?.(error);
+				onError?.(error);
 			});
 	};
 	const boundary: HydrationIntentBoundary = (eventType, intent) => {
@@ -206,9 +221,12 @@ export function registerIndependentHydrationIsland(
 			if (disposed) return;
 			disposed = true;
 			generation++;
+			initialDocumentSignals = undefined;
 			unarm();
 			unregisterHydrationIntentBoundary(element, boundary);
-			root?.unmount();
+			const activatedRoot = root;
+			root = undefined;
+			activatedRoot?.unmount();
 		},
 		{
 			pause() {
@@ -241,6 +259,15 @@ export function bootstrapIndependentHydration(
 	root: ParentNode,
 	options: IndependentHydrateBootstrapOptions,
 ): IndependentHydrateLifecycle {
+	const { buildId, loadModule, loadStyles, signalOwner, onError } = options;
+	let initialDocumentSignals =
+		options.initialDocumentSignals === undefined
+			? undefined
+			: captureInitialDocumentSignals(
+					options.initialDocumentSignals,
+					((signalOwner as SignalRendererOwnerIdentity | undefined)?.documentOwner ?? signalOwner)
+						?.scopeKey ?? 'octane:document',
+				);
 	const cleanups = new Map<Element, IndependentHydrateLifecycle>();
 	const selector = `script[type="application/json"][${INDEPENDENT_HYDRATE_MANIFEST_ATTR}]`;
 	const ownerDocument = root.nodeType === 9 ? (root as Document) : root.ownerDocument!;
@@ -268,7 +295,7 @@ export function bootstrapIndependentHydration(
 			if (!isIndependentHydrateManifest(manifest)) {
 				throw new TypeError('Invalid independent Hydrate sidecar.');
 			}
-			if (options.buildId !== undefined && manifest.buildId !== options.buildId) {
+			if (buildId !== undefined && manifest.buildId !== buildId) {
 				throw new Error('Independent Hydrate build identity mismatch.');
 			}
 			const element = sidecar.parentElement;
@@ -278,15 +305,16 @@ export function bootstrapIndependentHydration(
 			cleanups.set(
 				element,
 				registerIndependentHydrationIsland(element, manifest, {
-					load: () => options.loadModule(manifest.moduleId),
-					loadStyles: options.loadStyles,
-					...(options.signalOwner === undefined ? {} : { signalOwner: options.signalOwner }),
-					...(options.onError === undefined ? {} : { onError: options.onError }),
+					load: () => loadModule(manifest.moduleId),
+					loadStyles,
+					...(signalOwner === undefined ? {} : { signalOwner }),
+					...(initialDocumentSignals === undefined ? {} : { initialDocumentSignals }),
+					...(onError === undefined ? {} : { onError }),
 				}),
 			);
 			sidecar.remove();
 		} catch (error) {
-			options.onError?.(error);
+			onError?.(error);
 		}
 	};
 	const scan = (node: Node): void => {
@@ -337,6 +365,7 @@ export function bootstrapIndependentHydration(
 		() => {
 			if (disposed) return;
 			disposed = true;
+			initialDocumentSignals = undefined;
 			observer.disconnect();
 			ownerDocument.removeEventListener('DOMContentLoaded', complete);
 			for (const cleanup of cleanups.values()) cleanup();

@@ -92,6 +92,8 @@ export {
 	renderToPipeableStream,
 	renderToReadableStream,
 	type RenderResult,
+	type NativeSignalManifest,
+	type NativeSignalReference,
 	type RenderOptions,
 	type ServerRenderNode,
 	type StreamOptions,

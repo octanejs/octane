@@ -1,4 +1,6 @@
 import type { RenderResult } from '../runtime.server.js';
+import type { ScopeSeed } from '../signals/types.js';
+import { materializeNativeSignalManifest } from '../signals/native-read-seeds.js';
 import {
 	isStreamedRendererFrame,
 	type StreamFrameIdentity,
@@ -6,6 +8,8 @@ import {
 } from '../streamed-signals-protocol.js';
 
 export interface StreamedRegionPlacementOptions {
+	/** Resolve compact renderer history into the standalone placement frame. */
+	readonly initialDocumentSignals?: ScopeSeed;
 	readonly sequence: number;
 	readonly contentRevision: number;
 	/** Completed-build stylesheet URLs; the receiver waits for them before reveal. */
@@ -23,7 +27,10 @@ export function createStreamedRegionPlacementFrame(
 	rendered: RenderResult,
 	options: StreamedRegionPlacementOptions,
 ): StreamedRegionPlacementFrame {
-	const scopes = rendered.signals?.scopes;
+	const scopes =
+		rendered.signals === undefined
+			? undefined
+			: materializeNativeSignalManifest(rendered.signals, options.initialDocumentSignals).scopes;
 	if (scopes?.length !== 1 || scopes[0].scopeKey !== identity.ownerKey) {
 		throw new TypeError('A streamed region requires the exact historical signal owner.');
 	}

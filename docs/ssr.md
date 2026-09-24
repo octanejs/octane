@@ -383,6 +383,11 @@ concurrently rather than awaiting `allReady` before reading. Same
   queue/placement waits retain their own timeout. Byte limits and the pre-module
   mailbox's 256 selections / 512 result frames still apply: long streams need an
   installed, consuming receiver. See [custom SSR hosts](#connect-signals-in-a-custom-ssr-host).
+- `initialDocumentSignals?: ScopeSeed` — share a host-emitted immutable initial
+  document seed with matching root, deferred and streamed historical reads. Pass
+  the same original seed to `hydrateRoot` (and independent-boundary bootstrap).
+  Distinct entries remain in each boundary's manifest; this option never
+  initializes live client state. See [initial document history](./signals.md#share-the-initial-document-history).
 - `signalOwner?: SignalOwner` — share a request-local signal owner across sibling
   SSR regions. A supplied owner is borrowed: the host retires it when its work
   ends. Do not share mutable owners across requests.
