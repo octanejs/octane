@@ -25415,7 +25415,12 @@ function planJsx(
 					? 'ref'
 					: b.kind === 'event' || b.kind === 'event-bundle'
 						? b.slotKeyOrigin?.name
-						: b.name;
+						: b.kind === 'style' ||
+							  b.kind === 'styleProperty' ||
+							  b.kind === 'styleProperties' ||
+							  b.kind === 'nativeStyle'
+							? 'style'
+							: b.name;
 			b.presentationUnbound =
 				typeof name === 'string' &&
 				ctx.presentationHydration.unboundAttributes.has(name.toLowerCase());
