@@ -453,11 +453,25 @@ export function App(props) @{
 			it(`keeps ${variant} component identities replaceable in a ${dev ? 'development' : 'production'} split child`, () => {
 				const source = `
 import { Hydrate } from 'octane';
-export function Row(props) @{ <section data-piece={props.label}>{props.label as string}</section> }
-export function Many(props) @{
-  <><section data-piece={props.label}>{props.label as string}</section><aside data-piece={props.label + '!'}>{(props.label + '!') as string}</aside></>
+export function Row(props) @{
+  ${variant === 'assigned' ? 'if (props.next) Row = props.next;' : ''}
+  <section data-piece={props.label}>{props.label as string}</section>
 }
-${variant === 'assigned' ? 'export function replaceRow(next) { Row = next; }' : ''}
+export function Many(props) ${variant === 'assigned' ? '{ return (' : '@{'}
+  <><section data-piece={props.label}>{props.label as string}</section><aside data-piece={props.label + '!'}>{(props.label + '!') as string}</aside></>
+${variant === 'assigned' ? '); }' : '}'}
+${
+	variant === 'assigned'
+		? `export function replaceRow(next) { Row = next; }
+export function getRow() { return Row; }
+export function Consumer(props) @{
+  <main>
+    @for (const item of props.rows; key item.id) { <Row label={item.label} /> }
+    <input id="consumer-tail" defaultValue="server draft" />
+  </main>
+}`
+		: ''
+}
 export function App(${variant === 'destructured' ? '{ rows, Row, ready }' : `props${variant === 'parameter' ? ', Row' : ''}`}) @{
   ${variant === 'local' ? 'const Row = props.component;' : ''}
   <Hydrate when={${variant === 'destructured' ? 'ready' : 'props.ready'}}>
@@ -494,7 +508,15 @@ export function App(${variant === 'destructured' ? '{ rows, Row, ready }' : `pro
 				let props = { ready: true, rows, component: module.Row };
 				const render = (Row: unknown) =>
 					root.render(query.default, [variant === 'destructured' ? props.rows : props, Row]);
+				const capturedRow = () => (variant === 'assigned' ? module.getRow() : module.Many);
 				try {
+					if (variant === 'assigned') {
+						const initialRow = module.getRow();
+						flushSync(() => root.render(initialRow, { label: 'setup', next: module.Many }));
+						expect(pieces()).toEqual(['setup']);
+						expect(module.getRow()).toBe(module.Many);
+						module.replaceRow(initialRow);
+					}
 					flushSync(() => render(module.Row));
 					const tail = host.querySelector<HTMLInputElement>('#split-tail')!;
 					tail.value = 'edited draft';
@@ -503,19 +525,51 @@ export function App(${variant === 'destructured' ? '{ rows, Row, ready }' : `pro
 					} else {
 						expect(pieces()).toEqual(['first', 'second']);
 						props = { ...props, component: module.Many };
-						flushSync(() => render(module.Many));
+						if (variant === 'assigned') module.replaceRow(module.Many);
+						flushSync(() => render(capturedRow()));
 						expect(pieces()).toEqual(['first', 'first!', 'second', 'second!']);
 					}
 					props = { ...props, rows: [rows[1]] };
-					flushSync(() => render(variant === 'loop' ? module.Row : module.Many));
+					flushSync(() => render(variant === 'loop' ? module.Row : capturedRow()));
 					expect(pieces()).toEqual(
 						variant === 'loop' ? ['second', 'second!', 'captured'] : ['second', 'second!'],
 					);
 					props = { ...props, rows: [] };
-					flushSync(() => render(variant === 'loop' ? module.Row : module.Many));
+					flushSync(() => render(variant === 'loop' ? module.Row : capturedRow()));
 					expect(pieces()).toEqual(variant === 'loop' ? ['captured'] : []);
 					expect(host.querySelector('#split-tail')).toBe(tail);
 					expect(tail.value).toBe('edited draft');
+					if (variant === 'assigned') {
+						props = { ...props, rows };
+						flushSync(() => root.render(module.Consumer, props));
+						expect(pieces()).toEqual(['first', 'first!', 'second', 'second!']);
+						const consumerTail = host.querySelector<HTMLInputElement>('#consumer-tail')!;
+						consumerTail.value = 'edited consumer draft';
+						props = { ...props, rows: [second] };
+						flushSync(() => root.render(module.Consumer, props));
+						expect(pieces()).toEqual(['second', 'second!']);
+						props = { ...props, rows: [] };
+						flushSync(() => root.render(module.Consumer, props));
+						expect(pieces()).toEqual([]);
+						expect(host.querySelector('#consumer-tail')).toBe(consumerTail);
+						expect(consumerTail.value).toBe('edited consumer draft');
+
+						const server = loadCompiledFixtureSource(source, {
+							id,
+							mode: 'server',
+							compileOptions: { dev, hmr: false },
+						});
+						const initialServerRow = server.getRow();
+						renderToString(initialServerRow, { label: 'setup', next: server.Many });
+						expect(server.getRow()).toBe(server.Many);
+						server.replaceRow(initialServerRow);
+						server.replaceRow(server.Many);
+						const serverHost = document.createElement('div');
+						serverHost.innerHTML = renderToString(server.getRow(), { label: 'reassigned' }).html;
+						expect(
+							[...serverHost.querySelectorAll('[data-piece]')].map((node) => node.textContent),
+						).toEqual(['reassigned', 'reassigned!']);
+					}
 				} finally {
 					flushSync(() => root.unmount());
 				}

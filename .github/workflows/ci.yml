@@ -862,7 +862,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check formatting
-        run: pnpm format:check
+        run: |
+          if ! pnpm format:check; then
+            pnpm format:files packages/octane/tests/hydration/_fixtures/split-hydrate-fragments.tsrx
+            git diff -- packages/octane/tests/hydration/_fixtures/split-hydrate-fragments.tsrx
+            exit 1
+          fi
 
       # Two-layer sync check for the RuleSync-generated agent files. The root
       # `prepare` script already re-ran `rulesync generate || true` during

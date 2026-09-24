@@ -5631,6 +5631,28 @@ function collectImmutableModuleFunctions(body) {
 	return declared;
 }
 
+// Keep an authored function declaration writable when its binding is written.
+// Arrow normalization must not turn an authored const into a writable binding,
+// and a same-named local write must not demote the module declaration.
+function isReassignedComponentDeclaration(node, ctx) {
+	if (ctx.moduleFunctionDeclarations?.get(node.id.name)?.id === node.id) return false;
+	let bindings = ctx.authoredComponentBindings;
+	if (bindings === undefined) {
+		bindings = ctx.authoredComponentBindings = new WeakSet();
+		for (const statement of ctx.authoredModuleAst.body) {
+			const declaration =
+				statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+					? statement.declaration
+					: statement;
+			if (declaration?.type === 'FunctionDeclaration' && declaration.id)
+				bindings.add(declaration.id);
+		}
+	}
+	if (!bindings.has(node.id)) return false;
+	const writes = (ctx.authoredComponentWrites ??= collectReassignedBindings(ctx.authoredModuleAst));
+	return writes.has(node.id);
+}
+
 /**
  * Top-level module bindings, split by whether their identity can change after
  * evaluation. `mutable` holds `let`/`var` declarations, class declarations, and
@@ -10303,6 +10325,7 @@ function compileInternal(
 	const universalUnits =
 		options?.__universalUnits ?? rendererBoundaryPreparation?.universalUnits ?? [];
 	const ctx = {
+		authoredModuleAst: parsedAst,
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
 		compilerNameSuffixes: null,
@@ -10681,7 +10704,8 @@ function compileInternal(
 				autoMemoMayReadContext: false,
 				node: compNode,
 				returnJsx: isReturnJsxFunction(compNode),
-				voidOutput: isVoidJsxCodeBlockFunction(compNode),
+				voidOutput:
+					!isReassignedComponentDeclaration(compNode, ctx) && isVoidJsxCodeBlockFunction(compNode),
 			});
 		}
 	}
@@ -10779,6 +10803,9 @@ function compileInternal(
 		: new Set();
 	for (const [, info] of ctx.componentInfo) {
 		const compNode = info.node;
+		// The body proof belongs to the initial function object. A writable
+		// declaration may call a different body, so retain the generic call shape.
+		if (isReassignedComponentDeclaration(compNode, ctx)) continue;
 		const locals = collectComponentLocals(compNode);
 		// Synthesise a root node combining setup statements + JSX render body so
 		// collectFreeIdentifiers sees the same identifier scope the runtime would.
@@ -11753,6 +11780,7 @@ function compileServer(
 		},
 	});
 	const ctx = {
+		authoredModuleAst: parsedAst,
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
 		compilerNameSuffixes: null,
@@ -12099,7 +12127,12 @@ function compileServerComponent(node, ctx) {
 	// component referenced ABOVE its declaration keeps real function-declaration
 	// hoisting instead of a TDZ `const` binding. Server and client compiles must
 	// agree, or the same route module renders on one side and crashes on the other.
-	if (componentReferencedAboveDeclaration(ctx, node, name)) {
+	// Writable declarations also keep their module binding inside their own body
+	// and preserve declaration-form live default exports.
+	if (
+		componentReferencedAboveDeclaration(ctx, node, name) ||
+		isReassignedComponentDeclaration(node, ctx)
+	) {
 		const declaration = isDefault ? b.export_default(fn) : isExported ? b.export(fn) : fn;
 		const nodes = [inheritOriginLoc(declaration, node)];
 		if (node._octaneBindingView) {
@@ -15531,8 +15564,10 @@ function compileComponent(node, ctx, options) {
 	// function object, so the pre-declaration capture observes them before any
 	// render can run. Components without early references keep the `const` +
 	// PURE-initializer form, which bundlers can drop when unused.
+	// Reassigned declarations use the same form: a named function expression
+	// would give own-body writes an immutable self binding instead of this module binding.
 	const referencedAboveDeclaration = componentReferencedAboveDeclaration(ctx, node, name);
-	if (referencedAboveDeclaration) {
+	if (referencedAboveDeclaration || isReassignedComponentDeclaration(node, ctx)) {
 		if (owner !== null) {
 			for (const event of owner.delegatedEvents) ctx.unownedDelegatedEvents.add(event);
 			for (const event of owner.capturedEvents) ctx.unownedCapturedEvents.add(event);
@@ -20186,7 +20221,18 @@ function compileReturnJsxFunction(node, ctx, options) {
 		return { nodes };
 	}
 	if (options && options.default) {
-		return { nodes: [fn, ...bindingStamp, inheritOriginLoc(b.export_default(b.id(name)), node)] };
+		return {
+			nodes: [
+				fn,
+				...bindingStamp,
+				inheritOriginLoc(
+					isReassignedComponentDeclaration(node, ctx)
+						? b.export(null, [b.export_specifier(name, 'default')])
+						: b.export_default(b.id(name)),
+					node,
+				),
+			],
+		};
 	}
 	if (options && options.export)
 		return { nodes: [inheritOriginLoc(b.export(fn), node), ...bindingStamp] };
