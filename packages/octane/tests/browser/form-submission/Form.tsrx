@@ -60,12 +60,7 @@ export function Form(props: FormProps) @{
 							</label>
 							<label>
 								Options
-								<select
-									id="options-input"
-									name="options"
-									multiple
-									defaultValue={['one', 'three']}
-								>
+								<select id="options-input" name="options" multiple defaultValue={['one', 'three']}>
 									<option value="one">One</option>
 									<option value="two">Two</option>
 									<option value="three">Three</option>
