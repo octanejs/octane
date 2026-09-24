@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
+import { MessageChannel } from 'node:worker_threads';
 import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
 import { build, version as esbuildVersion } from 'esbuild';
 import { JSDOM, VirtualConsole } from 'jsdom';
@@ -252,6 +253,14 @@ async function hydrate(code, rendered) {
 		url: 'https://initial-document.test/',
 		virtualConsole,
 	});
+	const channels = [];
+	class ConsumerMessageChannel extends MessageChannel {
+		constructor() {
+			super();
+			channels.push(this);
+		}
+	}
+	dom.window.MessageChannel = ConsumerMessageChannel;
 	try {
 		// Run the authentic renderer-free mailbox bootstrap before loading the consumer.
 		for (const script of dom.window.document.querySelectorAll(
@@ -259,7 +268,7 @@ async function hydrate(code, rendered) {
 		)) {
 			dom.window.eval(script.textContent);
 		}
-		// Use the JSDOM realm's timer fallback; no retained Node MessageChannel is installed.
+		// Public act() needs MessageChannel; close every port when this realm is discarded.
 		dom.window.eval(code);
 		// The host parses its server seed in the receiving browser realm.
 		const seed = dom.window.JSON.parse(
@@ -272,6 +281,10 @@ async function hydrate(code, rendered) {
 		assert.deepEqual(diagnostics, [], 'DOM adoption must remain diagnostic-free.');
 		return JSON.parse(JSON.stringify(result));
 	} finally {
+		for (const channel of channels) {
+			channel.port1.close();
+			channel.port2.close();
+		}
 		dom.window.close();
 	}
 }
