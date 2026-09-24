@@ -35,14 +35,16 @@ export function Independent() @{
 function IndependentReader() @{
 	const route = route$.get();
 	useLayoutEffect(() => {
-		document.dispatchEvent(new CustomEvent<CommitObservation>('initial-document-commit', {
-			detail: {
-				id: 'independent',
-				rendered: route,
-				current: route$.get(),
-				text: document.querySelector('[data-reader="independent"] > output')?.textContent ?? null,
-			},
-		}));
+		document.dispatchEvent(
+			new CustomEvent<CommitObservation>('initial-document-commit', {
+				detail: {
+					id: 'independent',
+					rendered: route,
+					current: route$.get(),
+					text: document.querySelector('[data-reader="independent"] > output')?.textContent ?? null,
+				},
+			}),
+		);
 	}, []);
 	<section data-reader="independent">
 		<output>{route as string}</output>
@@ -73,7 +75,14 @@ function Reader({ id, observe, cleanup, suspend, nestedWhen }: ReaderProps) @{
 	</section>
 }
 
-export function Document({ when, secondWhen, observe, cleanup, suspend, nestedWhen }: DocumentProps) @{
+export function Document({
+	when,
+	secondWhen,
+	observe,
+	cleanup,
+	suspend,
+	nestedWhen,
+}: DocumentProps) @{
 	const route = route$.get();
 	useLayoutEffect(() => {
 		observe?.({
