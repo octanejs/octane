@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/octane-is",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Element-kind predicates for Octane, matching react-is 19.2.7's public surface.",
   "license": "MIT",
   "type": "module",

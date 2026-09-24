@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/stylex",
-  "version": "0.1.54",
+  "version": "0.1.55",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -48,7 +48,7 @@
     "@stylexjs/stylex": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.4.0"
+    "octane": "workspace:^0.5.0"
   },
   "devDependencies": {
     "@types/babel__core": "catalog:default",

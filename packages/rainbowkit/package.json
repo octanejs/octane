@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/rainbowkit",
-  "version": "0.0.37",
+  "version": "0.0.38",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -43,7 +43,7 @@
   },
   "peerDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
-    "octane": "workspace:^0.4.0"
+    "octane": "workspace:^0.5.0"
   },
   "devDependencies": {
     "@rainbow-me/rainbowkit": "2.2.11",
