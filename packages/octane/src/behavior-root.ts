@@ -818,6 +818,7 @@ function releaseBehaviorSubmissions(record: EntryRecord): void {
 		elementPrototype.getAttribute.call(record.root.container, FORM_SUBMISSION_ATTR) ===
 			record.entry.id &&
 		matchesFormSubmissionTarget(record, record.root.container) &&
+		rangeMatches(record, nearestRange(record.root, record.root.container)) &&
 		!hasNestedSubmissionOwner(record.root, record.root.container)
 	)
 		mailbox.release(record.root.container as HTMLFormElement);
@@ -1130,7 +1131,8 @@ function disposeRoot(root: RootRecord, options: BehaviorDisposeOptions = {}): vo
 	}
 	if (root.registry.roots.size === 0 && root.registry.ranges.size === 0) {
 		const mailbox = getEarlyFormSubmissionMailbox(root.document);
-		if (mailbox?.receive === root.registry.submissionBridge) mailbox.receive = undefined;
+		if (mailbox !== undefined && mailbox.receive === root.registry.submissionBridge)
+			mailbox.receive = undefined;
 		documentRegistries.delete(root.document);
 	}
 	if (options.preserveDOM === false) root.container.replaceChildren();

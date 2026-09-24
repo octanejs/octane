@@ -22,14 +22,18 @@ const FORM =
 	'<textarea name="draft">accepted</textarea><button type="submit" name="intent" value="send">Send</button>' +
 	'</form></section><aside></aside></main>';
 
+function frameDocument(): Document {
+	const frame = document.createElement('iframe');
+	document.body.appendChild(frame);
+	frames.push(frame);
+	return frame.contentDocument!;
+}
+
 function earlyDocument(
 	html = FORM,
 	options: EarlySignalBootstrapOptions = { formSubmissions: true },
 ): Document {
-	const frame = document.createElement('iframe');
-	document.body.appendChild(frame);
-	frames.push(frame);
-	const ownerDocument = frame.contentDocument!;
+	const ownerDocument = frameDocument();
 	const script = earlySignalBootstrapScript(options);
 	// Execute the public inline artifact before exposing interactive HTML, as the
 	// early-independent-intent harness does. No generated-module rewriting.
@@ -104,6 +108,25 @@ afterEach(() => {
 });
 
 describe('parser-time native form commands', () => {
+	it('disposes a behavior root idempotently without a parser bootstrap', async () => {
+		const ownerDocument = frameDocument();
+		ownerDocument.body.innerHTML = FORM;
+		const form = ownerDocument.querySelector('form')!;
+		const root = attach(ownerDocument.querySelector('main')!);
+		const cleanup = vi.fn();
+		const deliveries: Delivery[] = [];
+		const registration = registerSave(root, deliveries, { adopt: () => cleanup });
+		await registration.ready;
+		expect(() => root.dispose()).not.toThrow();
+		expect(() => root.dispose()).not.toThrow();
+		expect(root.signal.aborted).toBe(true);
+		expect(registration.signal.aborted).toBe(true);
+		expect(cleanup).toHaveBeenCalledOnce();
+		expect(ownerDocument.querySelector('form')).toBe(form);
+		expect(submit(form).defaultPrevented).toBe(false);
+		expect(deliveries).toEqual([]);
+	});
+
 	it('delivers accepted fields and submitter once after later edits and registration', async () => {
 		const ownerDocument = earlyDocument(
 			'<main><form id="composer" action="/send" method="post" enctype="multipart/form-data" target="response" novalidate data-octane-capture-submit="save">' +
@@ -240,6 +263,47 @@ describe('parser-time native form commands', () => {
 			expect(wrongDeliveries).toEqual([]);
 		},
 	);
+
+	it('preserves a form-root accepted command when a wrong-owner registration is disposed', async () => {
+		const ownerDocument = earlyDocument();
+		const form = ownerDocument.querySelector('form')!;
+		const root = attach(form);
+		const owner = {};
+		root.registerExternalRange(form, { owner });
+		const original = submit(form);
+		const wrongCapture = vi.fn(acceptedSubmission);
+		const wrongDeliveries: Delivery[] = [];
+		const wrongRegistration = registerSave(root, wrongDeliveries, {
+			owner: {},
+			captureEvent: wrongCapture,
+		});
+		await wrongRegistration.ready;
+		expect(wrongCapture).not.toHaveBeenCalled();
+		expect(wrongDeliveries).toEqual([]);
+		wrongRegistration.dispose();
+		ownerDocument.querySelector('textarea')!.value = 'edited';
+		const ready = deferred();
+		const deliveries: Delivery[] = [];
+		const capture = vi.fn(acceptedSubmission);
+		const registration = registerSave(root, deliveries, {
+			owner,
+			ready: ready.promise,
+			captureEvent: capture,
+		});
+		expect(original.defaultPrevented).toBe(true);
+		expect(capture).toHaveBeenCalledOnce();
+		expect(capture.mock.calls[0][0]).toBe(original);
+		expect(deliveries).toEqual([]);
+		ready.resolve();
+		await registration.ready;
+		expect(deliveries.map(({ event }) => event)).toEqual([original]);
+		expect(deliveries[0].payload?.fields).toEqual([['draft', 'accepted']]);
+		const current = submit(form);
+		expect(current.defaultPrevented).toBe(true);
+		expect(deliveries.map(({ event }) => event)).toEqual([original, current]);
+		expect(deliveries[1].payload?.fields).toEqual([['draft', 'edited']]);
+		expect(wrongDeliveries).toEqual([]);
+	});
 
 	it('drops the accepted command after a pending external owner handoff', async () => {
 		const ownerDocument = earlyDocument();
