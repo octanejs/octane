@@ -10555,7 +10555,14 @@ export function renderBlock(block: Block): void {
 		}
 	}
 	const hydration = activeHydration();
-	if (hydration !== null && !hydration.owns(block)) {
+	// A replacement dynamic range owns client DOM even while its parent adopts
+	// server siblings. Fresh control-flow markers can instead be replay scaffolding
+	// whose body must still read the server rejection seed before adopting a catch.
+	if (
+		hydration !== null &&
+		(!hydration.owns(block) ||
+			(block.kind === 'dynamic' && block.endMarker !== null && hydration.isFresh(block.endMarker)))
+	) {
 		hydration.suspend(() => renderBlock(block));
 		return;
 	}
@@ -11426,6 +11433,25 @@ export function componentSlotLite<P>(
 		return;
 	}
 	const hydration = activeHydration();
+	// Fresh anchors belong to a client-built replacement, while the enclosing
+	// hydration cursor still owns later server siblings. Match the general
+	// component path by suspending adoption only for this subtree.
+	if (
+		hydration !== null &&
+		((anchor != null && hydration.isFresh(anchor)) || hydration.isFresh(host))
+	) {
+		suspendFreshLiteComponent(
+			hydration,
+			parentScope,
+			slotKey,
+			host,
+			comp,
+			props,
+			anchor,
+			invocationSite,
+		);
+		return;
+	}
 	let scope = parentScope.slots[slotKey] as Scope | undefined;
 	// The server `<!--]-->` this call adopted as its range end (hydration first
 	// render only) — consumed by the post-body cursor advance below.
@@ -11525,6 +11551,22 @@ export function componentSlotLite<P>(
 	// its commitBag insert MOVES the previous sibling's root to the shared
 	// anchor. Mirrors componentSlot's post-render advance.
 	if (hydration !== null && adoptedClose !== null) hydration.node = getNextSibling(adoptedClose);
+}
+
+// Keep the fresh-subtree callback's extra captures out of ordinary lite dispatch.
+function suspendFreshLiteComponent<P>(
+	hydration: HydrationCapability,
+	parentScope: Scope,
+	slotKey: number,
+	host: Node,
+	comp: ComponentBody<P>,
+	props: P,
+	anchor?: Node,
+	invocationSite?: string,
+): void {
+	hydration.suspend(() =>
+		componentSlotLite(parentScope, slotKey, host, comp, props, anchor, invocationSite),
+	);
 }
 
 // ── Teardown error routing (React's captureCommitPhaseError for deletions) ──
@@ -18670,6 +18712,27 @@ class HydrationCapability {
 		const framedRemainder =
 			claimsRoot && cursor !== null ? this.framedRootRemainder(cursor) : undefined;
 		const unframedRemainder = claimsRoot && cursor !== null ? getNextSibling(cursor) : undefined;
+		// A closing marker bounds an empty server range; it cannot be the first
+		// child of a newly populated fragment. Build fresh descendants without
+		// consuming that boundary, so its owner can advance the outer cursor.
+		if (isFragment && isBlockClose(cursor)) {
+			if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+			if (claimsRoot)
+				this.claimRootRemainder(
+					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
+				);
+			if (template === null) template = resolveLazyTemplate(lazy!);
+			if (!this.staleServerValues) {
+				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+				if (process.env.NODE_ENV !== 'production')
+					warnHydrationStructuralMismatch(
+						loc ?? componentSourceLoc(CURRENT_BLOCK?.body) ?? CURRENT_SCOPE?.locFile,
+						'a non-empty fragment',
+						describeHydrationNode(cursor),
+					);
+			}
+			return this.freshClone(template);
+		}
 		// A synthetic fragment wrapper has no server counterpart. At a root, compare
 		// its logical static roots before returning the virtual adoption view; otherwise
 		// arbitrary server markup could be mistaken for every fragment child at once.

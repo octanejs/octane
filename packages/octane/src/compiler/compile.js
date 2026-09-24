@@ -85,6 +85,7 @@ import {
 } from './compile-renderer-boundaries.js';
 import {
 	compiledSplitHydrateTagsForAst,
+	moduleCapturesForHydrateAst,
 	privateCompiledContextsForHydrateAst,
 	hydrateBoundaryPathFromId,
 	prepareHydrateBoundaries,
@@ -5630,6 +5631,28 @@ function collectImmutableModuleFunctions(body) {
 	return declared;
 }
 
+// Keep an authored function declaration writable when its binding is written.
+// Arrow normalization must not turn an authored const into a writable binding,
+// and a same-named local write must not demote the module declaration.
+function isReassignedComponentDeclaration(node, ctx) {
+	if (ctx.moduleFunctionDeclarations?.get(node.id.name)?.id === node.id) return false;
+	let bindings = ctx.authoredComponentBindings;
+	if (bindings === undefined) {
+		bindings = ctx.authoredComponentBindings = new WeakSet();
+		for (const statement of ctx.authoredModuleAst.body) {
+			const declaration =
+				statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+					? statement.declaration
+					: statement;
+			if (declaration?.type === 'FunctionDeclaration' && declaration.id)
+				bindings.add(declaration.id);
+		}
+	}
+	if (!bindings.has(node.id)) return false;
+	const writes = (ctx.authoredComponentWrites ??= collectReassignedBindings(ctx.authoredModuleAst));
+	return writes.has(node.id);
+}
+
 /**
  * Top-level module bindings, split by whether their identity can change after
  * evaluation. `mutable` holds `let`/`var` declarations, class declarations, and
@@ -7842,13 +7865,29 @@ function canShareSsrComponentItemRange(node, ctx) {
 	}
 
 	const attributes = component.attributes || component.openingElement?.attributes || [];
-	return !attributes.some((attribute) => {
-		if (attribute.type === 'SpreadAttribute' || attribute.type === 'JSXSpreadAttribute') {
-			return true;
-		}
-		const name = attribute.name?.name || attribute.name;
-		return name === 'key' || name === 'children';
-	});
+	if (
+		attributes.some((attribute) => {
+			if (attribute.type === 'SpreadAttribute' || attribute.type === 'JSXSpreadAttribute') {
+				return true;
+			}
+			const name = attribute.name?.name || attribute.name;
+			return name === 'key' || name === 'children';
+		})
+	)
+		return false;
+
+	// Split queries keep only stable module-function capture proofs. A shadow
+	// or writable module binding needs its separate component frame on the wire.
+	const binding = ctx.ssrSingleRootComponents.get(tag.name);
+	const functions = (ctx.ssrImmutableModuleFunctions ??= collectImmutableModuleFunctions(
+		ctx.authoredModuleAst.body,
+	));
+	if (functions.get(tag.name)?.id !== binding) return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	return (
+		lexical.bindingNodes.has(binding) &&
+		lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name)?.scope === lexical.rootScope
+	);
 }
 
 // Direct host-row mounting skips component-render bookkeeping. Keep the proof
@@ -10161,6 +10200,16 @@ function compileInternal(
 	const splitPrivateContexts = localVoidRootsEnabled
 		? privateCompiledContextsForHydrateAst(parsedAst)
 		: null;
+	const splitModuleCaptures = moduleCapturesForHydrateAst(parsedAst);
+	let splitModuleFunctions;
+	if (splitModuleCaptures !== undefined) {
+		const functions = collectImmutableModuleFunctions(splitModuleCaptures.moduleBody);
+		splitModuleFunctions = new Map(
+			[...splitModuleCaptures.bindings]
+				.filter(([name, capture]) => functions.get(name)?.id === capture.moduleBinding)
+				.map(([name, capture]) => [name, capture.binding]),
+		);
+	}
 	if (rootFactories.size > 0) {
 		for (const statement of ast.body) {
 			const node =
@@ -10292,6 +10341,7 @@ function compileInternal(
 	const universalUnits =
 		options?.__universalUnits ?? rendererBoundaryPreparation?.universalUnits ?? [];
 	const ctx = {
+		authoredModuleAst: parsedAst,
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
 		compilerNameSuffixes: null,
@@ -10303,6 +10353,7 @@ function compileInternal(
 		compiledHydrateTemplates: localVoidRootsEnabled,
 		compiledSplitHydrateTags: compiledSplitHydrateTagsForAst(parsedAst),
 		privateSplitContextProviders: splitPrivateContexts?.providers,
+		splitModuleFunctions,
 		autoMemo: autoMemoEnabled,
 		strongMemo: strongMemoEnabled,
 		nativeReads: options?.nativeReads === true,
@@ -10669,7 +10720,8 @@ function compileInternal(
 				autoMemoMayReadContext: false,
 				node: compNode,
 				returnJsx: isReturnJsxFunction(compNode),
-				voidOutput: isVoidJsxCodeBlockFunction(compNode),
+				voidOutput:
+					!isReassignedComponentDeclaration(compNode, ctx) && isVoidJsxCodeBlockFunction(compNode),
 			});
 		}
 	}
@@ -10767,6 +10819,9 @@ function compileInternal(
 		: new Set();
 	for (const [, info] of ctx.componentInfo) {
 		const compNode = info.node;
+		// The body proof belongs to the initial function object. A writable
+		// declaration may call a different body, so retain the generic call shape.
+		if (isReassignedComponentDeclaration(compNode, ctx)) continue;
 		const locals = collectComponentLocals(compNode);
 		// Synthesise a root node combining setup statements + JSX render body so
 		// collectFreeIdentifiers sees the same identifier scope the runtime would.
@@ -11741,6 +11796,7 @@ function compileServer(
 		},
 	});
 	const ctx = {
+		authoredModuleAst: parsedAst,
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
 		compilerNameSuffixes: null,
@@ -11789,7 +11845,7 @@ function compileServer(
 			ast,
 			options?.isDescriptorChildrenImport,
 		),
-		ssrSingleRootComponents: new Set(),
+		ssrSingleRootComponents: new Map(),
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
 		// Scaffolding without a more precise authored construct maps here.
@@ -11839,9 +11895,9 @@ function compileServer(
 		if (newBody !== null) ast = { ...ast, body: newBody };
 	}
 	ctx.moduleCssInjections = ctx.cssInjections.slice();
-	// Mirror the client's same-module shape proof without populating its richer
-	// componentInfo records on the independent server codegen path. Register all
-	// declarations before emitting any body so forward references stay eligible.
+	// Share an item's component frame only for the authored immutable identity
+	// that split queries can retain. Keep the direct-host shape proof separate
+	// from the client's richer componentInfo records and register forward refs.
 	for (const node of ast.body) {
 		const component =
 			node.type === 'ExportDefaultDeclaration' || node.type === 'ExportNamedDeclaration'
@@ -11852,7 +11908,7 @@ function compileServer(
 			(isComponentFunction(component) || isReturnJsxFunction(component)) &&
 			singleHostComponentRoot(component)
 		) {
-			ctx.ssrSingleRootComponents.add(component.id.name);
+			ctx.ssrSingleRootComponents.set(component.id.name, component.id);
 		}
 	}
 
@@ -12087,7 +12143,12 @@ function compileServerComponent(node, ctx) {
 	// component referenced ABOVE its declaration keeps real function-declaration
 	// hoisting instead of a TDZ `const` binding. Server and client compiles must
 	// agree, or the same route module renders on one side and crashes on the other.
-	if (componentReferencedAboveDeclaration(ctx, node, name)) {
+	// Writable declarations also keep their module binding inside their own body
+	// and preserve declaration-form live default exports.
+	if (
+		componentReferencedAboveDeclaration(ctx, node, name) ||
+		isReassignedComponentDeclaration(node, ctx)
+	) {
 		const declaration = isDefault ? b.export_default(fn) : isExported ? b.export(fn) : fn;
 		const nodes = [inheritOriginLoc(declaration, node)];
 		if (node._octaneBindingView) {
@@ -15519,8 +15580,10 @@ function compileComponent(node, ctx, options) {
 	// function object, so the pre-declaration capture observes them before any
 	// render can run. Components without early references keep the `const` +
 	// PURE-initializer form, which bundlers can drop when unused.
+	// Reassigned declarations use the same form: a named function expression
+	// would give own-body writes an immutable self binding instead of this module binding.
 	const referencedAboveDeclaration = componentReferencedAboveDeclaration(ctx, node, name);
-	if (referencedAboveDeclaration) {
+	if (referencedAboveDeclaration || isReassignedComponentDeclaration(node, ctx)) {
 		if (owner !== null) {
 			for (const event of owner.delegatedEvents) ctx.unownedDelegatedEvents.add(event);
 			for (const event of owner.capturedEvents) ctx.unownedCapturedEvents.add(event);
@@ -20174,7 +20237,18 @@ function compileReturnJsxFunction(node, ctx, options) {
 		return { nodes };
 	}
 	if (options && options.default) {
-		return { nodes: [fn, ...bindingStamp, inheritOriginLoc(b.export_default(b.id(name)), node)] };
+		return {
+			nodes: [
+				fn,
+				...bindingStamp,
+				inheritOriginLoc(
+					isReassignedComponentDeclaration(node, ctx)
+						? b.export(null, [b.export_specifier(name, 'default')])
+						: b.export_default(b.id(name)),
+					node,
+				),
+			],
+		};
 	}
 	if (options && options.export)
 		return { nodes: [inheritOriginLoc(b.export(fn), node), ...bindingStamp] };
@@ -31207,6 +31281,19 @@ function isPrivateSplitContextProvider(node, ctx) {
 	);
 }
 
+function isImmutableSplitComponentTag(tag, ctx) {
+	if (tag?.type !== 'JSXIdentifier' && tag?.type !== 'Identifier') return false;
+	const binding = ctx.splitModuleFunctions?.get(tag.name);
+	if (binding === undefined) return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	if (!lexical.bindingNodes.has(binding)) return false;
+	const owner = lexical.resolveBinding(lexical.nodeScopes.get(binding), binding.name);
+	return (
+		owner !== null &&
+		lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name)?.scope === owner.scope
+	);
+}
+
 function isCompiledHydrateTemplate(node, ctx, attrs) {
 	if (!ctx.compiledHydrateTemplates || ctx._universalRuntimeUnit != null) return false;
 	const tag = node.openingElement?.name ?? node.id;
@@ -31564,13 +31651,12 @@ function makeCompCall(
 			}
 		} else if (
 			keyExpr == null &&
-			ctx.importedNames !== undefined &&
-			ctx.importedNames.has(compName)
+			(ctx.importedNames?.has(compName) ||
+				isImmutableSplitComponentTag(node.openingElement?.name ?? node.id, ctx))
 		) {
-			// IMPORTED bindings only: immutable identity for the slot's whole
-			// life. A local variable callee (`const Comp = cond ? A : B`) can
-			// change identity per render — the markerless regime must not be
-			// pinned to whichever component happened to mount first.
+			// Imports and certified module-function captures keep one identity for
+			// the slot's whole life. Other local callees can change each render,
+			// so their marker regime cannot follow the first identity's stamp.
 			maybeSingleRoot = callSiteOk;
 		}
 		const importedBinding = ctx.importedComponentBindings?.get(compName);
@@ -32505,7 +32591,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					const compName = tagName.name;
 					const local = ctx.componentInfo?.get(compName);
 					if (local?.singleRoot === true) singleRoot = true;
-					else if (ctx.importedNames?.has(compName)) singleRootExpr = compName;
+					else if (ctx.importedNames?.has(compName) || isImmutableSplitComponentTag(tagName, ctx))
+						singleRootExpr = compName;
 				}
 			}
 		}
