@@ -2756,7 +2756,12 @@ function rewriteSourceAst(node, state) {
 		}
 		const replacement = state.astNodeReplacements?.get(value);
 		if (replacement !== undefined) return replacement;
-		if (value !== node && isTemplateNode(value)) {
+		// A template node in expression position — nested or the root itself
+		// (JSX as a component prop, a sole expression child, a renderable hole) —
+		// is a value and needs renderable lowering. Passing the root through
+		// leaves raw JSX for DOM codegen, which emits descriptor-runtime helpers
+		// the universal module does not export.
+		if (isTemplateNode(value)) {
 			return compileRenderableExpressionAst(value, state);
 		}
 		let output = null;
