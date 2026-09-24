@@ -238,12 +238,9 @@ export function ShadowRow({ row }: CapturedRowProps) @{
 	<div data-unused-row={row} />
 }
 
-export function ShadowBoundary({
-	when,
-	rows,
-	label,
-	ShadowRow = MutableRow,
-}: Props & { ShadowRow?: typeof MutableRow }) @{
+export function ShadowBoundary({ when, rows, label, ShadowRow = MutableRow }: Props & {
+	ShadowRow?: typeof MutableRow;
+}) @{
 	<main>
 		<Hydrate when={when}>
 			@for (const row of rows; key row) {

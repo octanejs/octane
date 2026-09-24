@@ -7865,13 +7865,29 @@ function canShareSsrComponentItemRange(node, ctx) {
 	}
 
 	const attributes = component.attributes || component.openingElement?.attributes || [];
-	return !attributes.some((attribute) => {
-		if (attribute.type === 'SpreadAttribute' || attribute.type === 'JSXSpreadAttribute') {
-			return true;
-		}
-		const name = attribute.name?.name || attribute.name;
-		return name === 'key' || name === 'children';
-	});
+	if (
+		attributes.some((attribute) => {
+			if (attribute.type === 'SpreadAttribute' || attribute.type === 'JSXSpreadAttribute') {
+				return true;
+			}
+			const name = attribute.name?.name || attribute.name;
+			return name === 'key' || name === 'children';
+		})
+	)
+		return false;
+
+	// Split queries keep only stable module-function capture proofs. A shadow
+	// or writable module binding needs its separate component frame on the wire.
+	const binding = ctx.ssrSingleRootComponents.get(tag.name);
+	const functions = (ctx.ssrImmutableModuleFunctions ??= collectImmutableModuleFunctions(
+		ctx.authoredModuleAst.body,
+	));
+	if (functions.get(tag.name)?.id !== binding) return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	return (
+		lexical.bindingNodes.has(binding) &&
+		lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name)?.scope === lexical.rootScope
+	);
 }
 
 // Direct host-row mounting skips component-render bookkeeping. Keep the proof
@@ -11829,7 +11845,7 @@ function compileServer(
 			ast,
 			options?.isDescriptorChildrenImport,
 		),
-		ssrSingleRootComponents: new Set(),
+		ssrSingleRootComponents: new Map(),
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
 		// Scaffolding without a more precise authored construct maps here.
@@ -11879,9 +11895,9 @@ function compileServer(
 		if (newBody !== null) ast = { ...ast, body: newBody };
 	}
 	ctx.moduleCssInjections = ctx.cssInjections.slice();
-	// Mirror the client's same-module shape proof without populating its richer
-	// componentInfo records on the independent server codegen path. Register all
-	// declarations before emitting any body so forward references stay eligible.
+	// Share an item's component frame only for the authored immutable identity
+	// that split queries can retain. Keep the direct-host shape proof separate
+	// from the client's richer componentInfo records and register forward refs.
 	for (const node of ast.body) {
 		const component =
 			node.type === 'ExportDefaultDeclaration' || node.type === 'ExportNamedDeclaration'
@@ -11892,7 +11908,7 @@ function compileServer(
 			(isComponentFunction(component) || isReturnJsxFunction(component)) &&
 			singleHostComponentRoot(component)
 		) {
-			ctx.ssrSingleRootComponents.add(component.id.name);
+			ctx.ssrSingleRootComponents.set(component.id.name, component.id);
 		}
 	}
 
