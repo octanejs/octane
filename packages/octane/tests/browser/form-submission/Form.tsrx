@@ -83,7 +83,7 @@ export function Form(props: FormProps) @{
 							value="save"
 							formAction="/submitted?form=button"
 							formMethod="post"
-							formEnctype="application/x-www-form-urlencoded"
+							formEncType="application/x-www-form-urlencoded"
 							formTarget="navigation-frame"
 							formNoValidate
 							onClick={recordClick}
