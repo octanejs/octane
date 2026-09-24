@@ -213,6 +213,51 @@ for (const dev of [false, true]) {
 			}
 		}
 
+		for (const mode of ['mutable', 'shadow'] as const) {
+			it(`activates matching server rows through a ${mode} component binding and preserves edited drafts`, async () => {
+				const view = await consumer<typeof fragmentClient>(dev, fragmentsFilename);
+				const props = {
+					when: condition(false),
+					show: true,
+					label: 'server',
+					tone: 'server-tone',
+					opacity: 1,
+					rows: ['first-row'],
+				};
+				const View =
+					mode === 'mutable' ? fragmentsServer.MutableBoundary : fragmentsServer.ShadowBoundary;
+				try {
+					view.host.innerHTML = renderToString(View, props).html;
+					const row = view.host.querySelector('[data-captured-row]')!;
+					const button = row.querySelector('button')!;
+					const draft = view.host.querySelector<HTMLInputElement>('[data-captured-draft]')!;
+					const outside = view.host.querySelector<HTMLInputElement>('#fragment-outside')!;
+					draft.value = 'edited row draft';
+					outside.value = 'edited outside draft';
+					const root = view.api.start(view.host, props, mode);
+					await root.settle();
+					expect(view.host.querySelector('[data-captured-row]')).toBe(row);
+					await root.update({ ...props, when: load() });
+					expect(view.host.querySelector('[data-captured-row]')).toBe(row);
+					expect(row.querySelector('button')).toBe(button);
+					expect(view.host.querySelector('[data-captured-draft]')).toBe(draft);
+					expect(view.host.querySelector('#fragment-outside')).toBe(outside);
+					expect(draft.value).toBe('edited row draft');
+					expect(outside.value).toBe('edited outside draft');
+					expect(button.textContent).toBe('server:0');
+					button.click();
+					await root.settle();
+					expect(button.textContent).toBe('server:1');
+					expect(root.recoverable).toEqual([]);
+					root.unmount();
+					expect(view.host.childNodes.length).toBe(0);
+					expect(view.diagnostics).toEqual([]);
+				} finally {
+					view.close();
+				}
+			});
+		}
+
 		for (const mode of ['root', 'sole', 'direct'] as const) {
 			for (const initiallyVisible of [false, true]) {
 				it(`preserves surrounding controls when an ${initiallyVisible ? 'initially visible' : 'initially empty'} ${mode} fragment becomes visible`, async () => {

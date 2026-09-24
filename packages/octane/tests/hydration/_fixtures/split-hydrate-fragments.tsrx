@@ -208,10 +208,56 @@ export function ReplacementBoundary(props: Props) @{
 	</Region>
 }
 
+type CapturedRowProps = { row: string; label: string };
+
+function MutableRow({ row, label }: CapturedRowProps) @{
+	const [count, setCount] = useState(0);
+	<div data-captured-row={row}>
+		<button onClick={() => setCount(count + 1)}>{label + ':' + count}</button>
+		<input data-captured-draft={row} defaultValue="server row draft" />
+	</div>
+}
+
+export function replaceMutableRow(next: typeof MutableRow) {
+	// @ts-expect-error JavaScript function bindings can be reassigned; keep that authored contract.
+	MutableRow = next;
+}
+
+export function MutableBoundary({ when, rows, label }: Props) @{
+	<main>
+		<Hydrate when={when}>
+			@for (const row of rows; key row) {
+				<MutableRow row={row} label={label} />
+			}
+		</Hydrate>
+		<input id="fragment-outside" defaultValue="server outside draft" />
+	</main>
+}
+
+export function ShadowRow({ row }: CapturedRowProps) @{
+	<div data-unused-row={row} />
+}
+
+export function ShadowBoundary({
+	when,
+	rows,
+	label,
+	ShadowRow = MutableRow,
+}: Props & { ShadowRow?: typeof MutableRow }) @{
+	<main>
+		<Hydrate when={when}>
+			@for (const row of rows; key row) {
+				<ShadowRow row={row} label={label} />
+			}
+		</Hydrate>
+		<input id="fragment-outside" defaultValue="server outside draft" />
+	</main>
+}
+
 export function start(
 	host: HTMLElement,
 	props: Props,
-	mode: 'row' | 'root' | 'sole' | 'direct' | 'replacement' = 'row',
+	mode: 'row' | 'root' | 'sole' | 'direct' | 'replacement' | 'mutable' | 'shadow' = 'row',
 	hydrate = true,
 ) {
 	const View =
@@ -223,9 +269,13 @@ export function start(
 					? DirectBoundary
 					: mode === 'replacement'
 						? ReplacementBoundary
-						: props.general
-							? GeneralBoundary
-							: LiteBoundary;
+						: mode === 'mutable'
+							? MutableBoundary
+							: mode === 'shadow'
+								? ShadowBoundary
+								: props.general
+									? GeneralBoundary
+									: LiteBoundary;
 	const recoverable: unknown[] = [];
 	const root =
 		hydrate
