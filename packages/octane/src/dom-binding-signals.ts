@@ -1,6 +1,7 @@
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
 import {
 	forwardNativeTransitionConsumer,
+	setNativeReadObserver,
 	type NativeTransitionPresentation,
 } from './signals/read-protocol.js';
 import {
@@ -24,6 +25,35 @@ export interface BindingSignalConnection {
 
 export interface BindingPreparedValue<T = unknown> extends NativeTransitionPresentation {
 	readonly value: T;
+}
+
+/** @internal Imported accessors must not silently turn live reads into source snapshots. */
+export function __assertBindingSnapshot<T>(read: () => T): T {
+	let observed = false;
+	const previous = setNativeReadObserver((source, version) => {
+		observed = true;
+		previous?.(source, version);
+	});
+	let value: T;
+	let failed = false;
+	let failure: unknown;
+	try {
+		value = read();
+	} catch (error) {
+		failed = true;
+		failure = error;
+	} finally {
+		setNativeReadObserver(previous);
+	}
+	if (observed)
+		throw Object.assign(
+			new TypeError(
+				'Octane DOM bindings: an imported signal accessor performed a live read without a subscription; bind the handle directly or pass an explicit sample through BindingSource.',
+			),
+			{ code: 'OCTANE_DOM_BINDINGS' },
+		);
+	if (failed) throw failure;
+	return value!;
 }
 
 /** @internal Query-selected capability; captures the existing owner, never creates a graph. */
