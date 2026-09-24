@@ -223,7 +223,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'__methodDep',
 	],
 	'./dom-binding-classes': ['__bindingClassReceipt', 'createBindingClassGroup'],
-	'./dom-binding-signals': ['__createBindingSignals'],
+	'./dom-binding-signals': ['__assertBindingSnapshot', '__createBindingSignals'],
 	'./dom-binding-controls': ['__createBindingControls'],
 	'./dom-binding-styles': ['__createBindingStyles'],
 	'./dom-binding-projections': ['__createBindingProjections'],

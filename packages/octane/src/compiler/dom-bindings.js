@@ -321,6 +321,31 @@ function expressionProjection(node) {
 	);
 }
 
+function importedReadReceiver(input, imports, lexical, parameterScope, seen = new Set()) {
+	const node = unwrap(input);
+	if (node?.type === 'ChainExpression')
+		return importedReadReceiver(node.expression, imports, lexical, parameterScope, seen);
+	if (['MemberExpression', 'OptionalMemberExpression'].includes(node?.type))
+		return importedReadReceiver(node.object, imports, lexical, parameterScope, seen);
+	if (node?.type !== 'Identifier') return false;
+	const binding = lexical.resolveBinding(lexical.nodeScopes.get(node) ?? parameterScope, node.name);
+	if (binding?.scope === lexical.rootScope) return imports.has(node.name);
+	const declaration = lexical.domBindingLocalDeclaration?.(node);
+	if (!declaration || seen.has(declaration)) return false;
+	return importedReadReceiver(
+		declaration.init,
+		imports,
+		lexical,
+		parameterScope,
+		new Set([...seen, declaration]),
+	);
+}
+
+// Fixed-prop folding copies calls while retaining their authored source ranges.
+function bindingReadOrigin(node) {
+	return node.start == null || node.end == null ? node : `${node.type}:${node.start}:${node.end}`;
+}
+
 // The directive asserts imported projections are pure. Obvious writes, ambient
 // reads, hooks and arbitrary calls remain diagnostics instead of silent one-shot work.
 function assertProjection(
@@ -346,8 +371,12 @@ function assertProjection(
 			)
 				continue;
 			const value = unwrap(property.value);
-			if (expressionProjection(value)) configurationArrows.add(value);
-			else if (value?.type === 'ObjectExpression') collectConfiguration(value);
+			if (expressionProjection(value)) {
+				configurationArrows.add(value);
+				// Providers own invocation of these deferred projections, including
+				// calls beneath an already subscribed attribute computation.
+				lexical.domBindingReadExclusions.add(value);
+			} else if (value?.type === 'ObjectExpression') collectConfiguration(value);
 		}
 	};
 	if (configuration) collectConfiguration(configuration);
@@ -504,8 +533,19 @@ function assertProjection(
 				readMethod(node) ||
 				importedProjectionCall(node, imports, lexical, parameterScope) ||
 				factoryProjection(callee)
-			)
+			) {
+				if (
+					node.arguments.length === 0 &&
+					['MemberExpression', 'OptionalMemberExpression'].includes(callee?.type) &&
+					(callee.computed ? callee.property?.value : callee.property?.name) === 'get'
+				) {
+					const reads = importedReadReceiver(callee.object, imports, lexical, parameterScope)
+						? lexical.domBindingImportedReads
+						: lexical.domBindingSourceSamples;
+					reads.add(bindingReadOrigin(node));
+				}
 				return;
+			}
 			error(
 				filename,
 				node,
@@ -975,21 +1015,23 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 						bindings.push([index, bindingKind(tag, name), name]);
 					}
 					providerBindings.add(bindings.length - 1);
-					values.push(
-						group
-							? inheritHookMemoOrigin(
-									group.length === 1 ? b.arrow([], argument) : b.literal(null),
-									attr,
-								)
-							: inheritHookMemoOrigin(
-									b.conditional(
-										b.binary('==', temporary, b.literal(null)),
-										b.unary('void', b.literal(0)),
-										b.member(temporary, b.literal(raw), true),
-									),
-									attr,
+					const value = group
+						? inheritHookMemoOrigin(
+								group.length === 1 ? b.arrow([], argument) : b.literal(null),
+								attr,
+							)
+						: inheritHookMemoOrigin(
+								b.conditional(
+									b.binary('==', temporary, b.literal(null)),
+									b.unary('void', b.literal(0)),
+									b.member(temporary, b.literal(raw), true),
 								),
-					);
+								attr,
+							);
+					// This computation has canonical read subscriptions. Its outer
+					// projector still checks setup values sampled before invocation.
+					if (group && group.length === 1) lexical.domBindingReadExclusions.add(value);
+					values.push(value);
 				}
 				continue;
 			}
@@ -1742,6 +1784,53 @@ function projectProgram(ast, plan, filename, lexical) {
 	};
 }
 
+function checkImportedBindingReads(artifact, lexical) {
+	const replacements = new Map();
+	const helper = lexical.domBindingAllocateName('_bindingSnapshot');
+	const check = (node) => inheritHookMemoOrigin(b.call(b.id(helper), b.arrow([], node)), node);
+	const hasSourceSample = (node) => {
+		let sampled = false;
+		walk(node, (child) => {
+			if (lexical.domBindingSourceSamples.has(bindingReadOrigin(child))) sampled = true;
+		});
+		return sampled;
+	};
+	walk(artifact, (node) => {
+		if (lexical.domBindingReadExclusions.has(node)) return false;
+		if (node.type === 'ChainExpression') {
+			let importedRead = false;
+			walk(node, (child) => {
+				if (lexical.domBindingImportedReads.has(bindingReadOrigin(child))) importedRead = true;
+			});
+			if (importedRead) {
+				// A mixed chain has no separate optional-call boundary at which to
+				// check imports while preserving deliberate source sampling.
+				if (hasSourceSample(node)) return false;
+				// Preserve the authored chain's complete optional short circuit.
+				replacements.set(node, check(node));
+				return false;
+			}
+		}
+		if (lexical.domBindingImportedReads.has(bindingReadOrigin(node))) {
+			if (hasSourceSample(node)) return false;
+			replacements.set(node, check(node));
+			return false;
+		}
+	});
+	if (replacements.size === 0) return artifact;
+	const checked = mapCow(artifact, replacements);
+	return {
+		...checked,
+		body: [
+			inheritHookMemoOrigin(
+				b.imports([['__assertBindingSnapshot', helper]], 'octane/dom-binding-signals'),
+				replacements.keys().next().value,
+			),
+			...checked.body,
+		],
+	};
+}
+
 function isRuntimeReference(node, lexical, parent, key) {
 	if (node.type === 'JSXIdentifier')
 		return (
@@ -1919,6 +2008,9 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 	const fixedChildProps = helpers.fixedPropNames?.length ? new Set(helpers.fixedPropNames) : null;
 	const imports = importedBindings(ast);
 	const lexical = createLexicalAnalysis(ast);
+	lexical.domBindingImportedReads = new Set();
+	lexical.domBindingSourceSamples = new Set();
+	lexical.domBindingReadExclusions = new WeakSet();
 	lexical.domBindingConstants = new Map(
 		ast.body.flatMap((statement) => {
 			const declaration = statement.declaration ?? statement;
@@ -1962,6 +2054,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 					.get(lexical.resolveBinding(lexical.nodeScopes.get(node), node.name)?.scope)
 					?.get(node.name)
 			: null;
+	lexical.domBindingLocalDeclaration = localDeclaration;
 	const callbackFor = (expression) => {
 		let value = unwrap(expression);
 		const seen = new Set();
@@ -2080,6 +2173,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			mapCow,
 			imports,
 			lexical,
+			readExclusions: lexical.domBindingReadExclusions,
 			allocateProgramName,
 			projectionBody,
 			annotationsOnly,
@@ -2381,7 +2475,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				imports,
 			),
 		);
-		return projectProgram(ast, plan, filename, lexical);
+		return checkImportedBindingReads(projectProgram(ast, plan, filename, lexical), lexical);
 	}
 	if (helpers.collectConstants) {
 		const names = new Set();

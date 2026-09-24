@@ -506,6 +506,29 @@ helpers must be pure; pass live values through the source snapshot rather than
 reading ambient state inside a projection. Snapshots must be synchronous values,
 never promises or other thenables.
 
+Pass an imported signal handle directly to a supported binding, for example
+`<span>{count$ as number}</span>`, to keep its subscription. Sampling it with
+`count$.get()` would produce a value that has no `BindingSource` notification.
+Selected binding artifacts diagnose actual native reads in eager imported `.get()`
+calls during activation or source publication, including computed/optional calls
+and pure setup aliases with an imported receiver. The check observes the canonical
+native-read protocol;
+ordinary imported `.get()` methods remain pure projections and are not subscribed.
+Normal SSR reads remain valid. A deliberate sample should enter through the source
+snapshot: `props.count.get()` continues to update only when that source publishes.
+Receiver aliases mixing props and imports, receiver expressions containing props
+samples, and optional chains combining imported reads with props samples retain
+their conservative sampling behavior; use direct handles or explicit source
+snapshots until subscribed projection lowering supports
+those shapes. Direct `.latest(fallback)` calls remain unsupported compiler
+diagnostics rather than implicitly subscribed reads.
+
+Known native attribute projections already own their read subscriptions and keep
+that behavior, including imported `.get()` reads inside the computation. Setup
+values sampled before that computation still need a direct handle or an explicit
+source snapshot. Deferred provider configuration callbacks retain their provider
+contract; their opaque invocation is outside this eager-accessor diagnostic.
+
 Pure projections also accept the canonical `isSignalHandle` import from `octane/signals` and unshadowed `String` and `Math.min` calls. Local `const` event and ref callbacks may be named or aliased in setup; their bodies execute as native adapters, not while preparing presentation values. They cannot be used as eager projections. Named refs preserve dependency-based attachment, but a ref that captures another local callback is unsupported. An explicit component `ref` may forward a ref supplied through props; this does not authorize arbitrary component-prop spreads.
 
 Compiler-proven presentation supports native HTML/SVG, text, native events and
@@ -648,7 +671,7 @@ bound textarea controls and deferred children keep their own ownership. Other
 host properties can remain outside this lease through `unbound`.
 
 This parent-only proof currently requires a named `props` parameter and no local
-setup declarations. Inline pure expressions, signal `.get()` reads, and imported
+setup declarations. Inline pure expressions, props-based signal `.get()` samples, and imported
 pure projections retain that scalar shape. Destructured parameters or local
 `const` declarations select the general binding program, which supports those
 forms but cannot transfer a parent with opaque children. This is a handoff

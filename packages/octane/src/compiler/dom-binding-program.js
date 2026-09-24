@@ -246,13 +246,15 @@ export function planBindingProgram(fn, render, context) {
 					: null,
 			),
 		);
-	const project = (names, value, node = fn, temporaries = []) => {
+	const project = (names, value, node = fn, temporaries = [], adapter = false) => {
 		value = context.fixed.fold(value);
 		expressions.push(value);
-		return origin(
+		const projector = origin(
 			b.arrow([environment(names)], projectionBody(value, expressions, temporaries)),
 			node,
 		);
+		if (adapter) context.readExclusions.add(projector);
+		return projector;
 	};
 	const validate = (expression) => {
 		if (!context.annotationsOnly) assertProjection(expression);
@@ -660,7 +662,7 @@ export function planBindingProgram(fn, render, context) {
 						...(refValues !== null && refValues !== undefined
 							? refValues.length === 0
 								? { stable: b.literal(true) }
-								: { dependencies: project(names, b.array(refValues), attr) }
+								: { dependencies: project(names, b.array(refValues), attr, [], true) }
 							: {}),
 						...(name === 'ref'
 							? {}
@@ -676,7 +678,7 @@ export function planBindingProgram(fn, render, context) {
 									),
 									...(capture ? { capture: b.literal(true) } : {}),
 								}),
-						read: project(names, expression, attr),
+						read: project(names, expression, attr, [], true),
 					}),
 				);
 				return false;
@@ -896,7 +898,7 @@ export function planBindingProgram(fn, render, context) {
 		initialOperations ||= initializers.length > 0;
 		if (initializers.length > 0) {
 			properties.initializers = data(initializers);
-			properties.initialize = project(names, b.array(initialValues));
+			properties.initialize = project(names, b.array(initialValues), fn, [], true);
 		}
 		if (bindings.some((binding) => binding[1] === 'classGroup')) {
 			if (classFactory === null) {
