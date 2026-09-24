@@ -7750,12 +7750,7 @@ export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
 					["import { state } from 'state';", '', 'state?.count$.get()', '1'],
 					["import { count$ } from 'state';", 'const value = count$.get();', 'value', '1'],
 					["import { count$ } from 'state';", 'const handle = count$;', 'handle.get()', '1'],
-					[
-						"import { count$ } from 'state';",
-						'',
-						'count$.get() + props.sampled.get()',
-						'3',
-					],
+					["import { count$ } from 'state';", '', 'count$.get() + props.sampled.get()', '3'],
 				] as const) {
 					const fixture = authoredPresentation(
 						'ImportedSnapshot',
@@ -8029,9 +8024,7 @@ export function EagerSnapshot(props) @{ 'use dom bindings';
 				host.innerHTML = eager.html;
 				const serverNode = host.firstElementChild!;
 				const previous = serverNode.outerHTML;
-				expect(() => eager.attach(serverNode, eager.state)).toThrow(
-					/imported signal.*handle/i,
-				);
+				expect(() => eager.attach(serverNode, eager.state)).toThrow(/imported signal.*handle/i);
 				expect(host.firstElementChild).toBe(serverNode);
 				expect(serverNode.outerHTML).toBe(previous);
 				const emptyHost = document.createElement('section');
@@ -8191,11 +8184,7 @@ export function EventSnapshot(props) @{ 'use dom bindings';
 							button.click();
 							count$.set(9);
 							button.click();
-							expect(onValue.mock.calls).toEqual([
-								[capture ? 1 : 7],
-								[7],
-								[capture ? 7 : 9],
-							]);
+							expect(onValue.mock.calls).toEqual([[capture ? 1 : 7], [7], [capture ? 7 : 9]]);
 							expect(button.textContent).toBe('Updated');
 							expect(host.querySelector('button')).toBe(button);
 							handle.dispose();

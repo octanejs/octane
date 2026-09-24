@@ -343,9 +343,7 @@ function importedReadReceiver(input, imports, lexical, parameterScope, seen = ne
 
 // Fixed-prop folding copies calls while retaining their authored source ranges.
 function bindingReadOrigin(node) {
-	return node.start == null || node.end == null
-		? node
-		: `${node.type}:${node.start}:${node.end}`;
+	return node.start == null || node.end == null ? node : `${node.type}:${node.start}:${node.end}`;
 }
 
 // The directive asserts imported projections are pure. Obvious writes, ambient
@@ -1017,17 +1015,16 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 						bindings.push([index, bindingKind(tag, name), name]);
 					}
 					providerBindings.add(bindings.length - 1);
-					const value =
-						group
-							? inheritHookMemoOrigin(
-									group.length === 1 ? b.arrow([], argument) : b.literal(null),
-									attr,
-								)
-							: inheritHookMemoOrigin(
-									b.conditional(
-										b.binary('==', temporary, b.literal(null)),
-										b.unary('void', b.literal(0)),
-										b.member(temporary, b.literal(raw), true),
+					const value = group
+						? inheritHookMemoOrigin(
+								group.length === 1 ? b.arrow([], argument) : b.literal(null),
+								attr,
+							)
+						: inheritHookMemoOrigin(
+								b.conditional(
+									b.binary('==', temporary, b.literal(null)),
+									b.unary('void', b.literal(0)),
+									b.member(temporary, b.literal(raw), true),
 								),
 								attr,
 							);
@@ -1787,8 +1784,7 @@ function projectProgram(ast, plan, filename, lexical) {
 function checkImportedBindingReads(artifact, lexical) {
 	const replacements = new Map();
 	const helper = lexical.domBindingAllocateName('_bindingSnapshot');
-	const check = (node) =>
-		inheritHookMemoOrigin(b.call(b.id(helper), b.arrow([], node)), node);
+	const check = (node) => inheritHookMemoOrigin(b.call(b.id(helper), b.arrow([], node)), node);
 	const hasSourceSample = (node) => {
 		let sampled = false;
 		walk(node, (child) => {
