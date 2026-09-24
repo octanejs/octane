@@ -9,6 +9,7 @@ export { initializeHydrationEventCapture } from './hydration/event-capture.js';
 // Keep external DOM ownership separate from the reconciling runtime so
 // behavior-only consumers never retain component or hydration machinery.
 export { attachBehaviorRoot } from './behavior-root.js';
+export { captureFormSubmissions } from './behavior-form-submissions.js';
 export type * from './behavior-root.js';
 export {
 	createSubSlot,

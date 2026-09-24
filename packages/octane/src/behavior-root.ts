@@ -1,13 +1,20 @@
 export { adoptBindings, mountBindings, unbound } from './dom-bindings.js';
 export type { BindingSource, BindingOptions, BindingHandle } from './dom-bindings.js';
 export type { BindingRange, BindingMountTarget } from './dom-binding-program.js';
-import {
-	FORM_SUBMISSION_ATTR,
-	getEarlyFormSubmissionMailbox,
-	isEarlyFormSubmissionCurrent,
-	type CapturedFormSubmission,
-	type EarlyFormSubmissionRecord,
-} from './form-submission.js';
+import type { CapturedFormSubmission } from './form-submission.js';
+import type { FormSubmissionCapture } from './behavior-form-submissions.js';
+export type { FormSubmissionCapture } from './behavior-form-submissions.js';
+import type {
+	AdoptionRecord,
+	BehaviorCaptureFactory,
+	BehaviorDOM,
+	DocumentRegistry,
+	EntryRecord,
+	RangeRecord,
+	Readiness,
+	RootRecord,
+} from './behavior-root-types.js';
+export { captureFormSubmissions } from './behavior-form-submissions.js';
 export type { CapturedFormSubmission } from './form-submission.js';
 
 /** A behavior-only root observes existing DOM without taking reconciliation ownership. */
@@ -16,6 +23,8 @@ export interface BehaviorRootOptions {
 	signal?: AbortSignal;
 	/** Explicitly dispose an existing behavior root attached to this container. */
 	replace?: boolean;
+	/** Explicit synchronous parser-command ingress for this root. */
+	formSubmissions?: FormSubmissionCapture;
 }
 
 export interface BehaviorDisposeOptions {
@@ -94,83 +103,26 @@ export interface BehaviorRoot {
 	dispose(options?: BehaviorDisposeOptions): void;
 }
 
-type Readiness = {
-	promise: Promise<void>;
-	resolve: () => void;
-	reject: (reason: unknown) => void;
-	settled: boolean;
-};
-
-type DocumentRegistry = {
-	roots: Map<Element, RootRecord>;
-	ranges: Map<Element, RangeRecord>;
-	submissionBridge?: (submission: EarlyFormSubmissionRecord) => boolean;
-};
-
-type RootRecord = {
-	container: Element;
-	document: Document;
-	registry: DocumentRegistry;
-	controller: AbortController;
-	behaviors: Set<EntryRecord>;
-	behaviorsById: Map<string, EntryRecord>;
-	ranges: Set<RangeRecord>;
-	pending: Set<Promise<void>>;
-	listeners: Map<string, EventListener>;
-	observer: MutationObserver | null;
-	disposed: boolean;
-	unlinkSignal: (() => void) | null;
-};
-
-type RangeRecord = {
-	root: RootRecord;
-	element: Element;
-	owner: unknown;
-	controller: AbortController;
-	readiness: Readiness;
-	status: 'pending' | 'ready' | 'failed' | 'disposed';
-	unlinks: Array<() => void>;
-	publicRange: ExternalRange;
-};
-
-type EntryRecord = {
-	root: RootRecord;
-	entry: BehaviorEntry;
-	controller: AbortController;
-	readiness: Readiness;
-	status: 'pending' | 'active' | 'failed' | 'disposed';
-	adoptions: Map<Element, AdoptionRecord>;
-	pendingAdoptionCount: number;
-	waitingRanges: Set<RangeRecord>;
-	queuedEvents: Array<{
-		event: Event;
-		element: Element;
-		range: RangeRecord | undefined;
-		payload?: unknown;
-		submission?: EarlyFormSubmissionRecord;
-	}>;
-	queuedEventHead: number;
-	queuedEventFlushDepth: number;
-	captureDepth?: number;
-	unlinks: Array<() => void>;
-	initialScanComplete: boolean;
-};
-
-type AdoptionRecord = {
-	entry: EntryRecord;
-	element: Element;
-	range: RangeRecord | undefined;
-	controller: AbortController;
-	unlinks: Array<() => void>;
-	cleanup: BehaviorCleanup | undefined;
-	pending: boolean;
-	disposed: boolean;
-};
-
 const documentRegistries = /* @__PURE__ */ new WeakMap<Document, DocumentRegistry>();
-const CANCELED = /* @__PURE__ */ Symbol('octane.behavior.canceled');
-let earlySubmissionRanges: WeakMap<EarlyFormSubmissionRecord, RangeRecord> | undefined;
-let earlySubmissionContainers: WeakMap<EarlyFormSubmissionRecord, Element> | undefined;
+const DEFAULT_DOM: BehaviorDOM = {
+	element: isElement,
+	parent: (node) => node.parentElement,
+	contains: (container, element, document) =>
+		element.ownerDocument === document && (element === container || container.contains(element)),
+	matches: (element, selector) => element.matches(selector),
+	query: (element, selector) => element.querySelectorAll(selector),
+	target: targetElement,
+};
+
+function registryFor(document: Document): DocumentRegistry {
+	let registry = documentRegistries.get(document);
+	if (registry === undefined) {
+		registry = { roots: new Map(), ranges: new Map() };
+		documentRegistries.set(document, registry);
+	}
+	return registry;
+}
+const CANCELED = /* @__PURE__ */ Symbol('behavior.canceled');
 
 function createReadiness(): Readiness {
 	let resolvePromise!: () => void;
@@ -215,55 +167,39 @@ function linkSignal(signal: AbortSignal, controller: AbortController): () => voi
 }
 
 /** A never-settling third-party promise must not hold a canceled owner open. */
-function waitUntilReady(source: PromiseLike<unknown>, signal: AbortSignal): Promise<unknown> {
+function waitUntilReady(source: PromiseLike<unknown>, signal: AbortSignal): Promise<void> {
 	if (signal.aborted) {
 		// Attach both continuations even after cancellation: a retained third-party
 		// promise may still reject later and must not become an unhandled rejection.
 		void Promise.resolve(source).then(undefined, () => undefined);
-		return Promise.resolve(CANCELED);
+		return Promise.resolve();
 	}
 	return new Promise((resolve, reject) => {
-		let settled = false;
-		const cancel = () => {
-			if (settled) return;
-			settled = true;
-			resolve(CANCELED);
+		// Native promises preserve the first settlement, including cancellation.
+		const complete = () => {
+			signal.removeEventListener('abort', complete);
+			resolve();
 		};
-		signal.addEventListener('abort', cancel, { once: true });
-		Promise.resolve(source).then(
-			(value) => {
-				if (settled) return;
-				settled = true;
-				signal.removeEventListener('abort', cancel);
-				resolve(value);
-			},
-			(error) => {
-				if (settled) return;
-				settled = true;
-				signal.removeEventListener('abort', cancel);
-				reject(error);
-			},
-		);
+		signal.addEventListener('abort', complete);
+		Promise.resolve(source).then(complete, (error) => {
+			signal.removeEventListener('abort', complete);
+			reject(error);
+		});
 	});
 }
 
 function trackPending(root: RootRecord, promise: Promise<void>): void {
 	root.pending.add(promise);
-	void promise.then(
-		() => root.pending.delete(promise),
-		() => root.pending.delete(promise),
-	);
+	const remove = () => root.pending.delete(promise);
+	void promise.then(remove, remove);
 }
 
 function isElement(value: unknown): value is Element {
 	return typeof value === 'object' && value !== null && (value as Node).nodeType === 1;
 }
 
-function contains(root: RootRecord, element: Element): boolean {
-	return (
-		element.ownerDocument === root.document &&
-		(element === root.container || root.container.contains(element))
-	);
+function contains(root: RootRecord, element: Element, container = root.container): boolean {
+	return root.dom.contains(container, element, root.document);
 }
 
 function assertActiveRoot(root: RootRecord): void {
@@ -277,7 +213,7 @@ function assertContainedElement(
 	element: unknown,
 	label: string,
 ): asserts element is Element {
-	if (!isElement(element) || !contains(root, element)) {
+	if (!root.dom.element(element) || !contains(root, element)) {
 		throw new Error(`${label} must belong to the behavior root container and document.`);
 	}
 }
@@ -290,14 +226,14 @@ function nearestRange(root: RootRecord, element: Element): RangeRecord | undefin
 			return range;
 		}
 		if (current === root.container) return undefined;
-		current = current.parentElement;
+		current = root.dom.parent(current);
 	}
 	return undefined;
 }
 
 function matchesTarget(record: EntryRecord, element: Element): boolean {
 	return typeof record.entry.target === 'string'
-		? element.matches(record.entry.target)
+		? record.root.dom.matches(element, record.entry.target)
 		: record.entry.target === element;
 }
 
@@ -309,7 +245,7 @@ function rangeMatches(record: EntryRecord, range: RangeRecord | undefined): bool
 }
 
 function dependsOnRange(record: EntryRecord, range: RangeRecord): boolean {
-	if (record.waitingRanges.has(range)) return true;
+	if (record.waiting.has(range)) return true;
 	if (
 		record.entry.owner === undefined ||
 		!Object.is(record.entry.owner, range.owner) ||
@@ -319,17 +255,17 @@ function dependsOnRange(record: EntryRecord, range: RangeRecord): boolean {
 	}
 	if (typeof record.entry.target !== 'string') {
 		return (
-			range.element.contains(record.entry.target) &&
+			contains(record.root, record.entry.target, range.element) &&
 			nearestRange(record.root, record.entry.target) === range
 		);
 	}
 	if (
-		range.element.matches(record.entry.target) &&
+		record.root.dom.matches(range.element, record.entry.target) &&
 		nearestRange(record.root, range.element) === range
 	) {
 		return true;
 	}
-	for (const element of range.element.querySelectorAll(record.entry.target)) {
+	for (const element of record.root.dom.query(range.element, record.entry.target)) {
 		if (nearestRange(record.root, element) === range) return true;
 	}
 	return false;
@@ -347,7 +283,7 @@ function adoptionContext(adoption: AdoptionRecord, event?: Event): BehaviorConte
 function finishPendingAdoption(adoption: AdoptionRecord): void {
 	if (!adoption.pending) return;
 	adoption.pending = false;
-	adoption.entry.pendingAdoptionCount--;
+	adoption.entry.pendingCount--;
 }
 
 function disposeAdoption(adoption: AdoptionRecord): void {
@@ -365,28 +301,24 @@ function disposeAdoption(adoption: AdoptionRecord): void {
 
 function flushQueuedEvents(record: EntryRecord): void {
 	if (record.status !== 'active' || record.captureDepth) return;
-	const queue = record.queuedEvents;
+	const queue = record.queue;
 	// Recursive native dispatch shares the cursor and defers compaction to the
 	// outermost flush so an in-flight item remains stable across callbacks.
-	record.queuedEventFlushDepth++;
+	record.flushDepth++;
 	try {
-		while (record.queuedEventHead < queue.length) {
-			const index = record.queuedEventHead;
+		while (record.head < queue.length) {
+			const index = record.head;
 			const queued = queue[index];
 			if (
 				queued.payload === CANCELED ||
-				!(queued.submission === undefined
-					? contains(record.root, queued.element)
-					: containsFormSubmission(record.root, queued.element)) ||
-				(queued.submission !== undefined &&
-					!isEarlyFormSubmissionCurrent(queued.submission, record.root.document))
+				!(queued.valid?.() ?? contains(record.root, queued.element))
 			) {
-				record.queuedEventHead = index + 1;
+				record.head = index + 1;
 				continue;
 			}
 			const range = nearestRange(record.root, queued.element);
 			if (range !== queued.range || !rangeMatches(record, range)) {
-				record.queuedEventHead = index + 1;
+				record.head = index + 1;
 				continue;
 			}
 			if (range?.status === 'pending') return;
@@ -396,8 +328,10 @@ function flushQueuedEvents(record: EntryRecord): void {
 			}
 			if (adoption === undefined || adoption.pending) return;
 			// Adoption can synchronously dispatch and recursively flush this item.
-			if (record.queuedEventHead !== index || queue[index] !== queued) continue;
-			record.queuedEventHead = index + 1;
+			if (record.head !== index || queue[index] !== queued) continue;
+			record.head = index + 1;
+			// Native custody must survive mutations made by synchronous adoption.
+			if (queued.valid?.() === false) continue;
 			record.entry.handleEvent?.(
 				queued.event,
 				queued.element,
@@ -406,39 +340,39 @@ function flushQueuedEvents(record: EntryRecord): void {
 			);
 		}
 	} finally {
-		record.queuedEventFlushDepth--;
-		if (record.queuedEventFlushDepth === 0 && record.queuedEventHead !== 0) {
-			const consumed = record.queuedEventHead;
+		record.flushDepth--;
+		if (record.flushDepth === 0 && record.head !== 0) {
+			const consumed = record.head;
 			if (consumed >= queue.length) {
 				queue.length = 0;
-				record.queuedEventHead = 0;
+				record.head = 0;
 			} else if (consumed >= queue.length - consumed) {
 				// Shift only after the dead prefix reaches the live suffix. Across
 				// one-event async resumes, shifted suffixes then shrink geometrically
 				// while retained storage stays below twice the outstanding events.
 				queue.splice(0, consumed);
-				record.queuedEventHead = 0;
+				record.head = 0;
 			}
 		}
 	}
 }
 
 function completeBehavior(record: EntryRecord): void {
-	if (record.status !== 'active' || !record.initialScanComplete) return;
-	for (const range of [...record.waitingRanges]) {
+	if (record.status !== 'active' || !record.scanned) return;
+	for (const range of record.waiting) {
 		if (range.status === 'pending') return;
-		record.waitingRanges.delete(range);
+		record.waiting.delete(range);
 	}
-	if (record.pendingAdoptionCount !== 0) return;
+	if (record.pendingCount !== 0) return;
 	flushQueuedEvents(record);
-	if (record.queuedEvents.length !== 0) return;
-	record.readiness.resolve();
+	if (record.queue.length !== 0) return;
+	record.ready.resolve();
 }
 
 function failBehavior(record: EntryRecord, error: unknown): void {
 	if (record.status === 'disposed' || record.status === 'failed') return;
 	record.status = 'failed';
-	record.readiness.reject(error);
+	record.ready.reject(error);
 	disposeBehavior(record);
 }
 
@@ -456,7 +390,7 @@ function adoptElement(
 		return undefined;
 	}
 	if (range?.status === 'pending') {
-		record.waitingRanges.add(range);
+		record.waiting.add(range);
 		return undefined;
 	}
 	const existing = record.adoptions.get(element);
@@ -490,7 +424,7 @@ function adoptElement(
 	}
 	if (typeof result === 'object' && result !== null && typeof result.then === 'function') {
 		adoption.pending = true;
-		record.pendingAdoptionCount++;
+		record.pendingCount++;
 		// The underlying adoption must still be observed after cancellation so a
 		// late cleanup can run exactly once, but public readiness races its signal.
 		const settled = Promise.resolve(result).then(
@@ -512,7 +446,7 @@ function adoptElement(
 				failBehavior(record, error);
 			},
 		);
-		const cancelable = waitUntilReady(settled, adoption.controller.signal).then(() => undefined);
+		const cancelable = waitUntilReady(settled, adoption.controller.signal);
 		trackPending(record.root, cancelable);
 	}
 	return adoption;
@@ -520,11 +454,12 @@ function adoptElement(
 
 function reconcileBehavior(record: EntryRecord): void {
 	if (record.status !== 'active') return;
-	record.waitingRanges.clear();
+	record.waiting.clear();
 	for (const [element, adoption] of [...record.adoptions]) {
-		const range = contains(record.root, element) ? nearestRange(record.root, element) : undefined;
+		const contained = contains(record.root, element);
+		const range = contained ? nearestRange(record.root, element) : undefined;
 		if (
-			!contains(record.root, element) ||
+			!contained ||
 			!matchesTarget(record, element) ||
 			!rangeMatches(record, range) ||
 			range !== adoption.range ||
@@ -535,8 +470,9 @@ function reconcileBehavior(record: EntryRecord): void {
 	}
 	let elements: Element[];
 	if (typeof record.entry.target === 'string') {
-		elements = Array.from(record.root.container.querySelectorAll(record.entry.target));
-		if (record.root.container.matches(record.entry.target)) elements.unshift(record.root.container);
+		elements = Array.from(record.root.dom.query(record.root.container, record.entry.target));
+		if (record.root.dom.matches(record.root.container, record.entry.target))
+			elements.unshift(record.root.container);
 	} else {
 		elements = contains(record.root, record.entry.target) ? [record.entry.target] : [];
 	}
@@ -544,20 +480,17 @@ function reconcileBehavior(record: EntryRecord): void {
 		const range = nearestRange(record.root, element);
 		if (!rangeMatches(record, range)) continue;
 		if (range?.status === 'pending') {
-			record.waitingRanges.add(range);
+			record.waiting.add(range);
 			continue;
 		}
 		adoptElement(record, element, range);
 	}
-	record.initialScanComplete = true;
+	record.scanned = true;
 	completeBehavior(record);
 }
 
 function refreshDocument(registry: DocumentRegistry): void {
-	for (const root of registry.roots.values()) {
-		getEarlyFormSubmissionMailbox(root.document)?.flush();
-		break;
-	}
+	registry.capture?.flush();
 	for (const root of [...registry.roots.values()]) {
 		if (root.disposed) continue;
 		for (const record of [...root.behaviors]) reconcileBehavior(record);
@@ -587,8 +520,8 @@ function targetElement(event: Event): Element | null {
 
 function handleDelegatedEvent(root: RootRecord, event: Event): void {
 	if (root.disposed) return;
-	if (event.type === 'submit' && getEarlyFormSubmissionMailbox(root.document)?.has(event)) return;
-	const target = targetElement(event);
+	if (root.registry.capture?.skip(root, event)) return;
+	const target = root.dom.target(event);
 	if (target === null || !contains(root, target)) return;
 	for (const record of [...root.behaviors]) {
 		if (
@@ -604,7 +537,7 @@ function handleDelegatedEvent(root: RootRecord, event: Event): void {
 				matched = null;
 				break;
 			}
-			matched = matched.parentElement;
+			matched = root.dom.parent(matched);
 		}
 		if (matched === null || !contains(root, matched)) continue;
 		const range = nearestRange(root, matched);
@@ -613,8 +546,8 @@ function handleDelegatedEvent(root: RootRecord, event: Event): void {
 			// Reserve native order before application capture: FormData can invoke
 			// a formdata listener which synchronously dispatches another command.
 			const queued = { event, element: matched, range, payload: CANCELED as unknown };
-			record.queuedEvents.push(queued);
-			if (range?.status === 'pending') record.waitingRanges.add(range);
+			record.queue.push(queued);
+			if (range?.status === 'pending') record.waiting.add(range);
 			record.captureDepth = (record.captureDepth ?? 0) + 1;
 			try {
 				const payload = record.entry.captureEvent(event, matched);
@@ -637,191 +570,18 @@ function handleDelegatedEvent(root: RootRecord, event: Event): void {
 			continue;
 		}
 		if (record.status !== 'active' || range?.status === 'pending') {
-			record.queuedEvents.push({ event, element: matched, range });
-			if (range?.status === 'pending') record.waitingRanges.add(range);
+			record.queue.push({ event, element: matched, range });
+			if (range?.status === 'pending') record.waiting.add(range);
 			continue;
 		}
 		const adoption = record.adoptions.get(matched) ?? adoptElement(record, matched, range, event);
-		if (adoption === undefined || adoption.pending || record.queuedEvents.length !== 0) {
-			record.queuedEvents.push({ event, element: matched, range });
+		if (adoption === undefined || adoption.pending || record.queue.length !== 0) {
+			record.queue.push({ event, element: matched, range });
 			flushQueuedEvents(record);
 			continue;
 		}
 		record.entry.handleEvent?.(event, matched, adoptionContext(adoption, event), undefined);
 	}
-}
-
-/** Native methods cannot be hidden by successful controls named after DOM methods. */
-function formSubmissionElementPrototype(document: Document): Element {
-	return (document.defaultView?.Element ?? globalThis.Element).prototype;
-}
-
-function containsFormSubmission(root: RootRecord, form: Element): boolean {
-	return (
-		form.ownerDocument === root.document &&
-		(form === root.container ||
-			formSubmissionElementPrototype(root.document).contains.call(root.container, form))
-	);
-}
-
-function matchesFormSubmissionTarget(record: EntryRecord, form: Element): boolean {
-	return typeof record.entry.target === 'string'
-		? formSubmissionElementPrototype(record.root.document).matches.call(form, record.entry.target)
-		: record.entry.target === form;
-}
-
-/** Transfer the original command into one exact behavior owner, without redispatch. */
-function receiveEarlyFormSubmission(
-	document: Document,
-	registry: DocumentRegistry,
-	submission: EarlyFormSubmissionRecord,
-): boolean {
-	if (submission.snapshot === undefined) return false;
-	if (!isEarlyFormSubmissionCurrent(submission, document)) return true;
-	const previousContainer = earlySubmissionContainers?.get(submission);
-	if (
-		previousContainer !== undefined &&
-		!formSubmissionElementPrototype(document).contains.call(previousContainer, submission.form)
-	) {
-		submission.discarded = true;
-		return true;
-	}
-	if (previousContainer === undefined) {
-		let container: Element | undefined;
-		for (const root of registry.roots.values()) {
-			if (
-				!root.disposed &&
-				containsFormSubmission(root, submission.form) &&
-				(container === undefined ||
-					formSubmissionElementPrototype(document).contains.call(container, root.container))
-			)
-				container = root.container;
-		}
-		if (container !== undefined)
-			(earlySubmissionContainers ??= new WeakMap()).set(submission, container);
-	}
-	let rangeElement: Element | null = submission.form;
-	let acceptedRange: RangeRecord | undefined;
-	while (rangeElement !== null) {
-		acceptedRange = registry.ranges.get(rangeElement);
-		if (acceptedRange !== undefined) break;
-		rangeElement = rangeElement.parentElement;
-	}
-	const previousRange = earlySubmissionRanges?.get(submission);
-	if (previousRange !== undefined && previousRange !== acceptedRange) {
-		submission.discarded = true;
-		return true;
-	}
-	if (acceptedRange !== undefined && previousRange === undefined)
-		(earlySubmissionRanges ??= new WeakMap()).set(submission, acceptedRange);
-	let ownerRoot: RootRecord | undefined;
-	for (const root of registry.roots.values()) {
-		if (root.disposed || !containsFormSubmission(root, submission.form)) continue;
-		if (
-			ownerRoot === undefined ||
-			formSubmissionElementPrototype(document).contains.call(ownerRoot.container, root.container)
-		)
-			ownerRoot = root;
-	}
-	// An attached nested root reserves its command scope while its module is
-	// still registering; an ancestor with the same id cannot claim that command.
-	const record = ownerRoot?.behaviorsById.get(submission.key);
-	if (
-		record === undefined ||
-		record.controller.signal.aborted ||
-		!record.entry.events?.includes('submit') ||
-		record.entry.captureEvent === undefined ||
-		!matchesFormSubmissionTarget(record, submission.form) ||
-		!rangeMatches(record, nearestRange(record.root, submission.form))
-	)
-		return false;
-	const range = nearestRange(record.root, submission.form);
-	const queued = {
-		event: submission.event,
-		element: submission.form,
-		range,
-		payload: CANCELED as unknown,
-		submission,
-	};
-	record.queuedEvents.push(queued);
-	if (range?.status === 'pending') record.waitingRanges.add(range);
-	record.captureDepth = (record.captureDepth ?? 0) + 1;
-	try {
-		const payload = record.entry.captureEvent!(
-			submission.event,
-			submission.form,
-			submission.snapshot,
-		);
-		if (
-			!record.controller.signal.aborted &&
-			containsFormSubmission(record.root, submission.form) &&
-			matchesFormSubmissionTarget(record, submission.form) &&
-			nearestRange(record.root, submission.form) === range &&
-			isEarlyFormSubmissionCurrent(submission, document)
-		)
-			queued.payload = payload;
-	} catch (error) {
-		failBehavior(record, error);
-		throw error;
-	} finally {
-		record.captureDepth--;
-	}
-	// Only routing authority remains in the queue after application capture. A
-	// small returned payload need not retain every accepted field or file.
-	submission.snapshot = undefined;
-	if (queued.payload === CANCELED) submission.discarded = true;
-	flushQueuedEvents(record);
-	return true;
-}
-
-function hasNestedSubmissionOwner(root: RootRecord, form: Element): boolean {
-	for (const nested of root.registry.roots.values()) {
-		if (
-			nested === root ||
-			nested.disposed ||
-			!formSubmissionElementPrototype(root.document).contains.call(
-				root.container,
-				nested.container,
-			) ||
-			!containsFormSubmission(nested, form)
-		)
-			continue;
-		return true;
-	}
-	return false;
-}
-
-function releaseBehaviorSubmissions(record: EntryRecord): void {
-	if (
-		record.entry.id === undefined ||
-		!record.entry.events?.includes('submit') ||
-		record.entry.captureEvent === undefined
-	)
-		return;
-	const mailbox = getEarlyFormSubmissionMailbox(record.root.document);
-	if (mailbox === undefined) return;
-	const elementPrototype = formSubmissionElementPrototype(record.root.document);
-	for (const form of elementPrototype.querySelectorAll.call(
-		record.root.container,
-		`form[${FORM_SUBMISSION_ATTR}]`,
-	) as NodeListOf<HTMLFormElement>) {
-		if (
-			elementPrototype.getAttribute.call(form, FORM_SUBMISSION_ATTR) === record.entry.id &&
-			matchesFormSubmissionTarget(record, form) &&
-			rangeMatches(record, nearestRange(record.root, form)) &&
-			!hasNestedSubmissionOwner(record.root, form)
-		)
-			mailbox.release(form);
-	}
-	if (
-		record.root.container.localName === 'form' &&
-		elementPrototype.getAttribute.call(record.root.container, FORM_SUBMISSION_ATTR) ===
-			record.entry.id &&
-		matchesFormSubmissionTarget(record, record.root.container) &&
-		rangeMatches(record, nearestRange(record.root, record.root.container)) &&
-		!hasNestedSubmissionOwner(record.root, record.root.container)
-	)
-		mailbox.release(record.root.container as HTMLFormElement);
 }
 
 function installListeners(root: RootRecord, events: readonly string[] | undefined): void {
@@ -858,19 +618,19 @@ function removeUnusedListeners(root: RootRecord): void {
 
 function disposeBehavior(record: EntryRecord): void {
 	if (record.status === 'disposed') return;
-	releaseBehaviorSubmissions(record);
+	record.root.registry.capture?.release(record);
 	const failed = record.status === 'failed';
 	record.status = 'disposed';
 	record.controller.abort();
 	for (const unlink of record.unlinks) unlink();
 	record.unlinks.length = 0;
 	record.root.behaviors.delete(record);
-	if (record.entry.id !== undefined && record.root.behaviorsById.get(record.entry.id) === record) {
-		record.root.behaviorsById.delete(record.entry.id);
+	if (record.entry.id !== undefined && record.root.byId.get(record.entry.id) === record) {
+		record.root.byId.delete(record.entry.id);
 	}
-	record.queuedEvents.length = 0;
-	record.queuedEventHead = 0;
-	record.waitingRanges.clear();
+	record.queue.length = 0;
+	record.head = 0;
+	record.waiting.clear();
 	let firstError: unknown;
 	for (const adoption of [...record.adoptions.values()]) {
 		try {
@@ -879,7 +639,7 @@ function disposeBehavior(record: EntryRecord): void {
 			firstError ??= error;
 		}
 	}
-	if (!failed) record.readiness.resolve();
+	if (!failed) record.ready.resolve();
 	removeUnusedListeners(record.root);
 	if (firstError !== undefined) throw firstError;
 }
@@ -899,14 +659,14 @@ function registerBehavior(root: RootRecord, entry: BehaviorEntry): BehaviorRegis
 		assertContainedElement(root, entry.target, 'A behavior target');
 	} else {
 		// Validate selector syntax synchronously, before claiming any registration.
-		root.container.matches(entry.target);
+		root.dom.matches(root.container, entry.target);
 	}
-	if (entry.id !== undefined && root.behaviorsById.has(entry.id)) {
+	if (entry.id !== undefined && root.byId.has(entry.id)) {
 		throw new Error(`A behavior with identity ${JSON.stringify(entry.id)} is already registered.`);
 	}
 	const dependencies: EntryRecord[] = [];
 	for (const id of entry.dependencies ?? []) {
-		const dependency = root.behaviorsById.get(id);
+		const dependency = root.byId.get(id);
 		if (dependency === undefined) {
 			throw new Error(`Behavior dependency ${JSON.stringify(id)} is not registered.`);
 		}
@@ -926,16 +686,16 @@ function registerBehavior(root: RootRecord, entry: BehaviorEntry): BehaviorRegis
 		root,
 		entry,
 		controller,
-		readiness,
+		ready: readiness,
 		status: 'pending',
 		adoptions: new Map(),
-		pendingAdoptionCount: 0,
-		waitingRanges: new Set(),
-		queuedEvents: [],
-		queuedEventHead: 0,
-		queuedEventFlushDepth: 0,
+		pendingCount: 0,
+		waiting: new Set(),
+		queue: [],
+		head: 0,
+		flushDepth: 0,
 		unlinks: [linkSignal(root.controller.signal, controller)],
-		initialScanComplete: false,
+		scanned: false,
 	};
 	const registration: BehaviorRegistration = {
 		...(entry.id === undefined ? {} : { id: entry.id }),
@@ -949,12 +709,12 @@ function registerBehavior(root: RootRecord, entry: BehaviorEntry): BehaviorRegis
 		return registration;
 	}
 	root.behaviors.add(record);
-	if (entry.id !== undefined) root.behaviorsById.set(entry.id, record);
+	if (entry.id !== undefined) root.byId.set(entry.id, record);
 	controller.signal.addEventListener('abort', () => disposeBehavior(record), { once: true });
 	try {
 		installListeners(root, entry.events);
 		ensureObserver(root);
-		getEarlyFormSubmissionMailbox(root.document)?.flush();
+		root.registry.capture?.flush();
 	} catch (error) {
 		disposeBehavior(record);
 		throw error;
@@ -962,7 +722,7 @@ function registerBehavior(root: RootRecord, entry: BehaviorEntry): BehaviorRegis
 	const blockers: PromiseLike<unknown>[] = [];
 	if (entry.ready !== undefined) blockers.push(entry.ready);
 	for (const dependency of dependencies) {
-		if (!dependency.readiness.settled) blockers.push(dependency.readiness.promise);
+		if (!dependency.ready.settled) blockers.push(dependency.ready.promise);
 	}
 	if (blockers.length === 0) {
 		activateBehavior(record);
@@ -970,10 +730,7 @@ function registerBehavior(root: RootRecord, entry: BehaviorEntry): BehaviorRegis
 		const gate = Promise.all(
 			blockers.map((blocker) => waitUntilReady(blocker, controller.signal)),
 		).then(
-			(results) => {
-				if (results.includes(CANCELED) || controller.signal.aborted) return;
-				activateBehavior(record);
-			},
+			() => activateBehavior(record),
 			(error) => {
 				if (!controller.signal.aborted) failBehavior(record, error);
 			},
@@ -994,7 +751,7 @@ function disposeRange(record: RangeRecord): void {
 	if (record.root.registry.ranges.get(record.element) === record) {
 		record.root.registry.ranges.delete(record.element);
 	}
-	if (!failed) record.readiness.resolve();
+	if (!failed) record.ready.resolve();
 	if (!record.root.disposed) refreshDocument(record.root.registry);
 }
 
@@ -1025,7 +782,7 @@ function registerExternalRange(
 		element,
 		owner: options.owner,
 		controller,
-		readiness,
+		ready: readiness,
 		status: options.ready === undefined ? 'ready' : 'pending',
 		unlinks: [linkSignal(root.controller.signal, controller)],
 		publicRange: undefined as unknown as ExternalRange,
@@ -1051,8 +808,8 @@ function registerExternalRange(
 		readiness.resolve();
 	} else {
 		const gate = waitUntilReady(options.ready, controller.signal).then(
-			(result) => {
-				if (result === CANCELED || record.status !== 'pending') return;
+			() => {
+				if (record.status !== 'pending') return;
 				record.status = 'ready';
 				refreshDocument(root.registry);
 				readiness.resolve();
@@ -1090,16 +847,7 @@ function registerExternalRange(
 
 function disposeRoot(root: RootRecord, options: BehaviorDisposeOptions = {}): void {
 	if (root.disposed) return;
-	const submissions = getEarlyFormSubmissionMailbox(root.document);
-	if (submissions !== undefined) {
-		for (const submission of [...submissions.q]) {
-			if (
-				containsFormSubmission(root, submission.form) &&
-				!hasNestedSubmissionOwner(root, submission.form)
-			)
-				submissions.release(submission.form);
-		}
-	}
+	root.registry.capture?.dispose(root);
 	const releasedExternalOwnership = root.ranges.size !== 0;
 	root.disposed = true;
 	root.controller.abort();
@@ -1130,9 +878,6 @@ function disposeRoot(root: RootRecord, options: BehaviorDisposeOptions = {}): vo
 		root.registry.roots.delete(root.container);
 	}
 	if (root.registry.roots.size === 0 && root.registry.ranges.size === 0) {
-		const mailbox = getEarlyFormSubmissionMailbox(root.document);
-		if (mailbox !== undefined && mailbox.receive === root.registry.submissionBridge)
-			mailbox.receive = undefined;
 		documentRegistries.delete(root.document);
 	}
 	if (options.preserveDOM === false) root.container.replaceChildren();
@@ -1155,40 +900,38 @@ export function attachBehaviorRoot(
 	container: Element,
 	options: BehaviorRootOptions = {},
 ): BehaviorRoot {
-	if (!isElement(container) || container.ownerDocument === null) {
+	const capture = options.formSubmissions as unknown as BehaviorCaptureFactory | undefined;
+	const document =
+		capture === undefined
+			? isElement(container)
+				? container.ownerDocument
+				: null
+			: capture.document(container);
+	if (document === null) {
 		throw new Error('A behavior root requires an element with an owner document.');
 	}
-	const document = container.ownerDocument;
-	let registry = documentRegistries.get(document);
-	if (registry === undefined) {
-		registry = { roots: new Map(), ranges: new Map() };
-		documentRegistries.set(document, registry);
-	}
+	let registry = registryFor(document);
 	const existing = registry.roots.get(container);
-	const canceledReplacement = existing !== undefined && options.replace && options.signal?.aborted;
 	if (existing !== undefined) {
 		if (!options.replace) {
 			throw new Error(
 				'This container already has a behavior root; pass replace: true to replace it.',
 			);
 		}
-		if (!canceledReplacement) {
+		if (!options.signal?.aborted) {
 			disposeRoot(existing);
-			registry = documentRegistries.get(document);
-			if (registry === undefined) {
-				registry = { roots: new Map(), ranges: new Map() };
-				documentRegistries.set(document, registry);
-			}
+			registry = registryFor(document);
 		}
 	}
 	const controller = createController(document);
 	const record: RootRecord = {
 		container,
 		document,
+		dom: DEFAULT_DOM,
 		registry,
 		controller,
 		behaviors: new Set(),
-		behaviorsById: new Map(),
+		byId: new Map(),
 		ranges: new Set(),
 		pending: new Set(),
 		listeners: new Map(),
@@ -1201,8 +944,8 @@ export function attachBehaviorRoot(
 		signal: controller.signal,
 		get ready() {
 			const waiting: Promise<void>[] = [...record.pending];
-			for (const range of record.ranges) waiting.push(range.readiness.promise);
-			for (const behavior of record.behaviors) waiting.push(behavior.readiness.promise);
+			for (const range of record.ranges) waiting.push(range.ready.promise);
+			for (const behavior of record.behaviors) waiting.push(behavior.ready.promise);
 			const ready = Promise.all(waiting).then(() => undefined);
 			void ready.catch(() => undefined);
 			return ready;
@@ -1212,18 +955,21 @@ export function attachBehaviorRoot(
 		registerBehavior: (entry) => registerBehavior(record, entry),
 		dispose: (disposeOptions) => disposeRoot(record, disposeOptions),
 	};
-	if (!canceledReplacement) registry.roots.set(container, record);
-	const mailbox = getEarlyFormSubmissionMailbox(document);
-	if (mailbox !== undefined && registry.submissionBridge === undefined) {
-		registry.submissionBridge = (submission) =>
-			receiveEarlyFormSubmission(document, registry!, submission);
-		mailbox.receive = registry.submissionBridge;
-	}
 	if (options.signal !== undefined) record.unlinkSignal = linkSignal(options.signal, controller);
 	if (controller.signal.aborted) {
 		disposeRoot(record);
 	} else {
+		registry.roots.set(container, record);
+		try {
+			capture?.(record, flushQueuedEvents, failBehavior, nearestRange, rangeMatches, CANCELED);
+		} catch (error) {
+			disposeRoot(record);
+			throw error;
+		}
 		controller.signal.addEventListener('abort', () => disposeRoot(record), { once: true });
+		// Application capture during the synchronous bridge flush may abort this
+		// lifetime before its listener has been installed.
+		if (controller.signal.aborted) disposeRoot(record);
 	}
 	return root;
 }

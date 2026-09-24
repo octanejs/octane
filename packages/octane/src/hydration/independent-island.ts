@@ -19,6 +19,7 @@ import {
 	hydrationMarkerInteractionStatus,
 	initializeIndependentHydrationEventCapture,
 	isHydrationSelectionIntentCurrent,
+	isNativeHydrationIntentCurrent,
 	registerHydrationIntentBoundary,
 	takePendingHydrationIntents,
 	unregisterHydrationIntentBoundary,
@@ -156,11 +157,24 @@ export function registerIndependentHydrationIsland(
 				if (typeof candidate !== 'function') {
 					throw new TypeError('Independent Hydrate activation export is not a function.');
 				}
-				replayReady = true;
 				const replays = intents.splice(0);
+				const nativeAuthority =
+					replays.length !== 0 && replays.every((intent) => intent.current !== undefined);
 				for (let index = replays.length - 1; index >= 0; index--) {
-					if (!isHydrationSelectionIntentCurrent(replays[index])) replays.splice(index, 1);
+					if (
+						!isHydrationSelectionIntentCurrent(replays[index]) ||
+						!isNativeHydrationIntentCurrent(replays[index])
+					)
+						replays.splice(index, 1);
 				}
+				// An expired native command cannot complete activation or retire the
+				// island. Automatic triggers and ordinary selection behavior remain
+				// independent; a future valid command can start another attempt.
+				if (nativeAuthority && replays.length === 0 && !triggered) {
+					active = false;
+					return;
+				}
+				replayReady = true;
 				return (candidate as IndependentHydrateActivator)({
 					element,
 					manifest,
@@ -176,6 +190,7 @@ export function registerIndependentHydrationIsland(
 					if (value && typeof value === 'object') value.unmount();
 					return;
 				}
+				if (!active) return;
 				if (value && typeof value === 'object') root = value;
 				hydrated = true;
 				active = false;

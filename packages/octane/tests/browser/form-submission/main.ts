@@ -1,5 +1,6 @@
 import {
 	attachBehaviorRoot,
+	captureFormSubmissions,
 	type BehaviorRegistration,
 	type CapturedFormSubmission,
 } from 'octane/behavior';
@@ -18,7 +19,10 @@ type SubmissionPayload = {
 const form = document.querySelector('#command-form') as HTMLFormElement;
 const originalInput = form.elements.namedItem('draft') as HTMLInputElement;
 const container = document.querySelector('#behavior-container')!;
-const root = attachBehaviorRoot(container);
+const root = attachBehaviorRoot(
+	new URLSearchParams(location.search).has('form-root') ? form : container,
+	{ formSubmissions: captureFormSubmissions() },
+);
 const captures: SubmissionPayload[] = [];
 const deliveries: Array<
 	SubmissionPayload & { original: boolean; submitterSame: boolean; trusted: boolean }
@@ -37,7 +41,7 @@ const held = new URLSearchParams(location.search).has('hold');
 function register(id = 'save'): void {
 	registration = root.registerBehavior<SubmissionPayload>({
 		id,
-		target: form,
+		target: '#command-form, #secondary-command-form',
 		events: ['submit'],
 		...(held ? { ready } : {}),
 		captureEvent(event, element, submission) {
@@ -126,7 +130,7 @@ const harness = {
 			islandLoads,
 			hydrated,
 			errors: errors.slice(),
-			inputSame: form.elements.namedItem('draft') === originalInput,
+			inputSame: document.querySelector('#draft-input') === originalInput,
 			value: originalInput.value,
 			nativeSubmissions: window.__formObservation.events.length,
 			canceled: window.__formObservation.events.map((event) => event.defaultPrevented),

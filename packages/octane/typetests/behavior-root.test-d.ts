@@ -1,5 +1,6 @@
 import {
 	attachBehaviorRoot,
+	captureFormSubmissions,
 	type BehaviorCleanup,
 	type BehaviorContext,
 	type BehaviorEntry,
@@ -12,6 +13,7 @@ import {
 	adoptBindings,
 	mountBindings,
 	attachBehaviorRoot as attachFocusedBehaviorRoot,
+	captureFormSubmissions as captureFocusedFormSubmissions,
 	type BindingHandle,
 	type BindingOptions,
 	type BindingSource,
@@ -23,8 +25,14 @@ const container = document.createElement('main');
 const owner = Symbol('external stream');
 const lifetime = new AbortController();
 
-const root: BehaviorRoot = attachBehaviorRoot(container, { signal: lifetime.signal });
-const focusedRoot: BehaviorRoot = attachFocusedBehaviorRoot(container, { replace: true });
+const root: BehaviorRoot = attachBehaviorRoot(container, {
+	signal: lifetime.signal,
+	formSubmissions: captureFormSubmissions(),
+});
+const focusedRoot: BehaviorRoot = attachFocusedBehaviorRoot(container, {
+	replace: true,
+	formSubmissions: captureFocusedFormSubmissions(),
+});
 const range: ExternalRange = focusedRoot.registerExternalRange(container, {
 	owner,
 	ready: Promise.resolve(),
@@ -90,6 +98,9 @@ root.dispose({ preserveDOM: true });
 
 // @ts-expect-error — a behavior root adopts an element, not an arbitrary node.
 attachBehaviorRoot(document.createTextNode('not a container'));
+
+// @ts-expect-error — importing the capture factory makes this root opt in explicitly.
+attachBehaviorRoot(container, { formSubmissions: true });
 
 // @ts-expect-error — every externally owned range declares its owner.
 focusedRoot.registerExternalRange(container, {});

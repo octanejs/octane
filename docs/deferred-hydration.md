@@ -811,10 +811,23 @@ submit event; implicit Enter and `form.requestSubmit()` use the same path.
 Submit-button clicks are not queued for hydration replay. Forms without this
 marker retain their existing native and hydration behavior.
 
+Enable the client bridge when attaching the behavior root. It connects accepted
+commands to behavior delivery and independent activation. The factory keeps
+form routing out of behavior bundles that do not import it:
+
+```ts
+import { attachBehaviorRoot, captureFormSubmissions } from 'octane/behavior';
+
+const root = attachBehaviorRoot(container, {
+	formSubmissions: captureFormSubmissions(),
+});
+```
+
 Register the owner with the matching `id`, an exact form target or matching form
 selector, `events: ['submit']`, and `captureEvent`. The closest attached behavior
-root reserves the form's command scope, even while its behavior is still absent;
-an enclosing root cannot claim that command:
+root reserves the form's command scope, even while its behavior is still absent.
+Each consuming root must enable the bridge; an enclosing root cannot claim a
+command reserved by a nested root:
 
 ```ts
 root.registerBehavior({

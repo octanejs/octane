@@ -1,12 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	attachBehaviorRoot,
+	captureFormSubmissions,
 	type BehaviorContext,
 	type BehaviorEntry,
 	type BehaviorRoot,
 	type CapturedFormSubmission,
 } from 'octane';
 import { earlySignalBootstrapScript, type EarlySignalBootstrapOptions } from 'octane/server';
+import {
+	createIndependentHydrateManifest,
+	initializeHydrationEventCapture,
+	registerIndependentHydrationIsland,
+	type IndependentHydrateActivationContext,
+} from 'octane/hydration';
 
 type Delivery = {
 	event: Event;
@@ -17,6 +24,7 @@ type Delivery = {
 
 const frames: HTMLIFrameElement[] = [];
 const roots: BehaviorRoot[] = [];
+const islands: Array<() => void> = [];
 const FORM =
 	'<main><section><form id="composer" action="/send" data-octane-capture-submit="save">' +
 	'<textarea name="draft">accepted</textarea><button type="submit" name="intent" value="send">Send</button>' +
@@ -32,8 +40,10 @@ function frameDocument(): Document {
 function earlyDocument(
 	html = FORM,
 	options: EarlySignalBootstrapOptions = { formSubmissions: true },
+	beforeBootstrap?: (ownerDocument: Document) => void,
 ): Document {
 	const ownerDocument = frameDocument();
+	beforeBootstrap?.(ownerDocument);
 	const script = earlySignalBootstrapScript(options);
 	// Execute the public inline artifact before exposing interactive HTML, as the
 	// early-independent-intent harness does. No generated-module rewriting.
@@ -48,9 +58,72 @@ function attach(
 	container: Element,
 	options?: Parameters<typeof attachBehaviorRoot>[1],
 ): BehaviorRoot {
+	const root = attachBehaviorRoot(container, {
+		formSubmissions: captureFormSubmissions(),
+		...options,
+	});
+	roots.push(root);
+	return root;
+}
+
+function attachWithoutForms(
+	container: Element,
+	options?: Parameters<typeof attachBehaviorRoot>[1],
+): BehaviorRoot {
 	const root = attachBehaviorRoot(container, options);
 	roots.push(root);
 	return root;
+}
+
+function independentDocument(beforeBootstrap?: (ownerDocument: Document) => void): Document {
+	const ownerDocument = earlyDocument(
+		FORM.replace('<section>', '<section><div>').replace('</section>', '</div></section>'),
+		{ independentHydration: true, formSubmissions: true },
+		beforeBootstrap,
+	);
+	const boundary = ownerDocument.querySelector('section')!;
+	boundary.setAttribute('data-octane-hydrate-id', 'form-widget');
+	boundary.setAttribute('data-octane-hydrate-when', 'interaction');
+	boundary.setAttribute('data-octane-hydrate-interaction-events', 'click');
+	boundary.setAttribute('data-octane-hydrate-independent', '');
+	return ownerDocument;
+}
+
+function registerIsland(ownerDocument: Document, moduleReady?: Promise<void>) {
+	const boundary = ownerDocument.querySelector('section')!;
+	const activations: IndependentHydrateActivationContext[] = [];
+	const unmount = vi.fn();
+	const load = vi.fn(async () => {
+		if (moduleReady !== undefined) await moduleReady;
+		return {
+			default(context: IndependentHydrateActivationContext) {
+				activations.push(context);
+				return { unmount };
+			},
+		};
+	});
+	const manifest = createIndependentHydrateManifest(
+		{
+			version: 1,
+			boundaryId: 'form-template',
+			exportName: 'default',
+			captureSchema: [],
+			hookSeed: 0,
+			idSeed: 0,
+			signalSites: [],
+			parentDependencies: false,
+		},
+		[],
+		'form-widget',
+		'form-intent-build',
+		{ moduleId: 'form-widget.js', styles: [] },
+	);
+	const dispose = registerIndependentHydrationIsland(boundary, manifest, {
+		load,
+		loadStyles() {},
+	});
+	islands.push(dispose);
+	return { boundary, activations, load, unmount, dispose };
 }
 
 function submit(form: HTMLFormElement, submitter: HTMLElement | null = null): SubmitEvent {
@@ -98,6 +171,7 @@ function registerSave(
 }
 
 afterEach(() => {
+	for (const dispose of islands.splice(0)) dispose();
 	for (const root of roots.splice(0)) root.dispose();
 	for (const frame of frames.splice(0)) {
 		const ownerWindow = frame.contentDocument!.defaultView!;
@@ -108,11 +182,402 @@ afterEach(() => {
 });
 
 describe('parser-time native form commands', () => {
+	it.each(
+		['native requestSubmit timer', 'dispatched submit microtask'].flatMap((path) =>
+			['factory first', 'capture first'].flatMap((order) =>
+				['historical', 'live'].map((phase) => ({ path, order, phase })),
+			),
+		),
+	)('activates the original $phase $path with $order', async ({ path, order, phase }) => {
+		vi.useFakeTimers();
+		const ownerDocument = independentDocument();
+		const form = ownerDocument.querySelector('form')!;
+		const button = ownerDocument.querySelector('button')!;
+		const events: SubmitEvent[] = [];
+		form.addEventListener('submit', (event) => events.push(event));
+		const accept = () => {
+			if (path === 'native requestSubmit timer') form.requestSubmit(button);
+			else submit(form, button);
+		};
+		if (phase === 'historical') accept();
+		const ready = deferred();
+		const deliveries: Delivery[] = [];
+		if (order === 'capture first') initializeHydrationEventCapture(ownerDocument);
+		const registration = registerSave(attach(ownerDocument.querySelector('main')!), deliveries, {
+			ready: ready.promise,
+		});
+		if (order === 'factory first') initializeHydrationEventCapture(ownerDocument);
+		const island = registerIsland(ownerDocument);
+		if (phase === 'live') accept();
+		expect(events).toHaveLength(1);
+		const original = events[0];
+		expect(original.isTrusted).toBe(path === 'native requestSubmit timer');
+		expect(original.defaultPrevented).toBe(true);
+		expect(island.load).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(island.load).toHaveBeenCalledOnce();
+		expect(island.activations).toHaveLength(1);
+		expect(island.activations[0].element).toBe(island.boundary);
+		expect(island.activations[0].intents).toHaveLength(1);
+		expect(island.activations[0].intents[0].event).toBe(original);
+		expect(island.activations[0].intents[0].earlyBinding).toBe(true);
+		expect(events).toEqual([original]);
+		expect(deliveries).toEqual([]);
+		ownerDocument.querySelector('textarea')!.value = 'edited';
+		ready.resolve();
+		await registration.ready;
+		expect(deliveries.map(({ event }) => event)).toEqual([original]);
+		expect(deliveries[0].payload?.fields).toEqual([
+			['draft', 'accepted'],
+			['intent', 'send'],
+		]);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(island.load).toHaveBeenCalledOnce();
+		expect(events).toEqual([original]);
+		island.dispose();
+		expect(island.unmount).toHaveBeenCalledOnce();
+	});
+
+	it.each([
+		'boundary identity',
+		'strategy',
+		'events',
+		'form marker',
+		'form parent',
+		'independent owner',
+	] as const)('drops deferred native activation after a change to %s', async (change) => {
+		vi.useFakeTimers();
+		const ownerDocument = independentDocument();
+		const form = ownerDocument.querySelector('form')!;
+		const button = ownerDocument.querySelector('button')!;
+		const island = registerIsland(ownerDocument);
+		attach(ownerDocument.querySelector('main')!);
+		const events: SubmitEvent[] = [];
+		form.addEventListener('submit', (event) => events.push(event));
+		form.requestSubmit(button);
+		expect(events).toHaveLength(1);
+		expect(events[0].isTrusted).toBe(true);
+		expect(events[0].defaultPrevented).toBe(true);
+		if (change === 'boundary identity')
+			island.boundary.setAttribute('data-octane-hydrate-id', 'replacement');
+		else if (change === 'strategy')
+			island.boundary.setAttribute('data-octane-hydrate-when', 'idle');
+		else if (change === 'events')
+			island.boundary.setAttribute('data-octane-hydrate-interaction-events', 'pointerdown');
+		else if (change === 'form marker') form.setAttribute('data-octane-capture-submit', 'other');
+		else if (change === 'form parent') {
+			const parent = ownerDocument.createElement('div');
+			island.boundary.appendChild(parent);
+			parent.appendChild(form);
+		} else {
+			const nested = ownerDocument.createElement('aside');
+			nested.setAttribute('data-octane-hydrate-id', 'nested-widget');
+			nested.setAttribute('data-octane-hydrate-when', 'interaction');
+			nested.setAttribute('data-octane-hydrate-independent', '');
+			island.boundary.appendChild(nested);
+			nested.appendChild(form.parentElement!);
+		}
+		await vi.advanceTimersByTimeAsync(0);
+		expect(island.load).not.toHaveBeenCalled();
+		expect(island.activations).toEqual([]);
+		expect(events).toHaveLength(1);
+	});
+
+	it.each(['factory before events', 'factory after events'] as const)(
+		'preserves both selections around a deferred accepted native command with %s',
+		async (order) => {
+			vi.useFakeTimers();
+			const ownerDocument = independentDocument();
+			const boundary = ownerDocument.querySelector('section')!;
+			const form = ownerDocument.querySelector('form')!;
+			const submitter = ownerDocument.querySelector('button')!;
+			const first = ownerDocument.createElement('button');
+			const last = ownerDocument.createElement('button');
+			for (const button of [first, last]) {
+				button.type = 'button';
+				button.setAttribute('data-octane-hydrate-selection', 'day');
+				boundary.appendChild(button);
+			}
+			first.textContent = 'Monday';
+			last.textContent = 'Tuesday';
+			const selectionEvents: MouseEvent[] = [];
+			ownerDocument.addEventListener('click', (event) => selectionEvents.push(event), true);
+			const submissions: SubmitEvent[] = [];
+			form.addEventListener('submit', (event) => submissions.push(event));
+			const moduleReady = deferred();
+			const island = registerIsland(ownerDocument, moduleReady.promise);
+			if (order === 'factory before events') attach(ownerDocument.querySelector('main')!);
+			first.click();
+			form.requestSubmit(submitter);
+			last.click();
+			if (order === 'factory after events') attach(ownerDocument.querySelector('main')!);
+			expect(selectionEvents).toHaveLength(2);
+			expect(submissions).toHaveLength(1);
+			expect(submissions[0].isTrusted).toBe(true);
+			expect(submissions[0].defaultPrevented).toBe(true);
+			await vi.advanceTimersByTimeAsync(0);
+			expect(island.load).toHaveBeenCalledOnce();
+			expect(island.activations).toEqual([]);
+			moduleReady.resolve();
+			await vi.advanceTimersByTimeAsync(0);
+			expect(island.activations).toHaveLength(1);
+			const intents = island.activations[0].intents;
+			const selections = intents.filter(({ event }) => event.type === 'click');
+			expect(selections).toHaveLength(2);
+			expect(selections[0].event).toBe(selectionEvents[0]);
+			expect(selections[1].event).toBe(selectionEvents[1]);
+			const commands = intents.filter(({ event }) => event.type === 'submit');
+			expect(commands).toHaveLength(1);
+			expect(commands[0].event).toBe(submissions[0]);
+			expect(commands[0].earlyBinding).toBe(true);
+			expect(submissions).toHaveLength(1);
+		},
+	);
+
+	it.each(['strategy', 'events'] as const)(
+		'retires independent activation after %s changes before the factory while preserving accepted fields',
+		async (change) => {
+			vi.useFakeTimers();
+			const ownerDocument = independentDocument();
+			const form = ownerDocument.querySelector('form')!;
+			const button = ownerDocument.querySelector('button')!;
+			const island = registerIsland(ownerDocument);
+			const events: SubmitEvent[] = [];
+			form.addEventListener('submit', (event) => events.push(event));
+			form.requestSubmit(button);
+			expect(events).toHaveLength(1);
+			const original = events[0];
+			expect(original.isTrusted).toBe(true);
+			expect(original.defaultPrevented).toBe(true);
+			if (change === 'strategy') island.boundary.setAttribute('data-octane-hydrate-when', 'idle');
+			else island.boundary.setAttribute('data-octane-hydrate-interaction-events', 'pointerdown');
+			ownerDocument.querySelector('textarea')!.value = 'edited';
+			const ready = deferred();
+			const deliveries: Delivery[] = [];
+			const capture = vi.fn(acceptedSubmission);
+			const registration = registerSave(attach(ownerDocument.querySelector('main')!), deliveries, {
+				ready: ready.promise,
+				captureEvent: capture,
+			});
+			expect(capture).toHaveBeenCalledOnce();
+			expect(capture.mock.calls[0][0]).toBe(original);
+			await vi.advanceTimersByTimeAsync(0);
+			expect(island.load).not.toHaveBeenCalled();
+			expect(island.activations).toEqual([]);
+			expect(deliveries).toEqual([]);
+			ready.resolve();
+			await registration.ready;
+			expect(deliveries.map(({ event }) => event)).toEqual([original]);
+			expect(deliveries[0].payload?.fields).toEqual([
+				['draft', 'accepted'],
+				['intent', 'send'],
+			]);
+			expect(events).toEqual([original]);
+		},
+	);
+
+	it.each(
+		['pending registration', 'loading module'].flatMap((stage) =>
+			['lease expiry', 'root disposal', 'form marker', 'form parent'].map((change) => ({
+				stage,
+				change,
+			})),
+		),
+	)('drops a native command after $change during $stage', async ({ stage, change }) => {
+		vi.useFakeTimers();
+		const ownerDocument = independentDocument();
+		const form = ownerDocument.querySelector('form')!;
+		const button = ownerDocument.querySelector('button')!;
+		const root = attach(ownerDocument.querySelector('main')!);
+		const moduleReady = deferred();
+		let island =
+			stage === 'loading module' ? registerIsland(ownerDocument, moduleReady.promise) : undefined;
+		const events: SubmitEvent[] = [];
+		form.addEventListener('submit', (event) => events.push(event));
+		form.requestSubmit(button);
+		expect(events).toHaveLength(1);
+		const original = events[0];
+		expect(original.isTrusted).toBe(true);
+		expect(original.defaultPrevented).toBe(true);
+		await vi.advanceTimersByTimeAsync(0);
+		if (island !== undefined) {
+			expect(island.load).toHaveBeenCalledOnce();
+			expect(island.activations).toEqual([]);
+		}
+		if (change === 'lease expiry') await vi.advanceTimersByTimeAsync(30_000);
+		else if (change === 'root disposal') root.dispose();
+		else if (change === 'form marker') form.setAttribute('data-octane-capture-submit', 'other');
+		else {
+			const parent = ownerDocument.createElement('div');
+			ownerDocument.querySelector('section')!.appendChild(parent);
+			parent.appendChild(form);
+		}
+		if (island === undefined) island = registerIsland(ownerDocument);
+		moduleReady.resolve();
+		await vi.advanceTimersByTimeAsync(0);
+		if (stage === 'pending registration') expect(island.load).not.toHaveBeenCalled();
+		expect(island.activations).toEqual([]);
+		expect(events).toEqual([original]);
+	});
+
+	it.each(['historical selections', 'historical and live selections'] as const)(
+		'preserves %s separated by a native command that expires before registration',
+		async (position) => {
+			vi.useFakeTimers();
+			const selectionEvents: MouseEvent[] = [];
+			const ownerDocument = independentDocument((ownerDocument) => {
+				ownerDocument.addEventListener('click', (event) => selectionEvents.push(event), true);
+			});
+			const boundary = ownerDocument.querySelector('section')!;
+			const form = ownerDocument.querySelector('form')!;
+			const submitter = ownerDocument.querySelector('button')!;
+			const first = ownerDocument.createElement('button');
+			const last = ownerDocument.createElement('button');
+			for (const button of [first, last]) {
+				button.type = 'button';
+				button.setAttribute('data-octane-hydrate-selection', 'day');
+				boundary.appendChild(button);
+			}
+			first.textContent = 'Monday';
+			last.textContent = 'Tuesday';
+			const submissions: SubmitEvent[] = [];
+			form.addEventListener('submit', (event) => submissions.push(event));
+			first.click();
+			form.requestSubmit(submitter);
+			if (position === 'historical selections') last.click();
+			expect(submissions).toHaveLength(1);
+			const original = submissions[0];
+			expect(original.isTrusted).toBe(true);
+			expect(original.defaultPrevented).toBe(true);
+			await vi.advanceTimersByTimeAsync(30_000);
+			const deliveries: Delivery[] = [];
+			const capture = vi.fn(acceptedSubmission);
+			await registerSave(attach(ownerDocument.querySelector('main')!), deliveries, {
+				captureEvent: capture,
+			}).ready;
+			const moduleReady = deferred();
+			const island = registerIsland(ownerDocument, moduleReady.promise);
+			if (position === 'historical and live selections') last.click();
+			expect(selectionEvents).toHaveLength(2);
+			await vi.advanceTimersByTimeAsync(0);
+			expect(island.load).toHaveBeenCalledOnce();
+			expect(island.activations).toEqual([]);
+			moduleReady.resolve();
+			await vi.advanceTimersByTimeAsync(0);
+			expect(island.activations).toHaveLength(1);
+			const intents = island.activations[0].intents;
+			const selections = intents.filter(({ event }) => event.type === 'click');
+			expect(selections).toHaveLength(2);
+			expect(selections[0].event).toBe(selectionEvents[0]);
+			expect(selections[1].event).toBe(selectionEvents[1]);
+			expect(intents.filter(({ event }) => event.type === 'submit')).toEqual([]);
+			expect(capture).not.toHaveBeenCalled();
+			expect(deliveries).toEqual([]);
+			expect(submissions).toEqual([original]);
+			expect(selectionEvents).toHaveLength(2);
+		},
+	);
+
+	it.each(['parent', 'marker', 'range owner'] as const)(
+		'captures a newly appended form once but drops delivery when adoption changes its %s',
+		async (change) => {
+			const ownerDocument = earlyDocument('<main><section></section><aside></aside></main>');
+			const section = ownerDocument.querySelector('section')!;
+			const root = attach(ownerDocument.querySelector('main')!);
+			const owner = {};
+			root.registerExternalRange(section, { owner });
+			const deliveries: Delivery[] = [];
+			const capture = vi.fn(acceptedSubmission);
+			const adopt = vi.fn((element: Element) => {
+				if (change === 'marker') element.setAttribute('data-octane-capture-submit', 'other');
+				else if (change === 'range owner') root.registerExternalRange(element, { owner: {} });
+				else {
+					const parent = ownerDocument.createElement('div');
+					section.appendChild(parent);
+					parent.appendChild(element);
+				}
+			});
+			await registerSave(root, deliveries, { owner, captureEvent: capture, adopt }).ready;
+			const form = ownerDocument.createElement('form');
+			form.setAttribute('data-octane-capture-submit', 'save');
+			form.innerHTML =
+				'<textarea name="draft">accepted</textarea><button type="submit">Send</button>';
+			section.appendChild(form);
+			const original = submit(form, form.querySelector('button')!);
+			expect(original.defaultPrevented).toBe(true);
+			expect(capture).toHaveBeenCalledOnce();
+			expect(capture.mock.calls[0][0]).toBe(original);
+			expect(capture.mock.calls[0][1]).toBe(form);
+			expect(capture.mock.calls[0][2]?.fields).toEqual([['draft', 'accepted']]);
+			expect(adopt).toHaveBeenCalledOnce();
+			expect(adopt.mock.calls[0][0]).toBe(form);
+			expect(deliveries).toEqual([]);
+			await Promise.resolve();
+			expect(capture).toHaveBeenCalledOnce();
+			expect(adopt).toHaveBeenCalledOnce();
+			expect(deliveries).toEqual([]);
+		},
+	);
+
+	it.each(['synchronous', 'pending'] as const)(
+		'revokes island activation when %s adoption changes a claimed native command range owner',
+		async (mode) => {
+			vi.useFakeTimers();
+			const ownerDocument = independentDocument();
+			const form = ownerDocument.querySelector('form')!;
+			const parent = form.parentElement!;
+			const button = ownerDocument.querySelector('button')!;
+			form.remove();
+			const root = attach(ownerDocument.querySelector('main')!);
+			const owner = {};
+			root.registerExternalRange(parent, { owner });
+			const deliveries: Delivery[] = [];
+			const capture = vi.fn(acceptedSubmission);
+			const adoptionReady = deferred();
+			const adopt = vi.fn((element: Element) => {
+				root.registerExternalRange(element, { owner: {} });
+				if (mode === 'pending') return adoptionReady.promise;
+			});
+			await registerSave(root, deliveries, { owner, captureEvent: capture, adopt }).ready;
+			const island = registerIsland(ownerDocument);
+			const events: SubmitEvent[] = [];
+			form.addEventListener('submit', (event) => events.push(event));
+			parent.appendChild(form);
+			form.requestSubmit(button);
+			expect(events).toHaveLength(1);
+			const original = events[0];
+			expect(original.isTrusted).toBe(true);
+			expect(original.defaultPrevented).toBe(true);
+			expect(capture).toHaveBeenCalledOnce();
+			expect(capture.mock.calls[0][0]).toBe(original);
+			expect(capture.mock.calls[0][1]).toBe(form);
+			expect(capture.mock.calls[0][2]?.fields).toEqual([
+				['draft', 'accepted'],
+				['intent', 'send'],
+			]);
+			expect(adopt).toHaveBeenCalledOnce();
+			expect(adopt.mock.calls[0][0]).toBe(form);
+			expect(deliveries).toEqual([]);
+			await vi.advanceTimersByTimeAsync(0);
+			expect(island.load).not.toHaveBeenCalled();
+			expect(island.activations).toEqual([]);
+			expect(capture).toHaveBeenCalledOnce();
+			expect(adopt).toHaveBeenCalledOnce();
+			expect(deliveries).toEqual([]);
+			expect(events).toEqual([original]);
+			adoptionReady.resolve();
+			await vi.advanceTimersByTimeAsync(0);
+			expect(island.load).not.toHaveBeenCalled();
+			expect(island.activations).toEqual([]);
+			expect(deliveries).toEqual([]);
+		},
+	);
+
 	it('disposes a behavior root idempotently without a parser bootstrap', async () => {
 		const ownerDocument = frameDocument();
 		ownerDocument.body.innerHTML = FORM;
 		const form = ownerDocument.querySelector('form')!;
-		const root = attach(ownerDocument.querySelector('main')!);
+		const root = attachWithoutForms(ownerDocument.querySelector('main')!);
 		const cleanup = vi.fn();
 		const deliveries: Delivery[] = [];
 		const registration = registerSave(root, deliveries, { adopt: () => cleanup });
@@ -126,6 +591,194 @@ describe('parser-time native form commands', () => {
 		expect(submit(form).defaultPrevented).toBe(false);
 		expect(deliveries).toEqual([]);
 	});
+
+	it('keeps native events ordinary for a default root without claiming accepted snapshots', async () => {
+		const ownerDocument = earlyDocument();
+		const form = ownerDocument.querySelector('form')!;
+		const root = attachWithoutForms(ownerDocument.querySelector('main')!);
+		const historical = submit(form);
+		ownerDocument.querySelector('textarea')!.value = 'edited';
+		const deliveries: Delivery[] = [];
+		const capture = vi.fn(acceptedSubmission);
+		const registration = registerSave(root, deliveries, { captureEvent: capture });
+		await registration.ready;
+		expect(historical.defaultPrevented).toBe(true);
+		expect(capture).not.toHaveBeenCalled();
+		expect(deliveries).toEqual([]);
+		const live = submit(form);
+		expect(live.defaultPrevented).toBe(true);
+		expect(capture).toHaveBeenCalledOnce();
+		expect(capture).toHaveBeenCalledWith(live, form);
+		expect(deliveries.map(({ event, payload }) => [event, payload])).toEqual([[live, undefined]]);
+	});
+
+	it('keeps an unconfigured child ordinary while configured ancestors and siblings capture', async () => {
+		const ownerDocument = earlyDocument();
+		const form = ownerDocument.querySelector('form')!;
+		const outer = attach(ownerDocument.querySelector('main')!);
+		const outerDeliveries: Delivery[] = [];
+		const outerCapture = vi.fn(acceptedSubmission);
+		await registerSave(outer, outerDeliveries, { captureEvent: outerCapture }).ready;
+		const inner = attachWithoutForms(ownerDocument.querySelector('section')!);
+		const historical = submit(form);
+		const innerDeliveries: Delivery[] = [];
+		const innerCapture = vi.fn(acceptedSubmission);
+		await registerSave(inner, innerDeliveries, { captureEvent: innerCapture }).ready;
+		expect(historical.defaultPrevented).toBe(true);
+		expect(innerCapture).not.toHaveBeenCalled();
+		expect(outerCapture).not.toHaveBeenCalled();
+		const live = submit(form);
+		expect(live.defaultPrevented).toBe(true);
+		expect(innerCapture).toHaveBeenCalledWith(live, form);
+		expect(innerDeliveries.map(({ event, payload }) => [event, payload])).toEqual([
+			[live, undefined],
+		]);
+		outer.dispose();
+		expect(inner.signal.aborted).toBe(false);
+		const afterOuter = submit(form);
+		expect(afterOuter.defaultPrevented).toBe(true);
+		expect(innerCapture).toHaveBeenLastCalledWith(afterOuter, form);
+		const siblingContainer = ownerDocument.createElement('main');
+		siblingContainer.innerHTML =
+			'<form data-octane-capture-submit="save"><input name="draft" value="sibling"></form>';
+		ownerDocument.body.appendChild(siblingContainer);
+		const siblingForm = siblingContainer.querySelector('form')!;
+		const siblingDeliveries: Delivery[] = [];
+		await registerSave(attach(siblingContainer), siblingDeliveries).ready;
+		const sibling = submit(siblingForm);
+		expect(sibling.defaultPrevented).toBe(true);
+		expect(siblingDeliveries.map(({ event }) => event)).toEqual([sibling]);
+		expect(siblingDeliveries[0].payload?.fields).toEqual([['draft', 'sibling']]);
+		const afterSibling = submit(form);
+		expect(afterSibling.defaultPrevented).toBe(true);
+		expect(innerCapture).toHaveBeenCalledTimes(3);
+		expect(innerCapture).toHaveBeenLastCalledWith(afterSibling, form);
+		expect(innerDeliveries.map(({ event, payload }) => [event, payload])).toEqual([
+			[live, undefined],
+			[afterOuter, undefined],
+			[afterSibling, undefined],
+		]);
+		expect(outerCapture).not.toHaveBeenCalled();
+		expect(outerDeliveries).toEqual([]);
+	});
+
+	it('preserves unrelated pending commands after the last configured root is disposed', async () => {
+		const ownerDocument = earlyDocument();
+		const unrelatedContainer = ownerDocument.createElement('main');
+		unrelatedContainer.innerHTML =
+			'<form data-octane-capture-submit="save"><input name="draft" value="accepted elsewhere"></form>';
+		ownerDocument.body.appendChild(unrelatedContainer);
+		const form = unrelatedContainer.querySelector('form')!;
+		const original = submit(form);
+		attach(ownerDocument.querySelector('main')!).dispose();
+		unrelatedContainer.querySelector('input')!.value = 'edited';
+		const deliveries: Delivery[] = [];
+		const registration = registerSave(attach(unrelatedContainer), deliveries);
+		await registration.ready;
+		expect(original.defaultPrevented).toBe(true);
+		expect(deliveries.map(({ event }) => event)).toEqual([original]);
+		expect(deliveries[0].payload?.fields).toEqual([['draft', 'accepted elsewhere']]);
+		const current = submit(form);
+		expect(current.defaultPrevented).toBe(true);
+		expect(deliveries.map(({ event }) => event)).toEqual([original, current]);
+		expect(deliveries[1].payload?.fields).toEqual([['draft', 'edited']]);
+	});
+
+	it('drops accepted commands from a disposed default root before an opting replacement arrives', async () => {
+		const ownerDocument = earlyDocument();
+		const form = ownerDocument.querySelector('form')!;
+		const container = ownerDocument.querySelector('section')!;
+		const outer = attach(ownerDocument.querySelector('main')!);
+		const inner = attachWithoutForms(container);
+		const historical = submit(form);
+		outer.dispose();
+		inner.dispose();
+		ownerDocument.querySelector('textarea')!.value = 'current';
+		const deliveries: Delivery[] = [];
+		const capture = vi.fn(acceptedSubmission);
+		await registerSave(attach(container), deliveries, { captureEvent: capture }).ready;
+		expect(historical.defaultPrevented).toBe(true);
+		expect(capture).not.toHaveBeenCalled();
+		expect(deliveries).toEqual([]);
+		const current = submit(form);
+		expect(current.defaultPrevented).toBe(true);
+		expect(capture).toHaveBeenCalledOnce();
+		expect(deliveries.map(({ event }) => event)).toEqual([current]);
+		expect(deliveries[0].payload?.fields).toEqual([['draft', 'current']]);
+	});
+
+	it.each(['default', 'configured'] as const)(
+		'keeps accepted commands available after an already-aborted %s root with a configured sibling',
+		async (mode) => {
+			const ownerDocument = earlyDocument();
+			const container = ownerDocument.querySelector('main')!;
+			const form = ownerDocument.querySelector('form')!;
+			attach(ownerDocument.querySelector('aside')!);
+			const historical = submit(form);
+			const lifetime = new ownerDocument.defaultView!.AbortController();
+			lifetime.abort();
+			const options = { signal: lifetime.signal };
+			const canceled =
+				mode === 'configured' ? attach(container, options) : attachWithoutForms(container, options);
+			expect(canceled.signal.aborted).toBe(true);
+			expect(() => canceled.dispose()).not.toThrow();
+			expect(ownerDocument.querySelector('form')).toBe(form);
+			ownerDocument.querySelector('textarea')!.value = 'current';
+			const deliveries: Delivery[] = [];
+			await registerSave(attach(container), deliveries).ready;
+			expect(historical.defaultPrevented).toBe(true);
+			expect(deliveries.map(({ event }) => event)).toEqual([historical]);
+			expect(deliveries[0].payload?.fields).toEqual([['draft', 'accepted']]);
+			const current = submit(form);
+			expect(current.defaultPrevented).toBe(true);
+			expect(deliveries.map(({ event }) => event)).toEqual([historical, current]);
+			expect(deliveries[1].payload?.fields).toEqual([['draft', 'current']]);
+		},
+	);
+
+	it.each(['unclaimed', 'captured'] as const)(
+		'keeps the live owner %s command through an already-aborted configured replacement',
+		async (phase) => {
+			const ownerDocument = earlyDocument();
+			const container = ownerDocument.querySelector('main')!;
+			const form = ownerDocument.querySelector('form')!;
+			const root = attach(container);
+			const ready = deferred();
+			const deliveries: Delivery[] = [];
+			const capture = vi.fn(acceptedSubmission);
+			let registration =
+				phase === 'captured'
+					? registerSave(root, deliveries, { ready: ready.promise, captureEvent: capture })
+					: undefined;
+			const original = submit(form);
+			const lifetime = new ownerDocument.defaultView!.AbortController();
+			lifetime.abort();
+			const canceled = attach(container, { replace: true, signal: lifetime.signal });
+			expect(canceled.signal.aborted).toBe(true);
+			expect(root.signal.aborted).toBe(false);
+			expect(() => canceled.dispose()).not.toThrow();
+			expect(ownerDocument.querySelector('form')).toBe(form);
+			ownerDocument.querySelector('textarea')!.value = 'current';
+			registration ??= registerSave(root, deliveries, {
+				ready: ready.promise,
+				captureEvent: capture,
+			});
+			expect(original.defaultPrevented).toBe(true);
+			expect(registration.signal.aborted).toBe(false);
+			expect(capture).toHaveBeenCalledOnce();
+			expect(capture.mock.calls[0][0]).toBe(original);
+			expect(deliveries).toEqual([]);
+			ready.resolve();
+			await registration.ready;
+			expect(deliveries.map(({ event }) => event)).toEqual([original]);
+			expect(deliveries[0].payload?.fields).toEqual([['draft', 'accepted']]);
+			const current = submit(form);
+			expect(current.defaultPrevented).toBe(true);
+			expect(capture).toHaveBeenCalledTimes(2);
+			expect(deliveries.map(({ event }) => event)).toEqual([original, current]);
+			expect(deliveries[1].payload?.fields).toEqual([['draft', 'current']]);
+		},
+	);
 
 	it('delivers accepted fields and submitter once after later edits and registration', async () => {
 		const ownerDocument = earlyDocument(
@@ -635,6 +1288,39 @@ describe('parser-time native form commands', () => {
 		expect(event.defaultPrevented).toBe(true);
 		expect(deliveries).toEqual([]);
 		expect(submit(form).defaultPrevented).toBe(false);
+	});
+
+	it('drops a claimed accepted command after page exit while ordinary registration remains live', async () => {
+		const ownerDocument = earlyDocument();
+		const form = ownerDocument.querySelector('form')!;
+		const original = submit(form);
+		const root = attach(ownerDocument.querySelector('main')!);
+		const ready = deferred();
+		const deliveries: Delivery[] = [];
+		const capture = vi.fn(acceptedSubmission);
+		const adopt = vi.fn();
+		const registration = registerSave(root, deliveries, {
+			ready: ready.promise,
+			captureEvent: capture,
+			adopt,
+		});
+		expect(original.defaultPrevented).toBe(true);
+		expect(capture).toHaveBeenCalledOnce();
+		expect(capture.mock.calls[0][0]).toBe(original);
+		expect(capture.mock.calls[0][2]?.fields).toEqual([['draft', 'accepted']]);
+		expect(adopt).not.toHaveBeenCalled();
+		expect(deliveries).toEqual([]);
+		const ownerWindow = ownerDocument.defaultView!;
+		ownerWindow.dispatchEvent(new ownerWindow.Event('pagehide'));
+		ready.resolve();
+		await registration.ready;
+		expect(deliveries).toEqual([]);
+		expect(capture).toHaveBeenCalledOnce();
+		expect(adopt).toHaveBeenCalledOnce();
+		expect(adopt.mock.calls[0][0]).toBe(form);
+		expect(adopt.mock.calls[0][1].event).toBeUndefined();
+		expect(root.signal.aborted).toBe(false);
+		expect(registration.signal.aborted).toBe(false);
 	});
 
 	it('releases unanswered forms after thirty seconds without stale delivery', async () => {

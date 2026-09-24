@@ -13,6 +13,7 @@ import { octane } from 'octane/compiler/vite';
 import { earlySignalBootstrapScript, renderToString } from 'octane/server';
 import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { loadServerFixture } from '../../_server-fixture.js';
+import type { EarlyFormSubmissionMailbox } from '../../../src/form-submission.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -202,6 +203,23 @@ for (const production of [false, true]) {
 				};
 			}
 
+			async function addGetterControls(current: Page): Promise<boolean[]> {
+				return current.evaluate(() => {
+					const form = document.querySelector('#command-form') as HTMLFormElement;
+					const container = document.querySelector('#behavior-container')!;
+					// External successful controls exercise native form named properties
+					// without changing the compiler-owned DOM inside the Hydrate boundary.
+					return ['parentElement', 'ownerDocument', 'isConnected', 'nodeType'].map((name) => {
+						const input = document.createElement('input');
+						input.name = name;
+						input.value = `original-${name}`;
+						input.setAttribute('form', 'command-form');
+						Node.prototype.appendChild.call(container, input);
+						return (form as unknown as Record<string, unknown>)[name] === input;
+					});
+				});
+			}
+
 			it('preserves ordinary click holding while implicit Enter and requestSubmit retain their native default', async () => {
 				const { page, submissions, load } = await openPage('plain');
 				await page.getByLabel('Draft', { exact: true }).fill('A');
@@ -365,20 +383,31 @@ for (const production of [false, true]) {
 
 			it('accepts successful controls, files, external controls and submitter overrides before their DOM values change', async () => {
 				const { page, submissions, load } = await openPage('controls');
-				await page.locator('#draft-input').fill('A');
 				await page.locator('#attachment-input').setInputFiles({
 					name: 'original.txt',
 					mimeType: 'text/plain',
 					buffer: Buffer.from('accepted'),
 				});
-				await page.locator('#save-button').click();
-				await page.locator('#draft-input').fill('B');
-				await page.locator('#external-input').fill('changed-external');
-				await page.locator('#checked-input').uncheck();
-				await page.locator('#second-input').check();
-				await page.locator('#options-input').selectOption(['two']);
+				await page.evaluate(() => {
+					(document.querySelector('#draft-input') as HTMLInputElement).value = 'A';
+					// Playwright's actionability check calls the form's masked methods.
+					// The native API still generates the genuine submit event and fields.
+					HTMLFormElement.prototype.requestSubmit.call(
+						document.querySelector('#command-form') as HTMLFormElement,
+						document.querySelector('#save-button') as HTMLButtonElement,
+					);
+				});
 				await page.locator('#attachment-input').setInputFiles([]);
 				await page.evaluate(() => {
+					(document.querySelector('#draft-input') as HTMLInputElement).value = 'B';
+					(document.querySelector('#external-input') as HTMLInputElement).value =
+						'changed-external';
+					(document.querySelector('#checked-input') as HTMLInputElement).checked = false;
+					(document.querySelector('#second-input') as HTMLInputElement).checked = true;
+					for (const option of (document.querySelector('#options-input') as HTMLSelectElement)
+						.options) {
+						option.selected = option.value === 'two';
+					}
 					const form = document.querySelector('#command-form') as HTMLFormElement;
 					form.setAttribute('action', '/submitted?form=changed');
 					form.method = 'get';
@@ -442,12 +471,115 @@ for (const production of [false, true]) {
 				expect(submissions).toEqual([]);
 			});
 
+			for (const scope of ['container', 'form'] as const) {
+				it(`captures, delivers and activates native commands in a ${scope} root when successful controls mask form DOM getters`, async () => {
+					const { page, submissions, load } = await openPage(
+						'index',
+						scope === 'form' ? '?hold&form-root' : '?hold',
+					);
+					expect(await addGetterControls(page)).toEqual([true, true, true, true]);
+					await page.evaluate(() => {
+						(document.querySelector('#draft-input') as HTMLInputElement).value = 'A';
+						HTMLFormElement.prototype.requestSubmit.call(
+							document.querySelector('#command-form') as HTMLFormElement,
+							document.querySelector('#save-button') as HTMLButtonElement,
+						);
+						(document.querySelector('#draft-input') as HTMLInputElement).value = 'B';
+					});
+					expect(
+						await page.evaluate(() =>
+							window.__formObservation.events.map((event) => event.defaultPrevented),
+						),
+					).toEqual([true]);
+					await load();
+					await page.evaluate(() => window.__formSubmission.release());
+					await expect
+						.poll(() => page.evaluate(() => window.__formSubmission.state()), { timeout: 30_000 })
+						.toMatchObject({
+							hydrated: 1,
+							captures: [expect.any(Object)],
+							deliveries: [expect.any(Object)],
+							errors: [],
+						});
+					const state = await page.evaluate(() => window.__formSubmission.state());
+					expect(state.deliveries[0]).toMatchObject({
+						fields: [
+							['draft', 'A'],
+							['intent', 'save'],
+							['parentElement', 'original-parentElement'],
+							['ownerDocument', 'original-ownerDocument'],
+							['isConnected', 'original-isConnected'],
+							['nodeType', 'original-nodeType'],
+						],
+						early: true,
+						original: true,
+						trusted: true,
+						submitterSame: true,
+						immutable: true,
+					});
+					expect(state).toMatchObject({
+						adoptions: ['command-form'],
+						islandLoads: 1,
+						nativeSubmissions: 1,
+						canceled: [true],
+						inputSame: true,
+						value: 'B',
+						clicks: [],
+					});
+					expect(submissions).toEqual([]);
+				});
+			}
+
+			it('drops a native command after a same-island parent move despite successful controls masking DOM getters', async () => {
+				const { page, submissions, load } = await openPage('index', '?hold');
+				expect(await addGetterControls(page)).toEqual([true, true, true, true]);
+				await page.evaluate(() => {
+					const form = document.querySelector('#command-form') as HTMLFormElement;
+					(document.querySelector('#draft-input') as HTMLInputElement).value = 'A';
+					HTMLFormElement.prototype.requestSubmit.call(
+						form,
+						document.querySelector('#save-button') as HTMLButtonElement,
+					);
+					const boundary = Element.prototype.closest.call(
+						form,
+						'[data-octane-hydrate-independent]',
+					) as Element;
+					const parent = document.createElement('div');
+					Node.prototype.appendChild.call(boundary, parent);
+					Node.prototype.appendChild.call(parent, form);
+					(document.querySelector('#draft-input') as HTMLInputElement).value = 'B';
+				});
+				expect(
+					await page.evaluate(() =>
+						window.__formObservation.events.map((event) => event.defaultPrevented),
+					),
+				).toEqual([true]);
+				await load();
+				await page.evaluate(() => window.__formSubmission.release());
+				await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
+				expect(await page.evaluate(() => window.__formSubmission.state())).toMatchObject({
+					captures: [],
+					deliveries: [],
+					islandLoads: 0,
+					hydrated: 0,
+					nativeSubmissions: 1,
+					canceled: [true],
+					inputSame: true,
+					value: 'B',
+					clicks: [],
+					errors: [],
+				});
+				expect(submissions).toEqual([]);
+			});
+
 			it('keeps submit commands separate from island activation and ordinary behavior registration', async () => {
 				const { page, submissions, load } = await openPage('index', '?hold');
 				await page.getByLabel('Draft', { exact: true }).fill('A');
 				await page.getByRole('button', { name: 'Save', exact: true }).click();
 				await load();
-				await page.waitForFunction(() => window.__formSubmission.state().hydrated === 1);
+				await expect
+					.poll(() => page.evaluate(() => window.__formSubmission.state()), { timeout: 30_000 })
+					.toMatchObject({ hydrated: 1, errors: [] });
 				let state = await page.evaluate(() => window.__formSubmission.state());
 				expect(state).toMatchObject({
 					captures: [expect.any(Object)],
@@ -500,6 +632,163 @@ for (const production of [false, true]) {
 				expect(submissions).toEqual([]);
 			});
 
+			it('preserves both selection clicks around a native command during real formdata construction', async () => {
+				const { page, submissions, load } = await openPage('index', '?hold');
+				await page.evaluate(() => {
+					(document.querySelector('#draft-input') as HTMLInputElement).value = 'A';
+					(document.querySelector('#activate-button') as HTMLButtonElement).setAttribute(
+						'data-octane-hydrate-selection',
+						'day',
+					);
+				});
+				await page.locator('#activate-button').click();
+				const observed = await page.evaluate(() => {
+					const form = document.querySelector('#command-form') as HTMLFormElement;
+					const button = document.querySelector('#activate-button') as HTMLButtonElement;
+					const entries: Array<{ draft: string; trusted: boolean }> = [];
+					form.addEventListener(
+						'formdata',
+						(event) => {
+							entries.push({
+								draft: String((event as FormDataEvent).formData.get('draft')),
+								trusted: event.isTrusted,
+							});
+							// The submit command must already separate these same-group
+							// selections when native FormData fires this synchronous event.
+							button.click();
+						},
+						{ once: true },
+					);
+					HTMLFormElement.prototype.requestSubmit.call(
+						form,
+						document.querySelector('#save-button') as HTMLButtonElement,
+					);
+					(document.querySelector('#draft-input') as HTMLInputElement).value = 'B';
+					return {
+						entries,
+						nativeSubmissions: window.__formObservation.events.length,
+						canceled: window.__formObservation.events.map((event) => event.defaultPrevented),
+					};
+				});
+				expect(observed).toEqual({
+					entries: [{ draft: 'A', trusted: true }],
+					nativeSubmissions: 1,
+					canceled: [true],
+				});
+				await load();
+				await page.evaluate(() => window.__formSubmission.release());
+				await expect
+					.poll(() => page.evaluate(() => window.__formSubmission.state()), { timeout: 30_000 })
+					.toMatchObject({
+						hydrated: 1,
+						clicks: ['activate-button', 'activate-button'],
+						deliveries: [expect.any(Object)],
+						errors: [],
+					});
+				const state = await page.evaluate(() => window.__formSubmission.state());
+				expect(state.deliveries[0]).toMatchObject({
+					fields: [
+						['draft', 'A'],
+						['intent', 'save'],
+					],
+					original: true,
+					trusted: true,
+					submitterSame: true,
+					immutable: true,
+				});
+				expect(state).toMatchObject({
+					captures: [expect.any(Object)],
+					islandLoads: 1,
+					nativeSubmissions: 1,
+					canceled: [true],
+					inputSame: true,
+					value: 'B',
+				});
+				expect(submissions).toEqual([]);
+			});
+
+			it('captures native formdata reentrancy across forms in accepted order while preserving the same-form submission guard', async () => {
+				const { page, submissions, load } = await openPage('index', '?hold');
+				await page.getByLabel('Draft', { exact: true }).fill('A');
+				await page.evaluate(() => {
+					const form = document.querySelector('#command-form') as HTMLFormElement;
+					const nested = form.cloneNode(true) as HTMLFormElement;
+					for (const element of nested.querySelectorAll('[id]')) element.removeAttribute('id');
+					nested.id = 'secondary-command-form';
+					(document.querySelector('#behavior-container') as HTMLElement).appendChild(nested);
+					const nestedInput = nested.elements.namedItem('draft') as HTMLInputElement;
+					nestedInput.value = 'B';
+					window.__nativeFormData = { entries: [], sameFormAdded: -1, attempts: 0 };
+					document.addEventListener(
+						'formdata',
+						(event) => {
+							const native = event as FormDataEvent;
+							window.__nativeFormData.entries.push({
+								formId: (event.target as HTMLFormElement).id,
+								draft: String(native.formData.get('draft')),
+								trusted: event.isTrusted,
+							});
+						},
+						true,
+					);
+					form.addEventListener(
+						'formdata',
+						() => {
+							window.__nativeFormData.attempts++;
+							(form.elements.namedItem('draft') as HTMLInputElement).value = 'B';
+							const before = window.__formObservation.events.length;
+							form.requestSubmit();
+							window.__nativeFormData.sameFormAdded =
+								window.__formObservation.events.length - before;
+							// Native entry-list construction guards belong to each form. A
+							// different form can submit while the first snapshot is being built.
+							nested.requestSubmit();
+						},
+						{ once: true },
+					);
+				});
+				await page.locator('#save-button').click();
+				expect(await page.evaluate(() => window.__nativeFormData)).toEqual({
+					entries: [
+						{ formId: 'command-form', draft: 'A', trusted: true },
+						{ formId: 'secondary-command-form', draft: 'B', trusted: true },
+					],
+					sameFormAdded: 0,
+					attempts: 1,
+				});
+				await page.evaluate(() => {
+					for (const form of document.querySelectorAll<HTMLFormElement>('form')) {
+						(form.elements.namedItem('draft') as HTMLInputElement).value = 'C';
+					}
+				});
+				await load();
+				await page.evaluate(() => window.__formSubmission.release());
+				await page.waitForFunction(() => window.__formSubmission.state().deliveries.length === 2);
+				const state = await page.evaluate(() => window.__formSubmission.state());
+				expect(state.deliveries.map((entry) => entry.fields)).toEqual([
+					[
+						['draft', 'A'],
+						['intent', 'save'],
+					],
+					[['draft', 'B']],
+				]);
+				expect(state.deliveries.map((entry) => entry.form?.id)).toEqual([
+					'command-form',
+					'secondary-command-form',
+				]);
+				expect(
+					state.deliveries.every((entry) => entry.original && entry.submitterSame && entry.trusted),
+				).toBe(true);
+				expect(state).toMatchObject({
+					nativeSubmissions: 2,
+					canceled: [true, true],
+					value: 'C',
+					clicks: [],
+					errors: [],
+				});
+				expect(submissions).toEqual([]);
+			});
+
 			it('delivers repeated click and submit sequences once each without replaying their native defaults', async () => {
 				const { page, submissions, load } = await openPage('index', '?hold');
 				for (const value of ['A', 'B']) {
@@ -508,7 +797,9 @@ for (const production of [false, true]) {
 				}
 				await page.getByLabel('Draft', { exact: true }).fill('C');
 				await load();
-				await page.waitForFunction(() => window.__formSubmission.state().hydrated === 1);
+				await expect
+					.poll(() => page.evaluate(() => window.__formSubmission.state()), { timeout: 30_000 })
+					.toMatchObject({ hydrated: 1, errors: [] });
 				expect(await page.evaluate(() => window.__formSubmission.state())).toMatchObject({
 					captures: [expect.any(Object), expect.any(Object)],
 					deliveries: [],
@@ -542,29 +833,118 @@ for (const production of [false, true]) {
 				expect(submissions).toEqual([]);
 			});
 
-			it('drops pending commands when their behavior registration is disposed and releases the native default', async () => {
-				const { page, submissions, load } = await openPage('index', '?hold');
-				await page.getByLabel('Draft', { exact: true }).fill('A');
-				await page.getByRole('button', { name: 'Save', exact: true }).click();
-				await load();
-				expect((await page.evaluate(() => window.__formSubmission.state())).deliveries).toEqual([]);
-				await page.evaluate(() => {
-					window.__formSubmission.disposeRegistration();
-					window.__formSubmission.release();
+			for (const scope of ['container', 'form'] as const) {
+				it(`releases future native submits when a ${scope} root registration is disposed despite a successful localName control`, async () => {
+					const { page, submissions, load } = await openPage(
+						'index',
+						scope === 'form' ? '?form-root' : '?hold',
+					);
+					expect(
+						await page.evaluate(() => {
+							const form = document.querySelector('#command-form') as HTMLFormElement;
+							const input = document.createElement('input');
+							input.name = 'localName';
+							input.value = 'original-localName';
+							input.setAttribute('form', 'command-form');
+							Node.prototype.appendChild.call(
+								document.querySelector('#behavior-container')!,
+								input,
+							);
+							return (form as unknown as Record<string, unknown>).localName === input;
+						}),
+					).toBe(true);
+					await page.evaluate(() => {
+						(document.querySelector('#draft-input') as HTMLInputElement).value = 'A';
+						HTMLFormElement.prototype.requestSubmit.call(
+							document.querySelector('#command-form') as HTMLFormElement,
+							document.querySelector('#save-button') as HTMLButtonElement,
+						);
+					});
+					await load();
+					if (scope === 'form') {
+						// Drain the accepted command before disposal, so release must
+						// identify the form root after the pending command queue is empty.
+						await expect
+							.poll(() => page.evaluate(() => window.__formSubmission.state()))
+							.toMatchObject({ deliveries: [expect.any(Object)], errors: [] });
+					} else {
+						expect((await page.evaluate(() => window.__formSubmission.state())).deliveries).toEqual(
+							[],
+						);
+					}
+					expect(
+						await page.evaluate(() => {
+							const mailbox = (
+								document as Document & {
+									__octaneEarlyFormSubmissions: EarlyFormSubmissionMailbox;
+								}
+							).__octaneEarlyFormSubmissions;
+							return {
+								queued: mailbox.q.length,
+								capturesForm: mailbox.captures(
+									document.querySelector('#command-form') as HTMLFormElement,
+								),
+							};
+						}),
+					).toEqual({ queued: 0, capturesForm: true });
+					const afterDispose = await page.evaluate(() => {
+						window.__formSubmission.disposeRegistration();
+						window.__formSubmission.release();
+						const mailbox = (
+							document as Document & {
+								__octaneEarlyFormSubmissions: EarlyFormSubmissionMailbox;
+							}
+						).__octaneEarlyFormSubmissions;
+						const released = {
+							queued: mailbox.q.length,
+							capturesForm: mailbox.captures(
+								document.querySelector('#command-form') as HTMLFormElement,
+							),
+						};
+						(document.querySelector('#draft-input') as HTMLInputElement).value = 'B';
+						HTMLFormElement.prototype.requestSubmit.call(
+							document.querySelector('#command-form') as HTMLFormElement,
+							document.querySelector('#save-button') as HTMLButtonElement,
+						);
+						return released;
+					});
+					expect(afterDispose).toEqual({ queued: 0, capturesForm: false });
+					await expect.poll(() => submissions.length).toBe(1);
+					const state = await page.evaluate(() => window.__formSubmission.state());
+					expect(state).toMatchObject({
+						captures: [expect.any(Object)],
+						deliveries:
+							scope === 'form'
+								? [
+										{
+											fields: [
+												['draft', 'A'],
+												['intent', 'save'],
+												['localName', 'original-localName'],
+											],
+											early: true,
+											immutable: true,
+											original: true,
+											submitterSame: true,
+											trusted: true,
+										},
+									]
+								: [],
+						adoptions: scope === 'form' ? ['command-form'] : [],
+						cleanups: scope === 'form' ? ['command-form'] : [],
+						inputSame: true,
+						value: 'B',
+						nativeSubmissions: 2,
+						canceled: [true, false],
+						errors: [],
+					});
+					expect(submissions[0].method).toBe('POST');
+					expect(new URLSearchParams(submissions[0].body!).get('draft')).toBe('B');
+					expect(new URLSearchParams(submissions[0].body!).get('localName')).toBe(
+						'original-localName',
+					);
 				});
-				await page.getByLabel('Draft', { exact: true }).fill('B');
-				await page.getByRole('button', { name: 'Save', exact: true }).click();
-				await expect.poll(() => submissions.length).toBe(1);
-				const state = await page.evaluate(() => window.__formSubmission.state());
-				expect(state).toMatchObject({
-					deliveries: [],
-					adoptions: [],
-					cleanups: [],
-					nativeSubmissions: 2,
-					canceled: [true, false],
-					errors: [],
-				});
-			});
+			}
 
 			it('releases future native submits after the bounded lease expires without an owner', async () => {
 				const { page, submissions, load } = await openPage('index', '?no-owner', true);
@@ -616,4 +996,14 @@ for (const production of [false, true]) {
 			});
 		},
 	);
+}
+
+declare global {
+	interface Window {
+		__nativeFormData: {
+			entries: Array<{ formId: string; draft: string; trusted: boolean }>;
+			sameFormAdded: number;
+			attempts: number;
+		};
+	}
 }

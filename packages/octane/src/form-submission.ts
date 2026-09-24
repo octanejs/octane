@@ -1,4 +1,5 @@
 import { HYDRATE_ID_ATTR, HYDRATE_INDEPENDENT_ATTR } from './hydration-markers.js';
+import { getNativeHydrationDocument, getNativeHydrationDOM } from './hydration/native-intent.js';
 
 export const FORM_SUBMISSION_ATTR = 'data-octane-capture-submit';
 export const EARLY_FORM_SUBMISSIONS_KEY = '__octaneEarlyFormSubmissions';
@@ -37,6 +38,11 @@ export interface EarlyFormSubmissionRecord {
 	readonly parent: Element | null;
 	readonly boundary: Element | null;
 	readonly boundaryId: string | null;
+	readonly boundaryWhen: string | null;
+	readonly boundaryEvents: string | null;
+	readonly sequence: number;
+	/** A claimed owner's routing authority remains current through native activation. */
+	valid?: () => boolean;
 	/** Routing or application capture invalidated this command, without releasing its form. */
 	discarded?: true;
 	/** Undefined while capture is reserved, or after the owner extracts its payload. */
@@ -84,11 +90,12 @@ export function isEarlyFormSubmissionCurrent(
 ): boolean {
 	const form = record.form;
 	const ElementConstructor = ownerDocument.defaultView?.Element ?? globalThis.Element;
+	const dom = getNativeHydrationDOM(ownerDocument);
 	return (
 		record.event.target === form &&
-		form.ownerDocument === ownerDocument &&
-		form.isConnected &&
-		form.parentElement === record.parent &&
+		dom.owner(form) === ownerDocument &&
+		dom.connected(form) &&
+		dom.parent(form) === record.parent &&
 		ElementConstructor.prototype.getAttribute.call(form, FORM_SUBMISSION_ATTR) === record.key &&
 		ElementConstructor.prototype.closest.call(form, `[${HYDRATE_INDEPENDENT_ATTR}]`) ===
 			record.boundary &&
@@ -102,7 +109,8 @@ export function isEarlyFormSubmissionCurrent(
 export function formSubmissionControl(
 	target: Element,
 ): HTMLButtonElement | HTMLInputElement | null {
-	const ElementConstructor = target.ownerDocument.defaultView?.Element ?? globalThis.Element;
+	const ownerDocument = getNativeHydrationDocument(target)!;
+	const ElementConstructor = ownerDocument.defaultView?.Element ?? globalThis.Element;
 	const control = ElementConstructor.prototype.closest.call(target, 'button,input') as
 		HTMLButtonElement | HTMLInputElement | null;
 	return control !== null &&
@@ -117,11 +125,12 @@ export function formSubmissionControl(
 export function isEarlyFormSubmitActivation(event: Event): boolean {
 	if (event.type !== 'click') return false;
 	const target = event.target;
-	if (target === null || (target as Node).nodeType !== 1) return false;
+	const ownerDocument = getNativeHydrationDocument(target);
+	if (ownerDocument === null) return false;
 	const element = target as Element;
-	if (getEarlyFormSubmissionMailbox(element.ownerDocument) === undefined) return false;
+	if (getEarlyFormSubmissionMailbox(ownerDocument) === undefined) return false;
 	const form = formSubmissionControl(element)?.form;
-	const ElementConstructor = element.ownerDocument.defaultView?.Element ?? globalThis.Element;
+	const ElementConstructor = ownerDocument.defaultView?.Element ?? globalThis.Element;
 	// Release stops command capture, but submit-button activation must continue to
 	// reach the native default instead of being deferred again as a replayed click.
 	return (
