@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/mantine-hooks",
-  "version": "0.1.35",
+  "version": "0.1.36",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -34,7 +34,7 @@
     "test": "vitest run --root ../.. --project mantine-hooks --project mantine-hooks-differential --project mantine-hooks-ssr"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.4.0"
+    "octane": "workspace:^0.5.0"
   },
   "devDependencies": {
     "@mantine/hooks": "9.5.0",

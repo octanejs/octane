@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/window",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -52,7 +52,7 @@
     "@types/react": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.4.0"
+    "octane": "workspace:^0.5.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

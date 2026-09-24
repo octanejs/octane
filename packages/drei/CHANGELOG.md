@@ -1,5 +1,27 @@
 # @octanejs/drei
 
+## 0.0.24
+
+### Patch Changes
+
+- 2d46905: `TransformControls` and the pivot controls cast `state.controls` through
+  `unknown`, as upstream drei does. `tsrx-tsc` from `@tsrx/typescript-plugin`
+  0.4.10 reports the direct cast from `EventDispatcher | null` as TS2352.
+- Updated dependencies [3390f40]
+- Updated dependencies [d285bd7]
+- Updated dependencies [701b8c3]
+- Updated dependencies [4f25786]
+- Updated dependencies [afc0bee]
+- Updated dependencies [752d750]
+- Updated dependencies [2d46905]
+- Updated dependencies [a95c2dc]
+- Updated dependencies [fd81578]
+- Updated dependencies [bdd7db7]
+- Updated dependencies [47580bd]
+  - octane@0.5.0
+  - @octanejs/three@0.1.49
+  - @octanejs/zustand@0.1.56
+
 ## 0.0.23
 
 ### Patch Changes

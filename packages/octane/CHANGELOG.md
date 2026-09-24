@@ -1,5 +1,86 @@
 # octane
 
+## 0.5.0
+
+### Minor Changes
+
+- 752d750: Allow custom SSR hosts to share an immutable initial document signal seed with root, deferred, independent and streamed hydration. Matching native historical reads use versioned manifest references, while differing histories retain their own entries and live writes remain authoritative after adoption commits.
+
+### Patch Changes
+
+- 3390f40: Build newly visible fragment content inside an empty server hydration range without adopting its closing marker, preserving surrounding server nodes and mismatch diagnostics. Preserve immutable component framing across split Hydrate captures, retain separate server frames for mutable or shadowed component bindings, and build replacement component bodies as client DOM. Keep reassigned component declarations writable and decline callsite assumptions about their original bodies.
+- d285bd7: Diagnose actual eager imported signal `.get()` reads when activating compiled DOM
+  bindings instead of silently presenting an unsubscribed snapshot. Pass a signal
+  handle directly for a live binding, or provide a deliberate sample through the
+  BindingSource snapshot. Props-based sampling, pure foreign `.get()` methods and
+  already subscribed native attribute projections keep their existing behavior;
+  ordinary SSR reads are unchanged.
+- 701b8c3: Allocate a signal scope's request, resource, streamed-result, derived-binding,
+  adoption and trace bookkeeping only when those features are used. A `useSignal$`
+  hook scope now retains about 70% less memory, and bundles that use scoped
+  signals without streamed results are about 700 bytes smaller after gzip.
+  Streamed selections move into a capability that only the stream ingress
+  functions create.
+- 4f25786: Allow native host binding leases to hand off known unbound provider spreads while preserving renderer ownership of external styles and children.
+- afc0bee: Compile fixed-node `'use dom bindings'` views whose channels are all attributes,
+  booleans, ARIA/data attributes, classes or text to a scalar-only adopter. It keeps
+  the same claims, signal handles, transition presentation and cleanup, but no
+  longer ships the projection, control, class-group, style-restoration, host-handoff
+  or URL-sanitization code these views never use. The documented `adoptBindings`
+  example is about 41% smaller after gzip. Views with other channels keep the
+  general adopter.
+- 2d46905: Update the shared TSRX compiler dependency to `@tsrx/core` 0.3.2. Each `@switch`
+  arm is now its own block scope, so two arms can declare the same local, and
+  `@import` inside a `<style>` block is now the `tsrx-css-import` compile error.
+
+  `octane/tsrx-iterable` also re-exports `map_iterable_async`, which core now uses
+  in the editor for a `@for` whose body awaits, so the loop binding keeps its type.
+  Type inspection claims only that loop's `@for` keyword.
+- a95c2dc: Keep `.tsrx` modules that only declare signals renderer-free, as plain `.ts`
+  modules already were. They previously activated the renderer's native-read
+  driver on load, so a renderer-free consumer such as `adoptBindings` bundled the
+  renderer (about 24 KB gzip in a measured example). Modules that render signal
+  reads still activate native reads themselves through their documented
+  `octane/signals` import; a component that reads signals during render without
+  that import no longer relies on the declaring module to activate them.
+- fd81578: Return `@else if` branch values on universal renderers. An `@else if` arm
+  parses to an `IfStatement` alternate, which the universal compiler routed
+  through block codegen: the chained branch values were emitted as setup
+  statements and the else thunk returned an empty range, so every arm but the
+  first rendered nothing. The else thunk now returns the chained `universalIf`
+  value, so `@if`/`@else if`/`@else` chains — including chains nested inside
+  another arm — select their branch correctly.
+- bdd7db7: Allow `@for` without a `key` clause on universal renderers.
+
+  Universal lowering used to reject `@for (const x of xs)` with "universal @for
+  ranges require an explicit key", forcing boilerplate on static or throwaway
+  lists. The universal runtime reconciles ranges by key only — there is no
+  unkeyed path — so the compiler now synthesizes a positional key
+  (`(item, index) => index`) when `key` is omitted, matching the implicit-index
+  semantics an unkeyed list has elsewhere.
+
+  An explicit `key` is unchanged and still recommended for reorderable stateful
+  rows: with a positional key, item state (hooks, component owners, uncontrolled
+  leaf state) follows the slot rather than the item across reorders. The DOM
+  renderer is untouched — its unkeyed `@for` continues to fall back to
+  `x.id ?? x`.
+- 47580bd: Keep a live Suspense replay alive across an unrelated scheduled render so a
+  settled boundary still reveals its content.
+
+  A committed `@try`/`@pending` boundary wires its thrown thenables into a local
+  replay: on settle the root queues a microtask that re-renders with the pinned
+  memo cache. The next scheduled render unconditionally deactivated that replay
+  before preparing its own attempt. When the render only re-executed a scoped
+  owner, or retained the suspended subtree because its inputs looked unchanged,
+  nothing else ever re-attempted the region — the pending arm stayed on screen
+  after its promise had already resolved.
+
+  `prepare` now hands a live non-transition replay's memo cache to the fresh
+  attempt and disables retention for it, so the render itself re-attempts the
+  suspended regions. A settled boundary resolves inside that commit; one still
+  waiting on its thenables re-suspends and republishes a fresh replay.
+  Transition replays keep their existing supersede semantics.
+
 ## 0.4.3
 
 ### Patch Changes
