@@ -449,7 +449,8 @@ function isTemplateNode(node) {
 		node?.type === 'JSXForExpression' ||
 		node?.type === 'JSXIfExpression' ||
 		node?.type === 'JSXSwitchExpression' ||
-		node?.type === 'JSXTryExpression'
+		node?.type === 'JSXTryExpression' ||
+		node?.type === 'JSXCodeBlock'
 	);
 }
 
@@ -3296,19 +3297,24 @@ function compileBlockValueAst(statements, state, params = [], origin = null) {
 	const templates = [];
 	const setup = [];
 	for (const statement of statements ?? []) {
+		// Inside a BlockStatement the parser wraps JSX-producing nodes like
+		// `@{ … }` in an ExpressionStatement; unwrap it for the template/setup
+		// partition while keeping the statement for setup output.
+		const inner = statement.type === 'ExpressionStatement' ? statement.expression : statement;
 		if (
-			statement.type === 'JSXElement' ||
-			statement.type === 'Element' ||
-			statement.type === 'JSXFragment' ||
-			statement.type === 'Fragment' ||
-			statement.type === 'JSXText' ||
-			statement.type === 'JSXExpressionContainer' ||
-			statement.type === 'JSXForExpression' ||
-			statement.type === 'JSXIfExpression' ||
-			statement.type === 'JSXSwitchExpression' ||
-			statement.type === 'JSXTryExpression'
+			inner.type === 'JSXElement' ||
+			inner.type === 'Element' ||
+			inner.type === 'JSXFragment' ||
+			inner.type === 'Fragment' ||
+			inner.type === 'JSXText' ||
+			inner.type === 'JSXExpressionContainer' ||
+			inner.type === 'JSXForExpression' ||
+			inner.type === 'JSXIfExpression' ||
+			inner.type === 'JSXSwitchExpression' ||
+			inner.type === 'JSXTryExpression' ||
+			inner.type === 'JSXCodeBlock'
 		) {
-			templates.push(...compileChildAst(statement, context, state));
+			templates.push(...compileChildAst(inner, context, state));
 		} else {
 			setup.push(statement);
 		}
@@ -3612,6 +3618,14 @@ function compileChildAst(node, context, state) {
 	}
 	if (node.type === 'JSXExpressionContainer') {
 		if (!node.expression || node.expression.type === 'JSXEmptyExpression') return [];
+		// `{() => @{ … }}` is the explicit scoped child — it lowers to the same
+		// scoped block as bare `@{ … }`, keeping the arrow's parameters.
+		if (
+			node.expression.type === 'ArrowFunctionExpression' &&
+			node.expression.body?.type === 'JSXCodeBlock'
+		) {
+			return compileCodeBlockAst(node.expression.body, node.expression.params, context, state);
+		}
 		// A string-literal child is authored text with braces around it: fold it
 		// into the plan like JSXText, so the constant stops riding every render's
 		// slot array. Renderers without host text keep the renderable-hole slot.
@@ -3639,6 +3653,7 @@ function compileChildAst(node, context, state) {
 	if (node.type === 'JSXIfExpression') return [compileIfAst(node, context, state)];
 	if (node.type === 'JSXSwitchExpression') return [compileSwitchAst(node, context, state)];
 	if (node.type === 'JSXTryExpression') return [compileTryAst(node, context, state)];
+	if (node.type === 'JSXCodeBlock') return compileCodeBlockAst(node, [], context, state);
 	if (node.type === 'JSXStyleElement') {
 		throw universalError(
 			state.filename,
@@ -3656,6 +3671,37 @@ function compileChildrenAst(children, context, state) {
 	const output = [];
 	for (const child of children) output.push(...compileChildAst(child, context, state));
 	return output;
+}
+
+// `@{ … }` at child position: an empty block contributes nothing, a
+// render-only block merges into the parent template, and a setup-bearing or
+// code-only block lowers to a scoped dynamic child whose thunk runs its
+// statements inside a persistent child owner — the universal counterpart of
+// the DOM childSlot lowering for JSXCodeBlock. The explicit `{() => @{ … }}`
+// spelling always keeps its scope: its parameters bind inside the thunk.
+function compileCodeBlockAst(block, params, context, state) {
+	const body = block.body ?? [];
+	const render = block.render ?? null;
+	if (body.length === 0 && params.length === 0) {
+		return render === null ? [] : compileChildAst(render, context, state);
+	}
+	return [
+		addDynamicAst(
+			context,
+			generatedCall(
+				state.helpers.block,
+				[
+					compileBlockValueAst(
+						[...body, ...(render === null ? [] : [render])],
+						state,
+						params,
+						block,
+					),
+				],
+				block,
+			),
+		),
+	];
 }
 
 function extractEntryParallelUsesAst(expression, state) {
@@ -3875,6 +3921,7 @@ function universalHelperImportAsts(state, extraPairs = [], origin = null) {
 		['universalChildren', state.helpers.children],
 		['universalContext', state.helpers.context],
 		['universalActivity', state.helpers.activity],
+		['universalBlock', state.helpers.block],
 		...(state.helpers.firstScreenEvent === undefined
 			? []
 			: [['firstScreenEvent', state.helpers.firstScreenEvent]]),
@@ -4239,6 +4286,7 @@ export function lowerUniversalRendererRegionAst(
 	state.helpers.children = allocName(state, `${prefix}Children`);
 	state.helpers.context = allocName(state, `${prefix}Context`);
 	state.helpers.activity = allocName(state, `${prefix}Activity`);
+	state.helpers.block = allocName(state, `${prefix}Block`);
 	const generatedRuntimeAliases = Object.freeze(
 		Object.fromEntries(
 			[
@@ -4464,6 +4512,7 @@ export function lowerUniversalRendererRegionAst(
 				try: state.helpers.try,
 				context: state.helpers.context,
 				activity: state.helpers.activity,
+				block: state.helpers.block,
 			}),
 			components: Object.freeze(state.components),
 			bindings: Object.freeze([...specializationBindings]),
@@ -4553,6 +4602,7 @@ export function compileUniversal(
 	state.helpers.children = allocName(state, '__octaneUniversalChildren');
 	state.helpers.context = allocName(state, '__octaneUniversalContext');
 	state.helpers.activity = allocName(state, '__octaneUniversalActivity');
+	state.helpers.block = allocName(state, '__octaneUniversalBlock');
 	if (state.hmr) {
 		state.helpers.hmr = allocName(state, '__octaneUniversalHmr');
 		state.helpers.hmrSymbol = allocName(state, '__octaneUniversalHmrSymbol');
@@ -4606,6 +4656,7 @@ export function compileUniversal(
 			try: state.helpers.try,
 			context: state.helpers.context,
 			activity: state.helpers.activity,
+			block: state.helpers.block,
 		},
 		components: state.components,
 	};
