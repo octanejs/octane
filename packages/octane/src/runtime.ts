@@ -10547,11 +10547,13 @@ export function renderBlock(block: Block): void {
 		}
 	}
 	const hydration = activeHydration();
-	// A replacement range owns client DOM even while its parent continues
-	// adopting server siblings. Its fresh close marker is an insertion anchor.
+	// A replacement dynamic range owns client DOM even while its parent adopts
+	// server siblings. Fresh control-flow markers can instead be replay scaffolding
+	// whose body must still read the server rejection seed before adopting a catch.
 	if (
 		hydration !== null &&
-		(!hydration.owns(block) || (block.endMarker !== null && hydration.isFresh(block.endMarker)))
+		(!hydration.owns(block) ||
+			(block.kind === 'dynamic' && block.endMarker !== null && hydration.isFresh(block.endMarker)))
 	) {
 		hydration.suspend(() => renderBlock(block));
 		return;
