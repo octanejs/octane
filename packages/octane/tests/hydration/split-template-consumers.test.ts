@@ -11,6 +11,7 @@ import { condition, load } from 'octane/hydration';
 import { loadServerFixture } from '../_server-fixture.js';
 import type * as client from './_fixtures/split-template-lifecycle.tsrx';
 import type * as updatedAttributesClient from './_fixtures/split-hydrate-updated-attributes.tsrx';
+import type * as fragmentClient from './_fixtures/split-hydrate-fragments.tsrx';
 
 const filename = resolve(import.meta.dirname, '_fixtures/split-template-lifecycle.tsrx');
 const server = loadServerFixture<typeof client>(filename);
@@ -20,6 +21,8 @@ const updatedAttributesFilename = resolve(
 );
 const updatedAttributesServer =
 	loadServerFixture<typeof updatedAttributesClient>(updatedAttributesFilename);
+const fragmentsFilename = resolve(import.meta.dirname, '_fixtures/split-hydrate-fragments.tsrx');
+const fragmentsServer = loadServerFixture<typeof fragmentClient>(fragmentsFilename);
 
 async function consumer<T = typeof client>(dev: boolean, fixtureFilename = filename) {
 	const authored = await readFile(fixtureFilename, 'utf8');
@@ -94,6 +97,243 @@ async function consumer<T = typeof client>(dev: boolean, fixtureFilename = filen
 
 for (const dev of [false, true]) {
 	describe(`${dev ? 'development' : 'production'} split template consumers`, () => {
+		for (const general of [false, true]) {
+			for (const initiallyVisible of [false, true]) {
+				it(`activates an ${initiallyVisible ? 'initially visible' : 'initially empty'} fragment with ${general ? 'stateful' : 'plain'} headings and keeps its surrounding server controls`, async () => {
+					const view = await consumer<typeof fragmentClient>(dev, fragmentsFilename);
+					const effects: [string, string][] = [];
+					const refs: (HTMLElement | null)[] = [];
+					const clicked: string[] = [];
+					const props = {
+						when: condition(false),
+						show: initiallyVisible,
+						label: 'server',
+						tone: 'server-tone',
+						opacity: 0.5,
+						rows: ['first-row'],
+						general,
+						onEffect: (phase: 'mount' | 'cleanup', row: string) => effects.push([phase, row]),
+						onRef: (node: HTMLElement | null) => refs.push(node),
+						onClick: (label: string) => clicked.push(label),
+					};
+					try {
+						const View = general ? fragmentsServer.GeneralBoundary : fragmentsServer.LiteBoundary;
+						view.host.innerHTML = renderToString(View, props).html;
+						const prefix = view.host.querySelector('[data-row-prefix]')!;
+						const tail = view.host.querySelector<HTMLInputElement>('[data-row-tail]')!;
+						const outside = view.host.querySelector<HTMLInputElement>('#fragment-outside')!;
+						const serverSection = view.host.querySelector<HTMLElement>('section');
+						const serverHeadings = [...view.host.querySelectorAll('h2')];
+						tail.value = 'edited row draft';
+						outside.value = 'edited outside draft';
+						const root = view.api.start(view.host, props);
+						await root.settle();
+						expect(effects).toEqual([]);
+						expect(refs).toEqual([]);
+						const activeProps = {
+							...props,
+							when: load(),
+							show: true,
+							label: 'active',
+							tone: 'active-tone',
+							opacity: 1,
+						};
+						await root.update(activeProps);
+						const section = view.host.querySelector<HTMLElement>('section')!;
+						const headings = [...view.host.querySelectorAll<HTMLElement>('h2')];
+						expect(headings.map((node) => node.textContent)).toEqual(
+							general ? ['active:0', 'active:0'] : ['active', 'active'],
+						);
+						expect(section.className).toBe('active-tone');
+						expect(section.style.opacity).toBe('1');
+						expect(section.dataset.region).toBe('fragment region');
+						if (initiallyVisible) {
+							expect(section).toBe(serverSection);
+							headings.forEach((node, index) => expect(node).toBe(serverHeadings[index]));
+						}
+						expect(view.host.querySelector('[data-row-prefix]')).toBe(prefix);
+						expect(view.host.querySelector('[data-row-tail]')).toBe(tail);
+						expect(view.host.querySelector('#fragment-outside')).toBe(outside);
+						expect(tail.value).toBe('edited row draft');
+						expect(outside.value).toBe('edited outside draft');
+						expect(refs).toEqual([section]);
+						if (general) {
+							headings[0].click();
+							await root.settle();
+						}
+						const updatedProps = { ...activeProps, label: 'updated', tone: 'muted', opacity: 0.4 };
+						await root.update(updatedProps);
+						expect(view.host.querySelector('section')).toBe(section);
+						[...view.host.querySelectorAll('h2')].forEach((node, index) =>
+							expect(node).toBe(headings[index]),
+						);
+						expect(headings.map((node) => node.textContent)).toEqual(
+							general ? ['updated:1', 'updated:0'] : ['updated', 'updated'],
+						);
+						expect(section.className).toBe('muted');
+						expect(section.style.opacity).toBe('0.4');
+						expect(refs).toEqual([section]);
+						section.querySelector('button')!.click();
+						await root.settle();
+						expect(clicked).toEqual(['updated']);
+						await root.update({ ...updatedProps, show: false });
+						expect(view.host.querySelector('section')).toBeNull();
+						expect(view.host.querySelector('h2')).toBeNull();
+						expect(refs).toEqual([section, null]);
+						await root.update(updatedProps);
+						const reentered = view.host.querySelector<HTMLElement>('section')!;
+						expect(reentered).not.toBe(section);
+						expect(view.host.querySelector('h2')!.textContent).toBe(
+							general ? 'updated:0' : 'updated',
+						);
+						await root.update({ ...updatedProps, rows: ['replacement-row'] });
+						const replacement = view.host.querySelector<HTMLElement>('section')!;
+						expect(replacement).not.toBe(reentered);
+						expect(replacement.dataset.fragmentSection).toBe('replacement-row');
+						expect(view.host.querySelector('[data-row="first-row"]')).toBeNull();
+						expect(view.host.querySelector('#fragment-outside')).toBe(outside);
+						expect(outside.value).toBe('edited outside draft');
+						expect(root.recoverable).toEqual([]);
+						root.unmount();
+						expect(refs.filter((node) => node !== null)).toEqual([section, reentered, replacement]);
+						expect(refs.at(-1)).toBeNull();
+						for (const phase of ['mount', 'cleanup']) {
+							expect(effects.filter(([event]) => event === phase).map(([, row]) => row)).toEqual([
+								'first-row',
+								'first-row',
+								'replacement-row',
+							]);
+						}
+						expect(view.host.childNodes.length).toBe(0);
+						expect(view.diagnostics).toEqual([]);
+					} finally {
+						view.close();
+					}
+				});
+			}
+		}
+
+		for (const mode of ['root', 'sole', 'direct'] as const) {
+			for (const initiallyVisible of [false, true]) {
+				it(`preserves surrounding controls when an ${initiallyVisible ? 'initially visible' : 'initially empty'} ${mode} fragment becomes visible`, async () => {
+					const view = await consumer<typeof fragmentClient>(dev, fragmentsFilename);
+					const props = {
+						when: condition(false),
+						show: initiallyVisible,
+						label: 'server',
+						tone: 'server-tone',
+						opacity: 0.5,
+						rows: ['first-row'],
+					};
+					const View =
+						mode === 'root'
+							? fragmentsServer.RootBoundary
+							: mode === 'sole'
+								? fragmentsServer.SoleRootBoundary
+								: fragmentsServer.DirectBoundary;
+					try {
+						view.host.innerHTML = renderToString(View, props).html;
+						const outside = view.host.querySelector<HTMLInputElement>('#fragment-outside')!;
+						const tail = view.host.querySelector<HTMLInputElement>('#fragment-root-tail');
+						const serverSection = view.host.querySelector('section');
+						outside.value = 'edited outside draft';
+						if (tail) tail.value = 'edited root draft';
+						const root = view.api.start(view.host, props, mode);
+						await root.settle();
+						await root.update({
+							...props,
+							show: true,
+							label: 'active',
+							tone: 'active-tone',
+							opacity: 1,
+							when: load(),
+						});
+						const section = view.host.querySelector<HTMLElement>('section')!;
+						expect([...view.host.querySelectorAll('h2')].map((node) => node.textContent)).toEqual([
+							'active',
+							'active',
+						]);
+						expect(section.className).toBe('active-tone');
+						expect(section.style.opacity).toBe('1');
+						if (initiallyVisible) expect(section).toBe(serverSection);
+						expect(view.host.querySelector('#fragment-outside')).toBe(outside);
+						expect(outside.value).toBe('edited outside draft');
+						if (tail) {
+							expect(view.host.querySelector('#fragment-root-tail')).toBe(tail);
+							expect(tail.value).toBe('edited root draft');
+						}
+						expect(root.recoverable).toEqual([]);
+						root.unmount();
+						expect(view.host.childNodes.length).toBe(0);
+						expect(view.diagnostics).toEqual([]);
+					} finally {
+						view.close();
+					}
+				});
+			}
+		}
+
+		for (const mode of ['row', 'root', 'sole', 'direct'] as const) {
+			it(`reports an initial empty server versus visible client ${mode} fragment mismatch while keeping adjacent server controls`, async () => {
+				const view = await consumer<typeof fragmentClient>(dev, fragmentsFilename);
+				const props = {
+					when: load(),
+					show: true,
+					label: 'client',
+					tone: 'client-tone',
+					opacity: 1,
+					rows: ['first-row'],
+				};
+				const View =
+					mode === 'root'
+						? fragmentsServer.RootBoundary
+						: mode === 'sole'
+							? fragmentsServer.SoleRootBoundary
+							: mode === 'direct'
+								? fragmentsServer.DirectBoundary
+								: fragmentsServer.LiteBoundary;
+				try {
+					view.host.innerHTML = renderToString(View, { ...props, show: false }).html;
+					const outside = view.host.querySelector<HTMLInputElement>('#fragment-outside')!;
+					const tail = view.host.querySelector<HTMLInputElement>(
+						'[data-row-tail], #fragment-root-tail',
+					);
+					outside.value = 'edited outside draft';
+					if (tail) tail.value = 'edited adjacent draft';
+					const root = view.api.start(view.host, props, mode);
+					await root.settle();
+					expect([...view.host.querySelectorAll('h2')].map((node) => node.textContent)).toEqual([
+						'client',
+						'client',
+					]);
+					const section = view.host.querySelector<HTMLElement>('section')!;
+					expect(section.className).toBe('client-tone');
+					expect(section.style.opacity).toBe('1');
+					expect(view.host.querySelector('#fragment-outside')).toBe(outside);
+					expect(outside.value).toBe('edited outside draft');
+					if (tail) {
+						expect(view.host.querySelector('[data-row-tail], #fragment-root-tail')).toBe(tail);
+						expect(tail.value).toBe('edited adjacent draft');
+					}
+					expect(root.recoverable.length).toBeGreaterThan(0);
+					root.unmount();
+					expect(view.host.childNodes.length).toBe(0);
+					if (dev) {
+						expect(
+							view.diagnostics.some(
+								({ level, args }) =>
+									level === 'error' && String(args[0]).includes('hydration mismatch'),
+							),
+						).toBe(true);
+					} else {
+						expect(view.diagnostics).toEqual([]);
+					}
+				} finally {
+					view.close();
+				}
+			});
+		}
+
 		it('adopts server UI and preserves native drafts, IDs, events and cleanup after loading', async () => {
 			const view = await consumer(dev);
 			const effects: string[] = [];

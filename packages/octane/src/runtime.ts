@@ -11418,6 +11418,18 @@ export function componentSlotLite<P>(
 		return;
 	}
 	const hydration = activeHydration();
+	// Fresh anchors belong to a client-built replacement, while the enclosing
+	// hydration cursor still owns later server siblings. Match the general
+	// component path by suspending adoption only for this subtree.
+	if (
+		hydration !== null &&
+		((anchor != null && hydration.isFresh(anchor)) || hydration.isFresh(host))
+	) {
+		hydration.suspend(() =>
+			componentSlotLite(parentScope, slotKey, host, comp, props, anchor, invocationSite),
+		);
+		return;
+	}
 	let scope = parentScope.slots[slotKey] as Scope | undefined;
 	// The server `<!--]-->` this call adopted as its range end (hydration first
 	// render only) — consumed by the post-body cursor advance below.
@@ -18662,6 +18674,27 @@ class HydrationCapability {
 		const framedRemainder =
 			claimsRoot && cursor !== null ? this.framedRootRemainder(cursor) : undefined;
 		const unframedRemainder = claimsRoot && cursor !== null ? getNextSibling(cursor) : undefined;
+		// A closing marker bounds an empty server range; it cannot be the first
+		// child of a newly populated fragment. Build fresh descendants without
+		// consuming that boundary, so its owner can advance the outer cursor.
+		if (isFragment && isBlockClose(cursor)) {
+			if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+			if (claimsRoot)
+				this.claimRootRemainder(
+					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
+				);
+			if (template === null) template = resolveLazyTemplate(lazy!);
+			if (!this.staleServerValues) {
+				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+				if (process.env.NODE_ENV !== 'production')
+					warnHydrationStructuralMismatch(
+						loc ?? componentSourceLoc(CURRENT_BLOCK?.body) ?? CURRENT_SCOPE?.locFile,
+						'a non-empty fragment',
+						describeHydrationNode(cursor),
+					);
+			}
+			return this.freshClone(template);
+		}
 		// A synthetic fragment wrapper has no server counterpart. At a root, compare
 		// its logical static roots before returning the virtual adoption view; otherwise
 		// arbitrary server markup could be mistaken for every fragment child at once.
