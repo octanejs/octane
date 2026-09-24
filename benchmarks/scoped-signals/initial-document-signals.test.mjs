@@ -261,7 +261,8 @@ async function hydrate(code, rendered) {
 		}
 		// Use the JSDOM realm's timer fallback; no retained Node MessageChannel is installed.
 		dom.window.eval(code);
-		const seed = JSON.parse(
+		// The host parses its server seed in the receiving browser realm.
+		const seed = dom.window.JSON.parse(
 			dom.window.document.getElementById('initial-document-signals').textContent,
 		).scopes[0];
 		const result = await dom.window.__INITIAL_DOCUMENT_CONSUMER__.hydrate(
