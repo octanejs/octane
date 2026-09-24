@@ -8120,8 +8120,8 @@ export function ForeignChain(props) @{ 'use dom bindings';
 					const host = document.createElement('section');
 					container.append(host);
 					host.innerHTML = fixture.html;
-					expect(host.textContent).toBe('fallback');
 					const serverParagraph = host.querySelector('p')!;
+					expect(serverParagraph.textContent).toBe('fallback');
 					if (!adopt) host.replaceChildren();
 					const handle = adopt
 						? fixture.attach(serverParagraph, fixture.state)
@@ -8147,11 +8147,11 @@ export function ForeignChain(props) @{ 'use dom bindings';
 			}
 		});
 
-		it(`preserves live event reads and intentional setup captures (${dev ? 'dev' : 'prod'})`, () => {
+		it(`preserves event samples and committed props captures (${dev ? 'dev' : 'prod'})`, () => {
 			const scope = createScope({ scopeKey: `imported-signal-events-${dev}` });
 			const count$ = scope.signal$('count', 1);
 			try {
-				for (const capture of [false, true]) {
+				for (const setup of [false, true]) {
 					for (const adopt of [false, true]) {
 						count$.set(1);
 						const onValue = vi.fn();
@@ -8161,8 +8161,8 @@ export function ForeignChain(props) @{ 'use dom bindings';
 							dev,
 							`import { count$ } from 'state';
 export function EventSnapshot(props) @{ 'use dom bindings';
- ${capture ? 'const sample = count$.get(); const onClick = () => props.onValue(sample);' : ''}
- <button type="button" onClick={${capture ? 'onClick' : '() => props.onValue(count$.get())'}}>{props.label as string}</button>
+ ${setup ? 'const sample = count$.get(); const label = props.label; const onClick = () => props.onValue(sample, label);' : ''}
+ <button type="button" onClick={${setup ? 'onClick' : '() => props.onValue(count$.get(), props.label)'}}>{props.label as string}</button>
 }`,
 							{ state: { count$ } },
 						);
@@ -8179,17 +8179,31 @@ export function EventSnapshot(props) @{ 'use dom bindings';
 							if (adopt) expect(button).toBe(serverButton);
 							count$.set(7);
 							button.click();
-							expect(onValue.mock.calls).toEqual([[capture ? 1 : 7]]);
+							expect(onValue.mock.calls).toEqual([[7, 'Initial']]);
+							// Native samples advance at delivery; props stay with the committed snapshot.
+							fixture.publish({ label: 'Unpublished' }, false);
+							count$.set(8);
+							button.click();
+							expect(onValue.mock.calls).toEqual([
+								[7, 'Initial'],
+								[8, 'Initial'],
+							]);
+							expect(button.textContent).toBe('Initial');
 							fixture.publish({ label: 'Updated' });
 							button.click();
 							count$.set(9);
 							button.click();
-							expect(onValue.mock.calls).toEqual([[capture ? 1 : 7], [7], [capture ? 7 : 9]]);
+							expect(onValue.mock.calls).toEqual([
+								[7, 'Initial'],
+								[8, 'Initial'],
+								[8, 'Updated'],
+								[9, 'Updated'],
+							]);
 							expect(button.textContent).toBe('Updated');
 							expect(host.querySelector('button')).toBe(button);
 							handle.dispose();
 							button.click();
-							expect(onValue).toHaveBeenCalledTimes(3);
+							expect(onValue).toHaveBeenCalledTimes(4);
 						} finally {
 							handle.dispose();
 						}

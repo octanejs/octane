@@ -1819,7 +1819,10 @@ function checkImportedBindingReads(artifact, lexical) {
 	return {
 		...checked,
 		body: [
-			b.imports([['__assertBindingSnapshot', helper]], 'octane/dom-binding-signals'),
+			inheritHookMemoOrigin(
+				b.imports([['__assertBindingSnapshot', helper]], 'octane/dom-binding-signals'),
+				replacements.keys().next().value,
+			),
 			...checked.body,
 		],
 	};
