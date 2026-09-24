@@ -1013,6 +1013,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 							`unbound spreads cannot supply reserved or structural attribute ${JSON.stringify(raw)}`,
 						);
 					externalNames.add(name);
+					unboundAttributes.add(name);
 				};
 				const external = unwrap(unwrap(attr.argument).arguments[0]);
 				if (attr._octaneKnownAttributeSpread) {
@@ -1203,7 +1204,9 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		[...(render.openingElement?.attributes ?? render.attributes ?? [])].every(
 			(attr) =>
 				!['JSXSpreadAttribute', 'SpreadAttribute'].includes(attr.type) ||
-				(attr._octaneKnownAttributeSpread && !attr._octaneKnownAttributeSpread.unbound),
+				// Proved external fields retain renderer ownership. Reserved names and
+				// collisions with early owned channels were checked above.
+				attr._octaneKnownAttributeSpread,
 		) &&
 		!(render.openingElement?.attributes ?? render.attributes ?? []).some(
 			(attr) => attrName(attr)?.toLowerCase() === 'dangerouslysetinnerhtml',

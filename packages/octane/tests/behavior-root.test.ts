@@ -387,6 +387,179 @@ describe('behavior-only roots', () => {
 	});
 
 	for (const dev of [false, true]) {
+		for (const styles of ['provider', 'single property', 'multiple properties', 'native reads']) {
+			it(`hands off a host with a known unbound provider spread and ${styles} styles (${dev ? 'dev' : 'prod'})`, () => {
+				const externalStyle =
+					styles === 'single property'
+						? ' style={unbound({ color: props.color })}'
+						: styles === 'multiple properties'
+							? ' style={unbound({ color: props.color, backgroundColor: props.background })}'
+							: '';
+				const source = `${styles === 'native reads' ? "import 'octane/signals';" : ''}
+import { unbound } from 'octane/behavior';
+import * as styles from 'host-styles';
+export function StyledHost(props) @{ 'use dom bindings';
+ <section {...unbound(styles.attrs(props.styles))}${externalStyle} data-active={props.active ? '' : undefined}>{unbound(props.children)}</section>
+}
+export function StyledApplication(props) @{
+ <StyledHost styles={props.styles} color={props.color} background={props.background} active={props.active}><span>{props.label as string}</span></StyledHost>
+}`;
+				const attrs = vi.fn((value: unknown) => value);
+				const initial = {
+					active: false,
+					color: 'red',
+					background: 'white',
+					styles: {
+						class: 'server-style',
+						...(!externalStyle ? { style: { color: 'red' } } : {}),
+						'data-style-src': 'fixture',
+					},
+					label: 'Server child',
+				};
+				const fixture = authoredPresentation(
+					'StyledHost',
+					initial,
+					dev,
+					source,
+					{ 'host-styles': { attrs } },
+					{
+						knownAttributeSpreads: [
+							{
+								source: 'host-styles',
+								imported: '*',
+								members: ['attrs'],
+								fields: ['class', ...(!externalStyle ? ['style'] : []), 'data-style-src'],
+							},
+						],
+					},
+					['active'],
+				);
+				container.innerHTML = renderToString(fixture.server.StyledApplication, initial).html;
+				const section = container.querySelector('section')!;
+				const child = section.firstElementChild;
+				const error = vi.spyOn(console, 'error');
+				const warn = vi.spyOn(console, 'warn');
+				attrs.mockClear();
+				let binding: DomBindings.BindingHandle | undefined;
+				try {
+					binding = fixture.attach(section, fixture.state);
+					fixture.publish({ active: true });
+					expect(section.hasAttribute('data-active')).toBe(true);
+					expect(section.className).toBe('server-style');
+					expect(section.style.color).toBe('red');
+					expect(attrs).not.toHaveBeenCalled();
+					const client = fixture.loadClient();
+					hydratedRoot = hydrateRoot(
+						container,
+						client.StyledApplication,
+						{ ...initial, active: true },
+						{ bindingLeases: [binding] },
+					);
+					flushSync(() => {});
+					flushEffects();
+					expect(container.querySelector('section')).toBe(section);
+					expect(section.firstElementChild).toBe(child);
+					expect(section.textContent).toBe('Server child');
+					expect(section.hasAttribute('data-active')).toBe(true);
+					expect(section.className).toBe('server-style');
+					expect(section.style.color).toBe('red');
+					expect(section.getAttribute('data-style-src')).toBe('fixture');
+					expect(fixture.cleanup).toHaveBeenCalledOnce();
+					fixture.publish({ active: false });
+					binding.refresh();
+					expect(section.hasAttribute('data-active')).toBe(true);
+					flushSync(() =>
+						hydratedRoot!.render(client.StyledApplication, {
+							active: false,
+							color: 'blue',
+							background: 'black',
+							styles: {
+								class: 'live-style',
+								...(!externalStyle ? { style: { color: 'blue' } } : {}),
+								'data-style-src': 'live',
+							},
+							label: 'Live child',
+						}),
+					);
+					expect(section.firstElementChild).toBe(child);
+					expect(section.textContent).toBe('Live child');
+					expect(section.hasAttribute('data-active')).toBe(false);
+					expect(section.className).toBe('live-style');
+					expect(section.style.color).toBe('blue');
+					if (styles === 'multiple properties') expect(section.style.backgroundColor).toBe('black');
+					expect(section.getAttribute('data-style-src')).toBe('live');
+					binding.dispose();
+					hydratedRoot!.unmount();
+					hydratedRoot = undefined;
+					expect(fixture.cleanup).toHaveBeenCalledOnce();
+					expect(error).not.toHaveBeenCalled();
+					expect(warn).not.toHaveBeenCalled();
+				} finally {
+					binding?.dispose();
+					error.mockRestore();
+					warn.mockRestore();
+				}
+			});
+		}
+		it(`keeps unknown unbound spreads ineligible for host handoff (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `import { unbound } from 'octane/behavior';
+export function UnknownHost(props) @{ 'use dom bindings';
+ <section {...unbound(props.attrs)} data-active={props.active ? '' : undefined}>{unbound(props.children)}</section>
+}`;
+			const fixture = authoredPresentation(
+				'UnknownHost',
+				{ attrs: { class: 'retained' }, active: false },
+				dev,
+				source,
+			);
+			container.innerHTML = fixture.html;
+			const section = container.querySelector('section')!;
+			const binding = fixture.attach(section, fixture.state);
+			try {
+				fixture.publish({ active: true });
+				expect(() =>
+					hydrateRoot(container, fixture.loadClient().UnknownHost, fixture.state.getSnapshot(), {
+						bindingLeases: [binding],
+					}),
+				).toThrow(/active fixed native views|#77/);
+				expect(fixture.cleanup).not.toHaveBeenCalled();
+				expect(section.className).toBe('retained');
+				expect(section.hasAttribute('data-active')).toBe(true);
+				fixture.publish({ active: false });
+				expect(section.hasAttribute('data-active')).toBe(false);
+			} finally {
+				binding.dispose();
+			}
+		});
+
+		it(`retains known unbound provider ownership checks (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `import { unbound } from 'octane/behavior';
+import * as styles from 'host-styles';
+export function CollisionHost(props) @{ 'use dom bindings';
+ <section {...unbound(styles.attrs(props.styles))} data-active={props.active ? '' : undefined}>{unbound(props.children)}</section>
+}`;
+			for (const fields of [['data-active'], ['children'], ['data-octane-bindings']]) {
+				expect(() =>
+					authoredPresentation(
+						'CollisionHost',
+						{ styles: {}, active: false },
+						dev,
+						source,
+						{ 'host-styles': { attrs: (value: unknown) => value } },
+						{
+							knownAttributeSpreads: [
+								{ source: 'host-styles', imported: '*', members: ['attrs'], fields },
+							],
+						},
+					),
+				).toThrow(
+					/unbound spreads|known.*spread|reserved|structural|Invalid knownAttributeSpreads/,
+				);
+			}
+		});
+	}
+
+	for (const dev of [false, true]) {
 		it(`preserves native renderer event policy for explicitly unbound lowercase props (${dev ? 'dev' : 'prod'})`, () => {
 			const source = `import { unbound } from 'octane/behavior';
 export function EventHost(props) @{ 'use dom bindings';
