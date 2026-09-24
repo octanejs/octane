@@ -19,10 +19,11 @@ export type ReaderProps = {
 	nestedWhen?: HydrateProps['when'];
 };
 
-export type DocumentProps = Omit<ReaderProps, 'id'> & {
-	when: HydrateProps['when'];
-	secondWhen?: HydrateProps['when'];
-};
+export type DocumentProps =
+	Omit<ReaderProps, 'id'> & {
+		when: HydrateProps['when'];
+		secondWhen?: HydrateProps['when'];
+	};
 
 export function Independent() @{
 	<aside>

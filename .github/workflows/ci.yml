@@ -861,12 +861,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Diagnose hydration fixture formatting
-        run: |
-          pnpm format:files packages/octane/tests/hydration/_fixtures/initial-document-signals.tsrx
-          git diff -- packages/octane/tests/hydration/_fixtures/initial-document-signals.tsrx
-          git diff --exit-code -- packages/octane/tests/hydration/_fixtures/initial-document-signals.tsrx
-
       - name: Check formatting
         run: pnpm format:check
 
