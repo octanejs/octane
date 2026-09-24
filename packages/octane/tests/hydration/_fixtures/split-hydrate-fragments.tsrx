@@ -152,9 +152,10 @@ export function RootBoundary(props: Props) @{
 					<>
 						<Heading label={props.label} position="first" />
 						<Heading label={props.label} position="second" />
-						<section class={props.tone} style={{ opacity: props.opacity }}>
-							{props.label as string}
-						</section>
+						<section
+							class={props.tone}
+							style={{ opacity: props.opacity }}
+						>{props.label as string}</section>
 					</>
 				}
 				<input id="fragment-root-tail" defaultValue="server root draft" />
@@ -171,9 +172,10 @@ export function SoleRootBoundary(props: Props) @{
 				<>
 					<Heading label={props.label} position="first" />
 					<Heading label={props.label} position="second" />
-					<section class={props.tone} style={{ opacity: props.opacity }}>
-						{props.label as string}
-					</section>
+					<section
+						class={props.tone}
+						style={{ opacity: props.opacity }}
+					>{props.label as string}</section>
 				</>
 			}
 		</Hydrate>
@@ -207,11 +209,12 @@ export function start(
 						? GeneralBoundary
 						: LiteBoundary;
 	const recoverable: unknown[] = [];
-	const root = hydrate
-		? hydrateRoot(host, View, props, {
-				onRecoverableError: (error) => recoverable.push(error),
-			})
-		: createRoot(host);
+	const root =
+		hydrate
+			? hydrateRoot(host, View, props, {
+					onRecoverableError: (error) => recoverable.push(error),
+				})
+			: createRoot(host);
 	if (!hydrate) root.render(View, props);
 	return {
 		recoverable,

@@ -26,9 +26,13 @@ const fragmentsServer = loadServerFixture<typeof fragmentClient>(fragmentsFilena
 
 async function consumer<T = typeof client>(dev: boolean, fixtureFilename = filename) {
 	const authored = await readFile(fixtureFilename, 'utf8');
+	const compiled = compile(authored, fixtureFilename, { dev, hmr: false }).code;
+	const fragmentCompilations: { path: string; code: string }[] = [];
+	if (fixtureFilename === fragmentsFilename)
+		fragmentCompilations.push({ path: 'authored entry', code: compiled });
 	const result = await build({
 		stdin: {
-			contents: compile(authored, fixtureFilename, { dev, hmr: false }).code,
+			contents: compiled,
 			resolveDir: resolve(import.meta.dirname, '_fixtures'),
 			loader: 'js',
 		},
@@ -40,11 +44,16 @@ async function consumer<T = typeof client>(dev: boolean, fixtureFilename = filen
 						path: resolve(args.resolveDir, args.path),
 						namespace: 'authored-hydrate-query',
 					}));
-					build.onLoad({ filter: /.*/, namespace: 'authored-hydrate-query' }, (args) => ({
-						contents: compile(authored, args.path, { dev, hmr: false }).code,
-						loader: 'js',
-						resolveDir: resolve(import.meta.dirname, '_fixtures'),
-					}));
+					build.onLoad({ filter: /.*/, namespace: 'authored-hydrate-query' }, (args) => {
+						const code = compile(authored, args.path, { dev, hmr: false }).code;
+						if (fixtureFilename === fragmentsFilename)
+							fragmentCompilations.push({ path: args.path, code });
+						return {
+							contents: code,
+							loader: 'js',
+							resolveDir: resolve(import.meta.dirname, '_fixtures'),
+						};
+					});
 				},
 			},
 		],
@@ -61,6 +70,64 @@ async function consumer<T = typeof client>(dev: boolean, fixtureFilename = filen
 	});
 	const code = result.outputFiles[0].text;
 	const window = new Window({ settings: { enableJavaScriptEvaluation: true } });
+	let diagnosticStage = 'fixture evaluation';
+	if (fixtureFilename === fragmentsFilename) {
+		const excerptsByModule = fragmentCompilations
+			.map(({ path, code }) => {
+				const functions = [...code.matchAll(/(?:^|\n)(?:export )?function\s+([$\w]+)\s*\(/g)];
+				const excerpts = functions
+					.map((match, index) => ({
+						name: match[1],
+						code: code.slice(match.index, functions[index + 1]?.index ?? code.length),
+					}))
+					.filter(({ code }) =>
+						/\b(?:LiteRow|GeneralRow)\b|data-row-prefix|data-row-tail/.test(code),
+					)
+					.map(({ name, code }) => `${name}:\n${code.slice(0, 1800)}`);
+				return excerpts.length === 0 ? '' : `${path}:\n${excerpts.join('\n')}`;
+			})
+			.filter(Boolean);
+		const compiledRows = `${excerptsByModule[0]?.slice(0, 1600) ?? ''}\n${excerptsByModule.slice(1).join('\n').slice(0, 3200)}`;
+		const describeNode = (node: Node | null) => {
+			if (node === null) return null;
+			return {
+				nodeType: node.nodeType,
+				tag: node.nodeType === 1 ? (node as Element).tagName : undefined,
+				comment: node.nodeType === 8 ? node.nodeValue : undefined,
+				html: (node.nodeType === 1 ? (node as Element).outerHTML : node.nodeValue)?.slice(0, 240),
+			};
+		};
+		window.Node.prototype.insertBefore = new Proxy(window.Node.prototype.insertBefore, {
+			apply(insertBefore, target, args) {
+				try {
+					return Reflect.apply(insertBefore, target, args);
+				} catch (cause) {
+					const [node, anchor] = args as [Node, Node | null];
+					const nodes = {
+						stage: diagnosticStage,
+						target: describeNode(target),
+						node: describeNode(node),
+						anchor: describeNode(anchor),
+						targetParent: describeNode(target.parentNode),
+						nodeParent: describeNode(node.parentNode),
+						anchorParent: describeNode(anchor?.parentNode ?? null),
+						nodeParentIsTarget: node.parentNode === target,
+						anchorParentIsTarget: anchor?.parentNode === target,
+						targetContainsNode: target.contains(node),
+						targetContainsAnchor: anchor !== null && target.contains(anchor),
+						nodeContainsTarget: node.contains(target),
+					};
+					throw new Error(
+						`split fragment insertBefore failure\n${JSON.stringify(nodes, null, 2)}\nCompiled rows:\n${compiledRows}\nOriginal stack:\n${String((cause as Error)?.stack ?? cause).slice(0, 1000)}`.slice(
+							0,
+							8000,
+						),
+						{ cause },
+					);
+				}
+			},
+		});
+	}
 	const diagnostics: { level: 'warn' | 'error'; args: unknown[] }[] = [];
 	for (const level of ['warn', 'error'] as const) {
 		const original = window.console[level];
@@ -85,6 +152,9 @@ async function consumer<T = typeof client>(dev: boolean, fixtureFilename = filen
 		diagnostics,
 		host: window.document.querySelector('#host') as unknown as HTMLElement,
 		api: (window as unknown as { __SPLIT_CONSUMER__: T }).__SPLIT_CONSUMER__,
+		setDiagnosticStage(stage: string) {
+			diagnosticStage = stage;
+		},
 		close() {
 			for (const channel of channels) {
 				channel.port1.close();
@@ -104,6 +174,13 @@ for (const dev of [false, true]) {
 					const effects: [string, string][] = [];
 					const refs: (HTMLElement | null)[] = [];
 					const clicked: string[] = [];
+					let stage = 'server render';
+					const setStage = (next: string) => {
+						stage = next;
+						view.setDiagnosticStage(
+							`row ${general ? 'general' : 'lite'} ${initiallyVisible ? 'visible' : 'empty'}: ${stage}`,
+						);
+					};
 					const props = {
 						when: condition(false),
 						show: initiallyVisible,
@@ -126,6 +203,7 @@ for (const dev of [false, true]) {
 						const serverHeadings = [...view.host.querySelectorAll('h2')];
 						tail.value = 'edited row draft';
 						outside.value = 'edited outside draft';
+						setStage('dormant hydration');
 						const root = view.api.start(view.host, props);
 						await root.settle();
 						expect(effects).toEqual([]);
@@ -138,6 +216,7 @@ for (const dev of [false, true]) {
 							tone: 'active-tone',
 							opacity: 1,
 						};
+						setStage('activation');
 						await root.update(activeProps);
 						const section = view.host.querySelector<HTMLElement>('section')!;
 						const headings = [...view.host.querySelectorAll<HTMLElement>('h2')];
@@ -158,10 +237,12 @@ for (const dev of [false, true]) {
 						expect(outside.value).toBe('edited outside draft');
 						expect(refs).toEqual([section]);
 						if (general) {
+							setStage('heading state update');
 							headings[0].click();
 							await root.settle();
 						}
 						const updatedProps = { ...activeProps, label: 'updated', tone: 'muted', opacity: 0.4 };
+						setStage('retained update');
 						await root.update(updatedProps);
 						expect(view.host.querySelector('section')).toBe(section);
 						[...view.host.querySelectorAll('h2')].forEach((node, index) =>
@@ -173,19 +254,23 @@ for (const dev of [false, true]) {
 						expect(section.className).toBe('muted');
 						expect(section.style.opacity).toBe('0.4');
 						expect(refs).toEqual([section]);
+						setStage('retained event');
 						section.querySelector('button')!.click();
 						await root.settle();
 						expect(clicked).toEqual(['updated']);
+						setStage('hide');
 						await root.update({ ...updatedProps, show: false });
 						expect(view.host.querySelector('section')).toBeNull();
 						expect(view.host.querySelector('h2')).toBeNull();
 						expect(refs).toEqual([section, null]);
+						setStage('reentry');
 						await root.update(updatedProps);
 						const reentered = view.host.querySelector<HTMLElement>('section')!;
 						expect(reentered).not.toBe(section);
 						expect(view.host.querySelector('h2')!.textContent).toBe(
 							general ? 'updated:0' : 'updated',
 						);
+						setStage('keyed replacement');
 						await root.update({ ...updatedProps, rows: ['replacement-row'] });
 						const replacement = view.host.querySelector<HTMLElement>('section')!;
 						expect(replacement).not.toBe(reentered);
@@ -194,6 +279,7 @@ for (const dev of [false, true]) {
 						expect(view.host.querySelector('#fragment-outside')).toBe(outside);
 						expect(outside.value).toBe('edited outside draft');
 						expect(root.recoverable).toEqual([]);
+						setStage('unmount');
 						root.unmount();
 						expect(refs.filter((node) => node !== null)).toEqual([section, reentered, replacement]);
 						expect(refs.at(-1)).toBeNull();
@@ -206,6 +292,10 @@ for (const dev of [false, true]) {
 						}
 						expect(view.host.childNodes.length).toBe(0);
 						expect(view.diagnostics).toEqual([]);
+					} catch (cause) {
+						throw new Error(`fragment row lifecycle failed during ${stage}`, {
+							cause,
+						});
 					} finally {
 						view.close();
 					}
@@ -300,6 +390,7 @@ for (const dev of [false, true]) {
 					);
 					outside.value = 'edited outside draft';
 					if (tail) tail.value = 'edited adjacent draft';
+					view.setDiagnosticStage(`${mode}: initial SSR-empty/client-visible hydration`);
 					const root = view.api.start(view.host, props, mode);
 					await root.settle();
 					expect([...view.host.querySelectorAll('h2')].map((node) => node.textContent)).toEqual([
