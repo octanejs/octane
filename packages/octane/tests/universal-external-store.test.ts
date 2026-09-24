@@ -529,4 +529,59 @@ describe('universal useSyncExternalStore', () => {
 		root.unmount();
 		expect(lifecycle.at(-1)).toBe('unsubscribe:store');
 	});
+
+	it('keeps a settled suspense replay when an unrelated store update renders first', async () => {
+		const store = createStore(0);
+		let resolveWait!: (value: string) => void;
+		const wait = new Promise<string>((resolve) => {
+			resolveWait = resolve;
+		});
+		const Scene = defineUniversalComponent('object', () => [
+			universalComponent('object', StableReader, { store }),
+			universalTry(
+				() => universalValue(valuePlan, [use(wait), 0]),
+				() => universalValue(valuePlan, ['pending', 0]),
+			),
+		]);
+		const { container, root } = objectRoot();
+		root.render(Scene, undefined);
+		expect(container.children.map((child) => child.props.value)).toEqual([0, 'pending']);
+
+		// The settled thenable's replay is a microtask queued behind this store
+		// notification's scheduled render. That render only re-executes the
+		// reader's owner, so canceling the replay there would strand the pending
+		// boundary on screen forever.
+		resolveWait('ready');
+		store.set(1);
+		await flushMicrotasks();
+		expect(container.children.map((child) => child.props.value)).toEqual([1, 'ready']);
+		root.unmount();
+	});
+
+	it('keeps a pending suspense replay across an unrelated store update', async () => {
+		const store = createStore(0);
+		let resolveWait!: (value: string) => void;
+		const wait = new Promise<string>((resolve) => {
+			resolveWait = resolve;
+		});
+		const Scene = defineUniversalComponent('object', () => [
+			universalComponent('object', StableReader, { store }),
+			universalTry(
+				() => universalValue(valuePlan, [use(wait), 0]),
+				() => universalValue(valuePlan, ['pending', 0]),
+			),
+		]);
+		const { container, root } = objectRoot();
+		root.render(Scene, undefined);
+		expect(container.children.map((child) => child.props.value)).toEqual([0, 'pending']);
+
+		store.set(1);
+		await flushMicrotasks();
+		expect(container.children.map((child) => child.props.value)).toEqual([1, 'pending']);
+
+		resolveWait('ready');
+		await flushMicrotasks();
+		expect(container.children.map((child) => child.props.value)).toEqual([1, 'ready']);
+		root.unmount();
+	});
 });

@@ -8853,6 +8853,22 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		if (this.owner !== null) visit(this.owner);
 	}
 
+	// A live replay still owns suspended regions that a scoped update or a
+	// retained subtree can leave untouched in this attempt. Hand its memo cache
+	// to the fresh render so that render re-attempts those regions itself;
+	// discarding the replay would drop the only scheduled retry and leave
+	// pending content on screen after its thenables have already settled.
+	private absorbableReplay(component: UniversalComponent<any>): SuspendedMemoReplay | null {
+		const replay =
+			this.awaitingReplay?.active === true
+				? this.awaitingReplay
+				: this.queuedReplay?.active === true
+					? this.queuedReplay
+					: null;
+		if (replay === null || replay.transitionRender || replay.component !== component) return null;
+		return replay;
+	}
+
 	private cancelSuspendedReplays(preserveTransitions = false): void {
 		if (
 			this.awaitingReplay === null &&
@@ -9486,6 +9502,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		// updates remain queued. Non-urgent work consumes every promoted batch in
 		// one ordered rebase; urgent work leaves them scheduled for the next pass.
 		this.suspended?.abort(true);
+		const absorbedReplay = this.absorbableReplay(component);
 		this.cancelSuspendedReplays(true);
 		const scheduledTransitions = scheduledUrgent
 			? EMPTY_UNIVERSAL_TRANSITION_BATCHES
@@ -9496,6 +9513,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		UNIVERSAL_WARM_CACHES.delete(this);
 		try {
 			if (
+				absorbedReplay === null &&
 				ownedTarget !== undefined &&
 				component === this.lastComponent &&
 				universalShallowEqual(props, this.lastProps)
@@ -9506,9 +9524,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			const attempt = this.prepareWithReplay(
 				component,
 				props,
-				[],
+				absorbedReplay?.entries ?? [],
 				scheduledTransitions,
 				!scheduledUrgent && scheduledTransitions.size !== 0,
+				absorbedReplay === null,
 			);
 			if (scheduledUrgent && attempt.status === 'suspended') {
 				this.ensureScheduledTransitionWork();
