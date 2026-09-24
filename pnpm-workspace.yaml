@@ -348,7 +348,7 @@ catalogs:
     es-module-lexer: ^1.7.0
     esbuild: ^0.28.1
     esrap: ^2.3.2
-    '@tsrx/oxc': 0.13.0
+    '@tsrx/oxc': 0.16.0
     sucrase: ^3.35.1
     graphql: ^16.14.2
     gsap: 3.15.0
@@ -594,15 +594,15 @@ minimumReleaseAgeExclude:
   - '@blocknote/core@0.53.0'
   - '@blocknote/react@0.53.0'
   - '@tanstack/db@0.7.0'
-  - '@tsrx/oxc-darwin-arm64@0.13.0'
-  - '@tsrx/oxc-darwin-x64@0.13.0'
-  - '@tsrx/oxc-linux-arm64-gnu@0.13.0'
-  - '@tsrx/oxc-linux-arm64-musl@0.13.0'
-  - '@tsrx/oxc-linux-x64-gnu@0.13.0'
-  - '@tsrx/oxc-linux-x64-musl@0.13.0'
-  - '@tsrx/oxc-win32-arm64-msvc@0.13.0'
-  - '@tsrx/oxc-win32-x64-msvc@0.13.0'
-  - '@tsrx/oxc@0.13.0'
+  - '@tsrx/oxc-darwin-arm64@0.16.0'
+  - '@tsrx/oxc-darwin-x64@0.16.0'
+  - '@tsrx/oxc-linux-arm64-gnu@0.16.0'
+  - '@tsrx/oxc-linux-arm64-musl@0.16.0'
+  - '@tsrx/oxc-linux-x64-gnu@0.16.0'
+  - '@tsrx/oxc-linux-x64-musl@0.16.0'
+  - '@tsrx/oxc-win32-arm64-msvc@0.16.0'
+  - '@tsrx/oxc-win32-x64-msvc@0.16.0'
+  - '@tsrx/oxc@0.16.0'
   - '@ripple-ts/adapter@0.4.0'
   - '@ripple-ts/vite-plugin@0.4.0'
   - '@tsrx/core@0.3.2'
