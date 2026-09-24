@@ -2213,6 +2213,50 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 		root.unmount();
 	});
 
+	it('renders unkeyed host loops keyed by position', () => {
+		const source = `
+			export function Scene({items}) @{
+				@for (const item of items) {
+					<node name={item.name} />
+				}
+			}
+		`;
+		let output = compile(source, '/src/UnkeyedList.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+		expect(output).toMatch(/__octaneUniversalFor\(\s*items/);
+		output = output.replace(
+			/import\s*\{([^}]*)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replace('export const Scene =', 'const Scene =');
+		const UnkeyedList = new Function('__universal', `${output}\nreturn Scene;`)(
+			UniversalRuntime,
+		) as (props: unknown) => unknown;
+		const { container, root } = objectRoot(true);
+
+		root.render(UnkeyedList as any, { items: [{ name: 'A' }, { name: 'B' }] });
+		const a = container.children[0];
+		const b = container.children[1];
+		expect(container.children.map((child) => child.props.name)).toEqual(['A', 'B']);
+
+		// Positional keys: a reorder re-props the records in place rather than
+		// moving host identity with the item.
+		root.render(UnkeyedList as any, { items: [{ name: 'B' }, { name: 'A' }] });
+		expect(container.children).toEqual([a, b]);
+		expect(container.children.map((child) => child.props.name)).toEqual(['B', 'A']);
+
+		root.render(UnkeyedList as any, { items: [{ name: 'C' }] });
+		expect(container.children).toEqual([a]);
+		expect(container.children[0].props.name).toBe('C');
+
+		root.render(UnkeyedList as any, { items: [] });
+		expect(container.children).toEqual([]);
+		root.unmount();
+	});
+
 	it('preserves keyed state reached through data property getters', () => {
 		const source = `
 			export function Scene({items}) @{

@@ -89,6 +89,12 @@ would collide. Use the keyed `@for` directive or extract a child component, so
 each item renders in its own scope. `use()` and `useContext` are exempt: they
 are call-order and context-identity keyed.
 
+`key` is optional. Omit it for static or append-only lists: the DOM renderer
+falls back to `x.id ?? x`, and universal renderers fall back to the item's
+position. A positional key means item state (hooks, component instances,
+uncontrolled leaf state) follows the slot, not the item, across reorders —
+declare `key` explicitly for movable stateful rows.
+
 ## Refs
 
 Refs are passed as props, React-19 style: `ref={cb}`, `ref={obj}`, or multi-ref

@@ -390,7 +390,8 @@ ABI is static plan plus dynamic values, not these local variable names.
 There is no runtime JSX descriptor walk. A static element is represented once
 in the plan; only its dynamic slots are reevaluated. Nested components are
 compiler-emitted component records, and render bodies are stable child-region
-records. Keyed template control flow uses explicit keys and produces logical
+records. Keyed template control flow uses explicit keys — or a positional key
+the compiler synthesizes when `@for` omits `key` — and produces logical
 ranges when an item has more than one root.
 
 The selected renderer module is expected to provide the compiler ABI helpers,
