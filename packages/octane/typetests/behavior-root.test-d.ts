@@ -5,6 +5,7 @@ import {
 	type BehaviorEntry,
 	type BehaviorRegistration,
 	type BehaviorRoot,
+	type CapturedFormSubmission,
 	type ExternalRange,
 } from 'octane';
 import {
@@ -56,6 +57,32 @@ const registration: BehaviorRegistration = focusedRoot.registerBehavior(entry);
 const rangeReady: Promise<void> = range.ready;
 const behaviorReady: Promise<void> = registration.ready;
 const rootReady: Promise<void> = focusedRoot.ready;
+
+focusedRoot.registerBehavior({
+	id: 'save',
+	target: 'form[data-octane-capture-submit="save"]',
+	events: ['submit'],
+	captureEvent(event, element, submission) {
+		const accepted: CapturedFormSubmission | undefined = submission;
+		const fields: readonly (readonly [string, string | File])[] | undefined = accepted?.fields;
+		const native: Event = event;
+		const target: Element = element;
+		native.preventDefault();
+		target.matches('form');
+		if (accepted) {
+			// @ts-expect-error Accepted fields are immutable.
+			accepted.fields.push(['draft', 'edited']);
+			// @ts-expect-error Accepted metadata is immutable.
+			accepted.form.action = '/edited';
+		}
+		return { text: String(fields?.find(([name]) => name === 'draft')?.[1] ?? '') };
+	},
+	adopt() {},
+	handleEvent(_event, _element, _context, payload) {
+		const text: string = payload.text;
+		text.toUpperCase();
+	},
+});
 
 registration.dispose();
 range.dispose();

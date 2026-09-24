@@ -388,7 +388,12 @@ concurrently rather than awaiting `allReady` before reading. Same
   ends. Do not share mutable owners across requests.
 - `earlySignalBootstrap?: 'external'` — omit the renderer's early capture script
   because the host has already emitted `earlySignalBootstrapScript()` before
-  bound controls and streamed results.
+  bound controls and streamed results. To capture native form commands before
+  client registration, emit `earlySignalBootstrapScript({ formSubmissions: true })`
+  and mark forms with `data-octane-capture-submit="behavior-id"`. Add
+  `independentHydration: true` when the envelope contains independent widgets.
+  See [parser-time form capture](./deferred-hydration.md#native-submissions-before-the-client-module-loads)
+  for snapshots, behavior ownership, and bounded release.
 - `nonce?: string` — CSP nonce stamped on every inline tag the renderer emits
   (style, suspense seed, swap-runtime, and recovery scripts). Applies to every
   buffered and streaming renderer.

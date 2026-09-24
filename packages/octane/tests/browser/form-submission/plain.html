@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<title>Parser-time native form commands</title>
+		<script>
+			window.__formObservation = { events: [], submitters: [] };
+			document.addEventListener(
+				'submit',
+				(event) => {
+					window.__formObservation.events.push(event);
+					window.__formObservation.submitters.push(event.submitter);
+				},
+				true,
+			);
+		</script>
+		<!--octane-early-->
+	</head>
+	<body>
+		<!--octane-ssr-->
+		<script type="module" src="/main.ts"></script>
+	</body>
+</html>

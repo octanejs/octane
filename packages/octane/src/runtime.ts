@@ -45035,6 +45035,7 @@ export function createIndependentHydrateActivator(
 						const replays = intents;
 						intents = null;
 						for (const replay of replays) {
+							if (replay.earlyBinding) continue;
 							// A preceding replay may have changed this control's selection meaning.
 							if (!isHydrationSelectionIntentCurrent(replay)) continue;
 							const originalTarget = replay.event.target;

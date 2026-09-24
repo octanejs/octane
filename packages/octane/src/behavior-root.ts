@@ -1,6 +1,14 @@
 export { adoptBindings, mountBindings, unbound } from './dom-bindings.js';
 export type { BindingSource, BindingOptions, BindingHandle } from './dom-bindings.js';
 export type { BindingRange, BindingMountTarget } from './dom-binding-program.js';
+import {
+	FORM_SUBMISSION_ATTR,
+	getEarlyFormSubmissionMailbox,
+	isEarlyFormSubmissionCurrent,
+	type CapturedFormSubmission,
+	type EarlyFormSubmissionRecord,
+} from './form-submission.js';
+export type { CapturedFormSubmission } from './form-submission.js';
 
 /** A behavior-only root observes existing DOM without taking reconciliation ownership. */
 export interface BehaviorRootOptions {
@@ -53,10 +61,11 @@ export interface BehaviorEntry<Payload = unknown> {
 	/**
 	 * Synchronously capture detached, immutable command arguments on the original
 	 * native event, before readiness or adoption. Register eagerly; this cannot
-	 * recover values from interactions that happened before registration.
+	 * recover earlier values unless the form opted into parser-time submit capture.
+	 * Its third argument is the accepted snapshot for those native submissions.
 	 * May preventDefault(), but must not return live DOM/state or a promise.
 	 */
-	captureEvent?(event: Event, element: Element): Payload;
+	captureEvent?(event: Event, element: Element, submission?: CapturedFormSubmission): Payload;
 	ready?: PromiseLike<unknown>;
 	dependencies?: readonly string[];
 	conflicts?: readonly string[];
@@ -95,6 +104,7 @@ type Readiness = {
 type DocumentRegistry = {
 	roots: Map<Element, RootRecord>;
 	ranges: Map<Element, RangeRecord>;
+	submissionBridge?: (submission: EarlyFormSubmissionRecord) => boolean;
 };
 
 type RootRecord = {
@@ -137,6 +147,7 @@ type EntryRecord = {
 		element: Element;
 		range: RangeRecord | undefined;
 		payload?: unknown;
+		submission?: EarlyFormSubmissionRecord;
 	}>;
 	queuedEventHead: number;
 	queuedEventFlushDepth: number;
@@ -158,6 +169,8 @@ type AdoptionRecord = {
 
 const documentRegistries = /* @__PURE__ */ new WeakMap<Document, DocumentRegistry>();
 const CANCELED = /* @__PURE__ */ Symbol('octane.behavior.canceled');
+let earlySubmissionRanges: WeakMap<EarlyFormSubmissionRecord, RangeRecord> | undefined;
+let earlySubmissionContainers: WeakMap<EarlyFormSubmissionRecord, Element> | undefined;
 
 function createReadiness(): Readiness {
 	let resolvePromise!: () => void;
@@ -360,7 +373,14 @@ function flushQueuedEvents(record: EntryRecord): void {
 		while (record.queuedEventHead < queue.length) {
 			const index = record.queuedEventHead;
 			const queued = queue[index];
-			if (queued.payload === CANCELED || !contains(record.root, queued.element)) {
+			if (
+				queued.payload === CANCELED ||
+				!(queued.submission === undefined
+					? contains(record.root, queued.element)
+					: containsFormSubmission(record.root, queued.element)) ||
+				(queued.submission !== undefined &&
+					!isEarlyFormSubmissionCurrent(queued.submission, record.root.document))
+			) {
 				record.queuedEventHead = index + 1;
 				continue;
 			}
@@ -534,6 +554,10 @@ function reconcileBehavior(record: EntryRecord): void {
 }
 
 function refreshDocument(registry: DocumentRegistry): void {
+	for (const root of registry.roots.values()) {
+		getEarlyFormSubmissionMailbox(root.document)?.flush();
+		break;
+	}
 	for (const root of [...registry.roots.values()]) {
 		if (root.disposed) continue;
 		for (const record of [...root.behaviors]) reconcileBehavior(record);
@@ -563,6 +587,7 @@ function targetElement(event: Event): Element | null {
 
 function handleDelegatedEvent(root: RootRecord, event: Event): void {
 	if (root.disposed) return;
+	if (event.type === 'submit' && getEarlyFormSubmissionMailbox(root.document)?.has(event)) return;
 	const target = targetElement(event);
 	if (target === null || !contains(root, target)) return;
 	for (const record of [...root.behaviors]) {
@@ -626,6 +651,178 @@ function handleDelegatedEvent(root: RootRecord, event: Event): void {
 	}
 }
 
+/** Native methods cannot be hidden by successful controls named after DOM methods. */
+function formSubmissionElementPrototype(document: Document): Element {
+	return (document.defaultView?.Element ?? globalThis.Element).prototype;
+}
+
+function containsFormSubmission(root: RootRecord, form: Element): boolean {
+	return (
+		form.ownerDocument === root.document &&
+		(form === root.container ||
+			formSubmissionElementPrototype(root.document).contains.call(root.container, form))
+	);
+}
+
+function matchesFormSubmissionTarget(record: EntryRecord, form: Element): boolean {
+	return typeof record.entry.target === 'string'
+		? formSubmissionElementPrototype(record.root.document).matches.call(form, record.entry.target)
+		: record.entry.target === form;
+}
+
+/** Transfer the original command into one exact behavior owner, without redispatch. */
+function receiveEarlyFormSubmission(
+	document: Document,
+	registry: DocumentRegistry,
+	submission: EarlyFormSubmissionRecord,
+): boolean {
+	if (submission.snapshot === undefined) return false;
+	if (!isEarlyFormSubmissionCurrent(submission, document)) return true;
+	const previousContainer = earlySubmissionContainers?.get(submission);
+	if (
+		previousContainer !== undefined &&
+		!formSubmissionElementPrototype(document).contains.call(previousContainer, submission.form)
+	) {
+		submission.discarded = true;
+		return true;
+	}
+	if (previousContainer === undefined) {
+		let container: Element | undefined;
+		for (const root of registry.roots.values()) {
+			if (
+				!root.disposed &&
+				containsFormSubmission(root, submission.form) &&
+				(container === undefined ||
+					formSubmissionElementPrototype(document).contains.call(container, root.container))
+			)
+				container = root.container;
+		}
+		if (container !== undefined)
+			(earlySubmissionContainers ??= new WeakMap()).set(submission, container);
+	}
+	let rangeElement: Element | null = submission.form;
+	let acceptedRange: RangeRecord | undefined;
+	while (rangeElement !== null) {
+		acceptedRange = registry.ranges.get(rangeElement);
+		if (acceptedRange !== undefined) break;
+		rangeElement = rangeElement.parentElement;
+	}
+	const previousRange = earlySubmissionRanges?.get(submission);
+	if (previousRange !== undefined && previousRange !== acceptedRange) {
+		submission.discarded = true;
+		return true;
+	}
+	if (acceptedRange !== undefined && previousRange === undefined)
+		(earlySubmissionRanges ??= new WeakMap()).set(submission, acceptedRange);
+	let ownerRoot: RootRecord | undefined;
+	for (const root of registry.roots.values()) {
+		if (root.disposed || !containsFormSubmission(root, submission.form)) continue;
+		if (
+			ownerRoot === undefined ||
+			formSubmissionElementPrototype(document).contains.call(ownerRoot.container, root.container)
+		)
+			ownerRoot = root;
+	}
+	// An attached nested root reserves its command scope while its module is
+	// still registering; an ancestor with the same id cannot claim that command.
+	const record = ownerRoot?.behaviorsById.get(submission.key);
+	if (
+		record === undefined ||
+		record.controller.signal.aborted ||
+		!record.entry.events?.includes('submit') ||
+		record.entry.captureEvent === undefined ||
+		!matchesFormSubmissionTarget(record, submission.form) ||
+		!rangeMatches(record, nearestRange(record.root, submission.form))
+	)
+		return false;
+	const range = nearestRange(record.root, submission.form);
+	const queued = {
+		event: submission.event,
+		element: submission.form,
+		range,
+		payload: CANCELED as unknown,
+		submission,
+	};
+	record.queuedEvents.push(queued);
+	if (range?.status === 'pending') record.waitingRanges.add(range);
+	record.captureDepth = (record.captureDepth ?? 0) + 1;
+	try {
+		const payload = record.entry.captureEvent!(
+			submission.event,
+			submission.form,
+			submission.snapshot,
+		);
+		if (
+			!record.controller.signal.aborted &&
+			containsFormSubmission(record.root, submission.form) &&
+			matchesFormSubmissionTarget(record, submission.form) &&
+			nearestRange(record.root, submission.form) === range &&
+			isEarlyFormSubmissionCurrent(submission, document)
+		)
+			queued.payload = payload;
+	} catch (error) {
+		failBehavior(record, error);
+		throw error;
+	} finally {
+		record.captureDepth--;
+	}
+	// Only routing authority remains in the queue after application capture. A
+	// small returned payload need not retain every accepted field or file.
+	submission.snapshot = undefined;
+	if (queued.payload === CANCELED) submission.discarded = true;
+	flushQueuedEvents(record);
+	return true;
+}
+
+function hasNestedSubmissionOwner(root: RootRecord, form: Element): boolean {
+	for (const nested of root.registry.roots.values()) {
+		if (
+			nested === root ||
+			nested.disposed ||
+			!formSubmissionElementPrototype(root.document).contains.call(
+				root.container,
+				nested.container,
+			) ||
+			!containsFormSubmission(nested, form)
+		)
+			continue;
+		return true;
+	}
+	return false;
+}
+
+function releaseBehaviorSubmissions(record: EntryRecord): void {
+	if (
+		record.entry.id === undefined ||
+		!record.entry.events?.includes('submit') ||
+		record.entry.captureEvent === undefined
+	)
+		return;
+	const mailbox = getEarlyFormSubmissionMailbox(record.root.document);
+	if (mailbox === undefined) return;
+	const elementPrototype = formSubmissionElementPrototype(record.root.document);
+	for (const form of elementPrototype.querySelectorAll.call(
+		record.root.container,
+		`form[${FORM_SUBMISSION_ATTR}]`,
+	) as NodeListOf<HTMLFormElement>) {
+		if (
+			elementPrototype.getAttribute.call(form, FORM_SUBMISSION_ATTR) === record.entry.id &&
+			matchesFormSubmissionTarget(record, form) &&
+			rangeMatches(record, nearestRange(record.root, form)) &&
+			!hasNestedSubmissionOwner(record.root, form)
+		)
+			mailbox.release(form);
+	}
+	if (
+		record.root.container.localName === 'form' &&
+		elementPrototype.getAttribute.call(record.root.container, FORM_SUBMISSION_ATTR) ===
+			record.entry.id &&
+		matchesFormSubmissionTarget(record, record.root.container) &&
+		!hasNestedSubmissionOwner(record.root, record.root.container)
+	)
+		mailbox.release(record.root.container as HTMLFormElement);
+}
+
 function installListeners(root: RootRecord, events: readonly string[] | undefined): void {
 	if (events === undefined) return;
 	for (const event of new Set(events)) {
@@ -660,6 +857,7 @@ function removeUnusedListeners(root: RootRecord): void {
 
 function disposeBehavior(record: EntryRecord): void {
 	if (record.status === 'disposed') return;
+	releaseBehaviorSubmissions(record);
 	const failed = record.status === 'failed';
 	record.status = 'disposed';
 	record.controller.abort();
@@ -755,6 +953,7 @@ function registerBehavior(root: RootRecord, entry: BehaviorEntry): BehaviorRegis
 	try {
 		installListeners(root, entry.events);
 		ensureObserver(root);
+		getEarlyFormSubmissionMailbox(root.document)?.flush();
 	} catch (error) {
 		disposeBehavior(record);
 		throw error;
@@ -890,6 +1089,16 @@ function registerExternalRange(
 
 function disposeRoot(root: RootRecord, options: BehaviorDisposeOptions = {}): void {
 	if (root.disposed) return;
+	const submissions = getEarlyFormSubmissionMailbox(root.document);
+	if (submissions !== undefined) {
+		for (const submission of [...submissions.q]) {
+			if (
+				containsFormSubmission(root, submission.form) &&
+				!hasNestedSubmissionOwner(root, submission.form)
+			)
+				submissions.release(submission.form);
+		}
+	}
 	const releasedExternalOwnership = root.ranges.size !== 0;
 	root.disposed = true;
 	root.controller.abort();
@@ -920,6 +1129,8 @@ function disposeRoot(root: RootRecord, options: BehaviorDisposeOptions = {}): vo
 		root.registry.roots.delete(root.container);
 	}
 	if (root.registry.roots.size === 0 && root.registry.ranges.size === 0) {
+		const mailbox = getEarlyFormSubmissionMailbox(root.document);
+		if (mailbox?.receive === root.registry.submissionBridge) mailbox.receive = undefined;
 		documentRegistries.delete(root.document);
 	}
 	if (options.preserveDOM === false) root.container.replaceChildren();
@@ -1000,6 +1211,12 @@ export function attachBehaviorRoot(
 		dispose: (disposeOptions) => disposeRoot(record, disposeOptions),
 	};
 	if (!canceledReplacement) registry.roots.set(container, record);
+	const mailbox = getEarlyFormSubmissionMailbox(document);
+	if (mailbox !== undefined && registry.submissionBridge === undefined) {
+		registry.submissionBridge = (submission) =>
+			receiveEarlyFormSubmission(document, registry!, submission);
+		mailbox.receive = registry.submissionBridge;
+	}
 	if (options.signal !== undefined) record.unlinkSignal = linkSignal(options.signal, controller);
 	if (controller.signal.aborted) {
 		disposeRoot(record);

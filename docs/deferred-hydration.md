@@ -778,6 +778,96 @@ cannot reconstruct commands captured earlier by the default inline bootstrap.
 Neither this hook nor deferred delivery restores transient activation; cancellation
 such as `preventDefault()` must happen in the actual early capture handler.
 
+#### Native submissions before the client module loads
+
+An envelope-owning SSR host can opt into native submit capture before ESM
+registration. Emit this script in the document head, before exposing forms:
+
+```ts
+import { earlySignalBootstrapScript } from 'octane/server';
+
+const bootstrap = earlySignalBootstrapScript({
+	nonce,
+	independentHydration: true,
+	formSubmissions: true,
+});
+```
+
+Pass `earlySignalBootstrap: 'external'` to the fragment renderers. Mark each
+participating form with the exact identity of its behavior owner:
+
+```tsx
+<form data-octane-capture-submit="save" action="/save" method="post">
+	<input name="draft" defaultValue="Server draft" />
+	<button name="command" value="save" type="submit">
+		Save
+	</button>
+</form>
+```
+
+The parser listener synchronously cancels eligible, cancelable native `submit`
+events. Button activation still runs browser validation and produces its real
+submit event; implicit Enter and `form.requestSubmit()` use the same path.
+Submit-button clicks are not queued for hydration replay. Forms without this
+marker retain their existing native and hydration behavior.
+
+Register the owner with the matching `id`, an exact form target or matching form
+selector, `events: ['submit']`, and `captureEvent`. The closest attached behavior
+root reserves the form's command scope, even while its behavior is still absent;
+an enclosing root cannot claim that command:
+
+```ts
+root.registerBehavior({
+	id: 'save',
+	target: form,
+	events: ['submit'],
+	ready: import('./save-behavior'),
+	captureEvent(event, element, submission) {
+		event.preventDefault();
+		const fields =
+			submission?.fields ??
+			Array.from(new FormData(element as HTMLFormElement, (event as SubmitEvent).submitter));
+		return Object.freeze({ text: String(fields.find(([name]) => name === 'draft')?.[1] ?? '') });
+	},
+	adopt() {},
+	handleEvent(_event, _element, _context, payload) {
+		save(payload);
+	},
+});
+```
+
+The optional third capture argument is `CapturedFormSubmission`, exported from
+`octane` and `octane/behavior`. Its frozen `fields` array contains frozen
+`[name, string | File]` pairs from `FormData(form, submitter)`, including duplicate
+names, successful controls outside the form, selected options, checked controls,
+files, and the named submitter. Files have immutable contents. The frozen `form`
+object records `id`, resolved `action`, `method`, `enctype`, `target`, and
+`noValidate` at acceptance. The frozen `submitter` object records `id`, `name`,
+`value`, `type`, raw `formAction`, `formMethod`, `formEnctype`, `formTarget`
+override attributes (or `null`), and `formNoValidate`; it is `null` for submissions
+without a submitter. Image submitters use FormData's default coordinate fields
+(`0`, `0`), rather than coordinates inferred from a prior click.
+
+Capture receives the original native event once, before behavior readiness or
+adoption can change controls. Its returned payload then follows the existing
+FIFO, external-range ownership, and disposal rules. Later edits do not change
+the accepted snapshot. Moving, removing, or repurposing the form invalidates
+undelivered commands. An independent interaction boundary can activate from the
+submission separately from its behavior owner; activation never redispatches
+the accepted submit event.
+
+Before an owner claims a command, a form has a 30-second lease beginning with its
+first pending submission. Repeated submissions do not extend it. Expiry drops
+that form's unclaimed commands and permits future native submissions. The
+document accepts at most 256 pending commands; overflow drops them and disables
+parser submit capture for that document. Page exit, root disposal, owner failure,
+and registration disposal release their pending custody. Already accepted
+commands are never automatically resubmitted. Once the behavior claims a command,
+its readiness and abort lifetime replace the parser lease. Eager ordinary
+registrations keep their native `captureEvent` contract; they receive no third
+argument unless parser submit capture accepted the event. `form.submit()` emits
+no submit event and remains outside this API.
+
 Root identity is scoped to its document and container. A second root for the
 same live container requires `{ replace: true }`, which disposes the old root
 without removing markup; creating a root for a replacement document never adopts
