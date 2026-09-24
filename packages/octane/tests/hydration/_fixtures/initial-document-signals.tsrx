@@ -44,7 +44,7 @@ export function IndependentReader() @{
 	</section>
 }
 
-function Reader({ id, observe, cleanup, suspend, nestedWhen }: ReaderProps) @{
+function ReaderContent({ id, observe, cleanup, suspend }: Omit<ReaderProps, 'nestedWhen'>) @{
 	const route = route$.get();
 	suspend?.();
 	useLayoutEffect(() => {
@@ -56,9 +56,15 @@ function Reader({ id, observe, cleanup, suspend, nestedWhen }: ReaderProps) @{
 		});
 		return () => cleanup?.(id);
 	}, []);
-	<section data-reader={id}>
+	<>
 		<output>{route as string}</output>
 		<input aria-label={id} defaultValue="server draft" />
+	</>
+}
+
+function Reader({ id, observe, cleanup, suspend, nestedWhen }: ReaderProps) @{
+	<section data-reader={id}>
+		<ReaderContent id={id} observe={observe} cleanup={cleanup} suspend={suspend} />
 		@if (nestedWhen) {
 			<Hydrate split={false} when={nestedWhen}>
 				<Reader id="nested" observe={observe} cleanup={cleanup} />
@@ -67,14 +73,7 @@ function Reader({ id, observe, cleanup, suspend, nestedWhen }: ReaderProps) @{
 	</section>
 }
 
-export function Document({
-	when,
-	secondWhen,
-	observe,
-	cleanup,
-	suspend,
-	nestedWhen,
-}: DocumentProps) @{
+function Heading({ observe, cleanup }: Pick<ReaderProps, 'observe' | 'cleanup'>) @{
 	const route = route$.get();
 	useLayoutEffect(() => {
 		observe?.({
@@ -85,8 +84,19 @@ export function Document({
 		});
 		return () => cleanup?.('heading');
 	}, []);
+	<h1>{route as string}</h1>
+}
+
+export function Document({
+	when,
+	secondWhen,
+	observe,
+	cleanup,
+	suspend,
+	nestedWhen,
+}: DocumentProps) @{
 	<main>
-		<h1>{route as string}</h1>
+		<Heading observe={observe} cleanup={cleanup} />
 		<Hydrate split={false} when={when}>
 			<Reader
 				id="first"

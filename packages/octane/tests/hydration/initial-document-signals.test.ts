@@ -122,9 +122,10 @@ for (const dev of [false, true]) {
 					initialDocumentSignals: clientSeed,
 					onRecoverableError: (value) => recoverable.push(value),
 				});
-				expect(committed).toEqual([observations('heading', 'thread', 'home')]);
+				expect(container.querySelector('h1')!.textContent).toBe('thread');
 				expect(runWithSignalOwner(clientOwner, () => client.route$.get())).toBe('home');
 				await act(() => {});
+				expect(committed).toEqual([observations('heading', 'thread', 'home')]);
 				expect(container.querySelector('h1')!.textContent).toBe('home');
 				expect([...container.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
 					'thread',
@@ -444,6 +445,10 @@ for (const dev of [false, true]) {
 					initialDocumentSignals,
 					onRecoverableError: (value) => recoverable.push(value),
 				});
+				expect(container.querySelector('h1')!.textContent).toBe('thread');
+				expect(runWithSignalOwner(clientOwner, () => client.route$.get())).toBe('newer live value');
+				await act(() => {});
+				expect(committed).toEqual([observations('heading', 'thread', 'newer live value')]);
 				await act(() => root!.render(client.Document, { ...props, when: condition(true) }));
 				expect(committed).toEqual([
 					observations('heading', 'thread', 'newer live value'),
@@ -491,6 +496,10 @@ for (const dev of [false, true]) {
 					signalOwner: clientOwner,
 					onRecoverableError: (value) => recoverable.push(value),
 				});
+				expect(container.querySelector('h1')!.textContent).toBe('thread');
+				expect(runWithSignalOwner(clientOwner, () => client.route$.get())).toBe('home');
+				await act(() => {});
+				expect(committed).toEqual([observations('heading', 'thread', 'home')]);
 				await act(() => root!.render(client.Document, { ...props, when: condition(true) }));
 				expect(committed).toEqual([
 					observations('heading', 'thread', 'home'),
@@ -754,6 +763,10 @@ for (const dev of [false, true]) {
 					initialDocumentSignals,
 					onRecoverableError: (value) => recoverable.push(value),
 				});
+				expect(container.querySelector('h1')!.textContent).toBe('thread');
+				expect(runWithSignalOwner(clientOwner, () => client.route$.get())).toBe('home');
+				await act(() => {});
+				expect(committed).toEqual([observations('heading', 'thread', 'home')]);
 				await act(() => {
 					container
 						.querySelector('[data-reader="first"] > output')!
@@ -827,6 +840,10 @@ for (const dev of [false, true]) {
 					signalOwner: clientOwner,
 					initialDocumentSignals,
 				});
+				expect(container.querySelector('h1')!.textContent).toBe('thread');
+				expect(runWithSignalOwner(clientOwner, () => client.route$.get())).toBe('home');
+				await act(() => {});
+				expect(committed).toEqual([observations('heading', 'thread', 'home')]);
 				await act(() => {
 					container
 						.querySelector('[data-reader="first"] > output')!
