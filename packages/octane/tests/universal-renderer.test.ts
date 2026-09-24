@@ -2877,6 +2877,74 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 		expect(output).not.toContain('"key":');
 	});
 
+	it.each([
+		['a', 'a'],
+		['b', 'b'],
+		['c', 'c'],
+		['z', 'fallback'],
+	] as const)('renders the %s arm of an @if/@else if/@else chain', (mode, expected) => {
+		// An `@else if` arm parses to an IfStatement alternate, not a
+		// JSXIfExpression. The else thunk must return the chained universalIf
+		// value; dropping it renders an empty range for every arm but the first.
+		const source = `
+			export function Scene({mode}) @{
+				<scene>
+					@if (mode === 'a') { <leaf value="a" /> }
+					@else if (mode === 'b') { <leaf value="b" /> }
+					@else if (mode === 'c') { <leaf value="c" /> }
+					@else { <leaf value="fallback" /> }
+				</scene>
+			}
+		`;
+		const module = evaluateUniversalHmrModule(
+			compile(source, '/src/ElseIf.object.tsrx', { renderer, hmr: false }).code,
+			{ data: {}, dispose() {}, accept() {}, invalidate() {} },
+		);
+		const { root, container } = objectRoot();
+		try {
+			root.render(module.Scene, { mode });
+			expect(container.children[0].children.map((child) => child.props.value)).toEqual([expected]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it.each([
+		['x', 'p', 'x'],
+		['y', 'p', 'y-p'],
+		['y', 'q', 'y-q'],
+		['y', 'z', null],
+		['w', 'p', 'fallback'],
+	] as const)(
+		'renders the %s/%s arm of an @else if chain nested in an @else if arm',
+		(outer, inner, expected) => {
+			const source = `
+				export function Scene({outer, inner}) @{
+					<scene>
+						@if (outer === 'x') { <leaf value="x" /> }
+						@else if (outer === 'y') {
+							@if (inner === 'p') { <leaf value="y-p" /> }
+							@else if (inner === 'q') { <leaf value="y-q" /> }
+						}
+						@else { <leaf value="fallback" /> }
+					</scene>
+				}
+			`;
+			const module = evaluateUniversalHmrModule(
+				compile(source, '/src/NestedElseIf.object.tsrx', { renderer, hmr: false }).code,
+				{ data: {}, dispose() {}, accept() {}, invalidate() {} },
+			);
+			const { root, container } = objectRoot();
+			try {
+				root.render(module.Scene, { outer, inner });
+				const values = container.children[0].children.map((child) => child.props.value);
+				expect(values).toEqual(expected === null ? [] : [expected]);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
 	it('keeps HMR, profiling, and parallel-use planning on universal components', () => {
 		const source = `
 			import { use } from 'octane';

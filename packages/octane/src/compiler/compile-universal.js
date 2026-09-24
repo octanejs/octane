@@ -3522,8 +3522,14 @@ function compileIfAst(node, context, state) {
 	);
 	let alternate = null;
 	if (node.alternate) {
+		// An `@else if` arm arrives as an IfStatement alternate rather than a
+		// JSXIfExpression. Both share test/consequent/alternate and must recurse
+		// through compileIfValueAst so the chained universalIf call becomes the
+		// else thunk's return value — routing an IfStatement through
+		// compileBlockValueAst instead would emit its branch values as setup
+		// statements and return an empty range.
 		alternate =
-			node.alternate.type === 'JSXIfExpression'
+			node.alternate.type === 'JSXIfExpression' || node.alternate.type === 'IfStatement'
 				? generatedArrow([], compileIfValueAst(node.alternate, state), node.alternate)
 				: compileBlockValueAst(node.alternate?.body ?? [node.alternate], state, [], node.alternate);
 	}
