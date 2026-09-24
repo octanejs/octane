@@ -1702,3 +1702,84 @@ export const ordinaryResult: string = ordinary('draft', { count: 1 });
 		}
 	});
 });
+
+describe('awaited @for bodies', () => {
+	// @tsrx/core lowers a `@for` whose body awaits to `await __map_iterable_async(…)`,
+	// imported from the platform's `forOfIterableHelper`, `octane/tsrx-iterable`.
+	// TS1058 is Octane's deliberate async-component diagnostic: `JSX.Element`
+	// poisons the promise protocol (see `jsx-runtime.d.ts`), so an async function
+	// returning an element reports it with or without a loop.
+	const ASYNC_ELEMENT = 1058;
+	const awaitedLoop = (body: string) => `export async function rows(items: number[]) @{
+	@for (const item of items; key item) {
+		<li>{${body}}</li>
+	}
+}
+`;
+
+	it('type-checks the loop against octane/tsrx-iterable with a typed binding', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-awaited-for-'));
+		try {
+			mkdirSync(join(root, 'node_modules'));
+			symlinkSync(
+				fileURLToPath(new URL('../..', import.meta.url)),
+				join(root, 'node_modules/octane'),
+				'dir',
+			);
+			const valid = compileToVolarMappings(
+				awaitedLoop('(await Promise.resolve(item)).toFixed(0)'),
+				'Rows.tsrx',
+			);
+			// A wrong element type has to surface as a member error, not as `any`.
+			const invalid = compileToVolarMappings(
+				awaitedLoop('(await Promise.resolve(item)).toUpperCase()'),
+				'Invalid.tsrx',
+			);
+			expect(valid.errors).toEqual([]);
+			expect(valid.code).toContain('__map_iterable_async');
+			expect(invalid.errors).toEqual([]);
+			const validFile = join(root, 'Rows.tsx');
+			const invalidFile = join(root, 'Invalid.tsx');
+			writeFileSync(validFile, valid.code);
+			writeFileSync(invalidFile, invalid.code);
+			const program = ts.createProgram({
+				rootNames: [validFile, invalidFile],
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					skipLibCheck: false,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+					types: [],
+				},
+			});
+			const codes = (file: string) => {
+				const sourceFile = program.getSourceFile(file)!;
+				return [
+					...program.getSyntacticDiagnostics(sourceFile),
+					...program.getSemanticDiagnostics(sourceFile),
+				].map(({ code }) => code);
+			};
+			expect(codes(validFile)).toEqual([ASYNC_ELEMENT]);
+			expect(codes(invalidFile).filter((code) => code !== ASYNC_ELEMENT)).toEqual([2339]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it.each([
+		['a plain body', 'item'],
+		['an awaited body', 'await Promise.resolve(item)'],
+	])('claims only the @for keyword for %s', (_label, body) => {
+		const source = awaitedLoop(body);
+		const at = source.indexOf('@for');
+		const { segments } = compileTypesInspection(source, 'Rows.tsrx');
+		const keyword = segments.filter((segment) => segment.srcStart === at);
+		expect(keyword.length).toBeGreaterThan(0);
+		for (const segment of keyword) {
+			expect(source.slice(segment.srcStart, segment.srcEnd!)).toBe('@for');
+		}
+	});
+});

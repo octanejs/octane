@@ -648,13 +648,14 @@ const DIRECTIVE_KEYWORDS = {
  * The generated text each directive resolves to.
  *
  * Two kinds. A directive the transform REWRITES (`@for` → a `map_iterable`
- * call) has no keyword left in the output, so the transform anchors the helper
- * on it — see `stamp_directive_origin` in @tsrx/core. A directive it PRESERVES
+ * call, or `map_iterable_async` when its body awaits) has no keyword left in
+ * the output, so the transform anchors the helper on it — see
+ * `stamp_directive_origin` in @tsrx/core. A directive it PRESERVES
  * as JavaScript (`@switch`) still emits its keyword; the map already reaches
  * it, and only the authored END needs claiming.
  */
 const DIRECTIVE_GENERATED_NAMES = {
-	JSXForExpression: ['__map_iterable'],
+	JSXForExpression: ['__map_iterable', '__map_iterable_async'],
 	JSXSwitchExpression: ['switch'],
 	// `@if` becomes a ternary whose arms are hoisted statics with generated
 	// names, so there is no stable text to match — but the transform anchors

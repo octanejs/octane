@@ -64,7 +64,7 @@ export function TransformControls({
 	ref,
 	...props
 }: TransformControlsProps) @{
-	const defaultControls = useThree((state) => state.controls) as ControlsProto | undefined;
+	const defaultControls = useThree((state) => state.controls) as unknown as ControlsProto | undefined;
 	const gl = useThree((state) => state.gl);
 	const events = useThree((state) => state.events);
 	const defaultCamera = useThree((state) => state.camera);

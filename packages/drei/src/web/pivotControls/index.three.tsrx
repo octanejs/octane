@@ -111,7 +111,7 @@ export function calculateOffset(
 }
 
 function AxisArrow({ direction, axis }: { direction: THREE.Vector3; axis: 0 | 1 | 2 }) @{
-	const config = useContext(PivotControlsContext), controls = useThree((state) => state.controls) as {
+	const config = useContext(PivotControlsContext), controls = useThree((state) => state.controls) as unknown as {
 		enabled: boolean;
 	} | undefined;
 	const divRef = useRef<HTMLDivElement | null>(null), objectRef = useRef<THREE.Group | null>(null);
@@ -250,7 +250,7 @@ function PlaneSlider({
 	dir2: THREE.Vector3;
 	axis: 0 | 1 | 2;
 }) @{
-	const config = useContext(PivotControlsContext), controls = useThree((state) => state.controls) as {
+	const config = useContext(PivotControlsContext), controls = useThree((state) => state.controls) as unknown as {
 		enabled: boolean;
 	} | undefined;
 	const divRef = useRef<HTMLDivElement | null>(null), objectRef = useRef<THREE.Group | null>(
@@ -422,7 +422,7 @@ function AxisRotator({
 	dir2: THREE.Vector3;
 	axis: 0 | 1 | 2;
 }) @{
-	const config = useContext(PivotControlsContext), controls = useThree((state) => state.controls) as {
+	const config = useContext(PivotControlsContext), controls = useThree((state) => state.controls) as unknown as {
 		enabled: boolean;
 	} | undefined;
 	const divRef = useRef<HTMLDivElement | null>(null), objectRef = useRef<THREE.Group | null>(
@@ -562,7 +562,7 @@ function AxisRotator({
 function ScalingSphere({ direction, axis }: { direction: THREE.Vector3; axis: 0 | 1 | 2 }) @{
 	const config = useContext(PivotControlsContext), size = useThree((state) => state.size), controls = useThree(
 		(state) => state.controls,
-	) as { enabled: boolean } | undefined;
+	) as unknown as { enabled: boolean } | undefined;
 	const divRef = useRef<HTMLDivElement | null>(null), objectRef = useRef<THREE.Group | null>(
 		null,
 	), meshRef = useRef<THREE.Mesh | null>(null), scale0 = useRef(1), scaleCurrent = useRef(1);

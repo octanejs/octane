@@ -292,14 +292,14 @@ catalogs:
     '@vitest/coverage-v8': 4.1.10
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
-    '@tsrx/core': ^0.2.0
-    '@tsrx/prettier-plugin': ^0.4.1
-    '@tsrx/typescript-plugin': ^0.4.1
+    '@tsrx/core': ^0.3.2
+    '@tsrx/prettier-plugin': ^0.4.10
+    '@tsrx/typescript-plugin': ^0.4.10
     '@tsrx/ripple': ^0.2.0
-    '@tsrx/react': ^0.3.0
-    '@tsrx/solid': ^0.2.0
-    '@tsrx/vite-plugin-react': ^0.0.105
-    '@tsrx/vite-plugin-solid': ^0.0.102
+    '@tsrx/react': ^0.3.7
+    '@tsrx/solid': ^0.2.7
+    '@tsrx/vite-plugin-react': ^0.0.112
+    '@tsrx/vite-plugin-solid': ^0.0.109
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.14
@@ -605,31 +605,27 @@ minimumReleaseAgeExclude:
   - '@tsrx/oxc@0.13.0'
   - '@ripple-ts/adapter@0.4.0'
   - '@ripple-ts/vite-plugin@0.4.0'
-  - '@tsrx/core@0.2.0'
-  - '@tsrx/prettier-plugin@0.4.1'
-  - '@tsrx/react@0.3.0'
+  - '@tsrx/core@0.3.2'
+  - '@tsrx/prettier-plugin@0.4.10'
+  - '@tsrx/react@0.3.7'
   - '@tsrx/ripple@0.2.0'
-  - '@tsrx/solid@0.2.0'
-  - '@tsrx/typescript-plugin@0.4.1'
-  - '@tsrx/vite-plugin-react@0.0.105'
-  - '@tsrx/vite-plugin-solid@0.0.102'
+  - '@tsrx/solid@0.2.7'
+  - '@tsrx/typescript-plugin@0.4.10'
+  - '@tsrx/vite-plugin-react@0.0.112'
+  - '@tsrx/vite-plugin-solid@0.0.109'
   - ripple@0.4.0
-  - '@tsrx/runtime@0.2.0'
-  - '@tsrx/react-runtime@0.1.8'
-  - '@tsrx/solid-runtime@0.1.8'
+  - '@tsrx/runtime@0.2.3'
+  - '@tsrx/react-runtime@0.1.11'
+  - '@tsrx/solid-runtime@0.1.11'
   - cn@0.2.6
   - '@tanstack/react-virtual@3.14.12'
   - '@tanstack/virtual-core@3.17.10'
 
 # The JSX type-only, generic-arrow, and typed-default mapping fixes formerly
-# patched into @tsrx/core are published in the required @tsrx/core >= 0.1.69.
+# patched into @tsrx/core are published in the required @tsrx/core >= 0.1.69,
+# and the parameter-property and bodyless-method mapping fix
+# (https://github.com/tsrx-org/tsrx/pull/143) in @tsrx/core >= 0.3.0.
 patchedDependencies:
-  # Map TS parameter properties and bodyless class methods (TSDeclareMethod) in
-  # the tsrx-tsc mapping walker, which otherwise throws and falls back to raw
-  # text, and print `override` on parameter properties (esrap drops it).
-  # Upstream: https://github.com/tsrx-org/tsrx/pull/143;
-  # drop once a @tsrx/core release with that fix is adopted.
-  '@tsrx/core@0.2.0': patches/@tsrx__core@0.2.0.patch
   # Preserve sibling package URLs when browser mocks share a directory-name prefix.
   # Browser ships its own prebundled copy of the mocker implementation.
   '@vitest/browser@4.1.10': patches/@vitest__browser@4.1.10.patch
