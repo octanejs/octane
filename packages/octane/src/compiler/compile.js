@@ -16856,6 +16856,7 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 			else if (name === regions.switch) thunkIndexes = [1, 2];
 			else if (name === regions.for) thunkIndexes = [2, 3];
 			else if (name === regions.try) thunkIndexes = [0, 1, 2];
+			else if (name === regions.block) thunkIndexes = [0];
 			if (thunkIndexes !== null) {
 				for (const index of thunkIndexes) transformThunkValue(node.arguments?.[index], ownerName);
 				for (let index = 0; index < (node.arguments?.length || 0); index++) {

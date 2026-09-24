@@ -42,6 +42,7 @@ const UNIVERSAL_HOST_COMPONENT = Symbol('octane.universal.host-component');
 const UNIVERSAL_PROPS = Symbol.for('octane.universal.props');
 const UNIVERSAL_CHILDREN = Symbol.for('octane.universal.children');
 const UNIVERSAL_IF = Symbol.for('octane.universal.if');
+const UNIVERSAL_BLOCK = Symbol.for('octane.universal.block');
 const UNIVERSAL_SWITCH = Symbol.for('octane.universal.switch');
 const UNIVERSAL_FOR = Symbol.for('octane.universal.for');
 const UNIVERSAL_HOST_BINDING = Symbol('octane.universal.host-binding');
@@ -228,6 +229,7 @@ export type UniversalRenderable =
 	| UniversalComponentValue
 	| UniversalChildrenValue
 	| UniversalIfValue
+	| UniversalBlockValue
 	| UniversalSwitchValue
 	| UniversalForValue
 	| UniversalTryValue
@@ -287,6 +289,11 @@ export interface UniversalIfValue {
 	readonly condition: boolean;
 	readonly then: () => UniversalRenderable;
 	readonly else: (() => UniversalRenderable) | null;
+}
+
+export interface UniversalBlockValue {
+	readonly $$kind: typeof UNIVERSAL_BLOCK;
+	readonly body: () => UniversalRenderable;
 }
 
 export interface UniversalSwitchValue {
@@ -1844,6 +1851,11 @@ export function universalIf(
 	otherwise: (() => UniversalRenderable) | null = null,
 ): UniversalIfValue {
 	return { $$kind: UNIVERSAL_IF, condition: !!condition, then, else: otherwise };
+}
+
+export function universalBlock(body: () => UniversalRenderable): UniversalBlockValue {
+	if (typeof body !== 'function') throw new TypeError('universalBlock expected a body function.');
+	return { $$kind: UNIVERSAL_BLOCK, body };
 }
 
 export function universalSwitch(
@@ -3717,6 +3729,18 @@ function materializeValue(
 			);
 			return ownerRange(owner, nodes);
 		}
+	}
+	if ((value as UniversalBlockValue)?.$$kind === UNIVERSAL_BLOCK) {
+		// `@{ … }` child blocks own a persistent child scope at this exact
+		// sibling position: setup re-runs each parent render while hook state,
+		// effects, and cleanup ride the claimed owner — the universal
+		// counterpart of the DOM childSlot lowering.
+		return materializeScoped(
+			CURRENT_OWNER!,
+			[...path, 'block'],
+			0,
+			(value as UniversalBlockValue).body,
+		);
 	}
 	if (Array.isArray(value)) {
 		const output: BlueprintNode[] = [];
