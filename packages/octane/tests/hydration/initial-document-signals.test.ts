@@ -5,6 +5,7 @@ import {
 	bootstrapIndependentHydration,
 	condition,
 	createStreamedRegionReceiver,
+	interaction,
 	type StreamFrameIdentity,
 } from 'octane/hydration';
 import {
@@ -28,6 +29,10 @@ const source = readFileSync(
 	'packages/octane/tests/hydration/_fixtures/initial-document-signals.tsrx',
 	'utf8',
 );
+const independentSource = readFileSync(
+	'packages/octane/tests/hydration/_fixtures/initial-document-independent.tsrx',
+	'utf8',
+);
 
 function fixture(dev: boolean) {
 	const options = {
@@ -35,14 +40,24 @@ function fixture(dev: boolean) {
 		compileOptions: { dev, hmr: false },
 		runtimeModules: { 'octane/signals': Signals },
 	};
+	const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+	const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+	const independentId = '/src/initial-document-independent.tsrx';
+	const independentServer = loadCompiledFixtureSource(independentSource, {
+		...options,
+		id: independentId,
+		mode: 'server',
+		runtimeModules: { ...options.runtimeModules, './initial-document-signals.tsrx': server },
+	});
 	return {
-		server: loadCompiledFixtureSource(source, { ...options, mode: 'server' }),
-		client: loadCompiledFixtureSource(source, { ...options, mode: 'client' }),
+		server: { ...server, Independent: independentServer.Independent },
+		client,
 		independent: () =>
-			loadCompiledFixtureSource(source, {
+			loadCompiledFixtureSource(independentSource, {
 				...options,
-				id: options.id + '?octane-hydrate=0',
+				id: independentId + '?octane-hydrate=0',
 				mode: 'client',
+				runtimeModules: { ...options.runtimeModules, './initial-document-signals.tsrx': client },
 			}),
 	};
 }
@@ -82,7 +97,11 @@ for (const dev of [false, true]) {
 			try {
 				runWithSignalOwner(serverOwner, () => server.route$.set('thread'));
 				const initialDocumentSignals = serverOwner.serialize();
-				const props: DocumentProps = { when: condition(false), observe };
+				const props: DocumentProps = {
+					when: interaction({ events: 'click' }),
+					secondWhen: interaction({ events: 'click' }),
+					observe,
+				};
 				const rendered = renderToString(server.Document, props, {
 					signalOwner: serverOwner,
 					initialDocumentSignals,
@@ -113,14 +132,11 @@ for (const dev of [false, true]) {
 				]);
 				// The root owns an immutable adoption snapshot for boundaries activated later.
 				(clientSeed.entries[0]!.value as ['string', string])[1] = 'mutated seed';
-				await act(() =>
-					root!.render(client.Document, {
-						...props,
-						when: condition(true),
-						secondWhen: condition(false),
-						observe,
-					}),
-				);
+				await act(() => {
+					container
+						.querySelector('[data-reader="first"] > output')!
+						.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+				});
 				expect(committed).toEqual([
 					observations('heading', 'thread', 'home'),
 					observations('first', 'thread', 'home'),
@@ -130,13 +146,11 @@ for (const dev of [false, true]) {
 					'thread',
 				]);
 				await act(() => runWithSignalOwner(clientOwner, () => client.route$.set('live edit')));
-				await act(() =>
-					root!.render(client.Document, {
-						...props,
-						when: condition(true),
-						observe,
-					}),
-				);
+				await act(() => {
+					container
+						.querySelector('[data-reader="second"] > output')!
+						.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+				});
 				expect(committed.at(-1)).toEqual(observations('second', 'thread', 'live edit'));
 				expect([...container.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
 					'live edit',
@@ -723,9 +737,9 @@ for (const dev of [false, true]) {
 				runWithSignalOwner(serverOwner, () => server.route$.set('thread'));
 				const initialDocumentSignals = serverOwner.serialize();
 				const props = {
-					when: condition(false),
-					secondWhen: condition(false),
-					nestedWhen: condition(false),
+					when: interaction({ events: 'click' }),
+					secondWhen: interaction({ events: 'click' }),
+					nestedWhen: interaction({ events: 'click' }),
 					observe: (value: CommitObservation) => committed.push(value),
 					cleanup: (id: string) => cleaned.push(id),
 				};
@@ -740,7 +754,11 @@ for (const dev of [false, true]) {
 					initialDocumentSignals,
 					onRecoverableError: (value) => recoverable.push(value),
 				});
-				await act(() => root!.render(client.Document, { ...props, when: condition(true) }));
+				await act(() => {
+					container
+						.querySelector('[data-reader="first"] > output')!
+						.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+				});
 				expect(committed).toEqual([
 					observations('heading', 'thread', 'home'),
 					observations('first', 'thread', 'home'),
@@ -749,13 +767,11 @@ for (const dev of [false, true]) {
 				expect(container.querySelector('[data-reader="nested"] > output')!.textContent).toBe(
 					'thread',
 				);
-				await act(() =>
-					root!.render(client.Document, {
-						...props,
-						when: condition(true),
-						nestedWhen: condition(true),
-					}),
-				);
+				await act(() => {
+					container
+						.querySelector('[data-reader="nested"] > output')!
+						.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+				});
 				expect(committed.at(-1)).toEqual(observations('nested', 'thread', 'home'));
 				expect(container.querySelector('[data-reader="nested"] > output')!.textContent).toBe(
 					'home',
@@ -792,7 +808,8 @@ for (const dev of [false, true]) {
 				runWithSignalOwner(serverOwner, () => server.route$.set('thread'));
 				const initialDocumentSignals = serverOwner.serialize();
 				const props = {
-					when: condition(false),
+					when: interaction({ events: 'click' }),
+					secondWhen: interaction({ events: 'click' }),
 					nestedWhen: condition(false),
 					observe: (value: CommitObservation) => committed.push(value),
 					cleanup: (id: string) => cleaned.push(id),
@@ -810,13 +827,11 @@ for (const dev of [false, true]) {
 					signalOwner: clientOwner,
 					initialDocumentSignals,
 				});
-				await act(() =>
-					root!.render(client.Document, {
-						...props,
-						when: condition(true),
-						secondWhen: condition(false),
-					}),
-				);
+				await act(() => {
+					container
+						.querySelector('[data-reader="first"] > output')!
+						.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+				});
 				expect(committed.map((value) => value.id)).toEqual(['heading']);
 				flushSync(() => root!.unmount());
 				root = undefined;

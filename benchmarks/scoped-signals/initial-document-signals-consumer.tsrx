@@ -13,14 +13,14 @@ function Region(props: { name: string; accepted?: Accepted }) @{
 	<output data-region={props.name}>{value as string}</output>
 }
 
-export function DocumentView(props: Props) @{
+export function DocumentView({ first, second, accepted }: Props) @{
 	<main>
-		<Region name="eager" accepted={props.accepted} />
-		<Hydrate when={props.first} split={false}>
-			<Region name="first" accepted={props.accepted} />
+		<Region name="eager" accepted={accepted} />
+		<Hydrate when={first} split={false}>
+			<Region name="first" accepted={accepted} />
 		</Hydrate>
-		<Hydrate when={props.second} split={false}>
-			<Region name="second" accepted={props.accepted} />
+		<Hydrate when={second} split={false}>
+			<Region name="second" accepted={accepted} />
 		</Hydrate>
 	</main>
 }

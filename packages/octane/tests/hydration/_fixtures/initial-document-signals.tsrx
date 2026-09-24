@@ -1,6 +1,5 @@
 import { Hydrate, use, useLayoutEffect, type HydrateProps } from 'octane';
 import { signal$ } from 'octane/signals';
-import { load } from 'octane/hydration';
 
 export const route$ = signal$('home');
 
@@ -25,15 +24,7 @@ export type DocumentProps =
 		secondWhen?: HydrateProps['when'];
 	};
 
-export function Independent() @{
-	<aside>
-		<Hydrate independent when={load()}>
-			<IndependentReader />
-		</Hydrate>
-	</aside>
-}
-
-function IndependentReader() @{
+export function IndependentReader() @{
 	const route = route$.get();
 	useLayoutEffect(() => {
 		document.dispatchEvent(

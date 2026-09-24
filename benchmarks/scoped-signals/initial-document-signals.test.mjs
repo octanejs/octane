@@ -39,7 +39,7 @@ const occurrenceCount = (haystack, needle) => haystack.split(needle).length - 1;
 
 const serverEntry = `
 import {renderToString,earlySignalBootstrapScript} from 'octane/server';
-import {condition} from 'octane/hydration';
+import {interaction} from 'octane/hydration';
 import {createScope,runWithSignalOwner} from 'octane/signals';
 import {DocumentView,route$} from 'consumer';
 export function render(distinct=false,reuse=true){
@@ -48,7 +48,8 @@ export function render(distinct=false,reuse=true){
   runWithSignalOwner(owner,()=>route$.set(${JSON.stringify(SHARED)}));
   const initialDocumentSignals=owner.serialize();
   if(distinct)runWithSignalOwner(owner,()=>route$.set(${JSON.stringify(DISTINCT)}));
-  const rendered=renderToString(DocumentView,{first:condition(false),second:condition(false)},
+  const first=interaction({events:'click'}),second=interaction({events:'click'});
+  const rendered=renderToString(DocumentView,{first,second},
    {signalOwner:owner,earlySignalBootstrap:'external',...(reuse?{initialDocumentSignals}:{})});
   const initialJson=JSON.stringify({version:1,scopes:[initialDocumentSignals]}).replace(/</g,'\\\\u003c');
   const bootstrap=earlySignalBootstrapScript()+'<script id="initial-document-signals" type="application/json">'+initialJson+'</script>';
@@ -59,7 +60,7 @@ export function render(distinct=false,reuse=true){
 
 const clientEntry = `
 import {act,flushSync,hydrateRoot} from 'octane';
-import {condition} from 'octane/hydration';
+import {interaction} from 'octane/hydration';
 import {bootstrapStreamedSignalResults} from 'octane/hydration/streamed-signals';
 import {DocumentView,route$} from 'consumer';
 export async function hydrate(host,initialDocumentSignals){
@@ -69,21 +70,24 @@ export async function hydrate(host,initialDocumentSignals){
  const texts=()=>[...host.querySelectorAll('output')].map(node=>node.textContent);
  const historyReads={};
  const accepted=(name,presented,live)=>{if(!(name in historyReads))historyReads[name]={presented,live};};
+ const first=interaction({events:'click'}),second=interaction({events:'click'});
  const recoveries=[];let root;
  try{
   const server=texts();
   route$.set('live-before-root');
-  root=hydrateRoot(host,DocumentView,{first:condition(false),second:condition(false),accepted},
+  root=hydrateRoot(host,DocumentView,{first,second,accepted},
    {signalOwner:bridge.signalOwner,initialDocumentSignals,onRecoverableError:error=>recoveries.push(String(error))});
   await act(()=>{});
   const preactivated=texts();
   const rootLive=route$.get();
   flushSync(()=>route$.set('live-before-first'));
-  await act(()=>root.render(DocumentView,{first:condition(true),second:condition(false),accepted}));
+  await act(()=>host.querySelector('[data-region="first"]').dispatchEvent(
+   new MouseEvent('click',{bubbles:true,cancelable:true})));
   const firstActivated=texts();
   const firstLive=route$.get();
   flushSync(()=>route$.set('live-before-second'));
-  await act(()=>root.render(DocumentView,{first:condition(true),second:condition(true),accepted}));
+  await act(()=>host.querySelector('[data-region="second"]').dispatchEvent(
+   new MouseEvent('click',{bubbles:true,cancelable:true})));
   const secondActivated=texts();
   const secondLive=route$.get();
   const identity=previous.every((node,index)=>node===host.querySelectorAll('output')[index]);
