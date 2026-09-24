@@ -31,6 +31,7 @@ import {
 import { mount } from './_helpers.js';
 import { UniversalBoundaryFixture, UniversalTheme } from './_fixtures/universal-boundary.tsrx';
 import { CompiledUniversalScene } from './_fixtures/compiled-universal.object.tsrx';
+import { UniversalPropScene } from './_fixtures/universal-jsx-prop.object.tsrx';
 import { inspectProfileOutput } from './_profile-output.js';
 
 const renderer = {
@@ -3884,6 +3885,23 @@ export function App() @{
 				{ renderer },
 			),
 		).toThrow(/Activity requires an explicit renderer visibility capability/);
+	});
+
+	it('renders JSX passed as a component prop through the object driver', () => {
+		// `card={<UniversalPropCard/>}` is a renderable value in the universal
+		// model, not a DOM descriptor: the universal module exports no
+		// `createScopedValue`/`createElementFromConfig`, so a bundle-time import
+		// of the descriptor runtime is the reported failure. The hole in
+		// UniversalPropHost must mount the same content the callee authored.
+		const { container, root } = objectRoot();
+
+		root.render(UniversalPropScene, { title: 'first' });
+		expect(container.children[0]).toMatchObject({ type: 'frame' });
+		expect(container.children[0].children[0]).toMatchObject({ type: 'label' });
+		expect(container.children[0].children[0].children[0].props.value).toBe('first');
+
+		root.render(UniversalPropScene, { title: 'second' });
+		expect(container.children[0].children[0].children[0].props.value).toBe('second');
 	});
 
 	it('executes a compiler-produced static plan through the object driver', () => {
