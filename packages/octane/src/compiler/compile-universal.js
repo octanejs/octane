@@ -2288,9 +2288,15 @@ function isOwnerFreeForAttribute(attribute) {
 	);
 }
 
+// A missing `key` clause synthesizes a positional key, which cannot observe
+// item ownership — treat it as owner-free like any pure key expression.
+function isOwnerFreeForKey(node) {
+	return node.key == null || isOwnerFreeForExpression(node.key);
+}
+
 function ownerFreeForLeaf(node) {
 	if (node.empty != null) return null;
-	if (!isOwnerFreeForExpression(node.right) || !isOwnerFreeForExpression(node.key)) return null;
+	if (!isOwnerFreeForExpression(node.right) || !isOwnerFreeForKey(node)) return null;
 	const body = (node.body?.body ?? []).filter(
 		(statement) => statement.type !== 'JSXText' || normalizeJsxText(statement.value ?? '') !== '',
 	);
@@ -2424,7 +2430,7 @@ function templateProgramForHost(node, state) {
 		node.empty != null ||
 		!rendererHasCapability(state, 'template-program-mount') ||
 		!isOwnerFreeForExpression(node.right) ||
-		!isOwnerFreeForExpression(node.key)
+		!isOwnerFreeForKey(node)
 	) {
 		return false;
 	}
@@ -2440,7 +2446,7 @@ function templateProgramForComponent(node, state) {
 		(!rendererHasCapability(state, 'template-program-mount') &&
 			!rendererHasCapability(state, COMPONENT_SCOPE_FOR_CAPABILITY)) ||
 		!isOwnerFreeForExpression(node.right) ||
-		!isOwnerFreeForExpression(node.key)
+		!isOwnerFreeForKey(node)
 	) {
 		return null;
 	}
@@ -3433,9 +3439,6 @@ function compileForAst(node, context, state) {
 			'await @for requires the async-collection capability.',
 		);
 	}
-	if (!node.key) {
-		throw universalError(state.filename, node, 'universal @for ranges require an explicit key.');
-	}
 	const declaration = node.left?.declarations?.[0];
 	if (!declaration?.id) {
 		throw universalError(state.filename, node, 'universal @for requires one item binding.');
@@ -3444,7 +3447,7 @@ function compileForAst(node, context, state) {
 	const indexBinding =
 		node.index ?? generatedIdentifier(allocName(state, '__octaneUniversalIndex'), node);
 	assertNoResidualTemplate(node.right, state, '@for source');
-	assertNoResidualTemplate(node.key, state, '@for key');
+	if (node.key) assertNoResidualTemplate(node.key, state, '@for key');
 	const host = !state.hmr ? ownerFreeForHost(node) : null;
 	const component = host === null ? ownerFreeForThreeHostComponent(node, state) : null;
 	const templateComponent =
@@ -3459,7 +3462,18 @@ function compileForAst(node, context, state) {
 			: compileOwnerFreeThreeHostComponentAst(component, state, itemBinding, indexBinding);
 	const args = [
 		rewriteSourceAst(node.right, state),
-		generatedArrow([itemBinding, indexBinding], rewriteSourceAst(node.key, state), node.key),
+		// The universal runtime reconciles ranges by key only — there is no
+		// unkeyed path — so a missing `key` clause synthesizes a positional key.
+		// Item state (hooks, component owners, uncontrolled leaf state) then
+		// follows the slot rather than the item across reorders; `key item.id`
+		// remains the way to keep state attached to a moving item.
+		node.key
+			? generatedArrow([itemBinding, indexBinding], rewriteSourceAst(node.key, state), node.key)
+			: generatedArrow(
+					[itemBinding, indexBinding],
+					generatedIdentifier(indexBinding.name, node),
+					node,
+				),
 		compactHost?.render ??
 			compactComponent?.render ??
 			(templateComponent === null

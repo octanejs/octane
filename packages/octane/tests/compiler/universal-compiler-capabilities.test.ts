@@ -519,6 +519,46 @@ describe('compact intrinsic host loops', () => {
 	});
 });
 
+describe('universal @for without an explicit key', () => {
+	const unkeyed = `
+		export function Scene({ items }) @{
+			@for (const item of items) {
+				<mesh name={item.name} />
+			}
+		}
+	`;
+
+	it('keys the range by position instead of rejecting the loop', () => {
+		const args = compiledUniversalForArguments(unkeyed);
+
+		expect(args[1]).toMatchObject({
+			type: 'ArrowFunctionExpression',
+			params: [{ type: 'Identifier' }, { type: 'Identifier' }],
+		});
+		expect(args[1].body).toMatchObject({
+			type: 'Identifier',
+			name: args[1].params[1].name,
+		});
+	});
+
+	it('keeps the compact leaf plan that a keyed loop over the same body gets', () => {
+		const args = compiledUniversalForArguments(unkeyed);
+
+		expect(args.slice(3, 6).map((argument) => argument.value)).toEqual([null, true, true]);
+		expect(args[6]).toMatchObject({ type: 'UnaryExpression', operator: 'void' });
+		expect(args[7]?.type).toBe('Identifier');
+	});
+
+	it('honours a declared index binding in the positional key', () => {
+		const args = compiledUniversalForArguments(
+			unkeyed.replace('@for (const item of items)', '@for (const item of items; index i)'),
+		);
+
+		expect(args[1].params[1]).toMatchObject({ type: 'Identifier', name: 'i' });
+		expect(args[1].body).toMatchObject({ type: 'Identifier', name: 'i' });
+	});
+});
+
 describe('tree-shakable Three intrinsic registration', () => {
 	function compiledModule(source: string, options: Record<string, any> = {}): any {
 		return parseModule(
