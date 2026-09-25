@@ -491,6 +491,11 @@
         "packageName": "@octanejs/tiptap",
         "title": "Tiptap",
         "tags": ["editor", "rich text"]
+      },
+      {
+        "packageName": "@octanejs/blocknote",
+        "title": "BlockNote",
+        "tags": ["rich text", "editor", "headless"]
       }
     ]
   },

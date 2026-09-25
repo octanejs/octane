@@ -1,8 +1,10 @@
 import type { BlockNoteEditor, BlockNoteEditorOptions } from '@blocknote/core';
-import { BlockNoteContext, useCreateBlockNote } from '@octanejs/blocknote';
-
-import { useEditorChange } from '../../src/hooks/useEditorChange.js';
-import { useEditorSelectionChange } from '../../src/hooks/useEditorSelectionChange.js';
+import {
+	BlockNoteContext,
+	useCreateBlockNote,
+	useEditorChange,
+	useEditorSelectionChange,
+} from '@octanejs/blocknote';
 
 interface OptionalHookArgumentsProps {
 	options: Partial<BlockNoteEditorOptions<any, any, any>>;

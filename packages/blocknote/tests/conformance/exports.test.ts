@@ -1,32 +1,16 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import * as BlockNote from '@octanejs/blocknote';
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-
 describe('@octanejs/blocknote — exports', () => {
-	it('exports milestone-1 editor bootstrap symbols', () => {
-		expect(typeof BlockNote.useCreateBlockNote).toBe('function');
-		expect(typeof BlockNote.useBlockNoteEditor).toBe('function');
-		expect(typeof BlockNote.useBlockNoteContext).toBe('function');
-		expect(BlockNote.BlockNoteContext).toBeTruthy();
-	});
-
-	it('keeps the unfinished editor view outside the milestone-1 surface', () => {
-		expect('BlockNoteViewRaw' in BlockNote).toBe(false);
+	it('ships the headless view without a default-UI BlockNoteView', () => {
+		// OCTANE DIVERGENCE[blocknote-headless][conformance:blocknote-headless]:
+		// @blocknote/react also exports the default UI (toolbars, menus,
+		// ComponentsContext). This binding ships only the headless view, so a
+		// UI-kit `BlockNoteView` must not appear to exist.
+		expect(typeof BlockNote.BlockNoteViewRaw).toBe('function');
+		expect(typeof BlockNote.BlockNoteViewEditor).toBe('function');
 		expect('BlockNoteView' in BlockNote).toBe(false);
-	});
-
-	it('packs only the supported milestone-1 source surface', () => {
-		const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
-		expect(manifest.files).toEqual([
-			'src/index.ts',
-			'src/editor/BlockNoteContext.ts',
-			'src/hooks/useBlockNoteEditor.ts',
-			'src/hooks/useCreateBlockNote.tsrx',
-			'README.md',
-		]);
+		expect('BlockNoteDefaultUI' in BlockNote).toBe(false);
+		expect('ComponentsContext' in BlockNote).toBe(false);
 	});
 });

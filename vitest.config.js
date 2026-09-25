@@ -9427,13 +9427,50 @@ export default defineConfig({
 			octaneSourceTestProject({
 				test: {
 					name: 'blocknote',
-					include: ['packages/blocknote/tests/**/*.test.ts'],
+					include: [
+						'packages/blocknote/tests/**/*.test.ts',
+						'!packages/blocknote/tests/ssr/**/*.test.ts',
+						'!packages/blocknote/tests/browser/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					testTimeout: 30_000,
 					globals: false,
 				},
 				aliases: BLOCKNOTE_SOURCE_ALIASES,
 			}),
+			octaneSourceTestProject({
+				test: {
+					name: 'blocknote-ssr',
+					include: ['packages/blocknote/tests/ssr/server.test.ts'],
+					environment: 'node',
+					testTimeout: 30_000,
+					globals: false,
+				},
+				aliases: BLOCKNOTE_SOURCE_ALIASES,
+				ssr: true,
+			}),
+			{
+				test: {
+					name: 'blocknote-hydration',
+					include: ['packages/blocknote/tests/ssr/hydration.test.ts'],
+					environment: 'jsdom',
+					testTimeout: 30_000,
+					globals: false,
+				},
+				plugins: [octaneServerFixtures(import.meta.dirname), octane()],
+				resolve: { alias: BLOCKNOTE_SOURCE_ALIASES },
+			},
+			{
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'blocknote-browser',
+					include: ['packages/blocknote/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
 		],
 	},
 });
