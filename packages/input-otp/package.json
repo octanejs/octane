@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/input-otp",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -48,7 +48,7 @@
     "typecheck:pristine": "tsc --noEmit -p audit/type-probes/tsconfig.pristine.json"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.5.0"
+    "octane": "workspace:^0.6.0"
   },
   "devDependencies": {
     "@testing-library/react": "16.3.2",

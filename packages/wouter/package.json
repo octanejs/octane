@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/wouter",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "license": "Unlicense",
   "type": "module",
   "engines": {
@@ -51,7 +51,7 @@
     "regexparam": "^3.0.0"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.5.0"
+    "octane": "workspace:^0.6.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

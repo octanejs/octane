@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/cmdk",
-  "version": "0.1.40",
+  "version": "0.1.41",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -37,7 +37,7 @@
     "@octanejs/radix": "workspace:*"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.5.0"
+    "octane": "workspace:^0.6.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

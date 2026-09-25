@@ -9,7 +9,7 @@
     "react-dom": "catalog:default",
     "vitest": "catalog:default"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -50,7 +50,7 @@
     "@blocknote/core": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.5.0"
+    "octane": "workspace:^0.6.0"
   },
   "octane": {
     "hookSlots": {

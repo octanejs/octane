@@ -1,5 +1,21 @@
 # octane
 
+## 0.6.0
+
+### Minor Changes
+
+- 4b235d2: Add opt-in parser-time capture of native SSR form submissions. Forms naming a behavior owner can accept button, implicit Enter, and requestSubmit commands before client registration, preserving immutable accepted fields and submitter metadata for exactly-once behavior delivery. Behavior roots consume these commands with the optional captureFormSubmissions factory, keeping form routing out of ordinary behavior bundles. Unclaimed commands have a bounded lease, and forms without opt-in preserve native behavior.
+- 6e86908: Report unsupported JSX spread children in client and server compilation and in editor diagnostics. Assigned style blocks now keep all selectors, including element and descendant rules that apply to elements carrying a class entry from the block.
+- b9b0bc4: Support `@{ … }` blocks at JSX child position on universal renderers. Setup-bearing blocks now compile to a new `universalBlock` descriptor that materializes inside a persistent child scope at the block's sibling position, matching the DOM `childSlot` lowering: hook state survives parent re-renders and effect cleanup runs when the scope is discarded. Empty blocks are dropped and render-only blocks merge into the parent template, and the explicit `{() => @{ … }}` scoped-child spelling lowers to the same form. `@{ … }` inside `@if`/`@for`/`@switch`/`@try` bodies — previously emitted as a raw statement that failed printing — compiles through the same path.
+
+### Patch Changes
+
+- 411c555: Match server and client hydration boundaries for render-function children in
+  descriptor hosts, preserving their DOM identity, refs, and events alongside
+  component siblings.
+- ac2a217: Upgrade `@tsrx/oxc` to 0.16.0 so `oxlint` parses a project's `.oxlintrc.json` with the project's own Oxlint when that one is newer than the vendored pin. A rule added to Oxlint after the pin is no longer rejected as unknown.
+- c3dda51: Fix universal-renderer compilation of JSX used as a value in expression position — a component prop (`card={<Card/>}`), a sole expression child, or a renderable hole. The universal expression rewriter lowered only nested template nodes, so a root JSX expression passed through to DOM codegen and emitted descriptor-runtime helpers (`createScopedValue`, `createElementFromConfig`) that universal entries such as `octane/universal/native` do not export, breaking native bundles. Root JSX now lowers to the same `universalValue`/`universalComponent` representation as nested JSX.
+
 ## 0.5.0
 
 ### Minor Changes

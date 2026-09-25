@@ -1,5 +1,17 @@
 # @octanejs/swr
 
+## 0.0.22
+
+### Patch Changes
+
+- Updated dependencies [4b235d2]
+- Updated dependencies [411c555]
+- Updated dependencies [ac2a217]
+- Updated dependencies [6e86908]
+- Updated dependencies [b9b0bc4]
+- Updated dependencies [c3dda51]
+  - octane@0.6.0
+
 ## 0.0.21
 
 ### Patch Changes

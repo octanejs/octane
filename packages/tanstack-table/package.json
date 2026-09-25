@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-table",
-  "version": "0.1.55",
+  "version": "0.1.56",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -45,7 +45,7 @@
     "@tanstack/table-core": "9.2.4"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.5.0"
+    "octane": "workspace:^0.6.0"
   },
   "devDependencies": {
     "@tanstack/react-table": "9.2.4",
