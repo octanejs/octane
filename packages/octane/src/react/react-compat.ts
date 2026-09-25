@@ -273,6 +273,7 @@ function ReactCompatImpl(
 	useLayoutEffect(() => controller.commit(child, contexts, identifierPrefix), null, PUBLISH_SLOT);
 	return createElement('div', {
 		'data-react-compat': '',
+		style: 'display: contents',
 		ref: controller.ref,
 		suppressHydrationWarning: true,
 		dangerouslySetInnerHTML: SENTINEL,
