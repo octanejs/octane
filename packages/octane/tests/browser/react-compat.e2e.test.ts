@@ -86,6 +86,19 @@ describe.sequential('public ReactCompat with browser scheduling and production R
 			expect(await page.locator('#counter [data-react-compat] button').textContent()).toBe(
 				'SSR <counter>:7',
 			);
+			const buttonWidth = await page
+				.locator('#counter [data-react-compat] button')
+				.evaluate((button) => {
+					const parent = button.parentElement!.parentElement!;
+					const sibling = parent.querySelector<HTMLElement>('[data-sibling]')!;
+					parent.style.display = 'flex';
+					parent.style.width = '400px';
+					sibling.style.flex = '0 0 100px';
+					button.style.flex = '1 1 0';
+					button.style.minWidth = '0';
+					return button.getBoundingClientRect().width;
+				});
+			expect(buttonWidth).toBeCloseTo(300);
 			expect(await page.locator('#context [data-react-compat] [data-theme]').textContent()).toBe(
 				'server theme:0',
 			);
@@ -171,6 +184,25 @@ describe.sequential('public ReactCompat with browser scheduling and production R
 						document.getElementById('reference')?.textContent === 'detached',
 				);
 			}
+
+			it('lets a React child participate in the parent flex layout', async () => {
+				const { page, failures } = await openPage();
+				try {
+					const buttonWidth = await page.locator('[data-react-counter]').evaluate((button) => {
+						const parent = button.parentElement!.parentElement!;
+						parent.style.display = 'flex';
+						parent.style.width = '400px';
+						button.style.flex = '1 1 0';
+						button.style.minWidth = '0';
+						return button.getBoundingClientRect().width;
+					});
+					expect(buttonWidth).toBeCloseTo(400);
+					await unmount(page);
+					expect(failures).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			});
 
 			it('retains React state and DOM through an escaped urgent suspension and a painted fallback', async () => {
 				const { page, failures } = await openPage();

@@ -77,6 +77,7 @@ export async function sample(lane: Lane, count: number) {
 		for (const index of indices) {
 			const host = document.createElement('div');
 			host.setAttribute('data-react-compat', '');
+			host.style.display = 'contents';
 			main.append(host);
 			roots[index] = createReactRoot(host);
 		}

@@ -251,7 +251,9 @@ describe('ReactCompat through octane/react', () => {
 			try {
 				const root = await render(App, { target, log, hidden: false });
 				const button = root.find('[data-life]');
+				const host = root.find('[data-react-compat]') as HTMLElement;
 				const portal = target.querySelector('[data-life-portal]') as HTMLElement;
+				expect(host.style.display).toBe('contents');
 				await run(() => root.click('[data-life]'));
 				log.length = 0;
 				await run(() =>
@@ -260,8 +262,10 @@ describe('ReactCompat through octane/react', () => {
 				expect(log).toContain('layout:off');
 				expect(log).toContain('ref:off');
 				expect(portal.style.display).toBe('none');
-				if (mode === 'activity') expect(log).toContain('passive:off');
-				else expect(log).not.toContain('passive:off');
+				if (mode === 'activity') {
+					expect(log).toContain('passive:off');
+					expect(host.style.display).toBe('none');
+				} else expect(log).not.toContain('passive:off');
 				log.length = 0;
 				await run(async () => {
 					resource.resolve('ready');
@@ -269,6 +273,7 @@ describe('ReactCompat through octane/react', () => {
 					root.update(App, { target, log, hidden: false });
 				});
 				expect(root.find('[data-life]')).toBe(button);
+				expect(host.style.display).toBe('contents');
 				expect(button.textContent).toBe('1');
 				expect(portal.style.display).toBe('');
 				expect(log).toContain('ref:on');
