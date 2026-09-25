@@ -1,49 +1,55 @@
 # @octanejs/blocknote
 
-Octane binding for [`@blocknote/react`](https://www.npmjs.com/package/@blocknote/react) — block-based rich text editors.
+An Octane adapter for [`@blocknote/core`](https://www.blocknotejs.org/docs/reference/editor/overview).
+
+This package is private while the provenance of two retained context/hook files
+is resolved. It is not ready for an MIT-only release; see [UPSTREAM.md](./UPSTREAM.md).
+
+## Planned installation (after release)
+
+```sh
+npm install @octanejs/blocknote @blocknote/core@0.53.0 octane
+pnpm add @octanejs/blocknote @blocknote/core@0.53.0 octane
+```
+
+Import BlockNote's framework-neutral editor styles once in your application:
+
+```ts
+import '@blocknote/core/style.css';
+```
 
 ## Usage
 
-```tsx
-import {
-  BlockNoteContext,
-  useBlockNoteContext,
-  useBlockNoteEditor,
-  useCreateBlockNote,
-} from '@octanejs/blocknote';
+```tsrx
+import { BlockNoteView, useCreateBlockNote } from '@octanejs/blocknote';
+
+export function Editor() @{
+	const editor = useCreateBlockNote({
+		initialContent: [{ type: 'paragraph', content: 'Hello from Octane' }],
+	});
+
+	<BlockNoteView
+		editor={editor}
+		onChange={(currentEditor) => console.log(currentEditor.document)}
+	/>
+}
 ```
 
-## Compatibility
+`BlockNoteView` mounts the core editor, synchronizes `editable`, subscribes to
+content and selection changes, supplies `BlockNoteContext`, and unmounts cleanly.
 
-Pinned to `@blocknote/react@0.53.0`. Reuses `@blocknote/core` unchanged; React binding reimplemented on Octane with `@octanejs/tiptap` at the editor boundary.
+The view follows the system color scheme by default. Set `theme="light"` or
+`theme="dark"` to override it; the wrapper exposes the corresponding CSS class
+alongside `bn-root` for the core stylesheet. Application-owned UI and theme
+colors remain the application's responsibility.
 
-### Milestone 1 exports
+Set `renderEditor={false}` to provide `BlockNoteViewEditor` yourself among the
+view's children. Other children can implement application-owned toolbars, menus,
+or status UI and may call `useBlockNoteEditor`.
 
-- `useCreateBlockNote`
-- `useBlockNoteEditor`
-- `BlockNoteContext` / `useBlockNoteContext`
+## Scope
 
-Only the four authored modules behind these exports are included by the package
-files allowlist and checked by the package's CI typecheck. The rest of the
-mechanical port remains private staging source until later milestones make it
-part of the supported surface.
-
-### Mechanical port
-
-```bash
-pnpm port-upstream   # from packages/blocknote — copies upstream src with transforms
-```
-
-Review files flagged `CHECKPOINT` in `scripts/port-upstream.mjs` before shipping milestone 1.
-
-## Known differences
-
-None documented yet.
-
-## Tests
-
-Organized per the hook-form / react-parity contract:
-
-- `tests/conformance/` — package-authored contract tests (ordinary CI shards)
-- `tests/differential/` — Octane vs React oracle (dedicated project + `globalSetup`)
-- Vitest projects declare `testExecution.group: 'react-parity'` on parity-owned lanes
+This package is an Octane adapter for the framework-neutral `@blocknote/core`
+package. It does not ship the upstream React UI components. Two retained
+context/hook files derive from the earlier mechanical port; see
+[UPSTREAM.md](./UPSTREAM.md) for the unresolved ownership and licensing boundary.

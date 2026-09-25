@@ -1,0 +1,14 @@
+[
+  {
+    "path": "src/editor/BlockNoteContext.ts",
+    "sha256": "cc186031dbeffc2ba9dd8ba36f5fd8de28055a8ba5d3c04f956695c605f0975c",
+    "origin": "adapted",
+    "packageName": "@blocknote/react"
+  },
+  {
+    "path": "src/hooks/useBlockNoteEditor.ts",
+    "sha256": "84254785eb1647706d9cd1caa52a839eeeb21aa815a965a5df4bf42d5311f8ef",
+    "origin": "adapted",
+    "packageName": "@blocknote/react"
+  }
+]

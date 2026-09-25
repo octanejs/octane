@@ -2,12 +2,12 @@
   "name": "@octanejs/blocknote",
   "private": true,
   "version": "0.1.0",
-  "license": "MIT",
+  "license": "SEE LICENSE IN UPSTREAM.md",
   "type": "module",
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "BlockNote for the octane renderer — an Octane binding for @blocknote/react block-based rich text editors.",
+  "description": "An Octane adapter for @blocknote/core editors (private pending provenance review).",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -20,42 +20,33 @@
     "url": "git+https://github.com/octanejs/octane.git",
     "directory": "packages/blocknote"
   },
-  "main": "src/index.ts",
-  "module": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
   "files": [
-    "src/index.ts",
-    "src/editor/BlockNoteContext.ts",
-    "src/hooks/useBlockNoteEditor.ts",
-    "src/hooks/useCreateBlockNote.tsrx",
-    "README.md"
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "port-upstream": "node scripts/port-upstream.mjs node_modules/@blocknote/react",
-    "test": "vitest run --root ../.. --project blocknote",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.supported.json"
+    "test": "vitest run --root ../.. --project blocknote --project blocknote-ssr",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "typecheck:public": "tsrx-tsc --noEmit -p tests/types/tsconfig.json"
   },
   "dependencies": {
-    "@blocknote/core": "catalog:default",
-    "@octanejs/floating-ui": "workspace:*",
-    "@octanejs/tanstack-store": "workspace:*",
-    "@octanejs/tiptap": "workspace:*",
-    "fast-deep-equal": "^3.1.3"
+    "@blocknote/core": "catalog:default"
   },
   "peerDependencies": {
     "octane": "workspace:^0.5.0"
   },
   "devDependencies": {
-    "@blocknote/react": "catalog:default",
-    "@tsrx/react": "catalog:default",
-    "esbuild": "catalog:default",
     "octane": "workspace:*",
-    "react": "catalog:default",
-    "react-dom": "catalog:default",
     "vitest": "catalog:default"
   }
 }

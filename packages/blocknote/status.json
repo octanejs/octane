@@ -1,20 +1,72 @@
 {
   "upstream": {
-    "package": "@blocknote/react",
-    "version": "0.53.0"
+    "package": "@blocknote/core",
+    "version": "0.53.0",
+    "source": "https://github.com/TypeCellOS/BlockNote/tree/37614ab348dcc7faa830a9a88437b37197a2162d/packages/core",
+    "license": "MPL-2.0",
+    "relationship": "ordinary dependency"
   },
-  "surface": "Milestone 1 — useCreateBlockNote, useBlockNoteEditor, BlockNoteContext/useBlockNoteContext. The full mechanical port remains private staging source and is excluded from the package files allowlist.",
+  "surface": "Private Octane core-editor adapter with two retained React-port context/hook files; MIT-only publication is blocked on provenance review.",
+  "inventory": {
+    "supported": [
+      "BlockNoteView",
+      "BlockNoteViewEditor",
+      "useCreateBlockNote",
+      "useBlockNoteEditor",
+      "BlockNoteContext",
+      "useBlockNoteContext"
+    ],
+    "subpaths": []
+  },
   "divergences": [
-    "Upstream exports BlockNoteViewRaw; BlockNoteView alias not yet added.",
-    "TipTap/react-dom boundary files flagged CHECKPOINT in port-upstream.mjs."
+    "The package integrates @blocknote/core directly and does not claim the full @blocknote/react public surface.",
+    "Floating toolbars, menus, schema renderers, and other UI are application-owned children rather than bundled React UI.",
+    "Refs are ordinary Octane props; no forwardRef layer exists."
   ],
-  "ssr": "Not yet evaluated.",
-  "verified": "2026-08-07",
+  "ssr": "BlockNoteView renders its container during SSR and mounts the core editor from an isomorphic layout effect on the client. useCreateBlockNote is a client-side editor hook.",
+  "verified": "2026-09-25",
   "notes": [
-    "Private workspace scaffold until the published source passes strict external-consumer validation.",
-    "The package files allowlist and CI typecheck cover only the four-file M1 surface; the remaining mechanical port is retained as private staging source for future milestones.",
-    "Full mechanical port (~156 files) via scripts/port-upstream.mjs (2026-08-07).",
-    "M1 export conformance test wired; editor mount blocked on @octanejs/tiptap EditorContent checkpoint.",
-    "Dependencies: @blocknote/core (reuse), @octanejs/tiptap, @octanejs/floating-ui, @octanejs/tanstack-store."
+    "Runtime and public-type tests pass; this is not license approval or full upstream parity verification.",
+    "BlockNoteContext.ts and useBlockNoteEditor.ts retain mechanical-port provenance. The package is private until an independently authored replacement or approved upstream-license distribution resolves this boundary."
+  ],
+  "surfaces": [
+    {
+      "entrypoint": ".",
+      "exports": [
+        "BlockNoteDependencyList",
+        "BlockNoteView",
+        "BlockNoteViewEditor",
+        "BlockNoteViewEditorProps",
+        "BlockNoteViewProps",
+        "useCreateBlockNote"
+      ],
+      "ownership": "adapter",
+      "files": ["src/index.ts", "src/editor/BlockNoteView.tsrx", "src/hooks/useCreateBlockNote.ts"],
+      "dependency": {
+        "package": "@blocknote/core",
+        "version": "catalog:default"
+      },
+      "evidence": [
+        "tests/conformance/exports.test.ts",
+        "tests/conformance/hook-slots.test.ts",
+        "tests/conformance/view.test.ts",
+        "tests/ssr/server.test.ts",
+        "tests/types/public.test-d.ts"
+      ]
+    },
+    {
+      "entrypoint": ".",
+      "exports": [
+        "BlockNoteContext",
+        "BlockNoteContextValue",
+        "useBlockNoteContext",
+        "useBlockNoteEditor"
+      ],
+      "ownership": "copied",
+      "files": ["src/editor/BlockNoteContext.ts", "src/hooks/useBlockNoteEditor.ts"],
+      "dependency": { "package": "@blocknote/react", "version": "0.53.0" },
+      "upstreamPaths": ["src/editor/BlockNoteContext.ts", "src/hooks/useBlockNoteEditor.ts"],
+      "evidence": ["UPSTREAM.md", "audit/source-ledger.json"]
+    }
   ]
 }

@@ -571,26 +571,6 @@ const BLOCKNOTE_SOURCE_ALIASES = [
 		find: /^@octanejs\/blocknote\/(.*)$/,
 		replacement: resolve(import.meta.dirname, 'packages/blocknote/src') + '/$1.ts',
 	},
-	{
-		find: /^@octanejs\/tiptap$/,
-		replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
-	},
-	{
-		find: /^@octanejs\/tiptap\/(.*)$/,
-		replacement: resolve(import.meta.dirname, 'packages/tiptap/src') + '/$1.ts',
-	},
-	{
-		find: /^@octanejs\/floating-ui$/,
-		replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
-	},
-	{
-		find: /^@octanejs\/floating-ui\/(.*)$/,
-		replacement: resolve(import.meta.dirname, 'packages/floating-ui/src') + '/$1.ts',
-	},
-	{
-		find: /^@octanejs\/tanstack-store$/,
-		replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-	},
 ];
 
 function octaneSourceTestProject({ aliases, ssr = false, test }) {
@@ -9428,11 +9408,23 @@ export default defineConfig({
 				test: {
 					name: 'blocknote',
 					include: ['packages/blocknote/tests/**/*.test.ts'],
+					exclude: ['packages/blocknote/tests/ssr/**/*.test.ts'],
 					environment: 'jsdom',
 					testTimeout: 30_000,
 					globals: false,
 				},
 				aliases: BLOCKNOTE_SOURCE_ALIASES,
+			}),
+			octaneSourceTestProject({
+				test: {
+					name: 'blocknote-ssr',
+					include: ['packages/blocknote/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 30_000,
+					globals: false,
+				},
+				aliases: BLOCKNOTE_SOURCE_ALIASES,
+				ssr: true,
 			}),
 		],
 	},

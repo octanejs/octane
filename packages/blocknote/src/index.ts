@@ -1,12 +1,17 @@
-// Milestone 1 bootstrap — BlockNoteViewRaw deferred until .js import paths are normalized.
+/// <reference lib="esnext.disposable" />
+
+'use client';
+
 export {
 	BlockNoteContext,
 	useBlockNoteContext,
 	type BlockNoteContextValue,
-} from './editor/BlockNoteContext.js';
-
-export { useBlockNoteEditor } from './hooks/useBlockNoteEditor.js';
-export { useCreateBlockNote } from './hooks/useCreateBlockNote.tsrx';
-
-// Re-export when editor shell imports resolve:
-// export { BlockNoteViewRaw, BlockNoteViewEditor, type BlockNoteViewProps } from './editor/BlockNoteView.tsrx';
+} from './editor/BlockNoteContext';
+export {
+	BlockNoteView,
+	BlockNoteViewEditor,
+	type BlockNoteViewEditorProps,
+	type BlockNoteViewProps,
+} from './editor/BlockNoteView.tsrx';
+export { useBlockNoteEditor } from './hooks/useBlockNoteEditor';
+export { useCreateBlockNote, type BlockNoteDependencyList } from './hooks/useCreateBlockNote';

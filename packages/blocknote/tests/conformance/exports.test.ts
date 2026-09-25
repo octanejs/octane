@@ -6,27 +6,22 @@ import * as BlockNote from '@octanejs/blocknote';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-describe('@octanejs/blocknote — exports', () => {
-	it('exports milestone-1 editor bootstrap symbols', () => {
-		expect(typeof BlockNote.useCreateBlockNote).toBe('function');
-		expect(typeof BlockNote.useBlockNoteEditor).toBe('function');
-		expect(typeof BlockNote.useBlockNoteContext).toBe('function');
+describe('@octanejs/blocknote exports', () => {
+	it('exports the core editor adapter', () => {
 		expect(BlockNote.BlockNoteContext).toBeTruthy();
+		expect(BlockNote.BlockNoteView).toBeTypeOf('function');
+		expect(BlockNote.BlockNoteViewEditor).toBeTypeOf('function');
+		expect(BlockNote.useBlockNoteContext).toBeTypeOf('function');
+		expect(BlockNote.useBlockNoteEditor).toBeTypeOf('function');
+		expect(BlockNote.useCreateBlockNote).toBeTypeOf('function');
 	});
 
-	it('keeps the unfinished editor view outside the milestone-1 surface', () => {
-		expect('BlockNoteViewRaw' in BlockNote).toBe(false);
-		expect('BlockNoteView' in BlockNote).toBe(false);
-	});
-
-	it('packs only the supported milestone-1 source surface', () => {
+	it('keeps the package private while retained port provenance is unresolved', () => {
 		const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
-		expect(manifest.files).toEqual([
-			'src/index.ts',
-			'src/editor/BlockNoteContext.ts',
-			'src/hooks/useBlockNoteEditor.ts',
-			'src/hooks/useCreateBlockNote.tsrx',
-			'README.md',
-		]);
+
+		expect(manifest.private).toBe(true);
+		expect(manifest.license).toBe('SEE LICENSE IN UPSTREAM.md');
+		expect(manifest.dependencies).toEqual({ '@blocknote/core': 'catalog:default' });
+		expect(manifest.files).toEqual(['src', 'README.md', 'UPSTREAM.md', 'LICENSE']);
 	});
 });

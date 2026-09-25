@@ -1,4 +1,4 @@
-import {
+import type {
 	BlockNoteEditor,
 	BlockNoteSchema,
 	BlockSchema,
@@ -8,26 +8,22 @@ import {
 	InlineContentSchema,
 	StyleSchema,
 } from '@blocknote/core';
+import { useContext } from 'octane';
 
-import { useBlockNoteContext } from '../editor/BlockNoteContext.js';
+import { BlockNoteContext, type BlockNoteContextValue } from '../editor/BlockNoteContext';
 
-/**
- * Get the BlockNoteEditor instance from the nearest BlockNoteContext provider
- * @param _schema: optional, pass in the schema to return type-safe BlockNoteEditor if you're using a custom schema
- */
+/** Read the editor supplied by the nearest BlockNoteView or BlockNoteContext. */
 export function useBlockNoteEditor<
 	BSchema extends BlockSchema = DefaultBlockSchema,
 	ISchema extends InlineContentSchema = DefaultInlineContentSchema,
 	SSchema extends StyleSchema = DefaultStyleSchema,
->(
-	_schema?: BlockNoteSchema<BSchema, ISchema, SSchema>,
-): BlockNoteEditor<BSchema, ISchema, SSchema> {
-	const context = useBlockNoteContext(_schema);
+>(schema?: BlockNoteSchema<BSchema, ISchema, SSchema>): BlockNoteEditor<BSchema, ISchema, SSchema> {
+	void schema;
+	const context = useContext(BlockNoteContext) as unknown as
+		BlockNoteContextValue<BSchema, ISchema, SSchema> | undefined;
 
 	if (!context?.editor) {
-		throw new Error(
-			'useBlockNoteEditor was called outside of a BlockNoteContext provider or BlockNoteView component',
-		);
+		throw new Error('useBlockNoteEditor must be used inside BlockNoteView or BlockNoteContext');
 	}
 
 	return context.editor;
