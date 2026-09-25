@@ -1,17 +1,17 @@
-/// <reference lib="esnext.disposable" />
-
-'use client';
-
+// Independently authored Octane adapter for the public @blocknote/react 0.53.0 API.
 export {
 	BlockNoteContext,
 	useBlockNoteContext,
 	type BlockNoteContextValue,
-} from './editor/BlockNoteContext';
+} from './BlockNoteContext';
 export {
-	BlockNoteView,
+	BlockNoteViewRaw,
 	BlockNoteViewEditor,
-	type BlockNoteViewEditorProps,
 	type BlockNoteViewProps,
-} from './editor/BlockNoteView.tsrx';
+} from './BlockNoteViewRaw.tsrx';
+export type { PortalElementsMap, PortalTarget } from './portalTarget';
+export { useCreateBlockNote } from './hooks/useCreateBlockNote';
 export { useBlockNoteEditor } from './hooks/useBlockNoteEditor';
-export { useCreateBlockNote, type BlockNoteDependencyList } from './hooks/useCreateBlockNote';
+export { useEditorChange } from './hooks/useEditorChange';
+export { useEditorSelectionChange } from './hooks/useEditorSelectionChange';
+export { usePrefersColorScheme } from './hooks/usePrefersColorScheme';

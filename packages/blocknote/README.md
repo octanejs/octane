@@ -1,62 +1,142 @@
 # @octanejs/blocknote
 
-An Octane adapter for [`@blocknote/core`](https://www.blocknotejs.org/docs/reference/editor/overview).
+Headless [BlockNote](https://www.blocknotejs.org) editor for Octane. It covers the editor surface of `@blocknote/react@0.53.0` without the default UI, and uses `@blocknote/core` unchanged.
 
-This package is private while the provenance of two retained context/hook files
-is resolved. It is not ready for an MIT-only release; see [UPSTREAM.md](./UPSTREAM.md).
+## Install
 
-## Planned installation (after release)
-
-```sh
-npm install @octanejs/blocknote @blocknote/core@0.53.0 octane
-pnpm add @octanejs/blocknote @blocknote/core@0.53.0 octane
-```
-
-Import BlockNote's framework-neutral editor styles once in your application:
-
-```ts
-import '@blocknote/core/style.css';
+```bash
+npm install @octanejs/blocknote
+pnpm add @octanejs/blocknote
 ```
 
 ## Usage
 
-```tsrx
-import { BlockNoteView, useCreateBlockNote } from '@octanejs/blocknote';
+```tsx
+import { BlockNoteViewRaw, useCreateBlockNote } from '@octanejs/blocknote';
 
 export function Editor() @{
 	const editor = useCreateBlockNote({
-		initialContent: [{ type: 'paragraph', content: 'Hello from Octane' }],
+		initialContent: [{ type: 'paragraph', content: 'Hello' }],
 	});
 
-	<BlockNoteView
-		editor={editor}
-		onChange={(currentEditor) => console.log(currentEditor.document)}
-	/>
+	<BlockNoteViewRaw editor={editor} onChange={() => console.log(editor.document)} />
 }
 ```
 
-`BlockNoteView` mounts the core editor, synchronizes `editable`, subscribes to
-content and selection changes, supplies `BlockNoteContext`, and unmounts cleanly.
+`BlockNoteViewRaw` imports `@blocknote/core/style.css`. Toolbars, menus, and other UI are yours to build. Render them as children, read the editor with `useBlockNoteEditor()`, and use `renderEditor={false}` with `<BlockNoteViewEditor />` to control where the editable area goes.
 
-The view follows the system color scheme by default. Set `theme="light"` or
-`theme="dark"` to override it; the wrapper exposes the corresponding CSS class
-alongside `bn-root` for the core stylesheet. Application-owned UI and theme
-colors remain the application's responsibility. Without an explicit theme, SSR
-and the initial client render use light mode; the browser preference is applied
-after hydration.
+## Exports
 
-`useCreateBlockNote` retains an editor until its dependency list changes.
-`BlockNoteView` owns DOM mounting and unmounting. The pinned core API does not
-expose a public `destroy()` method; collaboration providers supplied by the
-application remain application-owned.
+- `BlockNoteViewRaw`, `BlockNoteViewEditor`, `BlockNoteViewProps`
+- `BlockNoteContext`, `useBlockNoteContext`, `BlockNoteContextValue`
+- `useCreateBlockNote`, `useBlockNoteEditor`
+- `useEditorChange`, `useEditorSelectionChange`, `usePrefersColorScheme`
+- `PortalElementsMap`, `PortalTarget`
 
-Set `renderEditor={false}` to provide `BlockNoteViewEditor` yourself among the
-view's children. Other children can implement application-owned toolbars, menus,
-or status UI and may call `useBlockNoteEditor`.
+## Building UI
 
-## Scope
+This package has no default UI. Each BlockNote menu and toolbar is a framework-neutral `@blocknote/core` extension that exposes a store. The store has `subscribe(listener)` and `state`, so Octane's own `useSyncExternalStore` can read it without any extra dependency.
 
-This package is an Octane adapter for the framework-neutral `@blocknote/core`
-package. It does not ship the upstream React UI components. Two retained
-context/hook files derive from the earlier mechanical port; see
-[UPSTREAM.md](./UPSTREAM.md) for the unresolved ownership and licensing boundary.
+### Menus and toolbars
+
+```tsx
+import { SuggestionMenu, filterSuggestionItems, getDefaultSlashMenuItems } from '@blocknote/core';
+import { useBlockNoteEditor } from '@octanejs/blocknote';
+import { useEffect, useSyncExternalStore } from 'octane';
+
+export function SlashMenu() @{
+	const editor = useBlockNoteEditor();
+	const menu = editor.getExtension(SuggestionMenu)!;
+
+	useEffect(() => {
+		menu.addSuggestionMenu({ triggerCharacter: '/' });
+		return () => menu.removeSuggestionMenu('/');
+	}, [menu]);
+
+	const state = useSyncExternalStore(menu.store.subscribe, () => menu.store.state);
+	const items = state?.show
+		? filterSuggestionItems(getDefaultSlashMenuItems(editor), state.query)
+		: [];
+
+	@if (state?.show) {
+		<ul
+			class="slash-menu"
+			style={{ position: 'fixed', left: state.referencePos.left, top: state.referencePos.bottom }}
+		>
+			@for (const item of items; key item.key) {
+				<li
+					onMouseDown={(event: MouseEvent) => {
+						event.preventDefault(); // keep focus in the editor
+						menu.clearQuery();
+						menu.closeMenu();
+						item.onItemClick();
+					}}
+				>
+					{item.title}
+				</li>
+			}
+		</ul>
+	}
+}
+
+// <BlockNoteViewRaw editor={editor}><SlashMenu /></BlockNoteViewRaw>
+```
+
+`FormattingToolbar`, `SideMenu`, `LinkToolbar`, `FilePanel`, and `TableHandles` follow the same pattern. For collision-aware placement, position the element from `referencePos` with a library such as `@octanejs/floating-ui`.
+
+The extension stores are TanStack Stores. If your app already uses `@octanejs/tanstack-store`, `useStore(menu.store, (state) => state?.query)` also works and adds selector-based updates.
+
+### Custom blocks
+
+Core's `createBlockSpec` renders to DOM. To render an Octane component inside a block, mount a root on a node you own and unmount it in `destroy`:
+
+```tsx
+import { BlockNoteSchema, createBlockSpec, defaultBlockSpecs } from '@blocknote/core';
+import { createRoot } from 'octane';
+
+function CalloutIcon(props: { emoji: string }) @{
+	<span class="callout-icon">{props.emoji}</span>
+}
+
+const Callout = createBlockSpec(
+	{ type: 'callout', propSchema: { emoji: { default: '💡' } }, content: 'inline' },
+	{
+		render: (block) => {
+			const dom = document.createElement('div');
+			const icon = document.createElement('span');
+			const contentDOM = document.createElement('div');
+			dom.className = 'callout';
+			icon.contentEditable = 'false';
+			dom.append(icon, contentDOM);
+			const root = createRoot(icon);
+			root.render(CalloutIcon, { emoji: block.props.emoji });
+			return { dom, contentDOM, destroy: () => root.unmount() };
+		},
+	},
+);
+
+export const schema = BlockNoteSchema.create({
+	blockSpecs: { ...defaultBlockSpecs, callout: Callout() },
+});
+
+// useCreateBlockNote({ schema })
+```
+
+Each block root is separate from your app tree, so it does not see your contexts (theme, router, stores). Pass what it needs through props or module state. Context-aware block and inline content specs are planned.
+
+Both recipes run as real-browser tests in `tests/browser/harness`.
+
+## Server rendering
+
+Server rendering is supported. The server emits the view shell, and the editor mounts into it on the client after hydration. Document content is not part of the server HTML. Without a `theme` prop the server renders the light scheme, and the system scheme applies after hydration. Pass `theme` to fix it on both sides.
+
+## Known differences
+
+- No default UI. `BlockNoteView`, `BlockNoteDefaultUI`, `ComponentsContext`, and the toolbar, menu, side-menu, table-handle, and comment components are not provided. Upstream disables all of them when no components context exists, so `BlockNoteViewRaw` here matches that upstream configuration.
+- `BlockNoteViewRaw` does not accept the default UI flags (`formattingToolbar`, `slashMenu`, and so on). `portalElements` reads only `default`.
+- Custom React block, inline content, and style specs are not provided.
+- Event handlers receive native DOM events, as everywhere in Octane.
+
+## Provenance
+
+Independently authored and MIT licensed. See [UPSTREAM.md](./UPSTREAM.md).

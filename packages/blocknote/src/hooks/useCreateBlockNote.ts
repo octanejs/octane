@@ -1,3 +1,4 @@
+// Independently authored Octane adapter for the public @blocknote/react 0.53.0 API.
 import {
 	BlockNoteEditor,
 	type BlockNoteEditorOptions,
@@ -8,30 +9,29 @@ import {
 } from '@blocknote/core';
 import { useMemo } from 'octane';
 
-export type BlockNoteDependencyList = readonly unknown[];
+import { splitSlot, subSlot } from '../internal';
 
-type CreatedBlockNoteEditor<
-	Options extends Partial<BlockNoteEditorOptions<any, any, any>> | undefined,
-> = Options extends {
-	schema: CustomBlockNoteSchema<infer BSchema, infer ISchema, infer SSchema>;
-}
-	? BlockNoteEditor<BSchema, ISchema, SSchema>
-	: BlockNoteEditor<DefaultBlockSchema, DefaultInlineContentSchema, DefaultStyleSchema>;
+type DependencyList = readonly unknown[];
 
-/** Create one BlockNote editor for the lifetime of the supplied dependency list. */
+const noDeps: DependencyList = [];
+
+/** Create a BlockNote editor once, or again whenever `deps` change. */
 export function useCreateBlockNote<
 	Options extends Partial<BlockNoteEditorOptions<any, any, any>> | undefined,
 >(
-	options: Options = {} as Options,
-	dependencies: BlockNoteDependencyList = [],
-): CreatedBlockNoteEditor<Options> {
-	// Compiled calls to custom hooks carry their slot as a trailing symbol. When an
-	// optional argument is omitted that symbol can occupy its position.
-	const normalizedOptions = typeof options === 'symbol' ? ({} as Options) : options;
-	const normalizedDependencies = typeof dependencies === 'symbol' ? [] : dependencies;
+	options?: Options,
+	deps?: DependencyList,
+): Options extends { schema: CustomBlockNoteSchema<infer B, infer I, infer S> }
+	? BlockNoteEditor<B, I, S>
+	: BlockNoteEditor<DefaultBlockSchema, DefaultInlineContentSchema, DefaultStyleSchema>;
+export function useCreateBlockNote(...args: unknown[]): BlockNoteEditor<any, any, any> {
+	const [userArgs, slot] = splitSlot(args);
+	const options = userArgs[0] as Partial<BlockNoteEditorOptions<any, any, any>> | undefined;
+	const deps = (userArgs[1] as DependencyList | undefined) ?? noDeps;
 
 	return useMemo(
-		() => BlockNoteEditor.create(normalizedOptions),
-		normalizedDependencies as unknown[],
-	) as CreatedBlockNoteEditor<Options>;
+		() => BlockNoteEditor.create(options ?? {}),
+		deps as unknown[],
+		subSlot(slot, 'create'),
+	);
 }

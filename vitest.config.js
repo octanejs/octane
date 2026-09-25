@@ -571,6 +571,26 @@ const BLOCKNOTE_SOURCE_ALIASES = [
 		find: /^@octanejs\/blocknote\/(.*)$/,
 		replacement: resolve(import.meta.dirname, 'packages/blocknote/src') + '/$1.ts',
 	},
+	{
+		find: /^@octanejs\/tiptap$/,
+		replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/tiptap\/(.*)$/,
+		replacement: resolve(import.meta.dirname, 'packages/tiptap/src') + '/$1.ts',
+	},
+	{
+		find: /^@octanejs\/floating-ui$/,
+		replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/floating-ui\/(.*)$/,
+		replacement: resolve(import.meta.dirname, 'packages/floating-ui/src') + '/$1.ts',
+	},
+	{
+		find: /^@octanejs\/tanstack-store$/,
+		replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+	},
 ];
 
 function octaneSourceTestProject({ aliases, ssr = false, test }) {
@@ -9407,8 +9427,11 @@ export default defineConfig({
 			octaneSourceTestProject({
 				test: {
 					name: 'blocknote',
-					include: ['packages/blocknote/tests/**/*.test.ts'],
-					exclude: ['packages/blocknote/tests/ssr/**/*.test.ts'],
+					include: [
+						'packages/blocknote/tests/**/*.test.ts',
+						'!packages/blocknote/tests/ssr/**/*.test.ts',
+						'!packages/blocknote/tests/browser/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					testTimeout: 30_000,
 					globals: false,
@@ -9418,7 +9441,7 @@ export default defineConfig({
 			octaneSourceTestProject({
 				test: {
 					name: 'blocknote-ssr',
-					include: ['packages/blocknote/tests/ssr/**/*.test.ts'],
+					include: ['packages/blocknote/tests/ssr/server.test.ts'],
 					environment: 'node',
 					testTimeout: 30_000,
 					globals: false,
@@ -9426,6 +9449,28 @@ export default defineConfig({
 				aliases: BLOCKNOTE_SOURCE_ALIASES,
 				ssr: true,
 			}),
+			{
+				test: {
+					name: 'blocknote-hydration',
+					include: ['packages/blocknote/tests/ssr/hydration.test.ts'],
+					environment: 'jsdom',
+					testTimeout: 30_000,
+					globals: false,
+				},
+				plugins: [octaneServerFixtures(import.meta.dirname), octane()],
+				resolve: { alias: BLOCKNOTE_SOURCE_ALIASES },
+			},
+			{
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'blocknote-browser',
+					include: ['packages/blocknote/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
 		],
 	},
 });

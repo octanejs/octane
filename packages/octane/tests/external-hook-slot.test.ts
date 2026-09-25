@@ -730,6 +730,7 @@ describe('manifest-declared manual hook slots', () => {
 			'animejs',
 			'aria',
 			'better-auth',
+			'blocknote',
 			'devtools',
 			'dexie',
 			'dnd-kit',

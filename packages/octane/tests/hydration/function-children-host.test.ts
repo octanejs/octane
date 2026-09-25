@@ -36,7 +36,11 @@ describe('function children in descriptor hosts', () => {
 				flushSync(() => root!.render(FunctionChildrenHost, { ...props, label: 'updated' }));
 				expect(container.querySelector('#function-child')).toBe(button);
 				expect(button.textContent).toBe('updated');
-				expect([...container.querySelectorAll('i')]).toEqual(adjacent);
+				const updatedAdjacent = [...container.querySelectorAll('i')];
+				expect(updatedAdjacent).toHaveLength(adjacent.length);
+				for (let i = 0; i < adjacent.length; i++) {
+					expect(updatedAdjacent[i]).toBe(adjacent[i]);
+				}
 				expect(host?.textContent).toBe(siblings ? 'beforeupdatedafter' : 'updated');
 			} finally {
 				root?.unmount();

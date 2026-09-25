@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "scope": "Projects and explicit private-port exceptions added by the 2026-09-02 cleanup audit.",
   "requiredProjects": [
-    "packages/blocknote/tsconfig.json",
+    "packages/blocknote/tsconfig.supported.json",
     "packages/thinking-orbs/tsconfig.json",
     "packages/xyflow/tsconfig.json"
   ],

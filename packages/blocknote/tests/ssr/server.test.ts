@@ -1,23 +1,20 @@
-import type { BlockNoteEditor } from '@blocknote/core';
-import { renderToString } from 'octane/server';
-import { describe, expect, it, vi } from 'vitest';
+import { renderToStaticMarkup } from 'octane/server';
+import { describe, expect, it } from 'vitest';
 
-import { SsrViewFixture } from '../_fixtures/view.tsrx';
+import { SsrEditor } from '../_fixtures/ssr-editor.tsrx';
 
-describe('@octanejs/blocknote server rendering', () => {
-	it('renders the view shell without mounting or reading the DOM', () => {
-		const editor = {
-			mount: vi.fn(),
-			unmount: vi.fn(),
-		} as unknown as BlockNoteEditor;
+describe('@octanejs/blocknote SSR', () => {
+	it('renders the view shell in Node without a DOM', () => {
+		expect(typeof document).toBe('undefined');
+		expect(typeof window).toBe('undefined');
 
-		const { html } = renderToString(SsrViewFixture, { editor, theme: 'dark' });
+		const { html } = renderToStaticMarkup(SsrEditor, { text: 'Server text' });
 
-		expect(html).toContain('class="bn-container bn-root dark server-view"');
-		expect(html).toContain('data-color-scheme="dark"');
-		expect(html).toContain('data-blocknote-editor=""');
-		expect(html).toContain('data-server-child="">server</span>');
-		expect(editor.mount).not.toHaveBeenCalled();
-		expect(editor.unmount).not.toHaveBeenCalled();
+		// The editor mounts on the client, so the server emits only the shell.
+		// Without a media query the scheme is the "light" fallback.
+		expect(html.replace(/<!--[^>]*-->/g, '')).toBe(
+			'<main id="ssr-editor"><div class="bn-root bn-container light" data-color-scheme="light">' +
+				'<div aria-autocomplete="list" aria-haspopup="listbox"></div></div></main>',
+		);
 	});
 });

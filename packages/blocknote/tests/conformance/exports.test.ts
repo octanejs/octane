@@ -1,27 +1,16 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import * as BlockNote from '@octanejs/blocknote';
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-
-describe('@octanejs/blocknote exports', () => {
-	it('exports the core editor adapter', () => {
-		expect(BlockNote.BlockNoteContext).toBeTruthy();
-		expect(BlockNote.BlockNoteView).toBeTypeOf('function');
-		expect(BlockNote.BlockNoteViewEditor).toBeTypeOf('function');
-		expect(BlockNote.useBlockNoteContext).toBeTypeOf('function');
-		expect(BlockNote.useBlockNoteEditor).toBeTypeOf('function');
-		expect(BlockNote.useCreateBlockNote).toBeTypeOf('function');
-	});
-
-	it('keeps the package private while retained port provenance is unresolved', () => {
-		const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
-
-		expect(manifest.private).toBe(true);
-		expect(manifest.license).toBe('SEE LICENSE IN UPSTREAM.md');
-		expect(manifest.dependencies).toEqual({ '@blocknote/core': 'catalog:default' });
-		expect(manifest.files).toEqual(['src', 'README.md', 'UPSTREAM.md', 'LICENSE']);
+describe('@octanejs/blocknote — exports', () => {
+	it('ships the headless view without a default-UI BlockNoteView', () => {
+		// OCTANE DIVERGENCE[blocknote-headless][conformance:blocknote-headless]:
+		// @blocknote/react also exports the default UI (toolbars, menus,
+		// ComponentsContext). This binding ships only the headless view, so a
+		// UI-kit `BlockNoteView` must not appear to exist.
+		expect(typeof BlockNote.BlockNoteViewRaw).toBe('function');
+		expect(typeof BlockNote.BlockNoteViewEditor).toBe('function');
+		expect('BlockNoteView' in BlockNote).toBe(false);
+		expect('BlockNoteDefaultUI' in BlockNote).toBe(false);
+		expect('ComponentsContext' in BlockNote).toBe(false);
 	});
 });

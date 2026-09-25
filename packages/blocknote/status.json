@@ -1,73 +1,22 @@
 {
   "upstream": {
-    "package": "@blocknote/core",
-    "version": "0.53.0",
-    "source": "https://github.com/TypeCellOS/BlockNote/tree/37614ab348dcc7faa830a9a88437b37197a2162d/packages/core",
-    "license": "MPL-2.0",
-    "relationship": "ordinary dependency"
+    "package": "@blocknote/react",
+    "version": "0.53.0"
   },
-  "surface": "Private Octane core-editor adapter with two retained React-port context/hook files; MIT-only publication is blocked on provenance review.",
-  "inventory": {
-    "supported": [
-      "BlockNoteView",
-      "BlockNoteViewEditor",
-      "useCreateBlockNote",
-      "useBlockNoteEditor",
-      "BlockNoteContext",
-      "useBlockNoteContext"
-    ],
-    "subpaths": []
-  },
+  "surface": "Headless editor surface: BlockNoteViewRaw, BlockNoteViewEditor, BlockNoteContext/useBlockNoteContext, useCreateBlockNote, useBlockNoteEditor, useEditorChange, useEditorSelectionChange, usePrefersColorScheme. Default UI and custom React specs are out of scope.",
   "divergences": [
-    "The package integrates @blocknote/core directly and does not claim the full @blocknote/react public surface.",
-    "Floating toolbars, menus, schema renderers, and other UI are application-owned children rather than bundled React UI.",
-    "Refs are ordinary Octane props; no forwardRef layer exists."
+    "No default UI: BlockNoteView, BlockNoteDefaultUI, ComponentsContext, and toolbar/menu/side-menu/table-handle/comment components are not provided. BlockNoteViewRaw matches upstream rendered without a components context.",
+    "BlockNoteViewRaw accepts no default UI flags, and portalElements reads only `default`.",
+    "Custom React block, inline content, and style specs are not provided.",
+    "Handlers receive native DOM events rather than React synthetic events."
   ],
-  "ssr": "BlockNoteView renders its container during SSR and mounts the core editor from an isomorphic layout effect on the client. Without an explicit theme, the initial client render preserves the server's light theme before applying the browser preference. useCreateBlockNote is a client-side editor hook.",
-  "verified": "2026-09-25",
+  "ssr": "Server rendering emits the BlockNoteViewRaw shell (container and empty editor host) without touching the DOM; the editor mounts on the client. usePrefersColorScheme uses a no-preference server snapshot, so server HTML and hydration agree on the light fallback and the live system scheme applies after hydration. Covered by the blocknote-ssr (Node) and blocknote-hydration projects.",
+  "verified": "2026-09-23",
   "notes": [
-    "Runtime and public-type tests pass; this is not license approval or full upstream parity verification.",
-    "BlockNoteContext.ts and useBlockNoteEditor.ts retain mechanical-port provenance. The package is private until an independently authored replacement or approved upstream-license distribution resolves this boundary."
-  ],
-  "surfaces": [
-    {
-      "entrypoint": ".",
-      "exports": [
-        "BlockNoteDependencyList",
-        "BlockNoteView",
-        "BlockNoteViewEditor",
-        "BlockNoteViewEditorProps",
-        "BlockNoteViewProps",
-        "useCreateBlockNote"
-      ],
-      "ownership": "adapter",
-      "files": ["src/index.ts", "src/editor/BlockNoteView.tsrx", "src/hooks/useCreateBlockNote.ts"],
-      "dependency": {
-        "package": "@blocknote/core",
-        "version": "catalog:default"
-      },
-      "evidence": [
-        "tests/conformance/exports.test.ts",
-        "tests/conformance/hook-slots.test.ts",
-        "tests/conformance/hydration.test.ts",
-        "tests/conformance/view.test.ts",
-        "tests/ssr/server.test.ts",
-        "tests/types/public.test-d.ts"
-      ]
-    },
-    {
-      "entrypoint": ".",
-      "exports": [
-        "BlockNoteContext",
-        "BlockNoteContextValue",
-        "useBlockNoteContext",
-        "useBlockNoteEditor"
-      ],
-      "ownership": "copied",
-      "files": ["src/editor/BlockNoteContext.ts", "src/hooks/useBlockNoteEditor.ts"],
-      "dependency": { "package": "@blocknote/react", "version": "0.53.0" },
-      "upstreamPaths": ["src/editor/BlockNoteContext.ts", "src/hooks/useBlockNoteEditor.ts"],
-      "evidence": ["UPSTREAM.md", "audit/source-ledger.json"]
-    }
+    "Independently authored MIT adapter. @blocknote/react is MPL-2.0 and none of its source is vendored or adapted; see UPSTREAM.md.",
+    "@blocknote/core is reused unchanged as a runtime dependency and supplies @blocknote/core/style.css.",
+    "Conformance tests mount real BlockNote editors in jsdom for view rendering, onChange, editable remounts, renderEditor=false placement, and unmount.",
+    "useCreateBlockNote still constructs the editor during server render, matching upstream; construction needs no DOM and the instance is discarded with the request.",
+    "Published types reach @blocknote/core → @shikijs/types, which uses Symbol.dispose. Consumers need lib esnext.disposable (or ES2025+) or skipLibCheck; the strict ES2024 browser consumer check lists this in packedTsrxSourceExceptions, like @octanejs/lexical."
   ]
 }
