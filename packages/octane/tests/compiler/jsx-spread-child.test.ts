@@ -41,57 +41,60 @@ describe('JSX spread children', () => {
 		});
 	});
 
-	it.each([false, true])('reports and maps each spread child in the editor (loose: %s)', (loose) => {
-		const source = `export function List({ first, second }) @{
+	it.each([false, true])(
+		'reports and maps each spread child in the editor (loose: %s)',
+		(loose) => {
+			const source = `export function List({ first, second }) @{
 	<ul><li>before</li>{...first}<li>between</li>{...second}<li>after</li></ul>
 }`;
-		const result = compileToVolarMappings(source, 'list.tsrx', { loose });
-		const spreads = ['first', 'second'];
+			const result = compileToVolarMappings(source, 'list.tsrx', { loose });
+			const spreads = ['first', 'second'];
 
-		expect(result.errors.map(({ code, pos, end }) => ({ code, pos, end }))).toEqual(
-			spreads.map((name) => {
-				const spread = `{...${name}}`;
-				const pos = source.indexOf(spread);
-				return { code: SPREAD_CHILD, pos, end: pos + spread.length };
-			}),
-		);
-		for (const error of result.errors) {
-			expect(error.message).toContain('Render the array as an expression child');
-		}
-		expect(
-			ts.transpileModule(result.code, {
-				compilerOptions: { jsx: ts.JsxEmit.Preserve },
-				reportDiagnostics: true,
-			}).diagnostics,
-		).toEqual([]);
-		const parsed = ts.createSourceFile(
-			'list.tsx',
-			result.code,
-			ts.ScriptTarget.Latest,
-			true,
-			ts.ScriptKind.TSX,
-		);
-		const parsedSpreads: string[] = [];
-		function visit(node: ts.Node): void {
-			if (ts.isJsxExpression(node) && node.dotDotDotToken && node.expression) {
-				parsedSpreads.push(node.expression.getText(parsed));
-			}
-			ts.forEachChild(node, visit);
-		}
-		visit(parsed);
-		expect(parsedSpreads).toEqual(spreads);
-		for (const name of spreads) {
-			const offset = source.indexOf(`{...${name}}`) + 4;
-			const mappedText = result.mappings.flatMap((mapping) =>
-				mapping.sourceOffsets.map((start, index) => {
-					if (offset < start || offset >= start + mapping.lengths[index]) return '';
-					const generated = mapping.generatedOffsets[index] + offset - start;
-					return result.code.slice(generated, generated + name.length);
+			expect(result.errors.map(({ code, pos, end }) => ({ code, pos, end }))).toEqual(
+				spreads.map((name) => {
+					const spread = `{...${name}}`;
+					const pos = source.indexOf(spread);
+					return { code: SPREAD_CHILD, pos, end: pos + spread.length };
 				}),
 			);
-			expect(mappedText).toContain(name);
-		}
-	});
+			for (const error of result.errors) {
+				expect(error.message).toContain('Render the array as an expression child');
+			}
+			expect(
+				ts.transpileModule(result.code, {
+					compilerOptions: { jsx: ts.JsxEmit.Preserve },
+					reportDiagnostics: true,
+				}).diagnostics,
+			).toEqual([]);
+			const parsed = ts.createSourceFile(
+				'list.tsx',
+				result.code,
+				ts.ScriptTarget.Latest,
+				true,
+				ts.ScriptKind.TSX,
+			);
+			const parsedSpreads: string[] = [];
+			function visit(node: ts.Node): void {
+				if (ts.isJsxExpression(node) && node.dotDotDotToken && node.expression) {
+					parsedSpreads.push(node.expression.getText(parsed));
+				}
+				ts.forEachChild(node, visit);
+			}
+			visit(parsed);
+			expect(parsedSpreads).toEqual(spreads);
+			for (const name of spreads) {
+				const offset = source.indexOf(`{...${name}}`) + 4;
+				const mappedText = result.mappings.flatMap((mapping) =>
+					mapping.sourceOffsets.map((start, index) => {
+						if (offset < start || offset >= start + mapping.lengths[index]) return '';
+						const generated = mapping.generatedOffsets[index] + offset - start;
+						return result.code.slice(generated, generated + name.length);
+					}),
+				);
+				expect(mappedText).toContain(name);
+			}
+		},
+	);
 
 	it('accepts expression children and spread attributes', () => {
 		const source = `export function List({ items, props }) @{ <ul {...props}>{items}</ul> }`;

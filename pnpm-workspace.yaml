@@ -292,7 +292,7 @@ catalogs:
     '@vitest/coverage-v8': 4.1.10
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
-    '@tsrx/core': ^0.3.2
+    '@tsrx/core': ^0.4.0
     '@tsrx/prettier-plugin': ^0.4.10
     '@tsrx/typescript-plugin': ^0.4.10
     '@tsrx/ripple': ^0.2.0
@@ -606,6 +606,7 @@ minimumReleaseAgeExclude:
   - '@ripple-ts/adapter@0.4.0'
   - '@ripple-ts/vite-plugin@0.4.0'
   - '@tsrx/core@0.3.2'
+  - '@tsrx/core@0.4.0'
   - '@tsrx/prettier-plugin@0.4.10'
   - '@tsrx/react@0.3.7'
   - '@tsrx/ripple@0.2.0'

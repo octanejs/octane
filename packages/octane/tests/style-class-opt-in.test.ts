@@ -6,10 +6,9 @@ import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { hasRuntimeValueArgument } from './_compiler-value-arguments.js';
 
 // RFC tsrx-org/RFCs#1: `apply` stamps a theme on every element of a scope;
-// reading `theme.$class` is the selective form. A block whose `$class` is read
-// anywhere in the module is a theme (every selector kept, `div.<hash>`), and
-// only the elements that carry the class match its element selectors — a child
-// component's elements included, when the class arrives through a prop.
+// reading `theme.$class` is the selective form. Assigned blocks keep every
+// selector, and only the elements that carry the class match element selectors
+// — a child component's elements included when the class arrives through a prop.
 
 const SOURCE = `
 function Card({ parentClass }: { parentClass: string }) @{
@@ -60,14 +59,13 @@ function load(mode: 'client' | 'server') {
 	return loadCompiledFixtureSource(SOURCE, { id: ID, mode, compileOptions: COMPILE_OPTIONS });
 }
 
-describe('$class opt-in — a block whose $class is read is a theme', () => {
+describe('$class opt-in — theme rules apply to class carriers', () => {
 	it.for(['client', 'server'] as const)(
 		'[%s] keeps the element selector and stamps only the opted-in elements',
 		(mode) => {
 			const code = compiled(mode);
 			const { theme, local } = hashes(code);
-			// Nothing exports or applies `theme`; the `$class` reads alone keep
-			// `div.<hash>` (an unapplied local block would prune it).
+			// Nothing exports or applies `theme`; its element rule still survives.
 			const css = injection(code, theme);
 			expect(css).toContain(`div.${theme} { color: blue; }`);
 			expect(css).toContain(`.card.${theme} { color: red; }`);
@@ -86,6 +84,34 @@ describe('$class opt-in — a block whose $class is read is a theme', () => {
 		expect(hasRuntimeValueArgument(code, 'theme.$class')).toBe(true);
 		expect(hasRuntimeValueArgument(code, 'theme.card')).toBe(true);
 		expect(code).toContain("Card, { 'parentClass': theme.$class }");
+	});
+
+	it('keeps local theme rules when $class is destructured', () => {
+		const source = `export function Card() @{
+	const theme = <style>div { color: rgb(11, 22, 33); }</style>;
+	const { $class } = theme;
+	<div class={$class}>{'themed'}</div>
+}`;
+		const id = 'destructured-theme.tsrx';
+		const client = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: COMPILE_OPTIONS,
+		});
+		const server = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions: COMPILE_OPTIONS,
+		});
+		const mounted = mount(client.Card);
+		const div = mounted.find('div');
+		const themeClass = div.className;
+		expect(themeClass).toMatch(/^tsrx-[0-9a-f]+$/);
+		expect(getComputedStyle(div).color).toBe('rgb(11, 22, 33)');
+		const { html, css } = ServerRuntime.renderToString(server.Card, {});
+		expect(html).toContain(`<div class="${themeClass}">themed</div>`);
+		expect(css).toContain(`div.${themeClass} { color: rgb(11, 22, 33); }`);
+		mounted.unmount();
 	});
 
 	it('client: only the elements carrying $class pick up the theme rules', () => {

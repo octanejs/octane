@@ -542,10 +542,10 @@ export function Label() @{
 }
 ```
 
-The sheet is injected where the declaration is. A block that is exported,
-applied (below), or whose `$class` is read anywhere in the module is a **theme**
-and keeps every selector; a local block that is none of these keeps only the
-class selectors its map exposes, and the rest are removed as unused.
+The sheet is injected where the declaration is. Every assigned block is a
+**theme** and keeps all its selectors, including element and descendant rules.
+Class-map entries carry the hash too, so those rules can match elements that use
+an entry such as `theme.dark`.
 `.$class` is reserved as a selector name in an assigned block
 (`STYLE_RESERVED_CLASS_KEY`), and a bare standalone block at module scope is an
 error (`STYLE_STANDALONE_AT_MODULE_SCOPE`): assign it.
@@ -622,12 +622,12 @@ export function App() @{
 }
 ```
 
-Reading `theme.$class` is what makes `theme` a theme here: the `div, h2` rule
-survives although nothing exports or applies the block. A block whose only reads
-are class entries (`theme.card`) stays a class map and drops its element
-selectors. `class={[a.$class, b.$class]}` opts one element into several themes,
-the way `apply={[a, b]}` does for a whole scope, and the two forms compose: a
-scope can apply a base theme while single elements opt into an accent.
+The `div, h2` rule is kept because every assigned block is a theme. It also
+matches the `div` carrying `theme.card`, since that class entry includes the
+hash; the `.card` rule wins there because it is more specific.
+`class={[a.$class, b.$class]}` opts one element into several themes, the way
+`apply={[a, b]}` does for a whole scope, and the two forms compose: a scope can
+apply a base theme while single elements opt into an accent.
 
 ### `:global(…)`
 

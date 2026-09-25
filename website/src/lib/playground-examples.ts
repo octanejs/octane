@@ -1549,7 +1549,7 @@ export function Counter({ label, start, ref, onCount }: CounterProps) {
 // ── Scoped styles & themes ──────────────────────────────────────────────────
 
 const THEME_TSRX = `// A <style> assigned to a variable is a theme: an object with $class
-// (its scope hash) plus one key per class selector. Exported themes keep
+// (its scope hash) plus one key per class selector. Assigned blocks keep
 // every selector, element rules included.
 const base = <style>
 	article {
