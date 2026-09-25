@@ -152,6 +152,7 @@ function ReactCompatServer(
 	const html = use(pending, SERVER_RESULT_SLOT);
 	return createElement('div', {
 		'data-react-compat': '',
+		style: 'display: contents',
 		suppressHydrationWarning: true,
 		dangerouslySetInnerHTML: { __html: html },
 	});
