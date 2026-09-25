@@ -268,13 +268,9 @@ them. The declaration can sit at module scope or anywhere a declaration is legal
 a component body. `$class` is reserved, so a block cannot declare a `.$class` selector,
 and a standalone `<style>` at module scope is an error: assign it to a variable.
 
-A block that is exported, applied, or whose `$class` is read anywhere in the module is
-a **theme** and keeps every selector, element and descendant selectors included. A
-local block used only through its class keys is a plain class map: it keeps only the
-selectors that are a single class, such as `.dark`, and every other selector is removed
-as unused and left as a `/* (unused) … */` comment in the compiled CSS. Descendant
-selectors and `:global` escapes on that local block are unused too — they belong on a
-theme you apply, or on a sibling block beside the markup.
+Every assigned block is a **theme** and keeps every selector, including element and
+descendant selectors. Class-map entries carry the hash too, so those rules can match
+elements that use an entry such as `theme.dark`.
 
 <h2 id="apply">Apply a theme to a scope</h2>
 
@@ -386,12 +382,11 @@ export function App() @{
 }
 ```
 
-Reading `theme.$class` is what makes `theme` a theme: the `div, h2` rule survives even
-though nothing exports or applies the block. A block whose only reads are class entries
-such as `theme.card` stays a class map and loses its element selectors. Opt one element
-into several themes with `class={[a.$class, b.$class]}`, the counterpart of
-`apply={[a, b]}`; the two forms compose, so a scope can apply a base theme while single
-elements opt into an accent.
+The `div, h2` rule is kept because every assigned block is a theme. It also matches the
+`div` carrying `theme.card`, since that class entry includes the hash; the `.card` rule
+wins there because it is more specific. Opt one element into several themes with
+`class={[a.$class, b.$class]}`, the counterpart of `apply={[a, b]}`; the two forms
+compose, so a scope can apply a base theme while single elements opt into an accent.
 
 <h2 id="global">
 	Reach outside the scope with <code>:global</code>

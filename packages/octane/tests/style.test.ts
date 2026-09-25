@@ -1422,8 +1422,8 @@ describe('scoped <style> blocks', () => {
 		);
 		expect(new Set([bodyHash, blockHash, nestedHash, fnHash]).size).toBe(4);
 		expect(sheetText(bodyHash)).toContain(`.laBody.${bodyHash}`);
-		// A local, unapplied block keeps only what its class map exposes.
-		expect(sheetText(bodyHash)).toContain('(unused) i');
+		expect(sheetText(bodyHash)).toContain(`i.${bodyHash}`);
+		expect(sheetText(bodyHash)).not.toContain('(unused) i');
 		expect(sheetText(blockHash)).toContain(`.laBlock.${blockHash}`);
 		expect(sheetText(fnHash)).toContain(`.laFn.${fnHash}`);
 		expect(sheetOrder([fnHash, bodyHash, blockHash, nestedHash])).toEqual([

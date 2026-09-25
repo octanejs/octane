@@ -46,11 +46,11 @@
  *   `JSXElement`: it is not a block, opens no scope, and is never stamped.
  * - Assigned blocks (`const theme = <style>…</style>`) lower anywhere a
  *   declaration is legal: their sheet injects at the declaration position and
- *   the initializer becomes the class-map object (`$class` first). Exported or
- *   applied blocks are themes and keep every selector; other blocks keep only
- *   what the class map exposes. The classification comes from the core
- *   analyzer (`metadata.styleKind`, `metadata.styleApplies`), which runs on
- *   the parser AST before it is adopted, so this pass reads it read-only.
+ *   the initializer becomes the class-map object (`$class` first). Every
+ *   assigned block is a theme and keeps every selector. The classification
+ *   comes from the core analyzer (`metadata.styleKind`, `metadata.styleApplies`),
+ *   which runs on the parser AST before it is adopted, so this pass reads it
+ *   read-only.
  * - `style(expr)` is Octane's class-string expression (core has no such
  *   intrinsic): it resolves to the scope chain plus the value only where TSRX
  *   reads a class value — as the expression of a JSX attribute value or of a

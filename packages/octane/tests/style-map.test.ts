@@ -87,8 +87,7 @@ describe('style maps — module-level <style> assigned to const', () => {
 });
 
 // RFC tsrx-org/RFCs#1: assigned blocks are class maps whose `$class` is the
-// scope class; exported or applied blocks are themes and keep every selector,
-// while an unapplied local block keeps only what its class map exposes.
+// scope class. Every assigned block keeps its element and class selectors.
 describe('style maps — $class, themes, and apply bundles', () => {
 	function injection(code: string, hash: string): string {
 		const match = code.match(new RegExp(`injectStyle\\("${hash}",\\s*"((?:[^"\\\\]|\\\\.)*)"`));
@@ -96,7 +95,7 @@ describe('style maps — $class, themes, and apply bundles', () => {
 		return match[1];
 	}
 
-	it('an exported theme keeps element selectors; an unapplied local block prunes them', () => {
+	it('exported and local themes keep element selectors', () => {
 		const { code } = compile(
 			`
       export const theme = <style>
@@ -117,10 +116,11 @@ describe('style maps — $class, themes, and apply bundles', () => {
 		expect(injection(code, themeHash)).toContain(`div.${themeHash} { margin: 0; }`);
 		expect(injection(code, themeHash)).not.toContain('(unused)');
 		expect(injection(code, localHash)).toContain(`.tone.${localHash} { color: blue; }`);
-		expect(injection(code, localHash)).toContain('/* (unused) div { margin: 0; }*/');
+		expect(injection(code, localHash)).toContain(`div.${localHash} { margin: 0; }`);
+		expect(injection(code, localHash)).not.toContain('(unused)');
 	});
 
-	it('a local block becomes a theme once something applies it', () => {
+	it('applying a local theme stamps its class on the scope', () => {
 		const { code } = compile(
 			`
       const local = <style>

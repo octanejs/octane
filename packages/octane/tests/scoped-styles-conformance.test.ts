@@ -14,7 +14,7 @@
  * - `classMaps`: `$class` composition of assigned blocks and their own entry;
  * - `pruned`: `(unused)` comments, in emission order across every sheet —
  *   standalone blocks prune what matches nothing among the list's other
- *   children, assigned blocks what their class map does not expose.
+ *   children; assigned blocks keep every selector.
  *
  * Where the shared module loader can evaluate the module (no export lists,
  * imports satisfiable with stubs) the client module is mounted and the
@@ -534,7 +534,7 @@ describe('scoped style conformance fixtures (@tsrx/core test harness)', () => {
 				});
 
 				sheetIt(
-					`injects scoped sheets in lexical pre-order and prunes only assigned blocks${suffix}`,
+					`injects scoped sheets in lexical pre-order and prunes unmatched standalone rules${suffix}`,
 					() => {
 						const distinct = distinctInjections(compiledCode(), mode);
 						const css = distinct.map((injection) => injection.css).join('\n');
@@ -553,7 +553,7 @@ describe('scoped style conformance fixtures (@tsrx/core test harness)', () => {
 
 						// Pruning: every `(unused)` selector, in emission order, is exactly
 						// what the contract lists — standalone scopes prune against the
-						// list's other children, assigned blocks against their class map.
+						// list's other children, while assigned blocks keep every selector.
 						expect(prunedSelectors(css)).toEqual(expected.pruned);
 					},
 				);

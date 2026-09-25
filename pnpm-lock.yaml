@@ -398,8 +398,8 @@ catalogs:
       specifier: 3.28.0
       version: 3.28.0
     '@tsrx/core':
-      specifier: ^0.3.2
-      version: 0.3.2
+      specifier: ^0.4.0
+      version: 0.4.0
     '@tsrx/oxc':
       specifier: 0.16.0
       version: 0.16.0
@@ -3143,7 +3143,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.3.2
+        version: 0.4.0
       miniflare:
         specifier: catalog:default
         version: 4.20260714.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -7107,7 +7107,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.3.2
+        version: 0.4.0
       '@tsrx/oxc':
         specifier: catalog:default
         version: 0.16.0(svelte@5.56.7)
@@ -7183,7 +7183,7 @@ importers:
     devDependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.3.2
+        version: 0.4.0
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -10821,7 +10821,7 @@ importers:
         version: 3.23.0
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.3.2
+        version: 0.4.0
       '@tsrx/prettier-plugin':
         specifier: catalog:default
         version: 0.4.10(prettier@3.9.6)
@@ -20596,6 +20596,9 @@ packages:
   '@tsrx/core@0.3.2':
     resolution: {integrity: sha512-L2Pi841MRybR6PX5sqyTCWssBOP5dnUFjb+AUz3zxlCXOUhilQblLwOEc9oKXU9EkoNKp5E0kUbVaknWP/SC7A==}
 
+  '@tsrx/core@0.4.0':
+    resolution: {integrity: sha512-JE5qhuu6EUY2TlaA25UC2JD97q8dyBiK94OaykgEQN7FnCRP/2IU/BNDesVN502Lm1pOq/BZoVEx3jezAuxV9Q==}
+
   '@tsrx/oxc-darwin-arm64@0.16.0':
     resolution: {integrity: sha512-CdPAlfLuWZ47dFf+UMvkwcJdFOP9lhrYPonjqfkE2/fPwSj2X34i2xYdOrnxkAjrkkhuVT98C+qdlct8e8zumg==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -20681,6 +20684,9 @@ packages:
 
   '@tsrx/runtime@0.2.3':
     resolution: {integrity: sha512-OTyZfuGOusdikUdT+Tva6W8HoCcHcPKrwZiJaW0r30oZsze63vU+V5Q1vEKjZpvlI1tyel2WXg90Pghdbjn4BA==}
+
+  '@tsrx/runtime@0.2.4':
+    resolution: {integrity: sha512-rLwKYml/Qbb1D9LtB+NE5bcJDs/SowSKaL+lMR0m6Mr61lKZNuK43IFK+jxFmLvRlG+7ico1kOszMyhA5rObNA==}
 
   '@tsrx/solid-runtime@0.1.11':
     resolution: {integrity: sha512-K8CsCAK9bse2KJS02xRedWaasfj9Wdfg0eff9K7nhBqd1vXh+c52JDqcKG+C52Y+OrDdTt+ja2VnUSh+EDOcAg==}
@@ -22567,6 +22573,11 @@ packages:
 
   acorn@8.17.0:
     resolution: {integrity: sha512-xRQbDb9BnwDafYNn6Vwl839DYVjqXYb1XVGtWAZ1kcDc6iwAL4hg3B1dZlRiuENFeO2H53gFG3in621AdERVAg==}
+    engines: {node: '>=0.4.0'}
+    hasBin: true
+
+  acorn@8.18.0:
+    resolution: {integrity: sha512-lGq+9yr1/GuAWaVYIHRjvvySG5/4VfKIvC8EWxStPdcDh/Ka7FG3twP6v4d5BkravUilhIAsG4Qj83t02LWUPQ==}
     engines: {node: '>=0.4.0'}
     hasBin: true
 
@@ -46375,6 +46386,10 @@ snapshots:
     dependencies:
       acorn: 8.17.0
 
+  '@sveltejs/acorn-typescript@1.0.13(acorn@8.18.0)':
+    dependencies:
+      acorn: 8.18.0
+
   '@sveltejs/load-config@0.2.0': {}
 
   '@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.56.7)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
@@ -48179,6 +48194,22 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
+  '@tsrx/core@0.4.0':
+    dependencies:
+      '@jridgewell/sourcemap-codec': 1.5.5
+      '@noble/hashes': 2.2.0
+      '@sveltejs/acorn-typescript': 1.0.13(acorn@8.18.0)
+      '@tsrx/runtime': 0.2.4
+      '@types/estree': 1.0.9
+      '@types/estree-jsx': 1.0.5
+      acorn: 8.18.0
+      esrap: 2.3.2
+      get-tsconfig: 5.0.0-beta.6
+      magic-string: 0.30.21
+      zimmerframe: 1.1.4
+    transitivePeerDependencies:
+      - '@typescript-eslint/types'
+
   '@tsrx/oxc-darwin-arm64@0.16.0':
     optional: true
 
@@ -48334,6 +48365,8 @@ snapshots:
   '@tsrx/runtime@0.2.0': {}
 
   '@tsrx/runtime@0.2.3': {}
+
+  '@tsrx/runtime@0.2.4': {}
 
   '@tsrx/solid-runtime@0.1.11(@solidjs/web@2.0.0-beta.20(solid-js@2.0.0-beta.20))(solid-js@2.0.0-beta.20)':
     dependencies:
@@ -51589,6 +51622,8 @@ snapshots:
   acorn@8.14.0: {}
 
   acorn@8.17.0: {}
+
+  acorn@8.18.0: {}
 
   address@1.2.2: {}
 

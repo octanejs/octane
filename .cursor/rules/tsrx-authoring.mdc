@@ -152,9 +152,9 @@ of a scoped block: `$class` (the applied themes' classes, then its own hash) plu
 one key per class selector whose value is `"<hash> <name>"`. Pass those strings
 as props (`<Badge class={theme.dark} />`). The declaration may live anywhere a
 declaration can, including module scope, where a standalone block is an error.
-Exported or applied blocks, and blocks whose `$class` is read anywhere in the
-module, are themes and keep every selector; a local block that is none of these
-keeps only its standalone class selectors.
+Every assigned block is a theme and keeps every selector, including element and
+descendant rules. A class-map entry carries the hash too, so those rules can
+match elements that use an entry such as `theme.dark`.
 
 `<style apply={theme} />` adds `theme.$class` to the items beside it and
 everything below them, so the theme's element and descendant rules reach them;
