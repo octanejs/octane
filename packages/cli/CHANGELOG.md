@@ -1,5 +1,11 @@
 # @octanejs/cli
 
+## 0.0.12
+
+### Patch Changes
+
+- 45ee943: Include the headless BlockNote binding in the maintained React-to-Octane package catalog.
+
 ## 0.0.11
 
 ### Patch Changes

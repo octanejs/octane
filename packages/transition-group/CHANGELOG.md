@@ -1,5 +1,18 @@
 # @octanejs/transition-group
 
+## 0.0.22
+
+### Patch Changes
+
+- 6e86908: Fix strict TypeScript consumption of Transition's published source by expressing the element type validated by Children.only before cloning it. Runtime behavior is unchanged.
+- Updated dependencies [4b235d2]
+- Updated dependencies [411c555]
+- Updated dependencies [ac2a217]
+- Updated dependencies [6e86908]
+- Updated dependencies [b9b0bc4]
+- Updated dependencies [c3dda51]
+  - octane@0.6.0
+
 ## 0.0.21
 
 ### Patch Changes

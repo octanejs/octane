@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/sanity-logos",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -39,7 +39,7 @@
     "typecheck": "tsgo --noEmit -p tsconfig.json"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.5.0"
+    "octane": "workspace:^0.6.0"
   },
   "devDependencies": {
     "@sanity/logos": "catalog:default",

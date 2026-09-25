@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/mobx",
-  "version": "0.1.36",
+  "version": "0.1.37",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -43,7 +43,7 @@
     "mobx": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.5.0"
+    "octane": "workspace:^0.6.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

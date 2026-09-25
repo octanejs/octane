@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.2.34
+
+### Patch Changes
+
+- 45ee943: Include the headless BlockNote binding in the maintained React-to-Octane package catalog.
+
 ## 0.2.33
 
 ### Patch Changes

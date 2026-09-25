@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/swr",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "type": "module",
   "files": [
     "src",
@@ -73,7 +73,7 @@
     "dequal": "^2.0.3"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.5.0"
+    "octane": "workspace:^0.6.0"
   },
   "devDependencies": {
     "@edge-runtime/jest-environment": "^4.0.0",

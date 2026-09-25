@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/apollo-client",
-  "version": "0.1.51",
+  "version": "0.1.52",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -65,7 +65,7 @@
   "peerDependencies": {
     "@apollo/client": ">=4.2.6 <4.3.0",
     "graphql": "^16.0.0 || ^17.0.0",
-    "octane": "workspace:^0.5.0",
+    "octane": "workspace:^0.6.0",
     "rxjs": "^7.3.0"
   },
   "devDependencies": {
