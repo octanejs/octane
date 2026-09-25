@@ -543,7 +543,7 @@ export function Styled(props) @{ 'use dom bindings'; <div sx={${expression}}/> }
 		}
 	});
 
-	it('accepts only a one-shot descriptor proof for its exact source', () => {
+	it('keeps descriptor exports consistent across preflight and fallback parsing', () => {
 		const authority = Symbol('test descriptor preflight');
 		const compiler = createOctaneCompiler({
 			_descriptorPreflightAuthority: authority,
@@ -587,35 +587,39 @@ export function Styled(props) @{ 'use dom bindings'; <div sx={${expression}}/> }
 		} as any);
 		expect(matching?.descriptorChildrenExports).toEqual(['Marked']);
 
-		// This syntax is accepted by the authoritative compiler parser but not the
-		// preflight parser, so string fallback returns no descriptor fact. It makes
-		// an id-mismatched proof observably distinct from an incorrectly reused one.
-		const parserDisagreement = `${marked}\nconst unicodeSets = /[a&&b]/v;`;
+		// Both parsers support Unicode-set regular expressions. Reusing a consumed
+		// proof or changing the module query must preserve the fallback's exports.
+		const unicodeSets = `${marked}\nconst unicodeSets = /[a&&b]/v;`;
+		expect(compiler.transform(unicodeSets, id)?.descriptorChildrenExports).toEqual(['Marked']);
 		const oneShotProof = (compiler as any)._prepareDescriptorChildrenExports(
 			authority,
-			parserDisagreement,
+			unicodeSets,
 			id,
-			parseCompilerModule(parserDisagreement, id),
+			parseCompilerModule(unicodeSets, id),
 		);
-		const firstUse = compiler.transform(parserDisagreement, id, {
+		const firstUse = compiler.transform(unicodeSets, id, {
 			_descriptorChildrenExportsProof: oneShotProof,
 		} as any);
 		expect(firstUse?.descriptorChildrenExports).toEqual(['Marked']);
-		const reused = compiler.transform(parserDisagreement, id, {
+		const reused = compiler.transform(unicodeSets, id, {
 			_descriptorChildrenExportsProof: oneShotProof,
 		} as any);
-		expect(reused?.descriptorChildrenExports).toEqual([]);
+		expect(reused?.descriptorChildrenExports).toEqual(['Marked']);
+		const changedSource = compiler.transform(ordinary, id, {
+			_descriptorChildrenExportsProof: oneShotProof,
+		} as any);
+		expect(changedSource?.descriptorChildrenExports).toEqual([]);
 
 		const idProof = (compiler as any)._prepareDescriptorChildrenExports(
 			authority,
-			parserDisagreement,
+			unicodeSets,
 			id,
-			parseCompilerModule(parserDisagreement, id),
+			parseCompilerModule(unicodeSets, id),
 		);
-		const mismatchedId = compiler.transform(parserDisagreement, `${id}?changed`, {
+		const mismatchedId = compiler.transform(unicodeSets, `${id}?changed`, {
 			_descriptorChildrenExportsProof: idProof,
 		} as any);
-		expect(mismatchedId?.descriptorChildrenExports).toEqual([]);
+		expect(mismatchedId?.descriptorChildrenExports).toEqual(['Marked']);
 	});
 
 	it('enforces project-wide Strong mode on both client and server without claiming dependencies', () => {

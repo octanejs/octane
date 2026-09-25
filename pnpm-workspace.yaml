@@ -605,8 +605,7 @@ minimumReleaseAgeExclude:
   - '@tsrx/oxc@0.16.0'
   - '@ripple-ts/adapter@0.4.0'
   - '@ripple-ts/vite-plugin@0.4.0'
-  - '@tsrx/core@0.3.2'
-  - '@tsrx/core@0.4.0'
+  - '@tsrx/core@0.3.2 || 0.4.0'
   - '@tsrx/prettier-plugin@0.4.10'
   - '@tsrx/react@0.3.7'
   - '@tsrx/ripple@0.2.0'
@@ -615,7 +614,7 @@ minimumReleaseAgeExclude:
   - '@tsrx/vite-plugin-react@0.0.112'
   - '@tsrx/vite-plugin-solid@0.0.109'
   - ripple@0.4.0
-  - '@tsrx/runtime@0.2.3'
+  - '@tsrx/runtime@0.2.3 || 0.2.4'
   - '@tsrx/react-runtime@0.1.11'
   - '@tsrx/solid-runtime@0.1.11'
   - cn@0.2.6
