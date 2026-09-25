@@ -1,4 +1,5 @@
 import { BlockNoteEditor } from '@blocknote/core';
+import { flushSync } from 'octane';
 import { describe, expect, it, vi } from 'vitest';
 
 import { flushEffects, mount } from '../../../octane/tests/_helpers.js';
@@ -166,6 +167,7 @@ describe('BlockNoteView', () => {
 		const mounted = mount(ViewFixture, viewProps(double.editor));
 		try {
 			flushEffects();
+			flushSync(() => {});
 			expect(mounted.find('.bn-container').matches('.bn-root.dark')).toBe(true);
 			media.matches = false;
 			listeners.forEach((listener) => listener());

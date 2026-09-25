@@ -39,15 +39,9 @@ export type BlockNoteViewEditorProps = {
 const useIsomorphicLayoutEffect =
 	typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
-function readPreferredColorScheme(): ColorScheme {
-	return typeof window !== 'undefined' &&
-	window.matchMedia?.('(prefers-color-scheme: dark)').matches
-		? 'dark'
-		: 'light';
-}
-
 function useColorScheme(theme: ColorScheme | undefined): ColorScheme {
-	const [preferred, setPreferred] = useState<ColorScheme>(readPreferredColorScheme);
+	// Match the server snapshot until effects can read the browser preference.
+	const [preferred, setPreferred] = useState<ColorScheme>('light');
 
 	useEffect(() => {
 		if (theme || typeof window === 'undefined' || !window.matchMedia) {

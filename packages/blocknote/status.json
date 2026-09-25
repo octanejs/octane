@@ -23,7 +23,7 @@
     "Floating toolbars, menus, schema renderers, and other UI are application-owned children rather than bundled React UI.",
     "Refs are ordinary Octane props; no forwardRef layer exists."
   ],
-  "ssr": "BlockNoteView renders its container during SSR and mounts the core editor from an isomorphic layout effect on the client. useCreateBlockNote is a client-side editor hook.",
+  "ssr": "BlockNoteView renders its container during SSR and mounts the core editor from an isomorphic layout effect on the client. Without an explicit theme, the initial client render preserves the server's light theme before applying the browser preference. useCreateBlockNote is a client-side editor hook.",
   "verified": "2026-09-25",
   "notes": [
     "Runtime and public-type tests pass; this is not license approval or full upstream parity verification.",
@@ -49,6 +49,7 @@
       "evidence": [
         "tests/conformance/exports.test.ts",
         "tests/conformance/hook-slots.test.ts",
+        "tests/conformance/hydration.test.ts",
         "tests/conformance/view.test.ts",
         "tests/ssr/server.test.ts",
         "tests/types/public.test-d.ts"

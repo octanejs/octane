@@ -11,7 +11,7 @@ describe('@octanejs/blocknote server rendering', () => {
 			unmount: vi.fn(),
 		} as unknown as BlockNoteEditor;
 
-		const { html } = renderToString(SsrViewFixture, { editor });
+		const { html } = renderToString(SsrViewFixture, { editor, theme: 'dark' });
 
 		expect(html).toContain('class="bn-container bn-root dark server-view"');
 		expect(html).toContain('data-color-scheme="dark"');

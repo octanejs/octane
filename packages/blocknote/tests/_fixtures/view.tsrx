@@ -33,8 +33,8 @@ export function ViewFixture(props: ViewFixtureProps) @{
 	</BlockNoteView>
 }
 
-export function SsrViewFixture(props: { editor: Editor }) @{
-	<BlockNoteView editor={props.editor} class="server-view" theme="dark">
+export function SsrViewFixture(props: { editor: Editor; theme?: BlockNoteViewProps['theme'] }) @{
+	<BlockNoteView editor={props.editor} class="server-view" theme={props.theme}>
 		<span data-server-child="">server</span>
 	</BlockNoteView>
 }

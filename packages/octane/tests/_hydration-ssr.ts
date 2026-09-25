@@ -12,6 +12,7 @@ type HydrationBinding =
 	| 'apollo-client'
 	| 'aria'
 	| 'base-ui'
+	| 'blocknote'
 	| 'docusaurus'
 	| 'formisch'
 	| 'monaco-editor'
@@ -30,6 +31,9 @@ const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
 function bindingAliases(binding: HydrationBinding) {
 	const source = resolve(repositoryRoot, 'packages', binding, 'src');
+	if (binding === 'blocknote') {
+		return [{ find: /^@octanejs\/blocknote$/, replacement: resolve(source, 'index.ts') }];
+	}
 	if (binding === 'alien-signals') {
 		return [{ find: /^@octanejs\/alien-signals$/, replacement: resolve(source, 'index.ts') }];
 	}

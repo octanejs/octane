@@ -41,7 +41,14 @@ content and selection changes, supplies `BlockNoteContext`, and unmounts cleanly
 The view follows the system color scheme by default. Set `theme="light"` or
 `theme="dark"` to override it; the wrapper exposes the corresponding CSS class
 alongside `bn-root` for the core stylesheet. Application-owned UI and theme
-colors remain the application's responsibility.
+colors remain the application's responsibility. Without an explicit theme, SSR
+and the initial client render use light mode; the browser preference is applied
+after hydration.
+
+`useCreateBlockNote` retains an editor until its dependency list changes.
+`BlockNoteView` owns DOM mounting and unmounting. The pinned core API does not
+expose a public `destroy()` method; collaboration providers supplied by the
+application remain application-owned.
 
 Set `renderEditor={false}` to provide `BlockNoteViewEditor` yourself among the
 view's children. Other children can implement application-owned toolbars, menus,
