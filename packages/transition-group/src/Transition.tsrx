@@ -7,6 +7,7 @@ import {
 	useLayoutEffect,
 	useRef,
 	useState,
+	type ElementDescriptor,
 	type OctaneNode,
 } from 'octane';
 import config from './config.ts';
@@ -251,7 +252,7 @@ function TransitionImpl(props: TransitionProps) @{
 			? children(status, childProps)
 			: isChildrenBlock(children)
 				? children
-				: cloneElement(Children.only(children), childProps);
+				: cloneElement(Children.only(children) as ElementDescriptor, childProps);
 	}
 
 	<TransitionGroupContext value={null}>{rendered}</TransitionGroupContext>
