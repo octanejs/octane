@@ -1,5 +1,32 @@
 import type { BlockNoteEditor } from '@blocknote/core';
-import { BlockNoteViewEditor, BlockNoteViewRaw, useBlockNoteEditor } from '@octanejs/blocknote';
+import {
+	BlockNoteViewEditor,
+	BlockNoteViewRaw,
+	useBlockNoteEditor,
+	useCreateBlockNote,
+} from '@octanejs/blocknote';
+import { Activity } from 'octane';
+
+type ActivityEditorProps = {
+	mode: 'visible' | 'hidden';
+	capture(editor: BlockNoteEditor): void;
+};
+
+function CreatedEditor(props: ActivityEditorProps) @{
+	const editor = useCreateBlockNote({
+		initialContent: [
+			{ type: 'paragraph', content: 'Retained content' },
+		],
+	});
+	props.capture(editor);
+	<BlockNoteViewRaw editor={editor} />
+}
+
+export function ActivityEditor(props: ActivityEditorProps) @{
+	<Activity mode={props.mode}>
+		<CreatedEditor {...props} />
+	</Activity>
+}
 
 export interface HeadlessViewProps {
 	editor: BlockNoteEditor<any, any, any>;

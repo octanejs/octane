@@ -2,7 +2,7 @@ import { BlockNoteEditor } from '@blocknote/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { flushEffects, mount, type MountResult } from '../../../octane/tests/_helpers.js';
-import { HeadlessView, SplitView } from '../_fixtures/headless-view.tsrx';
+import { ActivityEditor, HeadlessView, SplitView } from '../_fixtures/headless-view.tsrx';
 
 const createEditor = () =>
 	BlockNoteEditor.create({
@@ -17,6 +17,30 @@ afterEach(() => {
 });
 
 describe('@octanejs/blocknote — headless BlockNoteViewRaw', () => {
+	it('keeps the created editor usable after Activity hides and reveals it', () => {
+		let editor: BlockNoteEditor | undefined;
+		const capture = (value: BlockNoteEditor) => {
+			editor = value;
+		};
+		const props = { mode: 'visible' as const, capture };
+		mounted = mount(ActivityEditor, props);
+		flushEffects();
+		const original = editor!;
+		expect(original.domElement?.isConnected).toBe(true);
+		original.updateBlock(original.document[0], { content: 'Edited before hiding' });
+
+		mounted.update(ActivityEditor, { ...props, mode: 'hidden' });
+		flushEffects();
+		mounted.update(ActivityEditor, props);
+		flushEffects();
+
+		expect(editor).toBe(original);
+		expect(original.domElement?.isConnected).toBe(true);
+		expect(original.domElement?.textContent).toContain('Edited before hiding');
+		original.updateBlock(original.document[0], { content: 'Edited after reveal' });
+		expect(original.domElement?.textContent).toContain('Edited after reveal');
+	});
+
 	it('mounts the editor into the container with no default UI', () => {
 		const editor = createEditor();
 		mounted = mount(HeadlessView, { editor, theme: 'dark', className: 'custom' });

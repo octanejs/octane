@@ -2504,6 +2504,9 @@ function ssrDeoptBlockChildren(children: unknown, scope: SSRScope): string {
 // contains a COMPONENT anywhere (so its de-opt host parent must serialize children
 // through the block-bearing `ssrChild` path rather than plain markup).
 function serverDescNeedsBlocks(v: unknown): boolean {
+	// Compiled children are render functions. Like the client, borrow their
+	// component range instead of adding a second keyed-item wrapper around it.
+	if (typeof v === 'function') return true;
 	if (v == null || typeof v !== 'object') return false;
 	if ((v as any).$$kind === CONTEXT_TAG || typeof (v as any).then === 'function') return true;
 	// Arrays are the ordinary descriptor-children container. Inspect their
