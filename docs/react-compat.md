@@ -85,10 +85,11 @@ identity. Changing the child key or type replaces the React component. Changing
 the `ReactCompat` key replaces the whole root. Ordinary props, callbacks, and
 React 19 ref props pass through unchanged; React class refs target the instance.
 
-Each island has one `div[data-react-compat]` host. Octane never reconciles its
-interior. Place the boundary where a div is valid, not directly in a table row,
-select, SVG tree, or another restricted content model. Treat its children as
-React-owned DOM; direct writes by an outer renderer are unsupported.
+Each island has one `div[data-react-compat]` host, styled with `display: contents`
+so it does not add a layout box. Octane never reconciles its interior. Place the
+boundary where a div is valid, not directly in a table row, select, SVG tree, or
+another restricted content model. Treat its children as React-owned DOM; direct
+writes by an outer renderer are unsupported.
 
 The React root starts or updates after the Octane host commits. `root.render()`
 and Octane `flushSync()` do not synchronously flush React work. React-local

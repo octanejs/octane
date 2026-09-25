@@ -98,6 +98,7 @@ describe('ReactCompat buffered server rendering', () => {
 		const container = document.createElement('div');
 		container.innerHTML = html;
 		document.body.appendChild(container);
+		const islandHost = container.querySelector<HTMLElement>('[data-react-compat]')!;
 		const input = container.querySelector('input')!;
 		const button = container.querySelector('button')!;
 		const neighbor = container.querySelector('aside')!;
@@ -115,6 +116,7 @@ describe('ReactCompat buffered server rendering', () => {
 		};
 		let root: Client.Root | undefined;
 		try {
+			expect(getComputedStyle(islandHost).display).toBe('contents');
 			await run(() => {
 				root = Client.hydrateRoot(
 					container,
@@ -124,6 +126,7 @@ describe('ReactCompat buffered server rendering', () => {
 				);
 			});
 			await vi.waitFor(() => expect(inputRef.current).toBe(input));
+			expect(getComputedStyle(islandHost).display).toBe('contents');
 			expect(container.querySelector('input')).toBe(input);
 			expect(container.querySelector('button')).toBe(button);
 			expect(container.querySelector('aside')).toBe(neighbor);
