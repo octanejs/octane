@@ -30,6 +30,8 @@ export function octaneServerFixtures(root) {
 				target: 'esnext',
 				external: ['octane', 'octane/*'],
 				resolveExtensions: ['.tsrx', '.tsx', '.ts', '.jsx', '.js', '.json'],
+				// Stylesheet imports have no server output; the client build owns them.
+				loader: { '.css': 'empty' },
 				plugins: [
 					{
 						name: 'octane-server-compile',

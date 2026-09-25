@@ -1,41 +1,32 @@
+// Independently authored Octane adapter for the public @blocknote/react 0.53.0 API.
 import type { BlockNoteEditor } from '@blocknote/core';
 import { useEffect } from 'octane';
-import { useBlockNoteContext } from '../editor/BlockNoteContext.js';
 
-/**
- * Subscribes to editor selection changes. The callback is invoked whenever the
- * user's cursor position or text selection changes, and the subscription is
- * automatically cleaned up when the component unmounts.
- *
- * @param callback - Function called when the selection changes.
- * @param editor - The BlockNote editor instance. If omitted, uses the editor
- * from the nearest `BlockNoteContext`.
- * @param includeSelectionChangedByRemote - Whether to also fire the callback
- * when the selection is changed by a remote collaborator. Defaults to `false`.
- */
+import { useBlockNoteContext } from '../BlockNoteContext';
+import { splitSlot, subSlot } from '../internal';
+
+/** Subscribe to selection changes of `editor`, or of the context editor when omitted. */
 export function useEditorSelectionChange(
 	callback: () => void,
 	editor?: BlockNoteEditor<any, any, any>,
 	includeSelectionChangedByRemote?: boolean,
-) {
-	if (typeof (editor as unknown) === 'symbol') {
-		editor = undefined;
-	}
-	if (typeof (includeSelectionChangedByRemote as unknown) === 'symbol') {
-		includeSelectionChangedByRemote = undefined;
-	}
+): void;
+export function useEditorSelectionChange(...args: unknown[]): void {
+	const [userArgs, slot] = splitSlot(args);
+	const callback = userArgs[0] as () => void;
+	const includeSelectionChangedByRemote = userArgs[2] as boolean | undefined;
+	const context = useBlockNoteContext();
+	const editor = (userArgs[1] as BlockNoteEditor<any, any, any> | undefined) ?? context?.editor;
 
-	const editorContext = useBlockNoteContext();
 	if (!editor) {
-		editor = editorContext?.editor;
+		throw new Error(
+			'useEditorSelectionChange was called outside of a BlockNoteContext provider or BlockNoteViewRaw component',
+		);
 	}
 
-	useEffect(() => {
-		if (!editor) {
-			throw new Error(
-				"'editor' is required, either from BlockNoteContext or as a function argument",
-			);
-		}
-		return editor.onSelectionChange(callback, includeSelectionChangedByRemote);
-	}, [callback, editor, includeSelectionChangedByRemote]);
+	useEffect(
+		() => editor.onSelectionChange(callback, includeSelectionChangedByRemote),
+		[editor, callback, includeSelectionChangedByRemote],
+		subSlot(slot, 'subscribe'),
+	);
 }

@@ -1,4 +1,5 @@
-import {
+// Independently authored Octane adapter for the public @blocknote/react 0.53.0 API.
+import type {
 	BlockNoteEditor,
 	BlockNoteSchema,
 	BlockSchema,
@@ -9,24 +10,22 @@ import {
 	StyleSchema,
 } from '@blocknote/core';
 
-import { useBlockNoteContext } from '../editor/BlockNoteContext.js';
+import { useBlockNoteContext } from '../BlockNoteContext';
+import { splitSlot } from '../internal';
 
-/**
- * Get the BlockNoteEditor instance from the nearest BlockNoteContext provider
- * @param _schema: optional, pass in the schema to return type-safe BlockNoteEditor if you're using a custom schema
- */
+/** Read the editor from the nearest `BlockNoteViewRaw` or `BlockNoteContext`. */
 export function useBlockNoteEditor<
-	BSchema extends BlockSchema = DefaultBlockSchema,
-	ISchema extends InlineContentSchema = DefaultInlineContentSchema,
-	SSchema extends StyleSchema = DefaultStyleSchema,
->(
-	_schema?: BlockNoteSchema<BSchema, ISchema, SSchema>,
-): BlockNoteEditor<BSchema, ISchema, SSchema> {
-	const context = useBlockNoteContext(_schema);
+	B extends BlockSchema = DefaultBlockSchema,
+	I extends InlineContentSchema = DefaultInlineContentSchema,
+	S extends StyleSchema = DefaultStyleSchema,
+>(schema?: BlockNoteSchema<B, I, S>): BlockNoteEditor<B, I, S>;
+export function useBlockNoteEditor(...args: unknown[]): BlockNoteEditor<any, any, any> {
+	const [userArgs] = splitSlot(args);
+	const context = useBlockNoteContext(userArgs[0] as BlockNoteSchema<any, any, any> | undefined);
 
 	if (!context?.editor) {
 		throw new Error(
-			'useBlockNoteEditor was called outside of a BlockNoteContext provider or BlockNoteView component',
+			'useBlockNoteEditor was called outside of a BlockNoteContext provider or BlockNoteViewRaw component',
 		);
 	}
 

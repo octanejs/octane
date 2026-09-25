@@ -120,6 +120,10 @@ const packedExampleCanaries = [
 // enrolled automatically. The five bindings reported in #721 must stay enrolled.
 const packedTsrxSourceExceptions = new Map([
 	['@octanejs/aria', 'its browser source still reads process.env.NODE_ENV'],
+	[
+		'@octanejs/blocknote',
+		'@blocknote/core reaches @shikijs/types declarations that require disposable globals outside the stable ES2024 library',
+	],
 	['@octanejs/cmdk', 'its browser source still reads process.env.NODE_ENV'],
 	['@octanejs/dnd-kit', 'its browser source still reads process.env.NODE_ENV'],
 	[

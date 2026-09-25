@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**122 publishable package(s), including 108 framework binding(s) and 3 framework integration(s).**
+**123 publishable package(s), including 109 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -24,6 +24,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.56` | 79 |
 | `@octanejs/base-ui-utils` | [`packages/base-ui-utils`](../packages/base-ui-utils) | framework binding | `0.1.4` | 45 |
 | `@octanejs/better-auth` | [`packages/better-auth`](../packages/better-auth) | framework binding | `0.0.8` | 1 |
+| `@octanejs/blocknote` | [`packages/blocknote`](../packages/blocknote) | framework binding | `0.1.0` | 2 |
 | `@octanejs/calendar` | [`packages/calendar`](../packages/calendar) | framework binding | `0.0.12` | 4 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.0.11` | 2 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.40` | 1 |
@@ -137,7 +138,6 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
 ## Private packages
 
-- `@octanejs/blocknote` ([`packages/blocknote`](../packages/blocknote))
 - `@octanejs/evals` ([`packages/octane-evals`](../packages/octane-evals))
 - `@octanejs/lynx` ([`packages/lynx`](../packages/lynx))
 - `@octanejs/puck` ([`packages/puck`](../packages/puck))

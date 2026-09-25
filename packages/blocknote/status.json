@@ -3,18 +3,20 @@
     "package": "@blocknote/react",
     "version": "0.53.0"
   },
-  "surface": "Milestone 1 — useCreateBlockNote, useBlockNoteEditor, BlockNoteContext/useBlockNoteContext. The full mechanical port remains private staging source and is excluded from the package files allowlist.",
+  "surface": "Headless editor surface: BlockNoteViewRaw, BlockNoteViewEditor, BlockNoteContext/useBlockNoteContext, useCreateBlockNote, useBlockNoteEditor, useEditorChange, useEditorSelectionChange, usePrefersColorScheme. Default UI and custom React specs are out of scope.",
   "divergences": [
-    "Upstream exports BlockNoteViewRaw; BlockNoteView alias not yet added.",
-    "TipTap/react-dom boundary files flagged CHECKPOINT in port-upstream.mjs."
+    "No default UI: BlockNoteView, BlockNoteDefaultUI, ComponentsContext, and toolbar/menu/side-menu/table-handle/comment components are not provided. BlockNoteViewRaw matches upstream rendered without a components context.",
+    "BlockNoteViewRaw accepts no default UI flags, and portalElements reads only `default`.",
+    "Custom React block, inline content, and style specs are not provided.",
+    "Handlers receive native DOM events rather than React synthetic events."
   ],
-  "ssr": "Not yet evaluated.",
-  "verified": "2026-08-07",
+  "ssr": "Server rendering emits the BlockNoteViewRaw shell (container and empty editor host) without touching the DOM; the editor mounts on the client. usePrefersColorScheme uses a no-preference server snapshot, so server HTML and hydration agree on the light fallback and the live system scheme applies after hydration. Covered by the blocknote-ssr (Node) and blocknote-hydration projects.",
+  "verified": "2026-09-23",
   "notes": [
-    "Private workspace scaffold until the published source passes strict external-consumer validation.",
-    "The package files allowlist and CI typecheck cover only the four-file M1 surface; the remaining mechanical port is retained as private staging source for future milestones.",
-    "Full mechanical port (~156 files) via scripts/port-upstream.mjs (2026-08-07).",
-    "M1 export conformance test wired; editor mount blocked on @octanejs/tiptap EditorContent checkpoint.",
-    "Dependencies: @blocknote/core (reuse), @octanejs/tiptap, @octanejs/floating-ui, @octanejs/tanstack-store."
+    "Independently authored MIT adapter. @blocknote/react is MPL-2.0 and none of its source is vendored or adapted; see UPSTREAM.md.",
+    "@blocknote/core is reused unchanged as a runtime dependency and supplies @blocknote/core/style.css.",
+    "Conformance tests mount real BlockNote editors in jsdom for view rendering, onChange, editable remounts, renderEditor=false placement, and unmount.",
+    "useCreateBlockNote still constructs the editor during server render, matching upstream; construction needs no DOM and the instance is discarded with the request.",
+    "Published types reach @blocknote/core → @shikijs/types, which uses Symbol.dispose. Consumers need lib esnext.disposable (or ES2025+) or skipLibCheck; the strict ES2024 browser consumer check lists this in packedTsrxSourceExceptions, like @octanejs/lexical."
   ]
 }

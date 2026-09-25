@@ -5336,18 +5336,6 @@ importers:
       '@blocknote/core':
         specifier: catalog:default
         version: 0.53.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@types/hast@3.0.5)(refractor@5.0.0)(yjs@13.6.31)
-      '@octanejs/floating-ui':
-        specifier: workspace:*
-        version: link:../floating-ui
-      '@octanejs/tanstack-store':
-        specifier: workspace:*
-        version: link:../tanstack-store
-      '@octanejs/tiptap':
-        specifier: workspace:*
-        version: link:../tiptap
-      fast-deep-equal:
-        specifier: ^3.1.3
-        version: 3.1.3
     devDependencies:
       '@blocknote/react':
         specifier: catalog:default

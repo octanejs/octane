@@ -51,6 +51,7 @@ export const KNOWN_BINDINGS = {
 	cmdk: '@octanejs/cmdk',
 	'@lexical/react': '@octanejs/lexical',
 	'@tiptap/react': '@octanejs/tiptap',
+	'@blocknote/react': '@octanejs/blocknote',
 	'react-pdf': '@octanejs/pdf',
 	'@portabletext/react': '@octanejs/portabletext',
 	'@sanity/icons': '@octanejs/sanity-icons',
