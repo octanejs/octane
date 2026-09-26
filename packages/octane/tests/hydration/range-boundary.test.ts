@@ -6,12 +6,14 @@ import * as BehaviorRuntime from 'octane/behavior';
 import { getLeadingHydrationListRange } from 'octane/hydration';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
 import {
+	BoundaryArrayClient,
 	BoundaryClient,
 	BoundaryFailingListClient,
 	BoundaryFailingSuspenseClient,
 	BoundaryListClient,
 	BoundaryNestedListClient,
 	BoundaryPendingHeadClient,
+	BoundarySuspendingArrayClient,
 	BoundarySuspendingListClient,
 } from './_fixtures/range-boundary.tsrx';
 
@@ -228,6 +230,71 @@ describe('hydration range boundary', () => {
 			expect(portalTarget.textContent).toBe('');
 			expect(container.contains(style)).toBe(true);
 			root.unmount();
+		});
+	}
+
+	for (const [suspendTail, withinSuspense, directOwner] of [
+		[false, false, false],
+		[false, false, true],
+		[true, false, false],
+		[true, true, false],
+		[true, true, true],
+	]) {
+		it(`hydrates ${directOwner ? 'a keyed owner item' : 'an owner'} in a bare array beside client-only content${suspendTail ? ` that suspends ${withinSuspense ? 'within Suspense' : 'at the root'}` : ''}`, async () => {
+			container.innerHTML = ServerRuntime.renderToString(server.ServerListSelection).html;
+			const button = container.querySelector('#range-boundary-counter') as HTMLButtonElement;
+			let resolve!: () => void;
+			const deferred = suspendTail
+				? {
+						ready: false,
+						promise: new Promise<void>((done) => {
+							resolve = done;
+						}),
+					}
+				: undefined;
+			const errors: unknown[] = [];
+			const client = withinSuspense ? BoundarySuspendingArrayClient : BoundaryArrayClient;
+			const root = hydrateRoot(
+				container,
+				client,
+				{ portalTarget, deferred, directOwner },
+				{ onRecoverableError: (error) => errors.push(error) },
+			);
+			flushSync(() => {});
+			expect([...container.querySelectorAll('#range-boundary-counter')]).toEqual([button]);
+			if (deferred !== undefined) {
+				expect(container.querySelector('#range-boundary-tail')).toBeNull();
+				await act(() => {
+					deferred.ready = true;
+					resolve();
+				});
+			}
+			expect(errors).toEqual([]);
+			expect([...container.querySelectorAll('#range-boundary-counter')]).toEqual([button]);
+			expect(container.querySelectorAll('#range-boundary-tail')).toHaveLength(1);
+			expect(container.querySelector('#range-boundary-tail')?.textContent).toBe('tail');
+			expect(portalTarget.querySelector('#range-boundary-portal')?.textContent).toBe('portal');
+			expect(portalTarget.querySelector('#range-boundary-portal-after')?.textContent).toBe('after');
+			flushSync(() => button.click());
+			expect(button.textContent?.trim()).toBe('count 1');
+
+			flushSync(() =>
+				root.render(client, {
+					portalTarget,
+					directOwner,
+					order: ['portal', 'after', 'body', 'head'],
+				}),
+			);
+			expect([...container.querySelectorAll('#range-boundary-counter')]).toEqual([button]);
+			expect(container.querySelectorAll('#range-boundary-tail')).toHaveLength(1);
+			expect(button.textContent?.trim()).toBe('count 1');
+			flushSync(() => root.render(client, { portalTarget, directOwner, order: ['body'] }));
+			expect([...container.querySelectorAll('#range-boundary-counter')]).toEqual([button]);
+			expect(container.querySelector('#range-boundary-tail')).toBeNull();
+			expect(portalTarget.textContent).toBe('');
+			root.unmount();
+			expect(container.querySelector('#range-boundary-counter')).toBeNull();
+			expect(container.textContent).toBe('');
 		});
 	}
 

@@ -33627,6 +33627,11 @@ export function childSlot(
 				  })
 				| null
 		)?.[HYDRATION_RANGE_BOUNDARY] !== 'owner';
+	// Reaching the selected owner through a value slot (for example a keyed list
+	// item) ends passthrough exactly as componentSlot does, so later siblings and
+	// boundaries know the server cursor has been handed off.
+	if (hydration?.passthroughRanges === true && !hydrationTransparent)
+		hydration.passthroughRanges = false;
 	const iterable = iterableChildArray(value);
 	if (iterable !== null) value = iterable;
 	const preparedList =
@@ -35907,9 +35912,10 @@ function mountPassthroughCatch(
 	try {
 		const hydration = activeHydration();
 		if (freshFallback && hydration !== null) {
-			const last = (STAGED_DOM?.view(state.domParent) ?? state.domParent).lastChild;
+			const parent = state.domParent;
+			const last = (STAGED_DOM?.view(parent) ?? parent).lastChild;
 			hydration.suspend(() => renderBlock(block));
-			let node = last !== null ? getNextSibling(last) : getFirstChild(state.domParent);
+			let node = last !== null ? getNextSibling(last) : getFirstChild(parent);
 			while (node !== null) {
 				hydration.markFresh(node);
 				node = getNextSibling(node);
@@ -42279,11 +42285,11 @@ function mountPassthroughListItem<T>(
 	block.key = key;
 	block.itemIndex = index;
 	preserveRootCreatedDom(block);
+	const fresh = cursor === null || cursor === anchor || hydration.isFresh(cursor);
 	const previousPassthrough = hydration.passthroughRanges;
 	hydration.passthroughRanges = true;
 	try {
-		if (cursor === null || cursor === anchor || hydration.isFresh(cursor))
-			hydration.suspend(() => renderBlock(block));
+		if (fresh) hydration.suspend(() => renderBlock(block));
 		else renderBlock(block);
 	} catch (error) {
 		if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
@@ -42310,6 +42316,14 @@ function mountPassthroughListItem<T>(
 	hydration.node = getNextSibling(end);
 	hydration.markFresh(start);
 	hydration.markFresh(end);
+	// A client-only item's content is not stale server remainder for finishRoot().
+	if (fresh)
+		for (
+			let node = getNextSibling(start);
+			node !== null && node !== end;
+			node = getNextSibling(node)
+		)
+			hydration.markFresh(node);
 	return block;
 }
 

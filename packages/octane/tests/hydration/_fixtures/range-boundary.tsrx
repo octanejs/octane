@@ -14,10 +14,6 @@ interface ChildProps {
 	key?: string;
 }
 
-// The createElement runtime accepts null config, but its TypeScript signature
-// currently describes only the component's props or undefined.
-type EmptyConfig = ChildProps;
-
 interface Deferred {
 	ready: boolean;
 	promise: Promise<void>;
@@ -36,6 +32,13 @@ interface ListProps {
 	failOwner?: boolean;
 	failAfterOwner?: boolean;
 	pair?: boolean;
+}
+
+interface ArrayProps {
+	portalTarget: Element;
+	order?: ('head' | 'body' | 'after' | 'portal')[];
+	deferred?: Deferred;
+	directOwner?: boolean;
 }
 
 interface NestedListProps {
@@ -110,7 +113,7 @@ export function ServerListSelection() {
 }
 
 export function ServerPartialOwner() {
-	return createElement(Passthrough, null as unknown as EmptyConfig, createElement(Interactive));
+	return createElement(Passthrough, {}, createElement(Interactive));
 }
 
 export function ServerPairSelection() {
@@ -149,12 +152,7 @@ export function BoundaryListClient(props: ListProps) {
 			BoundaryHost,
 			{ key: 'body' },
 			props.failAfterOwner
-				? createElement(
-						Passthrough,
-						null as unknown as EmptyConfig,
-						createElement(Interactive),
-						createElement(ThrowingContent),
-					)
+				? createElement(Passthrough, {}, createElement(Interactive), createElement(ThrowingContent))
 				: createElement(
 						props.failOwner
 							? ThrowingContent
@@ -171,12 +169,69 @@ export function BoundaryListClient(props: ListProps) {
 	};
 	return createElement(
 		Passthrough,
-		null as unknown as EmptyConfig,
+		{},
 		...(props.order ?? ['head', 'body', 'after']).map((key) => children[key]),
 	);
 }
 
 BoundaryListClient[HYDRATION_RANGE_BOUNDARY] = 'passthrough';
+
+function DeferredText(props: { deferred?: Deferred }) {
+	if (props.deferred !== undefined && !props.deferred.ready) throw props.deferred.promise;
+	return 'tail';
+}
+
+function Children(props: ChildProps) {
+	return props.children;
+}
+
+function Tail(props: { deferred?: Deferred }) {
+	return createElement(
+		'p',
+		{ id: 'range-boundary-tail' },
+		createElement(DeferredText, { deferred: props.deferred }),
+	);
+}
+
+// A shell may return its logical siblings as a bare array rather than through
+// a fragment's children hole, including client-only host content after the
+// selected owner.
+export function BoundaryArrayClient(props: ArrayProps) {
+	const children = {
+		head: createElement(
+			PortalBridge,
+			{ key: 'head', target: props.portalTarget },
+			createElement('span', { id: 'range-boundary-portal' }, 'portal'),
+		),
+		body: createElement(
+			props.directOwner ? HydrationOwner : BoundaryHost,
+			{ key: 'body' },
+			createElement(Interactive),
+		),
+		after: createElement(Tail, { key: 'after', deferred: props.deferred }),
+		portal: createElement(
+			Children,
+			{ key: 'portal' },
+			createPortal(
+				createElement('span', { id: 'range-boundary-portal-after' }, 'after'),
+				props.portalTarget,
+			),
+		),
+	};
+	return (props.order ?? ['head', 'body', 'after', 'portal']).map((key) => children[key]);
+}
+
+BoundaryArrayClient[HYDRATION_RANGE_BOUNDARY] = 'passthrough';
+
+export function BoundarySuspendingArrayClient(props: ArrayProps) {
+	return createElement(
+		Suspense as ComponentBody<BoundaryConfig>,
+		{ fallback: null },
+		createElement(BoundaryArrayClient, props),
+	);
+}
+
+BoundarySuspendingArrayClient[HYDRATION_RANGE_BOUNDARY] = 'passthrough';
 
 export function BoundaryNestedListClient(props: NestedListProps) {
 	const portal = (key: 'h' | 't' | 'a' | 'b') => createElement(
@@ -200,7 +255,7 @@ export function BoundaryNestedListClient(props: NestedListProps) {
 	};
 	return createElement(
 		Passthrough,
-		null as unknown as EmptyConfig,
+		{},
 		...(props.outer ?? ['h', 'middle', 't']).map((key) => outer[key]),
 	);
 }
@@ -224,7 +279,7 @@ BoundarySuspendingListClient[HYDRATION_RANGE_BOUNDARY] = 'passthrough';
 export function BoundaryPendingHeadClient(props: { portalTarget: Element; deferred: Deferred }) {
 	return createElement(
 		Passthrough,
-		null as unknown as EmptyConfig,
+		{},
 		createElement(
 			Suspense as ComponentBody<BoundaryConfig>,
 			{
