@@ -1,5 +1,15 @@
 # octane
 
+## 0.6.1
+
+### Patch Changes
+
+- 9b6c3a4: Include imported theme styles in server output when `$class` or a class-map entry was captured at module scope or cached during an earlier render. Collect the theme and its dependencies when the class is rendered, preserving request-specific styles, dependency order, and CSP nonces.
+- 1e4f1ee: `createElement` now accepts `null` as its config under `strictNullChecks`, matching React's `props?: P | null` signature. A bare `null` config infers props from the element type alone, and a non-null config still enforces required props. `Fragment`'s props are exported as `FragmentProps` (as in React), so declarations emitted for `createElement(Fragment, null)` reference that type instead of inlining it.
+- 5a05767: Preserve and activate server-rendered content when a document shell hydrates a selected owner alongside portal siblings.
+- e813fc0: Prevent ReactCompat host elements from adding a layout box around React content.
+- 211144a: Collect applied theme dependencies before a stylesheet first enters a server response, including when a component and its extending theme share a module. This preserves base-before-override CSS order and includes base-defined CSS variables for captured class-map entries.
+
 ## 0.6.0
 
 ### Minor Changes
