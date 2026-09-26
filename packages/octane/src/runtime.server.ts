@@ -505,6 +505,17 @@ function newStyleCollector(): StyleCollector {
 	return collector;
 }
 let CSS: StyleCollector | null = null;
+interface RegisteredStyle {
+	id: string;
+	css: string;
+	classes: string;
+	applied: string[] | null;
+}
+// Class strings can outlive their map or the render which read it. Keep only
+// static stylesheet data here, never proxies, request props, or touch closures.
+// Recreating a component-local map replaces its hash entry, so retention is
+// bounded by compiled style scopes rather than the number of requests.
+let REGISTERED_STYLES: Map<string, RegisteredStyle> | undefined;
 // Pre-escaped ` nonce="..."` fragment for renderer-owned inline tags emitted
 // during the active pass. Saved/restored with every other ambient so nested or
 // concurrent server renders cannot leak a CSP nonce across requests.
@@ -3088,7 +3099,9 @@ export function ssrAttr(
 	// compose emits `class=""`, matching `el.className = ''`).
 	if (name === 'class') {
 		if (v == null || v === false) return '';
-		return ' class="' + escapeAttr(normalizeClass(v)) + '"';
+		const classes = normalizeClass(v);
+		if (REGISTERED_STYLES !== undefined && CSS !== null) collectClassStyles(classes, CSS);
+		return ' class="' + escapeAttr(classes) + '"';
 	}
 	// `aria-*` attributes are ENUMERATED (React parity): `false` serialises as "false"
 	// and `true` as "true"; only null/undefined drops them.
@@ -7796,7 +7809,8 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
  * or imported, each a wrapper of its own, so a chain injects transitively in
  * "applied before applier" order and each sheet once). A body-less bundle
  * (`<style apply={[a, b]} />`) has no sheet — `id` and `css` are `null` — and
- * only forwards the touch. Reads outside a render are no-ops.
+ * only forwards the touch. Reads outside a render do not inject anything;
+ * serializing a captured class string collects its registered sheets instead.
  */
 export function styleMap<T extends object>(
 	id: string | null,
@@ -7804,6 +7818,21 @@ export function styleMap<T extends object>(
 	map: T,
 	applied: ReadonlyArray<unknown> = [],
 ): T {
+	if (id !== null && css !== null) {
+		// The compiler's plain map literal already carries the complete applied
+		// chain in $class, in cascade order. Reuse it without retaining or reading
+		// dependency proxies, and reuse the record for repeated local declarations.
+		const classes = applied.length === 0 ? id : (map as { $class: string }).$class;
+		const previous = REGISTERED_STYLES?.get(id);
+		if (previous === undefined || previous.css !== css || previous.classes !== classes) {
+			(REGISTERED_STYLES ??= new Map()).set(id, {
+				id,
+				css,
+				classes,
+				applied: classes === id ? null : classes.split(' '),
+			});
+		}
+	}
 	let touching = false;
 	const touch = () => {
 		if (CSS === null || touching) return;
@@ -7821,6 +7850,43 @@ export function styleMap<T extends object>(
 			return Reflect.get(target, key, receiver);
 		},
 	});
+}
+
+function collectRegisteredStyle(style: RegisteredStyle, collector: StyleCollector): void {
+	// Preserve an explicit write (including its nonce) and the first insertion
+	// order. Normal proxy reads have already collected the dependency chain.
+	if (collector.has(style.id)) return;
+	if (style.applied !== null) {
+		for (const hash of style.applied) {
+			if (hash === style.id) continue;
+			const dependency = REGISTERED_STYLES!.get(hash);
+			if (dependency !== undefined && !collector.has(hash)) injectStyle(hash, dependency.css);
+		}
+	}
+	injectStyle(style.id, style.css);
+}
+
+function classWhitespace(code: number): boolean {
+	return code === 32 || code === 9 || code === 10 || code === 12 || code === 13;
+}
+
+function collectClassStyles(classes: string, collector: StyleCollector): void {
+	// Ordinary classes need only the prefix search. Inspect complete HTML class
+	// tokens: a substring of an authored class is not a scoped-style carrier.
+	let start = classes.indexOf('tsrx-');
+	if (start === 0 && collector.has(classes)) return;
+	while (start !== -1) {
+		let end = start + 5;
+		if (start === 0 || classWhitespace(classes.charCodeAt(start - 1))) {
+			while (end < classes.length && !classWhitespace(classes.charCodeAt(end))) end++;
+			const hash = classes.slice(start, end);
+			if (!collector.has(hash)) {
+				const style = REGISTERED_STYLES!.get(hash);
+				if (style !== undefined) collectRegisteredStyle(style, collector);
+			}
+		}
+		start = classes.indexOf('tsrx-', end);
+	}
 }
 
 /**

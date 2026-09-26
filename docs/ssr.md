@@ -237,8 +237,10 @@ optional `head` and `signals` fields:
   request rendered: a component contributes one tag per children list that
   holds a `<style>` block (its output fragment, nested elements, the fragments
   of nested `@{ … }` blocks and control-flow branches, assigned templates), and
-  an assigned theme block contributes its own. Only components
-  the render actually executed inject, in lexical pre-order. Place inside
+  an assigned theme block contributes its own. Rendering a captured theme class
+  also collects that theme's CSS and applied dependencies, even if the class
+  was read at module scope or cached during an earlier request. Unused imported
+  themes do not add sheets to a response. Components inject in lexical pre-order. Place inside
   `<head>`. The client skips re-injecting any hash already present. (Kept as its
   own field because Octane has scoped CSS that React core does not.)
 
