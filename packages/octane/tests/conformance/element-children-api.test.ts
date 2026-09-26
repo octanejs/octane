@@ -720,7 +720,7 @@ describe('ReactCreateElement public behavior', () => {
 
 	// Per ReactCreateElement-test.js:274.
 	it('merges rest arguments onto the children prop in an array', () => {
-		const children = createElement(Component, null as any, 1, 2, 3).props.children as any[];
+		const children = createElement(Component, null, 1, 2, 3).props.children as any[];
 		expect(children).toEqual([1, 2, 3]);
 		expect(Object.isFrozen(children)).toBe(true);
 	});
@@ -848,7 +848,7 @@ describe('ReactElementClone public behavior', () => {
 	// Per ReactElementClone-test.js:140 and :154.
 	it('should transfer children', () => {
 		const child = createElement('span', null, 'xyz');
-		const original = createElement(Composite, null as any, child);
+		const original = createElement(Composite, null, child);
 		const clone = cloneElement(original, {});
 		expect(clone.props.children).toBe(child);
 		expect(cloneElement(original, { children: 'next' }).props.children).toBe('next');
@@ -857,14 +857,14 @@ describe('ReactElementClone public behavior', () => {
 	// Per ReactElementClone-test.js:154.
 	it('should shallow clone children', () => {
 		const child = createElement('span', null, 'xyz');
-		const clone = cloneElement(createElement(Composite, null as any, child), {});
+		const clone = cloneElement(createElement(Composite, null, child), {});
 		expect(clone.props.children).toBe(child);
 	});
 
 	// Per ReactElementClone-test.js:168.
 	it('should accept children as rest arguments', () => {
 		const clone = cloneElement(
-			createElement(Composite, null as any, 'old'),
+			createElement(Composite, null, 'old'),
 			{ children: 'config' },
 			createElement('div'),
 			createElement('span'),
@@ -1008,10 +1008,7 @@ describe('ReactElementValidator portable outcomes', () => {
 			return props.children;
 		}
 		const warnings = missingKeyWarnings(() => {
-			const value = createElement(Passthrough, null as any, [
-				createElement('i'),
-				createElement('b'),
-			]);
+			const value = createElement(Passthrough, null, [createElement('i'), createElement('b')]);
 			const result = mount(RenderValue as any, { value });
 			result.unmount();
 		});
