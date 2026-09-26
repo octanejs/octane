@@ -21760,15 +21760,22 @@ type FragmentRefValue =
 	| readonly FragmentRefValue[]
 	| null;
 
+/**
+ * Props accepted by `<Fragment>` (React's `FragmentProps`, plus `key` and
+ * fragment refs). Named so declaration emit can reference it instead of
+ * expanding the recursive ref type inline.
+ */
+export interface FragmentProps {
+	children?: unknown;
+	key?: string | number | bigint | null | undefined;
+	ref?: FragmentRefValue;
+}
+
 // The VALUE stays the sentinel symbol (the compiler matches `Fragment` by
 // name and the runtime compares descriptor types by identity); the declared
 // TYPE is component-shaped so long-form `<Fragment key ref>` JSX type-checks —
 // which is the export's entire purpose (see above).
-export const Fragment = FRAGMENT_TAG as unknown as (props: {
-	children?: unknown;
-	key?: string | number | bigint | null | undefined;
-	ref?: FragmentRefValue;
-}) => unknown;
+export const Fragment = FRAGMENT_TAG as unknown as (props: FragmentProps) => unknown;
 
 interface ActivityDescriptorDispatch {
 	type: symbol;
@@ -28983,7 +28990,7 @@ function scopedValueDescriptor<P>(resolve: () => ElementDescriptor<P>): ElementD
  */
 export function createScopedElement<P>(
 	type: ComponentBody<P> | string | typeof Fragment,
-	props: P | undefined,
+	props: P | null | undefined,
 	readChildren: () => unknown,
 	invocationSite?: string,
 ): ElementDescriptor<P> {
@@ -28993,7 +29000,7 @@ export function createScopedElement<P>(
 /** @internal Resolve native children in their represented render Scope. */
 export function nativeCreateScopedElement<P>(
 	type: ComponentBody<P> | string | typeof Fragment,
-	props: P | undefined,
+	props: P | null | undefined,
 	readChildren: () => unknown,
 	invocationSite?: string,
 ): ElementDescriptor<P> {
@@ -29007,7 +29014,7 @@ export function nativeCreateScopedElement<P>(
 
 function scopedElementDescriptor<P>(
 	type: ComponentBody<P> | string | typeof Fragment,
-	props: P | undefined,
+	props: P | null | undefined,
 	children: () => unknown,
 	invocationSite?: string,
 ): ElementDescriptor<P> {
@@ -29038,10 +29045,22 @@ function scopedElementDescriptor<P>(
 // (`createElement(Comp, props)`) stay the component-value form the compiler emits
 // for `{<Comp/>}`. With a string `type` and/or explicit children it produces a
 // host descriptor for the runtime de-opt renderer. `key` is lifted out of props
-// (React semantics — `key` is never a real prop).
+// (React semantics — `key` is never a real prop). A `null` config is React's
+// "no props" spelling; its overload infers `P` from `type` alone so a bare
+// `null` never becomes the descriptor's props type.
 export function createElement<P>(
 	type: ComponentBody<P> | string | typeof Fragment,
-	props?: P,
+	props: null,
+	...children: any[]
+): ElementDescriptor<P>;
+export function createElement<P>(
+	type: ComponentBody<P> | string | typeof Fragment,
+	props?: P | null,
+	...children: any[]
+): ElementDescriptor<P>;
+export function createElement<P>(
+	type: ComponentBody<P> | string | typeof Fragment,
+	props?: P | null,
 	...children: any[]
 ): ElementDescriptor<P> {
 	return createElementFromConfig(undefined, type, props, children);
@@ -29051,7 +29070,7 @@ export function createElement<P>(
 export function createElementAt<P>(
 	invocationSite: string,
 	type: ComponentBody<P> | string | typeof Fragment,
-	props?: P,
+	props?: P | null,
 	...children: any[]
 ): ElementDescriptor<P> {
 	return createElementFromConfig(invocationSite, type, props, children);
@@ -29061,7 +29080,7 @@ export function createElementAt<P>(
 export function createElementFromConfig<P>(
 	invocationSite: string | undefined,
 	type: ComponentBody<P> | string | typeof Fragment,
-	props: P | undefined,
+	props: P | null | undefined,
 	children: any[] = EMPTY_ARGS,
 ): ElementDescriptor<P> {
 	if (typeof type === 'function' && isRendererContext(type)) {

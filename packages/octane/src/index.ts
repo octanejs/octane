@@ -101,6 +101,7 @@ export {
 	type ViewTransitionProps,
 	type ViewTransitionInstance,
 	Fragment,
+	type FragmentProps,
 	createPortal,
 	type PortalDescriptor,
 	// Elements

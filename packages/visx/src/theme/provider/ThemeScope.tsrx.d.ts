@@ -17,7 +17,7 @@ interface EmittingThemeScopeProps extends BaseThemeScopeProps {
     as?: ThemeScopeElement;
 }
 export type ThemeScopeProps = AutoThemeScopeProps | EmittingThemeScopeProps;
-export default function ThemeScope({ as, children, className, style, theme, }: ThemeScopeProps): import("octane").ElementDescriptor<null> | import("octane").ElementDescriptor<{
+export default function ThemeScope({ as, children, className, style, theme, }: ThemeScopeProps): import("octane").ElementDescriptor<import("octane").FragmentProps> | import("octane").ElementDescriptor<{
     className: string | undefined;
     style: CSSVarStyle | undefined;
 }>;
