@@ -5,5 +5,5 @@ interface LinkSafetyModalProps {
     onConfirm: () => void;
     url: string;
 }
-export declare const LinkSafetyModal: ({ url, isOpen, onClose, onConfirm }: LinkSafetyModalProps) => import("octane/jsx-runtime").Octane.JSX.Element | null;
+export declare const LinkSafetyModal: ({ url, isOpen, onClose, onConfirm }: LinkSafetyModalProps) => import("octane/jsx-runtime").JSX.Element | null;
 export {};

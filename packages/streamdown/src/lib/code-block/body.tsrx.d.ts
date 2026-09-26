@@ -8,5 +8,8 @@ type CodeBlockBodyProps = ComponentProps<'div'> & {
     /** Show line numbers in code blocks. @default true */
     lineNumbers?: boolean;
 };
-export declare const CodeBlockBody: import("octane").ComponentBody<CodeBlockBodyProps, any>;
+export declare const CodeBlockBody: (({ children, result, language, className, startLine, lineNumbers, ...rest }: CodeBlockBodyProps) => import("octane/jsx-runtime").JSX.Element) & {
+    readonly type: ({ children, result, language, className, startLine, lineNumbers, ...rest }: CodeBlockBodyProps) => import("octane/jsx-runtime").JSX.Element;
+    displayName?: string;
+};
 export {};

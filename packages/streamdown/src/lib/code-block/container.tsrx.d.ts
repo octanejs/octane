@@ -6,5 +6,5 @@ type CodeBlockContainerProps = Omit<ComponentProps<'div'>, 'style'> & {
     /** Whether the code block is still being streamed (incomplete) */
     isIncomplete?: boolean;
 };
-export declare const CodeBlockContainer: ({ className, language, style, isIncomplete, ...props }: CodeBlockContainerProps) => import("octane/jsx-runtime").Octane.JSX.Element;
+export declare const CodeBlockContainer: ({ className, language, style, isIncomplete, ...props }: CodeBlockContainerProps) => import("octane/jsx-runtime").JSX.Element;
 export {};
