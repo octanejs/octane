@@ -8,5 +8,5 @@ type HighlightedCodeBlockBodyProps = HTMLAttributes<HTMLDivElement> & {
     startLine?: number;
     lineNumbers?: boolean;
 };
-export declare const HighlightedCodeBlockBody: ({ code, language, raw, className, startLine, lineNumbers, ...rest }: HighlightedCodeBlockBodyProps) => import("octane/jsx-runtime").Octane.JSX.Element;
+export declare const HighlightedCodeBlockBody: ({ code, language, raw, className, startLine, lineNumbers, ...rest }: HighlightedCodeBlockBodyProps) => import("octane/jsx-runtime").JSX.Element;
 export {};
