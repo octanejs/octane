@@ -7795,6 +7795,19 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
 		// Repeated component/theme styles leave the replay generation unchanged.
 		// Changed CSS or nonce still replaces the sheet without moving its order.
 		if (previous !== undefined && previous.css === css && previous.nonce === nonce) return;
+		if (previous === undefined) {
+			// Compiled component preludes can inject a module's assigned sheet
+			// before its map is read. Collect its registered dependencies first:
+			// an existing collector entry must mean the entire chain is present.
+			const applied = REGISTERED_STYLES?.get(id)?.applied;
+			if (applied != null) {
+				for (const hash of applied) {
+					if (hash === id || CSS.has(hash)) continue;
+					const dependency = REGISTERED_STYLES!.get(hash);
+					if (dependency !== undefined) injectStyle(hash, dependency.css);
+				}
+			}
+		}
 		CSS.replay = null;
 		CSS.set(id, nonce === undefined ? { css } : { css, nonce });
 	}
@@ -7852,20 +7865,6 @@ export function styleMap<T extends object>(
 	});
 }
 
-function collectRegisteredStyle(style: RegisteredStyle, collector: StyleCollector): void {
-	// Preserve an explicit write (including its nonce) and the first insertion
-	// order. Normal proxy reads have already collected the dependency chain.
-	if (collector.has(style.id)) return;
-	if (style.applied !== null) {
-		for (const hash of style.applied) {
-			if (hash === style.id) continue;
-			const dependency = REGISTERED_STYLES!.get(hash);
-			if (dependency !== undefined && !collector.has(hash)) injectStyle(hash, dependency.css);
-		}
-	}
-	injectStyle(style.id, style.css);
-}
-
 function classWhitespace(code: number): boolean {
 	return code === 32 || code === 9 || code === 10 || code === 12 || code === 13;
 }
@@ -7882,7 +7881,7 @@ function collectClassStyles(classes: string, collector: StyleCollector): void {
 			const hash = classes.slice(start, end);
 			if (!collector.has(hash)) {
 				const style = REGISTERED_STYLES!.get(hash);
-				if (style !== undefined) collectRegisteredStyle(style, collector);
+				if (style !== undefined) injectStyle(style.id, style.css);
 			}
 		}
 		start = classes.indexOf('tsrx-', end);

@@ -720,7 +720,10 @@ block's sheet joins the request when the block is read: on the server the
 class-map object injects its CSS (after the CSS of the themes it applies) on
 property access, and a component that applies an imported theme touches it
 before its own sheets, so a theme from another module still precedes the scope
-that applies it. Hydration matches the server's `<style data-octane="hash">`
+that applies it. When a component injects a registered assigned sheet directly,
+its applied dependencies are collected first too, including when the theme and
+component share a module and the class was captured before rendering.
+Hydration matches the server's `<style data-octane="hash">`
 tags by hash and never re-injects them.
 
 ### `<style href precedence>`

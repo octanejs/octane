@@ -40,6 +40,21 @@ const themeFixture = compile(
 	{ mode: 'server', hmr: false },
 ).code;
 fs.writeFileSync(path.join(temp, 'theme.js'), themeFixture);
+const appliedBase = compile(
+	'export const base = <style>span { color: red; }</style>;',
+	'runtime-style-dedup-base.tsrx',
+	{ mode: 'server', hmr: false },
+).code;
+const appliedFixture = compile(
+	`import { base } from './applied-base.js';
+	export const theme = <style apply={base}>.row { color: blue; }</style>;
+	const row = theme.row;
+	export function AppliedLeaf(p) @{ <span class={row}>{p.index as string}</span> }`,
+	'runtime-style-dedup-applied.tsrx',
+	{ mode: 'server', hmr: false },
+).code;
+fs.writeFileSync(path.join(temp, 'applied-base.js'), appliedBase);
+fs.writeFileSync(path.join(temp, 'applied.js'), appliedFixture);
 
 function instrument(source) {
 	const write = 'CSS.set(id, nonce === undefined ? { css } : { css, nonce });';
@@ -61,7 +76,7 @@ async function bundle(root, observed, label) {
 	);
 	const output = await build({
 		stdin: {
-			contents: `export * from ${JSON.stringify(path.join(root, 'packages/octane/src/server/index.ts'))}; export * as fixture from ${JSON.stringify(path.join(temp, 'fixture.js'))}; export { registerTheme } from ${JSON.stringify(path.join(temp, 'theme.js'))};`,
+			contents: `export * from ${JSON.stringify(path.join(root, 'packages/octane/src/server/index.ts'))}; export * as fixture from ${JSON.stringify(path.join(temp, 'fixture.js'))}; export { registerTheme } from ${JSON.stringify(path.join(temp, 'theme.js'))}; export * as applied from ${JSON.stringify(path.join(temp, 'applied.js'))};`,
 			resolveDir: repo,
 			sourcefile: 'style-entry.js',
 		},
@@ -110,6 +125,14 @@ async function bundle(root, observed, label) {
 
 function workload(rt, mode, count, seeds) {
 	const { createElement: h } = rt;
+	if (mode === 'applied-class' || mode === 'applied-class-touch') {
+		const rows = Array.from({ length: count }, (_, index) => h(rt.applied.AppliedLeaf, { index }));
+		return () =>
+			rt.renderToString(() => {
+				if (mode === 'applied-class-touch') void rt.applied.theme.$class;
+				return h('main', null, rows);
+			});
+	}
 	if (
 		mode === 'plain-class' ||
 		mode === 'theme-class' ||
@@ -153,6 +176,16 @@ function workload(rt, mode, count, seeds) {
 function check(result, mode, count, seeds) {
 	assert.equal((result.html.match(/<span(?: |>)/g) || []).length, count, 'all rows render');
 	for (let i = 0; i < count; i++) assert.ok(result.html.includes('>' + i + '</span>'), 'row text');
+	if (mode === 'applied-class') {
+		assert.equal((result.css.match(/<style /g) || []).length, 2, 'base and extending sheets');
+		assert.ok(result.css.includes('color: red;'), 'applied base survives');
+		assert.ok(result.css.includes('color: blue;'), 'extending theme survives');
+		assert.ok(
+			result.css.indexOf('color: red;') < result.css.indexOf('color: blue;'),
+			'base precedes override',
+		);
+		return;
+	}
 	const sheets = [
 		...result.css.matchAll(/<style data-octane="([^"]+)"([^>]*)>([\s\S]*?)<\/style>/g),
 	];
@@ -218,6 +251,7 @@ try {
 		['registered-theme-classes', 'theme-class', 128],
 		['captured-theme-classes', 'captured-class', 128],
 		['component-local-themes', 'local-theme', 128],
+		['same-module-applied-classes', 'applied-class', 128],
 	]) {
 		const render = workload(clean.runtime, mode, count, seeds);
 		const expected = render();
@@ -236,7 +270,11 @@ try {
 			// equivalent CSS; compare captured strings against that working control.
 			const renderBaseline = workload(
 				baseline.runtime,
-				mode === 'captured-class' ? 'theme-class' : mode,
+				mode === 'captured-class'
+					? 'theme-class'
+					: mode === 'applied-class'
+						? 'applied-class-touch'
+						: mode,
 				count,
 				seeds,
 			);
@@ -282,7 +320,7 @@ try {
 			v8: process.versions.v8,
 			platform: process.platform,
 			arch: process.arch,
-			fixtureHash: hash(fixture + themeFixture),
+			fixtureHash: hash(fixture + themeFixture + appliedBase + appliedFixture),
 			candidate: metadata(clean),
 			...(baseline === null ? {} : { baseline: metadata(baseline) }),
 		},
