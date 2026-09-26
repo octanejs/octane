@@ -1,7 +1,9 @@
-import { readFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { readdir, readFile } from 'node:fs/promises';
+import { basename, dirname, resolve } from 'node:path';
 import { build } from 'esbuild';
 import { createOctaneCompiler } from '../../packages/octane/src/compiler/bundler.js';
+
+const resolveExtensions = ['.tsrx', '.tsx', '.ts', '.jsx', '.js', '.json'];
 
 /** Compile an authored fixture and its binding imports against the server runtime. */
 export function octaneServerFixtures(root) {
@@ -29,13 +31,23 @@ export function octaneServerFixtures(root) {
 				platform: 'node',
 				target: 'esnext',
 				external: ['octane', 'octane/*'],
-				resolveExtensions: ['.tsrx', '.tsx', '.ts', '.jsx', '.js', '.json'],
+				resolveExtensions,
 				// Stylesheet imports have no server output; the client build owns them.
 				loader: { '.css': 'empty' },
 				plugins: [
 					{
 						name: 'octane-server-compile',
 						setup(builder) {
+							// esbuild matches directory entries case-insensitively, so `./link`
+							// would resolve to `Link.tsrx` before `link.ts`. Prefer exact names.
+							builder.onResolve({ filter: /^\.\.?\// }, async ({ path, resolveDir }) => {
+								const target = resolve(resolveDir, path);
+								const name = basename(target);
+								const entries = await readdir(dirname(target)).catch(() => null);
+								if (entries === null || entries.includes(name)) return;
+								const extension = resolveExtensions.find((ext) => entries.includes(name + ext));
+								if (extension !== undefined) return { path: target + extension };
+							});
 							builder.onLoad({ filter: /\.(?:tsrx|tsx|ts|jsx|js)$/ }, async ({ path }) => {
 								const source = await readFile(path, 'utf8');
 								const transformed = compiler.transform(source, path, {
