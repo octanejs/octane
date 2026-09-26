@@ -283,7 +283,8 @@ export function installStreamedRendererGlobal(
 		}
 		openResults.clear();
 		if (target[STREAMED_RENDERER_RECEIVER] !== entrypoint) return;
-		delete target[STREAMED_RENDERER_RECEIVER];
+		if (previous === undefined) delete target[STREAMED_RENDERER_RECEIVER];
+		else Object.defineProperty(target, STREAMED_RENDERER_RECEIVER, previous);
 	};
 }
 

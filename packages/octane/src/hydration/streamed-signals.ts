@@ -271,13 +271,17 @@ function bootstrapStreamedSignals<Receiver extends StreamedResultReceiver>(
 		uninstallOwnerActivator();
 		for (const selection of selections.values()) selection.detach?.();
 		const ownsIngress = target.__octaneStreamedRenderer === installedRenderer;
-		uninstallDelivery();
 		if (!restore && ownsIngress) {
-			// Uninstall restores the pre-module descriptor. Do not allow late
-			// parser calls to refill that mailbox after a BFCache freeze.
-			target.__octaneStreamedRenderer = { receive() {} };
+			// Replace our configurable entrypoint before uninstall so late parser
+			// calls cannot refill the prior mailbox after a BFCache freeze.
+			Object.defineProperty(target, '__octaneStreamedRenderer', {
+				value: { receive() {} },
+				configurable: true,
+				writable: true,
+			});
 			if (earlyRenderer) earlyRenderer.frames.length = 0;
 		}
+		uninstallDelivery();
 		selections.clear();
 		owners.clear();
 		receiver.dispose();

@@ -139,6 +139,77 @@ it('automatically publishes a rendered query attempt after the pre-module receiv
 	container.remove();
 });
 
+it.each(
+	(['results', 'hydration'] as const).flatMap((mode) =>
+		(['dispose', 'suspend'] as const).map((ending) => ({ mode, ending })),
+	),
+)(
+	'keeps a safe parser receiver when the $mode bridge uses $ending before its response ends',
+	async ({ mode, ending }) => {
+		enableServerSignalBindings();
+		const result = deferred<string>();
+		const value$ = __queryAt(
+			`g:closed-stream-query-${mode}-${ending}`,
+			() => 'key',
+			() => result.promise,
+		);
+		const stream = await renderToReadableStream(
+			() => `<p>${value$.snapshot().status}</p>`,
+			undefined,
+			{
+				streamedSignals: { buildId: 'closed-build', documentId: 'closed-document' },
+			},
+		);
+		const reader = stream.getReader();
+		let bridge: ReturnType<typeof bootstrapStreamedSignalResults> | undefined;
+		try {
+			let shell = '';
+			while (!shell.includes('v.register(')) {
+				const chunk = await reader.read();
+				if (chunk.done) throw new Error('The stream ended before announcing its selection');
+				shell += new TextDecoder().decode(chunk.value);
+			}
+			const target = streamedTarget(shell);
+			const mailbox = target.__octaneStreamedRenderer as {
+				frames: unknown[];
+				receive(frame: unknown): void;
+			};
+			Object.defineProperty(target, '__octaneStreamedRenderer', {
+				value: mailbox,
+				configurable: true,
+				enumerable: true,
+				writable: false,
+			});
+			bridge = (
+				mode === 'results' ? bootstrapStreamedSignalResults : bootstrapStreamedSignalHydration
+			)({
+				buildId: 'closed-build',
+				documentId: 'closed-document',
+				signalOwner: { scopeKey: 'octane:document' },
+				target,
+			});
+			bridge[ending]();
+			result.resolve('late server result');
+			let tail = '';
+			for (;;) {
+				const chunk = await reader.read();
+				if (chunk.done) break;
+				tail += new TextDecoder().decode(chunk.value);
+			}
+			const frames = streamedFrames(tail);
+			expect(frames.map((frame) => frame.kind)).toContain('value');
+			expect(frames.map((frame) => frame.kind)).toContain('complete');
+			for (const frame of frames)
+				(target.__octaneStreamedRenderer as { receive(frame: unknown): void }).receive(frame);
+			expect(mailbox.frames).toEqual(ending === 'dispose' ? frames : []);
+		} finally {
+			result.resolve('cleanup');
+			bridge?.dispose();
+			await reader.cancel();
+		}
+	},
+);
+
 it('releases 32 staggered query regions without waiting for earlier siblings', async () => {
 	enableServerSignalBindings();
 	const pending = Array.from({ length: 32 }, () => deferred<string>());

@@ -268,6 +268,68 @@ describe('streamed renderer delivery', () => {
 		receiver.dispose();
 	});
 
+	it('restores an existing pre-module mailbox after its receiver is uninstalled', () => {
+		const receiver = createStreamedRegionReceiver({
+			buildId: 'build',
+			documentId: 'document',
+			ownerKey: 'owner',
+		});
+		const frames: unknown[] = [];
+		const mailbox = {
+			version: 1,
+			frames,
+			receive(frame: unknown) {
+				frames.push(frame);
+			},
+		};
+		const realm: Record<string, unknown> = {};
+		Object.defineProperty(realm, '__octaneStreamedRenderer', {
+			value: mailbox,
+			configurable: true,
+			enumerable: true,
+			writable: false,
+		});
+		const original = Object.getOwnPropertyDescriptor(realm, '__octaneStreamedRenderer');
+		const uninstall = installStreamedRendererGlobal(receiver, realm);
+		try {
+			uninstall();
+			const late = { frame: 'late' };
+			(realm.__octaneStreamedRenderer as StreamedRendererGlobal).receive(late);
+			expect(frames).toEqual([late]);
+			expect(Object.getOwnPropertyDescriptor(realm, '__octaneStreamedRenderer')).toEqual(original);
+			uninstall();
+			expect(Object.getOwnPropertyDescriptor(realm, '__octaneStreamedRenderer')).toEqual(original);
+		} finally {
+			uninstall();
+			receiver.dispose();
+		}
+	});
+
+	it('does not overwrite a receiver installed by another owner during teardown', () => {
+		const receiver = createStreamedRegionReceiver({
+			buildId: 'build',
+			documentId: 'document',
+			ownerKey: 'owner',
+		});
+		const original = { version: 1, frames: [], receive() {} };
+		const realm: Record<string, unknown> = { __octaneStreamedRenderer: original };
+		const uninstall = installStreamedRendererGlobal(receiver, realm);
+		const replacement = { receive: vi.fn() };
+		Object.defineProperty(realm, '__octaneStreamedRenderer', {
+			value: replacement,
+			configurable: true,
+		});
+		try {
+			uninstall();
+			const late = { frame: 'late' };
+			(realm.__octaneStreamedRenderer as StreamedRendererGlobal).receive(late);
+			expect(replacement.receive).toHaveBeenCalledWith(late);
+		} finally {
+			uninstall();
+			receiver.dispose();
+		}
+	});
+
 	it('upgrades and drains the bounded pre-module mailbox in frame order', async () => {
 		const state = independentRegions();
 		const realm: Record<string, unknown> = {
