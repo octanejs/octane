@@ -1983,6 +1983,17 @@ export interface Block extends Scope {
 	 * the bail's lazy consumer refresh is sound.
 	 */
 	$$implicitBail: boolean;
+	/**
+	 * True when this block's committed subtree contains a component slot whose
+	 * callee carries `__compare` or a lazy body check — a compare that can veto
+	 * on non-prop grounds (lazy re-resolution, custom comparators reading live
+	 * state). A memo/`$$stable`/implicit bail keeps the committed subtree
+	 * without invoking it, which would strand that veto; such bails must
+	 * decline while this is set. Sticky by design: re-deriving it would need a
+	 * subtree walk per render, and a stale flag only costs a missed bail, never
+	 * a wrong one.
+	 */
+	$$compareInChain: boolean;
 	/** Per-render `use(thenable)` call-order counter; reset at the top of renderBlock. */
 	__thenableIdx: number;
 	/**
@@ -1998,6 +2009,13 @@ export interface Block extends Scope {
 	drainRenders: number;
 	/** True when the queued render came from a different component's render body. */
 	crossRenderUpdate: boolean;
+	/**
+	 * A queued update was dropped by the drain loop's aborted-transaction skip
+	 * ("later siblings must not publish a partial screen"). The block's state
+	 * cells still carry values only a body re-run consumes; cleared at the top
+	 * of renderBlockInner. Bails must not take this block while it stands.
+	 */
+	suppressedUpdate: boolean;
 	/** Commit-callback loop guard, scoped to one externally-started update chain. */
 	nestedUpdateChain: number;
 	nestedUpdateCount: number;
@@ -2907,6 +2925,39 @@ function hasHeldTransitionUpdate(slot: TransitionActionSlot<unknown>, block: Blo
 	return findHeldTransitionUpdate(slot, block) !== undefined;
 }
 
+/**
+ * True when a transition/urgent update targeted at this block was rolled back
+ * and is still waiting to re-apply. Held entries re-apply inside the state hook
+ * during render, so a memo/stable bail that skips the body would strand the
+ * pending value while keeping the rolled-back DOM — the bail must decline.
+ */
+function blockHasHeldUpdate(block: Block): boolean {
+	const rootHeld = block.idState.renderOwner?.transition;
+	if (
+		HELD_SYNC_TRANSITION === null &&
+		rootHeld === undefined &&
+		FLUSHED_TRANSITION_UPDATES.length === 0
+	)
+		return false;
+	const pending = (entries: Array<TransitionActionUpdate<any>> | undefined): boolean => {
+		if (entries === undefined) return false;
+		for (const entry of entries) {
+			if (
+				entry.block === block &&
+				!entry.superseded &&
+				Object.is(entry.slot.value, entry.baseValue)
+			)
+				return true;
+		}
+		return false;
+	};
+	if (pending(HELD_SYNC_TRANSITION?.entries) || pending(rootHeld?.entries)) return true;
+	for (const entries of FLUSHED_TRANSITION_UPDATES) {
+		if (pending(entries)) return true;
+	}
+	return false;
+}
+
 function cancelHeldTransitionUpdate(slot: TransitionActionSlot<unknown>, block: Block): boolean {
 	if (!urgentTransitionCellUpdate(block)) return false;
 	const rootHeld = block.idState.renderOwner?.transition;
@@ -3278,7 +3329,9 @@ function promoteHeldSyncTransition(): boolean {
 	PROMOTED_WARM_HARVEST = held.warmHarvest;
 	TRANSITION_DEPTH++;
 	try {
-		for (let i = 0; i < promoted.length; i++) scheduleRender(promoted[i].block);
+		for (let i = 0; i < promoted.length; i++) {
+			scheduleRender(promoted[i].block);
+		}
 	} finally {
 		TRANSITION_DEPTH--;
 	}
@@ -6916,7 +6969,12 @@ function drainQueue(): { err: any } | null {
 		// Every queued origin in this root belongs to the same commit attempt.
 		// Once one suspends, later siblings must not publish a partial screen.
 		const rootTransaction = block.idState.renderOwner?.transaction;
-		if (rootTransaction?.aborted === true) continue;
+		if (rootTransaction?.aborted === true) {
+			// The update is deferred to the resolve pass — flag it so a memo/
+			// stable/implicit bail cannot skip the body that consumes it.
+			block.suppressedUpdate = true;
+			continue;
+		}
 		const retired = rootTransaction?.retired;
 		if (retired !== null && retired !== undefined && retired.size !== 0) {
 			// Retained DOM is still connected for rollback and deletion cleanups,
@@ -10306,12 +10364,15 @@ class BlockImpl {
 	// Arming makes the block a stamping target (like __memo) so the bail's lazy
 	// consumer refresh has the context deps it needs.
 	declare $$implicitBail: boolean;
+	// A committed descendant callee carries a veto-capable compare (see Block).
+	declare $$compareInChain: boolean;
 	// __thenableIdx is reset every renderBlock so pre-init costs nothing.
 	declare __thenableIdx: number;
 	// Render-loop guard bookkeeping (see the Block interface).
 	declare drainStamp: number;
 	declare drainRenders: number;
 	declare crossRenderUpdate: boolean;
+	declare suppressedUpdate: boolean;
 	declare nestedUpdateChain: number;
 	declare nestedUpdateCount: number;
 	declare nestedUpdateError: boolean;
@@ -10366,11 +10427,15 @@ class BlockImpl {
 		this.props = props;
 		this.extra = extra;
 		this.outputHandler = outputHandler;
-		// Self-or-ancestor memo flag — OR of our own memo marker with the parent's
-		// flag, so the whole property is resolved in O(1) at creation instead of
-		// re-walked on every context read.
+		// Self-or-ancestor memo flag — OR of our own memo/stable marker with the
+		// parent's flag, so the whole property is resolved in O(1) at creation
+		// instead of re-walked on every context read. `$$stable` is the compiler's
+		// definition-site stamp; it participates in the same context-bookkeeping
+		// contract as an explicit memo boundary.
 		this.memoInChain =
-			(body as any)?.__memo === true || (parentBlock !== null && parentBlock.memoInChain === true);
+			(body as any)?.__memo === true ||
+			(body as any)?.$$stable === true ||
+			(parentBlock !== null && parentBlock.memoInChain === true);
 		this.parentNode = parentNode;
 		this.parentBlock = parentBlock;
 		this.idState = parentBlock?.idState ?? { prefix: '', next: 0 };
@@ -10400,10 +10465,12 @@ class BlockImpl {
 		this.$$ctxCache = null;
 		this.$$ctxCacheOwner = null;
 		this.$$implicitBail = false;
+		this.$$compareInChain = false;
 		this.__thenableIdx = 0;
 		this.drainStamp = 0;
 		this.drainRenders = 0;
 		this.crossRenderUpdate = false;
+		this.suppressedUpdate = false;
 		this.nestedUpdateChain = -1;
 		this.nestedUpdateCount = 0;
 		this.nestedUpdateError = false;
@@ -10798,6 +10865,7 @@ function renderBlockInner(block: Block): true | undefined {
 	// at the TOP so a re-entrant setState during this render re-queues correctly.
 	block.pending = false;
 	block.crossRenderUpdate = false;
+	block.suppressedUpdate = false;
 	// Reset the per-render `use(thenable)` call-order counter. Cached entries
 	// in __thenables persist ONLY across the failed attempts of ONE suspension
 	// episode: earlier use() calls return synchronously on replay-after-resolve
@@ -14083,6 +14151,30 @@ export function markSingleRoot<T extends Function>(component: T): T {
 }
 
 /**
+ * Compiler-emitted: attach the definition-site purity stamp while a fresh
+ * component function is still being initialized. The compiler only calls this
+ * with an otherwise-unobserved function whose body it proved pure of render-time
+ * context reads, mutable ref contents, live imported members, and unwitnessed
+ * module state — so a shallow-equal parent update may keep the committed subtree,
+ * React.memo's contract without the wrapper.
+ *
+ * The stamp is a bound, non-enumerable getter for the same reason `__memo` is:
+ * statics-copying wrappers (`Object.assign`, descriptor forwarding) must not
+ * inherit the proof — a wrapper that injects props or reads outside state is not
+ * the function the compiler analyzed.
+ * @internal
+ */
+export function markStable<T extends Function>(component: T): T {
+	Object.defineProperty(component, '$$stable', {
+		configurable: true,
+		get() {
+			return this === component;
+		},
+	});
+	return component;
+}
+
+/**
  * Compiler-emitted: tag a children-block render function so `isChildrenBlock` recognises it.
  * Returns the function for inline use (`{ children: markChildrenBlock(__children$N) }`).
  * @internal
@@ -16272,7 +16364,11 @@ function recordContextDependency(block: Block | null, context: Context<any>): vo
 	if (block === null || !block.memoInChain) return;
 	(block.$$ctxDirect ??= new Map()).set(context, context.$$version);
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
-		if ((current.body as any)?.__memo === true || current.$$implicitBail === true) {
+		if (
+			(current.body as any)?.__memo === true ||
+			(current.body as any)?.$$stable === true ||
+			current.$$implicitBail === true
+		) {
 			(current.$$ctxReads ??= new Map()).set(context, context.$$version);
 		}
 	}
@@ -17873,12 +17969,13 @@ export function lazy<C extends ComponentBody<any>>(
 			hooks.set(bodySlot, comp);
 		}
 		resolvedName = (comp as any).displayName || comp.name || 'Lazy';
-		if ((comp as any).__memo === true) {
-			// The lazy wrapper owns the live Block, so a resolved memo wrapper would
+		if ((comp as any).__memo === true || (comp as any).$$stable === true) {
+			// The lazy wrapper owns the live Block, so a resolved memo/stable body would
 			// otherwise be tail-called below the place where componentSlot performs its
 			// bailout. Publish equivalent metadata on this wrapper once the module has
 			// resolved. The comparator resolves defaultProps at the same public boundary
-			// as the component invocation.
+			// as the component invocation. A compiler `$$stable` body carries no
+			// `__compare`, so it always lands on the shallow-equal path below.
 			if (!memoMetadataInstalled) {
 				Object.defineProperty(lazyWrapper, '__memo', {
 					get() {
@@ -17890,7 +17987,10 @@ export function lazy<C extends ComponentBody<any>>(
 						const current = resolveLazyModule(result);
 						// Equal props cannot reuse a different module body's output. This
 						// check belongs to the mounted scope, not the shared lazy payload.
-						if (renderScope.hooks?.get(bodySlot) !== current || (current as any).__memo !== true)
+						if (
+							renderScope.hooks?.get(bodySlot) !== current ||
+							((current as any).__memo !== true && (current as any).$$stable !== true)
+						)
 							return false;
 						const compare = (current as any).__compare as
 							((previous: any, incoming: any) => boolean) | undefined;
@@ -29743,6 +29843,19 @@ function componentSlotImpl(
 		);
 		return;
 	}
+	// A callee whose compare can veto on non-prop grounds (lazy body
+	// re-resolution, a custom comparator reading live state) must be reached by
+	// every commit: an ancestor's memo/`$$stable`/implicit bail keeps this
+	// subtree without invoking it, which would strand that veto. Flag the whole
+	// ancestor chain so those bails decline. `LAZY_BODY_CHECK` marks eagerly —
+	// the lazy wrapper's resolution-aware `__compare` is only installed once the
+	// module resolves, after ancestors may already have committed.
+	if ((body as any).__compare !== undefined || (body as any)[LAZY_BODY_CHECK] !== undefined) {
+		for (let b: Block | null = parentBlock; b !== null; b = b.parentBlock) {
+			if (b.$$compareInChain === true) break;
+			b.$$compareInChain = true;
+		}
+	}
 	let state = parentScope.slots[slotKey] as CompSlot | undefined;
 	let hydrationCursor: Node | null = null;
 	if (state === undefined) {
@@ -34713,20 +34826,49 @@ function refreshContextConsumers(block: Block): void {
 	}
 }
 
+/**
+ * The hazards that veto every props-equality bail (memo, $$stable, implicit):
+ * each names a reason the body must re-run regardless of prop equality. A new
+ * bail hazard belongs here so the bail paths cannot desynchronize.
+ */
+function blockBailUnsafe(block: Block): boolean {
+	// A body that suspended or threw on its initial attempt has no committed
+	// props/output to reuse; the retry must execute until the Block mounts.
+	// This also makes lazy-resolved memo metadata safe to publish during that
+	// attempt.
+	if (!block.mounted || block.renderStatus !== RENDER_VALID) return true;
+	// A descendant compare (lazy re-resolution, custom comparator) can veto the
+	// bail on non-prop grounds — the kept subtree must not strand it.
+	if (block.$$compareInChain === true) return true;
+	// A render attempt that suspended or hid inside a try subtree may have
+	// queued an Effect Event impl the drain then dropped — its version is ahead
+	// of the last completed render. Bailing would strand that unpublished
+	// payload forever, so fall through and let the re-render re-queue it.
+	if (block.effectEventRenderVersion !== block.effectEventCompletedVersion) return true;
+	// A rolled-back transition update re-applies inside the state hook during
+	// render; bailing would skip the body that consumes it and strand the
+	// pending value on the rolled-back DOM.
+	if (blockHasHeldUpdate(block)) return true;
+	// The drain loop dropped this block's own queued update when a sibling's
+	// suspend aborted the transaction. Its state cells still hold the update;
+	// only the body reads them — bailing strands the pre-abort screen forever.
+	return block.suppressedUpdate === true;
+}
+
 // React.memo's bail, shared by BOTH same-component update paths (componentSlot for
 // compiled component positions, childSlot for value-position children — provider
 // children, `.ts` binding trees). Skip the body when new props compare equal to the
 // committed props, UNLESS the component itself directly reads a changed context (then
 // it must re-run). If only a DESCENDANT consumes a changed context, refresh just those
-// consumers without re-running this body — React's lazy propagation. Returns true when
-// the update was fully handled (bail taken); the committed props identity is kept, and
-// diffing against it next time is what makes the memo terminate.
+// consumers without re-running this body — React's lazy propagation. `$$stable` is the
+// compiler-emitted definition-site proof of the same contract (pure of render-time
+// context reads and unwitnessed mutable reads), so it enters the same bail with the
+// default shallow comparison. Returns true when the update was fully handled (bail
+// taken); the committed props identity is kept, and diffing against it next time is
+// what makes the memo terminate.
 function tryMemoBail(block: Block, comp: any, props: any): boolean {
-	if ((comp as any).__memo !== true) return false;
-	// A memo body that suspended or threw on its initial attempt has no committed
-	// props/output to reuse. This also makes lazy-resolved memo metadata safe to
-	// publish during that attempt: the retry must execute until the Block mounts.
-	if (!block.mounted || block.renderStatus !== RENDER_VALID) return false;
+	if ((comp as any).__memo !== true && (comp as any).$$stable !== true) return false;
+	if (blockBailUnsafe(block)) return false;
 	const compare = (comp as any).__compare as ((prev: any, next: any) => boolean) | undefined;
 	// React.memo's optional comparator: returns true when props are equal
 	// (→ skip the render). Falls back to a shallow Object.is comparison.
@@ -34754,9 +34896,7 @@ function tryMemoBail(block: Block, comp: any, props: any): boolean {
 // bailing it could strand consumers. Returns true when the update was handled.
 function tryImplicitBail(block: Block): boolean {
 	if (block.$$implicitBail !== true) return false;
-	// A first attempt that suspended or threw has no committed output to reuse.
-	// Its identity-equal retry must execute until this Block mounts successfully.
-	if (!block.mounted || block.renderStatus !== RENDER_VALID) return false;
+	if (blockBailUnsafe(block)) return false;
 	const checkLazyBody = (block.body as any)[LAZY_BODY_CHECK] as LazyBodyCheck | undefined;
 	if (checkLazyBody !== undefined && !checkLazyBody(block)) return false;
 	if (!ctxBailDepsClean(block)) return false;
@@ -34782,7 +34922,12 @@ function restampCtxDeps(block: Block): void {
 	const hasDirect = direct !== null && direct.size > 0;
 	if (!hasReads && !hasDirect) return;
 	for (let b: Block | null = block.parentBlock; b !== null; b = b.parentBlock) {
-		if ((b.body as any)?.__memo !== true && b.$$implicitBail !== true) continue;
+		if (
+			(b.body as any)?.__memo !== true &&
+			(b.body as any)?.$$stable !== true &&
+			b.$$implicitBail !== true
+		)
+			continue;
 		const m = (b.$$ctxReads ??= new Map());
 		if (hasReads) {
 			for (const [ctx, v] of reads!) {
@@ -34821,7 +34966,11 @@ function restampCtxDeps(block: Block): void {
 function restampCachedContextScope(scope: Scope): void {
 	if (scope.block === scope) {
 		const block = scope as Block;
-		if ((block.body as any)?.__memo === true || block.$$implicitBail === true) {
+		if (
+			(block.body as any)?.__memo === true ||
+			(block.body as any)?.$$stable === true ||
+			block.$$implicitBail === true
+		) {
 			restampCtxDeps(block);
 			return;
 		}
@@ -34869,8 +35018,12 @@ function refreshBlockForContext(block: Block): void {
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileSchedule(block, 'context');
 		renderBlock(block);
-	} else if ((block.body as any)?.__memo === true || block.$$implicitBail === true) {
-		// A memo'd (or implicit-bail-armed) pure indirection: its $$ctxReads is
+	} else if (
+		(block.body as any)?.__memo === true ||
+		(block.body as any)?.$$stable === true ||
+		block.$$implicitBail === true
+	) {
+		// A memo'd/stable (or implicit-bail-armed) pure indirection: its $$ctxReads is
 		// stamped, so prune to subtrees that actually hold a changed-context consumer.
 		// A clean scan re-stamps it — direct was already verified above — so a
 		// re-reach inside the same epoch prunes without rescanning.

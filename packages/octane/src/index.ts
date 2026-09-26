@@ -244,9 +244,11 @@ export {
 	compilerCacheContext,
 	compilerOwnsContextProvider,
 	markSingleRoot,
+	markStable,
 	markWarm,
 	// Compact compiler ABI; keep the descriptive export for older compiled output.
 	markSingleRoot as __s,
+	markStable as __st,
 	markChildrenBlock,
 	createScopedValue,
 	createScopedElement,
