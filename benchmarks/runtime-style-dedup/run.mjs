@@ -34,6 +34,12 @@ const fixture = compile(fixtureSource, 'runtime-style-dedup.tsrx', {
 	hmr: false,
 }).code;
 fs.writeFileSync(path.join(temp, 'fixture.js'), fixture);
+const themeFixture = compile(
+	'export function registerTheme() { const theme = <style>span { color: teal; }</style>; return theme; }',
+	'runtime-style-dedup-theme.tsrx',
+	{ mode: 'server', hmr: false },
+).code;
+fs.writeFileSync(path.join(temp, 'theme.js'), themeFixture);
 
 function instrument(source) {
 	const write = 'CSS.set(id, nonce === undefined ? { css } : { css, nonce });';
@@ -55,7 +61,7 @@ async function bundle(root, observed, label) {
 	);
 	const output = await build({
 		stdin: {
-			contents: `export * from ${JSON.stringify(path.join(root, 'packages/octane/src/server/index.ts'))}; export * as fixture from ${JSON.stringify(path.join(temp, 'fixture.js'))};`,
+			contents: `export * from ${JSON.stringify(path.join(root, 'packages/octane/src/server/index.ts'))}; export * as fixture from ${JSON.stringify(path.join(temp, 'fixture.js'))}; export { registerTheme } from ${JSON.stringify(path.join(temp, 'theme.js'))};`,
 			resolveDir: repo,
 			sourcefile: 'style-entry.js',
 		},
@@ -104,6 +110,30 @@ async function bundle(root, observed, label) {
 
 function workload(rt, mode, count, seeds) {
 	const { createElement: h } = rt;
+	if (
+		mode === 'plain-class' ||
+		mode === 'theme-class' ||
+		mode === 'captured-class' ||
+		mode === 'local-theme'
+	) {
+		const theme = rt.registerTheme();
+		const className = mode === 'plain-class' ? 'ordinary' : theme.$class;
+		const rows = Array.from({ length: count }, (_, index) => h('span', { className }, index));
+		return () =>
+			rt.renderToString(() => {
+				if (mode === 'theme-class') void theme.$class;
+				if (mode === 'local-theme') {
+					return h(
+						'main',
+						null,
+						Array.from({ length: count }, (_, index) =>
+							h('span', { className: rt.registerTheme().$class }, index),
+						),
+					);
+				}
+				return h('main', null, rows);
+			});
+	}
 	const rows = Array.from({ length: count }, (_, index) =>
 		h(mode === 'compiled' ? rt.fixture.CompiledLeaf : rt.fixture.Leaf, {
 			index,
@@ -134,12 +164,17 @@ function check(result, mode, count, seeds) {
 	}
 	assert.equal(
 		sheets.length,
-		mode === 'empty' ? 0 : mode === 'unique' ? count : 1,
+		mode === 'empty' || mode === 'plain-class' ? 0 : mode === 'unique' ? count : 1,
 		'effective style count',
 	);
-	if (mode === 'compiled')
+	if (
+		mode === 'compiled' ||
+		mode === 'theme-class' ||
+		mode === 'captured-class' ||
+		mode === 'local-theme'
+	)
 		assert.match(result.css, /color:\s*teal/, 'compiled scoped CSS survives');
-	else if (mode !== 'empty') {
+	else if (mode !== 'empty' && mode !== 'plain-class') {
 		assert.equal(sheets[0][1], mode === 'unique' ? 'row-0' : 'row');
 		assert.equal(sheets[0][3], '.row{--value:' + (mode === 'changed' ? count - 1 : 0) + '}');
 		assert.equal(sheets[0][2], mode === 'nonce' ? ' nonce="' + (count - 1) + '"' : '');
@@ -179,6 +214,10 @@ try {
 		['changed', 'changed', 128],
 		['unique', 'unique', 128],
 		['nonce', 'nonce', 128],
+		['registered-ordinary-classes', 'plain-class', 128],
+		['registered-theme-classes', 'theme-class', 128],
+		['captured-theme-classes', 'captured-class', 128],
+		['component-local-themes', 'local-theme', 128],
 	]) {
 		const render = workload(clean.runtime, mode, count, seeds);
 		const expected = render();
@@ -193,7 +232,14 @@ try {
 		const work = { ...globalThis.__styleWork };
 		const timing = { baseline: [], candidate: [] };
 		if (baseline !== null) {
-			const renderBaseline = workload(baseline.runtime, mode, count, seeds);
+			// The unfixed runtime must read the proxy during each render to emit
+			// equivalent CSS; compare captured strings against that working control.
+			const renderBaseline = workload(
+				baseline.runtime,
+				mode === 'captured-class' ? 'theme-class' : mode,
+				count,
+				seeds,
+			);
 			assert.deepEqual(renderBaseline(), expected, 'baseline/candidate complete output');
 			for (let i = 0; i < 40; i++) {
 				renderBaseline();
@@ -236,7 +282,7 @@ try {
 			v8: process.versions.v8,
 			platform: process.platform,
 			arch: process.arch,
-			fixtureHash: hash(fixture),
+			fixtureHash: hash(fixture + themeFixture),
 			candidate: metadata(clean),
 			...(baseline === null ? {} : { baseline: metadata(baseline) }),
 		},
