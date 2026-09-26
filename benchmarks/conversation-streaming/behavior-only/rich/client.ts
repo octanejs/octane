@@ -39,6 +39,8 @@ let mapControls: typeof import('./map-interaction.ts') | undefined;
 let binding: ReturnType<typeof activate>;
 let updates = 0;
 let subscriptions = 0;
+const recoverableErrors: string[] = [];
+const onRecoverableError = (error: unknown) => recoverableErrors.push(String(error));
 const revisions: Array<{ body: number; history: number; current: string }> = [];
 
 function source(conversation: 'a' | 'b', signal: AbortSignal) {
@@ -99,9 +101,9 @@ function navigate(next: 'a' | 'b') {
 	visit.abort();
 	visit = new AbortController();
 	current = next;
-	binding = activate(slot, source(next, visit.signal), visit.signal, false);
+	binding = activate(slot, source(next, visit.signal), visit.signal, false, onRecoverableError);
 }
-binding = activate(slot, source('a', visit.signal), visit.signal, true);
+binding = activate(slot, source('a', visit.signal), visit.signal, true, onRecoverableError);
 document.getElementById('rich-visit-b')!.addEventListener('click', () => navigate('b'));
 document.getElementById('rich-return-a')!.addEventListener('click', () => navigate('a'));
 const trace = () => {
@@ -123,6 +125,7 @@ window.__richPresentation = {
 			current,
 			updates,
 			subscriptions,
+			recoverableErrors: recoverableErrors.slice(),
 			intent,
 			revisions: revisions.slice(),
 			bodyRevision: body.status === 'ready' ? body.value.revision : 0,

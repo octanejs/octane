@@ -17,13 +17,16 @@ type RequestState = {
 	trace: RequestTrace;
 	run: RunTrace;
 	viewer: object;
+	signal: AbortSignal;
 	ready: boolean;
 	auth?: Promise<object>;
+	waveGate?: Promise<void>;
 };
 
 const requests = new WeakMap<Request, RequestState>();
 const traces = new Map<string, RunTrace>();
 const authGates = new Map<RequestState, () => void>();
+const waveGates = new Map<RequestState, () => void>();
 let nextRequest = 0;
 
 export function requestState(request: Request): RequestState {
@@ -53,6 +56,7 @@ export function requestState(request: Request): RequestState {
 		trace,
 		run,
 		viewer: Object.freeze({ requestId: trace.requestId }),
+		signal: request.signal,
 		ready: false,
 	};
 	requests.set(request, state);
@@ -141,6 +145,55 @@ async function holdAuthorization(state: RequestState, signal: AbortSignal) {
 	});
 }
 
+// The rich browser comparison can resume presentation between two values of
+// each existing stream. Both streams share a single, sticky release.
+function holdAfterFirstWave(state: RequestState, signal: AbortSignal): Promise<void> {
+	signal.throwIfAborted();
+	if (state.waveGate === undefined) {
+		state.signal.throwIfAborted();
+		if (waveGates.size >= 64) throw new Error('Too many held fixture requests');
+		state.waveGate = new Promise<void>((resolve, reject) => {
+			const cleanup = () => {
+				clearTimeout(timer);
+				waveGates.delete(state);
+				state.signal.removeEventListener('abort', abort);
+			};
+			const abort = () => {
+				cleanup();
+				reject(state.signal.reason);
+			};
+			const timer = setTimeout(() => {
+				cleanup();
+				reject(new Error('Fixture wave hold expired'));
+			}, 30_000);
+			waveGates.set(state, () => {
+				cleanup();
+				record(state, 'waves:released');
+				resolve();
+			});
+			state.signal.addEventListener('abort', abort, { once: true });
+			record(state, 'waves:held');
+		});
+	}
+	return new Promise<void>((resolve, reject) => {
+		const abort = () => {
+			signal.removeEventListener('abort', abort);
+			reject(signal.reason);
+		};
+		signal.addEventListener('abort', abort, { once: true });
+		state.waveGate!.then(
+			() => {
+				signal.removeEventListener('abort', abort);
+				resolve();
+			},
+			(error) => {
+				signal.removeEventListener('abort', abort);
+				reject(error);
+			},
+		);
+	});
+}
+
 function authorized(context: ServerCallContext): RequestState {
 	context.signal.throwIfAborted();
 	const state = requests.get(context.request);
@@ -166,6 +219,8 @@ export async function* conversation(context: ServerCallContext) {
 			const visible = rows.slice(0, Math.ceil((rows.length * revision) / state.config.waves));
 			record(state, 'body:yield', revision, visible.length);
 			yield { revision, total: rows.length, rows: visible };
+			if (revision === 1 && new URL(context.request.url).searchParams.get('holdWaves') === 'true')
+				await holdAfterFirstWave(state, context.signal);
 		}
 		record(state, 'body:complete');
 	} finally {
@@ -186,6 +241,8 @@ export async function* history(context: ServerCallContext) {
 			const visible = rows.slice(0, Math.ceil((rows.length * revision) / state.config.waves));
 			record(state, 'history:yield', revision, visible.length);
 			yield { revision, total: rows.length, rows: visible };
+			if (revision === 1 && new URL(context.request.url).searchParams.get('holdWaves') === 'true')
+				await holdAfterFirstWave(state, context.signal);
 		}
 		record(state, 'history:complete');
 	} finally {
@@ -210,7 +267,9 @@ export function releaseAuthorization(context: Context): Response {
 	const run = new URL(context.request.url).searchParams.get('run') ?? '';
 	if (!/^[a-zA-Z0-9_-]{1,80}$/.test(run)) return new Response('Invalid run', { status: 400 });
 	let released = 0;
-	for (const [state, release] of authGates) {
+	const gates =
+		new URL(context.request.url).searchParams.get('phase') === 'waves' ? waveGates : authGates;
+	for (const [state, release] of gates) {
 		if (state.config.run === run) {
 			release();
 			released++;

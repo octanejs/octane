@@ -33,6 +33,7 @@ const configKeys = [
 	'interval',
 	'waves',
 	'turns',
+	'historyRows',
 ];
 
 function runId(value: unknown): string {
@@ -89,6 +90,7 @@ function configInput(value: unknown): LabConfig {
 		interval: integer(config.interval, 0, 2_000),
 		waves: integer(config.waves, 1, 64),
 		turns: integer(config.turns, 1, 200),
+		historyRows: integer(config.historyRows, 1, 200),
 	};
 }
 
@@ -111,6 +113,7 @@ function requestConfig(request: Request): LabConfig {
 	const existing = requestConfigs.get(request);
 	if (existing !== undefined) return existing;
 	const params = new URL(request.url).searchParams;
+	const turns = urlInteger(params, 'turns', 4, 200, 1);
 	const config: LabConfig = {
 		run: runId(params.get('run') ?? crypto.randomUUID()),
 		scenario: scenario(params.get('scenario') ?? 'steady'),
@@ -120,7 +123,8 @@ function requestConfig(request: Request): LabConfig {
 		historyDelay: urlInteger(params, 'history', 600, 2_000),
 		interval: urlInteger(params, 'interval', 160, 2_000),
 		waves: urlInteger(params, 'waves', 8, 64, 1),
-		turns: urlInteger(params, 'turns', 4, 200, 1),
+		turns,
+		historyRows: urlInteger(params, 'historyRows', turns, 200, 1),
 	};
 	requestConfigs.set(request, config);
 	return config;
@@ -316,7 +320,7 @@ export async function* history(
 	let terminal = false;
 	record('start');
 	try {
-		const rows = Array.from({ length: config.turns }, (_, index) => ({
+		const rows = Array.from({ length: config.historyRows }, (_, index) => ({
 			id: `history-${index + 1}`,
 			title: ['Streaming and hydration', 'Independent tool activity', 'A Unicode conversation'][
 				index % 3

@@ -48,7 +48,9 @@ export function Metrics() @{
 					{String(config.waves)}
 					snapshots ·
 					{String(config.turns)}
-					turns
+					turns ·
+					{String(config.historyRows)}
+					history rows
 				</p>
 				<button
 					type="button"

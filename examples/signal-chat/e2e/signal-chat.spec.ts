@@ -512,6 +512,7 @@ test('configured deferred and eager runs download evidence for the selected work
 		interval: '25',
 		waves: '5',
 		turns: '2',
+		historyRows: '5',
 		hydrateDelay: '0',
 		q: 'Compare 東京 · 👩🏽‍💻 · café & "quoted" <script>text</script>',
 	};
@@ -528,6 +529,7 @@ test('configured deferred and eager runs download evidence for the selected work
 			[/^Between yields/, settings.interval],
 			[/^Stream snapshots/, settings.waves],
 			[/^Total turns/, settings.turns],
+			[/^History rows/, settings.historyRows],
 			[/^Shell hydration delay/, settings.hydrateDelay],
 			[/^Initial prompt/, settings.q],
 		] as const) {
@@ -570,6 +572,7 @@ test('configured deferred and eager runs download evidence for the selected work
 		}
 		await completedAnswer(page, Number(settings.waves));
 		await expect(page.locator('[data-history]')).toHaveAttribute('data-revision', settings.waves);
+		await expect(page.locator('[data-history] li')).toHaveCount(Number(settings.historyRows));
 		await expect(page.locator('[data-tools]')).toHaveAttribute('data-revision', settings.waves);
 		const conversation = page.getByRole('region', { name: 'Conversation', exact: true });
 		await expect(

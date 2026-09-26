@@ -196,6 +196,23 @@ leave the exact activation timing uncertain. Completed-stream catch-up needs
 separate evidence that the map import remained held until after stream completion.
 It does not assert deletion of place lifetimes that preceded map activation.
 
+The `before` and `split` lanes hold the presentation entry while the response
+continues to parse. They wait for both streams' actual result frames in the
+browser's pre-module mailbox before allowing activation. The `before` lane waits
+for both streams to complete; `split` holds both after revision 1 until the live
+view is active, then delivers revisions 2–4. They check the exact visible
+projection, selected original shell nodes and the draft edit, native map interaction,
+selected survivor identity, disposal, loader counts, and recoverable hydration diagnostics.
+The gate belongs to the request while each query remains independently abortable.
+These lanes use document-owned module signals: they do not demonstrate that a
+renderer-free view can own an instance-local streamed query.
+
+Run the fixture gate's cancellation and ordinary-stream checks separately with:
+
+```sh
+node node_modules/vitest/vitest.mjs run --config benchmarks/conversation-streaming/fixture/vitest.config.mjs
+```
+
 The navigation lane disposes A's visible presentation, mounts B, lets any remaining
 accepted A server work finish, and reconstructs A from the latest retained results and
 per-conversation map intent. Late A results cannot change B. The document result
@@ -210,6 +227,31 @@ against `build.json` before totaling each phase. The deliberately held auth and
 400 ms inter-wave waits enable interaction; they are not renderer CPU timings.
 The small cold zoom helper is not a production map SDK or its loading cost.
 WebKit results are not native Safari or iOS device qualification.
+
+### Renderer fallback measurement control
+
+`--rich-presentation=fallback-control` adds the ordinary renderer as a lazy
+fallback to the authored binding path. The query parameter `rendererFallback=1`
+selects it before either presentation claims the DOM; without that parameter the
+binding path runs. This parameter is a measurement control, not an eligibility
+proof or a general mismatch recovery mechanism. In particular, this control does
+not catch failures after binding adoption starts. The host supplies the same
+explicit snapshot and subscription source as the other rich modes.
+
+Run `runRichBrowser` with `presentation: 'fallback-control'` to exercise the
+binding path, and again with `rendererFallback: true` to select the renderer.
+The latter run holds the fallback chunk while the document and its signal frames
+continue streaming in the delayed lanes. All modes check native draft edits,
+streamed catch-up, keyed identity, map interaction, navigation, subscriptions
+and loader counts. The runner also verifies that the renderer chunk is requested
+only when selected. It does not capture navigation-button clicks made before the
+host installs its handlers, and it does not prove late handoff from a claimed
+binding region to a renderer.
+
+The candidate's initial closure and its complete emitted graph answer different
+questions. Include the renderer fallback when reporting total emitted bytes, and
+report actual requested files separately. A matched local result and reproducible
+commands are in [the fallback measurement](../../streamed-shell-prototype/RICH-FALLBACK-RESULTS.md).
 
 ## Observation limits
 

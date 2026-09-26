@@ -75,6 +75,16 @@ export function App({ eager = false }: { eager?: boolean } = {}) @{
 								Total turns<input type="number" name="turns" min={1} max={200} defaultValue={4} />
 							</label>
 							<label>
+								History
+								rows<input
+									type="number"
+									name="historyRows"
+									min={1}
+									max={200}
+									placeholder="Same as total turns"
+								/>
+							</label>
+							<label>
 								Shell hydration delay
 								(ms)<input type="number" name="hydrateDelay" min={0} max={5000} defaultValue={0} />
 							</label>

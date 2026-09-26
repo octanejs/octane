@@ -37,7 +37,7 @@ export async function buildFixture(
 	assert.ok(bundler === 'esbuild' || bundler === 'vite', 'Unknown client bundler');
 	assert.ok(['none', 'manual', 'authored'].includes(projection), 'Unknown projection variant');
 	assert.ok(
-		['none', 'authored', 'renderer'].includes(richPresentation),
+		['none', 'authored', 'renderer', 'fallback-control'].includes(richPresentation),
 		'Unknown rich presentation variant',
 	);
 	assert.ok(
@@ -119,6 +119,12 @@ export async function buildFixture(
 			importer === path.join(HERE, 'rich/client.ts')
 		)
 			return path.join(HERE, 'rich/activate-renderer.ts');
+		if (
+			richPresentation === 'fallback-control' &&
+			request === './activate.tsrx' &&
+			importer === path.join(HERE, 'rich/client.ts')
+		)
+			return path.join(HERE, 'rich/activate-fallback.ts');
 		if (request.includes('?octane-bindings=')) {
 			const [file, query] = request.split('?');
 			return path.resolve(path.dirname(importer), file) + '?' + query;
@@ -225,6 +231,9 @@ export async function buildFixture(
 		const viteOptions = {
 			configFile: false,
 			root: REPO,
+			// The fixture serves every output under /assets/. Vite's preload
+			// helper must use the same base for dynamic chunks with dependencies.
+			base: '/assets/',
 			logLevel: 'warn',
 			clearScreen: false,
 			publicDir: false,
@@ -297,7 +306,7 @@ export async function buildFixture(
 			JSON.stringify({ clientInputs, outputs }, null, 2),
 		);
 	}
-	if (richPresentation === 'renderer') {
+	if (richPresentation === 'renderer' || richPresentation === 'fallback-control') {
 		assert.ok(
 			clientInputs.some((file) => /\/src\/runtime\.ts$/.test(file)),
 			'The explicit equal-work renderer control must include the renderer',
@@ -359,6 +368,17 @@ export async function buildFixture(
 		}
 	}
 	includeEager('behavior.js');
+	if (richPresentation === 'fallback-control') {
+		assert.deepEqual(
+			[...eagerOutputs].flatMap((file) =>
+				Object.entries(outputs[file].inputs).filter(
+					([input, contribution]) => /\/src\/runtime\.ts$/.test(input) && emitted(contribution),
+				),
+			),
+			[],
+			'The renderer fallback must not contribute to the initial static closure',
+		);
+	}
 	if (composerReceipts) {
 		assert.deepEqual(
 			Object.values(outputs).flatMap((output) =>
@@ -429,10 +449,10 @@ export async function buildFixture(
 		},
 		inputHashes: Object.fromEntries([...inputs].map(([file, bytes]) => [file, hash(bytes)])),
 		harnessHashes: Object.fromEntries(
-			fs
-				.readdirSync(HERE)
-				.filter((file) => /\.(?:[cm]?[jt]s|tsrx)$/.test(file))
-				.map((file) => [file, hash(fs.readFileSync(path.join(HERE, file)))]),
+			[
+				...fs.readdirSync(HERE).filter((file) => /\.(?:[cm]?[jt]s|tsrx)$/.test(file)),
+				...(richPresentation === 'none' ? [] : ['rich/run-browser.mjs']),
+			].map((file) => [file, hash(fs.readFileSync(path.join(HERE, file)))]),
 		),
 		changedInputsDuringBuild,
 		limitations: [

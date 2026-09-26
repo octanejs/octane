@@ -6,6 +6,7 @@ export function activate(
 	source: BindingSource<RichConversationProps>,
 	signal: AbortSignal,
 	existing: boolean,
+	_onRecoverableError: (error: unknown) => void,
 ) {
 	return existing
 		? adoptBindings(slot.querySelector('[data-rich]')!, RichConversation, source, { signal })
