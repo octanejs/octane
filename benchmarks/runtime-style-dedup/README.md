@@ -139,3 +139,52 @@ the complete dependency chain as a string, so registration needs no per-request
 object graph. Real request concurrency throughput and other JS engines were not
 benchmarked; concurrency, aborts, streaming, hydration, and nonce isolation have
 behavioral regression coverage.
+
+## First insertion of an applied theme
+
+`injectStyle` now collects a registered sheet's applied dependencies before its
+first insertion. This also covers compiler-generated component preludes, which
+can inject a module's sheet before rendering a captured class. The unchanged
+CSS/nonce fast path still returns first. New sheets pay a registry lookup when
+themes have been registered; applied chains reuse the existing hash arrays and
+skip dependencies already in the request. There is no new cache or retained
+state, and generated component code is unchanged.
+
+The `same-module-applied-classes` workload renders 128 components whose local
+theme applies an imported base. Its captured class entry must collect both
+sheets, in base-before-override order. The baseline explicitly reads the theme
+proxy before rendering so both versions produce byte-identical HTML and CSS.
+This compares against a working control, not the broken missing-CSS output.
+
+Paired measurements against `9b6c3a48e1f196c7097b48d429f6997169556922` use the
+same compiler and fixture, 40 warmups, and 31 alternating samples of 16 renders.
+Node 24.18.0 / V8 13.6.233.17-node.50, macOS x64. Median milliseconds per response:
+
+| Scenario | Baseline | Candidate |
+| --- | ---: | ---: |
+| Repeated styles | 0.20932 | 0.20571 |
+| Unique styles | 0.96200 | 1.00994 |
+| Ordinary classes with registered themes | 0.08629 | 0.10206 |
+| Same-module applied classes vs explicit proxy-read control | 0.35621 | 0.36703 |
+
+Every timing range overlaps; these shared-machine results do not establish a
+throughput improvement or regression. All 14 existing workloads preserve their
+complete output hashes and deterministic work counts, and all five applicable
+ratio guards pass. The new workload creates two stylesheet records and one
+two-entry replay copy. Broad server/fixture bundles grow from 177,609 to 177,679
+minified bytes and from 58,286 to 58,293 gzip bytes (+7 gzip bytes).
+[Recorded measurements](./applied-theme-measurements.json) contain the samples,
+source/bundle hashes, output hashes, and deterministic work counts.
+
+The regression suite fails 12 cases against the original runtime while its four
+no-import controls pass. The candidate passes 670 targeted tests across dev and
+prod compilation, covering repeated requests, explicit CSS/nonce preservation,
+shared transitive dependencies, streaming, errors/aborts, and hydration. Review
+consolidated dependency collection at first stylesheet insertion rather than
+adding another compiler emission path. Large dependency graphs, other engines,
+and concurrent-request throughput were not benchmarked.
+
+Local tests used a focused Vitest config with the standard Octane plugin,
+per-test cleanup, frozen-AST/source-location checks, and one worker. Scoped
+typechecking, formatting, and changeset checks passed. The full repository
+suite and CI were not run.
