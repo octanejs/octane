@@ -10,7 +10,7 @@
     "preview": "octane-preview --port 5237 --strictPort",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
     "test:e2e": "pnpm test:capture && pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
-    "test:capture": "node --test scripts/capture.test.mjs",
+    "test:capture": "node --test scripts/capture.test.mjs tests/backend.test.mjs",
     "test:e2e:dev": "playwright test --config e2e/playwright.config.ts",
     "capture": "node scripts/capture.mjs"
   },

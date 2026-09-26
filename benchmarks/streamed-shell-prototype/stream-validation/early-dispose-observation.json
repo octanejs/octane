@@ -1,0 +1,143 @@
+{
+  "browser": "149.0.7827.55",
+  "artifact": "/var/folders/zr/_4f6yytj45z6l0cfjlchy5gc0000gn/T/octane-stream-browser-P9Oarb",
+  "outcomes": [
+    {
+      "variant": "baseline",
+      "disposal": "before-end",
+      "before": {
+        "globalType": "object",
+        "receiveType": "function",
+        "loads": 0
+      },
+      "afterEarly": {
+        "globalType": "undefined",
+        "receiveType": "undefined"
+      },
+      "errors": [
+        {
+          "message": "TypeError: Cannot read properties of undefined (reading 'receive')",
+          "stack": "TypeError: Cannot read properties of undefined (reading 'receive')\n    at http://127.0.0.1:54734/?case=baseline-before-end:1:6349"
+        }
+      ],
+      "terminal": "<script data-octane-stream>globalThis.__octaneStreamedRenderer.receive({\"identity\":{\"protocol\":1,\"buildId\":\"shell-build\",\"documentId\":\"shell-document\",\"ownerKey\":\"octane:document\",\"instanceKey\":\"[\\\"\\\",\\\"root\\\"][\\\"c:9f51aa73\\\",[],\\\"\\\"]\",\"nodeKey\":\"i:077c2394\",\"selectionKey\":\"[\\\"i:077c2394\\\",[\\\"string\\\",\\\"conversation\\\"]]\",\"selectionGeneration\":0,\"attempt\":1},\"sequence\":3,\"channel\":\"result\",\"kind\":\"complete\"});</script>",
+      "serverLoads": 1,
+      "ended": true
+    },
+    {
+      "variant": "baseline",
+      "disposal": "after-end",
+      "before": {
+        "globalType": "object",
+        "receiveType": "function",
+        "loads": 0
+      },
+      "afterEarly": {
+        "globalType": "object",
+        "receiveType": "function"
+      },
+      "errors": [],
+      "terminal": "<script data-octane-stream>globalThis.__octaneStreamedRenderer.receive({\"identity\":{\"protocol\":1,\"buildId\":\"shell-build\",\"documentId\":\"shell-document\",\"ownerKey\":\"octane:document\",\"instanceKey\":\"[\\\"\\\",\\\"root\\\"][\\\"c:9f51aa73\\\",[],\\\"\\\"]\",\"nodeKey\":\"i:077c2394\",\"selectionKey\":\"[\\\"i:077c2394\\\",[\\\"string\\\",\\\"conversation\\\"]]\",\"selectionGeneration\":0,\"attempt\":1},\"sequence\":3,\"channel\":\"result\",\"kind\":\"complete\"});</script>",
+      "serverLoads": 1,
+      "ended": true
+    },
+    {
+      "variant": "baseline",
+      "disposal": "suspend-before-end",
+      "before": {
+        "globalType": "object",
+        "receiveType": "function",
+        "loads": 0
+      },
+      "afterEarly": {
+        "globalType": "object",
+        "receiveType": "function"
+      },
+      "errors": [],
+      "terminal": "<script data-octane-stream>globalThis.__octaneStreamedRenderer.receive({\"identity\":{\"protocol\":1,\"buildId\":\"shell-build\",\"documentId\":\"shell-document\",\"ownerKey\":\"octane:document\",\"instanceKey\":\"[\\\"\\\",\\\"root\\\"][\\\"c:9f51aa73\\\",[],\\\"\\\"]\",\"nodeKey\":\"i:077c2394\",\"selectionKey\":\"[\\\"i:077c2394\\\",[\\\"string\\\",\\\"conversation\\\"]]\",\"selectionGeneration\":0,\"attempt\":1},\"sequence\":3,\"channel\":\"result\",\"kind\":\"complete\"});</script>",
+      "serverLoads": 1,
+      "ended": true
+    },
+    {
+      "variant": "candidate",
+      "disposal": "before-end",
+      "before": {
+        "globalType": "object",
+        "receiveType": "function",
+        "loads": 0
+      },
+      "afterEarly": {
+        "globalType": "undefined",
+        "receiveType": "undefined"
+      },
+      "errors": [
+        {
+          "message": "TypeError: Cannot read properties of undefined (reading 'receive')",
+          "stack": "TypeError: Cannot read properties of undefined (reading 'receive')\n    at http://127.0.0.1:54734/?case=candidate-before-end:1:6349"
+        }
+      ],
+      "terminal": "<script data-octane-stream>globalThis.__octaneStreamedRenderer.receive({\"identity\":{\"protocol\":1,\"buildId\":\"shell-build\",\"documentId\":\"shell-document\",\"ownerKey\":\"octane:document\",\"instanceKey\":\"[\\\"\\\",\\\"root\\\"][\\\"c:9f51aa73\\\",[],\\\"\\\"]\",\"nodeKey\":\"i:077c2394\",\"selectionKey\":\"[\\\"i:077c2394\\\",[\\\"string\\\",\\\"conversation\\\"]]\",\"selectionGeneration\":0,\"attempt\":1},\"sequence\":3,\"channel\":\"result\",\"kind\":\"complete\"});</script>",
+      "serverLoads": 1,
+      "ended": true
+    },
+    {
+      "variant": "candidate",
+      "disposal": "after-end",
+      "before": {
+        "globalType": "object",
+        "receiveType": "function",
+        "loads": 0
+      },
+      "afterEarly": {
+        "globalType": "object",
+        "receiveType": "function"
+      },
+      "errors": [],
+      "terminal": "<script data-octane-stream>globalThis.__octaneStreamedRenderer.receive({\"identity\":{\"protocol\":1,\"buildId\":\"shell-build\",\"documentId\":\"shell-document\",\"ownerKey\":\"octane:document\",\"instanceKey\":\"[\\\"\\\",\\\"root\\\"][\\\"c:9f51aa73\\\",[],\\\"\\\"]\",\"nodeKey\":\"i:077c2394\",\"selectionKey\":\"[\\\"i:077c2394\\\",[\\\"string\\\",\\\"conversation\\\"]]\",\"selectionGeneration\":0,\"attempt\":1},\"sequence\":3,\"channel\":\"result\",\"kind\":\"complete\"});</script>",
+      "serverLoads": 1,
+      "ended": true
+    },
+    {
+      "variant": "candidate",
+      "disposal": "suspend-before-end",
+      "before": {
+        "globalType": "object",
+        "receiveType": "function",
+        "loads": 0
+      },
+      "afterEarly": {
+        "globalType": "object",
+        "receiveType": "function"
+      },
+      "errors": [],
+      "terminal": "<script data-octane-stream>globalThis.__octaneStreamedRenderer.receive({\"identity\":{\"protocol\":1,\"buildId\":\"shell-build\",\"documentId\":\"shell-document\",\"ownerKey\":\"octane:document\",\"instanceKey\":\"[\\\"\\\",\\\"root\\\"][\\\"c:9f51aa73\\\",[],\\\"\\\"]\",\"nodeKey\":\"i:077c2394\",\"selectionKey\":\"[\\\"i:077c2394\\\",[\\\"string\\\",\\\"conversation\\\"]]\",\"selectionGeneration\":0,\"attempt\":1},\"sequence\":3,\"channel\":\"result\",\"kind\":\"complete\"});</script>",
+      "serverLoads": 1,
+      "ended": true
+    }
+  ],
+  "manifest": {
+    "version": 1,
+    "node": "v26.4.0",
+    "vite": "8.1.5",
+    "site": "c:9f51aa73",
+    "inputs": {
+      "pnpm-lock.yaml": "c6e776b9656dfa6d7b1b04cee540c846b0d0347e8941ccd01255e21a7e312a34",
+      "packages/octane/tests/hydration/_fixtures/streamed-static-shell.tsrx": "1ad26ad25185e5f917894aa89cb00c9ac4d13cd42f8cb78e9524d6b68a3307f6",
+      "packages/octane/tests/hydration/_fixtures/streamed-static-shell-client.ts": "a4474f0bcc60df100220444c7d1f28cd7bcce3dceb15258e9088590b0fb02c5c",
+      "benchmarks/streamed-shell-prototype/streamed-baseline.ts": "8bf40649ec35f8921d4f65e0eecdf44cd20ecd662549f8f077021da99f1318b2",
+      "benchmarks/streamed-shell-prototype/streamed-candidate.ts": "cab94a1bc00ed37262dd213ed0dd1c6867fe9721a344845660c516bfd2634057",
+      "benchmarks/streamed-shell-prototype/streamed-hydrate.ts": "adcc89a443cec7ad89cd57e159458fcfa071f8d05019a994c9d4fb70e950c5b7",
+      "benchmarks/streamed-shell-prototype/stream-validation/evidence.mjs": "e81657f1356a9d8cf05884217ada73c9c0baf563e5098c68f48aa46f030f4ad6",
+      "benchmarks/streamed-shell-prototype/stream-validation/server-entry.ts": "4eb721a6c343a3b0b3392b88b41a0130a4206d4e80c791cabba755f2b67aafce",
+      "benchmarks/streamed-shell-prototype/stream-validation/run.mjs": "53eacb7220e211a3fbd405b2ecc55dee7f20c941d378a39f2f504893f46244cc",
+      "benchmarks/streamed-shell-prototype/stream-validation/node-jsdom.mjs": "1b360912cbda399de1e754a1529b8d70a7e39d43a3ae9eb1374537b70d707ce8"
+    },
+    "emitted": {
+      "baseline/entry.js": "b15d79341c199627635d13f7b36569dd77e707afb6b55701310683c2394f7ce4",
+      "baseline/octane-client-build.json": "cff45e9213f7ae69e60fb691af1aa5c19fc801fbb9c5fb3953a5677a6676037a",
+      "candidate/entry.js": "a954ec50947d86d0d346391c194a5a974d1f59d0d32a2809732a2219e68731cc",
+      "candidate/octane-client-build.json": "0e61daac9757f4bfeceee7159110bb17d33427313bc1eae6fdfb70b7713beccc",
+      "server.mjs": "75ba92c2b1b326cd427132c2f7f0b71df50043d9e6eda0eb01feec164d914d32"
+    }
+  }
+}

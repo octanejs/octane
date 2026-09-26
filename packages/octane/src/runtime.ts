@@ -18793,7 +18793,9 @@ class HydrationCapability {
 			}
 			if (claimsRoot)
 				this.claimRootRemainder(
-					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
+					// A removed marker range may contain cursor.nextSibling. The
+					// advanced cursor points outside the discarded range instead.
+					framedRemainder === undefined ? this.node : framedRemainder,
 				);
 			return this.freshClone(template);
 		}

@@ -10,6 +10,7 @@ export type LabConfig = {
 	interval: number;
 	waves: number;
 	turns: number;
+	historyRows: number;
 };
 
 export type Session = LabConfig;

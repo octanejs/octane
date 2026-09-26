@@ -8,9 +8,10 @@ export function activate(
 	source: BindingSource<RichConversationProps>,
 	signal: AbortSignal,
 	existing: boolean,
+	onRecoverableError: (error: unknown) => void,
 ) {
 	const root = existing
-		? hydrateRoot(slot, RichConversation, source.getSnapshot())
+		? hydrateRoot(slot, RichConversation, source.getSnapshot(), { onRecoverableError })
 		: createRoot(slot);
 	const refresh = () => flushSync(() => root.render(RichConversation, source.getSnapshot()));
 	if (!existing) refresh();

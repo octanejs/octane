@@ -51,12 +51,30 @@ activity. Each async-generator yield is a cumulative, serializable value.
 
 The **Design a run** form reloads with a shareable configuration URL. Query
 parameters are `scenario`, `q` (initial prompt), `auth`, `answer`, `history`,
-`interval` (milliseconds), `waves` (1–64), `turns` (1–200), and `hydrateDelay`
-(0–5000 ms, delaying the composed shell; independent widgets can activate sooner).
+`interval` (milliseconds), `waves` (1–64), `turns` (1–200), `historyRows`
+(1–200), and `hydrateDelay` (0–5000 ms, delaying the composed shell; independent
+widgets can activate sooner). An omitted or blank `historyRows` uses the turn
+count, preserving the default behavior.
 Producer delays are capped at 2000 ms. `run` supplies an optional
 diagnostic ID; otherwise the server creates one. `observe=0` disables the browser
 DOM observer for a control run. Initial streams are finite; this is not a
 permanent chat transport or an authentication example.
+
+The history and conversation sizes can be chosen independently. These local
+profiles align the turn count, history count, first-result delays, and wave
+count with scenarios in the [conversation-streaming benchmark](../../benchmarks/conversation-streaming):
+
+| Profile | URL |
+| --- | --- |
+| Body first | `/?auth=30&answer=8&history=25&interval=8&waves=1&turns=20&historyRows=10` |
+| History first | `/?auth=30&answer=25&history=8&interval=8&waves=1&turns=20&historyRows=10` |
+| Large conversation | `/?auth=30&answer=8&history=25&interval=8&waves=4&turns=200&historyRows=60` |
+
+These are synthetic workload dimensions, not samples from Lightweight Web.
+The apps use different content, markup, and producers (Signal Chat also has a
+tools stream), so matching these settings does not make their timings or bytes
+directly comparable. Compare baseline and candidate builds of the same app and
+profile.
 
 Browser commands use the framework's default 30-second total RPC invocation
 deadline. Initial SSR signal delivery uses a progress deadline that renews as

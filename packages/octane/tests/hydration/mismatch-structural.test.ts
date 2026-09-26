@@ -509,6 +509,60 @@ describe.each([
 		}
 	});
 
+	it('cleans stale root siblings after rebuilding a framed server root', async () => {
+		const { html } = await ServerRT.renderToString(server.RootScopedRecovery, {
+			isClient: false,
+		});
+		container.innerHTML = html;
+		const staleRoot = container.querySelector('#root-server')!;
+		const staleText = document.createTextNode('unexpected server text');
+		const staleSibling = document.createElement('aside');
+		staleSibling.textContent = 'unexpected server element';
+		container.append(staleText, staleSibling);
+		const swap = shouldWarn
+			? devClientModule(SWAP, 'swap.tsrx')
+			: prodClientModule(SWAP, 'swap.tsrx');
+		const onRecoverableError = vi.fn();
+		const root = hydrateRoot(container, swap.Swap, { host: true }, { onRecoverableError });
+		flushSync(() => {});
+
+		try {
+			expect(staleRoot.isConnected).toBe(false);
+			expect(staleText.isConnected).toBe(false);
+			expect(staleSibling.isConnected).toBe(false);
+			expect(container.querySelector('#swap')).not.toBeNull();
+			await Promise.resolve();
+			expect(onRecoverableError).toHaveBeenCalled();
+			flushSync(() => root.render(swap.Swap, { host: false }));
+			expect(container.querySelector('b.inner')).not.toBeNull();
+			expect(container.textContent).not.toContain('unexpected');
+		} finally {
+			root.unmount();
+		}
+		expect(container.textContent).toBe('');
+	});
+
+	it('retains a matching framed root while removing a stale trailing sibling', async () => {
+		const { html } = await ServerRT.renderToString(server.RootScopedRecovery, {
+			isClient: false,
+		});
+		container.innerHTML = html;
+		const serverRoot = container.querySelector('#root-server')!;
+		const staleText = document.createTextNode('unexpected server text');
+		container.append(staleText);
+		const root = hydrateRoot(container, client.RootScopedRecovery, { isClient: false });
+		flushSync(() => {});
+		try {
+			expect(container.querySelector('#root-server')).toBe(serverRoot);
+			expect(staleText.isConnected).toBe(false);
+			flushSync(() => root.render(client.RootScopedRecovery, { isClient: true }));
+			expect(container.querySelector('#root-client')).not.toBeNull();
+		} finally {
+			root.unmount();
+		}
+		expect(container.textContent).toBe('');
+	});
+
 	// Per Redact hydration-mismatch-recovery.test.tsx:262-297.
 	it('nearest-host recovery preserves outside objects and both outside and regenerated handlers', async () => {
 		const { html } = await ServerRT.renderToString(server.HostScopedRecovery, {
