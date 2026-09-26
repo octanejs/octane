@@ -1,4 +1,4 @@
-import { createElement, type ReactElement } from 'octane';
+import { createElement, Fragment, type FragmentProps, type ReactElement } from 'octane';
 
 // React's `createElement(type, props?: (Attributes & P) | null, ...children)`
 // accepts `null` as the config; Octane's runtime already normalizes it.
@@ -18,6 +18,12 @@ const hostNullChildren: ReactElement = createElement('div', null, 'a', createEle
 const componentNullProps: { label?: string } = createElement(Leaf, null).props;
 // @ts-expect-error A null config does not type the descriptor's props as null.
 const hostNullProps: null = createElement('div', null).props;
+
+// Fragment props are a named public type, so emitted declarations reference
+// `FragmentProps` instead of expanding its recursive ref type.
+const fragmentNullProps: FragmentProps = createElement(Fragment, null, 'x').props;
+// @ts-expect-error Fragment props are not typed as null.
+const fragmentPropsNotNull: null = createElement(Fragment, null).props;
 
 // A nullable config variable is accepted and still infers from its object type.
 declare const maybeLabelled: { label: string } | null;

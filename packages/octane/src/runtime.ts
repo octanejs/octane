@@ -21760,15 +21760,22 @@ type FragmentRefValue =
 	| readonly FragmentRefValue[]
 	| null;
 
+/**
+ * Props accepted by `<Fragment>` (React's `FragmentProps`, plus `key` and
+ * fragment refs). Named so declaration emit can reference it instead of
+ * expanding the recursive ref type inline.
+ */
+export interface FragmentProps {
+	children?: unknown;
+	key?: string | number | bigint | null | undefined;
+	ref?: FragmentRefValue;
+}
+
 // The VALUE stays the sentinel symbol (the compiler matches `Fragment` by
 // name and the runtime compares descriptor types by identity); the declared
 // TYPE is component-shaped so long-form `<Fragment key ref>` JSX type-checks —
 // which is the export's entire purpose (see above).
-export const Fragment = FRAGMENT_TAG as unknown as (props: {
-	children?: unknown;
-	key?: string | number | bigint | null | undefined;
-	ref?: FragmentRefValue;
-}) => unknown;
+export const Fragment = FRAGMENT_TAG as unknown as (props: FragmentProps) => unknown;
 
 interface ActivityDescriptorDispatch {
 	type: symbol;
