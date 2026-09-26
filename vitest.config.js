@@ -4057,7 +4057,7 @@ export default defineConfig({
 					environment: 'jsdom',
 					globals: false,
 				},
-				plugins: [octane()],
+				plugins: [octaneServerFixtures(import.meta.dirname), octane()],
 				resolve: {
 					alias: [
 						{

@@ -33017,6 +33017,9 @@ function renderPreparedChildList(
 	compiledMapDeps?: any[],
 	mappedFallback?: boolean,
 ): void {
+	const passthroughList = hydration?.passthroughRanges === true && state.borrowed;
+	let passthroughStart: Comment | null = null;
+	let passthroughEnd: Comment | null = null;
 	if (preparedList.items.length === 0 && hydration === null && state.ownerHost !== null) {
 		// An owns-parent slot needs no list anchors while empty. This also lets
 		// an upgraded host retain its element after its last component disappears,
@@ -33046,17 +33049,58 @@ function renderPreparedChildList(
 			// marker pair (reconcileKeyed anchors on it) — mint it lazily,
 			// appended at the element's tail. One-way, like the promotion above.
 			state.end = (STAGED_DOM?.view(document) ?? document).createComment('');
-			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(state.end, null);
+			let anchor: Node | null = null;
+			if (passthroughList) {
+				for (let owner: Block | null = parentBlock; owner !== null; owner = owner.parentBlock) {
+					if (
+						owner.forSlot !== null &&
+						owner.endMarker !== null &&
+						domNode(owner.endMarker).parentNode === domParent
+					) {
+						anchor = owner.endMarker;
+						break;
+					}
+				}
+				if (anchor === null) {
+					let node = (STAGED_DOM?.view(domParent) ?? domParent).lastChild;
+					while (node !== null && isRendererHydrationStyle(node)) {
+						anchor = node;
+						node = (STAGED_DOM?.view(node) ?? node).previousSibling;
+					}
+				}
+			}
+			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(state.end, anchor);
+			if (passthroughList) {
+				hydration!.markFresh(state.end);
+				passthroughEnd = state.end;
+				if (TRANSITION_JOURNAL !== null) {
+					const end = state.end;
+					journalUndo(() => (STAGED_DOM?.view(end) ?? end).remove());
+				}
+			}
 		}
 		if (state.start === null) {
 			state.start = (STAGED_DOM?.view(document) ?? document).createComment('');
 			// Upgrade adoption: the element's existing raw children must sit
 			// INSIDE [start, end] (they become the items) — mint start before
 			// the first of them, not at the tail.
+			const cursor = passthroughList ? hydration!.node : null;
 			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(
 				state.start,
-				upgradeArmed ? getFirstChild(domParent) : state.end,
+				upgradeArmed
+					? getFirstChild(domParent)
+					: cursor !== null && domNode(cursor).parentNode === domParent
+						? cursor
+						: state.end,
 			);
+			if (passthroughList) {
+				hydration!.markFresh(state.start);
+				passthroughStart = state.start;
+				if (TRANSITION_JOURNAL !== null) {
+					const start = state.start;
+					journalUndo(() => (STAGED_DOM?.view(start) ?? start).remove());
+				}
+			}
 		}
 		state.forSlot = {
 			__kind: 'forBlockSlot',
@@ -33198,16 +33242,30 @@ function renderPreparedChildList(
 	// First fill dispatches to the linear pass directly (see mountItemsLinear)
 	// so a de-opt list's hydration adopt skips the full reconciler too.
 	if (state.forSlot.size === 0) {
-		mountItemsLinear(
-			parentBlock,
-			state.forSlot,
-			items,
-			keySource,
-			body,
-			compiledMapBody === undefined ? 2 : (fastFlags & 2) !== 0,
-			ssrMarkerless,
-			normalizeKey,
-		);
+		try {
+			mountItemsLinear(
+				parentBlock,
+				state.forSlot,
+				items,
+				keySource,
+				body,
+				compiledMapBody === undefined ? 2 : (fastFlags & 2) !== 0,
+				ssrMarkerless,
+				normalizeKey,
+				passthroughList,
+			);
+		} catch (error) {
+			if (passthroughStart !== null) {
+				(STAGED_DOM?.view(passthroughStart) ?? passthroughStart).remove();
+				state.start = null;
+			}
+			if (passthroughEnd !== null) {
+				(STAGED_DOM?.view(passthroughEnd) ?? passthroughEnd).remove();
+				state.end = null;
+			}
+			if (passthroughStart !== null || passthroughEnd !== null) state.forSlot = null;
+			throw error;
+		}
 	} else {
 		reconcileKeyed(
 			parentBlock,
@@ -33242,6 +33300,11 @@ function renderPreparedChildList(
 			}
 		}
 		state.forSlot.adopt = null;
+	}
+	if (passthroughList && !hydration!.passthroughRanges) {
+		// Once this list consumed the selected owner, its containing item must
+		// end after the entire list, including its own closing marker.
+		hydration!.node = getNextSibling(state.forSlot.end);
 	}
 	return;
 }
@@ -33583,6 +33646,11 @@ export function childSlot(
 				  })
 				| null
 		)?.[HYDRATION_RANGE_BOUNDARY] !== 'owner';
+	// Reaching the selected owner through a value slot (for example a keyed list
+	// item) ends passthrough exactly as componentSlot does, so later siblings and
+	// boundaries know the server cursor has been handed off.
+	if (hydration?.passthroughRanges === true && !hydrationTransparent)
+		hydration.passthroughRanges = false;
 	const iterable = iterableChildArray(value);
 	if (iterable !== null) value = iterable;
 	const preparedList =
@@ -35837,7 +35905,12 @@ function clearPassthroughTry(state: TrySlot): void {
 	state.tryBlock = null;
 }
 
-function mountPassthroughCatch(state: TrySlot, error: unknown, reportInline = false): void {
+function mountPassthroughCatch(
+	state: TrySlot,
+	error: unknown,
+	reportInline = false,
+	freshFallback = false,
+): void {
 	if (isAdoptionControl(error)) throw error;
 	clearPassthroughTry(state);
 	state.pendingThenable = null;
@@ -35856,7 +35929,17 @@ function mountPassthroughCatch(state: TrySlot, error: unknown, reportInline = fa
 	);
 	state.block = block;
 	try {
-		renderBlock(block);
+		const hydration = activeHydration();
+		if (freshFallback && hydration !== null) {
+			const parent = state.domParent;
+			const last = (STAGED_DOM?.view(parent) ?? parent).lastChild;
+			hydration.suspend(() => renderBlock(block));
+			let node = last !== null ? getNextSibling(last) : getFirstChild(parent);
+			while (node !== null) {
+				hydration.markFresh(node);
+				node = getNextSibling(node);
+			}
+		} else renderBlock(block);
 	} finally {
 		if (reportInline) enqueueInlineCaughtError(state);
 	}
@@ -35939,15 +36022,17 @@ function renderPassthroughTry(state: TrySlot): void {
 		block.body = state.tryBody;
 		block.extra = state.env;
 	}
+	const hydration = activeHydration();
+	const beforeOwner = hydration?.passthroughRanges === true;
 	try {
 		renderBlock(block);
 		state.hasResolved = true;
 	} catch (error) {
 		if (isSuspenseException(error)) {
-			if (state.propagateSuspense) throw error;
+			if (state.propagateSuspense || (beforeOwner && !hydration!.passthroughRanges)) throw error;
 			mountPassthroughPending(state, error.thenable);
 		} else {
-			mountPassthroughCatch(state, error, true);
+			mountPassthroughCatch(state, error, true, beforeOwner && !hydration!.passthroughRanges);
 		}
 	}
 }
@@ -42054,6 +42139,7 @@ function mountItemsLinear<T>(
 	singleRoot: boolean | 2,
 	ssrMarkerless: boolean,
 	normalizeKey: boolean = false,
+	passthroughList: boolean = false,
 ): void {
 	const newLen = items.length;
 	const observeKey =
@@ -42111,19 +42197,21 @@ function mountItemsLinear<T>(
 					}
 				}
 			}
-			const block = mountItem(
-				parentBlock,
-				parentNode,
-				anchor,
-				item,
-				i,
-				key,
-				itemBody,
-				state,
-				singleRoot,
-				ssrMarkerless,
-				adoptNode,
-			);
+			const block = passthroughList
+				? mountPassthroughListItem(parentBlock, parentNode, anchor, item, i, key, itemBody, state)
+				: mountItem(
+						parentBlock,
+						parentNode,
+						anchor,
+						item,
+						i,
+						key,
+						itemBody,
+						state,
+						singleRoot,
+						ssrMarkerless,
+						adoptNode,
+					);
 			oldItems.set(key, block);
 			block.prevSibling = prev;
 			block.nextSibling = null;
@@ -42146,10 +42234,20 @@ function mountItemsLinear<T>(
 			const block = prev;
 			prev = block.prevSibling;
 			oldItems.delete(block.key);
+			const start = passthroughList ? block.startMarker : null;
+			const end = passthroughList ? block.endMarker : null;
+			const discardOwnedDom =
+				passthroughList &&
+				!isSuspenseException(error) &&
+				!isHostContextRequest(error) &&
+				!isAdoptionControl(error);
+			if (discardOwnedDom && start !== null && domNode(start).parentNode !== null)
+				journalRootChildren(domNode(start).parentNode!);
 			if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
 			if (block.idState.renderOwner?.signalOwner !== undefined)
 				discardSignalRetryItem(block, error);
 			else unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
+			if (start !== null && end !== null) removePassthroughItemRange(start, end, discardOwnedDom);
 		}
 		state.head = null;
 		state.tail = null;
@@ -42163,6 +42261,103 @@ function mountItemsLinear<T>(
 			if (!adoptedNodes?.has(entry.node)) adopt![remaining++] = entry;
 		}
 		adopt!.length = remaining;
+	}
+}
+
+// A list above a selected hydration owner has no server list frames in the
+// selected container. Give each logical sibling its own client range while
+// leaving the server cursor for the owner inside one of those siblings.
+function mountPassthroughListItem<T>(
+	parentBlock: Block,
+	parentNode: Node,
+	anchor: Node,
+	item: T,
+	index: number,
+	key: unknown,
+	body: (item: T, scope: Scope) => void,
+	forSlot: ForSlot,
+): Block {
+	const hydration = activeHydration()!;
+	const cursor = hydration.node;
+	const before = cursor !== null && domNode(cursor).parentNode === parentNode ? cursor : anchor;
+	const start = (STAGED_DOM?.view(document) ?? document).createComment('it');
+	const end = (STAGED_DOM?.view(document) ?? document).createComment('/it');
+	(STAGED_DOM?.view(parentNode) ?? parentNode).insertBefore(start, before);
+	(STAGED_DOM?.view(parentNode) ?? parentNode).insertBefore(end, anchor);
+	if (TRANSITION_JOURNAL !== null) {
+		journalUndo(() => {
+			(STAGED_DOM?.view(start) ?? start).remove();
+			(STAGED_DOM?.view(end) ?? end).remove();
+		});
+	}
+	const block = createBlock(
+		'control-flow',
+		parentBlock,
+		parentNode,
+		start,
+		end,
+		body as ComponentBody,
+		item,
+		forSlot.env,
+	);
+	block.forSlot = forSlot;
+	block.key = key;
+	block.itemIndex = index;
+	preserveRootCreatedDom(block);
+	const fresh = cursor === null || cursor === anchor || hydration.isFresh(cursor);
+	const previousPassthrough = hydration.passthroughRanges;
+	hydration.passthroughRanges = true;
+	try {
+		if (fresh) hydration.suspend(() => renderBlock(block));
+		else renderBlock(block);
+	} catch (error) {
+		if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
+		const discardOwnedDom =
+			previousPassthrough &&
+			!hydration.passthroughRanges &&
+			!isSuspenseException(error) &&
+			!isHostContextRequest(error) &&
+			!isAdoptionControl(error);
+		if (discardOwnedDom) journalRootChildren(parentNode);
+		unmountBlock(block, false);
+		removePassthroughItemRange(start, end, discardOwnedDom);
+		throw error;
+	} finally {
+		hydration.passthroughRanges = previousPassthrough && hydration.passthroughRanges;
+	}
+	const next = hydration.node;
+	(STAGED_DOM?.view(parentNode) ?? parentNode).insertBefore(
+		end,
+		next !== null && domNode(next).parentNode === parentNode ? next : anchor,
+	);
+	// The owner can advance the cursor to this item's provisional end. The
+	// following logical sibling must start after that end, not inside the item.
+	hydration.node = getNextSibling(end);
+	hydration.markFresh(start);
+	hydration.markFresh(end);
+	// A client-only item's content is not stale server remainder for finishRoot().
+	if (fresh)
+		for (
+			let node = getNextSibling(start);
+			node !== null && node !== end;
+			node = getNextSibling(node)
+		)
+			hydration.markFresh(node);
+	return block;
+}
+
+function removePassthroughItemRange(start: Node, end: Node, discardContents: boolean): void {
+	if (!discardContents) {
+		(STAGED_DOM?.view(start as ChildNode) ?? (start as ChildNode)).remove();
+		(STAGED_DOM?.view(end as ChildNode) ?? (end as ChildNode)).remove();
+		return;
+	}
+	for (let node: Node | null = start; node !== null;) {
+		const next = getNextSibling(node);
+		if (!isRendererHydrationStyle(node))
+			(STAGED_DOM?.view(node as ChildNode) ?? (node as ChildNode)).remove();
+		if (node === end) break;
+		node = next;
 	}
 }
 
