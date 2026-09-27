@@ -33,6 +33,11 @@ import { resolveLazyDefaultProps } from './shared-value-helpers.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
+// Compiler-emitted dependency helper — pure function, no DOM. Re-exported here
+// so the 'octane' import it lowers to resolves under the universal entries the
+// same way it does under the default entry (src/index.ts).
+export { __methodDep } from './method-dep.js';
+
 const UNIVERSAL_PLAN = Symbol.for('octane.universal.plan');
 const UNIVERSAL_VALUE = Symbol.for('octane.universal.value');
 const UNIVERSAL_LIST = Symbol.for('octane.universal.list');
