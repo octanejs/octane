@@ -567,7 +567,6 @@ export function Parent(p) @{
 
 	it('keeps renderable value returns on the generic component path', () => {
 		const code = compile(source, 'value-return.tsrx', { hmr: false }).code;
-		expect(code).not.toContain('componentSlotLite');
 		expect(code).not.toContain('EarlyString.$$singleRoot');
 		expect(code).not.toContain('EarlyDescriptor.$$singleRoot');
 		expect(code).not.toContain('EarlyArray.$$singleRoot');
@@ -575,9 +574,13 @@ export function Parent(p) @{
 		// generic return-reconciliation helper; it does not change that helper ABI.
 		expect(code).toContain('return undefined ?? null;');
 		// A bare return is an empty template branch in production, so EarlyVoid
-		// joins the direct-render path without retaining return reconciliation.
+		// joins the lite slot path without retaining return reconciliation. It is
+		// the only lite callsite: the value-returning components stay generic.
+		expect(code.match(/_\$componentSlotLite\(\s*__s,\s*\d+,\s*[^,]+,\s*EarlyVoid,/g)).toHaveLength(
+			1,
+		);
 		expect(code.match(/_\$componentSlot\(/g)).toHaveLength(4);
-		expect(code.match(/_\$componentSlotVoid\(/g)).toHaveLength(2);
+		expect(code.match(/_\$componentSlotVoid\(/g)).toHaveLength(1);
 	});
 
 	it('uses the generic component path during HMR', () => {

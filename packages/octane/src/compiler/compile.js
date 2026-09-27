@@ -4888,7 +4888,7 @@ function containsAutoMemoContextRead(root, ctx) {
 
 const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext']);
 
-function autoMemoBuiltinHookName(call, ctx) {
+function autoMemoBuiltinHookName(call, ctx, includeOrdinary = false) {
 	if (call?.type !== 'CallExpression' && call?.type !== 'OptionalCallExpression') return null;
 	const imported = call._octaneImportedHook ?? call._octaneHookRuntimeImportedHook;
 	if (imported !== undefined && AUTO_MEMO_SETUP_HOOK_NAMES.has(imported)) return imported;
@@ -4899,7 +4899,10 @@ function autoMemoBuiltinHookName(call, ctx) {
 	) {
 		return call.callee.name;
 	}
-	if ((call.type !== 'OptionalCallExpression' && call.optional !== true) || ctx == null) {
+	if (
+		(!includeOrdinary && call.type !== 'OptionalCallExpression' && call.optional !== true) ||
+		ctx == null
+	) {
 		return null;
 	}
 
@@ -5278,6 +5281,30 @@ const SETUP_PURE_NAMESPACE_MEMBERS = new Map([
 	['Date', new Set(['now', 'parse', 'UTC'])],
 	['JSON', new Set(['parse', 'stringify'])],
 ]);
+
+// Built-in hooks whose FUNCTION arguments still execute during render on inputs
+// a props compare cannot witness: a `useSyncExternalStore` snapshot reader runs
+// unconditionally, and the linked-state reconciler / optimistic reducer run
+// when their hook input moves. Those bodies stay under render rules inside the
+// `$$stable` proof, as does a `useMemo`/`useCallback` factory whose deps are
+// absent or an explicit `null` (recomputed every render — checked at the call
+// site). Every
+// other built-in's function arguments are deferred or mount-only (effects,
+// callbacks, lazy state/reducer initializers, dep-gated memo factories), so a
+// skipped render is indistinguishable from a deps-equal one for them.
+const STABLE_SYNC_ARG_HOOKS = new Set(['useLinkedState', 'useOptimistic', 'useSyncExternalStore']);
+
+// Shared by the unsafe-structure walk and the deferred-function collector: a
+// hook whose function arguments execute during render on inputs a props
+// compare cannot witness (plus useMemo/useCallback without an explicit dep
+// array — an absent or `null` second argument recomputes every render).
+function stableCallHasSyncArgs(call, hook) {
+	return (
+		STABLE_SYNC_ARG_HOOKS.has(hook) ||
+		((hook === 'useMemo' || hook === 'useCallback') &&
+			call.arguments?.[1]?.type !== 'ArrayExpression')
+	);
+}
 
 // Every binding name the module declares anywhere. A global namespace shadowed
 // by any local, parameter, or import is treated as an unknown callee.
@@ -6681,7 +6708,7 @@ function scanComponentBody(root, importedNames) {
 // A JSX member chain bottoms out at a JSXIdentifier, so the base test below
 // never matches one. Do not reintroduce a JSX-awareness flag: it cannot change
 // the answer.
-function containsImportedMemberRead(root, importedNames) {
+function containsImportedMemberRead(root, importedNames, exemptNamespaces = null) {
 	let found = false;
 	const seen = new WeakSet();
 	function walk(n) {
@@ -6697,7 +6724,14 @@ function containsImportedMemberRead(root, importedNames) {
 			while (object?.type === 'MemberExpression' || object?.type === 'JSXMemberExpression') {
 				object = object.object;
 			}
-			if (object?.type === 'Identifier' && importedNames.has(object.name)) {
+			if (
+				object?.type === 'Identifier' &&
+				importedNames.has(object.name) &&
+				// A namespace object whose module is octane exposes immutable runtime
+				// exports — `Octane.useEffect` resolves to the same builtin the
+				// call classifier handles, not a live binding a dep must witness.
+				exemptNamespaces?.has(object.name) !== true
+			) {
 				found = true;
 				return;
 			}
@@ -6835,7 +6869,12 @@ function collectAutoMemoLocalHazards(stmts, importedNames) {
 	return hazards;
 }
 
-function containsAutoMemoUnsafeStructure(stmts, ctx = null) {
+function containsAutoMemoUnsafeStructure(
+	stmts,
+	ctx = null,
+	stable = false,
+	admitContextReads = false,
+) {
 	let found = false;
 	const seen = new WeakSet();
 	// Spread bags on HOST elements, marked admissible by the owning element's
@@ -6862,6 +6901,87 @@ function containsAutoMemoUnsafeStructure(stmts, ctx = null) {
 			// that child's render. Keep mutable ref reads opaque even though ordinary
 			// event-handler calls/mutations remain deferred.
 			if (containsDeferredRefRead(n)) found = true;
+			return;
+		}
+		// An `@{ }` scoped child lowers to a nested function value invoked by the
+		// hole machinery — the same deferred shape as the explicit `() => @{ }`
+		// spelling — so `$$stable` classifies its internals as child-render work
+		// rather than this component's render. Non-stable callsites keep walking
+		// it: their region guard already skips the child with everything else.
+		if (stable && t === 'JSXCodeBlock') {
+			if (containsDeferredRefRead(n)) found = true;
+			return;
+		}
+		if (
+			stable &&
+			(t === 'CallExpression' ||
+				t === 'OptionalCallExpression' ||
+				t === 'NewExpression' ||
+				t === 'TaggedTemplateExpression')
+		) {
+			// `$$stable` mode also owns the render-call gate, because hook calls are
+			// ADMITTED here — a skipped render cannot repeat their setup work, so
+			// each built-in must be classified rather than failing closed. Deferred
+			// and mount-only function arguments are skipped wholesale; the
+			// sync-factory hooks keep theirs under render rules (a
+			// useSyncExternalStore snapshot read or an always-run memo factory can
+			// still observe unwitnessed state during render).
+			if (t === 'NewExpression' || t === 'TaggedTemplateExpression') {
+				if (ctx?.strongMemo === true) {
+					walk(n.callee ?? n.tag, n, 'callee');
+					walk(n.arguments ?? n.quasi?.expressions, n, 'arguments');
+					return;
+				}
+				found = true;
+				return;
+			}
+			const hook = autoMemoBuiltinHookName(n, ctx, true);
+			if (
+				hook === 'useFormStatus' ||
+				((hook === 'useContext' || hook === 'use') && !admitContextReads)
+			) {
+				// A render-position context read must re-run when the provider value
+				// moves; a bail would freeze it. useFormStatus re-resolves the
+				// nearest ANCESTOR <form> on every render — an equal-props update
+				// can still move the consumer under a different form, and no
+				// dependency map tracks that ancestry — so it fails closed even in
+				// the context-admitting (bail-safe dependency) mode. (Reads inside
+				// descendants' own bodies are runtime work, covered by the
+				// memoInChain contract.)
+				found = true;
+				return;
+			}
+			if (hook !== null) {
+				const sync = stableCallHasSyncArgs(n, hook);
+				walk(n.callee, n, 'callee');
+				for (const argument of n.arguments ?? []) {
+					const arg = unwrapTsExpr(argument);
+					if (arg.type === 'ArrowFunctionExpression' || arg.type === 'FunctionExpression') {
+						if (sync) {
+							// The factory/snapshot/reconciler executes during render, so
+							// its body is render-position code — classify it under the
+							// same rules rather than deferring it.
+							walk(arg.params, arg, 'params');
+							walk(arg.body, arg, 'body');
+						}
+						continue;
+					}
+					walk(argument, n, 'arguments');
+				}
+				return;
+			}
+			if (autoMemoCallExecutesSetupHook(n, ctx)) {
+				// A same-module hookful helper is render-time lifecycle work a skipped
+				// render cannot repeat — fail closed.
+				found = true;
+				return;
+			}
+			if (ctx?.strongMemo === true || plainCalleeIsMemoizable(n, ctx)) {
+				walk(n.callee, n, 'callee');
+				walk(n.arguments, n, 'arguments');
+				return;
+			}
+			found = true;
 			return;
 		}
 		// Native styles perform implicit reads, including styles carried by a host
@@ -7003,6 +7123,62 @@ function containsAutoMemoUnsafeStructure(stmts, ctx = null) {
 	}
 	for (const s of stmts) walk(s);
 	return found;
+}
+
+// Function nodes whose bodies are DEFERRED under the `$$stable` proof — every
+// function value (event handlers, effect/memo factories gated by deps, lazy
+// initializers, callbacks) except the function arguments of sync-factory hooks,
+// which execute during render and therefore stay render-position code. Passed
+// to collectFreeIdentifiers as its ignore set so a name read only inside
+// deferred work (`useState(() => new Set())`) never counts as a render read.
+function collectStableDeferredFunctions(stmts, ctx) {
+	const deferred = new Set();
+	const seen = new WeakSet();
+	function walk(n) {
+		if (!n) return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x);
+			return;
+		}
+		if (typeof n !== 'object' || !n.type || seen.has(n)) return;
+		seen.add(n);
+		const t = n.type;
+		if (
+			t === 'ArrowFunctionExpression' ||
+			t === 'FunctionExpression' ||
+			t === 'FunctionDeclaration' ||
+			// A nested `@{ }` scoped child is a deferred function value too — the
+			// lowering emits it as a sibling `__tsrx$N` passed to the hole machinery.
+			t === 'JSXCodeBlock'
+		) {
+			deferred.add(n);
+			return;
+		}
+		if (t === 'CallExpression' || t === 'OptionalCallExpression') {
+			const hook = autoMemoBuiltinHookName(n, ctx, true);
+			if (hook !== null && stableCallHasSyncArgs(n, hook)) {
+				walk(n.callee);
+				for (const argument of n.arguments ?? []) {
+					const arg = unwrapTsExpr(argument);
+					if (arg.type === 'ArrowFunctionExpression' || arg.type === 'FunctionExpression') {
+						// The factory runs during render: collect its free names, but
+						// its nested functions defer again relative to the factory.
+						walk(arg.params);
+						walk(arg.body);
+					} else {
+						walk(argument);
+					}
+				}
+				return;
+			}
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	}
+	for (const s of stmts) walk(s);
+	return deferred;
 }
 
 /**
@@ -10718,6 +10894,10 @@ function compileInternal(
 				autoMemoComponentDeps: [],
 				autoMemoImportedComponents: [],
 				autoMemoMayReadContext: false,
+				stable: false,
+				stableBody: false,
+				bailSafe: false,
+				stableComponentDeps: [],
 				node: compNode,
 				returnJsx: isReturnJsxFunction(compNode),
 				voidOutput:
@@ -10838,6 +11018,13 @@ function compileInternal(
 		let importedMemberRead = null;
 		const readsImportedMember = () =>
 			(importedMemberRead ??= containsImportedMemberRead(root, ctx.importedNames));
+		let importedMemberReadStable = null;
+		const readsImportedMemberStable = () =>
+			(importedMemberReadStable ??= containsImportedMemberRead(
+				root,
+				ctx.importedNames,
+				ctx.octaneImportNamespaces,
+			));
 		// Call-site regions inside this body are gated per site: the site's own
 		// props are walked directly (containsAutoMemoUnsafeStructure /
 		// containsImportedMemberRead over the JSX node), and ref/imported-member
@@ -10916,6 +11103,110 @@ function compileInternal(
 			(containsAutoMemoContextRead(root, ctx) ||
 				autoMemoImportedComponents.size > 0 ||
 				[...free].some((name) => ctx.defaultMemoBindings.has(name)));
+		// `$$stable` — the definition-site purity stamp consumed by the runtime's
+		// memo bail (U4). Unlike `autoMemoSafe` (which proves a CALL-SITE region's
+		// dep tuple complete), stable proves the body's committed output is a pure
+		// projection of its props snapshot plus its own hook lifecycle, so a later
+		// shallow-equal props update may keep the committed subtree. Two body
+		// verdicts share one free-name pass:
+		//
+		//   stableBody — strict purity. Deferred and mount-only hook bodies are
+		//   admitted (they run at commit/dispatch time, never in the skipped
+		//   render), while a render-position useContext/use/useFormStatus read is
+		//   not: the contract the stamp promises is a props-only projection.
+		//
+		//   bailSafe — the same proof modulo RUNTIME-TRACKED reads. A subtree
+		//   that only fails strictness by reading context stays correct when a
+		//   bailed parent keeps it committed: memoInChain stamps the read and
+		//   refreshContextConsumers reaches it on provider commits (React.memo's
+		//   lazy-propagation rule). useFormStatus still fails — it re-resolves
+		//   ancestor <form> identity per render and no dependency map tracks
+		//   that. Only bailSafe same-module components may sit under a stamp:
+		//   keeping an impure child's committed subtree would hide the work its
+		//   re-render would have done, which explicit memo() asks the user for
+		//   but a compiler stamp must prove.
+		//
+		// Free names are render-position reads only — deferred hook bodies and
+		// callbacks are excluded via collectStableDeferredFunctions — and are
+		// admitted only as component tags (each boundary self-governs), built-in
+		// hook imports, proven createContext identities, immutable memo() walls,
+		// octane's own namespace, and same-module declarations.
+		const stableGate =
+			ctx.autoMemo === true &&
+			ctx.mode === 'client' &&
+			options?.__universal == null &&
+			ctx._universalRuntimeUnitsByBinding?.has(compNode.id?.name) !== true &&
+			ordinaryPropsParam &&
+			!compNode._octaneBindingView &&
+			!readsImportedMemberStable();
+		let stableBody = false;
+		let bailSafeBody = false;
+		const stableComponentDeps = [];
+		if (stableGate) {
+			// Strict purity implies the context-admitting verdict, so the strict
+			// walk only runs when the bail-safe one passed.
+			bailSafeBody = !containsAutoMemoUnsafeStructure(stmts, ctx, true, true);
+			if (bailSafeBody) {
+				stableBody = !containsAutoMemoUnsafeStructure(stmts, ctx, true, false);
+				const renderFree = collectFreeIdentifiers(
+					root,
+					locals,
+					collectStableDeferredFunctions(stmts, ctx),
+				);
+				let admitted = true;
+				for (const name of renderFree) {
+					if (ctx._octaneBoundaryNames.has(name)) {
+						admitted = false;
+						break;
+					}
+					if (ctx.importNamespaceNames.has(name)) {
+						// Only octane's own namespace is admitted — its member reads
+						// resolve to the built-in hooks classified above. Any other
+						// namespace object exposes live exported properties a props
+						// compare cannot witness.
+						if (!ctx.octaneImportNamespaces?.has(name)) {
+							admitted = false;
+							break;
+						}
+						continue;
+					}
+					if (ctx.importedNames.has(name)) {
+						const imported = ctx.octaneImportLocals?.get(name);
+						const hookImport =
+							typeof imported === 'string' && AUTO_MEMO_SETUP_HOOK_NAMES.has(imported);
+						// Imported component callsites fail closed for `$$stable`: a
+						// block-level bail keeps the committed subtree without running
+						// the callee's own memo witness, so an opaque import that
+						// reads mutable module state (or gains a veto compare after a
+						// lazy resolution) would go stale. The callsite memo region
+						// still guards them live at render time.
+						if (!hookImport) {
+							admitted = false;
+							break;
+						}
+						continue;
+					}
+					// A module const proven to hold a createContext identity is
+					// immutable: provider tags and useContext args read only the
+					// identity, and the value flow is the runtime-tracked dep.
+					if (ctx.provenContextBindings?.has(name)) continue;
+					if (ctx.defaultMemoBindings.has(name)) continue;
+					if (ctx.componentInfo.has(name)) {
+						stableComponentDeps.push(name);
+						continue;
+					}
+					if (ctx.moduleFunctionDeclarations?.has(name)) continue;
+					admitted = false;
+					break;
+				}
+				stableBody = stableBody && admitted;
+				bailSafeBody = bailSafeBody && admitted;
+			}
+		}
+		info.stableBody = stableBody;
+		info.bailSafe = bailSafeBody;
+		info.stableComponentDeps = bailSafeBody ? [...new Set(stableComponentDeps)].sort() : [];
+		info.stable = false; // stamped only after the bailSafe fixed point below
 		// Hookless check.
 		// Return-JSX functions reconcile their returned descriptor through
 		// renderBlock. componentSlotLite intentionally ignores return values, so
@@ -11052,6 +11343,31 @@ function compileInternal(
 				}
 			}
 		}
+	}
+	// `$$stable` bail-safety is transitive over same-module component edges: a
+	// bailed parent keeps the child's committed subtree, which is only equivalent
+	// to re-rendering when the child is itself bail-safe — pure modulo
+	// runtime-tracked context reads. Iterate to a fixed point so declaration
+	// order cannot matter and recursive components fail closed, then stamp the
+	// strict bodies whose deps are all bail-safe.
+	let bailSafeChanged = true;
+	while (bailSafeChanged) {
+		bailSafeChanged = false;
+		for (const [, info] of ctx.componentInfo) {
+			if (!info.bailSafe) continue;
+			for (const name of info.stableComponentDeps) {
+				if (ctx.componentInfo.get(name)?.bailSafe !== true) {
+					info.bailSafe = false;
+					bailSafeChanged = true;
+					break;
+				}
+			}
+		}
+	}
+	for (const [, info] of ctx.componentInfo) {
+		info.stable =
+			info.stableBody === true &&
+			info.stableComponentDeps.every((name) => ctx.componentInfo.get(name)?.bailSafe === true);
 	}
 	// Pull live imported captures through the safe same-module call graph. Work
 	// flows from a dependency to its dependents, so declaration order cannot turn
@@ -11562,6 +11878,19 @@ function compileInternal(
 						b.stmt(
 							b.assignment('=', b.member(b.id(name), '$$singleRoot'), b.literal(true, 'true')),
 						),
+						info.node?.loc ? info.node : moduleOrigin,
+					),
+				);
+			}
+			// `$$stable` follow-up for the declaration forms that cannot carry the
+			// initializer (hoisted return-JSX functions). The helper stamps the
+			// live binding — deliberately NOT a `X.$$stable = true` assignment,
+			// so the property stays non-enumerable and bound to the function.
+			if (info.stable === true && info.stableInitialized !== true) {
+				ctx.runtimeNeeded.add('__st');
+				stampNodes.push(
+					inheritOriginLoc(
+						b.stmt(b.call('_$__st', b.id(name))),
 						info.node?.loc ? info.node : moduleOrigin,
 					),
 				);
@@ -15328,6 +15657,15 @@ function singleRootInitializer(ctx, component) {
 	return markPure(b.call('_$__s', component));
 }
 
+// Same delivery contract as singleRootInitializer: `$$stable` rides on the
+// compiler-owned function's initializer so bundlers can discard the stamp with
+// an unused export, and the bound getter keeps arbitrary wrappers from
+// inheriting the proof.
+function stableInitializer(ctx, component) {
+	ctx.runtimeNeeded.add('__st');
+	return markPure(b.call('_$__st', component));
+}
+
 // An exact public memo wrapper preserves the already-proven host output of its
 // immutable local component. Stamp only the fresh compiler-owned wrapper:
 // probing arbitrary component metadata would invoke observable getters, and
@@ -15637,6 +15975,14 @@ function compileComponent(node, ctx, options) {
 				componentInfo.singleRootInitialized = true;
 			}
 		}
+		if (componentInfo?.stable === true) {
+			ctx.runtimeNeeded.add('__st');
+			// Same position and contract as the `__s` stamp above — the raw
+			// hoisted declaration. `$$stable` is never true under HMR (the
+			// autoMemo gate excludes it), so no rebind ordering exists here.
+			statements.push(guarded(b.call('_$__st', b.id(name))));
+			componentInfo.stableInitialized = true;
+		}
 		if (hmrWrap && isExported) {
 			// `_$hmr` returns a stable wrapper with a DIFFERENT identity; rebinding
 			// keeps later references hot-updatable while the pre-declaration capture
@@ -15699,6 +16045,10 @@ function compileComponent(node, ctx, options) {
 	if (!hmrWrap && componentInfo?.singleRoot === true) {
 		valueExpr = inheritOriginLoc(singleRootInitializer(ctx, valueExpr), node);
 		componentInfo.singleRootInitialized = true;
+	}
+	if (!hmrWrap && componentInfo?.stable === true) {
+		valueExpr = inheritOriginLoc(stableInitializer(ctx, valueExpr), node);
+		componentInfo.stableInitialized = true;
 	}
 	const declKind = options && options.hmrMutable ? 'let' : 'const';
 	const declNode = inheritOriginLoc(
@@ -27110,12 +27460,18 @@ const depNodeFor = (rec) => (dep) => {
 	return dep.startsWith('props.') ? b.member(b.id('props'), dep.slice('props.'.length)) : b.id(dep);
 };
 
-// `<name>.__memo === true && <name>.__compare === undefined` chains (and the
-// negated miss form) for imported-component memo witnesses.
+// `(<name>.__memo === true || <name>.$$stable === true) && <name>.__compare ===
+// undefined` chains (and the negated miss form) for imported-component memo
+// witnesses. A `$$stable` definition satisfies the same self-bail contract the
+// witness exists to prove; a custom comparator still fails closed.
 function witnessOkChain(names) {
 	return andChain(
 		names.flatMap((name) => [
-			b.binary('===', b.member(b.id(name), '__memo'), b.literal(true)),
+			b.logical(
+				'||',
+				b.binary('===', b.member(b.id(name), '__memo'), b.literal(true)),
+				b.binary('===', b.member(b.id(name), '$$stable'), b.literal(true)),
+			),
 			b.binary('===', b.member(b.id(name), '__compare'), b.id('undefined')),
 		]),
 	);
@@ -27123,7 +27479,11 @@ function witnessOkChain(names) {
 function witnessMissChain(names) {
 	return orChain(
 		names.flatMap((name) => [
-			b.binary('!==', b.member(b.id(name), '__memo'), b.literal(true)),
+			b.logical(
+				'&&',
+				b.binary('!==', b.member(b.id(name), '__memo'), b.literal(true)),
+				b.binary('!==', b.member(b.id(name), '$$stable'), b.literal(true)),
+			),
 			b.binary('!==', b.member(b.id(name), '__compare'), b.id('undefined')),
 		]),
 	);
@@ -31641,10 +32001,17 @@ function makeCompCall(
 						} else {
 							autoMemoWitnesses = [...(calleeInfo.autoMemoImportedComponents || [])];
 							autoMemoContextAware = calleeInfo.autoMemoMayReadContext === true;
-							// The ordinary cache may need a context-stamping Block. The
-							// proven synchronous state-only path keeps its existing lite
-							// representation and therefore adds no mount boundaries.
-							liteEligible = false;
+							if (autoMemoContextAware) {
+								// A context-aware cache needs the context-stamping Block,
+								// so the call keeps the full componentSlot lowering.
+								liteEligible = false;
+							} else {
+								// A context-free callee's guard stamps nothing: keep the
+								// lite representation and memo-wrap the same
+								// componentSlotLite call the unguarded path would emit —
+								// the cache adds no mount boundaries.
+								autoMemoLite = liteEligible;
+							}
 							singleRoot = calleeInfo.singleRoot === true;
 						}
 					}
@@ -31683,13 +32050,16 @@ function makeCompCall(
 	// emitElementHtml). Only a componentSlotLite lowering can lose its
 	// position (no markers, no anchor, no record) — and only when the callee's
 	// body root can take a null-arm branch; anchorlessRootSafe carries that
-	// transitive proof (see anchorlessRootShape). Every non-lite lowering
-	// self-positions: componentSlot mints its marker pair, and the singleRoot
-	// regimes keep the root element from mount. (A staticFragmentRenderer fold
-	// registers only for single-plain-host-root callees, so its authored
-	// info's shape proof holds.)
+	// transitive proof (see anchorlessRootShape). A memo-guarded lite call
+	// (autoMemoLite) is the same markerless regime, so it needs the same
+	// proof. Every non-lite lowering self-positions: componentSlot mints its
+	// marker pair, and the singleRoot regimes keep the root element from
+	// mount. (A staticFragmentRenderer fold registers only for
+	// single-plain-host-root callees, so its authored info's shape proof
+	// holds.)
+	const liteLowering = liteEligible || autoMemoLite;
 	const anchorlessAppendSafe =
-		!liteEligible || ctx.componentInfo?.get(compName)?.anchorlessRootSafe === true;
+		!liteLowering || ctx.componentInfo?.get(compName)?.anchorlessRootSafe === true;
 
 	return {
 		id,
