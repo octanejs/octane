@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
@@ -158,18 +158,64 @@ export function generateFiles(catalog) {
 	);
 }
 
+// Framework modules outside the two runtime entries whose Error messages must
+// also come from the catalog. Paths are relative to packages/octane/src.
+// independent-hydration-protocol.ts shares its manifest message with
+// hydration/independent-island.ts, so it is covered with the hydration modules.
+const COVERED_MODULE =
+	/^(?:signals\/[^/]+|hydration\/[^/]+|dom-bindings?(?:-[a-z-]+)?|independent-hydration-protocol)\.ts$/;
+// Surfaces follow static import reachability from the package entries: modules
+// reachable only from client entries are "client"; only from server entries
+// (runtime.server.ts, octane/server, octane/signals/server, ...) are "server".
+// Everything else in scope is "shared": octane/signals, octane/hydration, and
+// the modules they pull in also load in SSR bundles.
+//
+// Shared modules call formatClientError() with codes registered for both
+// runtimes. The client formatter declares `process` only at the type level and
+// reads process.env.NODE_ENV exactly as the server formatter does, so it is safe
+// in Node. Client bundles keep a single message table; the server table merely
+// repeats those dev-only messages. Misclassifying a module is therefore a
+// catalog-metadata error, never a runtime one, which is why unlisted covered
+// modules default to "shared".
+const CLIENT_ONLY_MODULES = new Set([
+	'dom-binding-claims.ts',
+	'dom-binding-classes.ts',
+	'dom-binding-controls.ts',
+	'dom-binding-program.ts',
+	'dom-binding-projections.ts',
+	'dom-binding-signals.ts',
+	'dom-binding-styles.ts',
+	'dom-bindings.ts',
+	'signals/client.ts',
+	'signals/native-read-client.ts',
+	'signals/native-read-events.ts',
+	'signals/native-read-inspection.ts',
+	'signals/native-read-retry.ts',
+	'signals/transition-candidate.ts',
+]);
+const SERVER_ONLY_MODULES = new Set(['signals/native-read-server.ts', 'signals/server.ts']);
+
+export function frameworkErrorSurface(filename) {
+	if (filename === 'runtime.ts') return 'client';
+	if (filename === 'runtime.server.ts') return 'server';
+	if (!COVERED_MODULE.test(filename)) return undefined;
+	if (CLIENT_ONLY_MODULES.has(filename)) return 'client';
+	if (SERVER_ONLY_MODULES.has(filename)) return 'server';
+	return 'shared';
+}
+
 export function validateRuntimeUsages(catalog, sources) {
 	const used = { client: new Set(), server: new Set() };
+	const covered = [];
 	for (const [filename, source] of sources) {
-		const surface =
-			filename === 'runtime.ts'
-				? 'client'
-				: filename === 'runtime.server.ts'
-					? 'server'
-					: undefined;
-		if (surface !== undefined) {
-			validateFrameworkErrorConstruction(filename, source, surface, catalog, used);
-		}
+		const surface = frameworkErrorSurface(filename);
+		if (surface === undefined) continue;
+		const sourceFile = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true);
+		covered.push([filename, sourceFile, surface]);
+	}
+	const errorClasses = collectErrorClasses(covered.map(([, sourceFile]) => sourceFile));
+	for (const [filename, sourceFile, surface] of covered) {
+		validateFrameworkErrorConstruction(filename, sourceFile, surface, catalog, used, errorClasses);
 	}
 	for (const [rawCode, entry] of Object.entries(catalog.codes)) {
 		if (entry.status !== 'active') continue;
@@ -182,17 +228,78 @@ export function validateRuntimeUsages(catalog, sources) {
 	}
 }
 
-const ERROR_CONSTRUCTORS = new Set([
-	'AggregateError',
-	'Error',
-	'EvalError',
-	'MaximumUpdateDepthError',
-	'RangeError',
-	'ReferenceError',
-	'SyntaxError',
-	'TypeError',
-	'URIError',
+// Built-in constructors mapped to the index of their message argument.
+const ERROR_CONSTRUCTORS = new Map([
+	['AggregateError', 1],
+	['Error', 0],
+	['EvalError', 0],
+	['RangeError', 0],
+	['ReferenceError', 0],
+	['SyntaxError', 0],
+	['TypeError', 0],
+	['URIError', 0],
 ]);
+
+function extendedClassName(node) {
+	const clause = node.heritageClauses?.find(
+		(heritage) => heritage.token === ts.SyntaxKind.ExtendsKeyword,
+	);
+	const base = clause?.types[0]?.expression;
+	return base !== undefined && ts.isIdentifier(base) ? base.text : undefined;
+}
+
+function findSuperCall(node) {
+	if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.SuperKeyword) return node;
+	if (ts.isFunctionLike(node) || ts.isClassLike(node)) return undefined;
+	return ts.forEachChild(node, findSuperCall);
+}
+
+function forwardedParameterIndex(constructor, message) {
+	if (message === undefined) return -1;
+	message = unwrapExpression(message);
+	if (!ts.isIdentifier(message)) return -1;
+	return constructor.parameters.findIndex(
+		(parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === message.text,
+	);
+}
+
+/**
+ * Error subclasses declared in covered modules, mapped to the constructor
+ * argument that becomes the message, or null when the subclass formats its own
+ * message in super(). Constructions of a forwarding subclass (new
+ * SignalFrameError(message)) are then checked exactly like `new Error(message)`,
+ * and a self-formatting super() call is checked as a construction site.
+ */
+function collectErrorClasses(sourceFiles) {
+	const classes = new Map(ERROR_CONSTRUCTORS);
+	const declarations = [];
+	for (const sourceFile of sourceFiles) {
+		const visit = (node) => {
+			if (ts.isClassLike(node) && node.name !== undefined) declarations.push(node);
+			ts.forEachChild(node, visit);
+		};
+		visit(sourceFile);
+	}
+	for (let changed = true; changed;) {
+		changed = false;
+		for (const declaration of declarations) {
+			const name = declaration.name.text;
+			const parent = extendedClassName(declaration);
+			if (classes.has(name) || parent === undefined || !classes.has(parent)) continue;
+			const parentIndex = classes.get(parent);
+			const constructor = declaration.members.find(ts.isConstructorDeclaration);
+			const superCall = constructor?.body && findSuperCall(constructor.body);
+			let index = parentIndex;
+			if (constructor !== undefined && parentIndex !== null) {
+				const forwarded = forwardedParameterIndex(constructor, superCall?.arguments[parentIndex]);
+				index = forwarded === -1 ? null : forwarded;
+			}
+			classes.set(name, index);
+			changed = true;
+		}
+	}
+	return classes;
+}
 
 function unwrapExpression(node) {
 	while (
@@ -257,13 +364,57 @@ function isStringTypeGuard(condition, value) {
 	);
 }
 
+// `cause instanceof Error ? cause.message : <coded fallback>`: rewrapping a
+// caught foreign error (a failed fetch or reader) keeps that error's own text.
+function isCaughtErrorMessage(condition, value) {
+	condition = unwrapExpression(condition);
+	value = unwrapExpression(value);
+	return (
+		ts.isBinaryExpression(condition) &&
+		condition.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword &&
+		ts.isIdentifier(condition.left) &&
+		ts.isIdentifier(condition.right) &&
+		condition.right.text === 'Error' &&
+		ts.isPropertyAccessExpression(value) &&
+		value.name.text === 'message' &&
+		sameDynamicExpression(value.expression, condition.left)
+	);
+}
+
 function isAllowedErrorMessage(node, formatterName) {
 	node = unwrapExpression(node);
 	if (isDirectFormatterCall(node, formatterName)) return true;
+	if (
+		ts.isBinaryExpression(node) &&
+		node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+	) {
+		// A compiled DOM binding definition carries the compiler's own reason an
+		// opaque view is not constructible; that message is emitted program data,
+		// so only the runtime's fallback is catalogued.
+		const carried = unwrapExpression(node.left);
+		return (
+			ts.isPropertyAccessExpression(carried) &&
+			carried.name.text === 'constructionError' &&
+			isAllowedErrorMessage(node.right, formatterName)
+		);
+	}
 	if (!ts.isConditionalExpression(node)) return false;
+	// Choosing between catalogued messages keeps every branch coded.
+	if (
+		isAllowedErrorMessage(node.whenTrue, formatterName) &&
+		isAllowedErrorMessage(node.whenFalse, formatterName)
+	) {
+		return true;
+	}
+	if (
+		isCaughtErrorMessage(node.condition, node.whenTrue) &&
+		isAllowedErrorMessage(node.whenFalse, formatterName)
+	) {
+		return true;
+	}
 	const fallback = unwrapExpression(node.whenFalse);
-	// The one audited exception transports a server-provided Error.message when
-	// it is a string and substitutes registered code 23 only for malformed
+	// The audited runtime exception transports a server-provided Error.message
+	// when it is a string and substitutes registered code 23 only for malformed
 	// payloads. Keep this exact so arbitrary local framework strings cannot evade
 	// production-code enforcement behind a conditional.
 	return (
@@ -277,9 +428,17 @@ function isAllowedErrorMessage(node, formatterName) {
 	);
 }
 
-function validateFrameworkErrorConstruction(filename, source, surface, catalog, used) {
-	const sourceFile = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true);
-	const formatterName = surface === 'client' ? 'formatClientError' : 'formatServerError';
+function validateFrameworkErrorConstruction(
+	filename,
+	sourceFile,
+	surface,
+	catalog,
+	used,
+	errorClasses,
+) {
+	const formatterName = surface === 'server' ? 'formatServerError' : 'formatClientError';
+	const formatterRuntime = surface === 'server' ? 'server' : 'client';
+	const requiredRuntimes = surface === 'shared' ? ['client', 'server'] : [surface];
 
 	function location(node) {
 		const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
@@ -296,7 +455,7 @@ function validateFrameworkErrorConstruction(filename, source, surface, catalog, 
 					? 'server'
 					: undefined;
 		if (runtime === undefined) return;
-		if (runtime !== surface) {
+		if (runtime !== formatterRuntime) {
 			fail(`${location(node)} cannot use the ${runtime} formatter in the ${surface} runtime.`);
 		}
 		const codeNode = node.arguments[0];
@@ -310,8 +469,10 @@ function validateFrameworkErrorConstruction(filename, source, surface, catalog, 
 		const entry = catalog.codes[String(code)];
 		if (entry === undefined) fail(`${location(node)} references unknown ${runtime} code ${code}.`);
 		if (entry.status !== 'active') fail(`${location(node)} references retired code ${code}.`);
-		if (!entry.runtime.includes(runtime)) {
-			fail(`${location(node)} references code ${code}, which is not registered for ${runtime}.`);
+		for (const required of requiredRuntimes) {
+			if (!entry.runtime.includes(required)) {
+				fail(`${location(node)} references code ${code}, which is not registered for ${required}.`);
+			}
 		}
 		const argumentCount = node.arguments.length - 1;
 		if (argumentCount !== entry.argumentCount) {
@@ -319,23 +480,40 @@ function validateFrameworkErrorConstruction(filename, source, surface, catalog, 
 				`${location(node)} passes ${argumentCount} arguments to ${runtime} code ${code}; expected ${entry.argumentCount}.`,
 			);
 		}
-		used[runtime].add(code);
+		for (const required of requiredRuntimes) used[required].add(code);
+	}
+
+	function validateMessage(node, name, message) {
+		if (message === undefined || !isAllowedErrorMessage(message, formatterName)) {
+			fail(`${location(node)} constructs ${name} without a direct ${formatterName}() message.`);
+		}
+	}
+
+	function validateSuperCall(node) {
+		let owner = node.parent;
+		while (owner !== undefined && !ts.isClassLike(owner)) owner = owner.parent;
+		const parent = owner && extendedClassName(owner);
+		const messageIndex = parent === undefined ? undefined : errorClasses.get(parent);
+		// A null index means the parent formats its own message; super() then
+		// passes data, not a message.
+		if (messageIndex === undefined || messageIndex === null) return;
+		const message = node.arguments[messageIndex];
+		const constructor = ts.findAncestor(node, ts.isConstructorDeclaration);
+		// Forwarding a constructor parameter is checked at each construction site.
+		if (constructor !== undefined && forwardedParameterIndex(constructor, message) !== -1) return;
+		validateMessage(node, `${parent} via super()`, message);
 	}
 
 	function visit(node) {
-		if (ts.isCallExpression(node)) validateFormatterCall(node);
+		if (ts.isCallExpression(node)) {
+			if (node.expression.kind === ts.SyntaxKind.SuperKeyword) validateSuperCall(node);
+			else validateFormatterCall(node);
+		}
 		const isErrorCall = ts.isCallExpression(node) || ts.isNewExpression(node);
-		if (
-			isErrorCall &&
-			ts.isIdentifier(node.expression) &&
-			ERROR_CONSTRUCTORS.has(node.expression.text)
-		) {
-			const messageIndex = node.expression.text === 'AggregateError' ? 1 : 0;
-			const message = node.arguments?.[messageIndex];
-			if (message === undefined || !isAllowedErrorMessage(message, formatterName)) {
-				fail(
-					`${location(node)} constructs ${node.expression.text} without a direct ${formatterName}() message.`,
-				);
+		if (isErrorCall && ts.isIdentifier(node.expression)) {
+			const messageIndex = errorClasses.get(node.expression.text);
+			if (messageIndex !== undefined && messageIndex !== null) {
+				validateMessage(node, node.expression.text, node.arguments?.[messageIndex]);
 			}
 		}
 		ts.forEachChild(node, visit);
@@ -346,10 +524,15 @@ function validateFrameworkErrorConstruction(filename, source, surface, catalog, 
 
 function runtimeSources() {
 	const sourceDir = join(root, 'packages/octane/src');
-	return ['runtime.ts', 'runtime.server.ts'].map((filename) => [
-		filename,
-		readFileSync(join(sourceDir, filename), 'utf8'),
-	]);
+	const filenames = ['.', 'signals', 'hydration'].flatMap((directory) =>
+		readdirSync(join(sourceDir, directory))
+			.filter((name) => name.endsWith('.ts') && !name.endsWith('.d.ts'))
+			.map((name) => (directory === '.' ? name : `${directory}/${name}`)),
+	);
+	return filenames
+		.filter((filename) => frameworkErrorSurface(filename) !== undefined)
+		.sort()
+		.map((filename) => [filename, readFileSync(join(sourceDir, filename), 'utf8')]);
 }
 
 async function formatGeneratedFile(source, filename) {

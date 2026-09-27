@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	isStreamedRendererFrame,
 	streamFrameIdentityKey,
@@ -48,7 +49,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 function positiveLimit(value: number | undefined, fallback: number): number {
 	const limit = value ?? fallback;
 	if (!Number.isSafeInteger(limit) || limit <= 0) {
-		throw new RangeError('Streamed renderer response limits must be positive safe integers.');
+		throw new RangeError(formatClientError(222));
 	}
 	return limit;
 }
@@ -76,10 +77,7 @@ function createDelivery(
 	};
 	function validateSize(bytes: number) {
 		if (bytes > maxFrameBytes || bytes > maxPendingBytes)
-			throw new StreamedReceiverError(
-				'overflow',
-				'A streamed renderer frame exceeded its byte budget.',
-			);
+			throw new StreamedReceiverError('overflow', formatClientError(223));
 	}
 	return {
 		async room(bytes: number) {
@@ -95,10 +93,7 @@ function createDelivery(
 			try {
 				validateSize(bytes);
 				if (pending.size >= maxPendingFrames || pendingBytes + bytes > maxPendingBytes)
-					throw new StreamedReceiverError(
-						'overflow',
-						'Streamed renderer delivery exceeded its pending budget.',
-					);
+					throw new StreamedReceiverError('overflow', formatClientError(224));
 			} catch (error) {
 				receiver.failSelection(frame.identity, error as StreamedReceiverError);
 				throw error;
@@ -122,7 +117,7 @@ function createDelivery(
 				aborters.add(abort);
 			});
 			const timer = setTimeout(
-				() => abort(new StreamedReceiverError('timeout', 'Streamed renderer delivery timed out.')),
+				() => abort(new StreamedReceiverError('timeout', formatClientError(225))),
 				timeoutMs,
 			);
 			const work = previous
@@ -140,7 +135,7 @@ function createDelivery(
 					const error =
 						cause instanceof StreamedReceiverError
 							? cause
-							: new StreamedReceiverError('protocol', 'Streamed renderer delivery failed.');
+							: new StreamedReceiverError('protocol', formatClientError(226));
 					try {
 						receiver.failSelection(frame.identity, error);
 					} catch {
@@ -194,10 +189,10 @@ export function installStreamedRendererGlobal(
 			!Array.isArray(early.frames) ||
 			typeof early.receive !== 'function')
 	) {
-		throw new Error('An Octane streamed renderer receiver is already installed in this realm.');
+		throw new Error(formatClientError(227));
 	}
 	if (early?.overflow === true) {
-		throw new Error('The pre-module streamed renderer mailbox overflowed.');
+		throw new Error(formatClientError(228));
 	}
 	const maxOpenResults = positiveLimit(options.maxPendingFrames, DEFAULT_PENDING_FRAMES);
 	const resultTimeoutMs = positiveLimit(options.timeoutMs, DEFAULT_TIMEOUT_MS);
@@ -221,16 +216,13 @@ export function installStreamedRendererGlobal(
 			const previous = openResults.get(key);
 			if (previous !== undefined) clearTimeout(previous.timer);
 			else if (openResults.size >= maxOpenResults)
-				throw new StreamedReceiverError(
-					'overflow',
-					'Streamed renderer exceeded its open result budget.',
-				);
+				throw new StreamedReceiverError('overflow', formatClientError(229));
 			const timer = setTimeout(() => {
 				forgetResult(frame.identity);
 				try {
 					receiver.failSelection(
 						frame.identity,
-						new StreamedReceiverError('timeout', 'Streamed renderer result timed out.'),
+						new StreamedReceiverError('timeout', formatClientError(230)),
 					);
 				} catch {
 					/* The result was fenced before the host error callback ran. */
@@ -268,10 +260,7 @@ export function installStreamedRendererGlobal(
 	}
 	return () => {
 		removed = true;
-		const error = new StreamedReceiverError(
-			'terminal',
-			'Streamed renderer entrypoint was removed.',
-		);
+		const error = new StreamedReceiverError('terminal', formatClientError(231));
 		delivery.close(error);
 		for (const { identity, timer } of openResults.values()) {
 			clearTimeout(timer);
@@ -297,7 +286,7 @@ export async function readStreamedRendererResponse(
 	receiver: StreamedDeliveryReceiver,
 	options: StreamedRendererReadOptions = {},
 ): Promise<void> {
-	if (response.body === null) throw new Error('The streamed renderer response has no body.');
+	if (response.body === null) throw new Error(formatClientError(232));
 	const maxFrameBytes = positiveLimit(options.maxFrameBytes, DEFAULT_MAX_FRAME_BYTES);
 	const maxTotalBytes = positiveLimit(options.maxTotalBytes, DEFAULT_MAX_TOTAL_BYTES);
 	const timeoutMs = positiveLimit(options.timeoutMs, DEFAULT_TIMEOUT_MS);
@@ -338,7 +327,7 @@ export async function readStreamedRendererResponse(
 					})();
 		const frame = JSON.parse(decoder.decode(bytes)) as unknown;
 		if (!isStreamedRendererFrame(frame))
-			throw new StreamedReceiverError('protocol', 'Malformed streamed renderer frame.');
+			throw new StreamedReceiverError('protocol', formatClientError(233));
 		await delivery.room(frameBytes);
 		void delivery.enqueue(frame, frameBytes).catch((error: StreamedReceiverError) => {
 			failure ??= error;
@@ -346,7 +335,7 @@ export async function readStreamedRendererResponse(
 	};
 
 	const abort = (): void => {
-		failure ??= new StreamedReceiverError('terminal', 'Streamed renderer response was canceled.');
+		failure ??= new StreamedReceiverError('terminal', formatClientError(234));
 		delivery.close(failure);
 		failOpenResults(failure);
 		void reader.cancel(options.signal?.reason).catch(() => {});
@@ -360,7 +349,7 @@ export async function readStreamedRendererResponse(
 			// Local delivery backpressure has its own bounded wait. Only time
 			// spent waiting for the transport belongs to the response deadline.
 			const timer = setTimeout(() => {
-				failure ??= new StreamedReceiverError('timeout', 'Streamed renderer response timed out.');
+				failure ??= new StreamedReceiverError('timeout', formatClientError(235));
 				abort();
 			}, timeoutMs);
 			let next: Awaited<ReturnType<typeof reader.read>>;
@@ -372,7 +361,7 @@ export async function readStreamedRendererResponse(
 			if (next.done) break;
 			totalBytes += next.value.byteLength;
 			if (totalBytes > maxTotalBytes) {
-				throw new Error('The streamed renderer response exceeded its total byte budget.');
+				throw new Error(formatClientError(236));
 			}
 			let start = 0;
 			for (let index = 0; index < next.value.byteLength; index++) {
@@ -381,7 +370,7 @@ export async function readStreamedRendererResponse(
 				if (part.byteLength > 0) frameParts.push(part);
 				frameBytes += part.byteLength;
 				if (frameBytes > maxFrameBytes) {
-					throw new Error('A streamed renderer frame exceeded its byte budget.');
+					throw new Error(formatClientError(223));
 				}
 				await acceptLine();
 				frameParts = [];
@@ -392,15 +381,12 @@ export async function readStreamedRendererResponse(
 			if (tail.byteLength > 0) frameParts.push(tail);
 			frameBytes += tail.byteLength;
 			if (frameBytes > maxFrameBytes) {
-				throw new Error('A streamed renderer frame exceeded its byte budget.');
+				throw new Error(formatClientError(223));
 			}
 		}
-		if (frameBytes !== 0) throw new Error('The streamed renderer response ended mid-frame.');
+		if (frameBytes !== 0) throw new Error(formatClientError(237));
 		await delivery.drain();
-		const terminalError = new StreamedReceiverError(
-			'terminal',
-			'The streamed renderer response ended before a result terminal.',
-		);
+		const terminalError = new StreamedReceiverError('terminal', formatClientError(238));
 		if (failOpenResults(terminalError)) failure ??= terminalError;
 		if (failure !== undefined) throw failure;
 		finished = true;
@@ -410,7 +396,7 @@ export async function readStreamedRendererResponse(
 				? cause
 				: new StreamedReceiverError(
 						'protocol',
-						cause instanceof Error ? cause.message : 'Streamed renderer response failed.',
+						cause instanceof Error ? cause.message : formatClientError(239),
 					);
 		delivery.close(error);
 		failOpenResults(error);

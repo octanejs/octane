@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import { decodeSignalValue, encodeSignalValue, snapshotSignalValue } from './encoding.js';
 import { ScopeDisposedError, SignalFrameError, SignalSerializationError } from './errors.js';
 import { scopeStreams, type ScopeStreams } from './scope-streams.js';
@@ -96,7 +97,7 @@ registerNativeBatchHooks({ startBatch: startSignalBatch, endBatch: endSignalBatc
 
 function requireKey(key: string, label: string): void {
 	if (typeof key !== 'string' || !key.trim()) {
-		throw new TypeError(`${label} must be a nonempty string.`);
+		throw new TypeError(formatClientError(125, label));
 	}
 }
 
@@ -121,7 +122,7 @@ function decodeSeed(scopeKey: string, seed: ScopeSeed): Map<string, DecodedSeedE
 	// execute while constructing an immutable historical view.
 	seed = snapshotSignalValue(seed) as ScopeSeed;
 	if (!seed || seed.version !== 1 || seed.scopeKey !== scopeKey || !Array.isArray(seed.entries)) {
-		throw new SignalFrameError(`A signal seed must match scope "${scopeKey}" and version 1.`);
+		throw new SignalFrameError(formatClientError(126, scopeKey));
 	}
 	const entries = new Map<string, DecodedSeedEntry>();
 	for (const entry of seed.entries) {
@@ -140,16 +141,14 @@ function decodeSeed(scopeKey: string, seed: ScopeSeed): Map<string, DecodedSeedE
 				!['none', 'connecting', 'open', 'closed'].includes(entry.connection)) ||
 			entries.has(seedKey(entry.key, read))
 		) {
-			throw new SignalFrameError('Signal seeds require unique, valid ready node entries.');
+			throw new SignalFrameError(formatClientError(127));
 		}
 		const value = decodeSignalValue(entry.value);
 		if (
 			entry.available === false &&
 			(value !== undefined || entry.complete || entry.request !== undefined)
 		) {
-			throw new SignalFrameError(
-				'An unavailable latest entry cannot contain a ready value or request.',
-			);
+			throw new SignalFrameError(formatClientError(128));
 		}
 		let request: SignalSeedEntry['request'];
 		if (entry.kind === 'async' && entry.available !== false) {
@@ -159,7 +158,7 @@ function decodeSeed(scopeKey: string, seed: ScopeSeed): Map<string, DecodedSeedE
 				!entry.request.queryKey.trim() ||
 				!['promise', 'stream'].includes(entry.request.kind)
 			) {
-				throw new SignalFrameError('Async seed entries require a query identity.');
+				throw new SignalFrameError(formatClientError(129));
 			}
 			// The outer snapshot already owns this immutable encoded argument.
 			// Decode for canonical validation, then retain it without encoding again.
@@ -170,7 +169,7 @@ function decodeSeed(scopeKey: string, seed: ScopeSeed): Map<string, DecodedSeedE
 				argument: entry.request.argument,
 			};
 		} else if (entry.request !== undefined) {
-			throw new SignalFrameError('Only async seed entries may contain a query identity.');
+			throw new SignalFrameError(formatClientError(130));
 		}
 		entries.set(seedKey(entry.key, read), {
 			value,
@@ -255,7 +254,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		requireKey(key, 'scopeKey');
 		const traceLimit = options.debug ? (options.debug.traceLimit ?? 256) : 0;
 		if (!Number.isInteger(traceLimit) || traceLimit < 0 || traceLimit > 10_000) {
-			throw new RangeError('Signal traceLimit must be an integer from 0 through 10000.');
+			throw new RangeError(formatClientError(131));
 		}
 		this.traceLimit = traceLimit;
 		this.seedEntries = options.seed ? decodeSeed(key, options.seed) : undefined;
@@ -283,14 +282,13 @@ export class ScopeImpl implements Scope, GraphOwner {
 		// render lifetime, never a write to an already committed signal.
 		if (this.seedable && !allowDuringRead) assertWritable();
 		requireKey(key, 'Signal key');
-		if (this.nodes.has(key))
-			throw new TypeError(`Signal key "${key}" already exists in this scope.`);
+		if (this.nodes.has(key)) throw new TypeError(formatClientError(132, key));
 		const seeds = this.seedEntries;
 		if (seeds)
 			for (const read of ['value', 'latest', 'snapshot'] as const) {
 				const seed = seeds.get(seedKey(key, read));
 				if (seed && seed.entry.kind !== kind) {
-					throw new SignalFrameError(`Signal seed kind does not match "${key}".`);
+					throw new SignalFrameError(formatClientError(133, key));
 				}
 			}
 		const node = new ScopedNode<T>(this, key, kind);
@@ -304,7 +302,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		const existing = this.nodes.get(key);
 		if (existing) {
 			if (existing.kind !== kind) {
-				throw new TypeError(`Signal key "${key}" already has kind "${existing.kind}".`);
+				throw new TypeError(formatClientError(134, key, existing.kind));
 			}
 			return [existing as ScopedNode<T>, false];
 		}
@@ -366,7 +364,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		key: string,
 		compute: (() => T) & (T extends PromiseLike<unknown> ? never : unknown),
 	): DerivedSignal<T> {
-		if (typeof compute !== 'function') throw new TypeError('derived$ requires a function.');
+		if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 		const node = this.createNode<T>(key, 'derived');
 		node.compute = (target) => derivedState(target, compute);
 		this.initializeRetention(node);
@@ -384,16 +382,14 @@ export class ScopeImpl implements Scope, GraphOwner {
 		frame: SignalCandidateFrame,
 	): CandidateProducer | undefined {
 		if (this.nodes.get(node.key) !== node || this.readBarrier || this.frames?.size) {
-			throw new CandidateUnsupportedError('Candidate frames require live, non-adopting nodes.');
+			throw new CandidateUnsupportedError(formatClientError(135));
 		}
 		const resource = this.resources?.get(node);
 		if (resource) return resource.forkCandidate(target);
 		const binding = this.derivedBindings?.get(node);
 		if (binding) {
 			if (!binding.forkCandidate) {
-				throw new CandidateUnsupportedError(
-					'Async derived candidates are not supported by this prototype.',
-				);
+				throw new CandidateUnsupportedError(formatClientError(136));
 			}
 			return binding.forkCandidate(target, frame);
 		}
@@ -406,7 +402,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		options: DerivedOptions | undefined,
 		Binding: DerivedBindingFactory<T>,
 	): DerivedSignal<T> {
-		if (typeof compute !== 'function') throw new TypeError('derived$ requires a function.');
+		if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 		const [node, created] = this.declaredNode<T>(key, 'derived');
 		if (!created) return node as DerivedSignal<T>;
 		const binding = new Binding(this, node, compute, options);
@@ -422,8 +418,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		initialize: typeof initializeResource,
 		unique = false,
 	): Resource<T> {
-		if (typeof describe !== 'function')
-			throw new TypeError('A query resource requires a description.');
+		if (typeof describe !== 'function') throw new TypeError(formatClientError(137));
 		let node: ScopedNode<T>;
 		if (unique) node = this.createNode<T>(key, 'async');
 		else {
@@ -448,7 +443,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 	private own<T>(handle$: SignalHandle<T>): ScopedNode<T> {
 		assertAlive(this);
 		if (!(handle$ instanceof ScopedNode) || handle$.owner !== this) {
-			throw new TypeError('Read or write a signal through its owning scope or its handle.');
+			throw new TypeError(formatClientError(138));
 		}
 		return handle$;
 	}
@@ -479,7 +474,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 	}
 
 	action<F extends (...args: any[]) => any>(write: F): F {
-		if (typeof write !== 'function') throw new TypeError('A signal action requires a function.');
+		if (typeof write !== 'function') throw new TypeError(formatClientError(139));
 		const owner = this;
 		return function (this: unknown, ...args: Parameters<F>): ReturnType<F> {
 			return owner.batch(() => write.apply(this, args));
@@ -529,8 +524,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 
 	serialize(): ScopeSeed {
 		assertAlive(this);
-		if (!this.seedable)
-			throw new SignalSerializationError('Local hook scopes do not create SSR seeds.');
+		if (!this.seedable) throw new SignalSerializationError(formatClientError(140));
 		return untrack(() => {
 			const entries: SignalSeedEntry[] = [];
 			for (const node of this.nodes.values()) {
@@ -563,9 +557,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 			if (!owner.seedable) continue;
 			const other = keys.get(owner.scopeKey);
 			if (other && other !== owner) {
-				throw new SignalFrameError(
-					'Distinct scopes in one presented graph need distinct scopeKey values.',
-				);
+				throw new SignalFrameError(formatClientError(141));
 			}
 			keys.set(owner.scopeKey, owner);
 			const entry = node === root ? rootEntry : owner.seedEntry(node);
@@ -586,8 +578,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 
 	beginAdoption(seed: ScopeSeed): AdoptionFrame {
 		assertAlive(this);
-		if (!this.seedable)
-			throw new SignalFrameError('Local hook scopes do not adopt shared-state seeds.');
+		if (!this.seedable) throw new SignalFrameError(formatClientError(142));
 		const data: FrameData = {
 			owner: this,
 			entries: decodeSeed(this.scopeKey, seed),
@@ -700,7 +691,7 @@ class AdoptionFrameImpl implements AdoptionFrame {
 
 	private assertActive(): void {
 		assertAlive(this.data.owner);
-		if (this.ended) throw new SignalFrameError('The signal adoption lease has been released.');
+		if (this.ended) throw new SignalFrameError(formatClientError(143));
 	}
 
 	run<T>(read: () => T): T {
@@ -768,9 +759,7 @@ class AdoptionFrameImpl implements AdoptionFrame {
 		reportNativeRead(source, 0);
 		if (!seed || seed.entry.kind !== node.kind) {
 			if (getNativeAdoptionResolver()) throw new NativeAdoptionMiss(this.scopeKey, node.key, read);
-			throw new SignalFrameError(
-				`The presented frame has no compatible ready value for "${node.key}".`,
-			);
+			throw new SignalFrameError(formatClientError(144, node.key));
 		}
 		if (seed.entry.available === false) {
 			// This channel records absence, not the client request's pending token.
@@ -782,7 +771,7 @@ class AdoptionFrameImpl implements AdoptionFrame {
 		if (node.kind === 'async' && read !== 'latest') {
 			const binding = this.data.owner.resources?.get(node);
 			if (!binding?.acceptsSeed(seed.entry)) {
-				throw new SignalFrameError(`The presented query definition does not match "${node.key}".`);
+				throw new SignalFrameError(formatClientError(145, node.key));
 			}
 		}
 		return seedState(seed);
@@ -810,14 +799,13 @@ function readHistoricalNode(node: ScopedNode, read: SignalReadMode): NodeState |
 		const resolved = getNativeAdoptionResolver()?.(owner);
 		if (resolved) return resolved.run(() => readNode(node, read));
 		if (getNativeAdoptionResolver()) throw new NativeAdoptionMiss(owner.scopeKey, node.key, read);
-		throw new SignalFrameError(`Missing adoption frame for signal scope "${owner.scopeKey}".`);
+		throw new SignalFrameError(formatClientError(146, owner.scopeKey));
 	}
 	return frame.read(node, read);
 }
 
 export function createScope(options: ScopeOptions): Scope {
-	if (!options || typeof options !== 'object')
-		throw new TypeError('createScope requires scopeKey.');
+	if (!options || typeof options !== 'object') throw new TypeError(formatClientError(147));
 	return new ScopeImpl(options.scopeKey, options);
 }
 
@@ -832,7 +820,7 @@ export function createDeclaredSignalCell<T>(
 	initial: T,
 	preferInitial = false,
 ): WritableSignal<T> {
-	if (!(owner instanceof ScopeImpl)) throw new TypeError('A direct signal needs an Octane scope.');
+	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(148));
 	return owner.createSignalDeclaration(key, initial, preferInitial);
 }
 
@@ -845,8 +833,7 @@ export function createDerivedCellWith<T>(
 	options: DerivedOptions | undefined,
 	Binding: DerivedBindingFactory<T>,
 ): DerivedSignal<T> {
-	if (!(owner instanceof ScopeImpl))
-		throw new TypeError('A direct derived signal needs an Octane scope.');
+	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(149));
 	return owner.createDerivedDeclaration(key, compute, options, Binding);
 }
 
@@ -859,7 +846,7 @@ export function createResourceCellWith<T>(
 	initialize: typeof initializeResource,
 	unique = false,
 ): Resource<T> {
-	if (!(owner instanceof ScopeImpl)) throw new TypeError('A direct query needs an Octane scope.');
+	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(150));
 	return owner.createResourceDeclaration(key, describe, initialize, unique);
 }
 

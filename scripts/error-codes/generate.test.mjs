@@ -182,6 +182,138 @@ test('requires every active surface code to have a valid literal call site', () 
 	);
 });
 
+test('enforces coded messages in covered signal, hydration, and DOM binding modules', () => {
+	const shared = catalog({
+		codes: {
+			1: {
+				message: 'Expected %s.',
+				argumentCount: 1,
+				runtime: ['client', 'server'],
+				status: 'active',
+			},
+		},
+	});
+	const coded = 'throw new TypeError(formatClientError(1, value));';
+	for (const filename of ['signals/engine.ts', 'hydration/stream-delivery.ts']) {
+		assert.doesNotThrow(() => validateRuntimeUsages(shared, [[filename, coded]]));
+		assert.throws(
+			() =>
+				validateRuntimeUsages(shared, [
+					[filename, `${coded} throw new Error('An uncatalogued framework failure.');`],
+				]),
+			/constructs Error without a direct formatClientError/,
+		);
+	}
+	// Shared modules also load in SSR bundles, so their codes must exist on both surfaces.
+	assert.throws(
+		() => validateRuntimeUsages(catalog(), [['signals/engine.ts', coded]]),
+		/which is not registered for server/,
+	);
+	assert.throws(
+		() =>
+			validateRuntimeUsages(shared, [
+				['signals/engine.ts', `${coded} void formatServerError(1, value);`],
+			]),
+		/cannot use the server formatter in the shared runtime/,
+	);
+	// Client-only DOM binding modules use client-only codes.
+	assert.doesNotThrow(() => validateRuntimeUsages(catalog(), [['dom-bindings.ts', coded]]));
+	assert.throws(
+		() =>
+			validateRuntimeUsages(catalog(), [
+				['dom-binding-program.ts', `${coded} throw new RangeError(\`Bad \${value}.\`);`],
+			]),
+		/constructs RangeError without a direct formatClientError/,
+	);
+	// Modules outside the covered set are not framework error surfaces.
+	assert.throws(
+		() => validateRuntimeUsages(catalog(), [['data-encoding.ts', coded]]),
+		/has no runtime call site/,
+	);
+
+	// Error subclasses: forwarded messages are checked at each construction and
+	// self-formatted messages at super().
+	const forwarding =
+		'export class SignalFrameError extends Error { constructor(message: string) { super(message); } }';
+	assert.doesNotThrow(() =>
+		validateRuntimeUsages(shared, [
+			['signals/errors.ts', forwarding],
+			['signals/engine.ts', 'throw new SignalFrameError(formatClientError(1, key));'],
+		]),
+	);
+	assert.throws(
+		() =>
+			validateRuntimeUsages(shared, [
+				['signals/errors.ts', forwarding],
+				['signals/engine.ts', `${coded} throw new SignalFrameError('Unknown signal.');`],
+			]),
+		/constructs SignalFrameError without a direct formatClientError/,
+	);
+	assert.throws(
+		() =>
+			validateRuntimeUsages(shared, [
+				[
+					'hydration/stream-result-receiver.ts',
+					`${coded} class ReceiverError extends Error { constructor(readonly code: string, message: string) { super(message); } } throw new ReceiverError('protocol', 'Malformed frame.');`,
+				],
+			]),
+		/constructs ReceiverError without a direct formatClientError/,
+	);
+	assert.throws(
+		() =>
+			validateRuntimeUsages(shared, [
+				[
+					'signals/errors.ts',
+					`${coded} export class SignalIdleError extends Error { constructor(key: string) { super(\`Signal "\${key}" has no value.\`); } }`,
+				],
+			]),
+		/constructs Error via super\(\) without a direct formatClientError/,
+	);
+	assert.doesNotThrow(() =>
+		validateRuntimeUsages(shared, [
+			[
+				'signals/errors.ts',
+				'export class SignalIdleError extends Error { constructor(key: string) { super(formatClientError(1, key)); } } throw new SignalIdleError(key);',
+			],
+		]),
+	);
+
+	// The narrow allowed shapes: coded alternatives, a caught foreign error's own
+	// message, and a compiler-emitted construction reason.
+	const shapes = catalog({
+		nextCode: 3,
+		codes: {
+			1: { message: 'First.', argumentCount: 0, runtime: ['client'], status: 'active' },
+			2: { message: 'Second.', argumentCount: 0, runtime: ['client'], status: 'active' },
+		},
+	});
+	for (const message of [
+		'flag ? formatClientError(1) : formatClientError(2)',
+		'cause instanceof Error ? cause.message : formatClientError(1)',
+		'definition.constructionError ?? formatClientError(1)',
+	]) {
+		assert.doesNotThrow(() =>
+			validateRuntimeUsages(shapes, [
+				['dom-bindings.ts', `throw new Error(${message}); void formatClientError(2);`],
+			]),
+		);
+	}
+	for (const message of [
+		"flag ? formatClientError(1) : 'Second.'",
+		'cause instanceof Error ? other.message : formatClientError(1)',
+		'cause instanceof Error ? cause.stack : formatClientError(1)',
+		'definition.reason ?? formatClientError(1)',
+	]) {
+		assert.throws(
+			() =>
+				validateRuntimeUsages(shapes, [
+					['dom-bindings.ts', `throw new Error(${message}); void formatClientError(2);`],
+				]),
+			/constructs Error without a direct formatClientError/,
+		);
+	}
+});
+
 test('keeps published codes append-only while allowing retirement and additions', () => {
 	const previous = catalog();
 	const retiredAndExtended = catalog({

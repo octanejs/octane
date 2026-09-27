@@ -1,3 +1,4 @@
+import { formatClientError } from './error-codes.client.generated.js';
 import { __normalizeBinding, type BindingOperation, type BindingValue } from './dom-bindings.js';
 import { __createBindingStyles, __prepareBindingSources } from './dom-binding-styles.js';
 import type { BindingPreparedValue, BindingSignalConnection } from './dom-binding-signals.js';
@@ -85,8 +86,7 @@ export function __createBindingProjections() {
 								}),
 							),
 						);
-						if (typeof stop !== 'function')
-							throw new TypeError('A DOM projection subscription must return cleanup.');
+						if (typeof stop !== 'function') throw new TypeError(formatClientError(304));
 						const cleanup = (): void => {
 							active = false;
 							stop();
@@ -102,8 +102,7 @@ export function __createBindingProjections() {
 				group,
 				get,
 				preview(next): BindingPreparedValue<BindingValue[]> {
-					if (typeof next !== 'function')
-						throw new TypeError('A DOM binding projection group requires a computation.');
+					if (typeof next !== 'function') throw new TypeError(formatClientError(305));
 					const reads = new Map<NativeReadSource, number>();
 					const preparedStyles: BindingPreparedValue[] = [];
 					const createdStyles = new Map<number, BindingSignalConnection>();
@@ -168,8 +167,7 @@ export function __createBindingProjections() {
 					};
 				},
 				read(next) {
-					if (typeof next !== 'function')
-						throw new TypeError('A DOM binding projection group requires a computation.');
+					if (typeof next !== 'function') throw new TypeError(formatClientError(305));
 					compute = next as typeof compute;
 					return get();
 				},

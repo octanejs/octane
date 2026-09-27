@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import { createResourceCellWith } from './engine.js';
 import { Descriptor, descriptorKey, signalOptionsKey } from './facade.js';
 import { runWithSignalOwner } from './owner-context.js';
@@ -36,7 +37,7 @@ export function __queryAt<A, T>(
 	options?: QueryOptions & SignalOptions,
 ): QuerySignal<T> {
 	if (typeof select !== 'function' || typeof load !== 'function') {
-		throw new TypeError('query$ requires selector and loader functions.');
+		throw new TypeError(formatClientError(193));
 	}
 	const explicit = signalOptionsKey(options);
 	site ??= explicit;

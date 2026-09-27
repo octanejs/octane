@@ -1,3 +1,4 @@
+import { formatClientError } from './error-codes.client.generated.js';
 import { cssStyleValue, hyphenateStyleName } from './style-values.js';
 import { __writeBinding, type BindingValue } from './dom-bindings.js';
 import type { BindingPreparedValue, BindingSignalConnection } from './dom-binding-signals.js';
@@ -80,8 +81,7 @@ export type BindingStyleSnapshot = Readonly<Record<string, string | null>>;
 export function __normalizeBindingStyle(value: unknown): BindingValue {
 	if (value == null || value === false || value === '') return null;
 	if (typeof value === 'string') return value;
-	if (typeof value !== 'object')
-		throw new TypeError('A whole-style DOM binding requires a style object, CSS text or null.');
+	if (typeof value !== 'object') throw new TypeError(formatClientError(311));
 	const result: Record<string, string | null> = Object.create(null);
 	for (const name in value) {
 		const property = (value as Record<string, unknown>)[name];
@@ -154,8 +154,7 @@ export function __createBindingStyles() {
 								}),
 							),
 						);
-						if (typeof stop !== 'function')
-							throw new TypeError('A DOM style subscription must return cleanup.');
+						if (typeof stop !== 'function') throw new TypeError(formatClientError(312));
 						const disposeSource = (): void => {
 							active = false;
 							stop();

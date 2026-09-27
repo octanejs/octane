@@ -1,3 +1,4 @@
+import { formatServerError } from '../error-codes.server.generated.js';
 import { encodeSignalValue } from '../data-encoding.js';
 import { STREAM_SCRIPT_ATTR } from '../stream-protocol.js';
 import {
@@ -232,10 +233,7 @@ export function createStreamedRendererFrameStream(
 			},
 			async pull() {
 				if (finished) return;
-				timer = setTimeout(
-					() => fail(new Error('Streamed renderer response timed out.')),
-					budget.timeoutMs,
-				);
+				timer = setTimeout(() => fail(new Error(formatServerError(235))), budget.timeoutMs);
 				try {
 					const next = await iterator.next();
 					clearTimeout(timer);

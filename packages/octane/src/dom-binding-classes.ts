@@ -1,3 +1,4 @@
+import { formatClientError } from './error-codes.client.generated.js';
 import { normalizeClass } from './class-names.js';
 
 /** Class membership owned by one compiler-authored host and its class groups. */
@@ -31,7 +32,7 @@ function readReceipt(node: Element, name: string, initialReceipt?: string): Clas
 	try {
 		value = JSON.parse(initialReceipt ?? node.getAttribute(name) ?? 'null');
 	} catch {
-		throw new Error('DOM class groups require a valid compiler-issued class receipt.');
+		throw new Error(formatClientError(271));
 	}
 	if (
 		!name.startsWith('data-octane-class-') ||
@@ -41,7 +42,7 @@ function readReceipt(node: Element, name: string, initialReceipt?: string): Clas
 		!Array.isArray(value[1]) ||
 		value[1].some((group: unknown) => typeof group !== 'string')
 	)
-		throw new Error('DOM class groups require a valid compiler-issued class receipt.');
+		throw new Error(formatClientError(271));
 	const counts = new Map<string, number>();
 	for (const contribution of [value[0], ...value[1]])
 		for (const token of tokens(contribution)) counts.set(token, (counts.get(token) ?? 0) + 1);
@@ -60,12 +61,11 @@ export function createBindingClassGroup(
 	initialReceipt?: string,
 ): BindingClassGroup {
 	let receipt = receipts.get(node);
-	if (receipt !== undefined && receipt.name !== name)
-		throw new Error('A DOM host cannot mix class groups from different binding views.');
+	if (receipt !== undefined && receipt.name !== name) throw new Error(formatClientError(272));
 	receipt ??= readReceipt(node, name, initialReceipt);
 	if (!Number.isInteger(index) || index < 0 || index >= receipt.values.length)
-		throw new Error('A DOM class group does not match its compiler-issued receipt.');
-	if (receipt.active.has(index)) throw new Error('This DOM class group already has a binding.');
+		throw new Error(formatClientError(273));
+	if (receipt.active.has(index)) throw new Error(formatClientError(274));
 	receipt.active.add(index);
 	receipts.set(node, receipt);
 	let disposed = false;
@@ -111,14 +111,13 @@ export function createBindingClassGroup(
 
 	return {
 		prepare(value) {
-			if (disposed) throw new Error('Cannot prepare a disposed DOM class group.');
+			if (disposed) throw new Error(formatClientError(275));
 			const preparedAt = revision;
 			const next = value === state.values[index] ? null : tokens(value);
 			return {
 				commit() {
 					if (disposed) return;
-					if (preparedAt !== revision)
-						throw new Error('Cannot commit an outdated DOM class group preparation.');
+					if (preparedAt !== revision) throw new Error(formatClientError(276));
 					committed = true;
 					if (next !== null) publish(value, next);
 				},

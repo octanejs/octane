@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import { HYDRATE_INPUT_ATTR } from '../hydration-markers.js';
 import { rendererRangeClose } from '../stream-protocol.js';
 import {
@@ -48,14 +49,14 @@ interface PreservedControl {
 
 function rangeNodes(start: Comment, end: Comment): Node[] {
 	if (start.parentNode === null || start.parentNode !== end.parentNode) {
-		throw new StreamedReceiverError('placement', 'The streamed region range is detached.');
+		throw new StreamedReceiverError('placement', formatClientError(240));
 	}
 	const nodes: Node[] = [];
 	for (let node = start.nextSibling; node !== null && node !== end; node = node.nextSibling) {
 		nodes.push(node);
 	}
 	if (end.previousSibling !== start && nodes.length === 0) {
-		throw new StreamedReceiverError('placement', 'The streamed region range is malformed.');
+		throw new StreamedReceiverError('placement', formatClientError(241));
 	}
 	return nodes;
 }
@@ -66,7 +67,7 @@ function keyedControls(nodes: readonly Node[]): Map<string, Element> {
 		const key = element.getAttribute(HYDRATE_INPUT_ATTR);
 		if (key !== null) {
 			if (controls.has(key)) {
-				throw new StreamedReceiverError('placement', `Duplicate streamed control key "${key}".`);
+				throw new StreamedReceiverError('placement', formatClientError(242, key));
 			}
 			controls.set(key, element);
 		}
@@ -132,10 +133,7 @@ function placeFullRegion(registration: StreamedRegionRegistration, html: string)
 		incomingClose === null ||
 		incomingClose !== template.content.lastChild
 	) {
-		throw new StreamedReceiverError(
-			'placement',
-			'A full streamed region must be one balanced range.',
-		);
+		throw new StreamedReceiverError('placement', formatClientError(243));
 	}
 	const incomingNodes: Node[] = [];
 	for (let node = incomingOpen.nextSibling; node !== incomingClose; node = node!.nextSibling) {
@@ -150,10 +148,7 @@ function placeFullRegion(registration: StreamedRegionRegistration, html: string)
 				preserved.snapshot.composing) &&
 			(replacement === undefined || !compatibleControl(preserved.element, replacement))
 		) {
-			throw new StreamedReceiverError(
-				'placement',
-				`Streamed HTML cannot preserve live control "${key}".`,
-			);
+			throw new StreamedReceiverError('placement', formatClientError(244, key));
 		}
 	}
 
@@ -196,7 +191,7 @@ async function commitPlacement(
 	try {
 		await registration.loadStyles(frame.styles);
 	} catch {
-		throw new StreamedReceiverError('styles', 'Required streamed region styles are unavailable.');
+		throw new StreamedReceiverError('styles', formatClientError(245));
 	}
 	if (
 		!isCurrent(state, frame.identity) ||
@@ -237,15 +232,12 @@ async function commitPlacement(
 	try {
 		lease = registration.adoptHistoricalFrame(frame.historicalFrame);
 	} catch {
-		throw new StreamedReceiverError('historical-frame', 'Historical read-frame adoption failed.');
+		throw new StreamedReceiverError('historical-frame', formatClientError(246));
 	}
 	try {
 		if (frame.mode === 'delta') {
 			if (registration.applyDelta === undefined) {
-				throw new StreamedReceiverError(
-					'placement',
-					'This region does not support renderer deltas.',
-				);
+				throw new StreamedReceiverError('placement', formatClientError(247));
 			}
 			registration.applyDelta(frame);
 		} else {
@@ -269,19 +261,13 @@ export function createStreamedRegionReceiver(
 	const registerRegion = (registration: StreamedRegionRegistration): (() => void) => {
 		const state = current(registration.identity);
 		if (state === undefined) {
-			throw new StreamedReceiverError('identity', 'Register the exact current selection first.');
+			throw new StreamedReceiverError('identity', formatClientError(248));
 		}
 		if (registration.start.parentNode !== registration.end.parentNode) {
-			throw new StreamedReceiverError(
-				'placement',
-				'The streamed region markers do not share a parent.',
-			);
+			throw new StreamedReceiverError('placement', formatClientError(249));
 		}
 		if (!Number.isSafeInteger(registration.contentRevision) || registration.contentRevision < 0) {
-			throw new StreamedReceiverError(
-				'identity',
-				'Streamed region content revisions must be nonnegative safe integers.',
-			);
+			throw new StreamedReceiverError('identity', formatClientError(250));
 		}
 		state.region = registration;
 		state.contentRevision = registration.contentRevision;

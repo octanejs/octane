@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import type { SignalOwner, SignalOwnerEnvironment } from './types.js';
 
 let installedEnvironment: SignalOwnerEnvironment | undefined;
@@ -19,7 +20,7 @@ export function installSignalOwnerEnvironment(environment: SignalOwnerEnvironmen
 		typeof environment.run !== 'function' ||
 		typeof environment.capture !== 'function'
 	) {
-		throw new TypeError('A signal owner environment requires current, run, and capture.');
+		throw new TypeError(formatClientError(189));
 	}
 	const previous = installedEnvironment;
 	installedEnvironment = environment;
@@ -41,8 +42,7 @@ export function currentExplicitSignalOwner(): SignalOwner | null {
 
 /** @internal Client renderer installs its lazy document owner, never a last-root owner. */
 export function installDefaultSignalOwner(current: () => SignalOwner | null): () => void {
-	if (typeof current !== 'function')
-		throw new TypeError('A default signal owner requires a provider.');
+	if (typeof current !== 'function') throw new TypeError(formatClientError(190));
 	const previous = defaultOwner;
 	defaultOwner = current;
 	return () => {
@@ -52,7 +52,7 @@ export function installDefaultSignalOwner(current: () => SignalOwner | null): ()
 
 /** Enter an owner for a synchronous declaration, read, write, or callback. */
 export function runWithSignalOwner<T>(owner: SignalOwner, callback: () => T): T {
-	if (typeof callback !== 'function') throw new TypeError('A signal owner callback is required.');
+	if (typeof callback !== 'function') throw new TypeError(formatClientError(191));
 	if (installedEnvironment) return installedEnvironment.run(owner, callback);
 	const previous = synchronousOwner;
 	synchronousOwner = owner;

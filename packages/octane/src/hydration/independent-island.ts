@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import { decodeSignalValue } from '../data-encoding.js';
 import type { ScopeSeed, SignalOwner, SignalRendererOwnerIdentity } from '../signals/types.js';
 import { captureInitialDocumentSignals } from '../signals/native-read-seeds.js';
@@ -106,10 +107,10 @@ export function registerIndependentHydrationIsland(
 	registration: IndependentHydrateRegistration,
 ): IndependentHydrateLifecycle {
 	if (!isIndependentHydrateManifest(manifest)) {
-		throw new TypeError('Invalid independent Hydrate manifest.');
+		throw new TypeError(formatClientError(215));
 	}
 	if (element.getAttribute(HYDRATE_ID_ATTR) !== manifest.boundaryId) {
-		throw new Error('Independent Hydrate boundary identity mismatch.');
+		throw new Error(formatClientError(216));
 	}
 	const { load, loadStyles, signalOwner, onError } = registration;
 	let initialDocumentSignals =
@@ -171,7 +172,7 @@ export function registerIndependentHydrationIsland(
 				if (disposed || generation !== attempt || module === undefined) return;
 				const candidate = module[manifest.exportName];
 				if (typeof candidate !== 'function') {
-					throw new TypeError('Independent Hydrate activation export is not a function.');
+					throw new TypeError(formatClientError(217));
 				}
 				const replays = intents.splice(0);
 				const nativeAuthority =
@@ -308,15 +309,14 @@ export function bootstrapIndependentHydration(
 				throw error;
 			}
 			if (!isIndependentHydrateManifest(manifest)) {
-				throw new TypeError('Invalid independent Hydrate sidecar.');
+				throw new TypeError(formatClientError(218));
 			}
 			if (buildId !== undefined && manifest.buildId !== buildId) {
-				throw new Error('Independent Hydrate build identity mismatch.');
+				throw new Error(formatClientError(219));
 			}
 			const element = sidecar.parentElement;
-			if (element === null) throw new Error('Independent Hydrate sidecar has no boundary.');
-			if (cleanups.has(element))
-				throw new Error('Independent Hydrate boundary already registered.');
+			if (element === null) throw new Error(formatClientError(220));
+			if (cleanups.has(element)) throw new Error(formatClientError(221));
 			cleanups.set(
 				element,
 				registerIndependentHydrationIsland(element, manifest, {

@@ -3,6 +3,7 @@
 import { parseModule } from '@tsrx/core';
 import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { compile } from '../../src/compiler/compile.js';
@@ -12,6 +13,15 @@ import * as signals from 'octane/signals';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 
 const FILENAME = '/src/signals/site.tsrx';
+const ERROR_CODES = JSON.parse(
+	readFileSync(resolve(import.meta.dirname, '../../error-codes/codes.json'), 'utf8'),
+).codes as Record<string, { message: string }>;
+
+/** evaluateDeclarations() bundles for production, where framework errors are coded. */
+function productionErrorMessage(message: string): string {
+	const code = Object.keys(ERROR_CODES).find((key) => ERROR_CODES[key].message === message);
+	return code === undefined ? message : `Minified Octane error #${code};`;
+}
 
 async function evaluateDeclarations(
 	source: string,
@@ -214,7 +224,7 @@ export function exercise() { return 1; }
 								environment,
 								dev,
 							),
-						).rejects.toThrow(message);
+						).rejects.toThrow(productionErrorMessage(message));
 					}
 				}
 			}

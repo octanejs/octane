@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import { createDeclaredDerivedCell } from './computations.js';
 import { DerivedDescriptor, descriptorKey, signalOptionsKey } from './facade.js';
 import { runWithSignalOwner } from './owner-context.js';
@@ -10,7 +11,7 @@ export function __derivedAt<T>(
 	compute: DerivedCompute<T>,
 	options?: DerivedOptions & SignalOptions,
 ): DerivedSignal<T> {
-	if (typeof compute !== 'function') throw new TypeError('derived$ requires a function.');
+	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 	const explicit = signalOptionsKey(options);
 	site ??= explicit;
 	const key = descriptorKey(site, explicit);

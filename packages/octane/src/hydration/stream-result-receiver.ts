@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	decodeStreamedRendererFrame,
 	isStreamedRendererFrame,
@@ -94,7 +95,7 @@ const DEFAULT_PENDING_TIMEOUT = 30_000;
 function counter(value: number | undefined, fallback: number): number {
 	const result = value ?? fallback;
 	if (!Number.isSafeInteger(result) || result <= 0) {
-		throw new RangeError('Stream receiver limits must be positive safe integers.');
+		throw new RangeError(formatClientError(251));
 	}
 	return result;
 }
@@ -189,7 +190,7 @@ export function createStreamedResultReceiverState(
 	const renewResultTimeout = (state: StreamedSelectionState): void => {
 		if (state.result.timer !== undefined) clearTimeout(state.result.timer);
 		state.result.timer = setTimeout(() => {
-			report(new StreamedReceiverError('timeout', 'Streamed result timed out.'), state);
+			report(new StreamedReceiverError('timeout', formatClientError(252)), state);
 		}, timeoutMs);
 	};
 	const registerSelection = (identity: StreamFrameIdentity, contentRevision = 0): void => {
@@ -201,7 +202,7 @@ export function createStreamedResultReceiverState(
 				kind: 'complete',
 			})
 		) {
-			throw new StreamedReceiverError('identity', 'Invalid streamed selection identity.');
+			throw new StreamedReceiverError('identity', formatClientError(253));
 		}
 		if (
 			identity.buildId !== options.buildId ||
@@ -210,7 +211,7 @@ export function createStreamedResultReceiverState(
 			!Number.isSafeInteger(contentRevision) ||
 			contentRevision < 0
 		) {
-			throw new StreamedReceiverError('identity', 'Streamed selection has the wrong authority.');
+			throw new StreamedReceiverError('identity', formatClientError(254));
 		}
 		const key = slotKey(identity);
 		const previous = selections.get(key);
@@ -244,10 +245,10 @@ export function createStreamedResultReceiverState(
 	): (() => void) => {
 		const state = current(identity);
 		if (state === undefined) {
-			throw new StreamedReceiverError('identity', 'Cannot attach a result to a stale selection.');
+			throw new StreamedReceiverError('identity', formatClientError(255));
 		}
 		if (state.result.consumer !== undefined && state.result.consumer !== consumer) {
-			throw new StreamedReceiverError('identity', 'A streamed result already has a consumer.');
+			throw new StreamedReceiverError('identity', formatClientError(256));
 		}
 		state.result.consumer = consumer;
 		if (state.result.failure !== undefined) {
@@ -283,31 +284,25 @@ export function createStreamedResultReceiverState(
 	): StreamedFrameDisposition => {
 		const result = state.result;
 		if (result.terminal || frame.sequence !== result.sequence) {
-			throw new StreamedReceiverError('sequence', 'Invalid or duplicate streamed result sequence.');
+			throw new StreamedReceiverError('sequence', formatClientError(257));
 		}
 		result.sequence++;
 		if (!result.opened) {
 			if (frame.kind !== 'open') {
-				throw new StreamedReceiverError('terminal', 'A streamed result must begin with open.');
+				throw new StreamedReceiverError('terminal', formatClientError(258));
 			}
 			result.opened = true;
 			result.resource = frame.resource;
 		} else if (frame.kind === 'open') {
-			throw new StreamedReceiverError('terminal', 'A streamed result cannot open twice.');
+			throw new StreamedReceiverError('terminal', formatClientError(259));
 		} else if (frame.kind === 'value') {
 			result.values++;
 			if (result.resource === 'promise' && result.values > 1) {
-				throw new StreamedReceiverError(
-					'terminal',
-					'A promise result emitted more than one value.',
-				);
+				throw new StreamedReceiverError('terminal', formatClientError(260));
 			}
 		} else {
 			if (frame.kind === 'complete' && result.resource === 'promise' && result.values !== 1) {
-				throw new StreamedReceiverError(
-					'terminal',
-					'A promise result completed without one value.',
-				);
+				throw new StreamedReceiverError('terminal', formatClientError(261));
 			}
 		}
 		// A terminal is accepted only after the pre-code mailbox can retain it.
@@ -320,7 +315,7 @@ export function createStreamedResultReceiverState(
 		) {
 			const bytes = frameBytes(frame);
 			if (result.frames.length + 1 > maxFrames || result.bytes + bytes > maxBytes) {
-				throw new StreamedReceiverError('overflow', 'Streamed result mailbox exceeded its bound.');
+				throw new StreamedReceiverError('overflow', formatClientError(262));
 			}
 			result.frames.push(frame);
 			// Release the original byte charge on drain without serializing the frame again.
@@ -339,7 +334,7 @@ export function createStreamedResultReceiverState(
 		frame: StreamedRegionPlacementFrame,
 	): Promise<StreamedFrameDisposition> => {
 		if (frame.sequence !== state.placementSequence) {
-			throw new StreamedReceiverError('sequence', 'Invalid or duplicate placement sequence.');
+			throw new StreamedReceiverError('sequence', formatClientError(263));
 		}
 		state.placementSequence++;
 		const registration = state.region;
@@ -352,7 +347,7 @@ export function createStreamedResultReceiverState(
 	const receive = async (value: unknown): Promise<StreamedFrameDisposition> => {
 		if (disposed) return 'stale';
 		if (!isStreamedRendererFrame(value)) {
-			const error = new StreamedReceiverError('protocol', 'Malformed streamed renderer frame.');
+			const error = new StreamedReceiverError('protocol', formatClientError(233));
 			report(error);
 			throw error;
 		}
@@ -368,7 +363,7 @@ export function createStreamedResultReceiverState(
 			const receiverError =
 				error instanceof StreamedReceiverError
 					? error
-					: new StreamedReceiverError('protocol', 'Streamed renderer frame failed.');
+					: new StreamedReceiverError('protocol', formatClientError(264));
 			report(receiverError, state);
 			throw receiverError;
 		}
@@ -392,7 +387,7 @@ export function createStreamedResultReceiverState(
 			disposed = true;
 			for (const state of selections.values()) {
 				try {
-					report(new StreamedReceiverError('terminal', 'Streamed receiver was disposed.'), state);
+					report(new StreamedReceiverError('terminal', formatClientError(265)), state);
 				} catch {
 					// A host error callback must not prevent remaining owners retiring.
 				} finally {
