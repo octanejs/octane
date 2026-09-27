@@ -4721,6 +4721,14 @@
     "note": "Production portal-free native dispatch retains framework/native order and exact public descriptors while avoiding repeated event-type sets, portal ancestry reads, and private symbols."
   },
   {
+    "suite": "event-delegation",
+    "op": "idleEventDefinitions",
+    "target": "dispatch-work",
+    "reference": "dispatch-work-model",
+    "maxRatio": 0,
+    "note": "A registered event type whose path has no capture or bubble handler reaches native listeners without Octane patching and restoring stopPropagation/currentTarget descriptors on the Event (baseline: 4 descriptor operations per click)."
+  },
+  {
     "suite": "effect-scheduling",
     "op": "collections",
     "target": "chain",

@@ -25747,15 +25747,17 @@ const CAPTURE_SLOTS: EventSlot[] = [];
 // handler/owner before a queued ancestor runs. Allocate only after ownership exists.
 let CAPTURE_OWNERS: (SignalOwner | ScopeImpl | BlockImpl | undefined)[] | null = null;
 
-function snapshotDelegatedSlots(base: number, type: DelegatedEventType, capture: boolean): void {
+/** Snapshot the phase's handler slots; returns whether any node on the path has one. */
+function snapshotDelegatedSlots(base: number, type: DelegatedEventType, capture: boolean): boolean {
 	const key = capture ? type.captureKey : type.bubbleKey;
 	const suppressDisabled =
 		(type.flags & EVENT_DISABLED_MOUSE) !== 0 ||
 		(!capture && (type.flags & EVENT_DISABLED_ENTER) !== 0);
+	let found = false;
 	for (let index = base; index < CAPTURE_PATH.length; index++) {
 		const node = CAPTURE_PATH[index];
 		const slot = node[key] as EventSlot;
-		CAPTURE_SLOTS[index] =
+		const active =
 			slot != null &&
 			suppressDisabled &&
 			node.disabled &&
@@ -25765,9 +25767,14 @@ function snapshotDelegatedSlots(base: number, type: DelegatedEventType, capture:
 				node.localName === 'textarea')
 				? null
 				: slot;
-		if (SIGNAL_EVENT_OWNERS !== null && CAPTURE_SLOTS[index] != null)
-			(CAPTURE_OWNERS ??= [])[index] = SIGNAL_EVENT_OWNERS.get(node);
+		CAPTURE_SLOTS[index] = active;
+		if (active != null) {
+			found = true;
+			if (SIGNAL_EVENT_OWNERS !== null)
+				(CAPTURE_OWNERS ??= [])[index] = SIGNAL_EVENT_OWNERS.get(node);
+		}
 	}
+	return found;
 }
 
 // Bundles are mutable between events to avoid per-render closures. Only a
@@ -26239,7 +26246,11 @@ function dispatchDelegated(this: Node, event: Event): void {
 		)
 			return;
 		buildDelegatedPath(event, this, path);
-		snapshotDelegatedSlots(pathBase, type, false);
+		// With no bubble handler on the logical path and no form action to drive,
+		// nothing can observe the propagation frame: leave the native event's
+		// stopPropagation/currentTarget untouched instead of patching and restoring
+		// them for every unhandled pointer/touch/input event under the root.
+		if (!snapshotDelegatedSlots(pathBase, type, false) && submitRec === null) return;
 		stop = Object.getOwnPropertyDescriptor(event, 'stopPropagation');
 		propagationStarted = true;
 		frame = beginDelegatedPropagation(event, stop, null);
@@ -26276,7 +26287,8 @@ function dispatchDelegated(this: Node, event: Event): void {
 			// commits in this event's flush window (like handleFormSubmit's does).
 			publishManualFormPending(submitRec);
 		}
-		clearCurrentTarget(event);
+		// Only this bubble queue sets currentTarget here; the capture queue clears its own.
+		if (propagationStarted) clearCurrentTarget(event);
 		try {
 			endNativeEventBatch(event, nativeBatch, false, reportListenerError);
 		} catch (error) {
@@ -26302,10 +26314,12 @@ function dispatchDelegatedCapture(
 	if (!event.bubbles || (type.flags & EVENT_BUBBLE) === 0) maybeEnqueueRestore(event, type);
 	const pathBase = CAPTURE_PATH.length;
 	buildDelegatedPath(event, this, path);
-	snapshotDelegatedSlots(pathBase, type, true);
-	const stop = Object.getOwnPropertyDescriptor(event, 'stopPropagation');
+	// Without a capture handler on the path no callback can observe the frame, so
+	// the native stopPropagation/currentTarget stay untouched (see dispatchDelegated).
+	const hasSlot = snapshotDelegatedSlots(pathBase, type, true);
+	const stop = hasSlot ? Object.getOwnPropertyDescriptor(event, 'stopPropagation') : undefined;
 	const immediate =
-		(type.flags & EVENT_NATIVE_CAPTURE) !== 0
+		hasSlot && (type.flags & EVENT_NATIVE_CAPTURE) !== 0
 			? Object.getOwnPropertyDescriptor(event, 'stopImmediatePropagation')
 			: null;
 	const wasCancelled = event.cancelBubble;
@@ -26314,22 +26328,28 @@ function dispatchDelegatedCapture(
 	const nativeBatch = beginNativeEventBatch(event);
 	let frame: DelegatedEventFrame | undefined;
 	try {
-		frame = beginDelegatedPropagation(event, stop, immediate);
-		for (let i = CAPTURE_PATH.length - 1; i >= pathBase; i--) {
-			const slot = CAPTURE_SLOTS[i];
-			if (slot != null && !consumeBindingEvent(event, CAPTURE_PATH[i], true)) {
-				setCurrentTarget(event, CAPTURE_PATH[i], frame);
-				fireEventSlot(slot, event, CAPTURE_OWNERS?.[i]);
-				if ((frame.flags & 1) !== 0) break;
+		if (hasSlot) {
+			frame = beginDelegatedPropagation(event, stop, immediate);
+			for (let i = CAPTURE_PATH.length - 1; i >= pathBase; i--) {
+				const slot = CAPTURE_SLOTS[i];
+				if (slot != null && !consumeBindingEvent(event, CAPTURE_PATH[i], true)) {
+					setCurrentTarget(event, CAPTURE_PATH[i], frame);
+					fireEventSlot(slot, event, CAPTURE_OWNERS?.[i]);
+					if ((frame.flags & 1) !== 0) break;
+				}
 			}
 		}
 	} finally {
-		stopped = frame?.flags !== 0 || (!wasCancelled && event.cancelBubble);
+		// A frame that failed to begin still reports stopped, as before.
+		stopped =
+			(frame === undefined ? hasSlot : frame.flags !== 0) || (!wasCancelled && event.cancelBubble);
 		CAPTURE_PATH.length = pathBase;
 		CAPTURE_SLOTS.length = pathBase;
 		if (CAPTURE_OWNERS !== null) CAPTURE_OWNERS.length = pathBase;
-		endDelegatedPropagation(event, stop, immediate);
-		clearCurrentTarget(event);
+		if (hasSlot) {
+			endDelegatedPropagation(event, stop, immediate);
+			clearCurrentTarget(event);
+		}
 		try {
 			endNativeEventBatch(
 				event,

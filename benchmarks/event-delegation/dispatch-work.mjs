@@ -93,8 +93,20 @@ try {
 					},
 					body,
 				);
-			flushSync(() => root.render(body));
+			// An idle sibling outside the handler chain: its clicks reach the delegated
+			// listener (click is registered) but no Octane handler is on their path.
+			flushSync(() =>
+				root.render(
+					createElement(
+						'div',
+						{ id: 'event-shell' },
+						body,
+						createElement('span', { id: 'idle-target' }, 'idle'),
+					),
+				),
+			);
 			const target = container.querySelector('#event-target');
+			const idleTarget = container.querySelector('#idle-target');
 			const stop = Event.prototype.stopPropagation;
 			container.addEventListener('click', (event) => {
 				nativeAfter++;
@@ -126,7 +138,44 @@ try {
 						invalid++;
 				}
 			}
+			function dispatchIdle(count) {
+				for (let index = 0; index < count; index++) {
+					active = new MouseEvent('click', { bubbles: true, cancelable: true });
+					idleTarget.dispatchEvent(active);
+					if (
+						active.currentTarget !== null ||
+						Object.hasOwn(active, 'currentTarget') ||
+						Object.hasOwn(active, 'stopPropagation')
+					)
+						invalid++;
+				}
+			}
 			dispatch(500);
+			dispatchIdle(500);
+			// Idle clicks must reach native listeners untouched, run no handler, and
+			// leave the Event's own properties alone (no stopPropagation/currentTarget
+			// descriptors patched and restored around a queue with nothing to run).
+			callbacks = 0;
+			nativeAfter = 0;
+			let idleEventDefinitions = 0;
+			const oldDefine = Object.defineProperty,
+				oldDescriptor = Object.getOwnPropertyDescriptor;
+			Object.defineProperty = function (object, key, descriptor) {
+				if (object instanceof Event) idleEventDefinitions++;
+				return oldDefine.call(this, object, key, descriptor);
+			};
+			Object.getOwnPropertyDescriptor = function (object, key) {
+				if (object instanceof Event) idleEventDefinitions++;
+				return oldDescriptor.call(this, object, key);
+			};
+			try {
+				dispatchIdle(128);
+			} finally {
+				Object.defineProperty = oldDefine;
+				Object.getOwnPropertyDescriptor = oldDescriptor;
+			}
+			const idleCallbacks = callbacks,
+				idleNativeAfter = nativeAfter;
 			callbacks = 0;
 			nativeAfter = 0;
 			observing = true;
@@ -170,33 +219,53 @@ try {
 				typeLookups,
 				portalReads,
 				symbolPeak,
+				idleCallbacks,
+				idleNativeAfter,
+				idleEventDefinitions,
 			};
 			const timings = [];
+			const idleTimings = [];
 			for (let round = 0; round < timingRounds; round++) {
-				const start = performance.now();
+				let start = performance.now();
 				dispatch(timingEvents);
 				timings.push(((performance.now() - start) * 1000) / timingEvents);
+				start = performance.now();
+				dispatchIdle(timingEvents);
+				idleTimings.push(((performance.now() - start) * 1000) / timingEvents);
 			}
 			if (invalid !== 0) throw new Error(`Native event semantics failed ${invalid} times`);
 			root.unmount();
 			container.remove();
-			return { work, timingEvents, timingRounds, microsecondsPerDispatch: timings };
+			return {
+				work,
+				timingEvents,
+				timingRounds,
+				microsecondsPerDispatch: timings,
+				microsecondsPerIdleDispatch: idleTimings,
+			};
 		},
 		{ timingEvents, timingRounds },
 	);
 	assert.equal(report.work.invalid, 0);
 	assert.equal(report.work.callbacks, 128 * 10);
 	assert.equal(report.work.nativeAfter, 128);
+	assert.equal(report.work.idleCallbacks, 0);
+	assert.equal(report.work.idleNativeAfter, 128);
 	assert.deepEqual(failures, []);
 	if (!args.includes('--observe')) {
 		assert.equal(report.work.setProbes, 0, 'Registered click metadata should avoid Set probes');
 		assert.equal(report.work.portalReads, 0, 'Portal-free clicks should avoid portal-parent reads');
 		assert.equal(report.work.symbolPeak, 0, 'Temporary dispatch state should stay off the Event');
 		assert(report.work.typeLookups <= 256, 'Each click needs at most two registered-type reads');
+		assert.equal(
+			report.work.idleEventDefinitions,
+			0,
+			'Clicks with no handler on their path should not patch Event descriptors',
+		);
 	}
 	if (process.env.BENCH_JSON) {
 		const stat = (value) => ({ median: value, min: value, samples: 1 });
-		const keys = ['setProbes', 'portalReads', 'symbolPeak', 'typeLookups'];
+		const keys = ['setProbes', 'portalReads', 'symbolPeak', 'typeLookups', 'idleEventDefinitions'];
 		await writeFile(
 			process.env.BENCH_JSON,
 			JSON.stringify(
