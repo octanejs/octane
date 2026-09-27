@@ -7,4 +7,4 @@ export type CodeBlockDownloadButtonProps = ComponentProps<'button'> & {
 export declare const CodeBlockDownloadButton: ({ onDownload, onError, language, children, className, code: propCode, ...props }: CodeBlockDownloadButtonProps & {
     code?: string;
     language?: string;
-}) => import("octane/jsx-runtime").Octane.JSX.Element;
+}) => import("octane/jsx-runtime").JSX.Element;

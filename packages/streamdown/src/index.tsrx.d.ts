@@ -157,5 +157,11 @@ export type BlockProps = Options & {
     /** Animate plugin instance for tracking previous content length */
     animatePlugin?: AnimatePlugin | null;
 };
-export declare const Block: ComponentBody<BlockProps, any>;
-export declare const Streamdown: ComponentBody<StreamdownProps, any>;
+export declare const Block: (({ content, shouldParseIncompleteMarkdown: _, shouldNormalizeHtmlIndentation, index, isIncomplete, dir, animatePlugin: animatePluginProp, ...props }: BlockProps) => import("octane/jsx-runtime").JSX.Element) & {
+    readonly type: ({ content, shouldParseIncompleteMarkdown: _, shouldNormalizeHtmlIndentation, index, isIncomplete, dir, animatePlugin: animatePluginProp, ...props }: BlockProps) => import("octane/jsx-runtime").JSX.Element;
+    displayName?: string;
+};
+export declare const Streamdown: (({ children, mode, dir, parseIncompleteMarkdown: shouldParseIncompleteMarkdown, normalizeHtmlIndentation: shouldNormalizeHtmlIndentation, components, rehypePlugins, remarkPlugins, className, shikiTheme, mermaid, controls, isAnimating, animated, BlockComponent, parseMarkdownIntoBlocksFn, caret, plugins, remend: remendOptions, linkSafety, lineNumbers, allowedTags, literalTagContent, translations, icons: iconOverrides, prefix, onAnimationStart, onAnimationEnd, ...props }: StreamdownProps) => import("octane/jsx-runtime").JSX.Element) & {
+    readonly type: ({ children, mode, dir, parseIncompleteMarkdown: shouldParseIncompleteMarkdown, normalizeHtmlIndentation: shouldNormalizeHtmlIndentation, components, rehypePlugins, remarkPlugins, className, shikiTheme, mermaid, controls, isAnimating, animated, BlockComponent, parseMarkdownIntoBlocksFn, caret, plugins, remend: remendOptions, linkSafety, lineNumbers, allowedTags, literalTagContent, translations, icons: iconOverrides, prefix, onAnimationStart, onAnimationEnd, ...props }: StreamdownProps) => import("octane/jsx-runtime").JSX.Element;
+    displayName?: string;
+};

@@ -7,5 +7,5 @@ type MermaidFullscreenButtonProps = ComponentProps<'button'> & {
     onFullscreen?: () => void;
     onExit?: () => void;
 };
-export declare const MermaidFullscreenButton: ({ chart, config, onFullscreen, onExit, className, ...props }: MermaidFullscreenButtonProps) => import("octane/jsx-runtime").Octane.JSX.Element;
+export declare const MermaidFullscreenButton: ({ chart, config, onFullscreen, onExit, className, ...props }: MermaidFullscreenButtonProps) => import("octane/jsx-runtime").JSX.Element;
 export {};

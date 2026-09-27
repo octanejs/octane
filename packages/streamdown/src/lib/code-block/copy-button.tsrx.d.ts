@@ -7,4 +7,4 @@ export type CodeBlockCopyButtonProps = ComponentProps<'button'> & {
 };
 export declare const CodeBlockCopyButton: ({ onCopy, onError, timeout, children, className, code: propCode, ...props }: CodeBlockCopyButtonProps & {
     code?: string;
-}) => import("octane/jsx-runtime").Octane.JSX.Element;
+}) => import("octane/jsx-runtime").JSX.Element;

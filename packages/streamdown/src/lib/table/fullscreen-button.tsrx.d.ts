@@ -6,5 +6,5 @@ interface TableFullscreenButtonProps {
     showCopy?: boolean;
     showDownload?: boolean;
 }
-export declare const TableFullscreenButton: ({ children, className, showCopy, showDownload, }: TableFullscreenButtonProps) => import("octane/jsx-runtime").Octane.JSX.Element;
+export declare const TableFullscreenButton: ({ children, className, showCopy, showDownload, }: TableFullscreenButtonProps) => import("octane/jsx-runtime").JSX.Element;
 export {};

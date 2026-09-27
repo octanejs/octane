@@ -7,4 +7,4 @@ export interface TableCopyDropdownProps {
     onError?: (error: Error) => void;
     timeout?: number;
 }
-export declare const TableCopyDropdown: ({ children, className, onCopy, onError, timeout, }: TableCopyDropdownProps) => import("octane/jsx-runtime").Octane.JSX.Element;
+export declare const TableCopyDropdown: ({ children, className, onCopy, onError, timeout, }: TableCopyDropdownProps) => import("octane/jsx-runtime").JSX.Element;

@@ -9,5 +9,5 @@ interface MermaidDownloadDropdownProps {
     onDownload?: (format: 'mmd' | 'png' | 'svg') => void;
     onError?: (error: Error) => void;
 }
-export declare const MermaidDownloadDropdown: ({ chart, children, className, onDownload, config, onError, }: MermaidDownloadDropdownProps) => import("octane/jsx-runtime").Octane.JSX.Element;
+export declare const MermaidDownloadDropdown: ({ chart, children, className, onDownload, config, onError, }: MermaidDownloadDropdownProps) => import("octane/jsx-runtime").JSX.Element;
 export {};

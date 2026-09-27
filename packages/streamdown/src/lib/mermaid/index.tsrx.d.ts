@@ -7,5 +7,5 @@ interface MermaidProps {
     fullscreen?: boolean;
     showControls?: boolean;
 }
-export declare const Mermaid: ({ chart, className, config, fullscreen, showControls, }: MermaidProps) => import("octane/jsx-runtime").Octane.JSX.Element;
+export declare const Mermaid: ({ chart, className, config, fullscreen, showControls, }: MermaidProps) => import("octane/jsx-runtime").JSX.Element;
 export {};

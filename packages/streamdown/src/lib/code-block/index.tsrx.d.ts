@@ -10,5 +10,5 @@ type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
     /** Show line numbers in code blocks. @default true */
     lineNumbers?: boolean;
 };
-export declare const CodeBlock: ({ code, language, className, children, isIncomplete, startLine, lineNumbers, ...rest }: CodeBlockProps) => import("octane/jsx-runtime").Octane.JSX.Element;
+export declare const CodeBlock: ({ code, language, className, children, isIncomplete, startLine, lineNumbers, ...rest }: CodeBlockProps) => import("octane/jsx-runtime").JSX.Element;
 export {};

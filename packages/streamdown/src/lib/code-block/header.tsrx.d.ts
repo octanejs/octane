@@ -2,5 +2,5 @@
 interface CodeBlockHeaderProps {
     language: string;
 }
-export declare const CodeBlockHeader: ({ language }: CodeBlockHeaderProps) => import("octane/jsx-runtime").Octane.JSX.Element;
+export declare const CodeBlockHeader: ({ language }: CodeBlockHeaderProps) => import("octane/jsx-runtime").JSX.Element;
 export {};

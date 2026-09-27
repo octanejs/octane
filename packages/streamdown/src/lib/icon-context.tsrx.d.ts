@@ -21,5 +21,5 @@ export declare const IconContext: import("octane").Context<IconMap>;
 export declare const IconProvider: ({ icons, children, }: {
     icons?: Partial<IconMap>;
     children: OctaneNode;
-}) => import("octane/jsx-runtime").Octane.JSX.Element;
+}) => import("octane/jsx-runtime").JSX.Element;
 export declare const useIcons: () => IconMap;

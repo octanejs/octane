@@ -10,5 +10,5 @@ interface PanZoomProps {
     showControls?: boolean;
     zoomStep?: number;
 }
-export declare const PanZoom: ({ children, className, minZoom, maxZoom, zoomStep, showControls, initialZoom, fullscreen, }: PanZoomProps) => import("octane/jsx-runtime").Octane.JSX.Element;
+export declare const PanZoom: ({ children, className, minZoom, maxZoom, zoomStep, showControls, initialZoom, fullscreen, }: PanZoomProps) => import("octane/jsx-runtime").JSX.Element;
 export {};

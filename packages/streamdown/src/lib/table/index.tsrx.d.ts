@@ -6,5 +6,5 @@ type TableProps = ComponentProps<'table'> & {
     showDownload?: boolean;
     showFullscreen?: boolean;
 };
-export declare const Table: ({ children, className, showControls, showCopy, showDownload, showFullscreen, ...props }: TableProps) => import("octane/jsx-runtime").Octane.JSX.Element;
+export declare const Table: ({ children, className, showControls, showCopy, showDownload, showFullscreen, ...props }: TableProps) => import("octane/jsx-runtime").JSX.Element;
 export {};

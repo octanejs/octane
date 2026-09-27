@@ -2,5 +2,5 @@
 import type { ExtraProps } from './markdown.tsrx';
 import type { DetailedHTMLProps, ImgHTMLAttributes } from './types';
 type ImageComponentProps = DetailedHTMLProps<ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement> & ExtraProps;
-export declare const ImageComponent: ({ node, className, src, alt, onLoad: onLoadProp, onError: onErrorProp, ...props }: ImageComponentProps) => import("octane/jsx-runtime").Octane.JSX.Element | null;
+export declare const ImageComponent: ({ node, className, src, alt, onLoad: onLoadProp, onError: onErrorProp, ...props }: ImageComponentProps) => import("octane/jsx-runtime").JSX.Element | null;
 export {};
