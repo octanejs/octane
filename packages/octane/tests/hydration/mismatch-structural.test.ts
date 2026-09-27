@@ -78,6 +78,38 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 		expect(w[0]).toContain('control.tsrx:');
 	});
 
+	// The prod root-recovery paths skip the location lookup; dev must still name
+	// the root component and both sides of the divergence.
+	it('root recovery warns with the root location in dev', async () => {
+		const MIXEDFRAG = join(
+			process.cwd(),
+			'packages/octane/tests/hydration/_fixtures/mixed-frag.tsrx',
+		);
+		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
+		container.innerHTML = `${html}<p id="stale-tail">stale</p>`;
+		let root = hydrateRoot(container, clientDev.Toggle, { on: true });
+		flushSync(() => {});
+		expect(container.querySelector('#stale-tail')).toBeNull();
+		expect(warns()).toEqual([
+			expect.stringMatching(
+				/^Octane hydration mismatch at [^ ]*control\.tsrx.*the client expected the end of the root but the server rendered <p>\./,
+			),
+		]);
+		root.unmount();
+
+		errSpy.mockClear();
+		container.innerHTML = '<section id="stale">server</section>';
+		root = hydrateRoot(container, devClientModule(MIXEDFRAG, 'mixed-frag.tsrx').MixedFrag, {});
+		flushSync(() => {});
+		expect(container.querySelector('#stale')).toBeNull();
+		expect(warns()).toEqual([
+			expect.stringMatching(
+				/^Octane hydration mismatch at [^ ]*mixed-frag\.tsrx.*the client expected a fragment starting with a comment but the server rendered <section>\./,
+			),
+		]);
+		root.unmount();
+	});
+
 	it('@switch case swap (different tags): server <em>, client <strong> → rebuilds case b', async () => {
 		const srv = serverModule(STRUCTURAL, 'structural.tsrx');
 		const cli = devClientModule(STRUCTURAL, 'structural.tsrx');
@@ -440,6 +472,56 @@ describe('hydrateRoot — PROD runtime validation (root nodeType+tag only, parse
 		expect(container.querySelector('.leaf')).toBe(leaf);
 		expect(leaf.textContent).toBe('A');
 		expect(warns()).toEqual([]);
+	});
+
+	// Root recovery (stale trailing siblings, an unframed root over stale markup,
+	// a fragment root whose statics diverge) still runs in prod, but its source
+	// location only feeds the dev warning. Prod must not stringify the root
+	// component's source to find a location nobody reads.
+	it.each([
+		{
+			name: 'stale server siblings after the adopted root',
+			html: async () =>
+				(await ServerRT.renderToString(server.Toggle, { on: true })).html +
+				'<p id="stale-tail">stale</p>',
+			body: () => prodClientModule(CONTROL, 'control.tsrx').Toggle,
+			props: { on: true },
+			expected: '<div id="toggle"><!--[--><button id="hit" class="on">on:0</button><!--]--></div>',
+		},
+		{
+			name: 'an unframed string root over stale server markup',
+			html: async () => '<p id="stale">server</p>',
+			body: () =>
+				function StringRoot() {
+					return 'client';
+				},
+			props: {},
+			expected: 'client<!---->',
+		},
+		{
+			name: 'a fragment root whose statics do not match the server',
+			html: async () => '<section id="stale">server</section>',
+			body: () => prodClientModule(MIXEDFRAG, 'mixed-frag.tsrx').MixedFrag,
+			props: {},
+			expected: '<div class="leaf">A</div><!----><input type="text">',
+		},
+	])('recovers $name without reading the root source', async ({ html, body, props, expected }) => {
+		container.innerHTML = await html();
+		const Root = body();
+		const toString = vi.spyOn(Function.prototype, 'toString');
+		let rootSourceReads: number;
+		const root = hydrateRoot(container, Root, props);
+		try {
+			flushSync(() => {});
+			rootSourceReads = toString.mock.contexts.filter((context) => context === Root).length;
+		} finally {
+			toString.mockRestore();
+		}
+		expect(container.innerHTML).toBe(expected);
+		expect(container.querySelector('#stale, #stale-tail')).toBeNull();
+		expect(rootSourceReads).toBe(0);
+		expect(warns()).toEqual([]);
+		root.unmount();
 	});
 });
 

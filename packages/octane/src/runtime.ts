@@ -1727,6 +1727,9 @@ function describeHydrationNode(node: Node | null): string {
  * argument construction (describeHydrationNode etc.) — the internal `!loc` return stays as
  * defense-in-depth. The recovery at the call site runs in dev AND prod regardless.
  */
+/** `[loc, expected, actual]` for a root-abandon structural warning (DEV only). */
+type HydrationRootDiagnostic = readonly [loc: string | undefined, expected: string, actual: string];
+
 function warnHydrationStructuralMismatch(
 	loc: string | undefined,
 	expected: string,
@@ -18445,8 +18448,9 @@ class HydrationCapability {
 		return ssrForMarkerState(node);
 	}
 
+	/** DEV-only: every caller is dev-gated, so prod must not retain the describer. */
 	describe(node: Node | null): string {
-		return describeHydrationNode(node);
+		return process.env.NODE_ENV === 'production' ? '' : describeHydrationNode(node);
 	}
 
 	warnStructural(loc: string | undefined, expected: string, actual: string): void {
@@ -18659,11 +18663,19 @@ class HydrationCapability {
 		return outerOpen === null ? undefined : getNextSibling(this.close(outerOpen));
 	}
 
-	/** Give up root adoption after an unframed return/fragment mismatch. */
-	abandonRoot(expected: string, actual: string, loc?: string): void {
+	/**
+	 * Give up root adoption after an unframed return/fragment mismatch. Callers pass
+	 * the dev warning's inputs as a thunk behind a `NODE_ENV` check, so production
+	 * builds neither stringify the root component to find its location nor retain
+	 * the node describers.
+	 */
+	abandonRoot(diagnostic?: () => HydrationRootDiagnostic): void {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 		noteRecoverableHydrationError(() => new Error(formatClientError(52)));
-		if (loc) warnHydrationStructuralMismatch(loc, expected, actual);
+		if (process.env.NODE_ENV !== 'production' && diagnostic !== undefined) {
+			const [loc, expected, actual] = diagnostic();
+			if (loc) warnHydrationStructuralMismatch(loc, expected, actual);
+		}
 		let node = this.node;
 		while (node !== null) {
 			const next = getNextSibling(node);
@@ -18741,10 +18753,15 @@ class HydrationCapability {
 			if (template === null) template = resolveLazyTemplate(lazy!);
 			const remainder = this.fragmentRemainder(template, cursor, partialStyles);
 			if (remainder === undefined) {
+				const fragment = template;
 				this.abandonRoot(
-					`a fragment starting with ${describeHydrationNode(getFirstChild(template))}`,
-					describeHydrationNode(cursor),
-					componentSourceLoc(this.rootBlock.body),
+					process.env.NODE_ENV !== 'production'
+						? () => [
+								componentSourceLoc(this.rootBlock.body),
+								`a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
+								describeHydrationNode(cursor),
+							]
+						: undefined,
 				);
 				return this.freshClone(template);
 			}
@@ -18824,11 +18841,12 @@ class HydrationCapability {
 			remainder = getNextSibling(remainder);
 		if (remainder === null) return;
 		noteRecoverableHydrationError(() => new Error(formatClientError(53)), this.rootBlock);
-		warnHydrationStructuralMismatch(
-			componentSourceLoc(this.rootBlock.body),
-			'the end of the root',
-			describeHydrationNode(remainder),
-		);
+		if (process.env.NODE_ENV !== 'production')
+			warnHydrationStructuralMismatch(
+				componentSourceLoc(this.rootBlock.body),
+				'the end of the root',
+				describeHydrationNode(remainder),
+			);
 		while (remainder !== null && remainder !== this.rootCleanupBoundary) {
 			const next: Node | null = getNextSibling(remainder);
 			if (!this.freshNodes.has(remainder) && !isRendererHydrationStyle(remainder))
@@ -33731,10 +33749,15 @@ export function childSlot(
 				? cursor === null
 				: (typeof value === 'string' && cursor?.nodeType === 3) || unframedComponentRoot;
 		if (!unframedMatch) {
-			hydration.abandonRoot(
-				preparedList === null ? 'a renderable root' : 'a renderable list range',
-				hydration.describe(cursor),
-				componentSourceLoc(parentBlock.body),
+			const rootHydration = hydration;
+			rootHydration.abandonRoot(
+				process.env.NODE_ENV !== 'production'
+					? () => [
+							componentSourceLoc(parentBlock.body),
+							preparedList === null ? 'a renderable root' : 'a renderable list range',
+							rootHydration.describe(cursor),
+						]
+					: undefined,
 			);
 			childSlot(
 				parentScope,
