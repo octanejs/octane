@@ -28990,6 +28990,33 @@ export function createScopedValue<P>(
 	return scopedValueDescriptor(createScopedResolver(readElement));
 }
 
+/**
+ * Whether a compiled return-JSX function is running as the component body of
+ * `scope`. Every render path invokes a body as `body(props, scope, extra)` while
+ * that Scope is current, so argument 1 is the current Scope only for that call.
+ * A direct call returns a JSX value instead, which the compiler defers until the
+ * value renders.
+ *
+ * @internal
+ */
+export function isRenderCall(scope: unknown): boolean {
+	return scope === CURRENT_SCOPE && scope !== null;
+}
+
+/**
+ * The value a direct call of a compiled return-JSX function returns: its record
+ * builder, applied to the locals it reads, when the value renders or is
+ * inspected.
+ *
+ * @internal
+ */
+export function deferRecord<P>(
+	read: (...locals: any[]) => ElementDescriptor<P>,
+	...locals: any[]
+): ElementDescriptor<P> {
+	return createScopedValue(() => read(...locals));
+}
+
 /** @internal Native deferred JSX preserves its complete descriptor contract. */
 export function nativeCreateScopedValue<P>(
 	readElement: () => ElementDescriptor<P>,

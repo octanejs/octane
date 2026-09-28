@@ -9,6 +9,8 @@ export {
 	enableSignalBindings,
 	createElementAt,
 	createElementFromConfig,
+	isRenderCall,
+	deferRecord,
 	bindSignalText,
 	bindSignalChild,
 	bindSignalAttribute,

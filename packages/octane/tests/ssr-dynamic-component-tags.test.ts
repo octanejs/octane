@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 
 // Dynamic JSX tags (`<Wrap/>` where Wrap is a local binding) whose RUNTIME value
 // is a COMPONENT FUNCTION — the shape @octanejs/tanstack-router's Match pipeline uses for
@@ -9,14 +9,7 @@ import * as RT from 'octane/server';
 // ssr-host-string-tags.test.ts; these pin the function case, with children.
 
 function evalServer(source: string, file: string): Record<string, any> {
-	let { code } = compile(source, file, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(RT, {});
+	return loadCompiledFixtureSource(source, { id: file, mode: 'server' });
 }
 
 const mod = evalServer(
