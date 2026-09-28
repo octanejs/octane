@@ -1224,6 +1224,16 @@ export function createScopedValue(readElement: () => ElementDescriptor): Element
 	return scopedValueDescriptor(resolve);
 }
 
+/**
+ * Server twin of the client check: argument 1 of a compiled return-JSX function
+ * is the current Scope only when the renderer invokes it as a component body.
+ *
+ * @internal
+ */
+export function isRenderCall(scope: unknown): boolean {
+	return scope === CURRENT_SCOPE && scope !== null;
+}
+
 /** @internal Native complete-record deferral with request-local evidence. */
 export function nativeCreateScopedValue(readElement: () => ElementDescriptor): ElementDescriptor {
 	return scopedValueDescriptor(createNativeServerScopedResolver(readElement));

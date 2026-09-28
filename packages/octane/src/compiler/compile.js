@@ -1452,6 +1452,8 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'enableSignalBindings',
 	'createElementAt',
 	'createElementFromConfig',
+	'isRenderCall',
+	'deferRecord',
 	'bindSignalText',
 	'bindSignalChild',
 	'bindSignalAttribute',
@@ -1491,6 +1493,7 @@ const INTERNAL_SERVER_RUNTIME_HELPERS = new Set([
 	'enableServerSignalBindings',
 	'createElementAt',
 	'createElementFromConfig',
+	'isRenderCall',
 	'ssrSignalValue',
 	'ssrSignalControlValue',
 	'ssrSignalControlAttrs',
@@ -12087,6 +12090,11 @@ function compileServerComponent(node, ctx) {
 	const beforeCss = ctx.cssInjections.length;
 	const scoping = applyStyleScopes(node, ctx);
 	node = scoping.node;
+	// A plain return-JSX declaration can also be called directly; its returned
+	// JSX then needs the same deferred value the client emits.
+	if (node.body?.type === 'BlockStatement' && !node._octaneBindingView) {
+		node = { ...node, _octaneDirectCallReturn: true };
+	}
 	const cssHash = scoping.cssHash;
 	const cssEntries = [...ctx.moduleCssInjections, ...ctx.cssInjections.slice(beforeCss)].sort(
 		(a, b) => a.order - b.order,
@@ -12280,6 +12288,7 @@ function ssrCompileBodyWithMapTemps(
 
 	let statements;
 	let jsxNodes;
+	let directCallRoot = null;
 	if (node.body && node.body.type === 'JSXCodeBlock') {
 		statements = returnedOutput
 			? (node.body.body || []).map(normalizeOwnRenderableReturns)
@@ -12298,6 +12307,9 @@ function ssrCompileBodyWithMapTemps(
 		jsxNodes = [];
 		for (const child of bodyRewritten) {
 			if (child.type === 'ReturnStatement' && child.argument && isJsxNode(child.argument)) {
+				if (directCallRoot === null && node._octaneDirectCallReturn === true) {
+					directCallRoot = child.argument;
+				}
 				// return-JSX form: the returned host element (+ its directive children) is
 				// the render output — route it to jsxNodes so it flows through ssrEmitNode
 				// (byte-identical SSR to the `@{}` form), not printed as `return <jsx>`.
@@ -12425,6 +12437,53 @@ function ssrCompileBodyWithMapTemps(
 	ctx._returnedFragmentTemplate = prevReturnedFragmentTemplate;
 	ctx._tsxValuePos = prevValuePos;
 	ctx._valueDirectiveLowering = prevValueDirectiveLowering;
+	// Mirrors compileReturnJsxFunction: a direct call defers the record that a
+	// body call renders now. Its fragment sub is declared only in that branch, and
+	// it is lowered after the body template so body-call output is unchanged.
+	let directCall = null;
+	const directCallKind = directCallRoot === null ? null : directCallReturnKind(directCallRoot, ctx);
+	if (directCallKind === 'value') {
+		// Directives in the returned value fold into helpers owned by the direct
+		// call, so a body call never declares them.
+		const subs = [];
+		const previousLowering = ctx._valueDirectiveLowering;
+		ctx._valueDirectiveLowering = serverValueDirectiveFold(ctx, name, subs, cssHash);
+		try {
+			const returned = rewriteHookCalls(b.return(directCallRoot), ctx, name, localSetupSlots);
+			directCall = { subs, value: rewriteJsxValues(returned.argument, ctx) };
+		} finally {
+			ctx._valueDirectiveLowering = previousLowering;
+		}
+	} else if (directCallKind === 'fragment') {
+		const subs = [];
+		const record = serverValueDirectiveFold(
+			ctx,
+			name,
+			subs,
+			cssHash,
+			false,
+			'html',
+		)(directCallRoot);
+		ctx.runtimeNeeded.add('createScopedValue');
+		directCall = {
+			subs,
+			value: inheritOriginLoc(
+				b.call(rtAlias('createScopedValue'), b.arrow([], record)),
+				directCallRoot,
+			),
+		};
+	}
+	const renderCallTest =
+		directCall === null
+			? null
+			: () =>
+					inheritOriginLoc(
+						b.call(
+							requireRuntimeForContext(ctx, 'isRenderCall'),
+							node.params.length > 1 ? secondArgument(node) : b.id('__s'),
+						),
+						directCallRoot,
+					);
 
 	const body = [];
 	body.push(...serverThemeTouchStatements(themeTouches ?? [], ctx, node));
@@ -12488,7 +12547,39 @@ function ssrCompileBodyWithMapTemps(
 			}
 		}
 	}
-	body.push(...frontHead, ...rewritten, ...inlinedSubs, ...deferredHead);
+	// A direct call's deferred fragment registers its own head elements when it
+	// renders, so the body-call registrations run only for a body call.
+	const guardHead = (statements) =>
+		renderCallTest === null || statements.length === 0
+			? statements
+			: [inheritOriginLoc(b.if(renderCallTest(), b.block(statements), null), statements[0])];
+	body.push(...guardHead(frontHead), ...rewritten, ...inlinedSubs, ...guardHead(deferredHead));
+	if (directCall !== null) {
+		const scopeNames = collectFunctionScopeBindings(
+			node.params.length > 0 ? node.params : [b.id('__props')],
+			[...rewritten, ...inlinedSubs],
+			new Set([...mapTemps, '__s', '__extra']),
+		);
+		const captures = directCallCaptures(node, scopeNames, directCall.subs, directCall.value);
+		const branch =
+			captures === null
+				? [...directCall.subs, b.return(directCall.value)]
+				: [
+						b.return(
+							hoistCapturingHelper(
+								ctx,
+								`${name}$direct`,
+								captures,
+								directCall.subs,
+								directCall.value,
+								directCallRoot,
+							),
+						),
+					];
+		body.push(
+			inheritOriginLoc(b.if(b.unary('!', renderCallTest()), b.block(branch), null), directCallRoot),
+		);
+	}
 	// PROPS-FIRST ABI (matches the client): `(…userParams, __s, __extra)`. A leading
 	// `__props` placeholder stands in when there are no user params, so a verbatim
 	// `function Foo(props)` and a compiled component both bind props from arg 0.
@@ -19990,6 +20081,9 @@ function compileReturnJsxFunction(node, ctx, options) {
 	// their closure over setup locals/props — and only their values + the control
 	// expression are threaded into the renderer as `props.hN` holes.
 	const compInlinedSubs = [];
+	// Set once a returned record needs a separate direct-call value.
+	let renderCall = null;
+	const returnedRecords = [];
 	// Fold a directive found at value position into a hoisted renderer owned by THIS
 	// body — the same fold the `@{}` body and the server emitter build.
 	const lowerBodyValueDirective =
@@ -20121,7 +20215,23 @@ function compileReturnJsxFunction(node, ctx, options) {
 						};
 					}
 				}
-				return { ...h, argument: lowerReturnJsx(h.argument, ctx, compInlinedSubs, cssHash) };
+				const record = lowerReturnJsx(h.argument, ctx, compInlinedSubs, cssHash);
+				if (node._octaneBindingView || !directCallNeedsClientBranch(h.argument, node, ctx)) {
+					return { ...h, argument: record };
+				}
+				renderCall ??= renderCallScopeParam(node, ctx);
+				// Built once the function's top-level bindings are all known.
+				const placeholder = inheritOriginLoc(b.id('__octaneReturnedRecord'), h.argument);
+				returnedRecords.push({
+					placeholder,
+					record,
+					origin: h.argument,
+					test: inheritOriginLoc(
+						b.call(requireRuntimeForContext(ctx, 'isRenderCall'), cloneAstNode(renderCall.scope)),
+						h.argument,
+					),
+				});
+				return { ...h, argument: placeholder };
 			}
 			return rewriteJsxValues(h, ctx);
 		});
@@ -20132,6 +20242,20 @@ function compileReturnJsxFunction(node, ctx, options) {
 		ctx.currentAutoMemoLocalHazards = prevAutoMemoLocalHazards;
 		ctx.currentAutoCalculatedRenderableRefs = prevAutoCalculatedRenderableRefs;
 		ctx.currentMapTemps = prevMapTemps;
+	}
+	if (returnedRecords.length > 0) {
+		const scopeNames = collectFunctionScopeBindings(
+			renderCall.params,
+			[...compInlinedSubs, ...newStatements],
+			new Set(mapTemps),
+		);
+		const replacements = new Map(
+			returnedRecords.map((entry) => [
+				entry.placeholder,
+				splitReturnedRecord(ctx, node, name, scopeNames, entry),
+			]),
+		);
+		newStatements = mapAst(newStatements, (candidate) => replacements.get(candidate) ?? null);
 	}
 	if (
 		ctx.autoMemo &&
@@ -20184,7 +20308,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 	}
 	const emittedFunction = b.function_declaration(
 		node.id,
-		node.params,
+		renderCall?.params ?? node.params,
 		b.block(
 			ctx.nativeReads ? wrapNativeReadScope(returnBody, b.void0, nativeReadNames(ctx)) : returnBody,
 		),
@@ -20530,6 +20654,238 @@ function requiresTemplateNormalization(
 	return (node.children || []).some((child) =>
 		requiresTemplateNormalization(child, childNs, childAllowsHeadHoists, ctx),
 	);
+}
+
+// A named return-JSX declaration is also a component. Its body call evaluates
+// the returned record in the scope that renders it. A direct call returns a JSX
+// value instead, which must resolve where it renders, like the value an arrow
+// function returns. Both emitters classify the same authored root: 'fragment'
+// defers the compiled fragment record, 'value' uses ordinary value lowering, and
+// null marks static host markup that renders the same anywhere. The server's
+// body call renders the whole tree to HTML, so every non-literal hole and every
+// component below the root needs deferral there.
+function directCallReturnKind(node, ctx, stableNames = null) {
+	if (VALUE_DIRECTIVE_ARM_TYPES.has(node.type)) return 'fragment';
+	if (requiresTemplateNormalization(node, 'html', true, ctx)) return 'fragment';
+	if (node.type !== 'Element' && node.type !== 'JSXElement') {
+		return jsxValueChildrenNeedRenderScope(node, false, stableNames) ? 'value' : null;
+	}
+	if (isComponentTag(node)) return 'value';
+	return jsxValueRootNeedsRenderScope(node, stableNames) ||
+		jsxValueChildrenNeedRenderScope(node, false, stableNames)
+		? 'fragment'
+		: null;
+}
+
+// Whether the client's body-call record evaluates anything a direct call must
+// defer. The client record only stores hole values and interprets them where
+// it mounts, so reading an unreassigned local is the same during the call and
+// at render. Value-lowered roots already defer, except a component's own props.
+function directCallNeedsClientBranch(node, fn, ctx) {
+	const stable = directCallStableNames(fn);
+	const kind = directCallReturnKind(node, ctx, stable);
+	if (kind === 'fragment') return true;
+	return (
+		kind === 'value' &&
+		(node.type === 'Element' || node.type === 'JSXElement') &&
+		jsxValueRootNeedsRenderScope(node, stable)
+	);
+}
+
+// Names that code anywhere in the function assigns after declaring them.
+const DIRECT_CALL_ASSIGNED_NAMES = new WeakMap();
+function directCallAssignedNames(fn) {
+	const cached = DIRECT_CALL_ASSIGNED_NAMES.get(fn);
+	if (cached !== undefined) return cached;
+	const assigned = new Set();
+	const target = (node) => {
+		if (node?.type === 'Identifier') assigned.add(node.name);
+		else if (node != null && typeof node === 'object') collectBindings(node, assigned);
+	};
+	mapAst(fn.body, (node) => {
+		if (node.type === 'AssignmentExpression') target(node.left);
+		else if (node.type === 'UpdateExpression') target(node.argument);
+		else if (
+			(node.type === 'ForInStatement' || node.type === 'ForOfStatement') &&
+			node.left?.type !== 'VariableDeclaration'
+		) {
+			target(node.left);
+		}
+		return null;
+	});
+	DIRECT_CALL_ASSIGNED_NAMES.set(fn, assigned);
+	return assigned;
+}
+
+// Parameters and top-level declarations that nothing in the function assigns.
+// Reading one runs no user code and yields the same value during the call and
+// at render, so the client record needs no deferral for it.
+function directCallStableNames(fn) {
+	const names = collectComponentLocals(fn);
+	for (const name of directCallAssignedNames(fn)) names.delete(name);
+	return names;
+}
+
+// A direct call's deferred value reads the function's locals after the call has
+// returned. Declaring its closure inside the function would make those locals
+// context slots, allocating a context on every call, body calls included, so
+// the value is built by a module function that receives them as arguments.
+// Returns those arguments, or null when a copy could differ from the live
+// binding: a captured authored local that the function reassigns, or a read of
+// `this` or `arguments`.
+function directCallCaptures(fn, scopeNames, statements, value) {
+	const body = b.block([...statements, b.return(value)]);
+	let contextual = false;
+	mapAst(body, (node) => {
+		if (
+			node.type === 'ThisExpression' ||
+			node.type === 'Super' ||
+			node.type === 'MetaProperty' ||
+			(node.type === 'Identifier' && node.name === 'arguments')
+		) {
+			contextual = true;
+		}
+		return contextual ? node : null;
+	});
+	if (contextual) return null;
+	const captures = [...collectFreeIdentifiers(body, new Set())]
+		.filter((identifier) => scopeNames.has(identifier))
+		.sort();
+	const assigned = directCallAssignedNames(fn);
+	return captures.some((identifier) => assigned.has(identifier)) ? null : captures;
+}
+
+// Declare `function helper(captures) { ...statements; return value; }` among the
+// module's hoisted helpers and return a call to it.
+function hoistCapturingHelper(ctx, preferred, captures, statements, value, origin) {
+	const helper = allocCompilerName(ctx, preferred);
+	const ids = () => captures.map((identifier) => inheritOriginLoc(b.id(identifier), origin));
+	ctx.hoistedHelpers.push(
+		inheritOriginLoc(
+			b.function_declaration(b.id(helper), ids(), b.block([...statements, b.return(value)])),
+			origin,
+		),
+	);
+	return inheritOriginLoc(b.call(helper, ...ids()), origin);
+}
+
+// The client's returned record, split between a body call and a direct call.
+// The record is printed once, in a module function the body call invokes; a
+// direct call defers that same function until the value renders.
+function splitReturnedRecord(ctx, fn, name, scopeNames, { record, test, origin }) {
+	const captures = directCallCaptures(fn, scopeNames, [], record);
+	if (captures === null) {
+		ctx.runtimeNeeded.add('createScopedValue');
+		const direct = b.call(rtAlias('createScopedValue'), b.arrow([], cloneAstNode(record)));
+		return inheritOriginLoc(b.conditional(test, record, inheritOriginLoc(direct, origin)), origin);
+	}
+	const read = hoistCapturingHelper(ctx, `${name}$record`, captures, [], record, origin);
+	const direct = b.call(
+		requireRuntimeForContext(ctx, 'deferRecord'),
+		b.id(read.callee.name),
+		...read.arguments.map((argument) => cloneAstNode(argument)),
+	);
+	return inheritOriginLoc(b.conditional(test, read, inheritOriginLoc(direct, origin)), origin);
+}
+
+// Names an emitted function body binds in its own scope: parameters, top-level
+// declarations, and `var` declarations in nested blocks.
+function collectFunctionScopeBindings(params, statements, into) {
+	for (const param of params) collectBindings(param, into);
+	const visit = (statement, topLevel) => {
+		if (statement == null || typeof statement !== 'object') return;
+		switch (statement.type) {
+			case 'VariableDeclaration':
+				if (topLevel || statement.kind === 'var') {
+					for (const declaration of statement.declarations || []) {
+						collectBindings(declaration.id, into);
+					}
+				}
+				return;
+			case 'FunctionDeclaration':
+			case 'ClassDeclaration':
+				if (topLevel && statement.id) into.add(statement.id.name);
+				return;
+			case 'BlockStatement':
+				for (const child of statement.body || []) visit(child, false);
+				return;
+			case 'IfStatement':
+				visit(statement.consequent, false);
+				visit(statement.alternate, false);
+				return;
+			case 'ForStatement':
+				visit(statement.init, false);
+				visit(statement.body, false);
+				return;
+			case 'ForInStatement':
+			case 'ForOfStatement':
+				visit(statement.left, false);
+				visit(statement.body, false);
+				return;
+			case 'WhileStatement':
+			case 'DoWhileStatement':
+			case 'LabeledStatement':
+				visit(statement.body, false);
+				return;
+			case 'TryStatement':
+				visit(statement.block, false);
+				visit(statement.handler?.body, false);
+				visit(statement.finalizer, false);
+				return;
+			case 'SwitchStatement':
+				for (const clause of statement.cases || []) {
+					for (const child of clause.consequent || []) visit(child, false);
+				}
+				return;
+			default:
+				return;
+		}
+	};
+	for (const statement of statements) visit(statement, true);
+	return into;
+}
+
+// Argument 1 of a function whose own parameters already reach it: the second
+// parameter when the function never reassigns it, `arguments[1]` otherwise.
+function secondArgument(fn) {
+	const params = fn.params || [];
+	const second = params[1]?.type === 'AssignmentPattern' ? params[1].left : params[1];
+	return second?.type === 'Identifier' &&
+		params[0]?.type !== 'RestElement' &&
+		!(params[0]?.type === 'Identifier' && params[0].name === 'this') &&
+		!directCallAssignedNames(fn).has(second.name)
+		? b.id(second.name)
+		: b.member(b.id('arguments'), b.literal(1), true);
+}
+
+// The argument a body call receives its Scope in. A spare default parameter
+// keeps the function's `length` and avoids an `arguments` object; functions
+// that cannot take one read `arguments[1]`.
+function renderCallScopeParam(node, ctx) {
+	const params = node.params || [];
+	const statements = node.body?.body || [];
+	const strictBody = statements.some(
+		(statement) => statement.type === 'ExpressionStatement' && statement.directive === 'use strict',
+	);
+	if (
+		params.length > 1 ||
+		strictBody ||
+		params.some(
+			(param) =>
+				param.type === 'RestElement' || (param.type === 'Identifier' && param.name === 'this'),
+		)
+	) {
+		return { params, scope: inheritOriginLoc(secondArgument(node), node) };
+	}
+	const scope = inheritOriginLoc(b.id(allocCompilerName(ctx, '__renderScope')), node);
+	const spare = (identifier) => inheritOriginLoc(b.assignment_pattern(identifier, b.void0), node);
+	return {
+		params:
+			params.length === 0
+				? [spare(inheritOriginLoc(b.id(allocCompilerName(ctx, '__props')), node)), spare(scope)]
+				: [...params, spare(scope)],
+		scope,
+	};
 }
 
 // Lower JSX at return position. Host roots always use the compiled-fragment
@@ -22096,18 +22452,19 @@ function jsxNameToExpr(name) {
 // hit the TDZ, while a member, coercion, spread, or computed key can invoke
 // user code without containing a call. Function expressions are values here;
 // their bodies still run only when an event/render-prop consumer invokes them.
-function isStaticJsxValueExpression(expression) {
+function isStaticJsxValueExpression(expression, stableNames = null) {
 	const value = unwrapTsExpr(expression);
 	return (
 		isInvariantLiteral(value) ||
 		value?.type === 'ArrowFunctionExpression' ||
-		value?.type === 'FunctionExpression'
+		value?.type === 'FunctionExpression' ||
+		(stableNames !== null && value?.type === 'Identifier' && stableNames.has(value.name))
 	);
 }
 
 // A root member tag, spread, or dynamic prop can invoke user code before its
 // descriptor exists. Defer the complete record rather than just its children.
-function jsxValueRootNeedsRenderScope(node) {
+function jsxValueRootNeedsRenderScope(node, stableNames = null) {
 	const name = node.openingElement?.name || node.id;
 	if (
 		name?.type === 'MemberExpression' ||
@@ -22120,7 +22477,7 @@ function jsxValueRootNeedsRenderScope(node) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') return true;
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		if (attr.value?.type !== 'JSXExpressionContainer') continue;
-		if (!isStaticJsxValueExpression(attr.value.expression)) return true;
+		if (!isStaticJsxValueExpression(attr.value.expression, stableNames)) return true;
 	}
 	return false;
 }
@@ -22129,21 +22486,27 @@ function jsxValueRootNeedsRenderScope(node) {
 // syntax is effectful. Nested component/tag resolution and dynamic attributes
 // belong to their represented parent, so they make that parent's children lazy
 // even when the nested element has no expression children of its own.
-function jsxValueChildrenNeedRenderScope(node, descendantElementsOwnChildren = false) {
+function jsxValueChildrenNeedRenderScope(
+	node,
+	descendantElementsOwnChildren = false,
+	stableNames = null,
+) {
 	for (const child of node.children || []) {
 		if (child == null || child.type === 'JSXText' || child.type === 'Text') continue;
 		if (child.type === 'JSXExpressionContainer') {
 			if (
 				child.expression &&
 				child.expression.type !== 'JSXEmptyExpression' &&
-				!isStaticJsxValueExpression(child.expression)
+				!isStaticJsxValueExpression(child.expression, stableNames)
 			) {
 				return true;
 			}
 			continue;
 		}
 		if (child.type === 'Fragment' || child.type === 'JSXFragment') {
-			if (jsxValueChildrenNeedRenderScope(child, descendantElementsOwnChildren)) return true;
+			if (jsxValueChildrenNeedRenderScope(child, descendantElementsOwnChildren, stableNames)) {
+				return true;
+			}
 			continue;
 		}
 		if (child.type !== 'Element' && child.type !== 'JSXElement') return true;
@@ -22152,11 +22515,16 @@ function jsxValueChildrenNeedRenderScope(node, descendantElementsOwnChildren = f
 			if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') return true;
 			if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') return true;
 			if (attr.value?.type !== 'JSXExpressionContainer') continue;
-			if (!isStaticJsxValueExpression(attr.value.expression)) return true;
+			if (!isStaticJsxValueExpression(attr.value.expression, stableNames)) return true;
 		}
 		// A fragment can retain its inspectable positional array when only a nested
 		// element's descendants are dynamic: that element already owns their scope.
-		if (!descendantElementsOwnChildren && jsxValueChildrenNeedRenderScope(child)) return true;
+		if (
+			!descendantElementsOwnChildren &&
+			jsxValueChildrenNeedRenderScope(child, false, stableNames)
+		) {
+			return true;
+		}
 	}
 	return false;
 }

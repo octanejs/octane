@@ -630,6 +630,25 @@ expressions while constructing the caller's element, before that element's
 represented provider or boundary renders; Octane intentionally follows the
 visible rendered tree instead.
 
+The same applies to JSX a function returns when you call it directly, whether
+the function is an arrow, a method, or a named `function` declaration:
+
+```tsx
+function Label() {
+  return <span>{use(Theme)}</span>;
+}
+
+function Page() {
+  const label = Label();
+  return <Theme value="inner">{label}</Theme>; // "inner"
+}
+```
+
+Statements before the `return` still run during the call; only the returned
+element record waits for its render scope. Rendering the function as a
+component, `<Label />`, evaluates its output as part of that component's own
+render.
+
 JSX values remain inspectable element descriptors: `isValidElement`,
 `Children.only`, `cloneElement`, and ordinary `type`/`props`/`children`
 inspection keep their existing contracts. Inspecting a deferred element record
