@@ -40,7 +40,7 @@ function assertNoTsrx(paths) {
 	}
 }
 
-async function discoverGraph({ packageDir, entryPaths, tsrxPlugin }) {
+async function discoverGraph({ packageDir, entryPaths, tsrxPlugin, plugins }) {
 	let metadata;
 	try {
 		const result = await build({
@@ -54,7 +54,7 @@ async function discoverGraph({ packageDir, entryPaths, tsrxPlugin }) {
 			target: 'node22',
 			packages: 'external',
 			metafile: true,
-			plugins: [tsrxPlugin],
+			plugins: [tsrxPlugin, ...plugins],
 			logLevel: 'silent',
 		});
 		if (result.warnings.length > 0) {
@@ -107,6 +107,7 @@ export async function buildPackageCommonjs({
 	outdir,
 	sourceRoot,
 	callableDefault = false,
+	plugins = [],
 }) {
 	if (!packageDir || !Array.isArray(entries) || entries.length === 0 || !outdir) {
 		throw new Error('buildPackageCommonjs requires packageDir, entries, and outdir');
@@ -135,7 +136,12 @@ export async function buildPackageCommonjs({
 	}
 	assertNoTsrx(entryPaths);
 	const tsrxPlugin = createTsrxFailClosedPlugin();
-	const modules = await discoverGraph({ packageDir: absolutePackageDir, entryPaths, tsrxPlugin });
+	const modules = await discoverGraph({
+		packageDir: absolutePackageDir,
+		entryPaths,
+		tsrxPlugin,
+		plugins,
+	});
 	const sourceModules = [...modules.keys()].filter((path) => extname(path) !== '.json');
 	const outputs = new Map();
 	for (const sourcePath of sourceModules) {
@@ -164,7 +170,7 @@ export async function buildPackageCommonjs({
 		target: 'node22',
 		bundle: false,
 		logLevel: 'silent',
-		plugins: [tsrxPlugin],
+		plugins: [tsrxPlugin, ...plugins],
 	});
 
 	await Promise.all(
