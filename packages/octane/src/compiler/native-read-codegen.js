@@ -42,6 +42,10 @@ function bracket(statements, begin, finish, names) {
 }
 
 export function wrapNativeReadScope(statements, scope, names) {
+	// An empty body (an empty @if/@else arm, a bodiless block callback) runs no
+	// code that could read, so a scope would only publish the same empty read set
+	// on every render. Module activation already enabled collection.
+	if (statements.length === 0) return statements;
 	return bracket(
 		statements,
 		b.call(names.runtime('beginNativeReadScope'), scope, b.literal(1)),

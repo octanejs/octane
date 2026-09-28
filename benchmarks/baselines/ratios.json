@@ -5345,6 +5345,22 @@
     "note": "Escaped argument tuples remain independent under real nested branch updates; absent branches omit unused captures."
   },
   {
+    "suite": "compiler-output",
+    "op": "empty_brackets",
+    "target": "native-read-emptyThen",
+    "reference": "native-read-emptyThen-model",
+    "maxRatio": 0,
+    "note": "Empty @if/@else arms in native-read modules compile to bodiless functions instead of entering and publishing an empty read scope on every render; the two-arm control keeps all three scope sites."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "empty_brackets",
+    "target": "native-read-emptyElse",
+    "reference": "native-read-emptyElse-model",
+    "maxRatio": 0,
+    "note": "Empty @if/@else arms in native-read modules compile to bodiless functions instead of entering and publishing an empty read scope on every render; the two-arm control keeps all three scope sites."
+  },
+  {
     "suite": "root-transactions",
     "op": "retirement_closures",
     "target": "retirement-remove-half",

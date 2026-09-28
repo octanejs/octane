@@ -60,6 +60,27 @@ The new event-capture analysis is skipped entirely in HMR, profiling, and native
 read modes, where handler lifting is disabled. Production still pays for the
 capture safety checks, including the branch argument-escape proof.
 
+## Empty arms in native-read modules
+
+A module that imports `octane/signals` brackets each compiled block body with
+`beginNativeReadScope`/`endNativeReadScope`. An empty `@if`/`@else` arm has no
+code that can read, but it still entered and published an empty read scope on
+every render; a production application bundle carried six such bodies.
+`native-read-scopes.mjs` compiles three modules and runs them through public
+roots for 64 cycles. Each cycle updates a signal read by the non-empty arm,
+renders the other arm twice, and switches back, asserting the visible text at
+each step.
+
+| Module | Scope sites | Empty brackets | Scope entries (64 cycles) | Minified bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Empty `then` arm, baseline `e99af7160` → candidate | 3 → 2 | 1 → 0 | 448 → 320 | 833 → 811 |
+| Empty `else` arm, baseline → candidate | 3 → 2 | 1 → 0 | 448 → 320 | 833 → 811 |
+| Two rendering arms (control) | 3 → 3 | 0 → 0 | 448 → 448 | 959 → 959 |
+
+Module activation still calls `enableNativeReadCollection`, so dropping the
+bracket around an empty body skips no driver setup. Ratio guards hold
+`empty_brackets` at zero for both empty-arm modules.
+
 ## Reproduce
 
 Use Node 24 and the repository lockfile dependencies:
