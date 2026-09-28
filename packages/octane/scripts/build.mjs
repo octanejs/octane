@@ -3,9 +3,10 @@
 // swaps the published entry points to `./dist`.
 //
 // Three steps, matching the two source shapes:
-//   1. The `.ts` runtime → ESM `.js`, transpiled PER FILE (no bundling) so the module
+//   1. The `.ts` runtime → `.js`, transpiled PER FILE (no bundling) so the module
 //      structure and generated package-version literal remain intact for a plain Node
-//      ESM consumer.
+//      consumer. build-runtime.mjs emits the bundler ESM tree, the `node`-condition
+//      ESM tree, and CommonJS.
 //   2. The compiler and its separately imported Node adapters are already plain
 //      `.js` — copy them and their hand-written declarations. Bundle only the
 //      Volar entry's third-party graph so published typechecks use the audited
@@ -17,24 +18,18 @@
 // dist shipped with unresolvable imports). verify-dist.mjs backstops the build:
 // every emitted module's relative imports must resolve, every publishConfig export
 // must exist, and every entry point must import cleanly in plain Node.
-import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
-import { cpSync, readFileSync, readdirSync, rmSync } from 'node:fs';
-import { dirname, join, sep } from 'node:path';
+import { cpSync, readFileSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { buildPackageCommonjs } from '../../../scripts/build-package-commonjs.mjs';
+import { buildPublishedRuntime } from './build-runtime.mjs';
 import { bundleVolarCompiler } from './bundle-volar.mjs';
-import { createErrorSpecializationPlugin } from './specialize-error-calls.mjs';
 import { smokeDist, verifyDist } from './verify-dist.mjs';
 
 const pkgDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const root = join(pkgDir, '..', '..');
 const src = join(pkgDir, 'src');
 const dist = join(pkgDir, 'dist');
-const errorSpecialization = await createErrorSpecializationPlugin({
-	sourceRoot: src,
-	catalogPath: join(pkgDir, 'error-codes/codes.json'),
-});
 
 execFileSync(process.execPath, [join(pkgDir, 'scripts', 'generate-version.mjs'), '--check'], {
 	stdio: 'inherit',
@@ -42,44 +37,7 @@ execFileSync(process.execPath, [join(pkgDir, 'scripts', 'generate-version.mjs'),
 
 rmSync(dist, { recursive: true, force: true });
 
-// Every .ts module plus any shared plain-JS modules, except the compiler dir
-// (already plain .js — copied verbatim below).
-const entryPoints = readdirSync(src, { recursive: true })
-	.filter(
-		(f) =>
-			(f.endsWith('.ts') || f.endsWith('.js')) &&
-			!f.endsWith('.d.ts') &&
-			!f.startsWith(`compiler${sep}`),
-	)
-	.map((f) => join(src, f));
-
-await build({
-	entryPoints,
-	outdir: dist,
-	outbase: src,
-	format: 'esm',
-	platform: 'neutral',
-	target: 'esnext',
-	bundle: false,
-	plugins: [errorSpecialization],
-});
-
-await buildPackageCommonjs({
-	packageDir: pkgDir,
-	entries: [
-		'src/index.ts',
-		'src/server/index.ts',
-		'src/internal/client.ts',
-		'src/internal/server.ts',
-		'src/internal/context.ts',
-		'src/signals/index.ts',
-		'src/signals/client.ts',
-		'src/signals/server.ts',
-	],
-	outdir: 'dist/cjs',
-	sourceRoot: 'src',
-	plugins: [errorSpecialization],
-});
+await buildPublishedRuntime(pkgDir);
 
 cpSync(join(src, 'compiler'), join(dist, 'compiler'), { recursive: true });
 await bundleVolarCompiler({ packageDir: pkgDir, outdir: join(dist, 'compiler') });

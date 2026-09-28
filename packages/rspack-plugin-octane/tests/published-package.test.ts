@@ -3,7 +3,6 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
-	readdirSync,
 	realpathSync,
 	rmSync,
 	symlinkSync,
@@ -16,10 +15,9 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { constants as zlib, gzipSync } from 'node:zlib';
 import rspack from '@rspack/core';
-import { build } from 'esbuild';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { verifyScenario } from '../../../benchmarks/bundle-size/verify-reachability.mjs';
-import { buildPackageCommonjs } from '../../../scripts/build-package-commonjs.mjs';
+import { buildPublishedRuntime } from '../../octane/scripts/build-runtime.mjs';
 import { OctaneRspackPlugin } from '../src/index.js';
 
 const repositoryRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
@@ -64,30 +62,7 @@ async function installPublishedOctane(packageDirectory: string) {
 		join(packageDirectory, 'node_modules'),
 		'dir',
 	);
-	const entryPoints = readdirSync(sourceDirectory, { recursive: true, encoding: 'utf8' })
-		.filter(
-			(file) =>
-				(file.endsWith('.ts') || file.endsWith('.js')) &&
-				!file.endsWith('.d.ts') &&
-				!file.startsWith(`compiler${sep}`),
-		)
-		.map((file) => join(sourceDirectory, file));
-	await build({
-		entryPoints,
-		outdir: distDirectory,
-		outbase: sourceDirectory,
-		format: 'esm',
-		platform: 'neutral',
-		target: 'esnext',
-		bundle: false,
-		logLevel: 'silent',
-	});
-	await buildPackageCommonjs({
-		packageDir: packageDirectory,
-		entries: ['src/index.ts', 'src/server/index.ts'],
-		outdir: 'dist/cjs',
-		sourceRoot: 'src',
-	});
+	await buildPublishedRuntime(packageDirectory);
 	cpSync(join(sourceDirectory, 'compiler'), join(distDirectory, 'compiler'), { recursive: true });
 	rmSync(sourceDirectory, { recursive: true, force: true });
 }

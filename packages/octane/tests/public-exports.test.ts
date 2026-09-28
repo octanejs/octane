@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
 	assertRequiredPublicValueExports,
+	missingNodeConditions,
 	missingPublishedPublicSubpaths,
 	publishedRequireEntries,
 	publishedRuntimeEntries,
@@ -57,6 +58,37 @@ describe('published package export contract', () => {
 		).toEqual([['.', './dist/cjs/index.cjs']]);
 	});
 
+	it('resolves Node to the runtime tree that reads NODE_ENV once per module', () => {
+		expect(
+			missingNodeConditions({
+				'./a': {
+					types: './dist/a.d.ts',
+					node: {
+						import: './dist/node/a.js',
+						require: './dist/cjs/a.cjs',
+						default: './dist/node/a.js',
+					},
+					import: './dist/a.js',
+					require: './dist/cjs/a.cjs',
+				},
+				'./b': { types: './dist/b.d.ts', node: './dist/node/b.js', default: './dist/b.js' },
+				'./compiler': { types: './dist/compiler/index.d.ts', default: './dist/compiler/index.js' },
+				'./types-only': { types: './dist/types.d.ts' },
+				'./missing': { types: './dist/missing.d.ts', default: './dist/missing.js' },
+				'./stale': {
+					types: './dist/stale.d.ts',
+					node: './dist/stale.js',
+					default: './dist/stale.js',
+				},
+				'./no-require': {
+					node: './dist/node/c.js',
+					import: './dist/c.js',
+					require: './dist/cjs/c.cjs',
+				},
+			}),
+		).toEqual(['./missing', './stale', './no-require']);
+	});
+
 	it('publishes every subpath advertised to source consumers', () => {
 		expect(
 			missingPublishedPublicSubpaths(
@@ -85,6 +117,7 @@ describe('published package export contract', () => {
 		expect(
 			missingPublishedPublicSubpaths(manifest.exports, manifest.publishConfig.exports),
 		).toEqual([]);
+		expect(missingNodeConditions(manifest.publishConfig.exports)).toEqual([]);
 		expect(Object.keys(REQUIRED_PUBLIC_VALUE_EXPORTS).sort()).toEqual(
 			[
 				...new Set(

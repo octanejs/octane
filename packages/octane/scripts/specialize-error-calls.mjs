@@ -1,7 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import { dirname, relative, resolve, sep } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import ts from 'typescript';
-import { frameworkErrorSurface, validateCatalog } from '../../../scripts/error-codes/generate.mjs';
+import { frameworkErrorSurface } from '../../../scripts/error-codes/generate.mjs';
 import { formatProdErrorMessage } from '../src/error-message.ts';
 
 const HELPER = '__octaneNoArgError';
@@ -168,27 +167,4 @@ export function specializeErrorCalls(source, filename, catalog) {
 	} finally {
 		result.dispose();
 	}
-}
-
-export async function createErrorSpecializationPlugin({ sourceRoot, catalogPath }) {
-	const catalog = validateCatalog(JSON.parse(await readFile(catalogPath, 'utf8')));
-	return {
-		name: 'octane-specialize-no-argument-errors',
-		setup(build) {
-			build.onLoad({ filter: /\.ts$/ }, async ({ path }) => {
-				const filename = relative(sourceRoot, path).split(sep).join('/');
-				if (filename.startsWith('../') || frameworkErrorSurface(filename) === undefined) return;
-				const source = await readFile(path, 'utf8');
-				const contents = specializeErrorCalls(source, filename, catalog);
-				if (contents !== source) {
-					return {
-						contents,
-						loader: 'ts',
-						resolveDir: dirname(path),
-						watchFiles: [path, catalogPath],
-					};
-				}
-			});
-		},
-	};
 }
