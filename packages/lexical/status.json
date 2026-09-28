@@ -1,21 +1,24 @@
 {
-  "upstream": { "package": "@lexical/react", "version": "0.46.0" },
-  "surface": "The 35 legacy `@lexical/react` modules represented by this port cover composer + contexts, the editable surface, plain/rich text, the plugin/menu set, and the `useLexical*` hooks. The 0.46.0 extension subsystem, collaboration plugin, and tree view remain excluded as itemized in UPSTREAM.md.",
+  "upstream": {
+    "package": "@lexical/react",
+    "version": "0.51.0"
+  },
+  "surface": "The 49 `@lexical/react` entry points represented by this port cover composer + contexts, the editable surface, plain/rich text, the plugin/menu set with its `*Utils` and `LexicalMenuOption` entries, and the `useLexical*` hooks including the `@lexical/a11y`-backed accessibility hooks. The 0.51.0 React extension subsystem, collaboration plugin, and tree view remain excluded as itemized in UPSTREAM.md.",
   "divergences": [
-    "Positioning uses `@floating-ui/dom` instead of `@floating-ui/react`.",
+    "Positioning uses `@octanejs/floating-ui` (the Octane port of `@floating-ui/react`) in place of `@floating-ui/react`.",
     "The class-based `LexicalErrorBoundary` becomes an Octane error boundary; `forwardRef` becomes ref-as-prop."
   ],
   "ssr": "No dedicated SSR/hydration tests.",
   "provenance": {
-    "source": "https://github.com/facebook/lexical/tree/ad93fe6b9917ff54d9f84e965c8dd785f5b021e2/packages/lexical-react",
+    "source": "https://github.com/facebook/lexical/tree/4c61ded2134f68c8106198d504fd1fb1fff8497a/packages/lexical-react",
     "license": "MIT",
-    "commit": "ad93fe6b9917ff54d9f84e965c8dd785f5b021e2",
+    "commit": "4c61ded2134f68c8106198d504fd1fb1fff8497a",
     "verification": "recorded-unverified"
   },
-  "verified": "2026-08-02",
+  "verified": "2026-09-28",
   "notes": [
     "The manifest registers two bounded runtime differential cases; the pinned upstream runtime suite has not been vendored or adapted exhaustively, and the React package has no separate executable type-test suite.",
-    "Positioning uses `@floating-ui/dom`; LexicalErrorBoundary uses an Octane boundary; refs are ordinary props. These adaptations are outside the registered equality cases and are not claimed as verified divergences.",
+    "Positioning uses `@octanejs/floating-ui`; LexicalErrorBoundary uses an Octane boundary; refs are ordinary props. These adaptations are outside the registered equality cases and are not claimed as verified divergences.",
     "Excluded public entry points and every pinned upstream test artifact are dispositioned in UPSTREAM.md."
   ]
 }

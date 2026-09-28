@@ -148,6 +148,13 @@ export function LexicalMenu<TOption extends MenuOption>(props: LexicalMenuProps<
 		}
 	}, [options, selectedIndex, updateSelectedIndex, preselectFirstItem]);
 
+	// Whether this menu currently puts nothing on screen, and so must not
+	// consume the keys that would otherwise reach the editor. Only true for the
+	// default renderer: a `menuRenderFn` is called whatever the option list
+	// looks like, and is free to draw a "no results" panel that the user still
+	// has to be able to arrow through and dismiss.
+	const rendersNothing = menuRenderFnProp == null && (options === null || !options.length);
+
 	useEffect(() => {
 		return mergeRegister(
 			editor.registerCommand(
@@ -169,30 +176,34 @@ export function LexicalMenu<TOption extends MenuOption>(props: LexicalMenuProps<
 			editor.registerCommand(
 				KEY_ARROW_DOWN_COMMAND,
 				(event) => {
-					if (options !== null && options.length) {
-						const newSelectedIndex =
-							selectedIndex === null
-								? 0
-								: selectedIndex !== options.length - 1
-									? selectedIndex + 1
-									: 0;
-						updateSelectedIndex(newSelectedIndex);
-						const option = options[newSelectedIndex];
-						if (!option) {
-							updateSelectedIndex(-1);
-							event.preventDefault();
-							event.stopImmediatePropagation();
-							return true;
-						}
-						if (option.ref && option.ref.current) {
-							editor.dispatchCommand(SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND, {
-								index: newSelectedIndex,
-								option,
-							});
-						}
+					if (rendersNothing) {
+						// There is nothing to move through, and the default renderer draws
+						// no menu for an empty list, so the key has to keep propagating to
+						// whatever would otherwise move the caret.
+						return false;
+					}
+					const newSelectedIndex =
+						selectedIndex === null
+							? 0
+							: selectedIndex !== options.length - 1
+								? selectedIndex + 1
+								: 0;
+					updateSelectedIndex(newSelectedIndex);
+					const option = options[newSelectedIndex];
+					if (!option) {
+						updateSelectedIndex(-1);
 						event.preventDefault();
 						event.stopImmediatePropagation();
+						return true;
 					}
+					if (option.ref && option.ref.current) {
+						editor.dispatchCommand(SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND, {
+							index: newSelectedIndex,
+							option,
+						});
+					}
+					event.preventDefault();
+					event.stopImmediatePropagation();
 					return true;
 				},
 				commandPriority,
@@ -200,27 +211,29 @@ export function LexicalMenu<TOption extends MenuOption>(props: LexicalMenuProps<
 			editor.registerCommand(
 				KEY_ARROW_UP_COMMAND,
 				(event) => {
-					if (options !== null && options.length) {
-						const newSelectedIndex =
-							selectedIndex === null
-								? options.length - 1
-								: selectedIndex !== 0
-									? selectedIndex - 1
-									: options.length - 1;
-						updateSelectedIndex(newSelectedIndex);
-						const option = options[newSelectedIndex];
-						if (!option) {
-							updateSelectedIndex(-1);
-							event.preventDefault();
-							event.stopImmediatePropagation();
-							return true;
-						}
-						if (option.ref && option.ref.current) {
-							scrollIntoViewIfNeeded(option.ref.current);
-						}
+					if (rendersNothing) {
+						// See KEY_ARROW_DOWN_COMMAND above.
+						return false;
+					}
+					const newSelectedIndex =
+						selectedIndex === null
+							? options.length - 1
+							: selectedIndex !== 0
+								? selectedIndex - 1
+								: options.length - 1;
+					updateSelectedIndex(newSelectedIndex);
+					const option = options[newSelectedIndex];
+					if (!option) {
+						updateSelectedIndex(-1);
 						event.preventDefault();
 						event.stopImmediatePropagation();
+						return true;
 					}
+					if (option.ref && option.ref.current) {
+						scrollIntoViewIfNeeded(option.ref.current);
+					}
+					event.preventDefault();
+					event.stopImmediatePropagation();
 					return true;
 				},
 				commandPriority,
@@ -228,6 +241,12 @@ export function LexicalMenu<TOption extends MenuOption>(props: LexicalMenuProps<
 			editor.registerCommand(
 				KEY_ESCAPE_COMMAND,
 				(event) => {
+					if (rendersNothing) {
+						// See KEY_ARROW_DOWN_COMMAND above: with nothing on screen there
+						// is no menu to dismiss, so Escape has to keep propagating to
+						// whatever would otherwise handle it.
+						return false;
+					}
 					event.preventDefault();
 					event.stopImmediatePropagation();
 					close();
@@ -272,6 +291,7 @@ export function LexicalMenu<TOption extends MenuOption>(props: LexicalMenuProps<
 		close,
 		editor,
 		options,
+		rendersNothing,
 		selectedIndex,
 		updateSelectedIndex,
 		commandPriority,
@@ -282,11 +302,9 @@ export function LexicalMenu<TOption extends MenuOption>(props: LexicalMenuProps<
 		[selectOptionAndCleanUp, selectedIndex, options],
 	);
 
-	if (anchorElementRef.current === null) {
-		return null;
-	}
-	// A custom menuRenderFn returns a portal directly (React-compatible); the default
-	// renders DefaultMenu into the anchor. octane renders a createPortal VALUE at any
+	// A custom menuRenderFn returns a portal directly (React-compatible) and, as
+	// upstream, is called whatever the anchor/option state; the default renders
+	// DefaultMenu into the anchor. octane renders a createPortal VALUE at any
 	// position, so no host-element wrapper is needed.
 	if (menuRenderFnProp != null) {
 		return menuRenderFnProp(
@@ -295,7 +313,7 @@ export function LexicalMenu<TOption extends MenuOption>(props: LexicalMenuProps<
 			resolution.match ? resolution.match.matchingString : '',
 		);
 	}
-	return options.length
+	return anchorElementRef.current !== null && options.length
 		? createPortal(DefaultMenu, anchorElementRef.current, {
 				options,
 				selectedIndex,

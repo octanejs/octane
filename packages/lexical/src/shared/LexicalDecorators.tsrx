@@ -1,25 +1,13 @@
-// Ported from @lexical/react/src/shared/useDecorators.tsx (the LegacyDecorators
-// path used by Rich/PlainTextPlugin). React's `useDecorators` hook is realized as
-// a `Decorators` COMPONENT here: each <Decorators/> usage is its own octane scope,
-// so its useState/useEffect/useMemo get per-instance identity automatically.
+// Ported from @lexical/react/src/shared/useReactDecorators.tsx (the LegacyDecorators
+// path used by Rich/PlainTextPlugin). React's hook is realized as a `Decorators`
+// COMPONENT here: each <Decorators/> usage is its own octane scope, so its hooks
+// get per-instance identity automatically.
 //
 // Each decorator node renders into the DOM element Lexical created for it, via a
-// portal. octane's createPortal lowers to portal() only as a DIRECT child of a host
-// element (a createPortal VALUE is inert), so each portal lives inside its own
-// `DecoratorPortal` (a display:contents wrapper — the content escapes into the
-// node's element).
+// `DecoratorPortal` component that returns a createPortal value.
 import type { LexicalEditor } from 'lexical';
 import type { OctaneNode } from 'octane';
-import {
-	useState,
-	useEffect,
-	useLayoutEffect,
-	useMemo,
-	flushSync,
-	createElement,
-	createPortal,
-	Suspense,
-} from 'octane';
+import { createElement, createPortal, Suspense, useMemo, useSyncExternalStore } from 'octane';
 
 type ErrorBoundaryType =
 	(props: {
@@ -58,25 +46,25 @@ export function Decorators(props: DecoratorsProps) {
 	const editor = props.editor;
 	const ErrorBoundary = props.ErrorBoundary;
 
-	const [decorators, setDecorators] = useState(() => editor.getDecorators());
-
-	// Subscribe to decorator changes.
-	useLayoutEffect(() => {
-		return editor.registerDecoratorListener((nextDecorators: Record<string, OctaneNode>) => {
-			flushSync(() => {
-				setDecorators(nextDecorators);
-			});
-		});
-	}, [editor]);
-
-	useEffect(() => {
-		// If the content editable mounts before the subscription is added, nothing
-		// renders on the initial pass — re-read on mount to cover that.
-		setDecorators(editor.getDecorators());
-	}, [editor]);
+	const [subscribe, getSnapshot] = useMemo(
+		() => [
+			(cb: () => void) => editor.registerDecoratorListener(cb),
+			() => editor.getDecorators<OctaneNode>(),
+		] as const,
+		[editor],
+	);
+	const decorators = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+	// A root remount recreates every decorator's DOM element without changing the
+	// decorator map, so the portals are re-derived when the root element changes.
+	const [subscribeRoot, getRootSnapshot] = useMemo(
+		() => [editor.registerRootListener.bind(editor), editor.getRootElement.bind(editor)] as const,
+		[editor],
+	);
+	const rootElement = useSyncExternalStore(subscribeRoot, getRootSnapshot, getRootSnapshot);
 
 	// Resolve each decorator node's DOM element + its decorator content.
 	const entries = useMemo(() => {
+		void rootElement;
 		const out = [];
 		const decoratorKeys = Object.keys(decorators);
 		for (let i = 0; i < decoratorKeys.length; i++) {
@@ -87,7 +75,7 @@ export function Decorators(props: DecoratorsProps) {
 			}
 		}
 		return out;
-	}, [decorators, editor]);
+	}, [decorators, editor, rootElement]);
 
 	// Render nothing when there are no decorators (matches @lexical/react). Each
 	// decorator is a portal into its node's element — a keyed list of DecoratorPortal

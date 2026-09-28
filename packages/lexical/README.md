@@ -31,11 +31,13 @@ function MyPlugin() {
 A convenience root barrel (`@octanejs/lexical`) re-exporting everything is also
 provided, but the per-subpath paths above are the drop-in form.
 
-Pinned to **Lexical 0.46.0**.
+Pinned to **Lexical 0.51.0**.
 
 ## Status
 
-Near-complete `@lexical/react` parity — **35 of 39 modules ported** (Lexical 0.46.0).
+`@lexical/react` parity for the classic composer API — **49 of 60 entry points ported**
+(Lexical 0.51.0). The 11 remaining entry points are the React extension subsystem,
+collaboration, and the tree view, each listed below.
 Parity is verified two ways: **differential** tests (the same `.tsrx` fixture run on
 octane *and* the real `@lexical/react`, asserting byte-identical DOM) plus ports of
 Lexical's own unit tests onto octane's harness.
@@ -47,20 +49,24 @@ Landed: the composer + context (`LexicalComposer`, `LexicalComposerContext`,
 link + clickable-link, hashtag, tab-indentation, markdown shortcuts, horizontal-rule,
 table, table-of-contents, auto-focus / -link / -embed, clear-editor, character-limit,
 draggable-block, node-event, on-change, selection-always-on-display, and the
-typeahead / node-menu / node-context-menu family — plus the `useLexical*` hooks and
-`LexicalCollaborationContext`.
+typeahead / node-menu / node-context-menu family (with `LexicalMenuOption` and the
+`*Utils` entry points) — plus the `useLexical*` hooks, including the accessibility
+hooks backed by `@lexical/a11y` extensions, and `LexicalCollaborationContext`.
 
-The 4 not-yet-ported modules are each deferred for a specific reason, not merely
+The not-yet-ported entry points are each deferred for a specific reason, not merely
 undone:
 
 - `LexicalCollaborationPlugin` — real-time Yjs collaboration. A genuine binding-layer
   port (it wraps the framework-agnostic `@lexical/yjs`), deferred until there's a
   two-peer Yjs harness to verify sync: the differential DOM-parity suite the other
   modules rely on can't meaningfully exercise live collaboration.
-- `LexicalExtensionComposer` + `LexicalExtensionEditorComposer` — the newer
-  extension-builder composer API. Thin wrappers over a separate React-only subsystem
-  (`@lexical/react/ReactExtension` + `ReactProviderExtension`); the classic
-  `LexicalComposer` path here is fully supported.
+- `LexicalExtensionComposer` + `LexicalExtensionEditorComposer`, and the rest of the
+  React extension subsystem (`ReactExtension`, `ReactProviderExtension`,
+  `ReactPluginHostExtension`, `ExtensionComponent`, `useExtensionComponent`,
+  `useExtensionSignalValue`, `TreeViewExtension`) — the newer extension-builder
+  composer API. The classic `LexicalComposer` path here is fully supported. The
+  accessibility hooks need an editor built from the matching `@lexical/a11y`
+  extension; provide one through `LexicalComposerContext` yourself.
 - `LexicalTreeView` — the debug tree viewer. A thin wrapper over
   `@lexical/devtools-core`'s `TreeView`, which is itself a React component (React is
   its peer dependency) — porting it means porting that separate devtools UI.
@@ -70,7 +76,7 @@ undone:
 The agnostic `@lexical/*` packages contain no React code, so they're consumed
 directly. Only `@lexical/react`'s components/hooks are reimplemented — translating
 React hooks to octane's (1:1 in nearly all cases), `forwardRef` to octane's
-ref-as-prop, `@floating-ui/react` to `@floating-ui/dom`, and the class-based
+ref-as-prop, `@floating-ui/react` to `@octanejs/floating-ui`, and the class-based
 `LexicalErrorBoundary` to octane's `<ErrorBoundary>`.
 
 Lexical node classes require one module-family identity. The package manifest marks

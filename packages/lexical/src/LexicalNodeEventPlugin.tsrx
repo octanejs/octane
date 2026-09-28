@@ -1,6 +1,6 @@
 // Ported from @lexical/react/src/LexicalNodeEventPlugin.ts.
 import { useLexicalComposerContext } from './LexicalComposerContext';
-import { $findMatchingParent, $getNearestNodeFromDOMNode } from 'lexical';
+import { $findMatchingParent, $getNearestNodeFromDOMNode, registerEventListener } from 'lexical';
 import type { Klass, LexicalEditor, LexicalNode, NodeKey } from 'lexical';
 import { useEffect, useRef } from 'octane';
 
@@ -44,8 +44,7 @@ export function NodeEventPlugin(props: Props) {
 
 		return editor.registerRootListener((rootElement) => {
 			if (rootElement) {
-				rootElement.addEventListener(eventType, onEvent, isCaptured);
-				return () => rootElement.removeEventListener(eventType, onEvent, isCaptured);
+				return registerEventListener(rootElement, eventType, onEvent, isCaptured);
 			}
 		});
 		// We intentionally don't respect changes to eventType.

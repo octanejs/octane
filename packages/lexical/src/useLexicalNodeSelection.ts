@@ -58,6 +58,17 @@ export function useLexicalNodeSelection(
 			editor.update(() => {
 				let selection = $getSelection();
 				if (!$isNodeSelection(selection)) {
+					const node = selected ? null : $getNodeByKey(key);
+					if (node !== null && !node.isSelected()) {
+						// Nothing to remove: this node is not part of the current
+						// selection, and replacing it with an empty NodeSelection would
+						// discard the user's caret for no benefit.
+						return;
+					}
+					// Deselecting a node the selection *does* cover still has to take
+					// effect, or the `clearSelection(); setSelected(!isSelected)` toggle
+					// that decorator nodes use becomes a dead click under a
+					// RangeSelection.
 					selection = $createNodeSelection();
 					$setSelection(selection);
 				}

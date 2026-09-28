@@ -61,6 +61,13 @@ async function settle() {
 // attribute / text structure, ignoring comment nodes (octane portals leave
 // `<!--portal-->` markers inside decorator hosts), attribute order, and
 // inter-tag whitespace.
+// Lexical (0.49+) appends this zero-size anchor after a trailing block decorator
+// so a select-all highlight stays visible (lexical/src/__tests__/utils).
+const DECORATOR_BOUNDARY_ANCHOR_HTML =
+	'<img alt="" style="position: absolute !important; width: 0px !important; ' +
+	'height: 0px !important; border: 0px !important; margin: 0px !important; ' +
+	'padding: 0px !important;" data-lexical-decorator-boundary="true" />';
+
 function domToSpec(node: Element): unknown {
 	const attrs: Record<string, string> = {};
 	for (const a of Array.from(node.attributes)) {
@@ -146,6 +153,7 @@ describe('LexicalNestedComposer', () => {
 					<p dir="auto"><span data-lexical-text="true">nested</span></p>
 				</div>
 			</div>
+			${DECORATOR_BOUNDARY_ANCHOR_HTML}
 		</div>
 	`;
 
@@ -262,6 +270,7 @@ describe('LexicalNestedComposer', () => {
 				role="textbox"
 				spellcheck="true"
 				style="user-select: text; white-space: pre-wrap; word-break: break-word"
+				tabindex="-1"
 				aria-autocomplete="none"
 				aria-label="parent"
 				aria-readonly="true"
@@ -273,6 +282,7 @@ describe('LexicalNestedComposer', () => {
 						role="textbox"
 						spellcheck="true"
 						style="user-select: text; white-space: pre-wrap; word-break: break-word"
+						tabindex="-1"
 						aria-autocomplete="none"
 						aria-label="nested"
 						aria-readonly="true"
@@ -280,6 +290,7 @@ describe('LexicalNestedComposer', () => {
 						<p dir="auto"><span data-lexical-text="true">nested</span></p>
 					</div>
 				</div>
+				${DECORATOR_BOUNDARY_ANCHOR_HTML}
 			</div>
 			`,
 		);
@@ -325,6 +336,7 @@ describe('LexicalNestedComposer', () => {
 						role="textbox"
 						spellcheck="true"
 						style="user-select: text; white-space: pre-wrap; word-break: break-word"
+						tabindex="-1"
 						aria-autocomplete="none"
 						aria-label="nested"
 						aria-readonly="true"
@@ -332,6 +344,7 @@ describe('LexicalNestedComposer', () => {
 						<p dir="auto"><span data-lexical-text="true">nested</span></p>
 					</div>
 				</div>
+				${DECORATOR_BOUNDARY_ANCHOR_HTML}
 			</div>
 			`,
 		);
@@ -515,7 +528,7 @@ describe('LexicalNestedComposer', () => {
 		}
 		class ConfigTransformNode extends TextNode {
 			$config() {
-				return this.config('$config-transform', { $transform });
+				return this.config('$config-transform', { $transform, extends: TextNode });
 			}
 		}
 

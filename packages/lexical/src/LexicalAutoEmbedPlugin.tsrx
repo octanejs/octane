@@ -1,25 +1,31 @@
 // Ported from @lexical/react/src/LexicalAutoEmbedPlugin.tsx. Watches pasted
 // AutoLink/Link nodes that match an embed config (YouTube, tweet, …) and shows a
 // node menu offering to replace the link with an embed node. Built on the ported
-// LexicalNodeMenuPlugin. Typed surface + AutoEmbedOption live in autoEmbedShared.ts.
+// LexicalNodeMenuPlugin. Typed surface + AutoEmbedOption live in
+// LexicalAutoEmbedPluginUtils.ts.
 import { $isLinkNode, AutoLinkNode, LinkNode } from '@lexical/link';
-import type { AutoEmbedOption, EmbedConfig } from './autoEmbedShared';
-import { INSERT_EMBED_COMMAND } from './autoEmbedShared';
+import type { AutoEmbedOption, EmbedConfig } from './LexicalAutoEmbedPluginUtils';
+import { INSERT_EMBED_COMMAND } from './LexicalAutoEmbedPluginUtils';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { LexicalNodeMenuPlugin } from './LexicalNodeMenuPlugin.tsrx';
 import type { MenuRenderFn } from './shared/menuShared';
-import type { CommandListenerPriority, LexicalNode, NodeKey, NodeMutation } from 'lexical';
+import { objectKlassEquals } from '@lexical/utils';
+import type { CommandListenerPriority, LexicalNode, MutationListener, NodeKey } from 'lexical';
 import {
 	$getNodeByKey,
 	$getSelection,
+	$onUpdate,
+	COMMAND_PRIORITY_BEFORE_EDITOR,
 	COMMAND_PRIORITY_EDITOR,
 	COMMAND_PRIORITY_LOW,
 	mergeRegister,
+	PASTE_COMMAND,
 	PASTE_TAG,
 } from 'lexical';
 import { useCallback, useEffect, useMemo, useState } from 'octane';
 
-export { URL_MATCHER, INSERT_EMBED_COMMAND, AutoEmbedOption } from './autoEmbedShared';
+export { URL_MATCHER, INSERT_EMBED_COMMAND, AutoEmbedOption } from './LexicalAutoEmbedPluginUtils';
+export type { EmbedConfig, EmbedMatchResult } from './LexicalAutoEmbedPluginUtils';
 
 type LexicalAutoEmbedPluginProps<TEmbedConfig extends EmbedConfig> = {
 	embedConfigs: TEmbedConfig[];
@@ -69,18 +75,10 @@ export function LexicalAutoEmbedPlugin<TEmbedConfig extends EmbedConfig>(
 	}, [editor, embedConfigs]);
 
 	useEffect(() => {
-		const listener = (
-			nodeMutations: Map<NodeKey, NodeMutation>,
-			{
-				updateTags,
-				dirtyLeaves,
-			}: {
-				updateTags: Set<string>;
-				dirtyLeaves: Set<string>;
-			},
-		) => {
+		let isSingleTokenPaste = false;
+		const listener: MutationListener = (nodeMutations, { updateTags }) => {
 			for (const [key, mutation] of nodeMutations) {
-				if (mutation === 'created' && updateTags.has(PASTE_TAG) && dirtyLeaves.size <= 3) {
+				if (mutation === 'created' && updateTags.has(PASTE_TAG) && isSingleTokenPaste) {
 					checkIfLinkNodeIsEmbeddable(key);
 				} else if (key === nodeKey) {
 					reset();
@@ -88,8 +86,23 @@ export function LexicalAutoEmbedPlugin<TEmbedConfig extends EmbedConfig>(
 			}
 		};
 		return mergeRegister(
+			editor.registerCommand(
+				PASTE_COMMAND,
+				(event) => {
+					isSingleTokenPaste = objectKlassEquals(event, ClipboardEvent) &&
+						event.clipboardData !== null &&
+						/^\S+$/.test(event.clipboardData.getData('text/plain'));
+					if (isSingleTokenPaste) {
+						$onUpdate(() => {
+							isSingleTokenPaste = false;
+						});
+					}
+					return false;
+				},
+				COMMAND_PRIORITY_BEFORE_EDITOR,
+			),
 			...[LinkNode, AutoLinkNode].map(
-				(Klass) => editor.registerMutationListener(Klass, (...args) => listener(...args), {
+				(Klass) => editor.registerMutationListener(Klass, listener, {
 					skipInitialization: true,
 				}),
 			),

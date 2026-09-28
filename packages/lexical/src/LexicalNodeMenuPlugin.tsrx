@@ -8,7 +8,8 @@ import type { CommandListenerPriority, NodeKey, TextNode } from 'lexical';
 import { startTransition, useCallback, useEffect, useState } from 'octane';
 import type { MenuOption, MenuRenderFn, MenuResolution } from './shared/menuShared';
 
-export { MenuOption } from './shared/menuShared';
+export { MenuOption } from './LexicalMenuOption';
+export type { MenuRenderFn, MenuResolution } from './shared/menuShared';
 
 /**
  * Props for the {@link LexicalNodeMenuPlugin} component.

@@ -3,6 +3,7 @@
 // The DOM math helpers are framework-agnostic and copied as-is; the portal body is a
 // component (DraggableContainer) so its <div> events wire through the template path.
 import { useLexicalComposerContext } from './LexicalComposerContext';
+import { useLexicalEditable } from './useLexicalEditable';
 import { eventFiles } from '@lexical/rich-text';
 import { calculateZoomLevel } from '@lexical/utils';
 import {
@@ -24,6 +25,8 @@ import {
 	IS_FIREFOX,
 	isHTMLElement,
 	mergeRegister,
+	registerEventListener,
+	registerEventListeners,
 } from 'lexical';
 import type { LexicalEditor } from 'lexical';
 import { createPortal, useCallback, useEffect, useRef, useState } from 'octane';
@@ -57,14 +60,26 @@ function getTopLevelNodeKeys(editor: LexicalEditor): string[] {
 	return editor.read('latest', () => $getRoot().getChildrenKeys());
 }
 
+function restoreEditorFocus(editor: LexicalEditor, rootElement: HTMLElement): void {
+	rootElement.focus({ preventScroll: true });
+	editor.update(() => {
+		const selection = $getSelection();
+		if (selection !== null && !selection.dirty) {
+			selection.dirty = true;
+		}
+	});
+}
+
 function getCollapsedMargins(elem: HTMLElement): {
 	marginTop: number;
 	marginBottom: number;
 } {
+	const view = elem.ownerDocument.defaultView;
 	const getMargin = (element: Element | null, margin: 'marginTop' | 'marginBottom'): number =>
-		element ? parseFloat(window.getComputedStyle(element)[margin]) : 0;
+		element && view ? parseFloat(view.getComputedStyle(element)[margin]) : 0;
 
-	const { marginTop, marginBottom } = window.getComputedStyle(elem);
+	const { marginTop = '0', marginBottom = '0' } =
+		view ? view.getComputedStyle(elem) : {};
 	const prevElemSiblingMarginBottom = getMargin(elem.previousElementSibling, 'marginBottom');
 	const nextElemSiblingMarginTop = getMargin(elem.nextElementSibling, 'marginTop');
 	const collapsedTopMargin = Math.max(parseFloat(marginTop), prevElemSiblingMarginBottom);
@@ -168,11 +183,14 @@ function setMenuPosition(
 	}
 
 	const targetRect = targetElem.getBoundingClientRect();
-	const targetStyle = window.getComputedStyle(targetElem);
+	const targetView = targetElem.ownerDocument.defaultView;
+	const targetStyle =
+		targetView ? targetView.getComputedStyle(targetElem) : null;
 	const floatingElemRect = floatingElem.getBoundingClientRect();
 	const anchorElementRect = anchorElem.getBoundingClientRect();
 
-	let targetCalculateHeight = parseInt(targetStyle.lineHeight, 10);
+	let targetCalculateHeight =
+		targetStyle ? parseInt(targetStyle.lineHeight, 10) : NaN;
 	if (isNaN(targetCalculateHeight)) {
 		targetCalculateHeight = targetRect.bottom - targetRect.top;
 	}
@@ -294,16 +312,11 @@ function useDraggableBlockMenu(
 		}
 
 		if (scrollerElem != null) {
-			scrollerElem.addEventListener('mousemove', onMouseMove);
-			scrollerElem.addEventListener('mouseleave', onMouseLeave);
+			return registerEventListeners(scrollerElem, {
+				mouseleave: onMouseLeave,
+				mousemove: onMouseMove,
+			});
 		}
-
-		return () => {
-			if (scrollerElem != null) {
-				scrollerElem.removeEventListener('mousemove', onMouseMove);
-				scrollerElem.removeEventListener('mouseleave', onMouseLeave);
-			}
-		};
 	}, [scrollerElem, anchorElem, editor, isOnMenu, setDraggableBlockElem]);
 
 	useEffect(() => {
@@ -421,21 +434,14 @@ function useDraggableBlockMenu(
 					const relatedTarget = event.relatedTarget;
 					if (isHTMLElement(relatedTarget) && isOnMenu(relatedTarget)) {
 						if (rootElement) {
-							rootElement.focus({ preventScroll: true });
-							editor.update(() => {
-								const selection = $getSelection();
-								if (selection !== null && !selection.dirty) {
-									selection.dirty = true;
-								}
-							});
+							restoreEditorFocus(editor, rootElement);
 						}
 						event.stopImmediatePropagation();
 					}
 				}
 
 				if (rootElement) {
-					rootElement.addEventListener('blur', onBlur, true);
-					return () => rootElement.removeEventListener('blur', onBlur, true);
+					return registerEventListener(rootElement, 'blur', onBlur, true);
 				}
 			}),
 			editor.registerCommand(
@@ -444,13 +450,7 @@ function useDraggableBlockMenu(
 					const rootElement = editor.getRootElement();
 					const activeElement = getActiveElementDeep(getRootOwnerDocument(rootElement));
 					if (rootElement && isHTMLElement(activeElement) && isOnMenu(activeElement)) {
-						rootElement.focus({ preventScroll: true });
-						editor.update(() => {
-							const selection = $getSelection();
-							if (selection !== null && !selection.dirty) {
-								selection.dirty = true;
-							}
-						});
+						restoreEditorFocus(editor, rootElement);
 						return true;
 					}
 					return false;
@@ -480,13 +480,7 @@ function useDraggableBlockMenu(
 		if (IS_FIREFOX) {
 			const rootElement = editor.getRootElement();
 			if (rootElement !== null && getActiveElement(rootElement) !== rootElement) {
-				rootElement.focus({ preventScroll: true });
-				editor.update(() => {
-					const selection = $getSelection();
-					if (selection !== null && !selection.dirty) {
-						selection.dirty = true;
-					}
-				});
+				restoreEditorFocus(editor, rootElement);
 			}
 		}
 	}
@@ -495,8 +489,9 @@ function useDraggableBlockMenu(
 		isDraggingBlockRef.current = false;
 		hideTargetLine(targetLineRef.current);
 
-		if (IS_FIREFOX) {
-			editor.focus();
+		const rootElement = editor.getRootElement();
+		if (rootElement !== null && getActiveElement(rootElement) !== rootElement) {
+			restoreEditorFocus(editor, rootElement);
 		}
 	}
 
@@ -522,12 +517,15 @@ type Props = {
 export function DraggableBlockPlugin_EXPERIMENTAL(props: Props) {
 	const anchorElem = props.anchorElem ?? document.body;
 	const [editor] = useLexicalComposerContext();
+	// Subscribed rather than read off the editor, so that setEditable() actually
+	// re-renders the handle.
+	const isEditable = useLexicalEditable();
 	return useDraggableBlockMenu(
 		editor,
 		anchorElem,
 		props.menuRef,
 		props.targetLineRef,
-		editor._editable,
+		isEditable,
 		props.menuComponent,
 		props.targetLineComponent,
 		props.isOnMenu,

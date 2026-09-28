@@ -1,7 +1,7 @@
 import type { MenuResolution } from './menuShared';
 
 import { getScrollParent } from '@lexical/utils';
-import { getDOMShadowRoots } from 'lexical';
+import { getDOMShadowRoots, mergeRegister, registerEventListener } from 'lexical';
 import { useEffect } from 'octane';
 
 import { useLexicalComposerContext } from '../LexicalComposerContext';
@@ -21,8 +21,12 @@ export function useDynamicPositioning(
 		() => {
 			if (targetElement != null && resolution != null) {
 				const rootElement = editor.getRootElement();
+				// Listen in the editor's own browsing context: an editor inside an
+				// iframe scrolls and resizes with that frame, not the host window.
+				const ownerDocument = rootElement != null ? rootElement.ownerDocument : document;
+				const ownerWindow = ownerDocument.defaultView ?? window;
 				const rootScrollParent =
-					rootElement != null ? getScrollParent(rootElement, false) : document.body;
+					rootElement != null ? getScrollParent(rootElement, false) : ownerDocument.body;
 				let ticking = false;
 				let previousIsInView = isTriggerVisibleInNearestScrollContainer(
 					targetElement,
@@ -30,7 +34,7 @@ export function useDynamicPositioning(
 				);
 				const handleScroll = function () {
 					if (!ticking) {
-						window.requestAnimationFrame(function () {
+						ownerWindow.requestAnimationFrame(function () {
 							onReposition();
 							ticking = false;
 						});
@@ -48,22 +52,25 @@ export function useDynamicPositioning(
 					}
 				};
 				const resizeObserver = new ResizeObserver(onReposition);
-				window.addEventListener('resize', onReposition);
-				document.addEventListener('scroll', handleScroll, { capture: true, passive: true });
-				const shadowRootSource = rootElement ?? targetElement;
-				const enclosingShadowRoots = getDOMShadowRoots(shadowRootSource);
-				for (const root of enclosingShadowRoots) {
-					root.addEventListener('scroll', handleScroll, { capture: true, passive: true });
-				}
+				// Scroll events are non-composed and do not cross shadow boundaries, so
+				// also listen on the editor root's enclosing shadow roots (keyed off the
+				// root rather than the target, which may be portaled into light DOM).
+				const enclosingShadowRoots = getDOMShadowRoots(rootElement ?? targetElement);
 				resizeObserver.observe(targetElement);
-				return () => {
-					resizeObserver.unobserve(targetElement);
-					window.removeEventListener('resize', onReposition);
-					document.removeEventListener('scroll', handleScroll, true);
-					for (const root of enclosingShadowRoots) {
-						root.removeEventListener('scroll', handleScroll, true);
-					}
-				};
+				return mergeRegister(
+					registerEventListener(ownerWindow, 'resize', onReposition),
+					registerEventListener(ownerDocument, 'scroll', handleScroll, {
+						capture: true,
+						passive: true,
+					}),
+					...enclosingShadowRoots.map((root) =>
+						registerEventListener(root, 'scroll', handleScroll, {
+							capture: true,
+							passive: true,
+						}),
+					),
+					() => resizeObserver.unobserve(targetElement),
+				);
 			}
 		},
 		[targetElement, editor, onVisibilityChange, onReposition, resolution],

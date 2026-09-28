@@ -3,12 +3,12 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/facebook/lexical.git",
-    "version": "0.46.0",
-    "commit": "ad93fe6b9917ff54d9f84e965c8dd785f5b021e2",
+    "version": "0.51.0",
+    "commit": "4c61ded2134f68c8106198d504fd1fb1fff8497a",
     "sourceRoot": "packages/lexical-react/src",
     "testRoot": "packages/lexical-react/src/__tests__",
     "license": "MIT",
-    "integrity": "sha256:a7f56b39ebc7fe1cb101d63b829947cd8ee21a28af44eadaed65453b83293060",
+    "integrity": "sha256:37af6defc5008ed23dd52323c5e5b2244f0ed3467c01a795c2660e792bddcf08",
     "verification": "recorded-unverified"
   },
   "upstreamSuites": { "runtime": "present", "types": "absent" },
@@ -29,7 +29,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "c6e776b9656dfa6d7b1b04cee540c846b0d0347e8941ccd01255e21a7e312a34"
+      "lockfileSha256": "e343fccf527e853ab1d5b50f8056795e02d2c7785e8c52071c162d6f7e3f518c"
     }
   },
   "lanes": [
@@ -40,7 +40,7 @@
       "environment": "workspace-node",
       "project": "lexical-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs the same rich-text and list .tsrx fixtures against @lexical/react 0.46.0 on React and @octanejs/lexical on Octane, comparing byte-identical DOM after mount and identical editor updates.",
+      "notes": "Runs the same rich-text and list .tsrx fixtures against @lexical/react 0.51.0 on React and @octanejs/lexical on Octane, comparing byte-identical DOM after mount and identical editor updates.",
       "files": [
         {
           "path": "packages/lexical/tests/differential/parity.test.ts",
@@ -77,7 +77,7 @@
         {
           "path": "packages/lexical/audit/test-classifications.json",
           "role": "support",
-          "sha256": "12fbc354b7a8b13ecdda70d43acaba43b2c6c170711489b34ddabfe5eab761ff"
+          "sha256": "e3dad206d1148459165e87253ee17b5b06d840459da84b7e0b7c40bddfc6ada0"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",

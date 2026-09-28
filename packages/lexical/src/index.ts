@@ -60,11 +60,26 @@ export { useLexicalNodeSelection } from './useLexicalNodeSelection';
 export { useLexicalTextEntity } from './useLexicalTextEntity';
 export { useLexicalIsTextContentEmpty } from './useLexicalIsTextContentEmpty';
 
+// --- Accessibility hooks (require the matching @lexical/a11y extension) ---
+export { useLexicalAriaLiveRegion } from './useLexicalAriaLiveRegion';
+export { useLexicalFocusManagerRef, type FocusManagerOptions } from './useLexicalFocusManagerRef';
+export { useLexicalFocusTrapRef, type FocusTrapInitialFocus } from './useLexicalFocusTrapRef';
+export {
+	useLexicalRovingTabIndexRef,
+	type RovingOrientation,
+	type RovingTabIndexOptions,
+} from './useLexicalRovingTabIndexRef';
+
 // --- Phase 4: menus + utilities ---
 export { LexicalTypeaheadMenuPlugin } from './LexicalTypeaheadMenuPlugin.tsrx';
 export { LexicalNodeMenuPlugin } from './LexicalNodeMenuPlugin.tsrx';
-export { useBasicTypeaheadTriggerMatch, PUNCTUATION } from './typeaheadShared';
-export { MenuOption, SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND } from './shared/menuShared';
+export {
+	getScrollParent,
+	useBasicTypeaheadTriggerMatch,
+	PUNCTUATION,
+	SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND,
+} from './LexicalTypeaheadMenuPluginUtils';
+export { MenuOption } from './LexicalMenuOption';
 export type {
 	MenuRef,
 	MenuRenderFn,
@@ -89,8 +104,8 @@ export { CharacterLimitPlugin } from './LexicalCharacterLimitPlugin.tsrx';
 export { useCharacterLimit } from './shared/useCharacterLimit';
 export { TableOfContentsPlugin } from './LexicalTableOfContentsPlugin.tsrx';
 export { LexicalAutoEmbedPlugin } from './LexicalAutoEmbedPlugin.tsrx';
-export { URL_MATCHER, INSERT_EMBED_COMMAND, AutoEmbedOption } from './autoEmbedShared';
-export type { EmbedConfig, EmbedMatchResult } from './autoEmbedShared';
+export { URL_MATCHER, INSERT_EMBED_COMMAND, AutoEmbedOption } from './LexicalAutoEmbedPluginUtils';
+export type { EmbedConfig, EmbedMatchResult } from './LexicalAutoEmbedPluginUtils';
 export { DraggableBlockPlugin_EXPERIMENTAL } from './LexicalDraggableBlockPlugin.tsrx';
 export {
 	NodeContextMenuPlugin,
