@@ -2210,7 +2210,7 @@
     },
     "74": {
       "message": "Unsupported Octane signal binding ABI.",
-      "runtime": ["client"],
+      "runtime": ["client", "server"],
       "status": "active"
     },
     "75": {
@@ -2241,6 +2241,1257 @@
     "80": {
       "message": "Independent Hydrate cannot activate a `%s` strategy because its lexical parent never runs on the client. Use load(), idle(), visible(), media(), interaction(), or never(), or remove `independent`.",
       "runtime": ["server"],
+      "status": "active"
+    },
+    "81": {
+      "message": "An optimistic source needs a live Octane scope.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "82": {
+      "message": "Action operation \"%s\" is no longer writable.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "83": {
+      "message": "An optimistic write requires ready source authority.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "84": {
+      "message": "An action cannot adopt authority for a different query selection.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "85": {
+      "message": "Only a writable or query source can adopt an authoritative value.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "86": {
+      "message": "An action needs current authority to compare receipt revisions.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "87": {
+      "message": "An authority revision comparator must return a finite number.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "88": {
+      "message": "The pinned query selection is no longer current.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "89": {
+      "message": "optimistic$ requires an Octane signal source.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "90": {
+      "message": "An optimistic source cannot use conflicting authority revision policies.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "91": {
+      "message": "An optimistic subscription needs an active signal owner.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "92": {
+      "message": "An optimistic write must belong to action$ or use operation.set().",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "93": {
+      "message": "Action operation \"%s\" may have been accepted.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "94": {
+      "message": "action$ requires crypto.randomUUID() for operation identity.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "95": {
+      "message": "operation.set() requires a signal from optimistic$().",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "96": {
+      "message": "Action operation \"%s\" is settled.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "97": {
+      "message": "operation.adopt() requires exactly one optimistic source.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "98": {
+      "message": "The action is settled.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "99": {
+      "message": "until() requires a read.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "100": {
+      "message": "until() timeout must be a nonnegative number.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "101": {
+      "message": "until() requires a pinned optimistic source.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "102": { "message": "The action is %s.", "runtime": ["client", "server"], "status": "active" },
+    "103": {
+      "message": "The optimistic owner was retired.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "104": {
+      "message": "The pinned optimistic selection is no longer current.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "105": {
+      "message": "The optimistic confirmation timed out.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "106": {
+      "message": "optimistic$ requires a signal source.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "107": {
+      "message": "An authority revision policy must be a comparator function.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "108": {
+      "message": "action$ requires a handler and an optional nonempty key.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "109": {
+      "message": "Attempt reads require an Octane signal handle.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "110": {
+      "message": "Frozen derived candidates are not supported.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "111": {
+      "message": "The derived attempt is no longer active.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "112": {
+      "message": "A derived signal cannot read itself.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "113": {
+      "message": "Signal \"%s\" has no selected value.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "114": {
+      "message": "An async iterator must return an iteration result.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "115": {
+      "message": "The stream completed without yielding a value.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "116": {
+      "message": "A signal control requires a native value/checked property and a signal.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "117": {
+      "message": "This control property already has a signal binding. Dispose it before rebinding.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "118": {
+      "message": "A signal control subscription must return cleanup.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "119": {
+      "message": "A checked signal must contain a boolean.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "120": {
+      "message": "A multiple select signal must contain an array.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "121": {
+      "message": "A value signal must contain a string.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "122": {
+      "message": "derived$ requires a function.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "123": {
+      "message": "A signal document owner requires a document.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "124": {
+      "message": "A streamed signal hydration owner is already installed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "125": {
+      "message": "%s must be a nonempty string.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "126": {
+      "message": "A signal seed must match scope \"%s\" and version 1.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "127": {
+      "message": "Signal seeds require unique, valid ready node entries.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "128": {
+      "message": "An unavailable latest entry cannot contain a ready value or request.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "129": {
+      "message": "Async seed entries require a query identity.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "130": {
+      "message": "Only async seed entries may contain a query identity.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "131": {
+      "message": "Signal traceLimit must be an integer from 0 through 10000.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "132": {
+      "message": "Signal key \"%s\" already exists in this scope.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "133": {
+      "message": "Signal seed kind does not match \"%s\".",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "134": {
+      "message": "Signal key \"%s\" already has kind \"%s\".",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "135": {
+      "message": "Candidate frames require live, non-adopting nodes.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "136": {
+      "message": "Async derived candidates are not supported by this prototype.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "137": {
+      "message": "A query resource requires a description.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "138": {
+      "message": "Read or write a signal through its owning scope or its handle.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "139": {
+      "message": "A signal action requires a function.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "140": {
+      "message": "Local hook scopes do not create SSR seeds.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "141": {
+      "message": "Distinct scopes in one presented graph need distinct scopeKey values.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "142": {
+      "message": "Local hook scopes do not adopt shared-state seeds.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "143": {
+      "message": "The signal adoption lease has been released.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "144": {
+      "message": "The presented frame has no compatible ready value for \"%s\".",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "145": {
+      "message": "The presented query definition does not match \"%s\".",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "146": {
+      "message": "Missing adoption frame for signal scope \"%s\".",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "147": {
+      "message": "createScope requires scopeKey.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "148": {
+      "message": "A direct signal needs an Octane scope.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "149": {
+      "message": "A direct derived signal needs an Octane scope.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "150": {
+      "message": "A direct query needs an Octane scope.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "151": {
+      "message": "Signal scope \"%s\" has been disposed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "152": {
+      "message": "Signals cannot be changed during a computation, render, or adoption frame.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "153": {
+      "message": "Signal \"%s\" depends on its own unfinished computation.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "154": {
+      "message": "Streamed signal failed with code \"%s\".",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "155": {
+      "message": "Initial document signals require an implicit document owner.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "156": {
+      "message": "Initial document signals must be installed once, before any signal reads or writes.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "157": {
+      "message": "A document lifecycle requires its document owner.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "158": {
+      "message": "A module signal needs an active signal owner. Render it in an Octane root or use runWithSignalOwner().",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "159": {
+      "message": "Module signal identity is assigned by the Octane compiler. Use an explicit key outside compiled code.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "160": {
+      "message": "Signal declaration options must be an object.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "161": {
+      "message": "A signal declaration key must be a nonempty string.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "162": {
+      "message": "A signal binding requires a signal handle.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "163": {
+      "message": "Only an async signal can be retried.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "164": {
+      "message": "Only a writable signal accepts set().",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "165": {
+      "message": "A signal subscriber must be a function.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "166": {
+      "message": "derived$ requires a synchronous computation.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "167": {
+      "message": "A completed native render requires a renderer transaction.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "168": {
+      "message": "Native reads require a renderer transaction.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "169": {
+      "message": "A native capture must be accepted before publication.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "170": {
+      "message": "Initial document signals require a matching version 1 scope seed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "171": {
+      "message": "Initial document signals require unique, valid node entries.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "172": {
+      "message": "Unavailable initial document entries cannot contain ready data.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "173": {
+      "message": "Initial document async entries require a query identity.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "174": {
+      "message": "Only initial document async entries may contain a query identity.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "175": {
+      "message": "Native signal revisions changed during server rendering.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "176": {
+      "message": "Native signal revisions changed before server output was accepted.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "177": {
+      "message": "Native signal revisions changed during server serialization.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "178": {
+      "message": "A completed native server read has no serializable ready value.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "179": {
+      "message": "Multiple data scopes claim native server key %s.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "180": {
+      "message": "Conflicting native signal seed for %s:%s.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "181": {
+      "message": "Invalid native signal hydration manifest.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "182": {
+      "message": "Invalid or duplicate native signal hydration scope.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "183": {
+      "message": "Invalid initial document signal references.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "184": {
+      "message": "Invalid or duplicate initial document signal reference.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "185": {
+      "message": "Native signal hydration requires its initial document signal seed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "186": {
+      "message": "Missing or duplicate initial document signal reference.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "187": {
+      "message": "Overlapping initial document signal reference and boundary history.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "188": {
+      "message": "Multiple data scopes claim native hydration key %s.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "189": {
+      "message": "A signal owner environment requires current, run, and capture.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "190": {
+      "message": "A default signal owner requires a provider.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "191": {
+      "message": "A signal owner callback is required.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "192": {
+      "message": "A server signal query observer requires an observation factory.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "193": {
+      "message": "query$ requires selector and loader functions.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "194": {
+      "message": "Native hydration has no %s seed for %s:%s.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "195": {
+      "message": "query requires a nonempty key and a loader function.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "196": {
+      "message": "Unsupported signal query kind.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "197": {
+      "message": "The streamed signal completed without yielding a value.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "198": {
+      "message": "A stream query must return an async iterable.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "199": {
+      "message": "A stream query returned an invalid iterator.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "200": {
+      "message": "A resource must describe a query request.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "201": {
+      "message": "Streamed candidates are not supported by this prototype.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "202": {
+      "message": "Incompatible query definitions use the same key \"%s\".",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "203": {
+      "message": "The signal candidate has retired.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "204": {
+      "message": "The request description is still pending.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "205": {
+      "message": "Frozen scalar candidates are not supported.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "206": {
+      "message": "Nested signal candidates are not supported.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "207": {
+      "message": "Only live candidate-capable owners are supported.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "208": {
+      "message": "Rebase the signal candidate before writing.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "209": {
+      "message": "Native signal presentation is not installed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "210": {
+      "message": "The candidate owner changed lifetime.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "211": {
+      "message": "Candidate dependency escaped its frame.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "212": {
+      "message": "The native read candidate has retired.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "213": {
+      "message": "A signal document lifecycle requires a live document and build identity.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "214": {
+      "message": "Early independent Hydrate intent queue overflow; reload the document.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "215": {
+      "message": "Invalid independent Hydrate manifest.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "216": {
+      "message": "Independent Hydrate boundary identity mismatch.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "217": {
+      "message": "Independent Hydrate activation export is not a function.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "218": {
+      "message": "Invalid independent Hydrate sidecar.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "219": {
+      "message": "Independent Hydrate build identity mismatch.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "220": {
+      "message": "Independent Hydrate sidecar has no boundary.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "221": {
+      "message": "Independent Hydrate boundary already registered.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "222": {
+      "message": "Streamed renderer response limits must be positive safe integers.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "223": {
+      "message": "A streamed renderer frame exceeded its byte budget.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "224": {
+      "message": "Streamed renderer delivery exceeded its pending budget.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "225": {
+      "message": "Streamed renderer delivery timed out.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "226": {
+      "message": "Streamed renderer delivery failed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "227": {
+      "message": "An Octane streamed renderer receiver is already installed in this realm.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "228": {
+      "message": "The pre-module streamed renderer mailbox overflowed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "229": {
+      "message": "Streamed renderer exceeded its open result budget.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "230": {
+      "message": "Streamed renderer result timed out.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "231": {
+      "message": "Streamed renderer entrypoint was removed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "232": {
+      "message": "The streamed renderer response has no body.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "233": {
+      "message": "Malformed streamed renderer frame.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "234": {
+      "message": "Streamed renderer response was canceled.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "235": {
+      "message": "Streamed renderer response timed out.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "236": {
+      "message": "The streamed renderer response exceeded its total byte budget.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "237": {
+      "message": "The streamed renderer response ended mid-frame.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "238": {
+      "message": "The streamed renderer response ended before a result terminal.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "239": {
+      "message": "Streamed renderer response failed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "240": {
+      "message": "The streamed region range is detached.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "241": {
+      "message": "The streamed region range is malformed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "242": {
+      "message": "Duplicate streamed control key \"%s\".",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "243": {
+      "message": "A full streamed region must be one balanced range.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "244": {
+      "message": "Streamed HTML cannot preserve live control \"%s\".",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "245": {
+      "message": "Required streamed region styles are unavailable.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "246": {
+      "message": "Historical read-frame adoption failed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "247": {
+      "message": "This region does not support renderer deltas.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "248": {
+      "message": "Register the exact current selection first.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "249": {
+      "message": "The streamed region markers do not share a parent.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "250": {
+      "message": "Streamed region content revisions must be nonnegative safe integers.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "251": {
+      "message": "Stream receiver limits must be positive safe integers.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "252": {
+      "message": "Streamed result timed out.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "253": {
+      "message": "Invalid streamed selection identity.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "254": {
+      "message": "Streamed selection has the wrong authority.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "255": {
+      "message": "Cannot attach a result to a stale selection.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "256": {
+      "message": "A streamed result already has a consumer.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "257": {
+      "message": "Invalid or duplicate streamed result sequence.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "258": {
+      "message": "A streamed result must begin with open.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "259": {
+      "message": "A streamed result cannot open twice.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "260": {
+      "message": "A promise result emitted more than one value.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "261": {
+      "message": "A promise result completed without one value.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "262": {
+      "message": "Streamed result mailbox exceeded its bound.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "263": {
+      "message": "Invalid or duplicate placement sequence.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "264": {
+      "message": "Streamed renderer frame failed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "265": {
+      "message": "Streamed receiver was disposed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "266": {
+      "message": "Streamed signal hydration requires buildId and documentId.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "267": {
+      "message": "The streamed signal selection bootstrap is missing or incompatible.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "268": {
+      "message": "The pre-module streamed signal selection mailbox overflowed.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "269": {
+      "message": "A streamed signal selection has the wrong authority.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "270": {
+      "message": "Document initialization requires full initial signal scopes.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "271": {
+      "message": "DOM class groups require a valid compiler-issued class receipt.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "272": {
+      "message": "A DOM host cannot mix class groups from different binding views.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "273": {
+      "message": "A DOM class group does not match its compiler-issued receipt.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "274": {
+      "message": "This DOM class group already has a binding.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "275": {
+      "message": "Cannot prepare a disposed DOM class group.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "276": {
+      "message": "Cannot commit an outdated DOM class group preparation.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "277": {
+      "message": "A DOM binding hydration lease must be active and have only one root owner.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "278": {
+      "message": "A DOM presentation ref must be a callback, object, or ref array.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "279": {
+      "message": "A native event binding must resolve to a function.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "280": {
+      "message": "Conditional hydration requires a compiler-proven caller shape.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "281": {
+      "message": "Structural hydration leases require compiler-owned native nodes.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "282": {
+      "message": "Native rest hydration requires an eligible closed child view.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "283": {
+      "message": "Structural hydration leases do not support lists or opaque regions.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "284": {
+      "message": "Structural hydration leases require primitive text.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "285": {
+      "message": "Structural hydration leases require a supported child view.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "286": {
+      "message": "DOM presentation cannot adopt mismatched compiler-owned ranges or nodes.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "287": {
+      "message": "This opaque view cannot be constructed without its external owner.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "288": {
+      "message": "A DOM presentation projection must return its synchronous scalar values.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "289": {
+      "message": "A DOM presentation signal text requires a primitive value.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "290": {
+      "message": "A DOM presentation initializer must return its synchronous scalar values.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "291": {
+      "message": "A DOM presentation branch projection returned an unknown arm.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "292": {
+      "message": "A DOM presentation child slot requires a compiler-owned fragment.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "293": {
+      "message": "A DOM presentation activation must return cleanup or undefined.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "294": {
+      "message": "DOM presentation requires synchronous getSnapshot() and subscribe() methods.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "295": {
+      "message": "A DOM presentation mount requires a parent and its optional insertion anchor.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "296": {
+      "message": "DOM presentation requires a synchronous snapshot, not a thenable.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "297": {
+      "message": "Hydration binding leases require an adopted fixed native view without structural regions or controls.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "298": {
+      "message": "This DOM presentation range already has a binding. Dispose it before rebinding.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "299": {
+      "message": "A DOM presentation subscription must return cleanup.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "300": {
+      "message": "A DOM presentation list requires a synchronous iterable.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "301": {
+      "message": "A DOM presentation list cannot contain duplicate keys.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "302": {
+      "message": "A DOM control binding requires its compiler-selected adapter.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "303": {
+      "message": "A constructible class group requires its compiler baseline initializer.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "304": {
+      "message": "A DOM projection subscription must return cleanup.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "305": {
+      "message": "A DOM binding projection group requires a computation.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "306": {
+      "message": "A DOM presentation key must be a string or finite number.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "307": {
+      "message": "A DOM presentation key has invalid serialized identity.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "308": {
+      "message": "Octane DOM bindings: an imported signal accessor performed a live read without a subscription; bind the handle directly or pass an explicit sample through BindingSource.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "309": {
+      "message": "A DOM binding signal requires the native binding protocol.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "310": {
+      "message": "A DOM binding signal subscription must return cleanup.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "311": {
+      "message": "A whole-style DOM binding requires a style object, CSS text or null.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "312": {
+      "message": "A DOM style subscription must return cleanup.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "313": {
+      "message": "adoptBindings() requires an Octane-compiled .tsrx or .tsx call and a supported static view.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "314": {
+      "message": "mountBindings() requires an Octane-compiled .tsrx or .tsx call.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "315": {
+      "message": "A DOM class token binding requires one nonempty class token.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "316": {
+      "message": "This DOM property already has a binding. Dispose it before rebinding.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "317": {
+      "message": "DOM bindings require the matching compiler-stamped root.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "318": {
+      "message": "DOM bindings cannot adopt a mismatched static element topology.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "319": {
+      "message": "DOM bindings cannot adopt an incomplete static element topology.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "320": {
+      "message": "DOM bindings require unique compiler-issued target addresses.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "321": {
+      "message": "DOM bindings cannot adopt a mismatched addressed element topology.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "322": {
+      "message": "DOM bindings cannot adopt an incomplete addressed element topology.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "323": {
+      "message": "DOM binding text must be a synchronous scalar.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "324": {
+      "message": "A whole-style DOM binding requires serialized CSS text or null.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "325": {
+      "message": "DOM bindings require synchronous getSnapshot() and subscribe() methods.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "326": {
+      "message": "DOM bindings require a synchronous snapshot, not a thenable.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "327": {
+      "message": "A DOM binding projection must return its synchronous scalar values.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "328": {
+      "message": "A DOM binding targets an unknown element.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "329": {
+      "message": "A DOM binding subscription must return a cleanup function.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "330": {
+      "message": "This DOM binding view requires the general adopter.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "331": {
+      "message": "Invalid independent Hydrate manifest inputs.",
+      "runtime": ["client", "server"],
       "status": "active"
     }
   }

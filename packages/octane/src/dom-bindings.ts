@@ -1,3 +1,4 @@
+import { formatClientError } from './error-codes.client.generated.js';
 import { normalizeClass } from './class-names.js';
 import { domBindingClaims } from './dom-binding-claims.js';
 import { sanitizeURL } from './sanitize-url.js';
@@ -76,9 +77,7 @@ export function adoptBindings<Props>(
 	_source: BindingSource<NoInfer<Props>>,
 	_options?: BindingOptions,
 ): BindingHandle {
-	throw new Error(
-		'adoptBindings() requires an Octane-compiled .tsrx or .tsx call and a supported static view.',
-	);
+	throw new Error(formatClientError(313));
 }
 
 /** Construct a compiler-proven fragment at an application-owned insertion point. */
@@ -88,7 +87,7 @@ export function mountBindings<Props>(
 	_source: BindingSource<NoInfer<Props>>,
 	_options?: BindingOptions,
 ): BindingHandle {
-	throw new Error('mountBindings() requires an Octane-compiled .tsrx or .tsx call.');
+	throw new Error(formatClientError(314));
 }
 
 /** @internal Structural artifacts carry their own statically imported mounting entry. */
@@ -190,11 +189,11 @@ function conflicts(channels: Set<string>, binding: BindingOperation, name: strin
 /** @internal Shared channel ownership for compiled scalar and structural presentation. */
 export function __claimBinding(node: Element, binding: BindingOperation): string {
 	if (binding[1] === 'classToken' && !/^\S+$/.test(binding[2]))
-		throw new TypeError('A DOM class token binding requires one nonempty class token.');
+		throw new TypeError(formatClientError(315));
 	const name = channel(binding);
 	let channels = claims.get(node);
 	if (channels !== undefined && conflicts(channels, binding, name))
-		throw new Error('This DOM property already has a binding. Dispose it before rebinding.');
+		throw new Error(formatClientError(316));
 	if (channels === undefined) claims.set(node, (channels = new Set()));
 	channels.add(name);
 	return name;
@@ -218,7 +217,7 @@ function assertBindingRoot(root: Element, descriptor: CompiledBindings<unknown>)
 		root.getAttribute('data-octane-bindings') !== descriptor.id ||
 		descriptor.nodes.length === 0
 	) {
-		throw new Error('DOM bindings require the matching compiler-stamped root.');
+		throw new Error(formatClientError(317));
 	}
 	return root;
 }
@@ -247,14 +246,14 @@ function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>)
 				: children !== null &&
 					(node.childNodes.length !== children || node.children.length !== children))
 		) {
-			throw new Error('DOM bindings cannot adopt a mismatched static element topology.');
+			throw new Error(formatClientError(318));
 		}
 		nodes.push(node);
 		childIndices.push(0);
 	}
 	for (let i = 0; i < nodes.length; i++) {
 		if (childIndices[i] !== (descriptor.nodes[i]![3] ?? 0)) {
-			throw new Error('DOM bindings cannot adopt an incomplete static element topology.');
+			throw new Error(formatClientError(319));
 		}
 	}
 	return nodes;
@@ -279,7 +278,7 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 					marker !== `${prefix}${index}` ||
 					nodes[index] !== undefined
 				) {
-					throw new Error('DOM bindings require unique compiler-issued target addresses.');
+					throw new Error(formatClientError(320));
 				}
 				nodes[index] = current;
 				if (descriptor.nodes[index]![3] === null) descend = false;
@@ -317,13 +316,13 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 					!openChildren &&
 					(node.childNodes.length !== children || node.children.length !== children))
 		) {
-			throw new Error('DOM bindings cannot adopt a mismatched addressed element topology.');
+			throw new Error(formatClientError(321));
 		}
 		if (parent !== -1) childCounts[parent]++;
 	}
 	for (let i = 0; i < descriptor.nodes.length; i++) {
 		if (childCounts[i] !== (descriptor.nodes[i]![3] ?? 0)) {
-			throw new Error('DOM bindings cannot adopt an incomplete addressed element topology.');
+			throw new Error(formatClientError(322));
 		}
 	}
 	return nodes;
@@ -346,7 +345,7 @@ function normalizeFixedScalar(binding: BindingOperation, value: unknown): string
 		case 'text':
 			if (value == null || value === false) return '';
 			if (type !== 'string' && type !== 'number' && type !== 'bigint' && type !== 'boolean')
-				throw new TypeError('DOM binding text must be a synchronous scalar.');
+				throw new TypeError(formatClientError(323));
 			return String(value);
 		case 'class':
 			return value == null || value === false ? null : normalizeClass(value);
@@ -385,8 +384,7 @@ function normalize(binding: BindingOperation, value: unknown): BindingValue {
 			return value == null || value === false ? '' : normalizeClass(value);
 		case 'styleAttribute':
 			if (value == null || value === false || value === '') return null;
-			if (type !== 'string')
-				throw new TypeError('A whole-style DOM binding requires serialized CSS text or null.');
+			if (type !== 'string') throw new TypeError(formatClientError(324));
 			return value as string;
 		case 'classToken':
 			return value ? '' : null;
@@ -515,7 +513,7 @@ export function __adoptBindings<Props>(
 	// selected adopter, so dispatching by that method would recurse into itself.
 	if ('root' in descriptor) return descriptor.adopt(root, descriptor, source, options);
 	if (!source || typeof source.getSnapshot !== 'function' || typeof source.subscribe !== 'function')
-		throw new TypeError('DOM bindings require synchronous getSnapshot() and subscribe() methods.');
+		throw new TypeError(formatClientError(325));
 	const nodes = descriptor.addressed
 		? resolveAddressedNodes(assertBindingRoot(root as Element, descriptor), descriptor)
 		: resolveFixedNodes(root as Element, descriptor);
@@ -757,14 +755,12 @@ export function __adoptBindings<Props>(
 						!dirty &&
 						!disposed
 					)
-						throw new TypeError('DOM bindings require a synchronous snapshot, not a thenable.');
+						throw new TypeError(formatClientError(326));
 					if (dirty || disposed) continue;
 					const values = descriptor.project(snapshot);
 					if (dirty || disposed) continue;
 					if (!Array.isArray(values) || values.length !== bindings.length)
-						throw new TypeError(
-							'A DOM binding projection must return its synchronous scalar values.',
-						);
+						throw new TypeError(formatClientError(327));
 					let resolved = values;
 					if (projectionFactory && descriptor.projectionGroups) {
 						for (const group of descriptor.projectionGroups) {
@@ -1064,7 +1060,7 @@ export function __adoptBindings<Props>(
 		for (let index = 0; index < bindings.length; index++) {
 			const binding = bindings[index]!;
 			const node = nodes[binding[0]];
-			if (node === undefined) throw new TypeError('A DOM binding targets an unknown element.');
+			if (node === undefined) throw new TypeError(formatClientError(328));
 			owned.push([node, __claimBinding(node, binding)]);
 			if (binding[1] === 'control') {
 				controls!.set(
@@ -1089,8 +1085,7 @@ export function __adoptBindings<Props>(
 		}
 		signal?.addEventListener('abort', dispose, { once: true });
 		const stop = source.subscribe(refresh);
-		if (typeof stop !== 'function')
-			throw new TypeError('A DOM binding subscription must return a cleanup function.');
+		if (typeof stop !== 'function') throw new TypeError(formatClientError(329));
 		if (disposed) stop();
 		else unsubscribe = stop;
 		busy = false;
@@ -1127,9 +1122,9 @@ export function __adoptScalarBindings<Props>(
 		descriptor.connectProjection ||
 		!descriptor.bindings.every(isFixedScalarChannel)
 	)
-		throw new TypeError('This DOM binding view requires the general adopter.');
+		throw new TypeError(formatClientError(330));
 	if (!source || typeof source.getSnapshot !== 'function' || typeof source.subscribe !== 'function')
-		throw new TypeError('DOM bindings require synchronous getSnapshot() and subscribe() methods.');
+		throw new TypeError(formatClientError(325));
 	const nodes = resolveFixedNodes(root, descriptor);
 	const bindings = descriptor.bindings;
 	const owned: Array<readonly [Element, string]> = [];
@@ -1229,14 +1224,12 @@ export function __adoptScalarBindings<Props>(
 						!dirty &&
 						!disposed
 					)
-						throw new TypeError('DOM bindings require a synchronous snapshot, not a thenable.');
+						throw new TypeError(formatClientError(326));
 					if (dirty || disposed) continue;
 					const values = descriptor.project(snapshot);
 					if (dirty || disposed) continue;
 					if (!Array.isArray(values) || values.length !== bindings.length)
-						throw new TypeError(
-							'A DOM binding projection must return its synchronous scalar values.',
-						);
+						throw new TypeError(formatClientError(327));
 					let resolved = values;
 					if (signalFactory && descriptor.signalIndices) {
 						for (const index of descriptor.signalIndices) {
@@ -1355,13 +1348,12 @@ export function __adoptScalarBindings<Props>(
 		// Claim all channels before invoking source callbacks or mutating any node.
 		for (let index = 0; index < bindings.length; index++) {
 			const node = nodes[bindings[index]![0]];
-			if (node === undefined) throw new TypeError('A DOM binding targets an unknown element.');
+			if (node === undefined) throw new TypeError(formatClientError(328));
 			owned.push([node, __claimBinding(node, bindings[index]!)]);
 		}
 		signal?.addEventListener('abort', dispose, { once: true });
 		const stop = source.subscribe(refresh);
-		if (typeof stop !== 'function')
-			throw new TypeError('A DOM binding subscription must return a cleanup function.');
+		if (typeof stop !== 'function') throw new TypeError(formatClientError(329));
 		if (disposed) stop();
 		else unsubscribe = stop;
 		busy = false;

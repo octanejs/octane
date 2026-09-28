@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	acceptScopeStreamedResult,
 	bindScopeStreamedSelection,
@@ -81,13 +82,11 @@ function resolveIdentity(identity: object, scopeKey: string, owner: SignalOwner)
 /** @internal Install initial response data before this document creates any live cells. */
 export function initializeDocumentSignalOwner(owner: SignalOwnerIdentity, seed: ScopeSeed): void {
 	if (isScope(owner) || isRendererOwner(owner)) {
-		throw new TypeError('Initial document signals require an implicit document owner.');
+		throw new TypeError(formatClientError(155));
 	}
 	if (retiredIdentities.has(owner)) throw new ScopeDisposedError(owner.scopeKey);
 	if (identityScopes.has(owner)) {
-		throw new Error(
-			'Initial document signals must be installed once, before any signal reads or writes.',
-		);
+		throw new Error(formatClientError(156));
 	}
 	// createScope validates and copies the seed before publishing any ownership.
 	const scope = createScope({ scopeKey: owner.scopeKey, seed });
@@ -195,8 +194,7 @@ installSignalOwnerRetirement((owner) => {
 
 /** @internal A document may freeze read work without retiring data or accepted writes. */
 export function createSignalOwnerLifecycle(owner: SignalOwner) {
-	if (isRendererOwner(owner))
-		throw new TypeError('A document lifecycle requires its document owner.');
+	if (isRendererOwner(owner)) throw new TypeError(formatClientError(157));
 	let barrier: Promise<void> | undefined;
 	let release: (() => void) | undefined;
 	let disposed = false;
@@ -258,9 +256,7 @@ export function createSignalOwnerLifecycle(owner: SignalOwner) {
 function requireOwner(): SignalOwner {
 	const owner = currentSignalOwner();
 	if (!owner) {
-		throw new Error(
-			'A module signal needs an active signal owner. Render it in an Octane root or use runWithSignalOwner().',
-		);
+		throw new Error(formatClientError(158));
 	}
 	return owner;
 }
@@ -290,9 +286,7 @@ export function resolveSignalHandleForScope<T>(
 
 function requireSite(site: string | undefined): string {
 	if (site) return site;
-	throw new Error(
-		'Module signal identity is assigned by the Octane compiler. Use an explicit key outside compiled code.',
-	);
+	throw new Error(formatClientError(159));
 }
 
 /** @internal Shared owner resolution for statically selected signal factories. */
@@ -405,11 +399,11 @@ export function descriptorKey(site: string | undefined, explicit: string | undef
 /** @internal Read authored identity once, without interpreting initial data as a key. */
 export function signalOptionsKey(options?: SignalOptions): string | undefined {
 	if (options != null && typeof options !== 'object') {
-		throw new TypeError('Signal declaration options must be an object.');
+		throw new TypeError(formatClientError(160));
 	}
 	const key = options?.key;
 	if (key !== undefined && (typeof key !== 'string' || !key.trim())) {
-		throw new TypeError('A signal declaration key must be a nonempty string.');
+		throw new TypeError(formatClientError(161));
 	}
 	return key;
 }
@@ -451,7 +445,7 @@ export function __derivedScalarAt<T>(
 	compute: DerivedCompute<T>,
 	options?: DerivedOptions & SignalOptions,
 ): DerivedSignal<T> {
-	if (typeof compute !== 'function') throw new TypeError('derived$ requires a function.');
+	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 	const explicit = signalOptionsKey(options);
 	site ??= explicit;
 	const key = descriptorKey(site, explicit);
@@ -467,7 +461,7 @@ export function __derivedScalarAt<T>(
 }
 
 export function readSignalBinding<T>(handle$: SignalHandle<T>): T {
-	if (!isSignalHandle(handle$)) throw new TypeError('A signal binding requires a signal handle.');
+	if (!isSignalHandle(handle$)) throw new TypeError(formatClientError(162));
 	return handle$[SIGNAL_BINDING_READ]();
 }
 

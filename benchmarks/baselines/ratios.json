@@ -4721,6 +4721,14 @@
     "note": "Production portal-free native dispatch retains framework/native order and exact public descriptors while avoiding repeated event-type sets, portal ancestry reads, and private symbols."
   },
   {
+    "suite": "event-delegation",
+    "op": "idleEventDefinitions",
+    "target": "dispatch-work",
+    "reference": "dispatch-work-model",
+    "maxRatio": 0,
+    "note": "A registered event type whose path has no capture or bubble handler reaches native listeners without Octane patching and restoring stopPropagation/currentTarget descriptors on the Event (baseline: 4 descriptor operations per click)."
+  },
+  {
     "suite": "effect-scheduling",
     "op": "collections",
     "target": "chain",
@@ -5335,6 +5343,22 @@
     "reference": "branch-argumentsEscape-work-budget",
     "maxRatio": 0,
     "note": "Escaped argument tuples remain independent under real nested branch updates; absent branches omit unused captures."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "empty_brackets",
+    "target": "native-read-emptyThen",
+    "reference": "native-read-emptyThen-model",
+    "maxRatio": 0,
+    "note": "Empty @if/@else arms in native-read modules compile to bodiless functions instead of entering and publishing an empty read scope on every render; the two-arm control keeps all three scope sites."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "empty_brackets",
+    "target": "native-read-emptyElse",
+    "reference": "native-read-emptyElse-model",
+    "maxRatio": 0,
+    "note": "Empty @if/@else arms in native-read modules compile to bodiless functions instead of entering and publishing an empty read scope on every render; the two-arm control keeps all three scope sites."
   },
   {
     "suite": "root-transactions",

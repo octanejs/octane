@@ -1146,7 +1146,8 @@ export function mount(root, source, options) { return view.mount(root, view, sou
 												{ id: 'a', label: 'Duplicate' },
 											],
 										}),
-									/duplicate keys/,
+									// Production bundle: the framework error is the catalog code, not English.
+									/Minified Octane error #301;/,
 								);
 								assert.equal(host.innerHTML, before);
 								assert.equal(subscriptions.size, 0);

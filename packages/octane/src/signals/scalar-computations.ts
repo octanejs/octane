@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import { createDerivedCellWith, type DerivedBindingLifecycle, type ScopeImpl } from './engine.js';
 import {
 	CandidateUnsupportedError,
@@ -51,7 +52,7 @@ class ScalarBinding<T> implements DerivedBindingLifecycle {
 
 	forkCandidate(target: ScopedNode): undefined {
 		if (this.frozen || this.owner.readBarrier || !this.compute) {
-			throw new CandidateUnsupportedError('Frozen scalar candidates are not supported.');
+			throw new CandidateUnsupportedError(formatClientError(205));
 		}
 		target.compute = this.node.compute;
 	}

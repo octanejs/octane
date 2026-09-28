@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import type { AdoptionFrame, ScopeSeed, SignalSeedEntry } from './types.js';
 import type { NativeReadWitness } from './native-read-collector.js';
 import type { NativeAdoptionOwner, NativeReadSource } from './read-protocol.js';
@@ -54,7 +55,7 @@ function getInitialDocumentCapture(seed: ScopeSeed, scopeKey?: string): InitialD
 	const previous = capturedInitialDocumentSignals.get(seed);
 	if (previous !== undefined) {
 		if (scopeKey !== undefined && previous.seed.scopeKey !== scopeKey)
-			throw new Error('Initial document signals require a matching version 1 scope seed.');
+			throw new Error(formatClientError(170));
 		return previous;
 	}
 	const captured = snapshotSignalValue(seed) as ScopeSeed;
@@ -67,7 +68,7 @@ function getInitialDocumentCapture(seed: ScopeSeed, scopeKey?: string): InitialD
 		(scopeKey !== undefined && captured.scopeKey !== scopeKey) ||
 		!Array.isArray(captured.entries)
 	)
-		throw new Error('Initial document signals require a matching version 1 scope seed.');
+		throw new Error(formatClientError(170));
 	const entries = new Map<string, SignalSeedEntry>();
 	const signatures = new Map<string, string>();
 	for (const entry of captured.entries) {
@@ -88,7 +89,7 @@ function getInitialDocumentCapture(seed: ScopeSeed, scopeKey?: string): InitialD
 				!['none', 'connecting', 'open', 'closed'].includes(entry.connection)) ||
 			entries.has(seedEntryKey(entry))
 		)
-			throw new Error('Initial document signals require unique, valid node entries.');
+			throw new Error(formatClientError(171));
 		if (entry.available === false) {
 			if (
 				entry.complete ||
@@ -96,7 +97,7 @@ function getInitialDocumentCapture(seed: ScopeSeed, scopeKey?: string): InitialD
 				entry.value.length !== 1 ||
 				entry.value[0] !== 'undefined'
 			)
-				throw new Error('Unavailable initial document entries cannot contain ready data.');
+				throw new Error(formatClientError(172));
 		} else if (entry.kind === 'async') {
 			const request = entry.request;
 			if (
@@ -107,10 +108,10 @@ function getInitialDocumentCapture(seed: ScopeSeed, scopeKey?: string): InitialD
 				!['promise', 'stream'].includes(request.kind) ||
 				!Array.isArray(request.argument)
 			)
-				throw new Error('Initial document async entries require a query identity.');
+				throw new Error(formatClientError(173));
 			decodeSignalValue(request.argument);
 		} else if (entry.request !== undefined) {
-			throw new Error('Only initial document async entries may contain a query identity.');
+			throw new Error(formatClientError(174));
 		}
 		decodeSignalValue(entry.value);
 		const key = seedEntryKey(entry);
@@ -161,24 +162,21 @@ export function serializeNativeSeedReads(
 	initialDocumentSignals?: ScopeSeed,
 ): NativeSignalManifest | undefined {
 	if (reads === null) return undefined;
-	if (reads.mixed) throw new Error('Native signal revisions changed during server rendering.');
+	if (reads.mixed) throw new Error(formatClientError(175));
 	const scopes = new Map<string, Map<string, SignalSeedEntry>>();
 	const claims = new Map<string, NativeAdoptionOwner>();
 	for (const [source, version] of reads.reads) {
-		if (source.getVersion() !== version)
-			throw new Error('Native signal revisions changed before server output was accepted.');
+		if (source.getVersion() !== version) throw new Error(formatClientError(176));
 		const seeds = source.serialize?.(version);
-		if (source.getVersion() !== version)
-			throw new Error('Native signal revisions changed during server serialization.');
+		if (source.getVersion() !== version) throw new Error(formatClientError(177));
 		if (seeds === undefined) {
-			if (source.serialize !== undefined)
-				throw new Error('A completed native server read has no serializable ready value.');
+			if (source.serialize !== undefined) throw new Error(formatClientError(178));
 			continue;
 		}
 		for (const { owner, seed } of seeds) {
 			const claimant = claims.get(seed.scopeKey);
 			if (claimant !== undefined && claimant !== owner)
-				throw new Error('Multiple data scopes claim native server key ' + seed.scopeKey + '.');
+				throw new Error(formatClientError(179, seed.scopeKey));
 			claims.set(seed.scopeKey, owner);
 			let entries = scopes.get(seed.scopeKey);
 			if (entries === undefined) scopes.set(seed.scopeKey, (entries = new Map()));
@@ -187,9 +185,7 @@ export function serializeNativeSeedReads(
 				const key = channel + ':' + entry.key;
 				const previous = entries.get(key);
 				if (previous !== undefined && JSON.stringify(previous) !== JSON.stringify(entry))
-					throw new Error(
-						'Conflicting native signal seed for ' + seed.scopeKey + ':' + entry.key + '.',
-					);
+					throw new Error(formatClientError(180, seed.scopeKey, entry.key));
 				entries.set(key, entry);
 			}
 		}
@@ -243,7 +239,7 @@ function validateNativeSignalManifest(value: unknown): NativeSignalManifest {
 			(value as NativeSignalManifest).version !== 2) ||
 		!Array.isArray((value as NativeSignalManifest).scopes)
 	)
-		throw new Error('Invalid native signal hydration manifest.');
+		throw new Error(formatClientError(181));
 	const manifest = value as NativeSignalManifest;
 	const keys = new Set<string>();
 	for (const scope of manifest.scopes) {
@@ -256,7 +252,7 @@ function validateNativeSignalManifest(value: unknown): NativeSignalManifest {
 			!Array.isArray(scope.entries) ||
 			keys.has(scope.scopeKey)
 		)
-			throw new Error('Invalid or duplicate native signal hydration scope.');
+			throw new Error(formatClientError(182));
 		keys.add(scope.scopeKey);
 	}
 	if (manifest.version === 2) {
@@ -269,7 +265,7 @@ function validateNativeSignalManifest(value: unknown): NativeSignalManifest {
 			!Array.isArray(document.entries) ||
 			document.entries.length === 0
 		)
-			throw new Error('Invalid initial document signal references.');
+			throw new Error(formatClientError(183));
 		const references = new Set<string>();
 		for (const reference of document.entries) {
 			if (
@@ -280,7 +276,7 @@ function validateNativeSignalManifest(value: unknown): NativeSignalManifest {
 				!['value', 'latest', 'snapshot'].includes(reference.read) ||
 				references.has(seedEntryKey(reference))
 			)
-				throw new Error('Invalid or duplicate initial document signal reference.');
+				throw new Error(formatClientError(184));
 			references.add(seedEntryKey(reference));
 		}
 	}
@@ -294,24 +290,21 @@ export function materializeNativeSignalManifest(
 ): Extract<NativeSignalManifest, { readonly version: 1 }> {
 	if (manifest.version === 1) return manifest;
 	validateNativeSignalManifest(manifest);
-	if (initialDocumentSignals === undefined)
-		throw new Error('Native signal hydration requires its initial document signal seed.');
+	if (initialDocumentSignals === undefined) throw new Error(formatClientError(185));
 	const document = manifest.initialDocument;
 	const initial = getInitialDocumentCapture(initialDocumentSignals, document.scopeKey);
 	const entries = new Map<string, SignalSeedEntry>();
 	for (const reference of document.entries) {
 		const key = seedEntryKey(reference);
 		const entry = initial.entries.get(key);
-		if (entry === undefined || entries.has(key))
-			throw new Error('Missing or duplicate initial document signal reference.');
+		if (entry === undefined || entries.has(key)) throw new Error(formatClientError(186));
 		entries.set(key, entry);
 	}
 	for (const scope of manifest.scopes) {
 		if (scope.scopeKey !== document.scopeKey) continue;
 		for (const entry of scope.entries) {
 			const key = seedEntryKey(entry);
-			if (entries.has(key))
-				throw new Error('Overlapping initial document signal reference and boundary history.');
+			if (entries.has(key)) throw new Error(formatClientError(187));
 			entries.set(key, entry);
 		}
 	}
@@ -345,7 +338,7 @@ export function createNativeAdoptionState(
 			if (seed === undefined) return undefined;
 			const claimant = claims.get(owner.scopeKey);
 			if (claimant !== undefined && claimant !== owner)
-				throw new Error('Multiple data scopes claim native hydration key ' + owner.scopeKey + '.');
+				throw new Error(formatClientError(188, owner.scopeKey));
 			let frame = frames.get(owner);
 			if (frame === undefined) {
 				frame = owner.beginAdoption(seed);

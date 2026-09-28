@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import type { SignalRendererOwnerIdentity } from './types.js';
 
 export interface ServerSignalQueryAttempt {
@@ -78,7 +79,7 @@ export function serverSignalQueryAttemptObserver(
 		return;
 	}
 	if (typeof context.createObservations !== 'function') {
-		throw new TypeError('A server signal query observer requires an observation factory.');
+		throw new TypeError(formatClientError(192));
 	}
 	return context;
 }

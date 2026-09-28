@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	EARLY_HYDRATION_INTENTS_KEY,
 	HYDRATE_DEFAULT_INTERACTION_EVENTS,
@@ -436,7 +437,7 @@ export function initializeHydrationEventCapture(ownerDocument?: Document): void 
 	};
 	host[EARLY_HYDRATION_INTENTS_KEY] = claimed;
 	if (mailbox?.overflow) {
-		throw new RangeError('Early independent Hydrate intent queue overflow; reload the document.');
+		throw new RangeError(formatClientError(214));
 	}
 	HYDRATE_INTENT_DOCUMENTS.add(targetDocument);
 	for (let i = 0; i < HYDRATE_SUPPORTED_INTERACTION_EVENTS.length; i++) {

@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import type { Block, Scope } from '../runtime.js';
 import {
 	createNativeReadCollector,
@@ -307,8 +308,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				if (frame.candidates !== null) {
 					if (completed) {
 						const capture = host.capture();
-						if (capture === null)
-							throw new Error('A completed native render requires a renderer transaction.');
+						if (capture === null) throw new Error(formatClientError(167));
 						const destination = target(capture);
 						for (const candidate of frame.candidates.values()) put(destination, candidate);
 					} else {
@@ -327,7 +327,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		},
 		beginScope(scope: Scope, block: Block): number {
 			if (collector.isDetached()) return collector.beginScope(scope);
-			if (host.capture() === null) throw new Error('Native reads require a renderer transaction.');
+			if (host.capture() === null) throw new Error(formatClientError(168));
 			if (depth === 0 || frames[depth - 1].block !== block) this.beginRender(block);
 			const frame = frames[depth - 1];
 			// An empty successful render replaces its prior dependencies. A Scope
@@ -361,7 +361,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		spliceCapture(capture: object, parent: object | null): void {
 			const candidates = captures.get(capture);
 			if (candidates === undefined) return;
-			if (parent === null) throw new Error('A native capture must be accepted before publication.');
+			if (parent === null) throw new Error(formatClientError(169));
 			captures.delete(capture);
 			const destination = target(parent);
 			for (const candidate of candidates.values()) put(destination, candidate);

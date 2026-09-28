@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import { documentSignalOwner } from '../signals/document-owner.js';
 import { createSignalOwnerLifecycle } from '../signals/facade.js';
 import type { SignalOwner } from '../signals/types.js';
@@ -21,7 +22,7 @@ export function installSignalDocumentLifecycle(options: SignalDocumentLifecycleO
 	const document = options.document;
 	const view = document.defaultView;
 	if (!view || !options.buildId || !options.documentId) {
-		throw new TypeError('A signal document lifecycle requires a live document and build identity.');
+		throw new TypeError(formatClientError(213));
 	}
 	const signalOwner = options.signalOwner ?? documentSignalOwner(document);
 	const owner = createSignalOwnerLifecycle(signalOwner);

@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import type {
 	ScopedNode,
 	NodeState,
@@ -120,9 +121,9 @@ export class SignalActionFrame {
 	private demand: Set<ScopedNode> | undefined;
 
 	run<T>(callback: () => T): T {
-		if (!this.active) throw new TypeError('The signal candidate has retired.');
+		if (!this.active) throw new TypeError(formatClientError(203));
 		if (activeCandidate && activeCandidate !== this) {
-			throw new CandidateUnsupportedError('Nested signal candidates are not supported.');
+			throw new CandidateUnsupportedError(formatClientError(206));
 		}
 		const previous = swapActiveSignalCandidate(this);
 		try {
@@ -133,7 +134,7 @@ export class SignalActionFrame {
 	}
 
 	resolve<T>(node: ScopedNode<T>): ScopedNode<T> {
-		if (!this.active) throw new TypeError('The signal candidate has retired.');
+		if (!this.active) throw new TypeError(formatClientError(203));
 		const original = this.originals?.get(node);
 		if (original) {
 			this.demand?.add(original);
@@ -143,7 +144,7 @@ export class SignalActionFrame {
 		const existing = this.entries?.get(node);
 		if (existing) return existing.target;
 		if (bridge.historical() || node.owner.readBarrier || !node.owner.forkCandidate) {
-			throw new CandidateUnsupportedError('Only live candidate-capable owners are supported.');
+			throw new CandidateUnsupportedError(formatClientError(207));
 		}
 		bridge.assertAlive(node.owner);
 		// A receipt covers the discovered read set, not only the writes. A later
@@ -182,7 +183,7 @@ export class SignalActionFrame {
 	}
 
 	write<T>(node: ScopedNode<T>, value: T | ((previous: T) => T)): void {
-		if (!this.validate()) throw new TypeError('Rebase the signal candidate before writing.');
+		if (!this.validate()) throw new TypeError(formatClientError(208));
 		const target = this.resolve(node);
 		const current = bridge.strictValue(bridge.refreshNode(target), node.key);
 		let previous = current;
@@ -234,8 +235,7 @@ export class SignalActionFrame {
 		read: SignalReadMode,
 		source: NativeReadSource,
 	): NativeReadSource {
-		if (!nativeExtension)
-			throw new CandidateUnsupportedError('Native signal presentation is not installed.');
+		if (!nativeExtension) throw new CandidateUnsupportedError(formatClientError(209));
 		return nativeExtension.source(this.entries!.get(this.originals!.get(target)!)!, read, source);
 	}
 	validate(): boolean {
@@ -322,7 +322,7 @@ export class SignalActionFrame {
 
 	/** Urgent writes win their own cells without restarting unaffected producer leases. */
 	rebase(): void {
-		if (!this.active) throw new TypeError('The signal candidate has retired.');
+		if (!this.active) throw new TypeError(formatClientError(203));
 		const hadWrites = this.hasWrites();
 		this.generation++;
 		this.invalidatePreparation();
@@ -330,7 +330,7 @@ export class SignalActionFrame {
 			for (const entry of this.entries?.values() ?? []) {
 				bridge.assertAlive(entry.node.owner);
 				if (entry.epoch !== entry.node.owner.epoch || entry.node.owner.readBarrier) {
-					throw new TypeError('The candidate owner changed lifetime.');
+					throw new TypeError(formatClientError(210));
 				}
 				const operations = entry.urgentOperations;
 				if (!entry.withdrawn && !operations && entry.revision === entry.node.revision) continue;
@@ -485,7 +485,7 @@ export class SignalActionFrame {
 								while (node.deps) bridge.graph.unlink(node.deps, node);
 								for (let link = target.deps; link; link = link.nextDep) {
 									const original = this.originals!.get(link.dep as ScopedNode);
-									if (!original) throw new TypeError('Candidate dependency escaped its frame.');
+									if (!original) throw new TypeError(formatClientError(211));
 									bridge.link(original, node);
 								}
 								const currentChanged =

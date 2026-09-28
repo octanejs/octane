@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import type { NativeReadSource } from './read-protocol.js';
 import { candidateGraph as bridge } from './transition-state.js';
 import {
@@ -31,7 +32,7 @@ function createNativeReadCandidateSource(candidate: NativeReadSource) {
 						? acceptedVersion
 						: NaN,
 		subscribe(notify) {
-			if (target === undefined) throw new TypeError('The native read candidate has retired.');
+			if (target === undefined) throw new TypeError(formatClientError(212));
 			const subscription = { notify, dispose: target.subscribe(notify) };
 			subscriptions.add(subscription);
 			return () => {

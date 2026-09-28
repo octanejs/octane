@@ -1,4 +1,5 @@
 /** Compiler-owned DOM presentation markers. This leaf is shared by client and SSR. */
+import { formatClientError } from './error-codes.client.generated.js';
 import {
 	HYDRATION_FOR_ARM_INDEX,
 	HYDRATION_FOR_EMPTY,
@@ -32,7 +33,7 @@ export function encodeBindingKey(key: BindingKey): string {
 	if (typeof key === 'string')
 		return 's:' + JSON.stringify(key).replace(/-/g, '\\u002d').replace(/</g, '\\u003c');
 	if (typeof key === 'number' && Number.isFinite(key)) return 'n:' + String(key);
-	throw new TypeError('A DOM presentation key must be a string or finite number.');
+	throw new TypeError(formatClientError(306));
 }
 
 export function decodeBindingKey(encoded: string): BindingKey {
@@ -40,7 +41,7 @@ export function decodeBindingKey(encoded: string): BindingKey {
 	try {
 		key = JSON.parse(encoded.slice(2));
 	} catch {
-		throw new TypeError('A DOM presentation key has invalid serialized identity.');
+		throw new TypeError(formatClientError(307));
 	}
 	if (
 		(encoded.startsWith('s:') && typeof key === 'string') ||
@@ -48,7 +49,7 @@ export function decodeBindingKey(encoded: string): BindingKey {
 	) {
 		if (encodeBindingKey(key) === encoded) return key;
 	}
-	throw new TypeError('A DOM presentation key has invalid serialized identity.');
+	throw new TypeError(formatClientError(307));
 }
 
 export interface BindingMarker {

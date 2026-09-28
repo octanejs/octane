@@ -1,3 +1,4 @@
+import { formatClientError } from './error-codes.client.generated.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
 import {
 	forwardNativeTransitionConsumer,
@@ -46,12 +47,7 @@ export function __assertBindingSnapshot<T>(read: () => T): T {
 		setNativeReadObserver(previous);
 	}
 	if (observed)
-		throw Object.assign(
-			new TypeError(
-				'Octane DOM bindings: an imported signal accessor performed a live read without a subscription; bind the handle directly or pass an explicit sample through BindingSource.',
-			),
-			{ code: 'OCTANE_DOM_BINDINGS' },
-		);
+		throw Object.assign(new TypeError(formatClientError(308)), { code: 'OCTANE_DOM_BINDINGS' });
 	if (failed) throw failure;
 	return value!;
 }
@@ -143,7 +139,7 @@ export function __createBindingSignals() {
 								typeof handle[SIGNAL_BINDING_READ] !== 'function' ||
 								typeof handle[SIGNAL_BINDING_SUBSCRIBE] !== 'function'
 							)
-								throw new TypeError('A DOM binding signal requires the native binding protocol.');
+								throw new TypeError(formatClientError(309));
 							const stopNext = run(() =>
 								handle![SIGNAL_BINDING_SUBSCRIBE](
 									forwardNativeTransitionConsumer(notify, () => {
@@ -151,8 +147,7 @@ export function __createBindingSignals() {
 									}),
 								),
 							);
-							if (typeof stopNext !== 'function')
-								throw new TypeError('A DOM binding signal subscription must return cleanup.');
+							if (typeof stopNext !== 'function') throw new TypeError(formatClientError(310));
 							if (disposed || ticket !== generation) stopNext();
 							else unsubscribe = stopNext;
 						}

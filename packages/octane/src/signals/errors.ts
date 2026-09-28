@@ -1,27 +1,28 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 export class ScopeDisposedError extends Error {
 	constructor(scopeKey: string) {
-		super(`Signal scope "${scopeKey}" has been disposed.`);
+		super(formatClientError(151, scopeKey));
 		this.name = 'ScopeDisposedError';
 	}
 }
 
 export class SignalWriteError extends Error {
 	constructor() {
-		super('Signals cannot be changed during a computation, render, or adoption frame.');
+		super(formatClientError(152));
 		this.name = 'SignalWriteError';
 	}
 }
 
 export class SignalCycleError extends Error {
 	constructor(key: string) {
-		super(`Signal "${key}" depends on its own unfinished computation.`);
+		super(formatClientError(153, key));
 		this.name = 'SignalCycleError';
 	}
 }
 
 export class SignalIdleError extends Error {
 	constructor(key: string) {
-		super(`Signal "${key}" has no selected value.`);
+		super(formatClientError(113, key));
 		this.name = 'SignalIdleError';
 	}
 }
@@ -36,7 +37,7 @@ export class SignalFrameError extends Error {
 export class SignalStreamError extends Error {
 	readonly code: string;
 	constructor(code: string) {
-		super(`Streamed signal failed with code "${code}".`);
+		super(formatClientError(154, code));
 		this.code = code;
 		this.name = 'SignalStreamError';
 	}

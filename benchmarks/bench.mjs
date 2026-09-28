@@ -1407,6 +1407,7 @@ const SUITES = [
 		iter: { normal: 2, quick: 1 },
 		runs: [
 			{ script: 'branch-environments.mjs', args: () => [] },
+			{ script: 'native-read-scopes.mjs', args: () => [] },
 			{ script: 'handlers.mjs', args: () => [] },
 			{ script: 'server.mjs', args: (n) => [String(n)] },
 		],

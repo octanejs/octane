@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import type { AdoptionFrame, ConnectionState, ScopeSeed, SignalHandle } from './types.js';
 import type { SignalCandidateFrame } from './transition-candidate.js';
 import type { ScopedNode } from './graph.js';
@@ -149,7 +150,7 @@ export class NativeAdoptionMiss extends Error {
 	readonly read: 'value' | 'latest' | 'snapshot';
 
 	constructor(scopeKey: string, nodeKey: string, read: 'value' | 'latest' | 'snapshot' = 'value') {
-		super('Native hydration has no ' + read + ' seed for ' + scopeKey + ':' + nodeKey + '.');
+		super(formatClientError(194, read, scopeKey, nodeKey));
 		this.name = 'NativeAdoptionMiss';
 		this.scopeKey = scopeKey;
 		this.nodeKey = nodeKey;

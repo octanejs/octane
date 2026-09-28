@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	consumeHydrationControl,
 	initializeHydrationControlCapture,
@@ -109,16 +110,12 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 					(control.localName !== 'input' || !['checkbox', 'radio'].includes(control.type))) ||
 				(channel === 'value' && control.localName === 'input' && control.type === 'file')
 			)
-				throw new TypeError(
-					'A signal control requires a native value/checked property and a signal.',
-				);
+				throw new TypeError(formatClientError(116));
 			if (
 				CONTROL_BINDINGS.get(control)?.has(channel) ||
 				hasHydrationControlSignalWriter(control, channel)
 			)
-				throw new Error(
-					'This control property already has a signal binding. Dispose it before rebinding.',
-				);
+				throw new Error(formatClientError(117));
 			let channels = CONTROL_BINDINGS.get(control);
 			if (!channels) CONTROL_BINDINGS.set(control, (channels = new Set()));
 			channels.add(channel);
@@ -221,9 +218,7 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 					(typeof next[SIGNAL_BINDING_READ] !== 'function' ||
 						typeof next[SIGNAL_BINDING_SUBSCRIBE] !== 'function')
 				)
-					throw new TypeError(
-						'A signal control requires a native value/checked property and a signal.',
-					);
+					throw new TypeError(formatClientError(116));
 				if (!preview && raw !== next) {
 					const ticket = ++generation;
 					const stop = unsubscribe;
@@ -252,8 +247,7 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 								},
 							),
 						);
-						if (typeof stopNext !== 'function')
-							throw new TypeError('A signal control subscription must return cleanup.');
+						if (typeof stopNext !== 'function') throw new TypeError(formatClientError(118));
 						if (disposed || generation !== ticket) stopNext();
 						else unsubscribe = stopNext;
 					}
@@ -273,10 +267,10 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 				)
 					throw new TypeError(
 						channel === 'checked'
-							? 'A checked signal must contain a boolean.'
+							? formatClientError(119)
 							: multiple
-								? 'A multiple select signal must contain an array.'
-								: 'A value signal must contain a string.',
+								? formatClientError(120)
+								: formatClientError(121),
 					);
 				let selected: Set<string> | undefined;
 				if (multiple && Array.isArray(value)) {
@@ -446,8 +440,7 @@ export function bindSignalControl(
 	channel: ControlChannel,
 	handle$: SignalHandle<unknown>,
 ): SignalControlBinding {
-	if (!isSignalHandle(handle$))
-		throw new TypeError('A signal control requires a native value/checked property and a signal.');
+	if (!isSignalHandle(handle$)) throw new TypeError(formatClientError(116));
 	let busy = false;
 	let dirty = false;
 	let disposed = false;

@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	documentSignalOwner,
 	enableSignalDocument,
@@ -111,7 +112,7 @@ function bootstrapStreamedSignals<Receiver extends StreamedResultReceiver>(
 	createReceiver: (options: StreamedResultReceiverOptions) => Receiver,
 ): StreamedSignalResults & { readonly receiver: Receiver } {
 	if (!options.buildId || !options.documentId) {
-		throw new TypeError('Streamed signal hydration requires buildId and documentId.');
+		throw new TypeError(formatClientError(266));
 	}
 	const target = options.target ?? (globalThis as Record<string, unknown>);
 	const signalOwner = options.signalOwner ?? documentSignalOwner(document);
@@ -135,11 +136,11 @@ function bootstrapStreamedSignals<Receiver extends StreamedResultReceiver>(
 		typeof early.register !== 'function'
 	) {
 		receiver.dispose();
-		throw new Error('The streamed signal selection bootstrap is missing or incompatible.');
+		throw new Error(formatClientError(267));
 	}
 	if (early.overflow === true) {
 		receiver.dispose();
-		throw new Error('The pre-module streamed signal selection mailbox overflowed.');
+		throw new Error(formatClientError(268));
 	}
 	const selections = new Map<string, { identity: StreamFrameIdentity; detach?: () => void }>();
 	const owners = new Map<string, SignalRendererOwnerIdentity>();
@@ -160,7 +161,7 @@ function bootstrapStreamedSignals<Receiver extends StreamedResultReceiver>(
 			candidate.documentId !== options.documentId ||
 			candidate.ownerKey !== signalOwner.scopeKey
 		) {
-			throw new Error('A streamed signal selection has the wrong authority.');
+			throw new Error(formatClientError(269));
 		}
 		const slot = JSON.stringify([candidate.instanceKey, candidate.nodeKey]);
 		const previous = selections.get(slot);
@@ -196,8 +197,7 @@ function bootstrapStreamedSignals<Receiver extends StreamedResultReceiver>(
 		});
 		if (options.initialSignals !== undefined) {
 			const manifest = parseNativeSignalManifest(JSON.stringify(options.initialSignals));
-			if (manifest.version !== 1)
-				throw new TypeError('Document initialization requires full initial signal scopes.');
+			if (manifest.version !== 1) throw new TypeError(formatClientError(270));
 			initializeDocumentSignalOwner(
 				signalOwner,
 				manifest.scopes.find((scope) => scope.scopeKey === signalOwner.scopeKey) ?? {

@@ -13,7 +13,7 @@ export let streamedSignalOwnerActivator: ((owner: SignalOwner) => void) | undefi
 export function documentSignalOwner(container: Node): SignalOwnerIdentity {
 	const ownerDocument =
 		container.nodeType === 9 ? (container as Document) : container.ownerDocument;
-	if (ownerDocument === null) throw new TypeError('A signal document owner requires a document.');
+	if (ownerDocument === null) throw new TypeError(formatClientError(123));
 	let owner = documentOwners.get(ownerDocument);
 	if (owner === undefined) {
 		owner = Object.freeze({ scopeKey: 'octane:document' });
@@ -39,7 +39,7 @@ export function installStreamedSignalOwnerActivator(
 	activate: (owner: SignalOwner) => void,
 ): () => void {
 	if (streamedSignalOwnerActivator !== undefined) {
-		throw new Error('A streamed signal hydration owner is already installed.');
+		throw new Error(formatClientError(124));
 	}
 	streamedSignalOwnerActivator = activate;
 	return () => {

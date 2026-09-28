@@ -1,3 +1,4 @@
+import { formatClientError } from './error-codes.client.generated.js';
 import { BINDING_HANDOFF } from './signals/control-handoff.js';
 
 export { BINDING_HANDOFF };
@@ -66,8 +67,7 @@ export function registerBindingEvent(node: Node, type: string): () => void {
 
 /** @internal Called only by a host explicitly acquiring bindingLeases. */
 export function claimBindingHandoff(lease: BindingHandoff, owner: object): void {
-	if (!lease.active() || lease.owner !== undefined)
-		throw new Error('A DOM binding hydration lease must be active and have only one root owner.');
+	if (!lease.active() || lease.owner !== undefined) throw new Error(formatClientError(277));
 	lease.owner = owner;
 }
 

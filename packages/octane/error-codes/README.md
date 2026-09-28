@@ -2,8 +2,10 @@
 
 `codes.json` is the canonical, Octane-owned catalog for framework-created errors
 in the core DOM client and server runtimes (`runtime.ts` and
-`runtime.server.ts`) that remain observable in production. The numbers are
-unrelated to React's error codes.
+`runtime.server.ts`), the signal engine (`signals/*.ts`), the hydration modules
+(`hydration/*.ts` and `independent-hydration-protocol.ts`), and the compiled DOM
+binding runtime (`dom-binding*.ts`, `dom-bindings.ts`) that remain observable in
+production. The numbers are unrelated to React's error codes.
 
 - Add new codes at `nextCode`, then increment `nextCode`.
 - Never reuse or renumber a published code.
@@ -20,14 +22,18 @@ and a link to `https://octanejs.dev/errors/<code>`. Error construction stays at
 the original call site so `Error` subclasses, `TypeError`, `AggregateError`
 contents, stacks, and other observable identity are preserved.
 
-The generator currently scans those two core DOM runtime files exhaustively. A
-future runtime surface must opt in deliberately, with its own bundle and behavior
-coverage, rather than relying on this catalog's guarantees implicitly.
+The generator scans those files exhaustively, including `Error` subclasses
+declared there. A future runtime surface must opt in deliberately, with its own
+bundle and behavior coverage, rather than relying on this catalog's guarantees
+implicitly.
 
-The renderer-free document signal capability reuses the client signal ABI code
-because it is also reachable through the core runtime. This shared diagnostic
-does not enroll other signal-engine errors in the catalog. Its formatter import
-must remain renderer-free and its production bundle cost is measured separately.
+Each covered module has a surface: `client` or `server` when only that runtime's
+entries reach it, and `shared` when it also loads in SSR bundles (everything
+behind `octane/signals` and `octane/hydration`). Shared modules call
+`formatClientError()` with codes registered for both runtimes; the formatter is
+renderer-free and safe in Node. `scripts/error-codes/generate.mjs` lists the
+client- and server-only modules and documents the few audited messages that stay
+uncoded because they carry data rather than framework text.
 
 The website imports this committed catalog directly and decodes the same revision
 at `/errors/<code>`; it must not fetch a mutable external error map. Consequently,

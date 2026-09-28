@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import { decodeSignalValue, encodeSignalValue } from './encoding.js';
 import { createResourceCellWith } from './engine.js';
 import { SignalStreamError } from './errors.js';
@@ -103,11 +104,10 @@ export function query<A, T>(
 	options?: { kind?: 'promise' | 'stream' },
 ): Query<A, T> {
 	if (typeof key !== 'string' || !key.trim() || typeof load !== 'function') {
-		throw new TypeError('query requires a nonempty key and a loader function.');
+		throw new TypeError(formatClientError(195));
 	}
 	const kind = options?.kind ?? 'promise';
-	if (kind !== 'promise' && kind !== 'stream')
-		throw new TypeError('Unsupported signal query kind.');
+	if (kind !== 'promise' && kind !== 'stream') throw new TypeError(formatClientError(196));
 	const definition: QueryDefinition = Object.freeze({ key, load, kind });
 	const describe = Object.assign((argument: A) => new Request<T>(definition, argument), {
 		queryKey: key,
@@ -326,7 +326,7 @@ export class RequestEntry {
 			}
 			if (!attempt.hasYielded || this.state.snapshot.status !== 'ready') {
 				this.state = errorState(
-					new Error('The streamed signal completed without yielding a value.'),
+					new Error(formatClientError(197)),
 					this.request.definition.kind === 'stream' ? 'closed' : 'none',
 					this.request.identity,
 				);
@@ -451,13 +451,13 @@ function observeStream(attempt: Attempt, result: unknown): void {
 					!iterable ||
 					typeof (iterable as AsyncIterable<unknown>)[Symbol.asyncIterator] !== 'function'
 				) {
-					throw new TypeError('A stream query must return an async iterable.');
+					throw new TypeError(formatClientError(198));
 				}
 				iterator = untrack(() =>
 					signalBatch(() => (iterable as AsyncIterable<unknown>)[Symbol.asyncIterator]()),
 				);
 				if (!iterator || typeof iterator.next !== 'function') {
-					throw new TypeError('A stream query returned an invalid iterator.');
+					throw new TypeError(formatClientError(199));
 				}
 			} catch (error) {
 				failAttempt(attempt, error);
@@ -495,7 +495,7 @@ function receiveStreamStep(attempt: Attempt, result: IteratorResult<unknown>): v
 	let entry = currentEntry(attempt);
 	if (!entry) return;
 	if (!result || (typeof result !== 'object' && typeof result !== 'function')) {
-		failAttempt(attempt, new TypeError('An async iterator must return an iteration result.'));
+		failAttempt(attempt, new TypeError(formatClientError(114)));
 		return;
 	}
 	let done = false;
@@ -518,7 +518,7 @@ function receiveStreamStep(attempt: Attempt, result: IteratorResult<unknown>): v
 	const accepted = entry;
 	if (done) {
 		if (!attempt.hasYielded || entry.state.snapshot.status !== 'ready') {
-			failAttempt(attempt, new Error('The stream completed without yielding a value.'));
+			failAttempt(attempt, new Error(formatClientError(115)));
 			return;
 		}
 		signalBatch(() => {
@@ -592,16 +592,13 @@ export class ResourceBinding<T = any> {
 	private request(): Request<T> | typeof skip {
 		const request = pure(() => this.describe!());
 		if (request === skip) return request;
-		if (!(request instanceof Request))
-			throw new TypeError('A resource must describe a query request.');
+		if (!(request instanceof Request)) throw new TypeError(formatClientError(200));
 		return request;
 	}
 
 	forkCandidate(target: ScopedNode<T>): CandidateProducer {
 		if (this.streamedSelection || this.owner.streams?.selections.has(this.node.key)) {
-			throw new CandidateUnsupportedError(
-				'Streamed candidates are not supported by this prototype.',
-			);
+			throw new CandidateUnsupportedError(formatClientError(201));
 		}
 		const fork = new ResourceBinding(this.owner, target, this.describe);
 		fork.candidate = true;
@@ -702,9 +699,7 @@ export class ResourceBinding<T = any> {
 				(previousDefinition.load !== request.definition.load ||
 					previousDefinition.kind !== request.definition.kind)
 			) {
-				throw new TypeError(
-					`Incompatible query definitions use the same key "${request.queryKey}".`,
-				);
+				throw new TypeError(formatClientError(202, request.queryKey));
 			}
 			(this.owner.queryDefinitions ??= new Map()).set(request.queryKey, request.definition);
 		} catch (error) {
@@ -720,7 +715,7 @@ export class ResourceBinding<T = any> {
 			// Cancellation can synchronously retire the candidate without retiring
 			// its shared data scope. A dead fork must not acquire another request.
 			if (this.candidate && this.describe === undefined) {
-				throw new TypeError('The signal candidate has retired.');
+				throw new TypeError(formatClientError(203));
 			}
 			this.selectedIdentity = {
 				queryKey: request.queryKey,
@@ -908,7 +903,7 @@ export class ResourceBinding<T = any> {
 				// they do not fabricate a request identity or mutate another resource.
 				throw this.node.state?.snapshot.status === 'error'
 					? this.node.state.snapshot.error
-					: new Error('The request description is still pending.');
+					: new Error(formatClientError(204));
 			}
 			this.owner.trace('retry', this.node);
 			// Recovery or a changed selection has already acquired its attempt in

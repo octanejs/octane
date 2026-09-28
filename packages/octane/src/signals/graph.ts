@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	activeCandidate,
 	candidateWriteCount,
@@ -464,7 +465,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	nativeSnapshotSource: NativeReadSource | undefined;
 	retry(_options?: { pending?: boolean }): void {
 		assertAlive(this.owner);
-		throw new TypeError('Only an async signal can be retried.');
+		throw new TypeError(formatClientError(163));
 	}
 
 	constructor(
@@ -509,7 +510,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	set(value: T | ((previous: T) => T)): void {
 		assertAlive(this.owner);
 		assertWritable();
-		if (this.kind !== 'signal') throw new TypeError('Only a writable signal accepts set().');
+		if (this.kind !== 'signal') throw new TypeError(formatClientError(164));
 		const candidate = activeCandidate ?? getNativeCandidate();
 		if (candidate) {
 			candidate.run(() => candidate.write(this, value));
@@ -560,8 +561,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	subscribe(notify: () => void): () => void {
 		assertAlive(this.owner);
 		assertWritable();
-		if (typeof notify !== 'function')
-			throw new TypeError('A signal subscriber must be a function.');
+		if (typeof notify !== 'function') throw new TypeError(formatClientError(165));
 		const state = untrack(() => refreshNode(this));
 		return attachObserver(this, notify, false, state);
 	}
@@ -823,7 +823,7 @@ export function invalidateNode(node: ScopedNode): void {
 
 export function derivedState<T>(node: ScopedNode<T>, read: () => T): NodeState<T> {
 	const value = pure(read);
-	if (isThenable(value)) throw new TypeError('derived$ requires a synchronous computation.');
+	if (isThenable(value)) throw new TypeError(formatClientError(166));
 	return derivedValueState(node, value);
 }
 

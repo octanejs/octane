@@ -1,3 +1,4 @@
+import { formatClientError } from './error-codes.client.generated.js';
 import { decodeSignalValue, encodeSignalValue } from './data-encoding.js';
 import type { EncodedSignalValue } from './signals/types.js';
 
@@ -127,14 +128,14 @@ export function createIndependentHydrateManifest(
 		styles: build.styles,
 	};
 	if (!isIndependentHydrateManifest(manifest)) {
-		throw new TypeError('Invalid independent Hydrate manifest inputs.');
+		throw new TypeError(formatClientError(331));
 	}
 	return Object.freeze(manifest);
 }
 
 export function serializeIndependentHydrateManifest(manifest: IndependentHydrateManifest): string {
 	if (!isIndependentHydrateManifest(manifest)) {
-		throw new TypeError('Invalid independent Hydrate manifest.');
+		throw new TypeError(formatClientError(215));
 	}
 	return JSON.stringify(manifest)
 		.replace(/&/g, '\\u0026')

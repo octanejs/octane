@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import { createDerivedCellWith } from './engine.js';
 import {
 	ScopedNode,
@@ -105,7 +106,7 @@ function resolveHandle<T>(handle$: SignalHandle<T>, owner: Scope): ScopedNode<T>
 			? (handle$ as OwnerBoundSignal<T>)[SIGNAL_OWNER_RESOLVE](owner)
 			: handle$;
 	if (!(resolved instanceof ScopedNode)) {
-		throw new TypeError('Attempt reads require an Octane signal handle.');
+		throw new TypeError(formatClientError(109));
 	}
 	return resolved;
 }
@@ -128,7 +129,7 @@ export class DerivedBinding<T> {
 
 	forkCandidate(target: ScopedNode<T>, frame: SignalCandidateFrame): CandidateProducer {
 		if (this.frozen || this.owner.readBarrier || !this.compute) {
-			throw new CandidateUnsupportedError('Frozen derived candidates are not supported.');
+			throw new CandidateUnsupportedError(formatClientError(110));
 		}
 		const fork = new DerivedBinding(this.owner, target, this.compute, this.options);
 		fork.candidate = frame;
@@ -204,7 +205,7 @@ export class DerivedBinding<T> {
 			read<V>(handle$: SignalHandle<V>): Promise<V> {
 				return current.binding
 					? current.binding.read(current, handle$)
-					: Promise.reject(new Error('The derived attempt is no longer active.'));
+					: Promise.reject(new Error(formatClientError(111)));
 			},
 		};
 	}
@@ -218,8 +219,7 @@ export class DerivedBinding<T> {
 	}
 
 	private read<V>(current: DerivedAttempt<T>, handle$: SignalHandle<V>): Promise<V> {
-		if (!current.active)
-			return Promise.reject(new Error('The derived attempt is no longer active.'));
+		if (!current.active) return Promise.reject(new Error(formatClientError(111)));
 		try {
 			return DerivedBinding.readValue<T, V>(current, this.readDependency(current, handle$));
 		} catch (error) {
@@ -235,7 +235,7 @@ export class DerivedBinding<T> {
 			? this.candidate.run(() => this.candidate!.resolve(resolveHandle(handle$, this.owner)))
 			: resolveHandle(handle$, this.owner);
 		if ((dependency as ScopedNode) === this.node) {
-			throw new TypeError('A derived signal cannot read itself.');
+			throw new TypeError(formatClientError(112));
 		}
 		assertAlive(dependency.owner);
 		let lease = current.dependencies.get(dependency);
@@ -272,7 +272,7 @@ export class DerivedBinding<T> {
 			}
 			if (state.snapshot.status === 'error') throw state.snapshot.error;
 			if (state.snapshot.status === 'idle') {
-				throw new Error(`Signal "${dependency.node.key}" has no selected value.`);
+				throw new Error(formatClientError(113, dependency.node.key));
 			}
 			// The foreign producer need not settle when this owner retires. Wake
 			// only this read so its suspended stack releases the binding/dependency.
@@ -281,7 +281,7 @@ export class DerivedBinding<T> {
 			});
 			await Promise.race([state.waiting, current.cancelWaiting]);
 		}
-		throw new Error('The derived attempt is no longer active.');
+		throw new Error(formatClientError(111));
 	}
 
 	private valid(current: DerivedAttempt<T>): boolean {
@@ -433,15 +433,12 @@ export class DerivedBinding<T> {
 				const binding = current.binding;
 				if (!binding?.valid(current)) return;
 				if (!result || (typeof result !== 'object' && typeof result !== 'function')) {
-					binding.fail(
-						current,
-						new TypeError('An async iterator must return an iteration result.'),
-					);
+					binding.fail(current, new TypeError(formatClientError(114)));
 					return;
 				}
 				if (result.done) {
 					if (!current.hasYielded) {
-						binding.fail(current, new Error('The stream completed without yielding a value.'));
+						binding.fail(current, new Error(formatClientError(115)));
 						return;
 					}
 					const snapshot = binding.node.state?.snapshot;

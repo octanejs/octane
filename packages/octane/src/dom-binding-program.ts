@@ -1,3 +1,4 @@
+import { formatClientError } from './error-codes.client.generated.js';
 import {
 	type __adoptBindings,
 	type __adoptScalarBindings,
@@ -174,7 +175,7 @@ export function __activateBindingAdapters(
 			ownRef(() => {
 				if (ref.current === node) ref.current = null;
 			});
-		} else throw new TypeError('A DOM presentation ref must be a callback, object, or ref array.');
+		} else throw new TypeError(formatClientError(278));
 	};
 	const replaceRef = (ref: (typeof refs)[number], value: unknown): void => {
 		const cleanup = ref.cleanup;
@@ -219,8 +220,7 @@ export function __activateBindingAdapters(
 					if (disposed) return;
 					const handler = definition.read(context.getEnvironment());
 					if (handler == null || handler === false) return;
-					if (typeof handler !== 'function')
-						throw new TypeError('A native event binding must resolve to a function.');
+					if (typeof handler !== 'function') throw new TypeError(formatClientError(279));
 					markBindingEvent(event, node, !!definition.capture);
 					handler.call(node, event);
 				};
@@ -491,8 +491,7 @@ export function __createStructuralBindingHandoff(
 		let nextRest: Map<Element, Map<number, BindingHandoffRest>> | undefined;
 		const collect = (current: FragmentInstance, closed = false): void => {
 			if (current.definition.conditionalRest === true) {
-				if (current.definition.closedProps === undefined)
-					throw new Error('Conditional hydration requires a compiler-proven caller shape.');
+				if (current.definition.closedProps === undefined) throw new Error(formatClientError(280));
 				(nextViews ??= new Map()).set(current.range.start, {
 					id: current.id,
 					closedProps: current.definition.closedProps,
@@ -504,11 +503,10 @@ export function __createStructuralBindingHandoff(
 				current.definition.bindings.some((binding) => binding[1] === 'control') ||
 				current.definition.nodes.some((node) => node[1] === 'element' && node[4] === null)
 			)
-				throw new Error('Structural hydration leases require compiler-owned native nodes.');
+				throw new Error(formatClientError(281));
 			for (const site of current.definition.restSites ?? []) {
 				const element = current.nodes[site.node];
-				if (!closed || element?.nodeType !== 1)
-					throw new Error('Native rest hydration requires an eligible closed child view.');
+				if (!closed || element?.nodeType !== 1) throw new Error(formatClientError(282));
 				const sites = (nextRest ??= new Map()).get(element as Element) ?? new Map();
 				sites.set(site.site, {
 					id: current.id,
@@ -521,16 +519,16 @@ export function __createStructuralBindingHandoff(
 			for (const region of current.regions) {
 				const definition = region.definition;
 				if (definition.kind === 'for' || definition.kind === 'opaque')
-					throw new Error('Structural hydration leases do not support lists or opaque regions.');
+					throw new Error(formatClientError(283));
 				if (definition.kind === 'text' && definition.generic)
-					throw new Error('Structural hydration leases require primitive text.');
+					throw new Error(formatClientError(284));
 				if (
 					definition.kind === 'view' &&
 					definition.view.root.handoff !== true &&
 					definition.view.root.handoff !== 'structural' &&
 					definition.view.root.conditionalRest !== true
 				)
-					throw new Error('Structural hydration leases require a supported child view.');
+					throw new Error(formatClientError(285));
 				next.set(region.range.start, {
 					kind: definition.kind,
 					end: region.range.end,
@@ -647,7 +645,7 @@ function requireActive(transaction: Transaction): void {
 }
 
 function mismatch(): never {
-	throw new Error('DOM presentation cannot adopt mismatched compiler-owned ranges or nodes.');
+	throw new Error(formatClientError(286));
 }
 
 function rangeAt(node: Node | null, end: Node | null): BindingRange {
@@ -901,10 +899,7 @@ function createFragment(
 ): FragmentInstance {
 	requireActive(transaction);
 	if (definition.constructible === false)
-		throw new Error(
-			definition.constructionError ??
-				'This opaque view cannot be constructed without its external owner.',
-		);
+		throw new Error(definition.constructionError ?? formatClientError(287));
 	const template = document.createElement('template');
 	template.innerHTML = definition.ns === 1 ? `<svg>${definition.html}</svg>` : definition.html;
 	const content = document.createDocumentFragment();
@@ -927,7 +922,7 @@ function projectValues(
 ): BindingValue[] {
 	const operations = instance.definition.bindings;
 	if (!Array.isArray(values) || values.length !== operations.length)
-		throw new TypeError('A DOM presentation projection must return its synchronous scalar values.');
+		throw new TypeError(formatClientError(288));
 	values = transaction.hostOperations?.project(values, instance, transaction) ?? values;
 	if (transaction.signals || transaction.styles) {
 		let copied = false;
@@ -1003,7 +998,7 @@ function textValue(value: unknown, generic?: boolean): string {
 	if (generic) {
 		if (value == null || typeof value === 'boolean') return '';
 		if (!['string', 'number', 'bigint'].includes(typeof value))
-			throw new TypeError('A DOM presentation signal text requires a primitive value.');
+			throw new TypeError(formatClientError(289));
 	}
 	return value == null || value === false ? '' : String(value);
 }
@@ -1016,9 +1011,7 @@ function initialValues(
 	if (!instance.fresh || !definition.initializers?.length) return null;
 	const values = definition.initialize?.(environment);
 	if (!Array.isArray(values) || values.length !== definition.initializers.length)
-		throw new TypeError(
-			'A DOM presentation initializer must return its synchronous scalar values.',
-		);
+		throw new TypeError(formatClientError(290));
 	return definition.initializers.map((operation, index) => {
 		if (instance.nodes[operation[0]]?.nodeType !== 1) mismatch();
 		const value = values[index];
@@ -1136,7 +1129,7 @@ function prepareFragment(
 		} else if (descriptor.kind === 'if') {
 			const arm = descriptor.select(environment);
 			if (!Number.isSafeInteger(arm) || arm < -1 || arm >= descriptor.arms.length)
-				throw new TypeError('A DOM presentation branch projection returned an unknown arm.');
+				throw new TypeError(formatClientError(291));
 			candidate.arm = arm;
 			if (arm !== -1)
 				candidate.child = prepareFragment(
@@ -1163,7 +1156,7 @@ function prepareFragment(
 				value != null &&
 				(typeof value !== 'object' || (value as BindingSlot)[bindingSlot] !== true)
 			)
-				throw new TypeError('A DOM presentation child slot requires a compiler-owned fragment.');
+				throw new TypeError(formatClientError(292));
 			const slot = value as BindingSlot | null | undefined;
 			if (slot?.site !== undefined) candidate.slot = slot.id + ';' + slot.site;
 			if (region.unresolvedSlot) {
@@ -1410,7 +1403,7 @@ function activateInstance(instance: FragmentInstance, transaction: Transaction):
 				getEnvironment: () => instance.environment,
 			});
 			if (cleanup !== undefined && typeof cleanup !== 'function')
-				throw new TypeError('A DOM presentation activation must return cleanup or undefined.');
+				throw new TypeError(formatClientError(293));
 			if (instance.disposed) cleanup?.();
 			else if (cleanup) instance.cleanup = cleanup;
 		}
@@ -1436,17 +1429,13 @@ function bindProgram<Props>(
 	hostOperations: BindingProgramHostOperations | undefined = descriptor.hostOperations,
 ): BindingHandle {
 	if (!source || typeof source.getSnapshot !== 'function' || typeof source.subscribe !== 'function')
-		throw new TypeError(
-			'DOM presentation requires synchronous getSnapshot() and subscribe() methods.',
-		);
+		throw new TypeError(formatClientError(294));
 	const target = mount ? (root as BindingMountTarget) : null;
 	if (
 		target &&
 		(!target.parent || (target.before != null && target.before.parentNode !== target.parent))
 	)
-		throw new TypeError(
-			'A DOM presentation mount requires a parent and its optional insertion anchor.',
-		);
+		throw new TypeError(formatClientError(295));
 	const transaction: Transaction = {
 		disposed: false,
 		all: new Set(),
@@ -1571,7 +1560,7 @@ function bindProgram<Props>(
 					(typeof snapshot === 'object' || typeof snapshot === 'function') &&
 					typeof (snapshot as { then?: unknown }).then === 'function'
 				)
-					throw new TypeError('DOM presentation requires a synchronous snapshot, not a thenable.');
+					throw new TypeError(formatClientError(296));
 				transaction.preparing = true;
 				transaction.frame++;
 				const plan = prepareFragment(
@@ -1677,9 +1666,7 @@ function bindProgram<Props>(
 				try {
 					const snapshot = source.getSnapshot();
 					if (snapshot != null && typeof (snapshot as { then?: unknown }).then === 'function')
-						throw new TypeError(
-							'DOM presentation requires a synchronous snapshot, not a thenable.',
-						);
+						throw new TypeError(formatClientError(296));
 					plan = prepareFragment(
 						instance!,
 						descriptor.prepareProps ? descriptor.prepareProps(snapshot) : [snapshot],
@@ -1765,9 +1752,7 @@ function bindProgram<Props>(
 						),
 				)
 			)
-				throw new Error(
-					'Hydration binding leases require an adopted fixed native view without structural regions or controls.',
-				);
+				throw new Error(formatClientError(297));
 			const topology =
 				handoff === undefined &&
 				descriptor.root.nodes.some((node) => node[1] === 'element' && node[5] === 'value')
@@ -1824,10 +1809,7 @@ function bindProgram<Props>(
 			programRoots.add(ownedRoot);
 		} else {
 			const range = rootRange(root as Element | BindingRange, descriptor.id);
-			if (programRoots.has(range.start))
-				throw new Error(
-					'This DOM presentation range already has a binding. Dispose it before rebinding.',
-				);
+			if (programRoots.has(range.start)) throw new Error(formatClientError(298));
 			ownedRoot = range.start;
 			programRoots.add(ownedRoot);
 			instance = resolveFragment(descriptor.root, descriptor.id, range, false, transaction);
@@ -1838,8 +1820,7 @@ function bindProgram<Props>(
 		}
 		signal?.addEventListener('abort', abort, { once: true });
 		const stop = source.subscribe(refresh);
-		if (typeof stop !== 'function')
-			throw new TypeError('A DOM presentation subscription must return cleanup.');
+		if (typeof stop !== 'function') throw new TypeError(formatClientError(299));
 		if (transaction.disposed) stop();
 		else unsubscribe = stop;
 		busy = false;
@@ -2005,13 +1986,12 @@ function prepareList(
 	const descriptor = region.definition as Extract<BindingRegion, { kind: 'for' }>;
 	const input = descriptor.items(environment);
 	if (input == null || typeof input[Symbol.iterator] !== 'function')
-		throw new TypeError('A DOM presentation list requires a synchronous iterable.');
+		throw new TypeError(formatClientError(300));
 	const items = Array.from(input);
 	const keys = items.map((item, index) =>
 		encodeBindingKey(descriptor.key(item, index, environment)),
 	);
-	if (new Set(keys).size !== keys.length)
-		throw new Error('A DOM presentation list cannot contain duplicate keys.');
+	if (new Set(keys).size !== keys.length) throw new Error(formatClientError(301));
 	candidate.arm = items.length === 0 ? 0 : 1;
 	if (items.length === 0) {
 		if (descriptor.empty)
@@ -2087,8 +2067,7 @@ function claimProgramControl(
 	node: Element,
 	transaction: Transaction,
 ): void {
-	if (!transaction.controls)
-		throw new TypeError('A DOM control binding requires its compiler-selected adapter.');
+	if (!transaction.controls) throw new TypeError(formatClientError(302));
 	const prepare = (): (() => void) => {
 		if (instance.disposed || (transaction.preparing && instance.signalFrame !== transaction.frame))
 			return () => {};
@@ -2203,7 +2182,7 @@ function prepareHostGroups(plan: FragmentPlan): void {
 					initializer[2] === operation[2],
 			);
 			if (receipt === undefined || receipt < 0 || typeof plan.initial?.[receipt] !== 'string')
-				throw new Error('A constructible class group requires its compiler baseline initializer.');
+				throw new Error(formatClientError(303));
 			group = definition.createClassGroup!(
 				instance.nodes[operation[0]] as Element,
 				operation[2],

@@ -111,6 +111,28 @@ phase, with Event, DOM, and function references cleared after each phase. This
 moves a bounded amount of work/storage to registration and first use of a nested
 dispatch depth; it does not allocate a record per ordinary event.
 
+### Clicks with no handler on their path
+
+The same root also renders an idle `<span>` beside the handler chain. Once any
+component registers a type, every native event of that type under the root
+reaches the delegated listeners, including events no Octane handler can see:
+high-frequency pointer, touch, and input traffic on real pages. For 128 idle
+clicks the gate requires zero framework callbacks, 128 later native listeners
+with their own `currentTarget` and the original stop method, and zero
+`Object.defineProperty`/`Object.getOwnPropertyDescriptor` calls on the Event.
+The ratio guard `idleEventDefinitions` holds that count at zero.
+
+| Idle clicks (Chromium, 3 × 15 rounds × 4,000) | Baseline `5ef1af04a` | Candidate |
+| --- | ---: | ---: |
+| Event descriptor reads/definitions per 128 clicks | 512 | 0 |
+| Median µs per idle click | 2.70 | 2.43 |
+| Median µs per handled click (10 callbacks) | 4.85 | 4.85 |
+
+Both the capture queue and the bubble queue now return before installing their
+propagation frame when the phase has no handler on the path (and, for bubbling,
+no form action to drive). The capture queue still reports "not stopped" in that
+case, so non-bubbling families such as `play` continue into their bubble queue.
+
 Portal-free paths skip portal metadata reads. Applications with active portals
 retain the existing ownership walk. Portal target creation/removal advances the
 existing event-route epoch, so removing the last portal after native capture

@@ -1,3 +1,4 @@
+import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	adoptResourceValue,
 	createDeclaredSignalCell,
@@ -58,7 +59,7 @@ class OptimisticManager<T> {
 
 	constructor(readonly source: ScopedNode<T>) {
 		const owner = getSignalScope(source);
-		if (!owner) throw new TypeError('An optimistic source needs a live Octane scope.');
+		if (!owner) throw new TypeError(formatClientError(81));
 		this.owner = owner;
 		this.version$ = createDeclaredSignalCell(
 			this.owner,
@@ -129,12 +130,12 @@ class OptimisticManager<T> {
 	apply(operation: Operation, value: T | ((previous: T) => T)): Overlay<T> {
 		assertWritable();
 		if (operation.status !== 'pending') {
-			throw new Error(`Action operation "${operation.id}" is no longer writable.`);
+			throw new Error(formatClientError(82, operation.id));
 		}
 		let overlay = operation.targets.get(this) as Overlay<T> | undefined;
 		const snapshot = this.source.snapshot();
 		if (!overlay && snapshot.status !== 'ready') {
-			throw new Error('An optimistic write requires ready source authority.');
+			throw new Error(formatClientError(83));
 		}
 		const previous = this.read();
 		const next =
@@ -171,21 +172,21 @@ class OptimisticManager<T> {
 			snapshot.requestKey !== overlay.requestKey ||
 			getResourceSelectionAuthority(this.source) !== overlay.selectionAuthority
 		) {
-			throw new Error('An action cannot adopt authority for a different query selection.');
+			throw new Error(formatClientError(84));
 		}
 		if (this.source.kind !== 'async' && this.source.kind !== 'signal') {
-			throw new TypeError('Only a writable or query source can adopt an authoritative value.');
+			throw new TypeError(formatClientError(85));
 		}
 		if (this.compareAuthority) {
 			// Read accepted authority, including an initial seed or a newer watch value.
 			// Tentative overlays and client dispatch order cannot establish server freshness.
 			const current = this.source.latest(noAuthority);
 			if (current === noAuthority) {
-				throw new Error('An action needs current authority to compare receipt revisions.');
+				throw new Error(formatClientError(86));
 			}
 			const order = untrack(() => pure(() => this.compareAuthority!(value, current)));
 			if (!Number.isFinite(order)) {
-				throw new TypeError('An authority revision comparator must return a finite number.');
+				throw new TypeError(formatClientError(87));
 			}
 			if (order <= 0) {
 				this.remove(overlay.operation);
@@ -194,7 +195,7 @@ class OptimisticManager<T> {
 		}
 		if (this.source.kind === 'async') {
 			if (!adoptResourceValue(this.source, overlay.requestKey, value)) {
-				throw new Error('The pinned query selection is no longer current.');
+				throw new Error(formatClientError(88));
 			}
 		} else {
 			this.source.set(value);
@@ -216,7 +217,7 @@ function managerFor<T>(
 		? resolveSignalHandleForOwner(source$, owner)
 		: resolveCurrentSignalHandle(source$);
 	if (!(resolved instanceof ScopedNode)) {
-		throw new TypeError('optimistic$ requires an Octane signal source.');
+		throw new TypeError(formatClientError(89));
 	}
 	let manager = managers.get(resolved) as OptimisticManager<T> | undefined;
 	if (!manager) {
@@ -225,7 +226,7 @@ function managerFor<T>(
 	}
 	if (compareAuthority && manager.compareAuthority !== compareAuthority) {
 		if (manager.compareAuthority) {
-			throw new Error('An optimistic source cannot use conflicting authority revision policies.');
+			throw new Error(formatClientError(90));
 		}
 		manager.compareAuthority = compareAuthority;
 	}
@@ -263,7 +264,7 @@ class OptimisticDescriptor<T> implements OptimisticSignal<T>, OwnerBoundSignal<T
 
 	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
 		const owner = currentSignalOwner();
-		if (!owner) throw new Error('An optimistic subscription needs an active signal owner.');
+		if (!owner) throw new Error(formatClientError(91));
 		const run = captureSignalOwner(owner);
 		return this.manager().view$[SIGNAL_BINDING_SUBSCRIBE](
 			forwardNativeTransitionConsumer(notify, () => run(notify)),
@@ -288,7 +289,7 @@ class OptimisticDescriptor<T> implements OptimisticSignal<T>, OwnerBoundSignal<T
 
 	subscribe(notify: () => void): () => void {
 		const owner = currentSignalOwner();
-		if (!owner) throw new Error('An optimistic subscription needs an active signal owner.');
+		if (!owner) throw new Error(formatClientError(91));
 		const run = captureSignalOwner(owner);
 		return this.manager().view$.subscribe(
 			forwardNativeTransitionConsumer(notify, () => run(notify)),
@@ -297,7 +298,7 @@ class OptimisticDescriptor<T> implements OptimisticSignal<T>, OwnerBoundSignal<T
 
 	set(value: T | ((previous: T) => T)): void {
 		if (!activeOperation) {
-			throw new Error('An optimistic write must belong to action$ or use operation.set().');
+			throw new Error(formatClientError(92));
 		}
 		this.apply(activeOperation, value);
 	}
@@ -316,7 +317,7 @@ export class ActionUncertainError extends Error {
 		readonly operationId: string,
 		options: { cause: unknown },
 	) {
-		super(`Action operation "${operationId}" may have been accepted.`, options);
+		super(formatClientError(93, operationId), options);
 		this.name = 'ActionUncertainError';
 	}
 }
@@ -324,7 +325,7 @@ export class ActionUncertainError extends Error {
 function operationId(key: string): string {
 	const randomUUID = globalThis.crypto?.randomUUID;
 	if (typeof randomUUID !== 'function') {
-		throw new Error('action$ requires crypto.randomUUID() for operation identity.');
+		throw new Error(formatClientError(94));
 	}
 	return `${key}:${randomUUID.call(globalThis.crypto)}`;
 }
@@ -354,7 +355,7 @@ class Operation implements ActionOperation {
 
 	set<T>(signal$: OptimisticSignal<T>, value: T | ((previous: T) => T)): void {
 		if (!(signal$ instanceof OptimisticDescriptor)) {
-			throw new TypeError('operation.set() requires a signal from optimistic$().');
+			throw new TypeError(formatClientError(95));
 		}
 		const manager = this.descriptors.get(signal$ as OptimisticDescriptor<unknown>);
 		if (manager) {
@@ -373,9 +374,9 @@ class Operation implements ActionOperation {
 
 	adopt<T>(value: T): void {
 		if (this.status !== 'pending' && this.status !== 'uncertain')
-			throw new Error(`Action operation "${this.id}" is settled.`);
+			throw new Error(formatClientError(96, this.id));
 		if (this.targets.size !== 1) {
-			throw new Error('operation.adopt() requires exactly one optimistic source.');
+			throw new Error(formatClientError(97));
 		}
 		const [manager, overlay] = this.targets.entries().next().value!;
 		(manager as OptimisticManager<T>).adopt(overlay as Overlay<T>, value);
@@ -386,7 +387,7 @@ class Operation implements ActionOperation {
 	}
 
 	uncertain(): ActionUncertain {
-		if (this.status !== 'pending') throw new Error(`Action operation "${this.id}" is settled.`);
+		if (this.status !== 'pending') throw new Error(formatClientError(96, this.id));
 		this.status = 'uncertain';
 		this.notifyWaits();
 		const receipt = Object.freeze({ status: 'uncertain' as const, operationId: this.id });
@@ -395,16 +396,15 @@ class Operation implements ActionOperation {
 	}
 
 	until(read: () => unknown, options?: { timeout?: number }): Promise<void> {
-		if (this.status !== 'pending') return Promise.reject(new Error('The action is settled.'));
-		if (typeof read !== 'function')
-			return Promise.reject(new TypeError('until() requires a read.'));
+		if (this.status !== 'pending') return Promise.reject(new Error(formatClientError(98)));
+		if (typeof read !== 'function') return Promise.reject(new TypeError(formatClientError(99)));
 		const timeout = options?.timeout;
 		if (timeout !== undefined && (!Number.isFinite(timeout) || timeout < 0)) {
-			return Promise.reject(new RangeError('until() timeout must be a nonnegative number.'));
+			return Promise.reject(new RangeError(formatClientError(100)));
 		}
 		const managers = [...this.targets.keys()];
 		if (!managers.length) {
-			return Promise.reject(new Error('until() requires a pinned optimistic source.'));
+			return Promise.reject(new Error(formatClientError(101)));
 		}
 		return new Promise<void>((resolve, reject) => {
 			let ended = false;
@@ -423,12 +423,14 @@ class Operation implements ActionOperation {
 				if (ended) return;
 				if (this.status !== 'pending') {
 					finish(
-						this.status === 'confirmed' ? undefined : new Error(`The action is ${this.status}.`),
+						this.status === 'confirmed'
+							? undefined
+							: new Error(formatClientError(102, this.status)),
 					);
 					return;
 				}
 				if (managers.some((manager) => manager.owner.retired)) {
-					finish(new Error('The optimistic owner was retired.'));
+					finish(new Error(formatClientError(103)));
 					return;
 				}
 				const previous = excludedOperation;
@@ -439,7 +441,7 @@ class Operation implements ActionOperation {
 							manager.source.snapshot().requestKey !== overlay.requestKey ||
 							getResourceSelectionAuthority(manager.source) !== overlay.selectionAuthority
 						) {
-							finish(new Error('The pinned optimistic selection is no longer current.'));
+							finish(new Error(formatClientError(104)));
 							return;
 						}
 					}
@@ -453,10 +455,7 @@ class Operation implements ActionOperation {
 			(this.waits ??= new Set()).add(check);
 			for (const manager of managers) stops.push(subscribeNode(manager.source, check));
 			if (timeout !== undefined) {
-				timer = setTimeout(
-					() => finish(new Error('The optimistic confirmation timed out.')),
-					timeout,
-				);
+				timer = setTimeout(() => finish(new Error(formatClientError(105))), timeout);
 			}
 			check();
 		});
@@ -493,10 +492,10 @@ export function optimistic$<T>(
 	options?: OptimisticOptions<T>,
 ): OptimisticSignal<T> {
 	if (!source$ || typeof source$.get !== 'function') {
-		throw new TypeError('optimistic$ requires a signal source.');
+		throw new TypeError(formatClientError(106));
 	}
 	if (options?.compareAuthority !== undefined && typeof options.compareAuthority !== 'function') {
-		throw new TypeError('An authority revision policy must be a comparator function.');
+		throw new TypeError(formatClientError(107));
 	}
 	return new OptimisticDescriptor(source$, options?.compareAuthority);
 }
@@ -515,7 +514,7 @@ export function action$<F extends (operation: ActionOperation, ...args: any[]) =
 	const key = typeof keyOrHandler === 'string' ? keyOrHandler : 'action';
 	const execute = (typeof keyOrHandler === 'function' ? keyOrHandler : handler) as F;
 	if (!key.trim() || typeof execute !== 'function') {
-		throw new TypeError('action$ requires a handler and an optional nonempty key.');
+		throw new TypeError(formatClientError(108));
 	}
 	return function (this: unknown, ...args: unknown[]) {
 		const operation = new Operation(key);
