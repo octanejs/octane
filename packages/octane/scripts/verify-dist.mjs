@@ -9,8 +9,9 @@
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { DEVELOPMENT_FLAG } from './compile-node-env.mjs';
 
 // Required-subset contract for the package's public JavaScript namespaces.
 // Additive exports are intentionally harmless; removing one of these names is
@@ -666,6 +667,51 @@ export function missingPublishedPublicSubpaths(advertisedExports, publishedExpor
 	return Object.keys(advertisedExports).filter((subpath) => !publishedSubpaths.has(subpath));
 }
 
+// build-runtime.mjs keeps literal NODE_ENV guards in the bundler tree, for
+// consumers to substitute, and reads the environment once per module in the
+// trees Node evaluates. The compiler (build-time tooling, including the bundled
+// Volar graph) is copied rather than compiled, so it is held to neither.
+export function environmentReadViolations(dist) {
+	const declaration = new RegExp(
+		`^const ${DEVELOPMENT_FLAG} = process\\.env\\.NODE_ENV !== "production";$`,
+		'm',
+	);
+	const violations = [];
+	for (const file of readdirSync(dist, { recursive: true })) {
+		if (!/\.c?js$/.test(file) || file.startsWith(`compiler${sep}`)) continue;
+		const code = readFileSync(join(dist, file), 'utf8');
+		if (file.startsWith(`node${sep}`) || file.startsWith(`cjs${sep}`)) {
+			const reads = code.split('process.env.NODE_ENV').length - 1;
+			if (reads > 1 || (reads === 1 && !declaration.test(code))) {
+				violations.push(`${file}: reads process.env.NODE_ENV outside the module flag`);
+			}
+		} else if (code.includes(DEVELOPMENT_FLAG)) {
+			violations.push(`${file}: bundler module hoists the environment flag`);
+		}
+	}
+	return violations;
+}
+
+// Every runtime export resolves Node to the tree that reads the environment once.
+export function missingNodeConditions(publishedExports) {
+	return Object.entries(publishedExports).flatMap(([subpath, value]) => {
+		if (!value || typeof value !== 'object') return [];
+		const target = value.import ?? value.default;
+		if (typeof target !== 'string' || !/^\.\/dist\/(?!compiler\/).*\.js$/.test(target)) {
+			return [];
+		}
+		const node = `./dist/node/${target.slice('./dist/'.length)}`;
+		const condition = value.node;
+		const matches =
+			typeof condition === 'string'
+				? condition === node && value.require === undefined
+				: condition?.import === node &&
+					condition.default === node &&
+					condition.require === value.require;
+		return matches ? [] : [subpath];
+	});
+}
+
 export async function verifyDist(pkgDir) {
 	const pkg = readPackage(pkgDir);
 	const dist = join(pkgDir, 'dist');
@@ -689,6 +735,21 @@ export async function verifyDist(pkgDir) {
 		throw new Error(
 			`octane dist verify: publishConfig.exports targets missing from the build:\n` +
 				missing.map((p) => `  ${p}`).join('\n'),
+		);
+	}
+
+	const missingNode = missingNodeConditions(pkg.publishConfig.exports);
+	if (missingNode.length > 0) {
+		throw new Error(
+			`octane dist verify: runtime exports without a matching dist/node condition:\n` +
+				missingNode.map((subpath) => `  ${subpath}`).join('\n'),
+		);
+	}
+	const environmentReads = environmentReadViolations(dist);
+	if (environmentReads.length > 0) {
+		throw new Error(
+			`octane dist verify: environment reads in the wrong form:\n` +
+				environmentReads.map((violation) => `  ${violation}`).join('\n'),
 		);
 	}
 

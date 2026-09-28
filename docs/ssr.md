@@ -215,6 +215,24 @@ hook slots and otherwise pass through unchanged.
 Do not use this preload for a browser entry: Vite, Rsbuild, or another Octane
 build integration must produce the client compilation and bundle instead.
 
+### Development and production in Node
+
+Resolvers that apply the `node` export condition (Node, Bun, Deno, and
+server builds from Vite, webpack, or Rspack) and every `require()` load a
+build in which each Octane module reads `process.env.NODE_ENV` once, while it
+is first imported. Set `NODE_ENV` before the first Octane import; changing or
+removing `process` afterwards does not switch modes or affect error messages.
+Development checks on hot paths then cost a local read instead of a host
+environment lookup.
+
+Browser bundles resolve the default build, whose checks keep the literal
+`process.env.NODE_ENV` expression for the bundler to substitute and remove.
+Vite, webpack, Rspack, and esbuild's browser platform substitute it
+automatically; a custom pipeline must define it (see
+[Custom esbuild integrations](./getting-started.md#custom-esbuild-integrations)).
+A browser environment that neither substitutes the expression nor provides a
+`process` global is not supported.
+
 ## API
 
 The three buffered renderers return `RenderResult` with `html` and `css`, plus

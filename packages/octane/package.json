@@ -98,6 +98,11 @@
     "exports": {
       ".": {
         "types": "./dist/index.d.ts",
+        "node": {
+          "import": "./dist/node/index.js",
+          "require": "./dist/cjs/index.cjs",
+          "default": "./dist/node/index.js"
+        },
         "import": "./dist/index.js",
         "require": "./dist/cjs/index.cjs",
         "default": "./dist/index.js"
@@ -110,128 +115,184 @@
       },
       "./tsrx-iterable": {
         "types": "./dist/tsrx-iterable.d.ts",
+        "node": "./dist/node/tsrx-iterable.js",
         "default": "./dist/tsrx-iterable.js"
       },
       "./tsrx-spread": {
         "types": "./dist/tsrx-spread.d.ts",
+        "node": "./dist/node/tsrx-spread.js",
         "default": "./dist/tsrx-spread.js"
       },
       "./react": {
         "types": "./dist/react/index.d.ts",
+        "node": "./dist/node/react/index.js",
         "default": "./dist/react/index.js"
       },
       "./hydration": {
         "types": "./dist/hydration/index.d.ts",
+        "node": "./dist/node/hydration/index.js",
         "default": "./dist/hydration/index.js"
       },
       "./hydration/streamed-signals": {
         "types": "./dist/hydration/streamed-signals.d.ts",
+        "node": "./dist/node/hydration/streamed-signals.js",
         "default": "./dist/hydration/streamed-signals.js"
       },
       "./behavior": {
         "types": "./dist/behavior-root.d.ts",
+        "node": "./dist/node/behavior-root.js",
         "default": "./dist/behavior-root.js"
       },
       "./dom-bindings": {
         "types": "./dist/dom-bindings.d.ts",
+        "node": "./dist/node/dom-bindings.js",
         "default": "./dist/dom-bindings.js"
       },
       "./dom-binding-program": {
         "types": "./dist/dom-binding-program.d.ts",
+        "node": "./dist/node/dom-binding-program.js",
         "default": "./dist/dom-binding-program.js"
       },
       "./dom-binding-classes": {
         "types": "./dist/dom-binding-classes.d.ts",
+        "node": "./dist/node/dom-binding-classes.js",
         "default": "./dist/dom-binding-classes.js"
       },
       "./dom-binding-signals": {
         "types": "./dist/dom-binding-signals.d.ts",
+        "node": "./dist/node/dom-binding-signals.js",
         "default": "./dist/dom-binding-signals.js"
       },
       "./dom-binding-controls": {
         "types": "./dist/dom-binding-controls.d.ts",
+        "node": "./dist/node/dom-binding-controls.js",
         "default": "./dist/dom-binding-controls.js"
       },
       "./dom-binding-styles": {
         "types": "./dist/dom-binding-styles.d.ts",
+        "node": "./dist/node/dom-binding-styles.js",
         "default": "./dist/dom-binding-styles.js"
       },
       "./dom-binding-projections": {
         "types": "./dist/dom-binding-projections.d.ts",
+        "node": "./dist/node/dom-binding-projections.js",
         "default": "./dist/dom-binding-projections.js"
       },
       "./internal/signal-read": {
         "types": "./dist/internal/signal-read.d.ts",
+        "node": "./dist/node/internal/signal-read.js",
         "default": "./dist/internal/signal-read.js"
       },
       "./react/server": {
         "types": "./dist/react/server.d.ts",
+        "node": "./dist/node/react/server.js",
         "default": "./dist/react/server.js"
       },
       "./server": {
         "types": "./dist/server/index.d.ts",
+        "node": {
+          "import": "./dist/node/server/index.js",
+          "require": "./dist/cjs/server/index.cjs",
+          "default": "./dist/node/server/index.js"
+        },
         "import": "./dist/server/index.js",
         "require": "./dist/cjs/server/index.cjs",
         "default": "./dist/server/index.js"
       },
       "./signals": {
         "types": "./dist/signals/index.d.ts",
+        "node": {
+          "import": "./dist/node/signals/index.js",
+          "require": "./dist/cjs/signals/index.cjs",
+          "default": "./dist/node/signals/index.js"
+        },
         "import": "./dist/signals/index.js",
         "require": "./dist/cjs/signals/index.cjs",
         "default": "./dist/signals/index.js"
       },
       "./signals/client": {
         "types": "./dist/signals/client.d.ts",
+        "node": {
+          "import": "./dist/node/signals/client.js",
+          "require": "./dist/cjs/signals/client.cjs",
+          "default": "./dist/node/signals/client.js"
+        },
         "import": "./dist/signals/client.js",
         "require": "./dist/cjs/signals/client.cjs",
         "default": "./dist/signals/client.js"
       },
       "./signals/server": {
         "types": "./dist/signals/server.d.ts",
+        "node": {
+          "import": "./dist/node/signals/server.js",
+          "require": "./dist/cjs/signals/server.cjs",
+          "default": "./dist/node/signals/server.js"
+        },
         "import": "./dist/signals/server.js",
         "require": "./dist/cjs/signals/server.cjs",
         "default": "./dist/signals/server.js"
       },
       "./internal/client": {
         "types": "./dist/internal/client.d.ts",
+        "node": {
+          "import": "./dist/node/internal/client.js",
+          "require": "./dist/cjs/internal/client.cjs",
+          "default": "./dist/node/internal/client.js"
+        },
         "import": "./dist/internal/client.js",
         "require": "./dist/cjs/internal/client.cjs",
         "default": "./dist/internal/client.js"
       },
       "./internal/server": {
         "types": "./dist/internal/server.d.ts",
+        "node": {
+          "import": "./dist/node/internal/server.js",
+          "require": "./dist/cjs/internal/server.cjs",
+          "default": "./dist/node/internal/server.js"
+        },
         "import": "./dist/internal/server.js",
         "require": "./dist/cjs/internal/server.cjs",
         "default": "./dist/internal/server.js"
       },
       "./internal/context": {
         "types": "./dist/internal/context.d.ts",
+        "node": {
+          "import": "./dist/node/internal/context.js",
+          "require": "./dist/cjs/internal/context.cjs",
+          "default": "./dist/node/internal/context.js"
+        },
         "import": "./dist/internal/context.js",
         "require": "./dist/cjs/internal/context.cjs",
         "default": "./dist/internal/context.js"
       },
       "./static": {
         "types": "./dist/static/index.d.ts",
+        "node": "./dist/node/static/index.js",
         "default": "./dist/static/index.js"
       },
       "./testing": {
         "types": "./dist/testing.d.ts",
+        "node": "./dist/node/testing.js",
         "default": "./dist/testing.js"
       },
       "./constants": {
         "types": "./dist/constants.d.ts",
+        "node": "./dist/node/constants.js",
         "default": "./dist/constants.js"
       },
       "./profiling": {
         "types": "./dist/profiling.d.ts",
+        "node": "./dist/node/profiling.js",
         "default": "./dist/profiling.js"
       },
       "./universal": {
         "types": "./dist/universal.d.ts",
+        "node": "./dist/node/universal.js",
         "default": "./dist/universal.js"
       },
       "./universal/native": {
         "types": "./dist/universal-native.d.ts",
+        "node": "./dist/node/universal-native.js",
         "default": "./dist/universal-native.js"
       },
       "./compiler": {
