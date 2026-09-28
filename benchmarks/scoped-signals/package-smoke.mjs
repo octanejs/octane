@@ -17,7 +17,10 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { buildPackageCommonjs } from '../../scripts/build-package-commonjs.mjs';
+import {
+	buildPublishedRuntime,
+	COMMONJS_ENTRIES,
+} from '../../packages/octane/scripts/build-runtime.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const args = process.argv.slice(2);
@@ -70,6 +73,9 @@ const sourceInputs = readdirSync(join(packageDir, 'src'), { recursive: true })
 for (const path of [
 	'packages/octane/package.json',
 	'packages/octane/scripts/build.mjs',
+	'packages/octane/scripts/build-runtime.mjs',
+	'packages/octane/scripts/compile-node-env.mjs',
+	'packages/octane/scripts/specialize-error-calls.mjs',
 	'scripts/build-package-commonjs.mjs',
 	'benchmarks/scoped-signals/package-smoke.mjs',
 ]) {
@@ -83,38 +89,7 @@ for (const path of [
 
 const src = join(packageDir, 'src');
 const dist = join(packageDir, 'dist');
-const entryPoints = readdirSync(src, { recursive: true })
-	.filter(
-		(file) =>
-			(file.endsWith('.ts') || file.endsWith('.js')) &&
-			!file.endsWith('.d.ts') &&
-			!file.startsWith(`compiler${sep}`),
-	)
-	.map((file) => join(src, file));
-await esbuild.build({
-	entryPoints,
-	outdir: dist,
-	outbase: src,
-	format: 'esm',
-	platform: 'neutral',
-	target: 'esnext',
-	bundle: false,
-});
-
-// Read the entry list from the real build script; a missing emitted entry must
-// fail this probe instead of being quietly added by the validation harness.
-const buildSource = readFileSync(join(sourcePackageDir, 'scripts/build.mjs'), 'utf8');
-const list = /await buildPackageCommonjs\(\{[\s\S]*?entries:\s*\[([\s\S]*?)\]/.exec(
-	buildSource,
-)?.[1];
-assert.ok(list, 'Cannot locate the package CommonJS entry list');
-const commonjsEntries = [...list.matchAll(/'([^']+)'/g)].map((match) => match[1]);
-const commonjs = await buildPackageCommonjs({
-	packageDir,
-	entries: commonjsEntries,
-	outdir: 'dist/cjs',
-	sourceRoot: 'src',
-});
+const commonjs = await buildPublishedRuntime(packageDir);
 
 const declarationEntries = [
 	'src/index.ts',
@@ -265,7 +240,7 @@ const report = {
 	status: 'passed',
 	scope:
 		'Targeted per-file ESM/CommonJS public imports, native SSR invocation/parameter collection and protocol identity, local hook retirement, and declaration consumer. Compiler/Volar build and full package tarball not verified.',
-	commonjsEntries,
+	commonjsEntries: COMMONJS_ENTRIES,
 	commonjsModules: commonjs.modules,
 	declarationEntries,
 	probes,

@@ -748,3 +748,47 @@ export function DirectCreateElementValue() {
 	const content = createElement('span', { 'data-ordinary': 'create-element' }, 'direct');
 	return <InspectChild child={content} />;
 }
+
+// A value that is valid only while a synchronous call runs, like the editor
+// state a library makes active around a callback that builds JSX.
+let activeScope: string | null = null;
+
+function readActiveScope(): string {
+	if (activeScope === null) throw new Error('No active scope');
+	return activeScope;
+}
+
+export function runInScope<T>(scope: string, run: () => T): T {
+	const previous = activeScope;
+	activeScope = scope;
+	try {
+		return run();
+	} finally {
+		activeScope = previous;
+	}
+}
+
+class ScopedDecorator {
+	getLabel(): string {
+		return readActiveScope();
+	}
+
+	decorateInline() {
+		return <span data-scope="inline">{this.getLabel()}</span>;
+	}
+
+	decorateLocal() {
+		const label = this.getLabel();
+		return <span data-scope="local">{label}</span>;
+	}
+
+	decorateCreateElement() {
+		return createElement('span', { 'data-scope': 'create-element' }, this.getLabel());
+	}
+}
+
+export const scopedDecorator = new ScopedDecorator();
+
+export function ScopeOutlet(props: { content: OctaneNode }) {
+	return <section data-outlet="scope">{props.content}</section>;
+}

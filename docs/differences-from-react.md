@@ -638,6 +638,52 @@ a provider or boundary that has not rendered. Static JSX, explicit
 `createElement(...)` calls, and event or render-prop callbacks retain ordinary
 JavaScript evaluation semantics.
 
+### Values that exist only during the building call
+
+Deferral applies to every compiler-authored JSX value, including host-only
+markup with no provider or boundary of its own. When a method or arrow function
+returns JSX, or JSX is stored in a variable, array, or prop, its non-literal
+props and children can run after the building call has returned. They run when
+Octane renders or inspects the element, in the scope of the component rendering
+it. Anything valid only while that call is on the stack is gone by then, such
+as a module-level "current" variable, an open transaction, or a library read
+context.
+
+Lexical calls `DecoratorNode.decorate()` while it reconciles an update, with
+that update's editor state active, and expects the returned element to be
+complete. Node methods that read editor state, such as `$getState(...)` or
+`getLatest()`, throw when no editor state is active:
+
+```tsx
+class LabelNode extends DecoratorNode {
+  getLabel() {
+    return $getState(this, labelState);
+  }
+
+  decorate() {
+    // React calls getLabel() here, while editor state is active. Octane calls
+    // it when the decorator renders, after decorate() has returned, so
+    // $getState throws.
+    return <span>{this.getLabel()}</span>;
+  }
+}
+```
+
+Read context-bound values into locals before building the JSX, so the element
+carries plain data:
+
+```tsx
+decorate() {
+  const label = this.getLabel();
+  return <span>{label}</span>;
+}
+```
+
+`createElement('span', null, this.getLabel())` also evaluates its arguments
+during the call. To read the state at render time instead, pass a stable input
+such as the node key to a component, and have that component open its own read,
+for example with `editor.read(...)`.
+
 ### Template children and inspection
 
 Children authored inside an `@{ ... }` template normally arrive at a component

@@ -640,6 +640,48 @@ export function DirectCreateElementValue() @{
 	const content = createElement('span', { 'data-ordinary': 'create-element' }, 'direct');
 	<InspectChild child={content} />
 }
+
+let activeScope: string | null = null;
+
+function readActiveScope(): string {
+	if (activeScope === null) throw new Error('No active scope');
+	return activeScope;
+}
+
+export function runInScope<T>(scope: string, run: () => T): T {
+	const previous = activeScope;
+	activeScope = scope;
+	try {
+		return run();
+	} finally {
+		activeScope = previous;
+	}
+}
+
+class ScopedDecorator {
+	getLabel(): string {
+		return readActiveScope();
+	}
+
+	decorateInline() {
+		return <span data-scope="inline">{this.getLabel() as string}</span>;
+	}
+
+	decorateLocal() {
+		const label = this.getLabel();
+		return <span data-scope="local">{label as string}</span>;
+	}
+
+	decorateCreateElement() {
+		return createElement('span', { 'data-scope': 'create-element' }, this.getLabel());
+	}
+}
+
+export const scopedDecorator = new ScopedDecorator();
+
+export function ScopeOutlet(props: { content: OctaneNode }) @{
+	<section data-outlet="scope">{props.content}</section>
+}
 `;
 
 type ScopedTsRxFixture = typeof tsx & {
@@ -1171,6 +1213,34 @@ for (const fixture of fixtures) {
 			root.unmount();
 			container.remove();
 		});
+
+		// A method that builds JSX inside a synchronous scope, as Lexical calls
+		// DecoratorNode.decorate() while its editor state is active. The element
+		// renders after that scope has closed.
+		for (const [method, selector, expected] of [
+			['decorateInline', '[data-scope="inline"]', 'render'],
+			['decorateLocal', '[data-scope="local"]', 'build'],
+			['decorateCreateElement', '[data-scope="create-element"]', 'build'],
+		] as const) {
+			it(`${method} reads its label in the ${expected} scope`, () => {
+				const { runInScope, scopedDecorator, ScopeOutlet } = fixture.client;
+				const content = runInScope('build', () => scopedDecorator[method]());
+				const result = runInScope('render', () => mount(ScopeOutlet, { content }));
+				expect(result.find(selector).textContent).toBe(expected);
+				result.unmount();
+			});
+
+			it(`${method} server-renders its label from the ${expected} scope`, () => {
+				const { runInScope, scopedDecorator, ScopeOutlet } = fixture.server;
+				const content = runInScope('build', () => scopedDecorator[method]());
+				const { html } = runInScope('render', () =>
+					ServerRuntime.renderToString(ScopeOutlet, { content }),
+				);
+				const markup = document.createElement('div');
+				markup.innerHTML = html;
+				expect(markup.querySelector(selector)?.textContent).toBe(expected);
+			});
+		}
 	});
 }
 
