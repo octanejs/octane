@@ -49,8 +49,9 @@ export const scrollIntoViewIfNeeded = (target: HTMLElement) => {
 	if (!typeaheadContainerNode) {
 		return;
 	}
+	const ownerWindow = target.ownerDocument.defaultView ?? window;
 	const typeaheadRect = typeaheadContainerNode.getBoundingClientRect();
-	if (typeaheadRect.top + typeaheadRect.height > window.innerHeight) {
+	if (typeaheadRect.top + typeaheadRect.height > ownerWindow.innerHeight) {
 		typeaheadContainerNode.scrollIntoView({ block: 'center' });
 	}
 	if (typeaheadRect.top < 0) {

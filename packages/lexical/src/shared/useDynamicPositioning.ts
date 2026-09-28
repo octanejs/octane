@@ -21,8 +21,12 @@ export function useDynamicPositioning(
 		() => {
 			if (targetElement != null && resolution != null) {
 				const rootElement = editor.getRootElement();
+				// Listen in the editor's own browsing context: an editor inside an
+				// iframe scrolls and resizes with that frame, not the host window.
+				const ownerDocument = rootElement != null ? rootElement.ownerDocument : document;
+				const ownerWindow = ownerDocument.defaultView ?? window;
 				const rootScrollParent =
-					rootElement != null ? getScrollParent(rootElement, false) : document.body;
+					rootElement != null ? getScrollParent(rootElement, false) : ownerDocument.body;
 				let ticking = false;
 				let previousIsInView = isTriggerVisibleInNearestScrollContainer(
 					targetElement,
@@ -30,7 +34,7 @@ export function useDynamicPositioning(
 				);
 				const handleScroll = function () {
 					if (!ticking) {
-						window.requestAnimationFrame(function () {
+						ownerWindow.requestAnimationFrame(function () {
 							onReposition();
 							ticking = false;
 						});
@@ -54,8 +58,8 @@ export function useDynamicPositioning(
 				const enclosingShadowRoots = getDOMShadowRoots(rootElement ?? targetElement);
 				resizeObserver.observe(targetElement);
 				return mergeRegister(
-					registerEventListener(window, 'resize', onReposition),
-					registerEventListener(document, 'scroll', handleScroll, {
+					registerEventListener(ownerWindow, 'resize', onReposition),
+					registerEventListener(ownerDocument, 'scroll', handleScroll, {
 						capture: true,
 						passive: true,
 					}),

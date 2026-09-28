@@ -53,9 +53,12 @@ alias has the same disposition as its extensionless entry.
 
 The Octane package uses `@octanejs/floating-ui`, the Octane port of
 `@floating-ui/react`, and accepts refs as ordinary props rather than through
-`forwardRef`. Those are binding adaptations outside the two registered
-differential cases; they are not claimed as verified divergences by this
-manifest.
+`forwardRef`. Menu positioning also reads page offsets, the viewport and
+scroll/resize events from the editor's owner window, where upstream 0.51.0 reads
+the host window after creating the anchor in the owner document; this only
+differs for an editor inside an iframe. Those are binding adaptations outside
+the two registered differential cases; they are not claimed as verified
+divergences by this manifest.
 
 ## Upstream suite disposition
 

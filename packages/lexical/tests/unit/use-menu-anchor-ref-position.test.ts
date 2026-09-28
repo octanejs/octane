@@ -179,3 +179,84 @@ describe('useMenuAnchorRef positioning', () => {
 		expectAtCaret(anchor!);
 	});
 });
+
+// Not upstream: upstream creates the anchor in the editor's owner document but
+// still reads the host window's page offsets and listens on the host
+// window/document. In a multi-window setup (an editor inside an iframe) those
+// belong to the parent browsing context, so the menu lands at the wrong offset
+// and never repositions when the frame scrolls.
+describe('useMenuAnchorRef in an iframe editor', () => {
+	let frame: HTMLIFrameElement;
+	let frameWindow: Window & typeof globalThis;
+	let frameRoot: HTMLDivElement;
+
+	beforeEach(() => {
+		vi.stubGlobal(
+			'ResizeObserver',
+			class {
+				observe() {}
+				unobserve() {}
+				disconnect() {}
+			},
+		);
+		frame = document.createElement('iframe');
+		document.body.appendChild(frame);
+		frameWindow = frame.contentWindow as Window & typeof globalThis;
+		frameWindow.ResizeObserver = globalThis.ResizeObserver;
+		// The frame is scrolled; the host window is not.
+		Object.defineProperty(frameWindow, 'pageXOffset', { configurable: true, value: 7 });
+		Object.defineProperty(frameWindow, 'pageYOffset', { configurable: true, value: 40 });
+		frameRoot = frameWindow.document.createElement('div');
+		frameRoot.contentEditable = 'true';
+		frameWindow.document.body.appendChild(frameRoot);
+		editor = createEditor({
+			namespace: 'test',
+			onError: (e: unknown) => {
+				throw e;
+			},
+		});
+		editor.setRootElement(frameRoot);
+	});
+
+	afterEach(() => {
+		editor.setRootElement(null);
+		frame.remove();
+		vi.unstubAllGlobals();
+	});
+
+	function renderOpenProbe(): HTMLElement {
+		let anchorElement: HTMLElement | null = null;
+		const r = mount(MenuAnchorProbe as any, {
+			resolution,
+			setResolution: () => {},
+			className: 'test-menu-anchor',
+			onRef: (ref: { current: HTMLElement | null }) => {
+				anchorElement = ref.current;
+			},
+		});
+		flushEffects();
+		onTestFinished(() => r.unmount());
+		expect(anchorElement).not.toBeNull();
+		return anchorElement!;
+	}
+
+	it("offsets the anchor by the frame's scroll, not the host window's", () => {
+		expect(window.pageXOffset).toBe(0);
+		expect(window.pageYOffset).toBe(0);
+		const anchor = renderOpenProbe();
+		expect(anchor.ownerDocument).toBe(frameWindow.document);
+		expect(anchor.parentElement).toBe(frameWindow.document.body);
+		expect(parseFloat(anchor.style.left)).toBeCloseTo(CARET_RECT.left + 7, 0);
+		expect(parseFloat(anchor.style.top)).toBeCloseTo(CARET_RECT.top + 3 + 40, 0);
+	});
+
+	it("repositions when the frame's document scrolls", () => {
+		const hostFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+		const frameRaf = vi.fn((_callback: FrameRequestCallback) => 0);
+		frameWindow.requestAnimationFrame = frameRaf as any;
+		renderOpenProbe();
+		frameWindow.document.dispatchEvent(new frameWindow.Event('scroll'));
+		expect(frameRaf).toHaveBeenCalledTimes(1);
+		expect(hostFrame).not.toHaveBeenCalled();
+	});
+});

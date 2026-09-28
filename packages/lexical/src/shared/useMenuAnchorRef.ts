@@ -48,15 +48,19 @@ export function useMenuAnchorRef(...args: any[]): MenuRef {
 			if (rootElement !== null && resolution !== null) {
 				const { left, top, width, height } = resolution.getRect();
 				const anchorHeight = anchorElementRef.current.offsetHeight;
+				// The anchor is created in the editor's owner document, so its page
+				// offsets and viewport come from that document's window (an iframe's,
+				// in a multi-window setup), not the host window.
+				const ownerWindow = rootElement.ownerDocument.defaultView ?? window;
 				// `left`/`top` from getRect() are viewport coordinates; translate them
 				// into the coordinate space the anchor is actually positioned in.
 				const origin = getContainingBlockOrigin(resolvedParent);
 				const toAnchorLeft = (viewportLeft: number) =>
-					origin !== null ? viewportLeft - origin.left : viewportLeft + window.pageXOffset;
+					origin !== null ? viewportLeft - origin.left : viewportLeft + ownerWindow.pageXOffset;
 				const toAnchorTop = (viewportTop: number) =>
 					origin !== null
 						? viewportTop - origin.top
-						: viewportTop + (shouldIncludePageYOffset ? window.pageYOffset : 0);
+						: viewportTop + (shouldIncludePageYOffset ? ownerWindow.pageYOffset : 0);
 				containerDiv.style.top = `${toAnchorTop(top + anchorHeight + 3)}px`;
 				containerDiv.style.left = `${toAnchorLeft(left)}px`;
 				containerDiv.style.height = `${height}px`;
@@ -71,7 +75,8 @@ export function useMenuAnchorRef(...args: any[]): MenuRef {
 						containerDiv.style.left = `${toAnchorLeft(rootElementRect.right - menuWidth)}px`;
 					}
 					if (
-						(top + menuHeight > window.innerHeight || top + menuHeight > rootElementRect.bottom) &&
+						(top + menuHeight > ownerWindow.innerHeight ||
+							top + menuHeight > rootElementRect.bottom) &&
 						top - rootElementRect.top > menuHeight + height
 					) {
 						containerDiv.style.top = `${toAnchorTop(top - menuHeight - height)}px`;
