@@ -102,6 +102,43 @@ async function compileHmrComponent(
 	)(runtime, internalRuntime, hot, modules) as ComponentBody<any>;
 }
 
+/**
+ * One webpack module across successive saves: each `load` runs the previous
+ * evaluation's dispose handler, then evaluates the edit, which hands every
+ * export to its canonical wrapper and invalidates when one declines.
+ */
+function webpackHotModule(filename: string) {
+	const data: Record<string, unknown> = {};
+	let dispose: ((data: Record<string, unknown>) => void) | undefined;
+	const module = {
+		invalidated: false,
+		load(source: string): Promise<ComponentBody<any>> {
+			dispose?.(data);
+			dispose = undefined;
+			return compileHmrComponent(
+				source,
+				'App',
+				filename,
+				{},
+				{
+					hmr: 'webpack',
+					hot: {
+						data,
+						dispose(callback) {
+							dispose = callback;
+						},
+						accept() {},
+						invalidate() {
+							module.invalidated = true;
+						},
+					},
+				},
+			);
+		},
+	};
+	return module;
+}
+
 describe('hmr — runtime wrapper', () => {
 	it.each([
 		{ dialect: 'vite', name: 'App' },
@@ -255,19 +292,59 @@ describe('hmr — runtime wrapper', () => {
 		expect(meta.liveBlocks instanceof Set).toBe(true);
 	});
 
-	it('declines a lite-scope handoff so the bundler can reload safely', () => {
-		const initialBody = (() => {}) as ComponentBody<any>;
-		const Foo = hmr(initialBody);
-		const parent = document.createElement('div');
-		const anchor = document.createComment('anchor');
-		parent.appendChild(anchor);
-		const liteScope = {
-			block: { parentNode: parent, endMarker: anchor, parentBlock: null },
-		} as unknown as Scope;
-		Foo({}, liteScope, undefined);
+	it('declines a handoff for a hookless inline child so the bundler can reload safely', async () => {
+		// A same-module hookless child renders into its parent's element without a
+		// range of its own, so there is nothing its replacement could reset.
+		const source = (version: number) =>
+			`export function Leaf() @{ <b>leaf v${version}</b> }
+			 export function App() @{ <div><Leaf /></div> }`;
+		const hot = webpackHotModule('/src/App.tsrx');
+		const r = mount(await hot.load(source(1)));
+		try {
+			expect(r.find('b').textContent).toBe('leaf v1');
+			await hot.load(source(2));
+			expect(hot.invalidated).toBe(true);
+		} finally {
+			r.unmount();
+		}
+	});
 
-		expect((Foo as any)[HMR].update(hmr((() => {}) as ComponentBody<any>))).toBe(false);
-		expect((Foo as any)[HMR].fn).toBe(initialBody);
+	it('forwards direct calls verbatim and keeps later hot updates working', () => {
+		const calls: unknown[][] = [];
+		const initial = function (this: unknown, ...args: unknown[]) {
+			calls.push([this, ...args]);
+			return `v1/${args.length}`;
+		};
+		const renderRow = hmr(initial as unknown as ComponentBody<any>) as unknown as (
+			...args: unknown[]
+		) => unknown;
+		let blockReads = 0;
+		const lookalike = {
+			get block() {
+				blockReads++;
+				return undefined;
+			},
+		};
+		const receiver = { renderRow };
+
+		// Arguments in the render-call positions are ordinary values here: an
+		// index, a null placeholder while nothing renders, or an object whose
+		// `block` getter belongs to the caller.
+		expect(renderRow('a', 0)).toBe('v1/2');
+		expect(renderRow('b', null)).toBe('v1/2');
+		expect(renderRow('c', lookalike, 'x', 'y')).toBe('v1/4');
+		expect(receiver.renderRow('d')).toBe('v1/1');
+		expect(calls).toEqual([
+			[undefined, 'a', 0],
+			[undefined, 'b', null],
+			[undefined, 'c', lookalike, 'x', 'y'],
+			[receiver, 'd'],
+		]);
+		expect(blockReads).toBe(0);
+
+		const next = (...args: unknown[]) => `v2/${args.join(',')}`;
+		expect((renderRow as any)[HMR].update(hmr(next as unknown as ComponentBody<any>))).toBe(true);
+		expect(renderRow('e', 1, 'x', 'y')).toBe('v2/e,1,x,y');
 	});
 
 	it('update() swaps the body of live blocks + re-renders', () => {
@@ -421,6 +498,42 @@ describe('hmr — runtime wrapper', () => {
 
 		expect(r.findAll('.row').map((el) => el.textContent)).toEqual(['v2:a', '(none)']);
 		r.unmount();
+	});
+
+	it('refreshes a return-JSX helper called directly with positional arguments', async () => {
+		// Production has no wrapper, so each call must see exactly the arguments
+		// it was given. The index in the second position must not break the edit.
+		const source = (version: number) => `/** @jsxImportSource octane */
+			export function renderRow(item: string, index: number, ...rest: string[]) {
+				return <li key={item} className="row">{'v${version} ' + item + ' #' + index + ' +' + rest.length + ' ' + rest.join('|')}</li>;
+			}
+			export function App(props: { items: string[] }) {
+				return (
+					<ul>
+						{props.items.map((item, index) =>
+							index === 0 ? renderRow(item, index) : renderRow(item, index, 'x', 'y'),
+						)}
+					</ul>
+				);
+			}
+		`;
+		const hot = webpackHotModule('/src/App.tsx');
+		const r = mount(await hot.load(source(1)), { items: ['a', 'b'] });
+		try {
+			expect(r.findAll('.row').map((el) => el.textContent)).toEqual([
+				'v1 a #0 +0 ',
+				'v1 b #1 +2 x|y',
+			]);
+			await hot.load(source(2));
+			flushSync(() => {});
+			expect(hot.invalidated).toBe(false);
+			expect(r.findAll('.row').map((el) => el.textContent)).toEqual([
+				'v2 a #0 +0 ',
+				'v2 b #1 +2 x|y',
+			]);
+		} finally {
+			r.unmount();
+		}
 	});
 
 	it('refreshes a compiled child in place without duplicating its single root', async () => {
