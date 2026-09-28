@@ -35316,18 +35316,27 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 			return true;
 		},
 	};
-	function wrapper(props: P, scope: Scope, extra: any): unknown {
-		// Register on first call; cleared lazily during update() if disposed. A
-		// plain direct call (`Row({ … })` inside another component's render) has
-		// no scope of its own — stay transparent and register nothing. The call
-		// site's output still refreshes on edit: its owner's update() re-renders
-		// the owning block, which re-runs the direct call against the swapped-in
-		// body. Registering the AMBIENT block instead would let update() repoint
-		// that block's body at this wrapper, miswiring the caller.
-		if (scope !== undefined) meta.liveBlocks.add(scope.block);
-		// Propagate the wrapped body's return — a return-based (folded) component
-		// hands back a renderable descriptor that renderBlock must still mount.
-		return meta.fn(props as any, scope, extra);
+	function wrapper(this: unknown, props: P, scope: Scope, extra: any): unknown {
+		// Every runtime body invocation passes the Scope it has just installed as
+		// CURRENT_SCOPE. Register that block on first call; cleared lazily during
+		// update() if disposed.
+		if (scope === CURRENT_SCOPE && scope !== null) {
+			meta.liveBlocks.add(scope.block);
+			// Propagate the wrapped body's return — a return-based (folded) component
+			// hands back a renderable descriptor that renderBlock must still mount.
+			return meta.fn(props as any, scope, extra);
+		}
+		// Anything else is a direct call (`Row({ … })`, `renderRow(item, index)`),
+		// whose second argument is an ordinary value. Register nothing and forward
+		// the receiver and every argument unchanged, as production (no wrapper)
+		// would. The call site's output still refreshes on edit: its owner's
+		// update() re-renders the owning block, which re-runs the direct call
+		// against the swapped-in body. Registering the AMBIENT block instead would
+		// let update() repoint that block's body at this wrapper, miswiring the
+		// caller. Only this branch reads `arguments`, so once the wrapper tiers up
+		// Maglev and TurboFan elide the object on the per-render branch above (a
+		// rest parameter would stay allocated under Maglev).
+		return Reflect.apply(meta.fn, this, arguments);
 	}
 	Object.defineProperty(wrapper, HMR, {
 		get() {
