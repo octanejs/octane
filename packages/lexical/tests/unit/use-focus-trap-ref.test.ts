@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test } from 'vitest';
+import { startTransition } from 'octane';
 import { FocusTrapExtension } from '@lexical/a11y';
+import { act } from '../../../octane/tests/_helpers';
 import { flushEffects, mount } from '../_helpers';
-import { FocusTrapFixture } from '../_fixtures/a11y-hooks.tsrx';
+import { FocusTrapFixture, TransitionTrapFixture } from '../_fixtures/a11y-hooks.tsrx';
 
 function dispatchTab(target: HTMLElement, shiftKey = false): void {
 	target.dispatchEvent(
@@ -212,6 +214,44 @@ describe('useLexicalFocusTrapRef', () => {
 			// The new predicate is consulted at event time.
 			outside.focus();
 			expect(document.activeElement).toBe(outside);
+		} finally {
+			document.body.removeChild(outside);
+		}
+	});
+
+	// Octane-specific: upstream writes the predicate ref during render. A
+	// transition that re-renders the trap with a new predicate and then suspends
+	// is never committed, so the trap must keep consulting the committed one.
+	test('an abandoned transition render does not replace allowOutside', async () => {
+		const outside = document.createElement('button');
+		outside.setAttribute('data-allow', 'true');
+		outside.textContent = 'Outside';
+		document.body.appendChild(outside);
+		const rejectAll = () => false;
+		const allowMarked = (target: HTMLElement) => target.getAttribute('data-allow') === 'true';
+		try {
+			r = mount(TransitionTrapFixture as any, {
+				allowOutside: rejectAll,
+				extension: FocusTrapExtension,
+			});
+			flushEffects();
+			expect(document.activeElement).toBe(getByTestId('btn-0'));
+
+			await act(() => {
+				startTransition(() => {
+					r!.update(TransitionTrapFixture as any, {
+						allowOutside: allowMarked,
+						extension: FocusTrapExtension,
+						promise: new Promise(() => {}),
+					});
+				});
+			});
+			// The transition is held: the committed UI is still showing.
+			expect(r.container.querySelector('[data-testid="pending"]')).toBeNull();
+
+			// The committed predicate rejects the outside target: pulled back.
+			outside.focus();
+			expect(document.activeElement).toBe(getByTestId('btn-0'));
 		} finally {
 			document.body.removeChild(outside);
 		}

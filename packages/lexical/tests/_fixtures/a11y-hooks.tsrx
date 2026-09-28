@@ -10,7 +10,7 @@ import { useLexicalFocusManagerRef } from '@octanejs/lexical/useLexicalFocusMana
 import { useLexicalFocusTrapRef } from '@octanejs/lexical/useLexicalFocusTrapRef';
 import { useLexicalRovingTabIndexRef } from '@octanejs/lexical/useLexicalRovingTabIndexRef';
 import type { LexicalEditor } from 'lexical';
-import { useEffect, useImperativeHandle, useMemo, useRef } from 'octane';
+import { use, useEffect, useImperativeHandle, useMemo, useRef } from 'octane';
 
 // Fixtures for porting @lexical/react's useLexicalAriaLiveRegion /
 // useLexicalFocusManagerRef / useLexicalFocusTrapRef / useLexicalRovingTabIndexRef
@@ -125,6 +125,28 @@ export function FocusTrapFixture(props) @{
 			</WithExtension>
 		}
 	</>
+}
+
+function Suspender(props) {
+	if (props.promise != null) {
+		use(props.promise);
+	}
+	return null;
+}
+
+// The trap re-renders with a new `allowOutside` in the same pass as a sibling
+// that suspends, so a transition to these props is held (never committed).
+export function TransitionTrapFixture(props) @{
+	<WithExtension extension={props.extension}>
+		@try {
+			<>
+				<Trap isActive={true} buttons={2} allowOutside={props.allowOutside} />
+				<Suspender promise={props.promise} />
+			</>
+		} @pending {
+			<div data-testid="pending">{'loading'}</div>
+		}
+	</WithExtension>
 }
 
 function Group(props) @{

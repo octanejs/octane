@@ -1,6 +1,6 @@
 import { FocusTrapExtension, type FocusTrapInitialFocus } from '@lexical/a11y';
 import { getExtensionDependencyFromEditor } from '@lexical/extension';
-import { useCallback, useRef } from 'octane';
+import { useCallback, useLayoutEffect, useRef } from 'octane';
 
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { splitSlot, subSlot } from './shared/internal';
@@ -30,9 +30,17 @@ export function useLexicalFocusTrapRef(...args: any[]): (node: HTMLElement | nul
 	const disposeRef = useRef<(() => void) | null>(null, subSlot(slot, 'ulft:dispose'));
 	// Keep the latest predicate in a ref so an inline lambda doesn't change the
 	// callback-ref identity (which would tear down and rebuild the trap every
-	// render); the registered trap reads it at event time.
+	// render); the registered trap reads it at event time. Upstream writes the
+	// ref during render; here it is committed in a layout effect so an abandoned
+	// render (e.g. a suspended transition) never leaves an uncommitted predicate.
 	const allowOutsideRef = useRef(allowOutside, subSlot(slot, 'ulft:allow'));
-	allowOutsideRef.current = allowOutside;
+	useLayoutEffect(
+		() => {
+			allowOutsideRef.current = allowOutside;
+		},
+		[allowOutside],
+		subSlot(slot, 'ulft:allowSync'),
+	);
 
 	return useCallback(
 		(node: HTMLElement | null) => {
