@@ -1,5 +1,13 @@
 # octane
 
+## 0.6.3
+
+### Patch Changes
+
+- df0a086: JSX returned by a direct call of a named `function` declaration now resolves its non-literal props and children where the value renders, the same as JSX returned by an arrow function or method. Previously such a call read context and other values during the call, and the server rendered the value to HTML immediately, so a server-rendered fragment root or `.map()` row could disagree with the client. Rendering the same function as a component (`<Row />`) is unchanged.
+- 962ed16: Direct calls to hot-reloadable exports now behave the same in development as in production. Calling an exported return-JSX function directly with a second argument, as in `renderRow(item, index)`, no longer makes the next hot update throw `TypeError: Cannot read properties of undefined (reading 'disposed')`, and a `null` second argument no longer throws at the call. Direct calls also receive their `this` and every argument unchanged, where development previously passed exactly three arguments, dropping extras and padding missing ones with `undefined`.
+- 9441ccb: Node now loads a build that reads `process.env.NODE_ENV` once per module instead of at every development check. ESM imports get it through a new `node` export condition, and `require()` gets it through the CommonJS build. Unbundled server rendering is faster, and deleting the `process` global after import no longer turns framework errors into `ReferenceError: process is not defined`. Set `NODE_ENV` before the first Octane import in Node. Browser bundles are unchanged.
+
 ## 0.6.2
 
 ### Patch Changes

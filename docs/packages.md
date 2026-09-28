@@ -54,7 +54,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/input-otp` | [`packages/input-otp`](../packages/input-otp) | framework binding | `0.0.24` | 1 |
 | `@octanejs/intersection-observer` | [`packages/intersection-observer`](../packages/intersection-observer) | framework binding | `0.0.22` | 2 |
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.54` | 7 |
-| `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.1.57` | 50 |
+| `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.2.0` | 50 |
 | `@octanejs/livestore` | [`packages/livestore`](../packages/livestore) | framework binding | `0.0.26` | 2 |
 | `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.51` | 4 |
 | `@octanejs/mantine-hooks` | [`packages/mantine-hooks`](../packages/mantine-hooks) | framework binding | `0.1.37` | 1 |
@@ -134,7 +134,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.23` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.57` | 6 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.12` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.6.2` | 40 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.6.3` | 40 |
 
 ## Private packages
 
