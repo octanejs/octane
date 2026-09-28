@@ -24,12 +24,17 @@ import { dirname, join, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { buildPackageCommonjs } from '../../../scripts/build-package-commonjs.mjs';
 import { bundleVolarCompiler } from './bundle-volar.mjs';
+import { createErrorSpecializationPlugin } from './specialize-error-calls.mjs';
 import { smokeDist, verifyDist } from './verify-dist.mjs';
 
 const pkgDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const root = join(pkgDir, '..', '..');
 const src = join(pkgDir, 'src');
 const dist = join(pkgDir, 'dist');
+const errorSpecialization = await createErrorSpecializationPlugin({
+	sourceRoot: src,
+	catalogPath: join(pkgDir, 'error-codes/codes.json'),
+});
 
 execFileSync(process.execPath, [join(pkgDir, 'scripts', 'generate-version.mjs'), '--check'], {
 	stdio: 'inherit',
@@ -56,6 +61,7 @@ await build({
 	platform: 'neutral',
 	target: 'esnext',
 	bundle: false,
+	plugins: [errorSpecialization],
 });
 
 await buildPackageCommonjs({
@@ -72,6 +78,7 @@ await buildPackageCommonjs({
 	],
 	outdir: 'dist/cjs',
 	sourceRoot: 'src',
+	plugins: [errorSpecialization],
 });
 
 cpSync(join(src, 'compiler'), join(dist, 'compiler'), { recursive: true });
@@ -92,6 +99,9 @@ execFileSync(join(root, 'node_modules/.bin/tsc'), ['-p', join(pkgDir, 'tsconfig.
 
 await verifyDist(pkgDir);
 smokeDist(pkgDir);
+execFileSync(process.execPath, ['--test', join(pkgDir, 'scripts', 'published-errors.test.mjs')], {
+	stdio: 'inherit',
+});
 
 const packageVersion = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')).version;
 const { version: publishedVersion } = await import(pathToFileURL(join(dist, 'index.js')).href);
