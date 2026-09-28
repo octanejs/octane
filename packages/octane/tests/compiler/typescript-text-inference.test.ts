@@ -28,7 +28,10 @@ function childRange(source: string, expression: string): [number, number] {
 	return [start, start + expression.length];
 }
 
-describe('TypeScript-backed text facts', () => {
+// Each case builds a TypeScript project (one also type-checks a full program),
+// which is cold, CPU-bound work that a loaded CI shard can stretch well past
+// the 5 s default; none of these cases assert on speed.
+describe('TypeScript-backed text facts', { timeout: 20_000 }, () => {
 	it('proves only primitive text domains for numeric and mixed child values', () => {
 		const source = `export function TextValues(props: {
 			count: number; large: bigint; mixed: string | number | bigint;

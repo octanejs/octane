@@ -60,7 +60,9 @@ afterEach(async () => {
 	await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true })));
 });
 
-describe('startPreviewServer', () => {
+// Each case starts a Vite preview server (one also waits for a watched
+// recompile); a loaded CI shard can stretch that past the 5 s default.
+describe('startPreviewServer', { timeout: 20_000 }, () => {
 	it('lists templates and renders a selected email', async () => {
 		const { emails } = await fixture();
 		await mkdir(join(emails, 'account'));
@@ -102,7 +104,7 @@ describe('startPreviewServer', () => {
 		);
 		await expect
 			.poll(() => fetch(`${server.url}preview/notice`).then((response) => response.text()), {
-				timeout: 2_000,
+				timeout: 10_000,
 			})
 			.toContain('Second version');
 	});
