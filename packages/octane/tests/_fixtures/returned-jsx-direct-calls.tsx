@@ -66,6 +66,18 @@ export function TitledValue() {
 	);
 }
 
+function ReadContext() {
+	return <strong data-returned="framed">{use(ValueContext)}</strong>;
+}
+
+export function Frame({ children }: { children: OctaneNode }) {
+	return <div data-frame="">{children}</div>;
+}
+
+export function framedValue() {
+	return Frame({ children: <ReadContext /> });
+}
+
 export function RowValue(label: string, index: number) {
 	return (
 		<li data-returned="row" data-index={index}>

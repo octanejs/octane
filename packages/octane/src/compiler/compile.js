@@ -12441,8 +12441,7 @@ function ssrCompileBodyWithMapTemps(
 	// body call renders now. Its fragment sub is declared only in that branch, and
 	// it is lowered after the body template so body-call output is unchanged.
 	let directCall = null;
-	const directCallKind =
-		directCallRoot === null ? null : directCallReturnKind(directCallRoot, node, ctx);
+	const directCallKind = directCallRoot === null ? null : directCallReturnKind(directCallRoot, ctx);
 	if (directCallKind === 'value') {
 		// Directives in the returned value fold into helpers owned by the direct
 		// call, so a body call never declares them.
@@ -20217,8 +20216,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 					}
 				}
 				const record = lowerReturnJsx(h.argument, ctx, compInlinedSubs, cssHash);
-				const kind = node._octaneBindingView ? null : directCallReturnKind(h.argument, node, ctx);
-				if (!directCallNeedsClientBranch(kind, h.argument, node)) {
+				if (node._octaneBindingView || !directCallNeedsClientBranch(h.argument, node, ctx)) {
 					return { ...h, argument: record };
 				}
 				renderCall ??= renderCallScopeParam(node, ctx);
@@ -20664,30 +20662,33 @@ function requiresTemplateNormalization(
 // function returns. Both emitters classify the same authored root: 'fragment'
 // defers the compiled fragment record, 'value' uses ordinary value lowering, and
 // null marks static host markup that renders the same anywhere. The server's
-// body call renders the whole tree to HTML, so a component anywhere below the
-// root needs deferral there too.
-function directCallReturnKind(node, fn, ctx) {
+// body call renders the whole tree to HTML, so every non-literal hole and every
+// component below the root needs deferral there.
+function directCallReturnKind(node, ctx, stableNames = null) {
 	if (VALUE_DIRECTIVE_ARM_TYPES.has(node.type)) return 'fragment';
 	if (requiresTemplateNormalization(node, 'html', true, ctx)) return 'fragment';
-	const stable = directCallStableNames(fn);
 	if (node.type !== 'Element' && node.type !== 'JSXElement') {
-		return jsxValueChildrenNeedRenderScope(node, false, stable) ? 'value' : null;
+		return jsxValueChildrenNeedRenderScope(node, false, stableNames) ? 'value' : null;
 	}
 	if (isComponentTag(node)) return 'value';
-	return jsxValueRootNeedsRenderScope(node, stable) ||
-		jsxValueChildrenNeedRenderScope(node, false, stable)
+	return jsxValueRootNeedsRenderScope(node, stableNames) ||
+		jsxValueChildrenNeedRenderScope(node, false, stableNames)
 		? 'fragment'
 		: null;
 }
 
 // Whether the client's body-call record evaluates anything a direct call must
-// defer. Value-lowered roots already defer, except a component's own props.
-function directCallNeedsClientBranch(kind, node, fn) {
+// defer. The client record only stores hole values and interprets them where
+// it mounts, so reading an unreassigned local is the same during the call and
+// at render. Value-lowered roots already defer, except a component's own props.
+function directCallNeedsClientBranch(node, fn, ctx) {
+	const stable = directCallStableNames(fn);
+	const kind = directCallReturnKind(node, ctx, stable);
 	if (kind === 'fragment') return true;
 	return (
 		kind === 'value' &&
 		(node.type === 'Element' || node.type === 'JSXElement') &&
-		jsxValueRootNeedsRenderScope(node, directCallStableNames(fn))
+		jsxValueRootNeedsRenderScope(node, stable)
 	);
 }
 
@@ -20718,7 +20719,7 @@ function directCallAssignedNames(fn) {
 
 // Parameters and top-level declarations that nothing in the function assigns.
 // Reading one runs no user code and yields the same value during the call and
-// at render, so it needs no deferral.
+// at render, so the client record needs no deferral for it.
 function directCallStableNames(fn) {
 	const names = collectComponentLocals(fn);
 	for (const name of directCallAssignedNames(fn)) names.delete(name);

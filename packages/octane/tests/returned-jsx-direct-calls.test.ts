@@ -75,6 +75,18 @@ export function DirectiveValue(show: boolean) {
 	</div>;
 }
 
+function ReadContext() @{
+	<strong data-returned="framed">{use(ValueContext) as string}</strong>
+}
+
+export function Frame({ children }: { children: OctaneNode }) {
+	return <div data-frame="">{children}</div>;
+}
+
+export function framedValue() {
+	return Frame({ children: <ReadContext /> });
+}
+
 export function RowValue(label: string, index: number) {
 	return <li data-returned="row" data-index={index}>{(label + ':' + use(ValueContext)) as string}</li>;
 }
@@ -225,6 +237,11 @@ const scenarios: Scenario[] = [
 		selector: '[data-returned="reassigned"]',
 		build: (fixture) => fixture.ReassignedValue(),
 		fixedAttribute: ['data-count', '1'],
+	},
+	{
+		name: 'renderable parameter',
+		selector: '[data-returned="framed"]',
+		build: (fixture) => fixture.framedValue(),
 	},
 	{
 		name: 'several parameters',
