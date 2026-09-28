@@ -1,5 +1,11 @@
 # octane
 
+## 0.6.2
+
+### Patch Changes
+
+- 010c88c: Reduce production bundle overhead for modules that only report errors without arguments, while preserving development messages and parameterized errors.
+
 ## 0.6.1
 
 ### Patch Changes
