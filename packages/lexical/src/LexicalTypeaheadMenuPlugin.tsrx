@@ -15,11 +15,10 @@ import type { CommandListenerPriority, TextNode } from 'lexical';
 import { startTransition, useCallback, useEffect, useState } from 'octane';
 import type { MenuOption, MenuRenderFn, MenuResolution, TriggerFn } from './shared/menuShared';
 
-export { useBasicTypeaheadTriggerMatch, PUNCTUATION } from './typeaheadShared';
-export { MenuOption, SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND } from './shared/menuShared';
+export { MenuOption } from './LexicalMenuOption';
+export type { MenuRenderFn, MenuResolution, MenuTextMatch, TriggerFn } from './shared/menuShared';
 export { useDynamicPositioning } from './shared/useDynamicPositioning';
-// Upstream re-exports @lexical/utils' getScrollParent from this module.
-export { getScrollParent } from '@lexical/utils';
+export { getScrollParent, PUNCTUATION, SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND, useBasicTypeaheadTriggerMatch } from './LexicalTypeaheadMenuPluginUtils';
 
 /**
  * Props for the {@link LexicalTypeaheadMenuPlugin} component.
@@ -92,9 +91,11 @@ export function LexicalTypeaheadMenuPlugin<TOption extends MenuOption>(
 					closeTypeahead();
 					return;
 				}
-				if (editor.isComposing()) {
-					return;
-				}
+				const closeUnlessComposing = () => {
+					if (!editor.isComposing()) {
+						closeTypeahead();
+					}
+				};
 				const editorWindow = editor._window || window;
 				const range = editorWindow.document.createRange();
 				const selection = $getSelection();
@@ -103,7 +104,7 @@ export function LexicalTypeaheadMenuPlugin<TOption extends MenuOption>(
 					!$isRangeSelection(selection) || !selection.isCollapsed() || text === null ||
 						range === null
 				) {
-					closeTypeahead();
+					closeUnlessComposing();
 					return;
 				}
 				const match = triggerFn(text, editor);
@@ -125,7 +126,7 @@ export function LexicalTypeaheadMenuPlugin<TOption extends MenuOption>(
 						return;
 					}
 				}
-				closeTypeahead();
+				closeUnlessComposing();
 			});
 		};
 		return editor.registerUpdateListener(updateListener);

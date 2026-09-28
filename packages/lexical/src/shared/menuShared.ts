@@ -1,10 +1,13 @@
-import type { LexicalCommand, LexicalEditor, TextNode } from 'lexical';
+import type { LexicalEditor, TextNode } from 'lexical';
+import { MenuOption } from '../LexicalMenuOption';
+import { SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND } from '../LexicalTypeaheadMenuPluginUtils';
 import {
 	$getSelection,
 	$isRangeSelection,
 	CAN_USE_DOM,
-	createCommand,
+	getParentElement,
 	isDOMShadowRoot,
+	isHTMLElement,
 } from 'lexical';
 
 // Non-hook, non-JSX shared pieces of @lexical/react/src/shared/LexicalMenu.tsx
@@ -37,27 +40,9 @@ export type MenuRenderFn<TOption extends MenuOption> = (
 
 export type TriggerFn = (text: string, editor: LexicalEditor) => MenuTextMatch | null;
 
-export class MenuOption {
-	key: string;
-	ref?: MenuRef;
-	icon?: unknown;
-	title?: unknown;
-
-	constructor(key: string) {
-		this.key = key;
-		this.ref = { current: null };
-		this.setRefElement = this.setRefElement.bind(this);
-	}
-
-	setRefElement(element: HTMLElement | null) {
-		this.ref = { current: element };
-	}
-}
-
-export const SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND: LexicalCommand<{
-	index: number;
-	option: MenuOption;
-}> = createCommand('SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND');
+// Defined in their own entry points (as upstream) so the menu modules and
+// consumers share one class/command identity; re-exported for internal importers.
+export { MenuOption, SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND };
 
 export const scrollIntoViewIfNeeded = (target: HTMLElement) => {
 	const typeaheadContainerNode = target.closest('#typeahead-menu') as HTMLElement | null;
@@ -137,6 +122,70 @@ export function setContainerDivAttributes(containerDiv: HTMLElement, className?:
 	containerDiv.style.position = 'absolute';
 }
 
+/**
+ * Whether an element establishes the containing block that an absolutely
+ * positioned descendant resolves its offsets against. Being positioned is the
+ * usual reason, but a transform, filter, containment or a `will-change` naming
+ * one of those does it too, on an otherwise statically positioned element.
+ */
+function establishesContainingBlock(style: CSSStyleDeclaration): boolean {
+	if (style.position !== 'static') {
+		return true;
+	}
+	const willChange = style.willChange;
+	return (
+		style.transform !== 'none' ||
+		style.perspective !== 'none' ||
+		style.filter !== 'none' ||
+		style.backdropFilter !== 'none' ||
+		style.contain.includes('paint') ||
+		style.contain.includes('layout') ||
+		style.contain.includes('strict') ||
+		style.contain.includes('content') ||
+		willChange.includes('transform') ||
+		willChange.includes('perspective') ||
+		willChange.includes('filter') ||
+		willChange.includes('contain')
+	);
+}
+
+/**
+ * The anchor is absolutely positioned, so its `top`/`left` are resolved against
+ * its containing block. That is the initial containing block (document
+ * coordinates, hence the page scroll offsets) only while the anchor's ancestors
+ * are all statically positioned. Walks up from the element the anchor is
+ * appended to rather than from the anchor's `offsetParent`, because the anchor
+ * is usually detached when this runs.
+ *
+ * @returns The viewport coordinates of the origin that the anchor's `top`/
+ *   `left` are measured from, or `null` when document coordinates apply.
+ */
+export function getContainingBlockOrigin(
+	parent: HTMLElement | ShadowRoot,
+): null | { left: number; top: number } {
+	// An anchor inside a shadow tree is laid out against the flat tree, so the
+	// walk continues at the host.
+	const start = isDOMShadowRoot(parent) ? parent.host : parent;
+	for (
+		let element: HTMLElement | null = isHTMLElement(start) ? start : null;
+		element !== null;
+		element = getParentElement(element)
+	) {
+		const view = element.ownerDocument.defaultView;
+		if (view === null) {
+			break;
+		}
+		if (establishesContainingBlock(view.getComputedStyle(element))) {
+			const rect = element.getBoundingClientRect();
+			return {
+				left: rect.left + element.clientLeft - element.scrollLeft,
+				top: rect.top + element.clientTop - element.scrollTop,
+			};
+		}
+	}
+	return null;
+}
+
 export function resolveMenuParent(editor: LexicalEditor): HTMLElement | ShadowRoot | undefined {
 	if (!CAN_USE_DOM) {
 		return undefined;
@@ -147,6 +196,7 @@ export function resolveMenuParent(editor: LexicalEditor): HTMLElement | ShadowRo
 		if (isDOMShadowRoot(root)) {
 			return root as ShadowRoot;
 		}
+		return rootElement.ownerDocument.body;
 	}
 	return document.body;
 }

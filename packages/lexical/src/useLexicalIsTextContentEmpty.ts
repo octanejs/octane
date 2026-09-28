@@ -15,12 +15,16 @@ export function useLexicalIsTextContentEmpty(...args: any[]): boolean {
 	const trim = user[1] as boolean | undefined;
 
 	const [isEmpty, setIsEmpty] = useState(
-		editor.read('latest', $isRootTextContentEmptyCurry(editor.isComposing(), trim)),
+		() => editor.read('latest', $isRootTextContentEmptyCurry(editor.isComposing(), trim)),
 		subSlot(slot, 'ultce:state'),
 	);
 
 	useLayoutEffect(
 		() => {
+			// The state was seeded on the first render only, so re-derive it whenever
+			// the inputs the effect depends on change -- otherwise a new editor or a
+			// new trim keeps reporting the previous answer until the next update.
+			setIsEmpty(editor.read('latest', $isRootTextContentEmptyCurry(editor.isComposing(), trim)));
 			return editor.registerUpdateListener(({ editorState }) => {
 				const isComposing = editor.isComposing();
 				const currentIsEmpty = editorState.read($isRootTextContentEmptyCurry(isComposing, trim));

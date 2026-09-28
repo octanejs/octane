@@ -1,10 +1,14 @@
 import type { MenuRef, MenuResolution } from './menuShared';
 
-import { CAN_USE_DOM } from 'lexical';
+import { CAN_USE_DOM, getRootOwnerDocument } from 'lexical';
 import { useCallback, useEffect, useRef } from 'octane';
 
 import { useLexicalComposerContext } from '../LexicalComposerContext';
-import { resolveMenuParent, setContainerDivAttributes } from './menuShared';
+import {
+	getContainingBlockOrigin,
+	resolveMenuParent,
+	setContainerDivAttributes,
+} from './menuShared';
 import { useDynamicPositioning } from './useDynamicPositioning';
 import { splitSlot, subSlot } from './internal';
 
@@ -22,7 +26,9 @@ export function useMenuAnchorRef(...args: any[]): MenuRef {
 
 	const [editor] = useLexicalComposerContext();
 	const resolvedParent = parent ?? resolveMenuParent(editor);
-	const initialAnchorElement = CAN_USE_DOM ? document.createElement('div') : null;
+	const initialAnchorElement = CAN_USE_DOM
+		? getRootOwnerDocument(editor.getRootElement()).createElement('div')
+		: null;
 	const anchorElementRef = useRef<HTMLElement | null>(
 		initialAnchorElement,
 		subSlot(slot, 'uma:ref'),
@@ -42,10 +48,17 @@ export function useMenuAnchorRef(...args: any[]): MenuRef {
 			if (rootElement !== null && resolution !== null) {
 				const { left, top, width, height } = resolution.getRect();
 				const anchorHeight = anchorElementRef.current.offsetHeight;
-				containerDiv.style.top = `${
-					top + anchorHeight + 3 + (shouldIncludePageYOffset ? window.pageYOffset : 0)
-				}px`;
-				containerDiv.style.left = `${left + window.pageXOffset}px`;
+				// `left`/`top` from getRect() are viewport coordinates; translate them
+				// into the coordinate space the anchor is actually positioned in.
+				const origin = getContainingBlockOrigin(resolvedParent);
+				const toAnchorLeft = (viewportLeft: number) =>
+					origin !== null ? viewportLeft - origin.left : viewportLeft + window.pageXOffset;
+				const toAnchorTop = (viewportTop: number) =>
+					origin !== null
+						? viewportTop - origin.top
+						: viewportTop + (shouldIncludePageYOffset ? window.pageYOffset : 0);
+				containerDiv.style.top = `${toAnchorTop(top + anchorHeight + 3)}px`;
+				containerDiv.style.left = `${toAnchorLeft(left)}px`;
 				containerDiv.style.height = `${height}px`;
 				containerDiv.style.width = `${width}px`;
 				if (menuEle !== null) {
@@ -55,15 +68,13 @@ export function useMenuAnchorRef(...args: any[]): MenuRef {
 					const menuWidth = menuRect.width;
 					const rootElementRect = rootElement.getBoundingClientRect();
 					if (left + menuWidth > rootElementRect.right) {
-						containerDiv.style.left = `${rootElementRect.right - menuWidth + window.pageXOffset}px`;
+						containerDiv.style.left = `${toAnchorLeft(rootElementRect.right - menuWidth)}px`;
 					}
 					if (
 						(top + menuHeight > window.innerHeight || top + menuHeight > rootElementRect.bottom) &&
 						top - rootElementRect.top > menuHeight + height
 					) {
-						containerDiv.style.top = `${
-							top - menuHeight - height + (shouldIncludePageYOffset ? window.pageYOffset : 0)
-						}px`;
+						containerDiv.style.top = `${toAnchorTop(top - menuHeight - height)}px`;
 					}
 				}
 				if (!containerDiv.isConnected) {

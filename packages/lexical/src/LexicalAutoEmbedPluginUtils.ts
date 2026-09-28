@@ -1,10 +1,10 @@
-// Typed / agnostic surface of @lexical/react/src/LexicalAutoEmbedPlugin.tsx — the
-// types, the URL matcher, the INSERT_EMBED_COMMAND, and the AutoEmbedOption class.
-// The component lives in LexicalAutoEmbedPlugin.tsrx.
+// Ported from @lexical/react/src/LexicalAutoEmbedPluginUtils.ts — the types, the
+// URL matcher, the INSERT_EMBED_COMMAND, and the AutoEmbedOption class. The
+// component lives in LexicalAutoEmbedPlugin.tsrx.
 import type { LexicalCommand, LexicalEditor, LexicalNode } from 'lexical';
 
 import { createCommand } from 'lexical';
-import { MenuOption } from './shared/menuShared';
+import { MenuOption } from './LexicalMenuOption';
 
 export type EmbedMatchResult<TEmbedMatchResult = unknown> = {
 	url: string;

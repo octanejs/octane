@@ -583,14 +583,14 @@
       "name": "@octanejs/lexical",
       "version": "0.1.57",
       "category": "Content",
-      "upstream": { "package": "@lexical/react", "version": "0.46.0" },
-      "surface": "The 35 legacy `@lexical/react` modules represented by this port cover composer + contexts, the editable surface, plain/rich text, the plugin/menu set, and the `useLexical*` hooks. The 0.46.0 extension subsystem, collaboration plugin, and tree view remain excluded as itemized in UPSTREAM.md.",
+      "upstream": { "package": "@lexical/react", "version": "0.51.0" },
+      "surface": "The 49 `@lexical/react` entry points represented by this port cover composer + contexts, the editable surface, plain/rich text, the plugin/menu set with its `*Utils` and `LexicalMenuOption` entries, and the `useLexical*` hooks including the `@lexical/a11y`-backed accessibility hooks. The 0.51.0 React extension subsystem, collaboration plugin, and tree view remain excluded as itemized in UPSTREAM.md.",
       "divergences": [
-        "Positioning uses `@floating-ui/dom` instead of `@floating-ui/react`.",
+        "Positioning uses `@octanejs/floating-ui` (the Octane port of `@floating-ui/react`) in place of `@floating-ui/react`.",
         "The class-based `LexicalErrorBoundary` becomes an Octane error boundary; `forwardRef` becomes ref-as-prop."
       ],
       "ssr": "No dedicated SSR/hydration tests.",
-      "verified": "2026-08-02"
+      "verified": "2026-09-28"
     },
     {
       "name": "@octanejs/livestore",

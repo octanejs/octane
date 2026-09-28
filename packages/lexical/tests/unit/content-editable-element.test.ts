@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createEditor } from 'lexical';
 import type { LexicalEditor } from 'lexical';
-import { mount, flushEffects } from '../_helpers';
+import { mount, flushEffects, nextPaint } from '../_helpers';
 import { CeeProbe } from '../_fixtures/cee-probe.tsrx';
 
 // Ported from @lexical/react/src/__tests__/unit/LexicalContentEditableElement.test.tsx
-// (the two jest-axe accessibility tests are omitted — jest-axe isn't a dependency).
+// (the jest-axe accessibility tests are omitted — jest-axe isn't a dependency).
+// Updated to 0.51.0: the three tabindex cases are ported below.
 describe('ContentEditableElement (ported from @lexical/react)', () => {
 	let editor: LexicalEditor;
 	beforeEach(() => {
@@ -147,5 +148,54 @@ describe('ContentEditableElement (ported from @lexical/react)', () => {
 			expect(r.find('[role="textbox"]').getAttribute('spellcheck')).toBe(String(spellCheck));
 			r.unmount();
 		}
+	});
+
+	// Added in @lexical/react 0.51.0: a read-only editor leaves the tab order
+	// (tabindex="-1") unless the caller passes an explicit tabIndex.
+	it('renders tabindex="-1" when not editable', () => {
+		editor.setEditable(false);
+		const r = mount(CeeProbe as any, { editor, ceProps: { role: 'textbox' } });
+		flushEffects();
+		const el = r.find('[role="textbox"]');
+		expect(el.getAttribute('tabindex')).toBe('-1');
+		expect(el.getAttribute('contenteditable')).toBe('false');
+		r.unmount();
+	});
+
+	it('does not render tabindex when editable', () => {
+		const r = mount(CeeProbe as any, { editor, ceProps: { role: 'textbox' } });
+		flushEffects();
+		expect(r.find('[role="textbox"]').getAttribute('tabindex')).toBeNull();
+		r.unmount();
+	});
+
+	it('allows custom tabIndex to override default when not editable', () => {
+		editor.setEditable(false);
+		const r = mount(CeeProbe as any, { editor, ceProps: { role: 'textbox', tabIndex: 0 } });
+		flushEffects();
+		expect(r.find('[role="textbox"]').getAttribute('tabindex')).toBe('0');
+		r.unmount();
+	});
+
+	// Octane-only: the default follows setEditable() after mount (the editable
+	// listener re-renders the element), not just the value read at mount.
+	it('toggles the default tabindex with setEditable after mount', async () => {
+		const r = mount(CeeProbe as any, { editor, ceProps: { role: 'textbox' } });
+		flushEffects();
+		const el = r.find('[role="textbox"]');
+		expect(el.getAttribute('tabindex')).toBeNull();
+
+		editor.setEditable(false);
+		flushEffects();
+		await nextPaint();
+		expect(el.getAttribute('tabindex')).toBe('-1');
+		expect(el.getAttribute('contenteditable')).toBe('false');
+
+		editor.setEditable(true);
+		flushEffects();
+		await nextPaint();
+		expect(el.getAttribute('tabindex')).toBeNull();
+		expect(el.getAttribute('contenteditable')).toBe('true');
+		r.unmount();
 	});
 });

@@ -10,7 +10,7 @@ import {
 import { createLexicalComposerContext as createViaSubpath } from '@octanejs/lexical/LexicalComposerContext';
 
 // Phase 0 scaffold smoke test: proves the package resolves via its alias, the
-// Lexical 0.46.0 core is installed, and the composer-context foundation works.
+// Lexical 0.51.0 core is installed, and the composer-context foundation works.
 describe('@octanejs/lexical scaffold', () => {
 	it('resolves the Lexical core dependency', () => {
 		expect(typeof createEditor).toBe('function');

@@ -10,7 +10,6 @@ import {
 } from '@lexical/extension';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { useLexicalNodeSelection } from './useLexicalNodeSelection';
-import type { SerializedHorizontalRuleNode } from '@lexical/extension';
 import {
 	$applyNodeReplacement,
 	addClassNamesToElement,
@@ -20,7 +19,7 @@ import {
 	mergeRegister,
 	removeClassNamesFromElement,
 } from 'lexical';
-import type { DOMConversionMap, DOMConversionOutput, NodeKey } from 'lexical';
+import type { DOMConversionOutput, NodeKey } from 'lexical';
 import { useEffect } from 'octane';
 import type { OctaneNode } from 'octane';
 
@@ -67,25 +66,18 @@ function HorizontalRuleComponent(props: { nodeKey: NodeKey }) {
 }
 
 export class HorizontalRuleNode extends BaseHorizontalRuleNode {
-	static getType() {
-		return 'horizontalrule';
-	}
-
-	static clone(node: HorizontalRuleNode): HorizontalRuleNode {
-		return new HorizontalRuleNode(node.__key);
-	}
-
-	static importJSON(serializedNode: SerializedHorizontalRuleNode): HorizontalRuleNode {
-		return $createHorizontalRuleNode().updateFromJSON(serializedNode);
-	}
-
-	static importDOM(): DOMConversionMap | null {
-		return {
-			hr: () => ({
-				conversion: $convertHorizontalRuleElement,
-				priority: 0,
-			}),
-		};
+	$config() {
+		// Named rather than left to the runtime default, matching the base node:
+		// this deprecated subclass reuses the base node's 'horizontalrule' type.
+		return this.config('horizontalrule', {
+			extends: BaseHorizontalRuleNode,
+			importDOM: {
+				hr: () => ({
+					conversion: $convertHorizontalRuleElement,
+					priority: 0,
+				}),
+			},
+		});
 	}
 
 	decorate(): OctaneNode {

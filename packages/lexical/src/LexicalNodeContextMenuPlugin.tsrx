@@ -1,4 +1,4 @@
-// Ported 1:1 from @lexical/react/src/LexicalNodeContextMenuPlugin.tsx (0.46.0). The
+// Ported 1:1 from @lexical/react/src/LexicalNodeContextMenuPlugin.tsx (0.51.0). The
 // React version is built entirely on @floating-ui/REACT — useFloating, useRole,
 // useDismiss, useListNavigation, useTypeahead, useInteractions, and the
 // FloatingPortal/FloatingOverlay/FloatingFocusManager components. octane now has the
@@ -23,7 +23,7 @@ import {
 } from '@octanejs/floating-ui';
 import type { FloatingStyles } from '@octanejs/floating-ui';
 import { useLexicalComposerContext } from './LexicalComposerContext';
-import { $getNearestNodeFromDOMNode, $getRoot } from 'lexical';
+import { $getNearestNodeFromDOMNode, $getRoot, registerEventListener } from 'lexical';
 import type { LexicalNode } from 'lexical';
 import { useEffect, useRef, useState } from 'octane';
 import type { OctaneNode } from 'octane';
@@ -203,6 +203,23 @@ export function NodeContextMenuPlugin(props: Props) @{
 	// Build the menu model on right-click and open the menu at the cursor.
 	useEffect(() => {
 		function onContextMenu(e: MouseEvent) {
+			let visibleItems: ContextMenuType[] = [];
+			if (items) {
+				editor.read(() => {
+					const node = $getNearestNodeFromDOMNode(e.target as Element) ?? $getRoot();
+					if (node) {
+						visibleItems = items.filter((option) => (option.$showOn ? option.$showOn(node) : true));
+					}
+				});
+			}
+
+			// Nothing is left to show for this node -- separators on their own draw
+			// a menu with no items in it -- so let the browser's own context menu
+			// open rather than suppressing it and mounting an overlay around nothing.
+			if (!visibleItems.some((option) => option.type !== 'separator')) {
+				return;
+			}
+
 			e.preventDefault();
 
 			f.refs.setPositionReference({
@@ -219,16 +236,6 @@ export function NodeContextMenuPlugin(props: Props) @{
 					};
 				},
 			});
-
-			let visibleItems: ContextMenuType[] = [];
-			if (items) {
-				editor.read(() => {
-					const node = $getNearestNodeFromDOMNode(e.target as Element) ?? $getRoot();
-					if (node) {
-						visibleItems = items.filter((option) => (option.$showOn ? option.$showOn(node) : true));
-					}
-				});
-			}
 
 			const renderableItems = visibleItems.map((option, index) => {
 				if (option.type === 'separator') {
@@ -257,8 +264,7 @@ export function NodeContextMenuPlugin(props: Props) @{
 
 		return editor.registerRootListener((rootElement) => {
 			if (rootElement !== null) {
-				rootElement.addEventListener('contextmenu', onContextMenu);
-				return () => rootElement.removeEventListener('contextmenu', onContextMenu);
+				return registerEventListener(rootElement, 'contextmenu', onContextMenu);
 			}
 		});
 	}, [items, itemClassName, separatorClassName, editor]);

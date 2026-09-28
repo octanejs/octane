@@ -144,7 +144,7 @@ export function ContentEditableElement(props: ContentEditableElementProps) @{
 		role={role}
 		spellCheck={props.spellCheck === false ? 'false' : 'true'}
 		style={props.style}
-		tabIndex={props.tabIndex}
+		tabIndex={props.tabIndex ?? (isEditable ? undefined : -1)}
 		{...rest}
 	/>
 }

@@ -27,7 +27,18 @@ const HR: ElementTransformer = {
 	type: 'element',
 };
 
-export const DEFAULT_TRANSFORMERS: Transformer[] = [HR, ...TRANSFORMERS];
+/**
+ * A side-effect-free function rather than an array spread at module scope, which
+ * bundlers treat as a side effect that pins every transformer into any bundle
+ * importing this module.
+ *
+ * @__NO_SIDE_EFFECTS__
+ */
+function defaultTransformers(): Transformer[] {
+	return [HR, ...TRANSFORMERS];
+}
+
+export const DEFAULT_TRANSFORMERS: Transformer[] = /* @__PURE__ */ defaultTransformers();
 
 type Props =
 	Readonly<{

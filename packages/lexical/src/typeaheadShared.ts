@@ -1,5 +1,4 @@
 import type { LexicalEditor, RangeSelection } from 'lexical';
-import type { MenuTextMatch, TriggerFn } from './shared/menuShared';
 
 import {
 	$getSelection,
@@ -8,11 +7,9 @@ import {
 	getDOMSelection,
 	getDOMSelectionPoints,
 } from 'lexical';
-import { useCallback } from 'octane';
 
-// Non-component helpers + the trigger hook from LexicalTypeaheadMenuPlugin.tsx.
-
-export const PUNCTUATION = '\\.,\\+\\*\\?\\$\\@\\|#{}\\(\\)\\^\\-\\[\\]\\\\/!%\'"~=<>_:;';
+// Non-component internals of LexicalTypeaheadMenuPlugin.tsx. The public helpers
+// live in LexicalTypeaheadMenuPluginUtils.ts.
 
 export function getTextUpToAnchor(selection: RangeSelection): string | null {
 	const anchor = selection.anchor;
@@ -79,54 +76,4 @@ export function isSelectionOnEntityBoundary(editor: LexicalEditor, offset: numbe
 		}
 		return false;
 	});
-}
-
-// Two required user args (trigger, options), so the trailing slot is positional.
-export function useBasicTypeaheadTriggerMatch(
-	trigger: string,
-	options: {
-		minLength?: number;
-		maxLength?: number;
-		punctuation?: string;
-		allowWhitespace?: boolean;
-	},
-	slot?: symbol,
-): TriggerFn {
-	const minLength = options.minLength ?? 1;
-	const maxLength = options.maxLength ?? 75;
-	const punctuation = options.punctuation ?? PUNCTUATION;
-	const allowWhitespace = options.allowWhitespace ?? false;
-	return useCallback(
-		(text: string) => {
-			const validCharsSuffix = allowWhitespace ? '' : '\\s';
-			const validChars = '[^' + trigger + punctuation + validCharsSuffix + ']';
-			const TypeaheadTriggerRegex = new RegExp(
-				'(^|\\s|\\()(' +
-					'[' +
-					trigger +
-					']' +
-					'((?:' +
-					validChars +
-					'){0,' +
-					maxLength +
-					'})' +
-					')$',
-			);
-			const match = TypeaheadTriggerRegex.exec(text);
-			if (match !== null) {
-				const maybeLeadingWhitespace = match[1];
-				const matchingString = match[3];
-				if (matchingString.length >= minLength) {
-					return {
-						leadOffset: match.index + maybeLeadingWhitespace.length,
-						matchingString,
-						replaceableString: match[2],
-					};
-				}
-			}
-			return null;
-		},
-		[allowWhitespace, trigger, punctuation, maxLength, minLength],
-		slot,
-	);
 }

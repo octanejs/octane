@@ -7,6 +7,16 @@
       "oracle": "Runs every declared scenario against pinned @lexical/react and @octanejs/lexical through the shared differential rig."
     },
     {
+      "path": "packages/lexical/tests/unit/auto-embed-plugin.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream AutoEmbedPlugin unit suite onto the Octane port; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/character-limit-plugin.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream CharacterLimitPlugin unit suite onto the Octane port; it is not counted as React parity evidence."
+    },
+    {
       "path": "packages/lexical/tests/unit/composer.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane composer context and lifecycle behavior; it is not counted as React parity evidence."
@@ -17,9 +27,34 @@
       "reason": "Checks the Octane content-editable element implementation; it is not counted as React parity evidence."
     },
     {
+      "path": "packages/lexical/tests/unit/decorator-node-config.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane DecoratorBlockNode and HorizontalRuleNode $config serialization; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/decorators-root-remount.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream decorator root-remount suite onto the Octane decorator portals; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/draggable-block-plugin.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream DraggableBlockPlugin unit suite onto the Octane port; it is not counted as React parity evidence."
+    },
+    {
       "path": "packages/lexical/tests/unit/editor.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks representative editor integration on Octane; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/is-text-content-empty-resync.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream useLexicalIsTextContentEmpty resync suite onto the Octane hook; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/lexical-menu-empty-options.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream empty-options menu suite onto the Octane menu; it is not counted as React parity evidence."
     },
     {
       "path": "packages/lexical/tests/unit/lexical-menu.test.ts",
@@ -30,6 +65,11 @@
       "path": "packages/lexical/tests/unit/nested-composer.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks nested Octane composer behavior; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/node-context-menu-visibility.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream NodeContextMenuPlugin unit suite onto the Octane port; it is not counted as React parity evidence."
     },
     {
       "path": "packages/lexical/tests/unit/node-context-menu.test.ts",
@@ -62,14 +102,49 @@
       "reason": "Checks the local Octane package surface; it is not counted as React parity evidence."
     },
     {
+      "path": "packages/lexical/tests/unit/typeahead-menu-composition.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream typeahead IME-composition cases onto the Octane port; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/typeahead-menu-plugin-utils.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream TypeaheadMenuPluginUtils suite onto the Octane entry points; it is not counted as React parity evidence."
+    },
+    {
       "path": "packages/lexical/tests/unit/typeahead-menu.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks the Octane typeahead menu port; it is not counted as React parity evidence."
     },
     {
+      "path": "packages/lexical/tests/unit/use-aria-live-region.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream useLexicalAriaLiveRegion suite onto the Octane hook; it is not counted as React parity evidence."
+    },
+    {
       "path": "packages/lexical/tests/unit/use-character-limit.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks the Octane character-limit hook; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/use-focus-manager-ref.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream useLexicalFocusManagerRef suite onto the Octane hook; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/use-focus-trap-ref.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream useLexicalFocusTrapRef suite onto the Octane hook; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/use-lexical-node-selection.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream useLexicalNodeSelection suite onto the Octane hook; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/use-menu-anchor-ref-position.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream menu-anchor positioning browser suite to jsdom geometry stubs; it is not counted as React parity evidence."
     },
     {
       "path": "packages/lexical/tests/unit/use-menu-anchor-ref.shadow.test.ts",
@@ -80,6 +155,11 @@
       "path": "packages/lexical/tests/unit/use-menu-anchor-ref.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks menu-anchor positioning in the Octane port; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/use-roving-tab-index-ref.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Adapts the upstream useLexicalRovingTabIndexRef suite onto the Octane hook; it is not counted as React parity evidence."
     }
   ]
 }

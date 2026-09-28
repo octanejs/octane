@@ -83,12 +83,21 @@
     "./LexicalTableOfContentsPlugin": "./src/LexicalTableOfContentsPlugin.tsrx",
     "./LexicalAutoEmbedPlugin": "./src/LexicalAutoEmbedPlugin.tsrx",
     "./LexicalDraggableBlockPlugin": "./src/LexicalDraggableBlockPlugin.tsrx",
-    "./LexicalNodeContextMenuPlugin": "./src/LexicalNodeContextMenuPlugin.tsrx"
+    "./LexicalNodeContextMenuPlugin": "./src/LexicalNodeContextMenuPlugin.tsrx",
+    "./LexicalMenuOption": "./src/LexicalMenuOption.ts",
+    "./LexicalTypeaheadMenuPluginUtils": "./src/LexicalTypeaheadMenuPluginUtils.ts",
+    "./LexicalAutoEmbedPluginUtils": "./src/LexicalAutoEmbedPluginUtils.ts",
+    "./LexicalCollaborationContextUtils": "./src/LexicalCollaborationContextUtils.ts",
+    "./useLexicalAriaLiveRegion": "./src/useLexicalAriaLiveRegion.ts",
+    "./useLexicalFocusManagerRef": "./src/useLexicalFocusManagerRef.ts",
+    "./useLexicalFocusTrapRef": "./src/useLexicalFocusTrapRef.ts",
+    "./useLexicalRovingTabIndexRef": "./src/useLexicalRovingTabIndexRef.ts"
   },
   "scripts": {
     "test": "vitest run"
   },
   "dependencies": {
+    "@lexical/a11y": "catalog:default",
     "@lexical/devtools-core": "catalog:default",
     "@lexical/dragon": "catalog:default",
     "@lexical/extension": "catalog:default",

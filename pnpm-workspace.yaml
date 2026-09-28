@@ -208,7 +208,7 @@ catalogs:
     'aria-hidden': ^1.2.6
     'chrome-launcher': 1.2.1
     'tabbable': ^6.5.0
-    '@lexical/code': 0.46.0
+    '@lexical/code': 0.51.0
     '@jridgewell/remapping': ^2.3.5
     '@jridgewell/trace-mapping': ^0.3.31
     '@mdx-js/mdx': ^3.1.1
@@ -224,25 +224,26 @@ catalogs:
     'remark-frontmatter': ^5.0.0
     'remark-gfm': ^4.0.1
     'remark-mdx-frontmatter': ^5.2.0
-    '@lexical/devtools-core': 0.46.0
-    '@lexical/dragon': 0.46.0
-    '@lexical/extension': 0.46.0
-    '@lexical/hashtag': 0.46.0
-    '@lexical/history': 0.46.0
-    '@lexical/internal': 0.46.0
-    '@lexical/link': 0.46.0
-    '@lexical/list': 0.46.0
-    '@lexical/mark': 0.46.0
-    '@lexical/markdown': 0.46.0
-    '@lexical/overflow': 0.46.0
-    '@lexical/plain-text': 0.46.0
-    '@lexical/react': 0.46.0
-    '@lexical/rich-text': 0.46.0
-    '@lexical/selection': 0.46.0
-    '@lexical/table': 0.46.0
-    '@lexical/text': 0.46.0
-    '@lexical/utils': 0.46.0
-    '@lexical/yjs': 0.46.0
+    '@lexical/a11y': 0.51.0
+    '@lexical/devtools-core': 0.51.0
+    '@lexical/dragon': 0.51.0
+    '@lexical/extension': 0.51.0
+    '@lexical/hashtag': 0.51.0
+    '@lexical/history': 0.51.0
+    '@lexical/internal': 0.51.0
+    '@lexical/link': 0.51.0
+    '@lexical/list': 0.51.0
+    '@lexical/mark': 0.51.0
+    '@lexical/markdown': 0.51.0
+    '@lexical/overflow': 0.51.0
+    '@lexical/plain-text': 0.51.0
+    '@lexical/react': 0.51.0
+    '@lexical/rich-text': 0.51.0
+    '@lexical/selection': 0.51.0
+    '@lexical/table': 0.51.0
+    '@lexical/text': 0.51.0
+    '@lexical/utils': 0.51.0
+    '@lexical/yjs': 0.51.0
     '@tiptap/core': 3.28.0
     '@tiptap/extension-bubble-menu': 3.28.0
     '@tiptap/extension-floating-menu': 3.28.0
@@ -364,7 +365,7 @@ catalogs:
     jotai: ^3.0.0
     mobx: 6.16.1
     monaco-editor: 0.55.1
-    lexical: 0.46.0
+    lexical: 0.51.0
     lighthouse: 13.4.1
     lucide-react: 1.24.0
     # Pinned to the release @vis.gl/react-mapbox 8.1.2 develops and tests
