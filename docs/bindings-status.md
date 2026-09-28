@@ -768,7 +768,7 @@ Scope/evidence last checked: 2026-09-12.
 
 ## @octanejs/lexical
 
-[`packages/lexical`](../packages/lexical) `0.1.57` — ports `@lexical/react@0.51.0`. Status data: [`packages/lexical/status.json`](../packages/lexical/status.json).
+[`packages/lexical`](../packages/lexical) `0.2.0` — ports `@lexical/react@0.51.0`. Status data: [`packages/lexical/status.json`](../packages/lexical/status.json).
 
 The 49 `@lexical/react` entry points represented by this port cover composer + contexts, the editable surface, plain/rich text, the plugin/menu set with its `*Utils` and `LexicalMenuOption` entries, and the `useLexical*` hooks including the `@lexical/a11y`-backed accessibility hooks. The 0.51.0 React extension subsystem, collaboration plugin, and tree view remain excluded as itemized in UPSTREAM.md.
 
