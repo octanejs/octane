@@ -429,7 +429,8 @@ concurrently rather than awaiting `allReady` before reading. Same
 - `signal?: AbortSignal` — abort a suspended async/streaming render when the
   request dies; pending promises reject with `signal.reason` and streams cancel.
 - `timeoutMs?: number` — per-render override of the suspense settle deadline;
-  `0` disables it. Async renders only.
+  `0` disables it. Async renders only. In `prerender` it also bounds how long a
+  resource reader may keep rethrowing thenables that have already settled.
 - `headChannel?: 'fold' | 'separate'` — where hoisted `<title>`/`<meta>`/`<link>`
   go. `'fold'` (default) keeps React's resource-hoisting shape described above.
   `'separate'` withholds the metadata from `html`/the streamed shell and hands it
