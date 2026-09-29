@@ -12249,7 +12249,9 @@ function ssrReturnedJsxNode(argument, ctx) {
 		argument.type === 'JSXFragment' ||
 		argument.type === 'Fragment' ||
 		isFragmentLongForm(argument, ctx) ||
-		(!returnedHostRoot && requiresTemplateNormalization(argument, 'html', true, ctx))
+		(returnedHostRoot
+			? isRangedReturnedHost(argument)
+			: requiresTemplateNormalization(argument, 'html', true, ctx))
 	) {
 		return {
 			type: 'TSRXExpression',
@@ -15220,12 +15222,15 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 			node,
 		);
 	}
-	if (node.returnedJsxValue === true && requiresTemplateNormalization(expr, 'html', true, ctx)) {
+	if (
+		node.returnedJsxValue === true &&
+		(isRangedReturnedHost(expr) || requiresTemplateNormalization(expr, 'html', true, ctx))
+	) {
 		// A returned JSX value that contains template-only syntax is one compiled
 		// renderer on the client (rather than a descriptor array whose value
 		// lowering cannot represent directives, sentinels, head hoists, or child
-		// code blocks). Mirror that component boundary on the server: the local
-		// sub-function keeps access to the
+		// code blocks), as is an imperatively built host root. Mirror that component
+		// boundary on the server: the local sub-function keeps access to the
 		// enclosing return component's props/locals, while ssrComponent emits the
 		// range the client descriptor adopts during hydration.
 		// The final flag mirrors extractFragment's component-child decision inside
@@ -20932,6 +20937,25 @@ function renderCallScopeParam(node, ctx) {
 	};
 }
 
+/**
+ * A returned host root that keeps its fragment renderer's own range.
+ *
+ * The client renders every returned host root through a compiled fragment. That
+ * fragment mounts markerless when the host is its one template element, so the
+ * server inlines the host without a range. A host both modes build imperatively
+ * (keyed, `noscript`, document) is a descriptor hole inside the fragment
+ * instead, and the server frames that hole with its own range. A markerless
+ * fragment would adopt that inner range as its own during hydration, so both
+ * sides give this root the fragment range that returned fragments keep.
+ */
+function isRangedReturnedHost(node) {
+	return (
+		(node.type === 'Element' || node.type === 'JSXElement') &&
+		!isComponentTag(node) &&
+		alwaysImperativeHost(node)
+	);
+}
+
 // Lower JSX at return position. Host roots always use the compiled-fragment
 // path. Any other root whose subtree contains template-only syntax uses it too.
 // Ordinary component/Fragment values retain descriptor lowering and its identity
@@ -21789,11 +21813,16 @@ function lowerHostFragment(
 		node,
 	);
 	const renderer = compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash);
-	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
+	if (
+		(node.type === 'Element' || node.type === 'JSXElement') &&
+		!isComponentTag(node) &&
+		!isRangedReturnedHost(node)
+	) {
 		// A host fragment is a SINGLE root element, so it can mount markerless (the
 		// element self-delimits) — matching `@{}`'s inline render exactly (no extra
 		// comment markers), which is required for byte-equal DOM when folding `@{}`.
-		// A returned JSX fragment may have multiple roots and must retain its range.
+		// A returned JSX fragment may have multiple roots and must retain its range,
+		// as must an imperatively built host (see isRangedReturnedHost).
 		ctx.hoistedHelpers.push(
 			inheritOriginLoc(
 				b.const(fragName, singleRootInitializer(ctx, functionExpressionFromDeclaration(renderer))),
@@ -32493,9 +32522,11 @@ const isKeyAttribute = (attribute) => (attribute.name?.name || attribute.name) =
 // an @for body. It takes precedence over a header key, as in @tsrx/core's React
 // target. The reconciler reads row keys before the body runs, so the key can
 // read the item, the index and names outside the loop, but nothing the body
-// declares; hoisting such a key would throw a ReferenceError at runtime.
+// declares: the hoisted key function would throw a ReferenceError at runtime or
+// silently read an outer binding of the same name.
 function forRowKeyAttribute(node, ctx) {
-	const element = node.body.body.find((n) => n.type === 'Element' || n.type === 'JSXElement');
+	const statements = node.body.body;
+	const element = statements.find((n) => n.type === 'Element' || n.type === 'JSXElement');
 	const attribute = (element?.attributes || element?.openingElement?.attributes || []).find(
 		isKeyAttribute,
 	);
@@ -32507,21 +32538,39 @@ function forRowKeyAttribute(node, ctx) {
 			? attribute.value.expression
 			: attribute.value;
 	if (expression.type === 'JSXEmptyExpression') return null;
-	const bodyLocals = collectComponentLocals({ body: node.body.body });
-	if (bodyLocals.size === 0) return expression;
-	for (const name of collectFreeIdentifiers(expression, new Set())) {
-		if (!bodyLocals.has(name)) continue;
-		const l = attribute.loc && attribute.loc.start;
-		const at = l
-			? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})`
-			: '';
-		throw new Error(
-			`The \`key\` attribute on this \`@for\` row reads \`${name}\`, which is declared inside the ` +
-				'loop body. Row keys are computed before the body runs, so they can only read the item, ' +
-				'its `index` binding, and names from outside the loop. Derive the key from the item in ' +
-				`the loop header instead: \`@for (const item of items; key …)\`.${at}`,
-		);
-	}
+	// The keyed element is the row's only output node, so every other statement
+	// is setup that runs in the row function.
+	const setup = statements.filter((statement) => statement !== element);
+	if (setup.length === 0) return expression;
+	// Analyze the setup with the key placed after it, as the body sees it. Only
+	// row declarations are in scope, so a key identifier that resolves to the
+	// row block, or to the row function a `var` hoists into, reads one. A
+	// binding the key declares itself, such as a callback parameter, resolves to
+	// a scope of its own.
+	const probe = b.stmt(expression);
+	const lexical = createLexicalAnalysis(b.block([...setup, probe]));
+	const rowScope = lexical.nodeScopes.get(probe);
+	const visit = (child, parent, key) => {
+		// Array holes, as in `[, row.id]`, arrive as null entries.
+		if (!child || typeof child !== 'object') return;
+		if (child.type === 'Identifier' && isIdentifierReference(child, parent, key, lexical)) {
+			const binding = lexical.resolveBinding(lexical.nodeScopes.get(child) ?? rowScope, child.name);
+			if (binding?.scope === rowScope || binding?.scope === lexical.rootScope) {
+				const l = attribute.loc && attribute.loc.start;
+				const at = l
+					? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})`
+					: '';
+				throw new Error(
+					`The \`key\` attribute on this \`@for\` row reads \`${child.name}\`, which is declared ` +
+						'inside the loop body. Row keys are computed before the body runs, so they can only ' +
+						'read the item, its `index` binding, and names from outside the loop. Derive the key ' +
+						`from the item in the loop header instead: \`@for (const item of items; key …)\`.${at}`,
+				);
+			}
+		}
+		forEachRuntimeAstChild(child, (grandchild, childKey) => visit(grandchild, child, childKey));
+	};
+	visit(expression, probe, 'expression');
 	return expression;
 }
 
