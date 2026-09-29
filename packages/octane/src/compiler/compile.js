@@ -7633,10 +7633,10 @@ function isPlainHostRoot(node) {
  *   - keyed, `noscript`/document, and parser-repaired hosts lower to a
  *     descriptor hole, which is an anchor plus the element;
  *   - head-hoisted metadata and Float resources render nothing in place.
- * Parser-repaired hosts are imperative only on the client, but the SSR proofs
- * pick the wire shape that the client hydrates, so both modes reject them. The
- * planner exempts SVG and `<noscript>` content from some of these rules;
- * ignoring that context here only keeps a marker pair it could have skipped.
+ * The server writes a parser-repaired host from its template but frames it in
+ * the same hole range, so both modes reject it too. The planner exempts SVG
+ * and `<noscript>` content from some of these rules; ignoring that context
+ * here only keeps a marker pair it could have skipped.
  */
 function isSingleTemplateHost(node) {
 	return (
@@ -13054,6 +13054,14 @@ function ssrEmitNode(
 		case 'Element':
 			if (isComponentTag(node))
 				return ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
+			if (node.parserRepairRange === true) {
+				ctx.runtimeNeeded.add('ssrBlock');
+				return ssrCall(
+					'ssrBlock',
+					[ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)],
+					node,
+				);
+			}
 			return ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'TSRXExpression':
 			return ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
@@ -23819,8 +23827,9 @@ function requiresImperativeHostTree(root, ctx) {
 	);
 }
 
-// Hosts that both compile modes build imperatively. Parser-repaired trees are
-// client-only: server output is a string, so repair cannot move its bindings.
+// Hosts that both compile modes build imperatively. The server writes a
+// parser-repaired tree as a string, so repair cannot move its bindings there;
+// normalizeChildren frames it in the hole range the client hydrates instead.
 function alwaysImperativeHost(root) {
 	const tag = jsxTagName(root) || elementTagName(root);
 	return (
@@ -24114,6 +24123,13 @@ function normalizeChildren(
 			// `unstable_Activity` starts with a lowercase letter but is a component
 			// when it resolves to the builtin. Keep that fact on this rare node only.
 			if (isActivityLongForm(n, ctx)) element.activityDescriptor = true;
+			// The client builds a parser-repaired host through the descriptor hole
+			// above. The server keeps its template string and nesting diagnostics,
+			// but frames it as that hole's range: the browser's repair then stays
+			// inside a range the client can adopt or discard, and later siblings
+			// keep their positions.
+			if (ctx?.mode === 'server' && allowImperative && !inSvg && n._octaneImperativeHost === true)
+				element.parserRepairRange = true;
 			// Preserve @tsrx/core's raw-text script discriminator without changing
 			// the normalized object shape of every ordinary element.
 			if (elementTagName(element) === 'script' && typeof n.content === 'string') {

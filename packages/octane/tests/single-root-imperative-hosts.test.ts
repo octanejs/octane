@@ -254,16 +254,27 @@ describe('@for rows whose sole host is not a template element', () => {
 		);
 	});
 
-	it('removes hydrated rows that the HTML parser repaired', async () => {
-		// The parser splits each server row, so hydration rebuilds it. The rebuilt
-		// rows must still reorder, and removing them must leave nothing behind.
+	it('rebuilds and removes hydrated rows that the HTML parser repaired', async () => {
+		// The parser splits each server row before hydration, so hydration
+		// rebuilds it, discards the split nodes, and reports the recovery. The
+		// rebuilt rows must still reorder, and removing them must leave nothing.
 		const program = listShapes['a row the HTML parser repairs'].program;
 		const s = start('hydrate', program, { rows: rows([0, 1, 2, 3]) }, '.row');
 		const built = () => [...s.container.querySelectorAll('.list > p.row > div')];
+		const onlyRows = () =>
+			expect(content(between(s.container, '.list'))).toEqual(built().map((div) => div.parentNode));
+		expect(built().map((div) => div.textContent)).toEqual(['0', '1', '2', '3']);
+		onlyRows();
+		await Promise.resolve();
+		expect(s.recovered).toHaveLength(1);
+		expect(s.mismatches().length > 0).toBe(mode === 'dev');
+
 		s.render({ rows: rows([1, 2, 3, 4]) });
 		expect(built().map((div) => div.textContent)).toEqual(['1', '2', '3', '4']);
+		onlyRows();
 		s.render({ rows: rows([3, 2, 5]) });
 		expect(built().map((div) => div.textContent)).toEqual(['3', '2', '5']);
+		onlyRows();
 		s.render({ rows: [] });
 		expect(content(between(s.container, '.list'))).toEqual([]);
 	});

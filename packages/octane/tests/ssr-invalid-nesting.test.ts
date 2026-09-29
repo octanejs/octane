@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { compile } from 'octane/compiler';
 import { octane } from 'octane/compiler/vite';
 import { createRoot, flushSync, hydrateRoot } from 'octane';
-import { renderToString } from 'octane/server';
+import { renderToStaticMarkup, renderToString } from 'octane/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadServerFixture } from './_server-fixture';
 import {
@@ -22,6 +22,10 @@ import {
 	MathMlNestedLinks,
 	OptionComponentRoot,
 	ParagraphComponentRoot,
+	RepairedBranch,
+	RepairedComponentHost,
+	RepairedRows,
+	RepairedSibling,
 	SelectComponentRoot,
 	Valid,
 	ValidAnchorScope,
@@ -490,5 +494,146 @@ describe('DEV client invalid HTML nesting', () => {
 			root.unmount();
 			container.remove();
 		}
+	});
+});
+
+// The browser parses the server's `<p><div>…</div></p>` as
+// `<p></p><div>…</div><p></p>` before hydration. The client builds the same
+// host imperatively, so hydration must recover to its single `<p>`, keep later
+// siblings bound to their own server nodes, and report the recovery like any
+// other structural mismatch.
+describe('hydrating parser-repaired HTML nesting', () => {
+	const server = productionCompile ? prod : dev;
+
+	/** Element and text markup, ignoring hydration comments. */
+	function markup(node: Element): string {
+		const copy = node.cloneNode(true) as Element;
+		const walker = document.createTreeWalker(copy, NodeFilter.SHOW_COMMENT);
+		const comments: Node[] = [];
+		while (walker.nextNode()) comments.push(walker.currentNode);
+		for (const comment of comments) comment.parentNode!.removeChild(comment);
+		return copy.innerHTML;
+	}
+
+	/** `select` names a server element to capture before hydration. */
+	function hydrate(name: string, client: any, props: Record<string, unknown>, select = 'section') {
+		const container = document.createElement('div');
+		container.innerHTML = renderToString(server[name], props).html;
+		document.body.appendChild(container);
+		const serverNode = container.querySelector(select);
+		const recovered: unknown[] = [];
+		const root = hydrateRoot(container, client, props, {
+			onRecoverableError: (error) => recovered.push(error),
+		});
+		flushSync(() => {});
+		return {
+			container,
+			serverNode,
+			recovered,
+			render: (next: Record<string, unknown>) => flushSync(() => root.render(client, next)),
+			unmount: () => {
+				root.unmount();
+				container.remove();
+			},
+		};
+	}
+
+	/** DEV names the repaired host's source location in a structural warning. */
+	function expectMismatchWarnings(spy: ReturnType<typeof errors>): void {
+		const warnings = spy.mock.calls
+			.map((call) => String(call[0]))
+			.filter((warning) => warning.startsWith('Octane hydration mismatch at'));
+		if (productionCompile) {
+			expect(warnings).toEqual([]);
+			return;
+		}
+		expect(warnings.length).toBeGreaterThan(0);
+		for (const warning of warnings)
+			expect(warning).toMatch(/^[^:]*ssr-invalid-nesting\.tsrx:\d+:\d+: .*<p>/);
+	}
+
+	it('rebuilds a repaired branch once, reports it, and removes it cleanly', async () => {
+		const spy = errors();
+		const s = hydrate('RepairedBranch', RepairedBranch, { show: true, value: 'a' });
+		try {
+			const section = s.container.querySelector('section')!;
+			expect(markup(section)).toBe('<p class="repaired"><div>a</div></p><span>tail</span>');
+			await Promise.resolve();
+			expect(s.recovered).toHaveLength(1);
+			expectMismatchWarnings(spy);
+
+			s.render({ show: true, value: 'b' });
+			expect(markup(section)).toBe('<p class="repaired"><div>b</div></p><span>tail</span>');
+			s.render({ show: false, value: 'b' });
+			expect(markup(section)).toBe('<b>hidden</b><span>tail</span>');
+			s.render({ show: true, value: 'c' });
+			expect(markup(section)).toBe('<p class="repaired"><div>c</div></p><span>tail</span>');
+		} finally {
+			s.unmount();
+		}
+	});
+
+	it('keeps later siblings bound to their own server nodes', async () => {
+		errors();
+		const s = hydrate('RepairedSibling', RepairedSibling, { value: 'a', tone: 'one' }, 'i');
+		try {
+			const section = s.container.querySelector('section')!;
+			expect(markup(section)).toBe('<p class="repaired"><div>a</div></p><i class="one">tail</i>');
+			expect(section.querySelector('i')).toBe(s.serverNode);
+			await Promise.resolve();
+			expect(s.recovered).toHaveLength(1);
+
+			s.render({ value: 'b', tone: 'two' });
+			expect(markup(section)).toBe('<p class="repaired"><div>b</div></p><i class="two">tail</i>');
+			expect(section.querySelector('i')).toBe(s.serverNode);
+		} finally {
+			s.unmount();
+		}
+	});
+
+	it('rebuilds each repaired keyed row once, then reorders and removes the rows', async () => {
+		const spy = errors();
+		const rows = (ids: number[]) => ids.map((id) => ({ id }));
+		const s = hydrate('RepairedRows', RepairedRows, { rows: rows([1, 2, 3]) });
+		const row = (id: number) =>
+			`<div class="entry"><dt>${id}</dt><dd><p class="row"><div>${id}</div></p></dd></div>`;
+		try {
+			const list = s.container.querySelector('dl')!;
+			expect(markup(list)).toBe(row(1) + row(2) + row(3));
+			await Promise.resolve();
+			expect(s.recovered).toHaveLength(1);
+			expectMismatchWarnings(spy);
+
+			s.render({ rows: rows([3, 1, 4]) });
+			expect(markup(list)).toBe(row(3) + row(1) + row(4));
+			s.render({ rows: [] });
+			expect(markup(list)).toBe('');
+		} finally {
+			s.unmount();
+		}
+	});
+
+	it('rebuilds a repaired host whose children include a component', async () => {
+		const spy = errors();
+		const s = hydrate('RepairedComponentHost', RepairedComponentHost, { value: 'a' });
+		try {
+			const section = s.container.querySelector('section')!;
+			expect(markup(section)).toBe('<p class="repaired"><div><em>a</em></div></p>');
+			await Promise.resolve();
+			expect(s.recovered).toHaveLength(1);
+			expectMismatchWarnings(spy);
+
+			s.render({ value: 'b' });
+			expect(markup(section)).toBe('<p class="repaired"><div><em>b</em></div></p>');
+		} finally {
+			s.unmount();
+		}
+	});
+
+	it('leaves non-hydratable static markup unchanged', () => {
+		errors();
+		expect(renderToStaticMarkup(prod.RepairedSibling, { value: 'a', tone: 'one' }).html).toBe(
+			'<section><p class="repaired"><div>a</div></p><i class="one">tail</i></section>',
+		);
 	});
 });
