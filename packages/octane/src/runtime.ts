@@ -7758,6 +7758,11 @@ function vtFinalizeGroup(group: VtGroup, types: string[]): void {
 		while (ancestor !== null && !active.has(ancestor))
 			ancestor = vtNearestBoundaryAncestor(ancestor);
 		if (ancestor === null) vtCancelOldCapture(rec, cancelledAnimations);
+		// An unchanged boundary inside an animating ancestor keeps its name on the
+		// new side too (React parity), so its old snapshot never plays alone over
+		// the ancestor's new snapshot, which already paints the same element.
+		else if (visibleAfter.has(rec.block))
+			vtApplyStyles(rec, vtResolveClass(rec.props, 'update', types));
 	}
 	vtCheckNames(group);
 	const root = owner.documentElement;

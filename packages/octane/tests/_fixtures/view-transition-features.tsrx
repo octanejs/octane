@@ -21,6 +21,20 @@ export function NoneMapApp(props) @{
 	</ViewTransition>
 }
 
+// An ancestor boundary that updates around nested siblings, only one of which changes.
+export function NestedSiblingsApp(props) @{
+	<ViewTransition update={props.outerUpdate}>
+		<nav>
+			<ViewTransition update="item">
+				<span id="changing">{props.text as string}</span>
+			</ViewTransition>
+			<ViewTransition update="item">
+				<span id="unchanged">{'same'}</span>
+			</ViewTransition>
+		</nav>
+	</ViewTransition>
+}
+
 // Named pair for the share viewport-decay test.
 export function NamedShareApp(props) @{
 	<>

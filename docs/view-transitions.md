@@ -187,7 +187,9 @@ commit to continue. Lazy and offscreen images do not hold the capture. As in
 React, an image with an `onLoad` handler opts out of the client resource wait.
 
 Urgent work finishes pending layout work and skips the animation. Unchanged or
-`none` boundaries do not receive separate new captures. The default root overlay
+`none` boundaries do not receive separate new captures, except an unchanged
+boundary inside an animating ancestor: it keeps its name on both sides, so its
+old snapshot never plays alone over the ancestor's new one. The default root overlay
 is suppressed so controls outside animated regions remain interactive.
 Actionable native failures are sent to the root's `onRecoverableError` handler;
 otherwise they are logged, and the update still commits.

@@ -27,6 +27,7 @@ import {
 	ClickUpdateApp,
 	PlainClickApp,
 	RenderErrorApp,
+	NestedSiblingsApp,
 } from './_fixtures/view-transition-features.tsrx';
 
 function evalServer(source: string, filename: string): Record<string, any> {
@@ -321,6 +322,50 @@ describe('ViewTransition features', () => {
 		expect(typeof inst.old.animate).toBe('function');
 
 		(document as never as Record<string, any>)['startViewTransition'] = origSVT;
+	});
+
+	async function captureUnchangedSibling(outerUpdate: string) {
+		const props = { text: 'Short', outerUpdate };
+		await act(() => {
+			startTransition(() => {
+				root.render(NestedSiblingsApp, props);
+			});
+		});
+		const unchanged = container.querySelector('#unchanged') as HTMLElement;
+		const sides = { old: '', new: '' };
+		const origSVT = (document as never as Record<string, any>)['startViewTransition'];
+		(document as never as Record<string, any>)['startViewTransition'] = (opts: {
+			update: () => void;
+		}) =>
+			origSVT({
+				update: () => {
+					sides.old = unchanged.style.getPropertyValue('view-transition-name');
+					opts.update();
+					sides.new = unchanged.style.getPropertyValue('view-transition-name');
+				},
+			});
+		try {
+			await act(() => {
+				startTransition(() => {
+					root.render(NestedSiblingsApp, { ...props, text: 'Much longer content here' });
+				});
+			});
+		} finally {
+			(document as never as Record<string, any>)['startViewTransition'] = origSVT;
+		}
+		return sides;
+	}
+
+	// An old-only snapshot would play the nested update class over the ancestor's new snapshot, which already paints the element.
+	it('pairs the old capture of an unchanged nested boundary under an updating ancestor', async () => {
+		const sides = await captureUnchangedSibling('auto');
+		expect(sides.old).not.toBe('');
+		expect(sides.new).toBe(sides.old);
+	});
+
+	it('gives an unchanged nested boundary no new capture when no ancestor updates', async () => {
+		const sides = await captureUnchangedSibling('none');
+		expect(sides.new).toBe('');
 	});
 
 	it("a type map resolving 'none' deactivates the boundary (no callback)", async () => {
