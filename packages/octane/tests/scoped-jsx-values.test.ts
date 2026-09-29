@@ -682,6 +682,75 @@ export const scopedDecorator = new ScopedDecorator();
 export function ScopeOutlet(props: { content: OctaneNode }) @{
 	<section data-outlet="scope">{props.content}</section>
 }
+
+function CounterChild({ i }: { i: number }) {
+	return <b>{String(i)}</b>;
+}
+
+export function MappedCounterValues() {
+	let n = -1;
+	return (
+		<ul>
+			{['a', 'b', 'c'].map((x) => {
+				n++;
+				return (
+					<li key={x} data-snapshot="mapped">
+						<CounterChild i={n} />
+						<em data-value={String(n)}>{String(n)}</em>
+					</li>
+				);
+			})}
+		</ul>
+	);
+}
+
+export function LoopPushedValues({ count }: { count: number }) @{
+	const rows = [];
+	let label = '';
+	for (let i = 0; i < 3; i++) {
+		label = 'row ' + i;
+		rows.push(
+			<li key={i} data-snapshot="loop" data-value={label}>
+				<CounterChild i={count} />
+				{label as string}
+			</li>,
+		);
+		count--;
+	}
+	<ol>{rows}</ol>
+}
+
+export function SnapshotWithinProvider() @{
+	let label = 'created';
+	const content = <ValueContext value="inner">
+		<span data-snapshot="provider" data-value={label}>{getterValue.current as string}</span>
+	</ValueContext>;
+	label = 'reassigned';
+	<section>{content}</section>
+}
+
+export function WrappedReassignment() @{
+	let content = <b data-snapshot="wrapped" data-value="inner">inner</b>;
+	content = <i data-wrapper="">{content}</i>;
+	<section>{content}</section>
+}
+
+function Labeled(props: { label: string }) {
+	return <i data-snapshot="direct" data-value={props.label}>{props.label as string}</i>;
+}
+
+let directLabel = '';
+
+function DirectLabel() {
+	return <Labeled label={directLabel} />;
+}
+
+export function DirectCallRecord() @{
+	directLabel = 'called';
+	const content = DirectLabel();
+	directLabel = 'rendered';
+	<section>{content}</section>
+}
 `;
 
 type ScopedTsRxFixture = typeof tsx & {
@@ -1213,6 +1282,60 @@ for (const fixture of fixtures) {
 			root.unmount();
 			container.remove();
 		});
+
+		// React reads a binding when the JSX expression runs. Octane renders the
+		// deferred parts later, so a binding reassigned in between must keep its
+		// value from creation: on the client, on the server, and through hydration.
+		// A getter in the same subtree still resolves its represented provider.
+		for (const [exportName, props, expected] of [
+			['MappedCounterValues', undefined, ['00|0', '11|1', '22|2']],
+			['LoopPushedValues', { count: 5 }, ['5row 0|row 0', '4row 1|row 1', '3row 2|row 2']],
+			['SnapshotWithinProvider', undefined, ['inner|created']],
+			['WrappedReassignment', undefined, ['inner|inner']],
+			// OCTANE DIVERGENCE: JSX a named function returns when called directly
+			// still reads when it renders (React: 'called'). Server and client must
+			// agree on that, or hydration would see different text.
+			['DirectCallRecord', undefined, ['rendered|rendered']],
+		] as const) {
+			const rows = (root: ParentNode) =>
+				Array.from(root.querySelectorAll('[data-snapshot]'), (row) => {
+					const valued = row.hasAttribute('data-value') ? row : row.querySelector('[data-value]');
+					return `${row.textContent}|${valued?.getAttribute('data-value')}`;
+				});
+
+			it(`${exportName} reads reassigned bindings on the client`, () => {
+				const result = mount(fixture.client[exportName] as ComponentBody<any>, props);
+				expect(rows(result.container)).toEqual(expected);
+				result.unmount();
+			});
+
+			it(`${exportName} reads reassigned bindings on the server`, () => {
+				const { html } = ServerRuntime.renderToString(fixture.server[exportName], props);
+				const markup = document.createElement('div');
+				markup.innerHTML = html;
+				expect(rows(markup)).toEqual(expected);
+			});
+
+			it(`${exportName} hydrates the values its reassigned bindings had`, () => {
+				const { html } = ServerRuntime.renderToString(fixture.server[exportName], props);
+				const container = document.createElement('div');
+				container.innerHTML = html;
+				document.body.appendChild(container);
+				const existing = Array.from(container.querySelectorAll('[data-snapshot]'));
+				expect(rows(container)).toEqual(expected);
+
+				const root = hydrateRoot(
+					container,
+					fixture.client[exportName] as ComponentBody<any>,
+					props,
+				);
+				flushSync(() => {});
+				expect(Array.from(container.querySelectorAll('[data-snapshot]'))).toEqual(existing);
+				expect(rows(container)).toEqual(expected);
+				root.unmount();
+				container.remove();
+			});
+		}
 
 		// A method that builds JSX inside a synchronous scope, as Lexical calls
 		// DecoratorNode.decorate() while its editor state is active. The element

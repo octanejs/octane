@@ -64,3 +64,58 @@ export function JsxListStateful() @{
 		<ul>{items.map((it) => <li key={it.id}>{it.label as string}</li>)}</ul>
 	</div>
 }
+
+function CounterChild({ i }: { i: number }) {
+	return <b>{String(i)}</b>;
+}
+
+// Each `.map` callback reassigns one counter. React reads it while that row's
+// JSX evaluates, so the component prop, text child, and attribute all show the
+// row's own value, not the counter's final one.
+export function CounterJsxList() {
+	let n = -1;
+	return <ul>{['a', 'b', 'c'].map((x) => {
+		n++;
+		return <li key={x}>
+			<CounterChild i={n} />
+			<em data-n={String(n)}>{String(n)}</em>
+		</li>;
+	})}</ul>;
+}
+
+// A `for` loop pushing JSX while it reassigns a local and a parameter.
+export function LoopPushedJsxList({ count }: { count: number }) {
+	const rows = [];
+	let label = '';
+	for (let i = 0; i < 3; i++) {
+		label = `row ${i}`;
+		rows.push(
+			<li key={i} data-label={label}>
+				<CounterChild i={count} />
+				{label as string}
+			</li>,
+		);
+		count--;
+	}
+	return <ol>{rows}</ol>;
+}
+
+// Re-rendering restarts the counter from state. An event handler inside a row
+// still closes over the live binding, which holds its final value by then.
+export function CounterJsxListStateful() @{
+	const [start, setStart] = useState(0);
+	const [seen, setSeen] = useState(-1);
+	let n = start;
+	const rows = ['a', 'b'].map((x) => {
+		n++;
+		return <li key={x}>
+			<button id={`seen-${x}`} onClick={() => setSeen(n)}>{String(n)}</button>
+		</li>;
+	});
+	n = 100;
+	<div>
+		<button id="restart" onClick={() => setStart(start + 10)}>{'restart'}</button>
+		<p>{String(seen)}</p>
+		<ul>{rows}</ul>
+	</div>
+}
