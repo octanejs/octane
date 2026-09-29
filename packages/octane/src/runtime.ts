@@ -308,13 +308,13 @@ function profileTrackComponent(subject: object, fallback: Function): void {
 	);
 }
 
-function profilePortalComponent(rawBody: unknown): Function | null {
+function profilePortalComponent(rawBody: unknown, body: Function): Function | null {
 	if (typeof rawBody === 'function' && __profileHasComponentMetadata(rawBody)) return rawBody;
+	// Only a component element unwrapped into the portal block is that block's
+	// component. A keyed one renders through childSlot, which tracks its own block.
 	const descriptor = rawBody as any;
-	return descriptor != null &&
-		descriptor.$$kind === ELEMENT_TAG &&
-		typeof descriptor.type === 'function'
-		? descriptor.type
+	return descriptor != null && descriptor.$$kind === ELEMENT_TAG && descriptor.type === body
+		? body
 		: null;
 }
 
@@ -28210,6 +28210,8 @@ interface PortalSlot {
 	block: Block | null;
 	target: Element | DocumentFragment | null;
 	key: string | null;
+	// The element type the body block was built for (see portalChildType).
+	childType: unknown;
 	host: Node;
 	start: Comment | null;
 	end: Comment | null;
@@ -28543,9 +28545,16 @@ function renderPortalState(
 		);
 	}
 	const norm = normalizePortalBody(rawBody, rawProps);
+	const childType = portalChildType(rawBody, norm.body);
 	let state = prev;
-	if (state === null || state.target !== target || state.key !== key) {
-		// First mount, changed key, or the portal moved to a different target → (re)build.
+	if (
+		state === null ||
+		state.target !== target ||
+		state.key !== key ||
+		state.childType !== childType
+	) {
+		// First mount, changed key, a different child element type, or the portal
+		// moved to a different target → (re)build.
 		if (state !== null) teardownPortalState(state);
 		const start = (STAGED_DOM?.view(document) ?? document).createComment('portal');
 		const end = (STAGED_DOM?.view(document) ?? document).createComment('/portal');
@@ -28572,9 +28581,9 @@ function renderPortalState(
 			renderReturnedValue,
 		);
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-			__profileTrackComponent(block, profilePortalComponent(rawBody));
+			__profileTrackComponent(block, profilePortalComponent(rawBody, norm.body));
 		}
-		state = { __kind: 'portalSlotSlot', block, target, key, host, start, end };
+		state = { __kind: 'portalSlotSlot', block, target, key, childType, host, start, end };
 		registerPortalEventRange(target, state);
 		activityPortalCreated?.(block);
 		// Portal target hosts handlers stamped via the same `el.$$click = …`
@@ -28602,7 +28611,7 @@ function renderPortalState(
 		state.block!.props = norm.props;
 		state.block!.extra = env;
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-			__profileTrackComponent(state.block!, profilePortalComponent(rawBody));
+			__profileTrackComponent(state.block!, profilePortalComponent(rawBody, norm.body));
 		}
 		renderBlock(state.block!);
 	}
@@ -28668,19 +28677,38 @@ function normalizePortalBody(rawBody: any, rawProps: any): { body: ComponentBody
 	if (typeof rawBody === 'function') {
 		return { body: rawBody as ComponentBody, props: rawProps };
 	}
-	if (rawBody != null && rawBody.$$kind === ELEMENT_TAG && typeof rawBody.type === 'function') {
+	// An unkeyed component element renders as the portal Block itself. A keyed
+	// one takes the generic path below, whose childSlot remounts it when its key
+	// changes, exactly as for a keyed host element.
+	if (
+		rawBody != null &&
+		rawBody.$$kind === ELEMENT_TAG &&
+		typeof rawBody.type === 'function' &&
+		rawBody.key === null
+	) {
 		return {
 			body: rawBody.type as ComponentBody,
 			props: rawBody.props,
 		};
 	}
-	// Host element / array / primitive / component-descriptor → render via childSlot
-	// inside the portal Block (genericPortalBody has stable identity, so the portal
-	// reconciles its content across re-renders rather than rebuilding).
+	// Host element / array / primitive / keyed or non-function component element →
+	// render via childSlot inside the portal Block (genericPortalBody has stable
+	// identity, so the portal reconciles its content across re-renders rather than
+	// rebuilding).
 	return {
 		body: genericPortalBody as unknown as ComponentBody,
 		props: rawBody,
 	};
+}
+
+// The child identity a portal keeps its body Block for, alongside its target and
+// its own key: the unwrapped component type, or genericPortalBody for any other
+// renderable (whose childSlot reconciles type and key changes itself). A change
+// rebuilds the portal, so `createPortal(<A/>, t)` → `createPortal(<B/>, t)`
+// remounts like React. A raw function body is an Octane render function whose
+// identity may change every render (an inline arrow), so it never rebuilds.
+function portalChildType(rawBody: unknown, body: ComponentBody): unknown {
+	return typeof rawBody === 'function' ? null : body;
 }
 
 function genericPortalBody(value: any, scope: Block): void {

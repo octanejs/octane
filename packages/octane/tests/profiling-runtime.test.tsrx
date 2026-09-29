@@ -156,6 +156,10 @@ function InlinePortalApp(props) @{
 	<div>{createPortal(<span>inline portal</span>, props.target)}</div>
 }
 
+function KeyedPortalApp(props: { target: Element; id: string }) {
+	return createPortal(<PortalBody key={props.id} label={props.id} />, props.target, 'stable');
+}
+
 function renders(component) {
 	return profiler.why(component).filter((event) => event.type === 'component-render');
 }
@@ -395,6 +399,20 @@ describe('profile build component boundaries', () => {
 		const inlinePortal = mount(InlinePortalApp, { target });
 		expect(profiler.summary().map((entry) => entry.component)).toEqual(['InlinePortalApp']);
 		inlinePortal.unmount();
+		target.remove();
+	});
+
+	it('tracks a keyed portal element as one component instance per key', () => {
+		const target = document.createElement('div');
+		document.body.appendChild(target);
+		const view = mount(KeyedPortalApp, { target, id: 'a' });
+		view.update(KeyedPortalApp, { target, id: 'a' });
+		view.update(KeyedPortalApp, { target, id: 'b' });
+
+		const portalEvents = renders('PortalBody');
+		expect(portalEvents.map((event) => event.phase)).toEqual(['mount', 'update', 'mount']);
+		expect(new Set(portalEvents.map((event) => event.instanceId)).size).toBe(2);
+		view.unmount();
 		target.remove();
 	});
 });
