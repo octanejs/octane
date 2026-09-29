@@ -22,15 +22,13 @@ function getHydrationPromise(router: AnyRouter) {
 	return promise;
 }
 
-function RouterClientInner(props: { router: AnyRouter }) @{
+// Per react-router's RouterClient, which suspends through <Await> without a
+// fallback: no boundary sits above the router. A root that suspends keeps the
+// server DOM while hydrating and commits the whole tree once hydrate() settles.
+// A boundary here would commit an empty fallback, throttle the hydrated tree's
+// reveal as a Suspense retry, and add a range the server's RouterServer never
+// rendered.
+export function RouterClient(props: { router: AnyRouter }) @{
 	use(toExternalHydrationThenable(getHydrationPromise(props.router)));
 	<RouterProvider router={props.router} />
-}
-
-export function RouterClient(props: { router: AnyRouter }) @{
-	@try {
-		<RouterClientInner router={props.router} />
-	} @pending {
-		<></>
-	}
 }
