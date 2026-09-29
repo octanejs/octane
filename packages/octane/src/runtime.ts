@@ -11148,12 +11148,12 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 						block.parentNode,
 						d.type as ComponentBody,
 						d.props,
+						d.__octaneInvocationSite,
 						block.endMarker,
-						d.key ?? undefined,
 						true,
 						undefined,
+						d.key ?? undefined,
 						activeHydration() !== null && elementKeyWasProvided(d),
-						d.__octaneInvocationSite,
 					),
 				);
 			} else {
@@ -11163,12 +11163,12 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 					block.parentNode,
 					d.type as ComponentBody,
 					d.props,
+					d.__octaneInvocationSite,
 					block.endMarker,
-					d.key ?? undefined,
 					true,
 					undefined,
+					d.key ?? undefined,
 					activeHydration() !== null && elementKeyWasProvided(d),
-					d.__octaneInvocationSite,
 				);
 			}
 		} else {
@@ -11414,8 +11414,8 @@ export function componentSlotLite<P>(
 	host: Node,
 	comp: ComponentBody<P>,
 	props: P,
-	anchor?: Node,
 	invocationSite?: string,
+	anchor?: Node,
 ): void {
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	// Providers and lazy wrappers can execute independently compiled bodies in
@@ -11455,8 +11455,8 @@ export function componentSlotLite<P>(
 			host,
 			comp,
 			props,
-			anchor,
 			invocationSite,
+			anchor,
 		);
 		return;
 	}
@@ -11569,11 +11569,11 @@ function suspendFreshLiteComponent<P>(
 	host: Node,
 	comp: ComponentBody<P>,
 	props: P,
-	anchor?: Node,
 	invocationSite?: string,
+	anchor?: Node,
 ): void {
 	hydration.suspend(() =>
-		componentSlotLite(parentScope, slotKey, host, comp, props, anchor, invocationSite),
+		componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite, anchor),
 	);
 }
 
@@ -19914,14 +19914,16 @@ function preparePresentationSignalBinding(
 			if (witness >= 0)
 				frame.witnesses.set(handle!, finishNativeReadWitness(witness, readCompleted));
 		}
+		// bindSignalText(scope, previous, position, value, site, onlyChild,
+		// previousValue, seededText, bindingMarker): the marker is argument 8.
 		if (
 			text &&
 			((current !== null && (typeof current === 'object' || typeof current === 'function')) ||
-				typeof args[7] !== 'string')
+				typeof args[8] !== 'string')
 		)
 			presentationMiss(false);
 		const prepared = text
-			? bindingText(element, current, args[7])
+			? bindingText(element, current, args[8])
 			: preparedPresentationAttribute(element, name!, current, attributeKind!);
 		if (handle === null) {
 			if (text) {
@@ -20368,8 +20370,9 @@ export function presentationStructure(
 	if (frame?.revision === undefined) return writer(...args);
 	const hydration = activeHydration();
 	if (hydration === null) presentationMiss(false);
-	const anchorIndex = kind === 'if' ? 6 : 5;
-	const start = hydration.resolveOpen(args[anchorIndex] ?? null, args[2]);
+	// ifBlock and the component writers (componentSlot/Void/Lite) all carry their
+	// anchor at argument 6; compiled calls may omit it as a trailing undefined.
+	const start = hydration.resolveOpen(args[6] ?? null, args[2]);
 	if (kind === 'if') {
 		const arm = args[3] ? (args[4] === null ? -1 : 0) : args[5] === null ? -1 : 1;
 		const range = presentationRange(frame, start, marker + arm, kind);
@@ -21208,7 +21211,13 @@ function bindDirectSignal(
 	return binding;
 }
 
-/** @internal Compiler target for a direct signal/scalar text binding. */
+/**
+ * @internal Compiler target for a direct signal/scalar text binding.
+ *
+ * Updates pass `previousValue` (the bag's raw-value cache) right after
+ * `onlyChild`; `seededText` and `bindingMarker` only matter while `previous` is
+ * still undefined, so compiled updates omit them.
+ */
 export function bindSignalText(
 	scope: Scope,
 	previous: unknown,
@@ -21216,16 +21225,17 @@ export function bindSignalText(
 	value: unknown,
 	site: string,
 	onlyChild = false,
+	previousValue?: unknown,
 	seededText: 1 | undefined = undefined,
 	bindingMarker?: string,
-	previousValue?: unknown,
 ): unknown {
 	// Keep the ordinary text cache in the compiler's existing binding bag. A
 	// signal token must still re-enter the read path even when its handle is
 	// unchanged, so pending/error recovery is not hidden by this scalar guard.
+	// A supplied previousValue may itself be undefined, so count arguments.
 	if (
 		previous instanceof Text &&
-		arguments.length > 8 &&
+		arguments.length > 6 &&
 		previousValue === value &&
 		!isSignalHandle(value)
 	)
@@ -29719,19 +29729,29 @@ interface CompSlot {
 
 const NO_KEY: unique symbol = Symbol('NO_KEY');
 
-/** Generic component call site: reconcile any JavaScript return value. */
+/**
+ * Generic component call site: reconcile any JavaScript return value.
+ *
+ * Compiled call sites pass the optional tail in descending frequency — the
+ * invocation identity (every compiled site), anchor, singleRoot, inherit, then
+ * the rare keyed pair — and omit trailing `undefined` arguments, so the common
+ * call is `componentSlot(s, i, parent, Comp, props, site, anchor)`. Keep this
+ * order shared with componentSlotVoid and componentSlotLite: presentation
+ * hydration (presentationStructure) reads the anchor at the same index for all
+ * three writers.
+ */
 export function componentSlot(
 	parentScope: Scope,
 	slotKey: number,
 	domParent: Node,
 	comp: ComponentBody | string,
 	props: any,
+	invocationSite?: string,
 	anchor?: Node | null,
-	key?: any,
 	singleRoot?: boolean | 2,
 	inherit?: boolean,
+	key?: any,
 	hasKey?: boolean,
-	invocationSite?: string,
 ): void {
 	const dispatch = activityDescriptorDispatch;
 	const activity = dispatch !== null && (comp as unknown) === dispatch.type;
@@ -29793,12 +29813,12 @@ export function componentSlotVoid(
 	domParent: Node,
 	comp: ComponentBody | string,
 	props: any,
+	invocationSite?: string,
 	anchor?: Node | null,
-	key?: any,
 	singleRoot?: boolean | 2,
 	inherit?: boolean,
+	key?: any,
 	hasKey?: boolean,
-	invocationSite?: string,
 ): void {
 	if (typeof comp !== 'function') throw invalidElementTypeError(comp);
 	componentSlotImpl(
@@ -32347,12 +32367,10 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 				block.parentNode,
 				item.type,
 				item.props,
-				block.endMarker,
-				undefined,
-				true,
-				true,
-				undefined,
 				item.__octaneInvocationSite,
+				block.endMarker,
+				true,
+				true,
 			);
 			return;
 		}
@@ -45555,7 +45573,15 @@ export function createIndependentHydrateActivator(
 			tryBlock(scope, 0, scope.block.parentNode, content, null, null, scope.block.endMarker);
 		};
 		const adapter: ComponentBody = (_props, scope) => {
-			componentSlotVoid(scope, 0, scope.block.parentNode, framed, undefined, scope.block.endMarker);
+			componentSlotVoid(
+				scope,
+				0,
+				scope.block.parentNode,
+				framed,
+				undefined,
+				undefined,
+				scope.block.endMarker,
+			);
 		};
 		const root = hydrateRoot(element, adapter, captures, {
 			identifierPrefix: manifest.boundaryId + '-',
