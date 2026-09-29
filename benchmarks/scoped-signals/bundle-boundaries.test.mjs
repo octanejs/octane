@@ -642,7 +642,7 @@ test('scalar declarations select the bounded implementation only with a static p
 		['() => String(value())', '', false],
 		['() => (value() as string)', '', false],
 		['async () => 1', '', false],
-		['() => { "use strong"; return value(); }', '', false],
+		['() => { "use strict"; return value(); }', '', false],
 		['(context = undefined) => 1', '', false],
 		['() => value()', ', {sync: true}', true],
 		['() => value()', ', {key: "value", sync: true}', true],

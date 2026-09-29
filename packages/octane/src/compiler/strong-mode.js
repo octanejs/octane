@@ -452,7 +452,7 @@ function diagnostic(code, filename, node, message, suggestions = []) {
 	};
 }
 
-function strongDirectives(ast) {
+function strongDirectives(ast, source) {
 	let enabled = false;
 	let misplaced = null;
 	let prologue = true;
@@ -466,16 +466,52 @@ function strongDirectives(ast) {
 			continue;
 		}
 		prologue = false;
-		if (
-			misplaced === null &&
-			statement.type === 'ExpressionStatement' &&
-			statement.expression?.value === 'use strong' &&
-			(statement.expression.raw === '"use strong"' || statement.expression.raw === "'use strong'")
-		) {
+		if (misplaced === null && isStrongDirectiveStatement(statement)) {
 			misplaced = statement.expression;
 		}
 	}
-	return { enabled, misplaced };
+	let nested = null;
+	const first = source.indexOf('use strong');
+	if (
+		misplaced === null &&
+		first !== -1 &&
+		(!enabled || source.indexOf('use strong', first + 1) !== -1)
+	) {
+		for (const statement of ast?.body ?? []) {
+			if (isStrongDirectiveStatement(statement)) continue;
+			nested = nestedStrongDirective(statement);
+			if (nested !== null) break;
+		}
+	}
+	return { enabled, misplaced: misplaced ?? nested, nested: nested !== null };
+}
+
+function isStrongDirectiveStatement(statement) {
+	return (
+		statement.type === 'ExpressionStatement' &&
+		statement.expression?.value === 'use strong' &&
+		(statement.expression.raw === '"use strong"' || statement.expression.raw === "'use strong'")
+	);
+}
+
+// Strong applies per module. A function-body directive would otherwise be ignored
+// and leave the whole module in compat mode with no diagnostic.
+function nestedStrongDirective(node) {
+	if (node === null || typeof node !== 'object') return null;
+	if (Array.isArray(node)) {
+		for (const child of node) {
+			const found = nestedStrongDirective(child);
+			if (found !== null) return found;
+		}
+		return null;
+	}
+	if (isStrongDirectiveStatement(node)) return node.expression;
+	for (const key in node) {
+		if (SKIP_KEYS.has(key) || key.startsWith('_octane')) continue;
+		const found = nestedStrongDirective(node[key]);
+		if (found !== null) return found;
+	}
+	return null;
 }
 
 // Template arms create their own hook lifetimes. A value used only by one arm
@@ -1300,14 +1336,16 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return { enabled: false, diagnostics: [] };
 	}
 	const diagnostics = [];
-	const directives = strongDirectives(ast);
+	const directives = strongDirectives(ast, source);
 	if (directives.misplaced !== null) {
 		diagnostics.push(
 			diagnostic(
 				STRONG_DIRECTIVE_PLACEMENT,
 				filename,
 				directives.misplaced,
-				'Place "use strong" at the top of the file, before imports or other code.',
+				directives.nested
+					? '"use strong" applies to a whole module, not one function. Move it to the top of the file, before imports or other code.'
+					: 'Place "use strong" at the top of the file, before imports or other code.',
 			),
 		);
 	}
