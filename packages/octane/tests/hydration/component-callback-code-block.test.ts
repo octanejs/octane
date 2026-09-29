@@ -435,4 +435,73 @@ export function Counter({ log, target }: { log: (n: number) => void; target: HTM
 		expect(button.textContent).toBe('2');
 		root.unmount();
 	});
+
+	// A name a nested scope declares for itself (a block's setup, a `@catch` param)
+	// is not a read of the callback's same-named binding. Here that binding lives in
+	// a sibling block, so it is not in scope where the block is written at all.
+	describe('with a callback binding that only a nested scope shares', () => {
+		const SIBLING = `if (x < 0) {
+			const y = -x;
+			console.log(y);
+		}
+		try {
+			console.log(x);
+		} catch (reset) {
+			console.log(reset);
+		}`;
+		const SHAPES: Record<string, { jsx: string; inner: (id: number) => string }> = {
+			BlockLocal: {
+				jsx: '<p>@{ const y = x + 1; <b>{y as string}</b> }</p>',
+				inner: (id) => `<b>${id + 1}</b>`,
+			},
+			// The arm hoists, and threads what the nested block reads from the call site.
+			ArmBlockLocal: {
+				jsx: '<p>@if (x > 0) { <i>@{ const y = x + 1; <b>{y as string}</b> }</i> }</p>',
+				inner: (id) => `<i><b>${id + 1}</b></i>`,
+			},
+			CatchReset: {
+				jsx: "<p>@try { <b>{x as string}</b> } @catch (err, reset) { <button onClick={() => reset()}>{'retry'}</button> }</p>",
+				inner: (id) => `<b>${id}</b>`,
+			},
+		};
+		let compiled: Modules | undefined;
+		const modules = () =>
+			(compiled ??= load(
+				Object.entries(SHAPES)
+					.map(
+						([name, shape]) => `export function ${name}({ id: rowId }: { id: number }) @{
+	const render = (x: number) => {
+		${SIBLING}
+		return ${shape.jsx};
+	};
+	<div class="list">{render(rowId)}</div>
+}`,
+					)
+					.join('\n'),
+				'component-callback-block-shadow.tsrx',
+				dev,
+			));
+		const states = [{ id: 1 }, { id: 2 }];
+
+		for (const [name, shape] of Object.entries(SHAPES)) {
+			const html = states.map(({ id }) => `<div class="list"><p>${shape.inner(id)}</p></div>`);
+
+			it(`renders ${name} on the server and on mount and update`, () => {
+				expect(serverHtml(modules(), name, states[0])).toBe(html[0]);
+				const mounted = mount(modules(), name, states);
+				expect(mounted.seen).toEqual(html);
+				expect(mounted.blocks[1]).toBe(mounted.blocks[0]);
+			});
+
+			it(`hydrates ${name} from renderToString`, async () => {
+				const result = await hydrate(modules(), name, states);
+				expect(result.recoverable).toEqual([]);
+				expect(result.errors).toEqual([]);
+				expect(result.hydrated).toBe(html[0]);
+				expect(result.hydratedElements).toEqual(result.serverElements);
+				expect(result.updated).toBe(html[1]);
+				expect(result.blockSurvived).toBe(true);
+			});
+		}
+	});
 });

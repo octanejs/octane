@@ -2705,9 +2705,11 @@ function collectComponentLocals(componentNode) {
 // Every name a callback binds for code in its own body: its params, a function
 // expression's own name, and each declaration at ANY statement depth, where
 // collectComponentLocals reads only the top level. A name from a sibling block is
-// included too. That can only add a threaded name whose value resolves at the call
-// site like any other read; it never drops one. Nested functions and render bodies
-// bind their own names, and are visited on their own.
+// included too, which is sound only because a name is threaded when code reads it
+// free: that read already means whatever the name resolves to at the call site.
+// collectFreeIdentifiers must therefore never report a nested scope's own names
+// (a `@{ … }` block's locals, a `@catch` param) as free. Nested functions and
+// render bodies bind their own names, and are visited on their own.
 function collectCallbackBindings(fn) {
 	const names = new Set();
 	for (const p of fn.params || []) collectBindings(p, names);
@@ -4144,12 +4146,34 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 			return;
 		}
 
-		// CatchClause introduces its param.
+		// CatchClause introduces its param, and a `@catch (error, reset)` clause
+		// also its reset param.
 		if (t === 'CatchClause') {
 			const newScope = new Set(scope);
 			if (n.param) collectBindings(n.param, newScope);
+			if (n.resetParam) collectBindings(n.resetParam, newScope);
 			if (n.param) walkPatternExpressions(n.param, newScope);
 			walk(n.body, newScope);
+			return;
+		}
+
+		// A `@{ … }` block's setup declarations are scoped to its setup and render
+		// output, like a block statement's. Otherwise a block-local reads as a
+		// capture of any outer name it shares, which a caller would thread from a
+		// call site where that outer name may not be in scope.
+		if (t === 'JSXCodeBlock') {
+			const newScope = new Set(scope);
+			for (const stmt of n.body || []) {
+				if (stmt.type === 'VariableDeclaration') {
+					for (const d of stmt.declarations || []) collectBindings(d.id, newScope);
+				} else if (stmt.type === 'FunctionDeclaration' && stmt.id) {
+					newScope.add(stmt.id.name);
+				}
+			}
+			for (const key in n) {
+				if (AST_WALK_SKIP_KEYS.has(key)) continue;
+				walk(n[key], newScope);
+			}
 			return;
 		}
 
