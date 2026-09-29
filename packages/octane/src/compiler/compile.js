@@ -21101,7 +21101,18 @@ function isStaticReturnedFragmentComponent(node, ctx) {
 // text, nested host elements/fragments) stays in the template; nested component
 // children become renderable holes. The result is a self-contained fragment whose
 // only inputs are its props — compilable as an ordinary renderer.
-function extractFragment(node, ctx, holeProps, parentNs = 'html') {
+//
+// The renderer builds a keyed, `noscript`/document, or parser-repaired host as a
+// descriptor (isDescriptorBuiltHost), and a descriptor child must be a value: a
+// FoldedDirective or template-only component placeholder under it would be
+// dropped. Inside such a host (`inDescriptor`), directives and components lower
+// to value holes here in the owning component, as a `@{}` body and the server
+// lower them. Misreading a template host as a descriptor host costs only the
+// template fast path; the reverse drops children.
+function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor = false) {
+	const descriptor =
+		inDescriptor ||
+		(node.type === 'JSXElement' && isDescriptorBuiltHost(node, parentNs === 'svg', ctx));
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const newAttrs = [];
 	const mergedFragmentSpread = isFragmentLongForm(node, ctx) && hasJsxSpreadAttribute(node);
@@ -21211,14 +21222,16 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 	// Lower `{xs.map(item => <jsx key/>)}` children to a synthetic `@for`
 	// (ForOfStatement) up front so they take the directive fold path below
 	// (forBlock) instead of becoming a childSlot descriptor-array hole. Only when
-	// we have a fold context (always true on the .tsx host-fragment path).
-	const fragChildren = ctx._foldCtx
-		? (node.children || []).map((child) =>
-				child && child.type === 'JSXExpressionContainer'
-					? mapCallToForOf(child.expression, ctx) || child
-					: child,
-			)
-		: node.children || [];
+	// we have a fold context (always true on the .tsx host-fragment path) and the
+	// children are template children.
+	const fragChildren =
+		ctx._foldCtx && !descriptor
+			? (node.children || []).map((child) =>
+					child && child.type === 'JSXExpressionContainer'
+						? mapCallToForOf(child.expression, ctx) || child
+						: child,
+				)
+			: node.children || [];
 	const nodeTag = jsxTagName(node) || elementTagName(node);
 	const childNs =
 		typeof nodeTag === 'string' && !isComponentTag(node)
@@ -21268,9 +21281,12 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				newChildren.push({ ...child, expression: rendered });
 			}
 		} else if (t === 'Element' || t === 'JSXElement') {
-			if (isLongFormTemplateSentinel(child, childNs, true, ctx)) {
+			if (descriptor && !isComponentTag(child)) {
+				newChildren.push(extractFragment(child, ctx, holeProps, childNs, true));
+			} else if (!descriptor && isLongFormTemplateSentinel(child, childNs, true, ctx)) {
 				newChildren.push(extractFragment(child, ctx, holeProps, childNs));
 			} else if (
+				!descriptor &&
 				isComponentTag(child) &&
 				(child._octaneBindingSite ||
 					(ctx._foldCtx?.templateComponentChildren === true &&
@@ -21315,7 +21331,13 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			// A fragment nested inside the returned fragment shares the hoisted
 			// renderer. Extract its dynamic values/directives too; leaving it raw would
 			// make authored outer locals resolve against the renderer's hole-props object.
-			newChildren.push(extractFragment(child, ctx, holeProps, childNs));
+			newChildren.push(extractFragment(child, ctx, holeProps, childNs, descriptor));
+		} else if (descriptor && VALUE_DIRECTIVE_ARM_TYPES.has(t)) {
+			// lowerJsxChild folds the directive into a renderer owned by this
+			// component, the value a `@{}` body passes the same descriptor.
+			const hn = `h${holeProps.length}`;
+			holeProps.push(objectProp(hn, lowerJsxChild(child, ctx)));
+			newChildren.push(b.jsx_expression_container(memberProps(hn, child)));
 		} else if (t === 'JSXCodeBlock') {
 			const body = child.body || [];
 			if (body.length === 0) {
@@ -23869,6 +23891,17 @@ function rewriteImperativeHeadElements(node, ctx, namespace = 'html', inNoscript
 	};
 }
 
+// A JSXElement that normalizeChildren lowers with jsxElementToCreateElement
+// instead of the template compiler, so its whole subtree becomes descriptor
+// values. extractFragment uses the same test to keep that subtree's children in
+// value form.
+function isDescriptorBuiltHost(node, inSvg, ctx) {
+	return (
+		!isComponentTag(node) &&
+		(hasJsxAttribute(node, 'key') || (!inSvg && requiresImperativeHostTree(node, ctx)))
+	);
+}
+
 /**
  * Normalize a list of JSX child nodes into the shapes the emitters consume:
  *   - Indentation-only JSXText / JSX comments (`{…}` empty containers) → dropped
@@ -24016,12 +24049,7 @@ function normalizeChildren(
 			// Keys need a reconciliation boundary. Parser-sensitive host trees need
 			// imperative construction so HTML repair cannot change binding paths.
 			// The shared descriptor path provides both without taxing ordinary templates.
-			if (
-				ctx &&
-				allowImperative &&
-				!isComponentTag(n) &&
-				(hasJsxAttribute(n, 'key') || (!inSvg && requiresImperativeHostTree(n, ctx)))
-			) {
+			if (ctx && allowImperative && isDescriptorBuiltHost(n, inSvg, ctx)) {
 				out.push(
 					inheritOriginLoc(
 						{
