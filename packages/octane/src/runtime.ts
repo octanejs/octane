@@ -1619,6 +1619,11 @@ function siteLoc(scope: Scope, slotKey: number): string {
 	return `${scope.locFile ?? '<unknown>'}:${lc[0]}:${lc[1]}`;
 }
 
+// Function source is immutable, so one scan per function is enough. Misses are
+// cached too: dev-runtime ancestor walks repeat this for every mounted host.
+const COMPONENT_SOURCE_LOCS: WeakMap<Function, string | undefined> | null =
+	process.env.NODE_ENV === 'production' ? null : new WeakMap();
+
 /** DEV root-location fallback for anonymous ESM default functions. */
 function componentSourceLoc(body: unknown): string | undefined {
 	if (typeof body !== 'function') return undefined;
@@ -1628,14 +1633,18 @@ function componentSourceLoc(body: unknown): string | undefined {
 	} catch {
 		// A user proxy/getter must not turn a diagnostic fallback into a render error.
 	}
+	const cache = COMPONENT_SOURCE_LOCS;
+	if (cache !== null && cache.has(body)) return cache.get(body);
+	let loc: string | undefined;
 	try {
 		const source = Function.prototype.toString.call(body);
 		const match = /["']__octane_loc:([^"'\\\s]+)["']/.exec(source);
-		if (match !== null) return decodeURIComponent(match[1]);
+		if (match !== null) loc = decodeURIComponent(match[1]);
 	} catch {
 		// Native/proxied functions may not expose useful source; omit the location.
 	}
-	return undefined;
+	cache?.set(body, loc);
+	return loc;
 }
 
 // ---------------------------------------------------------------------------
