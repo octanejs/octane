@@ -3508,6 +3508,11 @@
       "message": "octane SSR: %s consecutive streaming passes completed no boundary — a component kept throwing thenables outside use(). A resource reader should stop suspending once its data has settled.",
       "runtime": ["server"],
       "status": "active"
+    },
+    "335": {
+      "message": "octane SSR: %s root streaming passes completed without producing a shell — a component kept throwing thenables outside use(). A resource reader should stop suspending once its data has settled.",
+      "runtime": ["server"],
+      "status": "active"
     }
   }
 }

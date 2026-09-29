@@ -18499,6 +18499,39 @@ class HydrationCapability {
 		warnHydrationStructuralMismatch(loc, expected, actual);
 	}
 
+	/**
+	 * A host descriptor serializes as exactly one element inside its hole's
+	 * `<!--[-->…<!--]-->` range. Before the hole's first hydrating render, check
+	 * that the range holds exactly that element. Anything else is server content
+	 * the client cannot adopt. The usual source is invalid nesting that the HTML
+	 * parser repaired: `<p><div></div></p>` arrives as `<p></p><div></div><p></p>`,
+	 * all inside the range. Report that as a structural mismatch and discard the
+	 * range's content, so the caller builds the element on the client, as
+	 * renderBranchSlot's rebuild does. Returns whether the range was adoptable.
+	 */
+	claimHostRange(scope: Scope, slotKey: number, start: Node, end: Node, type: string): boolean {
+		const first = getNextSibling(start)!;
+		const matches = first !== end && first.nodeType === 1 && (first as Element).localName === type;
+		if (matches && getNextSibling(first) === end) return true;
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from the server's; still rebuild, but there is nothing to report.
+		if (!this.staleServerValues) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+			if (process.env.NODE_ENV !== 'production') {
+				const loc = siteLoc(scope, slotKey);
+				if (loc)
+					warnHydrationStructuralMismatch(
+						loc,
+						matches ? `the end of <${type}>` : `<${type}>`,
+						describeHydrationNode(matches ? getNextSibling(first) : first === end ? null : first),
+					);
+			}
+		}
+		removeRange(first, end);
+		return false;
+	}
+
 	recordTextMismatch(node: Text, loc: string | undefined, server: string | null): void {
 		// Text already repaired from newer captures is not a server/client mismatch.
 		if (this.staleServerValues) return;
@@ -33970,6 +34003,8 @@ export function childSlot(
 			return;
 		}
 	}
+	// This call adopted the server's `<!--[-->…<!--]-->` pair as the slot's range.
+	let adoptedRange = false;
 	if (state === undefined) {
 		const transaction = ROOT_RENDER_TRANSACTION;
 		if (
@@ -34011,6 +34046,7 @@ export function childSlot(
 			end = hydration.close(anchor as Node);
 			if (parentBlock === hydration.rootBlock) hydration.claimRootRemainder(getNextSibling(end));
 			hydration.node = getNextSibling(start);
+			adoptedRange = true;
 		} else if (hydration !== null && hydration.isOpen(hydration.node)) {
 			// Hydration (sole top-level hole, e.g. a layout `<>{children}…</>`): the
 			// anchor is the block's end-marker (not a `<!--[-->`), but the CURSOR sits
@@ -34023,6 +34059,7 @@ export function childSlot(
 				hydration.claimRootRemainder(getNextSibling(end));
 			}
 			hydration.node = getNextSibling(start);
+			adoptedRange = true;
 		} else if (bindingMarker !== undefined) {
 			// An authored binding value retains its ordinary child-slot lifecycle,
 			// but its range must remain addressable even while empty or primitive.
@@ -34275,6 +34312,15 @@ export function childSlot(
 				state.start = (STAGED_DOM?.view(document) ?? document).createComment('');
 				(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(state.start, state.end);
 			}
+			// An unadoptable server range is emptied here, so the node is built below.
+			if (adoptedRange)
+				hydration!.claimHostRange(
+					parentScope,
+					slotKey,
+					state.start,
+					state.end!,
+					(value as ElementDescriptor).type as string,
+				);
 			// First render: adopt the server node during hydration, else reuse the
 			// prior built node, else build fresh.
 			let prev = state.hostNode;
@@ -34682,7 +34728,23 @@ export function childSlot(
 			b.memoInChain = true;
 		}
 		state.block = b;
-		renderBlock(b);
+		if (
+			adoptedRange &&
+			comp === (hostElementBody as unknown as ComponentBody) &&
+			!hydration!.claimHostRange(
+				parentScope,
+				slotKey,
+				state.start!,
+				state.end!,
+				(props as ElementDescriptor).type as string,
+			)
+		) {
+			// The server range is gone: build the element and its subtree on the
+			// client, so no descendant adopts a node outside that range.
+			hydration!.suspend(() => renderBlock(b));
+		} else {
+			renderBlock(b);
+		}
 		// Advance the cursor past this child's adopted range so a following sibling
 		// hole adopts the right node (mirrors componentSlot's post-render advance).
 		// (Hydration always adopts a marker pair, so `state.end` is non-null here.)
