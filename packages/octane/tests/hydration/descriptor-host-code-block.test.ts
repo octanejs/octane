@@ -52,10 +52,6 @@ ${apps}
 
 const FORMS = ['Body', 'SetupBody', 'Return', 'SetupReturn', 'Nested', 'SetupNested'] as const;
 type Form = (typeof FORMS)[number];
-// A keyed host that is itself a component's returned root does not hydrate in
-// place yet, whatever its children (it duplicates the element). The returned
-// forms hydrate the same keyed host one template element down instead.
-const HYDRATED_FORMS = new Set<Form>(['Body', 'SetupBody', 'Nested', 'SetupNested']);
 
 // Same key, new label: the host and the block's scope survive. New key: a keyed
 // host remounts, so the block's state starts over; an unkeyed host keeps it.
@@ -235,7 +231,7 @@ describe.each([false, true])(
 					expect(plain.blocks[1]).toBe(plain.blocks[0]);
 				});
 
-				if (!host.hydrates || !HYDRATED_FORMS.has(form)) continue;
+				if (!host.hydrates) continue;
 				it(`hydrates ${host.name} ${form} block from renderToString`, async () => {
 					const compiled = modules();
 					const html = expected(form, host.html, host.keyed);
