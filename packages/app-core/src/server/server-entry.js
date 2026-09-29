@@ -475,10 +475,10 @@ export async function nodeHandler(req, res) {
 		await sendWebResponse(res, response);
 	} catch (error) {
 		console.error('[octane] Request error:', error);
-		if (!res.headersSent) {
-			res.statusCode = 500;
-			res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-		}
+		// sendWebResponse already aborted a response whose headers were sent.
+		if (res.headersSent) return;
+		res.statusCode = 500;
+		res.setHeader('Content-Type', 'text/plain; charset=utf-8');
 		res.end('Internal Server Error');
 	}
 }

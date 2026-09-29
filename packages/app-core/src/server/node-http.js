@@ -212,7 +212,13 @@ export function nodeRequestToWebRequest(nodeRequest, nodeResponse) {
 
 /**
  * Pipe a Web Response to a Node.js ServerResponse. Streams chunk-by-chunk so a
- * streaming SSR body flushes as it renders (no buffering).
+ * streaming SSR body flushes as it renders (no buffering). A HEAD response ends
+ * with its headers and cancels the body.
+ *
+ * If the body fails, the returned promise rejects. Once headers were sent, the
+ * response has already been destroyed so the client observes an interrupted
+ * transfer; the caller must only report the error. Before that, the response's
+ * headers have been removed and the caller may send its own error response.
  *
  * @param {import('node:http').ServerResponse} nodeResponse
  * @param {Response} webResponse
@@ -251,6 +257,14 @@ async function sendWebResponseForRequest(nodeResponse, webResponse, nodeRequest)
 		nodeResponse.setHeader(key, value);
 	});
 	if (body) {
+		// HEAD transfers metadata without content, and Node discards body writes.
+		// End now and release the producer instead of draining a body that may
+		// stay open indefinitely.
+		if (nodeResponse.req?.method === 'HEAD') {
+			if (!nodeResponse.destroyed) nodeResponse.end();
+			await body.cancel().catch(() => {});
+			return;
+		}
 		const reader = body.getReader();
 		let disconnected = nodeResponse.destroyed;
 		let disconnectReason = new Error('The client disconnected while streaming the response.');
@@ -280,7 +294,21 @@ async function sendWebResponseForRequest(nodeResponse, webResponse, nodeRequest)
 				if (!accepted && !disconnected) await waitForDrain(nodeResponse);
 			}
 		} catch (error) {
-			if (!disconnected) throw error;
+			if (!disconnected) {
+				if (nodeResponse.headersSent) {
+					// The status is committed, so an interrupted transfer is the only
+					// failure signal left; completing it would pass the partial body off
+					// as whole. Destroy without the error, which Node would otherwise
+					// report as a clientError: the caller reports it.
+					nodeResponse.destroy();
+				} else {
+					// Nothing is on the wire yet. Drop this representation's metadata so
+					// the caller's error response does not inherit its framing or encoding.
+					for (const name of headers.keys()) nodeResponse.removeHeader(name);
+				}
+				void cancelReader(error);
+				throw error;
+			}
 		} finally {
 			nodeResponse.off('close', onClose);
 			nodeResponse.off('error', onError);
@@ -490,10 +518,11 @@ export function createNodeServer(handler, options = {}) {
 			await sendWebResponseForRequest(res, response, req);
 		})().catch((error) => {
 			console.error('[octane] Request error:', error);
-			if (!res.headersSent) {
-				res.statusCode = 500;
-				res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-			}
+			// Once headers are sent the sender has aborted the transfer. Appending
+			// here would complete it with bytes the application never produced.
+			if (res.headersSent) return;
+			res.statusCode = 500;
+			res.setHeader('Content-Type', 'text/plain; charset=utf-8');
 			res.end('Internal Server Error');
 		});
 	});

@@ -4,6 +4,7 @@
 // config resolution of `router.preHydrate` / RenderRoute `status`.
 import { fileURLToPath } from 'node:url';
 import { statSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -787,6 +788,136 @@ export default { compiler: { renderers } };
 			await rm(root, { recursive: true, force: true });
 		}
 	});
+
+	it('aborts a failed streamed route and ends HEAD without its body in dev', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-stream-completion-'));
+		const control = Promise.withResolvers<{
+			fail: () => void;
+			cancelled: Promise<unknown>;
+		}>();
+		(globalThis as any).__octaneStreamCompletion = control;
+		await mkdir(join(root, 'node_modules'));
+		await symlink(join(REPO_ROOT, 'packages/octane'), join(root, 'node_modules/octane'), 'dir');
+		await writeFile(join(root, 'index.html'), '<main>shell</main>');
+		await writeFile(
+			join(root, 'octane.config.ts'),
+			`function openStream() {
+	const cancelled = Promise.withResolvers();
+	let producer;
+	const body = new ReadableStream({
+		start(controller) {
+			producer = controller;
+			controller.enqueue(new TextEncoder().encode('first-line\\n'));
+		},
+		cancel: (reason) => cancelled.resolve(reason),
+	});
+	globalThis.__octaneStreamCompletion.resolve({
+		fail: () => producer.error(new Error('producer failed')),
+		cancelled: cancelled.promise,
+	});
+	return body;
+}
+export default {
+	router: {
+		routes: [
+			{
+				type: 'server',
+				path: '/stream',
+				methods: ['GET', 'HEAD'],
+				before: [],
+				after: [],
+				handler: () =>
+					new Response(openStream(), {
+						headers: { 'Content-Type': 'text/plain', 'X-Ready': 'yes' },
+					}),
+			},
+		],
+	},
+};
+`,
+		);
+		const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const server = await createServer({
+			root,
+			configFile: false,
+			logLevel: 'silent',
+			plugins: [octane({ hmr: false })],
+			server: { host: '127.0.0.1', port: 0, hmr: false, ws: false },
+		});
+		const exchange = (method: string, onFirstChunk?: () => void) =>
+			new Promise<{ status: number; ready: unknown; body: string; aborted: boolean }>(
+				(resolve, reject) => {
+					const address = server.httpServer?.address();
+					if (!address || typeof address !== 'object') throw new Error('no dev server address');
+					const client = httpRequest(
+						`http://127.0.0.1:${address.port}/stream`,
+						{ method, agent: false, headers: { Connection: 'close' } },
+						(response) => {
+							let body = '';
+							let aborted = false;
+							response.setEncoding('utf8');
+							response.on('data', (chunk: string) => {
+								const first = body === '';
+								body += chunk;
+								if (first) onFirstChunk?.();
+							});
+							response.on('aborted', () => (aborted = true));
+							response.on('error', () => {});
+							response.on('close', () =>
+								resolve({
+									status: response.statusCode ?? 0,
+									ready: response.headers['x-ready'],
+									body,
+									aborted,
+								}),
+							);
+						},
+					);
+					const bound = setTimeout(
+						() => client.destroy(new Error(`${method} did not settle without its producer`)),
+						2000,
+					);
+					client.on('close', () => clearTimeout(bound));
+					client.on('error', reject);
+					client.end();
+				},
+			);
+
+		try {
+			await server.listen();
+			const failed = await exchange('GET', () => {
+				void control.promise.then(({ fail }) => fail());
+			});
+			expect(failed).toMatchObject({ status: 200, body: 'first-line\n', aborted: true });
+			// The failure is reported once; the error page must not be written into
+			// a response whose headers were already sent.
+			expect(
+				logged.mock.calls
+					.map(([message]) => message)
+					.filter((message) => String(message).startsWith('[@octanejs/vite-plugin]')),
+			).toEqual(['[@octanejs/vite-plugin] Request error:']);
+
+			const head = Promise.withResolvers<{
+				fail: () => void;
+				cancelled: Promise<unknown>;
+			}>();
+			(globalThis as any).__octaneStreamCompletion = head;
+			expect(await exchange('HEAD')).toEqual({
+				status: 200,
+				ready: 'yes',
+				body: '',
+				aborted: false,
+			});
+			await (
+				await head.promise
+			).cancelled;
+		} finally {
+			logged.mockRestore();
+			delete (globalThis as any).__octaneStreamCompletion;
+			await server.close();
+			await rm(root, { recursive: true, force: true });
+		}
+	}, 30_000);
 
 	it('SSR-loads a manifest-discovered raw binding without app build shims', async () => {
 		const root = await mkdtemp(join(tmpdir(), 'octane-vite-raw-binding-'));
