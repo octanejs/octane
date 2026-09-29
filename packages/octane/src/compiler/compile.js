@@ -10611,8 +10611,7 @@ function compileInternal(
 			if (
 				item.id?.type === 'Identifier' &&
 				init?.type === 'CallExpression' &&
-				init.callee?.type === 'Identifier' &&
-				memoImportNames.has(init.callee.name) &&
+				isOctaneMemoCallee(init.callee, ctx, memoImportNames) &&
 				(init.arguments?.length ?? 0) === 1
 			) {
 				ctx.defaultMemoBindings.add(item.id.name);
@@ -15416,13 +15415,25 @@ function singleRootInitializer(ctx, component) {
 	return markPure(b.call('_$__s', component));
 }
 
+function isOctaneMemoCallee(callee, ctx, memoImportNames) {
+	if (callee?.type === 'Identifier') return memoImportNames.has(callee.name);
+	return (
+		callee?.type === 'MemberExpression' &&
+		!callee.computed &&
+		callee.object?.type === 'Identifier' &&
+		callee.property?.type === 'Identifier' &&
+		callee.property.name === 'memo' &&
+		ctx.octaneImportNamespaces?.has(callee.object.name) === true
+	);
+}
+
 // An exact public memo wrapper preserves the already-proven host output of its
 // immutable local component. Stamp only the fresh compiler-owned wrapper:
 // probing arbitrary component metadata would invoke observable getters, and
 // dev/HMR, custom comparators, imported components, and renderer units remain
 // deliberately opaque.
 function markSingleRootMemoInitializers(node, ctx, memoImportNames) {
-	if (ctx.hmr || ctx.dev || ctx.profile || memoImportNames.size === 0) return node;
+	if (ctx.hmr || ctx.dev || ctx.profile || ctx.defaultMemoBindings.size === 0) return node;
 	const exported = node.type === 'ExportNamedDeclaration';
 	const declaration = exported ? node.declaration : node;
 	if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') return node;
@@ -15434,8 +15445,7 @@ function markSingleRootMemoInitializers(node, ctx, memoImportNames) {
 			item.id?.type !== 'Identifier' ||
 			!ctx.defaultMemoBindings.has(item.id.name) ||
 			init?.type !== 'CallExpression' ||
-			init.callee?.type !== 'Identifier' ||
-			!memoImportNames.has(init.callee.name) ||
+			!isOctaneMemoCallee(init.callee, ctx, memoImportNames) ||
 			init.arguments.length !== 1 ||
 			wrapped?.type !== 'Identifier' ||
 			!ctx.moduleFunctionDeclarations.has(wrapped.name) ||

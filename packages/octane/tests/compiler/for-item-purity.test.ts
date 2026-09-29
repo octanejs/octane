@@ -359,3 +359,29 @@ describe('@for item-body purity with module and global reads', () => {
 		expect(flags[0]! & PURE).toBe(PURE);
 	});
 });
+
+// A memo wall reached through `import * as React from 'octane'` is the same
+// immutable default-memo binding as a named `memo` import. Treating it as an
+// opaque call dropped depEligible, so every row re-rendered on parent updates.
+describe('@for rows rendering a namespace-imported memo component', () => {
+	const row = 'function RowImpl(props) @{ <li>{props.label as string}</li> }';
+	const list = '<Row label={item.label} sel={props.sel} />';
+
+	it.each([
+		['a named memo import', "import { memo } from 'octane';", 'memo'],
+		['an octane namespace import', "import * as React from 'octane';", 'React.memo'],
+	])('keeps depEligible through %s', (_, imports, callee) => {
+		const flags = compileList(list, `${imports}\n${row}\nconst Row = ${callee}(RowImpl);`);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & DEP_ELIGIBLE).toBe(DEP_ELIGIBLE);
+	});
+
+	it('keeps a foreign namespace memo opaque', () => {
+		const flags = compileList(
+			list,
+			`import * as React from 'react';\n${row}\nconst Row = React.memo(RowImpl);`,
+		);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & DEP_ELIGIBLE).toBe(0);
+	});
+});
