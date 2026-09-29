@@ -494,8 +494,8 @@ function isStrongDirectiveStatement(statement) {
 	);
 }
 
-// Strong applies per module. A function-body prologue parses as a directive and
-// would otherwise compile that function in compat mode without any signal.
+// Strong applies per module. A function-body directive would otherwise be ignored
+// and leave the whole module in compat mode with no diagnostic.
 function nestedStrongDirective(node) {
 	if (node === null || typeof node !== 'object') return null;
 	if (Array.isArray(node)) {
