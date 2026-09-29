@@ -23985,7 +23985,7 @@ export function setHostPropSources(
 			props.get('checked')?.value,
 			props.get('defaultChecked')?.value,
 			props.get('multiple')?.value,
-			hasNestedChildren,
+			hasNestedChildren || props.has('children'),
 		);
 	return resolved;
 }
@@ -26985,6 +26985,9 @@ interface ControlledState {
 	formSeen: boolean;
 	/** Previous final <select multiple> mode. */
 	formMultiple: boolean;
+	/** A textarea's children writer was present at the previous commit, so its
+	 *  live child binding may still own Text inside the element. */
+	formChildren: boolean;
 }
 
 /**
@@ -27187,6 +27190,7 @@ function armControlledBase(el: Element): ControlledState {
 			queued: false,
 			formSeen: false,
 			formMultiple: false,
+			formChildren: false,
 		};
 		(STAGED_DOM?.view(el as any) ?? (el as any)).$$ctrl = ctrl;
 		// The restore pass rides the delegated dispatchers — an armed control
@@ -27906,7 +27910,7 @@ function applyFormControlValues(
 	checked: unknown,
 	defaultChecked: unknown,
 	multiple: unknown,
-	hasNestedChildren = false,
+	hasChildren = false,
 ): void {
 	const ctrl = armControlled(el);
 	const first = !ctrl.formSeen;
@@ -27949,15 +27953,21 @@ function applyFormControlValues(
 
 	if (tag === 'textarea') {
 		const textarea = el as HTMLTextAreaElement;
+		// Octane textarea children, whether authored, spread-held, or `children=`,
+		// are a live text binding that owns the default. It only holds DOM when a
+		// children writer rendered at the previous commit.
+		const childrenOwned = ctrl.formChildren;
+		ctrl.formChildren = hasChildren;
 		setValue(textarea, value);
 		if (value == null) {
 			if (defaultValue != null) setDefaultValue(textarea, defaultValue, first);
 			// React resets the default here because its children only seed the
-			// initial value. Authored Octane children are a live text binding that
-			// owns the default, so clearing it would detach their Text node.
+			// initial value. Clearing it under a live child binding would detach
+			// that binding's Text node, and later updates would write outside the
+			// element.
 			else if (
 				!first &&
-				!hasNestedChildren &&
+				!childrenOwned &&
 				(STAGED_DOM?.view(textarea) ?? textarea).defaultValue !== ''
 			)
 				(STAGED_DOM?.view(textarea) ?? textarea).defaultValue = '';

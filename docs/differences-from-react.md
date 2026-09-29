@@ -893,8 +893,9 @@ commit/discrete event reasserts. `<textarea>` with children AND a
 
 Uncontrolled `defaultValue` updates change an input or textarea's reset baseline
 without replacing its live value. A select uses `defaultValue` on mount and
-when `multiple` changes. A textarea authored with children instead has a live
-text binding; use `defaultValue` when later renders must preserve user edits.
+when `multiple` changes. A textarea's children, whether authored as JSX, held
+by a spread, or passed as `children=`, are instead a live text binding; use
+`defaultValue` when later renders must preserve user edits.
 Removing a controlled textarea's `value` retains its current content.
 
 A function form action has no `action` attribute while intercepted. Octane does
