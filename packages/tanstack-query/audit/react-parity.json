@@ -467,12 +467,12 @@
       "environment": "workspace-node",
       "project": "tanstack-query-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs cached query, asynchronous query and mutation scenarios against the exact 5.102.8 React adapter.",
+      "notes": "Runs cached query, asynchronous query, mutation and sequential suspense scenarios against the exact 5.102.8 React adapter.",
       "files": [
         {
           "path": "packages/tanstack-query/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "6839a2688dcc00d8f884f2b2ed912827c8bf6ea2931ab6c2055f5c8556778b5f",
+          "sha256": "289ac9ee32cce4e671e5443fba85872946bd15dfaca0c1e2a4b7792a5f2c89d5",
           "cases": [
             {
               "id": "differential:tanstack-query-cached",
@@ -488,13 +488,28 @@
               "id": "differential:tanstack-query-mutation",
               "testName": "MutationApp: idle → pending → success renders byte-identical",
               "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query MutationApp: idle → pending → success renders byte-identical"
+            },
+            {
+              "id": "differential:tanstack-query-sequential-suspense",
+              "testName": "SequentialSuspenseApp: useSuspenseQuery → useSuspenseQuery holds the fallback until both settle",
+              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query SequentialSuspenseApp: useSuspenseQuery → useSuspenseQuery holds the fallback until both settle"
+            },
+            {
+              "id": "differential:tanstack-query-grouped-singular-suspense",
+              "testName": "SequentialSuspenseApp: useSuspenseQueries → useSuspenseQuery holds the fallback until both settle",
+              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query SequentialSuspenseApp: useSuspenseQueries → useSuspenseQuery holds the fallback until both settle"
+            },
+            {
+              "id": "differential:tanstack-query-grouped-grouped-suspense",
+              "testName": "SequentialSuspenseApp: useSuspenseQueries → useSuspenseQueries holds the fallback until both settle",
+              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query SequentialSuspenseApp: useSuspenseQueries → useSuspenseQueries holds the fallback until both settle"
             }
           ]
         },
         {
           "path": "packages/tanstack-query/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "8cf12195e5fe493461684961480acaf19ca03acc614bd2d7f2ef71c4f17a3dbf"
+          "sha256": "52c0141ee84a3d1c30432b1e9ace6498c6bece6319f20a3d9c11f007fd498f33"
         },
         {
           "path": "packages/tanstack-query/tests/_fixtures/cached-diff.tsrx",
@@ -505,6 +520,11 @@
           "path": "packages/tanstack-query/tests/_fixtures/async-diff.tsrx",
           "role": "support",
           "sha256": "12015b62a30e93c32120d866f8124ab758a789043a8d351da627b3d8b11b515e"
+        },
+        {
+          "path": "packages/tanstack-query/tests/_fixtures/sequential-suspense-diff.tsrx",
+          "role": "support",
+          "sha256": "caa821362bdbd1b087744e74fd4e471d407ec240b4a17873c09cd3dd2b7a70a9"
         }
       ]
     },
@@ -602,7 +622,7 @@
         {
           "path": "packages/tanstack-query/tests/conformance/followups.test.ts",
           "role": "test",
-          "sha256": "0daa8a10b855ba238bce203c7e4be999b514a7d8416766b5a8c87ae6338aa324",
+          "sha256": "7b715dd1cccae43cd4459be5cf040ec8568f80309e085d85d3f025557659239b",
           "cases": [
             {
               "id": "conformance:f165617264a7297f",
@@ -643,6 +663,16 @@
               "id": "conformance:4ac0c99df4c76af3",
               "testName": "keeps sequential queries suspended until each query has data",
               "fullName": "useSuspenseQuery keeps sequential queries suspended until each query has data"
+            },
+            {
+              "id": "conformance:a0b4554a8a2820ea",
+              "testName": "keeps a following useSuspenseQuery suspended until it has data",
+              "fullName": "useSuspenseQueries keeps a following useSuspenseQuery suspended until it has data"
+            },
+            {
+              "id": "conformance:1f323dcc7dfd42c9",
+              "testName": "keeps a following useSuspenseQueries group suspended until it has data",
+              "fullName": "useSuspenseQueries keeps a following useSuspenseQueries group suspended until it has data"
             }
           ]
         },
@@ -770,7 +800,7 @@
         {
           "path": "packages/tanstack-query/tests/conformance/transition-suspense.test.ts",
           "role": "test",
-          "sha256": "1b23ca84fd5b9e15042baa77bb223bd62065bca88633eaca2fca308b610b72c7",
+          "sha256": "8f5304b9e5bafce236d3a8b534e110876b6effdeea16afacd76f11283037a8ec",
           "cases": [
             {
               "id": "conformance:c1e0561f0da086ba",
@@ -781,6 +811,11 @@
               "id": "conformance:6592b3cc7d15f45c",
               "testName": "an urgent key change supersedes a held transition and reveals fallback",
               "fullName": "useSuspenseQuery — transition keeps prior content, no fallback flash (React parity) an urgent key change supersedes a held transition and reveals fallback"
+            },
+            {
+              "id": "conformance:d97f02970206eef5",
+              "testName": "holds the committed group until the new group resolves",
+              "fullName": "useSuspenseQueries — transition keeps prior content holds the committed group until the new group resolves"
             }
           ]
         }

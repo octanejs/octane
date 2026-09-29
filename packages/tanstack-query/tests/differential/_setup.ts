@@ -52,7 +52,7 @@ function compileOne(srcPath: string): void {
 
 export async function setup(): Promise<void> {
 	mkdirSync(CACHE_DIR, { recursive: true });
-	for (const fixture of ['cached-diff.tsrx', 'async-diff.tsrx']) {
+	for (const fixture of ['cached-diff.tsrx', 'async-diff.tsrx', 'sequential-suspense-diff.tsrx']) {
 		compileOne(join(FIXTURE_DIR, fixture));
 	}
 }

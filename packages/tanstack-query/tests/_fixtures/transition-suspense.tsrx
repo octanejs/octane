@@ -1,5 +1,9 @@
 import { useState, useTransition } from 'octane';
-import { QueryClientProvider, useSuspenseQuery } from '@octanejs/tanstack-query';
+import {
+	QueryClientProvider,
+	useSuspenseQueries,
+	useSuspenseQuery,
+} from '@octanejs/tanstack-query';
 import type { QueryClient } from '@octanejs/tanstack-query';
 
 interface ReaderProps {
@@ -10,6 +14,7 @@ interface ReaderProps {
 
 interface AppProps extends ReaderProps {
 	client: QueryClient;
+	grouped?: boolean;
 }
 
 // Reader owns the transition; PendingProbe is independent and stays idle.
@@ -38,12 +43,32 @@ function Reader(props: ReaderProps) @{
 	<span id="data" data-pending={isPending ? 'pending' : 'idle'}>{'data:' + q.data as string}</span>
 }
 
+// The same transition through useSuspenseQueries: the group's retained promise
+// is keyed by its query hashes, so the held render restores the committed group.
+function GroupedReader(props: ReaderProps) @{
+	const [value, setValue] = useState(1);
+	const [isPending, start] = useTransition();
+	props.bindSetValue((v) => start(() => setValue(v)));
+	if (props.bindSetValueUrgent) props.bindSetValueUrgent((v) => setValue(v));
+	const [q] = useSuspenseQueries({
+		queries: [
+			{
+				queryKey: ['transition-suspense', value],
+				queryFn: () => props.queryFn(value),
+				retry: false,
+			},
+		],
+	});
+	<span id="data" data-pending={isPending ? 'pending' : 'idle'}>{'data:' + q.data as string}</span>
+}
+
 export function TransitionSuspenseApp(props: AppProps) @{
+	const QueryReader = props.grouped ? GroupedReader : Reader;
 	<QueryClientProvider client={props.client}>
 		<div>
 			<PendingProbe />
 			@try {
-				<Reader
+				<QueryReader
 					queryFn={props.queryFn}
 					bindSetValue={props.bindSetValue}
 					bindSetValueUrgent={props.bindSetValueUrgent}

@@ -17,6 +17,7 @@ import {
 	SequentialSuspenseQApp,
 	HydrationApp,
 } from '../_fixtures/followups.tsrx';
+import type { SequentialSuspenseOrder } from '../_fixtures/followups.tsrx';
 
 let client: QueryClient;
 beforeEach(() => {
@@ -29,6 +30,46 @@ async function flush() {
 		await new Promise((r) => setTimeout(r, 0));
 		await nextPaint();
 	}
+}
+
+// Resolve the first query while the second is still pending, then the second.
+// The boundary must stay on its fallback until both have data, whichever hook
+// (useSuspenseQuery or useSuspenseQueries) reads each one.
+async function expectSequentialSuspense(order: SequentialSuspenseOrder, valueB: string) {
+	let resolveA: (value: string) => void = () => {};
+	let resolveB: (value: string) => void = () => {};
+	const promiseA = new Promise<string>((resolve) => {
+		resolveA = resolve;
+	});
+	const promiseB = new Promise<string>((resolve) => {
+		resolveB = resolve;
+	});
+	const queryFnA = () => promiseA;
+	const queryFnB = () => promiseB;
+
+	const r = mount(SequentialSuspenseQApp, { client, queryFnA, queryFnB, order });
+	expect(r.find('#sequential-fallback').textContent).toBe('loading');
+
+	await act(async () => {
+		resolveA('A');
+		await flush();
+	});
+	// Resolving the first query must not expose the second query's pending
+	// `data`; the boundary stays suspended until that data is also defined.
+	expect(client.getQueryState(['susq-a'])?.status).toBe('success');
+	expect(client.getQueryState(['susq-b'])?.status).toBe('pending');
+	expect(r.findAll('#sequential-fallback')).toHaveLength(1);
+	expect(r.findAll('#sequential-data')).toHaveLength(0);
+	expect(r.findAll('#sequential-error')).toHaveLength(0);
+
+	await act(async () => {
+		resolveB(valueB);
+		await flush();
+	});
+	expect(r.find('#sequential-data').textContent).toBe('A/B');
+	expect(r.findAll('#sequential-fallback')).toHaveLength(0);
+	expect(r.findAll('#sequential-error')).toHaveLength(0);
+	r.unmount();
 }
 
 describe('useInfiniteQuery', () => {
@@ -127,37 +168,18 @@ describe('useSuspenseQuery', () => {
 
 	// @parity-case conformance:4ac0c99df4c76af3
 	it('keeps sequential queries suspended until each query has data', async () => {
-		let resolveA: (value: string) => void = () => {};
-		let resolveB: (value: string) => void = () => {};
-		const promiseA = new Promise<string>((resolve) => {
-			resolveA = resolve;
-		});
-		const promiseB = new Promise<string>((resolve) => {
-			resolveB = resolve;
-		});
-		const queryFnA = () => promiseA;
-		const queryFnB = () => promiseB;
+		await expectSequentialSuspense('singular-singular', 'B');
+	});
+});
 
-		const r = mount(SequentialSuspenseQApp, { client, queryFnA, queryFnB });
-		expect(r.find('#sequential-fallback').textContent).toBe('loading');
+describe('useSuspenseQueries', () => {
+	// @parity-case conformance:a0b4554a8a2820ea
+	it('keeps a following useSuspenseQuery suspended until it has data', async () => {
+		await expectSequentialSuspense('grouped-singular', 'b');
+	});
 
-		await act(async () => {
-			resolveA('A');
-			await flush();
-		});
-		// Resolving the first query must not expose the second query's pending
-		// `data`; the boundary stays suspended until that data is also defined.
-		expect(r.findAll('#sequential-fallback')).toHaveLength(1);
-		expect(r.findAll('#sequential-data')).toHaveLength(0);
-		expect(r.findAll('#sequential-error')).toHaveLength(0);
-
-		await act(async () => {
-			resolveB('B');
-			await flush();
-		});
-		expect(r.find('#sequential-data').textContent).toBe('A/B');
-		expect(r.findAll('#sequential-fallback')).toHaveLength(0);
-		expect(r.findAll('#sequential-error')).toHaveLength(0);
-		r.unmount();
+	// @parity-case conformance:1f323dcc7dfd42c9
+	it('keeps a following useSuspenseQueries group suspended until it has data', async () => {
+		await expectSequentialSuspense('grouped-grouped', 'b');
 	});
 });
