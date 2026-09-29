@@ -4155,7 +4155,7 @@ function suspendRootRender(
 				owner.retry();
 		});
 	};
-	wakeable.then(ping, ping);
+	resumeOnSettle(wakeable, ping);
 	return true;
 }
 
@@ -14610,7 +14610,7 @@ function preserveSuspendedHydrateActivation(
 		state.serverActivationStarted = false;
 		scheduleRender(state.parentBlock);
 	};
-	thenable.then(resume, resume);
+	resumeOnSettle(thenable, resume);
 }
 
 function hydrateStrategyType(when: InternalHydrateProps['when']): HydrationWhen {
@@ -16792,6 +16792,34 @@ function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): 
 	)
 		warnUseWaterfall(block, idx);
 	throw new SuspenseException(thenable);
+}
+
+/**
+ * Wakeables whose settlement a Suspense resume listener has already observed.
+ * A retry can suspend on one again: a resource reader whose own state lags its
+ * resolved promise, or use() of a thenable whose status React does not
+ * recognize (router-core reports `'resolved'`), which stays pending by design.
+ * A listener attached after settlement fires on the next microtask, so retrying
+ * there would re-render forever and starve the timer or network callback that
+ * ends the suspension. React's ping reaches its retry through a Scheduler task.
+ */
+let SETTLED_WAKEABLES: WeakSet<PromiseLike<unknown>> | null = null;
+
+/**
+ * Subscribe a Suspense retry to `wakeable`. A first settlement retries on its
+ * own microtask, keeping ordinary data reveals immediate. Once a settlement has
+ * been observed, the retry yields one macrotask after the next notification.
+ * It still subscribes, so a reusable custom wakeable is not turned into polling.
+ */
+function resumeOnSettle(wakeable: PromiseLike<unknown>, retry: () => void): void {
+	const onSettle =
+		SETTLED_WAKEABLES?.has(wakeable) === true
+			? () => void setTimeout(retry, 0)
+			: () => {
+					(SETTLED_WAKEABLES ??= new WeakSet()).add(wakeable);
+					retry();
+				};
+	wakeable.then(onSettle, onSettle);
 }
 
 // Tag a thenable's `status`/`value`/`reason` expandos and attach the settle
@@ -36100,7 +36128,7 @@ function mountPassthroughPending(state: TrySlot, thenable: TrackedThenable<unkno
 		setTryBranch(state, -1);
 		scheduleRender(state.parentBlock);
 	};
-	thenable.then(retry, retry);
+	resumeOnSettle(thenable, retry);
 }
 
 function renderPassthroughTry(state: TrySlot): void {
@@ -36919,7 +36947,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 				return;
 			scheduleRender(state.parentBlock);
 		};
-		suspended.then(resume, resume);
+		resumeOnSettle(suspended, resume);
 		return;
 	}
 	initialSuspenseHydrations?.delete(state);
@@ -38565,7 +38593,7 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 			commitResume(state);
 		}
 	};
-	thenable.then(retry, retry);
+	resumeOnSettle(thenable, retry);
 }
 
 // ---------------------------------------------------------------------------
@@ -38996,15 +39024,16 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 //
 // `optimisticState` equals `state` unless an Action/transition is in flight, in
 // which case it is `state` folded through `updateFn(acc, value)` for each queued
-// addOptimistic call (or the raw value when no updateFn). The queue is cleared
-// when the owning transition settles, so optimistic and real state converge in
-// the same commit — on success `state` has advanced, on error it is unchanged
-// (automatic revert). addOptimistic should be called inside an Action.
+// addOptimistic call. Without an updateFn the fold is React's basicStateReducer:
+// a function value is an updater called with the pending state, as in useState,
+// and any other value replaces it. The queue is cleared when the owning
+// transition settles, so optimistic and real state converge in the same commit —
+// on success `state` has advanced, on error it is unchanged (automatic revert).
+// addOptimistic should be called inside an Action.
 // ---------------------------------------------------------------------------
 
 interface OptimisticSlot<S, V> {
 	queue: V[];
-	updateFn?: (state: S, value: V) => S;
 	add: (value: V) => void;
 	/**
 	 * True when the queue was populated INSIDE a transition, so it should clear
@@ -39015,9 +39044,22 @@ interface OptimisticSlot<S, V> {
 	armed: boolean;
 }
 
+function basicOptimisticReducer<S>(state: S, value: unknown): S {
+	return typeof value === 'function' ? (value as (pending: S) => S)(state) : (value as S);
+}
+
+// Authored calls resolve to React's two overloads; the last one also takes the
+// hook slot the compiler appends.
+export function useOptimistic<S>(
+	passthrough: S,
+): [S, (action: S | ((pendingState: S) => S)) => void];
 export function useOptimistic<S, V = S>(
 	passthrough: S,
-	updateFnOrSlot?: ((state: S, value: V) => S) | symbol,
+	updateFn: (state: S, value: V) => S,
+): [S, (value: V) => void];
+export function useOptimistic<S, V = S>(
+	passthrough: S,
+	updateFnOrSlot: ((state: S, value: V) => S) | symbol | undefined,
 	slot?: symbol,
 ): [S, (value: V) => void];
 export function useOptimistic<S, V = S>(
@@ -39047,7 +39089,6 @@ export function useOptimistic<S, V = S>(
 		};
 		const slotRef: OptimisticSlot<S, V> = {
 			queue: [],
-			updateFn,
 			armed: false,
 			add: (value: V) => {
 				if (
@@ -39089,11 +39130,9 @@ export function useOptimistic<S, V = S>(
 		TRANSITION_LISTENERS.add(listener);
 		registerHookCleanup(scope, () => TRANSITION_LISTENERS.delete(listener));
 	}
-	s.updateFn = updateFn;
 	let optimistic = passthrough;
-	for (let i = 0; i < s.queue.length; i++) {
-		optimistic = s.updateFn ? s.updateFn(optimistic, s.queue[i]) : (s.queue[i] as unknown as S);
-	}
+	const reduce = updateFn ?? basicOptimisticReducer;
+	for (let i = 0; i < s.queue.length; i++) optimistic = reduce(optimistic, s.queue[i]);
 	return [optimistic, s.add];
 }
 
@@ -40677,7 +40716,7 @@ function suspendHiddenActivity(state: ActivitySlot, thenable: TrackedThenable<un
 		if (state.pendingThenable !== thenable || !state.hidden || blockSubtreeDisposed(block)) return;
 		scheduleRender(block);
 	};
-	thenable.then(retry, retry);
+	resumeOnSettle(thenable, retry);
 }
 
 /** Hidden content is its own suspense boundary; visible content still propagates. */
