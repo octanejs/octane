@@ -337,11 +337,26 @@ once it has lasted `timeoutMs` (10 seconds by default; `0` disables the
 deadline). When one of several stalled readers finishes, the rest start a new
 deadline; a reader cycling between settled thenables does not. A thenable's
 first settlement still retries on microtasks, so a waterfall of already-resolved
-resources, each thrown once, renders without waiting for a task. Streaming
-renders already yield one macrotask per wave, so short lags complete there, but
-a streamed stall still counts toward the 50 consecutive passes that complete no
-boundary. When either pass limit is reached on a wave made only of thrown
-thenables, the error names thrown thenables instead of `use()`.
+resources, each thrown once, renders without waiting for a task.
+
+Streaming renders (`renderToPipeableStream` and `renderToReadableStream`) yield
+one macrotask per wave, but that is not enough for a lag longer than about 50
+turns. A streamed wave also ends at its first settlement while other boundaries
+may still wait on real I/O. So a streamed wave stalls when the only things that
+landed before it ended are thenables this render has already seen settle, and
+nothing that can advance the render. Stalled waves count toward neither the
+50 root passes allowed before the shell nor the 50 consecutive passes that
+complete no boundary. They back off on the same timer, but any settlement that
+can advance the render ends the wait at once, so another boundary is never
+revealed late because a sibling reader is stalled. A stall fails with the same
+error once it has lasted `timeoutMs`. Publishing the shell, completing a
+boundary, or a stalled reader finishing starts a new deadline; a reader cycling
+between settled thenables does not. A thenable's first settlement is never
+paced.
+
+When a pass limit is reached on a wave made only of thrown thenables, the
+buffered, streamed-boundary, and streamed-root errors name thrown thenables
+instead of `use()`.
 
 Limits: stalls are recognized only by identity. A reader that throws a new
 thenable on every attempt is indistinguishable from a cached waterfall's next
@@ -358,15 +373,17 @@ the literal imported JSX ErrorBoundary, and
 fallback at an explicit finite deadline. Finally,
 [ssr-suspense.test.ts](../tests/ssr-suspense.test.ts) covers buffered and streamed
 rendering, sequential wakeables, rejection, abort, and hydration adoption. It also
-covers buffered readers that rethrow a settled thenable until a timer opens them,
-with and without a boundary. These readers rethrow a resolved or rejected
-promise, a custom thenable, or a promise that was pending first. The tests show
-that stalled retries keep the pass budget free for real work and fail at the
-suspense deadline with bounded retries. A waterfall of already-resolved thrown
-resources still renders before any task runs. Stalled readers that finish at
-different times each get a deadline, and a reader cycling between settled
-thenables still fails at its deadline. Abort and both thrown-thenable pass-limit
-messages are covered too.
+covers buffered and streamed readers that rethrow a settled thenable until a
+timer opens them, with and without a boundary. These readers rethrow a resolved
+or rejected promise, a custom thenable, or a promise that was pending first. The
+tests show that stalled retries keep every pass budget free for real work and
+fail at the suspense deadline with bounded retries. A waterfall of
+already-resolved thrown resources still renders before any task runs, and
+streams without pacing. Stalled readers that finish at different times each get
+a deadline, and a reader cycling between settled thenables still fails at its
+deadline. While one streamed reader is stalled, a sibling boundary whose data
+arrives is revealed within a task. Abort and all three thrown-thenable
+pass-limit messages are covered too.
 
 ---
 
@@ -500,7 +517,8 @@ Limits: the record is per wakeable. A reader that throws a new, already-settled
 promise on every attempt still retries on microtasks; React spins there too, but
 across tasks. A paced retry is a timer that `act()` does not drain, like the
 retry-reveal delay in #5, so a test must await a task inside `act()` to observe
-it. Buffered SSR paces the same case with its own backoff and deadline; see
+it. Buffered and streamed SSR pace the same case with their own backoff and
+deadline; see
 [server retries](#9-resource-thrown-thenables--render-suspension-gap-closed).
 
 **Evidence:** [suspense-settled-wakeable.test.ts](../tests/suspense-settled-wakeable.test.ts)
