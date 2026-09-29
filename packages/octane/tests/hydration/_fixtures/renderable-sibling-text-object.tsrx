@@ -14,7 +14,11 @@ type Kind =
 	| 'portal'
 	| 'returned'
 	| 'returned-list'
-	| 'returned-text';
+	| 'returned-text'
+	| 'chain'
+	| 'chain-list'
+	| 'chain-text'
+	| 'returned-template';
 
 interface HoleProps {
 	kind: Kind;
@@ -36,6 +40,35 @@ function ReturnedText(props: { v: string }): OctaneNode {
 	return props.v;
 }
 
+// Components that return another component's value. The middle return slot has
+// no server range of its own, so the server text begins outside the range of
+// the component whose return slot must discard it.
+function ReturnedChain(props: { v: string }): OctaneNode {
+	return createElement(Returned, { v: props.v });
+}
+
+function ReturnedListChain(props: { v: string }): OctaneNode {
+	return createElement(ReturnedList, { v: props.v });
+}
+
+// Returns the server's text through another component, then swaps that
+// component for an element once `v` changes.
+function ReturnedTextChain(props: { v: string }): OctaneNode {
+	return props.v === 'A'
+		? createElement(ReturnedText, { v: props.v })
+		: createElement(Returned, { v: props.v });
+}
+
+// A template component that is not single-root: it reports through its clone.
+function Guarded(props: { v: string }) @{
+	if (props.v === '') return null;
+	<p class="guarded">{props.v}</p>
+}
+
+function ReturnedTemplate(props: { v: string }): OctaneNode {
+	return createElement(Guarded, { v: props.v });
+}
+
 function pick(kind: Kind, v: string, target: Element | undefined): OctaneNode {
 	switch (kind) {
 		case 'p':
@@ -54,6 +87,14 @@ function pick(kind: Kind, v: string, target: Element | undefined): OctaneNode {
 			return createElement(ReturnedList, { v });
 		case 'returned-text':
 			return createElement(ReturnedText, { v });
+		case 'chain':
+			return createElement(ReturnedChain, { v });
+		case 'chain-list':
+			return createElement(ReturnedListChain, { v });
+		case 'chain-text':
+			return createElement(ReturnedTextChain, { v });
+		case 'returned-template':
+			return createElement(ReturnedTemplate, { v });
 		default:
 			return v;
 	}
@@ -109,6 +150,39 @@ export function SuspendingHole(props: { text: Promise<string> | null; v: string 
 		@try {
 			<section>
 				{waitList(props.text, props.v)}
+				<b>{props.v}</b>
+			</section>
+		} @pending {
+			<i>loading</i>
+		}
+	</main>
+}
+
+// Returns its value, text or an element, once `text` resolves.
+function WaitsFor(props: { text: Promise<string>; v: string; element: boolean }): OctaneNode {
+	use(props.text);
+	return props.element ? createElement('p', { class: 'x' }, props.v) : props.v;
+}
+
+function WaitsForChain(props: { text: Promise<string>; v: string; element: boolean }): OctaneNode {
+	return createElement(WaitsFor, props);
+}
+
+function waitChain(text: Promise<string> | null, v: string, element: boolean): OctaneNode {
+	return text === null ? v : createElement(WaitsForChain, { text, v, element });
+}
+
+// A component in a chain that suspends leaves the boundary to retry hydration
+// against the server DOM the first attempt left.
+export function SuspendingChain(props: {
+	text: Promise<string> | null;
+	v: string;
+	element: boolean;
+}) @{
+	<main>
+		@try {
+			<section>
+				{waitChain(props.text, props.v, props.element)}
 				<b>{props.v}</b>
 			</section>
 		} @pending {

@@ -11195,6 +11195,11 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 			// text/component values between the borrowed markers while the block
 			// remains their owner. This keeps hydration byte-preserving for `return
 			// null` / `false` / `''` components (including memo wrappers).
+			// A component returned where the server rendered a primitive borrows the
+			// range too, so the server's text stays inside every range below it,
+			// where a return slot adopts it or discards it for an element or a list.
+			// A marker minted in front of that text would outlive an attempt that
+			// suspends and hide the text from the retry.
 			const returnHydration = activeHydration();
 			if (
 				returnHydration !== null &&
@@ -11205,7 +11210,8 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 				block.startMarker.nodeType === 8 &&
 				block.endMarker.nodeType === 8 &&
 				(getNextSibling(block.startMarker) === block.endMarker ||
-					returnHydration.isUnframedRootRange(block.startMarker, block.endMarker))
+					returnHydration.isUnframedRootRange(block.startMarker, block.endMarker) ||
+					(isComponentDescriptor && returnHydration.holdsServerText(block)))
 			) {
 				const borrowed: ChildSlot = {
 					__kind: 'childSlot',
@@ -18781,6 +18787,20 @@ class HydrationCapability {
 
 	isUnframedRootRange(start: Node, end: Node): boolean {
 		return this.unframedRootRanges.get(start) === end;
+	}
+
+	/**
+	 * Whether `block`'s server range holds only unclaimed text at the cursor:
+	 * what the server rendered for a primitive.
+	 */
+	holdsServerText(block: Block): boolean {
+		const text = this.node;
+		return (
+			text !== null &&
+			text.nodeType === 3 &&
+			getNextSibling(block.startMarker!) === text &&
+			getNextSibling(text) === block.endMarker
+		);
 	}
 
 	/** Record the first node outside a root-owned range exactly once. */

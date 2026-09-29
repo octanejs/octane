@@ -10,9 +10,9 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 // frames its value in a `<!--[-->…<!--]-->` range, and a primitive in that range
 // is bare text. A list, a fragment, a keyed element, or a portal never
 // serializes as bare text, and neither does a component that returns an element
-// or a list. When the server rendered text but the client value is one of those,
-// hydration must discard the text and report it where the value is, without
-// giving up on the rest of the root.
+// or a list, directly or through another component. When the server rendered
+// text but the client value is one of those, hydration must discard the text
+// and report it where the value is, without giving up on the rest of the root.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -40,6 +40,10 @@ function markup(node: Element): string {
 	while (walker.nextNode()) comments.push(walker.currentNode);
 	for (const comment of comments) comment.parentNode!.removeChild(comment);
 	return copy.innerHTML;
+}
+
+function textChildren(node: Node): Node[] {
+	return [...node.childNodes].filter((child) => child.nodeType === 3);
 }
 
 /** The same node objects, not merely equal ones. */
@@ -132,14 +136,14 @@ describe.each([
 	] as const;
 
 	// A component that returns an element or a list has no site of its own, so
-	// the warning names the component.
+	// the warning names the component, even when another component returns it.
+	// A template component reports its mismatched root.
 	const RETURNED_VALUES = [
-		{ kind: 'returned', expected: '<p>', component: 'function Returned(' },
-		{
-			kind: 'returned-list',
-			expected: 'a renderable list range',
-			component: 'function ReturnedList(',
-		},
+		{ kind: 'returned', expected: '<p>', at: 'function Returned(' },
+		{ kind: 'returned-list', expected: 'a renderable list range', at: 'function ReturnedList(' },
+		{ kind: 'chain', expected: '<p>', at: 'function Returned(' },
+		{ kind: 'chain-list', expected: 'a renderable list range', at: 'function ReturnedList(' },
+		{ kind: 'returned-template', expected: '<p>', at: '<p class="guarded">' },
 	] as const;
 
 	describe.each([
@@ -174,6 +178,7 @@ describe.each([
 			const tailText = tail.firstChild;
 			const serverElements = [...container.querySelectorAll('*')];
 			const serverMarkup = markup(host(container));
+			const serverText = textChildren(host(container))[0] ?? null;
 			const recovered: unknown[] = [];
 			const root = hydrateRoot(
 				container,
@@ -187,6 +192,7 @@ describe.each([
 				tailText,
 				serverElements,
 				serverMarkup,
+				serverText,
 				recovered,
 				root,
 				render: (props: Record<string, unknown>) =>
@@ -210,7 +216,7 @@ describe.each([
 					await expectReported(
 						recovered,
 						FILE,
-						'component' in value ? lineOf(value.component) : holeLine,
+						'at' in value ? lineOf(value.at) : holeLine,
 						value.expected,
 					);
 
@@ -249,18 +255,30 @@ describe.each([
 			},
 		);
 
-		// A component may return text: the server's text is its value, not stale.
-		it('adopts server text that a component value returns', async () => {
-			const { serverMarkup, recovered, root } = hydrate('text', 'returned-text');
-			try {
-				expect(markup(host(container))).toBe(serverMarkup);
-				await Promise.resolve();
-				expect(recovered).toEqual([]);
-				expect(warns()).toEqual([]);
-			} finally {
-				root.unmount();
-			}
-		});
+		// A component may return text, also through another component: the
+		// server's text is its value, not stale. The component owns that text
+		// node, so a later value below the component replaces it.
+		it.each(['returned-text', 'chain-text'])(
+			'adopts server text that a %s value returns',
+			async (kind) => {
+				const { serverText, serverMarkup, recovered, root, render, expected } = hydrate(
+					'text',
+					kind,
+				);
+				try {
+					expect(markup(host(container))).toBe(serverMarkup);
+					expectSameNodes(textChildren(host(container)), [serverText]);
+					await Promise.resolve();
+					expect(recovered).toEqual([]);
+					expect(warns()).toEqual([]);
+
+					render({ kind, v: 'B', tail: 't' });
+					expect(markup(host(container))).toBe(expected({ kind, v: 'B', tail: 't' }));
+				} finally {
+					root.unmount();
+				}
+			},
+		);
 	});
 
 	it('renders a portal into its target once the hole’s server text is gone', async () => {
@@ -333,6 +351,73 @@ describe.each([
 		} finally {
 			root.unmount();
 		}
+	});
+
+	// A component in a chain that suspends leaves the boundary to retry
+	// hydration against the server DOM the first attempt left. The retry still
+	// finds the server's text where the value begins.
+	describe('through a component chain that suspends', () => {
+		function hydrateChain(element: boolean) {
+			container.innerHTML = ServerRT.renderToString(server.SuspendingChain, {
+				text: null,
+				v: 'A',
+				element,
+			}).html;
+			const section = container.querySelector('section')!;
+			const serverText = textChildren(section)[0];
+			const tail = container.querySelector('b')!;
+			let resolve!: (text: string) => void;
+			const text = new Promise<string>((r) => (resolve = r));
+			const recovered: unknown[] = [];
+			const root = hydrateRoot(
+				container,
+				client.SuspendingChain,
+				{ text, v: 'A', element },
+				{ onRecoverableError: (error) => recovered.push(error) },
+			);
+			flushSync(() => {});
+			return {
+				section,
+				serverText,
+				tail,
+				recovered,
+				root,
+				resume: () =>
+					act(async () => {
+						resolve('R');
+						await text;
+					}),
+			};
+		}
+
+		it('discards server text for an element and reports it once', async () => {
+			const { section, tail, recovered, root, resume } = hydrateChain(true);
+			try {
+				await resume();
+				expect(container.querySelector('section')).toBe(section);
+				expect(markup(section)).toBe('<p class="x">A</p><b>A</b>');
+				expect(container.querySelector('b')).toBe(tail);
+				await expectReported(recovered, FILE, lineOf('function WaitsFor('), '<p>');
+			} finally {
+				root.unmount();
+			}
+		});
+
+		it('adopts server text that the chain returns', async () => {
+			const { section, serverText, tail, recovered, root, resume } = hydrateChain(false);
+			try {
+				await resume();
+				expect(container.querySelector('section')).toBe(section);
+				expect(markup(section)).toBe('A<b>A</b>');
+				expectSameNodes(textChildren(section), [serverText]);
+				expect(container.querySelector('b')).toBe(tail);
+				await Promise.resolve();
+				expect(recovered).toEqual([]);
+				expect(warns()).toEqual([]);
+			} finally {
+				root.unmount();
+			}
+		});
 	});
 
 	// Captures that changed before a dormant boundary activated legitimately
