@@ -1757,7 +1757,9 @@ throwing.
 `hydrateRoot`'s `onRecoverableError` option fires (dev AND prod) after a
 structural or text recovery — a rebuilt subtree, corrected text, or a discarded
 stale server range —
-coalesced to one report per root per microtask burst. Octane recovers per site
+coalesced to one report per root per microtask burst. A boundary that retries
+hydration after suspending does not report content that an earlier attempt
+already rebuilt. Octane recovers per site
 rather than client-rendering a whole boundary, so attribute-level value patches
 do not report: production React does not detect those at all, and reporting
 Octane's extra detection would make the channel incomparable.

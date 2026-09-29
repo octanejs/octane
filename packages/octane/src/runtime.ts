@@ -11213,21 +11213,10 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 					returnHydration.isUnframedRootRange(block.startMarker, block.endMarker) ||
 					(isComponentDescriptor && returnHydration.holdsServerText(block)))
 			) {
-				const borrowed: ChildSlot = {
-					__kind: 'childSlot',
-					start: block.startMarker as Comment,
-					end: block.endMarker as Comment,
-					ownerHost: null,
-					borrowed: true,
-					compactable: false,
-					block: null,
-					text: null,
-					currentComp: null,
-					currentIsBodyFn: false,
-					forSlot: null,
-					hostNode: null,
-					portal: null,
-				};
+				const borrowed = returnHydration.lendRange(
+					block.startMarker as Comment,
+					block.endMarker as Comment,
+				);
 				block.slots[0] = borrowed;
 				registerSlot(block, borrowed);
 			}
@@ -18395,11 +18384,16 @@ interface PendingHydrationTextWarning {
 let currentHydration: HydrationCapability | null = null;
 
 /**
- * The first node of each value that hydrateOnlyChild built in place of server
- * content. A suspended attempt leaves its DOM for the next attempt, which runs
- * under a new capability and must not report the client's own content.
+ * Server content that a hydration attempt discarded and rebuilt on the client:
+ * the end marker of each such range, or the host whose children
+ * hydrateOnlyChild rebuilt. A suspended attempt leaves its DOM for the next
+ * attempt, which runs under a new capability. What that attempt finds there is
+ * the earlier attempt's own content, or nothing, and the mismatch is already
+ * reported. The end marker is the one node that every attempt at a return slot
+ * shares: the slot borrows its component's range, or mints its own range
+ * inside it, depending on what the failed attempt left.
  */
-let HYDRATION_BUILT_CONTENT: WeakSet<Node> | null = null;
+let HYDRATION_REBUILT: WeakSet<Node> | null = null;
 
 function activeHydration(): HydrationCapability | null {
 	const hydration = currentHydration;
@@ -18489,6 +18483,8 @@ class HydrationCapability {
 	private readonly textWarnings = new Map<Text, PendingHydrationTextWarning>();
 	/** Skip component-frame adoption until the declared container owner. */
 	passthroughRanges = false;
+	/** A slot lent a server range whose first render has yet to claim it. */
+	lentSlot: ChildSlot | null = null;
 	nativeAdoption?: NativeAdoptionState;
 	retryPresentation?: () => void;
 	presentation?: boolean;
@@ -18567,48 +18563,104 @@ class HydrationCapability {
 	}
 
 	/**
-	 * A host descriptor serializes as exactly one element inside its hole's
-	 * `<!--[-->…<!--]-->` range. Before the hole's first hydrating render, check
-	 * that the range holds exactly that element. Anything else is server content
-	 * the client cannot adopt. The usual source is invalid nesting that the HTML
-	 * parser repaired: `<p><div></div></p>` arrives as `<p></p><div></div><p></p>`,
-	 * all inside the range. Report that as a structural mismatch and discard the
-	 * range's content, so the caller builds the element on the client, as
-	 * renderBranchSlot's rebuild does. Returns whether the range was adoptable.
+	 * A slot for the range `start`…`end` that a list item or a returning
+	 * component adopted, lent to the child slot that renders its value, so that
+	 * the value hydrates inside that range rather than claiming a range of its
+	 * own. The slot's first render claims the server range as an adopted one.
 	 */
-	claimHostRange(scope: Scope, slotKey: number, start: Node, end: Node, type: string): boolean {
-		const first = getNextSibling(start)!;
-		const matches = first !== end && first.nodeType === 1 && (first as Element).localName === type;
-		if (matches && getNextSibling(first) === end) return true;
-		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
-		// Captures that changed before a dormant boundary activated legitimately
-		// differ from the server's; still rebuild, but there is nothing to report.
-		if (!this.staleServerValues) {
-			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
-			if (process.env.NODE_ENV !== 'production') {
-				const loc = siteLoc(scope, slotKey);
-				if (loc)
-					warnHydrationStructuralMismatch(
-						loc,
-						matches ? `the end of <${type}>` : `<${type}>`,
-						describeHydrationNode(matches ? getNextSibling(first) : first === end ? null : first),
-					);
-			}
-		}
-		removeRange(first, end);
-		return false;
+	lendRange(start: Comment, end: Comment): ChildSlot {
+		const slot: ChildSlot = {
+			__kind: 'childSlot',
+			start,
+			end,
+			ownerHost: null,
+			borrowed: true,
+			compactable: false,
+			block: null,
+			text: null,
+			currentComp: null,
+			currentIsBodyFn: false,
+			forSlot: null,
+			hostNode: null,
+			portal: null,
+		};
+		if (this.isOpen(start)) this.lentSlot = slot;
+		return slot;
 	}
 
 	/**
-	 * Before a child slot's first hydrating render of a list, a fragment, a keyed
-	 * element, or a portal, or of an element outside a range of its own. None of
-	 * them serializes as bare text: a list frames each primitive item in a range
-	 * of its own, and a portal leaves only a `<!---->` placeholder. Text at the
-	 * cursor where the value begins, heading the slot's `adopted` range or alone
-	 * before `end` in `parent`, is what the server rendered for a primitive, which
-	 * the value cannot adopt. Report it as a structural mismatch and remove the
-	 * server content up to `end`, so the caller builds the value as a client mount
-	 * would. Returns whether it did. A lone element's range is claimHostRange's.
+	 * Before a child slot's first hydrating render of the server range
+	 * `start`…`end`, which it adopted or was lent, check that `value` can adopt
+	 * what the range holds. A host descriptor serializes as exactly one element
+	 * of its tag. A list (`list`, from prepareDeoptList) frames or self-delimits
+	 * each of its items, so it neither leaves the range empty nor opens it with
+	 * text, and a portal does not open it with text either. Anything else is
+	 * server content the client cannot adopt: what the server rendered for a
+	 * primitive or empty value, or invalid nesting that the HTML parser repaired
+	 * (`<p><div></div></p>` arrives as `<p></p><div></div><p></p>`, all inside
+	 * the range). Discard it, as renderBranchSlot's rebuild does. Returns whether
+	 * it did, in which case the caller builds the value as a client mount would.
+	 */
+	claimRange(
+		scope: Scope,
+		slotKey: number,
+		start: Node,
+		end: Node,
+		value: unknown,
+		list: { items: readonly unknown[] } | null,
+	): boolean {
+		const rebuilt = HYDRATION_REBUILT?.has(end) === true;
+		const type = list === null && isHostDescriptor(value) ? value.type : null;
+		// Other values, such as a component or text, check what they adopt as
+		// they render.
+		if (!rebuilt && type === null && list === null && (value as any)?.$$kind !== PORTAL_TAG)
+			return false;
+		const first = getNextSibling(start)!;
+		const matches =
+			type !== null &&
+			first !== end &&
+			first.nodeType === 1 &&
+			(first as Element).localName === type;
+		if (
+			!rebuilt &&
+			(type !== null
+				? matches && getNextSibling(first) === end
+				: list !== null && first === end
+					? list.items.length === 0
+					: first.nodeType !== 3)
+		)
+			return false;
+		return this.discard(
+			scope,
+			slotKey,
+			first,
+			end,
+			// Items that render nothing differ from an empty range only in the
+			// frames the server would have given them: rebuild those quietly.
+			rebuilt ||
+				(list !== null &&
+					first === end &&
+					!list.items.some((item) => item != null && typeof item !== 'boolean' && item !== '')),
+			process.env.NODE_ENV !== 'production'
+				? type !== null
+					? matches
+						? `the end of <${type}>`
+						: `<${type}>`
+					: list !== null
+						? 'a renderable list range'
+						: 'a portal'
+				: '',
+			matches ? getNextSibling(first) : first === end ? null : first,
+		);
+	}
+
+	/**
+	 * A child slot's first hydrating render without a server range of its own,
+	 * such as a return slot's when its component's range holds server text. A
+	 * list, a fragment, a keyed or lone element, and a portal never serialize as
+	 * bare text, so a lone text node before `end` in `parent` is what the server
+	 * rendered for a primitive, which the value cannot adopt. Discard it; returns
+	 * whether it did. An earlier attempt that did so left its own content there.
 	 */
 	discardServerText(
 		scope: Scope,
@@ -18617,37 +18669,71 @@ class HydrationCapability {
 		end: Node | null,
 		value: unknown,
 		list: boolean,
-		adopted: boolean,
 	): boolean {
 		const text = this.node;
+		if (end !== null && HYDRATION_REBUILT?.has(end) === true) {
+			// Clear it only when the cursor precedes `end`.
+			let node = text;
+			while (node !== null && node !== end) node = getNextSibling(node);
+			return this.discard(scope, slotKey, node === end ? text : null, end, true, '', null);
+		}
 		if (
 			text === null ||
 			text.nodeType !== 3 ||
-			!(list || (value as any)?.$$kind === PORTAL_TAG || (!adopted && isHostDescriptor(value))) ||
-			(!adopted && (domNode(text).parentNode !== parent || getNextSibling(text) !== end))
+			!(list || (value as any)?.$$kind === PORTAL_TAG || isHostDescriptor(value)) ||
+			domNode(text).parentNode !== parent ||
+			getNextSibling(text) !== end
 		)
 			return false;
+		return this.discard(
+			scope,
+			slotKey,
+			text,
+			end,
+			false,
+			process.env.NODE_ENV !== 'production'
+				? list
+					? 'a renderable list range'
+					: (value as any).$$kind === PORTAL_TAG
+						? 'a portal'
+						: `<${(value as ElementDescriptor).type as string}>`
+				: '',
+			text,
+		);
+	}
+
+	/**
+	 * Remove the server content from `from` up to `end` that a child slot's
+	 * value cannot adopt, and point the cursor at `end`. Reports the structural
+	 * mismatch (`expected`, and the `actual` server node, describe it in
+	 * development) unless it is `quiet`, as it is when an earlier attempt already
+	 * rebuilt this content, or the captures legitimately changed before a dormant
+	 * boundary activated. Remembers `end` for later attempts.
+	 */
+	private discard(
+		scope: Scope,
+		slotKey: number,
+		from: Node | null,
+		end: Node | null,
+		quiet: boolean,
+		expected: string,
+		actual: Node | null,
+	): true {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
-		// Captures that changed before a dormant boundary activated legitimately
-		// differ from the server's; still rebuild, but there is nothing to report.
-		if (!this.staleServerValues) {
+		if (!quiet && !this.staleServerValues) {
 			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 			if (process.env.NODE_ENV !== 'production') {
-				// A return slot has no site of its own; name the returning component.
-				const loc = siteLoc(scope, slotKey) || componentSourceLoc(scope.block.body);
-				if (loc)
-					warnHydrationStructuralMismatch(
-						loc,
-						list
-							? 'a renderable list range'
-							: (value as any).$$kind === PORTAL_TAG
-								? 'a portal'
-								: `<${(value as ElementDescriptor).type as string}>`,
-						describeHydrationNode(text),
-					);
+				// A return slot or a list item has no site of its own: name the
+				// returning component, else the list's host.
+				const loc =
+					siteLoc(scope, slotKey) ||
+					componentSourceLoc(scope.block.body) ||
+					(domNode((from ?? end)!).parentNode as any)?.__oct_loc;
+				if (loc) warnHydrationStructuralMismatch(loc, expected, describeHydrationNode(actual));
 			}
 		}
-		removeRange(text, end);
+		removeRange(from, end);
+		if (end !== null) (HYDRATION_REBUILT ??= new WeakSet()).add(end);
 		this.node = end;
 		return true;
 	}
@@ -19122,18 +19208,20 @@ class HydrationCapability {
 	 */
 	hydrateOnlyChild(scope: Scope, slotKey: number, el: Node, render: () => void): void {
 		let stale = getFirstChild(el);
-		if (this.isOpen(stale)) {
+		// An earlier attempt built the value here before it suspended: the host
+		// holds that attempt's content, whatever node it begins with.
+		const rebuilt = HYDRATION_REBUILT?.has(el) === true;
+		if (!rebuilt && this.isOpen(stale)) {
 			this.node = stale;
 			render();
 			return;
 		}
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
-		// Neither what an earlier attempt built before its value suspended, nor
-		// server content for captures that changed before a dormant boundary
-		// activated, is a mismatch to report.
-		if (stale !== null && HYDRATION_BUILT_CONTENT?.has(stale) !== true) {
+		if (stale !== null) {
 			if ((el as Element).localName === 'textarea') stale = getNextSibling(stale);
-			else if (!this.staleServerValues) {
+			// Server content for captures that changed before a dormant boundary
+			// activated is not a mismatch to report either.
+			else if (!rebuilt && !this.staleServerValues) {
 				noteRecoverableHydrationError(() => new Error(formatClientError(51)), this.rootBlock);
 				if (process.env.NODE_ENV !== 'production')
 					warnHydrationStructuralMismatch(
@@ -19148,14 +19236,8 @@ class HydrationCapability {
 			(STAGED_DOM?.view(el) ?? el).removeChild(stale);
 			stale = next;
 		}
-		const last = (STAGED_DOM?.view(el) ?? el).lastChild;
-		try {
-			this.suspend(render);
-		} finally {
-			// A value that suspends throws here and leaves what it built so far.
-			const first = last === null ? getFirstChild(el) : getNextSibling(last);
-			if (first !== null) (HYDRATION_BUILT_CONTENT ??= new WeakSet()).add(first);
-		}
+		(HYDRATION_REBUILT ??= new WeakSet()).add(el);
+		this.suspend(render);
 	}
 
 	/**
@@ -32461,21 +32543,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		// return content, one level too deep) as its own, desyncing everything
 		// inside. The cursor already sits on the item's first content node.
 		if (hydration !== null && scope.slots[0] === undefined && hydration.isOpen(block.startMarker)) {
-			const seeded: ChildSlot = {
-				__kind: 'childSlot',
-				start: block.startMarker as Comment,
-				end: block.endMarker as Comment,
-				ownerHost: null,
-				borrowed: true,
-				compactable: false,
-				block: null,
-				text: null,
-				currentComp: null,
-				currentIsBodyFn: false,
-				forSlot: null,
-				hostNode: null,
-				portal: null,
-			};
+			const seeded = hydration.lendRange(block.startMarker as Comment, block.endMarker as Comment);
 			scope.slots[0] = seeded;
 			registerSlot(scope, seeded);
 		}
@@ -34194,16 +34262,14 @@ export function childSlot(
 			return;
 		}
 	}
-	// This call adopted the server's `<!--[-->…<!--]-->` pair as the slot's range.
+	// This call adopted the server's `<!--[-->…<!--]-->` pair as the slot's range,
+	// or is the first render of a slot lent its list item's or returning
+	// component's range.
 	let adoptedRange = false;
-	// The server rendered a primitive where this value begins, and that text is
-	// gone: build the value with hydration suspended, as a client mount would.
+	// The server content where this value begins is gone: build the value with
+	// hydration suspended, as a client mount would.
 	let rebuild = false;
 	if (state === undefined) {
-		// A compiled map's rows are the compiler's to frame; the rest of the list
-		// regime never serializes as bare text.
-		const framedList =
-			preparedList !== null && compiledMapBody === undefined && mappedFallback !== true;
 		const transaction = ROOT_RENDER_TRANSACTION;
 		if (
 			transaction !== null &&
@@ -34297,6 +34363,7 @@ export function childSlot(
 			start = null;
 			// Hydrating without a server range, as a return slot does. An owned
 			// host's text, such as an only-child hole's, is its owner's to judge.
+			// A compiled map's rows are the compiler's to frame.
 			if (hydration !== null && ownsHost === undefined)
 				rebuild = hydration.discardServerText(
 					parentScope,
@@ -34304,24 +34371,13 @@ export function childSlot(
 					domParent,
 					anchor ?? null,
 					value,
-					framedList,
-					false,
+					preparedList !== null && compiledMapBody === undefined && mappedFallback !== true,
 				);
 			end = (STAGED_DOM?.view(document) ?? document).createComment('');
 			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(end, anchor ?? null);
 			if (hydration !== null && parentBlock === hydration.rootBlock)
 				hydration.protectRootAnchor(end);
 		}
-		if (adoptedRange)
-			rebuild = hydration!.discardServerText(
-				parentScope,
-				slotKey,
-				domParent,
-				end,
-				value,
-				framedList,
-				true,
-			);
 		state = {
 			__kind: 'childSlot',
 			start,
@@ -34340,7 +34396,19 @@ export function childSlot(
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
+	} else if (hydration !== null && hydration.lentSlot === state) {
+		hydration.lentSlot = null;
+		adoptedRange = true;
 	}
+	if (adoptedRange)
+		rebuild = hydration!.claimRange(
+			parentScope,
+			slotKey,
+			state.start!,
+			state.end!,
+			value,
+			compiledMapBody === undefined && mappedFallback !== true ? preparedList : null,
+		);
 	if (compactable === true) state.compactable = true;
 
 	// Consume the pure-host → blocks upgrade handoff: this is the upgraded
@@ -34548,17 +34616,9 @@ export function childSlot(
 				state.start = (STAGED_DOM?.view(document) ?? document).createComment('');
 				(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(state.start, state.end);
 			}
-			// An unadoptable server range is emptied here, so the node is built below.
-			if (adoptedRange)
-				hydration!.claimHostRange(
-					parentScope,
-					slotKey,
-					state.start,
-					state.end!,
-					(value as ElementDescriptor).type as string,
-				);
 			// First render: adopt the server node during hydration, else reuse the
-			// prior built node, else build fresh.
+			// prior built node, else build fresh. claimRange emptied a server range
+			// that holds anything but that node.
 			let prev = state.hostNode;
 			if (prev === null && hydration !== null) {
 				prev = getNextSibling(state.start);
@@ -34964,20 +35024,9 @@ export function childSlot(
 			b.memoInChain = true;
 		}
 		state.block = b;
-		if (
-			rebuild ||
-			(adoptedRange &&
-				comp === (hostElementBody as unknown as ComponentBody) &&
-				!hydration!.claimHostRange(
-					parentScope,
-					slotKey,
-					state.start!,
-					state.end!,
-					(props as ElementDescriptor).type as string,
-				))
-		) {
-			// The server range is gone: build the element and its subtree on the
-			// client, so no descendant adopts a node outside that range.
+		if (rebuild) {
+			// The server content is gone: build the value and its subtree on the
+			// client, so that no descendant adopts a server node outside the range.
 			hydration!.suspend(() => renderBlock(b));
 		} else {
 			renderBlock(b);
