@@ -1005,7 +1005,8 @@ through `then`, so a reusable custom wakeable is not polled. `use()`
 instruments only a thenable with no `status`. It leaves any status it did not
 write untouched and treats it as pending, matching React's `trackUsedThenable`.
 A universal root hosted in a DOM boundary also resumes through the DOM
-runtime's listeners, so both runtimes must pace for that path.
+runtime's listeners, so both runtimes must pace for that path. See
+[retry pacing](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#13-retry-pacing-after-an-already-settled-wakeable).
 
 The universal runtime does not yet implement transition lanes. Its
 `startTransition` behavior is synchronous, so it makes no timing parity claim.

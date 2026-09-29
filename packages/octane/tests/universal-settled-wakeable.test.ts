@@ -10,10 +10,14 @@ import {
 	universalPlan,
 	universalTry,
 	universalValue,
+	use,
 	useLayoutEffect,
+	useState,
 	type ObjectHostInstance,
 	type RendererRegion,
 } from '../src/universal.js';
+import { act, mount } from './_helpers';
+import { UniversalPendingBoundaryFixture } from './_fixtures/universal-boundary.tsrx';
 import { SettledRegionChild } from './_fixtures/universal-settled-region.tsrx';
 import {
 	SettledBoundary,
@@ -257,6 +261,69 @@ describe('universal Suspense retries on an already-settled wakeable', () => {
 		expect(host.element.querySelector('.resolved')?.textContent).toBe('ready');
 		root.unmount();
 		host.dispose();
+	});
+
+	describe('through a DOM boundary hosting the universal root', () => {
+		// The DOM boundary projects a root suspension through its @pending arm, so
+		// the DOM runtime's retry and the universal root's retry both subscribe.
+		const hostedPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'resolved',
+			bindings: [
+				['label', 0],
+				['count', 1],
+			],
+		});
+		let beginTransition!: () => void;
+		const HostedScene = defineUniversalComponent('object', (props: { gate: Gate }) => {
+			const [count, setCount] = useState(0, 'hosted-count');
+			beginTransition = () => startTransition(() => setCount(1));
+			if (!props.gate.check()) use(props.gate.wakeable);
+			return universalValue(hostedPlan, [props.gate.label, count]);
+		});
+
+		function mountHosted(gate: Gate) {
+			const universal = objectRoot();
+			const dom = mount(UniversalPendingBoundaryFixture, {
+				root: universal.root,
+				component: HostedScene,
+				childProps: { gate },
+			});
+			return { ...universal, dom };
+		}
+
+		function hostedState(container: ReturnType<typeof createObjectContainer>) {
+			const host = container.children[0];
+			return host === undefined ? null : { label: host.props.label, count: host.props.count };
+		}
+
+		it('lets a timer end a projected root suspension', async () => {
+			const gate = settledGate(laggingResolved());
+			const { container, dom } = mountHosted(gate);
+			expect(dom.find('.projected-pending').textContent).toBe('pending');
+			await act(() => openFromTimer(gate));
+			expect(gate.starved).toBe(false);
+			expect(dom.findAll('.projected-pending')).toHaveLength(0);
+			expect(hostedState(container)).toEqual({ label: 'ready', count: 0 });
+			dom.unmount();
+		});
+
+		it('lets a timer end a projected suspension that holds a transition', async () => {
+			const { container, root, dom } = mountHosted(openGate('initial'));
+			expect(hostedState(container)).toEqual({ label: 'initial', count: 0 });
+			const gate = settledGate(laggingResolved(), 'next');
+			dom.update(UniversalPendingBoundaryFixture, {
+				root,
+				component: HostedScene,
+				childProps: { gate },
+			});
+			beginTransition();
+			await act(() => openFromTimer(gate));
+			expect(gate.starved).toBe(false);
+			expect(dom.findAll('.projected-pending')).toHaveLength(0);
+			expect(hostedState(container)).toEqual({ label: 'next', count: 1 });
+			dom.unmount();
+		});
 	});
 
 	it('waits for a reusable custom wakeable to notify again instead of polling', async () => {
