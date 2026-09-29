@@ -126,6 +126,34 @@ export function SuspenseStoreWithActionState(props: {
 	</StoreRegistryProvider>
 }
 
+function TwoStoreValues(props: {
+	first: RegistryStoreOptions<any>;
+	second: RegistryStoreOptions<any>;
+	log: (entry: string) => void;
+}) @{
+	const first = useStore(props.first);
+	const second = useStore(props.second);
+	const ids = `${(first as any).storeId}|${(second as any).storeId}`;
+	props.log(ids);
+	<div id="stores">{ids}</div>
+}
+
+/** Two sequential useStore calls in one component, under one Suspense boundary. */
+export function SuspenseTwoStoreReader(props: {
+	registry: StoreRegistry;
+	first: RegistryStoreOptions<any>;
+	second: RegistryStoreOptions<any>;
+	log: (entry: string) => void;
+}) @{
+	<StoreRegistryProvider storeRegistry={props.registry}>
+		@try {
+			<TwoStoreValues first={props.first} second={props.second} log={props.log} />
+		} @pending {
+			<div id="fallback">{'loading'}</div>
+		}
+	</StoreRegistryProvider>
+}
+
 export function augmentStore(store: object) {
 	return withReactApi(store as any);
 }
