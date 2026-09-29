@@ -23840,6 +23840,7 @@ export function setHostPropSources(
 			props.get('checked')?.value,
 			props.get('defaultChecked')?.value,
 			props.get('multiple')?.value,
+			hasNestedChildren,
 		);
 	return resolved;
 }
@@ -27760,6 +27761,7 @@ function applyFormControlValues(
 	checked: unknown,
 	defaultChecked: unknown,
 	multiple: unknown,
+	hasNestedChildren = false,
 ): void {
 	const ctrl = armControlled(el);
 	const first = !ctrl.formSeen;
@@ -27805,7 +27807,14 @@ function applyFormControlValues(
 		setValue(textarea, value);
 		if (value == null) {
 			if (defaultValue != null) setDefaultValue(textarea, defaultValue, first);
-			else if (!first && (STAGED_DOM?.view(textarea) ?? textarea).defaultValue !== '')
+			// React resets the default here because its children only seed the
+			// initial value. Authored Octane children are a live text binding that
+			// owns the default, so clearing it would detach their Text node.
+			else if (
+				!first &&
+				!hasNestedChildren &&
+				(STAGED_DOM?.view(textarea) ?? textarea).defaultValue !== ''
+			)
 				(STAGED_DOM?.view(textarea) ?? textarea).defaultValue = '';
 		}
 		return;
