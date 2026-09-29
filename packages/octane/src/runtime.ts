@@ -18402,6 +18402,55 @@ function isRendererHydrationStyle(node: Node): boolean {
 	);
 }
 
+/** A hoisted Float stylesheet, script, or resource hint the server stamped for dedupe. */
+function isFloatHeadResource(node: Node): boolean {
+	if (node.nodeType !== 1) return false;
+	const el = STAGED_DOM?.view(node as Element) ?? (node as Element);
+	const tag = el.localName;
+	return (
+		(tag === 'link' || tag === 'style' || tag === 'script') &&
+		(el.hasAttribute('data-precedence') ||
+			el.hasAttribute('data-oct-hint') ||
+			el.hasAttribute('data-oct-res'))
+	);
+}
+
+/**
+ * Return the first body node of a hydrating root container. A body-only render
+ * folds its hoisted metadata AHEAD of the body (`headChannel: 'fold'`, React's
+ * resource-hoisting shape), so a container filled with the whole `html` starts
+ * with that prefix. Each `<!--rnh-…-->` interval is a scope-owned head entry:
+ * move it into the document head, where a split-head host places it and
+ * headBlock adopts it, so the hydrated DOM matches a client render. Float
+ * resources and hints are global and deduped document-wide. Like scoped-style
+ * sidecars, they stay in place and the root claim skips them. ssrHeadEl frames
+ * every entry as exactly `<!--rnh-K--><tag>…</tag><!--/rnh-K-->`; any other
+ * shape ends the prefix and leaves ordinary mismatch recovery in charge.
+ */
+function skipFoldedHeadPrefix(container: RootContainer, node: Node | null): Node | null {
+	const head =
+		container.nodeType === 9 ? null : (container as Element | DocumentFragment).ownerDocument.head;
+	while (node !== null) {
+		if (node.nodeType === 10 || isRendererHydrationStyle(node) || isFloatHeadResource(node)) {
+			node = getNextSibling(node);
+			continue;
+		}
+		const el = head !== null && node.nodeType === 8 ? getNextSibling(node) : null;
+		const end = el === null ? null : getNextSibling(el);
+		if (end === null || end.nodeType !== 8) return node;
+		const key = (STAGED_DOM?.view(node as Comment) ?? (node as Comment)).data;
+		if (
+			!key.startsWith('rnh-') ||
+			(STAGED_DOM?.view(end as Comment) ?? (end as Comment)).data !== '/' + key
+		)
+			return node;
+		const next = getNextSibling(end);
+		(STAGED_DOM?.view(head!) ?? head!).append(node, el!, end);
+		node = next;
+	}
+	return null;
+}
+
 /**
  * Root-local hydration state and the dynamic dispatch boundary for hydration-only
  * code. The class is constructed only by hydrateRoot, so client-only bundles can
@@ -18979,6 +19028,42 @@ class HydrationCapability {
 		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
 		(STAGED_DOM?.view(el) ?? el).appendChild(created);
 		return created;
+	}
+
+	/**
+	 * htext's counterpart for an only-child hole whose first hydrating value
+	 * renders nothing (`null`, `undefined`, a boolean, or `''`). The server
+	 * serializes that as no children, or as an empty `<!--[--><!--]-->` frame,
+	 * which unwraps like htext's text-only frame. Anything else is server content
+	 * the client renders no node for, so a later value would land beside it.
+	 * Discard it and report the recovery as htext reports extra children.
+	 * A textarea's text is its default value, which its value props own.
+	 */
+	hempty(el: Node, loc?: string): void {
+		const first = getFirstChild(el);
+		if (first === null || (el as Element).localName === 'textarea') return;
+		const next = getNextSibling(first);
+		const framed = this.isOpen(first);
+		if (framed && this.isClose(next) && getNextSibling(next) === null) {
+			(STAGED_DOM?.view(first) ?? first).remove();
+			(STAGED_DOM?.view(next) ?? next).remove();
+			return;
+		}
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from the server's; still recover, but there is nothing to report.
+		if (!this.staleServerValues) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
+			if (process.env.NODE_ENV !== 'production') {
+				warnHydrationStructuralMismatch(
+					loc || (el as any).__oct_loc,
+					'nothing',
+					describeHydrationNode(framed && next !== null ? next : first),
+				);
+			}
+		}
+		for (let n = getFirstChild(el); n !== null; n = getFirstChild(el))
+			(STAGED_DOM?.view(el) ?? el).removeChild(n);
 	}
 
 	htextSwap(posNode: Node | null, text: string): Text {
@@ -23845,6 +23930,7 @@ export function setHostPropSources(
 			props.get('checked')?.value,
 			props.get('defaultChecked')?.value,
 			props.get('multiple')?.value,
+			hasNestedChildren,
 		);
 	return resolved;
 }
@@ -27765,6 +27851,7 @@ function applyFormControlValues(
 	checked: unknown,
 	defaultChecked: unknown,
 	multiple: unknown,
+	hasNestedChildren = false,
 ): void {
 	const ctrl = armControlled(el);
 	const first = !ctrl.formSeen;
@@ -27810,7 +27897,14 @@ function applyFormControlValues(
 		setValue(textarea, value);
 		if (value == null) {
 			if (defaultValue != null) setDefaultValue(textarea, defaultValue, first);
-			else if (!first && (STAGED_DOM?.view(textarea) ?? textarea).defaultValue !== '')
+			// React resets the default here because its children only seed the
+			// initial value. Authored Octane children are a live text binding that
+			// owns the default, so clearing it would detach their Text node.
+			else if (
+				!first &&
+				!hasNestedChildren &&
+				(STAGED_DOM?.view(textarea) ?? textarea).defaultValue !== ''
+			)
 				(STAGED_DOM?.view(textarea) ?? textarea).defaultValue = '';
 		}
 		return;
@@ -34924,7 +35018,9 @@ export function childTextHole(
 		journalRootRange(domParent, null, null);
 		journalRootProperty(parentScope.slots, slotKey, parentScope.slots[slotKey]);
 	}
-	if (state === undefined && vt !== 'object' && vt !== 'function') {
+	// `null` is a primitive here too: ssrChildText serializes every empty value
+	// alike, and childSlot's adoption would misread the host's markerless content.
+	if (state === undefined && (value === null || (vt !== 'object' && vt !== 'function'))) {
 		// Markerless pure-text mode.
 		const str =
 			value == null || value === false || value === true
@@ -34934,6 +35030,7 @@ export function childTextHole(
 					: String(value);
 		if (str === '') {
 			if (cachedNode !== null) (STAGED_DOM?.view(cachedNode) ?? cachedNode).remove();
+			else activeHydration()?.hempty(domParent, siteLoc(parentScope, slotKey));
 			return null;
 		}
 		if (cachedNode !== null) {
@@ -45456,9 +45553,7 @@ function hydrateRootWithOutputHandler(
 		// Every failed adoption discards its scopes, not the server DOM. Restart
 		// the root-local ID and seed cursors together on the next attempt.
 		idState.next = rootOptions?.identifierSeed ?? 0;
-		let firstNode = getFirstChild(container);
-		while (firstNode !== null && (firstNode.nodeType === 10 || isRendererHydrationStyle(firstNode)))
-			firstNode = getNextSibling(firstNode);
+		const firstNode = skipFoldedHeadPrefix(container, getFirstChild(container));
 		const hydration = new HydrationCapability(rootBlock, firstNode, seeds);
 		if (bindingLeases?.length) {
 			const attempted = rootBlock;

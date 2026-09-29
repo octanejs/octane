@@ -14166,7 +14166,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// still gets a `<!--[-->…<!--]-->` block). Must match the client's only-child
 	// markerless condition exactly so both sides agree for hydration: a single `Text`
 	// child that is neither a static literal (baked into HTML) nor proven text
-	// (emitted via `ssrText`).
+	// (emitted via `ssrText`). A spread or raw-HTML writer does not change the
+	// client's shape, so it must not change this one: inside RCDATA (<textarea>)
+	// a frame around a primitive would parse as literal text.
 	const onlyChild0 =
 		normChildren.length === 1 && normChildren[0].type === 'Text' ? normChildren[0] : null;
 	let childrenExpr;
@@ -14174,7 +14176,6 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		const content = escapeInlineScriptContent(authoredStaticScriptContent);
 		childrenExpr = ssrHtmlTemplate(content === '' ? [] : [content], node, ctx);
 	} else if (
-		htmlSources.length === 0 &&
 		onlyChild0 !== null &&
 		!onlyChild0._octaneBindingOpaque &&
 		!onlyChild0._octaneBindingValue &&
@@ -22086,20 +22087,31 @@ function rewriteTsrxBlocks(
  * A name the function introduces can shadow an enclosing lifetime-invariant
  * binding with one that changes between renders, so it must not inherit that
  * proof. `compileFunctionBody` recomputes the nested body's own invariants.
+ *
+ * Inside a module-level callback (`untracked`), nothing tracks the names the
+ * enclosing callbacks bind, so no env tuple can carry them. The whole nested
+ * compile, including the templates nested in it, then runs with no component
+ * context, which keeps every arm inline where it closes over those names.
  */
-function withNestedTemplateScope(fn, ctx, compile) {
+function withNestedTemplateScope(fn, ctx, compile, untracked = false) {
 	const prevLocals = ctx.currentComponentLocals;
 	const prevInvariantLocals = ctx.currentInvariantLocals;
 	const prevEventInvariantLocals = ctx.currentEventInvariantLocals;
+	const prevUntracked = ctx._untrackedScope;
 	const introduced = collectComponentLocals(fn);
-	const locals = new Set(prevLocals);
-	for (const name of introduced) locals.add(name);
-	ctx.currentComponentLocals = locals;
+	if (prevLocals == null && (untracked || prevUntracked === true)) {
+		ctx._untrackedScope = true;
+	} else {
+		const locals = new Set(prevLocals);
+		for (const name of introduced) locals.add(name);
+		ctx.currentComponentLocals = locals;
+	}
 	ctx.currentInvariantLocals = withoutShadowedNames(prevInvariantLocals, introduced);
 	ctx.currentEventInvariantLocals = withoutShadowedNames(prevEventInvariantLocals, introduced);
 	try {
 		return compile();
 	} finally {
+		ctx._untrackedScope = prevUntracked;
 		ctx.currentComponentLocals = prevLocals;
 		ctx.currentInvariantLocals = prevInvariantLocals;
 		ctx.currentEventInvariantLocals = prevEventInvariantLocals;
@@ -22129,7 +22141,7 @@ const SETUP_VALUE_DIRECTIVE_TYPES = new Set([
 // `@{ … }` block is also folded as a setup value, but it is a sub-template rather
 // than a set of arms — `rewriteTsrxBlocks` owns its expression-position handling,
 // and the unowned-directive diagnostic's advice does not apply to it — so it is
-// deliberately absent here.
+// deliberately absent here. With no owning body, lowerJsxChild compiles it in place.
 const VALUE_DIRECTIVE_ARM_TYPES = new Set([
 	'JSXIfExpression',
 	'JSXForExpression',
@@ -22487,12 +22499,14 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 			const name = n.id?.name ?? allocCompilerName(ctx, '__template');
 			// A nested body must not replace the enclosing component's warm plan.
 			const previousWarm = ctx._pendingWarm;
+			const compile = () =>
+				ctx.mode === 'server'
+					? ssrCompileBody(n, ctx, name, null, [], 'opaque')
+					: compileFunctionBody(n, ctx, name, 'opaque');
 			try {
-				const compiled = withNestedTemplateScope(n, ctx, () =>
-					ctx.mode === 'server'
-						? ssrCompileBody(n, ctx, name, null, [], 'opaque')
-						: compileFunctionBody(n, ctx, name, 'opaque'),
-				);
+				// A missing fold marks a module-level callback, whose names only this
+				// function's closure can reach.
+				const compiled = withNestedTemplateScope(n, ctx, compile, lower == null);
 				return functionExpressionFromDeclaration({ ...compiled, id: n.id ?? null }, n);
 			} finally {
 				ctx._pendingWarm = previousWarm;
@@ -22568,7 +22582,8 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 				// arms beside values they cannot reach. Drop the fold for this subtree so
 				// re-entries below (an attribute value re-enters rewriteJsxValues, with no
 				// function node left in view) cannot pick it back up, and the directive
-				// reaches the unowned diagnostic instead of folding into the wrong scope.
+				// reaches the unowned diagnostic instead of folding into the wrong scope. A
+				// `@{ … }` child block has no arms, so lowerJsxChild compiles it in place.
 				ctx._valueDirectiveLowering = null;
 			} else {
 				// Including names bound in the callback's nested blocks, which a fold
@@ -22682,6 +22697,16 @@ function lowerJsxChild(child, ctx) {
 		const fold = ctx._valueDirectiveLowering;
 		if (fold != null) return fold(child);
 		rejectUnownedValueDirective(child);
+	}
+	if (t === 'JSXCodeBlock' && ctx._valueDirectiveLowering == null) {
+		// No body owns this block, as inside a module-level callback. A block is a
+		// body of its own, so it needs no owner: a render-only block is transparent,
+		// and any other block compiles in place as the `() => @{ … }` child that
+		// normalizeChildren makes of it, closing over the callback's params.
+		if ((child.body?.length ?? 0) === 0) {
+			return child.render ? lowerJsxChild(child.render, ctx) : null;
+		}
+		return rewriteJsxValues(childCodeBlockArrow(child), ctx);
 	}
 	if (t === 'JSXFragment' || t === 'Fragment') {
 		const els = [];
@@ -26445,7 +26470,10 @@ function planJsx(
 			// Const-seeded straight into the bag factory args — no mount statement.
 			if (cc.isChild && !noTemplate) {
 				bag.constField(`_chv$${cc.id}`, 'null');
-				bag.constField(`_chp$${cc.id}`, 'undefined');
+				// An only-child hole's first render must reach childTextHole even for
+				// `undefined`: while hydrating, that call reconciles the host's server
+				// children, which no other binding owns.
+				bag.constField(`_chp$${cc.id}`, cc.onlyChildText ? 'unset' : 'undefined');
 			}
 		},
 	});
@@ -26490,11 +26518,12 @@ function planJsx(
 			);
 		}
 		// Const-seeded fields keep their registry strings until the factory call.
-		// A mixed-style scalar starts at its private owning scope so its first
-		// deferred write still runs for null/undefined. The same identity lets its
-		// setter distinguish a fresh mount from a preserved suspended retry.
+		// An `unset` field starts at its private owning scope, which no rendered
+		// value equals, so its first write still runs for null/undefined. For a
+		// mixed-style scalar, the same identity lets its setter distinguish a fresh
+		// mount from a preserved suspended retry.
 		const constArgNode = (expr) =>
-			expr === 'null' ? b.literal(null) : expr === 'style-unset' ? b.id('__s') : b.id(expr);
+			expr === 'null' ? b.literal(null) : expr === 'unset' ? b.id('__s') : b.id(expr);
 		const bagFieldValue = (f) =>
 			f.hostVar !== null
 				? b.id(f.hostVar)
@@ -27997,7 +28026,7 @@ function emitDeferredMount(bind, elVar, bag) {
 			: bind.kind === 'style' || bind.kind === 'styleProperties'
 				? `_sty$${bind.id}`
 				: `_prev$${bind.id}`,
-		bind.kind === 'styleProperty' || bind.kind === 'styleProperties' ? 'style-unset' : 'undefined',
+		bind.kind === 'styleProperty' || bind.kind === 'styleProperties' ? 'unset' : 'undefined',
 	);
 	if (bind.kind === 'styleProperties') {
 		if (bind.spread) bag.constField(`_styFull$${bind.id}`, 'undefined');
