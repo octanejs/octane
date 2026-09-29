@@ -3454,18 +3454,130 @@ function compileTemplateProgramForComponentAst(component, state, itemBinding, in
 	return generatedArrow([itemBinding, indexBinding], descriptor, component);
 }
 
-function compileForAst(node, context, state) {
-	if (node.await) {
+const isKeyAttribute = (attribute) => attributeName(attribute) === 'key';
+
+// The template partition of compileBlockValueAst: everything else is setup.
+function isForOutputStatement(statement) {
+	const inner = statement.type === 'ExpressionStatement' ? statement.expression : statement;
+	return (
+		isTemplateNode(inner) || inner.type === 'JSXExpressionContainer' || inner.type === 'JSXText'
+	);
+}
+
+// The React-style row key: a valued `key` attribute on the first element of an
+// @for body. It takes precedence over a header key, as on the DOM target. The
+// runtime reads row keys before the body runs, so the key can read the item,
+// the index and names outside the loop, but nothing the body declares: the
+// generated key function would throw a ReferenceError or silently read an
+// outer binding of the same name.
+function forRowKeyAttribute(node, state) {
+	const statements = node.body?.body ?? [];
+	const element = statements.find(
+		(statement) => statement.type === 'JSXElement' || statement.type === 'Element',
+	);
+	const attribute = (element?.openingElement?.attributes ?? element?.attributes ?? []).find(
+		isKeyAttribute,
+	);
+	// A valueless `<view key>` or a comment-only `key={}` carries no expression
+	// and falls through to the header key or the positional key.
+	if (attribute?.value == null) return null;
+	const expression =
+		attribute.value.type === 'JSXExpressionContainer'
+			? attribute.value.expression
+			: attribute.value;
+	if (expression == null || expression.type === 'JSXEmptyExpression') return null;
+	const setup = statements.filter((statement) => !isForOutputStatement(statement));
+	if (setup.length === 0) return expression;
+	// Analyze the row's setup with the key placed after it, as the body sees it.
+	// Only row declarations are in scope, so a key identifier that resolves to
+	// the row block, or to the row function a `var` hoists into, reads one. A
+	// binding the key declares itself, such as a callback parameter, resolves to
+	// a scope of its own.
+	const probe = b.stmt(expression);
+	const analysis = createLexicalAnalysis(b.block([...setup, probe]));
+	const rowScope = analysis.nodeScopes.get(probe);
+	const visit = (child, parent, key) => {
+		// Array holes such as `[, row.id]` arrive as null elements.
+		if (child === null) return;
+		if (child.type === 'Identifier' && isIdentifierReference(child, parent, key, analysis)) {
+			const binding = analysis.resolveBinding(
+				analysis.nodeScopes.get(child) ?? rowScope,
+				child.name,
+			);
+			if (binding?.scope === rowScope || binding?.scope === analysis.rootScope) {
+				throw universalError(
+					state.filename,
+					attribute,
+					`the \`key\` attribute on this \`@for\` row reads \`${child.name}\`, which is ` +
+						'declared inside the loop body. Row keys are computed before the body runs, so ' +
+						'they can only read the item, its `index` binding, and names from outside the ' +
+						'loop. Derive the key from the item in the loop header instead: ' +
+						'`@for (const item of items; key …)`.',
+				);
+			}
+		}
+		forEachRuntimeAstChild(child, (grandchild, childKey) => visit(grandchild, child, childKey));
+	};
+	visit(expression, probe, 'expression');
+	return expression;
+}
+
+// A `key` on the only output root of an @for body names the row, never a
+// separate element, so the root cannot change identity inside a row that shares
+// it. Left on the root it only repeats the row key while costing the row its
+// static plan props (a host key rides the ordered prop program) and every
+// owner-free and template-program row lowering. Remove it so the row compiles
+// exactly as the header spelling does; returns null when there is none. Keyed
+// elements below the root keep their own boundaries.
+function forRowTemplateBody(node) {
+	const statements = node.body?.body ?? [];
+	let root = null;
+	for (const statement of statements) {
+		if (
+			!isForOutputStatement(statement) ||
+			(statement.type === 'JSXText' && normalizeJsxText(statement.value ?? '') === '')
+		) {
+			continue;
+		}
+		if (root !== null) return null;
+		root = statement;
+	}
+	if (root?.type !== 'JSXElement' && root?.type !== 'Element') return null;
+	const attributes = root.openingElement?.attributes ?? root.attributes ?? [];
+	const kept = attributes.filter((attribute) => !isKeyAttribute(attribute));
+	if (kept.length === attributes.length) return null;
+	const unkeyed = root.openingElement
+		? {
+				...root,
+				...(root.attributes === undefined ? null : { attributes: kept }),
+				openingElement: { ...root.openingElement, attributes: kept },
+			}
+		: { ...root, attributes: kept };
+	return statements.map((statement) => (statement === root ? unkeyed : statement));
+}
+
+function compileForAst(authored, context, state) {
+	if (authored.await) {
 		throw universalError(
 			state.filename,
-			node,
+			authored,
 			'await @for requires the async-collection capability.',
 		);
 	}
-	const declaration = node.left?.declarations?.[0];
+	const declaration = authored.left?.declarations?.[0];
 	if (!declaration?.id) {
-		throw universalError(state.filename, node, 'universal @for requires one item binding.');
+		throw universalError(state.filename, authored, 'universal @for requires one item binding.');
 	}
+	const attributeKey = forRowKeyAttribute(authored, state);
+	const rowBody = forRowTemplateBody(authored);
+	const node =
+		attributeKey === null && rowBody === null
+			? authored
+			: {
+					...authored,
+					key: attributeKey ?? authored.key,
+					body: rowBody === null ? authored.body : { ...authored.body, body: rowBody },
+				};
 	const itemBinding = declaration.id;
 	const indexBinding =
 		node.index ?? generatedIdentifier(allocName(state, '__octaneUniversalIndex'), node);

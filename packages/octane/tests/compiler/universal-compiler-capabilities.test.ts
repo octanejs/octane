@@ -327,7 +327,6 @@ describe('component-owned Lynx template rows', () => {
 			source,
 			{ renderer: { ...resolvedLynxRenderer, capabilities: [] } },
 		],
-		['an explicit key', source.replace('row={row}', 'key={row.id} row={row}'), {}],
 		['a ref', source.replace('row={row}', 'ref={onSelect} row={row}'), {}],
 		['a spread', source.replace('row={row}', '{...row}'), {}],
 		['a prototype-sensitive prop', source.replace('row={row}', '__proto__={row} row={row}'), {}],
@@ -345,6 +344,17 @@ describe('component-owned Lynx template rows', () => {
 			});
 
 			expect(args[9]).toBeUndefined();
+		}
+	});
+
+	it('proves the scope redundant when the row key is written on the root', () => {
+		// A key on the row's only root is the row key, so it compiles exactly as
+		// the header spelling does rather than as a keyed component.
+		const keyed = source.replace('row={row}', 'key={row.id} row={row}');
+		for (const renderer of [resolvedLynxRenderer, resolvedLynxMainThreadRenderer]) {
+			const args = compiledUniversalForArguments(keyed, { renderer });
+			expect(args[9]).toMatchObject({ type: 'Literal', value: true });
+			expect(args).toEqual(compiledUniversalForArguments(source, { renderer }));
 		}
 	});
 });
@@ -454,7 +464,6 @@ describe('constructor-backed Three components in keyed loops', () => {
 		['a ref', '<Disposable ref={reference} args={[item.id, version]} />'],
 		['spread props', '<Disposable {...extra} args={[item.id, version]} />'],
 		['an event handler', '<Disposable onClick={handler} args={[item.id, version]} />'],
-		['an explicit key', '<Disposable key={item.id} args={[item.id, version]} />'],
 		['explicit children', '<Disposable children={child} args={[item.id, version]} />'],
 		['host attachment', '<Disposable attach="material" args={[item.id, version]} />'],
 		['a prototype-sensitive prop', '<Disposable __proto__={prototype} />'],
@@ -467,6 +476,18 @@ describe('constructor-backed Three components in keyed loops', () => {
 		);
 
 		expect(compiledUniversalForArguments(source)).toHaveLength(3);
+	});
+
+	it('elides item owners when the row key is written on the root', () => {
+		// A key on the row's only root is the row key, not a component key.
+		const source = extendedThreeComponent.replace(
+			'<Disposable args={[item.id, version]} />',
+			'<Disposable key={item.id} args={[item.id, version]} />',
+		);
+		const args = compiledUniversalForArguments(source);
+
+		expect(args.slice(3, 6).map((argument) => argument.value)).toEqual([null, true, true]);
+		expect(args).toEqual(compiledUniversalForArguments(extendedThreeComponent));
 	});
 
 	it.each([
