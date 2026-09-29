@@ -177,6 +177,7 @@ export {
 	markWarm,
 	ssrHtml,
 	ssrChildTextPre,
+	ssrTextareaText,
 	ssrChildPre,
 	descriptorChildren,
 	createElement,

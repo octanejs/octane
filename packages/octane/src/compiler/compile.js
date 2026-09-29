@@ -1057,6 +1057,90 @@ function rejectTextareaValueChildren(tag, node, ctx) {
 	);
 }
 
+const TEXTAREA_CHILD_KINDS = {
+	Element: 'an element',
+	TSRXExpression: 'a JSX expression',
+	IfStatement: 'an `@if` block',
+	ForOfStatement: 'an `@for` block or a mapped JSX list',
+	SwitchStatement: 'an `@switch` block',
+	TryStatement: 'an `@try` block',
+};
+
+// A `<textarea>`'s content is RCDATA: the HTML parser keeps markup and comments
+// inside it as literal text, so neither the client template nor the server can
+// place a `<!>` placeholder, a `<!-- -->` separator or a `<!--[-->` frame there.
+// Its children are therefore text on both sides: they fold into ONE text value
+// that the client binds as the host's only Text node (runtime `textareaText`)
+// and the server serializes markerless (`ssrTextareaText`). Returns the parts in
+// source order, or null when the ordinary only-child path already emits
+// markerless text on both sides (one static literal or one proven text hole).
+// Throws for a child that cannot be text, on both emit paths.
+function textareaTextParts(tag, ns, children, ctx) {
+	if (tag !== 'textarea' || (ns !== 'html' && ns !== 'opaque') || children.length === 0) {
+		return null;
+	}
+	const parts = [];
+	for (const child of children) {
+		if (child.type !== 'Text') {
+			const element = child.type === 'HeadHoist' ? child.element : child;
+			const kind =
+				element.type === 'JSXElement' || (element.type === 'Element' && !isComponentTag(element))
+					? `\`<${jsxTagName(element) || elementTagName(element)}>\``
+					: (TEXTAREA_CHILD_KINDS[child.type] ?? 'a non-text child');
+			const l = (element.loc ?? child.expression?.loc)?.start;
+			const at = l
+				? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})`
+				: '';
+			throw new Error(
+				`\`<textarea>\` children must be text, but it contains ${kind}. A textarea's content ` +
+					'is its default value and the HTML parser keeps markup inside it as literal ' +
+					`text: move the markup outside the textarea, or pass a string expression.${at}`,
+			);
+		}
+		// Authored binding views address each hole by its own marker range.
+		if (
+			child._octaneBindingText ||
+			child._octaneBindingOpaque ||
+			child._octaneBindingValue ||
+			child._octaneBindingSlot
+		) {
+			return null;
+		}
+		const literal = staticTextLiteral(child.expression);
+		if (literal === '') continue;
+		const previous = parts.at(-1);
+		if (literal !== null && previous?.kind === 'static') {
+			parts[parts.length - 1] = { ...previous, value: previous.value + literal };
+		} else if (literal !== null) {
+			parts.push({ kind: 'static', value: literal, node: child });
+		} else {
+			const text =
+				isDirectSignalHandleExpression(child.expression) ||
+				isKnownTextChildExpression(child.expression, ctx.knownStringChildLocals);
+			parts.push({ kind: text ? 'text' : 'child', expr: child.expression, node: child });
+		}
+	}
+	// Static text alone is baked into the template and serialized as one merged
+	// run; a sole text hole mounts with htext and serializes unframed.
+	if (parts.every((part) => part.kind === 'static')) return null;
+	if (children.length === 1 && parts[0].kind === 'text') return null;
+	return parts;
+}
+
+// The runtime call's arguments: the parts array, then a 't' at each
+// `{x as string}` part (omitted when there is none).
+function textareaTextArgs(parts, lowerHole) {
+	const values = parts.map((part) =>
+		part.kind === 'static'
+			? b.literal(part.value, JSON.stringify(part.value))
+			: lowerHole(part.expr, part.kind === 'text', part.node),
+	);
+	const textHoles = parts.map((part) => (part.kind === 'text' ? 't' : '-')).join('');
+	return textHoles.includes('t')
+		? [b.array(values), b.literal(textHoles, JSON.stringify(textHoles))]
+		: [b.array(values)];
+}
+
 // React's raw-HTML contract is mutually exclusive with a non-nullish child.
 // Static TSRX can reject definitely contradictory shapes before either the
 // client or server renderer runs them. Preserve React's accepted null/undefined
@@ -14066,10 +14150,31 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// (emitted via `ssrText`).
 	const onlyChild0 =
 		normChildren.length === 1 && normChildren[0].type === 'Text' ? normChildren[0] : null;
+	const textareaParts = textareaTextParts(tag, selfNs, normChildren, ctx);
 	let childrenExpr;
 	if (authoredStaticScriptContent !== undefined) {
 		const content = escapeInlineScriptContent(authoredStaticScriptContent);
 		childrenExpr = ssrHtmlTemplate(content === '' ? [] : [content], node, ctx);
+	} else if (textareaParts !== null) {
+		// The client binds these as one Text node (see textareaTextParts).
+		ctx.runtimeNeeded.add('ssrTextareaText');
+		childrenExpr = ssrCall(
+			'ssrTextareaText',
+			textareaTextArgs(textareaParts, (expression, text, part) =>
+				ssrSignalValue(
+					resolveStyleExpr(
+						text
+							? rewriteHookCalls(expression, ctx, name)
+							: rewriteJsxValues(rewriteHookCalls(expression, ctx, name), ctx),
+						cssHash,
+					),
+					ctx,
+					part,
+					true,
+				),
+			),
+			node,
+		);
 	} else if (
 		htmlSources.length === 0 &&
 		onlyChild0 !== null &&
@@ -14145,7 +14250,15 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		ctx.runtimeNeeded.add('ssrChildrenSources');
 		childrenExpr = ssrCall(
 			'ssrChildrenSources',
-			[b.array(effectiveChildrenPropSources), ssrThunk(childrenExpr, node), b.id('__s')],
+			[
+				b.array(effectiveChildrenPropSources),
+				ssrThunk(childrenExpr, node),
+				b.id('__s'),
+				// A textarea's children prop is text too (see textareaTextParts).
+				...(tag === 'textarea' && (selfNs === 'html' || selfNs === 'opaque')
+					? [b.literal(true, 'true')]
+					: []),
+			],
 			node,
 		);
 	}
@@ -30515,6 +30628,9 @@ function emitElementHtml(
 	}
 
 	let children = normalizeChildren(sourceChildren, childNs === 'svg', ctx, tag === 'noscript');
+	// Before metadata lifting, so a `<title>` inside a textarea is rejected here
+	// exactly as the server rejects it.
+	const textareaParts = textareaTextParts(tag, hostNs, children, ctx);
 	// NESTED document metadata / Float resources are zero-DOM children: lift
 	// them to the enclosing plan's head list (mounted out-of-band by
 	// emitHeadClient — scope-owned metadata, global resources), mirroring the
@@ -30530,8 +30646,51 @@ function emitElementHtml(
 		}
 		if (hasNestedHoist) children = children.filter((n) => n.type !== 'HeadHoist');
 	}
-	// Special case: a single Text child (only-child text fast path).
-	if (
+	if (textareaParts !== null) {
+		// Every child folds into one text binding (see textareaTextParts). It is a
+		// direct signal binding when any hole may carry a handle: the runtime then
+		// returns one derived handle over the parts.
+		let signalCapable = false;
+		for (const part of textareaParts) {
+			if (part.kind === 'static') continue;
+			if (canCarryDirectSignalHandle(part.expr)) signalCapable = true;
+			else if (canCarryDirectSignalHandle(part.expr, false, true)) ctx.signalBindingsUsed = true;
+			if (isDirectSignalHandleExpression(part.expr)) ctx.signalBindingsEager = true;
+		}
+		if (signalCapable) ctx.signalBindingsUsed = true;
+		const expr = inheritOriginLoc(
+			b.call(
+				requireRuntimeForContext(ctx, 'textareaText'),
+				...textareaTextArgs(textareaParts, (expression, text) =>
+					text
+						? resolveStyleExpr(expression, cssHash)
+						: tsrxExprNode(
+								resolveStyleExpr(rewriteChildHoleValue(expression, ctx), cssHash),
+								ctx,
+								componentName,
+								inlinedSubs,
+								childNs,
+								cssHash,
+							),
+				),
+			),
+			node,
+		);
+		// A customized built-in's constructor may inspect children while cloned.
+		const seededText = !directPropNames.has('is');
+		bindings.push({
+			id: bindings.length,
+			kind: 'textOnlyChild',
+			expr,
+			path,
+			seededText,
+			...(signalCapable
+				? { signalDirect: true, signalSite: directSignalSite(ctx, node, 'binding') }
+				: {}),
+		});
+		if (seededText) appendTemplatePart(html, ' ', 'text');
+	} else if (
+		// Special case: a single Text child (only-child text fast path).
 		children.length === 1 &&
 		children[0].type === 'Text' &&
 		!children[0]._octaneBindingText &&

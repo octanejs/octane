@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 336,
+  "nextCode": 337,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2010,6 +2010,12 @@
       "message": "octane SSR: %s root streaming passes completed without producing a shell \u2014 a component kept throwing thenables outside use(). A resource reader should stop suspending once its data has settled.",
       "argumentCount": 1,
       "runtime": ["server"],
+      "status": "active"
+    },
+    "336": {
+      "message": "`<textarea>` children must be text: strings, numbers, or arrays of them. One child was %s. A textarea's content is its default value, so it cannot contain elements; render them outside the textarea or pass a string.",
+      "argumentCount": 1,
+      "runtime": ["client", "server"],
       "status": "active"
     }
   }
