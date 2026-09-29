@@ -1514,6 +1514,34 @@ class UniversalSuspense {
 	constructor(readonly thenable: PromiseLike<unknown>) {}
 }
 
+/**
+ * Wakeables whose settlement a Suspense resume listener has already observed.
+ * A retry can suspend on one again: a thenable whose owner publishes its status
+ * on a later task, or use() of a thenable whose status React does not recognize
+ * (router-core reports `'resolved'`), which stays pending by design. A listener
+ * attached after settlement fires on the next microtask, so retrying there
+ * would re-render forever and starve the timer or network callback that ends
+ * the suspension. React's ping reaches its retry through a Scheduler task.
+ */
+let SETTLED_UNIVERSAL_WAKEABLES: WeakSet<PromiseLike<unknown>> | null = null;
+
+/**
+ * Subscribe a Suspense retry to `wakeable`. A first settlement retries on its
+ * own microtask, keeping ordinary data reveals immediate. Once a settlement has
+ * been observed, the retry yields one macrotask after the next notification.
+ * It still subscribes, so a reusable custom wakeable is not turned into polling.
+ */
+function resumeOnSettle(wakeable: PromiseLike<unknown>, retry: () => void): void {
+	const onSettle =
+		SETTLED_UNIVERSAL_WAKEABLES?.has(wakeable) === true
+			? () => void setTimeout(retry, 0)
+			: () => {
+					(SETTLED_UNIVERSAL_WAKEABLES ??= new WeakSet()).add(wakeable);
+					retry();
+				};
+	wakeable.then(onSettle, onSettle);
+}
+
 class UniversalSuspendedAttemptImpl implements UniversalSuspendedAttempt {
 	private state: 'suspended' | 'aborted' = 'suspended';
 
@@ -1527,10 +1555,7 @@ class UniversalSuspendedAttemptImpl implements UniversalSuspendedAttempt {
 		readonly transitionRender: boolean,
 		readonly bridgeContextReads: ReadonlyMap<UniversalContext<any>, unknown> | null,
 	) {
-		thenable.then(
-			() => this.settle(),
-			() => this.settle(),
-		);
+		resumeOnSettle(thenable, () => this.settle());
 	}
 
 	get status(): 'suspended' | 'aborted' {
@@ -6563,13 +6588,12 @@ type UniversalTrackedThenable<T = unknown> = PromiseLike<T> & {
 	reason?: unknown;
 };
 
+// Instrument an untagged thenable exactly once. A status we did not write, even
+// one React does not recognize such as router-core's `'resolved'`, belongs to
+// the thenable's owner: leave it alone and treat it as pending, as React's
+// trackUsedThenable and the DOM runtime do.
 function trackUniversalThenable<T>(thenable: UniversalTrackedThenable<T>): void {
-	if (
-		thenable.status === 'pending' ||
-		thenable.status === 'fulfilled' ||
-		thenable.status === 'rejected'
-	)
-		return;
+	if (thenable.status !== undefined) return;
 	thenable.status = 'pending';
 	thenable.then(
 		(value) => {
@@ -7198,7 +7222,7 @@ function routeUniversalOwnerSuspense(
 			current.boundaryThenable = null;
 			current.root.schedule();
 		};
-		thenable.then(settle, settle);
+		resumeOnSettle(thenable, settle);
 		current.root.schedule();
 		return true;
 	}
@@ -9205,10 +9229,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		};
 		this.awaitingReplay = replay;
 		for (const thenable of thenables) {
-			thenable.then(
-				() => this.queueReplay(replay),
-				() => this.queueReplay(replay),
-			);
+			resumeOnSettle(thenable, () => this.queueReplay(replay));
 		}
 	}
 
@@ -9239,7 +9260,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				this.urgentBoundarySuspension = null;
 				this.ensureScheduledTransitionWork();
 			};
-			thenable.then(releaseProjection, releaseProjection);
+			// Paced like the attempt's own retry. Releasing on the microtask
+			// invalidates the host boundary for held transition work, and that
+			// re-preparation suspends again on the same settled thenable.
+			resumeOnSettle(thenable, releaseProjection);
 		}
 		return attempt;
 	}

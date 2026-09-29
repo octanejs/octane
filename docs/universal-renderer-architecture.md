@@ -991,6 +991,23 @@ Durable callbacks close over the owner:
 - an async retry re-enters through the owning root rather than consulting a
   process-global renderer.
 
+A settled thenable's first observed settlement retries on its own microtask, so
+ordinary data reveals immediately. A retry can suspend again on a thenable
+already seen to settle. That happens when its owner publishes `status` on a
+later task, or when `use()` reads a status React does not recognize, such as
+router-core's `'resolved'`. In that case the retry waits for the thenable's next
+notification, then yields one macrotask, as the DOM runtime and React's
+Scheduler do. Retrying on the microtask would re-render forever and starve the
+timer or native callback that ends the suspension. Local and root replays,
+transition holds, hidden Activity, and suspensions a reverse-region DOM child
+routes to its universal owner all share this subscription. It still goes
+through `then`, so a reusable custom wakeable is not polled. `use()`
+instruments only a thenable with no `status`. It leaves any status it did not
+write untouched and treats it as pending, matching React's `trackUsedThenable`.
+A universal root hosted in a DOM boundary also resumes through the DOM
+runtime's listeners, so both runtimes must pace for that path. See
+[retry pacing](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#13-retry-pacing-after-an-already-settled-wakeable).
+
 The universal runtime does not yet implement transition lanes. Its
 `startTransition` behavior is synchronous, so it makes no timing parity claim.
 The scheduler expansion must carry the root owner and renderer

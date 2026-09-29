@@ -478,6 +478,17 @@ and `<Hydrate>` activation in
 Each livelock test opens its gate from a timer. It also records whether the gate
 had to open itself after 2,000 checks, as it did on the pre-fix runtime.
 
+**Universal renderer:** `octane/universal`, and so Lynx, paces its resume
+subscriptions the same way: local and root replays, transition holds, hidden
+Activity, and suspensions a reverse-region DOM child routes to its universal
+owner. Universal `use()` also leaves a status it did not write untouched and
+treats it as pending. A universal root hosted in a DOM boundary resumes through
+both runtimes, so both must pace. The DOM boundary projects the root's
+suspension, and releasing that projection early would let held transition work
+suspend on the same thenable again.
+[universal-settled-wakeable.test.ts](../tests/universal-settled-wakeable.test.ts)
+covers each path with the same self-opening gates and first-settlement controls.
+
 ---
 
 ## What we DO match React on (for the record)
