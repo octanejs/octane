@@ -957,6 +957,199 @@ export function App(props) @{ <main>@for (const item of props.items; key item) {
 		expect(clientKeys.a).not.toBe(clientKeys.b);
 		root.unmount();
 	});
+
+	it.each(
+		[false, true].flatMap((dev) =>
+			[
+				'function Row(props) @{ <>@if (props.show) { <p>shown</p> }<Field load={props.load}/></> }',
+				'function Row(props) { return <>@if (props.show) { <p>shown</p> }<Field load={props.load}/></>; }',
+				'function Row(props) { return <><p>shown</p><Field load={props.load}/></>; }',
+				'function Row(props) { return <div>@if (props.show) { <p>shown</p> }<Field load={props.load}/></div>; }',
+			].map((row) => ({ dev, row })),
+		),
+	)(
+		'resumes a server query below JSX returned from a signal module ($row, dev: $dev)',
+		async ({ dev, row }) => {
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const client = await import('../../src/runtime.js');
+			const signals = await import('../../src/signals/index.js');
+			const { bootstrapStreamedSignalHydration } =
+				await import('../../src/hydration/streamed-signals.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
+				await import('../_server-stream.js');
+			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			// Importing signals compiles a returning Row as a plain function whose
+			// JSX is a scoped value. Field's query must resolve to the same
+			// instance on both sides so the browser resumes the server result.
+			const source = `import { query$ } from 'octane/signals';
+function Field(props) @{
+ const value$ = query$(() => 'field', props.load);
+ <section><output>{value$}</output></section>
+}
+${row}
+export function App(props) @{ <main>@try { <Row show={props.show} load={props.load}/> } @pending { <i>waiting</i> }</main> }`;
+			const options = {
+				id: '/src/returned-signal-query.tsrx',
+				compileOptions: { dev, hmr: false },
+				runtimeModules: {
+					'octane/signals': signals,
+					'octane/signals/query': signals,
+					'octane/signals/facade': signals,
+				},
+			};
+			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const serverLoad = vi.fn(async () => 'server result');
+			const browserLoad = vi.fn(async () => 'browser result');
+			const streamedSignals = { buildId: 'returned-signal', documentId: 'returned-signal' };
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: ReturnType<typeof client.hydrateRoot> | undefined;
+			let hydration: ReturnType<typeof bootstrapStreamedSignalHydration> | undefined;
+			try {
+				const output = await server.prerender(
+					serverModule.App,
+					{ show: true, load: serverLoad },
+					{ streamedSignals },
+				);
+				expect(serverLoad).toHaveBeenCalledTimes(1);
+				container.innerHTML = output.html;
+				activateStreamedMarkup(container);
+				const result = container.querySelector('output')!;
+				expect(result.textContent).toBe('server result');
+				const errors: unknown[] = [];
+				hydration = bootstrapStreamedSignalHydration(streamedSignals);
+				root = client.hydrateRoot(
+					container,
+					clientModule.App,
+					{ show: true, load: browserLoad },
+					{
+						signalOwner: hydration.signalOwner,
+						onRecoverableError: (error) => errors.push(error),
+						onUncaughtError: (error) => errors.push(error),
+					},
+				);
+				await drainProducers();
+				client.flushSync(() => {});
+				expect(browserLoad).not.toHaveBeenCalled();
+				expect(container.querySelector('output')).toBe(result);
+				expect(result.textContent).toBe('server result');
+				expect(errors).toEqual([]);
+			} finally {
+				root?.unmount();
+				hydration?.dispose();
+				container.remove();
+				resetStreamRuntimeGlobals();
+			}
+		},
+	);
+
+	it.each(
+		[false, true].flatMap((dev) =>
+			[
+				{
+					ids: ['a', 'b'],
+					list: 'function List(props) { return props.ids.map((id) => <Field key={id} id={id} load={props.load}/>); }',
+				},
+				{
+					ids: ['a', 'b'],
+					list: 'function List(props) { return <>{props.ids.map((id) => <Field key={id} id={id} load={props.load}/>)}</>; }',
+				},
+				{
+					ids: ['only'],
+					list: 'function List(props) { return <Field key={props.ids[0]} id={props.ids[0]} load={props.load}/>; }',
+				},
+			].map((shape) => ({ dev, ...shape })),
+		),
+	)(
+		'resumes keyed server queries in a returned list and keeps them on reorder ($list, dev: $dev)',
+		async ({ dev, ids, list }) => {
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const client = await import('../../src/runtime.js');
+			const signals = await import('../../src/signals/index.js');
+			const { bootstrapStreamedSignalHydration } =
+				await import('../../src/hydration/streamed-signals.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
+				await import('../_server-stream.js');
+			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			// Every row reads the same query site and key. Only its keyed list item
+			// separates one row's instance from another on both sides.
+			const source = `import { query$ } from 'octane/signals';
+function Field(props) @{
+ const value$ = query$(() => 'field', () => props.load(props.id));
+ <section><output>{value$}</output></section>
+}
+${list}
+export function App(props) @{ <main>@try { <List ids={props.ids} load={props.load}/> } @pending { <i>waiting</i> }</main> }`;
+			const options = {
+				id: '/src/returned-keyed-query.tsrx',
+				compileOptions: { dev, hmr: false },
+				runtimeModules: {
+					'octane/signals': signals,
+					'octane/signals/query': signals,
+					'octane/signals/facade': signals,
+				},
+			};
+			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const serverLoad = vi.fn(async (id: string) => `server ${id}`);
+			const browserLoad = vi.fn(async (id: string) => `browser ${id}`);
+			const streamedSignals = { buildId: 'returned-keyed', documentId: 'returned-keyed' };
+			const container = document.createElement('div');
+			document.body.append(container);
+			const texts = () => [...container.querySelectorAll('output')].map((node) => node.textContent);
+			let root: ReturnType<typeof client.hydrateRoot> | undefined;
+			let hydration: ReturnType<typeof bootstrapStreamedSignalHydration> | undefined;
+			try {
+				const output = await server.prerender(
+					serverModule.App,
+					{ ids, load: serverLoad },
+					{ streamedSignals },
+				);
+				const expected = ids.map((id) => `server ${id}`);
+				expect(serverLoad).toHaveBeenCalledTimes(ids.length);
+				container.innerHTML = output.html;
+				activateStreamedMarkup(container);
+				const outputs = [...container.querySelectorAll('output')];
+				expect(texts()).toEqual(expected);
+				const errors: unknown[] = [];
+				hydration = bootstrapStreamedSignalHydration(streamedSignals);
+				root = client.hydrateRoot(
+					container,
+					clientModule.App,
+					{ ids, load: browserLoad },
+					{
+						signalOwner: hydration.signalOwner,
+						onRecoverableError: (error) => errors.push(error),
+						onUncaughtError: (error) => errors.push(error),
+					},
+				);
+				await drainProducers();
+				client.flushSync(() => {});
+				expect(browserLoad).not.toHaveBeenCalled();
+				expect([...container.querySelectorAll('output')]).toEqual(outputs);
+				expect(texts()).toEqual(expected);
+				client.flushSync(() =>
+					root!.render(clientModule.App, { ids: ids.toReversed(), load: browserLoad }),
+				);
+				await drainProducers();
+				client.flushSync(() => {});
+				expect(browserLoad).not.toHaveBeenCalled();
+				expect([...container.querySelectorAll('output')]).toEqual(outputs.toReversed());
+				expect(texts()).toEqual(expected.toReversed());
+				expect(errors).toEqual([]);
+			} finally {
+				root?.unmount();
+				hydration?.dispose();
+				container.remove();
+				resetStreamRuntimeGlobals();
+			}
+		},
+	);
 });
 
 describe('opaque keyed signals across hydration and retries', () => {

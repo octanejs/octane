@@ -160,7 +160,8 @@ if (worker !== undefined) {
 				nestedImplicitJson: 0,
 				nestedExplicitJson: 0,
 				flatImplicitJson: 0,
-				flatExplicitJson: 1,
+				// A top-level explicit key uses the client's 'k' namespace.
+				flatExplicitJson: 0,
 				pathOnlyJson: 0,
 			},
 			'flat control',

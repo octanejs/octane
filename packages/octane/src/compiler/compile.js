@@ -668,9 +668,14 @@ function directSignalSite(ctx, node, kind = 'binding') {
 }
 
 function componentInvocationSite(ctx, node) {
-	const position = node?.start ?? `${node?.loc?.start?.line ?? 0}:${node?.loc?.start?.column ?? 0}`;
 	// Authored positions identify call sites independently of the server/client
 	// helper names introduced for loops, branches, and value-position fragments.
+	// Hash line:col, not the parser offset: one call site in returned JSX reaches
+	// the client as the raw JSXElement but the server as a normalized template
+	// Element, and normalization keeps only `loc`.
+	const start = node?.loc?.start;
+	const position =
+		start != null ? `${start.line ?? 0}:${start.column ?? 0}` : (node?.start ?? '0:0');
 	return `c:${strongHash(
 		`octane:component-invocation-site:1\0${normalizeTextTypeFilename(ctx.filename) ?? ctx.filename}\0${position}`,
 	)}`;
