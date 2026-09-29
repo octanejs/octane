@@ -21855,7 +21855,7 @@ const SETUP_VALUE_DIRECTIVE_TYPES = new Set([
 // `@{ … }` block is also folded as a setup value, but it is a sub-template rather
 // than a set of arms — `rewriteTsrxBlocks` owns its expression-position handling,
 // and the unowned-directive diagnostic's advice does not apply to it — so it is
-// deliberately absent here.
+// deliberately absent here. With no owning body, lowerJsxChild compiles it in place.
 const VALUE_DIRECTIVE_ARM_TYPES = new Set([
 	'JSXIfExpression',
 	'JSXForExpression',
@@ -22214,7 +22214,11 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 			const previousLocals = ctx.currentComponentLocals;
 			// A nested body must not replace the enclosing component's warm plan.
 			const previousWarm = ctx._pendingWarm;
-			ctx.currentComponentLocals = collectComponentLocals(n);
+			// Inside a module-level callback, nothing tracks the names the enclosing
+			// callbacks bind, so an env tuple would miss them. Without a component
+			// context the body's arms stay inline and close over those names lexically.
+			ctx.currentComponentLocals =
+				previousLocals == null && lower == null ? null : collectComponentLocals(n);
 			try {
 				const compiled =
 					ctx.mode === 'server'
@@ -22296,7 +22300,8 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 				// arms beside values they cannot reach. Drop the fold for this subtree so
 				// re-entries below (an attribute value re-enters rewriteJsxValues, with no
 				// function node left in view) cannot pick it back up, and the directive
-				// reaches the unowned diagnostic instead of folding into the wrong scope.
+				// reaches the unowned diagnostic instead of folding into the wrong scope. A
+				// `@{ … }` child block has no arms, so lowerJsxChild compiles it in place.
 				ctx._valueDirectiveLowering = null;
 			} else {
 				const introduced = collectComponentLocals(n);
@@ -22408,6 +22413,16 @@ function lowerJsxChild(child, ctx) {
 		const fold = ctx._valueDirectiveLowering;
 		if (fold != null) return fold(child);
 		rejectUnownedValueDirective(child);
+	}
+	if (t === 'JSXCodeBlock' && ctx._valueDirectiveLowering == null) {
+		// No body owns this block, as inside a module-level callback. A block is a
+		// body of its own, so it needs no owner: a render-only block is transparent,
+		// and any other block compiles in place as the `() => @{ … }` child that
+		// normalizeChildren makes of it, closing over the callback's params.
+		if ((child.body?.length ?? 0) === 0) {
+			return child.render ? lowerJsxChild(child.render, ctx) : null;
+		}
+		return rewriteJsxValues(childCodeBlockArrow(child), ctx);
 	}
 	if (t === 'JSXFragment' || t === 'Fragment') {
 		const els = [];
