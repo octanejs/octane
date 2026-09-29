@@ -3513,6 +3513,11 @@
       "message": "octane SSR: %s root streaming passes completed without producing a shell — a component kept throwing thenables outside use(). A resource reader should stop suspending once its data has settled.",
       "runtime": ["server"],
       "status": "active"
+    },
+    "336": {
+      "message": "`<textarea>` children must be text: strings, numbers, or arrays of them. One child was %s. A textarea's content is its default value, so it cannot contain elements; render them outside the textarea or pass a string.",
+      "runtime": ["client", "server"],
+      "status": "active"
     }
   }
 }

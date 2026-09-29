@@ -240,6 +240,7 @@ type ServerErrorArguments = {
 	333: [unknown];
 	334: [unknown];
 	335: [unknown];
+	336: [unknown];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -984,6 +985,11 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 			case 335:
 				return formatDevErrorMessage(
 					'octane SSR: %s root streaming passes completed without producing a shell — a component kept throwing thenables outside use(). A resource reader should stop suspending once its data has settled.',
+					args,
+				);
+			case 336:
+				return formatDevErrorMessage(
+					"`<textarea>` children must be text: strings, numbers, or arrays of them. One child was %s. A textarea's content is its default value, so it cannot contain elements; render them outside the textarea or pass a string.",
 					args,
 				);
 			default:

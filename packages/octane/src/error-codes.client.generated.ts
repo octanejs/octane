@@ -314,6 +314,7 @@ type ClientErrorArguments = {
 	329: [];
 	330: [];
 	331: [];
+	336: [unknown];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1370,6 +1371,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				return formatDevErrorMessage('This DOM binding view requires the general adopter.', args);
 			case 331:
 				return formatDevErrorMessage('Invalid independent Hydrate manifest inputs.', args);
+			case 336:
+				return formatDevErrorMessage(
+					"`<textarea>` children must be text: strings, numbers, or arrays of them. One child was %s. A textarea's content is its default value, so it cannot contain elements; render them outside the textarea or pass a string.",
+					args,
+				);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

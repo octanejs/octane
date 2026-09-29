@@ -171,6 +171,7 @@ export {
 	devHtmlNesting,
 	htext,
 	htextSwap,
+	textareaText,
 	child,
 	sibling,
 	setText,

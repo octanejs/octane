@@ -497,3 +497,40 @@ describe('compile errors — slot-keyed hooks in plain JS loops', () => {
 		expect(() => compile(src, 'map-hook.tsrx', { mode: 'server' })).not.toThrow();
 	});
 });
+
+// Textarea content is RCDATA: the parser keeps markup inside it as literal
+// text, so an element or template directive there cannot mean what it says.
+describe('compile errors — textarea children', () => {
+	it.each([
+		['an element', '<textarea><b>x</b></textarea>', /contains `<b>`/],
+		['a component', '<textarea>{"a"}<Field /></textarea>', /contains an element/],
+		['document metadata', '<div><textarea><title>x</title></textarea></div>', /contains `<title>`/],
+		['an @if block', '<textarea>@if (props.on) {\n{"a"}\n}</textarea>', /contains an `@if` block/],
+		['a JSX expression', '<textarea>{props.on ? <b /> : "x"}</textarea>', /a JSX expression/],
+		[
+			'a mapped JSX list',
+			'<textarea>{props.items.map((item) => <i key={item}>{item}</i>)}</textarea>',
+			/contains an `@for` block or a mapped JSX list/,
+		],
+	])('rejects %s inside a textarea on both emit paths', (_label, markup, detail) => {
+		const src = `function Field() @{ <input /> }\nexport function T(props: any) @{\n\t${markup}\n}\n`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(src, 'textarea.tsrx', { mode })).toThrow(
+				/`<textarea>` children must be text/,
+			);
+			expect(() => compile(src, 'textarea.tsrx', { mode })).toThrow(detail);
+		}
+	});
+
+	it('allows text and markup children of an SVG-namespace textarea', () => {
+		const src = `export function T(props: any) @{
+			<div>
+				<textarea>hello {props.a}{props.b as string}</textarea>
+				<svg><textarea><b>x</b></textarea></svg>
+			</div>
+		}`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(src, 'textarea.tsrx', { mode })).not.toThrow();
+		}
+	});
+});

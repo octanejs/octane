@@ -865,34 +865,35 @@ describe.each([
 			);
 		});
 
-		// A textarea's text is its default value, owned by its value props (or its
-		// text children), never by markup the value renders beside it.
-		it('keeps a textarea host’s server text and keeps hydrating the root', async () => {
+		// A textarea's children are its default value, so they must be text on
+		// both sides (textarea-children-hydrate.test.ts). An element value is an
+		// authoring error, not markup to render beside the server text.
+		it('rejects an element value inside a textarea on both sides', async () => {
 			container.innerHTML = ServerRT.renderToString(server.AreaHole, {
 				kind: 'text',
 				v: 'A',
 				tail: 't',
 			}).html;
-			const textarea = container.querySelector('textarea')!;
-			const serverText = textarea.firstChild;
-			const tail = container.querySelector('b')!;
-			const tailText = tail.firstChild;
+			expect(() =>
+				ServerRT.renderToString(server.AreaHole, { kind: 'p', v: 'A', tail: 't' }),
+			).toThrow(/`<textarea>` children must be text/);
 			const recovered: unknown[] = [];
+			const uncaught: unknown[] = [];
 			const root = hydrateRoot(
 				container,
 				client.AreaHole,
 				{ kind: 'p', v: 'A', tail: 't' },
-				{ onRecoverableError: (error) => recovered.push(error) },
+				{
+					onRecoverableError: (error) => recovered.push(error),
+					onUncaughtError: (error) => uncaught.push(error),
+				},
 			);
 			flushSync(() => {});
 			try {
-				expect(container.querySelector('textarea')).toBe(textarea);
-				expect(textarea.firstChild).toBe(serverText);
-				expect(textarea.defaultValue).toBe('A');
-				expect(textarea.value).toBe('A');
-				expect(container.querySelector('b')).toBe(tail);
-				expectSameNodes(tail.childNodes, [tailText]);
-				expect(tail.textContent).toBe('t');
+				expect(uncaught).toHaveLength(1);
+				expect(String((uncaught[0] as Error).message)).toMatch(
+					/children must be text.*One child was an element\./,
+				);
 				await Promise.resolve();
 				expect(recovered).toEqual([]);
 				expect(warns()).toEqual([]);
@@ -909,11 +910,8 @@ describe.each([
 				v: 'A',
 			}).html;
 			const div = container.querySelector('section > div')!;
-			const textarea = container.querySelector('textarea')!;
-			const serverText = textarea.firstChild;
 			const tail = container.querySelector('b')!;
 			expect(div.textContent).toBe('A');
-			expect(textarea.defaultValue).toBe('A');
 			let resolve!: (text: string) => void;
 			const text = new Promise<string>((r) => (resolve = r));
 			const recovered: unknown[] = [];
@@ -931,9 +929,6 @@ describe.each([
 				});
 				expect(container.querySelector('section > div')).toBe(div);
 				expect(markup(div)).toBe('<em class="waits">R</em>');
-				expect(container.querySelector('textarea')).toBe(textarea);
-				expect(textarea.firstChild).toBe(serverText);
-				expect(markup(textarea)).toBe('A<em class="waits">R</em>');
 				expect(container.querySelector('b')).toBe(tail);
 				expect(tail.textContent).toBe('A');
 				await expectReported(recovered, 'renderable-text-object.tsrx', null);

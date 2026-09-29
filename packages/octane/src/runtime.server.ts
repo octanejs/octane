@@ -130,8 +130,10 @@ import {
 	applyElementDefaultProps,
 	childElementKey,
 	childrenIterator,
+	describeTextareaChild,
 	escapeMappedElementKey,
 	resolveLazyDefaultProps as lazyResolvedProps,
+	textareaChildText,
 } from './shared-value-helpers.js';
 
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
@@ -2295,6 +2297,38 @@ export function ssrChildTextPre(v: unknown, scope: SSRScope): string {
 	return content.charCodeAt(0) === 10 ? '\n' + content : content;
 }
 
+function rejectTextareaChild(child: unknown): never {
+	throw new Error(formatServerError(336, describeTextareaChild(child, isElementDescriptor)));
+}
+
+/**
+ * @internal A <textarea>'s authored children as its one markerless text, the
+ * server twin of the client's `textareaText`. Textarea content is RCDATA, so a
+ * `<!-- -->` separator or `<!--[-->` frame would parse as part of its default
+ * value. `textHoles` marks the `{x as string}` parts with a 't'; a part that is
+ * itself a signal handle is read, as the client binds it. A leading newline is
+ * doubled because the parser discards one directly after the opening tag.
+ */
+export function ssrTextareaText(parts: unknown[], textHoles?: string): string {
+	// Raw HTML probes only whether a child is present (ssrInnerHtml).
+	let probing = false;
+	for (const part of parts) if (probingDangerHtmlChild(part)) probing = true;
+	if (probing) return '';
+	let text = '';
+	for (let i = 0; i < parts.length; i++) {
+		let part = parts[i];
+		if (isSignalHandle(part)) part = readSignalBinding(part);
+		text +=
+			textHoles !== undefined && textHoles.charCodeAt(i) === 116 // 't'
+				? part == null || part === false
+					? ''
+					: String(part)
+				: textareaChildText(part, rejectTextareaChild);
+	}
+	const escaped = escapeHtml(text);
+	return escaped.charCodeAt(0) === 10 ? '\n' + escaped : escaped;
+}
+
 /** @internal First renderable child when static output has no shielding markers. */
 export function ssrChildPre(v: unknown, scope: SSRScope): string {
 	const content = ssrChild(v, scope);
@@ -2431,6 +2465,10 @@ function ssrHostElement(
 						: raw;
 		} else if (rawInner !== undefined) {
 			inner = rawInner;
+		} else if (hasChildren && semanticTag === 'textarea' && namespace === 'html') {
+			// Text on both sides, like a compiled textarea (the client folds these in
+			// deoptHostChildren); the newline guard below protects a leading '\n'.
+			inner = escapeHtml(textareaChildText(children, rejectTextareaChild));
 		} else if (hasChildren) {
 			// Script-data does not decode HTML entities. A compiler-generated host
 			// descriptor therefore needs the same whole-body serializer as the direct
@@ -3831,9 +3869,11 @@ export function ssrChildrenSources(
 	sources: readonly (readonly [boolean, unknown])[],
 	renderFallback: () => string,
 	scope: SSRScope,
+	textarea = false,
 ): string {
 	const child = finalPresentSource(sources);
-	return child[0] ? ssrChildText(child[1], scope) : renderFallback();
+	if (!child[0]) return renderFallback();
+	return textarea ? ssrTextareaText([child[1]]) : ssrChildText(child[1], scope);
 }
 
 /**

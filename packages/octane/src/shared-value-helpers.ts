@@ -47,3 +47,39 @@ export function childrenIterator(children: any): (() => Iterator<any>) | null {
 		(children as any)['@@iterator'];
 	return typeof iterator === 'function' ? iterator : null;
 }
+
+/**
+ * The text one renderable `<textarea>` child contributes to its default value.
+ * Textarea content is RCDATA: the HTML parser keeps markup and comments inside
+ * it as literal text, so neither renderer can place an element or a hydration
+ * marker there. Strings and numbers render, the empty values (null, undefined,
+ * booleans) render nothing, and arrays or iterables concatenate their items.
+ * Any other value goes to `reject`, which throws the renderer's own error.
+ */
+export function textareaChildText(value: unknown, reject: (child: unknown) => never): string {
+	if (value == null || typeof value === 'boolean') return '';
+	if (typeof value === 'string') return value;
+	if (typeof value === 'number' || typeof value === 'bigint') return '' + value;
+	let items: Iterable<unknown>;
+	if (Array.isArray(value)) items = value;
+	else {
+		const iterator = childrenIterator(value);
+		if (iterator === null) return reject(value);
+		items = { [Symbol.iterator]: () => iterator.call(value) };
+	}
+	let text = '';
+	for (const item of items) text += textareaChildText(item, reject);
+	return text;
+}
+
+/** Name a non-text `<textarea>` child for its error message. */
+export function describeTextareaChild(
+	value: unknown,
+	isElement: (value: unknown) => boolean,
+): string {
+	return isElement(value)
+		? 'an element'
+		: typeof value === 'object'
+			? 'an object'
+			: 'a ' + typeof value;
+}
