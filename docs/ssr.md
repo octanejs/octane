@@ -244,7 +244,9 @@ optional `head` and `signals` fields:
   anywhere in the tree, each preceded by an adoption marker comment) are folded
   in by default — spliced into `<head>` when the render produced a document or a
   fragment beginning with an authored `<head>`, else prepended (React-19 resource
-  hoisting). `headChannel: 'separate'` withholds
+  hoisting). `hydrateRoot` accepts a container holding the whole prepended
+  `html`: it moves the metadata into `document.head` and adopts it there.
+  `headChannel: 'separate'` withholds
   them and returns them as `head` instead.
 - `head` — the hoisted metadata on its own, present **only** under
   `headChannel: 'separate'` (see `RenderOptions`).
@@ -429,8 +431,8 @@ concurrently rather than awaiting `allReady` before reading. Same
 - `signal?: AbortSignal` — abort a suspended async/streaming render when the
   request dies; pending promises reject with `signal.reason` and streams cancel.
 - `timeoutMs?: number` — per-render override of the suspense settle deadline;
-  `0` disables it. Async renders only. In `prerender` it also bounds how long a
-  resource reader may keep rethrowing thenables that have already settled.
+  `0` disables it. Async renders only. It also bounds how long a resource reader
+  may keep rethrowing thenables that have already settled.
 - `headChannel?: 'fold' | 'separate'` — where hoisted `<title>`/`<meta>`/`<link>`
   go. `'fold'` (default) keeps React's resource-hoisting shape described above.
   `'separate'` withholds the metadata from `html`/the streamed shell and hands it
@@ -567,6 +569,9 @@ would repair a placement before hydration (for example, a `<div>` inside a
 `<p>`), Octane reports both authored locations in the server console. The check
 targets parser repairs rather than the complete HTML content model, never adds
 diagnostics to returned markup, and is removed from production compilation.
+Hydration recovers from such a repair in development and production: the
+client rebuilds the element in place of the nodes the parser split out and
+reports the recovery through `onRecoverableError`.
 
 On the server, page and layout props also receive `state`, the same
 request-scoped `Context.state` Map middleware populated. It is deliberately not

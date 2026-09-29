@@ -87,6 +87,26 @@ export function FirstBoundaryRevealApp(props) @{
 	</>
 }
 
+// A boundary nested in a component's template stays staged in the inert
+// template document until the swap commits, while the old arm still animates.
+function StagedPage() @{
+	<section>
+		<ViewTransition>
+			<b>{'page'}</b>
+		</ViewTransition>
+	</section>
+}
+
+export function StagedTemplateApp(props) @{
+	@if (props.page) {
+		<StagedPage />
+	} @else {
+		<ViewTransition>
+			<div>{'other'}</div>
+		</ViewTransition>
+	}
+}
+
 // A native delegated click is the primary way consumers start transitions.
 // Keep the boundary separate from the button so only its changing content is
 // captured, matching the website demo's shape.

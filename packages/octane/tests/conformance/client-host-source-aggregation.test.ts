@@ -15,6 +15,7 @@ import {
 	NullishFormCascades,
 	PropChildrenSources,
 	SpreadSelect,
+	SpreadTextareaChild,
 } from './_fixtures/client-host-source-aggregation.tsrx';
 
 afterEach(() => {
@@ -206,6 +207,38 @@ describe('conformance: final host props across JSX sources', () => {
 			expect(checkbox.checked).toBe(false);
 			expect(checkbox.defaultChecked).toBe(true);
 			expect(checkbox.hasAttribute('checked')).toBe(true);
+		} finally {
+			result.unmount();
+		}
+	});
+
+	// Per ReactDOMTextarea-test.js:481 (text children seed the default).
+	// OCTANE DIVERGENCE: authored textarea children are a live text binding
+	// (docs/differences-from-react.md), not React's initial-only default. With no
+	// value/defaultValue writer in the spread, the children keep owning the
+	// default across spread re-evaluation, exactly as without a spread.
+	it('keeps authored textarea children as the live default beside a spread', () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const result = mount(SpreadTextareaChild, { rest: { name: 'body' }, child: 'first' });
+		try {
+			const textarea = result.find('#spread-textarea-child') as HTMLTextAreaElement;
+			expect(textarea.defaultValue).toBe('first');
+			expect(textarea.value).toBe('first');
+
+			result.update(SpreadTextareaChild, { rest: { name: 'body' }, child: 'second' });
+			expect(textarea.defaultValue).toBe('second');
+			expect(textarea.value).toBe('second');
+
+			result.update(SpreadTextareaChild, { rest: {}, child: 7 });
+			expect(textarea.hasAttribute('name')).toBe(false);
+			expect(textarea.defaultValue).toBe('7');
+			expect(textarea.value).toBe('7');
+
+			result.update(SpreadTextareaChild, { rest: {}, child: null });
+			expect(textarea.defaultValue).toBe('');
+			result.update(SpreadTextareaChild, { rest: { rows: 2 }, child: 'again' });
+			expect(textarea.defaultValue).toBe('again');
+			expect(textarea.value).toBe('again');
 		} finally {
 			result.unmount();
 		}
