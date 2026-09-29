@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { hydrateRoot, flushSync } from '../../src/index.js';
+import { act, hydrateRoot, flushSync } from '../../src/index.js';
+import { condition, load } from 'octane/hydration';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
@@ -753,6 +754,274 @@ describe.each([
 			// Back on the array arm: the chip must be gone through the same boundary.
 			expect(container.querySelector('.host em')).toBeNull();
 			expectDiagnostics();
+		} finally {
+			root.unmount();
+		}
+	});
+});
+
+// A renderable `{expr}` hole whose server value was an element, a component, or
+// a list, but whose client value is text or empty. The hole adopts at most one
+// server text node; anything else the server rendered for it is content the
+// client cannot adopt. It must be discarded and reported like any other
+// structural recovery, not left on screen through every later render.
+describe.each([
+	{ name: 'development compile', dev: true },
+	{ name: 'production compile', dev: false },
+])('hydrateRoot — renderable hole whose client value is text or empty ($name)', ({ dev }) => {
+	const RENDERABLE = join(
+		process.cwd(),
+		'packages/octane/tests/hydration/_fixtures/renderable-text-swap.tsrx',
+	);
+	const server = serverModule(RENDERABLE, 'renderable-text-swap.tsrx');
+	const client = dev
+		? devClientModule(RENDERABLE, 'renderable-text-swap.tsrx')
+		: prodClientModule(RENDERABLE, 'renderable-text-swap.tsrx');
+	let container: HTMLElement;
+	let errSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		container = document.createElement('div');
+		document.body.appendChild(container);
+		errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		container.remove();
+		errSpy.mockRestore();
+	});
+
+	const warns = () =>
+		errSpy.mock.calls
+			.map((call: unknown[]) => String(call[0]))
+			.filter((message: string) => message.includes('hydration mismatch'));
+
+	/** Element and text markup, ignoring hydration comments. */
+	function markup(node: Element): string {
+		const copy = node.cloneNode(true) as Element;
+		const walker = document.createTreeWalker(copy, NodeFilter.SHOW_COMMENT);
+		const comments: Node[] = [];
+		while (walker.nextNode()) comments.push(walker.currentNode);
+		for (const comment of comments) comment.parentNode!.removeChild(comment);
+		return copy.innerHTML;
+	}
+
+	const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+	/**
+	 * Exactly one report: the recoverable error always, the located warning in
+	 * DEV only. `actual` is omitted where the server content's description
+	 * depends on how it serializes a list.
+	 */
+	async function expectReported(
+		recovered: unknown[],
+		expected: string,
+		actual?: string,
+		file = 'renderable-text-swap.tsrx',
+	) {
+		await Promise.resolve();
+		expect(recovered).toHaveLength(1);
+		expect(String((recovered[0] as Error).message)).toMatch(/hydration mismatch/i);
+		if (!dev) {
+			expect(warns()).toEqual([]);
+			return;
+		}
+		expect(warns()).toEqual([
+			expect.stringMatching(
+				new RegExp(
+					`^Octane hydration mismatch at [^ ]*${escape(file)}:\\d+:\\d+: ` +
+						`the client expected ${escape(expected)} but the server rendered ` +
+						`${actual === undefined ? '.+' : escape(actual)}\\.`,
+				),
+			),
+		]);
+	}
+
+	describe.each([
+		{ shape: 'the only child of its host', name: 'Hole', host: 'section > div' },
+		{ shape: 'beside a sibling', name: 'SiblingHole', host: 'section' },
+		{ shape: "its component's entire output", name: 'SoleHole', host: 'section' },
+	])('a hole that is $shape', ({ name, host }) => {
+		// The markup after the hole in its host: the tail when they share one.
+		const tailHtml = (text: string) => (host === 'section' ? `<i>${text}</i>` : '');
+
+		function hydrate(serverProps: Record<string, unknown>, props: Record<string, unknown>) {
+			container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
+			const parent = container.querySelector(host)!;
+			const tail = container.querySelector('i')!;
+			const serverTexts = [...parent.childNodes].filter((node) => node.nodeType === 3);
+			const recovered: unknown[] = [];
+			const root = hydrateRoot(container, client[name], props, {
+				onRecoverableError: (error) => recovered.push(error),
+			});
+			flushSync(() => {});
+			return {
+				parent,
+				tail,
+				serverTexts,
+				recovered,
+				render: (next: Record<string, unknown>) => flushSync(() => root.render(client[name], next)),
+				unmount: () => root.unmount(),
+			};
+		}
+
+		it.each([
+			{ from: 'p', to: 'text', text: 'A', client: 'text "A"', server: '<p>' },
+			{ from: 'inner', to: 'text', text: 'A', client: 'text "A"', server: '<b>' },
+			{ from: 'list', to: 'text', text: 'A', client: 'text "A"', server: undefined },
+			{ from: 'p', to: null, text: '', client: 'nothing', server: '<p>' },
+			{ from: 'p', to: 'undefined', text: '', client: 'nothing', server: '<p>' },
+			{ from: 'inner', to: null, text: '', client: 'nothing', server: '<b>' },
+			{ from: 'list', to: null, text: '', client: 'nothing', server: undefined },
+			{ from: 'textThenP', to: null, text: '', client: 'nothing', server: 'text "A"' },
+		])(
+			'discards a server $from for a client $to value, reports it once, and stays clean',
+			async ({ from, to, text, client: clientDescription, server: serverDescription }) => {
+				const s = hydrate({ kind: from, v: 'A', tail: 't' }, { kind: to, v: 'A', tail: 't' });
+				try {
+					expect(markup(s.parent)).toBe(text + tailHtml('t'));
+					expect(container.querySelector('i')).toBe(s.tail);
+					await expectReported(s.recovered, clientDescription, serverDescription);
+
+					s.render({ kind: 'text', v: 'B', tail: 't' });
+					expect(markup(s.parent)).toBe('B' + tailHtml('t'));
+					s.render({ kind: 'p', v: 'C', tail: 'u' });
+					expect(markup(s.parent)).toBe('<p class="x">C</p>' + tailHtml('u'));
+					s.render({ kind: null, v: 'C', tail: 'u' });
+					expect(markup(s.parent)).toBe(tailHtml('u'));
+					expect(container.querySelector('i')).toBe(s.tail);
+					expect(s.tail.textContent).toBe('u');
+				} finally {
+					s.unmount();
+				}
+			},
+		);
+
+		it('keeps an adopted server text node and discards only the content after it', async () => {
+			const s = hydrate(
+				{ kind: 'textThenP', v: 'A', tail: 't' },
+				{ kind: 'text', v: 'A', tail: 't' },
+			);
+			try {
+				expect(markup(s.parent)).toBe('A' + tailHtml('t'));
+				const texts = () => [...s.parent.childNodes].filter((node) => node.nodeType === 3);
+				expect(texts()).toEqual([s.serverTexts[0]]);
+				await expectReported(s.recovered, 'the end of text "A"', '<p>');
+				s.render({ kind: 'text', v: 'B', tail: 't' });
+				expect(texts()).toEqual([s.serverTexts[0]]);
+				expect(s.serverTexts[0].nodeValue).toBe('B');
+			} finally {
+				s.unmount();
+			}
+		});
+
+		it.each([{ kind: 'text' }, { kind: null }, { kind: 'p' }, { kind: 'inner' }])(
+			'adopts a matching $kind value silently',
+			async ({ kind }) => {
+				container.innerHTML = ServerRT.renderToString(server[name], {
+					kind,
+					v: 'A',
+					tail: 't',
+				}).html;
+				const parent = container.querySelector(host)!;
+				const serverMarkup = markup(parent);
+				const serverNodes: Node[] = [
+					...parent.querySelectorAll('*'),
+					...[...parent.childNodes].filter((node) => node.nodeType === 3),
+				];
+				const recovered: unknown[] = [];
+				const root = hydrateRoot(
+					container,
+					client[name],
+					{ kind, v: 'A', tail: 't' },
+					{ onRecoverableError: (error) => recovered.push(error) },
+				);
+				flushSync(() => {});
+				try {
+					expect(markup(parent)).toBe(serverMarkup);
+					for (const node of serverNodes) expect(parent.contains(node)).toBe(true);
+					await Promise.resolve();
+					expect(recovered).toEqual([]);
+					expect(warns()).toEqual([]);
+				} finally {
+					root.unmount();
+				}
+			},
+		);
+	});
+
+	describe('in .tsx', () => {
+		const TSX = join(
+			process.cwd(),
+			'packages/octane/tests/hydration/_fixtures/renderable-text-swap-tsx.tsx',
+		);
+		const tsxServer = loadServerFixture(TSX, { id: 'renderable-text-swap-tsx.tsx' });
+		const tsxClient = loadCompiledFixtureSource(readFileSync(TSX, 'utf8'), {
+			id: 'renderable-text-swap-tsx.tsx',
+			mode: 'client',
+			compileOptions: { dev },
+		});
+
+		it.each([
+			{ name: 'Hole', host: 'section > div', to: 'text', expected: 'A' },
+			{ name: 'Hole', host: 'section > div', to: null, expected: '' },
+			{ name: 'SiblingHole', host: 'section', to: 'text', expected: 'A<i>t</i>' },
+			{ name: 'SiblingHole', host: 'section', to: null, expected: '<i>t</i>' },
+		])(
+			'$name discards a server element for a client $to value',
+			async ({ name, host, to, expected }) => {
+				container.innerHTML = ServerRT.renderToString(tsxServer[name], {
+					kind: 'p',
+					v: 'A',
+					tail: 't',
+				}).html;
+				const tail = container.querySelector('i')!;
+				const recovered: unknown[] = [];
+				const root = hydrateRoot(
+					container,
+					tsxClient[name],
+					{ kind: to, v: 'A', tail: 't' },
+					{ onRecoverableError: (error) => recovered.push(error) },
+				);
+				flushSync(() => {});
+				try {
+					const parent = container.querySelector(host)!;
+					expect(markup(parent)).toBe(expected);
+					expect(container.querySelector('i')).toBe(tail);
+					await expectReported(
+						recovered,
+						to === null ? 'nothing' : 'text "A"',
+						'<p>',
+						'renderable-text-swap-tsx.tsx',
+					);
+					flushSync(() => root.render(tsxClient[name], { kind: 'p', v: 'B', tail: 't' }));
+					expect(markup(parent)).toBe(expected.replace(/^A?/, '<p class="x">B</p>'));
+				} finally {
+					root.unmount();
+				}
+			},
+		);
+	});
+
+	// Captures that changed before a dormant boundary activated legitimately
+	// differ from the server's: repair the hole, but report nothing.
+	it('repairs a dormant boundary updated before activation without reporting', async () => {
+		const serverProps = { when: condition(false), kind: 'p', v: 'A' };
+		container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
+		const recovered: unknown[] = [];
+		const root = hydrateRoot(container, client.DormantHole, serverProps, {
+			onRecoverableError: (error) => recovered.push(error),
+		});
+		flushSync(() => {});
+		try {
+			const div = container.querySelector('section > div')!;
+			expect(markup(div)).toBe('<p class="x">A</p>');
+			await act(() => root.render(client.DormantHole, { when: load(), kind: 'text', v: 'A' }));
+			expect(container.querySelector('section > div')).toBe(div);
+			expect(markup(div)).toBe('A');
+			await Promise.resolve();
+			expect(recovered).toEqual([]);
+			expect(warns()).toEqual([]);
 		} finally {
 			root.unmount();
 		}

@@ -18517,6 +18517,39 @@ class HydrationCapability {
 		removeHydrationRange(start, end);
 	}
 
+	/**
+	 * Runs before the first hydrating render of a text or empty value `str` in a
+	 * child slot that adopted the server's `<!--[-->…<!--]-->` range. The value
+	 * serializes as at most one text node there, which the slot adopts when it
+	 * leads the range. Anything else in the range is server content the client
+	 * cannot adopt, such as an element or component the server rendered for a
+	 * value the client renders as text or nothing. Discard it and report the
+	 * recovery, as other structural mismatches do.
+	 */
+	discardUnadoptedText(scope: Scope, slotKey: number, state: ChildSlot, str: string): void {
+		const end = state.end!;
+		const first = getNextSibling(state.start!)!;
+		const kept = str !== '' && first.nodeType === 3;
+		const stale = kept ? getNextSibling(first)! : first;
+		if (stale === end) return;
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from the server's; still recover, but there is nothing to report.
+		if (!this.staleServerValues) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+			if (process.env.NODE_ENV !== 'production') {
+				const loc = siteLoc(scope, slotKey);
+				if (loc) {
+					const client = str === '' ? 'nothing' : `text ${JSON.stringify(str)}`;
+					this.warnStructural(loc, kept ? `the end of ${client}` : client, this.describe(stale));
+				}
+			}
+		}
+		removeRange(stale, end);
+		// Leave the cursor where a clean range would, never on a removed node.
+		if (!kept) this.node = end;
+	}
+
 	parseSeeds(raw: string): unknown[] | null {
 		return parseSeedJson(raw);
 	}
@@ -18888,6 +18921,19 @@ class HydrationCapability {
 		}
 		this.node = null;
 		this.rootRemainder = null;
+	}
+
+	/**
+	 * Whether the server framed `el`'s only child in a `<!--[-->…<!--]-->` range
+	 * holding something other than one text node or nothing. htext unwraps a
+	 * text-only frame; any other framed content belongs to a child slot.
+	 */
+	framesSlotContent(el: Node): boolean {
+		const first = getFirstChild(el);
+		if (!this.isOpen(first)) return false;
+		let next = getNextSibling(first);
+		if (next !== null && next.nodeType === 3) next = getNextSibling(next);
+		return !this.isClose(next);
 	}
 
 	htext(el: Node, text: string, loc?: string): Text {
@@ -33906,6 +33952,8 @@ export function childSlot(
 			return;
 		}
 	}
+	// This call adopted the server's `<!--[-->…<!--]-->` pair as the slot's range.
+	let adoptedRange = false;
 	if (state === undefined) {
 		const transaction = ROOT_RENDER_TRANSACTION;
 		if (
@@ -33947,6 +33995,7 @@ export function childSlot(
 			end = hydration.close(anchor as Node);
 			if (parentBlock === hydration.rootBlock) hydration.claimRootRemainder(getNextSibling(end));
 			hydration.node = getNextSibling(start);
+			adoptedRange = true;
 		} else if (hydration !== null && hydration.isOpen(hydration.node)) {
 			// Hydration (sole top-level hole, e.g. a layout `<>{children}…</>`): the
 			// anchor is the block's end-marker (not a `<!--[-->`), but the CURSOR sits
@@ -33959,6 +34008,7 @@ export function childSlot(
 				hydration.claimRootRemainder(getNextSibling(end));
 			}
 			hydration.node = getNextSibling(start);
+			adoptedRange = true;
 		} else if (bindingMarker !== undefined) {
 			// An authored binding value retains its ordinary child-slot lifecycle,
 			// but its range must remain addressable even while empty or primitive.
@@ -34633,6 +34683,7 @@ export function childSlot(
 	// Swapped away from a component OR a pure-host de-opt node → tear it down first.
 	if (state.block !== null || state.hostNode !== null) clearChildContent(state);
 	const str = coerceChildText(value);
+	if (adoptedRange) hydration!.discardUnadoptedText(parentScope, slotKey, state, str);
 	if (str === '') {
 		// `null` / `undefined` / `false` / `true` / `''` render NOTHING — not even
 		// an empty text node — matching React/Octane. The server emits an empty
@@ -34829,7 +34880,15 @@ export function childTextHole(
 		journalRootRange(domParent, null, null);
 		journalRootProperty(parentScope.slots, slotKey, parentScope.slots[slotKey]);
 	}
-	if (state === undefined && vt !== 'object' && vt !== 'function') {
+	if (
+		state === undefined &&
+		vt !== 'object' &&
+		vt !== 'function' &&
+		// A server range around an element, component, or list is slot content a
+		// markerless primitive cannot adopt: childSlot adopts that range on the
+		// hole's first hydrating render and discards what the value cannot use.
+		(cachedNode !== null || activeHydration()?.framesSlotContent(domParent) !== true)
+	) {
 		// Markerless pure-text mode.
 		const str =
 			value == null || value === false || value === true
