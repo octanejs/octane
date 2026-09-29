@@ -277,9 +277,23 @@ export const useTranslation = (...args) => {
 		subSlot(slot, 'ut:result'),
 	);
 
+	// use() tracks thenables by call order, and a replay keeps the thenable
+	// already stored at a position. If this hook stopped calling use() once its
+	// namespaces loaded, the next use() in the component (a second
+	// useTranslation, or any other suspending read) would take this hook's
+	// position on the replay and receive this settled load instead of
+	// suspending on its own. Retain the load this call site suspended on and
+	// keep reading it after it settles. The key names what is being loaded, so
+	// settling never changes it.
+	const suspense = useMemo(
+		() => ({ promise: undefined }),
+		[i18n, props.lng, namespaces, useSuspense],
+		subSlot(slot, 'ut:suspense'),
+	);
 	if (i18n && useSuspense && !ready) {
-		use(getSuspenseLoadPromise(i18n, props.lng, namespaces));
+		suspense.promise = getSuspenseLoadPromise(i18n, props.lng, namespaces);
 	}
+	if (suspense.promise !== undefined) use(suspense.promise);
 
 	return ret;
 };

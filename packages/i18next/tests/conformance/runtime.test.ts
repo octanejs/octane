@@ -9,9 +9,11 @@ import {
 	IcuApp,
 	MultipleHooksApp,
 	ProviderApp,
+	SequentialNamespacesApp,
 	SSRSeedApp,
 	SuspenseApp,
 	TransApp,
+	TranslationThenUseApp,
 } from '../_fixtures/runtime.tsrx';
 
 class BackendMock {
@@ -31,6 +33,51 @@ class BackendMock {
 	flush() {
 		for (const callback of this.queue.splice(0)) callback(null, { key1: 'Loaded lazily' });
 	}
+}
+
+type ReadCallback = (error: Error | null, resources: Record<string, string>) => void;
+
+// Loads each namespace only when the test settles it, so hooks can suspend on
+// namespaces that become ready at different times.
+class NamespaceBackend {
+	type = 'backend' as const;
+	reads = new Map<string, ReadCallback>();
+
+	init() {}
+
+	read(_language: string, namespace: string, callback: ReadCallback) {
+		this.reads.set(namespace, callback);
+	}
+
+	pending(): string[] {
+		return [...this.reads.keys()];
+	}
+
+	load(namespace: string, resources: Record<string, string>) {
+		const callback = this.reads.get(namespace);
+		if (!callback) throw new Error(`namespace "${namespace}" was never requested`);
+		this.reads.delete(namespace);
+		callback(null, resources);
+	}
+}
+
+async function makeLoadingI18n(backend: BackendMock | NamespaceBackend): Promise<i18n> {
+	const instance = createInstance().use(backend);
+	await instance.init({
+		lng: 'en',
+		fallbackLng: false,
+		ns: ['translation'],
+		resources: { en: { translation: {} } },
+		partialBundledLanguages: true,
+		interpolation: { escapeValue: false },
+	});
+	return instance;
+}
+
+function deferred<T>() {
+	let resolve!: (value: T) => void;
+	const promise = new Promise<T>((res) => (resolve = res));
+	return { promise, resolve };
 }
 
 async function makeI18n(): Promise<i18n> {
@@ -137,15 +184,7 @@ describe('@octanejs/i18next runtime', () => {
 
 	it('loads missing namespaces through octane Suspense', async () => {
 		const backend = new BackendMock();
-		const loadingInstance = createInstance().use(backend);
-		await loadingInstance.init({
-			lng: 'en',
-			fallbackLng: false,
-			ns: ['translation'],
-			resources: { en: { translation: {} } },
-			partialBundledLanguages: true,
-			interpolation: { escapeValue: false },
-		});
+		const loadingInstance = await makeLoadingI18n(backend);
 
 		const view = render(SuspenseApp, { props: { i18n: loadingInstance } });
 		expect(view.container.querySelector('#loading')).toHaveTextContent('Loading');
@@ -153,6 +192,62 @@ describe('@octanejs/i18next runtime', () => {
 		await waitFor(() =>
 			expect(view.container.querySelector('#async-value')).toHaveTextContent('Loaded lazily'),
 		);
+	});
+
+	it('keeps sequential useTranslation calls suspended until each namespace is ready', async () => {
+		const backend = new NamespaceBackend();
+		const loadingInstance = await makeLoadingI18n(backend);
+		const view = render(SequentialNamespacesApp, { props: { i18n: loadingInstance } });
+		const loading = () => view.container.querySelector('#sequential-loading');
+		const value = () => view.container.querySelector('#sequential-value');
+
+		expect(loading()).toHaveTextContent('Loading');
+		expect(backend.pending()).toEqual(['first']);
+
+		// The replay reaches the second hook for the first time. It must suspend on
+		// its own namespace, not replay the first hook's settled load.
+		await act(() => backend.load('first', { key: 'First' }));
+		await waitFor(() => expect(backend.pending()).toEqual(['second']));
+		await act(() => {});
+		expect(value()).toBeNull();
+		expect(loading()).toHaveTextContent('Loading');
+
+		await act(() => backend.load('second', { key: 'Second' }));
+		await waitFor(() => expect(value()).toHaveTextContent('First/Second'));
+		expect(value()).toHaveAttribute('data-ready', 'true');
+		expect(loading()).toBeNull();
+	});
+
+	it('keeps a use() after useTranslation suspended until its own promise settles', async () => {
+		const backend = new NamespaceBackend();
+		const loadingInstance = await makeLoadingI18n(backend);
+		const data = deferred<string>();
+		const attempts: string[] = [];
+		const view = render(TranslationThenUseApp, {
+			props: {
+				i18n: loadingInstance,
+				promise: data.promise,
+				onAttempt: (translation: string) => attempts.push(translation),
+			},
+		});
+		const loading = () => view.container.querySelector('#then-use-loading');
+		const value = () => view.container.querySelector('#then-use-value');
+
+		expect(loading()).toHaveTextContent('Loading');
+		expect(backend.pending()).toEqual(['first']);
+
+		// The replay after the namespace loads reaches use() for the first time
+		// and must keep the fallback while the data is pending.
+		await act(() => backend.load('first', { key: 'First' }));
+		await waitFor(() => expect(attempts).toContain('First'));
+		await act(() => {});
+		expect(value()).toBeNull();
+		expect(loading()).toHaveTextContent('Loading');
+
+		// use() must read its own promise, not the hook's settled namespace load.
+		await act(() => data.resolve('data'));
+		await waitFor(() => expect(value()).toHaveTextContent('First/data'));
+		expect(loading()).toBeNull();
 	});
 
 	it('seeds an i18next instance through useSSR', async () => {

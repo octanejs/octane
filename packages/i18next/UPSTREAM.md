@@ -59,7 +59,7 @@ one-for-one, so the parity manifest remains `recorded-unverified`.
 
 | Suite | Upstream state | Current disposition |
 | --- | --- | --- |
-| Runtime tests under `test/` | Present | Not yet vendored or adapted exhaustively. Repo-authored conformance tests cover the shipped surface, and one bounded differential runs the same `.tsrx` fixture against React and Octane. |
+| Runtime tests under `test/` | Present | Not yet vendored or adapted exhaustively. Repo-authored conformance tests cover the shipped surface, and one bounded differential runs the same `.tsrx` fixtures against React and Octane. |
 | TypeScript tests under `test/typescript/` | Present | Not yet vendored or adapted one-for-one. The package has an Octane public type test, but it is not counted as upstream parity evidence. |
 
 ## Bounded evidence
@@ -67,8 +67,31 @@ one-for-one, so the parity manifest remains `recorded-unverified`.
 The `i18next-runtime-differential` lane compiles
 `tests/_fixtures/runtime-diff.tsrx` for both runtimes. It compares provider,
 `useTranslation`, `Trans`, and subscription output at mount and across
-English-to-French-to-English language changes. This lane establishes only those
-declared cases; it does not promote the package to full verified parity.
+English-to-French-to-English language changes. The same lane compiles
+`tests/_fixtures/suspense-diff.tsrx`, where a component suspends through
+`useTranslation` and then through a second `useTranslation` or a `use()` read,
+and compares the Suspense fallback and final output while those reads settle one
+after another. This lane establishes only those declared cases; it does not
+promote the package to full verified parity.
+
+## Suspense implementation
+
+Upstream `useTranslation` throws a new load Promise on every render while its
+namespaces are not ready. The port suspends through `use()` instead, on a load
+promise shared per instance, language, and namespace list. `use()` is
+positional: a Suspense replay reuses the thenable already stored at a position.
+So once a `useTranslation` call site has suspended, it keeps calling `use()` on
+that load after it settles. If it stopped, a following `useTranslation` or
+`use()` in the same component would take its position on the replay, receive
+the settled load, and commit untranslated keys or the wrong value instead of
+suspending. A thrown Promise has no position, so upstream never hits this. The
+retained load is keyed by instance, `lng`, namespaces, and `useSuspense`, so
+settling never drops it. `tests/conformance/runtime.test.ts` and the suspense
+cases in the differential lane cover a second `useTranslation` and a following
+`use()`. On the server, the pass that completes after the load settles starts
+with fresh hook state, so it never reads the settled load and writes no
+hydration seed for it. `tests/conformance/hydration.test.ts` hydrates a
+following `use()` after a server render that suspended in `useTranslation`.
 
 Known gaps and consumer-visible divergences remain recorded in `status.json`:
 natural block children for `Trans`, Suspense mechanics, refs-as-props and class

@@ -14,6 +14,7 @@ type HydrationBinding =
 	| 'base-ui'
 	| 'docusaurus'
 	| 'formisch'
+	| 'i18next'
 	| 'monaco-editor'
 	| 'pdf'
 	| 'rainbowkit'
@@ -70,6 +71,10 @@ function bindingAliases(binding: HydrationBinding) {
 
 	if (binding === 'formisch') {
 		return [{ find: /^@octanejs\/formisch$/, replacement: resolve(source, 'index.ts') }];
+	}
+
+	if (binding === 'i18next') {
+		return [{ find: /^@octanejs\/i18next$/, replacement: resolve(source, 'index.js') }];
 	}
 
 	if (binding === 'solana-kit') {

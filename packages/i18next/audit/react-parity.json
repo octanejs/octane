@@ -44,17 +44,27 @@
       "environment": "workspace-node",
       "project": "i18next-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs the same .tsrx fixture against react-i18next 17.0.9 on React and @octanejs/i18next on Octane, comparing provider, hook, Trans, and language-subscription output at mount and across language changes.",
+      "notes": "Runs the same .tsrx fixtures against react-i18next 17.0.9 on React and @octanejs/i18next on Octane, comparing provider, hook, Trans, and language-subscription output at mount and across language changes, and sequential useTranslation suspense until every read settles.",
       "files": [
         {
           "path": "packages/i18next/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "608b4374632ff19c9ca0a0c43949074b43b565c413f9afd7a166c403ae96a2e9",
+          "sha256": "68d23bc8ee351884211ab22cdf1e812e09100edc3886062e36af6b38a22c06a4",
           "cases": [
             {
               "id": "differential:i18next-runtime",
               "testName": "matches hook, provider, Trans, and language subscription output",
               "fullName": "differential: @octanejs/i18next vs react-i18next matches hook, provider, Trans, and language subscription output"
+            },
+            {
+              "id": "differential:i18next-sequential-suspense",
+              "testName": "useTranslation → useTranslation holds the fallback until both namespaces load",
+              "fullName": "differential: @octanejs/i18next vs react-i18next useTranslation → useTranslation holds the fallback until both namespaces load"
+            },
+            {
+              "id": "differential:i18next-translation-then-use-suspense",
+              "testName": "useTranslation → use() holds the fallback until both settle",
+              "fullName": "differential: @octanejs/i18next vs react-i18next useTranslation → use() holds the fallback until both settle"
             }
           ]
         },
@@ -62,6 +72,11 @@
           "path": "packages/i18next/tests/_fixtures/runtime-diff.tsrx",
           "role": "support",
           "sha256": "29c985249b8999c8cc0d810ca2de57a7e36d48fe5a9facff33bb2bdfba3f8173"
+        },
+        {
+          "path": "packages/i18next/tests/_fixtures/suspense-diff.tsrx",
+          "role": "support",
+          "sha256": "d1e22627b86feb5859cc9542d99402ac04c5c0a9a465b66fdfdeadf0ae1b6740"
         },
         {
           "path": "packages/i18next/tests/differential/_setup.ts",
