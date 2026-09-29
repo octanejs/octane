@@ -239,6 +239,7 @@ type ServerErrorArguments = {
 	332: [unknown];
 	333: [unknown];
 	334: [unknown];
+	335: [unknown];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -978,6 +979,11 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 			case 334:
 				return formatDevErrorMessage(
 					'octane SSR: %s consecutive streaming passes completed no boundary — a component kept throwing thenables outside use(). A resource reader should stop suspending once its data has settled.',
+					args,
+				);
+			case 335:
+				return formatDevErrorMessage(
+					'octane SSR: %s root streaming passes completed without producing a shell — a component kept throwing thenables outside use(). A resource reader should stop suspending once its data has settled.',
 					args,
 				);
 			default:
