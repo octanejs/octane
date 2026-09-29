@@ -21179,10 +21179,10 @@ function isStaticReturnedFragmentComponent(node, ctx) {
 // The renderer builds a keyed, `noscript`/document, or parser-repaired host as a
 // descriptor (isDescriptorBuiltHost), and a descriptor child must be a value: a
 // FoldedDirective or template-only component placeholder under it would be
-// dropped. Inside such a host (`inDescriptor`), directives and components lower
-// to value holes here in the owning component, as a `@{}` body and the server
-// lower them. Misreading a template host as a descriptor host costs only the
-// template fast path; the reverse drops children.
+// dropped. Inside such a host (`inDescriptor`), directives, components, and child
+// `@{}` blocks lower to value holes here in the owning component, as a `@{}` body
+// and the server lower them. Misreading a template host as a descriptor host costs
+// only the template fast path; the reverse drops children.
 function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor = false) {
 	const descriptor =
 		inDescriptor ||
@@ -21412,6 +21412,17 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor =
 			const hn = `h${holeProps.length}`;
 			holeProps.push(objectProp(hn, lowerJsxChild(child, ctx)));
 			newChildren.push(b.jsx_expression_container(memberProps(hn, child)));
+		} else if (descriptor && t === 'JSXCodeBlock') {
+			// lowerJsxChild lowers the block as it does under a `@{}` body's descriptor:
+			// a render-only block transparently, and a setup-bearing one through this
+			// component's fold. The renderer must never fold it, since that would move
+			// the block's setup away from the locals it closes over.
+			const value = lowerJsxChild(child, ctx);
+			if (value !== null) {
+				const hn = `h${holeProps.length}`;
+				holeProps.push(objectProp(hn, value));
+				newChildren.push(b.jsx_expression_container(memberProps(hn, child)));
+			}
 		} else if (t === 'JSXCodeBlock') {
 			const body = child.body || [];
 			if (body.length === 0) {
@@ -22525,6 +22536,13 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 function lowerInspectableJsxChild(child, ctx) {
 	const fold = ctx._valueDirectiveLowering;
 	if (fold == null) return lowerJsxChild(child, ctx);
+	// A render-only @{} block is transparent grouping: lowerJsxChild unwraps it
+	// to its render root. Letting lowerSetupValueDirectives fold it would produce
+	// a component range on the server while the descriptor path emits the
+	// unwrapped children on the client, breaking hydration.
+	if (child && child.type === 'JSXCodeBlock' && (child.body?.length ?? 0) === 0) {
+		return lowerJsxChild(child, ctx);
+	}
 	const prepared = lowerSetupValueDirectives(child, fold);
 	const t = prepared && prepared.type;
 	if (
@@ -22564,15 +22582,18 @@ function lowerJsxChild(child, ctx) {
 		if (fold != null) return fold(child);
 		rejectUnownedValueDirective(child);
 	}
-	if (t === 'JSXCodeBlock' && ctx._valueDirectiveLowering == null) {
-		// No body owns this block, as inside a module-level callback. A block is a
-		// body of its own, so it needs no owner: a render-only block is transparent,
-		// and any other block compiles in place as the `() => @{ … }` child that
-		// normalizeChildren makes of it, closing over the callback's params.
+	if (t === 'JSXCodeBlock') {
+		// A render-only block is transparent grouping, as under a template host.
 		if ((child.body?.length ?? 0) === 0) {
 			return child.render ? lowerJsxChild(child.render, ctx) : null;
 		}
-		return rewriteJsxValues(childCodeBlockArrow(child), ctx);
+		// A setup-bearing or code-only block is its own render scope. The owning
+		// body's fold compiles it into a renderer that closes over that body, the
+		// value both targets build. With no owning body, as inside a module-level
+		// callback, it compiles in place as the `() => @{ … }` child that
+		// normalizeChildren makes of it, closing over the callback's params.
+		const fold = ctx._valueDirectiveLowering;
+		return fold != null ? fold(child) : rewriteJsxValues(childCodeBlockArrow(child), ctx);
 	}
 	if (t === 'JSXFragment' || t === 'Fragment') {
 		const els = [];
