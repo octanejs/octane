@@ -10,6 +10,7 @@ import {
 	SelfFormStatus,
 	OptimisticForm,
 	BareOptimistic,
+	OptimisticCounter,
 	DirectAction,
 	ExposedDispatch,
 	RawForm,
@@ -374,6 +375,61 @@ describe('useOptimistic', () => {
 
 		await tick();
 		expect(r.find('#list').textContent).toBe('a'); // reverted, not stuck
+		r.unmount();
+	});
+
+	it('applies a function action as an updater when no reducer is given', async () => {
+		// React falls back to basicStateReducer: each function action receives the
+		// pending optimistic state, so updaters chain and rebase onto a new
+		// passthrough instead of being stored as the optimistic state.
+		const d = deferred();
+		let add!: (action: number | ((pending: number) => number)) => void;
+		const expose = (fn: typeof add) => {
+			add = fn;
+		};
+		const r = mount(OptimisticCounter, { count: 0, expose });
+		expect(r.find('#count').textContent).toBe('0');
+
+		startTransition(async () => {
+			add((n) => n + 1);
+			add((n) => n * 10);
+			await d.promise;
+		});
+		await tick();
+		expect(r.find('#count').textContent).toBe('10');
+
+		r.update(OptimisticCounter, { count: 2, expose });
+		expect(r.find('#count').textContent).toBe('30');
+
+		d.resolve();
+		await settle();
+		expect(r.find('#count').textContent).toBe('2');
+		r.unmount();
+	});
+
+	it('replaces the pending state with a non-function action when no reducer is given', async () => {
+		const d = deferred();
+		let add!: (action: number | ((pending: number) => number)) => void;
+		const expose = (fn: typeof add) => {
+			add = fn;
+		};
+		const r = mount(OptimisticCounter, { count: 0, expose });
+
+		startTransition(async () => {
+			add(5);
+			add((n) => n + 1);
+			await d.promise;
+		});
+		await tick();
+		expect(r.find('#count').textContent).toBe('6');
+
+		// The replacement ignores the passthrough, so a new one does not show through.
+		r.update(OptimisticCounter, { count: 2, expose });
+		expect(r.find('#count').textContent).toBe('6');
+
+		d.resolve();
+		await settle();
+		expect(r.find('#count').textContent).toBe('2');
 		r.unmount();
 	});
 });

@@ -106,6 +106,17 @@ export function BareOptimistic(props) @{
 	</div>
 }
 
+// useOptimistic without a reducer: a function action updates the pending
+// optimistic state, as in useState.
+export function OptimisticCounter(props: {
+	count: number;
+	expose: (add: (action: number | ((pending: number) => number)) => void) => void;
+}) @{
+	const [count, addOptimistic] = useOptimistic(props.count);
+	props.expose(addOptimistic);
+	<span id="count">{String(count) as string}</span>
+}
+
 // Direct dispatch: formAction(payload) called outside a <form>.
 export function DirectAction(props) @{
 	const [state, formAction, isPending] = useActionState(props.action, props.initial);

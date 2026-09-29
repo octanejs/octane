@@ -7605,8 +7605,15 @@ export function useFormStatus(): FormStatus {
 	return { pending: false, data: null, method: null, action: null };
 }
 
-export function useOptimistic<S, V = S>(state: S): [S, (value: V) => void] {
-	return [state, NOOP];
+export function useOptimistic<S>(
+	passthrough: S,
+): [S, (action: S | ((pendingState: S) => S)) => void];
+export function useOptimistic<S, V = S>(
+	passthrough: S,
+	updateFn: (state: S, value: V) => S,
+): [S, (value: V) => void];
+export function useOptimistic<S>(passthrough: S): [S, (value: never) => void] {
+	return [passthrough, NOOP];
 }
 
 const MEMO_OWNER = Symbol('memoOwner');
