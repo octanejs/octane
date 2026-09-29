@@ -24,6 +24,7 @@ import {
 	ParagraphComponentRoot,
 	RepairedBranch,
 	RepairedComponentHost,
+	RepairedReturnRows,
 	RepairedRows,
 	RepairedSibling,
 	SelectComponentRoot,
@@ -625,6 +626,26 @@ describe('hydrating parser-repaired HTML nesting', () => {
 
 			s.render({ value: 'b' });
 			expect(markup(section)).toBe('<p class="repaired"><div><em>b</em></div></p>');
+		} finally {
+			s.unmount();
+		}
+	});
+
+	it('rebuilds a repaired host that a component returns', async () => {
+		const spy = errors();
+		const s = hydrate('RepairedReturnRows', RepairedReturnRows, { rows: ['a', 'b'] });
+		const row = (value: string) => `<p class="repaired"><div>${value}</div></p>`;
+		try {
+			const section = s.container.querySelector('section')!;
+			expect(markup(section)).toBe(row('a') + row('b') + '<span>tail</span>');
+			await Promise.resolve();
+			expect(s.recovered).toHaveLength(1);
+			expectMismatchWarnings(spy);
+
+			s.render({ rows: ['b', 'c'] });
+			expect(markup(section)).toBe(row('b') + row('c') + '<span>tail</span>');
+			s.render({ rows: [] });
+			expect(markup(section)).toBe('<span>tail</span>');
 		} finally {
 			s.unmount();
 		}

@@ -20942,17 +20942,18 @@ function renderCallScopeParam(node, ctx) {
  *
  * The client renders every returned host root through a compiled fragment. That
  * fragment mounts markerless when the host is its one template element, so the
- * server inlines the host without a range. A host both modes build imperatively
- * (keyed, `noscript`, document) is a descriptor hole inside the fragment
- * instead, and the server frames that hole with its own range. A markerless
- * fragment would adopt that inner range as its own during hydration, so both
- * sides give this root the fragment range that returned fragments keep.
+ * server inlines the host without a range. A host the client builds
+ * imperatively (keyed, `noscript`, document, or parser-repaired) is a descriptor
+ * hole inside the fragment instead, and the server frames that hole with its
+ * own range. A markerless fragment would adopt that inner range as its own
+ * during hydration, so both sides give this root the fragment range that
+ * returned fragments keep.
  */
 function isRangedReturnedHost(node) {
 	return (
 		(node.type === 'Element' || node.type === 'JSXElement') &&
 		!isComponentTag(node) &&
-		alwaysImperativeHost(node)
+		(node._octaneImperativeHost === true || alwaysImperativeHost(node))
 	);
 }
 

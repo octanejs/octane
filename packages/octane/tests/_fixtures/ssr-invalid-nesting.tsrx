@@ -415,3 +415,18 @@ export function RepairedComponentHost(props: { value: string }) @{
 		<RepairedLabel value={props.value} />
 	</section>
 }
+
+function RepairedReturn(props: { value: string }) {
+	return <p class="repaired">
+		<div>{props.value as string}</div>
+	</p>;
+}
+
+export function RepairedReturnRows(props: { rows: string[] }) @{
+	<section>
+		@for (const row of props.rows; key row) {
+			<RepairedReturn value={row} />
+		}
+		<span>tail</span>
+	</section>
+}
