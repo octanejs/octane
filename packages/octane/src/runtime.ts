@@ -1835,6 +1835,16 @@ function hydrationNodeMatches(
 	return true; // any leftover could be holes — assume a match
 }
 
+/**
+ * Does the server node at the cursor match a nested fragment's FIRST logical
+ * root? A leading template comment is a dynamic hole whose server form (text,
+ * a marker range, or nothing) cannot decide a mismatch, as in fragmentRemainder.
+ */
+function fragmentRootMatches(server: Node, fragment: Node, partialStyles?: string): boolean {
+	const first = getFirstChild(fragment)!;
+	return first.nodeType === 8 || hydrationNodeMatches(server, first, partialStyles, '0');
+}
+
 /** Remove the server nodes from `start` to `end` (inclusive). Used to discard a divergent range. */
 function removeHydrationRange(start: Node, end: Node): void {
 	let n: Node | null = start;
@@ -18258,16 +18268,16 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
  * also what the parser's case-adjustment produces on the server DOM), or the
  * root's nodeType for a text (3) or comment/`<!>`-anchor (8) root.
  */
-function templateRootDescriptor(html: string): string | 3 | 8 {
-	if (html.charCodeAt(0) !== 60 /* < */) return 3;
-	const c = html.charCodeAt(1);
+function templateRootDescriptor(html: string, at: number = 0): string | 3 | 8 {
+	if (html.charCodeAt(at) !== 60 /* < */) return 3;
+	const c = html.charCodeAt(at + 1);
 	if (!((c >= 97 && c <= 122) || (c >= 65 && c <= 90))) return 8;
-	let i = 2;
+	let i = at + 2;
 	for (; i < html.length; i++) {
 		const cc = html.charCodeAt(i);
 		if (cc === 62 /* > */ || cc === 47 /* / */ || cc <= 32 /* whitespace */) break;
 	}
-	return html.slice(1, i);
+	return html.slice(at + 1, i);
 }
 
 function lazyRootDescriptor(lazy: LazyTemplateRecord): string | 3 | 8 {
@@ -18304,6 +18314,23 @@ function lazyRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
 	// wrong-namespace node would be a correctness break — a false mismatch fails
 	// safe (rebuild, exactly what the parsed-template compare did pre-narrowing).
 	return (server as Element).localName === root;
+}
+
+/**
+ * lazyRootMatches for a nested fragment's FIRST logical root, read from the
+ * template source. A raw fragment's cached descriptor is that root; a
+ * fixed-HTML fragment's starts after its synthetic `<octane-frag>` wrapper. A
+ * leading `<!>` is a dynamic hole whose server form (text, a marker range, or
+ * nothing) cannot decide a mismatch.
+ */
+function lazyFragmentRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
+	const root =
+		lazy.frag !== 0
+			? lazyRootDescriptor(lazy)
+			: templateRootDescriptor(lazy.html, 13 /* '<octane-frag>'.length */);
+	if (root === 8) return true;
+	if (root === 3) return server.nodeType === 3;
+	return server.nodeType === 1 && (server as Element).localName === root;
 }
 
 /**
@@ -18929,14 +18956,7 @@ class HydrationCapability {
 				(STAGED_DOM?.view(cursor) ?? cursor).parentNode !== target
 			)
 				return this.freshClone(template);
-			if (isBlockOpen(cursor)) {
-				const close = this.close(cursor);
-				this.node = getNextSibling(close);
-				removeHydrationRange(cursor, close);
-			} else {
-				this.node = getNextSibling(cursor);
-				(STAGED_DOM?.view(cursor as ChildNode) ?? (cursor as ChildNode)).remove();
-			}
+			this.discardCursor(cursor);
 			if (claimsRoot)
 				this.claimRootRemainder(
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
@@ -18944,13 +18964,79 @@ class HydrationCapability {
 			return this.freshClone(template);
 		}
 		if (isFragment) {
-			return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
+			// A nested fragment has no server wrapper, so its first logical root must
+			// be the cursor itself. A root claim already compared every root above.
+			if (
+				claimsRoot ||
+				(template !== null
+					? fragmentRootMatches(cursor, template, partialStyles)
+					: lazyFragmentRootMatches(cursor, lazy!))
+			)
+				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
+			return this.rebuildFragment(template ?? resolveLazyTemplate(lazy!), cursor, loc);
 		}
 		if (claimsRoot)
 			this.claimRootRemainder(
 				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 			);
 		return cursor;
+	}
+
+	/**
+	 * The server rendered something other than this nested fragment at the
+	 * cursor (a text value, another component's roots). Report it once and build
+	 * the fragment on the client. The fragment's block owns the server nodes from
+	 * the cursor up to its end marker, where drainFrag inserts the fresh roots, so
+	 * discard them. When the end marker does not follow the cursor inside the
+	 * block's range, discard only the cursor node or its range, as a single-root
+	 * mismatch does.
+	 */
+	private rebuildFragment(template: Node, cursor: Node, loc: string | undefined): Node {
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from the server's; still rebuild, but there is nothing to report.
+		if (!this.staleServerValues) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+			if (process.env.NODE_ENV !== 'production')
+				warnHydrationStructuralMismatch(
+					loc ?? componentSourceLoc(CURRENT_BLOCK?.body) ?? CURRENT_SCOPE?.locFile,
+					`a fragment starting with ${describeHydrationNode(getFirstChild(template))}`,
+					describeHydrationNode(cursor),
+				);
+		}
+		// The compiled mount inserts into its scope's block, which for a lite
+		// component is the scope's own range rather than CURRENT_BLOCK's.
+		const block = CURRENT_SCOPE?.block;
+		const parent = block?.parentNode;
+		const end = block?.endMarker ?? null;
+		if (
+			parent == null ||
+			cursor === end ||
+			(STAGED_DOM?.view(cursor) ?? cursor).parentNode !== parent
+		)
+			return this.freshClone(template);
+		let node: Node | null = cursor;
+		// Reaching the block's own start first means the cursor lies before its range.
+		if (end !== null)
+			while (node !== null && node !== end && node !== block!.startMarker)
+				node = getNextSibling(node);
+		if (node === end) {
+			this.node = end;
+			removeHydrationRange(cursor, (STAGED_DOM?.view(end!) ?? end!).previousSibling!);
+		} else this.discardCursor(cursor);
+		return this.freshClone(template);
+	}
+
+	/** Discard a mismatched server node (or the marker range it opens) and step past it. */
+	private discardCursor(cursor: Node): void {
+		if (isBlockOpen(cursor)) {
+			const close = this.close(cursor);
+			this.node = getNextSibling(close);
+			removeHydrationRange(cursor, close);
+		} else {
+			this.node = getNextSibling(cursor);
+			(STAGED_DOM?.view(cursor as ChildNode) ?? (cursor as ChildNode)).remove();
+		}
 	}
 
 	/** Remove server siblings left after the root's complete client shape was adopted. */
