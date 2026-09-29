@@ -893,12 +893,12 @@ export function App(props) @{ <main>@for (const item of props.items; key item) {
 				scope.block.parentNode,
 				ClientSibling,
 				{},
+				'c:sibling',
 				scope.block.endMarker,
+				false,
+				false,
 				undefined,
 				false,
-				false,
-				false,
-				'c:sibling',
 			);
 		};
 		const container = document.createElement('div');
@@ -937,12 +937,12 @@ export function App(props) @{ <main>@for (const item of props.items; key item) {
 					scope.block.parentNode,
 					ClientItem,
 					{ id },
-					scope.block.endMarker,
-					id,
-					false,
-					false,
-					true,
 					'c:item',
+					scope.block.endMarker,
+					false,
+					false,
+					id,
+					true,
 				);
 			}
 		};
