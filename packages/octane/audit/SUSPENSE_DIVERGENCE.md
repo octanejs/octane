@@ -318,6 +318,53 @@ fallbacks use the priority of the fallback render, not the earlier transition.
 On the server, a completed primary does not wait for an obsolete pending fallback
 that throws a raw wakeable.
 
+**Server retries after an already-settled thenable.** A reader can keep throwing
+a thenable that has already settled while its own state waits for a later task,
+such as a timer or an I/O callback. Fizz sends such retries through
+[`pingTask`](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-server/src/ReactFizzServer.js#L782-L793).
+Once a streaming request is open, it schedules them with `setImmediate`, so the
+task can run and the retries continue without a limit. During a stream's first
+task, and for the whole of `prerender`, it pings on a microtask. There the same
+reader spins on microtasks and starves the event loop. In a React 19.2.7 probe,
+it re-rendered 200,000 times without letting a 0ms timer fire.
+
+Octane's buffered renderers (`prerender` and `prerenderToNodeStream`) retry on
+microtasks. A wave stalls when a resource reader rethrew only thenables this
+render has already seen settle. Stalled waves do not count toward the 50-pass
+limit. Their retries wait for the thenables to notify again, then for a timer
+that starts at 1ms and doubles up to 100ms. The stall fails with its own error
+once it has lasted `timeoutMs` (10 seconds by default; `0` disables the
+deadline). When one of several stalled readers finishes, the rest start a new
+deadline; a reader cycling between settled thenables does not. A thenable's
+first settlement still retries on microtasks, so a waterfall of already-resolved
+resources, each thrown once, renders without waiting for a task.
+
+Streaming renders (`renderToPipeableStream` and `renderToReadableStream`) yield
+one macrotask per wave, but that is not enough for a lag longer than about 50
+turns. A streamed wave also ends at its first settlement while other boundaries
+may still wait on real I/O. So a streamed wave stalls when none of its own
+members settled since the last full pass began, apart from thrown thenables that
+pass had already seen settle. A thenable that no longer suspends anything, or
+that the last pass already consumed, is not progress, even when it settles
+while the stream waits for the consumer. Stalled waves count toward neither the
+50 root passes allowed before the shell nor the 50 consecutive passes that
+complete no boundary. They back off on the same timer, but any settlement that
+can advance the render ends the wait at once, so another boundary is never
+revealed late because a sibling reader is stalled. A stall fails with the same
+error once it has lasted `timeoutMs`. Publishing the shell, completing a
+boundary, or a stalled reader finishing starts a new deadline. A reader cycling
+between settled thenables does not, and neither does a sibling pending on real
+I/O that stops suspending. A thenable's first settlement is never paced.
+
+When a pass limit is reached on a wave made only of thrown thenables, the
+buffered, streamed-boundary, and streamed-root errors name thrown thenables
+instead of `use()`.
+
+Limits: stalls are recognized only by identity. A reader that throws a new
+thenable on every attempt is indistinguishable from a cached waterfall's next
+level, so those retries stay on microtasks and count toward the pass limit, even
+when every new thenable has already settled.
+
 **Evidence:** [suspense.test.ts](../tests/suspense.test.ts) covers raw resource
 reads, resolution, rejection, and the effect-throw error control;
 [differential/suspense-timing.test.ts](../tests/differential/suspense-timing.test.ts)
@@ -327,7 +374,20 @@ the literal imported JSX ErrorBoundary, and
 [transition-timeout.test.ts](../tests/transition-timeout.test.ts) covers a suspending
 fallback at an explicit finite deadline. Finally,
 [ssr-suspense.test.ts](../tests/ssr-suspense.test.ts) covers buffered and streamed
-rendering, sequential wakeables, rejection, abort, and hydration adoption.
+rendering, sequential wakeables, rejection, abort, and hydration adoption. It also
+covers buffered and streamed readers that rethrow a settled thenable until a
+timer opens them, with and without a boundary. These readers rethrow a resolved
+or rejected promise, a custom thenable, or a promise that was pending first. The
+tests show that stalled retries keep every pass budget free for real work and
+fail at the suspense deadline with bounded retries. A waterfall of
+already-resolved thrown resources still renders before any task runs, and
+streams without pacing. Stalled readers that finish at different times each get
+a deadline, and a reader cycling between settled thenables still fails at its
+deadline. While one streamed reader is stalled, a sibling boundary whose data
+arrives is revealed within a task, and a sibling that fails and abandons its
+pending thenable does not restart the deadline, even when that thenable settles
+during a write blocked on the consumer. Abort and all three thrown-thenable
+pass-limit messages are covered too.
 
 ---
 
@@ -461,8 +521,9 @@ Limits: the record is per wakeable. A reader that throws a new, already-settled
 promise on every attempt still retries on microtasks; React spins there too, but
 across tasks. A paced retry is a timer that `act()` does not drain, like the
 retry-reveal delay in #5, so a test must await a task inside `act()` to observe
-it. SSR is unchanged: it stops after `MAX_SUSPENSE_PASSES` consecutive passes
-that complete nothing, instead of pacing.
+it. Buffered and streamed SSR pace the same case with their own backoff and
+deadline; see
+[server retries](#9-resource-thrown-thenables--render-suspension-gap-closed).
 
 **Evidence:** [suspense-settled-wakeable.test.ts](../tests/suspense-settled-wakeable.test.ts)
 covers resolved and rejected thrown promises through template and JSX

@@ -472,55 +472,176 @@ describe('authored host JSX', () => {
 });
 
 describe('explicit keys in @for rows', () => {
-	it('keeps child key reads live when a later prop changes another row key', () => {
-		const keyState = {
-			version: 0,
-			active: false,
-			touch(item: { id: string }) {
-				if (this.active && item.id === 'a') this.version++;
-				return this.version;
-			},
-		};
-		const { App } = loadCompiledFixtureSource(
-			`import { keyState } from '@test/key-state';
-			export function App({items}) @{ <section>
-				@for (const item of items) {
-					<input key={keyState.version + ':' + item.id} data-id={item.id} data-touch={keyState.touch(item)} defaultValue="seed"/>
-				}
-				<span>tail</span>
-			</section> }`,
-			{
+	// A virtualizer-style row: the child is an opaque render call, so nothing
+	// about the row's content can be proven stable at compile time.
+	function opaqueRowSource(header: string, rootKey: string) {
+		return `export function App(props) @{ <section>
+			@for (const row of props.rows${header}) {
+				<div${rootKey} class="row" data-index={row.index}>{props.render(row)}</div>
+			}
+			<span>tail</span>
+		</section> }`;
+	}
+	const opaqueRowSpellings = [
+		['header key', '; key row.index', ''],
+		['root key attribute', '', ' key={row.index}'],
+		['root key attribute over a header key', '; key row.slot', ' key={row.index}'],
+	] as const;
+	// `slot` changes on every render, so only `index` can preserve a row.
+	let slotRender = 0;
+	function opaqueRows(indexes: number[]) {
+		slotRender++;
+		return indexes.map((index) => ({ index, slot: `${slotRender}:${index}` }));
+	}
+	const render = (row: { index: number }) => `Row ${row.index}`;
+	function sectionChildren(container: Element) {
+		return [...container.querySelector('section')!.children].map((child) =>
+			child.classList.contains('row') ? `${child.textContent}` : child.tagName.toLowerCase(),
+		);
+	}
+
+	it.each(opaqueRowSpellings)(
+		'moves, removes, and inserts opaque rows by their %s',
+		(_, header, rootKey) => {
+			const { App } = fixture(opaqueRowSource(header, rootKey));
+			const r = mount(App, { rows: opaqueRows([0, 1, 2, 3, 4]), render });
+			try {
+				const rows = r.findAll('.row');
+				const tail = r.find('span');
+				expect(sectionChildren(r.container)).toEqual([
+					'Row 0',
+					'Row 1',
+					'Row 2',
+					'Row 3',
+					'Row 4',
+					'span',
+				]);
+
+				r.update(App, { rows: opaqueRows([3, 1, 0, 4]), render });
+				expect(sectionChildren(r.container)).toEqual(['Row 3', 'Row 1', 'Row 0', 'Row 4', 'span']);
+				expect(r.findAll('.row')).toEqual([rows[3], rows[1], rows[0], rows[4]]);
+				expect(rows[2].isConnected).toBe(false);
+
+				r.update(App, { rows: opaqueRows([5, 3, 1]), render });
+				expect(sectionChildren(r.container)).toEqual(['Row 5', 'Row 3', 'Row 1', 'span']);
+				expect(r.findAll('.row').slice(1)).toEqual([rows[3], rows[1]]);
+				expect(rows[0].isConnected || rows[4].isConnected).toBe(false);
+				expect(r.find('span')).toBe(tail);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it.each(opaqueRowSpellings)(
+		'adopts server-rendered opaque rows and keeps them by their %s',
+		(_, header, rootKey) => {
+			const source = opaqueRowSource(header, rootKey);
+			const { App } = fixture(source);
+			const props = { rows: opaqueRows([0, 1, 2]), render };
+			const container = document.createElement('div');
+			container.innerHTML = renderToString(fixture(source, true).App, props).html;
+			document.body.append(container);
+			const rows = [...container.querySelectorAll('.row')];
+			const tail = container.querySelector('span');
+			const recovered: unknown[] = [];
+			const root = hydrateRoot(container, App, props, {
+				onRecoverableError: (error) => recovered.push(error),
+			});
+			try {
+				flushSync(() => {});
+				expect([...container.querySelectorAll('.row')]).toEqual(rows);
+				flushSync(() => root.render(App, { rows: opaqueRows([2, 0, 3]), render }));
+				expect(sectionChildren(container)).toEqual(['Row 2', 'Row 0', 'Row 3', 'span']);
+				expect([...container.querySelectorAll('.row')].slice(0, 2)).toEqual([rows[2], rows[0]]);
+				expect(rows[1].isConnected).toBe(false);
+				expect(container.querySelector('span')).toBe(tail);
+				expect(recovered).toEqual([]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	// A root key names the row exactly as the header key does, so the reconciler
+	// reads it once per reconcile. An input a row mutates while rendering takes
+	// effect whenever the next read happens, identically for either spelling.
+	it.each([
+		[
+			'a key input changed by another row',
+			(key: { header: string; root: string }) => `import { keyState } from '@test/key-state';
+				export function App({items}) @{ <section>
+					@for (const item of items${key.header}) {
+						<input${key.root} data-id={item.id} data-touch={keyState.touch(item)} defaultValue="seed"/>
+					}
+					<span>tail</span>
+				</section> }`,
+			'keyState.version + ":" + item.id',
+		],
+		[
+			'a key input changed by its own row',
+			(key: { header: string; root: string }) => `import { keyState } from '@test/key-state';
+				export function App({items}) @{ <section>
+					@for (const item of items${key.header}) {
+						<input data-mutated={item.key = item.id + keyState.reset}${key.root} data-id={item.id} defaultValue="seed"/>
+					}
+					<span>tail</span>
+				</section> }`,
+			'item.key',
+		],
+	])('reads %s the same way through either key spelling', (_, source, keyExpression) => {
+		function trace(key: { header: string; root: string }) {
+			const keyState = {
+				version: 0,
+				reset: 0,
+				active: false,
+				touch(item: { id: string }) {
+					if (this.active && item.id === 'a') this.version++;
+					return this.version;
+				},
+			};
+			const { App } = loadCompiledFixtureSource(source(key), {
 				id: 'compiler-authored-hosts.tsrx',
 				mode: 'client',
 				compileOptions: { dev: mode === 'dev', hmr: false },
 				runtimeModules: { '@test/key-state': { keyState } },
-			},
-		);
-		const r = mount(App, { items: ['a', 'b', 'c'].map((id) => ({ id })) });
-		try {
-			const originals = new Map(
-				['a', 'b', 'c'].map((id) => {
-					const input = r.find(`input[data-id="${id}"]`) as HTMLInputElement;
-					input.value = `typed ${id}`;
-					return [id, input];
-				}),
-			);
-			const tail = r.find('span');
-			keyState.active = true;
-			r.update(App, { items: ['c', 'b', 'a'].map((id) => ({ id })) });
-			expect(keyState.version).toBe(1);
-			expect(r.find('input[data-id="a"]')).toBe(originals.get('a'));
-			expect(originals.get('a')!.value).toBe('typed a');
-			for (const id of ['b', 'c']) {
-				const input = r.find(`input[data-id="${id}"]`) as HTMLInputElement;
-				expect(input).not.toBe(originals.get(id));
-				expect(originals.get(id)!.isConnected).toBe(false);
-				expect(input.value).toBe('seed');
+			});
+			const items = ['a', 'b', 'c'].map((id) => ({ id, key: id + '0' }));
+			const r = mount(App, { items });
+			const steps: string[][] = [];
+			try {
+				const originals = new Set(r.findAll('input'));
+				for (const input of originals) (input as HTMLInputElement).value = 'typed';
+				const record = () =>
+					steps.push(
+						(r.findAll('input') as HTMLInputElement[]).map(
+							(input) =>
+								`${input.dataset.id}:${originals.has(input) ? 'kept' : 'new'}:${input.value}`,
+						),
+					);
+				keyState.active = true;
+				keyState.reset = 1;
+				r.update(App, { items: items.toReversed() });
+				record();
+				r.update(App, { items: items.toReversed() });
+				record();
+				r.update(App, { items });
+				record();
+				expect(r.find('section')!.lastElementChild!.tagName).toBe('SPAN');
+			} finally {
+				r.unmount();
 			}
-			expect(r.find('span')).toBe(tail);
-		} finally {
-			r.unmount();
+			return steps;
 		}
+		const headerTrace = trace({ header: `; key ${keyExpression}`, root: '' });
+		expect(trace({ header: '', root: ` key={${keyExpression}}` })).toEqual(headerTrace);
+		// Every step still renders each item exactly once, in order.
+		expect(headerTrace.map((step) => step.map((entry) => entry[0]).join(''))).toEqual([
+			'cba',
+			'cba',
+			'abc',
+		]);
 	});
 
 	function inputSource(header: string) {
@@ -531,37 +652,6 @@ describe('explicit keys in @for rows', () => {
 			<span>tail</span>
 		</section> }`;
 	}
-
-	it('resets a child key changed by an earlier prop while preserving its keyed row', () => {
-		const { App } = fixture(`export function App({items, reset}) @{ <section>
-			@for (const item of items; key item.id) {
-				<input data-mutated={item.key = reset} key={item.key} defaultValue="seed"/>
-			}
-			<span>tail</span>
-		</section> }`);
-		const item = { id: 'a', key: 0 };
-		const items = [item];
-		const r = mount(App, { items, reset: 0 });
-		try {
-			const input = r.find('input') as HTMLInputElement;
-			const tail = r.find('span');
-			input.value = 'typed';
-			r.update(App, { items, reset: 0 });
-			expect(r.find('input')).toBe(input);
-			expect(input.value).toBe('typed');
-
-			// The row reads its unchanged key before this prop gives the child a new key.
-			r.update(App, { items, reset: 1 });
-			const replacement = r.find('input') as HTMLInputElement;
-			expect(item.key).toBe(1);
-			expect(replacement).not.toBe(input);
-			expect(input.isConnected).toBe(false);
-			expect(replacement.value).toBe('seed');
-			expect(r.find('span')).toBe(tail);
-		} finally {
-			r.unmount();
-		}
-	});
 
 	it('refreshes imported mutable row keys when the items and props retain their identity', () => {
 		const keyState = { reset: 0 };
@@ -754,21 +844,35 @@ describe('explicit keys in @for rows', () => {
 		},
 	);
 
-	const componentSource = `import { useState } from 'octane';
-		function Row({item}) @{ const [count, setCount] = useState(0);
-			<button data-id={item.id} onClick={() => setCount(count + 1)}>{item.label + ':' + count}</button>
-		}
-		export function App({items}) @{ <section>
-			@for (const item of items; key item.id) {
-				<Row key={item.id + ':' + item.version} item={item}/>
+	// A setup statement beside the root leaves the server wrapping each row in
+	// its own range while the client adopts the component's; both must agree.
+	function componentSource(header: string, setup: boolean) {
+		return `import { useState } from 'octane';
+			function Row({item}) @{ const [count, setCount] = useState(0);
+				<button data-id={item.id} onClick={() => setCount(count + 1)}>{item.label + ':' + count}</button>
 			}
-			<span>tail</span>
-		</section> }`;
+			export function App({items}) @{ <section>
+				@for (const item of items${header}) {
+					${setup ? 'const shown = item;' : ''}
+					<Row key={item.id + ':' + item.version} item={${setup ? 'shown' : 'item'}}/>
+				}
+				<span>tail</span>
+			</section> }`;
+	}
 
-	it.each(['mount', 'hydrate'])(
-		'preserves component state through reorder and resets changed child key suffixes after %s',
-		(kind) => {
-			const { App } = fixture(componentSource);
+	it.each([
+		['mount', '', false],
+		['mount', '; key item.id', false],
+		['mount', '', true],
+		['hydrate', '', false],
+		['hydrate', '; key item.id', false],
+		['hydrate', '', true],
+		['hydrate', '; key item.id', true],
+	] as const)(
+		'keeps component root state by its key through reorder, key changes, and removal after %s with header %j (setup statement %s)',
+		(kind, header, setup) => {
+			const source = componentSource(header, setup);
+			const { App } = fixture(source);
 			const items = [
 				{ id: 'a', version: 0, label: 'Alpha' },
 				{ id: 'b', version: 0, label: 'Beta' },
@@ -777,7 +881,7 @@ describe('explicit keys in @for rows', () => {
 			const container = r?.container ?? document.createElement('div');
 			if (kind === 'hydrate') {
 				document.body.append(container);
-				container.innerHTML = renderToString(fixture(componentSource, true).App, { items }).html;
+				container.innerHTML = renderToString(fixture(source, true).App, { items }).html;
 			}
 			const adopted = [...container.querySelectorAll('button')];
 			const recovered: unknown[] = [];
@@ -814,6 +918,10 @@ describe('explicit keys in @for rows', () => {
 				expect(container.querySelector('button[data-id="a"]')).toBe(buttons[0]);
 				expect(container.querySelector('span')).toBe(tail);
 				flushSync(() => replacement.click());
+				expect(replacement.textContent).toBe('Beta:1');
+				update([{ ...items[1], version: 1 }]);
+				expect(buttons[0].isConnected).toBe(false);
+				expect([...container.querySelector('section')!.children]).toEqual([replacement, tail]);
 				expect(replacement.textContent).toBe('Beta:1');
 				expect(recovered).toEqual([]);
 			} finally {

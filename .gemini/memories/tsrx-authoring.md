@@ -91,6 +91,11 @@ position. A positional key means item state (hooks, component instances,
 uncontrolled leaf state) follows the slot, not the item, across reorders —
 declare `key` explicitly for movable stateful rows.
 
+Write the key in the header. A React-style `key={…}` on the row's only root
+element is the same row key and compiles identically on DOM and universal
+renderers, taking precedence over a header key. A row key cannot read a
+`const` declared inside the row body; the compiler rejects it.
+
 ## Refs
 
 Refs are passed as props, React-19 style: `ref={cb}`, `ref={obj}`, or multi-ref

@@ -236,6 +236,10 @@ type ServerErrorArguments = {
 	306: [];
 	307: [];
 	331: [];
+	332: [unknown];
+	333: [unknown];
+	334: [unknown];
+	335: [unknown];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -962,6 +966,26 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				);
 			case 331:
 				return formatDevErrorMessage('Invalid independent Hydrate manifest inputs.', args);
+			case 332:
+				return formatDevErrorMessage(
+					'octane SSR: a component kept throwing already-settled thenables outside use() for %sms. A resource reader should stop suspending once its data has settled.',
+					args,
+				);
+			case 333:
+				return formatDevErrorMessage(
+					'octane SSR: exceeded %s suspense passes — a component kept throwing thenables outside use(). A resource reader should stop suspending once its data has settled.',
+					args,
+				);
+			case 334:
+				return formatDevErrorMessage(
+					'octane SSR: %s consecutive streaming passes completed no boundary — a component kept throwing thenables outside use(). A resource reader should stop suspending once its data has settled.',
+					args,
+				);
+			case 335:
+				return formatDevErrorMessage(
+					'octane SSR: %s root streaming passes completed without producing a shell — a component kept throwing thenables outside use(). A resource reader should stop suspending once its data has settled.',
+					args,
+				);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

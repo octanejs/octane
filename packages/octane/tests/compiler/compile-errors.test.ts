@@ -117,6 +117,48 @@ describe('compile errors — rejected authoring patterns', () => {
 		expect(() => compile(src, 'valueless-key.tsrx')).not.toThrow();
 		expect(() => compile(src, 'valueless-key.tsrx', { mode: 'server' })).not.toThrow();
 	});
+
+	it.each(['client', 'server'] as const)(
+		'rejects an @for row key that reads a declaration from the loop body (%s)',
+		(mode) => {
+			// Row keys are computed before the body runs; this key would otherwise
+			// hoist into a key function where `label` does not exist.
+			const src = `
+      export function L(props) @{
+        const label = 'outer';
+        <ul>
+          @for (const x of props.items) {
+            const label = x.first + ' ' + x.last;
+            <li key={label}>{label as string}</li>
+          }
+        </ul>
+      }
+    `;
+			expect(() => compile(src, 'body-local-key.tsrx', { mode })).toThrow(
+				/`key` attribute on this `@for` row reads `label`, which is declared inside the loop body/,
+			);
+			expect(() => compile(src, 'body-local-key.tsrx', { mode })).toThrow(/; key …\)/);
+		},
+	);
+
+	// Every declaration the row function sees is out of the key's reach, not
+	// only a top-level `const`, `let`, or `function`.
+	it.each([
+		['a class declaration', 'class K { static id = 1 }', 'K.id', 'K'],
+		['a `var` hoisted out of a nested block', 'if (row.ok) { var k = row.id; }', 'k', 'k'],
+		['an enum declaration', 'enum E { A }', 'E.A', 'E'],
+		['a `const` after an array hole', 'const k = row.id;', '[, k].join()', 'k'],
+	])('rejects an @for row key that reads %s from the loop body', (_, setup, key, name) => {
+		const src = `export function R(props) @{ <ul>@for (const row of props.rows) { ${setup} <li key={${key}}>x</li> }</ul> }`;
+		const message =
+			`The \`key\` attribute on this \`@for\` row reads \`${name}\`, which is declared inside the ` +
+			'loop body. Row keys are computed before the body runs, so they can only read the item, ' +
+			'its `index` binding, and names from outside the loop. Derive the key from the item in ' +
+			`the loop header instead: \`@for (const item of items; key …)\`. (r.tsrx:1:${src.indexOf('key=')})`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(src, 'r.tsrx', { mode, dev: false, hmr: false })).toThrow(message);
+		}
+	});
 });
 
 describe('compile errors — slot-keyed hooks in plain JS loops', () => {

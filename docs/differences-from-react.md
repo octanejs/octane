@@ -1138,7 +1138,7 @@ as non-goals in the parity ledger.
 
 ## Document metadata and Float resources
 
-Hoisted `<title>`/`<meta>`/`<link>` follow React 19's model with two
+Hoisted `<title>`/`<meta>`/`<link>` follow React 19's model with three
 differences:
 
 - **Ownership is per compile site, not per content.** Each authored element
@@ -1149,6 +1149,12 @@ differences:
   unmounts.
 - **`<title>` accepts any children Octane can stringify** — multiple children
   and expressions concatenate. React 19 errors on non-string title children.
+- **Hydration moves folded metadata into `document.head`.** A body-only render
+  prepends its hoisted metadata to `html`. When that whole `html` fills the
+  hydrating container, `hydrateRoot` moves each metadata entry into
+  `document.head` and adopts it there, so the hydrated DOM matches a client
+  render. React adopts the element where it lies in the container. Folded Float
+  resources and hints stay in place in both.
 
 Metadata and resources hoist from ANY depth, matching React: an element
 nested inside a host partitions out of the body on both the client and the
@@ -1367,6 +1373,14 @@ Other consequences:
   suspending until a later task changes its state without starving timers or
   network callbacks. See
   [retry pacing](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#13-retry-pacing-after-an-already-settled-wakeable).
+- On the server, a reader can keep rethrowing a thenable that has already
+  settled until a later task updates its state. React's `prerender` retries
+  that on microtasks indefinitely, starving timers, and its streams retry once
+  per task without a limit. Octane's SSR retries on a timer that backs off from
+  1ms to 100ms once it has seen the thenable settle. In a stream, any other data
+  that arrives ends that wait. These retries do not count toward the pass
+  limits, and the render fails once the stall lasts `timeoutMs`. See
+  [server retries](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#9-resource-thrown-thenables--render-suspension-gap-closed).
 - Without an enclosing Suspense/`@pending` boundary, the client root retains its
   committed screen, or stays empty on an initial mount, and retries when the
   thenable settles. Urgent and transition updates retry the latest inputs;

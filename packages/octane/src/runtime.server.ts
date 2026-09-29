@@ -1456,10 +1456,11 @@ function scopedSsrDeoptKey(
 	key: any,
 ): string | number {
 	const explicit = isElementDescriptor(item) && item.key != null;
-	// The async-identity encoder keeps numbers distinct from strings. Preserve
-	// the encoded wrapper/explicit-key paths, but avoid serializing each plain
-	// top-level position before the encoder sees it.
-	if (path.length === 0 && !explicit) return index;
+	// The client's key namespaces: a plain top-level position stays a number,
+	// an explicit top-level key gains a 'k' prefix, and wrapper paths are JSON
+	// (always '['-prefixed). Signal identity reads these keys as list-item tokens,
+	// so they must be byte-identical to the client's prepareDeoptList keys.
+	if (path.length === 0) return explicit ? 'k' + String(key) : index;
 	return JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]);
 }
 
@@ -2231,7 +2232,7 @@ function ssrChildValue(
 			for (let i = 0; i < preparedList.items.length; i++) {
 				const item = preparedList.items[i];
 				const key = preparedList.keys[i];
-				out += withAsyncIdentity('item', key, () => ssrChildValue(item, scope, false, true));
+				out += withSsrDeoptItem(key, i, () => ssrChildValue(item, scope, false, true));
 			}
 			return ssrBlock(out);
 		});
@@ -2503,7 +2504,7 @@ function ssrDeoptBlockChildren(children: unknown, scope: SSRScope): string {
 			for (let i = 0; i < preparedList.items.length; i++) {
 				const item = preparedList.items[i];
 				const key = preparedList.keys[i];
-				out += withAsyncIdentity('item', key, () => {
+				out += withSsrDeoptItem(key, i, () => {
 					// A pure host is its own keyed-item boundary. Text and empty values
 					// still need an explicit movable range because they do not provide
 					// one stable Element root.
@@ -2803,6 +2804,32 @@ function withAsyncListScope<T>(kind: string, fn: () => T): T {
 	const frame = FRAME;
 	const occurrence = frame === null ? 0 : nextFrameOccurrence(frame, '@list:' + kind);
 	return withAsyncIdentity('list:' + kind, occurrence, fn);
+}
+
+// Serialize one de-opt list leaf. The client mounts every leaf in its own keyed
+// list Block, and structural signal identity counts that Block like an @for row,
+// so a component below the leaf must chain the same item token here. The
+// withAsyncIdentity('item', key) membrane is inlined to share one try/finally.
+function withSsrDeoptItem(key: unknown, index: number, fn: () => string): string {
+	const previousScope = ASYNC_SCOPE;
+	const previousSignalKeys = SIGNAL_LIST_KEYS;
+	ASYNC_SCOPE = previousScope + '|@item:' + asyncIdentityKey(key, false);
+	if (SERVER_SIGNAL_BINDINGS_POTENTIAL) {
+		SIGNAL_LIST_KEYS = {
+			parent: previousSignalKeys,
+			key,
+			mapped: false,
+			signalSite: undefined,
+			position: index,
+			values: null,
+		};
+	}
+	try {
+		return fn();
+	} finally {
+		ASYNC_SCOPE = previousScope;
+		SIGNAL_LIST_KEYS = previousSignalKeys;
+	}
 }
 
 /** Compiler-emitted identity membrane for one @if/@switch/@for instance. */
@@ -8279,6 +8306,8 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 	streamSettlements?: StreamSettlements;
 	/** Recoverable buffered-boundary errors are reported once across async retries. */
 	bufferedErrors?: Map<string, { error: unknown; reported: boolean }>;
+	/** Resource-thrown thenables a buffered settle has seen settle (see isStalledWave). */
+	settledThrows?: Set<PromiseLike<unknown>>;
 	/** Undefined for externally hosted passes whose request lifetime is not owned here. */
 	resourceOptions?: RenderOptions | null;
 	/** Optional renderer resources; allocated only by a participating adapter. */
@@ -8921,6 +8950,67 @@ async function raceSettleGuards(
 	}
 }
 
+function isThrownKey(key: string): boolean {
+	return key.charCodeAt(0) === 124 /* '|' */ && key.startsWith('|throw#');
+}
+
+/** Every registration came from a resource reader's raw throw, not use(). */
+function isThrownWave(suspended: SuspendedList): boolean {
+	for (const { key } of suspended) if (!isThrownKey(key)) return false;
+	return true;
+}
+
+// A buffered wave STALLS when a resource reader rethrew only thenables this
+// render has already seen settle. The reader owns its value, so settling them
+// again records nothing, and the retry can only succeed once the reader's own
+// state changes, possibly on a later task (runBuffered paces those retries).
+// Identity is the only evidence: a reader may throw a new, already-settled
+// promise once per level of a cached waterfall, which is progress, not a stall.
+function isStalledWave(suspended: SuspendedList, resolved: ResolvedMap): boolean {
+	const seen = resolved.settledThrows;
+	if (seen === undefined) return false;
+	for (const { promise, key } of suspended) {
+		if (!isThrownKey(key) || !seen.has(promise)) return false;
+	}
+	return true;
+}
+
+// Stalled retries wait on a timer after the rethrown thenables notify, so the
+// timer or I/O callback that updates the reader can run first. The delay
+// doubles from 1ms up to this cap, so a reader that never recovers costs about
+// ten renders per second until the suspense deadline instead of one per task.
+const STALLED_RETRY_MAX_DELAY_MS = 100;
+
+/**
+ * Consecutive stalled waves of one render, when the first of them settled, and
+ * how many registrations it had. A stalled wave cannot advance the render by
+ * itself, so it does not spend the pass budget; the stall is bounded by the
+ * suspense deadline instead.
+ */
+interface SuspenseStall {
+	waves: number;
+	since: number;
+	width: number;
+}
+
+// Counts a stalled wave of `width` registrations and returns how long to wait
+// before retrying it, or -1 once the stall has lasted `timeoutMs`. A narrower
+// wave means a stalled reader finished, so the others get a fresh deadline.
+// Width only shrinks within a stall, so this restarts at most once per reader,
+// and a reader cycling between settled thenables stays bounded.
+function nextStalledRetryDelay(stall: SuspenseStall, timeoutMs: number, width: number): number {
+	if (stall.waves === 0 || width < stall.width) {
+		stall.waves = 0;
+		stall.since = Date.now();
+		stall.width = width;
+	}
+	const waves = ++stall.waves;
+	const remainingMs =
+		timeoutMs > 0 ? stall.since + timeoutMs - Date.now() : Number.POSITIVE_INFINITY;
+	if (remainingMs <= 0) return -1;
+	return Math.min(2 ** (waves - 1), STALLED_RETRY_MAX_DELAY_MS, remainingMs);
+}
+
 // Await everything a pass/round surfaced; cache each outcome in `resolved` by
 // its key. Only render-local state is touched across the await. This is the
 // BUFFERED pipeline's settle — nothing ships until everything resolves, so one
@@ -8953,6 +9043,7 @@ async function settleSuspended(
 				resolved.set(key, outcome);
 				if (isPu) pu.resolvedT.set(promise, outcome);
 			}
+			if (isThrownKey(key)) (resolved.settledThrows ??= new Set()).add(promise);
 		}),
 	);
 	await raceSettleGuards(settleAll, timeoutMs, signal);
@@ -8977,6 +9068,10 @@ interface StreamSettlementRecorder {
 	keys: Set<string> | null;
 	batch: boolean;
 	wave: number;
+	/** Every registration is a resource reader's raw throw (see isThrownKey). */
+	thrown: boolean;
+	/** A thrown thenable that settled before the last full pass rethrew it. */
+	settledBefore: boolean;
 }
 
 interface StreamSettlements {
@@ -8984,6 +9079,21 @@ interface StreamSettlements {
 	pending: Map<PromiseLike<unknown>, StreamSettlementRecorder>;
 	wave: number;
 	wake: (() => void) | null;
+	/**
+	 * Thenables whose settlement landed since the last full pass began, except
+	 * resource-thrown ones that pass had already seen settle. A wave made
+	 * progress only when one of its own members is here: a member the next pass
+	 * no longer suspends on, or one that pass already consumed, is not progress.
+	 * runStream clears it as each full pass begins.
+	 */
+	landed: Set<PromiseLike<unknown>>;
+}
+
+/** A member of this wave landed since the last full pass began (see StreamSettlements.landed). */
+function waveLanded(suspended: SuspendedList, settlements: StreamSettlements): boolean {
+	if (settlements.landed.size === 0) return false;
+	for (const { promise } of suspended) if (settlements.landed.has(promise)) return true;
+	return false;
 }
 
 async function recordStreamSettlement(
@@ -9008,6 +9118,10 @@ async function recordStreamSettlement(
 	if (recorder.batch && !resolved.pu.resolvedT.has(recorder.promise)) {
 		resolved.pu.resolvedT.set(recorder.promise, outcome);
 	}
+	if (recorder.thrown) (resolved.settledThrows ??= new Set()).add(recorder.promise);
+	// A rethrown thenable that already settled records nothing its reader does
+	// not own already, so it can end a wave's wait without being progress.
+	if (!recorder.thrown || !recorder.settledBefore) settlements.landed.add(recorder.promise);
 	settlements.pending.delete(recorder.promise);
 	// Only a member of the current suspended list may end its wait. A vanished
 	// branch's late result can warm replay state without starting another pass.
@@ -9022,12 +9136,21 @@ async function recordStreamSettlement(
 // the slowest sibling (a settle-all here held EVERY segment until the last
 // thenable landed), while simultaneous resolutions still share one re-pass
 // instead of costing a pass each.
+//
+// A wave STALLS when none of its members landed since the last full pass began
+// (see StreamSettlements.landed), only resource-thrown thenables that pass had
+// already seen settle (see isStalledWave). It still ends on the first settlement, so it may
+// leave other members pending on real I/O. A stalled wave's retry is paced on
+// the stall's backoff, which any settlement that can advance the render ends
+// early, and the stall fails once it has lasted `timeoutMs`. Returns true for a
+// stalled wave, which must not spend the caller's pass limit.
 async function settleFirstOfWave(
 	suspended: SuspendedList,
 	resolved: ResolvedMap,
 	timeoutMs: number,
 	signal: AbortSignal | undefined,
-): Promise<void> {
+	stall: SuspenseStall,
+): Promise<boolean> {
 	const pu = (resolved as ResolvedMap).pu;
 	pu.recreate ??= { strikes: 0, prevCreated: pu.created.size };
 	const settlements = (resolved.streamSettlements ??= {
@@ -9035,14 +9158,30 @@ async function settleFirstOfWave(
 		pending: new Map(),
 		wave: 0,
 		wake: null,
+		landed: new Set(),
 	});
 	const wave = ++settlements.wave;
 	let waiting = false;
+	// The stalled readers among the members: the stall's width, since a wave
+	// here may also hold members pending on real I/O (see nextStalledRetryDelay).
+	let stale = 0;
 	for (const { promise, key } of suspended) {
 		if (resolved.has(key)) continue;
 		let recorder = settlements.pending.get(promise);
 		if (recorder === undefined) {
-			recorder = { promise, key, keys: null, batch: key.startsWith('|pu#'), wave };
+			const thrown = isThrownKey(key);
+			recorder = {
+				promise,
+				key,
+				keys: null,
+				batch: key.startsWith('|pu#'),
+				wave,
+				thrown,
+				settledBefore:
+					thrown &&
+					resolved.settledThrows?.has(promise) === true &&
+					!settlements.landed.has(promise),
+			};
 			settlements.pending.set(promise, recorder);
 			// Attach once per thenable, preserving a first-writer outcome for each
 			// occurrence key. Even non-native thenables resume after this loop has
@@ -9051,11 +9190,16 @@ async function settleFirstOfWave(
 		} else {
 			if (key !== recorder.key) (recorder.keys ??= new Set()).add(key);
 			if (key.startsWith('|pu#')) recorder.batch = true;
+			if (recorder.thrown && !isThrownKey(key)) recorder.thrown = false;
 			recorder.wave = wave;
 		}
+		if (recorder.thrown && recorder.settledBefore) stale++;
 		waiting = true;
 	}
-	if (!waiting) return;
+	if (!waiting) {
+		stall.waves = 0;
+		return false;
+	}
 	// A single wake-up replaces Promise.race's reaction on every still-pending
 	// recorder each wave. Recording always precedes waking the next full pass.
 	const first = new Promise<void>((resolve) => {
@@ -9084,6 +9228,32 @@ async function settleFirstOfWave(
 	// report allReady) on a dead request. Surface it here; the caller's catch
 	// then marks pending boundaries errored exactly as a mid-race abort does.
 	signal?.throwIfAborted();
+	if (waveLanded(suspended, settlements)) {
+		stall.waves = 0;
+		return false;
+	}
+	const delayMs = nextStalledRetryDelay(stall, timeoutMs, stale);
+	if (delayMs < 0) throw new Error(formatServerError(332, timeoutMs));
+	// Other members may still be pending on real I/O. Their settlement ends the
+	// wait at once instead of holding their boundaries behind this backoff.
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const progress = new Promise<void>((resolve) => {
+		timer = setTimeout(resolve, delayMs);
+		settlements.wake = () => {
+			if (waveLanded(suspended, settlements)) resolve();
+		};
+	});
+	try {
+		await raceSettleGuards(progress, 0, signal);
+	} finally {
+		clearTimeout(timer);
+		settlements.wake = null;
+	}
+	if (waveLanded(suspended, settlements)) {
+		stall.waves = 0;
+		return false;
+	}
+	return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -9216,6 +9386,7 @@ async function runBuffered(
 	const identifierPrefix = options?.identifierPrefix ?? '';
 	let attempt = 0;
 	let lastSettled: SuspendedList | null = null;
+	const stall: SuspenseStall = { waves: 0, since: 0, width: 0 };
 	for (;;) {
 		// Bail before doing pass work if the request already died.
 		signal?.throwIfAborted();
@@ -9243,12 +9414,29 @@ async function runBuffered(
 		for (;;) {
 			// MAX bounds the TOTAL awaits (full-pass- and round-driven) so a
 			// never-resolving or nondeterministic use() can't wedge the loop.
-			if (++attempt > MAX_SUSPENSE_PASSES) {
-				const err = new Error(formatServerError(47, MAX_SUSPENSE_PASSES));
+			// Stalled waves are bounded by time instead (see below).
+			const stalled = isStalledWave(pending, resolved);
+			if (!stalled && ++attempt > MAX_SUSPENSE_PASSES) {
+				const err = new Error(
+					isThrownWave(pending)
+						? formatServerError(333, MAX_SUSPENSE_PASSES)
+						: formatServerError(47, MAX_SUSPENSE_PASSES),
+				);
 				options?.onError?.(err);
 				throw err;
 			}
 			await settleSuspended(pending, resolved, timeoutMs, signal);
+			if (stalled) {
+				const delayMs = nextStalledRetryDelay(stall, timeoutMs, pending.length);
+				if (delayMs < 0) {
+					const err = new Error(formatServerError(332, timeoutMs));
+					options?.onError?.(err);
+					throw err;
+				}
+				await raceSettleGuards(new Promise((resolve) => setTimeout(resolve, delayMs)), 0, signal);
+			} else {
+				stall.waves = 0;
+			}
 			lastSettled = pending;
 			if (jobs.length === 0 || !jobs.every((j) => j.frame.parent !== null)) break;
 			const round = withStream(null, () => runDiscoveryRound(jobs, resolved, identifierPrefix));
@@ -11125,6 +11313,8 @@ async function runStream(
 		boundaryKeys: Set<string>;
 	} => {
 		const boundaryKeys = new Set<string>();
+		// This pass consumes everything that has landed (see StreamSettlements.landed).
+		resolved.streamSettlements?.landed.clear();
 		const previousBoundaryKeys = stream.activePassBoundaryKeys;
 		const previousReplay = stream.replay;
 		stream.activePassBoundaryKeys = boundaryKeys;
@@ -11353,6 +11543,10 @@ async function runStream(
 	// so the final root retry cannot strand the same obsolete batch in the
 	// boundary loop. Both loops retain their abort checks and attempt bounds.
 	let retryWithoutSettling = false;
+	// Consecutive stalled waves (see settleFirstOfWave). A stalled wave does not
+	// spend either loop's pass limit; publishing the shell or completing a
+	// boundary is progress, so each ends the stall.
+	const stall: SuspenseStall = { waves: 0, since: 0, width: 0 };
 	try {
 		signal?.throwIfAborted();
 		({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
@@ -11370,17 +11564,25 @@ async function runStream(
 				throw new Error(formatServerError(34));
 			}
 			if (++rootAttempts > MAX_SUSPENSE_PASSES) {
-				throw new Error(formatServerError(35, MAX_SUSPENSE_PASSES));
+				throw new Error(
+					isThrownWave(pass.suspended)
+						? formatServerError(335, MAX_SUSPENSE_PASSES)
+						: formatServerError(35, MAX_SUSPENSE_PASSES),
+				);
 			}
 			const settledWave = pass.suspended;
-			if (!retryWithoutSettling) {
-				await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			if (
+				!retryWithoutSettling &&
+				(await settleFirstOfWave(settledWave, resolved, timeoutMs, signal, stall))
+			) {
+				rootAttempts--;
 			}
 			({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
 			preShellSuspended = pass.suspended;
 			retryWithoutSettling = observeSuspenseWave(resolved, settledWave, pass.suspended, false);
 			signal?.throwIfAborted();
 		}
+		stall.waves = 0;
 		pruneStreamBoundariesAbsentFromShell(stream, shellBoundaryKeys);
 	} catch (err) {
 		try {
@@ -11557,7 +11759,7 @@ async function runStream(
 	// loop does — flushing a segment resets it. It still trips on what it's
 	// for: an intra-boundary waterfall deeper than MAX (parity with the
 	// buffered bound) and the nondeterministic-key runaway, which never
-	// completes its boundary.
+	// completes its boundary. Stalled waves are refunded (see settleFirstOfWave).
 	let attempt = 0;
 	try {
 		// A bare root suspension may have delayed the shell long enough for an
@@ -11583,11 +11785,18 @@ async function runStream(
 				throw new Error(formatServerError(36));
 			}
 			if (++attempt > MAX_SUSPENSE_PASSES) {
-				throw new Error(formatServerError(48, MAX_SUSPENSE_PASSES));
+				throw new Error(
+					isThrownWave(suspended)
+						? formatServerError(334, MAX_SUSPENSE_PASSES)
+						: formatServerError(48, MAX_SUSPENSE_PASSES),
+				);
 			}
 			const settledWave = suspended;
-			if (!retryWithoutSettling) {
-				await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			if (
+				!retryWithoutSettling &&
+				(await settleFirstOfWave(settledWave, resolved, timeoutMs, signal, stall))
+			) {
+				attempt--;
 			}
 			pass = renderFullPass().pass;
 			suspended = pass.suspended;
@@ -11633,7 +11842,11 @@ async function runStream(
 					madeProgress = true;
 				}
 			}
-			if (madeProgress) attempt = 0; // a boundary completed — this wave was legitimate
+			if (madeProgress) {
+				// A boundary completed — this wave was legitimate.
+				attempt = 0;
+				stall.waves = 0;
+			}
 			retryWithoutSettling = observeSuspenseWave(resolved, settledWave, suspended, madeProgress);
 
 			// A nested boundary's template may live inside an enclosing boundary's
