@@ -844,28 +844,34 @@ describe('explicit keys in @for rows', () => {
 		},
 	);
 
-	function componentSource(header: string) {
+	// A setup statement beside the root leaves the server wrapping each row in
+	// its own range while the client adopts the component's; both must agree.
+	function componentSource(header: string, setup: boolean) {
 		return `import { useState } from 'octane';
 			function Row({item}) @{ const [count, setCount] = useState(0);
 				<button data-id={item.id} onClick={() => setCount(count + 1)}>{item.label + ':' + count}</button>
 			}
 			export function App({items}) @{ <section>
 				@for (const item of items${header}) {
-					<Row key={item.id + ':' + item.version} item={item}/>
+					${setup ? 'const shown = item;' : ''}
+					<Row key={item.id + ':' + item.version} item={${setup ? 'shown' : 'item'}}/>
 				}
 				<span>tail</span>
 			</section> }`;
 	}
 
 	it.each([
-		['mount', ''],
-		['mount', '; key item.id'],
-		['hydrate', ''],
-		['hydrate', '; key item.id'],
-	])(
-		'keeps component root state by its key through reorder, key changes, and removal after %s with header %j',
-		(kind, header) => {
-			const source = componentSource(header);
+		['mount', '', false],
+		['mount', '; key item.id', false],
+		['mount', '', true],
+		['hydrate', '', false],
+		['hydrate', '; key item.id', false],
+		['hydrate', '', true],
+		['hydrate', '; key item.id', true],
+	] as const)(
+		'keeps component root state by its key through reorder, key changes, and removal after %s with header %j (setup statement %s)',
+		(kind, header, setup) => {
+			const source = componentSource(header, setup);
 			const { App } = fixture(source);
 			const items = [
 				{ id: 'a', version: 0, label: 'Alpha' },

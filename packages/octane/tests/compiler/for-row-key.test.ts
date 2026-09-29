@@ -40,6 +40,10 @@ const rows: Record<string, [template: string, key: string]> = {
 		`export function Rows(props) @{ <ul>@for (const {id, label} of props.rows<H>) { <li<A>>{props.render(label)}</li> }</ul> }`,
 		'id',
 	],
+	'component root with setup statements': [
+		`function Row(p) @{ <li>{p.label as string}</li> } export function Rows(props) @{ <ul>@for (const row of props.rows<H>) { const label = props.format(row); <Row<A> label={label}/> }</ul> }`,
+		'row.id',
+	],
 	'component root': [
 		`function Row(p) @{ <li>{p.row.name as string}</li> } export function Rows(props) @{ <ul>@for (const row of props.rows<H>) { <Row<A> row={row}/> }</ul> }`,
 		'row.id',
