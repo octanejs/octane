@@ -4,6 +4,7 @@ import {
 	HydrationBoundary,
 	useInfiniteQuery,
 	useSuspenseQuery,
+	useSuspenseQueries,
 	useQueries,
 	useIsFetching,
 	useIsMutating,
@@ -67,14 +68,50 @@ function SuspenseReader(props: { queryFn: () => Promise<string> }) @{
 	<span id="data">{'data:' + q.data as string}</span>
 }
 
-function SequentialSuspenseReader(props: {
+interface SequentialReaderProps {
 	queryFnA: () => Promise<string>;
 	queryFnB: () => Promise<string>;
-}) @{
+}
+
+function SequentialSuspenseReader(props: SequentialReaderProps) @{
 	const a = useSuspenseQuery({ queryKey: ['susq-a'], queryFn: props.queryFnA, retry: false });
 	const b = useSuspenseQuery({ queryKey: ['susq-b'], queryFn: props.queryFnB, retry: false });
 	<span id="sequential-data">{a.data + '/' + b.data as string}</span>
 }
+
+// Once a suspense group settles, a following suspense query must still suspend
+// rather than render its always-defined `data` as undefined.
+function GroupedSingularSuspenseReader(props: SequentialReaderProps) @{
+	const [a] = useSuspenseQueries({
+		queries: [
+			{ queryKey: ['susq-a'], queryFn: props.queryFnA, retry: false },
+		],
+	});
+	const b = useSuspenseQuery({ queryKey: ['susq-b'], queryFn: props.queryFnB, retry: false });
+	<span id="sequential-data">{a.data + '/' + b.data.toUpperCase() as string}</span>
+}
+
+function GroupedGroupedSuspenseReader(props: SequentialReaderProps) @{
+	const [a] = useSuspenseQueries({
+		queries: [
+			{ queryKey: ['susq-a'], queryFn: props.queryFnA, retry: false },
+		],
+	});
+	const [b] = useSuspenseQueries({
+		queries: [
+			{ queryKey: ['susq-b'], queryFn: props.queryFnB, retry: false },
+		],
+	});
+	<span id="sequential-data">{a.data + '/' + b.data.toUpperCase() as string}</span>
+}
+
+const SEQUENTIAL_READERS = {
+	'singular-singular': SequentialSuspenseReader,
+	'grouped-singular': GroupedSingularSuspenseReader,
+	'grouped-grouped': GroupedGroupedSuspenseReader,
+};
+
+export type SequentialSuspenseOrder = keyof typeof SEQUENTIAL_READERS;
 
 export function SuspenseQApp(props: { client: unknown; queryFn: () => Promise<string> }) @{
 	<QueryClientProvider client={props.client}>
@@ -84,14 +121,14 @@ export function SuspenseQApp(props: { client: unknown; queryFn: () => Promise<st
 	</QueryClientProvider>
 }
 
-export function SequentialSuspenseQApp(props: {
+export function SequentialSuspenseQApp(props: SequentialReaderProps & {
 	client: unknown;
-	queryFnA: () => Promise<string>;
-	queryFnB: () => Promise<string>;
+	order?: SequentialSuspenseOrder;
 }) @{
+	const Reader = SEQUENTIAL_READERS[props.order ?? 'singular-singular'];
 	<QueryClientProvider client={props.client}>
 		@try {
-			<SequentialSuspenseReader queryFnA={props.queryFnA} queryFnB={props.queryFnB} />
+			<Reader queryFnA={props.queryFnA} queryFnB={props.queryFnB} />
 		} @pending {
 			<span id="sequential-fallback">loading</span>
 		} @catch (error) {

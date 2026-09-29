@@ -32,68 +32,74 @@ function deferred<T>() {
 	return { promise, resolve };
 }
 
+// value=1 commits; a transition to value=2 must keep value=1 on screen until
+// value=2 resolves, never flashing the fallback.
+async function expectTransitionHold(grouped: boolean) {
+	// Per-value controlled promises. value=1 resolves immediately so the first
+	// query commits content; value=2 stays pending until we resolve it.
+	const d1 = deferred<string>();
+	const d2 = deferred<string>();
+	const promises: Record<number, Promise<string>> = { 1: d1.promise, 2: d2.promise };
+	const queryFn = (v: number) => promises[v];
+
+	let setValue!: (v: number) => void;
+	const bindSetValue = (fn: (v: number) => void) => {
+		setValue = fn;
+	};
+
+	const r = mount(TransitionSuspenseApp, { client, queryFn, bindSetValue, grouped });
+
+	// First render suspends → fallback while value=1's query is in flight.
+	expect(r.find('#fallback').textContent).toBe('loading');
+
+	await act(async () => {
+		d1.resolve('one');
+		await flush();
+	});
+	// value=1 content committed.
+	expect(r.find('#data').textContent).toBe('data:one');
+	expect(r.findAll('#fallback')).toHaveLength(0);
+	expect(r.find('#pending').textContent).toBe('idle');
+
+	// Observe the entire pending window so a transient fallback cannot pass a
+	// settled-only assertion. The query key changes at transition priority.
+	let fallbackEverSeen = false;
+	let contentEverLost = false;
+	const mo = new MutationObserver(() => {
+		if (r.container.querySelector('#fallback')) fallbackEverSeen = true;
+		if (!r.container.querySelector('#data')) contentEverLost = true;
+	});
+	mo.observe(r.container, { childList: true, subtree: true });
+
+	await act(() => setValue(2));
+	await flush();
+	mo.disconnect();
+
+	expect(fallbackEverSeen).toBe(false);
+	expect(contentEverLost).toBe(false); // value=1 content never removed
+	expect(r.find('#data').textContent).toBe('data:one'); // OLD content held
+	expect(r.find('#data').getAttribute('data-pending')).toBe('pending');
+	expect(r.findAll('#fallback')).toHaveLength(0);
+	expect(r.find('#pending').textContent).toBe('idle');
+
+	// Resolve value=2 → the held boundary commits the new content all at once
+	// and isPending returns to idle. The fallback never showed at any point.
+	await act(async () => {
+		d2.resolve('two');
+		await flush();
+	});
+	expect(r.find('#data').textContent).toBe('data:two');
+	expect(r.find('#data').getAttribute('data-pending')).toBe('idle');
+	expect(r.findAll('#fallback')).toHaveLength(0);
+	expect(r.find('#pending').textContent).toBe('idle');
+
+	r.unmount();
+}
+
 describe('useSuspenseQuery — transition keeps prior content, no fallback flash (React parity)', () => {
 	// @parity-case conformance:c1e0561f0da086ba
 	it('value=1 committed; transition to value=2 holds value=1 until value=2 resolves', async () => {
-		// Per-value controlled promises. value=1 resolves immediately so the first
-		// query commits content; value=2 stays pending until we resolve it.
-		const d1 = deferred<string>();
-		const d2 = deferred<string>();
-		const promises: Record<number, Promise<string>> = { 1: d1.promise, 2: d2.promise };
-		const queryFn = (v: number) => promises[v];
-
-		let setValue!: (v: number) => void;
-		const bindSetValue = (fn: (v: number) => void) => {
-			setValue = fn;
-		};
-
-		const r = mount(TransitionSuspenseApp, { client, queryFn, bindSetValue });
-
-		// First render suspends → fallback while value=1's query is in flight.
-		expect(r.find('#fallback').textContent).toBe('loading');
-
-		await act(async () => {
-			d1.resolve('one');
-			await flush();
-		});
-		// value=1 content committed.
-		expect(r.find('#data').textContent).toBe('data:one');
-		expect(r.findAll('#fallback')).toHaveLength(0);
-		expect(r.find('#pending').textContent).toBe('idle');
-
-		// Observe the entire pending window so a transient fallback cannot pass a
-		// settled-only assertion. The query key changes at transition priority.
-		let fallbackEverSeen = false;
-		let contentEverLost = false;
-		const mo = new MutationObserver(() => {
-			if (r.container.querySelector('#fallback')) fallbackEverSeen = true;
-			if (!r.container.querySelector('#data')) contentEverLost = true;
-		});
-		mo.observe(r.container, { childList: true, subtree: true });
-
-		await act(() => setValue(2));
-		await flush();
-		mo.disconnect();
-
-		expect(fallbackEverSeen).toBe(false);
-		expect(contentEverLost).toBe(false); // value=1 content never removed
-		expect(r.find('#data').textContent).toBe('data:one'); // OLD content held
-		expect(r.find('#data').getAttribute('data-pending')).toBe('pending');
-		expect(r.findAll('#fallback')).toHaveLength(0);
-		expect(r.find('#pending').textContent).toBe('idle');
-
-		// Resolve value=2 → the held boundary commits the new content all at once
-		// and isPending returns to idle. The fallback never showed at any point.
-		await act(async () => {
-			d2.resolve('two');
-			await flush();
-		});
-		expect(r.find('#data').textContent).toBe('data:two');
-		expect(r.find('#data').getAttribute('data-pending')).toBe('idle');
-		expect(r.findAll('#fallback')).toHaveLength(0);
-		expect(r.find('#pending').textContent).toBe('idle');
-
-		r.unmount();
+		await expectTransitionHold(false);
 	});
 
 	// @parity-case conformance:6592b3cc7d15f45c
@@ -179,5 +185,12 @@ describe('useSuspenseQuery — transition keeps prior content, no fallback flash
 		expect(r.find('#pending').textContent).toBe('idle');
 
 		r.unmount();
+	});
+});
+
+describe('useSuspenseQueries — transition keeps prior content', () => {
+	// @parity-case conformance:d97f02970206eef5
+	it('holds the committed group until the new group resolves', async () => {
+		await expectTransitionHold(true);
 	});
 });

@@ -94,6 +94,10 @@ interface SuspensePromiseCache {
  * committed key's promise when publishing its pending cue. A mutable ref would
  * make that old-key render read the new key's pending promise and show fallback.
  * Re-renders during the same pending fetch reuse the in-flight promise.
+ *
+ * `key` must identify the queries this call site suspends on, never only the
+ * ones still pending: settling must not change it, or the memo drops the
+ * settled promise mid-episode and the call site stops reserving its position.
  */
 export function useSuspensePromise(
 	shouldSuspend: boolean,
