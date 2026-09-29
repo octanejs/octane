@@ -7846,9 +7846,10 @@ function isSsrMarkerlessForItem(node) {
  * again. Its component call then adopts the host through the established
  * singleRoot path. Explicit keys, spread/children overrides, imported or
  * dynamic callees, and additional item statements cannot use that proof.
+ * `body` is forItemTemplateBody's output, which the client's single-root proof
+ * also reads, so a removed row-key attribute leaves both sides in agreement.
  */
-function canShareSsrComponentItemRange(node, ctx) {
-	const body = node?.body?.body || [];
+function canShareSsrComponentItemRange(body, ctx) {
 	if (body.length !== 1) return false;
 	const component = body[0];
 	if (
@@ -7932,6 +7933,13 @@ const HOST_MOUNT_SAFE_TAGS = new Set([
 	'ul',
 ]);
 
+// Attributes whose writes carry their own lifecycle or ordering keep a row on
+// forBlock. `style` is a deliberate, conservative member: its writers also run
+// hydration comparison, hidden-Activity display enforcement and transition
+// snapshots, none of which the direct mount was audited against. The cost is
+// confined to refilling an already-mounted, empty list with at least
+// FAST_HOST_LIST_MIN_ITEMS rows: the first mount and every update, including
+// each virtualized scroll, run through forBlock whichever helper is named.
 const HOST_MOUNT_UNSAFE_ATTRIBUTES = new Set([
 	'autofocus',
 	'checked',
@@ -14813,21 +14821,8 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		),
 		node,
 	);
-	let explicitKey = null;
 	let keyDeclaration = null;
-	const firstEl = (node.body.body || []).find(
-		(child) => child.type === 'Element' || child.type === 'JSXElement',
-	);
-	if (firstEl) {
-		const keyAttr = (firstEl.attributes || firstEl.openingElement?.attributes || []).find(
-			(attr) => (attr.name?.name || attr.name) === 'key',
-		);
-		if (keyAttr?.value != null) {
-			explicitKey =
-				keyAttr.value.type === 'JSXExpressionContainer' ? keyAttr.value.expression : keyAttr.value;
-		}
-	}
-	if (explicitKey === null) explicitKey = node.key || null;
+	const explicitKey = forRowKeyAttribute(node, ctx) ?? node.key ?? null;
 	if (explicitKey !== null) {
 		const keyParams = [itemId];
 		if (node.index) keyParams.push(node.index);
@@ -14863,7 +14858,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		node,
 	);
 	const sharedItemRange =
-		!bindingSite && (markerlessItem || canShareSsrComponentItemRange(node, ctx));
+		!bindingSite && (markerlessItem || canShareSsrComponentItemRange(itemBody, ctx));
 	const itemHtml =
 		sharedItemRange || bindingSite ? itemCall : ssrCall('ssrBlock', [itemCall], node);
 	let renderItem = itemNeedsIdentity
@@ -32371,77 +32366,80 @@ function keyedSelectionDepIndex(itemName, keyBody, subStmts, runtimeDepNames, ct
 	return runtimeDepNames.indexOf(selected.name);
 }
 
-// The first root's legacy key already owns the entire row through keyFn.
-// Avoid a second descriptor boundary for that same key. Only consume a host
-// key when the row cannot change a collected key before a later child reads it.
-// Opaque rendering, spreads and duplicate keys retain the existing boundary.
-// Component keys and nested host keys retain their own reconciliation ranges.
+const isKeyAttribute = (attribute) => (attribute.name?.name || attribute.name) === 'key';
+
+// The legacy row-key spelling: a valued `key` attribute on the first element of
+// an @for body. It takes precedence over a header key, as in @tsrx/core's React
+// target. The reconciler reads row keys before the body runs, so the key can
+// read the item, the index and names outside the loop, but nothing the body
+// declares; hoisting such a key would throw a ReferenceError at runtime.
+function forRowKeyAttribute(node, ctx) {
+	const element = node.body.body.find((n) => n.type === 'Element' || n.type === 'JSXElement');
+	const attribute = (element?.attributes || element?.openingElement?.attributes || []).find(
+		isKeyAttribute,
+	);
+	// A valueless `<li key>` or a comment-only `key={}` carries no expression and
+	// falls through to the header key, the index, or the `x.id ?? x` default.
+	if (attribute?.value == null) return null;
+	const expression =
+		attribute.value.type === 'JSXExpressionContainer'
+			? attribute.value.expression
+			: attribute.value;
+	if (expression.type === 'JSXEmptyExpression') return null;
+	const bodyLocals = collectComponentLocals({ body: node.body.body });
+	if (bodyLocals.size === 0) return expression;
+	for (const name of collectFreeIdentifiers(expression, new Set())) {
+		if (!bodyLocals.has(name)) continue;
+		const l = attribute.loc && attribute.loc.start;
+		const at = l
+			? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})`
+			: '';
+		throw new Error(
+			`The \`key\` attribute on this \`@for\` row reads \`${name}\`, which is declared inside the ` +
+				'loop body. Row keys are computed before the body runs, so they can only read the item, ' +
+				'its `index` binding, and names from outside the loop. Derive the key from the item in ' +
+				`the loop header instead: \`@for (const item of items; key …)\`.${at}`,
+		);
+	}
+	return expression;
+}
+
+// A `key` on the only output root of an @for body names the row, never a
+// separate element: a valued key is the row key above, and the root cannot
+// change identity inside a row that shares it. Leaving the key on the root
+// would give it a boundary that only repeats the row key: an intrinsic root
+// lowers to a keyed descriptor instead of the native template, and a component
+// root loses the row memo and its shared single-root range. Remove it so the
+// row compiles exactly as the header spelling does. Like a header key, the
+// reconciler reads it; an input that changes while rows render takes effect at
+// the next reconcile. Keyed elements below the root keep their own boundaries.
 function forItemTemplateBody(node, ctx) {
 	const body = node.body.body;
-	if (ctx._universalRuntimeUnit != null || body.length !== 1) return body;
-	const root = body[0];
-	if (!isPlainHostRoot(root) || isActivityLongForm(root, ctx) || isFragmentLongForm(root, ctx))
+	if (ctx._universalRuntimeUnit != null) return body;
+	let root = null;
+	for (const statement of body) {
+		if (!isJsxNode(statement)) continue;
+		if (root !== null) return body;
+		root = statement;
+	}
+	if (
+		(root?.type !== 'Element' && root?.type !== 'JSXElement') ||
+		(!isPlainHostRoot(root) && !isComponentTag(root)) ||
+		isActivityLongForm(root, ctx) ||
+		isFragmentLongForm(root, ctx)
+	)
 		return body;
 	const attrs = root.attributes || root.openingElement?.attributes || [];
-	let keyIndex = -1;
-	for (let i = 0; i < attrs.length; i++) {
-		const attr = attrs[i];
-		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') return body;
-		if (jsxAttrRawName(attr) !== 'key') continue;
-		if (keyIndex !== -1 || attr.value == null) return body;
-		keyIndex = i;
-	}
-	if (keyIndex === -1) return body;
-	const value = attrs[keyIndex].value;
-	const key = value.type === 'JSXExpressionContainer' ? value.expression : value;
-	if (!isDeferralSafeBundleArg(key)) return body;
-	// Destructuring must not invoke defaults, computed reads or an iterator.
-	if (!isAutoMemoPropsParam(node.left.declarations[0].id)) return body;
-	function stableHost(host) {
-		if (!isPlainHostRoot(host) || isActivityLongForm(host, ctx) || isFragmentLongForm(host, ctx))
-			return false;
-		const tag = host.id?.name ?? host.openingElement?.name?.name;
-		if (tag.includes('-') || tag === 'script') return false;
-		const attributes = host.attributes || host.openingElement?.attributes || [];
-		if (
-			attributes.some(
-				(attr) =>
-					attr.type === 'SpreadAttribute' ||
-					attr.type === 'JSXSpreadAttribute' ||
-					jsxAttrRawName(attr) === 'is' ||
-					jsxAttrRawName(attr) === 'children',
-			)
-		)
-			return false;
-		// Inspect values so deferred event/ref callbacks remain eligible.
-		const values = attributes.map((attr) => attr.value);
-		if (containsRenderCall(values) || containsAutoMemoUnsafeStructure(values)) return false;
-		for (const child of host.children || []) {
-			if (child.type === 'JSXText') continue;
-			if (child.type === 'Text' || child.type === 'JSXExpressionContainer') {
-				const expr = child.expression;
-				if (!expr || expr.type === 'JSXEmptyExpression') continue;
-				if (
-					!isKnownTextChildExpression(expr) ||
-					containsRenderCall([expr]) ||
-					containsAutoMemoUnsafeStructure([expr])
-				)
-					return false;
-			} else if (!stableHost(child)) return false;
-		}
-		return true;
-	}
-	if (!stableHost(root)) return body;
-	const kept = attrs.filter((_, index) => index !== keyIndex);
-	return [
-		root.openingElement
-			? {
-					...root,
-					...(root.attributes === undefined ? {} : { attributes: kept }),
-					openingElement: { ...root.openingElement, attributes: kept },
-				}
-			: { ...root, attributes: kept },
-	];
+	const kept = attrs.filter((attribute) => !isKeyAttribute(attribute));
+	if (kept.length === attrs.length) return body;
+	const unkeyed = root.openingElement
+		? {
+				...root,
+				...(root.attributes === undefined ? {} : { attributes: kept }),
+				openingElement: { ...root.openingElement, attributes: kept },
+			}
+		: { ...root, attributes: kept };
+	return body.map((statement) => (statement === root ? unkeyed : statement));
 }
 
 function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
@@ -32496,26 +32494,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		return inheritOriginLoc(b.arrow(params, keyExpr), keyExpr);
 	}
 
-	let keyFn = null;
 	// New TSRX surfaces `key` on the JSXForExpression itself (read via `node.key`
-	// below). Legacy / `<li key={…}>` attribute syntax is also accepted: scan the
-	// body for the first Element and pull its `key=` attr if any. Accept both
-	// the old `Element` IR and the raw new `JSXElement` shape that's reached
-	// here when the body wasn't routed through normalizeChildren.
-	const firstEl = node.body.body.find((n) => n.type === 'Element' || n.type === 'JSXElement');
-	if (firstEl) {
-		const keyAttr = (firstEl.attributes || firstEl.openingElement?.attributes || []).find(
-			(a) => (a.name?.name || a.name) === 'key',
-		);
-		// A valueless `<li key>` carries no expression — skip it (mirroring
-		// makeCompCall's null-value handling) and fall through to the header key /
-		// index / `x.id ?? x` default instead of crashing on `keyAttr.value.type`.
-		if (keyAttr && keyAttr.value != null) {
-			const inner =
-				keyAttr.value.type === 'JSXExpressionContainer' ? keyAttr.value.expression : keyAttr.value;
-			keyFn = mkKeyFn(inner);
-		}
-	}
+	// below). The legacy `<li key={…}>` attribute spelling takes precedence.
+	const attributeKey = forRowKeyAttribute(node, ctx);
+	let keyFn = attributeKey === null ? null : mkKeyFn(attributeKey);
 	if (!keyFn && node.key) {
 		keyFn = mkKeyFn(node.key);
 	}

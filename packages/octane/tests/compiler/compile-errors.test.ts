@@ -117,6 +117,29 @@ describe('compile errors — rejected authoring patterns', () => {
 		expect(() => compile(src, 'valueless-key.tsrx')).not.toThrow();
 		expect(() => compile(src, 'valueless-key.tsrx', { mode: 'server' })).not.toThrow();
 	});
+
+	it.each(['client', 'server'] as const)(
+		'rejects an @for row key that reads a declaration from the loop body (%s)',
+		(mode) => {
+			// Row keys are computed before the body runs; this key would otherwise
+			// hoist into a key function where `label` does not exist.
+			const src = `
+      export function L(props) @{
+        const label = 'outer';
+        <ul>
+          @for (const x of props.items) {
+            const label = x.first + ' ' + x.last;
+            <li key={label}>{label as string}</li>
+          }
+        </ul>
+      }
+    `;
+			expect(() => compile(src, 'body-local-key.tsrx', { mode })).toThrow(
+				/`key` attribute on this `@for` row reads `label`, which is declared inside the loop body/,
+			);
+			expect(() => compile(src, 'body-local-key.tsrx', { mode })).toThrow(/; key …\)/);
+		},
+	);
 });
 
 describe('compile errors — slot-keyed hooks in plain JS loops', () => {

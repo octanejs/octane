@@ -283,10 +283,14 @@ export function Feed(props) @{
 ```
 
 Put a row's reconciliation key in the `@for` header: `; key item.id`.
-An explicit `key` attribute on the first direct root is also accepted as legacy
-row-key syntax and takes precedence over a header key. Eligible intrinsic rows
-retain native template compilation with either spelling. Component and nested
-child keys retain their reconciliation boundaries.
+A `key` attribute on the row's only root element, the React-style
+`<li key={item.id}>`, is the same row key. It compiles exactly like the header
+spelling, with the same output and cost, whether the root is an intrinsic
+element or a component. If both are present, the root attribute takes
+precedence. A row key is computed before the row body runs, so it can read the
+item, the `index` binding, and names outside the loop, but not a `const`
+declared inside the body; the compiler rejects that key. Keys on elements
+nested below the root keep their own reconciliation boundaries.
 
 ```jsx
 export function Greeting(props) @{

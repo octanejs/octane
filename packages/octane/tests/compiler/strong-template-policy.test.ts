@@ -67,6 +67,18 @@ describe('Strong template authoring checks', () => {
 		expect(() => compile(source, 'App.tsrx')).not.toThrow();
 		expect(() => compile(strong(source), 'App.tsrx')).toThrow('OCTANE_STRONG_INDEX_KEY');
 	});
+	it.each(['position', 'item.id + position'])(
+		'rejects index key %s written on the row root',
+		(key) => {
+			const source = `export function App(props) @{ <ul>@for (const item of props.items; index position) { <li key={${key}} /> }</ul> }`;
+			expect(() => compile(source, 'App.tsrx')).not.toThrow();
+			expect(() => compile(strong(source), 'App.tsrx')).toThrow('OCTANE_STRONG_INDEX_KEY');
+		},
+	);
+	it('allows an item identity written on the row root', () => {
+		const source = `export function App(props) @{ <ul>@for (const item of props.items; index position) { <li key={item.id}>{position as string}</li> }</ul> }`;
+		expect(() => compile(strong(source), 'App.tsrx')).not.toThrow();
+	});
 	it('distinguishes an item property from the index binding', () => {
 		const source = `export function App(props) @{ <ul>@for (const item of props.items; index index; key item.index) { <li /> }</ul> }`;
 		expect(() => compile(strong(source), 'App.tsrx')).not.toThrow();

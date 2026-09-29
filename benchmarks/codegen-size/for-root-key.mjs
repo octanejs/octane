@@ -1,6 +1,8 @@
 // Paired syntax sentinels stay outside the fixed corpus. A key on the first
 // intrinsic row root already supplies the row's reconciliation identity; its
-// production output should cost no more than the equivalent header key.
+// production output should cost no more than the equivalent header key. The
+// row reads an opaque prop call, as virtualized rows typically do, so the key
+// must be consumed without proving anything about the row's content.
 import { compile } from 'octane/compiler';
 import { build, transformSync } from 'esbuild';
 import assert from 'node:assert/strict';
@@ -17,7 +19,7 @@ const fixture = (header, root) => `export function Rows(props) @{
 		<header>before</header>
 		<ul>
 			@for (const row of props.rows${header}) {
-				<li${root} data-id={row.id}><span>{row.label as string}</span></li>
+				<li${root} data-id={props.rowId(row)}><span>{row.label as string}</span></li>
 			} @empty {
 				<li>empty</li>
 			}
@@ -30,9 +32,11 @@ const SOURCES = {
 	legacy: fixture('', " key={row.id + 'video'}"),
 	'with-header': fixture('; key row.id', " key={row.id + 'video'}"),
 };
+const rowId = (row) => row.id;
 const INPUTS = [
 	{
 		props: {
+			rowId,
 			rows: [
 				{ id: 'a', label: 'Alpha' },
 				{ id: 'b', label: 'Beta' },
@@ -41,11 +45,11 @@ const INPUTS = [
 		html: '<section><header>before</header><ul><li data-id="a"><span>Alpha</span></li><li data-id="b"><span>Beta</span></li></ul><footer>after</footer></section>',
 	},
 	{
-		props: { rows: [] },
+		props: { rowId, rows: [] },
 		html: '<section><header>before</header><ul><li>empty</li></ul><footer>after</footer></section>',
 	},
 	{
-		props: { rows: [{ id: 'a"<&', label: 'Row <A> & "B"' }] },
+		props: { rowId, rows: [{ id: 'a"<&', label: 'Row <A> & "B"' }] },
 		html: '<section><header>before</header><ul><li data-id="a&quot;<&amp;"><span>Row &lt;A&gt; &amp; "B"</span></li></ul><footer>after</footer></section>',
 	},
 ];

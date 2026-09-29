@@ -4588,6 +4588,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					} finally {
 						templatePolicy.exitKey();
 					}
+					// `key` on the body's first element is the same row key, spelled the
+					// React way, and follows the same identity rules as the header.
+					const rootKey = node.body?.body
+						?.find((statement) => statement.type === 'JSXElement')
+						?.openingElement.attributes.find(
+							(attribute) => attribute.type === 'JSXAttribute' && attribute.name?.name === 'key',
+						)?.value;
+					if (rootKey?.type === 'JSXExpressionContainer') {
+						templatePolicy.enterKey(rootKey.expression, row);
+						templatePolicy.exitKey();
+					}
 					visit(node.body, row, executionPhase);
 				} finally {
 					currentRetainedRowScope = enclosingRetainedRowScope;
