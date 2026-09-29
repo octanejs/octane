@@ -9043,7 +9043,7 @@ interface StreamSettlementRecorder {
 	wave: number;
 	/** Every registration is a resource reader's raw throw (see isThrownKey). */
 	thrown: boolean;
-	/** A thrown thenable this render had already seen settle when it was attached. */
+	/** A thrown thenable that settled before the last full pass rethrew it. */
 	settledBefore: boolean;
 }
 
@@ -9052,8 +9052,21 @@ interface StreamSettlements {
 	pending: Map<PromiseLike<unknown>, StreamSettlementRecorder>;
 	wave: number;
 	wake: (() => void) | null;
-	/** A settlement that can advance the render landed since the last full pass. */
-	progressed: boolean;
+	/**
+	 * Thenables whose settlement landed since the last full pass began, except
+	 * resource-thrown ones that pass had already seen settle. A wave made
+	 * progress only when one of its own members is here: a member the next pass
+	 * no longer suspends on, or one that pass already consumed, is not progress.
+	 * runStream clears it as each full pass begins.
+	 */
+	landed: Set<PromiseLike<unknown>>;
+}
+
+/** A member of this wave landed since the last full pass began (see StreamSettlements.landed). */
+function waveLanded(suspended: SuspendedList, settlements: StreamSettlements): boolean {
+	if (settlements.landed.size === 0) return false;
+	for (const { promise } of suspended) if (settlements.landed.has(promise)) return true;
+	return false;
 }
 
 async function recordStreamSettlement(
@@ -9079,15 +9092,13 @@ async function recordStreamSettlement(
 		resolved.pu.resolvedT.set(recorder.promise, outcome);
 	}
 	if (recorder.thrown) (resolved.settledThrows ??= new Set()).add(recorder.promise);
+	// A rethrown thenable that already settled records nothing its reader does
+	// not own already, so it can end a wave's wait without being progress.
+	if (!recorder.thrown || !recorder.settledBefore) settlements.landed.add(recorder.promise);
 	settlements.pending.delete(recorder.promise);
 	// Only a member of the current suspended list may end its wait. A vanished
 	// branch's late result can warm replay state without starting another pass.
-	if (recorder.wave === settlements.wave) {
-		// A rethrown thenable that already settled records nothing its reader does
-		// not own already: it ends the wave's wait but is not progress.
-		if (!recorder.thrown || !recorder.settledBefore) settlements.progressed = true;
-		settlements.wake?.();
-	}
+	if (recorder.wave === settlements.wave) settlements.wake?.();
 }
 
 // The STREAMING settle: await only until the FIRST unresolved thenable
@@ -9099,9 +9110,9 @@ async function recordStreamSettlement(
 // thenable landed), while simultaneous resolutions still share one re-pass
 // instead of costing a pass each.
 //
-// A wave STALLS when nothing that can advance the render landed since the last
-// full pass, only resource-thrown thenables this render had already seen
-// settle (see isStalledWave). It still ends on the first settlement, so it may
+// A wave STALLS when none of its members landed since the last full pass began
+// (see StreamSettlements.landed), only resource-thrown thenables that pass had
+// already seen settle (see isStalledWave). It still ends on the first settlement, so it may
 // leave other members pending on real I/O. A stalled wave's retry is paced on
 // the stall's backoff, which any settlement that can advance the render ends
 // early, and the stall fails once it has lasted `timeoutMs`. Returns true for a
@@ -9120,10 +9131,13 @@ async function settleFirstOfWave(
 		pending: new Map(),
 		wave: 0,
 		wake: null,
-		progressed: false,
+		landed: new Set(),
 	});
 	const wave = ++settlements.wave;
 	let waiting = false;
+	// The stalled readers among the members: the stall's width, since a wave
+	// here may also hold members pending on real I/O (see nextStalledRetryDelay).
+	let stale = 0;
 	for (const { promise, key } of suspended) {
 		if (resolved.has(key)) continue;
 		let recorder = settlements.pending.get(promise);
@@ -9136,7 +9150,10 @@ async function settleFirstOfWave(
 				batch: key.startsWith('|pu#'),
 				wave,
 				thrown,
-				settledBefore: thrown && resolved.settledThrows?.has(promise) === true,
+				settledBefore:
+					thrown &&
+					resolved.settledThrows?.has(promise) === true &&
+					!settlements.landed.has(promise),
 			};
 			settlements.pending.set(promise, recorder);
 			// Attach once per thenable, preserving a first-writer outcome for each
@@ -9149,10 +9166,10 @@ async function settleFirstOfWave(
 			if (recorder.thrown && !isThrownKey(key)) recorder.thrown = false;
 			recorder.wave = wave;
 		}
+		if (recorder.thrown && recorder.settledBefore) stale++;
 		waiting = true;
 	}
 	if (!waiting) {
-		settlements.progressed = false;
 		stall.waves = 0;
 		return false;
 	}
@@ -9184,12 +9201,11 @@ async function settleFirstOfWave(
 	// report allReady) on a dead request. Surface it here; the caller's catch
 	// then marks pending boundaries errored exactly as a mid-race abort does.
 	signal?.throwIfAborted();
-	if (settlements.progressed) {
-		settlements.progressed = false;
+	if (waveLanded(suspended, settlements)) {
 		stall.waves = 0;
 		return false;
 	}
-	const delayMs = nextStalledRetryDelay(stall, timeoutMs, suspended.length);
+	const delayMs = nextStalledRetryDelay(stall, timeoutMs, stale);
 	if (delayMs < 0) throw new Error(formatServerError(332, timeoutMs));
 	// Other members may still be pending on real I/O. Their settlement ends the
 	// wait at once instead of holding their boundaries behind this backoff.
@@ -9197,7 +9213,7 @@ async function settleFirstOfWave(
 	const progress = new Promise<void>((resolve) => {
 		timer = setTimeout(resolve, delayMs);
 		settlements.wake = () => {
-			if (settlements.progressed) resolve();
+			if (waveLanded(suspended, settlements)) resolve();
 		};
 	});
 	try {
@@ -9206,8 +9222,10 @@ async function settleFirstOfWave(
 		clearTimeout(timer);
 		settlements.wake = null;
 	}
-	// The next full pass consumes whatever landed during the wait.
-	settlements.progressed = false;
+	if (waveLanded(suspended, settlements)) {
+		stall.waves = 0;
+		return false;
+	}
 	return true;
 }
 
@@ -11268,6 +11286,8 @@ async function runStream(
 		boundaryKeys: Set<string>;
 	} => {
 		const boundaryKeys = new Set<string>();
+		// This pass consumes everything that has landed (see StreamSettlements.landed).
+		resolved.streamSettlements?.landed.clear();
 		const previousBoundaryKeys = stream.activePassBoundaryKeys;
 		const previousReplay = stream.replay;
 		stream.activePassBoundaryKeys = boundaryKeys;

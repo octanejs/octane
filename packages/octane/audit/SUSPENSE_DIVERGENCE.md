@@ -342,17 +342,19 @@ resources, each thrown once, renders without waiting for a task.
 Streaming renders (`renderToPipeableStream` and `renderToReadableStream`) yield
 one macrotask per wave, but that is not enough for a lag longer than about 50
 turns. A streamed wave also ends at its first settlement while other boundaries
-may still wait on real I/O. So a streamed wave stalls when the only things that
-landed before it ended are thenables this render has already seen settle, and
-nothing that can advance the render. Stalled waves count toward neither the
+may still wait on real I/O. So a streamed wave stalls when none of its own
+members settled since the last full pass began, apart from thrown thenables that
+pass had already seen settle. A thenable that no longer suspends anything, or
+that the last pass already consumed, is not progress, even when it settles
+while the stream waits for the consumer. Stalled waves count toward neither the
 50 root passes allowed before the shell nor the 50 consecutive passes that
 complete no boundary. They back off on the same timer, but any settlement that
 can advance the render ends the wait at once, so another boundary is never
 revealed late because a sibling reader is stalled. A stall fails with the same
 error once it has lasted `timeoutMs`. Publishing the shell, completing a
-boundary, or a stalled reader finishing starts a new deadline; a reader cycling
-between settled thenables does not. A thenable's first settlement is never
-paced.
+boundary, or a stalled reader finishing starts a new deadline. A reader cycling
+between settled thenables does not, and neither does a sibling pending on real
+I/O that stops suspending. A thenable's first settlement is never paced.
 
 When a pass limit is reached on a wave made only of thrown thenables, the
 buffered, streamed-boundary, and streamed-root errors name thrown thenables
@@ -382,7 +384,9 @@ already-resolved thrown resources still renders before any task runs, and
 streams without pacing. Stalled readers that finish at different times each get
 a deadline, and a reader cycling between settled thenables still fails at its
 deadline. While one streamed reader is stalled, a sibling boundary whose data
-arrives is revealed within a task. Abort and all three thrown-thenable
+arrives is revealed within a task, and a sibling that fails and abandons its
+pending thenable does not restart the deadline, even when that thenable settles
+during a write blocked on the consumer. Abort and all three thrown-thenable
 pass-limit messages are covered too.
 
 ---

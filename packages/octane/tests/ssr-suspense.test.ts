@@ -1,5 +1,6 @@
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { describe, it, expect } from 'vitest';
+import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as RT from 'octane/server';
@@ -856,6 +857,67 @@ describe('SSR — resource-thrown thenables', () => {
 		expect(streamedValues(out.html)).toEqual([]);
 		// Stalled retries back off instead of re-rendering on every task.
 		expect(reads).toBeLessThan(50);
+	});
+
+	it("keeps a stalled reader's deadline when an abandoned thenable settles during a blocked write", async () => {
+		// A sibling stops suspending on its pending thenable and fails instead.
+		// The stream then waits for the consumer to drain that failure, and the
+		// abandoned thenable settles meanwhile. Nothing suspends on it any more, so
+		// it is not progress and must not restart the stalled reader's deadline.
+		const stalled = stalledReader('resolved promise', Infinity);
+		let settleAbandoned!: () => void;
+		const abandoned = new Promise<void>((resolve) => (settleAbandoned = resolve));
+		let failing = false;
+		setTimeout(() => (failing = true), 250);
+		const Abandoning = () => {
+			if (failing) throw new Error('abandoned branch failed');
+			throw abandoned;
+		};
+		const Page = () =>
+			RT.createElement(
+				'main',
+				null,
+				RT.createElement(RT.Suspense, { fallback: 'loading' }, RT.createElement(Value, stalled)),
+				RT.createElement(RT.Suspense, { fallback: 'loading' }, RT.createElement(Abandoning)),
+			);
+		const start = performance.now();
+		const errors: { message: string; at: number }[] = [];
+		let blocked = false;
+		let ended!: () => void;
+		const done = new Promise<void>((resolve) => (ended = resolve));
+		const destination = Object.assign(new EventEmitter(), {
+			write() {
+				if (!failing || blocked) return true;
+				// Hold the first write after the sibling fails: its error.
+				blocked = true;
+				setTimeout(() => {
+					settleAbandoned();
+					setTimeout(() => destination.emit('drain'), 10);
+				}, 10);
+				return false;
+			},
+			end: () => ended(),
+		});
+		const stream = RT.renderToPipeableStream(Page, undefined, {
+			timeoutMs: 400,
+			onError: (error) => errors.push({ message: String(error), at: performance.now() - start }),
+		});
+		stream.pipe(destination);
+		try {
+			await done;
+			expect(blocked).toBe(true);
+			expect(errors.map((error) => error.message)).toEqual([
+				'Error: abandoned branch failed',
+				expect.stringContaining('already-settled thenables outside use() for 400ms'),
+			]);
+			// The stall began at the first render, so it fails near 400ms. Restarting
+			// the deadline after the blocked write would push that past 700ms.
+			expect(errors[1].at).toBeLessThan(575);
+			expect(stalled.selfOpened).toBe(false);
+		} finally {
+			stream.abort();
+			resetStreamRuntimeGlobals();
+		}
 	});
 
 	it('fails a streamed reader that cycles between settled thenables at the suspense deadline', async () => {
