@@ -792,3 +792,88 @@ export const scopedDecorator = new ScopedDecorator();
 export function ScopeOutlet(props: { content: OctaneNode }) {
 	return <section data-outlet="scope">{props.content}</section>;
 }
+
+function CounterChild({ i }: { i: number }) {
+	return <b>{String(i)}</b>;
+}
+
+// Bindings reassigned after a JSX value evaluated. React reads each one when the
+// expression runs, so every row keeps the value current at its creation.
+export function MappedCounterValues() {
+	let n = -1;
+	return (
+		<ul>
+			{['a', 'b', 'c'].map((x) => {
+				n++;
+				return (
+					<li key={x} data-snapshot="mapped">
+						<CounterChild i={n} />
+						<em data-value={String(n)}>{String(n)}</em>
+					</li>
+				);
+			})}
+		</ul>
+	);
+}
+
+export function LoopPushedValues({ count }: { count: number }) {
+	const rows = [];
+	let label = '';
+	for (let i = 0; i < 3; i++) {
+		label = 'row ' + i;
+		rows.push(
+			<li key={i} data-snapshot="loop" data-value={label}>
+				<CounterChild i={count} />
+				{label}
+			</li>,
+		);
+		count--;
+	}
+	return <ol>{rows}</ol>;
+}
+
+export function SnapshotWithinProvider() {
+	let label = 'created';
+	const content = (
+		<ValueContext value="inner">
+			<span data-snapshot="provider" data-value={label}>
+				{getterValue.current}
+			</span>
+		</ValueContext>
+	);
+	label = 'reassigned';
+	return <section>{content}</section>;
+}
+
+// Wrapping an element in a new one assigned to the same variable must nest the
+// previous element, not the wrapper itself.
+export function WrappedReassignment() {
+	let content = (
+		<b data-snapshot="wrapped" data-value="inner">
+			inner
+		</b>
+	);
+	content = <i data-wrapper="">{content}</i>;
+	return <section>{content}</section>;
+}
+
+function Labeled(props: { label: string }) {
+	return (
+		<i data-snapshot="direct" data-value={props.label}>
+			{props.label}
+		</i>
+	);
+}
+
+let directLabel = '';
+
+function DirectLabel() {
+	return <Labeled label={directLabel} />;
+}
+
+export function DirectCallRecord() {
+	directLabel = 'called';
+	const content = DirectLabel();
+	directLabel = 'rendered';
+	return <section>{content}</section>;
+}

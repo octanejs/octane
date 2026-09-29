@@ -51,6 +51,7 @@ import { decodeHTMLStrict } from 'entities';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { buildFatSegments } from './fat-segments.js';
+import { markDeferredLive, markDeferredRead, snapshotDeferredReads } from './deferred-snapshots.js';
 import {
 	METHOD_DEP_IMPORT,
 	analyzeCallbackDependencies,
@@ -12450,7 +12451,8 @@ function ssrCompileBodyWithMapTemps(
 		ctx._valueDirectiveLowering = serverValueDirectiveFold(ctx, name, subs, cssHash);
 		try {
 			const returned = rewriteHookCalls(b.return(directCallRoot), ctx, name, localSetupSlots);
-			directCall = { subs, value: rewriteJsxValues(returned.argument, ctx) };
+			// Like the client's deferred record, the value reads bindings when it renders.
+			directCall = { subs, value: markDeferredLive(rewriteJsxValues(returned.argument, ctx)) };
 		} finally {
 			ctx._valueDirectiveLowering = previousLowering;
 		}
@@ -20182,17 +20184,20 @@ function compileReturnJsxFunction(node, ctx, options) {
 				// represented render scope, not captured into fragment props while
 				// the factory runs. Reuse value lowering in both emitters so its
 				// public type/props and deferred children also stay inspectable.
+				// Like other returned records, it reads variables when it renders.
 				if (ctx.nativeReads) {
 					return {
 						...h,
-						argument: nativeReturnedJsxValue(
-							h.argument,
-							ctx,
-							name,
-							compInlinedSubs,
-							cssHash,
-							cssEntries,
-							scoping.runtimeApplied,
+						argument: markDeferredLive(
+							nativeReturnedJsxValue(
+								h.argument,
+								ctx,
+								name,
+								compInlinedSubs,
+								cssHash,
+								cssEntries,
+								scoping.runtimeApplied,
+							),
 						),
 					};
 				}
@@ -20776,7 +20781,11 @@ function splitReturnedRecord(ctx, fn, name, scopeNames, { record, test, origin }
 	const captures = directCallCaptures(fn, scopeNames, [], record);
 	if (captures === null) {
 		ctx.runtimeNeeded.add('createScopedValue');
-		const direct = b.call(rtAlias('createScopedValue'), b.arrow([], cloneAstNode(record)));
+		// A direct call's record reads bindings when it renders, as the server's does.
+		const direct = b.call(
+			rtAlias('createScopedValue'),
+			b.arrow([], markDeferredLive(cloneAstNode(record))),
+		);
 		return inheritOriginLoc(b.conditional(test, record, inheritOriginLoc(direct, origin)), origin);
 	}
 	const read = hoistCapturingHelper(ctx, `${name}$record`, captures, [], record, origin);
@@ -22422,7 +22431,7 @@ function lowerJsxChild(child, ctx) {
 				scopedElement,
 				inheritOriginLoc(b.id(rtAlias('Fragment')), child),
 				inheritOriginLoc(b.object([]), child),
-				inheritOriginLoc(b.arrow([], children), child),
+				inheritOriginLoc(deferredRead(ctx, children), child),
 			),
 			child,
 		);
@@ -22820,8 +22829,9 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 			const memoizedDescriptor = inheritOriginLoc(
 				b.call(
 					requireRuntimeForContext(ctx, ctx.nativeReads ? 'nativePuMemo' : 'useMemo'),
-					b.arrow(
-						[],
+					// Runs synchronously inside readChildren, so it reads the same snapshots.
+					deferredRead(
+						ctx,
 						b.sequence([b.assignment('=', b.id(freshName), b.literal(true)), childrenValue]),
 					),
 					b.array([rows, ...(captures ?? []).map((name) => inheritOriginLoc(b.id(name), host))]),
@@ -22872,7 +22882,10 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		const scopedElement = ctx.nativeReads
 			? requireRuntimeForContext(ctx, 'nativeCreateScopedElement')
 			: rtAlias('createScopedElement');
-		const readChildren = inheritOriginLoc(b.arrow([], memoizedChildrenBody ?? childrenValue), node);
+		const readChildren = inheritOriginLoc(
+			deferredRead(ctx, memoizedChildrenBody ?? childrenValue),
+			node,
+		);
 		descriptor = inheritOriginLoc(
 			b.call(
 				scopedElement,
@@ -22906,9 +22919,17 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		? requireRuntimeForContext(ctx, 'nativeCreateScopedValue')
 		: rtAlias('createScopedValue');
 	return inheritOriginLoc(
-		b.call(scopedValue, inheritOriginLoc(b.arrow([], descriptor), node)),
+		b.call(scopedValue, inheritOriginLoc(deferredRead(ctx, descriptor), node)),
 		node,
 	);
+}
+
+// A value-position JSX thunk: its body runs when Octane renders or inspects the
+// element. printNodeWithMap snapshots the reassigned bindings it reads, so it
+// sees their values from when the JSX evaluated (see deferred-snapshots.js).
+function deferredRead(ctx, body) {
+	ctx.deferredReads = true;
+	return markDeferredRead(b.arrow([], body));
 }
 
 // Short, unique, path-free slot description for non-HMR output: a djb2 hash of
@@ -33855,10 +33876,13 @@ const esrapCommentOptions = {
  * literal raws are re-derived centrally before the print.
  */
 function printNodeWithMap(node, ctx) {
-	const printable = stripTsOnlyWrappers(escapeMultilineStringLiterals(node), {
+	let printable = stripTsOnlyWrappers(escapeMultilineStringLiterals(node), {
 		filename: ctx.mapSourceName,
 		enums: null,
 	});
+	if (ctx.deferredReads === true) {
+		printable = snapshotDeferredReads(printable, (name) => allocCompilerName(ctx, `${name}$`));
+	}
 	if (assertPrintedLocs()) assertNodeLocs(printable);
 	const { code, map } = esrapPrint(printable, withDeferredImports(esrapTsx(esrapCommentOptions)), {
 		sourceMapSource: ctx.mapSourceName,

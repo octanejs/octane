@@ -1,4 +1,4 @@
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
@@ -62,6 +62,43 @@ describe('differential: deopt-list.tsrx — array of host descriptors vs React',
 			await i.click('#remove');
 			await r.click('#remove');
 		});
+		d.unmount();
+	});
+});
+
+// React evaluates JSX when the expression runs. Octane defers non-literal
+// children and props to render, so a binding reassigned after the JSX evaluated
+// must still read the value it had then.
+describe('differential: deopt-list.tsrx — JSX values read reassigned bindings at creation', () => {
+	it('CounterJsxList: a `.map` counter reaches props, text, and attributes per row', async () => {
+		const d = await mountDifferential(DEOPT, 'CounterJsxList');
+		await d.step('mount', () => {});
+		expect(d.octane.container.textContent).toBe('001122');
+		d.unmount();
+	});
+
+	it('LoopPushedJsxList: a `for` loop reassigning a local and a parameter', async () => {
+		const d = await mountDifferential(DEOPT, 'LoopPushedJsxList', { count: 5 });
+		await d.step('mount', () => {});
+		expect(d.octane.container.textContent).toBe('5row 04row 13row 2');
+		d.unmount();
+	});
+
+	it('CounterJsxListStateful: re-renders restart the counter; handlers see the live binding', async () => {
+		const d = await mountDifferential(DEOPT, 'CounterJsxListStateful');
+		const text = (selector: string) => d.octane.container.querySelector(selector)?.textContent;
+		await d.step('mount', () => {});
+		expect(text('ul')).toBe('12');
+		await d.step('handler reads the final value', async (i, r) => {
+			await i.click('#seen-a');
+			await r.click('#seen-a');
+		});
+		expect(text('p')).toBe('100');
+		await d.step('restart', async (i, r) => {
+			await i.click('#restart');
+			await r.click('#restart');
+		});
+		expect(text('ul')).toBe('1112');
 		d.unmount();
 	});
 });
