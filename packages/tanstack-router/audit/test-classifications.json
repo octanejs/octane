@@ -67,6 +67,11 @@
       "reason": "Checks adapted Router wiring; it is not a pristine or differential React suite."
     },
     {
+      "path": "packages/tanstack-router/tests/conformance/router-client.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks RouterClient hydration through Octane createRoot and hydrateRoot of Octane server HTML; it is not same-scenario React execution."
+    },
+    {
       "path": "packages/tanstack-router/tests/conformance/router.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks the broader Octane Router contract; it is not same-scenario React execution."
