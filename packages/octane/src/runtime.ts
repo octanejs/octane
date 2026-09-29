@@ -18390,6 +18390,13 @@ interface PendingHydrationTextWarning {
 
 let currentHydration: HydrationCapability | null = null;
 
+/**
+ * The first node of each value that hydrateOnlyChild built in place of server
+ * content. A suspended attempt leaves its DOM for the next attempt, which runs
+ * under a new capability and must not report the client's own content.
+ */
+let HYDRATION_BUILT_CONTENT: WeakSet<Node> | null = null;
+
 function activeHydration(): HydrationCapability | null {
 	const hydration = currentHydration;
 	return hydration !== null && hydration.isActive() ? hydration : null;
@@ -19030,6 +19037,54 @@ class HydrationCapability {
 		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
 		(STAGED_DOM?.view(el) ?? el).appendChild(created);
 		return created;
+	}
+
+	/**
+	 * childTextHole's first hydrating render of an element, a component, or a
+	 * list. The server frames such a value in a `<!--[-->…<!--]-->` range, which
+	 * the hole's child slot adopts from the cursor. Anything else in the host is
+	 * the text, or nothing, that the server rendered for a primitive value, which
+	 * none of these values can adopt: discard it, report the recovery, and build
+	 * the value as a client mount would. A textarea's text is its default value,
+	 * which its value props own, so it stays. `render` is the hole's childSlot
+	 * call, passed in so that hydration alone never retains the child-slot graph.
+	 */
+	hydrateOnlyChild(scope: Scope, slotKey: number, el: Node, render: () => void): void {
+		let stale = getFirstChild(el);
+		if (this.isOpen(stale)) {
+			this.node = stale;
+			render();
+			return;
+		}
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		// Neither what an earlier attempt built before its value suspended, nor
+		// server content for captures that changed before a dormant boundary
+		// activated, is a mismatch to report.
+		if (stale !== null && HYDRATION_BUILT_CONTENT?.has(stale) !== true) {
+			if ((el as Element).localName === 'textarea') stale = getNextSibling(stale);
+			else if (!this.staleServerValues) {
+				noteRecoverableHydrationError(() => new Error(formatClientError(51)), this.rootBlock);
+				if (process.env.NODE_ENV !== 'production')
+					warnHydrationStructuralMismatch(
+						siteLoc(scope, slotKey) || (el as any).__oct_loc,
+						'a renderable range',
+						describeHydrationNode(stale),
+					);
+			}
+		}
+		while (stale !== null) {
+			const next = getNextSibling(stale);
+			(STAGED_DOM?.view(el) ?? el).removeChild(stale);
+			stale = next;
+		}
+		const last = (STAGED_DOM?.view(el) ?? el).lastChild;
+		try {
+			this.suspend(render);
+		} finally {
+			// A value that suspends throws here and leaves what it built so far.
+			const first = last === null ? getFirstChild(el) : getNextSibling(last);
+			if (first !== null) (HYDRATION_BUILT_CONTENT ??= new WeakSet()).add(first);
+		}
 	}
 
 	/**
@@ -35152,14 +35207,18 @@ export function childTextHole(
 	// which is exactly the ownerHost invariant, so component/element/array values
 	// render with NO markers at all (M2's de-opt host regime; arrays still mint
 	// their ForSlot pair lazily). On a pure-text → object switch, drop the
-	// markerless text node first. While hydrating, point the cursor at the host's
-	// first child (the server's `<!--[-->`) so childSlot adopts the range —
-	// ownsHost is ignored under hydration (server-pair adoption wins, as in M2).
+	// markerless text node first. While hydrating, the first render adopts the
+	// server's `<!--[-->` range (ownsHost is ignored under hydration: server-pair
+	// adoption wins, as in M2), or builds the value as a client mount would when
+	// the server rendered text or nothing there.
 	if (state === undefined && cachedNode !== null)
 		(STAGED_DOM?.view(cachedNode) ?? cachedNode).remove();
 	const hydration = activeHydration();
-	if (hydration !== null && state === undefined) hydration.node = getFirstChild(domParent);
-	childSlot(parentScope, slotKey, domParent, value, null, false, domParent as Element);
+	if (hydration !== null && state === undefined)
+		hydration.hydrateOnlyChild(parentScope, slotKey, domParent, () =>
+			childSlot(parentScope, slotKey, domParent, value, null, false, domParent as Element),
+		);
+	else childSlot(parentScope, slotKey, domParent, value, null, false, domParent as Element);
 	const s = parentScope.slots[slotKey] as ChildSlot;
 	return s.block === null && s.forSlot === null && s.hostNode === null ? s.text : null;
 }
