@@ -7625,19 +7625,38 @@ function isPlainHostRoot(node) {
 }
 
 /**
+ * True when `node` compiles to exactly one template element in place, in both
+ * compile modes. Every single-root proof (keyed rows, sole-root components,
+ * host-only @if/@switch arms, and the SSR ranges that mirror them) uses this
+ * rather than isPlainHostRoot, because normalizeChildren plans some plain
+ * hosts differently:
+ *   - keyed, `noscript`/document, and parser-repaired hosts lower to a
+ *     descriptor hole, which is an anchor plus the element;
+ *   - head-hoisted metadata and Float resources render nothing in place.
+ * The server writes a parser-repaired host from its template but frames it in
+ * the same hole range, so both modes reject it too. The planner exempts SVG
+ * and `<noscript>` content from some of these rules; ignoring that context
+ * here only keeps a marker pair it could have skipped.
+ */
+function isSingleTemplateHost(node) {
+	return (
+		isPlainHostRoot(node) &&
+		node._octaneImperativeHost !== true &&
+		!alwaysImperativeHost(node) &&
+		!isHoistableHeadElementNode(node) &&
+		headResourceKind(node) === null
+	);
+}
+
+/**
  * A direct body host can adopt its enclosing control-flow range on hydration.
  *
  * Keep this narrower than the general single-root proof: setup statements,
- * components, nested directives, and head-hoisted hosts cannot guarantee that
- * the range's first child is the branch's own hydratable element.
+ * components, and nested directives cannot guarantee that the range's first
+ * child is the branch's own hydratable element.
  */
 function canBorrowSsrHostBranchRange(statements) {
-	if (statements == null || statements.length !== 1 || !isPlainHostRoot(statements[0])) {
-		return false;
-	}
-	const host = statements[0];
-	const tag = host.id?.name ?? host.openingElement?.name?.name;
-	return tag !== 'title' && tag !== 'meta' && tag !== 'link';
+	return statements != null && statements.length === 1 && isSingleTemplateHost(statements[0]);
 }
 
 function statementsOf(node) {
@@ -7663,16 +7682,17 @@ function hasSwitchCaseLocalBinding(statements) {
 }
 
 /**
- * A directive @if/@else whose every reachable arm emits exactly one plain
- * host. The chosen tag may change, but the item always owns one element; the
- * runtime propagates a branch replacement to enclosing shared boundaries.
+ * A directive @if/@else whose every reachable arm emits exactly one template
+ * host (isSingleTemplateHost). The chosen tag may change, but the item always
+ * owns one element; the runtime propagates a branch replacement to enclosing
+ * shared boundaries.
  */
 function isSingleHostIfRoot(node) {
 	if (!isIfDirective(node) || node.alternate == null) return false;
 	const armIsSingleHost = (arm) => {
 		if (isIfDirective(arm)) return isSingleHostIfRoot(arm);
 		const render = statementsOf(arm).filter((s) => isJsxNode(s) || isIfDirective(s));
-		return render.length === 1 && isPlainHostRoot(render[0]);
+		return render.length === 1 && isSingleTemplateHost(render[0]);
 	};
 	return armIsSingleHost(node.consequent) && armIsSingleHost(node.alternate);
 }
@@ -7703,7 +7723,7 @@ function singleRootComponentArmName(node, locals, ctx) {
 /**
  * Transitive definition-site single-root proof for a void `@{}` body whose
  * sole root is an exhaustive `@if`/`@else` or `@switch` tree: every reachable
- * arm must render exactly one plain host OR one qualifying same-module
+ * arm must render exactly one template host OR one qualifying same-module
  * component call (see
  * singleRootComponentArmName). Returns the set of callee names the proof
  * depends on (empty when every arm is a host), or null when the shape does
@@ -7732,7 +7752,7 @@ function collectSingleRootIfDeps(render, locals, ctx) {
 		const sole = out[0];
 		if (isIfDirective(sole)) return ifOk(sole, insideSwitch);
 		if (isSwitchDirective(sole)) return switchOk(sole);
-		if (isPlainHostRoot(sole)) return true;
+		if (isSingleTemplateHost(sole)) return true;
 		const name = singleRootComponentArmName(sole, locals, ctx);
 		if (name === null) return false;
 		deps.add(name);
@@ -7832,12 +7852,13 @@ function anchorlessRootShape(node) {
  * mount, but its current SSR representation still begins with that construct's
  * own hydration markers. A direct host always begins with the row element, so
  * the hydrator can use it as the keyed item boundary without an item pair.
+ * `itemBody` is forItemTemplateBody's result, whose root key has already been
+ * folded into the item key when that is safe.
  */
-function isSsrMarkerlessForItem(node) {
+function isSsrMarkerlessForItem(node, itemBody) {
 	if (node?._octaneBindingSite !== undefined) return false;
-	const body = node?.body?.body || [];
-	const jsxChildren = body.filter((s) => isJsxNode(s));
-	return jsxChildren.length === 1 && isPlainHostRoot(jsxChildren[0]);
+	const jsxChildren = itemBody.filter((s) => isJsxNode(s));
+	return jsxChildren.length === 1 && isSingleTemplateHost(jsxChildren[0]);
 }
 
 /**
@@ -8178,7 +8199,7 @@ export function hasOnlyLowerableNullishExits(node) {
 }
 
 /**
- * Prove that a component always returns one host element.
+ * Prove that a component always returns one template host element.
  *
  * TSRX's `@{}` form carries that output as `body.render`. Ordinary TSX keeps a
  * real `return`; accept only a final host-element return and reject any other
@@ -8187,12 +8208,13 @@ export function hasOnlyLowerableNullishExits(node) {
  */
 function singleHostComponentRoot(node) {
 	if (node?.body?.type === 'JSXCodeBlock') {
-		return isVoidJsxCodeBlockFunction(node) && isPlainHostRoot(node.body.render);
+		return isVoidJsxCodeBlockFunction(node) && isSingleTemplateHost(node.body.render);
 	}
 	if (node?.body?.type !== 'BlockStatement') return false;
 	const stmts = node.body.body || [];
 	const final = stmts[stmts.length - 1];
-	if (!final || final.type !== 'ReturnStatement' || !isPlainHostRoot(final.argument)) return false;
+	if (!final || final.type !== 'ReturnStatement' || !isSingleTemplateHost(final.argument))
+		return false;
 
 	let returns = 0;
 	const seen = new WeakSet();
@@ -13034,6 +13056,14 @@ function ssrEmitNode(
 		case 'Element':
 			if (isComponentTag(node))
 				return ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
+			if (node.parserRepairRange === true) {
+				ctx.runtimeNeeded.add('ssrBlock');
+				return ssrCall(
+					'ssrBlock',
+					[ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)],
+					node,
+				);
+			}
 			return ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 		case 'TSRXExpression':
 			return ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
@@ -14840,7 +14870,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	} else if (node.index) {
 		itemKey = inheritOriginLoc(b.id('__i'), node.index);
 	}
-	const markerlessItem = isSsrMarkerlessForItem(node);
+	const markerlessItem = isSsrMarkerlessForItem(node, itemBody);
 	// ssrArm exists solely to make use()/component identity distinct per item.
 	// Skip it when the item is compiler-proven synchronous and transparent:
 	// no render-time calls, nested components/control flow, or renderable child
@@ -20912,17 +20942,18 @@ function renderCallScopeParam(node, ctx) {
  *
  * The client renders every returned host root through a compiled fragment. That
  * fragment mounts markerless when the host is its one template element, so the
- * server inlines the host without a range. A host both modes build imperatively
- * (keyed, `noscript`, document) is a descriptor hole inside the fragment
- * instead, and the server frames that hole with its own range. A markerless
- * fragment would adopt that inner range as its own during hydration, so both
- * sides give this root the fragment range that returned fragments keep.
+ * server inlines the host without a range. A host the client builds
+ * imperatively (keyed, `noscript`, document, or parser-repaired) is a descriptor
+ * hole inside the fragment instead, and the server frames that hole with its
+ * own range. A markerless fragment would adopt that inner range as its own
+ * during hydration, so both sides give this root the fragment range that
+ * returned fragments keep.
  */
 function isRangedReturnedHost(node) {
 	return (
 		(node.type === 'Element' || node.type === 'JSXElement') &&
 		!isComponentTag(node) &&
-		alwaysImperativeHost(node)
+		(node._octaneImperativeHost === true || alwaysImperativeHost(node))
 	);
 }
 
@@ -21135,7 +21166,18 @@ function isStaticReturnedFragmentComponent(node, ctx) {
 // text, nested host elements/fragments) stays in the template; nested component
 // children become renderable holes. The result is a self-contained fragment whose
 // only inputs are its props — compilable as an ordinary renderer.
-function extractFragment(node, ctx, holeProps, parentNs = 'html') {
+//
+// The renderer builds a keyed, `noscript`/document, or parser-repaired host as a
+// descriptor (isDescriptorBuiltHost), and a descriptor child must be a value: a
+// FoldedDirective or template-only component placeholder under it would be
+// dropped. Inside such a host (`inDescriptor`), directives and components lower
+// to value holes here in the owning component, as a `@{}` body and the server
+// lower them. Misreading a template host as a descriptor host costs only the
+// template fast path; the reverse drops children.
+function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor = false) {
+	const descriptor =
+		inDescriptor ||
+		(node.type === 'JSXElement' && isDescriptorBuiltHost(node, parentNs === 'svg', ctx));
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const newAttrs = [];
 	const mergedFragmentSpread = isFragmentLongForm(node, ctx) && hasJsxSpreadAttribute(node);
@@ -21245,14 +21287,16 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 	// Lower `{xs.map(item => <jsx key/>)}` children to a synthetic `@for`
 	// (ForOfStatement) up front so they take the directive fold path below
 	// (forBlock) instead of becoming a childSlot descriptor-array hole. Only when
-	// we have a fold context (always true on the .tsx host-fragment path).
-	const fragChildren = ctx._foldCtx
-		? (node.children || []).map((child) =>
-				child && child.type === 'JSXExpressionContainer'
-					? mapCallToForOf(child.expression, ctx) || child
-					: child,
-			)
-		: node.children || [];
+	// we have a fold context (always true on the .tsx host-fragment path) and the
+	// children are template children.
+	const fragChildren =
+		ctx._foldCtx && !descriptor
+			? (node.children || []).map((child) =>
+					child && child.type === 'JSXExpressionContainer'
+						? mapCallToForOf(child.expression, ctx) || child
+						: child,
+				)
+			: node.children || [];
 	const nodeTag = jsxTagName(node) || elementTagName(node);
 	const childNs =
 		typeof nodeTag === 'string' && !isComponentTag(node)
@@ -21302,9 +21346,12 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				newChildren.push({ ...child, expression: rendered });
 			}
 		} else if (t === 'Element' || t === 'JSXElement') {
-			if (isLongFormTemplateSentinel(child, childNs, true, ctx)) {
+			if (descriptor && !isComponentTag(child)) {
+				newChildren.push(extractFragment(child, ctx, holeProps, childNs, true));
+			} else if (!descriptor && isLongFormTemplateSentinel(child, childNs, true, ctx)) {
 				newChildren.push(extractFragment(child, ctx, holeProps, childNs));
 			} else if (
+				!descriptor &&
 				isComponentTag(child) &&
 				(child._octaneBindingSite ||
 					(ctx._foldCtx?.templateComponentChildren === true &&
@@ -21349,7 +21396,13 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			// A fragment nested inside the returned fragment shares the hoisted
 			// renderer. Extract its dynamic values/directives too; leaving it raw would
 			// make authored outer locals resolve against the renderer's hole-props object.
-			newChildren.push(extractFragment(child, ctx, holeProps, childNs));
+			newChildren.push(extractFragment(child, ctx, holeProps, childNs, descriptor));
+		} else if (descriptor && VALUE_DIRECTIVE_ARM_TYPES.has(t)) {
+			// lowerJsxChild folds the directive into a renderer owned by this
+			// component, the value a `@{}` body passes the same descriptor.
+			const hn = `h${holeProps.length}`;
+			holeProps.push(objectProp(hn, lowerJsxChild(child, ctx)));
+			newChildren.push(b.jsx_expression_container(memberProps(hn, child)));
 		} else if (t === 'JSXCodeBlock') {
 			const body = child.body || [];
 			if (body.length === 0) {
@@ -23826,8 +23879,9 @@ function requiresImperativeHostTree(root, ctx) {
 	);
 }
 
-// Hosts that both compile modes build imperatively. Parser-repaired trees are
-// client-only: server output is a string, so repair cannot move its bindings.
+// Hosts that both compile modes build imperatively. The server writes a
+// parser-repaired tree as a string, so repair cannot move its bindings there;
+// normalizeChildren frames it in the hole range the client hydrates instead.
 function alwaysImperativeHost(root) {
 	const tag = jsxTagName(root) || elementTagName(root);
 	return (
@@ -23913,6 +23967,17 @@ function rewriteImperativeHeadElements(node, ctx, namespace = 'html', inNoscript
 			rewriteImperativeHeadElements(child, ctx, nextNamespace, inNoscript || tag === 'noscript'),
 		),
 	};
+}
+
+// A JSXElement that normalizeChildren lowers with jsxElementToCreateElement
+// instead of the template compiler, so its whole subtree becomes descriptor
+// values. extractFragment uses the same test to keep that subtree's children in
+// value form.
+function isDescriptorBuiltHost(node, inSvg, ctx) {
+	return (
+		!isComponentTag(node) &&
+		(hasJsxAttribute(node, 'key') || (!inSvg && requiresImperativeHostTree(node, ctx)))
+	);
 }
 
 /**
@@ -24062,12 +24127,7 @@ function normalizeChildren(
 			// Keys need a reconciliation boundary. Parser-sensitive host trees need
 			// imperative construction so HTML repair cannot change binding paths.
 			// The shared descriptor path provides both without taxing ordinary templates.
-			if (
-				ctx &&
-				allowImperative &&
-				!isComponentTag(n) &&
-				(hasJsxAttribute(n, 'key') || (!inSvg && requiresImperativeHostTree(n, ctx)))
-			) {
+			if (ctx && allowImperative && isDescriptorBuiltHost(n, inSvg, ctx)) {
 				out.push(
 					inheritOriginLoc(
 						{
@@ -24121,6 +24181,13 @@ function normalizeChildren(
 			// `unstable_Activity` starts with a lowercase letter but is a component
 			// when it resolves to the builtin. Keep that fact on this rare node only.
 			if (isActivityLongForm(n, ctx)) element.activityDescriptor = true;
+			// The client builds a parser-repaired host through the descriptor hole
+			// above. The server keeps its template string and nesting diagnostics,
+			// but frames it as that hole's range: the browser's repair then stays
+			// inside a range the client can adopt or discard, and later siblings
+			// keep their positions.
+			if (ctx?.mode === 'server' && allowImperative && !inSvg && n._octaneImperativeHost === true)
+				element.parserRepairRange = true;
 			// Preserve @tsrx/core's raw-text script discriminator without changing
 			// the normalized object shape of every ordinary element.
 			if (elementTagName(element) === 'script' && typeof n.content === 'string') {
@@ -33049,7 +33116,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			// row itself is the block-boundary host, no Comment markers needed).
 			if (isSingleHostIfRoot(c)) {
 				singleRoot = true;
-			} else if (isPlainHostRoot(c)) {
+			} else if (isSingleTemplateHost(c)) {
 				singleRoot = true;
 			} else if ((c.type === 'Element' || c.type === 'JSXElement') && isComponentTag(c)) {
 				// A sole component item can share the component's proven host root as
@@ -33089,7 +33156,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		singleRoot = false;
 		singleRootExpr = null;
 	}
-	const ssrMarkerless = isSsrMarkerlessForItem(node);
+	const ssrMarkerless = isSsrMarkerlessForItem(node, subStmts);
 	const hostRootTag = subStmts[0]?.id?.name ?? subStmts[0]?.openingElement?.name?.name;
 	const hostMountSafe =
 		ctx.autoMemo === true &&
