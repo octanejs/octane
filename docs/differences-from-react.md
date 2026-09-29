@@ -665,8 +665,10 @@ returns JSX, or JSX is stored in a variable, array, or prop, its non-literal
 props and children can run after the building call has returned. They run when
 Octane renders or inspects the element, in the scope of the component rendering
 it. Anything valid only while that call is on the stack is gone by then, such
-as a module-level "current" variable, an open transaction, or a library read
-context.
+as a module-level "current" value read through a function, an open
+transaction, or a library read context. A variable the JSX reads directly keeps
+its value from the building call; see
+[Variables reassigned after the JSX evaluates](#variables-reassigned-after-the-jsx-evaluates).
 
 Lexical calls `DecoratorNode.decorate()` while it reconciles an update, with
 that update's editor state active, and expects the returned element to be
@@ -702,6 +704,48 @@ decorate() {
 during the call. To read the state at render time instead, pass a stable input
 such as the node key to a component, and have that component open its own read,
 for example with `editor.read(...)`.
+
+### Variables reassigned after the JSX evaluates
+
+Deferral does not change which value a variable contributes. When deferred JSX
+reads a local, parameter, or module variable directly, and code can assign that
+variable again after the JSX evaluates, the compiler captures the value as the
+JSX evaluates, as React does:
+
+```tsx
+function List() {
+  let n = -1;
+  return (
+    <ul>
+      {['a', 'b', 'c'].map((x) => {
+        n++;
+        // Renders 0, 1, 2, not 2 three times.
+        return <li key={x}><Row index={n} />{String(n)}</li>;
+      })}
+    </ul>
+  );
+}
+```
+
+The same applies to a counter or parameter that a loop changes, a `var`
+initialized on each iteration, and a variable assigned an element that wraps
+its previous value, such as `content = <Frame>{content}</Frame>`. Functions
+inside the JSX, such as event handlers, still see the variable's current value
+when they run, as in React. A variable that nothing can assign after the JSX
+evaluates is read directly and costs nothing extra.
+
+Three cases still read at render:
+
+- An expression that assigns, such as `{String(n++)}`, runs its assignment at
+  render, so its reads of `n` also happen then.
+- Only variables are captured. A property, getter, or call result, such as
+  `{counter.value}` or `{getLabel()}`, is read when the element renders. Copy it
+  into a `const` before building the JSX to keep the earlier value.
+- A module-level `function` declaration that returns JSX builds its element
+  when it renders. Calling it directly (`const label = Label()` instead of
+  `<Label />`) therefore reads the variables it uses when that element renders.
+  Arrow functions, function expressions, and methods capture them during the
+  call.
 
 ### Template children and inspection
 

@@ -6,6 +6,7 @@ import {
 	createUniversalRoot,
 	defineUniversalComponent,
 	rendererRegion,
+	startTransition as startUniversalTransition,
 	universalComponent,
 	universalFor,
 	universalKey,
@@ -550,12 +551,26 @@ describe('universal runtime semantic regressions', () => {
 		expect(unmountLog).toEqual(['insertion:unmounted', 'layout:unmounted', 'passive:unmounted']);
 	});
 
-	it('parses the compiler slot when useOptimistic omits its reducer', () => {
+	it('parses the compiler slot when useOptimistic omits its reducer', async () => {
 		const { container, root } = objectRoot();
-		expect(() =>
-			root.render(OptimisticOmittedReducerScene, { value: 'base', action: 'optimistic' }),
-		).not.toThrow();
+		const action = deferred<void>();
+		let update!: (value: string) => void;
+		root.render(OptimisticOmittedReducerScene, {
+			value: 'base',
+			expose: (dispatch: (value: string) => void) => {
+				update = dispatch;
+			},
+		});
+		expect(instance(container, 'optimistic-result').props.value).toBe('base');
+		startUniversalTransition(() => {
+			update('optimistic');
+			return action.promise;
+		});
+		await flushMicrotasks();
 		expect(instance(container, 'optimistic-result').props.value).toBe('optimistic');
+		action.resolve();
+		await flushMicrotasks();
+		expect(instance(container, 'optimistic-result').props.value).toBe('base');
 		root.unmount();
 	});
 
