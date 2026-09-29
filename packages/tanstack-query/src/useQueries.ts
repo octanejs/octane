@@ -107,16 +107,21 @@ export function useQueries(options: any, ...rest: any[]): any {
 
 	// If any query should suspend, await their optimistic fetches as one retained
 	// suspense promise. Retaining it gives a sequential useQueries call the same
-	// stable replay position as useBaseQuery above.
+	// stable replay position as useBaseQuery. The key covers every suspense
+	// query, not only the pending ones, so it survives the group settling.
 	const suspenseIndexes: number[] = [];
+	const suspenseHashes: string[] = [];
 	for (let index = 0; index < optimisticResult.length; index++) {
-		if (shouldSuspend(defaultedQueries[index], optimisticResult[index])) {
+		const query = defaultedQueries[index];
+		if (!query.suspense) continue;
+		suspenseHashes.push(query.queryHash);
+		if (shouldSuspend(query, optimisticResult[index])) {
 			suspenseIndexes.push(index);
 		}
 	}
 	useSuspensePromise(
 		suspenseIndexes.length > 0,
-		JSON.stringify(suspenseIndexes.map((index) => defaultedQueries[index].queryHash)),
+		JSON.stringify(suspenseHashes),
 		() =>
 			Promise.all(
 				suspenseIndexes.map((index) => {

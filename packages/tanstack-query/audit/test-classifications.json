@@ -49,7 +49,7 @@
     {
       "path": "packages/tanstack-query/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Runs exact cached-query, async-query, and mutation scenarios against @tanstack/react-query@5.102.8."
+      "oracle": "Runs exact cached-query, async-query, mutation, and sequential-suspense scenarios against @tanstack/react-query@5.102.8."
     },
     {
       "path": "packages/tanstack-query/tests/ssr/server.test.ts",

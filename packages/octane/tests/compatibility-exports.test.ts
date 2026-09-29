@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Octane from 'octane';
 import * as Server from 'octane/server';
+import * as Universal from 'octane/universal';
+import * as UniversalNative from 'octane/universal/native';
 import { act, mount } from './_helpers.js';
 import { LegacyActionForm } from './_fixtures/host-update-contract.tsrx';
 
@@ -54,5 +56,10 @@ describe('migration exports', () => {
 	it('exports the deprecated form-state alias in both environments', () => {
 		expect(Octane.useFormState).toBe(Octane.useActionState);
 		expect(Server.useFormState).toBe(Server.useActionState);
+	});
+
+	it('exports the deprecated form-state alias that universal modules may import', () => {
+		expect(Universal.useFormState).toBe(Universal.useActionState);
+		expect(UniversalNative.useFormState).toBe(UniversalNative.useActionState);
 	});
 });

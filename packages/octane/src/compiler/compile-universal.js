@@ -378,8 +378,16 @@ function unwrapFirstScreenExpression(node) {
 	return node;
 }
 
+// Every emitted reference to a renderer helper goes through here, so a module
+// imports exactly the helpers its output calls (UNIVERSAL_RENDERER_HELPER_IMPORTS).
+function referenceHelper(state, key) {
+	state.usedHelpers.add(key);
+	return state.helpers[key];
+}
+
 function firstScreenEventHelper(state) {
-	return (state.helpers.firstScreenEvent ??= allocName(state, '__octaneFirstScreenEvent'));
+	state.helpers.firstScreenEvent ??= allocName(state, '__octaneFirstScreenEvent');
+	return referenceHelper(state, 'firstScreenEvent');
 }
 
 function universalError(filename, node, message) {
@@ -2728,7 +2736,7 @@ function compileRenderableExpressionAst(node, state) {
 		nodes.length === 1 ? nodes[0] : withPlanOrigin({ kind: 'range', children: nodes }, node);
 	const plan = allocPlan(state, root, node);
 	return generatedCall(
-		state.helpers.value,
+		referenceHelper(state, 'value'),
 		[generatedIdentifier(plan, node), inheritGeneratedOrigin(b.array(context.values), node)],
 		node,
 	);
@@ -2883,7 +2891,7 @@ function compilePropsAst(
 		args.push(childrenExpression);
 	}
 	if (canonicalizeHostClass) args.push(inheritGeneratedOrigin(b.literal(true), origin));
-	return generatedCall(state.helpers.props, args, origin);
+	return generatedCall(referenceHelper(state, 'props'), args, origin);
 }
 
 function compilePlainPropsObjectAst(attributes, state, origin) {
@@ -3218,7 +3226,10 @@ function compileActivityElementAst(node, context, state) {
 		throw universalError(state.filename, node, 'Activity requires an explicit mode prop.');
 	}
 	const body = compileBlockValueAst(node.children ?? [], state, [], node);
-	return addDynamicAst(context, generatedCall(state.helpers.activity, [mode, body], node));
+	return addDynamicAst(
+		context,
+		generatedCall(referenceHelper(state, 'activity'), [mode, body], node),
+	);
 }
 
 function compileComponentElementAst(node, context, state) {
@@ -3241,7 +3252,7 @@ function compileComponentElementAst(node, context, state) {
 	} else if (meaningfulChildren.length > 0) {
 		const body = compileBlockValueAst(childNodes, state, [], node);
 		childrenExpression = generatedCall(
-			state.helpers.children,
+			referenceHelper(state, 'children'),
 			[b.literal(state.renderer.id), body],
 			node,
 		);
@@ -3255,7 +3266,7 @@ function compileComponentElementAst(node, context, state) {
 		const callback = generatedArrow(
 			[propsName],
 			generatedCall(
-				state.helpers.context,
+				referenceHelper(state, 'context'),
 				[
 					providerContext,
 					inheritGeneratedOrigin(
@@ -3274,7 +3285,7 @@ function compileComponentElementAst(node, context, state) {
 	return addDynamicAst(
 		context,
 		generatedCall(
-			state.helpers.nestedComponent,
+			referenceHelper(state, 'nestedComponent'),
 			[b.literal(state.renderer.id), component, props],
 			node,
 		),
@@ -3330,7 +3341,7 @@ function compileBlockValueAst(statements, state, params = [], origin = null) {
 			: withPlanOrigin({ kind: 'range', children: templates }, origin ?? statements?.[0]);
 	const plan = allocPlan(state, root, origin ?? statements?.[0]);
 	const value = generatedCall(
-		state.helpers.value,
+		referenceHelper(state, 'value'),
 		[
 			generatedIdentifier(plan, origin ?? statements?.[0]),
 			inheritGeneratedOrigin(b.array(context.values), origin ?? statements?.[0]),
@@ -3402,10 +3413,11 @@ function compileOwnerFreeThreeHostComponentAst(component, state, itemBinding, in
 		names.push(name);
 		values.push(expression);
 	}
-	const helper = (state.helpers.hostComponentLeafPlan ??= allocName(
+	state.helpers.hostComponentLeafPlan ??= allocName(
 		state,
 		'__octaneUniversalHostComponentLeafPlan',
-	));
+	);
+	const helper = referenceHelper(state, 'hostComponentLeafPlan');
 	const signature = JSON.stringify(names);
 	return {
 		plan: generatedCall(
@@ -3425,7 +3437,7 @@ function compileOwnerFreeThreeHostComponentAst(component, state, itemBinding, in
 function compileTemplateProgramForComponentAst(component, state, itemBinding, indexBinding) {
 	const attributes = component.openingElement?.attributes ?? component.attributes ?? [];
 	const props = generatedCall(
-		state.helpers.props,
+		referenceHelper(state, 'props'),
 		[
 			compilePlainPropsObjectAst(attributes, state, component),
 			inheritGeneratedOrigin(b.unary('void', b.literal(0)), component),
@@ -3435,7 +3447,7 @@ function compileTemplateProgramForComponentAst(component, state, itemBinding, in
 		component,
 	);
 	const descriptor = generatedCall(
-		state.helpers.nestedComponent,
+		referenceHelper(state, 'nestedComponent'),
 		[b.literal(state.renderer.id), jsxNameExpressionAst(component, state), props],
 		component,
 	);
@@ -3534,7 +3546,7 @@ function compileForAst(node, context, state) {
 	} else if (node.empty) {
 		args.push(compileBlockValueAst(node.empty?.body ?? [], state, [], node.empty));
 	}
-	return addDynamicAst(context, generatedCall(state.helpers.for, args, node));
+	return addDynamicAst(context, generatedCall(referenceHelper(state, 'for'), args, node));
 }
 
 function compileIfAst(node, context, state) {
@@ -3560,7 +3572,7 @@ function compileIfAst(node, context, state) {
 	}
 	const args = [rewriteSourceAst(node.test, state), consequent];
 	if (alternate !== null) args.push(alternate);
-	return addDynamicAst(context, generatedCall(state.helpers.if, args, node));
+	return addDynamicAst(context, generatedCall(referenceHelper(state, 'if'), args, node));
 }
 
 function compileIfValueAst(node, state) {
@@ -3588,7 +3600,7 @@ function compileSwitchAst(node, context, state) {
 		inheritGeneratedOrigin(b.array(cases), node),
 	];
 	if (fallback !== null) args.push(fallback);
-	return addDynamicAst(context, generatedCall(state.helpers.switch, args, node));
+	return addDynamicAst(context, generatedCall(referenceHelper(state, 'switch'), args, node));
 }
 
 function compileTryAst(node, context, state) {
@@ -3604,7 +3616,10 @@ function compileTryAst(node, context, state) {
 				node.handler,
 			)
 		: inheritGeneratedOrigin(b.literal(null, 'null'), node);
-	return addDynamicAst(context, generatedCall(state.helpers.try, [body, pending, caught], node));
+	return addDynamicAst(
+		context,
+		generatedCall(referenceHelper(state, 'try'), [body, pending, caught], node),
+	);
 }
 
 function compileChildAst(node, context, state) {
@@ -3694,7 +3709,7 @@ function compileCodeBlockAst(block, params, context, state) {
 		addDynamicAst(
 			context,
 			generatedCall(
-				state.helpers.block,
+				referenceHelper(state, 'block'),
 				[
 					compileBlockValueAst(
 						[...body, ...(render === null ? [] : [render])],
@@ -3817,7 +3832,7 @@ function emitComponentAst(shape, state) {
 		fn,
 	);
 	let wrapped = generatedCall(
-		state.helpers.component,
+		referenceHelper(state, 'component'),
 		[
 			b.literal(state.renderer.id),
 			componentFunction,
@@ -3833,7 +3848,11 @@ function emitComponentAst(shape, state) {
 		);
 	}
 	if (state.hmr && exportKind !== null) {
-		wrapped = generatedCall(state.helpers.hmr, [b.literal(state.renderer.id), wrapped], fn);
+		wrapped = generatedCall(
+			referenceHelper(state, 'hmr'),
+			[b.literal(state.renderer.id), wrapped],
+			fn,
+		);
 		state.hmrComponents.push({ name, exportKind, origin: fn });
 	}
 	if (state.profile) {
@@ -3904,42 +3923,46 @@ function threadHelperImportPairs(state) {
 	].filter(([, local]) => local !== undefined);
 }
 
+// Every helper the universal compiler can import from `renderer.module`, as
+// [export name, `state.helpers` key]. A module imports a helper only once its
+// output references it: standalone renderer runtimes such as the Lynx main
+// thread export just the helpers their renderer can emit, and bundlers reject
+// an import of a missing export even when nothing calls it.
+export const UNIVERSAL_RENDERER_HELPER_IMPORTS = Object.freeze([
+	['defineUniversalComponent', 'component'],
+	['universalPlan', 'plan'],
+	['universalValue', 'value'],
+	['universalComponent', 'nestedComponent'],
+	['universalHostComponentLeafPlan', 'hostComponentLeafPlan'],
+	['registerThreeIntrinsic', 'threeRegisterIntrinsic'],
+	['universalProps', 'props'],
+	['universalIf', 'if'],
+	['universalSwitch', 'switch'],
+	['universalFor', 'for'],
+	['universalTry', 'try'],
+	['universalChildren', 'children'],
+	['universalContext', 'context'],
+	['universalActivity', 'activity'],
+	['universalBlock', 'block'],
+	['firstScreenEvent', 'firstScreenEvent'],
+	['hmrUniversalComponent', 'hmr'],
+	['UNIVERSAL_HMR', 'hmrSymbol'],
+]);
+
+// Call only after every statement of the output has been built.
 function universalHelperImportAsts(state, extraPairs = [], origin = null) {
 	const threadPairs = threadHelperImportPairs(state);
 	const threadModule = state.renderer.threadFunctionsModule ?? state.renderer.module;
-	const pairs = [
-		['defineUniversalComponent', state.helpers.component],
-		['universalPlan', state.helpers.plan],
-		['universalValue', state.helpers.value],
-		['universalComponent', state.helpers.nestedComponent],
-		...(state.helpers.hostComponentLeafPlan === undefined
+	const pairs = [];
+	for (const [imported, key] of UNIVERSAL_RENDERER_HELPER_IMPORTS) {
+		if (state.usedHelpers.has(key)) pairs.push([imported, state.helpers[key]]);
+	}
+	pairs.push(...extraPairs);
+	if (threadModule === state.renderer.module) pairs.push(...threadPairs);
+	const imports =
+		pairs.length === 0
 			? []
-			: [['universalHostComponentLeafPlan', state.helpers.hostComponentLeafPlan]]),
-		...(state.helpers.threeRegisterIntrinsic === undefined
-			? []
-			: [['registerThreeIntrinsic', state.helpers.threeRegisterIntrinsic]]),
-		['universalProps', state.helpers.props],
-		['universalIf', state.helpers.if],
-		['universalSwitch', state.helpers.switch],
-		['universalFor', state.helpers.for],
-		['universalTry', state.helpers.try],
-		['universalChildren', state.helpers.children],
-		['universalContext', state.helpers.context],
-		['universalActivity', state.helpers.activity],
-		['universalBlock', state.helpers.block],
-		...(state.helpers.firstScreenEvent === undefined
-			? []
-			: [['firstScreenEvent', state.helpers.firstScreenEvent]]),
-		...(state.hmr
-			? [
-					['hmrUniversalComponent', state.helpers.hmr],
-					['UNIVERSAL_HMR', state.helpers.hmrSymbol],
-				]
-			: []),
-		...extraPairs,
-		...(threadModule === state.renderer.module ? threadPairs : []),
-	];
-	const imports = [inheritGeneratedOrigin(b.imports(pairs, state.renderer.module), origin)];
+			: [inheritGeneratedOrigin(b.imports(pairs, state.renderer.module), origin)];
 	if (threadPairs.length !== 0 && threadModule !== state.renderer.module) {
 		imports.push(inheritGeneratedOrigin(b.imports(threadPairs, threadModule), origin));
 	}
@@ -3962,7 +3985,7 @@ function threeHostIntrinsicStatementsAst(state, origin = null) {
 		inheritGeneratedOrigin(
 			b.stmt(
 				generatedCall(
-					state.helpers.threeRegisterIntrinsic,
+					referenceHelper(state, 'threeRegisterIntrinsic'),
 					[
 						b.literal(constructor, JSON.stringify(constructor)),
 						generatedIdentifier(entry.local, entry.origin),
@@ -3991,7 +4014,7 @@ function universalPlanDeclarationsAst(state, origin = null) {
 		return generatedConst(
 			plan.name,
 			generatedCall(
-				state.helpers.plan,
+				referenceHelper(state, 'plan'),
 				[b.literal(state.renderer.id), jsonValueToAst(plan.root, planOrigin)],
 				planOrigin,
 			),
@@ -4069,7 +4092,7 @@ function hmrHandoffStatements(state, hot, origin) {
 		);
 		const update = b.stmt(
 			b.call(
-				b.member(b.member(existing, b.id(state.helpers.hmrSymbol), true), 'update'),
+				b.member(b.member(existing, b.id(referenceHelper(state, 'hmrSymbol')), true), 'update'),
 				b.id(component.name),
 			),
 		);
@@ -4269,6 +4292,7 @@ export function lowerUniversalRendererRegionAst(
 		profile: options.profile === true,
 		profileFilename: options.profileFilename,
 		helpers: {},
+		usedHelpers: new Set(),
 		componentNames: collectComponentNames(analysisAst),
 		contextSourceFacts: createContextSourceFacts(analysisAst),
 		runtimeImports: new Map(),
@@ -4429,7 +4453,7 @@ export function lowerUniversalRendererRegionAst(
 		origin,
 	);
 	let componentValue = generatedCall(
-		state.helpers.component,
+		referenceHelper(state, 'component'),
 		[
 			b.literal(renderer.id),
 			componentFunction,
@@ -4446,7 +4470,7 @@ export function lowerUniversalRendererRegionAst(
 	});
 	if (state.hmr) {
 		componentValue = generatedCall(
-			state.helpers.hmr,
+			referenceHelper(state, 'hmr'),
 			[b.literal(renderer.id), componentValue],
 			origin,
 		);
@@ -4483,6 +4507,7 @@ export function lowerUniversalRendererRegionAst(
 	const hmrBlocks = buildUniversalHmrBlocksAst(state, origin);
 	const profileImport = universalProfileImportAst(state, origin);
 	const threeHostIntrinsics = threeHostIntrinsicStatementsAst(state, origin);
+	const planDeclarations = universalPlanDeclarationsAst(state, origin);
 	const helperImportPairs = [
 		['rendererRegion', regionHelper],
 		...runtimeImports.map(({ imported, local }) => [imported, local]),
@@ -4533,7 +4558,7 @@ export function lowerUniversalRendererRegionAst(
 			...(profileImport === null ? [] : [profileImport]),
 			...hmrBlocks.prelude,
 			...threeHostIntrinsics.registrations,
-			...universalPlanDeclarationsAst(state, origin),
+			...planDeclarations,
 			...(state.threadFunctionRegistrationsAst ?? []),
 			...emittedComponents,
 			componentDeclaration,
@@ -4585,6 +4610,7 @@ export function compileUniversal(
 		profile: options.profile === true,
 		profileFilename: options.profileFilename,
 		helpers: {},
+		usedHelpers: new Set(),
 		componentNames: collectComponentNames(ast),
 		contextSourceFacts: createContextSourceFacts(ast),
 		runtimeImports: new Map(),
@@ -4667,6 +4693,7 @@ export function compileUniversal(
 	};
 	const profileImport = universalProfileImportAst(state, moduleOrigin);
 	const threeHostIntrinsics = threeHostIntrinsicStatementsAst(state, moduleOrigin);
+	const planDeclarations = universalPlanDeclarationsAst(state, moduleOrigin);
 	const program = {
 		...ast,
 		body: [
@@ -4675,7 +4702,7 @@ export function compileUniversal(
 			...(profileImport === null ? [] : [profileImport]),
 			...hmrBlocks.prelude,
 			...threeHostIntrinsics.registrations,
-			...universalPlanDeclarationsAst(state, moduleOrigin),
+			...planDeclarations,
 			...(state.threadFunctionRegistrationsAst ?? []),
 			...emitted,
 			...hmrBlocks.tail,
