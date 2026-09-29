@@ -9,15 +9,15 @@
 // component for it — otherwise `SafeFragment` passes through so suspensions and
 // errors bubble to the nearest ancestor boundary (upstream's
 // ResolvedSuspenseBoundary/ResolvedCatchBoundary/ResolvedNotFoundBoundary).
-// `MatchInner` handles the match STATUS: it suspends (octane `use`, upstream
-// `throw promise`) on pending/redirected/_displayPending/_forcePending, renders
+// `MatchInner` handles the match STATUS: it suspends (a thrown promise, as
+// upstream) on pending/redirected/_displayPending/_forcePending, renders
 // the route's not-found UI for `status === 'notFound'`, throws to the
 // CatchBoundary for `status === 'error'`, and otherwise renders the route
 // component (or `<Outlet/>` for component-less layout routes) keyed by
 // remountDeps. `OnRendered` (rendered by the match directly below the root)
 // emits the router's `onRendered` event after the subtree commits — scroll
 // restoration restores on it.
-import { useRef, useLayoutEffect, use, createElement, Suspense } from 'octane';
+import { useRef, useLayoutEffect, createElement, Suspense } from 'octane';
 import {
 	createControlledPromise,
 	getLocationChangeInfo,
@@ -143,12 +143,17 @@ function MatchInner(props: { matchId: string }) {
 	const getMatchPromise = (key: 'displayPendingPromise' | 'minPendingPromise' | 'loadPromise') =>
 		router.getMatch(match.id)?._nonReactive[key] ?? match._nonReactive[key];
 
+	// Suspend by throwing, like upstream, not with `use()`. Each match state
+	// waits on a different promise, and `use()` is positional: a replay that
+	// finds the match in a new state would get the promise stored for the old
+	// one. Router-core's promises settle to `status: 'resolved'`, which `use()`
+	// reads as still pending, so that stored promise retries forever.
 	if (match._displayPending) {
-		use(getMatchPromise('displayPendingPromise')!);
+		throw getMatchPromise('displayPendingPromise')!;
 	}
 
 	if (match._forcePending) {
-		use(getMatchPromise('minPendingPromise')!);
+		throw getMatchPromise('minPendingPromise')!;
 	}
 
 	if (match.status === 'pending') {
@@ -165,7 +170,7 @@ function MatchInner(props: { matchId: string }) {
 				}, pendingMinMs);
 			}
 		}
-		use(getMatchPromise('loadPromise')!);
+		throw getMatchPromise('loadPromise')!;
 	}
 
 	if (match.status === 'notFound') {
@@ -173,9 +178,12 @@ function MatchInner(props: { matchId: string }) {
 	}
 
 	if (match.status === 'redirected') {
-		// Observed mid-transition while a redirect is in flight — suspend on the
-		// load so this stale render is abandoned and the redirect completes.
-		use(getMatchPromise('loadPromise')!);
+		// Observed mid-transition while a redirect is in flight — stay suspended so
+		// this stale render is abandoned and the redirect completes.
+		const atom = matchStore as unknown as Partial<MatchAtom>;
+		throw typeof atom.subscribe === 'function'
+			? nextMatchUpdate(atom as MatchAtom, match)
+			: getMatchPromise('loadPromise')!;
 	}
 
 	if (match.status === 'error') {
@@ -197,6 +205,39 @@ function MatchInner(props: { matchId: string }) {
 		remountDeps ? JSON.stringify(remountDeps) : undefined;
 	if (Comp) return createElement(Comp, key !== undefined ? { key } : {});
 	return createElement(Outlet, {});
+}
+
+interface MatchAtom {
+	get: () => object;
+	subscribe: (cb: () => void) => { unsubscribe: () => void };
+}
+
+const matchUpdates = new WeakMap<object, Promise<void>>();
+
+// Settles on the first store update after `snapshot`. A redirected match waits
+// on this, not on its loadPromise: router-core resolves that promise when it
+// marks the redirect, and a settled promise retries on a microtask until the
+// redirect target has loaded, starving the timers and network callbacks that
+// load waits on. React's scheduler paces those retries; Octane's retry does
+// not. Server atoms cannot subscribe, so the server keeps upstream's promise:
+// a server redirect is answered before the app renders.
+function nextMatchUpdate(store: MatchAtom, snapshot: object): Promise<void> {
+	let update = matchUpdates.get(snapshot);
+	if (update === undefined) {
+		update = new Promise<void>((resolve) => {
+			const subscription = store.subscribe(() => {
+				subscription.unsubscribe();
+				resolve();
+			});
+			// The store may have moved on between this render and the subscription.
+			if (store.get() !== snapshot) {
+				subscription.unsubscribe();
+				resolve();
+			}
+		});
+		matchUpdates.set(snapshot, update);
+	}
+	return update;
 }
 
 // Emits the router's `onRendered` event once the subtree below the root layout
