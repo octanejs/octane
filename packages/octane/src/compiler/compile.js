@@ -12227,7 +12227,9 @@ function ssrReturnedJsxNode(argument, ctx) {
 		argument.type === 'JSXFragment' ||
 		argument.type === 'Fragment' ||
 		isFragmentLongForm(argument, ctx) ||
-		(!returnedHostRoot && requiresTemplateNormalization(argument, 'html', true, ctx))
+		(returnedHostRoot
+			? isRangedReturnedHost(argument)
+			: requiresTemplateNormalization(argument, 'html', true, ctx))
 	) {
 		return {
 			type: 'TSRXExpression',
@@ -15190,12 +15192,15 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 			node,
 		);
 	}
-	if (node.returnedJsxValue === true && requiresTemplateNormalization(expr, 'html', true, ctx)) {
+	if (
+		node.returnedJsxValue === true &&
+		(isRangedReturnedHost(expr) || requiresTemplateNormalization(expr, 'html', true, ctx))
+	) {
 		// A returned JSX value that contains template-only syntax is one compiled
 		// renderer on the client (rather than a descriptor array whose value
 		// lowering cannot represent directives, sentinels, head hoists, or child
-		// code blocks). Mirror that component boundary on the server: the local
-		// sub-function keeps access to the
+		// code blocks), as is an imperatively built host root. Mirror that component
+		// boundary on the server: the local sub-function keeps access to the
 		// enclosing return component's props/locals, while ssrComponent emits the
 		// range the client descriptor adopts during hydration.
 		// The final flag mirrors extractFragment's component-child decision inside
@@ -20902,6 +20907,25 @@ function renderCallScopeParam(node, ctx) {
 	};
 }
 
+/**
+ * A returned host root that keeps its fragment renderer's own range.
+ *
+ * The client renders every returned host root through a compiled fragment. That
+ * fragment mounts markerless when the host is its one template element, so the
+ * server inlines the host without a range. A host both modes build imperatively
+ * (keyed, `noscript`, document) is a descriptor hole inside the fragment
+ * instead, and the server frames that hole with its own range. A markerless
+ * fragment would adopt that inner range as its own during hydration, so both
+ * sides give this root the fragment range that returned fragments keep.
+ */
+function isRangedReturnedHost(node) {
+	return (
+		(node.type === 'Element' || node.type === 'JSXElement') &&
+		!isComponentTag(node) &&
+		alwaysImperativeHost(node)
+	);
+}
+
 // Lower JSX at return position. Host roots always use the compiled-fragment
 // path. Any other root whose subtree contains template-only syntax uses it too.
 // Ordinary component/Fragment values retain descriptor lowering and its identity
@@ -21759,11 +21783,16 @@ function lowerHostFragment(
 		node,
 	);
 	const renderer = compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash);
-	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
+	if (
+		(node.type === 'Element' || node.type === 'JSXElement') &&
+		!isComponentTag(node) &&
+		!isRangedReturnedHost(node)
+	) {
 		// A host fragment is a SINGLE root element, so it can mount markerless (the
 		// element self-delimits) — matching `@{}`'s inline render exactly (no extra
 		// comment markers), which is required for byte-equal DOM when folding `@{}`.
-		// A returned JSX fragment may have multiple roots and must retain its range.
+		// A returned JSX fragment may have multiple roots and must retain its range,
+		// as must an imperatively built host (see isRangedReturnedHost).
 		ctx.hoistedHelpers.push(
 			inheritOriginLoc(
 				b.const(fragName, singleRootInitializer(ctx, functionExpressionFromDeclaration(renderer))),
@@ -23807,9 +23836,16 @@ function normalizeAuthoredJsxLiterals(ast) {
 }
 
 function requiresImperativeHostTree(root, ctx) {
+	return (
+		(ctx.mode !== 'server' && root._octaneImperativeHost === true) || alwaysImperativeHost(root)
+	);
+}
+
+// Hosts that both compile modes build imperatively. Parser-repaired trees are
+// client-only: server output is a string, so repair cannot move its bindings.
+function alwaysImperativeHost(root) {
 	const tag = jsxTagName(root) || elementTagName(root);
 	return (
-		(ctx.mode !== 'server' && root._octaneImperativeHost === true) ||
 		hasJsxAttribute(root, 'key') ||
 		tag === 'noscript' ||
 		tag === 'html' ||
