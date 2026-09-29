@@ -15,8 +15,8 @@ import {
 
 // Compiled call sites pass optional runtime arguments positionally and omit
 // trailing undefined ones: componentSlot's tail (invocation site, anchor,
-// singleRoot, inherit, key, hasKey) and a signal-capable text hole's mount
-// (mountSignalText) and update (bindSignalText's previousValue). Each shape
+// singleRoot, inherit, key, hasKey) and a signal-capable text hole's update
+// (bindSignalText's previousValue). Each shape
 // must keep its identity, placement, and hydration adoption whether it renders
 // fresh or adopts server markup.
 

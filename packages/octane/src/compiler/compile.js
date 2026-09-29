@@ -1456,8 +1456,6 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'isRenderCall',
 	'deferRecord',
 	'bindSignalText',
-	'mountSignalText',
-	'mountSignalTextSwap',
 	'bindSignalChild',
 	'bindSignalAttribute',
 	'hydrateClaimedBindingCaches',
@@ -26003,21 +26001,8 @@ function planJsx(
 		if (!b.signalDirect && (b.kind === 'text' || b.kind === 'textOnlyChild')) {
 			ctx.runtimeNeeded.add('setText');
 		}
-		// A signal-capable text hole without a binding marker mounts through
-		// mountSignalText(Swap), which retains the scalar writer itself.
-		const sharedSignalTextMount = b.signalDirect && !b.bindingMarker;
-		if (b.kind === 'text') {
-			ctx.runtimeNeeded.add(
-				b.bindingMarker
-					? 'bindingText'
-					: sharedSignalTextMount
-						? 'mountSignalTextSwap'
-						: 'htextSwap',
-			);
-		}
-		if (b.kind === 'textOnlyChild') {
-			ctx.runtimeNeeded.add(sharedSignalTextMount ? 'mountSignalText' : 'htext');
-		}
+		if (b.kind === 'text') ctx.runtimeNeeded.add(b.bindingMarker ? 'bindingText' : 'htextSwap');
+		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
 		// Mounts use the unconditional writer; reactive scalar bindings use either
 		// that writer behind an inline guard or its compact comparison helper.
 		// Claim both authored-name tokens when both paths exist, and do not retain
@@ -27814,37 +27799,20 @@ function emitBindingMount(bind, elVar, bag) {
 	const signalHelper = directSignalBindingHelper(bind);
 	if (signalHelper !== null) {
 		const text = bind.kind === 'text' || bind.kind === 'textOnlyChild';
-		let mount;
-		if (text && !bind.bindingMarker) {
-			// mountSignalText(Swap) owns the primitive-or-handle dispatch that every
-			// such hole used to inline: primitives mount through htext/htextSwap,
-			// anything else through bindSignalText. Mount-only, so the shared call
-			// never reaches the update guard below.
-			mount = b.call(
-				attrLoweringToken(
-					b.id(bind.kind === 'textOnlyChild' ? '_$mountSignalText' : '_$mountSignalTextSwap'),
-					bind,
-				),
-				b.id('__s'),
-				el(),
-				V(),
-				b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
-				...(bind.kind === 'textOnlyChild' && bind.seededText ? [b.literal(1)] : []),
-			);
-		} else {
-			mount = b.call(
-				attrLoweringToken(b.id(`_$${signalHelper}`), bind),
-				...directSignalBindingArgs(bind, el(), undefinedNode(), text ? V() : bind.expr),
-			);
-		}
-		if (text && bind.bindingMarker) {
+		let mount = b.call(
+			attrLoweringToken(b.id(`_$${signalHelper}`), bind),
+			...directSignalBindingArgs(bind, el(), undefinedNode(), text ? V() : bind.expr),
+		);
+		if (text) {
 			// A possible handle is not a subscription. Primitive text mounts through
 			// the canonical hydration/seeded-placeholder writer, without journaling
 			// a freshly cloned Text as though it were an existing update target.
 			const scalarMount =
 				bind.kind === 'textOnlyChild'
 					? b.call('_$htext', el(), V(), ...(bind.seededText ? [b.literal(1)] : []))
-					: b.call('_$bindingText', el(), V(), b.literal(bind.bindingMarker));
+					: bind.bindingMarker
+						? b.call('_$bindingText', el(), V(), b.literal(bind.bindingMarker))
+						: b.call('_$htextSwap', el(), V());
 			mount = b.conditional(
 				b.logical(
 					'||',

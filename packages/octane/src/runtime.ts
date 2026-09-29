@@ -21265,37 +21265,6 @@ export function bindSignalText(
 	);
 }
 
-/**
- * @internal Compiler target for mounting a signal-capable only-child text hole.
- * A primitive mounts through htext, the canonical hydration and seeded-placeholder
- * writer, without journaling a freshly cloned Text as though it were an existing
- * update target. A possible handle is not a subscription until bindSignalText
- * reads it. Every such hole shares this one dispatch instead of inlining it.
- */
-export function mountSignalText(
-	scope: Scope,
-	el: Node,
-	value: unknown,
-	site: string,
-	seededText?: 1,
-): unknown {
-	return value === null || (typeof value !== 'object' && typeof value !== 'function')
-		? htext(el, value, seededText)
-		: bindSignalText(scope, undefined, el, value, site, true, undefined, seededText);
-}
-
-/** @internal mountSignalText for a text hole among siblings (htextSwap's position). */
-export function mountSignalTextSwap(
-	scope: Scope,
-	posNode: Node,
-	value: unknown,
-	site: string,
-): unknown {
-	return value === null || (typeof value !== 'object' && typeof value !== 'function')
-		? htextSwap(posNode, value)
-		: bindSignalText(scope, undefined, posNode, value, site);
-}
-
 /** @internal Compiler target for a direct signal/scalar attribute binding. */
 export function bindSignalAttribute(
 	scope: Scope,
