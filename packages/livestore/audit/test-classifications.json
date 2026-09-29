@@ -17,6 +17,11 @@
       "reason": "Covers StoreRegistryProvider context, explicit override, and missing-context errors for the Octane port surface outside the adapted upstream useStore cases."
     },
     {
+      "path": "packages/livestore/tests/conformance/sequential-stores.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Sequential useStore calls in one component keep their own Suspense positions through Octane's resume replay; an Octane guard with no upstream @livestore/react case, which React 19.2.3 fails in a transition replay."
+    },
+    {
       "path": "packages/livestore/tests/conformance/sync-status.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Sync-status subscription switching and hydration are Octane external-store contracts unpaired as adapted upstream-suite cases."
