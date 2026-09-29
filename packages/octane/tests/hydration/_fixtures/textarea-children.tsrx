@@ -51,6 +51,10 @@ export function Descriptor(props: { value: any }) @{
 	<section>{createElement('textarea', null, 'hello ', props.value)}</section>
 }
 
+export function DescriptorTag(props: { tag: string; value: any }) @{
+	<section>{createElement(props.tag, null, 'hello ', props.value)}</section>
+}
+
 export function StoredJsx(props: { value: OctaneNode }) {
 	const field = <textarea>hi {props.value}</textarea>;
 	return <section>{field}</section>;

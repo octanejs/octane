@@ -32138,7 +32138,7 @@ function reconcileDeoptNode(
 		if (!hasHostPropContent(value)) {
 			reconcileDeoptChildren(
 				el,
-				value.type === 'textarea' && elNs === undefined
+				isHtmlTextareaType(value.type, elNs)
 					? textareaChildText(value.children, rejectTextareaChild)
 					: value.children,
 				ownerBlock,
@@ -32706,6 +32706,16 @@ function descNeedsBlocks(value: any): boolean {
 	return false;
 }
 
+// An HTML tag name is ASCII case-insensitive (`createElement('TEXTAREA')` makes
+// a textarea), and the server folds on the lowercased tag (ssrHostElement).
+// Compare the string before paying for a DOM accessor on every de-opt host.
+function isHtmlTextareaType(type: string, elNs: string | undefined): boolean {
+	return (
+		elNs === undefined &&
+		(type === 'textarea' || (type.length === 8 && type.toLowerCase() === 'textarea'))
+	);
+}
+
 // One childSlot renders a block-backed de-opt host's children into it. A
 // <textarea>'s children are text instead, like a compiled one's (see
 // textareaText): they fold to one string whose single Text node needs no slot
@@ -32719,7 +32729,7 @@ function deoptHostChildren(
 	elNs: string | undefined,
 	adopt = false,
 ): void {
-	if (d.type !== 'textarea' || elNs !== undefined) {
+	if (!isHtmlTextareaType(d.type as string, elNs)) {
 		childSlot(block, 0, el, d.children, null, false, el);
 		return;
 	}

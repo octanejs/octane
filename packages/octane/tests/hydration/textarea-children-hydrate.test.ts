@@ -323,6 +323,32 @@ describe('textarea children: client-only mount and update', () => {
 		}
 	});
 
+	// HTML tag names are case-insensitive, so the server serializes these as the
+	// same text; the client must fold them the same way.
+	it.each(['TEXTAREA', 'TextArea'])('folds the children of a %s descriptor', (tag) => {
+		const serverHost = renderServer('DescriptorTag', { tag, value: new Set(['a', 'b']) });
+		expectOnlyText(serverHost.querySelector('textarea')!, 'hello ab');
+
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const host = container();
+		const root = createRoot(host);
+		try {
+			flushSync(() =>
+				root.render(Client.DescriptorTag as any, { tag, value: new Set(['a', 'b']) }),
+			);
+			expectOnlyText(host.querySelector('textarea')!, 'hello ab');
+			flushSync(() => root.render(Client.DescriptorTag as any, { tag, value: ['c', 1] }));
+			expectOnlyText(host.querySelector('textarea')!, 'hello c1');
+			expect(() =>
+				flushSync(() =>
+					root.render(Client.DescriptorTag as any, { tag, value: createElement('p', null) }),
+				),
+			).toThrow(/children must be text.*One child was an element\./);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('updates a signal part without replacing the text node', async () => {
 		const owner = createScope({ scopeKey: 'textarea-children-client-signal' });
 		const value = owner.signal$<unknown>('value', 'one');

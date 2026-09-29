@@ -47,8 +47,8 @@ export function NestedHole(props: HoleProps) @{
 	</main>
 }
 
-// A textarea's text is its default value. The server serializes an element
-// child as escaped text, so the client still finds a single text node there.
+// A textarea's children are its default value, so an element there is
+// rejected on both sides.
 export function AreaHole(props: HoleProps) @{
 	<section>
 		<textarea>{pick(props.kind, props.v)}</textarea>
@@ -70,7 +70,6 @@ export function SuspendingHole(props: { text: Promise<string> | null; v: string 
 		@try {
 			<section>
 				<div>{wait(props.text, props.v)}</div>
-				<textarea>{wait(props.text, props.v)}</textarea>
 				<b>{props.v}</b>
 			</section>
 		} @pending {
