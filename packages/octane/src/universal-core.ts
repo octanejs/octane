@@ -6293,6 +6293,154 @@ export function useTransition(slot?: unknown): [boolean, typeof startTransition]
 	});
 }
 
+// useActionState(action, initialState, permalink?) → [state, dispatch, isPending]
+//
+// React 19 queue semantics, shared with the DOM runtime's useActionState:
+// dispatches run SEQUENTIALLY, each receiving the previous COMPLETED result as
+// previousState, and each runs the action that was current when it was
+// dispatched. The dispatcher is stable. An idle queue runs a dispatch at once,
+// so a synchronous action has already run when dispatch returns. Every run is a
+// transition; isPending publishes urgently on dispatch and clears in the same
+// transition commit as the last result. An action error routes to the nearest
+// universalTry boundary (else the root's uncaught path), keeps the prior state,
+// and does not cancel queued dispatches (the documented React divergence).
+
+interface UniversalActionStateRun<State, Payload> {
+	readonly action: (previousState: State, payload: Payload) => State | PromiseLike<State>;
+	readonly payload: Payload;
+	next: UniversalActionStateRun<State, Payload> | null;
+}
+
+interface UniversalActionStateQueue<State, Payload> {
+	/** The committed action; a replacement is published at commit, never by a draft. */
+	action: (previousState: State, payload: Payload) => State | PromiseLike<State>;
+	/** The last completed result, threaded into the next run. */
+	state: State;
+	head: UniversalActionStateRun<State, Payload> | null;
+	tail: UniversalActionStateRun<State, Payload> | null;
+	running: boolean;
+	readonly owner: UniversalOwnerRecord;
+	readonly setState: (value: (previous: State) => State) => void;
+	readonly setPending: (value: boolean) => void;
+	readonly dispatch: (payload: Payload) => void;
+}
+
+function createUniversalActionStateQueue<State, Payload>(
+	owner: UniversalOwnerRecord,
+	action: UniversalActionStateQueue<State, Payload>['action'],
+	initialState: State,
+	setState: UniversalActionStateQueue<State, Payload>['setState'],
+	setPending: UniversalActionStateQueue<State, Payload>['setPending'],
+): UniversalActionStateQueue<State, Payload> {
+	const queue: UniversalActionStateQueue<State, Payload> = {
+		action,
+		state: initialState,
+		head: null,
+		tail: null,
+		running: false,
+		owner,
+		setState,
+		setPending,
+		dispatch(payload) {
+			const run: UniversalActionStateRun<State, Payload> = {
+				action: queue.action,
+				payload,
+				next: null,
+			};
+			if (queue.tail === null) queue.head = run;
+			else queue.tail.next = run;
+			queue.tail = run;
+			// React publishes isPending as an optimistic update, so it is visible
+			// even when the dispatch itself happens inside a transition.
+			publishUrgentUniversalUpdate(setPending, true);
+			if (!queue.running) runUniversalActionStateQueue(queue);
+		},
+	};
+	return queue;
+}
+
+function publishUrgentUniversalUpdate<T>(set: (value: T) => void, value: T): void {
+	const transitionDepth = UNIVERSAL_TRANSITION_DEPTH;
+	UNIVERSAL_TRANSITION_DEPTH = 0;
+	UNIVERSAL_DISCRETE_EVENT_DEPTH++;
+	try {
+		set(value);
+	} finally {
+		UNIVERSAL_DISCRETE_EVENT_DEPTH--;
+		UNIVERSAL_TRANSITION_DEPTH = transitionDepth;
+	}
+}
+
+function runUniversalActionStateQueue<State, Payload>(
+	queue: UniversalActionStateQueue<State, Payload>,
+): void {
+	// A loop, not recursion: synchronous runs drain here, and an async run
+	// resumes the loop when it settles.
+	while (queue.head !== null && !queue.running) {
+		const run = queue.head;
+		let failed = false;
+		let error: unknown;
+		queue.running = true;
+		startTransition(() => {
+			let result: State | PromiseLike<State>;
+			try {
+				result = run.action(queue.state, run.payload);
+				if (result != null && typeof (result as PromiseLike<State>).then === 'function') {
+					// Resolving before this chain settles keeps the transition open, so
+					// the result, a cleared isPending, and any later run it starts
+					// commit together.
+					return Promise.resolve(result).then(
+						(value) => settleUniversalActionStateRun(queue, true, value),
+						(reason) => settleUniversalActionStateRun(queue, false, reason),
+					);
+				}
+			} catch (reason) {
+				failed = true;
+				error = reason;
+				completeUniversalActionStateRun(queue, false, undefined);
+				return;
+			}
+			completeUniversalActionStateRun(queue, true, result);
+		});
+		if (failed) reportUniversalActionStateError(queue.owner, error);
+	}
+}
+
+function settleUniversalActionStateRun<State, Payload>(
+	queue: UniversalActionStateQueue<State, Payload>,
+	fulfilled: boolean,
+	value: unknown,
+): void {
+	startTransition(() => completeUniversalActionStateRun(queue, fulfilled, value));
+	if (!fulfilled) reportUniversalActionStateError(queue.owner, value);
+	runUniversalActionStateQueue(queue);
+}
+
+function completeUniversalActionStateRun<State, Payload>(
+	queue: UniversalActionStateQueue<State, Payload>,
+	fulfilled: boolean,
+	value: unknown,
+): void {
+	queue.head = queue.head!.next;
+	if (queue.head === null) queue.tail = null;
+	queue.running = false;
+	if (fulfilled) {
+		const state = value as State;
+		queue.state = state;
+		// An updater, so a function-valued state is stored rather than called.
+		queue.setState(() => state);
+	}
+	if (queue.head === null) queue.setPending(false);
+}
+
+function reportUniversalActionStateError(owner: UniversalOwnerRecord, error: unknown): void {
+	if (!owner.disposed && routeUniversalOwnerError(owner, error)) return;
+	if (reportUniversalUncaughtError(owner.root, error)) return;
+	owner.root.__scheduleMicrotask(() => {
+		throw error;
+	});
+}
+
 export function useActionState<State, Payload>(
 	action: (previousState: State, payload: Payload) => State | Promise<State>,
 	initialState: State,
@@ -6301,43 +6449,32 @@ export function useActionState<State, Payload>(
 ): [State, (payload: Payload) => void, boolean] {
 	const slot = maybeSlot ?? (typeof _permalinkOrSlot === 'string' ? undefined : _permalinkOrSlot);
 	const base = resolveHookSlot(slot);
-	const root = currentDraftOwner().record.root;
+	const owner = currentDraftOwner().record;
 	return withSlot(base, () => {
-		const [state, setState, getState] = useState(initialState, 'state');
+		// Initializers, so a function-valued initial state is stored rather than called.
+		const [state, setState] = useState(() => initialState, 'state');
 		const [pending, setPending] = useState(false, 'pending');
-		const dispatch = useCallback(
-			(payload: Payload) => {
-				let result: State | Promise<State>;
-				try {
-					result = action(getState(), payload);
-				} catch (error) {
-					root.__scheduleMicrotask(() => {
-						throw error;
-					});
-					return;
-				}
-				if (result != null && typeof (result as any).then === 'function') {
-					setPending(true);
-					Promise.resolve(result).then(
-						(value) => {
-							setState(value);
-							setPending(false);
-						},
-						(error) => {
-							setPending(false);
-							root.__scheduleMicrotask(() => {
-								throw error;
-							});
-						},
-					);
-				} else {
-					setState(result as State);
-				}
-			},
-			[action],
-			'dispatch',
+		const [queue] = useState(
+			() =>
+				createUniversalActionStateQueue<State, Payload>(
+					owner,
+					action,
+					initialState,
+					setState,
+					setPending,
+				),
+			'queue',
 		);
-		return [state, dispatch, pending];
+		// React assigns a new action in an effect: an abandoned draft never
+		// retargets later dispatches, and queued runs keep their own action.
+		useLayoutEffect(
+			() => {
+				queue.action = action;
+			},
+			[queue, action],
+			'action',
+		);
+		return [state, queue.dispatch, pending];
 	});
 }
 
