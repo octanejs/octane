@@ -21111,7 +21111,16 @@ function isStaticReturnedFragmentComponent(node, ctx) {
 // text, nested host elements/fragments) stays in the template; nested component
 // children become renderable holes. The result is a self-contained fragment whose
 // only inputs are its props — compilable as an ordinary renderer.
-function extractFragment(node, ctx, holeProps, parentNs = 'html') {
+//
+// The renderer builds a keyed, `noscript`/document, or parser-repaired host as a
+// descriptor (isDescriptorBuiltHost), so everything under it lowers through
+// lowerJsxChild. Inside such a host (`inDescriptor`), a child that lowerJsxChild
+// would compile against its owning body lowers here, in the owning component,
+// to the same value a `@{}` body and the server give it.
+function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor = false) {
+	const descriptor =
+		inDescriptor ||
+		(node.type === 'JSXElement' && isDescriptorBuiltHost(node, parentNs === 'svg', ctx));
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const newAttrs = [];
 	const mergedFragmentSpread = isFragmentLongForm(node, ctx) && hasJsxSpreadAttribute(node);
@@ -21278,9 +21287,12 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				newChildren.push({ ...child, expression: rendered });
 			}
 		} else if (t === 'Element' || t === 'JSXElement') {
-			if (isLongFormTemplateSentinel(child, childNs, true, ctx)) {
+			if (descriptor && !isComponentTag(child)) {
+				newChildren.push(extractFragment(child, ctx, holeProps, childNs, true));
+			} else if (!descriptor && isLongFormTemplateSentinel(child, childNs, true, ctx)) {
 				newChildren.push(extractFragment(child, ctx, holeProps, childNs));
 			} else if (
+				!descriptor &&
 				isComponentTag(child) &&
 				(child._octaneBindingSite ||
 					(ctx._foldCtx?.templateComponentChildren === true &&
@@ -21325,7 +21337,18 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			// A fragment nested inside the returned fragment shares the hoisted
 			// renderer. Extract its dynamic values/directives too; leaving it raw would
 			// make authored outer locals resolve against the renderer's hole-props object.
-			newChildren.push(extractFragment(child, ctx, holeProps, childNs));
+			newChildren.push(extractFragment(child, ctx, holeProps, childNs, descriptor));
+		} else if (descriptor && t === 'JSXCodeBlock') {
+			// lowerJsxChild lowers the block as it does under a `@{}` body's descriptor:
+			// a render-only block transparently, and a setup-bearing one through this
+			// component's fold. The renderer must never fold it, since that would move
+			// the block's setup away from the locals it closes over.
+			const value = lowerJsxChild(child, ctx);
+			if (value !== null) {
+				const hn = `h${holeProps.length}`;
+				holeProps.push(objectProp(hn, value));
+				newChildren.push(b.jsx_expression_container(memberProps(hn, child)));
+			}
 		} else if (t === 'JSXCodeBlock') {
 			const body = child.body || [];
 			if (body.length === 0) {
@@ -22408,6 +22431,16 @@ function lowerJsxChild(child, ctx) {
 		const fold = ctx._valueDirectiveLowering;
 		if (fold != null) return fold(child);
 		rejectUnownedValueDirective(child);
+	}
+	if (t === 'JSXCodeBlock') {
+		// A render-only block is transparent grouping, as under a template host. A
+		// setup-bearing or code-only block is its own render scope: the owning
+		// body's fold compiles it into a renderer that closes over that body.
+		if ((child.body?.length ?? 0) === 0) {
+			return child.render ? lowerJsxChild(child.render, ctx) : null;
+		}
+		const fold = ctx._valueDirectiveLowering;
+		if (fold != null) return fold(child);
 	}
 	if (t === 'JSXFragment' || t === 'Fragment') {
 		const els = [];
@@ -23879,6 +23912,17 @@ function rewriteImperativeHeadElements(node, ctx, namespace = 'html', inNoscript
 	};
 }
 
+// A JSXElement that normalizeChildren lowers with jsxElementToCreateElement
+// instead of the template compiler, so its whole subtree becomes descriptor
+// values. extractFragment uses the same test to keep that subtree's children in
+// value form.
+function isDescriptorBuiltHost(node, inSvg, ctx) {
+	return (
+		!isComponentTag(node) &&
+		(hasJsxAttribute(node, 'key') || (!inSvg && requiresImperativeHostTree(node, ctx)))
+	);
+}
+
 /**
  * Normalize a list of JSX child nodes into the shapes the emitters consume:
  *   - Indentation-only JSXText / JSX comments (`{…}` empty containers) → dropped
@@ -24026,12 +24070,7 @@ function normalizeChildren(
 			// Keys need a reconciliation boundary. Parser-sensitive host trees need
 			// imperative construction so HTML repair cannot change binding paths.
 			// The shared descriptor path provides both without taxing ordinary templates.
-			if (
-				ctx &&
-				allowImperative &&
-				!isComponentTag(n) &&
-				(hasJsxAttribute(n, 'key') || (!inSvg && requiresImperativeHostTree(n, ctx)))
-			) {
+			if (ctx && allowImperative && isDescriptorBuiltHost(n, inSvg, ctx)) {
 				out.push(
 					inheritOriginLoc(
 						{
