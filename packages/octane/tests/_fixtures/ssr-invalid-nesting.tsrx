@@ -360,3 +360,73 @@ export function NestedRenderIsolation(props) @{
 		</section>
 	</button>
 }
+
+export function RepairedBranch(props: { show: boolean; value: string }) @{
+	<section>
+		@if (props.show) {
+			<p class="repaired">
+				<div>{props.value as string}</div>
+			</p>
+		} @else {
+			<b>hidden</b>
+		}
+		<span>tail</span>
+	</section>
+}
+
+export function RepairedSibling(props: { value: string; tone: string }) @{
+	<section>
+		<p class="repaired">
+			<div>{props.value as string}</div>
+		</p>
+		<i class={props.tone}>tail</i>
+	</section>
+}
+
+export function RepairedRows(props: { rows: { id: number }[] }) @{
+	<dl>
+		@for (const row of props.rows; key row.id) {
+			<div class="entry">
+				<dt>{String(row.id)}</dt>
+				<dd>
+					<p class="row">
+						<div>{String(row.id)}</div>
+					</p>
+				</dd>
+			</div>
+		}
+	</dl>
+}
+
+function Label(props: { text: string }) @{
+	<em>{props.text as string}</em>
+}
+
+function RepairedLabel(props: { value: string }) @{
+	<p class="repaired">
+		<div>
+			<Label text={props.value} />
+		</div>
+	</p>
+}
+
+export function RepairedComponentHost(props: { value: string }) @{
+	<section>
+		<RepairedLabel value={props.value} />
+	</section>
+}
+
+function RepairedReturn(props: { value: string }) {
+	return <p class="repaired">
+		<div>{props.value as string}</div>
+	</p>;
+}
+
+export function RepairedReturnRows(props: { rows: string[] }) @{
+	<section>
+		@for (const row of props.rows; key row) {
+			<RepairedReturn value={row} />
+		}
+		<span>tail</span>
+	</section>
+}
