@@ -1,4 +1,4 @@
-import { Suspense } from 'octane';
+import { Suspense, use } from 'octane';
 import {
 	I18nextProvider,
 	IcuTrans,
@@ -144,4 +144,37 @@ export function SSRSeedApp(props) @{
 		useSuspense: false,
 	});
 	<p id="seeded-value">{t('seeded') as string}</p>
+}
+
+// Two suspending hooks in one component: the second is reached only on the
+// replay after the first namespace loads, so each hook must keep its own use()
+// position or the second would replay the first hook's settled promise.
+function SequentialNamespacesConsumer(props) @{
+	const { t: translateFirst } = useTranslation('first', { i18n: props.i18n });
+	const { t: translateSecond, ready } = useTranslation('second', { i18n: props.i18n });
+	const text: string = translateFirst('key') + '/' + translateSecond('key');
+	<p id="sequential-value" data-ready={String(ready)}>{text}</p>
+}
+
+export function SequentialNamespacesApp(props) @{
+	<Suspense fallback={<p id="sequential-loading">Loading</p>}>
+		<SequentialNamespacesConsumer i18n={props.i18n} />
+	</Suspense>
+}
+
+function TranslationThenUseConsumer(props) @{
+	const { t } = useTranslation('first', { i18n: props.i18n });
+	props.onAttempt(t('key'));
+	const value = use(props.promise);
+	<p id="then-use-value">{t('key') + '/' + value as string}</p>
+}
+
+export function TranslationThenUseApp(props) @{
+	<Suspense fallback={<p id="then-use-loading">Loading</p>}>
+		<TranslationThenUseConsumer
+			i18n={props.i18n}
+			promise={props.promise}
+			onAttempt={props.onAttempt}
+		/>
+	</Suspense>
 }
