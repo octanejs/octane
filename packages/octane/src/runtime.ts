@@ -38977,15 +38977,16 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 //
 // `optimisticState` equals `state` unless an Action/transition is in flight, in
 // which case it is `state` folded through `updateFn(acc, value)` for each queued
-// addOptimistic call (or the raw value when no updateFn). The queue is cleared
-// when the owning transition settles, so optimistic and real state converge in
-// the same commit — on success `state` has advanced, on error it is unchanged
-// (automatic revert). addOptimistic should be called inside an Action.
+// addOptimistic call. Without an updateFn the fold is React's basicStateReducer:
+// a function value is an updater called with the pending state, as in useState,
+// and any other value replaces it. The queue is cleared when the owning
+// transition settles, so optimistic and real state converge in the same commit —
+// on success `state` has advanced, on error it is unchanged (automatic revert).
+// addOptimistic should be called inside an Action.
 // ---------------------------------------------------------------------------
 
 interface OptimisticSlot<S, V> {
 	queue: V[];
-	updateFn?: (state: S, value: V) => S;
 	add: (value: V) => void;
 	/**
 	 * True when the queue was populated INSIDE a transition, so it should clear
@@ -38996,9 +38997,22 @@ interface OptimisticSlot<S, V> {
 	armed: boolean;
 }
 
+function basicOptimisticReducer<S>(state: S, value: unknown): S {
+	return typeof value === 'function' ? (value as (pending: S) => S)(state) : (value as S);
+}
+
+// Authored calls resolve to React's two overloads; the last one also takes the
+// hook slot the compiler appends.
+export function useOptimistic<S>(
+	passthrough: S,
+): [S, (action: S | ((pendingState: S) => S)) => void];
 export function useOptimistic<S, V = S>(
 	passthrough: S,
-	updateFnOrSlot?: ((state: S, value: V) => S) | symbol,
+	updateFn: (state: S, value: V) => S,
+): [S, (value: V) => void];
+export function useOptimistic<S, V = S>(
+	passthrough: S,
+	updateFnOrSlot: ((state: S, value: V) => S) | symbol | undefined,
 	slot?: symbol,
 ): [S, (value: V) => void];
 export function useOptimistic<S, V = S>(
@@ -39028,7 +39042,6 @@ export function useOptimistic<S, V = S>(
 		};
 		const slotRef: OptimisticSlot<S, V> = {
 			queue: [],
-			updateFn,
 			armed: false,
 			add: (value: V) => {
 				if (
@@ -39070,11 +39083,9 @@ export function useOptimistic<S, V = S>(
 		TRANSITION_LISTENERS.add(listener);
 		registerHookCleanup(scope, () => TRANSITION_LISTENERS.delete(listener));
 	}
-	s.updateFn = updateFn;
 	let optimistic = passthrough;
-	for (let i = 0; i < s.queue.length; i++) {
-		optimistic = s.updateFn ? s.updateFn(optimistic, s.queue[i]) : (s.queue[i] as unknown as S);
-	}
+	const reduce = updateFn ?? basicOptimisticReducer;
+	for (let i = 0; i < s.queue.length; i++) optimistic = reduce(optimistic, s.queue[i]);
 	return [optimistic, s.add];
 }
 
