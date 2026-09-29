@@ -5255,10 +5255,15 @@ function vtScopeForBlock(block: Block): VTOwner | null {
 		}
 		return host as VTOwner;
 	}
-	const parent = block.parentNode;
-	const physical = vtClosestScope(parent);
-	if (physical !== null) return physical as VTOwner;
-	return (parent.nodeType === 9 ? parent : parent.ownerDocument!) as VTOwner;
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		const parent = current.parentNode;
+		const physical = vtClosestScope(parent);
+		if (physical !== null) return physical as VTOwner;
+		const owner = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument!;
+		// A staged template clone still belongs to the inert template document.
+		if (owner.defaultView !== null) return owner as VTOwner;
+	}
+	return null;
 }
 
 /** A nested declaration owns its hosts even while its native animation is idle. */
@@ -18978,6 +18983,42 @@ class HydrationCapability {
 		return created;
 	}
 
+	/**
+	 * htext's counterpart for an only-child hole whose first hydrating value
+	 * renders nothing (`null`, `undefined`, a boolean, or `''`). The server
+	 * serializes that as no children, or as an empty `<!--[--><!--]-->` frame,
+	 * which unwraps like htext's text-only frame. Anything else is server content
+	 * the client renders no node for, so a later value would land beside it.
+	 * Discard it and report the recovery as htext reports extra children.
+	 * A textarea's text is its default value, which its value props own.
+	 */
+	hempty(el: Node, loc?: string): void {
+		const first = getFirstChild(el);
+		if (first === null || (el as Element).localName === 'textarea') return;
+		const next = getNextSibling(first);
+		const framed = this.isOpen(first);
+		if (framed && this.isClose(next) && getNextSibling(next) === null) {
+			(STAGED_DOM?.view(first) ?? first).remove();
+			(STAGED_DOM?.view(next) ?? next).remove();
+			return;
+		}
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from the server's; still recover, but there is nothing to report.
+		if (!this.staleServerValues) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
+			if (process.env.NODE_ENV !== 'production') {
+				warnHydrationStructuralMismatch(
+					loc || (el as any).__oct_loc,
+					'nothing',
+					describeHydrationNode(framed && next !== null ? next : first),
+				);
+			}
+		}
+		for (let n = getFirstChild(el); n !== null; n = getFirstChild(el))
+			(STAGED_DOM?.view(el) ?? el).removeChild(n);
+	}
+
 	htextSwap(posNode: Node | null, text: string): Text {
 		// The server's stand-in for an empty sibling hole (ssrTextSlot). Swap it for
 		// the hole's Text node, then compare against the server's '' like any text.
@@ -23897,6 +23938,7 @@ export function setHostPropSources(
 			props.get('checked')?.value,
 			props.get('defaultChecked')?.value,
 			props.get('multiple')?.value,
+			hasNestedChildren,
 		);
 	return resolved;
 }
@@ -27817,6 +27859,7 @@ function applyFormControlValues(
 	checked: unknown,
 	defaultChecked: unknown,
 	multiple: unknown,
+	hasNestedChildren = false,
 ): void {
 	const ctrl = armControlled(el);
 	const first = !ctrl.formSeen;
@@ -27862,7 +27905,14 @@ function applyFormControlValues(
 		setValue(textarea, value);
 		if (value == null) {
 			if (defaultValue != null) setDefaultValue(textarea, defaultValue, first);
-			else if (!first && (STAGED_DOM?.view(textarea) ?? textarea).defaultValue !== '')
+			// React resets the default here because its children only seed the
+			// initial value. Authored Octane children are a live text binding that
+			// owns the default, so clearing it would detach their Text node.
+			else if (
+				!first &&
+				!hasNestedChildren &&
+				(STAGED_DOM?.view(textarea) ?? textarea).defaultValue !== ''
+			)
 				(STAGED_DOM?.view(textarea) ?? textarea).defaultValue = '';
 		}
 		return;
@@ -35023,7 +35073,9 @@ export function childTextHole(
 		journalRootRange(domParent, null, null);
 		journalRootProperty(parentScope.slots, slotKey, parentScope.slots[slotKey]);
 	}
-	if (state === undefined && vt !== 'object' && vt !== 'function') {
+	// `null` is a primitive here too: ssrChildText serializes every empty value
+	// alike, and childSlot's adoption would misread the host's markerless content.
+	if (state === undefined && (value === null || (vt !== 'object' && vt !== 'function'))) {
 		// Markerless pure-text mode.
 		const str =
 			value == null || value === false || value === true
@@ -35033,6 +35085,7 @@ export function childTextHole(
 					: String(value);
 		if (str === '') {
 			if (cachedNode !== null) (STAGED_DOM?.view(cachedNode) ?? cachedNode).remove();
+			else activeHydration()?.hempty(domParent, siteLoc(parentScope, slotKey));
 			return null;
 		}
 		if (cachedNode !== null) {
