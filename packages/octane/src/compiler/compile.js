@@ -15264,7 +15264,10 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 				b.literal(false),
 				undefinedNode(),
 				undefinedNode(),
-				b.literal(componentInvocationSite(ctx, node)),
+				// Hash the authored JSX, as the client's lowerHostFragment does, not
+				// the synthetic wrapper: every signal instance below this renderer
+				// chains its key from this site.
+				b.literal(componentInvocationSite(ctx, expr)),
 			],
 			node,
 		);
