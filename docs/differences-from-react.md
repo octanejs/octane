@@ -1151,7 +1151,7 @@ as non-goals in the parity ledger.
 
 ## Document metadata and Float resources
 
-Hoisted `<title>`/`<meta>`/`<link>` follow React 19's model with two
+Hoisted `<title>`/`<meta>`/`<link>` follow React 19's model with three
 differences:
 
 - **Ownership is per compile site, not per content.** Each authored element
@@ -1162,6 +1162,12 @@ differences:
   unmounts.
 - **`<title>` accepts any children Octane can stringify** — multiple children
   and expressions concatenate. React 19 errors on non-string title children.
+- **Hydration moves folded metadata into `document.head`.** A body-only render
+  prepends its hoisted metadata to `html`. When that whole `html` fills the
+  hydrating container, `hydrateRoot` moves each metadata entry into
+  `document.head` and adopts it there, so the hydrated DOM matches a client
+  render. React adopts the element where it lies in the container. Folded Float
+  resources and hints stay in place in both.
 
 Metadata and resources hoist from ANY depth, matching React: an element
 nested inside a host partitions out of the body on both the client and the

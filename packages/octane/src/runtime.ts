@@ -18404,6 +18404,55 @@ function isRendererHydrationStyle(node: Node): boolean {
 	);
 }
 
+/** A hoisted Float stylesheet, script, or resource hint the server stamped for dedupe. */
+function isFloatHeadResource(node: Node): boolean {
+	if (node.nodeType !== 1) return false;
+	const el = STAGED_DOM?.view(node as Element) ?? (node as Element);
+	const tag = el.localName;
+	return (
+		(tag === 'link' || tag === 'style' || tag === 'script') &&
+		(el.hasAttribute('data-precedence') ||
+			el.hasAttribute('data-oct-hint') ||
+			el.hasAttribute('data-oct-res'))
+	);
+}
+
+/**
+ * Return the first body node of a hydrating root container. A body-only render
+ * folds its hoisted metadata AHEAD of the body (`headChannel: 'fold'`, React's
+ * resource-hoisting shape), so a container filled with the whole `html` starts
+ * with that prefix. Each `<!--rnh-…-->` interval is a scope-owned head entry:
+ * move it into the document head, where a split-head host places it and
+ * headBlock adopts it, so the hydrated DOM matches a client render. Float
+ * resources and hints are global and deduped document-wide. Like scoped-style
+ * sidecars, they stay in place and the root claim skips them. ssrHeadEl frames
+ * every entry as exactly `<!--rnh-K--><tag>…</tag><!--/rnh-K-->`; any other
+ * shape ends the prefix and leaves ordinary mismatch recovery in charge.
+ */
+function skipFoldedHeadPrefix(container: RootContainer, node: Node | null): Node | null {
+	const head =
+		container.nodeType === 9 ? null : (container as Element | DocumentFragment).ownerDocument.head;
+	while (node !== null) {
+		if (node.nodeType === 10 || isRendererHydrationStyle(node) || isFloatHeadResource(node)) {
+			node = getNextSibling(node);
+			continue;
+		}
+		const el = head !== null && node.nodeType === 8 ? getNextSibling(node) : null;
+		const end = el === null ? null : getNextSibling(el);
+		if (end === null || end.nodeType !== 8) return node;
+		const key = (STAGED_DOM?.view(node as Comment) ?? (node as Comment)).data;
+		if (
+			!key.startsWith('rnh-') ||
+			(STAGED_DOM?.view(end as Comment) ?? (end as Comment)).data !== '/' + key
+		)
+			return node;
+		const next = getNextSibling(end);
+		(STAGED_DOM?.view(head!) ?? head!).append(node, el!, end);
+		node = next;
+	}
+	return null;
+}
+
 /**
  * Root-local hydration state and the dynamic dispatch boundary for hydration-only
  * code. The class is constructed only by hydrateRoot, so client-only bundles can
@@ -45608,9 +45657,7 @@ function hydrateRootWithOutputHandler(
 		// Every failed adoption discards its scopes, not the server DOM. Restart
 		// the root-local ID and seed cursors together on the next attempt.
 		idState.next = rootOptions?.identifierSeed ?? 0;
-		let firstNode = getFirstChild(container);
-		while (firstNode !== null && (firstNode.nodeType === 10 || isRendererHydrationStyle(firstNode)))
-			firstNode = getNextSibling(firstNode);
+		const firstNode = skipFoldedHeadPrefix(container, getFirstChild(container));
 		const hydration = new HydrationCapability(rootBlock, firstNode, seeds);
 		if (bindingLeases?.length) {
 			const attempted = rootBlock;
