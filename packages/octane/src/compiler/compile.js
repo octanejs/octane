@@ -1455,6 +1455,8 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'isRenderCall',
 	'deferRecord',
 	'bindSignalText',
+	'mountSignalText',
+	'mountSignalTextSwap',
 	'bindSignalChild',
 	'bindSignalAttribute',
 	'hydrateClaimedBindingCaches',
@@ -25980,8 +25982,21 @@ function planJsx(
 		if (!b.signalDirect && (b.kind === 'text' || b.kind === 'textOnlyChild')) {
 			ctx.runtimeNeeded.add('setText');
 		}
-		if (b.kind === 'text') ctx.runtimeNeeded.add(b.bindingMarker ? 'bindingText' : 'htextSwap');
-		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
+		// A signal-capable text hole without a binding marker mounts through
+		// mountSignalText(Swap), which retains the scalar writer itself.
+		const sharedSignalTextMount = b.signalDirect && !b.bindingMarker;
+		if (b.kind === 'text') {
+			ctx.runtimeNeeded.add(
+				b.bindingMarker
+					? 'bindingText'
+					: sharedSignalTextMount
+						? 'mountSignalTextSwap'
+						: 'htextSwap',
+			);
+		}
+		if (b.kind === 'textOnlyChild') {
+			ctx.runtimeNeeded.add(sharedSignalTextMount ? 'mountSignalText' : 'htext');
+		}
 		// Mounts use the unconditional writer; reactive scalar bindings use either
 		// that writer behind an inline guard or its compact comparison helper.
 		// Claim both authored-name tokens when both paths exist, and do not retain
@@ -26174,10 +26189,17 @@ function planJsx(
 		// setter distinguish a fresh mount from a preserved suspended retry.
 		const constArgNode = (expr) =>
 			expr === 'null' ? b.literal(null) : expr === 'style-unset' ? b.id('__s') : b.id(expr);
-		const bagFieldValue = (f) => (f.constExpr !== null ? constArgNode(f.constExpr) : b.id(f.local));
+		const bagFieldValue = (f) =>
+			f.hostVar !== null
+				? b.id(f.hostVar)
+				: f.constExpr !== null
+					? constArgNode(f.constExpr)
+					: b.id(f.local);
 		const rootArg = () => (single ? b.id('_root') : b.literal(null));
 		if (bag.fields.length <= BAG_FACTORY_MAX) {
 			ctx.runtimeNeeded.add(`bag${bag.fields.length}`);
+			// The arity factory's object literal still declares every field, so an
+			// omitted trailing `undefined` seed keeps the same bag shape.
 			mountLines.push(
 				inheritOriginLoc(
 					b.stmt(
@@ -26188,7 +26210,9 @@ function planJsx(
 								`_$bag${bag.fields.length}`,
 								b.id('__s'),
 								rootArg(),
-								...bag.fields.map(bagFieldValue),
+								...optionalCallArgs(
+									...bag.fields.map((f) => (f.constExpr === 'undefined' ? null : bagFieldValue(f))),
+								),
 							),
 						),
 					),
@@ -26829,10 +26853,12 @@ function planJsx(
 								cc.valueExpr,
 								b.literal(cc.signalSite),
 								childAnchor ?? b.literal(null),
-								cc.anchorVar ? b.literal(true) : undefinedNode(),
-								undefinedNode(),
-								cc.coalesceRange ? b.literal(true) : undefinedNode(),
-								cc.onlyChildText ? b.literal(true) : undefinedNode(),
+								...optionalCallArgs(
+									cc.anchorVar ? b.literal(true) : null,
+									null,
+									cc.coalesceRange ? b.literal(true) : null,
+									cc.onlyChildText ? b.literal(true) : null,
+								),
 							),
 						),
 					),
@@ -27030,15 +27056,13 @@ function planJsx(
 			);
 			const memoAnchor = anchorNodeFor(cc, 'compAnchor');
 			const trailing = liteMemo
-				? [memoAnchor ?? undefinedNode(), b.literal(cc.invocationSite)]
-				: [
-						memoAnchor ?? undefinedNode(),
-						undefinedNode(),
-						cc.singleRoot ? b.literal(true) : undefinedNode(),
-						cc.inheritRange ? b.literal(true) : undefinedNode(),
-						undefinedNode(),
+				? optionalCallArgs(b.literal(cc.invocationSite), memoAnchor)
+				: optionalCallArgs(
 						b.literal(cc.invocationSite),
-					];
+						memoAnchor,
+						cc.singleRoot ? b.literal(true) : null,
+						cc.inheritRange ? b.literal(true) : null,
+					);
 			const witnessMiss = cc.autoMemoWitnesses.length
 				? witnessMissChain(cc.autoMemoWitnesses)
 				: null;
@@ -27079,7 +27103,7 @@ function planJsx(
 			continue;
 		}
 		// M3 inherit-range: the sole comp-call root of a `@{}` body — the slot
-		// BORROWS the enclosing block's marker range (10th positional arg), so it
+		// BORROWS the enclosing block's marker range (the `inherit` argument), so it
 		// mints nothing and the server skips the child's frame pair at the same
 		// site (ssrEmitComponent reads the same predicate). Supersedes lite (the
 		// borrow needs a real Block behind the slot) and singleRoot (the borrow
@@ -27090,7 +27114,6 @@ function planJsx(
 		if (cc.inheritRange) {
 			const componentHelper = cc.voidComponent ? '_$componentSlotVoid' : '_$componentSlot';
 			ctx.runtimeNeeded.add(cc.voidComponent ? 'componentSlotVoid' : 'componentSlot');
-			const inheritAnchor = anchorNodeFor(cc, 'compAnchor') ?? undefinedNode();
 			pushAfterStmt(
 				cc.id,
 				org,
@@ -27102,12 +27125,12 @@ function planJsx(
 						hostExpr(),
 						cc.compNode,
 						cc.propsExpr,
-						inheritAnchor,
-						undefinedNode(),
-						undefinedNode(),
-						b.literal(true),
-						undefinedNode(),
-						b.literal(cc.invocationSite),
+						...optionalCallArgs(
+							b.literal(cc.invocationSite),
+							anchorNodeFor(cc, 'compAnchor'),
+							null,
+							b.literal(true),
+						),
 					),
 				),
 			);
@@ -27134,8 +27157,7 @@ function planJsx(
 						hostExpr(),
 						cc.compNode,
 						cc.propsExpr,
-						liteAnchor ?? undefinedNode(),
-						b.literal(cc.invocationSite),
+						...optionalCallArgs(b.literal(cc.invocationSite), liteAnchor),
 					),
 				),
 			);
@@ -27148,14 +27170,14 @@ function planJsx(
 		// unmount move the slot DOM along with the block; an element host with
 		// no in-template anchor can safely append).
 		const compAnchor = anchorNodeFor(cc, 'compAnchor');
-		const trailing = [
-			compAnchor ?? undefinedNode(),
-			cc.keyExpr ?? undefinedNode(),
-			cc.singleRoot ? b.literal(true) : cc.maybeSingleRoot ? b.literal(2) : undefinedNode(),
-			undefinedNode(),
-			cc.keyExpr != null ? b.literal(true) : undefinedNode(),
+		const trailing = optionalCallArgs(
 			b.literal(cc.invocationSite),
-		];
+			compAnchor,
+			cc.singleRoot ? b.literal(true) : cc.maybeSingleRoot ? b.literal(2) : null,
+			null,
+			cc.keyExpr ?? null,
+			cc.keyExpr != null ? b.literal(true) : null,
+		);
 		let invocation = b.call(
 			componentHelper,
 			b.id('__s'),
@@ -27358,8 +27380,11 @@ const DEFERRABLE_MOUNT_KINDS = new Set([
 // field names are object properties, so unlike locals a minifier can never
 // shorten them; 1-char names are the shipped-bytes win. Each field is either
 // LOCAL-backed (the mount path assigns a pre-declared `_mN` local; the runtime
-// bag factory receives it positionally) or CONST-seeded (`null`/`undefined`
-// seeds pass straight to the factory — no local, no mount statement).
+// bag factory receives it positionally), CONST-seeded (`null`/`undefined`
+// seeds pass straight to the factory — no local, no mount statement), or
+// HOST-backed (a DOM host already held by the mount block's own `const _root` /
+// `const _elN`, which ensureVar declares before any binding mount and so before
+// the factory call: the factory reads that const directly, with no alias local).
 // Registration order = mount-write order = the factory's positional args =
 // the letter sequence, so `_$bagN(s, root, v0, v1, …)` builds `{a: v0, b: v1,
 // …}` with every field carrying its REAL mount value. `letter()` throws for a
@@ -27370,6 +27395,9 @@ const BAG_UC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 // Highest shared-factory arity (bag0..bag16 in the runtime); bigger bags fall
 // back to `bagOf(__s, root, { … })` with an inline literal of real values.
 const BAG_FACTORY_MAX = 16;
+// Hosts the mount block declares as top-level consts. `__block.parentNode` is a
+// property read, so it keeps an ordinary local.
+const BAG_CONST_HOST = /^(?:_root|_el\d+)$/;
 function bagLetter(i) {
 	if (i < 26) return BAG_LC[i];
 	if (i < 52) return BAG_UC[i - 26];
@@ -27392,6 +27420,7 @@ function makeBag() {
 				name: bagLetter(i),
 				local: constExpr === undefined ? `_m${i}` : null,
 				constExpr: constExpr === undefined ? null : constExpr,
+				hostVar: null,
 			};
 			fields.push(r);
 			byKey.set(key, r);
@@ -27399,16 +27428,34 @@ function makeBag() {
 		return r;
 	};
 	return {
-		/** Mount-write target for `key` — the pre-declared local. */
-		local: (key) => reg(key, undefined).local,
-		/** Register one immutable DOM-host field; aliases reuse its first mount write. */
+		/**
+		 * Mount-time reference for `key` — the pre-declared local, or a host-backed
+		 * field's const (read-only: host() returned false, so nothing assigns it).
+		 */
+		local: (key) => {
+			const r = reg(key, undefined);
+			return r.hostVar ?? r.local;
+		},
+		/**
+		 * Register one immutable DOM-host field; aliases reuse its first mount write.
+		 * Returns true when the caller must emit `local(key) = host`.
+		 */
 		host: (key, host) => {
 			const existing = byHost.get(host);
 			if (existing !== undefined) {
 				byKey.set(key, existing);
 				return false;
 			}
-			byHost.set(host, reg(key, undefined));
+			// Only a field this call creates can be host-backed: a key already read
+			// through local() may have handed its `_mN` name to emitted code.
+			const fresh = !byKey.has(key);
+			const r = reg(key, undefined);
+			byHost.set(host, r);
+			if (fresh && BAG_CONST_HOST.test(host)) {
+				r.local = null;
+				r.hostVar = host;
+				return false;
+			}
 			return true;
 		},
 		/** Seed `key` with a constant expression (no local, no mount write). */
@@ -27445,6 +27492,19 @@ function tsrxExprNode(node, ctx, componentName, inlinedSubs, parentNs = 'html', 
 // cross-stamp origins between statements.
 const undefinedNode = () => b.id('undefined');
 const nullNode = () => b.literal(null);
+
+// Optional positional arguments of a runtime writer whose parameters default to
+// undefined. Pass `null` for an absent entry: trailing absent entries are
+// omitted and interior ones become explicit `undefined` placeholders. Only use
+// it for writers that never inspect `arguments.length` (bindSignalText does).
+// componentSlot, componentSlotVoid, and componentSlotLite order their tail after
+// `props` by how often a call site supplies it — (invocationSite, anchor,
+// singleRoot, inherit, key, hasKey) — so the common call keeps two of the six.
+function optionalCallArgs(...entries) {
+	let end = entries.length;
+	while (end > 0 && entries[end - 1] == null) end--;
+	return entries.slice(0, end).map((entry) => entry ?? undefinedNode());
+}
 
 // Reference a compiled mount local / host var by NAME. ensureVar hands back
 // `__block.parentNode` for bagless hosts — resolve the member chain; every
@@ -27665,22 +27725,22 @@ function directSignalBindingHelper(bind) {
 function directSignalBindingArgs(bind, host, previous, value = bind.expr, previousValue) {
 	const common = [b.id('__s'), previous, host];
 	if (bind.kind === 'text' || bind.kind === 'textOnlyChild') {
+		// (…, onlyChild, previousValue, seededText, bindingMarker). An ordinary
+		// update passes only its raw-value cache: seededText matters only before
+		// the first write. A binding-view marker stays on every call because
+		// presentation hydration can replay a retry through the update path.
 		return [
 			...common,
 			value,
 			b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
 			b.literal(bind.kind === 'textOnlyChild'),
-			...(previousValue !== undefined
-				? [
-						bind.seededText ? b.literal(1) : undefinedNode(),
-						bind.bindingMarker ? b.literal(bind.bindingMarker) : undefinedNode(),
-						previousValue,
-					]
-				: bind.bindingMarker
-					? [bind.seededText ? b.literal(1) : undefinedNode(), b.literal(bind.bindingMarker)]
-					: bind.seededText
-						? [b.literal(1)]
-						: []),
+			...optionalCallArgs(
+				previousValue ?? null,
+				bind.seededText && (previousValue === undefined || bind.bindingMarker)
+					? b.literal(1)
+					: null,
+				bind.bindingMarker ? b.literal(bind.bindingMarker) : null,
+			),
 		];
 	}
 	if (
@@ -27733,20 +27793,37 @@ function emitBindingMount(bind, elVar, bag) {
 	const signalHelper = directSignalBindingHelper(bind);
 	if (signalHelper !== null) {
 		const text = bind.kind === 'text' || bind.kind === 'textOnlyChild';
-		let mount = b.call(
-			attrLoweringToken(b.id(`_$${signalHelper}`), bind),
-			...directSignalBindingArgs(bind, el(), undefinedNode(), text ? V() : bind.expr),
-		);
-		if (text) {
+		let mount;
+		if (text && !bind.bindingMarker) {
+			// mountSignalText(Swap) owns the primitive-or-handle dispatch that every
+			// such hole used to inline: primitives mount through htext/htextSwap,
+			// anything else through bindSignalText. Mount-only, so the shared call
+			// never reaches the update guard below.
+			mount = b.call(
+				attrLoweringToken(
+					b.id(bind.kind === 'textOnlyChild' ? '_$mountSignalText' : '_$mountSignalTextSwap'),
+					bind,
+				),
+				b.id('__s'),
+				el(),
+				V(),
+				b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
+				...(bind.kind === 'textOnlyChild' && bind.seededText ? [b.literal(1)] : []),
+			);
+		} else {
+			mount = b.call(
+				attrLoweringToken(b.id(`_$${signalHelper}`), bind),
+				...directSignalBindingArgs(bind, el(), undefinedNode(), text ? V() : bind.expr),
+			);
+		}
+		if (text && bind.bindingMarker) {
 			// A possible handle is not a subscription. Primitive text mounts through
 			// the canonical hydration/seeded-placeholder writer, without journaling
 			// a freshly cloned Text as though it were an existing update target.
 			const scalarMount =
 				bind.kind === 'textOnlyChild'
 					? b.call('_$htext', el(), V(), ...(bind.seededText ? [b.literal(1)] : []))
-					: bind.bindingMarker
-						? b.call('_$bindingText', el(), V(), b.literal(bind.bindingMarker))
-						: b.call('_$htextSwap', el(), V());
+					: b.call('_$bindingText', el(), V(), b.literal(bind.bindingMarker));
 			mount = b.conditional(
 				b.logical(
 					'||',
