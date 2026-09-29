@@ -6341,6 +6341,9 @@ export function useActionState<State, Payload>(
 	});
 }
 
+/** React's pre-19 name for `useActionState`, which universal modules may import from octane. */
+export { useActionState as useFormState };
+
 /** ES-only fallback for hosts that do not provide the WHATWG FormData global. */
 interface UniversalFormDataFallback {
 	append(name: string, value: unknown, filename?: string): void;

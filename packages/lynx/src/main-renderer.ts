@@ -393,6 +393,13 @@ export function universalIf(
 	return { $$kind: UNIVERSAL_IF, condition: !!condition, then, else: otherwise } as never;
 }
 
+// The one-shot first screen keys no retained owners, so a setup-bearing `@{ … }`
+// child renders exactly like a taken @if arm: one range at its sibling position,
+// matching the child owner range the background claims for the block.
+export function universalBlock(body: () => UniversalRenderable): UniversalRenderable {
+	return universalIf(true, body);
+}
+
 export function universalSwitch(
 	value: unknown,
 	cases: readonly (readonly [unknown, () => UniversalRenderable])[],
@@ -1556,6 +1563,8 @@ export function useActionState<State, Payload>(
 	currentOwner();
 	return [initialState, NOOP_UPDATE, false];
 }
+
+export const useFormState = useActionState;
 
 export interface FormStatus {
 	pending: boolean;

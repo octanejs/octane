@@ -36,6 +36,7 @@ import {
 	markWarm,
 	renderLynxFirstScreen,
 	UNIVERSAL_HMR,
+	universalBlock,
 	universalComponent,
 	universalContext,
 	universalActivity,
@@ -1138,6 +1139,7 @@ describe('Lynx main-thread first-screen renderer', () => {
 				if (!props.show) return null;
 				return [
 					universalIf(true, () => universalValue(rowPlan, [universalProps([['set', 'id', 'if']])])),
+					universalBlock(() => universalValue(rowPlan, [universalProps([['set', 'id', 'block']])])),
 					universalSwitch(
 						props.branch,
 						[['a', () => universalValue(rowPlan, [universalProps([['set', 'id', 'case']])])]],

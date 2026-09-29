@@ -777,3 +777,82 @@ describe('tree-shakable Three intrinsic registration', () => {
 		expect(namedThreeImports(unknown)).toEqual([]);
 	});
 });
+
+describe('universal renderer helper imports', () => {
+	// Bundlers reject an import of a missing export even when nothing calls it,
+	// and a standalone renderer runtime such as the Lynx main thread exports only
+	// the helpers its renderer can emit.
+	function unreferencedImports(code: string, module: string): string[] {
+		const imported: string[] = [];
+		const referenced = new Set<string>();
+		const seen = new WeakSet<object>();
+		const visit = (node: any) => {
+			if (node === null || typeof node !== 'object' || seen.has(node)) return;
+			seen.add(node);
+			if (Array.isArray(node)) {
+				for (const child of node) visit(child);
+				return;
+			}
+			if (node.type === 'Identifier') referenced.add(node.name);
+			for (const [key, child] of Object.entries(node)) {
+				if (key !== 'loc' && key !== 'metadata' && key !== 'parent') visit(child);
+			}
+		};
+		for (const statement of parseModule(code, '/dist/App.js').body) {
+			if (statement.type !== 'ImportDeclaration') {
+				visit(statement);
+			} else if (statement.source.value === module) {
+				for (const specifier of statement.specifiers ?? []) imported.push(specifier.local.name);
+			}
+		}
+		return imported.filter((name) => !referenced.has(name));
+	}
+
+	const sources = {
+		plain: `export function App() @{ <view id="simple" /> }`,
+		setupBlock: `
+			export function App(props) @{
+				<view>@{
+					const value = props.label;
+					<text>{value as string}</text>
+				}</view>
+			}
+		`,
+		controlFlow: `
+			export function App(props) @{
+				<view>
+					@if (props.show) {
+						<text>{'shown'}</text>
+					} @else {
+						<text>{'hidden'}</text>
+					}
+					@for (const item of props.items; key item.id) {
+						<view id={item.id} />
+					}
+				</view>
+			}
+		`,
+	};
+
+	it.each([
+		[
+			'the Lynx main thread',
+			resolvedLynxMainThreadRenderer,
+			{ runtime: 'lynx', thread: 'main-thread' },
+		],
+		['Lynx background', resolvedLynxRenderer, { runtime: 'lynx', thread: 'background' }],
+		['an object renderer', { ...baseRenderer, text: 'host' }, undefined],
+	] as const)(
+		'imports from %s only the helpers the compiled module references',
+		(_name, renderer, universalRuntime) => {
+			for (const [source, text] of Object.entries(sources)) {
+				for (const hmr of [false, true]) {
+					const { code } = compile(text, '/src/App.lynx.tsrx', { renderer, hmr, universalRuntime });
+					expect({ source, hmr, unreferenced: unreferencedImports(code, renderer.module) }).toEqual(
+						{ source, hmr, unreferenced: [] },
+					);
+				}
+			}
+		},
+	);
+});
