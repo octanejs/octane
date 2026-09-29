@@ -12423,7 +12423,7 @@ function ssrCompileBodyWithMapTemps(
 		// itself. rewriteEarlyExits wants the array.
 		const bodyStmts =
 			node.body && node.body.type === 'BlockStatement' ? node.body.body || [] : node.body || [];
-		const bodyRewritten = rewriteEarlyExits(bodyStmts);
+		const bodyRewritten = rewriteEarlyExits(unwrapOutputCodeBlock(bodyStmts));
 		statements = [];
 		jsxNodes = [];
 		for (const child of bodyRewritten) {
@@ -16249,7 +16249,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		statements = node.body.body || [];
 		jsxNodes = node.body.render ? [node.body.render] : [];
 	} else {
-		const bodyRewritten = rewriteEarlyExits(node.body);
+		const bodyRewritten = rewriteEarlyExits(unwrapOutputCodeBlock(node.body));
 		statements = [];
 		jsxNodes = [];
 		for (const child of bodyRewritten) {
@@ -34200,12 +34200,16 @@ function isJsxNode(node) {
 	if (node.type === 'JSXElement' || node.type === 'JSXFragment') return true;
 	// New TSRX directive nodes — always JSX-position. normalizeChildren will
 	// lower them to IfStatement / ForOfStatement / TryStatement / SwitchStatement
-	// when planJsx runs over them.
+	// when planJsx runs over them. A child `@{ … }` block in a statement list is
+	// a directive arm's output node, never setup: normalizeChildren makes a
+	// render-only block transparent and gives a setup-bearing one its own scope,
+	// exactly as it does for a block among element children.
 	if (
 		node.type === 'JSXIfExpression' ||
 		node.type === 'JSXForExpression' ||
 		node.type === 'JSXTryExpression' ||
 		node.type === 'JSXSwitchExpression' ||
+		node.type === 'JSXCodeBlock' ||
 		node.type === 'JSXExpressionContainer' ||
 		node.type === 'JSXText' ||
 		node.type === 'JSXStyleElement'
@@ -34234,6 +34238,18 @@ function isWrappedJsxDirective(node) {
 		type === 'JSXTryExpression' ||
 		type === 'JSXSwitchExpression'
 	);
+}
+
+// `@for` item bodies and `@switch` cases wrap a child `@{ … }` block written as
+// their output in an ExpressionStatement. The parser admits a block only as a
+// body's final statement, so unwrap just that one. A block inside plain JS
+// control flow in the body's setup is wrapped the same way and stays a
+// JavaScript expression, exactly like an element written there.
+function unwrapOutputCodeBlock(statements) {
+	const last = statements[statements.length - 1];
+	return last?.type === 'ExpressionStatement' && last.expression?.type === 'JSXCodeBlock'
+		? [...statements.slice(0, -1), last.expression]
+		: statements;
 }
 
 function bodyContainsJsx(node) {
