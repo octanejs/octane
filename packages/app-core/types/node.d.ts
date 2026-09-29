@@ -13,7 +13,13 @@ export function nodeRequestToWebRequest(
 
 /**
  * Pipe a Web Response to a Node.js ServerResponse, streaming chunk-by-chunk
- * (a streaming SSR body flushes as it renders).
+ * (a streaming SSR body flushes as it renders). A HEAD response ends with its
+ * headers and cancels the body.
+ *
+ * Rejects when the body fails. If headers were already sent, the response has
+ * been destroyed so the client sees an interrupted transfer; only report the
+ * error. Otherwise the Web Response's headers were removed and the caller may
+ * send its own error response.
  */
 export function sendWebResponse(nodeResponse: ServerResponse, webResponse: Response): Promise<void>;
 

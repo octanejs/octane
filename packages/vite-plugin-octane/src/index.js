@@ -784,6 +784,8 @@ export function octane(inlineOptions = {}) {
 					} catch (error) {
 						console.error('[@octanejs/vite-plugin] Request error:', error);
 						vite.ssrFixStacktrace(/** @type {Error} */ (error));
+						// sendWebResponse already aborted a response whose headers were sent.
+						if (res.headersSent) return;
 						res.statusCode = 500;
 						res.setHeader('Content-Type', 'text/html');
 						res.end(
@@ -1242,6 +1244,8 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 		await sendWebResponse(res, response);
 	} catch (error) {
 		console.error('[@octanejs/vite-plugin] RPC error:', error);
+		// sendWebResponse already aborted a response whose headers were sent.
+		if (res.headersSent) return;
 		res.statusCode = 500;
 		res.setHeader('Content-Type', 'application/json');
 		res.end(JSON.stringify({ error: 'Internal Server Error' }));

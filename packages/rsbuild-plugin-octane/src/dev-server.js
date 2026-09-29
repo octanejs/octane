@@ -150,10 +150,10 @@ export function createOctaneDevMiddleware(options) {
 			await sendWebResponse(response, webResponse);
 		} catch (error) {
 			options.logError?.('Dev SSR request failed', error);
-			if (!response.headersSent) {
-				response.statusCode = 500;
-				response.setHeader('Content-Type', 'text/plain; charset=utf-8');
-			}
+			// sendWebResponse already aborted a response whose headers were sent.
+			if (response.headersSent) return;
+			response.statusCode = 500;
+			response.setHeader('Content-Type', 'text/plain; charset=utf-8');
 			response.end('Internal Server Error');
 		}
 	};
