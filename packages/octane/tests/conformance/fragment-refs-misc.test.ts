@@ -397,6 +397,55 @@ describe('FragmentInstance — portaled imperative children', () => {
 			target.remove();
 		}
 	});
+
+	// #1367: the marker document's activeElement is the shadow host, never the owned input.
+	it('blurs an owned child focused inside a shadow root', () => {
+		const fragRef = makeRef();
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const shadow = host.attachShadow({ mode: 'open' });
+		const container = document.createElement('div');
+		shadow.appendChild(container);
+		const outside = document.createElement('button');
+		shadow.appendChild(outside);
+		const root = createRoot(container);
+		try {
+			root.render(ScrollTarget, { fragRef });
+			flushSync(() => {});
+			const button = container.querySelector('#btn') as HTMLButtonElement;
+			fragRef.current!.focus();
+			expect(shadow.activeElement).toBe(button);
+			fragRef.current!.blur();
+			expect(shadow.activeElement).not.toBe(button);
+			outside.focus();
+			fragRef.current!.blur();
+			expect(shadow.activeElement).toBe(outside);
+		} finally {
+			root.unmount();
+			host.remove();
+		}
+	});
+
+	// #1367: the marker document's activeElement is the iframe, never the portaled input.
+	it('blurs an owned portal child focused inside a same-origin iframe', () => {
+		const iframe = document.createElement('iframe');
+		document.body.appendChild(iframe);
+		const target = iframe.contentDocument!.body;
+		const fragRef = makeRef();
+		const r = mount(FragmentPortalChildren, { fragRef, target });
+		try {
+			(r.find('#inline-before') as HTMLButtonElement).disabled = true;
+			(r.find('#inline-after') as HTMLButtonElement).disabled = true;
+			const portal = target.querySelector('#owned-portal') as HTMLButtonElement;
+			fragRef.current!.focus();
+			expect(iframe.contentDocument!.activeElement).toBe(portal);
+			fragRef.current!.blur();
+			expect(iframe.contentDocument!.activeElement).not.toBe(portal);
+		} finally {
+			r.unmount();
+			iframe.remove();
+		}
+	});
 });
 
 describe('FragmentInstance — nested fragments', () => {
