@@ -244,7 +244,9 @@ optional `head` and `signals` fields:
   anywhere in the tree, each preceded by an adoption marker comment) are folded
   in by default — spliced into `<head>` when the render produced a document or a
   fragment beginning with an authored `<head>`, else prepended (React-19 resource
-  hoisting). `headChannel: 'separate'` withholds
+  hoisting). `hydrateRoot` accepts a container holding the whole prepended
+  `html`: it moves the metadata into `document.head` and adopts it there.
+  `headChannel: 'separate'` withholds
   them and returns them as `head` instead.
 - `head` — the hoisted metadata on its own, present **only** under
   `headChannel: 'separate'` (see `RenderOptions`).
