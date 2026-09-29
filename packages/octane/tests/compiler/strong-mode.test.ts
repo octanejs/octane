@@ -1539,7 +1539,7 @@ export function App(props) @{
 		expect(() => compile(`"use stronger";\n${source}`, '/src/Counter.tsrx')).not.toThrow();
 		expect(() =>
 			compile(stateComponent('"use strong"; setCount(count + 1);'), '/src/Counter.tsrx'),
-		).not.toThrow();
+		).toThrow(DIRECTIVE_PLACEMENT);
 	});
 
 	it('rejects misplaced top-level Strong directives instead of silently ignoring them', () => {
@@ -1549,6 +1549,38 @@ export function App(props) @{
 		expect(() => slotHooks(source, '/src/Counter.ts')).toThrow(DIRECTIVE_PLACEMENT);
 		expect(compileToVolarMappings(source, '/src/Counter.tsrx').diagnostics).toContainEqual(
 			expect.objectContaining({ code: DIRECTIVE_PLACEMENT, severity: 'error' }),
+		);
+	});
+
+	it.each([
+		[
+			'a component body',
+			`import { useState } from 'octane';
+export function Counter() @{
+  "use strong";
+  const [count, setCount] = useState(0);
+  <button onClick={() => setCount(count + 1)}>{count as string}</button>
+}`,
+		],
+		[
+			'a nested function body',
+			`export function useLabel() {
+  const read = () => {
+    'use strong';
+    return 'label';
+  };
+  return read();
+}`,
+		],
+	])('rejects a Strong directive in %s instead of compiling it as compat', (_, source) => {
+		expect(() => compile(source, '/src/Counter.tsrx')).toThrow(DIRECTIVE_PLACEMENT);
+		expect(() => slotHooks(source, '/src/Counter.ts')).toThrow(DIRECTIVE_PLACEMENT);
+		expect(compileToVolarMappings(source, '/src/Counter.tsrx').diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: DIRECTIVE_PLACEMENT,
+				severity: 'error',
+				message: expect.stringContaining('whole module'),
+			}),
 		);
 	});
 
