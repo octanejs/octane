@@ -5253,10 +5253,15 @@ function vtScopeForBlock(block: Block): VTOwner | null {
 		}
 		return host as VTOwner;
 	}
-	const parent = block.parentNode;
-	const physical = vtClosestScope(parent);
-	if (physical !== null) return physical as VTOwner;
-	return (parent.nodeType === 9 ? parent : parent.ownerDocument!) as VTOwner;
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		const parent = current.parentNode;
+		const physical = vtClosestScope(parent);
+		if (physical !== null) return physical as VTOwner;
+		const owner = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument!;
+		// A staged template clone still belongs to the inert template document.
+		if (owner.defaultView !== null) return owner as VTOwner;
+	}
+	return null;
 }
 
 /** A nested declaration owns its hosts even while its native animation is idle. */
