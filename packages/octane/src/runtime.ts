@@ -22038,15 +22038,16 @@ export class FragmentInstance {
 
 	/**
 	 * Blur the focused element only when a logical fragment child owns it,
-	 * including children rendered into foreign portal containers.
+	 * including children rendered into foreign portal containers. Each child is
+	 * checked against its own focus root, so shadow-root and iframe portal
+	 * children resolve to the owned element rather than their host or frame.
 	 */
 	blur(): void {
 		if (this._destroyed) return;
-		const doc = this._startMarker.ownerDocument || document;
-		const active = doc.activeElement;
-		if (!active || active === doc.body) return;
 		for (const child of fragmentDirectChildren(this)) {
-			if (child === active || (STAGED_DOM?.view(child) ?? child).contains(active)) {
+			const root = (STAGED_DOM?.view(child) ?? child).getRootNode() as Document | ShadowRoot;
+			const active = root.activeElement;
+			if (active && (child === active || (STAGED_DOM?.view(child) ?? child).contains(active))) {
 				(STAGED_DOM?.view(active as HTMLElement) ?? (active as HTMLElement)).blur();
 				return;
 			}
