@@ -318,6 +318,89 @@ export function App(props) @{
 		}
 	});
 
+	it.each(
+		[false, true].flatMap((dev) =>
+			[
+				'function Row(props) { return <>@if (props.show) { <Field query={props.query}/> }</>; }',
+				'function Row(props) { return <Fragment>@if (props.show) { <Field query={props.query}/> }</Fragment>; }',
+				'function Row(props) { return <Frame>@if (props.show) { <Field query={props.query}/> }</Frame>; }',
+				'function Row(props) @{ if (props.hidden) return null; <>@if (props.show) { <Field query={props.query}/> }</> }',
+			].map((row) => ({ dev, row })),
+		),
+	)(
+		'resumes a server query below a returned directive fragment ($row, dev: $dev)',
+		async ({ dev, row }) => {
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const client = await import('../../src/runtime.js');
+			const signals = await import('../../src/signals/index.js');
+			const { bootstrapStreamedSignalHydration } =
+				await import('../../src/hydration/streamed-signals.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
+				await import('../_server-stream.js');
+			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			// The module never imports signals, so a returned fragment keeps its
+			// compiled-renderer boundary on both sides. Its invocation site is the
+			// parent of every component site rendered inside it.
+			const source = `import { Fragment } from 'octane';
+function Frame(props) @{ <div>{props.children}</div> }
+function Field(props) @{ <section><output>{props.query('field') as string}</output></section> }
+${row}
+export function App(props) @{ <main>@try { <Row show={true} query={props.query}/> } @pending { <i>{'waiting'}</i> }</main> }`;
+			const options = {
+				id: '/src/returned-fragment-query.tsrx',
+				compileOptions: { dev, hmr: false },
+			};
+			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const serverLoad = vi.fn(async () => 'server result');
+			const browserLoad = vi.fn(async () => 'browser result');
+			const query = (load: () => Promise<string>) => (key: string) =>
+				signals.__queryAt('i:returned-fragment-query', () => key, load);
+			const streamedSignals = { buildId: 'returned-fragment', documentId: 'returned-fragment' };
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: ReturnType<typeof client.hydrateRoot> | undefined;
+			let hydration: ReturnType<typeof bootstrapStreamedSignalHydration> | undefined;
+			try {
+				const output = await server.prerender(
+					serverModule.App,
+					{ query: query(serverLoad) },
+					{ streamedSignals },
+				);
+				expect(serverLoad).toHaveBeenCalledTimes(1);
+				container.innerHTML = output.html;
+				activateStreamedMarkup(container);
+				const result = container.querySelector('output')!;
+				expect(result.textContent).toBe('server result');
+				const errors: unknown[] = [];
+				hydration = bootstrapStreamedSignalHydration(streamedSignals);
+				root = client.hydrateRoot(
+					container,
+					clientModule.App,
+					{ query: query(browserLoad) },
+					{
+						signalOwner: hydration.signalOwner,
+						onRecoverableError: (error) => errors.push(error),
+						onUncaughtError: (error) => errors.push(error),
+					},
+				);
+				await drainProducers();
+				client.flushSync(() => {});
+				expect(browserLoad).not.toHaveBeenCalled();
+				expect(container.querySelector('output')).toBe(result);
+				expect(result.textContent).toBe('server result');
+				expect(errors).toEqual([]);
+			} finally {
+				root?.unmount();
+				hydration?.dispose();
+				container.remove();
+				resetStreamRuntimeGlobals();
+			}
+		},
+	);
+
 	it('preserves inline row owners when Strong selection changes', async () => {
 		vi.resetModules();
 		const client = await import('../../src/runtime.js');
