@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as RT from 'octane/server';
-import { prerender } from 'octane/static';
+import { prerender, type RenderOptions } from 'octane/static';
 import { hydrateRoot, flushSync } from '../src/index.js';
 import {
 	Boundary as ClientBoundary,
@@ -350,6 +350,287 @@ describe('SSR — resource-thrown thenables', () => {
 			expect(errors.every((error) => error === reason)).toBe(true);
 		} finally {
 			stream.abort();
+		}
+	});
+
+	// A reader can keep rethrowing a thenable that has already settled while its
+	// own state waits for a later task, such as a timer or an I/O callback.
+	// Buffered rendering must let that task run instead of spending its pass
+	// budget on microtask retries. Each reader opens itself after 2,000 checks, so
+	// a microtask livelock fails the assertion instead of starving the test timeout.
+	type StalledThrow =
+		'resolved promise' | 'rejected promise' | 'custom thenable' | 'pending promise';
+
+	function stalledReader(kind: StalledThrow) {
+		let open = false;
+		let selfOpened = false;
+		let checks = 0;
+		const settled = Promise.resolve();
+		const rejected = Promise.reject(new Error('stale resource'));
+		rejected.catch(() => {});
+		const custom: PromiseLike<void> = { then: (resolve, reject) => settled.then(resolve, reject) };
+		let pending: Promise<void> | undefined;
+		if (kind === 'pending promise') {
+			// The thrown promise settles first; the state that ends suspension lands
+			// on a later timer.
+			pending = new Promise<void>((resolve) => setTimeout(resolve, 0));
+			pending.then(() => setTimeout(() => (open = true), 0));
+		} else {
+			setTimeout(() => (open = true), 0);
+		}
+		const read = () => {
+			if (!open && ++checks > 2000) open = selfOpened = true;
+			if (open) return 'ready';
+			throw kind === 'resolved promise'
+				? settled
+				: kind === 'rejected promise'
+					? rejected
+					: kind === 'custom thenable'
+						? custom
+						: pending;
+		};
+		return {
+			read,
+			get selfOpened() {
+				return selfOpened;
+			},
+		};
+	}
+
+	function stalledRender(mode: 'boundary' | 'root', read: () => string, options?: RenderOptions) {
+		return mode === 'boundary'
+			? prerender(m.ThrownResourceBoundary, { read, promise: Promise.resolve('seed') }, options)
+			: prerender(
+					() => RT.createElement('span', { className: 'resource-value' }, read()),
+					undefined,
+					options,
+				);
+	}
+
+	it.each([
+		['resolved promise', 'boundary'],
+		['resolved promise', 'root'],
+		['rejected promise', 'boundary'],
+		['rejected promise', 'root'],
+		['custom thenable', 'boundary'],
+		['custom thenable', 'root'],
+		['pending promise', 'boundary'],
+		['pending promise', 'root'],
+	] as const)(
+		'lets a later task end a reader that rethrows a settled %s (%s)',
+		async (kind, mode) => {
+			const reader = stalledReader(kind);
+			const out = await stalledRender(mode, reader.read);
+			expect(reader.selfOpened).toBe(false);
+			const container = document.createElement('div');
+			container.innerHTML = out.html;
+			expect(container.querySelector('.resource-value')?.textContent).toMatch(/^ready/);
+			expect(out.html).not.toContain('resource-loading');
+		},
+	);
+
+	it('does not spend the pass limit on retries while a reader is stalled', async () => {
+		// Forty-five pending levels spend forty-five of the fifty passes. The stall
+		// that follows lasts 20ms and must be bounded by time instead.
+		const settled = Promise.resolve();
+		let level = 0;
+		let current: Promise<void> | null = null;
+		let open = false;
+		let lagStarted = false;
+		let checks = 0;
+		const out = await stalledRender('root', () => {
+			if (level < 45) {
+				current ??= Promise.resolve().then(() => {
+					level++;
+					current = null;
+				});
+				throw current;
+			}
+			if (!open && ++checks > 2000) open = true;
+			if (open) return 'ready';
+			if (!lagStarted) {
+				lagStarted = true;
+				setTimeout(() => (open = true), 20);
+			}
+			throw settled;
+		});
+		expect(checks).toBeLessThanOrEqual(2000);
+		expect(out.html).toContain('<span class="resource-value">ready</span>');
+	});
+
+	it('renders a waterfall of already-resolved thrown resources before any task runs', async () => {
+		// Each resource throws its already-resolved promise once, before the
+		// reader's own subscription records the value. Every retry makes progress,
+		// so none of them may wait for the event loop.
+		const entries = new Map<string, { promise: Promise<string>; value?: string }>();
+		const read = (key: string) => {
+			let entry = entries.get(key);
+			if (entry === undefined) {
+				const created: { promise: Promise<string>; value?: string } = {
+					promise: Promise.resolve(key),
+				};
+				created.promise.then((value) => (created.value = value));
+				entries.set(key, (entry = created));
+			}
+			if (entry.value === undefined) throw entry.promise;
+			return entry.value;
+		};
+		const Level = (props: { level: number }): ReturnType<typeof RT.createElement> =>
+			RT.createElement(
+				'section',
+				{ className: 'level' },
+				RT.createElement('b', null, read('a' + props.level) + '/' + read('b' + props.level)),
+				props.level < 3 ? RT.createElement(Level, { level: props.level + 1 }) : null,
+			);
+		let taskRan = false;
+		setTimeout(() => (taskRan = true), 0);
+		const out = await prerender(() =>
+			RT.createElement(RT.Suspense, { fallback: 'loading' }, RT.createElement(Level, { level: 0 })),
+		);
+		expect(taskRan).toBe(false);
+		const container = document.createElement('div');
+		container.innerHTML = out.html;
+		expect([...container.querySelectorAll('.level > b')].map((level) => level.textContent)).toEqual(
+			['a0/b0', 'a1/b1', 'a2/b2', 'a3/b3'],
+		);
+	});
+
+	it('fails a reader that never stops throwing a settled thenable at the suspense deadline', async () => {
+		const settled = Promise.resolve();
+		const errors: unknown[] = [];
+		let reads = 0;
+		const work = stalledRender(
+			'boundary',
+			() => {
+				reads++;
+				throw settled;
+			},
+			{ timeoutMs: 100, onError: (error) => errors.push(error) },
+		);
+		await expect(work).rejects.toThrow(
+			'a component kept throwing already-settled thenables outside use() for 100ms',
+		);
+		expect(errors).toHaveLength(1);
+		// Stalled retries back off instead of re-rendering on every task.
+		expect(reads).toBeLessThan(50);
+	});
+
+	it('restarts the suspense deadline when one of several stalled readers finishes', async () => {
+		// Both readers stall together. The second needs 500ms in all: longer than
+		// the 400ms deadline, but not 400ms longer than the first, which finishes
+		// after 250ms.
+		const gate = (ms: number) => {
+			const settled = Promise.resolve();
+			let open = false;
+			let checks = 0;
+			setTimeout(() => (open = true), ms);
+			return () => {
+				if (!open && ++checks > 2000) open = true;
+				if (!open) throw settled;
+				return 'ready ' + ms;
+			};
+		};
+		const Reader = (props: { read: () => string }) =>
+			RT.createElement('span', { className: 'gate' }, props.read());
+		const boundary = (read: () => string) =>
+			RT.createElement(RT.Suspense, { fallback: 'loading' }, RT.createElement(Reader, { read }));
+		const first = gate(250);
+		const second = gate(500);
+		const out = await prerender(
+			() => RT.createElement('div', null, boundary(first), boundary(second)),
+			undefined,
+			{ timeoutMs: 400 },
+		);
+		const container = document.createElement('div');
+		container.innerHTML = out.html;
+		expect([...container.querySelectorAll('.gate')].map((gate) => gate.textContent)).toEqual([
+			'ready 250',
+			'ready 500',
+		]);
+	});
+
+	it('fails a reader that cycles between settled thenables at the suspense deadline', async () => {
+		const first = Promise.resolve();
+		const second = Promise.resolve();
+		let reads = 0;
+		const work = stalledRender(
+			'boundary',
+			() => {
+				// Resolve instead of hanging if cycling ever restarts the deadline.
+				if (++reads > 2000) return 'ready';
+				throw reads % 2 ? first : second;
+			},
+			{ timeoutMs: 100 },
+		);
+		await expect(work).rejects.toThrow(
+			'a component kept throwing already-settled thenables outside use() for 100ms',
+		);
+	});
+
+	it('aborts a request while a reader keeps throwing a settled thenable', async () => {
+		const settled = Promise.resolve();
+		const controller = new AbortController();
+		const reason = new Error('cancelled stalled request');
+		let checks = 0;
+		const work = stalledRender(
+			'boundary',
+			() => {
+				// Resolve instead of starving the abort timer if retries stop pacing.
+				if (++checks > 2000) return 'ready';
+				throw settled;
+			},
+			{ signal: controller.signal },
+		);
+		setTimeout(() => controller.abort(reason), 20);
+		await expect(work).rejects.toBe(reason);
+	});
+
+	it('names thrown thenables, not use(), when a reader exhausts the pass limit', async () => {
+		// A new thenable on every attempt is indistinguishable from a cached
+		// waterfall's next level, so these retries count toward the pass limit.
+		const work = stalledRender('boundary', () => {
+			throw Promise.resolve();
+		});
+		await expect(work).rejects.toThrow(
+			'exceeded 50 suspense passes — a component kept throwing thenables outside use()',
+		);
+
+		// Control: a use() waterfall that never ends keeps the use() diagnosis.
+		const values: Promise<number>[] = [];
+		let passes = 0;
+		const Growing = () => {
+			const depth = passes++;
+			for (let i = 0; i <= depth; i++) RT.use((values[i] ??= Promise.resolve(i)));
+			return RT.createElement('span', null, 'never');
+		};
+		await expect(prerender(Growing)).rejects.toThrow(
+			'exceeded 50 suspense passes — a use(thenable) never resolved',
+		);
+	});
+
+	it('names thrown thenables when a streamed boundary exhausts the pass limit', async () => {
+		const collector = createPipeableCollector();
+		const errors: unknown[] = [];
+		const stream = RT.renderToPipeableStream(
+			m.ThrownResourceBoundary,
+			{
+				read: () => {
+					throw Promise.resolve();
+				},
+				promise: Promise.resolve('seed'),
+			},
+			{ onError: (error) => errors.push(error) },
+		);
+		stream.pipe(collector.destination);
+		try {
+			await collector.ended;
+			expect(errors).toHaveLength(1);
+			expect(String(errors[0])).toContain(
+				'50 consecutive streaming passes completed no boundary — a component kept throwing thenables outside use()',
+			);
+		} finally {
+			stream.abort();
+			resetStreamRuntimeGlobals();
 		}
 	});
 });

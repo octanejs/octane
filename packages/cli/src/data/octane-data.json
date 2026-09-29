@@ -3493,6 +3493,21 @@
       "message": "Invalid independent Hydrate manifest inputs.",
       "runtime": ["client", "server"],
       "status": "active"
+    },
+    "332": {
+      "message": "octane SSR: a component kept throwing already-settled thenables outside use() for %sms. A resource reader should stop suspending once its data has settled.",
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "333": {
+      "message": "octane SSR: exceeded %s suspense passes — a component kept throwing thenables outside use(). A resource reader should stop suspending once its data has settled.",
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "334": {
+      "message": "octane SSR: %s consecutive streaming passes completed no boundary — a component kept throwing thenables outside use(). A resource reader should stop suspending once its data has settled.",
+      "runtime": ["server"],
+      "status": "active"
     }
   }
 }

@@ -1367,6 +1367,13 @@ Other consequences:
   suspending until a later task changes its state without starving timers or
   network callbacks. See
   [retry pacing](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#13-retry-pacing-after-an-already-settled-wakeable).
+- On the server, a reader can keep rethrowing a thenable that has already
+  settled until a later task updates its state. React's `prerender` retries
+  that on microtasks indefinitely, starving timers. Octane's buffered SSR
+  retries on a timer that backs off from 1ms to 100ms once it has seen the
+  thenable settle. These retries do not count toward the pass limit, and the
+  render fails once the stall lasts `timeoutMs`. See
+  [server retries](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#9-resource-thrown-thenables--render-suspension-gap-closed).
 - Without an enclosing Suspense/`@pending` boundary, the client root retains its
   committed screen, or stays empty on an initial mount, and retries when the
   thenable settles. Urgent and transition updates retry the latest inputs;
