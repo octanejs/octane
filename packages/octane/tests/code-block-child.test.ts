@@ -16,6 +16,12 @@ import {
 	StoredSetupBearingChild,
 	CodeOnlyChild,
 	SvgSetupBearingChild,
+	BranchReadsChildLocal,
+	BranchReadsShadowingChildLocal,
+	ListReadsChildLocal,
+	BranchReadsNestedChildLocals,
+	HandlerReadsChildLocal,
+	ChildShadowsStableSetter,
 } from './_fixtures/code-block-child.tsrx';
 
 const FIXTURE = 'packages/octane/tests/_fixtures/code-block-child.tsrx';
@@ -243,5 +249,118 @@ describe('@{ } at JSX child position', () => {
 		expect(circle?.getAttribute('data-diameter')).toBe('12');
 		root.unmount();
 		container.remove();
+	});
+});
+
+describe('scoped child locals reach its control-flow arms', () => {
+	const steps: Array<[string, boolean]> = [
+		['second', true],
+		['third', false],
+		['fourth', false],
+		['fifth', true],
+	];
+
+	// The rendered arm's tag and text, ignoring hydration markers.
+	const arm = (host: Element | null) =>
+		Array.from(host?.children ?? [], (child) => `${child.localName}:${child.textContent}`);
+
+	it('reads a child local in @if/@else arms across updates and branch switches', () => {
+		const r = mount(BranchReadsChildLocal, { value: 'first', enabled: true });
+		expect(arm(r.find('.branch-child'))).toEqual(['b:first']);
+		for (const [value, enabled] of steps) {
+			r.update(BranchReadsChildLocal, { value, enabled });
+			expect(arm(r.find('.branch-child'))).toEqual([`${enabled ? 'b' : 'i'}:${value}`]);
+		}
+		r.unmount();
+	});
+
+	it('server-renders and hydrates arms that read a child local', () => {
+		const server = loadServerFixture(FIXTURE);
+		const { html } = ServerRuntime.renderToString(server.BranchReadsChildLocal, {
+			value: 'first',
+			enabled: true,
+		});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const original = container.querySelector('.branch-child b');
+		expect(original?.textContent).toBe('first');
+
+		const root = hydrateRoot(container, BranchReadsChildLocal, { value: 'first', enabled: true });
+		flushSync(() => {});
+		expect(container.querySelector('.branch-child b')).toBe(original);
+
+		root.render(BranchReadsChildLocal, { value: 'second', enabled: true });
+		flushSync(() => {});
+		expect(container.querySelector('.branch-child b')).toBe(original);
+		expect(original?.textContent).toBe('second');
+
+		root.render(BranchReadsChildLocal, { value: 'third', enabled: false });
+		flushSync(() => {});
+		expect(arm(container.querySelector('.branch-child'))).toEqual(['i:third']);
+		root.unmount();
+		container.remove();
+	});
+
+	it('keeps a child local distinct from the parent binding it shadows', () => {
+		const r = mount(BranchReadsShadowingChildLocal, { value: 'first', enabled: true });
+		expect(arm(r.find('.shadow-child'))).toEqual(['em:outer', 'b:first']);
+		for (const [value, enabled] of steps) {
+			r.update(BranchReadsShadowingChildLocal, { value, enabled });
+			expect(arm(r.find('.shadow-child'))).toEqual(['em:outer', `${enabled ? 'b' : 'i'}:${value}`]);
+		}
+		r.unmount();
+	});
+
+	it('reads a child local in keyed @for rows', () => {
+		const r = mount(ListReadsChildLocal, { items: ['a', 'b'], loud: false });
+		const texts = () => r.findAll('.list-child li').map((li) => li.textContent);
+		expect(texts()).toEqual(['a.', 'b.']);
+
+		const [first] = r.findAll('.list-child li');
+		r.update(ListReadsChildLocal, { items: ['a', 'b', 'c'], loud: true });
+		expect(texts()).toEqual(['a!', 'b!', 'c!']);
+		expect(r.findAll('.list-child li')[0]).toBe(first);
+		r.unmount();
+	});
+
+	it('reads locals from every enclosing scoped child in a nested arm', () => {
+		const r = mount(BranchReadsNestedChildLocals, { value: 'ab', enabled: true });
+		expect(r.find('.nested-child b').textContent).toBe('ab:AB');
+
+		r.update(BranchReadsNestedChildLocals, { value: 'cd', enabled: true });
+		expect(r.find('.nested-child b').textContent).toBe('cd:CD');
+
+		r.update(BranchReadsNestedChildLocals, { value: 'ef', enabled: false });
+		expect(r.findAll('.nested-child b')).toHaveLength(0);
+
+		r.update(BranchReadsNestedChildLocals, { value: 'gh', enabled: true });
+		expect(r.find('.nested-child b').textContent).toBe('gh:GH');
+		r.unmount();
+	});
+
+	it('runs an event handler that reads a child local', () => {
+		const log: string[] = [];
+		const r = mount(HandlerReadsChildLocal, { value: 'first', log });
+		r.click('.handler-child-action');
+		expect(log).toEqual(['first', 'click']);
+
+		r.update(HandlerReadsChildLocal, { value: 'second', log });
+		r.click('.handler-child-action');
+		expect(log).toEqual(['first', 'click', 'second', 'click']);
+		r.unmount();
+	});
+
+	it('follows a changing handler that shadows a stable parent setter', () => {
+		const calls: string[] = [];
+		const r = mount(ChildShadowsStableSetter, { handler: () => calls.push('first') });
+		r.click('.shadow-setter-action');
+		expect(calls).toEqual(['first']);
+
+		r.update(ChildShadowsStableSetter, { handler: () => calls.push('second') });
+		r.click('.shadow-setter-action');
+		expect(calls).toEqual(['first', 'second']);
+		expect(r.find('.shadow-setter-count').textContent).toBe('count:0');
+		r.unmount();
 	});
 });

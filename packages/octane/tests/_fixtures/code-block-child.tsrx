@@ -158,3 +158,78 @@ export function SvgSetupBearingChild(props: { radius: number }) @{
 		<circle id="setup-circle" r={props.radius} data-diameter={diameter} />
 	}</svg>
 }
+
+// Control-flow arms hoist out of the scoped child, so every name the child
+// declares has to reach them.
+export function BranchReadsChildLocal(props: { value: string; enabled: boolean }) @{
+	<section class="branch-child">@{
+		const local = props.value;
+		@if (props.enabled) {
+			<b>{local as string}</b>
+		} @else {
+			<i>{local as string}</i>
+		}
+	}</section>
+}
+
+export function BranchReadsShadowingChildLocal(props: { value: string; enabled: boolean }) @{
+	const [local] = useState('outer');
+	<section class="shadow-child">
+		<em>{local as string}</em>
+		@{
+			const local = props.value;
+			@if (props.enabled) {
+				<b>{local as string}</b>
+			} @else {
+				<i>{local as string}</i>
+			}
+		}
+	</section>
+}
+
+export function ListReadsChildLocal(props: { items: string[]; loud: boolean }) @{
+	<ul class="list-child">@{
+		const suffix = props.loud ? '!' : '.';
+		@for (const item of props.items; key item) {
+			<li>{item + suffix as string}</li>
+		}
+	}</ul>
+}
+
+export function BranchReadsNestedChildLocals(props: { value: string; enabled: boolean }) @{
+	<section class="nested-child">@{
+		const outer = props.value;
+		<div>@{
+			const inner = outer.toUpperCase();
+			@if (props.enabled) {
+				<b>{outer + ':' + inner}</b>
+			}
+		}</div>
+	}</section>
+}
+
+export function HandlerReadsChildLocal(props: { value: string; log: string[] }) @{
+	<section class="handler-child">@{
+		const tag = props.value;
+		<button
+			class="handler-child-action"
+			onClick={(event) => {
+				props.log.push(tag);
+				props.log.push(event.type);
+			}}
+		>{'log'}</button>
+	}</section>
+}
+
+// The child's `setCount` shadows the parent's stable state setter with a prop
+// that changes, so the button has to follow the newest handler.
+export function ChildShadowsStableSetter(props: { handler: () => void }) @{
+	const [count, setCount] = useState(0);
+	<section class="shadow-setter">
+		<span class="shadow-setter-count">{'count:' + count}</span>
+		@{
+			const setCount = props.handler;
+			<button class="shadow-setter-action" onClick={setCount}>{'go'}</button>
+		}
+	</section>
+}
