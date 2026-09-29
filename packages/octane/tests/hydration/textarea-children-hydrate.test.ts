@@ -172,6 +172,22 @@ const CASES: Case[] = [
 		nextExpected: '\nB',
 	},
 	{
+		name: 'SpreadMixed',
+		label: 'forwarded attributes',
+		props: { value: 'v', rest: { name: 'body', rows: 3 } },
+		expected: 'A: v!',
+		next: { value: 'w', rest: { name: 'body', rows: 4 } },
+		nextExpected: 'A: w!',
+	},
+	{
+		name: 'SpreadMixed',
+		label: 'an empty spread',
+		props: { value: null, rest: {} },
+		expected: 'A: !',
+		next: { value: ['\n', 1], rest: {} },
+		nextExpected: 'A: \n1!',
+	},
+	{
 		name: 'Descriptor',
 		label: 'createElement text children',
 		props: { value: 'A' },
@@ -198,19 +214,10 @@ const CASES: Case[] = [
 	},
 ];
 
-// A spread host routes its form props through the aggregated writer, whose
-// update-time default reset belongs to the spread sole-child contract; these
-// cases pin serialization, adoption and mount.
-const SPREAD_CASES = [
-	{ rest: { name: 'body', rows: 3 }, value: 'v', expected: 'A: v!' },
-	{ rest: {}, value: null, expected: 'A: !' },
-	{ rest: { name: 'body' }, value: ['\n', 1], expected: 'A: \n1!' },
-];
-
 describe('textarea children: server serialization and hydration', () => {
 	it.each(CASES)('$name with $label', async ({ name, props, expected, next, nextExpected }) => {
 		const host = renderServer(name, props);
-		// The serialized content carries no hydration markers the parser would keep.
+		// Before any script runs, the parsed default value is exactly the text.
 		const textarea = host.querySelector('textarea')!;
 		expectOnlyText(textarea, expected);
 		const text = textarea.firstChild;
@@ -227,25 +234,6 @@ describe('textarea children: server serialization and hydration', () => {
 			flushSync(() => root.render(Client[name] as any, next));
 			expect(host.querySelector('textarea')).toBe(textarea);
 			expectOnlyText(textarea, nextExpected);
-		} finally {
-			root.unmount();
-		}
-	});
-
-	it.each(SPREAD_CASES)('SpreadMixed with $rest', async ({ rest, value, expected }) => {
-		const props = { value, rest };
-		const host = renderServer('SpreadMixed', props);
-		const textarea = host.querySelector('textarea')!;
-		expectOnlyText(textarea, expected);
-		if ('name' in rest) expect(textarea.getAttribute('name')).toBe(rest.name);
-
-		const { root, recoverable, reports } = hydrate(host, 'SpreadMixed', props);
-		try {
-			await act(() => {});
-			expect(recoverable).toEqual([]);
-			expect(reports()).toEqual([]);
-			expect(host.querySelector('textarea')).toBe(textarea);
-			expectOnlyText(textarea, expected);
 		} finally {
 			root.unmount();
 		}
@@ -330,20 +318,6 @@ describe('textarea children: client-only mount and update', () => {
 			expectOnlyText(textarea, nextExpected);
 			flushSync(() => root.render(Client[name] as any, props));
 			expectOnlyText(textarea, expected);
-		} finally {
-			root.unmount();
-		}
-	});
-
-	it.each(SPREAD_CASES)('SpreadMixed with $rest', ({ rest, value, expected }) => {
-		vi.spyOn(console, 'error').mockImplementation(() => {});
-		const host = container();
-		const root = createRoot(host);
-		try {
-			flushSync(() => root.render(Client.SpreadMixed as any, { value, rest }));
-			const textarea = host.querySelector('textarea')!;
-			expectOnlyText(textarea, expected);
-			if ('name' in rest) expect(textarea.getAttribute('name')).toBe(rest.name);
 		} finally {
 			root.unmount();
 		}
