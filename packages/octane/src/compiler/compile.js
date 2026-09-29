@@ -26186,7 +26186,10 @@ function planJsx(
 			// Const-seeded straight into the bag factory args — no mount statement.
 			if (cc.isChild && !noTemplate) {
 				bag.constField(`_chv$${cc.id}`, 'null');
-				bag.constField(`_chp$${cc.id}`, 'undefined');
+				// An only-child hole's first render must reach childTextHole even for
+				// `undefined`: while hydrating, that call reconciles the host's server
+				// children, which no other binding owns.
+				bag.constField(`_chp$${cc.id}`, cc.onlyChildText ? 'unset' : 'undefined');
 			}
 		},
 	});
@@ -26231,11 +26234,12 @@ function planJsx(
 			);
 		}
 		// Const-seeded fields keep their registry strings until the factory call.
-		// A mixed-style scalar starts at its private owning scope so its first
-		// deferred write still runs for null/undefined. The same identity lets its
-		// setter distinguish a fresh mount from a preserved suspended retry.
+		// An `unset` field starts at its private owning scope, which no rendered
+		// value equals, so its first write still runs for null/undefined. For a
+		// mixed-style scalar, the same identity lets its setter distinguish a fresh
+		// mount from a preserved suspended retry.
 		const constArgNode = (expr) =>
-			expr === 'null' ? b.literal(null) : expr === 'style-unset' ? b.id('__s') : b.id(expr);
+			expr === 'null' ? b.literal(null) : expr === 'unset' ? b.id('__s') : b.id(expr);
 		const bagFieldValue = (f) =>
 			f.hostVar !== null
 				? b.id(f.hostVar)
@@ -27738,7 +27742,7 @@ function emitDeferredMount(bind, elVar, bag) {
 			: bind.kind === 'style' || bind.kind === 'styleProperties'
 				? `_sty$${bind.id}`
 				: `_prev$${bind.id}`,
-		bind.kind === 'styleProperty' || bind.kind === 'styleProperties' ? 'style-unset' : 'undefined',
+		bind.kind === 'styleProperty' || bind.kind === 'styleProperties' ? 'unset' : 'undefined',
 	);
 	if (bind.kind === 'styleProperties') {
 		if (bind.spread) bag.constField(`_styFull$${bind.id}`, 'undefined');
