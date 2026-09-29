@@ -427,6 +427,57 @@ unchanged. [Root callback tests](../tests/root-error-callbacks.test.ts) cover th
 public descriptor, JSX, and template forms; this does not claim general
 transactional reporting for a catch abandoned by a later suspension.
 
+## 13. Retry pacing after an already-settled wakeable
+
+**React behavior:** a listener attached to a settled thenable fires on the next
+microtask, but React sends the resulting boundary retry, and a non-sync root
+ping, through its root scheduler. That work runs in a Scheduler task. A
+component that keeps suspending on the same settled thenable therefore renders
+again once per task until its own state changes. `use()` treats a thenable
+whose `status` is an unrecognized string as pending and leaves it uninstrumented
+([ReactFiberThenable.js](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberThenable.js)).
+
+**Octane behavior:** a Suspense retry runs on the settling thenable's own
+microtask, so ordinary data reveals without waiting for a task. Before this
+change, every retry did that. A retry that suspended again on the same settled
+thenable re-rendered on microtasks forever. The thenable could be thrown by a
+resource reader whose state lagged its resolved promise, or read through `use()`
+with a status such as router-core's `'resolved'`. Timers and network callbacks
+never ran, so the state that would end the suspension never arrived, and the
+page livelocked.
+
+Client resume subscriptions now remember which wakeables they have seen
+settle. A first settlement still retries on its microtask. For a wakeable whose
+settlement was already observed, the retry waits for the next notification,
+then yields one macrotask. The component can keep suspending until a later
+task changes its state, as under React, without starving the event loop. The
+subscription still goes through `then`, so a reusable custom wakeable waits for
+its next notification instead of being polled. Boundaries, transition holds,
+roots without a boundary, hidden Activity, and initial and deferred hydration
+all share this subscription. `use()` still treats an unrecognized status as
+pending without instrumenting the thenable.
+
+Limits: the record is per wakeable. A reader that throws a new, already-settled
+promise on every attempt still retries on microtasks; React spins there too, but
+across tasks. A paced retry is a timer that `act()` does not drain, like the
+retry-reveal delay in #5, so a test must await a task inside `act()` to observe
+it. SSR is unchanged: it stops after `MAX_SUSPENSE_PASSES` consecutive passes
+that complete nothing, instead of pacing.
+
+**Evidence:** [suspense-settled-wakeable.test.ts](../tests/suspense-settled-wakeable.test.ts)
+covers resolved and rejected thrown promises through template and JSX
+boundaries, `use()` of a `'resolved'`-status thenable, boundary and root
+transition holds, an initial root without a boundary, and hidden Activity. It
+also checks that a reusable custom wakeable is not polled. As controls, an
+already-resolved promise thrown for the first time and one pending promise
+shared by two roots still reveal on microtasks. Both hydration paths are
+covered: initial adoption in
+[initial-suspense-hydrate.test.ts](../tests/hydration/initial-suspense-hydrate.test.ts)
+and `<Hydrate>` activation in
+[deferred-hydration-contract.test.ts](../tests/hydration/deferred-hydration-contract.test.ts).
+Each livelock test opens its gate from a timer. It also records whether the gate
+had to open itself after 2,000 checks, as it did on the pre-fix runtime.
+
 ---
 
 ## What we DO match React on (for the record)

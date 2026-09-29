@@ -947,6 +947,61 @@ describe('deferred hydration contract edges', () => {
 		expect(onHydrated).toHaveBeenCalledOnce();
 	});
 
+	it('lets a timer end activation that keeps suspending on an already-settled thenable', async () => {
+		// use() treats an unrecognized status as pending, like React. Retrying on
+		// the settled thenable's own microtask would starve the timer that fulfills
+		// it, so the status getter fulfills after 2,000 reads and records that.
+		let status = 'resolved';
+		let reads = 0;
+		let starved = false;
+		const promise = Object.defineProperty(Promise.resolve(), 'status', {
+			get() {
+				if (status === 'resolved' && ++reads === 2_000) {
+					starved = true;
+					status = 'fulfilled';
+				}
+				return status;
+			},
+		});
+		const onHydrated = vi.fn();
+		const serverProps = {
+			when: condition(false),
+			suspend: false,
+			promise,
+			onHydrated,
+			shellLabel: 'Initial shell',
+		};
+		container.innerHTML = renderToString(server.ActivationSuspendingHydration, serverProps).html;
+		root = hydrateRoot(container, client.ActivationSuspendingHydration, serverProps);
+		flushSync(() => {});
+		flushEffects();
+
+		root.render(client.ActivationSuspendingHydration, {
+			...serverProps,
+			when: condition(true),
+			suspend: true,
+		});
+		flushSync(() => {});
+		flushEffects();
+		expect(container.querySelector('#activation-content')?.textContent).toBe('Server reviews');
+		expect(onHydrated).not.toHaveBeenCalled();
+
+		await act(async () => {
+			await new Promise<void>((resolve) =>
+				setTimeout(() => {
+					status = 'fulfilled';
+					resolve();
+				}, 0),
+			);
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		});
+
+		expect(starved).toBe(false);
+		expect(container.querySelector('#activation-content')?.textContent).toBe('Server reviews');
+		expect(container.querySelector('#activation-fallback')).toBeNull();
+		expect(onHydrated).toHaveBeenCalledOnce();
+	});
+
 	it('keeps the original focused server editor and its draft while activation suspends and resumes', async () => {
 		const pending = deferred<void>();
 		const onHydrated = vi.fn();
