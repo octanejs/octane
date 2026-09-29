@@ -8279,6 +8279,8 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 	streamSettlements?: StreamSettlements;
 	/** Recoverable buffered-boundary errors are reported once across async retries. */
 	bufferedErrors?: Map<string, { error: unknown; reported: boolean }>;
+	/** Resource-thrown thenables a buffered settle has seen settle (see isStalledWave). */
+	settledThrows?: Set<PromiseLike<unknown>>;
 	/** Undefined for externally hosted passes whose request lifetime is not owned here. */
 	resourceOptions?: RenderOptions | null;
 	/** Optional renderer resources; allocated only by a participating adapter. */
@@ -8921,6 +8923,37 @@ async function raceSettleGuards(
 	}
 }
 
+function isThrownKey(key: string): boolean {
+	return key.charCodeAt(0) === 124 /* '|' */ && key.startsWith('|throw#');
+}
+
+/** Every registration came from a resource reader's raw throw, not use(). */
+function isThrownWave(suspended: SuspendedList): boolean {
+	for (const { key } of suspended) if (!isThrownKey(key)) return false;
+	return true;
+}
+
+// A buffered wave STALLS when a resource reader rethrew only thenables this
+// render has already seen settle. The reader owns its value, so settling them
+// again records nothing, and the retry can only succeed once the reader's own
+// state changes, possibly on a later task (runBuffered paces those retries).
+// Identity is the only evidence: a reader may throw a new, already-settled
+// promise once per level of a cached waterfall, which is progress, not a stall.
+function isStalledWave(suspended: SuspendedList, resolved: ResolvedMap): boolean {
+	const seen = resolved.settledThrows;
+	if (seen === undefined) return false;
+	for (const { promise, key } of suspended) {
+		if (!isThrownKey(key) || !seen.has(promise)) return false;
+	}
+	return true;
+}
+
+// Stalled retries wait on a timer after the rethrown thenables notify, so the
+// timer or I/O callback that updates the reader can run first. The delay
+// doubles from 1ms up to this cap, so a reader that never recovers costs about
+// ten renders per second until the suspense deadline instead of one per task.
+const STALLED_RETRY_MAX_DELAY_MS = 100;
+
 // Await everything a pass/round surfaced; cache each outcome in `resolved` by
 // its key. Only render-local state is touched across the await. This is the
 // BUFFERED pipeline's settle — nothing ships until everything resolves, so one
@@ -8953,6 +8986,7 @@ async function settleSuspended(
 				resolved.set(key, outcome);
 				if (isPu) pu.resolvedT.set(promise, outcome);
 			}
+			if (isThrownKey(key)) (resolved.settledThrows ??= new Set()).add(promise);
 		}),
 	);
 	await raceSettleGuards(settleAll, timeoutMs, signal);
@@ -9216,6 +9250,13 @@ async function runBuffered(
 	const identifierPrefix = options?.identifierPrefix ?? '';
 	let attempt = 0;
 	let lastSettled: SuspendedList | null = null;
+	// Consecutive stalled waves (see isStalledWave), when the first of them
+	// settled, and the fewest registrations any of them had. A stalled wave cannot
+	// advance the render by itself, so it does not spend the pass budget; the
+	// stall is bounded by the suspense deadline instead.
+	let stalls = 0;
+	let stalledSince = 0;
+	let stallWidth = 0;
 	for (;;) {
 		// Bail before doing pass work if the request already died.
 		signal?.throwIfAborted();
@@ -9243,12 +9284,40 @@ async function runBuffered(
 		for (;;) {
 			// MAX bounds the TOTAL awaits (full-pass- and round-driven) so a
 			// never-resolving or nondeterministic use() can't wedge the loop.
-			if (++attempt > MAX_SUSPENSE_PASSES) {
-				const err = new Error(formatServerError(47, MAX_SUSPENSE_PASSES));
+			// Stalled waves are bounded by time instead (see below).
+			const stalled = isStalledWave(pending, resolved);
+			if (!stalled && ++attempt > MAX_SUSPENSE_PASSES) {
+				const err = new Error(
+					isThrownWave(pending)
+						? formatServerError(333, MAX_SUSPENSE_PASSES)
+						: formatServerError(47, MAX_SUSPENSE_PASSES),
+				);
 				options?.onError?.(err);
 				throw err;
 			}
 			await settleSuspended(pending, resolved, timeoutMs, signal);
+			if (stalled) {
+				// A narrower wave means a stalled reader finished, so the others get a
+				// fresh deadline. Width only shrinks, so this restarts at most once per
+				// reader and a reader cycling between settled thenables stays bounded.
+				if (stalls === 0 || pending.length < stallWidth) {
+					stalls = 0;
+					stalledSince = Date.now();
+					stallWidth = pending.length;
+				}
+				stalls++;
+				const remainingMs =
+					timeoutMs > 0 ? stalledSince + timeoutMs - Date.now() : Number.POSITIVE_INFINITY;
+				if (remainingMs <= 0) {
+					const err = new Error(formatServerError(332, timeoutMs));
+					options?.onError?.(err);
+					throw err;
+				}
+				const delayMs = Math.min(2 ** (stalls - 1), STALLED_RETRY_MAX_DELAY_MS, remainingMs);
+				await raceSettleGuards(new Promise((resolve) => setTimeout(resolve, delayMs)), 0, signal);
+			} else {
+				stalls = 0;
+			}
 			lastSettled = pending;
 			if (jobs.length === 0 || !jobs.every((j) => j.frame.parent !== null)) break;
 			const round = withStream(null, () => runDiscoveryRound(jobs, resolved, identifierPrefix));
@@ -11583,7 +11652,11 @@ async function runStream(
 				throw new Error(formatServerError(36));
 			}
 			if (++attempt > MAX_SUSPENSE_PASSES) {
-				throw new Error(formatServerError(48, MAX_SUSPENSE_PASSES));
+				throw new Error(
+					isThrownWave(suspended)
+						? formatServerError(334, MAX_SUSPENSE_PASSES)
+						: formatServerError(48, MAX_SUSPENSE_PASSES),
+				);
 			}
 			const settledWave = suspended;
 			if (!retryWithoutSettling) {
