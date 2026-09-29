@@ -67,7 +67,8 @@ try {
 }
 assert.equal(observed.html, first.html, 'observed HTML bytes');
 assert.equal(observed.css, first.css, 'observed CSS bytes');
-assert.equal(explicitJson, 1, 'explicit key control');
+// A top-level explicit key uses the client's 'k' namespace, never a JSON tuple.
+assert.equal(explicitJson, 0, 'explicit key work');
 assert.equal(implicitJson, Number(process.env.EXPECT_IMPLICIT_JSON ?? 0), 'implicit key work');
 
 const now = () => process.hrtime.bigint();
