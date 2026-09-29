@@ -30,6 +30,10 @@ const BLOCKS = {
 	SetupFor: `@{ const [first] = useState(label); @for (const row of [id]; key 0) { ${OUTPUT} } }`,
 	// The authored form a setup-bearing block is shorthand for.
 	RenderProp: `{() => @{ const [first] = useState(label); @if (label !== '') { ${OUTPUT} } }}`,
+	// Templates nested in the block's setup reach the callback's params only
+	// through the block's closure too.
+	NestedTemplate: `@{ const [first] = useState(label); const inner = () => @{ @if (label !== '') { ${OUTPUT} } }; <>{inner}</> }`,
+	NestedBlock: `@{ const [first] = useState(label); const inner = <>@{ const text = first + '/' + label; <b>{text as string}</b> }</>; <>{inner}</> }`,
 } as const;
 type Block = keyof typeof BLOCKS;
 
