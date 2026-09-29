@@ -88,7 +88,10 @@ suspending. A thrown Promise has no position, so upstream never hits this. The
 retained load is keyed by instance, `lng`, namespaces, and `useSuspense`, so
 settling never drops it. `tests/conformance/runtime.test.ts` and the suspense
 cases in the differential lane cover a second `useTranslation` and a following
-`use()`.
+`use()`. On the server, the pass that completes after the load settles starts
+with fresh hook state, so it never reads the settled load and writes no
+hydration seed for it. `tests/conformance/hydration.test.ts` hydrates a
+following `use()` after a server render that suspended in `useTranslation`.
 
 Known gaps and consumer-visible divergences remain recorded in `status.json`:
 natural block children for `Trans`, Suspense mechanics, refs-as-props and class
