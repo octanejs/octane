@@ -22533,6 +22533,13 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 function lowerInspectableJsxChild(child, ctx) {
 	const fold = ctx._valueDirectiveLowering;
 	if (fold == null) return lowerJsxChild(child, ctx);
+	// A render-only @{} block is transparent grouping: lowerJsxChild unwraps it
+	// to its render root. Letting lowerSetupValueDirectives fold it would produce
+	// a component range on the server while the descriptor path emits the
+	// unwrapped children on the client, breaking hydration.
+	if (child && child.type === 'JSXCodeBlock' && (child.body?.length ?? 0) === 0) {
+		return lowerJsxChild(child, ctx);
+	}
 	const prepared = lowerSetupValueDirectives(child, fold);
 	const t = prepared && prepared.type;
 	if (
