@@ -247,9 +247,15 @@ async function sendWebResponseForRequest(nodeResponse, webResponse, nodeRequest)
 
 	nodeResponse.statusCode = webResponse.status;
 	if (webResponse.statusText) nodeResponse.statusMessage = webResponse.statusText;
+	// `Headers` yields each Set-Cookie as its own entry, and `setHeader`
+	// replaces rather than appends, so cookies go over as one array: Node writes
+	// one header line per element. Commas cannot join them because `Expires`
+	// contains one.
 	headers.forEach((value, key) => {
-		nodeResponse.setHeader(key, value);
+		if (key !== 'set-cookie') nodeResponse.setHeader(key, value);
 	});
+	const cookies = headers.getSetCookie();
+	if (cookies.length) nodeResponse.setHeader('set-cookie', cookies);
 	if (body) {
 		const reader = body.getReader();
 		let disconnected = nodeResponse.destroyed;

@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { once } from 'node:events';
 import { createGunzip, gunzipSync } from 'node:zlib';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createNodeServer, serveStaticFile } from '../src/server/node-http.js';
+import { createNodeServer, sendWebResponse, serveStaticFile } from '../src/server/node-http.js';
 
 describe('serveStaticFile cache policy', () => {
 	let root: string;
@@ -442,5 +442,116 @@ describe('built-in Node server response compression', () => {
 		expect(head.headers['content-encoding']).toBeUndefined();
 		expect(head.headers['content-length']).toBe(String(Buffer.byteLength(staticJavaScript)));
 		expect(head.body).toHaveLength(0);
+	});
+});
+
+describe('built-in Node server response headers', () => {
+	const sessionCookie =
+		'session=session-value; Path=/; HttpOnly; Expires=Wed, 21 Oct 2037 07:28:00 GMT';
+	const csrfCookie = 'csrf=csrf-value; Path=/; SameSite=Lax';
+	const servers: { close(): void; listener: import('node:http').Server }[] = [];
+
+	function cookieResponse(pathname: string) {
+		const headers = new Headers({ 'Content-Type': 'text/plain; charset=utf-8' });
+		if (pathname !== '/none') headers.append('Set-Cookie', sessionCookie);
+		if (pathname === '/multiple') headers.append('Set-Cookie', csrfCookie);
+		headers.append('X-Multi', 'first');
+		headers.append('X-Multi', 'second');
+		headers.set('Cache-Control', 'private, max-age=0');
+		return new Response('ok', { headers });
+	}
+
+	async function track(
+		listener: import('node:http').Server,
+		close: () => void = () => listener.close(),
+	) {
+		servers.push({ close, listener });
+		if (!listener.listening) await once(listener, 'listening');
+		const address = listener.address();
+		if (!address || typeof address === 'string') throw new Error('Node test server has no port');
+		return `http://127.0.0.1:${address.port}`;
+	}
+
+	afterEach(async () => {
+		for (const { close, listener } of servers.splice(0)) {
+			const closed = once(listener, 'close');
+			close();
+			await closed;
+		}
+	});
+
+	function get(url: string) {
+		return new Promise<{
+			status: number;
+			headers: import('node:http').IncomingHttpHeaders;
+			rawHeaders: string[];
+			body: Buffer;
+		}>((resolve, reject) => {
+			const outgoing = request(url, { headers: { Connection: 'close' } }, (response) => {
+				const chunks: Buffer[] = [];
+				response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+				response.on('error', reject);
+				response.on('end', () => {
+					resolve({
+						status: response.statusCode ?? 0,
+						headers: response.headers,
+						rawHeaders: response.rawHeaders,
+						body: Buffer.concat(chunks),
+					});
+				});
+			});
+			outgoing.on('error', reject);
+			outgoing.end();
+		});
+	}
+
+	function rawValues(rawHeaders: string[], name: string) {
+		const values: string[] = [];
+		for (let index = 0; index < rawHeaders.length; index += 2) {
+			if (rawHeaders[index].toLowerCase() === name) values.push(rawHeaders[index + 1]);
+		}
+		return values;
+	}
+
+	async function expectCookieHeaders(origin: string) {
+		const none = await get(origin + '/none');
+		expect(none.status).toBe(200);
+		expect(none.headers['set-cookie']).toBeUndefined();
+
+		const single = await get(origin + '/single');
+		expect(single.status).toBe(200);
+		expect(single.body.toString()).toBe('ok');
+		// The comma inside `Expires` belongs to the cookie, not a list separator.
+		expect(single.headers['set-cookie']).toEqual([sessionCookie]);
+		expect(rawValues(single.rawHeaders, 'set-cookie')).toEqual([sessionCookie]);
+
+		const multiple = await get(origin + '/multiple');
+		expect(multiple.status).toBe(200);
+		expect(multiple.body.toString()).toBe('ok');
+		expect(multiple.headers['set-cookie']).toEqual([sessionCookie, csrfCookie]);
+		// Each cookie travels as its own header line, in source order.
+		expect(rawValues(multiple.rawHeaders, 'set-cookie')).toEqual([sessionCookie, csrfCookie]);
+
+		// Ordinary headers keep the Fetch combined-value behavior.
+		for (const response of [none, single, multiple]) {
+			expect(rawValues(response.rawHeaders, 'x-multi')).toEqual(['first, second']);
+			expect(response.headers['cache-control']).toBe('private, max-age=0');
+			expect(response.headers['content-type']).toBe('text/plain; charset=utf-8');
+		}
+	}
+
+	it('forwards every Set-Cookie value from the built-in server', async () => {
+		const transport = createNodeServer((request) => cookieResponse(new URL(request.url).pathname));
+		const origin = await track(transport.listen(0), () => transport.close());
+		await expectCookieHeaders(origin);
+	});
+
+	it('forwards every Set-Cookie value through sendWebResponse', async () => {
+		const origin = await track(
+			createServer((req, res) => {
+				void sendWebResponse(res, cookieResponse(new URL(req.url ?? '/', 'http://x').pathname));
+			}).listen(0),
+		);
+		await expectCookieHeaders(origin);
 	});
 });
