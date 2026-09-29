@@ -1394,6 +1394,8 @@ interface UniversalTransitionBatch {
 	promotionScheduled: boolean;
 	promoted: boolean;
 	settled: boolean;
+	/** useOptimistic reverts run at settle; each acts only if the batch never committed it. */
+	optimisticReverts: (() => void)[] | null;
 }
 
 const EMPTY_UNIVERSAL_TRANSITION_BATCHES: ReadonlySet<UniversalTransitionBatch> = new Set();
@@ -1514,6 +1516,34 @@ class UniversalSuspense {
 	constructor(readonly thenable: PromiseLike<unknown>) {}
 }
 
+/**
+ * Wakeables whose settlement a Suspense resume listener has already observed.
+ * A retry can suspend on one again: a thenable whose owner publishes its status
+ * on a later task, or use() of a thenable whose status React does not recognize
+ * (router-core reports `'resolved'`), which stays pending by design. A listener
+ * attached after settlement fires on the next microtask, so retrying there
+ * would re-render forever and starve the timer or network callback that ends
+ * the suspension. React's ping reaches its retry through a Scheduler task.
+ */
+let SETTLED_UNIVERSAL_WAKEABLES: WeakSet<PromiseLike<unknown>> | null = null;
+
+/**
+ * Subscribe a Suspense retry to `wakeable`. A first settlement retries on its
+ * own microtask, keeping ordinary data reveals immediate. Once a settlement has
+ * been observed, the retry yields one macrotask after the next notification.
+ * It still subscribes, so a reusable custom wakeable is not turned into polling.
+ */
+function resumeOnSettle(wakeable: PromiseLike<unknown>, retry: () => void): void {
+	const onSettle =
+		SETTLED_UNIVERSAL_WAKEABLES?.has(wakeable) === true
+			? () => void setTimeout(retry, 0)
+			: () => {
+					(SETTLED_UNIVERSAL_WAKEABLES ??= new WeakSet()).add(wakeable);
+					retry();
+				};
+	wakeable.then(onSettle, onSettle);
+}
+
 class UniversalSuspendedAttemptImpl implements UniversalSuspendedAttempt {
 	private state: 'suspended' | 'aborted' = 'suspended';
 
@@ -1527,10 +1557,7 @@ class UniversalSuspendedAttemptImpl implements UniversalSuspendedAttempt {
 		readonly transitionRender: boolean,
 		readonly bridgeContextReads: ReadonlyMap<UniversalContext<any>, unknown> | null,
 	) {
-		thenable.then(
-			() => this.settle(),
-			() => this.settle(),
-		);
+		resumeOnSettle(thenable, () => this.settle());
 	}
 
 	get status(): 'suspended' | 'aborted' {
@@ -5158,6 +5185,7 @@ function createUniversalTransitionBatch(): UniversalTransitionBatch {
 		promotionScheduled: false,
 		promoted: false,
 		settled: false,
+		optimisticReverts: null,
 	};
 	return batch;
 }
@@ -5181,6 +5209,11 @@ function settleUniversalTransitionBatch(batch: UniversalTransitionBatch): void {
 		IN_FLIGHT_UNIVERSAL_TRANSITION_BATCH = null;
 	}
 	tickUniversalTransitionCount(-batch.pendingSignals);
+	const reverts = batch.optimisticReverts;
+	if (reverts !== null) {
+		batch.optimisticReverts = null;
+		for (const revert of reverts) revert();
+	}
 }
 
 function finishUniversalTransitionRoot(
@@ -6520,7 +6553,81 @@ export function useFormStatus(): FormStatus {
 	return UNIVERSAL_FORM_STATUS;
 }
 
-export function useOptimistic<State>(passthrough: State): [State, (action: State) => void];
+// useOptimistic(passthrough, reducer?) → [optimisticState, addOptimistic]
+//
+// React 19 semantics. The state is passthrough folded through every pending
+// optimistic action, so pending actions rebase onto the latest passthrough;
+// without a reducer, a function action is an updater, as in useState.
+// addOptimistic publishes its action urgently and stages the action's removal
+// into the transition it belongs to: the one it was dispatched in, else the
+// pending async action it follows, else a transition of its own, so a stray
+// update shows once and reverts. The real state and the reverted optimistic
+// state therefore commit together. A transition that is discarded instead of
+// committed still settles, and settling reverts its actions urgently, so no
+// optimistic value outlives its transition.
+
+interface UniversalOptimisticUpdate<Action> {
+	readonly action: Action;
+}
+
+type UniversalOptimisticUpdates<Action> = readonly UniversalOptimisticUpdate<Action>[];
+
+type UniversalOptimisticUpdater<Action> = (
+	previous: UniversalOptimisticUpdates<Action>,
+) => UniversalOptimisticUpdates<Action>;
+
+const NO_UNIVERSAL_OPTIMISTIC_UPDATES: UniversalOptimisticUpdates<never> = [];
+
+function basicUniversalOptimisticReducer<State>(state: State, action: unknown): State {
+	return typeof action === 'function'
+		? (action as (pending: State) => State)(state)
+		: (action as State);
+}
+
+function createUniversalOptimisticDispatch<Action>(
+	record: UniversalOwnerRecord,
+	setUpdates: (updater: UniversalOptimisticUpdater<Action>) => void,
+	getUpdates: () => UniversalOptimisticUpdates<Action>,
+): (action: Action) => void {
+	return (action) => {
+		if (record.disposed) return;
+		if (CURRENT_ATTEMPT !== null && findDraftOwner(record) !== null) {
+			throw new Error('Cannot update optimistic state while rendering.');
+		}
+		const update: UniversalOptimisticUpdate<Action> = { action };
+		const revert: UniversalOptimisticUpdater<Action> = (previous) =>
+			previous.filter((pending) => pending !== update);
+		const pendingBatch =
+			UNIVERSAL_TRANSITION_DEPTH > 0
+				? ACTIVE_UNIVERSAL_TRANSITION_BATCH
+				: IN_FLIGHT_UNIVERSAL_TRANSITION_BATCH;
+		const batch = pendingBatch ?? createUniversalTransitionBatch();
+		publishUrgentUniversalUpdate(setUpdates, (previous) => [...previous, update]);
+		const activeBatch = ACTIVE_UNIVERSAL_TRANSITION_BATCH;
+		ACTIVE_UNIVERSAL_TRANSITION_BATCH = batch;
+		UNIVERSAL_TRANSITION_DEPTH++;
+		try {
+			setUpdates(revert);
+		} finally {
+			UNIVERSAL_TRANSITION_DEPTH--;
+			ACTIVE_UNIVERSAL_TRANSITION_BATCH = activeBatch;
+		}
+		(batch.optimisticReverts ??= []).push(() => {
+			if (!record.disposed && getUpdates().includes(update)) {
+				publishUrgentUniversalUpdate(setUpdates, revert);
+			}
+		});
+		if (pendingBatch === null) {
+			// Not a startTransition, so this transition leaves isPending untouched.
+			batch.closed = true;
+			queueUniversalTransitionPromotion(batch);
+		}
+	};
+}
+
+export function useOptimistic<State>(
+	passthrough: State,
+): [State, (action: State | ((pendingState: State) => State)) => void];
 export function useOptimistic<State, Action = State>(
 	passthrough: State,
 	reducer: (state: State, action: Action) => State,
@@ -6534,8 +6641,7 @@ export function useOptimistic<State, Action = State>(
 	passthrough: State,
 	...reducerAndSlot: unknown[]
 ): [State, (action: Action) => void] {
-	const defaultReducer = (_state: State, action: Action) => action as unknown as State;
-	let reducer: (state: State, action: Action) => State = defaultReducer;
+	let reducer: (state: State, action: Action) => State = basicUniversalOptimisticReducer;
 	let slot: unknown;
 	if (reducerAndSlot.length === 1) {
 		if (typeof reducerAndSlot[0] === 'function') {
@@ -6549,8 +6655,23 @@ export function useOptimistic<State, Action = State>(
 		}
 		slot = reducerAndSlot[reducerAndSlot.length - 1];
 	}
-	const [optimistic, dispatch] = useReducer(reducer, passthrough, slot);
-	return [Object.is(optimistic, passthrough) ? passthrough : optimistic, dispatch];
+	const base = resolveHookSlot(slot);
+	const record = currentDraftOwner().record;
+	return withSlot(base, () => {
+		const [updates, setUpdates, getUpdates] = useState<UniversalOptimisticUpdates<Action>>(
+			NO_UNIVERSAL_OPTIMISTIC_UPDATES,
+			'updates',
+		);
+		const [dispatch] = useState(
+			() => createUniversalOptimisticDispatch(record, setUpdates, getUpdates),
+			'dispatch',
+		);
+		let state = passthrough;
+		for (let index = 0; index < updates.length; index++) {
+			state = reducer(state, updates[index].action);
+		}
+		return [state, dispatch];
+	});
 }
 
 export function useContext<T>(context: UniversalContext<T>): T {
@@ -6563,13 +6684,12 @@ type UniversalTrackedThenable<T = unknown> = PromiseLike<T> & {
 	reason?: unknown;
 };
 
+// Instrument an untagged thenable exactly once. A status we did not write, even
+// one React does not recognize such as router-core's `'resolved'`, belongs to
+// the thenable's owner: leave it alone and treat it as pending, as React's
+// trackUsedThenable and the DOM runtime do.
 function trackUniversalThenable<T>(thenable: UniversalTrackedThenable<T>): void {
-	if (
-		thenable.status === 'pending' ||
-		thenable.status === 'fulfilled' ||
-		thenable.status === 'rejected'
-	)
-		return;
+	if (thenable.status !== undefined) return;
 	thenable.status = 'pending';
 	thenable.then(
 		(value) => {
@@ -7198,7 +7318,7 @@ function routeUniversalOwnerSuspense(
 			current.boundaryThenable = null;
 			current.root.schedule();
 		};
-		thenable.then(settle, settle);
+		resumeOnSettle(thenable, settle);
 		current.root.schedule();
 		return true;
 	}
@@ -9205,10 +9325,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		};
 		this.awaitingReplay = replay;
 		for (const thenable of thenables) {
-			thenable.then(
-				() => this.queueReplay(replay),
-				() => this.queueReplay(replay),
-			);
+			resumeOnSettle(thenable, () => this.queueReplay(replay));
 		}
 	}
 
@@ -9239,7 +9356,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				this.urgentBoundarySuspension = null;
 				this.ensureScheduledTransitionWork();
 			};
-			thenable.then(releaseProjection, releaseProjection);
+			// Paced like the attempt's own retry. Releasing on the microtask
+			// invalidates the host boundary for held transition work, and that
+			// re-preparation suspends again on the same settled thenable.
+			resumeOnSettle(thenable, releaseProjection);
 		}
 		return attempt;
 	}

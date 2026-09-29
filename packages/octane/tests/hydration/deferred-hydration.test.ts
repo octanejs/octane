@@ -23,6 +23,9 @@ const SPLIT_FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydrat
 const splitServer = loadServerFixture<typeof splitClient>(SPLIT_FIXTURE);
 const STYLED_FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration-styles.tsrx';
 const styledServer = loadServerFixture<typeof styledClient>(STYLED_FIXTURE);
+// A split child loads through Vite's real module graph. On a loaded CI runner
+// that request can take longer than vi.waitFor's 1s default.
+const SPLIT_CHILD_LOAD = { timeout: 4000 };
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
 	let resolve!: (value: T) => void;
@@ -243,7 +246,7 @@ describe('deferred hydration', () => {
 			// drain the hydration commit once that real module request completes.
 			await act(() => {});
 			expect(onHydrated).toHaveBeenCalledOnce();
-		});
+		}, SPLIT_CHILD_LOAD);
 
 		expect(container.querySelector('#split-review-action')).toBe(deferredButton);
 		expect(container.querySelector('#split-eager-prefix')).toBe(eagerPrefix);
@@ -305,7 +308,7 @@ describe('deferred hydration', () => {
 		await vi.waitFor(async () => {
 			await act(() => {});
 			expect(onHydrated).toHaveBeenCalledOnce();
-		});
+		}, SPLIT_CHILD_LOAD);
 
 		// Adoption, not mismatch recovery: the server nodes survive with their
 		// server-rendered scope classes, and the split child is live.
@@ -334,7 +337,7 @@ describe('deferred hydration', () => {
 		await vi.waitFor(async () => {
 			await act(() => {});
 			expect(onHydrated).toHaveBeenCalledOnce();
-		});
+		}, SPLIT_CHILD_LOAD);
 
 		// The sheet lives in the split child, so it appears only after the
 		// child chunk runs — under the same authored-position hash the server
@@ -473,7 +476,7 @@ export function App(props) @{
 		await act(async () => {
 			await vi.waitFor(() => {
 				expect(container.querySelector('#split-client-only-content')).not.toBeNull();
-			});
+			}, SPLIT_CHILD_LOAD);
 		});
 		const content = container.querySelector('#split-client-only-content') as HTMLButtonElement;
 		expect(container.querySelector('#split-client-only-fallback')).toBeNull();
@@ -511,7 +514,7 @@ export function App(props) @{
 		await vi.waitFor(async () => {
 			await act(() => {});
 			expect(onHydrated).toHaveBeenCalledTimes(2);
-		});
+		}, SPLIT_CHILD_LOAD);
 
 		const hydratedButtons = Array.from(
 			container.querySelectorAll('.repeated-split-action'),
