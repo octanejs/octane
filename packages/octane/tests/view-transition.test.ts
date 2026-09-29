@@ -28,6 +28,7 @@ import {
 	PlainClickApp,
 	RenderErrorApp,
 	NestedSiblingsApp,
+	StagedTemplateApp,
 } from './_fixtures/view-transition-features.tsrx';
 
 function evalServer(source: string, filename: string): Record<string, any> {
@@ -497,6 +498,36 @@ describe('ViewTransition features', () => {
 		expect(container.textContent).toBe('Ready');
 		expect(vt.calls.length).toBeGreaterThan(0);
 		expect(enters).toBe(1);
+	});
+
+	it('never starts a transition on the inert template document of a staged boundary', async () => {
+		const documentStart = (document as any).startViewTransition;
+		delete (document as any).startViewTransition;
+		const owners: Document[] = [];
+		// Browsers expose the method on every Document and return null without a browsing context.
+		Object.defineProperty(Document.prototype, 'startViewTransition', {
+			configurable: true,
+			value(this: Document, input: { update: () => void | Promise<void> }) {
+				owners.push(this);
+				return this.defaultView === null ? null : documentStart.call(this, input);
+			},
+		});
+		try {
+			await act(() => {
+				root.render(StagedTemplateApp, { page: false });
+			});
+			await act(() => {
+				startTransition(() => {
+					root.render(StagedTemplateApp, { page: true });
+				});
+			});
+		} finally {
+			delete (Document.prototype as any).startViewTransition;
+			(document as any).startViewTransition = documentStart;
+		}
+		expect(container.textContent).toBe('page');
+		expect(owners.length).toBeGreaterThan(0);
+		expect(owners.every((owner) => owner === document)).toBe(true);
 	});
 
 	it('routes delegated click transitions through startViewTransition, including while in flight', async () => {

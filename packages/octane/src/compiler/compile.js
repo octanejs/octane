@@ -668,9 +668,14 @@ function directSignalSite(ctx, node, kind = 'binding') {
 }
 
 function componentInvocationSite(ctx, node) {
-	const position = node?.start ?? `${node?.loc?.start?.line ?? 0}:${node?.loc?.start?.column ?? 0}`;
 	// Authored positions identify call sites independently of the server/client
 	// helper names introduced for loops, branches, and value-position fragments.
+	// Hash line:col, not the parser offset: one call site in returned JSX reaches
+	// the client as the raw JSXElement but the server as a normalized template
+	// Element, and normalization keeps only `loc`.
+	const start = node?.loc?.start;
+	const position =
+		start != null ? `${start.line ?? 0}:${start.column ?? 0}` : (node?.start ?? '0:0');
 	return `c:${strongHash(
 		`octane:component-invocation-site:1\0${normalizeTextTypeFilename(ctx.filename) ?? ctx.filename}\0${position}`,
 	)}`;
@@ -22013,7 +22018,11 @@ function rewriteTsrxBlocks(
 			);
 			fakeBody.generator = n.generator;
 			if (n.returnType !== undefined) fakeBody.returnType = n.returnType;
-			inlinedSubs.push(compileFunctionBody(fakeBody, ctx, helperName, parentNs, cssHash));
+			inlinedSubs.push(
+				withNestedTemplateScope(fakeBody, ctx, () =>
+					compileFunctionBody(fakeBody, ctx, helperName, parentNs, cssHash),
+				),
+			);
 			return inheritOriginLoc(b.id(helperName), n);
 		}
 		if (leaveCallbackReads && isFunctionNode(n)) {
@@ -22034,6 +22043,54 @@ function rewriteTsrxBlocks(
 		}
 		return null;
 	}
+}
+
+/**
+ * Compile a template function nested inside another body — a `() => @{ … }`
+ * sub-template (including the scoped child a setup-bearing `@{ … }` child
+ * lowers to) or a `function F() @{ … }` declared in a component — with its own
+ * params and locals visible to the constructs inside it.
+ *
+ * The nested function closes over the enclosing body, but its `@if`/`@for`/
+ * `@switch`/`@try` arms and lifted event bundles hoist to module scope and
+ * receive what they read through an env tuple that `helperCaptures` builds
+ * from `ctx.currentComponentLocals`. Every name visible at those call sites
+ * must be in that set: the enclosing body's, which the function still reaches,
+ * plus the function's own. A missing name is left out of the tuple and the
+ * hoisted arm reads it as a free identifier.
+ *
+ * A name the function introduces can shadow an enclosing lifetime-invariant
+ * binding with one that changes between renders, so it must not inherit that
+ * proof. `compileFunctionBody` recomputes the nested body's own invariants.
+ */
+function withNestedTemplateScope(fn, ctx, compile) {
+	const prevLocals = ctx.currentComponentLocals;
+	const prevInvariantLocals = ctx.currentInvariantLocals;
+	const prevEventInvariantLocals = ctx.currentEventInvariantLocals;
+	const introduced = collectComponentLocals(fn);
+	const locals = new Set(prevLocals);
+	for (const name of introduced) locals.add(name);
+	ctx.currentComponentLocals = locals;
+	ctx.currentInvariantLocals = withoutShadowedNames(prevInvariantLocals, introduced);
+	ctx.currentEventInvariantLocals = withoutShadowedNames(prevEventInvariantLocals, introduced);
+	try {
+		return compile();
+	} finally {
+		ctx.currentComponentLocals = prevLocals;
+		ctx.currentInvariantLocals = prevInvariantLocals;
+		ctx.currentEventInvariantLocals = prevEventInvariantLocals;
+	}
+}
+
+function withoutShadowedNames(names, introduced) {
+	if (names == null || introduced.size === 0) return names;
+	let out = names;
+	for (const name of introduced) {
+		if (!out.has(name)) continue;
+		if (out === names) out = new Set(names);
+		out.delete(name);
+	}
+	return out;
 }
 
 const SETUP_VALUE_DIRECTIVE_TYPES = new Set([
@@ -22404,23 +22461,16 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 		const t = n && n.type;
 		if (isFunctionNode(n) && n.body?.type === 'JSXCodeBlock') {
 			const name = n.id?.name ?? allocCompilerName(ctx, '__template');
-			const previousLocals = ctx.currentComponentLocals;
 			// A nested body must not replace the enclosing component's warm plan.
 			const previousWarm = ctx._pendingWarm;
-			const ownLocals = collectComponentLocals(n);
-			// The body is compiled where it is written, so the names in scope there are
-			// in scope in it too. Its hoisted arms thread the ones they read, alongside
-			// its own locals, through their env tuple.
-			ctx.currentComponentLocals =
-				previousLocals == null ? ownLocals : new Set([...previousLocals, ...ownLocals]);
 			try {
-				const compiled =
+				const compiled = withNestedTemplateScope(n, ctx, () =>
 					ctx.mode === 'server'
 						? ssrCompileBody(n, ctx, name, null, [], 'opaque')
-						: compileFunctionBody(n, ctx, name, 'opaque');
+						: compileFunctionBody(n, ctx, name, 'opaque'),
+				);
 				return functionExpressionFromDeclaration({ ...compiled, id: n.id ?? null }, n);
 			} finally {
-				ctx.currentComponentLocals = previousLocals;
 				ctx._pendingWarm = previousWarm;
 			}
 		}
