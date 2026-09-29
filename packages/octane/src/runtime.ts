@@ -4155,7 +4155,7 @@ function suspendRootRender(
 				owner.retry();
 		});
 	};
-	wakeable.then(ping, ping);
+	resumeOnSettle(wakeable, ping);
 	return true;
 }
 
@@ -14610,7 +14610,7 @@ function preserveSuspendedHydrateActivation(
 		state.serverActivationStarted = false;
 		scheduleRender(state.parentBlock);
 	};
-	thenable.then(resume, resume);
+	resumeOnSettle(thenable, resume);
 }
 
 function hydrateStrategyType(when: InternalHydrateProps['when']): HydrationWhen {
@@ -16792,6 +16792,34 @@ function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): 
 	)
 		warnUseWaterfall(block, idx);
 	throw new SuspenseException(thenable);
+}
+
+/**
+ * Wakeables whose settlement a Suspense resume listener has already observed.
+ * A retry can suspend on one again: a resource reader whose own state lags its
+ * resolved promise, or use() of a thenable whose status React does not
+ * recognize (router-core reports `'resolved'`), which stays pending by design.
+ * A listener attached after settlement fires on the next microtask, so retrying
+ * there would re-render forever and starve the timer or network callback that
+ * ends the suspension. React's ping reaches its retry through a Scheduler task.
+ */
+let SETTLED_WAKEABLES: WeakSet<PromiseLike<unknown>> | null = null;
+
+/**
+ * Subscribe a Suspense retry to `wakeable`. A first settlement retries on its
+ * own microtask, keeping ordinary data reveals immediate. Once a settlement has
+ * been observed, the retry yields one macrotask after the next notification.
+ * It still subscribes, so a reusable custom wakeable is not turned into polling.
+ */
+function resumeOnSettle(wakeable: PromiseLike<unknown>, retry: () => void): void {
+	const onSettle =
+		SETTLED_WAKEABLES?.has(wakeable) === true
+			? () => void setTimeout(retry, 0)
+			: () => {
+					(SETTLED_WAKEABLES ??= new WeakSet()).add(wakeable);
+					retry();
+				};
+	wakeable.then(onSettle, onSettle);
 }
 
 // Tag a thenable's `status`/`value`/`reason` expandos and attach the settle
@@ -36081,7 +36109,7 @@ function mountPassthroughPending(state: TrySlot, thenable: TrackedThenable<unkno
 		setTryBranch(state, -1);
 		scheduleRender(state.parentBlock);
 	};
-	thenable.then(retry, retry);
+	resumeOnSettle(thenable, retry);
 }
 
 function renderPassthroughTry(state: TrySlot): void {
@@ -36900,7 +36928,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 				return;
 			scheduleRender(state.parentBlock);
 		};
-		suspended.then(resume, resume);
+		resumeOnSettle(suspended, resume);
 		return;
 	}
 	initialSuspenseHydrations?.delete(state);
@@ -38546,7 +38574,7 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 			commitResume(state);
 		}
 	};
-	thenable.then(retry, retry);
+	resumeOnSettle(thenable, retry);
 }
 
 // ---------------------------------------------------------------------------
@@ -40658,7 +40686,7 @@ function suspendHiddenActivity(state: ActivitySlot, thenable: TrackedThenable<un
 		if (state.pendingThenable !== thenable || !state.hidden || blockSubtreeDisposed(block)) return;
 		scheduleRender(block);
 	};
-	thenable.then(retry, retry);
+	resumeOnSettle(thenable, retry);
 }
 
 /** Hidden content is its own suspense boundary; visible content still propagates. */

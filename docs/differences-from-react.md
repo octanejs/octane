@@ -1315,6 +1315,14 @@ Other consequences:
   renders can also suspend through an enclosing pending boundary. A catch-only
   error boundary does not own suspension; promises thrown by effects remain
   application errors.
+- A Suspense retry runs on the settling thenable's microtask; React waits for a
+  Scheduler task. If the retry suspends again on a thenable Octane has already
+  seen settle, the next retry yields one macrotask after that thenable notifies,
+  as React's does. A resource reader whose state lags its resolved promise, or
+  `use()` of a thenable with a status React does not recognize, can then keep
+  suspending until a later task changes its state without starving timers or
+  network callbacks. See
+  [retry pacing](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#13-retry-pacing-after-an-already-settled-wakeable).
 - Without an enclosing Suspense/`@pending` boundary, the client root retains its
   committed screen, or stays empty on an initial mount, and retries when the
   thenable settles. Urgent and transition updates retry the latest inputs;
