@@ -3,7 +3,7 @@ import { DEV_STYLES_ATTR } from '@tanstack/router-core';
 import type { AssetCrossOriginConfig } from '@tanstack/router-core';
 import { Asset } from './Asset.tsrx';
 import type { AssetProps } from './Asset.tsrx';
-import { getAssetKey, getManagedAssetKey } from './assetKeys.ts';
+import { getAssetKeys } from './assetKeys.ts';
 import { useTags } from './headContentUtils.ts';
 import { useHydrated } from './ClientOnly.tsrx';
 
@@ -27,15 +27,16 @@ export function HeadContent(props: HeadContentProps) @{
 		process.env.NODE_ENV !== 'production' && hydrated
 			? tags.filter((tag) => tag.tag !== 'link' || tag.attrs?.[DEV_STYLES_ATTR] !== true)
 			: tags;
+	const keys = getAssetKeys('head', owner, filteredTags);
 	<>
 		{filteredTags.map((tag, index) => {
-			const assetKey = getAssetKey('head', tag, index);
+			const { assetKey, managedKey } = keys[index]!;
 			// `key` is lifted out of props by createElement (React semantics); the
 			// explicit type argument admits it alongside the AssetProps shape.
 			return createElement<AssetProps & { key?: string; managedKey?: string }>(Asset, {
 				...tag,
 				assetKey,
-				managedKey: getManagedAssetKey('head', owner, index),
+				managedKey,
 				target: 'head',
 				key: assetKey,
 			});

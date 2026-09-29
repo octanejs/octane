@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import { attachRouterServerSsrUtils } from '@tanstack/router-core/ssr/server';
 import { createElement, flushSync, Suspense, use } from 'octane';
 import { flushEffects, mount, nextPaint } from '../_helpers';
 import { Asset, RouterProvider, routerContext } from '@octanejs/tanstack-router';
 import { usePrevious } from '../../src/utils';
 import { useStore } from '../../src/useStore';
-import { makeHooksRouter, navigateIdentities } from '../_fixtures/hooks.tsrx';
+import { makeHeadAssetRouter, makeHooksRouter, navigateIdentities } from '../_fixtures/hooks.tsrx';
 import { ManagedHeadOwners, makeSsrRouter } from '../_fixtures/ssr.tsrx';
-import type { AnyRouter } from '@tanstack/router-core';
+import type { AnyRouter, ServerManifest } from '@tanstack/router-core';
 
 async function flush() {
 	for (let i = 0; i < 6; i++) {
@@ -113,6 +114,42 @@ describe('@octanejs/tanstack-router — hooks', () => {
 });
 
 describe('@octanejs/tanstack-router — document asset ownership', () => {
+	it('keeps the stylesheet element mounted when route preload counts change', async () => {
+		const router = makeHeadAssetRouter();
+		const manifest: ServerManifest = {
+			routes: {
+				__root__: { css: ['/assets/app.css'] },
+				'/a': { preloads: ['/assets/a.js'] },
+				'/b': {
+					preloads: ['/assets/b.js', '/assets/shared.js', '/assets/extra.js'],
+				},
+			},
+		};
+		attachRouterServerSsrUtils({ router, manifest });
+		router.isServer = false;
+		await router.load();
+		const result = mount(RouterProvider as any, { router });
+		await flush();
+
+		const selector = 'link[rel="stylesheet"][href="/assets/app.css"]';
+		const stylesheet = document.head.querySelector(selector);
+		expect(stylesheet).not.toBeNull();
+		expect(document.head.querySelectorAll('link[rel="modulepreload"]')).toHaveLength(1);
+
+		try {
+			await router.navigate({ to: '/b' });
+			await flush();
+
+			expect(document.head.querySelectorAll('link[rel="modulepreload"]')).toHaveLength(3);
+			expect(document.head.querySelector(selector)).toBe(stylesheet);
+			expect(stylesheet?.isConnected).toBe(true);
+			expect(document.head.querySelectorAll(selector)).toHaveLength(1);
+		} finally {
+			result.unmount();
+			router.serverSsr?.cleanup();
+		}
+	});
+
 	it("keeps each head manager's metadata alive until that manager unmounts", async () => {
 		const router = makeSsrRouter();
 		router.isServer = false;
@@ -163,6 +200,77 @@ describe('@octanejs/tanstack-router — document asset ownership', () => {
 			result.unmount();
 		}
 		expect(document.head.querySelector('meta[name="legacy-router-asset"]')).toBeNull();
+	});
+
+	it('updates a public Asset when attrs change with a stable asset key', async () => {
+		const router = makeSsrRouter();
+		router.isServer = false;
+		await router.load();
+
+		function PublicAssetOwner(props: { router: AnyRouter; content: string }) {
+			return createElement(routerContext, {
+				value: props.router,
+				children: createElement(Asset, {
+					tag: 'meta',
+					attrs: { name: 'reactive-public-asset', content: props.content },
+					assetKey: 'reactive:public-asset',
+					target: 'head',
+				}),
+			});
+		}
+
+		const selector = 'meta[name="reactive-public-asset"]';
+		const result = mount(PublicAssetOwner, { router, content: 'one' });
+		try {
+			expect(document.head.querySelector(selector)?.getAttribute('content')).toBe('one');
+
+			result.update(PublicAssetOwner, { router, content: 'two' });
+
+			expect(document.head.querySelector(selector)?.getAttribute('content')).toBe('two');
+			expect(document.head.querySelectorAll(selector)).toHaveLength(1);
+		} finally {
+			result.unmount();
+		}
+	});
+
+	it('does not let one public Asset claim another mounted Asset element', async () => {
+		const router = makeSsrRouter();
+		router.isServer = false;
+		await router.load();
+
+		function PublicAssetOwner(props: { router: AnyRouter; content: string }) {
+			return createElement(routerContext, {
+				value: props.router,
+				children: createElement(Asset, {
+					tag: 'meta',
+					attrs: { name: 'colliding-public-asset', content: props.content },
+					assetKey: 'collision:public-asset',
+					target: 'head',
+				}),
+			});
+		}
+
+		const selector = 'meta[name="colliding-public-asset"]';
+		const first = mount(PublicAssetOwner, { router, content: 'one' });
+		const second = mount(PublicAssetOwner, { router, content: 'two' });
+		let firstMounted = true;
+		try {
+			expect(document.head.querySelectorAll(selector)).toHaveLength(2);
+			const secondElement = document.head.querySelector(`${selector}[content="two"]`);
+			expect(secondElement).not.toBeNull();
+
+			first.unmount();
+			firstMounted = false;
+
+			expect(secondElement?.isConnected).toBe(true);
+			expect(document.head.querySelectorAll(selector)).toHaveLength(1);
+			expect(document.head.querySelector(selector)).toBe(secondElement);
+		} finally {
+			if (firstMounted) {
+				first.unmount();
+			}
+			second.unmount();
+		}
 	});
 
 	it('adopts an existing nonce-protected body script without replacing or duplicating it', async () => {

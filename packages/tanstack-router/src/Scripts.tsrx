@@ -1,7 +1,7 @@
 import { createElement, useEffect, useId, useState } from 'octane';
 import { isServer } from '@tanstack/router-core/isServer';
 import type { RouterManagedTag } from '@tanstack/router-core';
-import { getAssetKey, getManagedAssetKey } from './assetKeys.ts';
+import { getAssetKeys } from './assetKeys.ts';
 import { useRouter } from './context.ts';
 import { useScripts } from './scriptContentUtils.ts';
 
@@ -29,13 +29,14 @@ export function Scripts() @{
 					...scripts,
 				]
 			: scripts;
+	const keys = getAssetKeys('body', owner, renderScripts);
 	<>
 		{renderScripts.map((script, index) => {
-			const assetKey = getAssetKey('body', script, index);
+			const { assetKey, managedKey } = keys[index]!;
 			return createElement('script', {
 				...script.attrs,
 				key: assetKey,
-				'data-tsr-managed-key': getManagedAssetKey('body', owner, index),
+				'data-tsr-managed-key': managedKey,
 				dangerouslySetInnerHTML: { __html: script.children ?? '' },
 			});
 		})}

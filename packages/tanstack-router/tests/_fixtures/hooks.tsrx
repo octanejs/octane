@@ -1,4 +1,5 @@
 import {
+	HeadContent,
 	createRouter,
 	createRootRoute,
 	createRoute,
@@ -129,5 +130,39 @@ export function makeHooksRouter(initial: string) {
 			searchRoute,
 		]),
 		history: createMemoryHistory({ initialEntries: [initial] }),
+	});
+}
+
+function HeadAssetRootLayout() @{
+	<>
+		<HeadContent />
+		<Outlet />
+	</>
+}
+
+function HeadAssetRouteA() @{
+	<main>{'Route A'}</main>
+}
+
+function HeadAssetRouteB() @{
+	<main>{'Route B'}</main>
+}
+
+export function makeHeadAssetRouter() {
+	const rootRoute = createRootRoute({ component: HeadAssetRootLayout });
+	const routeA = createRoute({
+		getParentRoute: () => rootRoute,
+		path: '/a',
+		component: HeadAssetRouteA,
+	});
+	const routeB = createRoute({
+		getParentRoute: () => rootRoute,
+		path: '/b',
+		component: HeadAssetRouteB,
+	});
+
+	return createRouter({
+		routeTree: rootRoute.addChildren([routeA, routeB]),
+		history: createMemoryHistory({ initialEntries: ['/a'] }),
 	});
 }

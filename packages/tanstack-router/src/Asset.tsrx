@@ -14,6 +14,11 @@ type ManagedAssetProps = AssetProps & { managedKey?: string };
 
 const MANAGED_KEY_ATTR = 'data-tsr-managed-key';
 
+// Elements currently owned by a mounted Asset. A managed key is a 32-bit
+// content hash, so a collision must not let a second Asset adopt, and later
+// remove, an element another Asset still owns.
+const claimedElements = new WeakSet<Element>();
+
 function attributeName(name: string) {
 	switch (name) {
 		case 'charSet':
@@ -46,11 +51,19 @@ function setAttributes(element: Element, attrs: RouterManagedTag['attrs']) {
 
 function findManagedElement(parent: HTMLElement, key: string) {
 	for (const element of parent.querySelectorAll(`[${MANAGED_KEY_ATTR}]`)) {
-		if (element.getAttribute(MANAGED_KEY_ATTR) === key) {
+		if (element.getAttribute(MANAGED_KEY_ATTR) === key && !claimedElements.has(element)) {
 			return element;
 		}
 	}
 	return undefined;
+}
+
+function claim(element: Element) {
+	claimedElements.add(element);
+	return () => {
+		claimedElements.delete(element);
+		element.remove();
+	};
 }
 
 function mountAsset(props: ManagedAssetProps) {
@@ -59,7 +72,7 @@ function mountAsset(props: ManagedAssetProps) {
 	const managedKey = props.managedKey ?? props.assetKey;
 	const existing = findManagedElement(parent, managedKey);
 	if (existing) {
-		return () => existing.remove();
+		return claim(existing);
 	}
 
 	const element = document.createElement(props.tag);
@@ -69,7 +82,7 @@ function mountAsset(props: ManagedAssetProps) {
 		element.textContent = props.children;
 	}
 	parent.appendChild(element);
-	return () => element.remove();
+	return claim(element);
 }
 
 export function Asset(props: AssetProps) @{
@@ -78,12 +91,16 @@ export function Asset(props: AssetProps) @{
 	const managedKey = (props as ManagedAssetProps).managedKey ?? props.assetKey;
 
 	if (!(isServer ?? router.isServer)) {
+		// Compare attrs by value: a rebuilt tag list allocates new attrs objects on
+		// every navigation, and an identity dependency would remove and re-add
+		// unchanged assets such as the stylesheet.
+		const attrsKey = JSON.stringify(props.attrs ?? null);
 		useLayoutEffect(() => mountAsset(props), [
 			props.assetKey,
 			managedKey,
-			props.attrs,
-			props.children,
 			props.tag,
+			attrsKey,
+			props.children,
 			props.target,
 		]);
 	}
