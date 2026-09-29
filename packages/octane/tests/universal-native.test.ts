@@ -19,7 +19,10 @@ import {
 	use,
 	useActionState,
 	useContext,
+	useLayoutEffect,
+	useOptimistic,
 	useState,
+	useTransition,
 	type ObjectHostContainer,
 	type UniversalRenderable,
 	type UniversalRootOptions,
@@ -659,5 +662,399 @@ describe('universal useActionState', () => {
 		await drainMicrotasks();
 		expect(values(container)).toEqual({ count: 7, pending: false });
 		root.unmount();
+	});
+});
+
+// React 19 useOptimistic semantics on the host-neutral core: an optimistic
+// action shows urgently, rebases onto every new passthrough, and reverts in the
+// commit of the transition it was dispatched in. The DOM runtime's equivalents
+// live in actions.test.ts.
+describe('universal useOptimistic', () => {
+	// Each layout-effect run is one commit of the owner. Consecutive equal values
+	// collapse, so the list is the sequence of states a host could have shown.
+	function shownStates(commits: readonly string[]): string[] {
+		return commits.filter((value, index) => index === 0 || value !== commits[index - 1]);
+	}
+
+	it('shows an optimistic value while its async action is pending and reverts when it settles', async () => {
+		const gate = deferred();
+		let add!: (value: string) => void;
+		const Label = defineUniversalComponent(RENDERER, (props: { value: string }) => {
+			const [value, update] = useOptimistic(props.value);
+			add = update;
+			return node('value', value);
+		});
+		const { container, root } = objectRoot();
+
+		root.render(Label, { value: 'base' });
+		startTransition(async () => {
+			add('optimistic');
+			await gate.promise;
+		});
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ value: 'optimistic' });
+
+		gate.resolve();
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ value: 'base' });
+		root.unmount();
+	});
+
+	it('associates an update dispatched after an await with the pending action', async () => {
+		const gate = deferred();
+		let add!: (value: string) => void;
+		const Label = defineUniversalComponent(RENDERER, () => {
+			const [value, update] = useOptimistic('base');
+			add = update;
+			return node('value', value);
+		});
+		const { container, root } = objectRoot();
+
+		root.render(Label, undefined);
+		startTransition(async () => {
+			await Promise.resolve();
+			add('optimistic');
+			await gate.promise;
+		});
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ value: 'optimistic' });
+
+		gate.resolve();
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ value: 'base' });
+		root.unmount();
+	});
+
+	it('reverts in the same commit that publishes the action result', async () => {
+		const gate = deferred();
+		const commits: string[] = [];
+		let send!: (text: string) => void;
+		const Thread = defineUniversalComponent(RENDERER, () => {
+			const [messages, setMessages] = useState<readonly string[]>(['a']);
+			const [shown, addOptimistic] = useOptimistic(
+				messages,
+				(list: readonly string[], text: string) => [...list, `${text}…`],
+			);
+			send = (text) =>
+				startTransition(async () => {
+					addOptimistic(text);
+					await gate.promise;
+					startTransition(() => setMessages((list) => [...list, text]));
+				});
+			useLayoutEffect(() => {
+				commits.push(shown.join(','));
+			}, null);
+			return node('messages', shown.join(','));
+		});
+		const { container, root } = objectRoot();
+
+		root.render(Thread, undefined);
+		send('b');
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ messages: 'a,b…' });
+
+		gate.resolve();
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ messages: 'a,b' });
+		// Never 'a,b,b…': the real message and the reverted optimistic one commit together.
+		expect(shownStates(commits)).toEqual(['a', 'a,b…', 'a,b']);
+		root.unmount();
+	});
+
+	it('rebases pending optimistic actions onto the latest passthrough', async () => {
+		const gate = deferred();
+		let add!: (amount: number) => void;
+		const Counter = defineUniversalComponent(RENDERER, (props: { count: number }) => {
+			const [count, update] = useOptimistic(
+				props.count,
+				(current: number, amount: number) => current + amount,
+			);
+			add = update;
+			return node('count', count);
+		});
+		const { container, root } = objectRoot();
+
+		root.render(Counter, { count: 0 });
+		startTransition(async () => {
+			add(1);
+			add(2);
+			await gate.promise;
+		});
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ count: 3 });
+
+		root.render(Counter, { count: 10 });
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ count: 13 });
+
+		gate.resolve();
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ count: 10 });
+		root.unmount();
+	});
+
+	it('applies a function action as an updater when no reducer is given', async () => {
+		const gate = deferred();
+		let add!: (action: number | ((pending: number) => number)) => void;
+		const Counter = defineUniversalComponent(RENDERER, (props: { count: number }) => {
+			const [count, update] = useOptimistic(props.count);
+			add = update;
+			return node('count', count);
+		});
+		const { container, root } = objectRoot();
+
+		root.render(Counter, { count: 0 });
+		startTransition(async () => {
+			add((pending) => pending + 1);
+			add((pending) => pending * 10);
+			await gate.promise;
+		});
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ count: 10 });
+
+		root.render(Counter, { count: 2 });
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ count: 30 });
+
+		gate.resolve();
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ count: 2 });
+		root.unmount();
+	});
+
+	it('reverts to the unchanged passthrough when the action fails', async () => {
+		const gate = deferred();
+		let add!: (value: string) => void;
+		const Label = defineUniversalComponent(RENDERER, () => {
+			const [value, update] = useOptimistic('saved');
+			add = update;
+			return node('value', value);
+		});
+		const { container, root } = objectRoot();
+
+		root.render(Label, undefined);
+		startTransition(async () => {
+			add('saving');
+			await gate.promise;
+			throw new Error('save failed');
+		});
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ value: 'saving' });
+
+		gate.resolve();
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ value: 'saved' });
+		root.unmount();
+	});
+
+	it('keeps the optimistic value while the transition that reverts it is suspended', async () => {
+		const gate = deferred();
+		const resource = deferred<string>();
+		let submit!: () => void;
+		const Scene = defineUniversalComponent(RENDERER, () => {
+			const [source, setSource] = useState<Promise<string> | null>(null);
+			const [label, addOptimistic] = useOptimistic('idle');
+			submit = () =>
+				startTransition(async () => {
+					addOptimistic('saving');
+					await gate.promise;
+					startTransition(() => setSource(resource.promise));
+				});
+			return [
+				node('label', label),
+				universalTry(
+					() => node('data', source === null ? 'none' : use(source)),
+					() => node('fallback', 'loading'),
+				),
+			];
+		});
+		const { container, root } = objectRoot();
+
+		root.render(Scene, undefined);
+		submit();
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ label: 'saving', data: 'none' });
+
+		gate.resolve();
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ label: 'saving', data: 'none' });
+
+		resource.resolve('loaded');
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ label: 'idle', data: 'loaded' });
+		root.unmount();
+	});
+
+	it('reverts in the same commit as the useActionState result it anticipates', async () => {
+		const gate = deferred();
+		const commits: string[] = [];
+		let submit!: (text: string) => void;
+		const Form = defineUniversalComponent(RENDERER, () => {
+			const [saved, dispatch, pending] = useActionState<readonly string[], string>(
+				async (previous, text) => {
+					addOptimistic(text);
+					await gate.promise;
+					return [...previous, text];
+				},
+				[],
+			);
+			const [shown, addOptimistic] = useOptimistic(
+				saved,
+				(list: readonly string[], text: string) => [...list, `${text}…`],
+			);
+			submit = dispatch;
+			useLayoutEffect(() => {
+				commits.push(shown.join(','));
+			}, null);
+			return [node('shown', shown.join(',')), node('pending', pending)];
+		});
+		const { container, root } = objectRoot();
+
+		root.render(Form, undefined);
+		submit('a');
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ shown: 'a…', pending: true });
+
+		gate.resolve();
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ shown: 'a', pending: false });
+		expect(shownStates(commits)).toEqual(['', 'a…', 'a']);
+		root.unmount();
+	});
+
+	it('shows an update dispatched outside any transition once and then reverts it', async () => {
+		const commits: string[] = [];
+		let add!: (value: string) => void;
+		const Label = defineUniversalComponent(RENDERER, () => {
+			const [value, update] = useOptimistic('base');
+			const [pending] = useTransition();
+			add = update;
+			useLayoutEffect(() => {
+				commits.push(`${value}:${pending}`);
+			}, null);
+			return node('value', value);
+		});
+		const { container, root } = objectRoot();
+
+		root.render(Label, undefined);
+		add('stray');
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ value: 'base' });
+		// The revert is not a startTransition, so it never reports isPending.
+		expect(shownStates(commits)).toEqual(['base:false', 'stray:false', 'base:false']);
+		root.unmount();
+	});
+
+	it('reverts when the transition render that would have reverted it fails', async () => {
+		const gate = deferred();
+		const errors: string[] = [];
+		let submit!: () => void;
+		const Scene = defineUniversalComponent(RENDERER, () => {
+			const [broken, setBroken] = useState(false);
+			if (broken) throw new Error('render failed');
+			const [label, addOptimistic] = useOptimistic('idle');
+			submit = () =>
+				startTransition(async () => {
+					addOptimistic('saving');
+					await gate.promise;
+					startTransition(() => setBroken(true));
+				});
+			return node('label', label);
+		});
+		const { container, root } = objectRoot({
+			onUncaughtError: (error) => errors.push((error as Error).message),
+		});
+
+		root.render(Scene, undefined);
+		submit();
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ label: 'saving' });
+
+		gate.resolve();
+		await drainMicrotasks();
+		expect(errors).toEqual(['render failed']);
+		expect(values(container)).toEqual({ label: 'idle' });
+		root.unmount();
+	});
+
+	it('keeps one dispatcher across renders', async () => {
+		const dispatchers = new Set<(value: string) => void>();
+		const Label = defineUniversalComponent(RENDERER, (props: { value: string }) => {
+			const [value, update] = useOptimistic(props.value);
+			dispatchers.add(update);
+			return node('value', value);
+		});
+		const { container, root } = objectRoot();
+
+		root.render(Label, { value: 'a' });
+		root.render(Label, { value: 'b' });
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ value: 'b' });
+		expect(dispatchers.size).toBe(1);
+		root.unmount();
+	});
+
+	it('rejects an optimistic update dispatched while its component renders', () => {
+		const Label = defineUniversalComponent(RENDERER, () => {
+			const [value, update] = useOptimistic('base');
+			if (value === 'base') update('optimistic');
+			return node('value', value);
+		});
+		const { root } = objectRoot();
+
+		expect(() => root.render(Label, undefined)).toThrow(
+			'Cannot update optimistic state while rendering.',
+		);
+		root.unmount();
+	});
+
+	it('accepts an optimistic update dispatched from a layout effect', async () => {
+		const gate = deferred();
+		const Label = defineUniversalComponent(RENDERER, () => {
+			const [value, update] = useOptimistic('base');
+			useLayoutEffect(() => {
+				startTransition(async () => {
+					update('optimistic');
+					await gate.promise;
+				});
+			}, []);
+			return node('value', value);
+		});
+		const { container, root } = objectRoot();
+
+		root.render(Label, undefined);
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ value: 'optimistic' });
+
+		gate.resolve();
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ value: 'base' });
+		root.unmount();
+	});
+
+	it('drops pending optimistic state when its owner unmounts before the action settles', async () => {
+		const gate = deferred();
+		let add!: (value: string) => void;
+		const Label = defineUniversalComponent(RENDERER, () => {
+			const [value, update] = useOptimistic('base');
+			add = update;
+			return node('value', value);
+		});
+		const { container, root } = objectRoot();
+
+		root.render(Label, undefined);
+		startTransition(async () => {
+			add('optimistic');
+			await gate.promise;
+		});
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ value: 'optimistic' });
+		root.unmount();
+
+		gate.resolve();
+		await drainMicrotasks();
+		expect(() => add('late')).not.toThrow();
+		await drainMicrotasks();
+		expect(container.children).toEqual([]);
 	});
 });

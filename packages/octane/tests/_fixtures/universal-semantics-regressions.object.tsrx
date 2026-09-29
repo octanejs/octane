@@ -69,7 +69,7 @@ export function EffectEventCleanupScene(props) @{
 
 export function OptimisticOmittedReducerScene(props) @{
 	const [value, update] = useOptimistic(props.value);
-	if (props.action !== null && value === props.value) update(props.action);
+	props.expose(update);
 	<optimistic-result value={value} />
 }
 
