@@ -28300,12 +28300,13 @@ export function portal(
 		env,
 		key,
 	);
-	// Register on first creation (or after a target-change rebuild) so the slot is
-	// torn down with its parent scope.
+	// Register on first creation so the slot is torn down with its parent scope.
+	// A rebuild returns a fresh slot, which takes over the replaced one's entry.
 	if (prev !== state) {
 		journalRootProperty(parentScope.slots, slotKey, parentScope.slots[slotKey]);
 		parentScope.slots[slotKey] = state;
-		registerSlot(parentScope, state);
+		if (prev === undefined) registerSlot(parentScope, state);
+		else replacePortalSlot(parentScope, prev, state);
 	}
 	if (fragmentOwners !== undefined && fragmentAnchor !== undefined) {
 		registerFragmentPortalOwners(state, fragmentOwners, fragmentAnchor);
@@ -28327,6 +28328,24 @@ export function portal(
 			child = getNextSibling(child);
 		}
 	}
+}
+
+/**
+ * A rebuilt portal's previous slot is already torn down, or deferred to this
+ * root's commit, so keeping its registry entry would retain it and its markers
+ * until the owner unmounts. The new slot takes the same entry. On rollback the
+ * journal restores `prev` there, and the new slot is released by its own
+ * creation undo and JOURNAL_CREATED rather than by registerSlot's unmount.
+ */
+function replacePortalSlot(scope: Scope, prev: PortalSlot, state: PortalSlot): void {
+	const slots = scope._slots;
+	const index = slots === null ? -1 : slots.indexOf(prev);
+	if (index === -1) {
+		registerSlot(scope, state);
+		return;
+	}
+	journalRootProperty(slots!, index, prev);
+	slots![index] = state;
 }
 
 /**

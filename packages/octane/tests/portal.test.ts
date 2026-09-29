@@ -1,16 +1,71 @@
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import { describe, it, expect } from 'vitest';
 import { flushSync } from '../src/index.js';
-import { mount } from './_helpers';
+import { act, flushEffects, mount } from './_helpers';
 import {
 	App,
 	InlineModal,
+	KeyedPortalApp,
 	PortalOwnedStateApp,
 	PortalPlacementApp,
+	type KeyedPortalControls,
 	type PortalPlacementControls,
 } from './_fixtures/portal.tsrx';
 
 function elementSlots(parent: Element): Array<string | null> {
 	return Array.from(parent.children, (child) => child.getAttribute('data-slot'));
+}
+
+function deferred<T>() {
+	let resolve!: (value: T) => void;
+	const promise = new Promise<T>((accept) => {
+		resolve = accept;
+	});
+	return { promise, resolve };
+}
+
+function fulfilled(value: string): Promise<string> {
+	return {
+		status: 'fulfilled',
+		value,
+		then: (accept: (value: string) => void) => void accept(value),
+	} as unknown as Promise<string>;
+}
+
+function dialogIds(target: Element): Array<string | null> {
+	return Array.from(target.children, (child) => child.getAttribute('data-id'));
+}
+
+function lifecycle(ids: number[], cleanedUp: boolean): string[] {
+	const phases = cleanedUp
+		? ['layout', 'passive', 'layout-cleanup', 'passive-cleanup']
+		: ['layout', 'passive'];
+	return ids.flatMap((id) => phases.map((phase) => phase + ':' + id)).sort();
+}
+
+// Weakly observe every node the target holds now, markers included. Kept out
+// of async frames so no strong local outlives the call.
+function observeRange(target: Element, into: WeakRef<Node>[]): void {
+	for (const node of Array.from(target.childNodes)) into.push(new WeakRef(node));
+}
+
+function retainedCount(refs: WeakRef<Node>[]): number {
+	let count = 0;
+	for (const ref of refs) if (ref.deref() !== undefined) count++;
+	return count;
+}
+
+// A WeakRef keeps its target alive until the current job ends, so collect on
+// later macrotasks.
+async function collectGarbage(): Promise<void> {
+	setFlagsFromString('--expose-gc');
+	const gc = runInNewContext('gc') as () => void;
+	setFlagsFromString('--no-expose-gc');
+	for (let attempt = 0; attempt < 3; attempt++) {
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		gc();
+	}
 }
 
 describe('portal', () => {
@@ -162,4 +217,113 @@ describe('portal — absolute placement', () => {
 		r.unmount();
 		portalTarget.remove();
 	});
+});
+
+describe('portal — keyed rebuilds under a mounted owner', () => {
+	it('releases every replaced portal range while its owner stays mounted', async () => {
+		const portalTarget = document.createElement('section');
+		document.body.appendChild(portalTarget);
+		const log: string[] = [];
+		let controls!: KeyedPortalControls;
+		const r = mount(KeyedPortalApp, {
+			target: portalTarget,
+			log: (entry) => log.push(entry),
+			bind(next) {
+				controls = next;
+			},
+		});
+		flushEffects();
+		const owner = r.find('.keyed-owner');
+		const replaced: WeakRef<Node>[] = [];
+		const last = 40;
+		const committed = Array.from({ length: last }, (_, id) => id);
+		for (let id = 1; id <= last; id++) {
+			observeRange(portalTarget, replaced);
+			flushSync(() => controls.setId(id));
+			flushEffects();
+		}
+
+		expect(r.find('.keyed-owner')).toBe(owner);
+		expect(dialogIds(portalTarget)).toEqual([String(last)]);
+		// No earlier range, its markers included, is left behind in the target.
+		expect(replaced.filter((ref) => ref.deref()?.isConnected === true)).toHaveLength(0);
+		expect([...log].sort()).toEqual(
+			[...lifecycle(committed, true), ...lifecycle([last], false)].sort(),
+		);
+
+		await collectGarbage();
+		expect(retainedCount(replaced)).toBe(0);
+
+		r.unmount();
+		flushEffects();
+		expect(portalTarget.childNodes).toHaveLength(0);
+		expect([...log].sort()).toEqual(lifecycle([...committed, last], true));
+		portalTarget.remove();
+	});
+
+	it.each(['commits after the data resolves', 'unmounts while held'] as const)(
+		'restores the committed portal when a transition that rebuilt it suspends, then %s',
+		async (outcome) => {
+			const portalTarget = document.createElement('section');
+			document.body.appendChild(portalTarget);
+			const pending = deferred<string>();
+			const log: string[] = [];
+			let controls!: KeyedPortalControls;
+			const r = mount(KeyedPortalApp, {
+				target: portalTarget,
+				log: (entry) => log.push(entry),
+				bind(next) {
+					controls = next;
+				},
+				load: (id) => (id === 0 ? fulfilled('ready:0') : pending.promise),
+			});
+			try {
+				await act(() => {});
+				const committed = new WeakRef(portalTarget.querySelector('.keyed-dialog')!);
+				const initialRange: WeakRef<Node>[] = [];
+				observeRange(portalTarget, initialRange);
+				expect(log.splice(0)).toEqual(['layout:0', 'passive:0']);
+
+				await act(() => controls.transitionTo(1));
+
+				// The committed UI holds: same dialog node, no fallback, no effects
+				// for the abandoned rebuild, and events still reach the owner.
+				expect(r.find('.keyed-status').textContent).toBe('ready:0');
+				expect(r.findAll('.keyed-fallback')).toHaveLength(0);
+				expect(Array.from(portalTarget.children)).toEqual([committed.deref()]);
+				expect(log).toEqual([]);
+				flushSync(() => (committed.deref() as HTMLElement).click());
+				expect(log.splice(0)).toEqual(['click:0']);
+
+				if (outcome === 'commits after the data resolves') {
+					await act(async () => {
+						pending.resolve('ready:1');
+						await pending.promise;
+					});
+					flushEffects();
+					expect(r.find('.keyed-status').textContent).toBe('ready:1');
+					expect(dialogIds(portalTarget)).toEqual(['1']);
+					expect(initialRange.filter((ref) => ref.deref()?.isConnected === true)).toHaveLength(0);
+					flushSync(() => (portalTarget.querySelector('.keyed-dialog') as HTMLElement).click());
+					expect(log.splice(0).sort()).toEqual(
+						['click:1', 'layout-cleanup:0', 'passive-cleanup:0', ...lifecycle([1], false)].sort(),
+					);
+					await collectGarbage();
+					expect(retainedCount(initialRange)).toBe(0);
+				}
+
+				r.unmount();
+				flushEffects();
+				expect(portalTarget.childNodes).toHaveLength(0);
+				expect(log.sort()).toEqual(
+					outcome === 'unmounts while held'
+						? ['layout-cleanup:0', 'passive-cleanup:0']
+						: ['layout-cleanup:1', 'passive-cleanup:1'],
+				);
+			} finally {
+				pending.resolve('late');
+				portalTarget.remove();
+			}
+		},
+	);
 });
