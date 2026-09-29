@@ -32422,6 +32422,8 @@ function forRowKeyAttribute(node, ctx) {
 	const lexical = createLexicalAnalysis(b.block([...setup, probe]));
 	const rowScope = lexical.nodeScopes.get(probe);
 	const visit = (child, parent, key) => {
+		// Array holes, as in `[, row.id]`, arrive as null entries.
+		if (!child || typeof child !== 'object') return;
 		if (child.type === 'Identifier' && isIdentifierReference(child, parent, key, lexical)) {
 			const binding = lexical.resolveBinding(lexical.nodeScopes.get(child) ?? rowScope, child.name);
 			if (binding?.scope === rowScope || binding?.scope === lexical.rootScope) {

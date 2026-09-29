@@ -147,6 +147,7 @@ describe('compile errors — rejected authoring patterns', () => {
 		['a class declaration', 'class K { static id = 1 }', 'K.id', 'K'],
 		['a `var` hoisted out of a nested block', 'if (row.ok) { var k = row.id; }', 'k', 'k'],
 		['an enum declaration', 'enum E { A }', 'E.A', 'E'],
+		['a `const` after an array hole', 'const k = row.id;', '[, k].join()', 'k'],
 	])('rejects an @for row key that reads %s from the loop body', (_, setup, key, name) => {
 		const src = `export function R(props) @{ <ul>@for (const row of props.rows) { ${setup} <li key={${key}}>x</li> }</ul> }`;
 		const message =

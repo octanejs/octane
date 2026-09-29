@@ -54,6 +54,10 @@ const rows: Record<string, [template: string, key: string]> = {
 		`export function Rows(props) @{ <ul>@for (const row of props.rows<H>) { const tag = props.format(row); <li<A>>{tag as string}</li> }</ul> }`,
 		'row.tags.find((tag) => tag.primary).id',
 	],
+	'key with an array hole beside setup statements': [
+		`export function Rows(props) @{ <ul>@for (const row of props.rows<H>) { const label = props.format(row); <li<A>>{label as string}</li> }</ul> }`,
+		'[, row.id].join()',
+	],
 	'body declarations in nested scopes': [
 		`export function Rows(props) @{ const tag = props.tag; <ul>@for (const row of props.rows<H>) { if (row.log) { const tag = row.id; props.log(tag); } const read = () => { var tag = row.id; return tag; }; <li<A>>{read() as string}</li> }</ul> }`,
 		'tag + row.id',
