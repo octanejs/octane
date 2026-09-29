@@ -38729,7 +38729,9 @@ export function useTransition(
 // `action(previousState, payload)` runs inside a transition. `formAction` is a
 // stable dispatcher you wire to `<form action={formAction}>` (payload = FormData)
 // or call directly (`formAction(payload)`). Dispatches run SEQUENTIALLY, each
-// receiving the previous COMPLETED result as previousState. `isPending` is true
+// receiving the previous COMPLETED result as previousState. Each runs the action
+// that was current when it was dispatched (React stores it on the queue node),
+// so a rerender never retargets an already-queued payload. `isPending` is true
 // from dispatch until the queue drains. The action's resolved value becomes the
 // new state. Errors route to the nearest @try boundary (else console.error).
 // `permalink` (server-action progressive enhancement) is accepted for signature
@@ -38793,6 +38795,8 @@ export function useActionState<S>(
 				process.env.NODE_ENV !== 'production' &&
 				transitionActionBatchForUpdate() === null &&
 				ACTIVE_SUBMIT_DISPATCH?.intercepted !== true;
+			// Pin the dispatch-time action; renders keep replacing slotRef.action.
+			const run = slotRef.action;
 			slotRef.pendingCount++;
 			setPending(true);
 			// Sequential queue: each run sees the prior COMPLETED state.
@@ -38806,7 +38810,7 @@ export function useActionState<S>(
 						startTransition(() => {
 							let p: Promise<S>;
 							try {
-								const result = slotRef.action(prevState, payload);
+								const result = run(prevState, payload);
 								if (
 									process.env.NODE_ENV !== 'production' &&
 									outsideTransition &&

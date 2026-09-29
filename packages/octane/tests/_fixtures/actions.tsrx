@@ -116,6 +116,21 @@ export function DirectAction(props) @{
 	</div>
 }
 
+// Direct dispatch through the exposed dispatcher, so a test can call it from
+// its own transition.
+export function ExposedDispatch<P>(props: {
+	action: (previous: string, payload: P) => string | Promise<string>;
+	initial: string;
+	expose: (dispatch: (payload: P) => void) => void;
+}) @{
+	const [state, dispatch, isPending] = useActionState(props.action, props.initial);
+	props.expose(dispatch);
+	<div>
+		<span id="state">{String(state) as string}</span>
+		<span id="pending">{(isPending ? 'pending' : 'idle') as string}</span>
+	</div>
+}
+
 // Raw <form action={fn}> (no useActionState): auto-resets uncontrolled fields on
 // success.
 export function RawForm(props) @{

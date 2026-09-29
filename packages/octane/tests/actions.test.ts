@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { mount, flushEffects } from './_helpers';
-import { flushSync, setFormAction } from '../src/index.js';
+import { flushSync, setFormAction, startTransition } from '../src/index.js';
 import {
 	ActionForm,
 	SubmitterActionForm,
@@ -11,6 +11,7 @@ import {
 	OptimisticForm,
 	BareOptimistic,
 	DirectAction,
+	ExposedDispatch,
 	RawForm,
 } from './_fixtures/actions.tsrx';
 
@@ -124,6 +125,102 @@ describe('useActionState + <form action>', () => {
 		expect(seen).toEqual(['a>b', 'a/b>c']);
 		expect(r.find('#state').textContent).toBe('a/b/c');
 		r.unmount();
+	});
+
+	// React captures the action on the queue node at dispatch time: a submission
+	// queued before a rerender runs the action it was submitted to, not the
+	// replacement. Only submissions dispatched after the rerender use the new one.
+	it.each([
+		['form action', ActionForm, 'fulfils'],
+		['submitter formAction', SubmitterActionForm, 'fulfils'],
+		['form action', ActionForm, 'rejects'],
+	] as const)(
+		'runs a queued %s submission with its dispatch-time action when the first %s',
+		async (_name, Component, outcome) => {
+			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const gate = deferred();
+			const saved: string[] = [];
+			const oldAction = async (prev: string, data: FormData) => {
+				const name = String(data.get('name'));
+				if (name === 'first') {
+					await gate.promise;
+					if (outcome === 'rejects') throw new Error('first failed');
+				}
+				saved.push('old:' + name);
+				return prev + '/old:' + name;
+			};
+			const newAction = async (prev: string, data: FormData) => {
+				const name = String(data.get('name'));
+				saved.push('new:' + name);
+				return prev + '/new:' + name;
+			};
+			const r = mount(Component, { action: oldAction, initial: 'init' });
+			const send = (name: string) => {
+				(r.find('#field') as HTMLInputElement).value = name;
+				submit(r.container, 'form', r.find('#submit') as HTMLElement);
+			};
+			try {
+				send('first');
+				await settle();
+				send('second');
+				r.update(Component, { action: newAction, initial: 'init' });
+				gate.resolve();
+				await settle();
+				send('third');
+				await settle();
+				expect(saved).toEqual(
+					outcome === 'rejects'
+						? ['old:second', 'new:third']
+						: ['old:first', 'old:second', 'new:third'],
+				);
+				expect(r.find('#state').textContent).toBe(
+					outcome === 'rejects'
+						? 'init/old:second/new:third'
+						: 'init/old:first/old:second/new:third',
+				);
+				expect(r.find('#pending').textContent).toBe('idle');
+				// An errored action still continues the queue (documented divergence).
+				expect(error).toHaveBeenCalledTimes(outcome === 'rejects' ? 1 : 0);
+			} finally {
+				gate.resolve();
+				await settle();
+				r.unmount();
+				error.mockRestore();
+			}
+		},
+	);
+
+	it('runs a directly dispatched payload with its dispatch-time action', async () => {
+		const gate = deferred();
+		const saved: string[] = [];
+		const oldAction = async (prev: string, payload: string) => {
+			if (payload === 'first') await gate.promise;
+			saved.push('old:' + payload);
+			return prev + '/old:' + payload;
+		};
+		const newAction = (prev: string, payload: string) => {
+			saved.push('new:' + payload);
+			return prev + '/new:' + payload;
+		};
+		let dispatch!: (payload: string) => void;
+		const expose = (fn: typeof dispatch) => (dispatch = fn);
+		const r = mount(ExposedDispatch, { action: oldAction, initial: 'init', expose });
+		try {
+			flushSync(() => startTransition(() => dispatch('first')));
+			flushSync(() => startTransition(() => dispatch('second')));
+			r.update(ExposedDispatch, { action: newAction, initial: 'init', expose });
+			gate.resolve();
+			await settle();
+			flushSync(() => startTransition(() => dispatch('third')));
+			await settle();
+			expect(saved).toEqual(['old:first', 'old:second', 'new:third']);
+			expect(r.find('#state').textContent).toBe('init/old:first/old:second/new:third');
+			expect(r.find('#pending').textContent).toBe('idle');
+		} finally {
+			gate.resolve();
+			await settle();
+			r.unmount();
+		}
 	});
 });
 
