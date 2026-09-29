@@ -1456,10 +1456,11 @@ function scopedSsrDeoptKey(
 	key: any,
 ): string | number {
 	const explicit = isElementDescriptor(item) && item.key != null;
-	// The async-identity encoder keeps numbers distinct from strings. Preserve
-	// the encoded wrapper/explicit-key paths, but avoid serializing each plain
-	// top-level position before the encoder sees it.
-	if (path.length === 0 && !explicit) return index;
+	// The client's key namespaces: a plain top-level position stays a number,
+	// an explicit top-level key gains a 'k' prefix, and wrapper paths are JSON
+	// (always '['-prefixed). Signal identity reads these keys as list-item tokens,
+	// so they must be byte-identical to the client's prepareDeoptList keys.
+	if (path.length === 0) return explicit ? 'k' + String(key) : index;
 	return JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]);
 }
 
@@ -2231,7 +2232,7 @@ function ssrChildValue(
 			for (let i = 0; i < preparedList.items.length; i++) {
 				const item = preparedList.items[i];
 				const key = preparedList.keys[i];
-				out += withAsyncIdentity('item', key, () => ssrChildValue(item, scope, false, true));
+				out += withSsrDeoptItem(key, i, () => ssrChildValue(item, scope, false, true));
 			}
 			return ssrBlock(out);
 		});
@@ -2503,7 +2504,7 @@ function ssrDeoptBlockChildren(children: unknown, scope: SSRScope): string {
 			for (let i = 0; i < preparedList.items.length; i++) {
 				const item = preparedList.items[i];
 				const key = preparedList.keys[i];
-				out += withAsyncIdentity('item', key, () => {
+				out += withSsrDeoptItem(key, i, () => {
 					// A pure host is its own keyed-item boundary. Text and empty values
 					// still need an explicit movable range because they do not provide
 					// one stable Element root.
@@ -2803,6 +2804,32 @@ function withAsyncListScope<T>(kind: string, fn: () => T): T {
 	const frame = FRAME;
 	const occurrence = frame === null ? 0 : nextFrameOccurrence(frame, '@list:' + kind);
 	return withAsyncIdentity('list:' + kind, occurrence, fn);
+}
+
+// Serialize one de-opt list leaf. The client mounts every leaf in its own keyed
+// list Block, and structural signal identity counts that Block like an @for row,
+// so a component below the leaf must chain the same item token here. The
+// withAsyncIdentity('item', key) membrane is inlined to share one try/finally.
+function withSsrDeoptItem(key: unknown, index: number, fn: () => string): string {
+	const previousScope = ASYNC_SCOPE;
+	const previousSignalKeys = SIGNAL_LIST_KEYS;
+	ASYNC_SCOPE = previousScope + '|@item:' + asyncIdentityKey(key, false);
+	if (SERVER_SIGNAL_BINDINGS_POTENTIAL) {
+		SIGNAL_LIST_KEYS = {
+			parent: previousSignalKeys,
+			key,
+			mapped: false,
+			signalSite: undefined,
+			position: index,
+			values: null,
+		};
+	}
+	try {
+		return fn();
+	} finally {
+		ASYNC_SCOPE = previousScope;
+		SIGNAL_LIST_KEYS = previousSignalKeys;
+	}
 }
 
 /** Compiler-emitted identity membrane for one @if/@switch/@for instance. */
