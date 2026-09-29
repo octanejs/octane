@@ -83,3 +83,18 @@ ownership in `audit/test-classifications.json`.
 - Public query instrumentation uses the label `octane`. The framework-neutral
   toolkit's internal refresh tag remains `react` because that released core API
   is reused unchanged.
+- Once a `useStore()` call site has suspended, it keeps calling `use()` on the
+  promise it suspended on after the store loads. Upstream calls `React.use()`
+  only while `getOrLoadPromise()` returns a promise. `use()` is positional in
+  both frameworks, and a replay reuses the thenable already stored at a
+  position, so skipping it gives a following `useStore()` in the same
+  component the loaded store instead of suspending on its own. React 19.2.3
+  hits this only when it replays a suspended component in place, for example
+  a transition that switches a mounted component to two unloaded stores and
+  the first loads while React waits: it commits the first store for both
+  calls. Octane replays a Suspense body after every settle, so without the
+  guard every such component would get the wrong store. The call still
+  returns the store that `getOrLoadPromise()` returns synchronously, and
+  `getOrLoadPromise()` still runs on every render.
+  `tests/conformance/sequential-stores.test.ts` covers mount, transition, a
+  real `StoreRegistry`, and `useActionState` commits after a Suspense load.
