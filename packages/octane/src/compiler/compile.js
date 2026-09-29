@@ -14063,7 +14063,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// still gets a `<!--[-->…<!--]-->` block). Must match the client's only-child
 	// markerless condition exactly so both sides agree for hydration: a single `Text`
 	// child that is neither a static literal (baked into HTML) nor proven text
-	// (emitted via `ssrText`).
+	// (emitted via `ssrText`). A spread or raw-HTML writer does not change the
+	// client's shape, so it must not change this one: inside RCDATA (<textarea>)
+	// a frame around a primitive would parse as literal text.
 	const onlyChild0 =
 		normChildren.length === 1 && normChildren[0].type === 'Text' ? normChildren[0] : null;
 	let childrenExpr;
@@ -14071,7 +14073,6 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		const content = escapeInlineScriptContent(authoredStaticScriptContent);
 		childrenExpr = ssrHtmlTemplate(content === '' ? [] : [content], node, ctx);
 	} else if (
-		htmlSources.length === 0 &&
 		onlyChild0 !== null &&
 		!onlyChild0._octaneBindingOpaque &&
 		!onlyChild0._octaneBindingValue &&

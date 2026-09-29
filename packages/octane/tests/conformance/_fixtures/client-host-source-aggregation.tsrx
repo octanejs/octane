@@ -1,3 +1,5 @@
+import { type OctaneNode } from 'octane';
+
 export function NullishFormCascades(props) @{
 	<section id="nullish-form-cascades">
 		<input id="nullish-input" value="a" {...props.input} readOnly />
@@ -43,6 +45,13 @@ export function MutableFormSpreads(props) @{
 			<option value="baz">Baz</option>
 		</select>
 	</section>
+}
+
+export function SpreadTextareaChild(props: {
+	rest: Record<string, unknown>;
+	child: OctaneNode;
+}) @{
+	<textarea id="spread-textarea-child" {...props.rest}>{props.child}</textarea>
 }
 
 export function FormSpreadEvaluationOrder(props) @{
