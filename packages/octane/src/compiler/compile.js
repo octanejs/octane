@@ -15415,11 +15415,6 @@ function singleRootInitializer(ctx, component) {
 	return markPure(b.call('_$__s', component));
 }
 
-// An exact public memo wrapper preserves the already-proven host output of its
-// immutable local component. Stamp only the fresh compiler-owned wrapper:
-// probing arbitrary component metadata would invoke observable getters, and
-// dev/HMR, custom comparators, imported components, and renderer units remain
-// deliberately opaque.
 function isOctaneMemoCallee(callee, ctx, memoImportNames) {
 	if (callee?.type === 'Identifier') return memoImportNames.has(callee.name);
 	return (
@@ -15432,6 +15427,11 @@ function isOctaneMemoCallee(callee, ctx, memoImportNames) {
 	);
 }
 
+// An exact public memo wrapper preserves the already-proven host output of its
+// immutable local component. Stamp only the fresh compiler-owned wrapper:
+// probing arbitrary component metadata would invoke observable getters, and
+// dev/HMR, custom comparators, imported components, and renderer units remain
+// deliberately opaque.
 function markSingleRootMemoInitializers(node, ctx, memoImportNames) {
 	if (ctx.hmr || ctx.dev || ctx.profile || ctx.defaultMemoBindings.size === 0) return node;
 	const exported = node.type === 'ExportNamedDeclaration';
