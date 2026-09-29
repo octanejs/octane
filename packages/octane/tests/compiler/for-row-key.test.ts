@@ -48,6 +48,16 @@ const rows: Record<string, [template: string, key: string]> = {
 		`function Row(p) @{ <li>{p.row.name as string}</li> } export function Rows(props) @{ <ul>@for (const row of props.rows<H>) { <Row<A> row={row}/> }</ul> }`,
 		'row.id',
 	],
+	// A key may read neither the row's declarations nor anything they shadow,
+	// but a name bound in a scope of its own is not a row declaration.
+	'key callback parameter shadowing a body const': [
+		`export function Rows(props) @{ <ul>@for (const row of props.rows<H>) { const tag = props.format(row); <li<A>>{tag as string}</li> }</ul> }`,
+		'row.tags.find((tag) => tag.primary).id',
+	],
+	'body declarations in nested scopes': [
+		`export function Rows(props) @{ const tag = props.tag; <ul>@for (const row of props.rows<H>) { if (row.log) { const tag = row.id; props.log(tag); } const read = () => { var tag = row.id; return tag; }; <li<A>>{read() as string}</li> }</ul> }`,
+		'tag + row.id',
+	],
 };
 
 const modes = [

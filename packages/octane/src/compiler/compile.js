@@ -32393,9 +32393,11 @@ const isKeyAttribute = (attribute) => (attribute.name?.name || attribute.name) =
 // an @for body. It takes precedence over a header key, as in @tsrx/core's React
 // target. The reconciler reads row keys before the body runs, so the key can
 // read the item, the index and names outside the loop, but nothing the body
-// declares; hoisting such a key would throw a ReferenceError at runtime.
+// declares: the hoisted key function would throw a ReferenceError at runtime or
+// silently read an outer binding of the same name.
 function forRowKeyAttribute(node, ctx) {
-	const element = node.body.body.find((n) => n.type === 'Element' || n.type === 'JSXElement');
+	const statements = node.body.body;
+	const element = statements.find((n) => n.type === 'Element' || n.type === 'JSXElement');
 	const attribute = (element?.attributes || element?.openingElement?.attributes || []).find(
 		isKeyAttribute,
 	);
@@ -32407,21 +32409,37 @@ function forRowKeyAttribute(node, ctx) {
 			? attribute.value.expression
 			: attribute.value;
 	if (expression.type === 'JSXEmptyExpression') return null;
-	const bodyLocals = collectComponentLocals({ body: node.body.body });
-	if (bodyLocals.size === 0) return expression;
-	for (const name of collectFreeIdentifiers(expression, new Set())) {
-		if (!bodyLocals.has(name)) continue;
-		const l = attribute.loc && attribute.loc.start;
-		const at = l
-			? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})`
-			: '';
-		throw new Error(
-			`The \`key\` attribute on this \`@for\` row reads \`${name}\`, which is declared inside the ` +
-				'loop body. Row keys are computed before the body runs, so they can only read the item, ' +
-				'its `index` binding, and names from outside the loop. Derive the key from the item in ' +
-				`the loop header instead: \`@for (const item of items; key …)\`.${at}`,
-		);
-	}
+	// The keyed element is the row's only output node, so every other statement
+	// is setup that runs in the row function.
+	const setup = statements.filter((statement) => statement !== element);
+	if (setup.length === 0) return expression;
+	// Analyze the setup with the key placed after it, as the body sees it. Only
+	// row declarations are in scope, so a key identifier that resolves to the
+	// row block, or to the row function a `var` hoists into, reads one. A
+	// binding the key declares itself, such as a callback parameter, resolves to
+	// a scope of its own.
+	const probe = b.stmt(expression);
+	const lexical = createLexicalAnalysis(b.block([...setup, probe]));
+	const rowScope = lexical.nodeScopes.get(probe);
+	const visit = (child, parent, key) => {
+		if (child.type === 'Identifier' && isIdentifierReference(child, parent, key, lexical)) {
+			const binding = lexical.resolveBinding(lexical.nodeScopes.get(child) ?? rowScope, child.name);
+			if (binding?.scope === rowScope || binding?.scope === lexical.rootScope) {
+				const l = attribute.loc && attribute.loc.start;
+				const at = l
+					? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})`
+					: '';
+				throw new Error(
+					`The \`key\` attribute on this \`@for\` row reads \`${child.name}\`, which is declared ` +
+						'inside the loop body. Row keys are computed before the body runs, so they can only ' +
+						'read the item, its `index` binding, and names from outside the loop. Derive the key ' +
+						`from the item in the loop header instead: \`@for (const item of items; key …)\`.${at}`,
+				);
+			}
+		}
+		forEachRuntimeAstChild(child, (grandchild, childKey) => visit(grandchild, child, childKey));
+	};
+	visit(expression, probe, 'expression');
 	return expression;
 }
 
