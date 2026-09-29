@@ -41,8 +41,9 @@ function gate() {
 function fulfilled(value: string) {
 	return Object.assign(Promise.resolve(value), { status: 'fulfilled' as const, value });
 }
-function setup(gateInChild: boolean, secondGate?: AdoptionGate) {
+function setup(gateInChild: boolean, secondGate?: AdoptionGate, gatePromise?: Promise<void>) {
 	const waiting = gate();
+	if (gatePromise) waiting.value.promise = gatePromise;
 	const props: AdoptionProps = {
 		gate: waiting.value,
 		secondGate,
@@ -155,6 +156,42 @@ describe.each([false, true])('initial suspended hydration (gate in child: %s)', 
 		expect(props.onRef).not.toHaveBeenCalled();
 		await act(() => sibling.click());
 		expect(props.onSiblingClick).toHaveBeenCalledOnce();
+	});
+
+	it('lets a timer end adoption that keeps waiting on an already-settled wakeable', async () => {
+		// Retrying on the settled promise's own microtask would starve the timer
+		// that clears the gate. The getter opens it after 2,000 checks instead of
+		// hanging the test, and records that it had to.
+		const { props, container, input, waiting } = setup(gateInChild, undefined, Promise.resolve());
+		let pending = true;
+		let checks = 0;
+		let starved = false;
+		Object.defineProperty(waiting.value, 'pending', {
+			configurable: true,
+			get() {
+				if (pending && ++checks === 2_000) {
+					starved = true;
+					pending = false;
+				}
+				return pending;
+			},
+			set(value: boolean) {
+				pending = value;
+			},
+		});
+		await act(async () => {
+			await new Promise<void>((resolve) =>
+				setTimeout(() => {
+					pending = false;
+					resolve();
+				}, 0),
+			);
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		});
+		expect(starved).toBe(false);
+		expect(container.querySelector('input')).toBe(input);
+		expect(container.querySelector('[data-adopted-label]')!.textContent).toBe('server');
+		expect(props.onLifecycle).toHaveBeenCalledExactlyOnceWith('mount:server');
 	});
 
 	it('unmounts a waiting boundary without publishing or retrying its children', async () => {

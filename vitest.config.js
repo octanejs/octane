@@ -3957,7 +3957,8 @@ export default defineConfig({
 					],
 					globals: false,
 				},
-				plugins: [octane()],
+				// `?octane-ssr` fixtures render server HTML for client hydration tests.
+				plugins: [octaneServerFixtures(import.meta.dirname), octane()],
 				resolve: {
 					alias: [
 						{
