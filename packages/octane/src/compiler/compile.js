@@ -8187,14 +8187,18 @@ function alwaysCompletesAbruptly(statements) {
  * template, so normalize every component-level early return through `?? null`.
  * This preserves one evaluation and every renderable value while making bare or
  * explicitly-undefined returns an unambiguous empty output. Nested functions are
- * separate execution scopes and remain untouched.
+ * separate execution scopes and remain untouched. So is JSX: a return inside a
+ * directive arm is that arm's early exit, which the arm lowers exactly as it
+ * does in a template body, so the server and client ranges agree.
  */
 function normalizeOwnRenderableReturns(statement, preserveJsx = false) {
 	return mapAst(statement, (node) => {
 		if (
 			node.type === 'FunctionDeclaration' ||
 			node.type === 'FunctionExpression' ||
-			node.type === 'ArrowFunctionExpression'
+			node.type === 'ArrowFunctionExpression' ||
+			JSX_CHILDREN_BEARING_TYPES.has(node.type) ||
+			SETUP_VALUE_DIRECTIVE_TYPES.has(node.type)
 		)
 			return node;
 		if (node.type !== 'ReturnStatement') return null;
