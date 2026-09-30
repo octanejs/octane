@@ -9702,8 +9702,9 @@ export async function prerender(
 							: AbortSignal.any([preparedOptions.signal, cancelRender.signal]),
 				};
 	const nonceAttr = nonceAttrOf(renderOptions);
-	const resolved = newResolvedMap(renderOptions ?? null);
+	let resolved: ResolvedMap | undefined;
 	try {
+		resolved = newResolvedMap(renderOptions ?? null);
 		const pass = await runBuffered(component, props, renderOptions, nonceAttr, resolved);
 		if (injection !== undefined) {
 			try {
@@ -9731,7 +9732,7 @@ export async function prerender(
 		}
 		throw error;
 	} finally {
-		releaseServerRenderResources(resolved);
+		if (resolved !== undefined) releaseServerRenderResources(resolved);
 	}
 }
 
