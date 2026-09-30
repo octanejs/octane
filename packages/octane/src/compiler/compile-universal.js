@@ -11,6 +11,7 @@ import { builders as b, clone_ast_node, parseModule } from '@tsrx/core';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
 import { createContextSourceFacts } from './context-provider.js';
 import { inheritGeneratedOrigin } from './generated-origin.js';
+import { ARM_BREAK_MESSAGE, ARM_VALUE_RETURN_MESSAGE, armJump } from './arm-exits.js';
 
 // Keep this catalogue in the compiler, never in generated application code. It
 // is the union of actual constructor exports from Three r156, r172, and r183,
@@ -3308,7 +3309,60 @@ function rewriteSetupStatementsAst(statements, state) {
 	return [...hoisted, ...body];
 }
 
-function compileBlockValueAst(statements, state, params = [], origin = null) {
+const LOOP_STATEMENT_TYPES = new Set([
+	'ForStatement',
+	'ForOfStatement',
+	'ForInStatement',
+	'WhileStatement',
+	'DoWhileStatement',
+]);
+
+/**
+ * Lower the exits a directive arm's setup owns (see arm-exits.js). The arm is
+ * the closure compileBlockValueAst returns, so `return;` and `return null;`
+ * already end it with an empty renderable, and a `continue;` that no inner
+ * loop owns becomes `return;`. A value return and a `break` that targets the
+ * directive throw the DOM compiler's diagnostics. Nested functions own their
+ * jumps, and templates and directives compile their own arms. The walk only
+ * reads the authored AST; rewriteSourceAst swaps the replacement in.
+ */
+function lowerArmExitsAst(setup, state) {
+	const visit = (node, loop, breakable) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, loop, breakable);
+			return;
+		}
+		const type = node.type;
+		if (
+			type === 'FunctionDeclaration' ||
+			type === 'FunctionExpression' ||
+			type === 'ArrowFunctionExpression' ||
+			type === 'StaticBlock' ||
+			isTemplateNode(node)
+		) {
+			return;
+		}
+		const jump = armJump(node, loop, breakable);
+		if (jump === 'value') throw universalError(state.filename, node, ARM_VALUE_RETURN_MESSAGE);
+		if (jump === 'break') throw universalError(state.filename, node, ARM_BREAK_MESSAGE);
+		if (jump === 'exit') {
+			if (type === 'ContinueStatement') {
+				state.astNodeReplacements ??= new WeakMap();
+				state.astNodeReplacements.set(node, inheritGeneratedOrigin(b.return(), node));
+			}
+			return;
+		}
+		const innerLoop = loop || LOOP_STATEMENT_TYPES.has(type);
+		const innerBreakable = breakable || innerLoop || type === 'SwitchStatement';
+		for (const key in node) {
+			if (!AST_SKIP_KEYS.has(key)) visit(node[key], innerLoop, innerBreakable);
+		}
+	};
+	visit(setup, false, false);
+}
+
+function compileBlockValueAst(statements, state, params = [], origin = null, arm = true) {
 	const context = { values: [] };
 	const templates = [];
 	const setup = [];
@@ -3335,6 +3389,7 @@ function compileBlockValueAst(statements, state, params = [], origin = null) {
 			setup.push(statement);
 		}
 	}
+	if (arm) lowerArmExitsAst(setup, state);
 	const root =
 		templates.length === 1
 			? templates[0]
@@ -3823,11 +3878,14 @@ function compileCodeBlockAst(block, params, context, state) {
 			generatedCall(
 				referenceHelper(state, 'block'),
 				[
+					// A child block is a sub-template rather than a directive arm, so, as on
+					// the DOM, its setup is not an arm whose exits get lowered.
 					compileBlockValueAst(
 						[...body, ...(render === null ? [] : [render])],
 						state,
 						params,
 						block,
+						false,
 					),
 				],
 				block,
