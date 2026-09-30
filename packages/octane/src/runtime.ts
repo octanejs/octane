@@ -18413,16 +18413,22 @@ interface PendingHydrationTextWarning {
 let currentHydration: HydrationCapability | null = null;
 
 /**
- * Server content that a hydration attempt discarded and rebuilt on the client:
- * the end marker of each such range, or the host whose children
- * hydrateOnlyChild rebuilt. A suspended attempt leaves its DOM for the next
+ * The end of each range of server content that a hydration attempt discarded
+ * and rebuilt on the client. A suspended attempt leaves its DOM for the next
  * attempt, which runs under a new capability. What that attempt finds there is
  * the earlier attempt's own content, or nothing, and the mismatch is already
- * reported. The end marker is the one node that every attempt at a return slot
+ * reported. The end is the one node that every attempt at a return slot
  * shares: the slot borrows its component's range, or mints its own range
  * inside it, depending on what the failed attempt left.
  */
 let HYDRATION_REBUILT: WeakSet<Node> | null = null;
+
+/**
+ * The hosts whose children hydrateOnlyChild rebuilt, for the same reason. They
+ * are kept apart because a range's end can be an element, the next sibling a
+ * hole inserts before, which must not read as a host that was rebuilt.
+ */
+let HYDRATION_REBUILT_HOSTS: WeakSet<Node> | null = null;
 
 function activeHydration(): HydrationCapability | null {
 	const hydration = currentHydration;
@@ -19344,7 +19350,7 @@ class HydrationCapability {
 		let stale = getFirstChild(el);
 		// An earlier attempt built the value here before it suspended: the host
 		// holds that attempt's content, whatever node it begins with.
-		const rebuilt = HYDRATION_REBUILT?.has(el) === true;
+		const rebuilt = HYDRATION_REBUILT_HOSTS?.has(el) === true;
 		if (!rebuilt && this.isOpen(stale)) {
 			this.node = stale;
 			render();
@@ -19370,7 +19376,7 @@ class HydrationCapability {
 			(STAGED_DOM?.view(el) ?? el).removeChild(stale);
 			stale = next;
 		}
-		(HYDRATION_REBUILT ??= new WeakSet()).add(el);
+		(HYDRATION_REBUILT_HOSTS ??= new WeakSet()).add(el);
 		this.suspend(render);
 	}
 
