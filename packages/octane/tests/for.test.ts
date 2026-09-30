@@ -48,6 +48,11 @@ import {
 	FastMappedRenderableList,
 	FastMappedBoundaryList,
 	FastSuspendingGetterList,
+	SuspendingRowHostList,
+	SuspendingRowComponentList,
+	SuspendingRowConditionalList,
+	EarlySuspendingRowHostList,
+	EarlySuspendingRowComponentList,
 	NestedKeyedReorderList,
 	NestedKeyedReorderBoundary,
 	NestedKeyedReorderTransition,
@@ -84,6 +89,7 @@ import {
 import { SnapshotMappedList } from './_fixtures/for-strong.js';
 
 const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
+const stripComments = (html: string) => html.replace(/<!--[\s\S]*?-->/g, '');
 
 describe('manual keyed lists', () => {
 	it('preserves object keys and callback arguments, and unmounts the root after an unhandled key error', () => {
@@ -1582,6 +1588,128 @@ describe('keyed list selection', () => {
 		expect(r.find('#selection-transition-list .selected').textContent).toBe('third');
 		r.unmount();
 	});
+});
+
+describe('keyed rows that suspend on their first mount', () => {
+	const cases = [
+		['a direct host root', SuspendingRowHostList],
+		['a component whose only root is the row element', SuspendingRowComponentList],
+		['a conditional whose arms are single row elements', SuspendingRowConditionalList],
+	] as const;
+
+	for (const [shape, List] of cases) {
+		it(`leaves no partial row behind when ${shape} suspends, then shows the retried row`, async () => {
+			let resolve!: (value: string) => void;
+			const text = new Promise<string>((done) => {
+				resolve = done;
+			});
+			const r = mount(List, { rows: ['b'], text });
+			try {
+				expect(r.find('#suspending-row-pending').textContent).toBe('loading');
+				expect(r.findAll('.suspending-row')).toHaveLength(0);
+
+				await act(async () => {
+					resolve('R');
+					await text;
+				});
+				expect(r.findAll('#suspending-row-pending')).toHaveLength(0);
+				expect(stripComments(r.find('section').innerHTML)).toBe(
+					'<ul id="suspending-row-list">' +
+						'<li class="suspending-row">b<em class="suspending-row-detail">R</em></li>' +
+						'</ul><b>tail</b>',
+				);
+			} finally {
+				resolve('R');
+				r.unmount();
+			}
+		});
+
+		it(`keeps row order when ${shape} suspends after a completed sibling`, async () => {
+			let resolve!: (value: string) => void;
+			const text = new Promise<string>((done) => {
+				resolve = done;
+			});
+			const r = mount(List, { rows: ['a', 'b'], text });
+			try {
+				expect(r.findAll('.suspending-row')).toHaveLength(0);
+
+				await act(async () => {
+					resolve('R');
+					await text;
+				});
+				expect(stripComments(r.find('#suspending-row-list').innerHTML)).toBe(
+					'<li class="suspending-row">a</li>' +
+						'<li class="suspending-row">b<em class="suspending-row-detail">R</em></li>',
+				);
+			} finally {
+				resolve('R');
+				r.unmount();
+			}
+		});
+
+		it(`leaves no partial row behind when ${shape} is inserted by an update and suspends`, async () => {
+			let resolve!: (value: string) => void;
+			const text = new Promise<string>((done) => {
+				resolve = done;
+			});
+			const r = mount(List, { rows: ['a'], text });
+			try {
+				const survivor = r.find('.suspending-row');
+				expect(stripComments(r.find('#suspending-row-list').innerHTML)).toBe(
+					'<li class="suspending-row">a</li>',
+				);
+
+				r.update(List, { rows: ['b', 'a'], text });
+				expect(r.find('#suspending-row-pending').textContent).toBe('loading');
+
+				await act(async () => {
+					resolve('R');
+					await text;
+				});
+				expect(stripComments(r.find('#suspending-row-list').innerHTML)).toBe(
+					'<li class="suspending-row">b<em class="suspending-row-detail">R</em></li>' +
+						'<li class="suspending-row">a</li>',
+				);
+				expect(r.findAll('.suspending-row')[1]).toBe(survivor);
+			} finally {
+				resolve('R');
+				r.unmount();
+			}
+		});
+	}
+
+	const earlyCases = [
+		['a direct host row', EarlySuspendingRowHostList],
+		['a component row', EarlySuspendingRowComponentList],
+	] as const;
+
+	for (const [shape, List] of earlyCases) {
+		it(`keeps the committed row before ${shape} that suspends before creating its element`, async () => {
+			let resolve!: (value: string) => void;
+			const text = new Promise<string>((done) => {
+				resolve = done;
+			});
+			const r = mount(List, { rows: ['a'], text });
+			try {
+				const survivor = r.find('.suspending-row');
+
+				r.update(List, { rows: ['a', 'b'], text });
+				expect(r.find('#suspending-row-pending').textContent).toBe('loading');
+
+				await act(async () => {
+					resolve('R');
+					await text;
+				});
+				expect(stripComments(r.find('#suspending-row-list').innerHTML)).toBe(
+					'<li class="suspending-row">a</li><li class="suspending-row">bR</li>',
+				);
+				expect(r.find('.suspending-row')).toBe(survivor);
+			} finally {
+				resolve('R');
+				r.unmount();
+			}
+		});
+	}
 });
 
 describe('large keyed list fills', () => {

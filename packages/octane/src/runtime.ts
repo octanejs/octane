@@ -40957,7 +40957,17 @@ function renderBranchSlot(
 			);
 			state.block = b;
 			state.markerlessBefore = before;
-			renderBlock(b);
+			try {
+				renderBlock(b);
+			} catch (error) {
+				// A branch that throws before inserting anything stays unfinalized so
+				// a same-branch retry finalizes it. One that already inserted its
+				// root owns that DOM now: finalize it so teardown can remove it (a
+				// discarded keyed item otherwise strands the partial row).
+				if ((before ? getNextSibling(before) : getFirstChild(domParent)) !== after)
+					finalizeMarkerlessBranch(state, domParent, b, marker, before, after);
+				throw error;
+			}
 			finalizeMarkerlessBranch(state, domParent, b, marker, before, after);
 			replaceSharedBlockBoundary(
 				parentBlock,
@@ -44130,7 +44140,12 @@ function mountItem<T>(
 		block.forSlot = forSlot;
 		block.key = key;
 		block.itemIndex = index;
-		renderBlock(block);
+		try {
+			renderBlock(block);
+		} catch (error) {
+			discardThrownItem(block, error, anchor);
+			throw error;
+		}
 		// Body inserted ONE node right before `anchor` via
 		// `__block.parentNode.insertBefore(_root, __block.endMarker)`. Grab it
 		// and promote it to start === end. From now on `block.endMarker` is the
@@ -44173,14 +44188,31 @@ function mountItem<T>(
 	try {
 		renderBlock(block);
 	} catch (error) {
-		// The caller cannot receive/register a Block whose initial render threw.
-		// Remove its owned range and hook scopes now; a Suspense retry will mount
-		// it afresh as part of the list transaction.
-		if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
-		unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
+		discardThrownItem(block, error, null);
 		throw error;
 	}
 	return block;
+}
+
+/**
+ * The caller cannot receive or register an item Block whose initial render
+ * threw, so remove its owned DOM and hook scopes now; a Suspense retry mounts
+ * it afresh as part of the list transaction. A self-marked item has no range
+ * yet, but its body may already have inserted its one root before
+ * `selfMarkedAnchor` when a child suspended. commitBag stores the template bag
+ * in slot 0 only after that insert, so a bag there proves the node before the
+ * anchor is this item's root. A sole component or `@if` root lives in a nested
+ * slot instead, whose own Block owns and removes its element.
+ */
+function discardThrownItem(block: Block, error: unknown, selfMarkedAnchor: Node | null): void {
+	const bag = block.slots[0];
+	if (selfMarkedAnchor !== null && bag != null && (bag as any).__kind === undefined) {
+		const root = (STAGED_DOM?.view(selfMarkedAnchor) ?? selfMarkedAnchor).previousSibling;
+		block.startMarker = root;
+		block.endMarker = root;
+	}
+	if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
+	unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
 }
 
 function moveBlockBefore(block: Block, anchor: Node): void {

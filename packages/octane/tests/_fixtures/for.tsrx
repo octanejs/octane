@@ -1,6 +1,7 @@
 import {
 	Activity as ActivitySentinel,
 	createContext,
+	createElement,
 	type OctaneNode,
 	startTransition,
 	use,
@@ -857,4 +858,122 @@ export function HostMappedBindingList(props: HostBindingListProps) @{
 			</li>,
 		)}</ul>
 	</FastRowContext>
+}
+
+// A keyed row whose single root element is already in place when a child
+// component suspends on its first mount. The suspended row must leave nothing
+// behind: the boundary retries it from scratch once the promise settles.
+function SuspendingRowDetail(props: { text: Promise<string> }) @{
+	<em class="suspending-row-detail">{use(props.text) as string}</em>
+}
+
+function suspendingRowDetail(row: string, text: Promise<string>): OctaneNode {
+	return row === 'a' ? null : createElement(SuspendingRowDetail, { text });
+}
+
+export function SuspendingRowHostList(props: { rows: string[]; text: Promise<string> }) @{
+	<main>
+		@try {
+			<section>
+				<ul id="suspending-row-list">
+					@for (const row of props.rows; key row) {
+						<li class="suspending-row">
+							{row}
+							{suspendingRowDetail(row, props.text)}
+						</li>
+					}
+				</ul>
+				<b>tail</b>
+			</section>
+		} @pending {
+			<u id="suspending-row-pending">{'loading'}</u>
+		}
+	</main>
+}
+
+function SuspendingRow(props: { row: string; text: Promise<string> }) @{
+	<li class="suspending-row">
+		{props.row}
+		{suspendingRowDetail(props.row, props.text)}
+	</li>
+}
+
+export function SuspendingRowComponentList(props: { rows: string[]; text: Promise<string> }) @{
+	<main>
+		@try {
+			<section>
+				<ul id="suspending-row-list">
+					@for (const row of props.rows; key row) {
+						<SuspendingRow row={row} text={props.text} />
+					}
+				</ul>
+				<b>tail</b>
+			</section>
+		} @pending {
+			<u id="suspending-row-pending">{'loading'}</u>
+		}
+	</main>
+}
+
+export function SuspendingRowConditionalList(props: { rows: string[]; text: Promise<string> }) @{
+	<main>
+		@try {
+			<section>
+				<ul id="suspending-row-list">
+					@for (const row of props.rows; key row) {
+						@if (row === 'z') {
+							<li class="suspending-row other">{row}</li>
+						} @else {
+							<li class="suspending-row">
+								{row}
+								{suspendingRowDetail(row, props.text)}
+							</li>
+						}
+					}
+				</ul>
+				<b>tail</b>
+			</section>
+		} @pending {
+			<u id="suspending-row-pending">{'loading'}</u>
+		}
+	</main>
+}
+
+// The same rows, suspending in setup before the row element exists.
+export function EarlySuspendingRowHostList(props: { rows: string[]; text: Promise<string> }) @{
+	@try {
+		<ul id="suspending-row-list">
+			@for (const row of props.rows; key row) {
+				const detail =
+					row === 'a' ? '' : use(props.text);
+				<li class="suspending-row">
+					{row}
+					{detail as string}
+				</li>
+			}
+		</ul>
+	} @pending {
+		<u id="suspending-row-pending">{'loading'}</u>
+	}
+}
+
+function EarlySuspendingRow(props: { row: string; text: Promise<string> }) @{
+	const detail =
+		props.row === 'a' ? '' : use(props.text);
+	<li class="suspending-row">
+		{props.row}
+		{detail as string}
+	</li>
+}
+
+export function EarlySuspendingRowComponentList(props: { rows: string[]; text: Promise<string> }) @{
+	@try {
+		<ul id="suspending-row-list">
+			@for (const row of props.rows; key row) {
+				<EarlySuspendingRow row={row} text={props.text} />
+			}
+		</ul>
+	} @pending {
+		<u id="suspending-row-pending">{'loading'}</u>
+	}
 }

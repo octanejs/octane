@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { hydrateRoot, flushSync } from '../../src/index.js';
+import { act, hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import {
@@ -9,6 +9,7 @@ import {
 	ExplicitKeyComponentList,
 	IndexedList,
 	List,
+	SuspendingRows,
 } from './_fixtures/forlist.tsrx';
 
 // SSR Phase 6 (M2) — a keyed @for list hydrates: the server wraps the @for in
@@ -25,6 +26,11 @@ function serverModule(): Record<string, any> {
 	});
 }
 const server = serverModule();
+
+/** Element and text markup, ignoring hydration comments. */
+function markup(node: Element): string {
+	return node.innerHTML.replace(/<!--[\s\S]*?-->/g, '');
+}
 
 let container: HTMLElement;
 beforeEach(() => {
@@ -279,6 +285,38 @@ describe('hydrateRoot — @for list (SSR Phase 6 / M2)', () => {
 			expect(onPick).toHaveBeenCalledExactlyOnceWith('b');
 		} finally {
 			root.unmount();
+		}
+	});
+
+	it('client-builds an extra row that suspends without adopting its partial element', async () => {
+		container.innerHTML = ServerRT.renderToString(server.SuspendingRows, {
+			rows: ['a'],
+			text: null,
+		}).html;
+		const tail = container.querySelector('b')!;
+		let resolve!: (value: string) => void;
+		const text = new Promise<string>((done) => {
+			resolve = done;
+		});
+		// The client renders one more row than the server: a structural mismatch
+		// whose DEV warning is not the contract under test here.
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = hydrateRoot(container, SuspendingRows, { rows: ['a', 'b'], text });
+		try {
+			flushSync(() => {});
+			await act(async () => {
+				resolve('R');
+				await text;
+			});
+			expect(markup(container.querySelector('#suspending-rows')!)).toBe(
+				'<li class="suspending-row">a</li>' +
+					'<li class="suspending-row">b<em class="suspending-detail">R</em></li>',
+			);
+			expect(container.querySelector('b')).toBe(tail);
+		} finally {
+			resolve('R');
+			root.unmount();
+			errSpy.mockRestore();
 		}
 	});
 });
