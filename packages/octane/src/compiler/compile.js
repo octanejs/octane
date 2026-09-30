@@ -12734,10 +12734,7 @@ function ssrCompileBodyWithMapTemps(
 			? null
 			: () =>
 					inheritOriginLoc(
-						b.call(
-							requireRuntimeForContext(ctx, 'isRenderCall'),
-							node.params.length > 1 ? secondArgument(node) : b.id('__s'),
-						),
+						b.call(requireRuntimeForContext(ctx, 'isRenderCall'), b.id('__s')),
 						directCallRoot,
 					);
 
@@ -12836,10 +12833,22 @@ function ssrCompileBodyWithMapTemps(
 			inheritOriginLoc(b.if(b.unary('!', renderCallTest()), b.block(branch), null), directCallRoot),
 		);
 	}
-	// PROPS-FIRST ABI (matches the client): `(…userParams, __s, __extra)`. A leading
+	// PROPS-FIRST ABI (matches the client): `(props, __s, __extra)`. A leading
 	// `__props` placeholder stands in when there are no user params, so a verbatim
 	// `function Foo(props)` and a compiled component both bind props from arg 0.
-	const { params, restBinding } = compiledBodyParams(node.params);
+	// A synthetic sub-body (a statement array) is called by its construct instead,
+	// with its own leading arguments: `(item, index, __s, __extra)` for a @for
+	// item, `(error, reset, __s, __extra)` for a @catch arm.
+	const { params, bindings: paramBindings } = Array.isArray(node.body)
+		? {
+				params: [
+					...(node.params.length > 0 ? node.params : [b.id('__props')]),
+					b.id('__s'),
+					b.id('__extra'),
+				],
+				bindings: [],
+			}
+		: compiledBodyParams(node.params);
 	// Private loop items feed only HTML concatenation, so their serialized tail
 	// needs no carrier. Other bodies can cross a component/value boundary, where
 	// the carrier distinguishes compiled HTML from authored text returns. This
@@ -12867,11 +12876,7 @@ function ssrCompileBodyWithMapTemps(
 		? wrapNativeReadScope(body, b.id('__s'), nativeReadNames(ctx))
 		: body;
 	return inheritOriginLoc(
-		b.function_declaration(
-			b.id(name),
-			params,
-			b.block(restBinding === null ? scopedBody : [restBinding, ...scopedBody]),
-		),
+		b.function_declaration(b.id(name), params, b.block([...paramBindings, ...scopedBody])),
 		origin,
 	);
 }
@@ -16936,10 +16941,10 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		);
 		presentationHostEnd++;
 	}
-	// PROPS-FIRST convention: `(…userProps, __s, __extra)`. The scope is the 2nd arg
+	// PROPS-FIRST convention: `(props, __s, __extra)`. The scope is the 2nd arg
 	// (a placeholder leads when there are no user params), so a plain function
 	// `App(props)` binds `props`, while compiled bodies still read `__s` by name.
-	const { params: fnParams, restBinding } = compiledBodyParams(node.params ?? []);
+	const { params: fnParams, bindings: paramBindings } = compiledBodyParams(node.params ?? []);
 	ctx.currentAutoMemoOffset = prevAutoMemoOffset;
 	ctx.currentAutoMemoCacheName = prevAutoMemoCacheName;
 	ctx.currentAutoMemoCommittedName = prevAutoMemoCommittedName;
@@ -16966,7 +16971,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	const emittedFunction = b.function_declaration(
 		b.id(name, node.id ?? node),
 		fnParams,
-		b.block(restBinding === null ? scopedBody : [restBinding, ...scopedBody]),
+		b.block([...paramBindings, ...scopedBody]),
 	);
 	return inheritOriginLoc(
 		hookMemoOpaqueOwner
@@ -21179,37 +21184,56 @@ function collectFunctionScopeBindings(params, statements, into) {
 	return into;
 }
 
-// A compiled body's parameters, `(…authored, __s, __extra)`, with a `__props`
-// placeholder when no authored parameter takes an argument ahead of the scope.
-// A TypeScript `this` parameter types the receiver and takes none. A rest
-// parameter must be last, so it leaves the list and a leading `var` binds it
-// from `arguments` at its authored position. It then holds what the
-// returned-JSX form's rest parameter holds: a direct call's trailing
-// arguments, and for a body call `(props, scope, extra)` from that position
+// A compiled body's parameters. The runtime calls every body as
+// `body(props, scope, extra)`, so the body takes `(props, __s, __extra)`: its
+// first authored parameter, or a `__props` placeholder, then the scope and the
+// extra. Each later authored parameter is a leading `var` bound to the argument
+// at its authored position, so it holds what the returned-JSX form's parameter
+// holds: a direct call's own argument, and for a body call the scope, the extra,
+// and then nothing. A rest parameter binds every argument from its position
 // on. The slice names no global, which a module may shadow
-// (`import { Array } from 'effect'`).
+// (`import { Array } from 'effect'`). A TypeScript `this` parameter types the
+// receiver and takes no argument.
 function compiledBodyParams(authored) {
 	const receiver = authored[0]?.type === 'Identifier' && authored[0].name === 'this' ? 1 : 0;
-	const last = authored.at(-1);
-	const rest = last?.type === 'RestElement' ? last : null;
-	const fixed = authored.slice(receiver, rest === null ? authored.length : -1);
+	const own = authored.slice(receiver);
+	const first = own.length > 0 && own[0].type !== 'RestElement' ? own[0] : null;
 	const params = [
 		...authored.slice(0, receiver),
-		...(fixed.length > 0 ? fixed : [b.id('__props')]),
+		first ?? b.id('__props'),
 		b.id('__s'),
 		b.id('__extra'),
 	];
-	if (rest === null) return { params, restBinding: null };
-	const slice = b.member(b.member(b.array([]), 'slice'), 'call');
-	const args =
-		fixed.length > 0 ? [b.id('arguments'), b.literal(fixed.length)] : [b.id('arguments')];
-	return {
-		params,
-		restBinding: inheritOriginLoc(
-			b.declaration('var', [b.declarator(rest.argument, b.call(slice, ...args))]),
-			rest,
-		),
-	};
+	const bindings = [];
+	for (let i = first === null ? 0 : 1; i < own.length; i++) {
+		const param = own[i];
+		const argument = () =>
+			i === 1
+				? b.id('__s')
+				: i === 2
+					? b.id('__extra')
+					: b.member(b.id('arguments'), b.literal(i), true);
+		let binding;
+		if (param.type === 'RestElement') {
+			const slice = b.member(b.member(b.array([]), 'slice'), 'call');
+			binding = b.declarator(
+				param.argument,
+				b.call(slice, b.id('arguments'), ...(i > 0 ? [b.literal(i)] : [])),
+			);
+		} else if (param.type === 'AssignmentPattern') {
+			binding = b.declarator(
+				param.left,
+				b.conditional(b.binary('===', argument(), b.void0), param.right, argument()),
+			);
+		} else {
+			binding = b.declarator(param, argument());
+		}
+		bindings.push({
+			...inheritOriginLoc(b.declaration('var', [binding]), param),
+			_octaneParamBinding: true,
+		});
+	}
+	return { params, bindings };
 }
 
 // Argument 1 of a function whose own parameters already reach it: the second
@@ -34919,7 +34943,18 @@ function directCallGuard(node, ctx) {
 
 function withDirectCallGuard(fn, node, ctx) {
 	if (node._octaneDirectCall === undefined) return fn;
-	return { ...fn, body: { ...fn.body, body: [directCallGuard(node, ctx), ...fn.body.body] } };
+	// The guard passes the parameters on, so it follows the leading bindings of
+	// those that compiledBodyParams binds from the arguments.
+	const body = fn.body.body;
+	let bound = 0;
+	while (body[bound]?._octaneParamBinding === true) bound++;
+	return {
+		...fn,
+		body: {
+			...fn.body,
+			body: [...body.slice(0, bound), directCallGuard(node, ctx), ...body.slice(bound)],
+		},
+	};
 }
 
 /** Visit every node with the functions that enclose it, outermost first. */

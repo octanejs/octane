@@ -6,10 +6,10 @@ import { loadCompiledFixtureSource, type CompiledFixtureModule } from '../_serve
 // `@{ … }` is shorthand for returning JSX, so `function Join(...parts) @{ <p /> }`
 // means `function Join(...parts) { return <p />; }`, and its rest parameter
 // holds what that returned-JSX form's rest parameter holds. The compiled body
-// takes the runtime's `body(props, scope, extra)` call with the scope and extra
-// parameters after the authored ones, and a rest parameter must be last. Each
-// case must load, render the same content as its returned-JSX form on a client
-// mount and update and on the server, and hydrate that server markup.
+// takes the runtime's `body(props, scope, extra)` call with the scope as its
+// second parameter, and a rest parameter must be last. Each case must load,
+// render the same content as its returned-JSX form on a client mount and update
+// and on the server, and hydrate that server markup.
 
 type Props = { v: string };
 
