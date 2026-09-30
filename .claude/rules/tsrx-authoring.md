@@ -85,7 +85,9 @@ setup.
 
 An arm ends early with `return;` or `return null;` (or `continue;` in an `@for`
 body) from anywhere in its setup; only that arm's output is skipped. A value
-return or a `break` that targets the directive is a compile error.
+return or a `break` that targets the directive is a compile error. A child
+`@{ … }` block is not an arm and has no early exit: a `break` or `continue` that
+would leave it, or a labeled one that would leave an arm, is a compile error.
 
 A slot-keyed hook inside a plain JS `for`/`while` is a compile error: every
 iteration would share the one call-site slot and its state/memo/effect entries

@@ -196,6 +196,43 @@ it('returns an idle upstream when the reader cancels a streamed response', async
 	expect(vi.getTimerCount()).toBe(0);
 });
 
+it.each(['reader', 'request'] as const)(
+	'returns an upstream that resolves after %s cancellation',
+	async (cancellation) => {
+		const upstream = idleUpstream();
+		let resolveResult!: (value: AsyncIterable<string>) => void;
+		const result = new Promise<AsyncIterable<string>>((resolve) => {
+			resolveResult = resolve;
+		});
+		const controller = new AbortController();
+		const injection = createStreamedSignalInjection(identity, result, { timeoutMs: 60_000 });
+		const stream = await renderToReadableStream(App, undefined, {
+			injection,
+			signal: controller.signal,
+			onError() {},
+		});
+		const reader = stream.getReader();
+		const disconnected = new Error('client disconnected');
+		const allReady = stream.allReady.catch((error: unknown) => error);
+		try {
+			expect(await readUntil(reader, 'shell')).toContain('shell');
+			await settle();
+			expect(upstream.state.returned).toBe(0);
+			if (cancellation === 'reader') await reader.cancel(disconnected);
+			else controller.abort(disconnected);
+			expect(await allReady).toBe(disconnected);
+			resolveResult(upstream.iterable);
+			await settle();
+			expect(upstream.state.returned).toBe(1);
+		} finally {
+			resolveResult(upstream.iterable);
+			controller.abort(disconnected);
+			await reader.cancel(disconnected).catch(() => {});
+			reader.releaseLock();
+		}
+	},
+);
+
 it('returns an idle upstream when its inactivity timeout fails the injection', async () => {
 	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
 	const upstream = idleUpstream();

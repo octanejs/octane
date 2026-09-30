@@ -538,10 +538,30 @@ describe('compile errors — textarea children', () => {
 // A directive arm's output is its final node, so it can end early only with
 // `return;`, `return null;`, or (in an `@for` body) `continue;`. A value return
 // has nothing to render in the node's place, and a `break` that targets the
-// directive has no loop to leave in the compiled arm.
+// directive has no loop to leave in the compiled arm. Every emit path shares
+// this contract, including the universal compiler, whose arms are closures.
 describe('compile errors — directive arm exits', () => {
 	const component = (markup: string) =>
 		`export function Arm({ x, items }: { x: number; items: string[] }) @{\n\t<div>${markup}</div>\n}\n`;
+	const object = { id: 'object', module: 'octane/universal', target: 'universal', text: 'host' };
+	// Each emit path compiles a source; its diagnostics end with the location in this form.
+	const paths = [
+		[
+			'client',
+			(src: string) => compile(src, 'arm-exit.tsrx', { mode: 'client' }),
+			'(arm-exit.tsrx:',
+		],
+		[
+			'server',
+			(src: string) => compile(src, 'arm-exit.tsrx', { mode: 'server' }),
+			'(arm-exit.tsrx:',
+		],
+		[
+			'universal',
+			(src: string) => compile(src, 'arm-exit.object.tsrx', { hmr: false, renderer: object }),
+			' at arm-exit.object.tsrx:',
+		],
+	] as const;
 
 	it.each([
 		['a returned element', '@if (x > 0) { if (x > 1) return <i />; <b /> }'],
@@ -554,13 +574,13 @@ describe('compile errors — directive arm exits', () => {
 			'an explicit `undefined`',
 			'@switch (x) { @case 1: { if (x > 0) { return undefined; } <b /> } }',
 		],
-	])('rejects %s in an arm on both emit paths, at the return', (_label, markup) => {
+	])('rejects %s in an arm on every emit path, at the return', (_label, markup) => {
 		// The markup sits on line 2 after `\t<div>`; columns are zero-based.
-		const at = `(arm-exit.tsrx:2:${'\t<div>'.length + markup.indexOf('return')})`;
-		for (const mode of ['client', 'server'] as const) {
-			const run = () => compile(component(markup), 'arm-exit.tsrx', { mode });
-			expect(run).toThrow(/can only end early with `return;` or `return null;`/);
-			expect(run).toThrow(at);
+		const at = `2:${'\t<div>'.length + markup.indexOf('return')}`;
+		for (const [path, run, prefix] of paths) {
+			const compileArm = () => run(component(markup));
+			expect(compileArm, path).toThrow(/can only end early with `return;` or `return null;`/);
+			expect(compileArm, path).toThrow(prefix + at);
 		}
 	});
 
@@ -572,14 +592,17 @@ describe('compile errors — directive arm exits', () => {
 			'@for (const item of items; key item) { @if (x > 0) { { break; } <b /> } }',
 		],
 	])('rejects a `break` that targets the directive around %s', (_label, markup) => {
-		for (const mode of ['client', 'server'] as const) {
-			expect(() => compile(component(markup), 'arm-exit.tsrx', { mode })).toThrow(
+		const at = `2:${'\t<div>'.length + markup.indexOf('break')}`;
+		for (const [path, run, prefix] of paths) {
+			const compileArm = () => run(component(markup));
+			expect(compileArm, path).toThrow(
 				/`break` cannot leave the `@for` or `@switch` around a directive arm/,
 			);
+			expect(compileArm, path).toThrow(prefix + at);
 		}
 	});
 
-	it('allows value returns in the component body and in functions inside an arm', () => {
+	it('allows value returns outside arms and jumps that the arm setup owns', () => {
 		const src = `export function Arm({ x }: { x: number }) @{
 			if (x < 0) return <i />;
 			<div>
@@ -590,12 +613,147 @@ describe('compile errors — directive arm exits', () => {
 					for (const c of [pick()]) {
 						if (c === 'a') break;
 					}
+					block: {
+						if (x > 2) break block;
+					}
 					<b>{pick()}</b>
 				}
 			</div>
 		}`;
-		for (const mode of ['client', 'server'] as const) {
-			expect(() => compile(src, 'arm-exit.tsrx', { mode })).not.toThrow();
+		for (const [path, run] of paths) {
+			expect(() => run(src), path).not.toThrow();
+		}
+	});
+
+	// A `@{ … }` block is a nested template, not an arm, so no jump ends it early
+	// (the parser rejects `return` there). Every target compiles the block apart
+	// from the loop or switch around it, so before this diagnostic each shape
+	// emitted a module that failed to load.
+	it.each([
+		[
+			'a `continue` in a child block of an `@for` row',
+			'@for (const item of items; key item) { <p>@{ if (item === "a") continue; <b>{item}</b> }</p> }',
+			'continue',
+		],
+		[
+			'a `continue` in a block that is an `@for` body output',
+			'@for (const item of items; key item) { @{ if (item === "a") continue; <b>{item}</b> } }',
+			'continue',
+		],
+		[
+			'a `break` in a child block of an `@for` row',
+			'@for (const item of items; key item) { <p>@{ if (item === "a") break; <b /> }</p> }',
+			'break',
+		],
+		[
+			'a `break` in a child block of an `@switch` case',
+			'@switch (x) { @case 1: { <p>@{ if (x > 0) break; <b /> }</p> } }',
+			'break',
+		],
+		[
+			'a `continue` inside a `switch` in a block',
+			'@for (const item of items; key item) { <p>@{ switch (item) { case "a": continue; } <b /> }</p> }',
+			'continue',
+		],
+		[
+			'a `continue` in a code-only block',
+			'@for (const item of items; key item) { <p>@{ if (item === "a") continue; console.log(item); }</p> }',
+			'continue',
+		],
+		[
+			'a `continue` in a block nested in a block',
+			'@for (const item of items; key item) { <p>@{ const n = item.length; <i>@{ if (n > 1) continue; <b /> }</i> }</p> }',
+			'continue',
+		],
+		[
+			'a `continue` that targets a plain loop around the block',
+			'@if (x > 0) { for (const item of items) { <p>@{ if (item === "a") continue; <b /> }</p> } <i /> }',
+			'continue',
+		],
+		[
+			'a labeled `break` that targets a label around the block',
+			'@if (x > 0) { outer: { <p>@{ if (x > 1) break outer; <b /> }</p> } <i /> }',
+			'break',
+		],
+	])('rejects %s on every emit path, at the jump', (_label, markup, jump) => {
+		const col = '\t<div>'.length + markup.indexOf(jump);
+		for (const [path, run] of paths) {
+			const file = path === 'universal' ? 'arm-exit.object.tsrx' : 'arm-exit.tsrx';
+			const compileBlock = () => run(component(markup));
+			expect(compileBlock, path).toThrow(/`break` and `continue` cannot leave a `@\{ … \}` block/);
+			expect(compileBlock, path).toThrow(`(${file}:2:${col})`);
+		}
+	});
+
+	it('rejects a jump that leaves a block under returned JSX on every emit path', () => {
+		const src = `export function Arm({ items }: { items: string[] }) {
+	return <div>@for (const item of items; key item) { <p>@{ if (item === "a") continue; <b /> }</p> }</div>;
+}
+`;
+		for (const [path, run] of paths) {
+			expect(() => run(src), path).toThrow(/cannot leave a `@\{ … \}` block/);
+		}
+	});
+
+	// The parser also accepts a labeled jump from an arm to a label in the setup
+	// around it, which the compiled arm has no statement for.
+	it.each([
+		[
+			'a labeled `break` to a label around an `@if` arm',
+			'@if (x > 0) { outer: { <p>@if (x > 1) { if (x > 2) break outer; <b /> }</p> } <i /> }',
+		],
+		[
+			'a labeled `continue` to a loop around an `@if` arm',
+			'@for (const item of items; key item) { outer: for (const c of item) { <p>@if (c !== "") { if (c === "a") continue outer; <b /> }</p> } <i /> }',
+		],
+	])('rejects %s on every emit path, at the jump', (_label, markup) => {
+		const col = '\t<div>'.length + markup.search(/(?:break|continue) outer/);
+		for (const [path, run] of paths) {
+			const file = path === 'universal' ? 'arm-exit.object.tsrx' : 'arm-exit.tsrx';
+			const compileArm = () => run(component(markup));
+			expect(compileArm, path).toThrow(
+				/A labeled `break` or `continue` cannot leave a directive arm/,
+			);
+			expect(compileArm, path).toThrow(`(${file}:2:${col})`);
+		}
+	});
+
+	it('allows jumps that a block owns, and an exit from an arm inside a block', () => {
+		const src = `export function Arm({ items }: { items: string[] }) @{
+			<ul>
+				@for (const item of items; key item) {
+					<li>
+						@{
+							let seen = 0;
+							outer: for (const c of item) {
+								for (const d of item) {
+									if (d === c) continue outer;
+								}
+								if (c === 'y') continue;
+								if (c === 'z') break;
+								seen++;
+							}
+							switch (seen) {
+								case 0:
+									break;
+							}
+							check: {
+								if (seen > 1) break check;
+							}
+							const visit = () => {
+								for (const c of item) if (c === 'a') return c;
+							};
+							@if (item !== '') {
+								if (item === visit()) continue;
+								<b>{seen}</b>
+							}
+						}
+					</li>
+				}
+			</ul>
+		}`;
+		for (const [path, run] of paths) {
+			expect(() => run(src), path).not.toThrow();
 		}
 	});
 });
