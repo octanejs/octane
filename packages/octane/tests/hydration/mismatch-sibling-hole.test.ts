@@ -335,19 +335,12 @@ describe.each([
 				'<p class="x">A</p><em class="waits">R</em><b>A</b>',
 			);
 			expect(container.querySelector('b')).toBe(tail);
-			await Promise.resolve();
-			expect(recovered).toHaveLength(1);
-			if (dev) {
-				expect(warns()[0]).toEqual(
-					mismatchWarning(
-						FILE,
-						lineOf('{waitList(props.text, props.v)}'),
-						'a renderable list range',
-					),
-				);
-			} else {
-				expect(warns()).toEqual([]);
-			}
+			await expectReported(
+				recovered,
+				FILE,
+				lineOf('{waitList(props.text, props.v)}'),
+				'a renderable list range',
+			);
 		} finally {
 			root.unmount();
 		}
