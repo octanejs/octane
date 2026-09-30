@@ -22,6 +22,16 @@ export function BlockHost(props: { tag: string; text: string }) @{
 	)}</section>
 }
 
+// A textarea whose `value` or `defaultValue` owns its content, not children.
+export function TextareaHost(props: { tag: string; value: string; controlled: boolean }) @{
+	<section id="textarea">{createElement(
+		props.tag,
+		props.controlled
+			? { id: 'el', value: props.value, onInput: () => {} }
+			: { id: 'el', defaultValue: props.value },
+	)}</section>
+}
+
 // A dynamic host tag at template position. JSX types list only the canonical
 // lowercase spellings, so the runtime casing is asserted to one of them.
 export function DynamicTag(props: { tag: string; text: string }) @{

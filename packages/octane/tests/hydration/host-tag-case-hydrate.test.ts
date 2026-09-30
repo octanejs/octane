@@ -3,7 +3,13 @@ import { join } from 'node:path';
 import { act, createRoot, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadServerFixture } from '../_server-fixture';
-import { BlockHost, DynamicTag, PureHost, SvgHost } from './_fixtures/host-tag-case.tsrx';
+import {
+	BlockHost,
+	DynamicTag,
+	PureHost,
+	SvgHost,
+	TextareaHost,
+} from './_fixtures/host-tag-case.tsrx';
 
 // HTML tag names are ASCII case-insensitive. The server writes an uppercase
 // descriptor tag, the parser lowercases it, and `createElement('DIV')` builds a
@@ -115,6 +121,41 @@ describe('an HTML host descriptor tag in any casing', () => {
 				expect(container.querySelector('#el')).toBe(el);
 				expect(el.textContent).toBe(c.text[1]);
 				expect(document.activeElement).toBe(el);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it.each(
+		['textarea', 'TEXTAREA', 'TextArea'].flatMap((tag) =>
+			[true, false].map((controlled) => ({ tag, controlled })),
+		),
+	)(
+		'<$tag> keeps the content its value owns (controlled: $controlled)',
+		async ({ tag, controlled }) => {
+			const container = renderServer('TextareaHost', { tag, value: 'A', controlled });
+			const el = container.querySelector('#el') as HTMLTextAreaElement;
+			expect(el.localName).toBe('textarea');
+			expect(el.value).toBe('A');
+
+			const { root, recoverable, reports } = hydrate(container, TextareaHost, {
+				tag,
+				value: 'A',
+				controlled,
+			});
+			try {
+				await act(() => {});
+				expect(recoverable).toEqual([]);
+				expect(reports()).toEqual([]);
+				expect(container.querySelector('#el')).toBe(el);
+				expect(el.value).toBe('A');
+				expect(el.defaultValue).toBe('A');
+
+				await act(() => root.render(TextareaHost, { tag, value: 'B', controlled }));
+				expect(container.querySelector('#el')).toBe(el);
+				expect(el.value).toBe('B');
+				expect(recoverable).toEqual([]);
 			} finally {
 				root.unmount();
 			}

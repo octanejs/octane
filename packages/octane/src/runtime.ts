@@ -31519,7 +31519,7 @@ function hasDangerHTML(props: any): boolean {
 function hasHostPropContent(descriptor: ElementDescriptor): boolean {
 	return (
 		hasDangerHTML(descriptor.props) ||
-		(descriptor.type === 'textarea' &&
+		(isTextareaTag(descriptor.type as string) &&
 			(descriptor.props?.value != null || descriptor.props?.defaultValue != null))
 	);
 }
@@ -32850,11 +32850,12 @@ function descNeedsBlocks(value: any): boolean {
 // An HTML tag name is ASCII case-insensitive (`createElement('TEXTAREA')` makes
 // a textarea), and the server folds on the lowercased tag (ssrHostElement).
 // Compare the string before paying for a DOM accessor on every de-opt host.
+function isTextareaTag(type: string): boolean {
+	return type === 'textarea' || (type.length === 8 && type.toLowerCase() === 'textarea');
+}
+
 function isHtmlTextareaType(type: string, elNs: string | undefined): boolean {
-	return (
-		elNs === undefined &&
-		(type === 'textarea' || (type.length === 8 && type.toLowerCase() === 'textarea'))
-	);
+	return elNs === undefined && isTextareaTag(type);
 }
 
 // One childSlot renders a block-backed de-opt host's children into it. A
