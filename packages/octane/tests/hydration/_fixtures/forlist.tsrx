@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { createElement, type OctaneNode, use, useState } from 'octane';
 
 // SSR Phase 6 (M2) — @for hydration. The server wraps the whole @for in a
 // `<!--[-->…<!--]-->` range. Each proven direct-host item self-delimits via its
@@ -73,4 +73,35 @@ export function ExplicitKeyComponentList(props: ComponentListProps) @{
 			<ComponentRow key={item.id} item={item} onPick={props.onPick} />
 		}
 	</ul>
+}
+
+function SuspendingDetail(props: { text: Promise<string> }) @{
+	<em class="suspending-detail">{use(props.text) as string}</em>
+}
+
+function suspendingDetail(row: string, text: Promise<string> | null): OctaneNode {
+	return row === 'a' || text === null ? null : createElement(SuspendingDetail, { text });
+}
+
+// The client may render more rows than the server. An extra row that suspends
+// after inserting its element must not leave that partial element for the
+// retry to adopt as server output.
+export function SuspendingRows(props: { rows: string[]; text: Promise<string> | null }) @{
+	<main>
+		@try {
+			<section>
+				<ul id="suspending-rows">
+					@for (const row of props.rows; key row) {
+						<li class="suspending-row">
+							{row}
+							{suspendingDetail(row, props.text)}
+						</li>
+					}
+				</ul>
+				<b>tail</b>
+			</section>
+		} @pending {
+			<u>loading</u>
+		}
+	</main>
 }

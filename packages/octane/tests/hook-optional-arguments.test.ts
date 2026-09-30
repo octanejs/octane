@@ -101,8 +101,9 @@ describe('optional hook arguments', () => {
 				Server.useDeferredValue('final', deferredSlot),
 			);
 		}
-		const { html } = Server.renderToString(Reader);
-		expect(html).toContain('<output>serverfinal</output>');
+		const parsed = document.createElement('div');
+		parsed.innerHTML = Server.renderToString(Reader).html;
+		expect(parsed.querySelector('output')!.textContent).toBe('serverfinal');
 		expect(calls).toEqual(['server']);
 		function NoServerSnapshot() {
 			return Server.createElement(
