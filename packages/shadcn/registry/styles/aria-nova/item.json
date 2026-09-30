@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/aria@0.0.53",
+    "@octanejs/aria@0.0.54",
     "class-variance-authority",
     "cn"
   ],
