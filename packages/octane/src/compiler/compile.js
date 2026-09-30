@@ -33977,6 +33977,11 @@ function retainTailHookState(body, first, ctx) {
  * Index of the first statement that can exit the body when a slot-keyed hook
  * call follows it in setup and output follows it too, or -1. Otherwise the
  * guard-nested form already leaves every hook on the body's own scope.
+ *
+ * The tail's output must also follow its last exit. An authored arm or `@{}`
+ * body always ends in its one output node, but a statement list with output
+ * ahead of a later exit renders that output under only the exits before it:
+ * the guard-nested form expresses that, and one guarded output cannot.
  */
 function hookedTailStart(body) {
 	const first = body.findIndex(
@@ -33986,8 +33991,13 @@ function hookedTailStart(body) {
 	let output = false;
 	let hook = false;
 	for (let i = first; i < body.length; i++) {
-		if (isJsxNode(body[i])) output = true;
-		else hook ||= containsHookCall(body[i], true);
+		const statement = body[i];
+		if (isJsxNode(statement)) {
+			output = true;
+			continue;
+		}
+		if (output && ownsArmJump(statement, false, false)) return -1;
+		hook ||= containsHookCall(statement, true);
 	}
 	return output && hook ? first : -1;
 }
