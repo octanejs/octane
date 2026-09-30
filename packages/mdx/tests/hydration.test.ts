@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { hydrateRoot, flushSync, createElement } from 'octane';
+import { act, hydrateRoot, flushSync, createElement } from 'octane';
 import * as ServerRT from 'octane/server';
 import { compile as octaneCompile } from 'octane/compiler';
 import { compileMdxSync } from '@octanejs/mdx/compile';
@@ -88,17 +88,27 @@ describe('hydration', () => {
 		root.unmount();
 	});
 
-	it('adopts a document with an embedded .tsrx component and keeps it interactive', () => {
+	it('adopts a document with an embedded .tsrx component and keeps it interactive', async () => {
 		const counter = serverTsrxModule('counter.tsrx');
 		const mod = serverMdxModule('components.mdx', { './counter.tsrx': counter });
 		const { html } = ServerRT.renderToString(mod.default, {});
 		expect(html).toContain('count: 2');
-		expect(html).toContain('The answer is 42.');
 		container.innerHTML = html;
+		expect(container.textContent).toContain('The answer is 42.');
 		const btn = container.querySelector('[data-testid="counter"]') as HTMLButtonElement;
 
-		const root = hydrateRoot(container, ComponentsDoc, {});
+		// `The answer is {answer + 2}.` renders adjacent text children, which
+		// hydrate without a text mismatch.
+		const recoverable: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			ComponentsDoc,
+			{},
+			{ onRecoverableError: (error) => recoverable.push(error) },
+		);
 		flushSync(() => {});
+		await act(() => {});
+		expect(recoverable).toEqual([]);
 		expect(container.innerHTML).toBe(html);
 		// Same button element (adopted), and the delegated event drives its state.
 		expect(container.querySelector('[data-testid="counter"]')).toBe(btn);

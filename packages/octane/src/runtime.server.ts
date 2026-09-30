@@ -58,6 +58,7 @@ import {
 	FOR_BLOCK_OPEN_EMPTY,
 	FOR_BLOCK_OPEN_ITEMS,
 	EMPTY_COMMENT,
+	TEXT_SEPARATOR,
 	SUSPENSE_SCRIPT_ATTR,
 	SUSPENSE_RESOLVED_COMMENT,
 	SUSPENSE_RESOLVED_SEED_ATTR,
@@ -2638,33 +2639,93 @@ function ssrDeoptItemContent(value: unknown, scope: SSRScope): string {
 
 // Serialize the CONTENT inside a host descriptor (a `createElement(...)` child
 // subtree) as PLAIN markup — NO childSlot block markers. Mirrors the client's
-// `buildDeoptDom`, which builds the descriptor's children as raw DOM nodes inside
-// the element (the de-opt host path REBUILDS on hydration, so the inside carries no
-// adopt markers). This keeps the serialized `<span>text</span>` byte-identical to a
-// fresh client mount. Arrays flatten, nested host descriptors recurse, components
-// still render through `ssrComponent` (block-wrapped — a component IS a hydration
-// boundary even inside de-opt markup), primitives coerce to escaped text.
+// de-opt reconciler (`reconcileDeoptChildren`), which builds the descriptor's
+// children as raw DOM nodes inside the element and adopts the server's nodes
+// positionally on hydration, so the inside carries no block markers. Arrays
+// flatten, nested host descriptors recurse, components still render through
+// `ssrComponent` (block-wrapped — a component IS a hydration boundary even inside
+// de-opt markup), primitives coerce to escaped text.
+//
+// The client builds one Text node per primitive child, but the HTML parser merges
+// adjacent server texts into one. Adjacent texts therefore get the compiled
+// template path's `<!-- -->` separator (React's convention), which the client
+// reconciler drops as it adopts them. Adjacency looks through nested arrays and
+// empty values, so it is tracked in SSR_DESCRIPTOR_TEXT_TAIL rather than read
+// back from the output, whose concatenation V8 would have to flatten per child.
 function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
+	SSR_DESCRIPTOR_TEXT_TAIL = false;
+	return ssrDescriptorPart(v, scope);
+}
+
+// Whether the de-opt content serialized so far ends with a text node. Each
+// ssrDescriptorContent call starts clear, markup clears it, and empty values
+// leave it unchanged.
+let SSR_DESCRIPTOR_TEXT_TAIL = false;
+
+function ssrDescriptorPart(v: unknown, scope: SSRScope): string {
 	if (v == null || v === false || v === true || v === '') return '';
-	if (typeof v === 'object' && SERVER_HTML in v) return (v as ServerHtml)[SERVER_HTML];
+	if (typeof v === 'object' && SERVER_HTML in v) {
+		SSR_DESCRIPTOR_TEXT_TAIL = false;
+		return (v as ServerHtml)[SERVER_HTML];
+	}
 	if (Array.isArray(v)) {
 		let out = '';
-		for (let i = 0; i < v.length; i++) out += ssrDescriptorContent(v[i], scope);
+		for (let i = 0; i < v.length; i++) out += ssrDescriptorPart(v[i], scope);
 		return out;
 	}
 	if (typeof v === 'object' && (v as any).$$kind === ELEMENT_TAG) {
 		const d = v as ElementDescriptor;
-		if (typeof d.type === 'string') return ssrHostElement(d.type, d.props, d.children, scope);
-		return ssrComponentDescriptor(d, scope);
+		const html =
+			typeof d.type === 'string'
+				? ssrHostElement(d.type, d.props, d.children, scope)
+				: ssrComponentDescriptor(d, scope);
+		SSR_DESCRIPTOR_TEXT_TAIL = false;
+		return html;
 	}
 	if (typeof v === 'function') {
 		// A host descriptor can receive a compiler-generated children block through
 		// an uncompiled wrapper. Its transient function identity must not become part
 		// of the streamed async boundary key used for a later retry.
-		return ssrComponent(scope, v as ServerComponent, {}, undefined, undefined, isChildrenBlock(v));
+		const html = ssrComponent(
+			scope,
+			v as ServerComponent,
+			{},
+			undefined,
+			undefined,
+			isChildrenBlock(v),
+		);
+		SSR_DESCRIPTOR_TEXT_TAIL = false;
+		return html;
 	}
 	if (typeof v === 'object') throw invalidChildError(v as object);
-	return escapeHtml(v);
+	const text = escapeHtml(v);
+	if (!SSR_DESCRIPTOR_TEXT_TAIL) {
+		SSR_DESCRIPTOR_TEXT_TAIL = true;
+		return text;
+	}
+	return ssrContentParsesComments() ? TEXT_SEPARATOR + text : text;
+}
+
+// HTML elements whose content the parser reads as RCDATA or raw text (noscript
+// is raw text whenever scripting is enabled). A comment there is literal text,
+// and the parser keeps the whole content as one text node anyway.
+const RAW_TEXT_CONTENT = new Set([
+	'textarea',
+	'title',
+	'script',
+	'style',
+	'xmp',
+	'iframe',
+	'noembed',
+	'noframes',
+	'noscript',
+	'plaintext',
+]);
+
+// Whether the host whose content is being serialized tokenizes comments.
+function ssrContentParsesComments(): boolean {
+	const host = CURRENT_SSR_ELEMENT;
+	return host === null || host.namespace !== 'html' || !RAW_TEXT_CONTENT.has(host.tag);
 }
 
 /**
@@ -4250,9 +4311,12 @@ function ssrOptionSelected(value: unknown, content: string): string {
 		key = String(value);
 	} else {
 		// Content carrying markup (nested elements / hydration markers) skips
-		// the text fallback — React flattens simple text children only.
-		if (content.indexOf('<') !== -1) return '';
-		key = unescapeOptionText(content);
+		// the text fallback — React flattens simple text children only. The
+		// separator between adjacent texts is not markup; the text is theirs.
+		const text =
+			content.indexOf(TEXT_SEPARATOR) === -1 ? content : content.replaceAll(TEXT_SEPARATOR, '');
+		if (text.indexOf('<') !== -1) return '';
+		key = unescapeOptionText(text);
 	}
 	if (scope.multi !== null) return scope.multi.has(key) ? ' selected' : '';
 	return scope.single === key ? ' selected' : '';
