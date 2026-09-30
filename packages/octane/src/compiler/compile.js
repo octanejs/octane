@@ -77,7 +77,12 @@ import {
 	UNIVERSAL_THREAD_RUNTIME_IMPORTS,
 } from './compile-universal.js';
 import { compileValdi, VALDI_COMPILER_RUNTIME_IMPORTS } from './compile-valdi.js';
-import { ARM_BREAK_MESSAGE, ARM_VALUE_RETURN_MESSAGE, armJump } from './arm-exits.js';
+import {
+	ARM_BREAK_MESSAGE,
+	ARM_VALUE_RETURN_MESSAGE,
+	armJump,
+	assertTemplateJumps,
+} from './arm-exits.js';
 import { HOOK_NAMES, NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 export { HOOK_NAMES } from './hook-names.js';
 import {
@@ -10005,6 +10010,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 		normalizeAuthoredJsxLiterals(parseModule(source, cleanFilename)),
 	);
 	analyzeTsrx(analyzedAst, cleanFilename);
+	assertTemplateJumps(analyzedAst, source, cleanFilename);
 	adoptParserAst(analyzedAst);
 	assertNoLegacyContextProviders(analyzedAst, source, cleanFilename);
 	options = nativeReadOptions(analyzedAst, options);

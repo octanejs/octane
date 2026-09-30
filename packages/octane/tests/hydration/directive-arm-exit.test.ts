@@ -395,3 +395,121 @@ describe.each([false, true])('an arm that can exit keeps its position (dev: %s)'
 		}
 	}
 });
+
+// A `@{ … }` block is a nested template, not an arm: the jumps its setup owns
+// stay JavaScript, and a `continue;` in an arm inside the block ends only that
+// arm. (A jump that would leave the block is a compile error.) Both forms keep
+// their rows in order while the inner arm exits, clears, and rows move.
+const BLOCK_SOURCE = `type Row = { id: string; hide: boolean };
+export function ChildBlock({ rows }: { rows: Row[] }) @{
+	<div class="list">
+		@for (const row of rows; key row.id) {
+			<p>
+				@{
+					let seen = 0;
+					for (const ch of row.id + 'xz') {
+						if (ch === 'x') continue;
+						if (ch === 'z') break;
+						seen++;
+					}
+					check: {
+						if (seen > 0) break check;
+						seen = -1;
+					}
+					@if (row.id !== '') {
+						if (row.hide) continue;
+						<b>{\`\${row.id}\${seen}\`}</b>
+					}
+				}
+			</p>
+		}
+		<hr />
+	</div>
+}
+export function OutputBlock({ rows }: { rows: Row[] }) @{
+	<div class="list">
+		@for (const row of rows; key row.id) {
+			@{
+				let seen = 0;
+				for (const ch of row.id) {
+					switch (ch) {
+						case 'x':
+							continue;
+						default:
+							break;
+					}
+					seen++;
+				}
+				@if (row.id !== '') {
+					if (row.hide) continue;
+					<b>{\`\${row.id}\${seen}\`}</b>
+				}
+			}
+		}
+		<hr />
+	</div>
+}
+`;
+
+function blockHtml(name: 'ChildBlock' | 'OutputBlock', state: Row[]): string {
+	const rendered = state.map((row) => {
+		const bold = row.hide ? '' : `<b>${row.id}${row.id.length}</b>`;
+		return name === 'ChildBlock' ? `<p>${bold}</p>` : bold;
+	});
+	return list(`${rendered.join('')}<hr>`);
+}
+
+describe.each([false, true])('an arm exit inside a child block (dev: %s)', (dev) => {
+	let shared: Modules | undefined;
+	const modules = () => (shared ??= load(BLOCK_SOURCE, 'directive-arm-exit-block.tsrx', dev));
+
+	for (const name of ['ChildBlock', 'OutputBlock'] as const) {
+		const expected = ROW_STATES.map((state) => blockHtml(name, state));
+
+		it(`renders ${name} on the server and on mount and update`, () => {
+			const { client, server } = modules();
+			const parsed = newContainer();
+			const serverSeen = ROW_STATES.map((state) => {
+				parsed.innerHTML = ServerRT.renderToString(server[name], { rows: state }).html;
+				return content(parsed);
+			});
+			expect(serverSeen).toEqual(expected);
+			const container = newContainer();
+			const root = createRoot(container);
+			const seen: string[] = [];
+			for (const state of ROW_STATES) {
+				flushSync(() => root.render(client[name], { rows: state }));
+				seen.push(content(container));
+			}
+			root.unmount();
+			expect(seen).toEqual(expected);
+		});
+
+		it(`hydrates ${name} and updates through exits and moves`, async () => {
+			const { client, server } = modules();
+			const container = newContainer();
+			container.innerHTML = ServerRT.renderToString(server[name], { rows: ROW_STATES[0] }).html;
+			const serverElements = Array.from(container.querySelectorAll('*'));
+			const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const recoverable: unknown[] = [];
+			const root = hydrateRoot(
+				container,
+				client[name],
+				{ rows: ROW_STATES[0] },
+				{ onRecoverableError: (error) => recoverable.push(error) },
+			);
+			await act(() => {});
+			const hydratedElements = Array.from(container.querySelectorAll('*'));
+			const seen = [content(container)];
+			for (const state of ROW_STATES.slice(1)) {
+				flushSync(() => root.render(client[name], { rows: state }));
+				seen.push(content(container));
+			}
+			root.unmount();
+			expect(recoverable).toEqual([]);
+			expect(errors.mock.calls).toEqual([]);
+			expect(hydratedElements).toEqual(serverElements);
+			expect(seen).toEqual(expected);
+		});
+	}
+});
