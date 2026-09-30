@@ -173,6 +173,64 @@ describe('executeServerFunction', () => {
 });
 
 describe('streamed server-function results', () => {
+	it.each([
+		['consumer', 'unread'],
+		['consumer', 'first pull'],
+		['request', 'unread'],
+		['request', 'first pull'],
+		['timeout', 'unread'],
+		['timeout', 'first pull'],
+	] as const)(
+		'releases a late upstream after %s cancellation with %s',
+		async (cancellation, reading) => {
+			if (cancellation === 'timeout') {
+				vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+			}
+			const setup = Promise.withResolvers<AsyncIterable<string>>();
+			const started = Promise.withResolvers<void>();
+			const cancellationController = new AbortController();
+			const cancelled = vi.fn();
+			const upstream = new ReadableStream<string>({ cancel: cancelled }, { highWaterMark: 0 });
+			const iterable = upstream.values();
+			const request = new Request('https://octane.test/', {
+				signal: cancellationController.signal,
+			});
+			const stream = executeServerFunctionStream(
+				() => {
+					started.resolve();
+					return setup.promise;
+				},
+				'[1,["array",[]]]',
+				{ request, signal: request.signal, viewer: undefined },
+				cancellation === 'timeout' ? { timeoutMs: 10 } : undefined,
+			);
+			await started.promise;
+			const reader = reading === 'first pull' ? stream.getReader() : undefined;
+			const pending = reader?.read();
+			await new Promise<void>((resolve) => setImmediate(resolve));
+			try {
+				if (cancellation === 'timeout') vi.advanceTimersByTime(10);
+				else if (cancellation === 'request') cancellationController.abort();
+				else if (reader) await reader.cancel();
+				else await stream.cancel();
+				setup.resolve(iterable);
+				await new Promise<void>((resolve) => setImmediate(resolve));
+				await pending?.catch(() => {});
+				expect(cancelled).toHaveBeenCalledOnce();
+				expect(upstream.locked).toBe(false);
+			} finally {
+				setup.resolve(iterable);
+				cancellationController.abort();
+				if (reader) {
+					await reader.cancel().catch(() => {});
+					reader.releaseLock();
+				} else await stream.cancel().catch(() => {});
+				await iterable.return?.();
+				if (cancellation === 'timeout') vi.useRealTimers();
+			}
+		},
+	);
+
 	function endpoint(fn: (...args: any[]) => unknown) {
 		return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 			const request = new Request(new URL(String(input), document.baseURI), init);
@@ -187,6 +245,71 @@ describe('streamed server-function results', () => {
 			);
 		});
 	}
+
+	it.each(['throws', 'rejects'] as const)(
+		'keeps unread cancellation settled when late source cleanup %s',
+		async (failure) => {
+			const setup = Promise.withResolvers<AsyncIterable<unknown>>();
+			const started = Promise.withResolvers<void>();
+			let released = false;
+			const stream = executeServerFunctionStream(() => {
+				started.resolve();
+				return setup.promise;
+			}, '[1,["array",[]]]');
+			await started.promise;
+			await stream.cancel();
+			setup.resolve({
+				[Symbol.asyncIterator]() {
+					return {
+						async next() {
+							return { value: undefined, done: true };
+						},
+						return() {
+							released = true;
+							const error = new Error('Source cleanup failed');
+							if (failure === 'throws') throw error;
+							return Promise.reject(error);
+						},
+					};
+				},
+			});
+			await new Promise<void>((resolve) => setImmediate(resolve));
+			expect(released).toBe(true);
+		},
+	);
+
+	it('leaves source values demand driven and releases the source after normal completion', async () => {
+		const produced: string[] = [];
+		const upstream = new ReadableStream<string>(
+			{
+				pull(controller) {
+					if (produced.length === 2) controller.close();
+					else {
+						const value = produced.length === 0 ? 'first' : 'second';
+						produced.push(value);
+						controller.enqueue(value);
+					}
+				},
+			},
+			{ highWaterMark: 0 },
+		);
+		const iterable = upstream.values();
+		const fetch = endpoint(() => iterable);
+		try {
+			const values = (await __serverRpc('deadbeef', [], {}, true)) as AsyncIterable<string>;
+			const iterator = values[Symbol.asyncIterator]();
+			expect(produced).toEqual([]);
+			await expect(iterator.next()).resolves.toEqual({ value: 'first', done: false });
+			expect(produced).toEqual(['first']);
+			await expect(iterator.next()).resolves.toEqual({ value: 'second', done: false });
+			expect(produced).toEqual(['first', 'second']);
+			await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+			expect(upstream.locked).toBe(false);
+		} finally {
+			fetch.mockRestore();
+			await iterable.return?.();
+		}
+	});
 
 	it('round-trips ready values on the page origin despite an external document base', async () => {
 		const fetch = endpoint(() => ({ missing: undefined, value: -0 }));

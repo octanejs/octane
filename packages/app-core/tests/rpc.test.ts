@@ -1,10 +1,13 @@
 // @vitest-environment node
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { setImmediate } from 'node:timers/promises';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Context, Middleware } from '@octanejs/app-core';
+import type { Context, Middleware, RpcRequestOptions } from '@octanejs/app-core';
+import { executeServerFunction, executeServerFunctionStream } from 'octane/server';
 import { createHandler } from '../src/server/production.js';
 import { getRequestContext, tryGetRequestContext } from '../src/server/request-context.js';
 import { createRpcRegistry } from '../src/server/rpc-registry.js';
+import { handleRpcRequest } from '../src/server/rpc.js';
 
 const TEMPLATE = `<!doctype html>
 <html><head><!--ssr-head--></head><body><div id="root"><!--ssr-body--></div>
@@ -562,6 +565,57 @@ describe('server-function HTTP security', () => {
 		expect(action).not.toHaveBeenCalled();
 		expect(loggedError).toHaveBeenCalledOnce();
 	});
+});
+
+describe('streamed RPC response cancellation', () => {
+	it.each(['body', 'request'] as const)(
+		'releases a late upstream after %s cancellation before the first response read',
+		async (cancellation) => {
+			const setup = Promise.withResolvers<AsyncIterable<string>>();
+			const started = Promise.withResolvers<void>();
+			const cancellationController = new AbortController();
+			const cancelled = vi.fn();
+			const upstream = new ReadableStream<string>({ cancel: cancelled }, { highWaterMark: 0 });
+			const iterable = upstream.values();
+			const options: RpcRequestOptions = {
+				asyncContext: new AsyncLocalStorage(),
+				resolveFunction: () => () => {
+					started.resolve();
+					return setup.promise;
+				},
+				executeServerFunction,
+				streamServerFunction: executeServerFunctionStream,
+			};
+			const response = await handleRpcRequest(
+				new Request('https://octane.test/_$_ripple_rpc_$_/deadbeef', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						Accept: 'application/x-octane-rpc+ndjson',
+					},
+					body: '[1,["array",[]]]',
+					signal: cancellationController.signal,
+				}),
+				options,
+			);
+			await started.promise;
+			try {
+				expect(response.status).toBe(200);
+				expect(response.bodyUsed).toBe(false);
+				if (cancellation === 'request') cancellationController.abort();
+				else await response.body!.cancel();
+				setup.resolve(iterable);
+				await setImmediate();
+				expect(cancelled).toHaveBeenCalledOnce();
+				expect(upstream.locked).toBe(false);
+			} finally {
+				setup.resolve(iterable);
+				cancellationController.abort();
+				await response.body!.cancel().catch(() => {});
+				await iterable.return?.();
+			}
+		},
+	);
 });
 
 describe('server-function id registry', () => {

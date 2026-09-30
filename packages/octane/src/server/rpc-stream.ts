@@ -29,14 +29,30 @@ export function createServerResultStream(
 	const cleanup = () => {
 		clearTimeout(timer);
 		options.signal?.removeEventListener('abort', abort);
+		const abandoned = pending;
+		pending = undefined;
+		if (abandoned === undefined) return;
+		// An unread response still owns any iterable that finishes setup after it ends.
+		void abandoned.then(
+			(value) => {
+				try {
+					if (value !== null && typeof value === 'object' && Symbol.asyncIterator in value) {
+						closeIterator((value as AsyncIterable<unknown>)[Symbol.asyncIterator]());
+					}
+				} catch {
+					/* Best effort. */
+				}
+			},
+			() => {},
+		);
 	};
-	const closeIterator = () => {
+	const closeIterator = (target = iterator) => {
+		iterator = undefined;
 		try {
-			void Promise.resolve(iterator?.return?.()).catch(() => {});
+			void Promise.resolve(target?.return?.()).catch(() => {});
 		} catch {
 			/* Best effort. */
 		}
-		iterator = undefined;
 	};
 	const write = (frame: ServerResultFrame) => {
 		const encoded = encodeServerResultFrame(sequence, frame);
@@ -53,7 +69,6 @@ export function createServerResultStream(
 	const fail = (message: string) => {
 		if (finished) return;
 		finished = true;
-		pending = undefined;
 		cleanup();
 		options.cancel?.();
 		closeIterator();
@@ -86,13 +101,7 @@ export function createServerResultStream(
 					if (!initialized) {
 						const value = await pending;
 						pending = undefined;
-						if (finished) {
-							if (value !== null && typeof value === 'object' && Symbol.asyncIterator in value) {
-								iterator = (value as AsyncIterable<unknown>)[Symbol.asyncIterator]();
-								closeIterator();
-							}
-							return;
-						}
+						if (finished) return;
 						initialized = true;
 						if (value !== null && typeof value === 'object' && Symbol.asyncIterator in value) {
 							iterator = (value as AsyncIterable<unknown>)[Symbol.asyncIterator]();
@@ -125,7 +134,6 @@ export function createServerResultStream(
 			cancel() {
 				if (finished) return;
 				finished = true;
-				pending = undefined;
 				cleanup();
 				options.cancel?.();
 				closeIterator();
