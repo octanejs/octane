@@ -1837,6 +1837,16 @@ function hydrationNodeMatches(
 	return true; // any leftover could be holes — assume a match
 }
 
+/**
+ * Does the server node at the cursor match a nested fragment's FIRST logical
+ * root? A leading template comment is a dynamic hole whose server form (text,
+ * a marker range, or nothing) cannot decide a mismatch, as in fragmentRemainder.
+ */
+function fragmentRootMatches(server: Node, fragment: Node, partialStyles?: string): boolean {
+	const first = getFirstChild(fragment)!;
+	return first.nodeType === 8 || hydrationNodeMatches(server, first, partialStyles, '0');
+}
+
 /** Remove the server nodes from `start` to `end` (inclusive). Used to discard a divergent range. */
 function removeHydrationRange(start: Node, end: Node): void {
 	let n: Node | null = start;
@@ -18255,16 +18265,16 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
  * also what the parser's case-adjustment produces on the server DOM), or the
  * root's nodeType for a text (3) or comment/`<!>`-anchor (8) root.
  */
-function templateRootDescriptor(html: string): string | 3 | 8 {
-	if (html.charCodeAt(0) !== 60 /* < */) return 3;
-	const c = html.charCodeAt(1);
+function templateRootDescriptor(html: string, at: number = 0): string | 3 | 8 {
+	if (html.charCodeAt(at) !== 60 /* < */) return 3;
+	const c = html.charCodeAt(at + 1);
 	if (!((c >= 97 && c <= 122) || (c >= 65 && c <= 90))) return 8;
-	let i = 2;
+	let i = at + 2;
 	for (; i < html.length; i++) {
 		const cc = html.charCodeAt(i);
 		if (cc === 62 /* > */ || cc === 47 /* / */ || cc <= 32 /* whitespace */) break;
 	}
-	return html.slice(1, i);
+	return html.slice(at + 1, i);
 }
 
 function lazyRootDescriptor(lazy: LazyTemplateRecord): string | 3 | 8 {
@@ -18301,6 +18311,23 @@ function lazyRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
 	// wrong-namespace node would be a correctness break — a false mismatch fails
 	// safe (rebuild, exactly what the parsed-template compare did pre-narrowing).
 	return (server as Element).localName === root;
+}
+
+/**
+ * lazyRootMatches for a nested fragment's FIRST logical root, read from the
+ * template source. A raw fragment's cached descriptor is that root; a
+ * fixed-HTML fragment's starts after its synthetic `<octane-frag>` wrapper. A
+ * leading `<!>` is a dynamic hole whose server form (text, a marker range, or
+ * nothing) cannot decide a mismatch.
+ */
+function lazyFragmentRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
+	const root =
+		lazy.frag !== 0
+			? lazyRootDescriptor(lazy)
+			: templateRootDescriptor(lazy.html, 13 /* '<octane-frag>'.length */);
+	if (root === 8) return true;
+	if (root === 3) return server.nodeType === 3;
+	return server.nodeType === 1 && (server as Element).localName === root;
 }
 
 /**
@@ -18622,7 +18649,7 @@ class HydrationCapability {
 			type !== null &&
 			first !== end &&
 			first.nodeType === 1 &&
-			(first as Element).localName === type;
+			isHostElementOfType(first as Element, type);
 		if (
 			!rebuilt &&
 			(type !== null
@@ -18774,7 +18801,7 @@ class HydrationCapability {
 	 * leads the range. Anything else in the range is server content the client
 	 * cannot adopt, such as an element or component the server rendered for a
 	 * value the client renders as text or nothing. Discard it and report the
-	 * recovery, as claimHostRange does for a host descriptor.
+	 * recovery, as claimRange does for a host descriptor.
 	 */
 	discardUnadoptedText(scope: Scope, slotKey: number, state: ChildSlot, str: string): void {
 		const end = state.end!;
@@ -19130,14 +19157,7 @@ class HydrationCapability {
 				(STAGED_DOM?.view(cursor) ?? cursor).parentNode !== target
 			)
 				return this.freshClone(template);
-			if (isBlockOpen(cursor)) {
-				const close = this.close(cursor);
-				this.node = getNextSibling(close);
-				removeHydrationRange(cursor, close);
-			} else {
-				this.node = getNextSibling(cursor);
-				(STAGED_DOM?.view(cursor as ChildNode) ?? (cursor as ChildNode)).remove();
-			}
+			this.discardCursor(cursor);
 			if (claimsRoot)
 				this.claimRootRemainder(
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
@@ -19145,13 +19165,79 @@ class HydrationCapability {
 			return this.freshClone(template);
 		}
 		if (isFragment) {
-			return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
+			// A nested fragment has no server wrapper, so its first logical root must
+			// be the cursor itself. A root claim already compared every root above.
+			if (
+				claimsRoot ||
+				(template !== null
+					? fragmentRootMatches(cursor, template, partialStyles)
+					: lazyFragmentRootMatches(cursor, lazy!))
+			)
+				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
+			return this.rebuildFragment(template ?? resolveLazyTemplate(lazy!), cursor, loc);
 		}
 		if (claimsRoot)
 			this.claimRootRemainder(
 				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 			);
 		return cursor;
+	}
+
+	/**
+	 * The server rendered something other than this nested fragment at the
+	 * cursor (a text value, another component's roots). Report it once and build
+	 * the fragment on the client. The fragment's block owns the server nodes from
+	 * the cursor up to its end marker, where drainFrag inserts the fresh roots, so
+	 * discard them. When the end marker does not follow the cursor inside the
+	 * block's range, discard only the cursor node or its range, as a single-root
+	 * mismatch does.
+	 */
+	private rebuildFragment(template: Node, cursor: Node, loc: string | undefined): Node {
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from the server's; still rebuild, but there is nothing to report.
+		if (!this.staleServerValues) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+			if (process.env.NODE_ENV !== 'production')
+				warnHydrationStructuralMismatch(
+					loc ?? componentSourceLoc(CURRENT_BLOCK?.body) ?? CURRENT_SCOPE?.locFile,
+					`a fragment starting with ${describeHydrationNode(getFirstChild(template))}`,
+					describeHydrationNode(cursor),
+				);
+		}
+		// The compiled mount inserts into its scope's block, which for a lite
+		// component is the scope's own range rather than CURRENT_BLOCK's.
+		const block = CURRENT_SCOPE?.block;
+		const parent = block?.parentNode;
+		const end = block?.endMarker ?? null;
+		if (
+			parent == null ||
+			cursor === end ||
+			(STAGED_DOM?.view(cursor) ?? cursor).parentNode !== parent
+		)
+			return this.freshClone(template);
+		let node: Node | null = cursor;
+		// Reaching the block's own start first means the cursor lies before its range.
+		if (end !== null)
+			while (node !== null && node !== end && node !== block!.startMarker)
+				node = getNextSibling(node);
+		if (node === end) {
+			this.node = end;
+			removeHydrationRange(cursor, (STAGED_DOM?.view(end!) ?? end!).previousSibling!);
+		} else this.discardCursor(cursor);
+		return this.freshClone(template);
+	}
+
+	/** Discard a mismatched server node (or the marker range it opens) and step past it. */
+	private discardCursor(cursor: Node): void {
+		if (isBlockOpen(cursor)) {
+			const close = this.close(cursor);
+			this.node = getNextSibling(close);
+			removeHydrationRange(cursor, close);
+		} else {
+			this.node = getNextSibling(cursor);
+			(STAGED_DOM?.view(cursor as ChildNode) ?? (cursor as ChildNode)).remove();
+		}
 	}
 
 	/** Remove server siblings left after the root's complete client shape was adopted. */
@@ -23014,6 +23100,17 @@ const HTML_NS = 'http://www.w3.org/1999/xhtml';
 // ordinary native alias/value tables instead of custom-element raw semantics.
 function isHtmlCustomElement(el: Element): boolean {
 	return el.namespaceURI === HTML_NS && el.localName.indexOf('-') !== -1;
+}
+
+// Whether `el` is the element a host descriptor of `type` builds. HTML tag names
+// are ASCII case-insensitive: createElement('DIV') builds a `div`, and the parser
+// lowercases the server's `<DIV>`, so an HTML element matches any casing of its
+// name. SVG and MathML names are case-sensitive (`foreignObject`), so a foreign
+// element matches only its exact spelling. Canonical spellings match on the
+// first comparison; the lowercase copy and namespace read run only on a miss.
+function isHostElementOfType(el: Element, type: string): boolean {
+	const name = el.localName;
+	return name === type || (name === type.toLowerCase() && el.namespaceURI === HTML_NS);
 }
 
 // Namespace for a de-opt host tag: `<svg>` always opens SVG; an SVG-ONLY tag
@@ -31589,7 +31686,7 @@ function hasDangerHTML(props: any): boolean {
 function hasHostPropContent(descriptor: ElementDescriptor): boolean {
 	return (
 		hasDangerHTML(descriptor.props) ||
-		(descriptor.type === 'textarea' &&
+		(isTextareaTag(descriptor.type as string) &&
 			(descriptor.props?.value != null || descriptor.props?.defaultValue != null))
 	);
 }
@@ -32331,7 +32428,7 @@ function reconcileDeoptNode(
 		if (
 			prev !== null &&
 			prev.nodeType === 1 &&
-			(prev as Element).localName === value.type &&
+			isHostElementOfType(prev as Element, value.type) &&
 			(prev as Element).namespaceURI === (elNs ?? HTML_NS)
 		) {
 			// REUSE the existing element — patch props in place instead of rebuilding.
@@ -32633,7 +32730,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 				scope.slots[0] === undefined &&
 				stale.nodeType === 1 /* Element */ &&
 				isHostDescriptor(item) &&
-				(stale as Element).localName === item.type &&
+				isHostElementOfType(stale as Element, item.type) &&
 				(STAGED_DOM?.view(stale) ?? stale).parentNode === block.parentNode
 			) {
 				transfer = stale;
@@ -32906,11 +33003,12 @@ function descNeedsBlocks(value: any): boolean {
 // An HTML tag name is ASCII case-insensitive (`createElement('TEXTAREA')` makes
 // a textarea), and the server folds on the lowercased tag (ssrHostElement).
 // Compare the string before paying for a DOM accessor on every de-opt host.
+function isTextareaTag(type: string): boolean {
+	return type === 'textarea' || (type.length === 8 && type.toLowerCase() === 'textarea');
+}
+
 function isHtmlTextareaType(type: string, elNs: string | undefined): boolean {
-	return (
-		elNs === undefined &&
-		(type === 'textarea' || (type.length === 8 && type.toLowerCase() === 'textarea'))
-	);
+	return elNs === undefined && isTextareaTag(type);
 }
 
 // One childSlot renders a block-backed de-opt host's children into it. A
@@ -32971,7 +33069,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		hydration !== null &&
 		hydration.node !== null &&
 		hydration.node.nodeType === 1 &&
-		(hydration.node as Element).localName === d.type &&
+		isHostElementOfType(hydration.node as Element, d.type as string) &&
 		(elNs === undefined || (hydration.node as Element).namespaceURI === elNs)
 	) {
 		el = hydration.node as Element;
@@ -33021,7 +33119,11 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		}
 		return;
 	}
-	if (el === null || el.localName !== d.type || (elNs !== undefined && el.namespaceURI !== elNs)) {
+	if (
+		el === null ||
+		!isHostElementOfType(el, d.type as string) ||
+		(elNs !== undefined && el.namespaceURI !== elNs)
+	) {
 		// First render, or the host tag changed at this slot — (re)create the element.
 		if (el !== null) {
 			const retired = el;
@@ -33102,7 +33204,7 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 			hydration !== null &&
 			hydration.node !== null &&
 			hydration.node.nodeType === 1 &&
-			(hydration.node as Element).localName === tag &&
+			isHostElementOfType(hydration.node as Element, tag) &&
 			(elNs === undefined || (hydration.node as Element).namespaceURI === elNs)
 		) {
 			// Hydration first render: ADOPT the server-rendered element at the cursor,
@@ -33291,7 +33393,7 @@ function buildDeoptAdoptQueue(
 		const compatible = isText
 			? cursor.nodeType === 3
 			: isHostDescriptor(v)
-				? cursor.nodeType === 1 && (cursor as Element).localName === v.type
+				? cursor.nodeType === 1 && isHostElementOfType(cursor as Element, v.type)
 				: false;
 		if (!compatible) break;
 		queue.push({ key: keys[i], node: cursor });
@@ -34345,7 +34447,7 @@ export function childSlot(
 			state.hostNode !== null &&
 			state.block === null &&
 			state.hostNode.nodeType === 1 &&
-			(state.hostNode as Element).localName === (value as ElementDescriptor).type;
+			isHostElementOfType(state.hostNode as Element, (value as ElementDescriptor).type as string);
 		const primitive = value == null || (typeof value !== 'object' && typeof value !== 'function');
 		const text = primitive ? coerceChildText(value) : null;
 		const unchangedText =
@@ -35001,7 +35103,7 @@ export function childSlot(
 			state.block === null &&
 			state.hostNode !== null &&
 			state.hostNode.nodeType === 1 /* Element */ &&
-			(state.hostNode as Element).localName === (props as ElementDescriptor).type &&
+			isHostElementOfType(state.hostNode as Element, (props as ElementDescriptor).type as string) &&
 			(state.hostNode as Element).namespaceURI ===
 				(inferTagNs((props as ElementDescriptor).type as string, deoptChildNamespace(domParent)) ??
 					HTML_NS) &&
