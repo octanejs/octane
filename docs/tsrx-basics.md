@@ -270,6 +270,21 @@ Directive arms keep setup and output separate. A bare expression statement such
 as `console.log(value);` or `value;` is setup and does not render; to render a
 computed value, make the output explicit with a fragment: `<>{value}</>`.
 
+An arm can end early from anywhere in its setup, including inside a nested `if`,
+`switch`, loop, or `try`. `return;` and `return null;` end that arm's output, and
+in an `@for` body so does a `continue;` that no inner loop owns. The rest of the
+arm is skipped and the surrounding template carries on. Because an arm's output
+is its final node, returning a value from an arm, or a `break` that would leave
+the `@for` or `@switch`, is a compile error; render alternatives with
+`@if`/`@else`.
+
+```jsx
+@for (const item of props.items; key item.id) {
+	if (item.hidden) continue;
+	<li>{item.title as string}</li>
+}
+```
+
 ```jsx
 export function Feed(props) @{
 	<ul>

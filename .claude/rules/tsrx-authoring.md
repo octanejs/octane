@@ -83,6 +83,10 @@ setup.
 @try { } @pending { } @catch (e) { }
 ```
 
+An arm ends early with `return;` or `return null;` (or `continue;` in an `@for`
+body) from anywhere in its setup; only that arm's output is skipped. A value
+return or a `break` that targets the directive is a compile error.
+
 A slot-keyed hook inside a plain JS `for`/`while` is a compile error: every
 iteration would share the one call-site slot and its state/memo/effect entries
 would collide. Use the keyed `@for` directive or extract a child component, so
