@@ -10372,6 +10372,8 @@ function compileInternal(
 	// Same contract for React-style conditional JSX returns: branch-selected
 	// output compiles as template control flow instead of de-opt descriptors.
 	ast = lowerJsxReturnBranchComponents(ast);
+	// A nested `@{ … }` function that code calls directly returns JSX instead.
+	ast = lowerDirectlyCalledTemplateFunctions(ast);
 	// Omitted dependency lists are compiler-owned: infer reactive captures
 	// before any component splitting/hoisting so every lexical binding is still
 	// visible to the shared TSRX/TSX analysis. Explicit arrays and `null` pass
@@ -11905,6 +11907,7 @@ function compileServer(
 	// hydration expects in both development and production.
 	ast = lowerNullishComponentExits(ast);
 	ast = lowerJsxReturnBranchComponents(ast);
+	ast = lowerDirectlyCalledTemplateFunctions(ast);
 	// Mirror the client transform exactly. Effects are server no-ops, but
 	// useMemo/useCallback execute during SSR and must receive the same inferred
 	// dependency shape as hydration's client compile.
@@ -34189,6 +34192,123 @@ function lowerJsxReturnBranchComponents(ast) {
 		if (out !== null) out.push(replacement);
 	}
 	return out === null ? ast : { ...ast, body: out };
+}
+
+/**
+ * A `@{ … }` body is shorthand for returning JSX: `(v) => @{ …; <p /> }` means
+ * `(v) => { …; return <p />; }`. A template function declared inside another
+ * function normally compiles as a render body instead, which receives its
+ * Scope as an argument and renders into it. That is sound only while the
+ * runtime is the one calling it: a `{helper}` child, a `<Helper />` tag, or a
+ * portal body. A direct call `helper(v)` passes no Scope, so the body reads
+ * `__s.slots` of undefined.
+ *
+ * When any code that can see the binding calls it directly, or hands it to
+ * `.map`, lower the function to its returned-JSX form, so the call returns a
+ * JSX value exactly as the `=> <jsx>` form does on the client and the server.
+ * The runtime's own calls render that value too. A call through a shadowing
+ * binding of the same name also lowers it, which costs only the template fast
+ * path.
+ *
+ * Module-level template functions are components, which this pass leaves to
+ * the component pipeline. Async and generator ones keep their bodies, because
+ * their returned-JSX forms return a promise or an iterator instead of JSX.
+ */
+function lowerDirectlyCalledTemplateFunctions(ast) {
+	// Template function node → [binding name, the function that declares it].
+	const candidates = new Map();
+	walkWithEnclosingFunctions(ast.body, (node, functions) => {
+		if (functions.length === 0) return;
+		let fn = null;
+		let name;
+		if (node.type === 'FunctionDeclaration') {
+			fn = node;
+			name = node.id?.name;
+		} else if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier') {
+			const init = unwrapTsExpr(node.init);
+			if (init?.type === 'ArrowFunctionExpression' || init?.type === 'FunctionExpression') {
+				fn = init;
+				name = node.id.name;
+			}
+		}
+		if (fn?.body?.type === 'JSXCodeBlock' && !fn.async && !fn.generator && name !== undefined) {
+			candidates.set(fn, [name, functions[functions.length - 1]]);
+		}
+	});
+	if (candidates.size === 0) return ast;
+
+	// Function node → candidate names that code inside it calls directly.
+	const names = new Set([...candidates.values()].map(([name]) => name));
+	const calledIn = new Map();
+	walkWithEnclosingFunctions(ast.body, (node, functions) => {
+		if (node.type !== 'CallExpression') return;
+		let callee = unwrapTsExpr(node.callee);
+		if (callee?.type === 'MemberExpression') {
+			const method = callee.computed ? callee.property?.value : callee.property?.name;
+			// `helper.call(…)` and `helper.apply(…)` call it, and so does
+			// `rows.map(helper)`, with the row index where a Scope would go.
+			callee =
+				method === 'call' || method === 'apply'
+					? unwrapTsExpr(callee.object)
+					: method === 'map'
+						? unwrapTsExpr(node.arguments[0])
+						: null;
+		}
+		if (callee?.type !== 'Identifier' || !names.has(callee.name)) return;
+		for (const fn of functions) {
+			let called = calledIn.get(fn);
+			if (called === undefined) calledIn.set(fn, (called = new Set()));
+			called.add(callee.name);
+		}
+	});
+	const lowered = new Set();
+	for (const [fn, [name, owner]] of candidates) {
+		if (calledIn.get(owner)?.has(name)) lowered.add(fn);
+	}
+	if (lowered.size === 0) return ast;
+	const lower = (node) =>
+		mapAst(node, (n) => {
+			if (!lowered.has(n)) return null;
+			const block = n.body;
+			const render = block.render;
+			const statements = [...lower(block.body)];
+			if (render != null) {
+				// A directive output returns as a value-position directive.
+				const value = lower(render);
+				// `() => @{ <p /> }` is exactly `() => <p />`.
+				if (statements.length === 0 && n.type === 'ArrowFunctionExpression') {
+					return { ...n, body: value, expression: true };
+				}
+				statements.push(inheritOriginLoc(b.return(value), render));
+			}
+			const body = inheritOriginLoc(b.block(statements), block);
+			return n.type === 'ArrowFunctionExpression'
+				? { ...n, body, expression: false }
+				: { ...n, body };
+		});
+	return lower(ast);
+}
+
+/** Visit every node with the functions that enclose it, outermost first. */
+function walkWithEnclosingFunctions(root, visit) {
+	const functions = [];
+	const walk = (node) => {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		visit(node, functions);
+		const isFunction = isFunctionNode(node);
+		if (isFunction) functions.push(node);
+		for (const key in node) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
+			const child = node[key];
+			if (child !== null && typeof child === 'object') walk(child);
+		}
+		if (isFunction) functions.pop();
+	};
+	walk(root);
 }
 
 function isJsxNode(node) {
