@@ -49,8 +49,7 @@ const EXITS = {
 	Switch: `switch (props.hidden.includes($V)) { case true: return; }`,
 } as const;
 
-// `continue;` is an exit only in an `@for` body, and only the DOM compiler
-// lowers it today.
+// `continue;` is an exit only in an `@for` body.
 const FOR_EXITS = {
 	Continue: `if (props.hidden.includes($V)) continue;`,
 	NestedContinue: `if (props.rows.length > 0) { if (props.hidden.includes($V)) continue; }`,
@@ -83,11 +82,11 @@ useEffect(() => {
 }, []);
 <item name={name} mount={new Reader().read()} />`;
 
-type Case = { source: string; multi: boolean; universal: boolean };
+type Case = { source: string; multi: boolean };
 const CASES: Record<string, Case> = {};
 
-function add(name: string, source: string, multi: boolean, universal = true) {
-	CASES[name] = { source, multi, universal };
+function add(name: string, source: string, multi: boolean) {
+	CASES[name] = { source, multi };
 }
 
 const DIRECTIVES = {
@@ -113,12 +112,7 @@ for (const [directive, wrap] of Object.entries(DIRECTIVES)) {
 	);
 }
 for (const [shape, exit] of Object.entries(FOR_EXITS)) {
-	add(
-		`For${shape}`,
-		`export function Case(props) @{\n${DIRECTIVES.For(arm(exit))}\n}`,
-		true,
-		false,
-	);
+	add(`For${shape}`, `export function Case(props) @{\n${DIRECTIVES.For(arm(exit))}\n}`, true);
 }
 
 // Component bodies: the host root lowers its guard to template control flow,
@@ -344,13 +338,11 @@ describe.each([false, true])('hook state after an early exit (dev: %s)', (dev) =
 				expect(result.seen).toEqual([b, [`a:${a}`, ...b], b, [`a:${a}`, ...b]]);
 			});
 
-			if (testCase.universal) {
-				it('keeps its state on the universal renderer', () => {
-					const result = runUniversal(loadUniversal(name, dev).Case);
-					expect(result.seen).toEqual(expected);
-					expect(result.log).toEqual(expectedLog(testCase.multi));
-				});
-			}
+			it('keeps its state on the universal renderer', () => {
+				const result = runUniversal(loadUniversal(name, dev).Case);
+				expect(result.seen).toEqual(expected);
+				expect(result.log).toEqual(expectedLog(testCase.multi));
+			});
 		});
 	}
 });

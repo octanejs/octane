@@ -25,7 +25,7 @@ export function MixedExitRows(props: {
 		}
 		<Canvas root={props.root}>
 			@for (const row of props.rows; key row) {
-				if (props.hidden.includes(row)) return;
+				if (props.hidden.includes(row)) continue;
 				const [mount] = useState(props.allocate);
 				useEffect(() => {
 					props.log.push('object mount ' + row);
