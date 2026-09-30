@@ -77,6 +77,7 @@ import {
 	UNIVERSAL_THREAD_RUNTIME_IMPORTS,
 } from './compile-universal.js';
 import { compileValdi, VALDI_COMPILER_RUNTIME_IMPORTS } from './compile-valdi.js';
+import { ARM_BREAK_MESSAGE, ARM_VALUE_RETURN_MESSAGE, armJump } from './arm-exits.js';
 import { HOOK_NAMES, NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 export { HOOK_NAMES } from './hook-names.js';
 import {
@@ -33899,21 +33900,10 @@ function replaceArmExits(node, loop, breakable, ctx, exit) {
 	const jump = armJump(node, loop, breakable);
 	if (jump === 'exit') return exit(node);
 	if (jump === 'value') {
-		throw armExitError(
-			ctx,
-			node,
-			'A directive arm can only end early with `return;` or `return null;`. Its output is ' +
-				'the node it ends with, so a returned value has nothing to render in its place: ' +
-				'render the alternative from an `@if`/`@else` arm instead.',
-		);
+		throw armExitError(ctx, node, ARM_VALUE_RETURN_MESSAGE);
 	}
 	if (jump === 'break') {
-		throw armExitError(
-			ctx,
-			node,
-			'`break` cannot leave the `@for` or `@switch` around a directive arm. End the arm ' +
-				'early with `return;` instead, or filter the `@for` items to stop the list early.',
-		);
+		throw armExitError(ctx, node, ARM_BREAK_MESSAGE);
 	}
 	const innerLoop = loop || LOOP_TYPES.has(type);
 	const innerBreakable = breakable || innerLoop || type === 'SwitchStatement';
@@ -33970,26 +33960,6 @@ function isArmJumpBoundary(type) {
 		JSX_CHILDREN_BEARING_TYPES.has(type) ||
 		SETUP_VALUE_DIRECTIVE_TYPES.has(type)
 	);
-}
-
-/**
- * How a jump statement relates to the arm whose setup holds it: 'exit' ends
- * the arm, 'value' (a value return) and 'break' (one that targets the
- * directive) have no arm meaning, and null stays JavaScript. `loop` and
- * `breakable` say whether an unlabeled `continue`/`break` here targets a loop
- * or `switch` inside the arm; a labeled jump always targets a label inside it.
- */
-function armJump(node, loop, breakable) {
-	switch (node.type) {
-		case 'ReturnStatement':
-			return isEarlyExitStatement(node, true) ? 'exit' : 'value';
-		case 'ContinueStatement':
-			return node.label == null && !loop ? 'exit' : null;
-		case 'BreakStatement':
-			return node.label == null && !breakable ? 'break' : null;
-		default:
-			return null;
-	}
 }
 
 function armExitError(ctx, node, message) {
