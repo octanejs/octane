@@ -897,6 +897,19 @@ when `multiple` changes. A textarea authored with children instead has a live
 text binding; use `defaultValue` when later renders must preserve user edits.
 Removing a controlled textarea's `value` retains its current content.
 
+A textarea's children are text on the client and the server. React accepts at
+most one child and converts it with `'' + children`, so an element becomes
+`[object Object]` and `false` becomes `"false"`. Octane joins any number of
+children into one text value. Holes follow their usual text rules: `{x}` renders
+strings and numbers, renders `null`, `undefined` and booleans as nothing, and
+joins arrays or iterables of text; `{x as string}` stringifies like any text
+binding. An element, function or other object throws on both sides, and an
+element, component or template directive written inside a `<textarea>` is a
+compile error. The HTML parser keeps textarea content as literal text, so it
+can carry no hydration markers. A compiled textarea's holes may each hold a
+signal handle; a textarea made by `createElement` or stored JSX takes text
+children only.
+
 A function form action has no `action` attribute while intercepted. Octane does
 not serialize React's JavaScript-URL sentinel. `onSubmit` and ancestor handlers
 run before the action and may cancel it with `preventDefault()`.
