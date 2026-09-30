@@ -627,6 +627,12 @@ minimumReleaseAgeExclude:
 # and the parameter-property and bodyless-method mapping fix
 # (https://github.com/tsrx-org/tsrx/pull/143) in @tsrx/core >= 0.3.0.
 patchedDependencies:
+  # Print labeled statements and empty statement bodies instead of deleting
+  # them, and throw on a node type with no printer instead of writing a
+  # placeholder comment. Backports tsrx-org/tsrx#322 and the empty-body part of
+  # tsrx-org/tsrx#283 (both in @tsrx/prettier-plugin >= 0.4.12); guarded by
+  # scripts/tsrx-prettier-plugin.test.mjs. Drop when the plugin is upgraded.
+  '@tsrx/prettier-plugin@0.4.10': patches/@tsrx__prettier-plugin@0.4.10.patch
   # Preserve sibling package URLs when browser mocks share a directory-name prefix.
   # Browser ships its own prebundled copy of the mocker implementation.
   '@vitest/browser@4.1.10': patches/@vitest__browser@4.1.10.patch

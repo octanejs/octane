@@ -18629,12 +18629,13 @@ class HydrationCapability {
 	 * what the range holds. A host descriptor serializes as exactly one element
 	 * of its tag. A list (`list`, from prepareDeoptList) frames or self-delimits
 	 * each of its items, so it neither leaves the range empty nor opens it with
-	 * text, and a portal does not open it with text either. Anything else is
-	 * server content the client cannot adopt: what the server rendered for a
-	 * primitive or empty value, or invalid nesting that the HTML parser repaired
-	 * (`<p><div></div></p>` arrives as `<p></p><div></div><p></p>`, all inside
-	 * the range). Discard it, as renderBranchSlot's rebuild does. Returns whether
-	 * it did, in which case the caller builds the value as a client mount would.
+	 * text, unless it has no items, and then the range is empty. A portal does
+	 * not open it with text either. Anything else is server content the client
+	 * cannot adopt: what the server rendered for another value, or invalid
+	 * nesting that the HTML parser repaired (`<p><div></div></p>` arrives as
+	 * `<p></p><div></div><p></p>`, all inside the range). Discard it, as
+	 * renderBranchSlot's rebuild does. Returns whether it did, in which case the
+	 * caller builds the value as a client mount would.
 	 */
 	claimRange(
 		scope: Scope,
@@ -18662,7 +18663,7 @@ class HydrationCapability {
 				? matches && getNextSibling(first) === end
 				: list !== null && first === end
 					? list.items.length === 0
-					: first.nodeType !== 3)
+					: first.nodeType !== 3 && list?.items.length !== 0)
 		)
 			return false;
 		return this.discard(
@@ -18681,9 +18682,11 @@ class HydrationCapability {
 					? matches
 						? `the end of <${type}>`
 						: `<${type}>`
-					: list !== null
-						? 'a renderable list range'
-						: 'a portal'
+					: list?.items.length === 0
+						? 'nothing'
+						: list !== null
+							? 'a renderable list range'
+							: 'a portal'
 				: '',
 			matches ? getNextSibling(first) : first === end ? null : first,
 		);
@@ -18738,6 +18741,43 @@ class HydrationCapability {
 	}
 
 	/**
+	 * A list item's first hydrating render where the server content at the
+	 * cursor cannot be that item: the server rendered fewer items, a bare item
+	 * where this one needs a range of its own, or an item of another tag.
+	 * Discard the list's server content from the cursor to its `end`, so that
+	 * this item and every later one build as a client mount would. The list
+	 * reports once, and an earlier attempt that rebuilt it left its own content.
+	 */
+	discardItems(end: Node, expected: string): void {
+		const from = this.node;
+		// Clear it only when the cursor precedes `end`.
+		let node = from;
+		while (node !== null && node !== end) node = getNextSibling(node);
+		const stale = node === end && from !== end ? from : null;
+		this.discard(null, 0, stale, end, HYDRATION_REBUILT?.has(end) === true, expected, stale);
+	}
+
+	/**
+	 * STRUCTURAL recovery for a list where the SERVER rendered MORE items than the
+	 * client now renders: after its first fill adopts the client's items, the
+	 * cursor sits on the first unconsumed server item (or at `end`). Discard
+	 * everything between the cursor and `end` so the extra server items don't
+	 * linger. Only when the cursor precedes `end`; stops AT `end`.
+	 */
+	discardLeftoverItems(end: Node): void {
+		const from = this.node;
+		if (from === end) return;
+		let node = from;
+		while (node !== null && node !== end) node = getNextSibling(node);
+		if (node === null) return;
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from the server's; still discard, but there is nothing to report.
+		if (!this.staleServerValues)
+			noteRecoverableHydrationError(() => new Error(formatClientError(56)));
+		removeRange(from, end);
+	}
+
+	/**
 	 * Remove the server content from `from` up to `end` that a child slot's
 	 * value cannot adopt, and point the cursor at `end`. Reports the structural
 	 * mismatch (`expected`, and the `actual` server node, describe it in
@@ -18746,7 +18786,7 @@ class HydrationCapability {
 	 * boundary activated. Remembers `end` for later attempts.
 	 */
 	private discard(
-		scope: Scope,
+		scope: Scope | null,
 		slotKey: number,
 		from: Node | null,
 		end: Node | null,
@@ -18761,8 +18801,7 @@ class HydrationCapability {
 				// A return slot or a list item has no site of its own: name the
 				// returning component, else the list's host.
 				const loc =
-					siteLoc(scope, slotKey) ||
-					componentSourceLoc(scope.block.body) ||
+					(scope !== null && (siteLoc(scope, slotKey) || componentSourceLoc(scope.block.body))) ||
 					(domNode((from ?? end)!).parentNode as any)?.__oct_loc;
 				if (loc) warnHydrationStructuralMismatch(loc, expected, describeHydrationNode(actual));
 			}
@@ -34035,6 +34074,8 @@ function renderPreparedChildList(
 			if (passthroughStart !== null || passthroughEnd !== null) state.forSlot = null;
 			throw error;
 		}
+		// Only first-fill adoption consumes unowned server items, as in forBlock.
+		if (hydration !== null && !passthroughList) hydration.discardLeftoverItems(state.forSlot.end);
 	} else {
 		reconcileKeyed(
 			parentBlock,
@@ -42375,7 +42416,7 @@ export function forBlock<T>(
 		// Only first-fill adoption consumes unowned server items. Survivor
 		// reconciliation can leave the cursor inside an already-owned item and
 		// must not discard that range when a pending child replays hydration.
-		if (hydration !== null) discardLeftoverHydrationItems(state.end, hydration);
+		if (hydration !== null) hydration.discardLeftoverItems(state.end);
 	} else {
 		reconcileKeyed(
 			parentBlock,
@@ -42743,24 +42784,6 @@ export function fastMapSlot(
 		deps,
 		true,
 	);
-}
-
-/**
- * STRUCTURAL recovery for an @for where the SERVER rendered MORE items than the client now
- * renders: after reconcile adopts the client's items, the cursor sits on the first unconsumed
- * server item's marker (or at `end`). Discard everything between the cursor and `end` so the
- * extra server rows don't linger. Same-parent guarded; stops AT `end` (never past it).
- */
-function discardLeftoverHydrationItems(end: Node, hydration: HydrationCapability): void {
-	const n = hydration.node;
-	if (
-		n === null ||
-		n === end ||
-		(STAGED_DOM?.view(n) ?? n).parentNode !== (STAGED_DOM?.view(end) ?? end).parentNode
-	)
-		return;
-	noteRecoverableHydrationError(() => new Error(formatClientError(56)));
-	removeRange(n, end);
 }
 
 /**
@@ -43989,31 +44012,32 @@ function mountItem<T>(
 ): Block {
 	const hydration = activeHydration();
 	if (hydration !== null) {
+		const node = hydration.node;
 		if (
 			ssrMarkerless &&
-			!hydration.isOpen(hydration.node) &&
+			!hydration.isOpen(node) &&
 			(singleRoot !== 2 ||
 				forSlot.plainDeopt !== true ||
 				(isHostDescriptor(item) && !descNeedsBlocks(item)))
 		) {
 			// The outer @for pair is the only list framing on the wire. Each proven
 			// direct-host item self-delimits, exactly like the existing client-mount
-			// singleRoot path. If the client has more items than the server, the
-			// cursor has reached the outer close; fall through to a fresh mount.
+			// singleRoot path. A de-opt item adopts only an element of its own tag.
 			if (
-				hydration.node !== null &&
-				hydration.node !== forSlot.end &&
+				node !== null &&
+				node !== forSlot.end &&
 				(singleRoot !== 2 ||
 					forSlot.plainDeopt !== true ||
-					(hydration.node.nodeType === 1 && domNode(hydration.node).parentNode === parentNode))
+					(node.nodeType === 1 &&
+						domNode(node).parentNode === parentNode &&
+						isHostElementOfType(node as Element, (item as ElementDescriptor).type as string)))
 			) {
-				const root = hydration.node;
 				const block = createBlock(
 					'control-flow',
 					parentBlock,
 					parentNode,
-					root,
-					root,
+					node,
+					node,
 					body as ComponentBody,
 					item,
 					forSlot.env,
@@ -44021,80 +44045,63 @@ function mountItem<T>(
 				block.forSlot = forSlot;
 				block.key = key;
 				block.itemIndex = index;
-				if (singleRoot === 2 && forSlot.plainDeopt === true) block.deoptNode = root;
+				if (singleRoot === 2 && forSlot.plainDeopt === true) block.deoptNode = node;
 				renderBlock(block);
-				hydration.node = domNode(block.endMarker)?.nextSibling ?? getNextSibling(root);
+				hydration.node = domNode(block.endMarker)?.nextSibling ?? getNextSibling(node);
 				return block;
 			}
-			if (process.env.NODE_ENV !== 'production') {
-				const mmLoc = (parentNode as any).__oct_loc;
-				if (mmLoc)
-					hydration.warnStructural(mmLoc, 'another list item', hydration.describe(hydration.node));
-			}
-			return hydration.suspend(() =>
-				mountItem(
-					parentBlock,
-					parentNode,
-					anchor,
-					item,
-					index,
-					key,
-					body,
-					forSlot,
-					singleRoot,
-					ssrMarkerless,
-				),
+		} else if (hydration.isOpen(node)) {
+			// Hydration: the server wraps each GENERAL-SHAPE item in its own
+			// `<!--[-->…<!--]-->` range. Also accept this legacy marked encoding
+			// when a current direct-host client could have adopted markerlessly, which
+			// keeps mixed-version/dev hydration recoverable.
+			const itemEnd = hydration.close(node as Node);
+			hydration.node = getNextSibling(node!);
+			const block = createBlock(
+				'control-flow',
+				parentBlock,
+				parentNode,
+				node,
+				itemEnd,
+				body as ComponentBody,
+				item,
+				forSlot.env,
 			);
+			block.forSlot = forSlot;
+			block.key = key;
+			block.itemIndex = index;
+			renderBlock(block);
+			hydration.node = getNextSibling(itemEnd);
+			return block;
 		}
-		// Hydration: the server wraps each GENERAL-SHAPE item in its own
-		// `<!--[-->…<!--]-->` range. Also accept this legacy marked encoding
-		// when a current direct-host client could have adopted markerlessly, which
-		// keeps mixed-version/dev hydration recoverable.
-		if (!hydration.isOpen(hydration.node)) {
-			// STRUCTURAL list mismatch: the client renders more items than the server did,
-			// so the cursor isn't on an item's open marker (it's at the @for's end marker or
-			// other content). Without this guard `matchingClose` would walk off the end and
-			// crash. Recover by building THIS item fresh — suspend hydration for the item's
-			// whole subtree (via a re-entrant call) so it client-mounts instead of adopting.
-			if (process.env.NODE_ENV !== 'production') {
-				const mmLoc = (parentNode as any).__oct_loc;
-				if (mmLoc)
-					hydration.warnStructural(mmLoc, 'another list item', hydration.describe(hydration.node));
-			}
-			return hydration.suspend(() =>
-				mountItem(
-					parentBlock,
-					parentNode,
-					anchor,
-					item,
-					index,
-					key,
-					body,
-					forSlot,
-					singleRoot,
-					ssrMarkerless,
-				),
-			);
-		}
-		const itemStart = hydration.node as Comment;
-		const itemEnd = hydration.close(itemStart as Node);
-		hydration.node = getNextSibling(itemStart);
-		const block = createBlock(
-			'control-flow',
-			parentBlock,
-			parentNode,
-			itemStart,
-			itemEnd,
-			body as ComponentBody,
-			item,
-			forSlot.env,
+		// STRUCTURAL list mismatch: the server rendered fewer items than the client,
+		// or at the cursor an item that cannot be this one. Discard the rest of the
+		// list's server content and build THIS item fresh: suspend hydration for its
+		// whole subtree (via a re-entrant call) so it client-mounts instead of
+		// adopting. Every later item finds the cursor at the list's end and does
+		// the same.
+		hydration.discardItems(
+			forSlot.end,
+			process.env.NODE_ENV !== 'production'
+				? forSlot.plainDeopt === true && isHostDescriptor(item) && !descNeedsBlocks(item)
+					? `<${item.type as string}>`
+					: 'another list item'
+				: '',
 		);
-		block.forSlot = forSlot;
-		block.key = key;
-		block.itemIndex = index;
-		renderBlock(block);
-		hydration.node = getNextSibling(itemEnd);
-		return block;
+		return hydration.suspend(() =>
+			mountItem(
+				parentBlock,
+				parentNode,
+				anchor,
+				item,
+				index,
+				key,
+				body,
+				forSlot,
+				singleRoot,
+				ssrMarkerless,
+			),
+		);
 	}
 	if (
 		singleRoot === true ||

@@ -77,6 +77,7 @@ import {
 	UNIVERSAL_THREAD_RUNTIME_IMPORTS,
 } from './compile-universal.js';
 import { compileValdi, VALDI_COMPILER_RUNTIME_IMPORTS } from './compile-valdi.js';
+import { ARM_BREAK_MESSAGE, ARM_VALUE_RETURN_MESSAGE, armJump } from './arm-exits.js';
 import { HOOK_NAMES, NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 export { HOOK_NAMES } from './hook-names.js';
 import {
@@ -10474,6 +10475,9 @@ function compileInternal(
 	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
 	ast = errorBoundaryLowering.ast;
 	const consumedRuntimeLocals = errorBoundaryLowering.consumed;
+	// A module-level `@{ … }` function that code calls directly also gets its
+	// returned-JSX form, before the passes below rewrite its authored returns.
+	ast = splitDirectlyCalledComponents(ast);
 	// A null-only shorthand guard is template control flow, not an arbitrary
 	// JavaScript return value. Lower it in every compiler mode so SSR, hydration,
 	// and HMR share one DOM-range shape. HMR still emits the generic component
@@ -10942,7 +10946,9 @@ function compileInternal(
 			(isComponentFunction(node.declaration) || isReturnJsxFunction(node.declaration))
 		)
 			compNode = node.declaration;
-		if (compNode && compNode.id) {
+		// A component's returned-JSX twin runs only for direct calls, never as a
+		// component.
+		if (compNode && compNode.id && compNode._octaneDirectCallTwin !== true) {
 			ctx.componentInfo.set(compNode.id.name, {
 				eligible: false,
 				autoMemoSafe: false,
@@ -12013,6 +12019,7 @@ function compileServer(
 	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
 	ast = errorBoundaryLowering.ast;
 	const consumedRuntimeLocals = errorBoundaryLowering.consumed;
+	ast = splitDirectlyCalledComponents(ast);
 	// Mirror the client transform so SSR emits the same control-flow ranges
 	// hydration expects in both development and production.
 	ast = lowerNullishComponentExits(ast);
@@ -12360,6 +12367,7 @@ function compileServerComponent(node, ctx) {
 			// its body (serverThemeTouchStatements) so their CSS precedes its own.
 			scoping.runtimeApplied,
 		);
+		fn = withDirectCallGuard(fn, node, ctx);
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.knownStringLocals = prevKnownStr;
@@ -12384,8 +12392,11 @@ function compileServerComponent(node, ctx) {
 	// hoisting instead of a TDZ `const` binding. Server and client compiles must
 	// agree, or the same route module renders on one side and crashes on the other.
 	// Writable declarations also keep their module binding inside their own body
-	// and preserve declaration-form live default exports.
+	// and preserve declaration-form live default exports. A component's
+	// returned-JSX twin is hoisted like the client's, because a direct call of
+	// its component can run while the module evaluates.
 	if (
+		node._octaneDirectCallTwin === true ||
 		componentReferencedAboveDeclaration(ctx, node, name) ||
 		isReassignedComponentDeclaration(node, ctx)
 	) {
@@ -15905,11 +15916,15 @@ function compileComponent(node, ctx, options) {
 		// other inner compileFunctionBody calls leave their arrows untouched
 		// (they rarely declare arrow consts; if they do, the stability oracle
 		// would need to be redefined relative to the inner scope).
-		fnNode = compileFunctionBody(node, ctx, name, 'opaque', cssHash, {
-			autoCallback: true,
-			localHookSlots: true,
-			returnedOutput,
-		});
+		fnNode = withDirectCallGuard(
+			compileFunctionBody(node, ctx, name, 'opaque', cssHash, {
+				autoCallback: true,
+				localHookSlots: true,
+				returnedOutput,
+			}),
+			node,
+			ctx,
+		);
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.currentAutoMemoCallsitesSafe = prevAutoMemoCallsitesSafe;
@@ -20514,17 +20529,27 @@ function compileReturnJsxFunction(node, ctx, options) {
 				if (node._octaneBindingView || !directCallNeedsClientBranch(h.argument, node, ctx)) {
 					return { ...h, argument: record };
 				}
-				renderCall ??= renderCallScopeParam(node, ctx);
+				// A component's returned-JSX twin runs only for direct calls, so it
+				// needs no Scope parameter and returns only the deferred value.
+				renderCall ??= node._octaneDirectCallTwin
+					? { params: node.params, scope: null }
+					: renderCallScopeParam(node, ctx);
 				// Built once the function's top-level bindings are all known.
 				const placeholder = inheritOriginLoc(b.id('__octaneReturnedRecord'), h.argument);
 				returnedRecords.push({
 					placeholder,
 					record,
 					origin: h.argument,
-					test: inheritOriginLoc(
-						b.call(requireRuntimeForContext(ctx, 'isRenderCall'), cloneAstNode(renderCall.scope)),
-						h.argument,
-					),
+					test:
+						renderCall.scope === null
+							? null
+							: inheritOriginLoc(
+									b.call(
+										requireRuntimeForContext(ctx, 'isRenderCall'),
+										cloneAstNode(renderCall.scope),
+									),
+									h.argument,
+								),
 				});
 				return { ...h, argument: placeholder };
 			}
@@ -21066,25 +21091,32 @@ function hoistCapturingHelper(ctx, preferred, captures, statements, value, origi
 
 // The client's returned record, split between a body call and a direct call.
 // The record is printed once, in a module function the body call invokes; a
-// direct call defers that same function until the value renders.
+// direct call defers that same function until the value renders. Without a
+// body-call `test`, the function only ever returns the direct call's value.
 function splitReturnedRecord(ctx, fn, name, scopeNames, { record, test, origin }) {
 	const captures = directCallCaptures(fn, scopeNames, [], record);
 	if (captures === null) {
 		ctx.runtimeNeeded.add('createScopedValue');
 		// A direct call's record reads bindings when it renders, as the server's does.
-		const direct = b.call(
-			rtAlias('createScopedValue'),
-			b.arrow([], markDeferredLive(cloneAstNode(record))),
+		const direct = inheritOriginLoc(
+			b.call(
+				rtAlias('createScopedValue'),
+				b.arrow([], markDeferredLive(test === null ? record : cloneAstNode(record))),
+			),
+			origin,
 		);
-		return inheritOriginLoc(b.conditional(test, record, inheritOriginLoc(direct, origin)), origin);
+		return test === null ? direct : inheritOriginLoc(b.conditional(test, record, direct), origin);
 	}
 	const read = hoistCapturingHelper(ctx, `${name}$record`, captures, [], record, origin);
-	const direct = b.call(
-		requireRuntimeForContext(ctx, 'deferRecord'),
-		b.id(read.callee.name),
-		...read.arguments.map((argument) => cloneAstNode(argument)),
+	const direct = inheritOriginLoc(
+		b.call(
+			requireRuntimeForContext(ctx, 'deferRecord'),
+			b.id(read.callee.name),
+			...read.arguments.map((argument) => cloneAstNode(argument)),
+		),
+		origin,
 	);
-	return inheritOriginLoc(b.conditional(test, read, inheritOriginLoc(direct, origin)), origin);
+	return test === null ? direct : inheritOriginLoc(b.conditional(test, read, direct), origin);
 }
 
 // Names an emitted function body binds in its own scope: parameters, top-level
@@ -33982,21 +34014,10 @@ function replaceArmExits(node, loop, breakable, ctx, exit) {
 	const jump = armJump(node, loop, breakable);
 	if (jump === 'exit') return exit(node);
 	if (jump === 'value') {
-		throw armExitError(
-			ctx,
-			node,
-			'A directive arm can only end early with `return;` or `return null;`. Its output is ' +
-				'the node it ends with, so a returned value has nothing to render in its place: ' +
-				'render the alternative from an `@if`/`@else` arm instead.',
-		);
+		throw armExitError(ctx, node, ARM_VALUE_RETURN_MESSAGE);
 	}
 	if (jump === 'break') {
-		throw armExitError(
-			ctx,
-			node,
-			'`break` cannot leave the `@for` or `@switch` around a directive arm. End the arm ' +
-				'early with `return;` instead, or filter the `@for` items to stop the list early.',
-		);
+		throw armExitError(ctx, node, ARM_BREAK_MESSAGE);
 	}
 	const innerLoop = loop || LOOP_TYPES.has(type);
 	const innerBreakable = breakable || innerLoop || type === 'SwitchStatement';
@@ -34053,26 +34074,6 @@ function isArmJumpBoundary(type) {
 		JSX_CHILDREN_BEARING_TYPES.has(type) ||
 		SETUP_VALUE_DIRECTIVE_TYPES.has(type)
 	);
-}
-
-/**
- * How a jump statement relates to the arm whose setup holds it: 'exit' ends
- * the arm, 'value' (a value return) and 'break' (one that targets the
- * directive) have no arm meaning, and null stays JavaScript. `loop` and
- * `breakable` say whether an unlabeled `continue`/`break` here targets a loop
- * or `switch` inside the arm; a labeled jump always targets a label inside it.
- */
-function armJump(node, loop, breakable) {
-	switch (node.type) {
-		case 'ReturnStatement':
-			return isEarlyExitStatement(node, true) ? 'exit' : 'value';
-		case 'ContinueStatement':
-			return node.label == null && !loop ? 'exit' : null;
-		case 'BreakStatement':
-			return node.label == null && !breakable ? 'break' : null;
-		default:
-			return null;
-	}
 }
 
 function armExitError(ctx, node, message) {
@@ -34544,6 +34545,8 @@ function lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis = null) {
 		return null;
 	}
 	if (!/^[A-Z]/.test(node.id.name)) return null;
+	// A component's returned-JSX twin exists only for direct calls.
+	if (node._octaneDirectCallTwin === true) return null;
 	const state = { failed: false, totalReturns: 0, branchReturn: false, jsxReturns: 0, roots: [] };
 	const result = armifyComponentReturnList(node.body.body || [], state, false);
 	if (result === null || state.failed) return null;
@@ -34661,26 +34664,12 @@ function lowerDirectlyCalledTemplateFunctions(ast) {
 	const names = new Set([...candidates.values()].map(([name]) => name));
 	const calledIn = new Map();
 	walkWithEnclosingFunctions(ast.body, (node, functions) => {
-		// Optional calls are an `optional` CallExpression inside a ChainExpression,
-		// or Babel's OptionalCallExpression and OptionalMemberExpression.
-		if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return;
-		let callee = unwrapTsExpr(node.callee);
-		if (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') {
-			const method = callee.computed ? callee.property?.value : callee.property?.name;
-			// `helper.call(…)` and `helper.apply(…)` call it, and so does
-			// `rows.map(helper)`, with the row index where a Scope would go.
-			callee =
-				method === 'call' || method === 'apply'
-					? unwrapTsExpr(callee.object)
-					: method === 'map'
-						? unwrapTsExpr(node.arguments[0])
-						: null;
-		}
-		if (callee?.type !== 'Identifier' || !names.has(callee.name)) return;
+		const name = directlyCalledName(node);
+		if (name === null || !names.has(name)) return;
 		for (const fn of functions) {
 			let called = calledIn.get(fn);
 			if (called === undefined) calledIn.set(fn, (called = new Set()));
-			called.add(callee.name);
+			called.add(name);
 		}
 	});
 	const lowered = new Set();
@@ -34689,26 +34678,147 @@ function lowerDirectlyCalledTemplateFunctions(ast) {
 	}
 	if (lowered.size === 0) return ast;
 	const lower = (node) =>
-		mapAst(node, (n) => {
-			if (!lowered.has(n)) return null;
-			const block = n.body;
-			const render = block.render;
-			const statements = [...lower(block.body)];
-			if (render != null) {
-				// A directive output returns as a value-position directive.
-				const value = lower(render);
-				// `() => @{ <p /> }` is exactly `() => <p />`.
-				if (statements.length === 0 && n.type === 'ArrowFunctionExpression') {
-					return { ...n, body: value, expression: true };
-				}
-				statements.push(inheritOriginLoc(b.return(value), render));
-			}
-			const body = inheritOriginLoc(b.block(statements), block);
-			return n.type === 'ArrowFunctionExpression'
-				? { ...n, body, expression: false }
-				: { ...n, body };
-		});
+		mapAst(node, (n) => (lowered.has(n) ? returnedJsxFunction(n, lower) : null));
 	return lower(ast);
+}
+
+/**
+ * The name a call invokes as a function, or null. `helper(…)` and
+ * `helper?.(…)` call it, and so do `helper.call(…)`, `helper.apply(…)`, and
+ * `rows.map(helper)`, which passes the row index where a render body takes its
+ * Scope. Optional calls are an `optional` CallExpression inside a
+ * ChainExpression, or Babel's OptionalCallExpression and
+ * OptionalMemberExpression.
+ */
+function directlyCalledName(node) {
+	if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return null;
+	let callee = unwrapTsExpr(node.callee);
+	if (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') {
+		const method = callee.computed ? callee.property?.value : callee.property?.name;
+		callee =
+			method === 'call' || method === 'apply'
+				? unwrapTsExpr(callee.object)
+				: method === 'map'
+					? unwrapTsExpr(node.arguments[0])
+					: null;
+	}
+	return callee?.type === 'Identifier' ? callee.name : null;
+}
+
+/**
+ * A `@{ … }` function rewritten to its returned-JSX form `{ setup; return
+ * <jsx>; }`. `lower` maps the setup statements and the output first.
+ */
+function returnedJsxFunction(fn, lower) {
+	const block = fn.body;
+	const render = block.render;
+	const statements = [...lower(block.body)];
+	if (render != null) {
+		// A directive output returns as a value-position directive.
+		const value = lower(render);
+		// `() => @{ <p /> }` is exactly `() => <p />`.
+		if (statements.length === 0 && fn.type === 'ArrowFunctionExpression') {
+			return { ...fn, body: value, expression: true };
+		}
+		statements.push(inheritOriginLoc(b.return(value), render));
+	}
+	const body = inheritOriginLoc(b.block(statements), block);
+	return fn.type === 'ArrowFunctionExpression'
+		? { ...fn, body, expression: false }
+		: { ...fn, body };
+}
+
+/**
+ * A module-level `@{ … }` function is a component: rendering it as `<F />` or
+ * as a `{F}` child calls its compiled body with the Scope it renders into. It is
+ * also shorthand for `function F(v) { …; return <jsx>; }`, whose direct call
+ * `F(v)` returns a JSX value, and a direct call passes no Scope.
+ *
+ * When code in the module calls the function directly, or hands it to `.map`,
+ * declare that returned-JSX form beside it as `F$direct` and mark the
+ * component. Its compiled body then starts with
+ * `if (!isRenderCall(__s)) return F$direct(…)`, so body calls keep the
+ * compiled template while a direct call runs the returned-JSX form: its setup
+ * and hooks run in the caller, and its JSX resolves where the value renders.
+ * The body has already bound the parameters, so the returned-JSX form takes
+ * the names they bind.
+ *
+ * This runs before the passes that rewrite component bodies, because the
+ * returned-JSX form keeps the authored returns: `if (!v) return null;` still
+ * returns null from a direct call. A call through a shadowing binding of the
+ * same name also marks the component, which costs only bytes.
+ */
+function splitDirectlyCalledComponents(ast) {
+	const statements = ast.body || [];
+	let names = null;
+	for (const statement of statements) {
+		const node = moduleStatementDeclaration(statement);
+		if (isSplittableComponent(node)) (names ??= new Set()).add(node.id.name);
+	}
+	if (names === null) return ast;
+	const called = new Set();
+	walkWithEnclosingFunctions(statements, (node) => {
+		const name = directlyCalledName(node);
+		if (name !== null && names.has(name)) called.add(name);
+	});
+	if (called.size === 0) return ast;
+	const used = collectIdentifierNames(statements);
+	const out = [];
+	for (const statement of statements) {
+		const node = moduleStatementDeclaration(statement);
+		if (!isSplittableComponent(node) || !called.has(node.id.name)) {
+			out.push(statement);
+			continue;
+		}
+		let twin = `${node.id.name}$direct`;
+		while (used.has(twin)) twin += '$';
+		used.add(twin);
+		const bound = new Set();
+		for (const param of node.params || []) {
+			// A TypeScript `this` parameter declares a type, not an argument.
+			if (param.type !== 'Identifier' || param.name !== 'this') collectBindings(param, bound);
+		}
+		const args = [...bound];
+		const params = args.map((name) => inheritOriginLoc(b.id(name), node));
+		// The two functions compile differently, so they must not share nodes:
+		// module-wide walks skip a node they have already visited, and later
+		// passes key facts by node identity.
+		const returned = returnedJsxFunction(
+			inheritOriginLoc(b.function_declaration(b.id(twin), params, cloneAstNode(node.body)), node),
+			(value) => value,
+		);
+		out.push({ ...returned, _octaneDirectCallTwin: true });
+		const marked = { ...node, _octaneDirectCall: { name: twin, args } };
+		out.push(statement === node ? marked : { ...statement, declaration: marked });
+	}
+	return { ...ast, body: out };
+}
+
+function moduleStatementDeclaration(statement) {
+	return statement.type === 'ExportNamedDeclaration' ||
+		statement.type === 'ExportDefaultDeclaration'
+		? statement.declaration
+		: statement;
+}
+
+function isSplittableComponent(node) {
+	return (
+		isComponentFunction(node) && node.id != null && node.async !== true && node.generator !== true
+	);
+}
+
+// `if (!isRenderCall(__s)) return F$direct(…);` for a component that
+// splitDirectlyCalledComponents marked.
+function directCallGuard(node, ctx) {
+	const { name, args } = node._octaneDirectCall;
+	const call = b.call(name, ...args.map((arg) => inheritOriginLoc(b.id(arg), node)));
+	const test = b.unary('!', b.call(requireRuntimeForContext(ctx, 'isRenderCall'), b.id('__s')));
+	return inheritOriginLoc(b.if(test, inheritOriginLoc(b.return(call), node), null), node);
+}
+
+function withDirectCallGuard(fn, node, ctx) {
+	if (node._octaneDirectCall === undefined) return fn;
+	return { ...fn, body: { ...fn.body, body: [directCallGuard(node, ctx), ...fn.body.body] } };
 }
 
 /** Visit every node with the functions that enclose it, outermost first. */

@@ -294,7 +294,10 @@ in an `@for` body so does a `continue;` that no inner loop owns. The rest of the
 arm is skipped and the surrounding template carries on. Because an arm's output
 is its final node, returning a value from an arm, or a `break` that would leave
 the `@for` or `@switch`, is a compile error; render alternatives with
-`@if`/`@else`. Hooks that the exit skips keep their state; see
+`@if`/`@else`. These rules hold on DOM and universal renderers alike. A
+universal renderer compiles each arm to a function that could return a value,
+but it rejects one too, so arm exits never decide which renderers a component
+can target. Hooks that the exit skips keep their state; see
 [Conditional hooks](#conditional-hooks).
 
 ```jsx
