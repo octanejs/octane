@@ -124,13 +124,16 @@ async function* produceStreamedSignalResultFrames(
 	let sequence = 0;
 	let resource: 'promise' | 'stream' = 'promise';
 	let iterator: AsyncIterator<unknown> | undefined;
+	let releaseLateResult = false;
 	const run = options.run ?? ((callback) => callback());
 	const signal = options.signal;
 	const abort = (): void => waits.interrupt(signal!.reason);
+	// Reuse one promise so cancellation never re-assimilates a user-provided thenable.
+	const pendingResult = Promise.resolve(result);
 	signal?.addEventListener('abort', abort, { once: true });
 	try {
 		signal?.throwIfAborted();
-		const resolved = await waits.wait(result);
+		const resolved = await waits.wait(pendingResult);
 		signal?.throwIfAborted();
 		if (isAsyncIterable(resolved)) {
 			resource = 'stream';
@@ -168,6 +171,7 @@ async function* produceStreamedSignalResultFrames(
 		}
 		yield { identity, sequence, channel: 'result', kind: 'complete' };
 	} catch (error) {
+		releaseLateResult = iterator === undefined && (error === CANCELLED || signal?.aborted === true);
 		// A departed consumer reads nothing further, so it is owed no terminal frame.
 		if (error === CANCELLED) return;
 		// Rejection or iterator construction can fail before the normal open.
@@ -178,6 +182,22 @@ async function* produceStreamedSignalResultFrames(
 		yield { identity, sequence, channel: 'result', kind: 'error', code: 'SERVER_RESULT_FAILED' };
 	} finally {
 		signal?.removeEventListener('abort', abort);
+		if (releaseLateResult) {
+			// The consumer cannot wait for setup to finish, but it still owns any
+			// iterable that arrives afterward. Dispose it without delaying return().
+			void pendingResult.then(
+				async (resolved) => {
+					try {
+						if (!isAsyncIterable(resolved)) return;
+						const lateIterator = run(() => resolved[Symbol.asyncIterator]());
+						await run(() => lateIterator.return?.());
+					} catch {
+						// Late iterator cleanup is best effort after cancellation.
+					}
+				},
+				() => {},
+			);
+		}
 		if (iterator !== undefined) {
 			try {
 				await run(() => iterator!.return?.());
