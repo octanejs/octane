@@ -34241,9 +34241,11 @@ function lowerDirectlyCalledTemplateFunctions(ast) {
 	const names = new Set([...candidates.values()].map(([name]) => name));
 	const calledIn = new Map();
 	walkWithEnclosingFunctions(ast.body, (node, functions) => {
-		if (node.type !== 'CallExpression') return;
+		// Optional calls are an `optional` CallExpression inside a ChainExpression,
+		// or Babel's OptionalCallExpression and OptionalMemberExpression.
+		if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return;
 		let callee = unwrapTsExpr(node.callee);
-		if (callee?.type === 'MemberExpression') {
+		if (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') {
 			const method = callee.computed ? callee.property?.value : callee.property?.name;
 			// `helper.call(…)` and `helper.apply(…)` call it, and so does
 			// `rows.map(helper)`, with the row index where a Scope would go.

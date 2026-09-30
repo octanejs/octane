@@ -216,6 +216,17 @@ export function H(props: { v: string }) @{
 }`,
 		html: (v) => section(`<p>${v}</p><p>${v}2</p>`),
 	},
+	'optional calls': {
+		block: `export function H(props: { v: string }) @{
+	const helper = (v: string) => @{ <p key={v}>{v}</p> };
+	<section>{helper?.(props.v)}{helper?.call(null, props.v + '1')}{[props.v + '2']?.map(helper)}<b>x</b></section>
+}`,
+		returned: `export function H(props: { v: string }) @{
+	const helper = (v: string) => <p key={v}>{v}</p>;
+	<section>{helper?.(props.v)}{helper?.call(null, props.v + '1')}{[props.v + '2']?.map(helper)}<b>x</b></section>
+}`,
+		html: (v) => section(`<p>${v}</p><p>${v}1</p><p>${v}2</p>`),
+	},
 	// The runtime still renders the helper as a render-function child and as a
 	// component, beside the direct call.
 	'a helper also rendered as a child': {
