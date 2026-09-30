@@ -711,7 +711,8 @@ describe('manifest-declared manual hook slots', () => {
 		// moment ANOTHER project imports them — the exact drift the declaration
 		// exists to prevent. Redux, Recharts, and Hook Form are auto-slotted by
 		// design and therefore carry no flag. Base UI is also auto-slotted after its
-		// authored source migration. Bindings whose hooks all live in
+		// authored source migration, and Puck's plain .ts hooks are auto-slotted
+		// through their @jsxImportSource pragma. Bindings whose hooks all live in
 		// .tsrx (tanstack-form, tanstack-hotkeys, tanstack-ai, tanstack-table) are
 		// fully compiled, so they hand-forward nothing and carry no flag either.
 		const packagesDir = join(process.cwd(), 'packages');
@@ -752,7 +753,6 @@ describe('manifest-declared manual hook slots', () => {
 			'motion',
 			'opentui',
 			'phosphor-icons',
-			'puck',
 			'radix',
 			'rainbowkit',
 			'react-error-boundary',
