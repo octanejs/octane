@@ -18580,7 +18580,8 @@ class HydrationCapability {
 	 */
 	claimHostRange(scope: Scope, slotKey: number, start: Node, end: Node, type: string): boolean {
 		const first = getNextSibling(start)!;
-		const matches = first !== end && first.nodeType === 1 && (first as Element).localName === type;
+		const matches =
+			first !== end && first.nodeType === 1 && isHostElementOfType(first as Element, type);
 		if (matches && getNextSibling(first) === end) return true;
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 		// Captures that changed before a dormant boundary activated legitimately
@@ -22932,6 +22933,17 @@ const HTML_NS = 'http://www.w3.org/1999/xhtml';
 // ordinary native alias/value tables instead of custom-element raw semantics.
 function isHtmlCustomElement(el: Element): boolean {
 	return el.namespaceURI === HTML_NS && el.localName.indexOf('-') !== -1;
+}
+
+// Whether `el` is the element a host descriptor of `type` builds. HTML tag names
+// are ASCII case-insensitive: createElement('DIV') builds a `div`, and the parser
+// lowercases the server's `<DIV>`, so an HTML element matches any casing of its
+// name. SVG and MathML names are case-sensitive (`foreignObject`), so a foreign
+// element matches only its exact spelling. Canonical spellings match on the
+// first comparison; the lowercase copy and namespace read run only on a miss.
+function isHostElementOfType(el: Element, type: string): boolean {
+	const name = el.localName;
+	return name === type || (name === type.toLowerCase() && el.namespaceURI === HTML_NS);
 }
 
 // Namespace for a de-opt host tag: `<svg>` always opens SVG; an SVG-ONLY tag
@@ -32249,7 +32261,7 @@ function reconcileDeoptNode(
 		if (
 			prev !== null &&
 			prev.nodeType === 1 &&
-			(prev as Element).localName === value.type &&
+			isHostElementOfType(prev as Element, value.type) &&
 			(prev as Element).namespaceURI === (elNs ?? HTML_NS)
 		) {
 			// REUSE the existing element — patch props in place instead of rebuilding.
@@ -32551,7 +32563,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 				scope.slots[0] === undefined &&
 				stale.nodeType === 1 /* Element */ &&
 				isHostDescriptor(item) &&
-				(stale as Element).localName === item.type &&
+				isHostElementOfType(stale as Element, item.type) &&
 				(STAGED_DOM?.view(stale) ?? stale).parentNode === block.parentNode
 			) {
 				transfer = stale;
@@ -32903,7 +32915,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		hydration !== null &&
 		hydration.node !== null &&
 		hydration.node.nodeType === 1 &&
-		(hydration.node as Element).localName === d.type &&
+		isHostElementOfType(hydration.node as Element, d.type as string) &&
 		(elNs === undefined || (hydration.node as Element).namespaceURI === elNs)
 	) {
 		el = hydration.node as Element;
@@ -32953,7 +32965,11 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		}
 		return;
 	}
-	if (el === null || el.localName !== d.type || (elNs !== undefined && el.namespaceURI !== elNs)) {
+	if (
+		el === null ||
+		!isHostElementOfType(el, d.type as string) ||
+		(elNs !== undefined && el.namespaceURI !== elNs)
+	) {
 		// First render, or the host tag changed at this slot — (re)create the element.
 		if (el !== null) {
 			const retired = el;
@@ -33034,7 +33050,7 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 			hydration !== null &&
 			hydration.node !== null &&
 			hydration.node.nodeType === 1 &&
-			(hydration.node as Element).localName === tag &&
+			isHostElementOfType(hydration.node as Element, tag) &&
 			(elNs === undefined || (hydration.node as Element).namespaceURI === elNs)
 		) {
 			// Hydration first render: ADOPT the server-rendered element at the cursor,
@@ -33223,7 +33239,7 @@ function buildDeoptAdoptQueue(
 		const compatible = isText
 			? cursor.nodeType === 3
 			: isHostDescriptor(v)
-				? cursor.nodeType === 1 && (cursor as Element).localName === v.type
+				? cursor.nodeType === 1 && isHostElementOfType(cursor as Element, v.type)
 				: false;
 		if (!compatible) break;
 		queue.push({ key: keys[i], node: cursor });
@@ -34277,7 +34293,7 @@ export function childSlot(
 			state.hostNode !== null &&
 			state.block === null &&
 			state.hostNode.nodeType === 1 &&
-			(state.hostNode as Element).localName === (value as ElementDescriptor).type;
+			isHostElementOfType(state.hostNode as Element, (value as ElementDescriptor).type as string);
 		const primitive = value == null || (typeof value !== 'object' && typeof value !== 'function');
 		const text = primitive ? coerceChildText(value) : null;
 		const unchangedText =
@@ -34941,7 +34957,7 @@ export function childSlot(
 			state.block === null &&
 			state.hostNode !== null &&
 			state.hostNode.nodeType === 1 /* Element */ &&
-			(state.hostNode as Element).localName === (props as ElementDescriptor).type &&
+			isHostElementOfType(state.hostNode as Element, (props as ElementDescriptor).type as string) &&
 			(state.hostNode as Element).namespaceURI ===
 				(inferTagNs((props as ElementDescriptor).type as string, deoptChildNamespace(domParent)) ??
 					HTML_NS) &&
