@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { act, hydrateRoot, flushSync } from '../../src/index.js';
+import { act, createElement, createRoot, hydrateRoot, flushSync } from '../../src/index.js';
 import { condition, load } from 'octane/hydration';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
@@ -663,6 +663,391 @@ describe.each([
 		}
 	});
 });
+
+// A renderable `{expr}` hole that is its host's only child renders markerless:
+// the server serializes a primitive as the host's bare text, and frames an
+// element, a component, or a list in a range the client's child slot adopts.
+// When the server rendered text but the client value is one of those, the host
+// holds nothing the value can adopt. The text must be discarded and reported
+// where the hole is, without giving up on the rest of the root.
+describe.each([
+	{ name: 'development compile', dev: true },
+	{ name: 'production compile', dev: false },
+])(
+	'hydrateRoot — only-child renderable hole whose client value is an element, component, or list ($name)',
+	({ dev }) => {
+		const OBJECT = join(
+			process.cwd(),
+			'packages/octane/tests/hydration/_fixtures/renderable-text-object.tsrx',
+		);
+		const server = serverModule(OBJECT, 'renderable-text-object.tsrx');
+		const client = dev
+			? devClientModule(OBJECT, 'renderable-text-object.tsrx')
+			: prodClientModule(OBJECT, 'renderable-text-object.tsrx');
+		// The hole's own line, so the warning cannot name a template inside its value.
+		const holeLine =
+			readFileSync(OBJECT, 'utf8')
+				.split('\n')
+				.findIndex((line) => line.includes('<div>{pick(props.kind, props.v)}</div>')) + 1;
+		let container: HTMLElement;
+		let errSpy: ReturnType<typeof vi.spyOn>;
+
+		beforeEach(() => {
+			container = document.createElement('div');
+			document.body.appendChild(container);
+			errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		});
+
+		afterEach(() => {
+			container.remove();
+			errSpy.mockRestore();
+		});
+
+		const warns = () =>
+			errSpy.mock.calls
+				.map((call: unknown[]) => String(call[0]))
+				.filter((message: string) => message.includes('hydration mismatch'));
+
+		/** Element and text markup, ignoring hydration comments. */
+		function markup(node: Element): string {
+			const copy = node.cloneNode(true) as Element;
+			const walker = document.createTreeWalker(copy, NodeFilter.SHOW_COMMENT);
+			const comments: Node[] = [];
+			while (walker.nextNode()) comments.push(walker.currentNode);
+			for (const comment of comments) comment.parentNode!.removeChild(comment);
+			return copy.innerHTML;
+		}
+
+		/** The same node objects, not merely equal ones. */
+		function expectSameNodes(actual: ArrayLike<Node>, expected: readonly (Node | null)[]) {
+			expect(actual).toHaveLength(expected.length);
+			for (let i = 0; i < expected.length; i++) expect(actual[i]).toBe(expected[i]);
+		}
+
+		/** The markup a client render of the same props puts in `selector`. */
+		function clientMarkup(
+			component: unknown,
+			props: Record<string, unknown>,
+			selector: string,
+		): string {
+			const host = document.createElement('div');
+			const root = createRoot(host);
+			flushSync(() => root.render(component as never, props));
+			try {
+				return markup(host.querySelector(selector)!);
+			} finally {
+				root.unmount();
+			}
+		}
+
+		/** Exactly one report: the recoverable error always, the warning in DEV only. */
+		async function expectReported(recovered: unknown[], file: string, line: number | null) {
+			await Promise.resolve();
+			expect(recovered).toHaveLength(1);
+			expect(String((recovered[0] as Error).message)).toMatch(/hydration mismatch/i);
+			if (!dev) {
+				expect(warns()).toEqual([]);
+				return;
+			}
+			expect(warns()).toEqual([
+				expect.stringMatching(
+					new RegExp(
+						`^Octane hydration mismatch at [^ ]*${file.replace(/\./g, '\\.')}:` +
+							`${line ?? '\\d+'}:\\d+: the client expected a renderable range but the ` +
+							`server rendered text "A"\\.`,
+					),
+				),
+			]);
+		}
+
+		const OBJECT_KINDS = ['p', 'inner', 'list'] as const;
+
+		describe.each([
+			{ where: 'in the root component', name: 'Hole' },
+			{ where: 'in a nested component', name: 'NestedHole' },
+		])('$where', ({ name }) => {
+			function hydrate(serverKind: string, kind: string) {
+				container.innerHTML = ServerRT.renderToString(server[name], {
+					kind: serverKind,
+					v: 'A',
+					tail: 't',
+				}).html;
+				const div = container.querySelector('section > div')!;
+				const serverElements = [...div.querySelectorAll('*')];
+				const serverMarkup = markup(div);
+				const tail = container.querySelector('b')!;
+				const tailText = tail.firstChild;
+				const recovered: unknown[] = [];
+				const root = hydrateRoot(
+					container,
+					client[name],
+					{ kind, v: 'A', tail: 't' },
+					{ onRecoverableError: (error) => recovered.push(error) },
+				);
+				flushSync(() => {});
+				return {
+					div,
+					serverElements,
+					serverMarkup,
+					tail,
+					tailText,
+					recovered,
+					root,
+					render: (props: Record<string, unknown>) =>
+						flushSync(() => root.render(client[name], props)),
+					expected: (props: Record<string, unknown>) =>
+						clientMarkup(client[name], props, 'section > div'),
+				};
+			}
+
+			it.each(OBJECT_KINDS)(
+				'discards server text for a client %s value, reports it once, and keeps hydrating',
+				async (kind) => {
+					const { div, tail, tailText, recovered, root, render, expected } = hydrate('text', kind);
+					try {
+						expect(container.querySelector('section > div')).toBe(div);
+						expect(markup(div)).toBe(expected({ kind, v: 'A', tail: 't' }));
+						// The recovery stays local: the next hole still adopts its server text.
+						expect(container.querySelector('b')).toBe(tail);
+						expectSameNodes(tail.childNodes, [tailText]);
+						expect(tail.textContent).toBe('t');
+						await expectReported(recovered, 'renderable-text-object.tsrx', holeLine);
+
+						render({ kind: 'text', v: 'B', tail: 'u' });
+						expect(markup(div)).toBe('B');
+						expect(tail.innerHTML).toBe('u');
+						render({ kind, v: 'C', tail: 'u' });
+						expect(markup(div)).toBe(expected({ kind, v: 'C', tail: 'u' }));
+						render({ kind: 'text', v: 'D', tail: 'u' });
+						expect(markup(div)).toBe('D');
+						await Promise.resolve();
+						expect(recovered).toHaveLength(1);
+					} finally {
+						root.unmount();
+					}
+				},
+			);
+
+			it.each(OBJECT_KINDS)('adopts a matching server %s value silently', async (kind) => {
+				const { div, serverElements, serverMarkup, recovered, root, render } = hydrate(kind, kind);
+				try {
+					expect(serverElements.length).toBeGreaterThan(0);
+					expectSameNodes(div.querySelectorAll('*'), serverElements);
+					expect(markup(div)).toBe(serverMarkup);
+					await Promise.resolve();
+					expect(recovered).toEqual([]);
+					expect(warns()).toEqual([]);
+					render({ kind: 'text', v: 'B', tail: 't' });
+					expect(markup(div)).toBe('B');
+				} finally {
+					root.unmount();
+				}
+			});
+
+			// A server that rendered nothing leaves nothing to discard, like a text
+			// hole whose server text is missing.
+			it.each(OBJECT_KINDS)(
+				'builds a client %s value into a host the server left empty',
+				async (kind) => {
+					const { div, tail, tailText, recovered, root, expected } = hydrate('empty', kind);
+					try {
+						expect(container.querySelector('section > div')).toBe(div);
+						expect(markup(div)).toBe(expected({ kind, v: 'A', tail: 't' }));
+						expect(container.querySelector('b')).toBe(tail);
+						expectSameNodes(tail.childNodes, [tailText]);
+						await Promise.resolve();
+						expect(recovered).toEqual([]);
+						expect(warns()).toEqual([]);
+					} finally {
+						root.unmount();
+					}
+				},
+			);
+		});
+
+		// A textarea's children are its default value, so they must be text on
+		// both sides (textarea-children-hydrate.test.ts). An element value is an
+		// authoring error, not markup to render beside the server text.
+		it('rejects an element value inside a textarea on both sides', async () => {
+			container.innerHTML = ServerRT.renderToString(server.AreaHole, {
+				kind: 'text',
+				v: 'A',
+				tail: 't',
+			}).html;
+			expect(() =>
+				ServerRT.renderToString(server.AreaHole, { kind: 'p', v: 'A', tail: 't' }),
+			).toThrow(/`<textarea>` children must be text/);
+			const recovered: unknown[] = [];
+			const uncaught: unknown[] = [];
+			const root = hydrateRoot(
+				container,
+				client.AreaHole,
+				{ kind: 'p', v: 'A', tail: 't' },
+				{
+					onRecoverableError: (error) => recovered.push(error),
+					onUncaughtError: (error) => uncaught.push(error),
+				},
+			);
+			flushSync(() => {});
+			try {
+				expect(uncaught).toHaveLength(1);
+				expect(String((uncaught[0] as Error).message)).toMatch(
+					/children must be text.*One child was an element\./,
+				);
+				await Promise.resolve();
+				expect(recovered).toEqual([]);
+				expect(warns()).toEqual([]);
+			} finally {
+				root.unmount();
+			}
+		});
+
+		// The boundary's next attempt finds the value's own client DOM where the
+		// server text was. Rebuilding it must neither report it nor duplicate it.
+		it('reports once and builds once when the client value suspends', async () => {
+			container.innerHTML = ServerRT.renderToString(server.SuspendingHole, {
+				text: null,
+				v: 'A',
+			}).html;
+			const div = container.querySelector('section > div')!;
+			const tail = container.querySelector('b')!;
+			expect(div.textContent).toBe('A');
+			let resolve!: (text: string) => void;
+			const text = new Promise<string>((r) => (resolve = r));
+			const recovered: unknown[] = [];
+			const root = hydrateRoot(
+				container,
+				client.SuspendingHole,
+				{ text, v: 'A' },
+				{ onRecoverableError: (error) => recovered.push(error) },
+			);
+			flushSync(() => {});
+			try {
+				await act(async () => {
+					resolve('R');
+					await text;
+				});
+				expect(container.querySelector('section > div')).toBe(div);
+				expect(markup(div)).toBe('<em class="waits">R</em>');
+				expect(container.querySelector('b')).toBe(tail);
+				expect(tail.textContent).toBe('A');
+				await expectReported(recovered, 'renderable-text-object.tsrx', null);
+			} finally {
+				root.unmount();
+			}
+		});
+
+		describe('in .tsx', () => {
+			const TSX = join(
+				process.cwd(),
+				'packages/octane/tests/hydration/_fixtures/renderable-text-object-tsx.tsx',
+			);
+			const tsxServer = loadServerFixture(TSX, { id: 'renderable-text-object-tsx.tsx' });
+			const tsxClient = loadCompiledFixtureSource(readFileSync(TSX, 'utf8'), {
+				id: 'renderable-text-object-tsx.tsx',
+				mode: 'client',
+				compileOptions: { dev },
+			});
+
+			it('discards server text for a client element value', async () => {
+				container.innerHTML = ServerRT.renderToString(tsxServer.Hole, {
+					kind: 'text',
+					v: 'A',
+					tail: 't',
+				}).html;
+				const div = container.querySelector('section > div')!;
+				const tail = container.querySelector('b')!;
+				const recovered: unknown[] = [];
+				const root = hydrateRoot(
+					container,
+					tsxClient.Hole,
+					{ kind: 'p', v: 'A', tail: 't' },
+					{ onRecoverableError: (error) => recovered.push(error) },
+				);
+				flushSync(() => {});
+				try {
+					expect(container.querySelector('section > div')).toBe(div);
+					expect(markup(div)).toBe('<p class="x">A</p>');
+					expect(container.querySelector('b')).toBe(tail);
+					expect(tail.textContent).toBe('t');
+					await expectReported(recovered, 'renderable-text-object-tsx.tsx', null);
+					flushSync(() => root.render(tsxClient.Hole, { kind: 'text', v: 'B', tail: 't' }));
+					expect(markup(div)).toBe('B');
+				} finally {
+					root.unmount();
+				}
+			});
+		});
+
+		// bindSignalChild has no cached-value helper in front of childTextHole, so
+		// its first render reaches the same hole by another route.
+		describe('through signal bindings', () => {
+			const SIGNAL = join(
+				process.cwd(),
+				'packages/octane/tests/hydration/_fixtures/renderable-text-object-signal.tsrx',
+			);
+			const signalServer = serverModule(SIGNAL, 'renderable-text-object-signal.tsrx');
+			const signalClient = dev
+				? devClientModule(SIGNAL, 'renderable-text-object-signal.tsrx')
+				: prodClientModule(SIGNAL, 'renderable-text-object-signal.tsrx');
+
+			it.each([
+				{ kind: 'element', value: () => createElement('p', { class: 'x' }, 'A') },
+				{ kind: 'list', value: () => [createElement('p', { key: 'a', class: 'x' }, 'A'), 'A'] },
+			])('discards server text for a client $kind value', async ({ value }) => {
+				container.innerHTML = ServerRT.renderToString(signalServer.Hole, {
+					value: 'A',
+					label: 't',
+				}).html;
+				const div = container.querySelector('section > div')!;
+				const tail = container.querySelector('i')!;
+				const recovered: unknown[] = [];
+				const props = { value: value(), label: 't' };
+				const root = hydrateRoot(container, signalClient.Hole, props, {
+					onRecoverableError: (error) => recovered.push(error),
+				});
+				flushSync(() => {});
+				try {
+					expect(container.querySelector('section > div')).toBe(div);
+					expect(markup(div)).toBe(clientMarkup(signalClient.Hole, props, 'section > div'));
+					expect(container.querySelector('i')).toBe(tail);
+					expect(tail.textContent).toBe('t');
+					await expectReported(recovered, 'renderable-text-object-signal.tsrx', null);
+					flushSync(() => root.render(signalClient.Hole, { value: 'B', label: 't' }));
+					expect(markup(div)).toBe('B');
+				} finally {
+					root.unmount();
+				}
+			});
+		});
+
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from the server's: repair the hole, but report nothing.
+		it('repairs a dormant boundary whose value became an element before activation without reporting', async () => {
+			const serverProps = { when: condition(false), kind: 'text', v: 'A' };
+			container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
+			const recovered: unknown[] = [];
+			const root = hydrateRoot(container, client.DormantHole, serverProps, {
+				onRecoverableError: (error) => recovered.push(error),
+			});
+			flushSync(() => {});
+			try {
+				const div = container.querySelector('section > div')!;
+				expect(div.textContent).toBe('A');
+				await act(() => root.render(client.DormantHole, { when: load(), kind: 'p', v: 'A' }));
+				expect(container.querySelector('section > div')).toBe(div);
+				expect(markup(div)).toBe('<p class="x">A</p>');
+				await Promise.resolve();
+				expect(recovered).toEqual([]);
+				expect(warns()).toEqual([]);
+				flushSync(() => root.render(client.DormantHole, { when: load(), kind: 'text', v: 'B' }));
+				expect(markup(div)).toBe('B');
+			} finally {
+				root.unmount();
+			}
+		});
+	},
+);
 
 // The server HTML below is a LEGACY shape for a sole-child mixed-arm-ternary hole:
 // an outer value pair wrapping one pair per keyed item. Today's client claims that
