@@ -1,4 +1,4 @@
-import { PrivateAppState } from '../types/Internal';
+import { PrivateAppState } from '../types/Internal.tsrx';
 
 export const getSelectorForId = (state: PrivateAppState, id: string) => {
 	const node = state.indexes.nodes[id];

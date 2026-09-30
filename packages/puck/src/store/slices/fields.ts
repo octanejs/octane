@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { ComponentData } from '../../types';
 import type { Fields } from '../../types';
 import { AppStore, useAppStoreApi } from '../';

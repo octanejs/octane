@@ -1,3 +1,5 @@
+import type { ForwardedRef, RefObject } from '../react-shim.js';
+
 export type Ref<ElementType = HTMLElement> =
 	| RefObject<ElementType | null>
 	| ForwardedRef<ElementType | null>

@@ -1,7 +1,7 @@
 import { Dispatch, ReactElement, SetStateAction } from '../../react-shim.js';
 import { Undo2Icon, Redo2Icon } from '@octanejs/lucide';
 
-import { IconButton } from '../IconButton/IconButton';
+import { IconButton } from '../IconButton/IconButton.tsrx';
 import getClassNameFactory from '../../lib/get-class-name-factory';
 import { PuckAction } from '../../reducer';
 import type { Data } from '../../types';

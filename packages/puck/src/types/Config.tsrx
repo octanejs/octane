@@ -1,20 +1,25 @@
 import type { JSX, OctaneNode } from '../react-shim.js';
 import { BaseField, Field, Fields } from './Fields';
-import { ComponentData, Metadata, RootData } from './Data';
+import { ComponentData, Metadata, RootData } from './Data.tsrx';
 
-import { AsFieldProps, WithChildren, WithId, WithPuckProps } from './Utils';
-import { AppState } from './AppState';
-import { DefaultComponentProps, DefaultRootFieldProps } from './Props';
+import { AsFieldProps, WithChildren, WithId, WithPuckProps } from './Utils.tsrx';
+import { AppState } from './AppState.tsrx';
+import { DefaultComponentProps, DefaultRootFieldProps } from './Props.tsrx';
 import { Permissions } from './API';
 import { DropZoneProps } from '../components/DropZone/types';
-import { ComponentConfigParams, ConfigParams, LeftOrExactRight, WithDeepSlots } from './Internal';
+import {
+	ComponentConfigParams,
+	ConfigParams,
+	LeftOrExactRight,
+	WithDeepSlots,
+} from './Internal.tsrx';
 
 export type SlotComponent = (props?: Omit<DropZoneProps, 'zone'>) => OctaneNode;
 
 export type PuckComponent<Props> =
 	(props: WithId<
 		WithPuckProps<{ [K in keyof Props]: WithDeepSlots<Props[K], SlotComponent> }>
-	>) => Octane.JSX.Element;
+	>) => JSX.Element;
 
 export type ResolveDataTrigger = 'insert' | 'replace' | 'load' | 'force';
 

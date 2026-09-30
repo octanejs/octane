@@ -1,5 +1,5 @@
 import { ComponentData, Config, UserGenerics } from '../../types';
-import { PrivateAppState } from '../../types/Internal';
+import { PrivateAppState } from '../../types/Internal.tsrx';
 import { walkAppState } from './walk-app-state';
 
 export const flattenData = <

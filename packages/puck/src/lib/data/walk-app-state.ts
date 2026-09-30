@@ -1,7 +1,7 @@
 import { forRelatedZones } from './for-related-zones';
 import { rootDroppableId } from '../root-droppable-id';
 import { ComponentData, Config, Content, Data, RootDataWithProps } from '../../types';
-import { NodeIndex, PrivateAppState, ZoneIndex, ZoneType } from '../../types/Internal';
+import { NodeIndex, PrivateAppState, ZoneIndex, ZoneType } from '../../types/Internal.tsrx';
 import { mapFields } from './map-fields';
 import { flattenNode } from './flatten-node';
 

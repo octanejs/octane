@@ -1,11 +1,11 @@
 import { useEffect } from '../../../../react-shim.js';
-import { FieldPropsInternal } from '../..';
+import { FieldPropsInternal } from '../../index.tsrx';
 import type {
 	ExternalField as ExternalFieldType,
 	ExternalFieldWithAdaptor,
 } from '../../../../types';
 
-import { ExternalInput } from '../../../ExternalInput';
+import { ExternalInput } from '../../../ExternalInput/index.tsrx';
 import { Link } from '@octanejs/lucide';
 
 export const ExternalField = ({

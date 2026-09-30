@@ -1,6 +1,14 @@
 'use client';
 
-import React, { createContext, useContext, useRef, RefObject, useMemo } from '../react-shim.js';
+import {
+	type FC,
+	type OctaneNode,
+	createContext,
+	useContext,
+	useRef,
+	RefObject,
+	useMemo,
+} from '../react-shim.js';
 
 interface FrameContextType {
 	frameRef: RefObject<HTMLDivElement | null>;
@@ -9,8 +17,8 @@ interface FrameContextType {
 const FrameContext = createContext<FrameContextType | null>(null);
 
 // Provider component
-export const FrameProvider: FC<{ children: React.OctaneNode }> = ({ children }) => {
-	const frameRef = useRef<HTMLDivElement>(null);
+export const FrameProvider: FC<{ children: OctaneNode }> = ({ children }) => {
+	const frameRef = useRef<HTMLDivElement | null>(null);
 
 	const value = useMemo(
 		() => ({

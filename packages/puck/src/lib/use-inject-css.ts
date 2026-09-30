@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { useEffect, useState } from '../react-shim.js';
 import { getFrame } from './get-frame';
 

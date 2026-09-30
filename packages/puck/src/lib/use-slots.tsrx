@@ -1,8 +1,8 @@
 import { OctaneNode } from '../react-shim.js';
 import { ComponentData, Config, Content, RootData } from '../types';
 import { DropZoneProps } from '../components/DropZone/types';
-import { useFieldTransforms } from './field-transforms/use-field-transforms';
-import { getSlotTransform } from './field-transforms/default-transforms/slot-transform';
+import { useFieldTransforms } from './field-transforms/use-field-transforms.tsrx';
+import { getSlotTransform } from './field-transforms/default-transforms/slot-transform.tsrx';
 
 export function useSlots<T extends ComponentData | RootData, UserConfig extends Config>(
 	config: UserConfig,

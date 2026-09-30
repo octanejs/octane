@@ -1,5 +1,6 @@
 import { getBox } from 'css-box-model';
 import {
+	type FC,
 	OctaneNode,
 	useCallback,
 	useEffect,
@@ -8,14 +9,14 @@ import {
 	useState,
 } from '../../../../react-shim.js';
 import { useAppStore } from '../../../../store';
-import { ViewportControls } from '../../../ViewportControls';
+import { ViewportControls } from '../../../ViewportControls/index.tsrx';
 import styles from './styles.module.css';
 import { getClassNameFactory, useResetAutoZoom } from '../../../../lib';
-import { Preview } from '../Preview';
+import { Preview } from '../Preview/index.tsrx';
 import { UiState } from '../../../../types';
-import { Loader } from '../../../Loader';
+import { Loader } from '../../../Loader/index.tsrx';
 import { useShallow } from '@octanejs/zustand/shallow';
-import { useCanvasFrame } from '../../../../lib/frame-context';
+import { useCanvasFrame } from '../../../../lib/frame-context.tsrx';
 
 const getClassName = getClassNameFactory('PuckCanvas', styles);
 

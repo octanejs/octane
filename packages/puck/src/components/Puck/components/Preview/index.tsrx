@@ -1,14 +1,23 @@
-import { DropZoneEditPure, DropZonePure } from '../../../DropZone';
+import { DropZoneEditPure, DropZonePure } from '../../../DropZone/index.tsrx';
 import { rootDroppableId } from '../../../../lib/root-droppable-id';
-import { RefObject, useCallback, useEffect, useRef, useMemo } from '../../../../react-shim.js';
+import {
+	type FC,
+	type OctaneNode,
+	RefObject,
+	useCallback,
+	useContext,
+	useEffect,
+	useRef,
+	useMemo,
+} from '../../../../react-shim.js';
 import { useAppStore } from '../../../../store';
-import AutoFrame, { autoFrameContext } from '../../../AutoFrame';
+import AutoFrame, { autoFrameContext } from '../../../AutoFrame/index.tsrx';
 import styles from './styles.module.css';
 import { getClassNameFactory } from '../../../../lib';
-import { DefaultRootRenderProps } from '../../../../types';
-import { Render } from '../../../Render';
+import { DefaultRootRenderProps, Overrides } from '../../../../types';
+import { Render } from '../../../Render/index.tsrx';
 import { BubbledPointerEvent } from '../../../../lib/bubble-pointer-event';
-import { useSlots } from '../../../../lib/use-slots';
+import { useSlots } from '../../../../lib/use-slots.tsrx';
 
 const getClassName = getClassNameFactory('PuckPreview', styles);
 
@@ -57,6 +66,26 @@ const useBubbleIframeEvents = (ref: RefObject<HTMLIFrameElement | null>) => {
 	}, [status]);
 };
 
+// Upstream reads the frame document with `<autoFrameContext.Consumer>`, which
+// Octane contexts do not have; read it with `useContext` instead.
+const FrameContent = ({
+	Frame,
+	children,
+}: {
+	Frame: Overrides['iframe'] | undefined;
+	children: OctaneNode;
+}) => {
+	const { document } = useContext(autoFrameContext);
+
+	if (Frame) {
+		return <Frame document={document}>{children}</Frame>;
+	}
+
+	return <>
+		{children}
+	</>;
+};
+
 export const Preview = ({ id = 'puck-preview' }: { id?: string }) => {
 	const dispatch = useAppStore((s) => s.dispatch);
 	const root = useAppStore((s) => s.state.data.root);
@@ -86,7 +115,7 @@ export const Preview = ({ id = 'puck-preview' }: { id?: string }) => {
 	// DEPRECATED
 	const rootProps = root.props || root;
 
-	const ref = useRef<HTMLIFrameElement>(null);
+	const ref = useRef<HTMLIFrameElement | null>(null);
 
 	useBubbleIframeEvents(ref);
 
@@ -137,15 +166,7 @@ export const Preview = ({ id = 'puck-preview' }: { id?: string }) => {
 					}}
 					frameRef={ref}
 				>
-					<autoFrameContext.Consumer>
-						{({ document }) => {
-							if (Frame) {
-								return <Frame document={document}>{inner}</Frame>;
-							}
-
-							return inner;
-						}}
-					</autoFrameContext.Consumer>
+					<FrameContent Frame={Frame}>{inner}</FrameContent>
 				</AutoFrame>
 			: <div
 					id="preview-frame"

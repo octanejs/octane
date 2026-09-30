@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { addTsrxSpecifiers } from './tsrx-specifiers.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const upstreamRoot = process.argv[2];
@@ -31,7 +32,7 @@ const COPY_FILES = [
 	join('bundle', 'index.css'),
 	join('bundle', 'core.css'),
 ];
-const SKIP_DIR_NAMES = new Set(['__tests__', '__mocks__', 'node_modules']);
+const SKIP_DIR_NAMES = new Set(['__helpers__', '__tests__', '__mocks__', 'node_modules']);
 const OMITTED_UPSTREAM_FILES = new Set([
 	join('lib', 'is-ios.ts'),
 	join('lib', 'plugin-debug.tsx'),
@@ -118,7 +119,6 @@ function transformSource(text, destRel) {
 	out = out.replace(/from 'use-debounce'/g, "from '@octanejs/tanstack-pacer'");
 	out = out.replace(/from "use-debounce"/g, 'from "@octanejs/tanstack-pacer"');
 	out = out.replace(/\bReactNode\b/g, 'OctaneNode');
-	out = out.replace(/\bJSX\.Element\b/g, 'Octane.JSX.Element');
 	out = out.replace(/\bMutableRefObject\b/g, 'RefObject');
 	out = out.replace(/React\.memo\b/g, 'memo');
 	out = out.replace(/React\.FC\b/g, 'FC');
@@ -139,12 +139,23 @@ function transformSource(text, destRel) {
 	return out;
 }
 
+// Plain `.ts` modules reach Octane's base hooks through `react-shim.js`, not an
+// `octane` import, so the compiler would leave their hook calls unslotted and
+// every hook in one custom hook would share a single cell. The leading pragma
+// declares the module Octane-owned, as `.tsrx` files already are.
+function claimHookModule(text, destRel) {
+	if (!destRel.endsWith('.ts') || destRel.endsWith('.d.ts')) return text;
+	if (!/\buse[A-Z]\w*\(/.test(text)) return text;
+	return `/** @jsxImportSource octane */\n${text}`;
+}
+
 function writeReactShim() {
 	writeFileSync(
 		join(DEST, 'react-shim.ts'),
 		`import {
 	createContext,
 	createPortal,
+	isValidElement,
 	memo,
 	useCallback,
 	useContext,
@@ -153,13 +164,15 @@ function writeReactShim() {
 	useMemo,
 	useRef,
 	useState,
+	useTransition,
 } from 'octane';
-import type { OctaneNode } from 'octane';
-import type { Octane } from 'octane/jsx-runtime';
+import type { Context as OctaneContext, OctaneNode } from 'octane';
+import type { JSX, Octane } from 'octane/jsx-runtime';
 
 export {
 	createContext,
 	createPortal,
+	isValidElement,
 	memo,
 	useCallback,
 	useContext,
@@ -168,9 +181,10 @@ export {
 	useMemo,
 	useRef,
 	useState,
+	useTransition,
 };
 
-export type { OctaneNode as ReactNode, OctaneNode };
+export type { JSX, Octane, OctaneNode as ReactNode, OctaneNode };
 
 export type CSSProperties = Exclude<
 	Octane.JSX.IntrinsicElements['div']['style'],
@@ -188,7 +202,7 @@ export type FC<P = Record<string, unknown>> = (props: P) => OctaneNode;
 export type ComponentType<P = Record<string, unknown>> = FC<P>;
 
 export type Reducer<S, A> = (state: S, action: A) => S;
-export type Context<T> = { Provider: FC<{ value: T; children?: OctaneNode }> };
+export type Context<T> = OctaneContext<T>;
 
 export type Dispatch<A> = (value: A) => void;
 export type SetStateAction<S> = S | ((previous: S) => S);
@@ -198,21 +212,21 @@ export type ReactElement = OctaneNode;
 export type ReactMouseEvent<T = Element> = MouseEvent;
 export type SyntheticEvent<T = Element> = Event;
 
-export function forwardRef<T, P extends Record<string, unknown>>(
-	render: (props: P & { ref?: Ref<T> }) => OctaneNode,
-): FC<P & { ref?: Ref<T> }> {
-	return render;
-}
-
-export namespace Octane {
-	export namespace JSX {
-		export type Element = OctaneNode;
-	}
+// Octane passes \`ref\` as an ordinary prop, so upstream's \`forwardRef\` render
+// functions get it back as their second argument here. Returning \`render\`
+// itself would call it with props alone and drop every forwarded ref.
+export function forwardRef<T, P = Record<string, unknown>>(
+	render: (props: P, ref: ForwardedRef<T>) => OctaneNode,
+): FC<P & RefAttributes<T>> {
+	return function ForwardRef(props) {
+		return render(props, props.ref ?? null);
+	};
 }
 
 const React = {
 	createContext,
 	createPortal,
+	isValidElement,
 	memo,
 	useCallback,
 	useContext,
@@ -221,6 +235,7 @@ const React = {
 	useMemo,
 	useRef,
 	useState,
+	useTransition,
 	forwardRef,
 };
 
@@ -244,7 +259,8 @@ for (const dirName of COPY_DIRS) {
 		const dest = join(DEST, destRel);
 		mkdirSync(dirname(dest), { recursive: true });
 		if (file.endsWith('.ts') || file.endsWith('.tsx')) {
-			writeFileSync(dest, transformSource(readFileSync(file, 'utf8'), destRel));
+			const text = transformSource(readFileSync(file, 'utf8'), destRel);
+			writeFileSync(dest, claimHookModule(text, destRel));
 		} else {
 			cpSync(file, dest);
 		}
@@ -305,5 +321,7 @@ export {
 } from './lib/use-puck';
 `,
 );
+
+addTsrxSpecifiers(DEST);
 
 console.log(`Ported into ${DEST}`);

@@ -3,11 +3,11 @@ import styles from './styles.module.css';
 import getClassNameFactory from '../../lib/get-class-name-factory';
 import { ExternalField } from '../../types';
 import { Link, Search, SlidersHorizontal, Unlock } from '@octanejs/lucide';
-import { Modal } from '../Modal';
-import { Heading } from '../Heading';
-import { Loader } from '../Loader';
+import { Modal } from '../Modal/index.tsrx';
+import { Heading } from '../Heading/index.tsrx';
+import { Loader } from '../Loader/index.tsrx';
 import { Button } from '../Button';
-import { AutoFieldPrivate } from '../AutoField';
+import { AutoFieldPrivate } from '../AutoField/index.tsrx';
 import { IconButton } from '../IconButton';
 
 const getClassName = getClassNameFactory('ExternalInput', styles);

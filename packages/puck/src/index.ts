@@ -3,28 +3,28 @@
 
 import './styles.css';
 
-export type { PuckAction } from './reducer/actions';
+export type { PuckAction } from './reducer/actions.tsrx';
 
 export * from './types/API';
 export * from './types';
-export * from './types/Data';
-export * from './types/Props';
+export * from './types/Data.tsrx';
+export * from './types/Props.tsrx';
 export * from './types/Fields';
 
-export * from './components/ActionBar';
-export { AutoField, FieldLabel } from './components/AutoField';
+export * from './components/ActionBar/index.tsrx';
+export { AutoField, FieldLabel } from './components/AutoField/index.tsrx';
 
 export * from './components/Button';
-export { Drawer } from './components/Drawer';
+export { Drawer } from './components/Drawer/index.tsrx';
 
-export { DropZone } from './components/DropZone';
+export { DropZone } from './components/DropZone/index.tsrx';
 export * from './components/IconButton';
-export { Puck } from './components/Puck';
-export * from './components/Render';
+export { Puck } from './components/Puck/index.tsrx';
+export * from './components/Render/index.tsrx';
 
 export * from './lib/migrate';
 export * from './lib/transform-props';
-export { registerOverlayPortal } from './lib/overlay-portal';
+export { registerOverlayPortal } from './lib/overlay-portal/index.tsrx';
 export * from './lib/resolve-all-data';
 export { setDeep } from './lib/data/set-deep';
 export { walkTree } from './lib/data/walk-tree';

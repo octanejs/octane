@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useEffect, useRef, useState } from '../../react-shim.js';
-import { registerOverlayPortal } from '../../lib/overlay-portal';
+import { registerOverlayPortal } from '../../lib/overlay-portal/index.tsrx';
 import { useAppStoreApi } from '../../store';
 import styles from './styles.module.css';
 import { getClassNameFactory } from '../../lib';
@@ -23,7 +23,7 @@ const InlineTextFieldInternal = ({
 	isReadOnly: boolean;
 	opts?: { disableLineBreaks?: boolean };
 }) => {
-	const ref = useRef<HTMLHeadingElement>(null);
+	const ref = useRef<HTMLHeadingElement | null>(null);
 	const appStoreApi = useAppStoreApi();
 	const disableLineBreaks = opts.disableLineBreaks ?? false;
 

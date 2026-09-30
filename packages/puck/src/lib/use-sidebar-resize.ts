@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { useCallback, useEffect, useRef, useState } from '../react-shim.js';
 import { useAppStore } from '../store';
 import { PuckAction } from '../reducer';
@@ -13,7 +14,7 @@ export function useSidebarResize(
 	dispatch: (action: PuckAction) => void,
 ) {
 	const [width, setWidth] = useState<number | null>(null);
-	const sidebarRef = useRef<HTMLDivElement>(null);
+	const sidebarRef = useRef<HTMLDivElement | null>(null);
 
 	const storeWidth = useAppStore((s) =>
 		position === 'left' ? s.state.ui.leftSideBarWidth : s.state.ui.rightSideBarWidth,

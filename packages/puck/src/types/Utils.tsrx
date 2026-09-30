@@ -1,9 +1,9 @@
 import { OctaneNode } from '../react-shim.js';
-import { Config, ExtractConfigParams } from './Config';
-import { DefaultRootFieldProps, PuckContext } from './Props';
-import { ComponentData, Data } from './Data';
-import { PrivateAppState } from './Internal';
-import { AppState } from './AppState';
+import { Config, ExtractConfigParams } from './Config.tsrx';
+import { DefaultRootFieldProps, PuckContext } from './Props.tsrx';
+import { ComponentData, Data } from './Data.tsrx';
+import { PrivateAppState } from './Internal.tsrx';
+import { AppState } from './AppState.tsrx';
 
 export type WithId<Props> =
 	Props & {

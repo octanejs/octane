@@ -2,9 +2,9 @@
 
 import { useShallow } from '@octanejs/zustand/shallow';
 import { useAppStore } from '../../store';
-import { SlotRenderPure } from './server';
+import { SlotRenderPure } from './server.tsrx';
 
-export * from './server';
+export * from './server.tsrx';
 
 export const ContextSlotRender = ({ componentId, zone }: { componentId: string; zone: string }) => {
 	const config = useAppStore((s) => s.config);

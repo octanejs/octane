@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { RefObject, useCallback, useEffect, useState } from '../../../react-shim.js';
 import { DragAxis } from '../../../types';
 import { useAppStore } from '../../../store';

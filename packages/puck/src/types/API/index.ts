@@ -1,11 +1,11 @@
 import { PuckAction } from '../../reducer';
-import { WithDeepSlots } from '../Internal';
-import { DefaultComponentProps } from '../Props';
-import { AppState } from './../AppState';
-import { ComponentDataOptionalId, Content, Data } from './../Data';
+import { WithDeepSlots } from '../Internal.tsrx';
+import { DefaultComponentProps } from '../Props.tsrx';
+import { AppState } from './../AppState.tsrx';
+import { ComponentDataOptionalId, Content, Data } from './../Data.tsrx';
 import { Overrides } from './Overrides';
 import { FieldTransforms } from './FieldTransforms';
-import { Config, DefaultComponents } from '../Config';
+import { Config, DefaultComponents } from '../Config.tsrx';
 
 export type Permissions = {
 	drag: boolean;

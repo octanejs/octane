@@ -27,7 +27,7 @@ import type {
 	Metadata,
 } from '../../types';
 
-import { SidebarSection } from '../SidebarSection';
+import { SidebarSection } from '../SidebarSection/index.tsrx';
 
 import { PuckAction } from '../../reducer';
 import getClassNameFactory from '../../lib/get-class-name-factory';
@@ -38,16 +38,16 @@ import {
 	appStoreContext as AppStoreContext,
 } from '../../store';
 import styles from './styles.module.css';
-import { Fields } from './components/Fields';
-import { Components } from './components/Components';
-import { Preview } from './components/Preview';
-import { Outline } from './components/Outline';
-import { Canvas } from './components/Canvas';
+import { Fields } from './components/Fields/index.tsrx';
+import { Components } from './components/Components/index.tsrx';
+import { Preview } from './components/Preview/index.tsrx';
+import { Outline } from './components/Outline/index.tsrx';
+import { Canvas } from './components/Canvas/index.tsrx';
 import { defaultViewports } from '../ViewportControls/default-viewports';
 import { Viewports } from '../../types';
-import { DragDropContext } from '../DragDropContext';
+import { DragDropContext } from '../DragDropContext/index.tsrx';
 import { useLoadedOverrides } from '../../lib/use-loaded-overrides';
-import { DefaultOverride } from '../DefaultOverride';
+import { DefaultOverride } from '../DefaultOverride/index.tsrx';
 import { useInjectGlobalCss } from '../../lib/use-inject-css';
 import { usePreviewModeHotkeys } from '../../lib/use-preview-mode-hotkeys';
 import { useRegisterHistorySlice } from '../../store/slices/history';
@@ -55,12 +55,12 @@ import { useRegisterPermissionsSlice } from '../../store/slices/permissions';
 import { monitorHotkeys, useMonitorHotkeys } from '../../lib/use-hotkey';
 import { getFrame } from '../../lib/get-frame';
 import { UsePuckStoreContext, useRegisterUsePuckStore } from '../../lib/use-puck';
-import { FrameProvider } from '../../lib/frame-context';
+import { FrameProvider } from '../../lib/frame-context.tsrx';
 import { walkAppState } from '../../lib/data/walk-app-state';
-import { PrivateAppState } from '../../types/Internal';
+import { PrivateAppState } from '../../types/Internal.tsrx';
 import fdeq from 'fast-deep-equal';
-import { Header } from './components/Header';
-import { Sidebar } from './components/Sidebar';
+import { Header } from './components/Header/index.tsrx';
+import { Sidebar } from './components/Sidebar/index.tsrx';
 import { useSidebarResize } from '../../lib/use-sidebar-resize';
 import { FieldTransforms } from '../../types/API/FieldTransforms';
 
@@ -329,7 +329,7 @@ function PuckProvider<
 		initialAppState,
 	});
 
-	const previousData = useRef<Data>(null);
+	const previousData = useRef<Data | null>(null);
 
 	useEffect(() => {
 		appStore.subscribe((s) => s.state.data, (data) => {

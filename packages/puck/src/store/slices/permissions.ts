@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { useEffect } from '../../react-shim.js';
 import { flattenData } from '../../lib/data/flatten-data';
 import { ComponentData, Config, Permissions, UserGenerics } from '../../types';

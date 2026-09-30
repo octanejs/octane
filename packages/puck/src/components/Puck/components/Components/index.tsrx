@@ -1,6 +1,6 @@
-import { useComponentList } from '../../../../lib/use-component-list';
+import { useComponentList } from '../../../../lib/use-component-list.tsrx';
 import { useAppStore } from '../../../../store';
-import { ComponentList } from '../../../ComponentList';
+import { ComponentList } from '../../../ComponentList/index.tsrx';
 import { useMemo } from '../../../../react-shim.js';
 
 export const Components = () => {

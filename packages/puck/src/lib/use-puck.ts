@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { Config, UserGenerics, AppState, ComponentData } from '../types';
 import { createContext, useContext, useEffect, useState } from '../react-shim.js';
 import { AppStore, useAppStoreApi } from '../store';

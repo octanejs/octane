@@ -1,5 +1,5 @@
 import { OctaneNode, useEffect, useState } from '../react-shim.js';
-import { ComponentList } from '../components/ComponentList';
+import { ComponentList } from '../components/ComponentList/index.tsrx';
 import { useAppStore } from '../store';
 
 export const useComponentList = () => {

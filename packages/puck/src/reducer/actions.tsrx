@@ -1,5 +1,5 @@
 import { AppState, ComponentData, Data, RootData, UiState } from '../types';
-import { PrivateAppState } from '../types/Internal';
+import { PrivateAppState } from '../types/Internal.tsrx';
 
 export type InsertAction = {
 	type: 'insert';

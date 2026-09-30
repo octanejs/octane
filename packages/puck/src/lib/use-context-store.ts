@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { Context, useContext } from '../react-shim.js';
 import { StoreApi, useStore } from '@octanejs/zustand';
 import { useShallow } from '@octanejs/zustand/shallow';

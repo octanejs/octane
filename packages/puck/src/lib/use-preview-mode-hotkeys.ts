@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { useCallback } from '../react-shim.js';
 import { useHotkey } from './use-hotkey';
 import { useAppStoreApi } from '../store';

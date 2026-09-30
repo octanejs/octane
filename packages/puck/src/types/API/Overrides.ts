@@ -1,8 +1,8 @@
-import { ReactElement, OctaneNode } from '../../react-shim.js';
+import { type FC, ReactElement, OctaneNode } from '../../react-shim.js';
 import { Field, FieldProps } from '../Fields';
 import { ItemSelector } from '../../lib/data/get-item';
-import { ExtractField, UserGenerics } from '../Utils';
-import { Config } from '../Config';
+import { ExtractField, UserGenerics } from '../Utils.tsrx';
+import { Config } from '../Config.tsrx';
 
 // Plugins can use `usePuck` instead of relying on props
 type RenderFunc<Props extends { [key: string]: any } = { children: OctaneNode }> = (

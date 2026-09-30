@@ -11,7 +11,11 @@
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
     "strict": true
+  },
+  "tsrx": {
+    "compiler": "octane/compiler/volar"
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"]

@@ -1,11 +1,11 @@
 import { OctaneNode } from '../../react-shim.js';
 import styles from './styles.module.css';
 import getClassNameFactory from '../../lib/get-class-name-factory';
-import { Heading } from '../Heading';
+import { Heading } from '../Heading/index.tsrx';
 import { ChevronRight } from '@octanejs/lucide';
 import { useBreadcrumbs } from '../../lib/use-breadcrumbs';
 import { useAppStore } from '../../store';
-import { Loader } from '../Loader';
+import { Loader } from '../Loader/index.tsrx';
 
 const getClassName = getClassNameFactory('SidebarSection', styles);
 

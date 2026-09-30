@@ -1,7 +1,7 @@
 import { Data } from '../../types';
-import { SetDataAction } from '../actions';
+import { SetDataAction } from '../actions.tsrx';
 import { AppStore } from '../../store';
-import { PrivateAppState } from '../../types/Internal';
+import { PrivateAppState } from '../../types/Internal.tsrx';
 import { walkAppState } from '../../lib/data/walk-app-state';
 
 export const setDataAction = <UserData extends Data>(

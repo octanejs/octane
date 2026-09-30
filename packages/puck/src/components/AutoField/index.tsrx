@@ -4,6 +4,8 @@ import { UiState } from '../../types';
 
 import styles from './styles.module.css';
 import {
+	type ComponentType,
+	type FC,
 	ReactElement,
 	OctaneNode,
 	useCallback,
@@ -19,12 +21,12 @@ import {
 	ArrayField,
 	DefaultField,
 	TextareaField,
-} from './fields';
+} from './fields/index.tsrx';
 import { Lock } from '@octanejs/lucide';
-import { ObjectField } from './fields/ObjectField';
+import { ObjectField } from './fields/ObjectField/index.tsrx';
 import { useAppStore } from '../../store';
 import { useSafeId } from '../../lib/use-safe-id';
-import { NestedFieldContext } from './context';
+import { NestedFieldContext } from './context.tsrx';
 
 const getClassName = getClassNameFactory('Input', styles);
 const getClassNameWrapper = getClassNameFactory('InputWrapper', styles);
@@ -169,7 +171,9 @@ function AutoFieldInternal<
 	);
 
 	const onFocus = useCallback((e: FocusEvent) => {
-		if (mergedProps.name && (e.target.nodeName === 'INPUT' || e.target.nodeName === 'TEXTAREA')) {
+		const target = e.target as Element;
+
+		if (mergedProps.name && (target.nodeName === 'INPUT' || target.nodeName === 'TEXTAREA')) {
 			e.stopPropagation();
 
 			dispatch({
@@ -182,7 +186,9 @@ function AutoFieldInternal<
 	}, [mergedProps.name]);
 
 	const onBlur = useCallback((e: FocusEvent) => {
-		if ('name' in e.target) {
+		const target = e.target as Element;
+
+		if ('name' in target) {
 			dispatch({
 				type: 'setUi',
 				ui: {

@@ -1,8 +1,8 @@
 import getClassNameFactory from '../../../../lib/get-class-name-factory';
 import styles from './styles.module.css';
 import { MoreVertical } from '@octanejs/lucide';
-import { AutoFieldPrivate, FieldPropsInternal } from '../..';
-import { NestedFieldProvider, useNestedFieldContext } from '../../context';
+import { AutoFieldPrivate, FieldPropsInternal } from '../../index.tsrx';
+import { NestedFieldProvider, useNestedFieldContext } from '../../context.tsrx';
 
 const getClassName = getClassNameFactory('ObjectField', styles);
 
