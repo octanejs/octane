@@ -20,6 +20,14 @@ describe('@octanejs/puck — render contract', () => {
 		expect(root.container.querySelector('h1')?.textContent).toBe('Hello Puck');
 	});
 
+	it('renders the components stored in a slot field via Render', () => {
+		root = mount(PuckRenderProbe);
+		flushEffects();
+		flushSync(function flush() {});
+
+		expect(root.container.querySelector('.columns h1')?.textContent).toBe('Inside a slot');
+	});
+
 	it('mounts the full Puck editor shell', () => {
 		root = mount(PuckEditorProbe);
 		flushEffects();
