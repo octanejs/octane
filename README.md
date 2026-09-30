@@ -59,7 +59,8 @@ without leaving the hooks model. Explicit arrays still mean exactly what they
 mean in React.
 
 **No rules of hooks.** Hooks are tracked by call site, not call order, so a hook
-can live inside an `if` or after an early return. The one rule left is enforced
+can live inside an `if` or after an early return, and keeps its state across
+renders that skip it. The one rule left is enforced
 for you: a hook in a plain JS loop is a compile error, because every iteration
 would share a single call-site slot. Use the keyed `@for` directive instead,
 where each item gets its own hook state.

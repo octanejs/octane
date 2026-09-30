@@ -77,9 +77,9 @@ Octane looks like React but differs deliberately. Check
 `docs/differences-from-react.md` before changing any of these:
 
 - Hooks are keyed by compiler-assigned call-site slot, not call order, so a hook
-  may sit behind a condition or after an early return. A slot-keyed hook in a
-  plain JS loop is a compile error: use the keyed `@for` directive or a child
-  component. `use()` and `useContext` are exempt.
+  may sit behind a condition or after an early return; skipped, it keeps its
+  state. A slot-keyed hook in a plain JS loop is a compile error: use the keyed
+  `@for` directive or a child component. `use()` and `useContext` are exempt.
 - An omitted dependency array is inferred by the compiler, not a bug. An explicit
   array keeps React's exact behavior and is never rewritten; `null` means "run
   every render".

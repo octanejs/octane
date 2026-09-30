@@ -36,6 +36,12 @@ export function Profile(props) {
 }
 ```
 
+A skipped hook keeps its state. The early return only skips the rest of that render,
+so `editing` holds its value while `props.user` is missing, for as long as `Profile`
+stays mounted. Effects follow the current render instead: one that a render returns
+before reaching is cleaned up, and runs again once a render reaches it. The same holds
+for `return;` or `continue;` in a directive arm, such as an `@for` row.
+
 The exception is a slot-based hook inside a plain JavaScript loop. Every iteration
 would share one source location, so the compiler reports an error. Use keyed `@for` or
 move the hook into a child component. `use()` and `useContext` are exempt because they
