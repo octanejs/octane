@@ -1,5 +1,111 @@
 # @octanejs/tanstack-router
 
+## 0.1.60
+
+### Patch Changes
+
+- 590129a: `RouterClient` no longer wraps the router in a Suspense boundary while
+  `hydrate()` runs, matching upstream, which suspends through `<Await>` with no
+  fallback.
+
+  The boundary caused two problems. With `hydrateRoot`, it had no match in the
+  server HTML from `RouterServer`, so hydration reported a mismatch, removed the
+  server DOM, and rebuilt the page on the client. With `createRoot`, its empty
+  fallback committed first, so the hydrated tree counted as a Suspense retry and
+  stayed hidden for up to 300ms. In both cases, the root layout was blank while
+  an `ssr: false` child route was still pending.
+
+  `RouterClient` now suspends at the root. `hydrateRoot` keeps and adopts the
+  server DOM, and the root layout and the child's pending component appear as soon
+  as `hydrate()` settles.
+- de2685e: Key head and body assets by content instead of list position.
+
+  `HeadContent` keyed each tag by its index, and manifest `modulepreload` links
+  precede the stylesheet. Navigating between routes with different preload counts
+  shifted the stylesheet's index, remounted its `Asset`, and removed and re-added
+  the `<link rel="stylesheet">`, flashing unstyled content in production builds.
+  `HeadContent` now keys tags by content, as `@tanstack/react-router` does, with
+  identical tags told apart by occurrence. `Scripts` uses the same keys, so body
+  scripts are no longer re-created when the hydration barrier is removed. `Asset`
+  compares `attrs` by value, so a rebuilt tag list no longer re-mounts unchanged
+  assets, and a mounted asset's element can no longer be adopted by another.
+- b1d7e24: Keep a route match suspended until the state that holds it has ended, so the
+  route never renders before its loader data exists.
+
+  Two cases could lock up the page before this fix: a hydrated `ssr: false` route
+  whose client loader outlasted `pendingMinMs`, and a loader that redirected to a
+  route whose loader waits on a timer or the network. The route match
+  suspended on a different router promise in each state, but through `use()`,
+  which tracks promises by call position. Once the match changed state, a retry
+  got back the earlier, already settled promise. Router-core marks its settled
+  promises `status: 'resolved'`, which `use()` reads as still pending, so each
+  retry suspended again at once, on a microtask. Timers and network callbacks
+  never ran, so the loader could never finish.
+
+  The match now throws the relevant promise, like upstream, so no earlier promise
+  can be reused. A redirected match waits for its next store update instead of its
+  load promise, which router-core has already resolved by then.
+- Updated dependencies [55c2c01]
+- Updated dependencies [38a5443]
+- Updated dependencies [0547835]
+- Updated dependencies [877a7a4]
+- Updated dependencies [68c094d]
+- Updated dependencies [c1a86ce]
+- Updated dependencies [63baf8c]
+- Updated dependencies [489db93]
+- Updated dependencies [687f584]
+- Updated dependencies [1b8c949]
+- Updated dependencies [04df7e9]
+- Updated dependencies [4c1ca88]
+- Updated dependencies [489b121]
+- Updated dependencies [ce47fae]
+- Updated dependencies [b2e4b9a]
+- Updated dependencies [8de664c]
+- Updated dependencies [5cc6b64]
+- Updated dependencies [0f8cb49]
+- Updated dependencies [7fa3a2d]
+- Updated dependencies [aa6753b]
+- Updated dependencies [ce11f82]
+- Updated dependencies [bd21050]
+- Updated dependencies [5575ff6]
+- Updated dependencies [5f14459]
+- Updated dependencies [9230292]
+- Updated dependencies [e4974cc]
+- Updated dependencies [19f07e0]
+- Updated dependencies [898820a]
+- Updated dependencies [25cc659]
+- Updated dependencies [8fb96a0]
+- Updated dependencies [699e363]
+- Updated dependencies [84d2eaf]
+- Updated dependencies [ca7d55d]
+- Updated dependencies [5bc3af7]
+- Updated dependencies [94ba1b6]
+- Updated dependencies [03e7ba0]
+- Updated dependencies [ddb655c]
+- Updated dependencies [4ebe8d4]
+- Updated dependencies [e325a83]
+- Updated dependencies [d78f279]
+- Updated dependencies [ddb655c]
+- Updated dependencies [8fb96a0]
+- Updated dependencies [d7ffa13]
+- Updated dependencies [32c1bf4]
+- Updated dependencies [7ee5f1a]
+- Updated dependencies [608ff43]
+- Updated dependencies [09c58dc]
+- Updated dependencies [28a3636]
+- Updated dependencies [3f9b16b]
+- Updated dependencies [25b6e6d]
+- Updated dependencies [9d322ef]
+- Updated dependencies [4d8a93b]
+- Updated dependencies [d455cb1]
+- Updated dependencies [40f4827]
+- Updated dependencies [4180828]
+- Updated dependencies [c587109]
+- Updated dependencies [ba483f4]
+- Updated dependencies [c37f922]
+- Updated dependencies [007691e]
+  - octane@0.7.0
+
 ## 0.1.59
 
 ### Patch Changes

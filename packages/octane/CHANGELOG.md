@@ -1,5 +1,577 @@
 # octane
 
+## 0.7.0
+
+### Minor Changes
+
+- 4c1ca88: Keep the state of a hook declared after an early exit on the DOM renderer. A
+  hook's state lasts as long as the component, `@for` row, or directive arm that
+  calls it; an exit only skips the rest of one render. On the DOM renderer, the
+  rest of a directive arm after `return;`, `return null;`, or `continue;`, and the
+  rest of a component whose early return guards a single host element, ran in a
+  scope of its own. So taking the exit reset every hook after it, while the
+  universal renderer, value-returning components, custom hooks, and plain `if`
+  blocks kept that state. The DOM compiler now keeps it too: only the arm's output
+  is removed when the exit is taken. An effect after the exit is still cleaned up
+  while renders skip it and runs again once one reaches it.
+
+  A class declared in setup is also passed to the directive arms nested below it
+  on the client, where reading it threw a `ReferenceError`.
+- 4d8a93b: End a directive arm early on universal renderers the same way as on the DOM. A
+  `continue;` in an `@for` row that no inner loop owns, at any nesting depth, now
+  ends that row. Before, it reached the arm's compiled function unchanged and the
+  module failed to load with "Illegal continue statement".
+
+  A `break` that targets the `@for` or `@switch` around an arm failed to load the
+  same way. It is now the DOM compiler's compile error, with its location.
+
+  Returning a value from an arm, such as `if (loading) return <Spinner />;`, used
+  to render that value on universal renderers and is now the same compile error as
+  on the DOM. An arm's output is its final node on every renderer, and a component
+  can mix DOM and universal regions across a renderer boundary. If the rule
+  differed by renderer, the same arm would compile on one side of a boundary and
+  fail on the other. Render the alternative from an `@if`/`@else` arm instead.
+
+### Patch Changes
+
+- 55c2c01: Run each queued `useActionState` dispatch with the action that was current when
+  it was dispatched, matching React 19. Before, a rerender that supplied a new
+  action while a submission waited in the queue made that submission run the
+  replacement action. Payloads dispatched after the rerender still use the new
+  action, and an action error still continues the queue.
+- 38a5443: Report a compile error for a `break` or `continue` that would leave a `@{ … }`
+  block, such as `if (done) continue;` in a child block inside an `@for` row. The
+  parser accepted it because the jump sits lexically inside the loop, but every
+  target compiles the block apart from that loop, so the module failed to load
+  with "Illegal continue statement". A block is a nested template, not a directive
+  arm, so it has no early exit. Skip the row with `continue;` in the row's setup
+  before its output, or render the part to leave out from an `@if` arm.
+
+  A labeled `break` or `continue` that would leave a directive arm, for a label in
+  the setup around it, failed to load the same way and is now a compile error too.
+- 0547835: A child `@{ … }` block inside JSX that a callback in a component body returns
+  can now read the callback's params, on the client and the server, and
+  hydrates. The compiler used to declare the block's render function in the
+  component body, outside the callback, so
+  `const row = (x) => <p>@{ const y = x + 1; <b>{y}</b> }</p>` threw
+  `x is not defined` at render. The block now compiles inside the callback,
+  keeps its hook state across parent updates, and its `@if`, `@for`,
+  `@switch`, and `@try` arms can read the callback's names. This also covers an
+  authored `{() => @{ … }}` child in such a callback, names bound in a nested
+  block of the callback, and the `.map` callback in setup or over a value that is
+  not an array.
+- 877a7a4: `hydrateRoot` now adopts adjacent text children of a `createElement` host
+  without a mismatch. `createElement('div', null, 'hello ', name)` rendered two
+  text nodes on the client, but the server wrote them as one run of text, which
+  the browser parses as a single node. Every hydrate reported a recoverable text
+  mismatch, rewrote the first node, and built the second. The server now writes
+  React's `<!-- -->` separator between adjacent texts, including across nested
+  arrays and empty values. Hydration adopts each server text node and leaves the
+  separator in place, as React does. `<textarea>`, `<title>`, and other raw-text
+  content is unchanged, because a comment there would be literal text.
+
+  A controlled or default `<select>` value now also preselects, during server
+  rendering, an `<option>` without a `value` whose label is split across adjacent
+  texts, such as `<option>{'Item '}{n as string}</option>`. The label is compared
+  as its flattened text, as in React.
+- 68c094d: A host element created from an uppercase or mixed-case HTML tag, such as
+  `createElement('DIV', null, text)` or a dynamic `<Tag>` whose value is `'H1'`,
+  now hydrates and updates like its lowercase spelling. HTML tag names are
+  ASCII case-insensitive, so the server's `<DIV>` parses as a `div` and
+  `document.createElement('DIV')` builds one too. The client compared the tag
+  exactly, so hydration reported a recoverable mismatch and rebuilt the subtree,
+  and every later render replaced the element, which lost focus, selection, and
+  scroll. A host tree built from such tags was also rebuilt, rather than adopted,
+  when a component child appeared in it. The client now matches an HTML element's
+  tag in any casing. SVG and MathML tags stay case-sensitive (`foreignObject`),
+  as the DOM requires.
+- c1a86ce: A child `@{ … }` block inside a keyed element, `<noscript>`, `<html>`/`<head>`/
+  `<body>`, or a host the HTML parser would repair (such as a `<p>` containing a
+  `<div>`) now renders, on the client and the server, exactly as it does under an
+  ordinary element. The compiler builds those hosts as element descriptors, and
+  that path silently dropped the block, so `<p key={id}>@{ … }</p>` rendered an
+  empty `<p>`. A component that returned such a host with a setup-bearing block
+  kept the block on the client but not on the server, so hydration reported a
+  mismatch and rebuilt the subtree. A render-only block now groups its output
+  transparently. A block with setup runs in its own render scope and keeps its
+  hook state across parent updates.
+- 63baf8c: Read each component's source at most once when the development runtime looks up
+  its `__octane_loc` marker. Form diagnostics walk every ancestor block for each
+  mounted host element, and the lookup ran `Function.prototype.toString` plus a
+  regex on every visit without caching. Output compiled without `dev: true` has
+  no marker, so every lookup missed and repeated: a 50-row `createElement` list
+  read component source 703 times per mount, and larger trees scanned megabytes of
+  source. Development mounts no longer pay that per element. Production builds are
+  unchanged.
+- 489db93: A `@{ … }` function declared inside a component or another function, such as
+  `const row = (v) => @{ <p>{v}</p> }` or `function row(v) @{ … }`, can now be
+  called directly: `{row(props.v)}` and `{rows.map(row)}` render what
+  `(v) => <p>{v}</p>` renders, on a client mount, on the server, and through
+  hydration. The compiler compiled such a function only as a render body that the
+  runtime calls with a render scope, so a direct call threw `Cannot read
+  properties of undefined` on the client, and the server rendered its output
+  without the range hydration expects. When code calls it directly, the function
+  now compiles to the returned-JSX form that `function f() @{ … }` is shorthand
+  for. It still renders when passed as a `{row}` child, a component, or a portal
+  body.
+- 687f584: A module-level `@{ … }` function, such as `function Row(v) @{ <p>{v}</p> }` or
+  `const row = (v) => @{ … }`, can now be called directly from the same module:
+  `{Row(props.v)}`, `Row.call(null, v)`, and `{items.map(Row)}` return what the
+  returned-JSX form `function Row(v) { return <p>{v}</p>; }` returns, on a client
+  mount, on the server, and through hydration. The compiler compiled such a
+  function only as a component body, which the runtime calls with a render scope,
+  so a direct call threw `Cannot read properties of undefined (reading 'slots')`
+  on the client, and the server rendered its output without the range hydration
+  expects. A directly called function now also gets its returned-JSX form, which
+  its body runs when it is not called to render. Its setup and hooks run in the
+  caller, an early `return null` returns null, and its JSX resolves where the
+  value renders. Rendering it as `<Row />` or a `{Row}` child still runs the
+  compiled template, and modules without direct calls compile unchanged.
+- 1b8c949: A child `@{ … }` block written directly in a directive body with no element
+  around it, such as `@if (x > 0) { @{ const y = x + 1; <b>{y}</b> } }`, now
+  renders on the client and the server, and hydrates. This covers `@if`,
+  `@else`, `@switch` cases, `@try`, `@pending`, `@catch`, `@for`, and `@empty`
+  bodies. The compiler used to treat the block as a setup statement and discard
+  it, so the body rendered nothing. The block is now that body's output, as it is
+  among element children. A render-only block groups its output transparently. A
+  block with setup runs in its own render scope, can read the body's own locals,
+  and keeps its hook state across parent updates.
+- 04df7e9: End a directive arm early the same way wherever the exit sits in its setup.
+  `return null;` is now the same exit as `return;`, and so is an exit inside a
+  nested `if`, block, `switch`, loop, `try`, or labeled statement. Before, only a
+  top-level `if (c) return;` (or `continue;` in an `@for` body) was lowered: the
+  server rendered any other exit's literal `null` or `undefined` as text, and a
+  client update that took the exit left the arm's earlier output in place.
+
+  A keyed `@for` row that can exit early no longer uses its element as the row
+  boundary, because the row renders no element when it exits. Rows with an exit
+  could previously crash (`insertBefore` of null) when a hidden row moved, and fail
+  to update after hydration. The same applies to a row or component whose root is
+  an `@if`/`@else` with an arm that can exit.
+
+  Returning a value from an arm, or a `break` that targets the `@for` or `@switch`
+  around it, is now a compile error with its location. These previously rendered
+  `[object Object]` on the server or emitted JavaScript that failed to load.
+- 489b121: `hydrateRoot` now adopts a container filled with the whole `html` of a
+  body-only render that hoisted document metadata. The default
+  `headChannel: 'fold'` prepends each hoisted `<title>`, `<meta>`, or `<link>`
+  ahead of the body markup, as React 19 does. Hydrating that container reported
+  a recoverable hydration mismatch and rebuilt the entire root on the client
+  (in development it also logged that the client expected the root element but
+  the server rendered a comment). `hydrateRoot` now moves each folded metadata
+  entry into `document.head` and adopts it there, which matches a client render.
+  Folded Float stylesheets, scripts, and resource hints stay in place and are
+  skipped.
+- ce47fae: A React-style `key` attribute on the only root of an `@for` row now compiles
+  exactly like the header spelling `@for (…; key expr)`, for intrinsic and
+  component roots alike. Before, an intrinsic root whose content read anything
+  not provably stable, such as `{props.render(row)}`, was lowered to a keyed
+  element descriptor. That cost about five times as much per update, and because
+  the row was still treated as a single node, removing or reordering such rows
+  left stale elements behind. A component root lost its row memo. The compiler
+  now also rejects a row key that reads a declaration from inside the loop body,
+  which previously failed at runtime with a `ReferenceError`.
+- b2e4b9a: The compiler now rejects an `@for` row `key={…}` attribute that reads a class,
+  an enum, or a `var` hoisted out of a nested block in the row body. Before, only
+  top-level `const`, `let`, `var` and `function` declarations were caught, so
+  such a key compiled to a key function that threw a `ReferenceError` or silently
+  read an outer binding of the same name. The check now resolves the key's names
+  by scope, so a name the key binds itself, such as a callback parameter, still
+  compiles.
+- 8de664c: Fix `FragmentInstance.blur()` for owned children focused inside a shadow root or a same-origin iframe portal. It now checks each child's own focus root instead of only the fragment marker's document.
+- 5cc6b64: Recover when hydration finds different server content where a nested
+  multi-root (fragment) template component renders. A renderable `{expr}` hole
+  whose server value was text but whose client value is a fragment component,
+  rendered directly or returned from a plain component, crashed `hydrateRoot`
+  with `HierarchyRequestError: Node can't be inserted in a #text parent`. When the
+  server had rendered a different fragment component in that hole, hydration
+  kept the server's elements without reporting anything. The fragment now checks
+  its first root against the server node, reports the mismatch to
+  `onRecoverableError` once, logs the development hydration-mismatch warning,
+  discards the server content it would have adopted, and builds its markup on
+  the client. A matching server fragment is still adopted in place.
+- 0f8cb49: Discard and report server list content that the client's items cannot adopt
+  during hydration. Several list shapes previously kept stale server content on
+  screen, or rebuilt it without reporting to `onRecoverableError`:
+
+  - A renderable hole whose client value is an empty list (`[]`) kept whatever
+    the server rendered there visible. Hydration now discards it and reports the
+    mismatch once.
+  - A list item whose server content cannot be that item now discards the rest
+    of the list's server content, builds the client items, and reports once. This
+    covers a bare server element where the client item needs a range of its own
+    (the stale element stayed visible) and a bare element of another tag (it was
+    swapped silently).
+  - A list or `@for` with more client items than server items builds the extra
+    items and now reports once, with one development warning in place of one per
+    item.
+  - A renderable list with fewer client items than server items now discards the
+    extra server items and reports them, as `@for` already did.
+
+  A boundary that retries hydration after suspending does not report these
+  again. A dormant `<Hydrate>` boundary whose captures changed before it
+  activated repairs its list without reporting, including when a `@for` rendered
+  fewer items than the server.
+- 7fa3a2d: Report a renderable value that hydration rebuilds once, including when it
+  suspends and its boundary retries. When the server rendered nothing where the
+  client renders a list, a fragment, or a keyed element, or where a component
+  returns a list or an element, hydration built the value without reporting it to
+  `onRecoverableError`, and development logged one warning per item. It now
+  reports the recovery once, with one development warning that names the hole,
+  the returning component, or the list's host. A list whose items all render
+  nothing still hydrates silently.
+
+  A boundary that retries hydration after its value suspended no longer reports
+  or warns about content an earlier attempt already rebuilt. The retry rebuilds
+  that content instead of adopting what the failed attempt left. Adopting it had
+  duplicated an element a component returned in place of its server text. Two
+  further shapes rendered with component children no longer throw
+  `NotFoundError` during hydration: an element a component returns where it
+  rendered nothing on the server, and a list item whose server range is empty.
+  A list item whose server range holds another element now reports its rebuild.
+- aa6753b: A `@{ … }` function passed as a call argument, such as
+  `{rows.map((row) => @{ <li key={row}>{row}</li> })}`, now renders what
+  `(row) => <li key={row}>{row}</li>` renders, on a client mount and update, on
+  the server, and through hydration. The compiler compiled such a function only
+  as a render body that the runtime calls with a render scope. `map` called it
+  with the row index in that position, so a client mount threw `Cannot read
+  properties of undefined`. A `@{ … }` function passed inline to any call or
+  `new`, or a nested `@{ … }` helper passed to one (`rows.flatMap(row)`,
+  `run(row)`), now compiles to the returned-JSX form that `@{ … }` is shorthand
+  for. Render props, `{fn}` children, `<Tag />` uses, portal bodies, and the
+  component given to `memo` or `createElement` still render through the compiled
+  template.
+- ce11f82: Read a reassigned variable's value from when a JSX value was built, matching
+  React. Octane renders the non-literal children and props of a JSX value later,
+  so a variable assigned again in between showed its later value: a counter
+  incremented in a `.map` callback rendered its final value in every row, and
+  `content = <Frame>{content}</Frame>` nested the wrapper inside itself until the
+  stack overflowed. The compiler now captures such variables when the JSX
+  evaluates, on the client and the server, so hydration agrees. Event handlers and
+  other functions inside the JSX still read the variable's current value. JSX a
+  module-level function declaration returns when called directly still reads at
+  render, as documented in `docs/differences-from-react.md`.
+- bd21050: Release streamed signal async iterables that resolve after an SSR response is cancelled or its request aborts.
+- 5575ff6: Emit smaller client code for `.tsrx` templates and compiled `.tsx` components
+  without changing what they render or the work they do. Component call sites no
+  longer pad their arguments with `undefined`, text-hole updates pass only the
+  arguments an update uses, and binding bags read their DOM nodes directly
+  instead of through copied locals. Across the compiler's test fixtures, minified
+  output shrinks by about 3% and gzipped output by about 2%.
+- 5f14459: A child `@{ … }` block inside JSX that a module-level callback returns now
+  renders, on the client and the server, and hydrates. The compiler used to drop
+  it silently, so `const row = (x) => <p>@{ const y = x + 1; <b>{y}</b> }</p>`
+  rendered an empty `<p>`. A render-only block now groups its output
+  transparently. A block with setup compiles in place, as the
+  `{() => @{ … }}` child it is shorthand for. It closes over the callback's
+  params, runs in its own render scope, and keeps its hook state across parent
+  updates. An `@if`, `@for`, `@switch`, or `@try` in that block's output, or in
+  an authored `{() => @{ … }}` child in a module-level callback, can now read
+  the callback's params. Its arms used to be hoisted to module scope, where
+  those params do not exist.
+- 9230292: A `@{ … }` component that declares parameters after `props`, such as
+  `function Row(props, extra) @{ … }`, now renders. The runtime calls a component
+  as `(props, scope, extra)`, but the compiled body listed the scope after every
+  authored parameter, so rendering `<Row />` threw `Cannot read properties of
+  undefined (reading 'slots')` on the client. The body now always takes the scope
+  second, and each later parameter holds the argument at its position, exactly as
+  in the returned-JSX form `function Row(props, extra) { return … }`. While a
+  component renders, the parameters after `props` receive internal values rather
+  than `undefined`, so pass a component's inputs through props. A rest parameter
+  after the first, and a parameter default or destructuring pattern, bind the same
+  way.
+- e4974cc: Treat `const Row = React.memo(Component)` the same as a named `memo` import when
+  `React` is `import * as React from 'octane'`. The compiler only recognized the
+  named form as an immutable memo wall, so a `@for` row rendering a
+  namespace-imported memo component lost its dependency-compare fast path and
+  re-rendered every row on each parent update. Such rows now keep the same
+  `@for` flags as the named form. A namespace import from another module stays
+  opaque.
+- 19f07e0: Fix a `ReferenceError` in DOM-compiled nested templates. Inside a setup-bearing
+  `@{ … }` child, a `() => @{ … }` sub-template (including a `createPortal` body),
+  or a `function F() @{ … }` declared in a component, an `@if`, `@for`,
+  `@switch` or `@try` arm, or a lifted event handler, could read the template's
+  own locals or parameters, or the enclosing component's locals, as unbound
+  identifiers on mount, hydration, update, or when the event fired. The compiler
+  now passes those names to the code it hoists. A child local that shadows a
+  stable parent binding, such as a state setter, is also no longer treated as
+  stable, so a changing handler takes effect.
+- 898820a: Discard stale server text when hydrating a renderable `{expr}` hole that is its
+  host element's only child and whose client value renders nothing (`null`,
+  `undefined`, `false`, `true`, or `''`). Hydration kept the server's text, so a
+  later value rendered beside it (`<div>AB</div>`) and nothing was reported. A
+  `null` value in the root component recovered only by abandoning hydration for
+  the rest of the root, which duplicated the text of a later only-child hole. The
+  hole now removes the server content, reports the recovery to
+  `onRecoverableError` once, and names its source location in the development
+  hydration-mismatch warning. A dormant `<Hydrate>` boundary whose props changed
+  before it activated still repairs the hole without reporting it.
+- 25cc659: Discard stale server text when hydrating a renderable `{expr}` hole that is its
+  host element's only child and whose client value is an element, a component, or
+  a list. In the root component, hydration gave up on the rest of the root, so a
+  later only-child hole rendered its text twice (`<b>tt</b>`) and the development
+  warning named the wrong cause. In a nested component, the value rendered beside
+  the server text and nothing was reported. The hole now removes the server text,
+  reports the recovery to `onRecoverableError` once, names its source location in
+  the development hydration-mismatch warning, and the rest of the root keeps
+  hydrating. A value that suspends is reported and built once when its boundary
+  retries, a textarea keeps its server text as its default value, and a dormant
+  `<Hydrate>` boundary whose props changed before it activated still repairs the
+  hole without reporting it.
+- 8fb96a0: Hydration now recovers when the browser's HTML parser has repaired
+  server-rendered markup, such as a `<div>` inside a `<p>`. The server wraps
+  such an element in a hydration range, so the parser's repair stays inside it.
+  The client rebuilds the element once, discards the nodes the parser split out,
+  and reports the recovery through `onRecoverableError`, with a development
+  hydration-mismatch warning. Previously the content appeared twice and the stale
+  copy stayed on screen, a later sibling's bindings could land on a stray node,
+  and a repaired element in the root component could blank the page. Hydrating an
+  element with component children where the server rendered nothing no longer
+  throws.
+- 699e363: Remount a portal's child element when its key or type changes.
+
+  `createPortal(<Editor key={id} />, target)` kept the same component instance when `id` changed, so its DOM and any value typed into an uncontrolled input survived a keyed reset. Switching the child between component types, or between a host element and a component, reused the old DOM the same way. The portal now remounts its child for a new key or element type, as React does. An unchanged key and type still preserve the child, and the portal's own third-argument key works as before.
+- 84d2eaf: Release a portal's previous range when it rebuilds under a mounted owner.
+
+  A `{createPortal(children, target, key)}` at JSX child position rebuilds its
+  whole subtree whenever its key, target, or child element type changes. Each
+  rebuild used to register the new portal alongside the old one instead of in its
+  place, so an owner that stayed mounted, such as a dialog host keyed by the
+  selected id, kept every replaced portal and its detached start and end markers
+  alive until it unmounted. The rebuilt portal now takes over the previous one's
+  registration.
+
+  A transition that rebuilt the portal and then suspended also left the restored
+  portal unable to receive delegated events, such as clicks inside a dialog,
+  because rolling back released the target's event listeners twice. Rollback now
+  restores the previous portal's registration and releases the abandoned one
+  exactly once.
+- ca7d55d: Release late-resolving streamed RPC iterables when an unread response is canceled, aborted, or times out.
+- 5bc3af7: Discard stale server content when hydrating a renderable `{expr}` hole whose
+  client value is text or empty. If the server rendered an element, component, or
+  list into the hole but the client rendered a string, number, `null`, or
+  `undefined`, hydration kept the server's content next to the client value
+  through every later render and reported nothing. The hole now keeps at most one
+  server text node, removes the rest, reports the recovery to `onRecoverableError`,
+  and names the hole's source location in the development hydration-mismatch
+  warning. A dormant `<Hydrate>` boundary whose props changed before it activated
+  still repairs the hole without reporting it.
+- 94ba1b6: A `@{ … }` function with a rest parameter, such as
+  `export function Join(...parts: string[]) @{ … }`, now loads and renders on
+  the client and the server, and hydrates. The compiled body appends its render
+  scope parameters after the authored ones, so it emitted
+  `function Join(...parts, __s, __extra)`, and the module threw
+  `SyntaxError: Rest parameter must be last formal parameter` when it loaded.
+  The server did the same for a returned-JSX function with a rest parameter,
+  even a helper that code only calls directly. The rest parameter now holds what
+  the returned-JSX form's rest parameter holds: a direct call's own arguments,
+  and for a component render the runtime's `(props, scope, extra)` arguments
+  from its position on. A TypeScript `this` parameter on a `@{ … }` function no
+  longer takes the place of the props, which had crashed the client render.
+- 03e7ba0: Lower an early exit inside a directive arm the same way under returned JSX as in
+  a template body. For `return <div>@if (x) { if (c) return; <b /> }</div>`, the
+  client kept the arm's `return` as a literal JavaScript return, while the server
+  rendered the rest of the arm as a nested range. Hydration reported a mismatch and
+  rebuilt the subtree. A client update that took the exit also left the arm's
+  earlier output in place. The same applied to `@else`, `@switch` cases, and
+  `return` in `@for` bodies, and to directives inside JSX values stored in
+  setup.
+- ddb655c: Discard stale server text when hydrating a renderable `{expr}` hole whose server
+  value was text but whose client value is a component that returns another
+  component's element or list. Hydration kept the server text beside the client
+  element and reported nothing. When the returned component rendered the server's
+  text instead, a later switch to a different returned component left that text
+  behind. The server text now stays inside the returned components' range, so it
+  is adopted as their text, or removed and reported once to `onRecoverableError`
+  with the development warning naming the component that returns the element. The
+  same holds when a component in the chain suspends during hydration.
+- 4ebe8d4: A component that returns a keyed element, a `<noscript>`, or a document element
+  such as `<body>` from an ordinary `return` now renders that element's `@if`,
+  `@for`, `@switch`, and `@try` children on the client, including directives
+  nested in a child element, fragment, or component inside it. The client used to
+  mount the element empty on every render while the server rendered its content,
+  and a directive inside a `<>…</>` fragment there failed to compile. A `.tsx`
+  component returning a keyed element with a `.map()` child rendered it empty in
+  the same way. The same element in a `@{ … }` body was not affected.
+- e325a83: A component that returns a keyed element, a `<noscript>`, or a document element
+  such as `<body>` or `<html>` from an ordinary `return` now hydrates by adopting
+  the server element. The client used to mistake that element's own server range
+  for the component's, so it warned about a list mismatch and rendered a second
+  copy beside the server element, or silently duplicated a `<noscript>` or
+  `<body>`, and a returned `<html>` failed to hydrate. Switching such a component
+  between that element and other output, such as text, no longer leaves the old
+  element behind. The same element in a `@{ … }` body was not affected.
+- d78f279: Resume server-resolved signals such as `query$` when their component renders
+  inside JSX that a parent returns with `return <…/>` rather than an `@{}` body.
+  The browser used to call its own loader, replace the server text, and report a
+  hydration mismatch, for two reasons. A component placed beside a directive in a
+  returned fragment or host element compiled to a different call-site id on each
+  side. Children of a returned fragment, array, or keyed element also missed
+  their list position in the server's signal identity. Both sides now agree, and
+  explicitly keyed de-opt children no longer serialize a JSON key per item on the
+  server.
+- ddb655c: Discard stale server text when hydrating a renderable `{expr}` hole beside other
+  children whose server value was text but whose client value is a list, a
+  fragment, a keyed element, or a portal, or a component that returns an element
+  or a list. Hydration kept the server text next to the client value, so the
+  content appeared twice (a portal's hole kept collecting text on later renders),
+  and nothing was reported. The hole now removes the server text, reports the
+  recovery to `onRecoverableError` once, names its source location (or the
+  returning component's) in the development hydration-mismatch warning, and the
+  rest of the root keeps hydrating. A dormant `<Hydrate>` boundary whose props
+  changed before it activated still repairs the hole without reporting it.
+- 8fb96a0: Keyed `@for` rows now reorder and remove correctly when a row's only element is
+  not built from the template. That covers a `<noscript>`, a tree the HTML parser
+  would repair (such as a `<div>` inside a `<p>`), a `<meta>` or other element
+  hoisted into the document head, and an element with its own `key` inside an
+  `@if` or `@switch` arm. It also covers components whose root is one of these.
+  Octane used to treat such a row as its single element, so removing rows could
+  leave elements or comment markers behind, reorders could misplace rows, and a
+  hoisted row could crash the list. Server-rendered keyed and `<noscript>` rows
+  now hydrate by adopting the server elements too.
+- d7ffa13: Server rendering no longer wraps the only renderable child of a host that has
+  a spread in hydration markers, matching how the client mounts that child.
+  Inside a `<textarea>`, whose content the HTML parser keeps as text, those
+  markers became part of the default value: `<textarea {...rest}>{value}</textarea>`
+  showed `<!--[-->A<!--]-->` before hydration, and hydration then reported a text
+  mismatch. The markers also stopped a server-rendered `<option {...rest}>{label}</option>`
+  without a `value` from matching its select's `value` or `defaultValue`, so the
+  wrong option was selected until hydration.
+
+  Updating the child of a `<textarea>` that has a spread also no longer empties
+  it. Authored textarea children are a live text binding, but every update after
+  mount cleared the default value when the spread supplied no `value` or
+  `defaultValue`, which detached the child's text.
+- 32c1bf4: Let `prerender` finish when a resource reader keeps rethrowing a thenable that
+  has already settled until a timer or I/O callback updates its state. These
+  retries used to run on microtasks, so the render failed after 50 passes before
+  the callback could run. Once the render has seen that thenable settle, it now
+  retries on a timer that backs off from 1ms to 100ms. These retries no longer
+  count toward the pass limit, and a reader that never recovers fails once the
+  stall lasts `timeoutMs`. When a pass limit is reached on thenables thrown
+  outside `use()`, buffered and streamed errors now name that cause instead of
+  `use()`.
+- 7ee5f1a: Let `renderToPipeableStream` and `renderToReadableStream` finish when a resource
+  reader keeps rethrowing a thenable that has already settled until a timer or I/O
+  callback updates its state. A lag longer than about 50 event-loop turns used to
+  fail the stream after 50 passes. These retries now back off on the same timer as
+  `prerender`, do not count toward either streaming pass limit, and stop waiting
+  as soon as another boundary's data arrives. A reader that never recovers fails
+  once the stall lasts `timeoutMs`. When the pass limit before the shell is
+  reached on thenables thrown outside `use()`, the shell error now names that
+  cause.
+- 608ff43: Report `"use strong"` inside a function or component body as
+  `OCTANE_STRONG_DIRECTIVE_PLACEMENT`. Strong mode applies to a whole module,
+  but a function-body prologue parsed as an ordinary directive and was ignored, so
+  the module compiled in compat mode with no diagnostic and Strong checks never
+  ran. The compiler, `slotHooks`, and the Volar diagnostics now reject it and
+  ask for the directive at the top of the file.
+- 09c58dc: A keyed `@for` row no longer leaves a partial copy of itself behind when a child
+  suspends or throws during the row's first render. When the row's only root is an
+  element, a component whose only root is an element, or an `@if` whose branches
+  are single elements, the row's element was already in the list when the child
+  suspended. Nothing owned it, so the retry rendered the row again beside the
+  stale one, or ahead of the rows that came before it. The partial element is now
+  removed with the rest of the row, whether the row is mounted, inserted by an
+  update, or rendered by a client that has more rows than the server. During
+  hydration, the retry no longer adopts the partial element as server output.
+- 28a3636: Stop a Suspense retry from livelocking the page when it keeps suspending on a
+  promise that has already settled. This happens when a resource reader throws a
+  resolved promise before its own state catches up, or when `use()` reads a
+  thenable whose `status` React does not recognize, such as `'resolved'`. Each
+  retry used to run on that promise's next microtask, so timers and network
+  callbacks never ran and the suspension could never end. A retry now waits one
+  task once the promise's settlement has been seen, as React's Scheduler does. A
+  promise's first settlement still retries right away.
+- 3f9b16b: A `<textarea>` whose children come from a spread or a `children=` prop, such as
+  `<textarea {...{ children: value }} />`, no longer empties on updates after
+  mount, whether it was mounted on the client or hydrated. Its default value now
+  follows every render, as it already did for authored JSX children. A signal
+  update to another prop in the same spread no longer clears it either.
+- 25b6e6d: A `<textarea>` with more than one child now renders its children as one run of
+  text on both the client and the server. The HTML parser keeps markup and comments
+  inside a textarea as literal text, so the hydration markers used between
+  children became part of its value. `<textarea>hello {name as string}</textarea>`
+  threw "Cannot read properties of null" on a client-only mount. Server rendering
+  showed `hello <!-- -->A` until hydration, which then reported a mismatch.
+  `<textarea>hello {name}</textarea>` and `<textarea>{a}{b}</textarea>` mounted
+  with a literal `<!>` in the value, and hydration rebuilt the textarea. The same
+  text rule applies to textareas made by `createElement`, stored
+  JSX, and a `children` prop from a spread. These no longer report a hydration
+  mismatch or serialize array children with markers. A signal handle in a
+  compiled textarea's children stays live.
+
+  A textarea child must be text. Strings and numbers render, `null`, `undefined`
+  and booleans render nothing, and arrays or iterables of text are concatenated.
+  An element, function or other object now throws a clear error on both sides.
+  Before, the client inserted an element that the textarea's value ignored and the
+  server wrote it as literal text. An element, component, or template directive
+  written inside a `<textarea>` is a compile error.
+- 9d322ef: Give `useActionState` on universal renderers the React 19 queue semantics the
+  DOM runtime already has. Dispatches now run one at a time, each receiving the
+  previous completed result as `previousState` and running the action that was
+  current when it was dispatched. The dispatcher keeps one identity across
+  renders, and `isPending` stays true until the queue drains. An action error now
+  reaches the nearest `universalTry` boundary (or the root's `onUncaughtError`),
+  keeps the prior state, and lets later queued dispatches continue. A
+  function-valued state is now stored rather than called.
+- d455cb1: Universal renderers now treat a React-style `key` attribute on the only root of
+  an `@for` row as the row key, exactly as the DOM renderer does. It takes
+  precedence over a header key and compiles byte for byte like
+  `@for (…; key expr)`, for intrinsic, component and Activity roots. Before,
+  universal renderers read only the header, so a row keyed by its root attribute
+  fell back to a positional key: its state followed the slot rather than the item
+  across reorders, and the attribute stayed on the root as a separate key that
+  kept the row off the static-prop, owner-free and template-program row lowerings.
+  A root key that reads a name declared inside the row body is now a compile
+  error.
+- 40f4827: Import only the renderer helpers a universal module's output references.
+
+  Universal compiler output used to import every region helper from its renderer
+  module, whether or not it called them. A standalone renderer runtime exports only
+  the helpers it implements, so bundlers such as esbuild rejected the unused
+  imports. The Lynx main thread hit this after `universalBlock` was added: even a
+  plain `<view />` component failed to link.
+
+  `octane/universal` and `octane/universal/native` now also export `useFormState`,
+  the pre-19 name for `useActionState`. The universal compiler already accepted
+  that import from `octane`, but no universal runtime provided it.
+- 4180828: Stop a universal renderer Suspense retry, including in Lynx, from livelocking
+  when it keeps suspending on a thenable that has already settled. Before, each
+  retry ran on that thenable's next microtask, so timers and native callbacks
+  never ran and the suspension could never end. This happened when a thenable's
+  owner publishes its `status` on a later task, or when a reverse-region DOM child
+  routed the same suspension back to its universal owner. A universal root inside
+  a DOM Suspense boundary could loop the same way. A retry now waits one task once
+  the thenable's settlement has been seen, as React's Scheduler does. A first
+  settlement still retries right away.
+
+  Universal `use()` no longer rewrites a thenable `status` it did not set. Before,
+  it replaced a status React does not recognize, such as router-core's
+  `'resolved'`, with its own `'pending'`/`'fulfilled'` tracking. It now leaves the
+  status alone and treats the thenable as pending, matching React and the DOM
+  runtime.
+- c587109: Give `useOptimistic` on universal renderers the React 19 semantics the DOM
+  runtime already has. It previously ignored every passthrough value after the
+  first and never reverted an optimistic update. An optimistic update now shows
+  at once, even inside a transition, and rebases onto each new passthrough. It
+  reverts in the same commit as the transition it was dispatched in, or the
+  pending async action it follows, including when that action fails. An update
+  dispatched outside any transition shows once and then reverts. Without a
+  reducer, a function action updates the pending state, as in `useState`.
+  Dispatching an optimistic update while its component renders now throws, as in
+  React.
+- ba483f4: Without a reducer, `useOptimistic` now applies a function action as an updater
+  that receives the pending optimistic state, as `useState` does and as React 19
+  does. It previously stored the function itself as the optimistic state. Updaters
+  now chain, and they rebase onto each new passthrough while the action is
+  pending. The dispatch type without a reducer is now
+  `(action: State | ((pendingState: State) => State)) => void`.
+- c37f922: Start a `<ViewTransition>` on the live document when a boundary is nested inside a component's compiled template that has not been inserted yet. The staged clone still belongs to the inert `<template>` document, so Octane picked that document as the transition owner. Its `startViewTransition` returns `null` because it has no browsing context, and the commit threw `Cannot read properties of null (reading 'ready')`, leaving the old screen in place. The owner now resolves through the parent block's host when the boundary's own parent belongs to a document without a `defaultView`.
+- 007691e: Keep an unchanged nested `<ViewTransition>` paired when an ancestor boundary animates.
+
+  The nested boundary was captured on the old side only, so its old snapshot played the boundary's `update` class on its own, over the ancestor's new snapshot that already paints the same element. It now keeps its name on the new side too, as React does, and cross-fades in place.
+
 ## 0.6.3
 
 ### Patch Changes
