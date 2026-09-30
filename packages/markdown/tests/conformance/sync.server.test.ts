@@ -14,7 +14,7 @@ import Markdown, { type Components, type ExtraProps } from '../../src/index';
 
 async function octaneHtml(props: Parameters<typeof Markdown>[0]): Promise<string> {
 	return (await prerender(Markdown as ComponentBody<typeof props>, props)).html
-		.replace(/<!--\[-->|<!--\]-->/g, '')
+		.replace(/<!--\[-->|<!--\]-->|<!-- -->/g, '')
 		.replace(/ checked(?=\/?>)/g, ' checked=""')
 		.replace(/style="([^"]*);"/g, 'style="$1"');
 }

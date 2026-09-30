@@ -45,9 +45,13 @@ export const EMPTY_COMMENT = '<!---->';
  * (`ssrEmitNodes` in `octane/compiler`) writes it; the client's hole-aware
  * `sibling()` walk (runtime.ts) treats it as a protocol node — stepping across
  * it between two text holes, or adopting it as the insert-before stand-in
- * position when a hole's server text was empty.
+ * position when a hole's server text was empty. A de-opt host's adjacent
+ * primitive children carry it too (runtime.server `ssrDescriptorContent`),
+ * and the client's de-opt reconciler drops it while adopting their texts.
  */
 export const HYDRATION_TEXT_SEP = ' ';
+/** The serialized text-hole separator comment. */
+export const TEXT_SEPARATOR = `<!--${HYDRATION_TEXT_SEP}-->`;
 
 /**
  * Marker attribute on the inline `<script type="application/json">` that the

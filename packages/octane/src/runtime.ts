@@ -32556,10 +32556,13 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		}
 		const stampedKey = (scan as any).$$deoptKey;
 		const descriptor = stampedKey === undefined ? getDeoptDesc(scan) : undefined;
+		// A server separator between adjacent texts (ssrDescriptorContent) is not
+		// adoptable content. Like the compiled path and React, hydration leaves it
+		// in place and unreported; unstamped, it stays foreign to later reconciles.
 		if (
 			stampedKey === undefined &&
 			descriptor === undefined &&
-			!(hydrationOwnsUnstamped ??= activeHydration() !== null)
+			(!(hydrationOwnsUnstamped ??= activeHydration() !== null) || isTextSeparator(scan))
 		) {
 			hasForeign = true;
 			scan = getNextSibling(scan);
@@ -32645,7 +32648,8 @@ function nodeAfterPortalRange(start: Node, end: Node): Node | null {
 }
 
 // Continue an ordering walk past foreign portal ranges and imperative nodes.
-// Hydration may also adopt unmarked server children in this owned host.
+// Hydration may also adopt unmarked server children in this owned host, except
+// the server's text separators, which stay where they are.
 function nextDeoptOwnedChild(scan: Node | null, adoptHydrationChildren: boolean): Node | null {
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
@@ -32654,9 +32658,9 @@ function nextDeoptOwnedChild(scan: Node | null, adoptHydrationChildren: boolean)
 			continue;
 		}
 		if (
-			!adoptHydrationChildren &&
-			(scan as any).$$deoptKey === undefined &&
-			getDeoptDesc(scan) === undefined
+			adoptHydrationChildren
+				? isTextSeparator(scan)
+				: (scan as any).$$deoptKey === undefined && getDeoptDesc(scan) === undefined
 		) {
 			scan = getNextSibling(scan);
 			continue;

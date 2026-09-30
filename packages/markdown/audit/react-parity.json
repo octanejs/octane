@@ -124,7 +124,7 @@
         {
           "path": "packages/markdown/audit/adapted-case-crosswalk.json",
           "role": "support",
-          "sha256": "e91a88f4e1fac0fb054c1d29bfc1fd7b7bba5660270f3bc81f5612980ede8829"
+          "sha256": "51d6f86f392292fe1c78674a5c1ee99b5653821641fbc59f01100a0127b1dfbf"
         },
         {
           "path": "scripts/react-parity/react-markdown-runtime-inventory.mjs",
