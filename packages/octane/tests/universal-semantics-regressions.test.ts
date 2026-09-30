@@ -20,6 +20,7 @@ import {
 	type RendererRegion,
 } from '../src/universal.js';
 import {
+	AsyncHelperScene,
 	EffectEventCleanupScene,
 	ExternalStoreWithoutServerScene,
 	ExternalStoreWithServerScene,
@@ -906,6 +907,25 @@ describe('universal runtime semantic regressions', () => {
 		expectRegionUnusable(region!);
 		expect(container.commits).toHaveLength(0);
 		expect(container.instanceCount).toBe(0);
+		root.unmount();
+	});
+
+	// Module-scope helpers that JSX never mounts are ordinary functions, so the
+	// universal compiler keeps `async`/`generator` helpers callable instead of
+	// rejecting the module.
+	it('runs module-scope async and generator helpers that JSX never mounts as components', async () => {
+		const { container, root } = objectRoot();
+		root.render(AsyncHelperScene, {});
+
+		expect(instance(container, 'generator-value').props.value).toBe('from-generator');
+
+		container.dispatchEvent(instance(container, 'async-action'), 'press', undefined);
+		await flushMicrotasks();
+		expect(instance(container, 'async-action').props.value).toBe('async-loaded');
+
+		container.dispatchEvent(instance(container, 'arrow-action'), 'press', undefined);
+		await flushMicrotasks();
+		expect(instance(container, 'async-action').props.value).toBe('arrow-loaded');
 		root.unmount();
 	});
 });

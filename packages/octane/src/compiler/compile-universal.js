@@ -2667,6 +2667,15 @@ function hasOwnTemplateReturn(fn) {
 }
 
 function componentRender(fn, state, force = false) {
+	// Functions that are never invoked as components stay ordinary functions,
+	// so an async/generator helper only fails once it is actually compiled as
+	// one (the `@{ … }` form, a JSX-shaped return, or component usage).
+	const component =
+		fn.body?.type === 'JSXCodeBlock' ||
+		(fn.body?.type !== 'BlockStatement'
+			? force || isTemplateNode(fn.body)
+			: force || hasOwnTemplateReturn(fn) || state.componentNames.has(functionName(fn)));
+	if (!component) return null;
 	if (fn.async || fn.generator) {
 		throw universalError(
 			state.filename,
@@ -2681,11 +2690,8 @@ function componentRender(fn, state, force = false) {
 		};
 	}
 	if (fn.body?.type !== 'BlockStatement') {
-		if (!force && !isTemplateNode(fn.body)) return null;
 		return { setup: [], render: isTemplateNode(fn.body) ? fn.body : null, expression: fn.body };
 	}
-	if (!force && !hasOwnTemplateReturn(fn) && !state.componentNames.has(functionName(fn)))
-		return null;
 	return { setup: fn.body.body ?? [], render: null };
 }
 

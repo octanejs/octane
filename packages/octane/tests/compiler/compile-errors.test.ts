@@ -757,3 +757,67 @@ describe('compile errors — directive arm exits', () => {
 		}
 	});
 });
+
+// The universal compiler compiles every module-scope function, but the
+// synchronous-body restriction belongs to component shapes only: a helper that
+// JSX never mounts stays an ordinary function and may be async or a generator.
+describe('compile errors — universal async/generator functions', () => {
+	const object = {
+		id: 'object',
+		module: 'octane/universal',
+		target: 'universal',
+		text: 'host',
+	} as const;
+	const universal = (src: string) =>
+		compile(src, 'async-helper.object.tsrx', { hmr: false, renderer: object });
+
+	it('compiles module-scope async and generator helpers that JSX never mounts', () => {
+		expect(() =>
+			universal(`
+				async function load(url: string) {
+					return (await fetch(url)).text();
+				}
+				const cached = async () => 'hit';
+				function* ids() {
+					yield 1;
+				}
+				export function Screen() @{
+					<view onTap={() => load('/x')} />
+				}
+			`),
+		).not.toThrow();
+	});
+
+	it('compiles an async helper nested in component setup', () => {
+		expect(() =>
+			universal(`
+				export function Screen() @{
+					const load = async () => 'hit';
+					<view onTap={() => load()} />
+				}
+			`),
+		).not.toThrow();
+	});
+
+	it.each([
+		['an async `@{ }` component', 'export async function Screen() @{ <view /> }'],
+		['a generator `@{ }` component', 'export function* Screen() @{ <view /> }'],
+		[
+			'an async function with a JSX return',
+			'async function Row() { return <view />; }\nexport function Screen() @{ <view /> }',
+		],
+		[
+			'an async function mounted in JSX',
+			'async function Loader() { return null; }\nexport function Screen() @{ <Loader /> }',
+		],
+		[
+			'a default-exported async function',
+			'export default async function Screen() { return null; }',
+		],
+		['an async arrow with a JSX body', 'export const Screen = async () => <view />'],
+	])('still rejects %s', (_label, src) => {
+		expect(() => universal(src)).toThrow(
+			/async\/generator component functions are not supported yet\./,
+		);
+	});
+});

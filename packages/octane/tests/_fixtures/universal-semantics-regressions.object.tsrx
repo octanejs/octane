@@ -5,6 +5,7 @@ import {
 	useInsertionEffect,
 	useLayoutEffect,
 	useOptimistic,
+	useState,
 	useSyncExternalStore,
 } from 'octane';
 
@@ -118,4 +119,35 @@ export function RecursiveMultiRefScene(props) @{
 
 export function WrongOwnerRegionPropScene(props) @{
 	<wrong-owner-region region={props.region} />
+}
+
+// Module-scope helpers that JSX never mounts stay ordinary functions, so they
+// may be `async` or generator functions. The synchronous-body restriction only
+// applies once a function is actually compiled as a component.
+async function loadAsyncLabel() {
+	return 'async-loaded';
+}
+
+const loadArrowLabel = async () => 'arrow-loaded';
+
+function* generatedLabel() {
+	yield 'from-generator';
+}
+
+export function AsyncHelperScene(props) @{
+	const [label, setLabel] = useState('idle');
+	<scene>
+		<async-action
+			value={label}
+			onPress={() => {
+				void loadAsyncLabel().then(setLabel);
+			}}
+		/>
+		<arrow-action
+			onPress={() => {
+				void loadArrowLabel().then(setLabel);
+			}}
+		/>
+		<generator-value value={generatedLabel().next().value} />
+	</scene>
 }
