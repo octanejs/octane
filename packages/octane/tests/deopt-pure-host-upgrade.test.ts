@@ -89,6 +89,44 @@ function NestedFlip() {
 	);
 }
 
+// HTML tag names are ASCII case-insensitive: an uppercase descriptor tag
+// builds the same lowercase element, so the upgrade adopts it too.
+function UppercaseFlip() {
+	const [on, setOn] = useState(false);
+	return createElement(
+		'FORM',
+		null,
+		createElement('Input', { 'data-testid': 'keep' }),
+		createElement(
+			'BUTTON',
+			{ type: 'button', 'data-testid': 'btn', onClick: () => setOn(!on) },
+			'flip',
+		),
+		on && createElement(Inner, null),
+	);
+}
+
+function UppercaseItemFlip() {
+	const [on, setOn] = useState(false);
+	return createElement(
+		'ul',
+		null,
+		createElement(
+			'button',
+			{ type: 'button', 'data-testid': 'btn', onClick: () => setOn(true) },
+			'flip',
+		),
+		['a', 'b'].map((v) =>
+			createElement(
+				'LI',
+				{ key: v, 'data-testid': `li-${v}` },
+				createElement('input', { 'data-testid': `keep-${v}` }),
+				on && createElement(Inner, null),
+			),
+		),
+	);
+}
+
 describe('de-opt pure-host → component upgrade', () => {
 	it('preserves sibling host node identity across the upgrade', () => {
 		const r = mount(Comp);
@@ -181,6 +219,40 @@ describe('de-opt pure-host → component upgrade', () => {
 			expect(staleB.isConnected).toBe(false);
 			expect(retainedC.isConnected).toBe(true);
 			expect(r.find('[data-testid="inner"]')).toBeTruthy();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('adopts an uppercase-tag host tree and keeps its input state', () => {
+		const r = mount(UppercaseFlip);
+		try {
+			const form = r.find('form');
+			const keep = r.find('[data-testid="keep"]') as HTMLInputElement;
+			const btn = r.find('[data-testid="btn"]');
+			keep.value = 'typed';
+			r.click('[data-testid="btn"]');
+			expect(r.find('[data-testid="inner"]')).toBeTruthy();
+			expect(r.find('form')).toBe(form);
+			expect(r.find('[data-testid="keep"]')).toBe(keep);
+			expect(r.find('[data-testid="btn"]')).toBe(btn);
+			expect(keep.value).toBe('typed');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('adopts uppercase-tag list items that gain a component child', () => {
+		const r = mount(UppercaseItemFlip);
+		try {
+			const liA = r.find('[data-testid="li-a"]');
+			const keepB = r.find('[data-testid="keep-b"]') as HTMLInputElement;
+			keepB.value = 'typed';
+			r.click('[data-testid="btn"]');
+			expect(r.findAll('[data-testid="inner"]')).toHaveLength(2);
+			expect(r.find('[data-testid="li-a"]')).toBe(liA);
+			expect(r.find('[data-testid="keep-b"]')).toBe(keepB);
+			expect(keepB.value).toBe('typed');
 		} finally {
 			r.unmount();
 		}
