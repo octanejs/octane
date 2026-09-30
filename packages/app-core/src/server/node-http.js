@@ -243,6 +243,9 @@ async function sendWebResponseForRequest(nodeResponse, webResponse, nodeRequest)
 	if (nodeRequest && body && shouldGzip(nodeRequest, webResponse.status, headers, true)) {
 		headers.set('Content-Encoding', 'gzip');
 		headers.delete('Content-Length');
+		const etag = headers.get('ETag');
+		// A strong validator for the identity bytes cannot identify their gzip form.
+		if (etag !== null && !etag.startsWith('W/')) headers.delete('ETag');
 		// Sync-flush each input chunk so an SSR shell stays progressively
 		// observable instead of waiting for the final segment to close gzip.
 		const gzip = Duplex.toWeb(createGzip({ flush: zlibConstants.Z_SYNC_FLUSH }));
