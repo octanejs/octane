@@ -34714,7 +34714,10 @@ function lowerJsxReturnBranchComponents(ast) {
  * lowers the helper. The runtime itself renders the function arguments of
  * three calls, which keep that path: a `createPortal` body, matched by name as
  * the portal lowering matches it, and the component or render-function child
- * given to octane's `memo` or `createElement`.
+ * given to octane's `memo` or `createElement`. So does a component given to an
+ * `Object` static that only stores or returns it, as
+ * `Object.assign(Button, { Item })` does: the component is rendered later, and
+ * inside a module-level function only its template body can own a directive.
  *
  * Module-level template bindings are components, which this pass leaves to
  * the component pipeline. Async and generator functions keep their bodies,
@@ -34752,9 +34755,11 @@ function lowerDirectlyCalledTemplateFunctions(ast) {
 	if (expressions.size === 0 && candidates.size === 0) return ast;
 
 	let renderingCallees = null;
-	// True when the runtime, not the callee, renders the call's function arguments.
-	const rendersArguments = (call) => {
+	// True when the callee never calls the call's function arguments: the runtime
+	// renders them, or an `Object` static stores or returns them.
+	const keepsArguments = (call) => {
 		const callee = unwrapTsExpr(call.callee);
+		if (isObjectPassThroughCallee(callee)) return true;
 		if (callee?.type !== 'Identifier') return false;
 		if (callee.name === 'createPortal') return true;
 		renderingCallees ??= collectOctaneImportLocals(ast.body, ['memo', 'createElement']);
@@ -34788,8 +34793,8 @@ function lowerDirectlyCalledTemplateFunctions(ast) {
 		for (let i = 0; i < args.length; i++) {
 			const arg = unwrapTsExpr(args[i]);
 			if (expressions.has(arg)) {
-				if (!rendersArguments(node)) lowered.add(arg);
-			} else if (arg?.type === 'Identifier' && names.has(arg.name) && !rendersArguments(node)) {
+				if (!keepsArguments(node)) lowered.add(arg);
+			} else if (arg?.type === 'Identifier' && names.has(arg.name) && !keepsArguments(node)) {
 				markCalled(functions, arg.name);
 			}
 		}
@@ -34805,6 +34810,29 @@ function lowerDirectlyCalledTemplateFunctions(ast) {
 
 function isLowerableTemplateFunction(fn) {
 	return fn.body?.type === 'JSXCodeBlock' && !fn.async && !fn.generator;
+}
+
+// The `Object` statics that return their first argument and call none of their
+// arguments. `Object.groupBy` calls its callback, so it is not one of them.
+const OBJECT_PASS_THROUGH_METHODS = new Set([
+	'assign',
+	'defineProperties',
+	'defineProperty',
+	'freeze',
+	'preventExtensions',
+	'seal',
+	'setPrototypeOf',
+]);
+
+/** `Object.assign`, `Object.freeze`, or another pass-through `Object` static. */
+function isObjectPassThroughCallee(callee) {
+	return (
+		callee?.type === 'MemberExpression' &&
+		!callee.computed &&
+		callee.object?.type === 'Identifier' &&
+		callee.object.name === 'Object' &&
+		OBJECT_PASS_THROUGH_METHODS.has(callee.property?.name)
+	);
 }
 
 /**
