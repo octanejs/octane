@@ -7780,7 +7780,9 @@ function isSingleHostIfRoot(node) {
 	if (!isIfDirective(node) || node.alternate == null) return false;
 	const armIsSingleHost = (arm) => {
 		if (isIfDirective(arm)) return isSingleHostIfRoot(arm);
-		const render = statementsOf(arm).filter((s) => isJsxNode(s) || isIfDirective(s));
+		const statements = statementsOf(arm);
+		if (armMayExit(statements)) return false;
+		const render = statements.filter((s) => isJsxNode(s) || isIfDirective(s));
 		return render.length === 1 && isSingleTemplateHost(render[0]);
 	};
 	return armIsSingleHost(node.consequent) && armIsSingleHost(node.alternate);
@@ -7836,6 +7838,7 @@ function collectSingleRootIfDeps(render, locals, ctx) {
 		if (isSwitchDirective(arm)) return switchOk(arm);
 		const statements = Array.isArray(arm) ? arm : statementsOf(arm);
 		if (insideSwitch && hasSwitchCaseLocalBinding(statements)) return false;
+		if (armMayExit(statements)) return false;
 		const out = statements.filter((s) => isJsxNode(s) || isIfDirective(s) || isSwitchDirective(s));
 		if (out.length !== 1) return false;
 		const sole = out[0];
@@ -7945,7 +7948,7 @@ function anchorlessRootShape(node) {
  * folded into the item key when that is safe.
  */
 function isSsrMarkerlessForItem(node, itemBody) {
-	if (node?._octaneBindingSite !== undefined) return false;
+	if (node?._octaneBindingSite !== undefined || armMayExit(itemBody)) return false;
 	const jsxChildren = itemBody.filter((s) => isJsxNode(s));
 	return jsxChildren.length === 1 && isSingleTemplateHost(jsxChildren[0]);
 }
@@ -12423,7 +12426,11 @@ function ssrCompileBodyWithMapTemps(
 		// itself. rewriteEarlyExits wants the array.
 		const bodyStmts =
 			node.body && node.body.type === 'BlockStatement' ? node.body.body || [] : node.body || [];
-		const bodyRewritten = rewriteEarlyExits(bodyStmts);
+		// A statement array is a synthetic arm body (see splitArmExits); a function
+		// body keeps its returns on the generic value ABI.
+		const bodyRewritten = Array.isArray(node.body)
+			? splitArmExits(bodyStmts, ctx)
+			: rewriteEarlyExits(bodyStmts);
 		statements = [];
 		jsxNodes = [];
 		for (const child of bodyRewritten) {
@@ -16249,7 +16256,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		statements = node.body.body || [];
 		jsxNodes = node.body.render ? [node.body.render] : [];
 	} else {
-		const bodyRewritten = rewriteEarlyExits(node.body);
+		const bodyRewritten = splitArmExits(node.body, ctx);
 		statements = [];
 		jsxNodes = [];
 		for (const child of bodyRewritten) {
@@ -33371,10 +33378,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// parent is laid out per child (e.g. <tbody> in js-framework-benchmark).
 	// In addition to a direct host root, accept only narrowly-proven sole
 	// component and host-vs-host conditional roots; all other shapes keep item
-	// ranges.
+	// ranges. An item that can exit early renders no root when it does.
 	let singleRoot = false;
 	let singleRootExpr = null;
-	{
+	if (!armMayExit(subStmts)) {
 		const jsxChildren = subStmts.filter((s) => isJsxNode(s));
 		if (jsxChildren.length === 1) {
 			const c = jsxChildren[0];
@@ -33670,6 +33677,181 @@ function rewriteEarlyExits(body, allowExplicitNull = false) {
 		out.push(stmt);
 	}
 	return out;
+}
+
+/**
+ * Split a directive arm (an @if/@else, @switch case, @try/@pending/@catch, or
+ * @for/@empty body) into its guard-nested form. The arm renders its final node
+ * unless it exits first, and an exit is `return;`, `return null;`, or a
+ * `continue;` that targets the `@for`. Wherever the exit sits in the arm's
+ * setup, it ends only that arm's output, exactly like the top-level guard
+ * rewriteEarlyExits nests. An exit inside a setup statement sets a flag and
+ * breaks out of that statement, and the flag becomes the guard:
+ *
+ *   if (a) { if (b) return null; f(); } rest
+ *   ⇒
+ *   let __exit = false;
+ *   __exit: if (a) { if (b) { __exit = true; break __exit; } f(); }
+ *   if (!__exit) { rest }
+ *
+ * Jumps that target a loop, `switch`, or label inside the arm, and returns in
+ * a nested function, stay JavaScript. Statements the split renders (directives
+ * and JSX-bearing `if`/`for`/`try`) are arms themselves and lower their own
+ * exits when they compile. Legacy synthetic bodies only: a real function body
+ * returns through the generic value ABI.
+ */
+function splitArmExits(body, ctx) {
+	let out = null;
+	for (let i = 0; i < body.length; i++) {
+		const stmt = body[i];
+		let lowered = stmt;
+		if (!isEarlyExitIf(stmt, true) && !isJsxNode(stmt)) {
+			// An unconditional exit: nothing after it runs.
+			if (isEarlyExitStatement(stmt, true)) return rewriteEarlyExits(out ?? body.slice(0, i), true);
+			let flag = null;
+			const replaced = replaceArmExits(stmt, false, false, ctx, (exit) => {
+				flag ??= allocCompilerName(ctx, '__exit');
+				return inheritOriginLoc(
+					b.block([
+						b.stmt(b.assignment('=', b.id(flag), b.literal(true, 'true'))),
+						{ type: 'BreakStatement', label: b.id(flag) },
+					]),
+					exit,
+				);
+			});
+			if (flag !== null) {
+				lowered = [
+					inheritOriginLoc(b.let(b.id(flag), b.literal(false, 'false')), stmt),
+					inheritOriginLoc(b.labeled(flag, replaced), stmt),
+					inheritOriginLoc(b.if(b.id(flag), b.return(), null), stmt),
+				];
+			}
+		}
+		if (out === null && lowered !== stmt) out = body.slice(0, i);
+		if (out !== null) Array.isArray(lowered) ? out.push(...lowered) : out.push(lowered);
+	}
+	return rewriteEarlyExits(out ?? body, true);
+}
+
+/**
+ * Replace each exit a setup statement owns with `exit(node)`. A value return
+ * and a `break` that targets the directive have no arm equivalent, so they are
+ * compile errors instead of literal JavaScript that renders "null"/"undefined",
+ * leaves stale DOM, or breaks out of a function.
+ */
+function replaceArmExits(node, loop, breakable, ctx, exit) {
+	if (node === null || typeof node !== 'object') return node;
+	if (Array.isArray(node)) {
+		let out = null;
+		for (let i = 0; i < node.length; i++) {
+			const mapped = replaceArmExits(node[i], loop, breakable, ctx, exit);
+			if (out === null && mapped !== node[i]) out = node.slice(0, i);
+			if (out !== null) out.push(mapped);
+		}
+		return out ?? node;
+	}
+	const type = node.type;
+	if (isArmJumpBoundary(type)) return node;
+	const jump = armJump(node, loop, breakable);
+	if (jump === 'exit') return exit(node);
+	if (jump === 'value') {
+		throw armExitError(
+			ctx,
+			node,
+			'A directive arm can only end early with `return;` or `return null;`. Its output is ' +
+				'the node it ends with, so a returned value has nothing to render in its place: ' +
+				'render the alternative from an `@if`/`@else` arm instead.',
+		);
+	}
+	if (jump === 'break') {
+		throw armExitError(
+			ctx,
+			node,
+			'`break` cannot leave the `@for` or `@switch` around a directive arm. End the arm ' +
+				'early with `return;` instead, or filter the `@for` items to stop the list early.',
+		);
+	}
+	const innerLoop = loop || LOOP_TYPES.has(type);
+	const innerBreakable = breakable || innerLoop || type === 'SwitchStatement';
+	let out = null;
+	for (const key in node) {
+		if (AST_WALK_SKIP_KEYS.has(key)) continue;
+		const child = node[key];
+		if (child === null || typeof child !== 'object') continue;
+		const mapped = replaceArmExits(child, innerLoop, innerBreakable, ctx, exit);
+		if (mapped !== child) (out ??= { ...node })[key] = mapped;
+	}
+	return out ?? node;
+}
+
+/**
+ * Whether an arm's setup can end it before its output node, so the output is
+ * conditional. Single-root and markerless proofs that pick an arm's output by
+ * its JSX statements must reject such an arm: when the exit is taken there is
+ * no host to serve as the boundary.
+ */
+function armMayExit(statements) {
+	return statements.some(
+		(statement) => !isJsxNode(statement) && ownsArmJump(statement, false, false),
+	);
+}
+
+function ownsArmJump(node, loop, breakable) {
+	if (node === null || typeof node !== 'object') return false;
+	if (Array.isArray(node)) return node.some((child) => ownsArmJump(child, loop, breakable));
+	const type = node.type;
+	if (isArmJumpBoundary(type)) return false;
+	if (armJump(node, loop, breakable) !== null) return true;
+	const innerLoop = loop || LOOP_TYPES.has(type);
+	const innerBreakable = breakable || innerLoop || type === 'SwitchStatement';
+	for (const key in node) {
+		if (AST_WALK_SKIP_KEYS.has(key)) continue;
+		const child = node[key];
+		if (
+			child !== null &&
+			typeof child === 'object' &&
+			ownsArmJump(child, innerLoop, innerBreakable)
+		)
+			return true;
+	}
+	return false;
+}
+
+// Nested functions own their returns, and JSX and directives own their arms.
+function isArmJumpBoundary(type) {
+	return (
+		typeof type !== 'string' ||
+		FN_TYPES.has(type) ||
+		type === 'StaticBlock' ||
+		JSX_CHILDREN_BEARING_TYPES.has(type) ||
+		SETUP_VALUE_DIRECTIVE_TYPES.has(type)
+	);
+}
+
+/**
+ * How a jump statement relates to the arm whose setup holds it: 'exit' ends
+ * the arm, 'value' (a value return) and 'break' (one that targets the
+ * directive) have no arm meaning, and null stays JavaScript. `loop` and
+ * `breakable` say whether an unlabeled `continue`/`break` here targets a loop
+ * or `switch` inside the arm; a labeled jump always targets a label inside it.
+ */
+function armJump(node, loop, breakable) {
+	switch (node.type) {
+		case 'ReturnStatement':
+			return isEarlyExitStatement(node, true) ? 'exit' : 'value';
+		case 'ContinueStatement':
+			return node.label == null && !loop ? 'exit' : null;
+		case 'BreakStatement':
+			return node.label == null && !breakable ? 'break' : null;
+		default:
+			return null;
+	}
+}
+
+function armExitError(ctx, node, message) {
+	const l = node.loc && node.loc.start;
+	const at = l ? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})` : '';
+	return new Error(message + at);
 }
 
 /**
