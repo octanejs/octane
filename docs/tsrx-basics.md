@@ -860,6 +860,9 @@ These patterns become compile errors:
   passed anywhere, or reading a reassigned module variable in synchronous effect
   setup (`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`). Read the render snapshot, or
   move the non-reactive read into a `useEffectEvent` callback.
+- Adding a platform event listener, interval, observer, connection, or
+  geolocation watch in effect setup without releasing it in the returned cleanup
+  (`OCTANE_STRONG_EFFECT_RESOURCE_LEAK`).
 - Calling a known third-tuple state getter during render
   (`OCTANE_STRONG_RENDER_STATE_GETTER_CALL`). Render from the first tuple member;
   read the latest scheduled state in an event, effect, or deferred callback.
@@ -1069,9 +1072,9 @@ including statically selected or spread literals; they do not assume an aliased
 or externally produced array is unchanged.
 
 Update state in event handlers instead. When state should reset or adjust after
-an input changes, use `useLinkedState`. Effects that connect to external systems,
-genuinely deferred callbacks, effect cleanup, and refs attached to DOM elements
-remain valid. Refs that hold timers or callbacks
+an input changes, use `useLinkedState`. Effects that connect to external systems
+and release what they acquire, genuinely deferred callbacks, effect cleanup, and
+refs attached to DOM elements remain valid. Refs that hold timers or callbacks
 remain valid in events, cleanup, deferred callbacks, and Effect Events. Obtain changing timestamps or random
 values in events or effects and put them in state. A lazy state initializer such
 as `useState(() => new Date())` may also capture the initial value.

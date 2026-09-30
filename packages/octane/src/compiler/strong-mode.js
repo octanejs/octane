@@ -9,7 +9,11 @@ import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { createStrongTemplatePolicy } from './strong-template-policy.js';
 import { createStrongEffectPolicy } from './strong-effects.js';
 
-export { STRONG_EFFECT_DATA_FETCH, STRONG_EFFECT_HIDDEN_DEPENDENCY } from './strong-effects.js';
+export {
+	STRONG_EFFECT_DATA_FETCH,
+	STRONG_EFFECT_HIDDEN_DEPENDENCY,
+	STRONG_EFFECT_RESOURCE_LEAK,
+} from './strong-effects.js';
 
 const STATE_HOOKS = new Set(['useState', 'useReducer', 'useLinkedState']);
 const EFFECT_HOOKS = new Set(['useEffect', 'useLayoutEffect', 'useInsertionEffect']);
@@ -4534,6 +4538,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 							effectPolicy.restoreFlow(beforeFlow);
 						}
 					}
+					if (executionPhase === 'effect') effectPolicy.acquire(currentEffect, node);
 				}
 				if (
 					executionPhase === 'render' ||
@@ -4594,6 +4599,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					unshadowedGlobal(callee, scope, 'Date')
 				) {
 					reportImpureCall(callee);
+				}
+				if (currentEffect !== null && executionPhase === 'effect') {
+					effectPolicy.construct(currentEffect, node);
 				}
 				if (inlineConstructor) {
 					visitCallback(callee, scope, executionPhase, argumentValues(node.arguments, scope));
@@ -4693,6 +4701,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					reportModuleStateRead(unwrap(node.left));
 				}
 				if (node.operator !== '=') reportHiddenUpdateRead(node.left, scope, phase);
+				if (currentEffect !== null && executionPhase === 'effect') {
+					effectPolicy.assign(currentEffect, node);
+				}
 				return;
 			}
 			case 'UpdateExpression':

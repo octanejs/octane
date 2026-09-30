@@ -2,12 +2,14 @@
 // state provenance; this policy owns the questions it asks about effect setup:
 // which platform calls run their callback before the next paint, whether an
 // asynchronous state update is cancelled or ignored by the returned cleanup,
-// and which refs are plain values rather than attached instances. Identity
-// comes from the shared lexical analysis, never from spelling. Nothing here
-// annotates the parser tree or changes emitted code.
+// whether a platform resource acquired in setup is released, and which refs are
+// plain values rather than attached instances. Identity comes from the shared
+// lexical analysis, never from spelling. Nothing here annotates the parser tree
+// or changes emitted code.
 
 export const STRONG_EFFECT_DATA_FETCH = 'OCTANE_STRONG_EFFECT_DATA_FETCH';
 export const STRONG_EFFECT_HIDDEN_DEPENDENCY = 'OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY';
+export const STRONG_EFFECT_RESOURCE_LEAK = 'OCTANE_STRONG_EFFECT_RESOURCE_LEAK';
 
 const TRANSPARENT = new Set([
 	'ChainExpression',
@@ -36,6 +38,20 @@ const SKIP_KEYS = new Set([
 const CONTINUATIONS = new Set(['then', 'catch', 'finally']);
 // `window`, `self` and `globalThis` name one object in a browser.
 const GLOBAL_OBJECTS = new Set(['window', 'self', 'globalThis']);
+const EVENT_TARGET_GLOBALS = new Set([
+	...GLOBAL_OBJECTS,
+	'document',
+	'navigator',
+	'screen',
+	'visualViewport',
+]);
+const OBSERVERS = new Set([
+	'ResizeObserver',
+	'IntersectionObserver',
+	'MutationObserver',
+	'PerformanceObserver',
+]);
+const CLOSABLES = new Set(['WebSocket', 'EventSource', 'BroadcastChannel']);
 const DEPENDENCY_ARGUMENTS = new Map([
 	['useEffect', 1],
 	['useLayoutEffect', 1],
@@ -60,6 +76,21 @@ const FETCH_MESSAGES = {
 		'Strong mode requires cleanup for a state update that runs after an await in an effect, but an async effect callback returns a promise instead of cleanup. Read asynchronous render data with use() or a query binding, or start the async work inside a synchronous effect whose returned cleanup aborts it or sets a flag checked before this update.',
 	ineffective:
 		'Strong mode requires the effect cleanup to cancel or ignore this asynchronous state update, but the returned cleanup does neither. Abort an AbortController whose signal is passed to the request, or set a flag in the cleanup and check it before this update, after the last await.',
+};
+const LEAK_MESSAGES = {
+	listener:
+		'Strong mode requires effect cleanup to remove this event listener. Keep the handler in a variable and pass it to removeEventListener in the returned cleanup, with the same capture option, or pass an AbortController signal in the listener options and abort it in cleanup.',
+	property:
+		'Strong mode requires effect cleanup to remove this event handler property. Assign null to it in the returned cleanup, or use addEventListener with a matching removeEventListener.',
+	interval:
+		'Strong mode requires effect cleanup to stop this interval. Keep the ID returned by setInterval and call clearInterval(id) in the returned cleanup.',
+	loop: 'Strong mode requires effect cleanup to stop this self-rescheduling timer. Store every timer ID in one variable and cancel it with clearTimeout or cancelAnimationFrame in the returned cleanup.',
+	observer:
+		'Strong mode requires effect cleanup to disconnect this observer. Keep the observer in a variable and call disconnect() in the returned cleanup.',
+	closable:
+		'Strong mode requires effect cleanup to close this connection. Keep it in a variable and call close() in the returned cleanup.',
+	watch:
+		'Strong mode requires effect cleanup to stop this geolocation watch. Keep the ID returned by watchPosition and call navigator.geolocation.clearWatch(id) in the returned cleanup.',
 };
 
 function unwrap(node) {
@@ -409,9 +440,17 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 
 	// --- cleanup scanning ----------------------------------------------------
 
-	// What a cleanup does synchronously: flags it assigns and controllers it aborts.
+	// What a cleanup does synchronously: flags it assigns, controllers it aborts,
+	// listeners it removes, handles it clears, and objects it disposes.
 	function emptyCleanup() {
-		return { flags: new Map(), aborted: new Set() };
+		return {
+			flags: new Map(),
+			aborted: new Set(),
+			removed: [],
+			cleared: new Set(),
+			disposed: new Set(),
+			properties: new Set(),
+		};
 	}
 
 	function mergeCleanup(result, child) {
@@ -421,6 +460,10 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			for (const value of values) target.add(value);
 		}
 		for (const value of child.aborted) result.aborted.add(value);
+		result.removed.push(...child.removed);
+		for (const value of child.cleared) result.cleared.add(value);
+		for (const value of child.disposed) result.disposed.add(value);
+		for (const value of child.properties) result.properties.add(value);
 	}
 
 	function scan(fn) {
@@ -446,6 +489,9 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 						if (values === undefined) result.flags.set(binding, (values = new Set()));
 						values.add(value === UNKNOWN ? UNKNOWN : Boolean(value));
 					}
+				} else if (left?.type === 'MemberExpression') {
+					const key = keyOf(left);
+					if (key !== null) result.properties.add(key);
 				}
 			} else if (node.type === 'CallExpression') {
 				const callee = unwrap(node.callee);
@@ -453,11 +499,38 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				if (inline !== null && inline !== fn && inline.async !== true && !inline.generator) {
 					mergeCleanup(result, scan(inline));
 				}
-				if (callee?.type === 'MemberExpression' && memberName(callee) === 'abort') {
-					const receiver = unwrap(callee.object);
-					const controller =
-						receiver?.type === 'Identifier' ? controllerOf(bindingOf(receiver)) : null;
-					if (controller !== null) result.aborted.add(controller);
+				const name = globalFunction(callee);
+				if (
+					name === 'clearInterval' ||
+					name === 'clearTimeout' ||
+					name === 'cancelAnimationFrame'
+				) {
+					const key = keyOf(node.arguments?.[0]);
+					if (key !== null) result.cleared.add(key);
+				} else if (callee?.type === 'MemberExpression') {
+					const method = memberName(callee);
+					const object = keyOf(callee.object);
+					if (method === 'abort') {
+						const receiver = unwrap(callee.object);
+						const controller =
+							receiver?.type === 'Identifier' ? controllerOf(bindingOf(receiver)) : null;
+						if (controller !== null) result.aborted.add(controller);
+					} else if (method === 'removeEventListener' && object !== null) {
+						result.removed.push({
+							target: object,
+							type: eventType(node.arguments?.[0]),
+							handler: keyOf(node.arguments?.[1]),
+							capture: captureOf(node.arguments?.[2]),
+						});
+					} else if (method === 'clearWatch' && object === 'g:navigator.geolocation') {
+						const key = keyOf(node.arguments?.[0]);
+						if (key !== null) result.cleared.add(key);
+					} else if (
+						(method === 'disconnect' || method === 'unobserve' || method === 'close') &&
+						object !== null
+					) {
+						result.disposed.add(object);
+					}
 				}
 			}
 			for (const key in node) {
@@ -509,11 +582,214 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		return false;
 	}
 
+	// --- platform resources --------------------------------------------------
+
+	function eventType(expression) {
+		const value = staticValue(expression);
+		return typeof value === 'string' ? value : UNKNOWN;
+	}
+
+	function captureOf(expression) {
+		const node = unwrap(expression);
+		if (node == null) return false;
+		if (node.type === 'ObjectExpression') {
+			let capture = false;
+			for (const property of node.properties ?? []) {
+				if (property.type !== 'Property') return UNKNOWN;
+				if (property.computed || (property.key?.name ?? property.key?.value) !== 'capture') {
+					continue;
+				}
+				const value = staticValue(property.value);
+				capture = value === UNKNOWN ? UNKNOWN : Boolean(value);
+			}
+			return capture;
+		}
+		const value = staticValue(node);
+		return value === UNKNOWN ? UNKNOWN : Boolean(value);
+	}
+
+	function listenerSignal(expression) {
+		const node = unwrap(expression);
+		if (node?.type !== 'ObjectExpression') return null;
+		for (const property of node.properties ?? []) {
+			if (
+				property.type === 'Property' &&
+				(property.key?.name ?? property.key?.value) === 'signal'
+			) {
+				return signalController(property.value);
+			}
+		}
+		return null;
+	}
+
+	function platformConstructor(expression) {
+		const node = unwrap(expression);
+		if (node?.type !== 'NewExpression') return null;
+		const name = globalFunction(node.callee);
+		return OBSERVERS.has(name) ? 'observer' : CLOSABLES.has(name) ? 'closable' : null;
+	}
+
+	// An EventTarget provided by the platform: browser globals and what they
+	// return, elements held by refs attached to intrinsic elements, and
+	// connections constructed here. A user object's addEventListener is not one.
+	function platformTarget(expression, depth = 0) {
+		const node = unwrap(expression);
+		if (depth > 8 || node == null) return false;
+		if (node.type === 'Identifier') {
+			const binding = bindingOf(node);
+			if (binding === null) return EVENT_TARGET_GLOBALS.has(node.name);
+			const init = stableInit(binding);
+			return init !== null && platformTarget(init, depth + 1);
+		}
+		if (node.type === 'MemberExpression') {
+			const object = unwrap(node.object);
+			if (memberName(node) === 'current' && object?.type === 'Identifier') {
+				return refs().host.has(refRoot(bindingOf(object)));
+			}
+			return platformTarget(node.object, depth + 1);
+		}
+		if (node.type === 'CallExpression') {
+			const name = globalFunction(node.callee);
+			if (name === 'matchMedia') return true;
+			const callee = unwrap(node.callee);
+			return callee?.type === 'MemberExpression' && platformTarget(callee.object, depth + 1);
+		}
+		return platformConstructor(node) !== null;
+	}
+
+	function ownerKey(node) {
+		return refs().owners.get(node) ?? null;
+	}
+
+	function acquire(record, node) {
+		const callee = unwrap(node.callee);
+		const name = globalFunction(callee);
+		if (name === 'setInterval') {
+			record.acquisitions.push({ kind: 'interval', node, handle: ownerKey(node) });
+			return;
+		}
+		if (name === 'setTimeout' || name === 'requestAnimationFrame') {
+			const reschedules = rescheduleKeys(node, name);
+			if (reschedules !== null) {
+				record.acquisitions.push({ kind: 'loop', node, handle: ownerKey(node), reschedules });
+			}
+			return;
+		}
+		if (callee?.type !== 'MemberExpression') return;
+		const method = memberName(callee);
+		if (method === 'addEventListener' && platformTarget(callee.object)) {
+			record.acquisitions.push({
+				kind: 'listener',
+				node,
+				target: keyOf(callee.object),
+				type: eventType(node.arguments?.[0]),
+				handler: keyOf(node.arguments?.[1]),
+				capture: captureOf(node.arguments?.[2]),
+				signal: listenerSignal(node.arguments?.[2]),
+			});
+		} else if (method === 'watchPosition' && keyOf(callee.object) === 'g:navigator.geolocation') {
+			record.acquisitions.push({ kind: 'watch', node, handle: ownerKey(node) });
+		}
+	}
+
+	function construct(record, node) {
+		const kind = platformConstructor(node);
+		if (kind !== null) record.acquisitions.push({ kind, node, handle: ownerKey(node) });
+	}
+
+	// `target.onresize = handler` installs a platform event handler property.
+	function assign(record, node) {
+		const left = unwrap(node.left);
+		if (node.operator !== '=' || left?.type !== 'MemberExpression') return;
+		const name = memberName(left);
+		if (name === null || !/^on[a-z]+$/.test(name) || !platformTarget(left.object)) return;
+		if (staticValue(node.right) === null || staticValue(node.right) === undefined) return;
+		record.acquisitions.push({
+			kind: 'property',
+			node: left,
+			handle: keyOf(left),
+			target: keyOf(left.object),
+		});
+	}
+
+	// A timer callback that schedules itself again is an interval.
+	function rescheduleKeys(node, name) {
+		const callback = functionOf(node.arguments?.[0]);
+		const self = unwrap(node.arguments?.[0]);
+		if (callback === null || self?.type !== 'Identifier') return null;
+		const binding = bindingOf(self);
+		const keys = [];
+		const visit = (value) => {
+			if (value == null || typeof value !== 'object') return;
+			if (Array.isArray(value)) {
+				for (const child of value) visit(child);
+				return;
+			}
+			if (FUNCTIONS.has(value.type)) return;
+			if (value.type === 'CallExpression' && globalFunction(value.callee) === name) {
+				const argument = unwrap(value.arguments?.[0]);
+				if (argument?.type === 'Identifier' && bindingOf(argument) === binding) {
+					keys.push(ownerKey(value));
+				}
+			}
+			for (const key in value) {
+				if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) visit(value[key]);
+			}
+		};
+		visit(callback.body);
+		return keys.length === 0 ? null : keys;
+	}
+
+	function released(acquisition, cleanup, record) {
+		switch (acquisition.kind) {
+			case 'listener':
+				if (acquisition.signal !== null && aborts(acquisition.signal, cleanup, record)) return true;
+				if (acquisition.target !== null && cleanup.disposed.has(acquisition.target)) return true;
+				return (
+					acquisition.handler !== null &&
+					acquisition.target !== null &&
+					cleanup.removed.some(
+						(removal) =>
+							removal.target === acquisition.target &&
+							removal.handler === acquisition.handler &&
+							(removal.type === UNKNOWN ||
+								acquisition.type === UNKNOWN ||
+								removal.type === acquisition.type) &&
+							(removal.capture === UNKNOWN ||
+								acquisition.capture === UNKNOWN ||
+								removal.capture === acquisition.capture),
+					)
+				);
+			case 'property':
+				return (
+					(acquisition.handle !== null && cleanup.properties.has(acquisition.handle)) ||
+					(acquisition.target !== null && cleanup.disposed.has(acquisition.target))
+				);
+			case 'interval':
+			case 'watch':
+				return acquisition.handle !== null && cleanup.cleared.has(acquisition.handle);
+			case 'loop':
+				return (
+					acquisition.handle !== null &&
+					cleanup.cleared.has(acquisition.handle) &&
+					acquisition.reschedules.every((key) => key === acquisition.handle)
+				);
+			default:
+				return acquisition.handle !== null && cleanup.disposed.has(acquisition.handle);
+		}
+	}
+
 	// --- ref provenance ------------------------------------------------------
 
-	// One module walk classifies every useRef binding: any use other than a
-	// property access, a stable alias, or a dependency list makes a ref an
-	// escaped instance.
+	function refRoot(binding) {
+		const info = refs();
+		return info.aliases.get(binding) ?? binding;
+	}
+
+	// One module walk classifies every useRef binding: refs attached through a
+	// `ref` attribute of an intrinsic element are host refs, and any use other
+	// than a property access or a stable alias makes a ref an escaped instance.
+	// It also records which declaration or assignment target owns a call result.
 	function refs() {
 		if (references !== null) return references;
 		references = {
@@ -521,8 +797,10 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			aliases: new Map(),
 			declarations: new Map(),
 			escaped: new Set(),
+			host: new Set(),
+			owners: new WeakMap(),
 		};
-		const { roots, aliases, declarations } = references;
+		const { roots, aliases, declarations, owners } = references;
 		const names = new Set();
 		for (const { decl, bindings } of declarators) {
 			const init = unwrap(decl.init);
@@ -533,6 +811,9 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 					declarations.set(decl.id, binding);
 					names.add(binding.name);
 				}
+			}
+			if (decl.id?.type === 'Identifier' && binding && init != null) {
+				owners.set(init, `b${binding.id}`);
 			}
 		}
 		// Stable aliases share their root's classification.
@@ -567,6 +848,10 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			if (Array.isArray(node)) {
 				for (const child of node) visit(child);
 				return;
+			}
+			if (node.type === 'AssignmentExpression' && node.operator === '=') {
+				const key = keyOf(node.left);
+				if (key !== null) owners.set(unwrap(node.right), key);
 			}
 			if (node.type === 'Identifier' && names.has(node.name)) classify(node, parents);
 			parents.push(node);
@@ -614,6 +899,22 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				const call = parents[index - 1];
 				const position = DEPENDENCY_ARGUMENTS.get(callNames.get(call));
 				if (position !== undefined && call.arguments?.[position] === parent) return;
+			}
+			// falls through
+			case 'JSXExpressionContainer': {
+				let attribute = parents[index - 1];
+				let element = parents[index - 2];
+				if (parent.type === 'ArrayExpression') {
+					attribute = parents[index - 2];
+					element = parents[index - 3];
+					if (parents[index - 1]?.type !== 'JSXExpressionContainer') attribute = null;
+				}
+				if (attribute?.type === 'JSXAttribute' && attribute.name?.name === 'ref') {
+					const name = element?.type === 'JSXOpeningElement' ? element.name : null;
+					if (name?.type === 'JSXIdentifier' && /^[a-z]/.test(name.name)) {
+						references.host.add(root);
+					}
+				}
 				break;
 			}
 		}
@@ -625,6 +926,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		// promise sources change only at yields and are restored per function.
 		enterEffect(record) {
 			record.continuations = [];
+			record.acquisitions = [];
 			record.cleanupFunctions = [];
 			record.opaqueCleanup = false;
 			record.setupScopes = new Set();
@@ -686,8 +988,11 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			}
 			for (const callback of callbacks) record.cleanupFunctions.push(callback);
 		},
+		acquire,
+		construct,
+		assign,
 		finishEffect(record, asyncCallback) {
-			if (record.continuations.length === 0) return;
+			if (record.continuations.length === 0 && record.acquisitions.length === 0) return;
 			const cleanup = cleanupOf(record);
 			const hasCleanup = record.cleanupFunctions.length !== 0 || record.opaqueCleanup;
 			for (const write of record.continuations) {
@@ -697,6 +1002,10 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 					write.origin,
 					FETCH_MESSAGES[asyncCallback ? 'async' : hasCleanup ? 'ineffective' : 'missing'],
 				);
+			}
+			for (const acquisition of record.acquisitions) {
+				if (released(acquisition, cleanup, record)) continue;
+				report(STRONG_EFFECT_RESOURCE_LEAK, acquisition.node, LEAK_MESSAGES[acquisition.kind]);
 			}
 		},
 		// Callbacks of these calls run before the browser paints, so an update

@@ -8,6 +8,7 @@ const CHAIN = 'OCTANE_STRONG_EFFECT_CHAIN';
 const PROPS = 'OCTANE_STRONG_UNLINKED_PROP_STATE';
 const UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 const HIDDEN = 'OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY';
+const LEAK = 'OCTANE_STRONG_EFFECT_RESOURCE_LEAK';
 const component = (setup: string, params = 'props') => `
 import { useState, useReducer, useLinkedState, useEffect, useLayoutEffect, useInsertionEffect, useEffectEvent, useRef } from 'octane';
 export function App(${params}) @{
@@ -1076,6 +1077,315 @@ export function usePreviousLog(value, log) { const last = useRef(value); useEffe
 	});
 });
 
+describe('Strong effect resource cleanup', () => {
+	const app = (setup: string) => `
+import { useState, useEffect, useLayoutEffect, useRef } from 'octane';
+export function App(props) @{
+  const [width, setWidth] = useState(0);
+  const element = useRef(null);
+  ${setup}
+  <div ref={element}>{width as string}</div>
+}`;
+
+	it.each([
+		[
+			'a window listener',
+			`useEffect(() => { window.addEventListener('resize', () => setWidth(window.innerWidth)); });`,
+		],
+		[
+			'a globalThis listener',
+			`useEffect(() => { globalThis.addEventListener('resize', () => setWidth(1)); });`,
+		],
+		[
+			'a document listener',
+			`useEffect(() => { document.addEventListener('keydown', () => setWidth(1)); });`,
+		],
+		[
+			'a body listener',
+			`useEffect(() => { document.body.addEventListener('click', () => setWidth(1)); });`,
+		],
+		[
+			'an element listener',
+			`useEffect(() => { element.current.addEventListener('scroll', () => setWidth(1)); });`,
+		],
+		[
+			'an element alias listener',
+			`useEffect(() => { const node = element.current; node.addEventListener('scroll', () => setWidth(1)); });`,
+		],
+		[
+			'a media query listener',
+			`useEffect(() => { const query = window.matchMedia('(min-width: 600px)'); query.addEventListener('change', () => setWidth(1)); });`,
+		],
+		[
+			'a one-shot listener',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize, { once: true }); });`,
+		],
+		[
+			'a listener removed with a new function',
+			`useEffect(() => { window.addEventListener('resize', () => setWidth(1)); return () => window.removeEventListener('resize', () => setWidth(1)); });`,
+		],
+		[
+			'a listener removed with another handler',
+			`useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); window.addEventListener('resize', first); return () => window.removeEventListener('resize', second); });`,
+		],
+		[
+			'a listener removed for another event',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize); return () => window.removeEventListener('scroll', onResize); });`,
+		],
+		[
+			'a capture listener removed without capture',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize, true); return () => window.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a capture listener removed from another target',
+			`useEffect(() => { const onKey = () => setWidth(1); document.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); });`,
+		],
+		[
+			'a signal that is never aborted',
+			`useEffect(() => { const controller = new AbortController(); window.addEventListener('resize', () => setWidth(1), { signal: controller.signal }); });`,
+		],
+		[
+			'a handler property',
+			`useEffect(() => { window.onresize = () => setWidth(window.innerWidth); });`,
+		],
+		[
+			'an interval',
+			`useEffect(() => { setInterval(() => setWidth((value) => value + 1), 1000); });`,
+		],
+		[
+			'an uncleared interval ID',
+			`useEffect(() => { const id = setInterval(() => setWidth(1), 1000); });`,
+		],
+		[
+			'an interval cleared by another ID',
+			`useEffect(() => { const id = setInterval(() => setWidth(1), 1000); const other = 1; return () => clearInterval(other); });`,
+		],
+		[
+			'a window interval with an empty cleanup',
+			`useEffect(() => { window.setInterval(() => setWidth(1), 1000); return () => {}; });`,
+		],
+		[
+			'a self-rescheduling timeout',
+			`useEffect(() => { const tick = () => { setWidth((value) => value + 1); setTimeout(tick, 1000); }; setTimeout(tick, 1000); });`,
+		],
+		[
+			'a timeout loop that loses its ID',
+			`useEffect(() => { let id = 0; const tick = () => { setWidth((value) => value + 1); setTimeout(tick, 1000); }; id = setTimeout(tick, 1000); return () => clearTimeout(id); });`,
+		],
+		[
+			'an animation frame loop',
+			`useEffect(() => { function loop() { setWidth((value) => value + 1); requestAnimationFrame(loop); } requestAnimationFrame(loop); });`,
+		],
+		[
+			'a chained ResizeObserver',
+			`useEffect(() => { new ResizeObserver(([entry]) => setWidth(entry.contentRect.height)).observe(element.current); });`,
+		],
+		[
+			'a ResizeObserver',
+			`useEffect(() => { const observer = new ResizeObserver(() => setWidth(1)); observer.observe(element.current); });`,
+		],
+		[
+			'an IntersectionObserver',
+			`useEffect(() => { const observer = new IntersectionObserver(() => setWidth(1)); observer.observe(element.current); return () => {}; });`,
+		],
+		[
+			'a MutationObserver',
+			`useEffect(() => { const observer = new MutationObserver(() => setWidth(1)); observer.observe(element.current, { childList: true }); });`,
+		],
+		[
+			'a PerformanceObserver',
+			`useEffect(() => { const observer = new PerformanceObserver(() => setWidth(1)); observer.observe({ type: 'paint' }); });`,
+		],
+		[
+			'a WebSocket',
+			`useEffect(() => { const socket = new WebSocket(props.url); socket.onmessage = (event) => setWidth(event.data); });`,
+		],
+		[
+			'an EventSource',
+			`useEffect(() => { const source = new EventSource(props.url); source.addEventListener('message', () => setWidth(1)); });`,
+		],
+		[
+			'a BroadcastChannel',
+			`useEffect(() => { const channel = new BroadcastChannel('x'); channel.onmessage = () => setWidth(1); });`,
+		],
+		[
+			'a geolocation watch',
+			`useEffect(() => { navigator.geolocation.watchPosition((position) => setWidth(position.coords.latitude)); });`,
+		],
+		[
+			'a geolocation watch cleared by another ID',
+			`useEffect(() => { const id = navigator.geolocation.watchPosition(() => setWidth(1)); return () => navigator.geolocation.clearWatch(0); });`,
+		],
+		[
+			'an async effect callback',
+			`useEffect(async () => { window.addEventListener('resize', () => setWidth(1)); });`,
+		],
+		[
+			'a layout effect',
+			`useLayoutEffect(() => { window.addEventListener('resize', () => setWidth(1)); });`,
+		],
+		[
+			'a zero-delay callback',
+			`useEffect(() => { queueMicrotask(() => window.addEventListener('resize', () => setWidth(1))); });`,
+		],
+		[
+			'a local helper',
+			`useEffect(() => { const listen = () => window.addEventListener('resize', () => setWidth(1)); listen(); });`,
+		],
+	])('rejects %s without release', (_label, setup) => {
+		rejects(app(setup), LEAK);
+	});
+
+	it.each([
+		[
+			'a removed listener',
+			`useEffect(() => { const onResize = () => setWidth(window.innerWidth); window.addEventListener('resize', onResize); return () => window.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a removed capture listener',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize, true); return () => window.removeEventListener('resize', onResize, true); });`,
+		],
+		[
+			'a capture option object',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize, { capture: true, passive: true }); return () => window.removeEventListener('resize', onResize, { capture: true }); });`,
+		],
+		[
+			'an aborted listener signal',
+			`useEffect(() => { const controller = new AbortController(); window.addEventListener('resize', () => setWidth(1), { signal: controller.signal }); return () => controller.abort(); });`,
+		],
+		[
+			'a removed element listener',
+			`useEffect(() => { const onScroll = () => setWidth(1); element.current.addEventListener('scroll', onScroll); return () => element.current.removeEventListener('scroll', onScroll); });`,
+		],
+		[
+			'a removed element alias listener',
+			`useEffect(() => { const node = element.current; const onScroll = () => setWidth(1); node.addEventListener('scroll', onScroll); return () => node.removeEventListener('scroll', onScroll); });`,
+		],
+		[
+			'a removed media query listener',
+			`useEffect(() => { const query = window.matchMedia('(x)'); const onChange = () => setWidth(1); query.addEventListener('change', onChange); return () => query.removeEventListener('change', onChange); });`,
+		],
+		[
+			'optional listener calls',
+			`useEffect(() => { const onResize = () => setWidth(1); window?.addEventListener('resize', onResize); return () => window?.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a conditional removal',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize); return () => { if (onResize) window.removeEventListener('resize', onResize); }; });`,
+		],
+		[
+			'a removal in a cleanup helper',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize); return () => stop(); function stop() { window.removeEventListener('resize', onResize); } });`,
+		],
+		[
+			'a reset handler property',
+			`useEffect(() => { window.onresize = () => setWidth(1); return () => { window.onresize = null; }; });`,
+		],
+		[
+			'a cleared interval',
+			`useEffect(() => { const id = setInterval(() => setWidth((value) => value + 1), 1000); return () => clearInterval(id); });`,
+		],
+		[
+			'a window interval',
+			`useEffect(() => { const id = window.setInterval(() => setWidth(1), 1000); return () => window.clearInterval(id); });`,
+		],
+		[
+			'an interval cleared with clearTimeout',
+			`useEffect(() => { const id = setInterval(() => setWidth(1), 1000); return () => clearTimeout(id); });`,
+		],
+		[
+			'an interval kept in a ref',
+			`const timer = useRef(0); useEffect(() => { timer.current = setInterval(() => setWidth(1), 1000); return () => clearInterval(timer.current); });`,
+		],
+		[
+			'a cancelled timeout loop',
+			`useEffect(() => { let id = 0; const tick = () => { setWidth((value) => value + 1); id = setTimeout(tick, 1000); }; id = setTimeout(tick, 1000); return () => clearTimeout(id); });`,
+		],
+		[
+			'a cancelled animation loop',
+			`useEffect(() => { let frame = 0; function loop() { setWidth((value) => value + 1); frame = requestAnimationFrame(loop); } frame = requestAnimationFrame(loop); return () => cancelAnimationFrame(frame); });`,
+		],
+		[
+			'a disconnected observer',
+			`useEffect(() => { const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.height)); observer.observe(element.current); return () => observer.disconnect(); });`,
+		],
+		[
+			'an unobserved observer',
+			`useEffect(() => { const observer = new ResizeObserver(() => setWidth(1)); observer.observe(element.current); return () => observer.unobserve(element.current); });`,
+		],
+		[
+			'an optional disconnect',
+			`useEffect(() => { const observer = new ResizeObserver(() => setWidth(1)); observer.observe(element.current); return () => { observer?.disconnect(); }; });`,
+		],
+		[
+			'a closed WebSocket',
+			`useEffect(() => { const socket = new WebSocket(props.url); socket.onmessage = (event) => setWidth(event.data); return () => socket.close(); });`,
+		],
+		[
+			'a closed EventSource',
+			`useEffect(() => { const source = new EventSource(props.url); source.addEventListener('message', () => setWidth(1)); return () => source.close(); });`,
+		],
+		[
+			'a cleared geolocation watch',
+			`useEffect(() => { const id = navigator.geolocation.watchPosition(() => setWidth(1)); return () => navigator.geolocation.clearWatch(id); });`,
+		],
+		[
+			'a same-module subscription helper',
+			`function subscribeResize(notify) { window.addEventListener('resize', notify); return () => window.removeEventListener('resize', notify); } useEffect(() => subscribeResize(() => setWidth(1)));`,
+		],
+		['a store subscription', `useEffect(() => { props.store.subscribe(() => setWidth(1)); });`],
+		[
+			'a user EventTarget',
+			`useEffect(() => { props.emitter.addEventListener('change', () => setWidth(1)); });`,
+		],
+		['a one-shot timeout', `useEffect(() => { setTimeout(() => setWidth(1), 1000); });`],
+		[
+			'a one-shot animation frame',
+			`useEffect(() => { requestAnimationFrame(() => setWidth(1)); });`,
+		],
+		[
+			'a listener added by an event handler',
+			`const onClick = () => window.addEventListener('resize', () => setWidth(1));`,
+		],
+	])('accepts %s', (_label, setup) => {
+		accepts(app(setup));
+	});
+
+	it('names the release for each resource', () => {
+		const messages = compileToVolarMappings(
+			app(`useEffect(() => {
+    window.addEventListener('resize', () => setWidth(1));
+    setInterval(() => setWidth(2), 1000);
+    new ResizeObserver(() => setWidth(3)).observe(element.current);
+    new WebSocket(props.url);
+    navigator.geolocation.watchPosition(() => setWidth(4));
+  });`),
+			'/src/App.tsrx',
+			{ strong: true },
+		)
+			.diagnostics.filter((diagnostic) => diagnostic.code === LEAK)
+			.map((diagnostic) => diagnostic.message);
+		expect(messages).toEqual([
+			expect.stringContaining('removeEventListener'),
+			expect.stringContaining('clearInterval'),
+			expect.stringContaining('disconnect()'),
+			expect.stringContaining('close()'),
+			expect.stringContaining('clearWatch'),
+		]);
+	});
+
+	it('enforces TSX components and plain TypeScript custom hooks', () => {
+		const tsx = `"use strong";
+import { useState, useEffect, useRef } from 'octane';
+export function A() { const r = useRef(null); const [h, setH] = useState(0); useEffect(() => { new ResizeObserver(([e]) => setH(e.contentRect.height)).observe(r.current); }); return <div ref={r}>{h}</div>; }`;
+		expect(() => compile(tsx, '/src/A.tsx')).toThrow(LEAK);
+		const ts = `"use strong";
+import { useState, useEffect } from 'octane';
+export function useWidth() { const [w, setW] = useState(0); useEffect(() => { window.addEventListener('resize', () => setW(window.innerWidth)); }); return w; }`;
+		expect(() => slotHooks(ts, '/src/use-width.ts')).toThrow(LEAK);
+	});
+});
+
 describe('Strong effect checks keep valid output unchanged', () => {
 	const source = `
 import { useState, useEffect, useRef, useEffectEvent } from 'octane';
@@ -1147,9 +1457,9 @@ export function App(props) @{
 		const lines = Object.fromEntries(
 			result.diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.start.line]),
 		);
-		expect(lines).toEqual({ [UPDATE]: 7, [FETCH]: 8, [HIDDEN]: 9 });
+		expect(lines).toEqual({ [UPDATE]: 7, [FETCH]: 8, [HIDDEN]: 9, [LEAK]: 10 });
 		expect(result.errors.map((error) => error.code)).toEqual(
-			expect.arrayContaining([UPDATE, FETCH, HIDDEN]),
+			expect.arrayContaining([UPDATE, FETCH, HIDDEN, LEAK]),
 		);
 	});
 });

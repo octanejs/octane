@@ -46,7 +46,9 @@ non-promise (`OCTANE_STRONG_EFFECT_STATE_UPDATE`). A state update after an
 (`OCTANE_STRONG_EFFECT_DATA_FETCH`). Effect setup may not call a state getter,
 read an unattached ref's `current`, or read a reassigned module variable
 (`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`); use the snapshot or `useEffectEvent`.
-Use `useLinkedState` for prop-driven state;
+Platform listeners, intervals, observers, connections, and geolocation watches
+acquired in setup must be released by the cleanup
+(`OCTANE_STRONG_EFFECT_RESOURCE_LEAK`). Use `useLinkedState` for prop-driven state;
 use a lazy `useState` initializer or an explicit third `useReducer` initializer
 for deliberate initial capture. In `.tsrx`, render lists
 with keyed `@for` and stable item IDs, never position keys. Strong `.tsx` keeps
