@@ -288,6 +288,30 @@ can target.
 }
 ```
 
+A child `@{ … }` block is a nested template, not an arm, even when it is an
+arm's whole output, so nothing ends it early. `return` in a block is a parse
+error, and a `break` or `continue` that would leave the block is a compile
+error, whether it targets the `@for` or `@switch` around it, a plain loop, or a
+label. Loops, `switch` statements, and labels inside the block's own setup keep
+their jumps. To skip a row, `continue;` in the row's setup before its output. To
+leave out part of a block's output, render it from an `@if` arm, where
+`continue;` ends only that arm. An arm's labeled `break` or `continue` follows
+the same rule: it can only target a label inside that arm.
+
+```jsx
+@for (const item of props.items; key item.id) {
+	<li>
+		@{
+			const label = item.title.trim();
+			// `if (item.hidden) continue;` here would be a compile error.
+			@if (!item.hidden) {
+				<span>{label as string}</span>
+			}
+		}
+	</li>
+}
+```
+
 ```jsx
 export function Feed(props) @{
 	<ul>

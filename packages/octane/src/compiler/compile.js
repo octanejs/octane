@@ -77,7 +77,12 @@ import {
 	UNIVERSAL_THREAD_RUNTIME_IMPORTS,
 } from './compile-universal.js';
 import { compileValdi, VALDI_COMPILER_RUNTIME_IMPORTS } from './compile-valdi.js';
-import { ARM_BREAK_MESSAGE, ARM_VALUE_RETURN_MESSAGE, armJump } from './arm-exits.js';
+import {
+	ARM_BREAK_MESSAGE,
+	ARM_VALUE_RETURN_MESSAGE,
+	armJump,
+	assertTemplateJumps,
+} from './arm-exits.js';
 import { HOOK_NAMES, NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 export { HOOK_NAMES } from './hook-names.js';
 import {
@@ -10005,6 +10010,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 		normalizeAuthoredJsxLiterals(parseModule(source, cleanFilename)),
 	);
 	analyzeTsrx(analyzedAst, cleanFilename);
+	assertTemplateJumps(analyzedAst, source, cleanFilename);
 	adoptParserAst(analyzedAst);
 	assertNoLegacyContextProviders(analyzedAst, source, cleanFilename);
 	options = nativeReadOptions(analyzedAst, options);
@@ -12833,10 +12839,7 @@ function ssrCompileBodyWithMapTemps(
 	// PROPS-FIRST ABI (matches the client): `(…userParams, __s, __extra)`. A leading
 	// `__props` placeholder stands in when there are no user params, so a verbatim
 	// `function Foo(props)` and a compiled component both bind props from arg 0.
-	const params =
-		node.params.length > 0
-			? [...node.params, b.id('__s'), b.id('__extra')]
-			: [b.id('__props'), b.id('__s'), b.id('__extra')];
+	const { params, restBinding } = compiledBodyParams(node.params);
 	// Private loop items feed only HTML concatenation, so their serialized tail
 	// needs no carrier. Other bodies can cross a component/value boundary, where
 	// the carrier distinguishes compiled HTML from authored text returns. This
@@ -12860,13 +12863,14 @@ function ssrCompileBodyWithMapTemps(
 			: ([...(node.params || []), ...(Array.isArray(node.body) ? node.body : [])].find(
 					(part) => part?.loc != null,
 				) ?? ctx._moduleOrigin);
+	const scopedBody = ctx.nativeReads
+		? wrapNativeReadScope(body, b.id('__s'), nativeReadNames(ctx))
+		: body;
 	return inheritOriginLoc(
 		b.function_declaration(
 			b.id(name),
 			params,
-			b.block(
-				ctx.nativeReads ? wrapNativeReadScope(body, b.id('__s'), nativeReadNames(ctx)) : body,
-			),
+			b.block(restBinding === null ? scopedBody : [restBinding, ...scopedBody]),
 		),
 		origin,
 	);
@@ -16925,8 +16929,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// PROPS-FIRST convention: `(…userProps, __s, __extra)`. The scope is the 2nd arg
 	// (a placeholder leads when there are no user params), so a plain function
 	// `App(props)` binds `props`, while compiled bodies still read `__s` by name.
-	const userParams = node.params && node.params.length > 0 ? node.params : [b.id('__props')];
-	const fnParams = [...userParams, b.id('__s'), b.id('__extra')];
+	const { params: fnParams, restBinding } = compiledBodyParams(node.params ?? []);
 	ctx.currentAutoMemoOffset = prevAutoMemoOffset;
 	ctx.currentAutoMemoCacheName = prevAutoMemoCacheName;
 	ctx.currentAutoMemoCommittedName = prevAutoMemoCommittedName;
@@ -16945,14 +16948,14 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	);
 	ctx.scalarBindingClaims = previousScalarBindingClaims;
 	ctx.presentationHydration = previousPresentationHydration;
+	const scopedBody =
+		ctx.nativeReads && !isStaticHostComponent(node)
+			? wrapNativeReadScope(presentationBody, b.id('__s'), nativeReadNames(ctx))
+			: presentationBody;
 	const emittedFunction = b.function_declaration(
 		b.id(name, node.id ?? node),
 		fnParams,
-		b.block(
-			ctx.nativeReads && !isStaticHostComponent(node)
-				? wrapNativeReadScope(presentationBody, b.id('__s'), nativeReadNames(ctx))
-				: presentationBody,
-		),
+		b.block(restBinding === null ? scopedBody : [restBinding, ...scopedBody]),
 	);
 	return inheritOriginLoc(
 		hookMemoOpaqueOwner
@@ -21163,6 +21166,39 @@ function collectFunctionScopeBindings(params, statements, into) {
 	};
 	for (const statement of statements) visit(statement, true);
 	return into;
+}
+
+// A compiled body's parameters, `(…authored, __s, __extra)`, with a `__props`
+// placeholder when no authored parameter takes an argument ahead of the scope.
+// A TypeScript `this` parameter types the receiver and takes none. A rest
+// parameter must be last, so it leaves the list and a leading `var` binds it
+// from `arguments` at its authored position. It then holds what the
+// returned-JSX form's rest parameter holds: a direct call's trailing
+// arguments, and for a body call `(props, scope, extra)` from that position
+// on. The slice names no global, which a module may shadow
+// (`import { Array } from 'effect'`).
+function compiledBodyParams(authored) {
+	const receiver = authored[0]?.type === 'Identifier' && authored[0].name === 'this' ? 1 : 0;
+	const last = authored.at(-1);
+	const rest = last?.type === 'RestElement' ? last : null;
+	const fixed = authored.slice(receiver, rest === null ? authored.length : -1);
+	const params = [
+		...authored.slice(0, receiver),
+		...(fixed.length > 0 ? fixed : [b.id('__props')]),
+		b.id('__s'),
+		b.id('__extra'),
+	];
+	if (rest === null) return { params, restBinding: null };
+	const slice = b.member(b.member(b.array([]), 'slice'), 'call');
+	const args =
+		fixed.length > 0 ? [b.id('arguments'), b.literal(fixed.length)] : [b.id('arguments')];
+	return {
+		params,
+		restBinding: inheritOriginLoc(
+			b.declaration('var', [b.declarator(rest.argument, b.call(slice, ...args))]),
+			rest,
+		),
+	};
 }
 
 // Argument 1 of a function whose own parameters already reach it: the second
