@@ -7,6 +7,7 @@ import {
 } from '../src/universal.js';
 import {
 	ArmKinds,
+	BlockInnerArm,
 	ForContinue,
 	IfReturn,
 	InnerArmContinue,
@@ -90,6 +91,24 @@ describe('universal directive arm exits', () => {
 		root.render(InnerArmContinue, { rows: ['a', 'b'], hidden: ['b'] });
 		expect(names(items[0])).toEqual(['a-badge']);
 		expect(names(items[1])).toEqual([]);
+		root.unmount();
+	});
+
+	it('ends only the arm inside a child block, keeping the jumps the block owns', () => {
+		const { container, root } = objectRoot();
+		root.render(BlockInnerArm, { rows: ['a', 'bb'], hidden: ['a'] });
+		const [a, bb] = list(container).children;
+		expect(names(list(container))).toEqual(['a', 'bb']);
+		expect(names(a)).toEqual([]);
+		expect(names(bb)).toEqual(['bb-2']);
+
+		root.render(BlockInnerArm, { rows: ['bb', 'a'], hidden: ['bb'] });
+		// Keyed rows keep their hosts while the inner arm exits and clears.
+		const [first, second] = list(container).children;
+		expect(first).toBe(bb);
+		expect(second).toBe(a);
+		expect(names(a)).toEqual(['a-1']);
+		expect(names(bb)).toEqual([]);
 		root.unmount();
 	});
 

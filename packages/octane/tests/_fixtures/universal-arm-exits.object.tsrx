@@ -61,6 +61,27 @@ export function InnerArmContinue(props: Rows) @{
 	</list>
 }
 
+// A `@{}` block is a nested template, not an arm: the jumps its setup owns stay
+// JavaScript, and `continue` in the arm inside it ends only that arm.
+export function BlockInnerArm(props: Rows) @{
+	<list>
+		@for (const row of props.rows; key row) {
+			<item name={row}>@{
+				let seen = 0;
+				for (const char of row + 'xz') {
+					if (char === 'x') continue;
+					if (char === 'z') break;
+					seen++;
+				}
+				@if (row !== '') {
+					if (props.hidden.includes(row)) continue;
+					<badge name={`${row}-${seen}`} />
+				}
+			}</item>
+		}
+	</list>
+}
+
 export function ArmKinds(props: Rows & { mode: number }) @{
 	<list>
 		@for (const row of props.rows; key row) {
