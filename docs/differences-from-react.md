@@ -1568,6 +1568,21 @@ createPortal(Menu, overlay, { open: true });
 The object overload does not supply a reconciliation key. Use a keyed element
 inside the portal or the keyed renderable overload when identity must change.
 
+## Parameters after `props`
+
+A component takes its props as its first argument. Octane reserves the
+arguments after it for the renderer, so while a component renders, the
+parameters after `props` receive internal values where React passes
+`undefined`. Pass a component's inputs through props. A `@{ … }` component
+binds each parameter exactly like its returned-JSX form:
+
+```tsx
+function Row(props, extra) @{
+  <li>{props.label}</li>
+}
+// Means: function Row(props, extra) { return <li>{props.label}</li>; }
+```
+
 ## `lazy()` module resolution
 
 Like React, `lazy(load)` accepts a thenable that resolves to a module object with
