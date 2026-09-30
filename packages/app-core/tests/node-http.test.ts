@@ -215,6 +215,19 @@ describe('built-in Node server response compression', () => {
 		transport = createNodeServer(
 			(request) => {
 				const pathname = new URL(request.url).pathname;
+				if (
+					pathname === '/strong-etag' ||
+					pathname === '/weak-etag' ||
+					pathname === '/no-transform-etag'
+				) {
+					return new Response(html, {
+						headers: {
+							'Content-Type': 'text/html; charset=utf-8',
+							ETag: pathname === '/weak-etag' ? 'W/"identity-v1"' : '"identity-v1"',
+							...(pathname === '/no-transform-etag' ? { 'Cache-Control': 'no-transform' } : {}),
+						},
+					});
+				}
 				if (pathname === '/stream') {
 					if (!segmentGate) throw new Error('stream gate was not initialized');
 					const gate = segmentGate;
@@ -352,6 +365,36 @@ describe('built-in Node server response compression', () => {
 		expect(asset.headers.vary).toBe('Accept-Encoding');
 		expect(asset.headers['cache-control']).toBe('public, max-age=31536000, immutable');
 		expect(gunzipSync(asset.body).toString()).toBe(staticJavaScript);
+	});
+
+	it('does not reuse a strong identity ETag for a gzip representation', async () => {
+		const identity = await get('/strong-etag');
+		expect(identity.headers.etag).toBe('"identity-v1"');
+		expect(identity.body.toString()).toBe(html);
+
+		const compressed = await get('/strong-etag', {
+			headers: { 'Accept-Encoding': 'gzip' },
+		});
+		expect(compressed.headers['content-encoding']).toBe('gzip');
+		expect(gunzipSync(compressed.body).toString()).toBe(html);
+		expect(compressed.headers.etag).toBeUndefined();
+
+		const weak = await get('/weak-etag', { headers: { 'Accept-Encoding': 'gzip' } });
+		expect(weak.headers['content-encoding']).toBe('gzip');
+		expect(weak.headers.etag).toBe('W/"identity-v1"');
+
+		const noTransform = await get('/no-transform-etag', {
+			headers: { 'Accept-Encoding': 'gzip' },
+		});
+		expect(noTransform.headers['content-encoding']).toBeUndefined();
+		expect(noTransform.headers.etag).toBe('"identity-v1"');
+
+		const head = await get('/strong-etag', {
+			method: 'HEAD',
+			headers: { 'Accept-Encoding': 'gzip' },
+		});
+		expect(head.headers['content-encoding']).toBeUndefined();
+		expect(head.headers.etag).toBe('"identity-v1"');
 	});
 
 	it('flushes each compressed SSR wave before a later segment resolves', async () => {
