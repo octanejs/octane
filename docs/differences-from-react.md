@@ -35,6 +35,15 @@ function Editor({ editable, initialValue }) {
 This is valid in Octane because the compiler assigns each hook call site a
 stable slot; hooks are not identified by call order.
 
+A hook that a render skips keeps its state. The early return in `Editor` only
+skips the rest of that render, so `draft` survives while `editable` is false and
+still holds the edited text when the input comes back. State belongs to the
+component, `@for` row, or directive arm that calls the hook, and lasts as long as
+that owner stays mounted, whether the call site sits behind an `if`, after an
+early return, or in a custom hook that returns early. Effects follow the current
+render instead: an effect that a completed render does not reach is cleaned up,
+and it runs again when a later render reaches it.
+
 A plain JavaScript loop is the exception:
 
 ```tsx

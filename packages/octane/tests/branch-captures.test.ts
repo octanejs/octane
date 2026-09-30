@@ -7,6 +7,7 @@ import {
 	NestedCaptures,
 	BranchHoldCaptures,
 	ShadowedCaptures,
+	ClassCaptures,
 	FoldedCaptures,
 	ElseCaptures,
 	ReorderedCaptures,
@@ -212,6 +213,38 @@ describe('branch captures', () => {
 						? 'FoldedCaptures'
 						: 'ElseCaptures';
 			expect(() => renderToString(server[name], props)).toThrow(error);
+		},
+	);
+
+	it.each(['render', 'hydrate'] as const)(
+		'%s threads a class declared in setup into nested arms',
+		async (mode) => {
+			const props = { visible: true, inner: true, label: 'first' };
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			if (mode === 'hydrate') {
+				const server = await loadServerFixture(fixture, { hmr: false, dev: false });
+				container.innerHTML = renderToString(server.ClassCaptures, props).html;
+			}
+			const errors: unknown[] = [];
+			const root =
+				mode === 'render'
+					? createRoot(container)
+					: hydrateRoot(container, ClassCaptures, props, {
+							onRecoverableError: (error) => errors.push(error),
+						});
+			try {
+				flushSync(() => {
+					if (mode === 'render') root.render(ClassCaptures, props);
+				});
+				expect(container.textContent).toBe('outer:firstinner:first');
+				flushSync(() => root.render(ClassCaptures, { ...props, label: 'second' }));
+				expect(container.textContent).toBe('outer:secondinner:second');
+				expect(errors).toEqual([]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
 		},
 	);
 

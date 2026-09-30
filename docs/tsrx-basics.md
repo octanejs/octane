@@ -256,6 +256,24 @@ export function Panel(props) @{
 }
 ```
 
+A hook after an early return keeps its state for as long as the component stays
+mounted: the return skips the rest of that render, and leaves the hook's state in
+place. Effects follow the current render instead. The effect in `Panel` is cleaned
+up while `hidden` is true, and runs again once a render gets past the return.
+
+Directive arms work the same way. State declared after an arm's `return;` or
+`continue;` lasts as long as the arm, which for an `@for` row is as long as its
+key stays in the list. Taking the exit removes only the arm's output.
+
+```jsx
+@for (const item of props.items; key item.id) {
+	if (item.hidden) continue;
+	// Kept while `item` is hidden, so its row reopens as it was left.
+	const [open, setOpen] = useState(false);
+	<Row item={item} open={open} onToggle={() => setOpen(!open)} />
+}
+```
+
 The one rule that remains is enforced for you: a hook in a plain JS loop is a
 compile error, because every iteration would share one call-site slot. Loop with
 the keyed `@for` directive, where each item gets its own hook state, or extract a
@@ -276,7 +294,8 @@ in an `@for` body so does a `continue;` that no inner loop owns. The rest of the
 arm is skipped and the surrounding template carries on. Because an arm's output
 is its final node, returning a value from an arm, or a `break` that would leave
 the `@for` or `@switch`, is a compile error; render alternatives with
-`@if`/`@else`.
+`@if`/`@else`. Hooks that the exit skips keep their state; see
+[Conditional hooks](#conditional-hooks).
 
 ```jsx
 @for (const item of props.items; key item.id) {

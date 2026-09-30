@@ -2779,7 +2779,7 @@ function collectComponentLocals(componentNode) {
 	for (const stmt of stmts) {
 		if (stmt.type === 'VariableDeclaration') {
 			for (const d of stmt.declarations || []) collectBindings(d.id, locals);
-		} else if (stmt.type === 'FunctionDeclaration') {
+		} else if (stmt.type === 'FunctionDeclaration' || stmt.type === 'ClassDeclaration') {
 			if (stmt.id) locals.add(stmt.id.name);
 		}
 	}
@@ -16362,11 +16362,21 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	//               Keep the old split + rewriteEarlyExits path for these.
 	let statements;
 	let jsxNodes;
+	const previousComponentLocals = ctx.currentComponentLocals;
 	if (node.body && node.body.type === 'JSXCodeBlock') {
 		statements = node.body.body || [];
 		jsxNodes = node.body.render ? [node.body.render] : [];
 	} else {
 		const bodyRewritten = splitArmExits(unwrapOutputCodeBlock(node.body), ctx);
+		// The split can declare a name of its own (a hooked tail's handoff), which
+		// the arms nested in this body capture like any other local of it.
+		if (previousComponentLocals) {
+			const declared = new Set();
+			for (const statement of bodyRewritten) collectStatementBindings(statement, declared);
+			if ([...declared].some((name) => !previousComponentLocals.has(name))) {
+				ctx.currentComponentLocals = new Set([...previousComponentLocals, ...declared]);
+			}
+		}
 		statements = [];
 		jsxNodes = [];
 		for (const child of bodyRewritten) {
@@ -16920,6 +16930,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx.currentHookMemoNames = prevHookMemoNames;
 	ctx.currentHookMemoOwnerSafe = prevHookMemoOwnerSafe;
 	ctx.currentMapTemps = prevMapTemps;
+	ctx.currentComponentLocals = previousComponentLocals;
 	// ONE FunctionDeclaration node — the caller prints it (once, with the full
 	// esrap map for top-level components) or embeds it in an enclosing body.
 	const presentationBody = preparePresentationHydration(
@@ -33845,6 +33856,8 @@ function rewriteEarlyExits(body, allowExplicitNull = false) {
  * returns through the generic value ABI.
  */
 function splitArmExits(body, ctx) {
+	const tail = hookedTailStart(body);
+	if (tail !== -1) return retainTailHookState(body, tail, ctx);
 	let out = null;
 	for (let i = 0; i < body.length; i++) {
 		const stmt = body[i];
@@ -33875,6 +33888,76 @@ function splitArmExits(body, ctx) {
 		if (out !== null) Array.isArray(lowered) ? out.push(...lowered) : out.push(lowered);
 	}
 	return rewriteEarlyExits(out ?? body, true);
+}
+
+/**
+ * Keep the state of hooks declared after an early exit. A hook's state lives
+ * as long as the component, `@for` row, or directive arm that calls it, and an
+ * exit only skips the rest of one render, exactly like a plain `if` around the
+ * hook, a custom hook that returns early, or a value-returning component. The
+ * guard-nested form would give the tail its own arm scope, which unmounts, and
+ * resets that state, whenever the exit is taken. So when a slot-keyed hook
+ * follows the first exit, only the tail's output moves into the guarded arm.
+ * Its setup stays in this body as ordinary guard-nested JavaScript and hands
+ * the output the tail names it reads:
+ *
+ *   if (x) return; const [s] = useState(0); <b>{s}</b>
+ *   ⇒
+ *   let __tail = false;
+ *   if (!x) { const [s] = useState(0); __tail = [s]; }
+ *   if (__tail) { const [s] = __tail; <b>{s}</b> }
+ *
+ * An effect the exit skips still disconnects and reconnects, like any effect
+ * whose call site a completed render does not reach. `first` is the index
+ * hookedTailStart found.
+ */
+function retainTailHookState(body, first, ctx) {
+	const setup = [];
+	const output = [];
+	for (let i = first; i < body.length; i++) (isJsxNode(body[i]) ? output : setup).push(body[i]);
+	const declared = new Set();
+	for (const statement of setup) collectStatementBindings(statement, declared);
+	const read = collectFreeIdentifiers(b.block(output), []);
+	const names = [...declared].filter((name) => read.has(name)).sort();
+	const tail = allocCompilerName(ctx, '__tail');
+	const origin = body[first];
+	const handoff = names.length === 0 ? b.literal(true, 'true') : b.array(names.map((n) => b.id(n)));
+	const lowered = splitArmExits(
+		[
+			...body.slice(0, first),
+			...setup,
+			inheritOriginLoc(b.stmt(b.assignment('=', b.id(tail), handoff)), origin),
+		],
+		ctx,
+	);
+	const unpack =
+		names.length === 0
+			? []
+			: [inheritOriginLoc(b.const(b.array_pattern(names.map((n) => b.id(n))), b.id(tail)), origin)];
+	return [
+		inheritOriginLoc(b.let(b.id(tail), b.literal(false, 'false')), origin),
+		...lowered,
+		inheritOriginLoc(b.if(b.id(tail), b.block([...unpack, ...output]), null), origin),
+	];
+}
+
+/**
+ * Index of the first statement that can exit the body when a slot-keyed hook
+ * call follows it in setup and output follows it too, or -1. Otherwise the
+ * guard-nested form already leaves every hook on the body's own scope.
+ */
+function hookedTailStart(body) {
+	const first = body.findIndex(
+		(statement) => !isJsxNode(statement) && ownsArmJump(statement, false, false),
+	);
+	if (first === -1) return -1;
+	let output = false;
+	let hook = false;
+	for (let i = first; i < body.length; i++) {
+		if (isJsxNode(body[i])) output = true;
+		else hook ||= containsHookCall(body[i], true);
+	}
+	return output && hook ? first : -1;
 }
 
 /**
@@ -34012,6 +34095,9 @@ function armExitError(ctx, node, message) {
 function lowerNullishComponentExits(ast) {
 	const statements = ast.body || [];
 	let out = null;
+	// Compiler-name allocation for retainTailHookState, before the compile
+	// context exists. That context later collects these names from the AST.
+	let names = null;
 	for (let i = 0; i < statements.length; i++) {
 		const statement = statements[i];
 		let replacement = statement;
@@ -34021,7 +34107,15 @@ function lowerNullishComponentExits(ast) {
 		if (hasOnlyLowerableNullishExits(node)) {
 			const body = node.body;
 			const sequence = [...(body.body || []), ...(body.render ? [body.render] : [])];
-			const rewritten = rewriteEarlyExits(sequence, true);
+			const tail = hookedTailStart(sequence);
+			const rewritten =
+				tail === -1
+					? rewriteEarlyExits(sequence, true)
+					: retainTailHookState(
+							sequence,
+							tail,
+							(names ??= { usedCompilerNames: collectIdentifierNames(ast) }),
+						);
 			const renderIndex = rewritten.findIndex(isJsxNode);
 			if (renderIndex !== -1 && !rewritten.slice(renderIndex + 1).some(isJsxNode)) {
 				const loweredNode = {
@@ -34105,13 +34199,16 @@ function jsxArmRoot(node) {
  * separate scopes and excluded). Content that moves into an if/else ARM must
  * not call hooks: on the value path a hook behind an early return keeps its
  * slot-keyed state on the COMPONENT scope across branch flips, while an arm's
- * scope is torn down with the arm.
+ * scope is torn down with the arm. `slotKeyed` skips `use` and `useContext`,
+ * which are keyed by call order and context identity and hold no such state.
  */
-function containsHookCall(node) {
+function containsHookCall(node, slotKeyed = false) {
 	const seen = new WeakSet();
 	// The shared convention (HOOK_NAME_CONVENTION_RE) — covers `use`, `useX`,
 	// and the `unstable_`/`UNSTABLE_` prefixed forms.
-	const isHookName = isHookCalleeName;
+	const isHookName = slotKeyed
+		? (name) => name !== 'use' && name !== 'useContext' && isHookCalleeName(name)
+		: isHookCalleeName;
 	const walk = (value) => {
 		if (value == null || typeof value !== 'object') return false;
 		if (Array.isArray(value)) {

@@ -20,6 +20,31 @@ export function NestedCaptures(props) @{
 	</section>
 }
 
+// A class declared in setup is a local like any other: a nested arm reads the
+// current render's class, from the component body and from an arm's setup.
+export function ClassCaptures(props) @{
+	class Outer {
+		read() {
+			return 'outer:' + props.label;
+		}
+	}
+	<section>
+		@if (props.visible) {
+			class Inner {
+				read() {
+					return 'inner:' + props.label;
+				}
+			}
+			<div>
+				<p>{new Outer().read() as string}</p>
+				@if (props.inner) {
+					<b>{new Inner().read() as string}</b>
+				}
+			</div>
+		}
+	</section>
+}
+
 export function ShadowedCaptures(props) @{
 	const label = props.label;
 	<section>
