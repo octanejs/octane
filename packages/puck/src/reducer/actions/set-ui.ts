@@ -1,6 +1,6 @@
 import { Data } from '../../types';
-import { SetUiAction } from '../actions';
-import { PrivateAppState } from '../../types/Internal';
+import { SetUiAction } from '../actions.tsrx';
+import { PrivateAppState } from '../../types/Internal.tsrx';
 
 export const setUiAction = <UserData extends Data>(
 	state: PrivateAppState<UserData>,

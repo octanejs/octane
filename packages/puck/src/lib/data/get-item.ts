@@ -1,5 +1,5 @@
 import { Data } from '../../types';
-import { PrivateAppState } from '../../types/Internal';
+import { PrivateAppState } from '../../types/Internal.tsrx';
 import { rootDroppableId } from '../root-droppable-id';
 
 export type ItemSelector = {

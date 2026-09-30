@@ -3,7 +3,7 @@ import getClassNameFactory from '../../lib/get-class-name-factory';
 import { OctaneNode, useEffect } from '../../react-shim.js';
 import { useAppStore } from '../../store';
 import { ChevronDown, ChevronUp } from '@octanejs/lucide';
-import { Drawer } from '../Drawer';
+import { Drawer } from '../Drawer/index.tsrx';
 
 const getClassName = getClassNameFactory('ComponentList', styles);
 

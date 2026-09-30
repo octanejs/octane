@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { RefObject, useCallback, useEffect, useRef } from '../react-shim.js';
 import { useAppStore, useAppStoreApi } from '../store';
 import { getZoomConfig } from './get-zoom-config';

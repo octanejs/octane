@@ -3,7 +3,7 @@
 import { OctaneNode, useEffect, useState } from '../../react-shim.js';
 import styles from './Button.module.css';
 import getClassNameFactory from '../../lib/get-class-name-factory';
-import { Loader } from '../Loader';
+import { Loader } from '../Loader/index.tsrx';
 import { filterDataAttrs } from '../../lib/filter-data-attrs';
 
 const getClassName = getClassNameFactory('Button', styles);

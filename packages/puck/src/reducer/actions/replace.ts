@@ -1,7 +1,7 @@
 import { ComponentDataOptionalId, Data } from '../../types';
-import { ReplaceAction } from '../actions';
+import { ReplaceAction } from '../actions.tsrx';
 import { AppStore } from '../../store';
-import { PrivateAppState } from '../../types/Internal';
+import { PrivateAppState } from '../../types/Internal.tsrx';
 import { walkAppState } from '../../lib/data/walk-app-state';
 import { getIdsForParent } from '../../lib/data/get-ids-for-parent';
 import { walkTree } from '../../lib/data/walk-tree';

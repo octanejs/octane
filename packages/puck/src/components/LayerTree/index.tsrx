@@ -7,7 +7,7 @@ import { scrollIntoView } from '../../lib/scroll-into-view';
 import { ChevronDown, LayoutGrid, Layers, Type } from '@octanejs/lucide';
 import { rootAreaId, rootDroppableId } from '../../lib/root-droppable-id';
 import { useCallback, useContext } from '../../react-shim.js';
-import { ZoneStoreContext } from '../DropZone/context';
+import { ZoneStoreContext } from '../DropZone/context.tsrx';
 import { getFrame } from '../../lib/get-frame';
 import { onScrollEnd } from '../../lib/on-scroll-end';
 import { useAppStore } from '../../store';

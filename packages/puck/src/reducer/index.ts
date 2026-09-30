@@ -1,9 +1,9 @@
 import { Reducer } from '../react-shim.js';
 import { AppState, Data } from '../types';
-import { PuckAction } from './actions';
+import { PuckAction } from './actions.tsrx';
 import type { OnAction } from '../types';
 import { AppStore } from '../store';
-import { PrivateAppState } from '../types/Internal';
+import { PrivateAppState } from '../types/Internal.tsrx';
 import { setAction } from './actions/set';
 import { insertAction } from './actions/insert';
 import { replaceAction } from './actions/replace';
@@ -17,7 +17,7 @@ import { setDataAction } from './actions/set-data';
 import { setUiAction } from './actions/set-ui';
 import { makeStatePublic } from '../lib/data/make-state-public';
 
-export * from './actions';
+export * from './actions.tsrx';
 
 export type ActionType = 'insert' | 'reorder';
 

@@ -1,8 +1,8 @@
 import { Slot } from './API';
-import { AppState } from './AppState';
-import { Config, DefaultComponents } from './Config';
-import { ComponentData, Data } from './Data';
-import { DefaultComponentProps, DefaultRootFieldProps } from './Props';
+import { AppState } from './AppState.tsrx';
+import { Config, DefaultComponents } from './Config.tsrx';
+import { ComponentData, Data } from './Data.tsrx';
+import { DefaultComponentProps, DefaultRootFieldProps } from './Props.tsrx';
 
 export type ZoneType = 'root' | 'dropzone' | 'slot';
 

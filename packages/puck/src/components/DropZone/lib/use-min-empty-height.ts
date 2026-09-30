@@ -1,5 +1,6 @@
+/** @jsxImportSource octane */
 import { RefObject, useEffect, useRef, useState } from '../../../react-shim.js';
-import { ZoneStoreContext } from './../context';
+import { ZoneStoreContext } from './../context.tsrx';
 import { useContextStore } from '../../../lib/use-context-store';
 import { AppStoreApi, useAppStoreApi } from '../../../store';
 import { useOnDragFinished } from '../../../lib/dnd/use-on-drag-finished';

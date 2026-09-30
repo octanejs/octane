@@ -13,15 +13,15 @@ import {
 	useState,
 } from '../../react-shim.js';
 import { AutoScroller, defaultPreset, DragDropManager } from '@dnd-kit/dom';
-import { DragDropEvents } from '@dnd-kit/abstract';
-import { DropZoneProvider } from '../DropZone';
+import type { DragDropEventHandlers } from '@dnd-kit/abstract';
+import { DropZoneProvider } from '../DropZone/index.tsrx';
 import type { Draggable, Droppable } from '@dnd-kit/dom';
 import { getItem } from '../../lib/data/get-item';
-import { DropZoneContext, Preview, ZoneStore, ZoneStoreProvider } from '../DropZone/context';
+import { DropZoneContext, Preview, ZoneStore, ZoneStoreProvider } from '../DropZone/context.tsrx';
 import { createNestedDroppablePlugin } from '../../lib/dnd/NestedDroppablePlugin';
 import { insertComponent } from '../../lib/insert-component';
 import { useDebouncer } from '@octanejs/tanstack-pacer';
-import { ComponentDndData } from '../DraggableComponent';
+import { ComponentDndData } from '../DraggableComponent/index.tsrx';
 
 import { collisionStore } from '../../lib/dnd/collision/dynamic/store';
 import { generateId } from '../../lib/generate-id';
@@ -34,7 +34,7 @@ import { effect } from '@dnd-kit/state';
 
 const DEBUG = false;
 
-type Events = DragDropEvents<Draggable, Droppable, DragDropManager>;
+type Events = DragDropEventHandlers<Draggable, Droppable, DragDropManager>;
 type DragCbs = Partial<{ [eventName in keyof Events]: Events[eventName][] }>;
 
 const DragListenerContext = createContext<{
@@ -81,7 +81,7 @@ type DragDropContextProps = {
  * @returns a function that temporarily disables the collision
  */
 const useTempDisableFallback = (timeout: number) => {
-	const lastFallbackDisable = useRef<string>(null);
+	const lastFallbackDisable = useRef<string | null>(null);
 
 	return useCallback((manager: DragDropManager) => {
 		collisionStore.setState({ fallbackEnabled: false });
@@ -264,7 +264,7 @@ const DragDropContextClient = ({ children, disableAutoScroll }: DragDropContextP
 
 	const dragMode = useRef<'new' | 'existing' | null>(null);
 
-	const initialSelector = useRef<{ zone: string; index: number }>(undefined);
+	const initialSelector = useRef<{ zone: string; index: number } | undefined>(undefined);
 
 	const nextContextValue = useMemo<DropZoneContext>(
 		() => ({

@@ -1,7 +1,7 @@
 import { forwardRef } from '../../react-shim.js';
 import { DropZoneProps } from '../DropZone/types';
 import { ComponentData, Config, Content, Metadata, WithPuckProps } from '../../types';
-import { useSlots } from '../../lib/use-slots';
+import { useSlots } from '../../lib/use-slots.tsrx';
 
 type SlotRenderProps =
 	DropZoneProps & {

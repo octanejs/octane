@@ -1,8 +1,9 @@
-import { Preview } from './../context';
+/** @jsxImportSource octane */
+import { Preview } from './../context.tsrx';
 import { useContext, useEffect, useState } from '../../../react-shim.js';
 import { useRenderedCallback } from '../../../lib/dnd/use-rendered-callback';
 import { insert } from '../../../lib/data/insert';
-import { ZoneStoreContext } from '../context';
+import { ZoneStoreContext } from '../context.tsrx';
 import { useContextStore } from '../../../lib/use-context-store';
 import { useAppStore } from '../../../store';
 

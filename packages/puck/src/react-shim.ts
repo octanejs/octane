@@ -1,6 +1,7 @@
 import {
 	createContext,
 	createPortal,
+	isValidElement,
 	memo,
 	useCallback,
 	useContext,
@@ -9,13 +10,15 @@ import {
 	useMemo,
 	useRef,
 	useState,
+	useTransition,
 } from 'octane';
 import type { Context as OctaneContext, OctaneNode } from 'octane';
-import type { Octane } from 'octane/jsx-runtime';
+import type { JSX, Octane } from 'octane/jsx-runtime';
 
 export {
 	createContext,
 	createPortal,
+	isValidElement,
 	memo,
 	useCallback,
 	useContext,
@@ -24,9 +27,10 @@ export {
 	useMemo,
 	useRef,
 	useState,
+	useTransition,
 };
 
-export type { OctaneNode as ReactNode, OctaneNode };
+export type { JSX, Octane, OctaneNode as ReactNode, OctaneNode };
 
 export type CSSProperties = Exclude<
 	Octane.JSX.IntrinsicElements['div']['style'],
@@ -54,21 +58,21 @@ export type ReactElement = OctaneNode;
 export type ReactMouseEvent<T = Element> = MouseEvent;
 export type SyntheticEvent<T = Element> = Event;
 
-export function forwardRef<T, P extends Record<string, unknown>>(
-	render: (props: P & { ref?: Ref<T> }) => OctaneNode,
-): FC<P & { ref?: Ref<T> }> {
-	return render;
-}
-
-export namespace Octane {
-	export namespace JSX {
-		export type Element = OctaneNode;
-	}
+// Octane passes `ref` as an ordinary prop, so upstream's `forwardRef` render
+// functions get it back as their second argument here. Returning `render`
+// itself would call it with props alone and drop every forwarded ref.
+export function forwardRef<T, P = Record<string, unknown>>(
+	render: (props: P, ref: ForwardedRef<T>) => OctaneNode,
+): FC<P & RefAttributes<T>> {
+	return function ForwardRef(props) {
+		return render(props, props.ref ?? null);
+	};
 }
 
 const React = {
 	createContext,
 	createPortal,
+	isValidElement,
 	memo,
 	useCallback,
 	useContext,
@@ -77,6 +81,7 @@ const React = {
 	useMemo,
 	useRef,
 	useState,
+	useTransition,
 	forwardRef,
 };
 

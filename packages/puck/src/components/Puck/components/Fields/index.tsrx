@@ -1,7 +1,7 @@
-import { Loader } from '../../../Loader';
+import { Loader } from '../../../Loader/index.tsrx';
 import { rootDroppableId } from '../../../../lib/root-droppable-id';
 import { UiState } from '../../../../types';
-import { AutoFieldPrivate } from '../../../AutoField';
+import { AutoFieldPrivate } from '../../../AutoField/index.tsrx';
 import { AppStore, useAppStore, useAppStoreApi } from '../../../../store';
 
 import styles from './styles.module.css';

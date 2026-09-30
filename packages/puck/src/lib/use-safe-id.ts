@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import React, { useState } from '../react-shim.js';
 import { generateId } from './generate-id';
 

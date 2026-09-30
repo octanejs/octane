@@ -2,9 +2,9 @@ import { Content, Data } from '../../types';
 import { insert } from '../../lib/data/insert';
 import { remove } from '../../lib/data/remove';
 import { getItem } from '../../lib/data/get-item';
-import { MoveAction } from '../actions';
+import { MoveAction } from '../actions.tsrx';
 import { AppStore } from '../../store';
-import { PrivateAppState } from '../../types/Internal';
+import { PrivateAppState } from '../../types/Internal.tsrx';
 import { walkAppState } from '../../lib/data/walk-app-state';
 import { getIdsForParent } from '../../lib/data/get-ids-for-parent';
 

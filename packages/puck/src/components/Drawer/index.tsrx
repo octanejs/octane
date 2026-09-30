@@ -1,9 +1,9 @@
 import styles from './styles.module.css';
 import getClassNameFactory from '../../lib/get-class-name-factory';
-import { DragIcon } from '../DragIcon';
+import { DragIcon } from '../DragIcon/index.tsrx';
 import { ReactElement, OctaneNode, Ref, useMemo, useState } from '../../react-shim.js';
 import { generateId } from '../../lib/generate-id';
-import { useDragListener } from '../DragDropContext';
+import { useDragListener } from '../DragDropContext/index.tsrx';
 import { useSafeId } from '../../lib/use-safe-id';
 import { useDraggable, useDroppable } from '@octanejs/dnd-kit';
 

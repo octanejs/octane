@@ -1,5 +1,5 @@
-import React from '../../../../react-shim.js';
-import { ResizeHandle } from '../ResizeHandle';
+import type { FC, OctaneNode } from '../../../../react-shim.js';
+import { ResizeHandle } from '../ResizeHandle/index.tsrx';
 import getClassNameFactory from '../../../../lib/get-class-name-factory';
 import styles from './styles.module.css';
 
@@ -11,7 +11,7 @@ interface SidebarProps {
 	isVisible: boolean;
 	onResize: (width: number) => void;
 	onResizeEnd: (width: number) => void;
-	children: React.OctaneNode;
+	children: OctaneNode;
 }
 
 export const Sidebar: FC<SidebarProps> = ({

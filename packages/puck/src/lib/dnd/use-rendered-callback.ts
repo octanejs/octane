@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { useDragDropManager } from '@octanejs/dnd-kit';
 import { DependencyList, useCallback } from '../../react-shim.js';
 

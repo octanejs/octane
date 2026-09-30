@@ -1,12 +1,12 @@
 'use client';
 
 import { rootZone } from '../../lib/root-droppable-id';
-import { useSlots } from '../../lib/use-slots';
+import { useSlots } from '../../lib/use-slots.tsrx';
 import { Config, Data, Metadata, UserGenerics } from '../../types';
-import { DropZonePure, DropZoneProvider, DropZoneRenderPure } from '../DropZone';
+import { DropZonePure, DropZoneProvider, DropZoneRenderPure } from '../DropZone/index.tsrx';
 import React, { useMemo } from '../../react-shim.js';
-import { SlotRender } from '../SlotRender';
-import { DropZoneContext } from '../DropZone/context';
+import { SlotRender } from '../SlotRender/index.tsrx';
+import { DropZoneContext } from '../DropZone/context.tsrx';
 
 export const renderContext = React.createContext<{
 	config: Config;

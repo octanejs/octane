@@ -1,4 +1,4 @@
-import { LayerTree } from '../../../LayerTree';
+import { LayerTree } from '../../../LayerTree/index.tsrx';
 import { useAppStore } from '../../../../store';
 import { useMemo } from '../../../../react-shim.js';
 import { findZonesForArea } from '../../../../lib/data/find-zones-for-area';

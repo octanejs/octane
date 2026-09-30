@@ -1,4 +1,4 @@
-import { PrivateAppState } from '../../types/Internal';
+import { PrivateAppState } from '../../types/Internal.tsrx';
 
 export const getIdsForParent = (zoneCompound: string, state: PrivateAppState) => {
 	const [parentId] = zoneCompound.split(':');

@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { useMemo } from '../react-shim.js';
 import { loadOverrides } from './load-overrides';
 import { Overrides, Plugin } from '../types';

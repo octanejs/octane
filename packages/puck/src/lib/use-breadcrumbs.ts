@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { useMemo } from '../react-shim.js';
 import { useAppStore, useAppStoreApi } from '../store';
 import { ItemSelector } from './data/get-item';

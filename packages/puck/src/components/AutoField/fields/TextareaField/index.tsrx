@@ -1,7 +1,7 @@
 import getClassNameFactory from '../../../../lib/get-class-name-factory';
 import styles from '../../styles.module.css';
 import { Type } from '@octanejs/lucide';
-import { FieldPropsInternal } from '../..';
+import { FieldPropsInternal } from '../../index.tsrx';
 
 const getClassName = getClassNameFactory('Input', styles);
 

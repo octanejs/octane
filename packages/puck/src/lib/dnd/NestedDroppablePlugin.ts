@@ -5,8 +5,8 @@ import type { Droppable } from '@dnd-kit/dom';
 
 import { effects, untracked } from '@dnd-kit/state';
 import { throttle } from '../throttle';
-import { ComponentDndData } from '../../components/DraggableComponent';
-import { DropZoneDndData } from '../../components/DropZone';
+import { ComponentDndData } from '../../components/DraggableComponent/index.tsrx';
+import { DropZoneDndData } from '../../components/DropZone/index.tsrx';
 import { getFrame } from '../get-frame';
 import { GlobalPosition } from '../global-position';
 import { BubbledPointerEvent, BubbledPointerEventType } from '../bubble-pointer-event';

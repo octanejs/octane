@@ -1,7 +1,7 @@
 import getClassNameFactory from '../../../../lib/get-class-name-factory';
 import styles from '../../styles.module.css';
 import { CheckCircle } from '@octanejs/lucide';
-import { FieldPropsInternal } from '../..';
+import { FieldPropsInternal } from '../../index.tsrx';
 
 const getClassName = getClassNameFactory('Input', styles);
 
@@ -34,7 +34,7 @@ export const RadioField = ({
 					value={JSON.stringify({ value: option.value })}
 					name={name}
 					onChange={(e) => {
-						onChange(JSON.parse(e.target.value).value);
+						onChange(JSON.parse(e.currentTarget.value).value);
 					}}
 					disabled={readOnly}
 					checked={value === option.value}

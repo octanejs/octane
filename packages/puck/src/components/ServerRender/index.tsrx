@@ -2,8 +2,8 @@ import { CSSProperties } from '../../react-shim.js';
 import { rootAreaId, rootDroppableId, rootZone } from '../../lib/root-droppable-id';
 import { setupZone } from '../../lib/data/setup-zone';
 import { Config, Data, Metadata, UserGenerics } from '../../types';
-import { useSlots } from '../../lib/use-slots';
-import { SlotRenderPure } from '../SlotRender/server';
+import { useSlots } from '../../lib/use-slots.tsrx';
+import { SlotRenderPure } from '../SlotRender/server.tsrx';
 
 type DropZoneRenderProps = {
 	zone: string;

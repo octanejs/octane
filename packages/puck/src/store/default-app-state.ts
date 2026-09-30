@@ -1,5 +1,5 @@
 import { defaultViewports } from '../components/ViewportControls/default-viewports';
-import { PrivateAppState } from '../types/Internal';
+import { PrivateAppState } from '../types/Internal.tsrx';
 
 export const defaultAppState: PrivateAppState = {
 	data: { content: [], root: {}, zones: {} },

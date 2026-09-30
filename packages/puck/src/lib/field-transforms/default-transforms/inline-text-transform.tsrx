@@ -1,4 +1,4 @@
-import { InlineTextField } from '../../../components/InlineTextField';
+import { InlineTextField } from '../../../components/InlineTextField/index.tsrx';
 import { FieldTransforms } from '../../../types/API/FieldTransforms';
 
 export const getInlineTextTransform = (): FieldTransforms => ({

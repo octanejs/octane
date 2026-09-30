@@ -1,7 +1,7 @@
 import { OctaneNode, SyntheticEvent, useState } from '../../react-shim.js';
 import styles from './IconButton.module.css';
 import getClassNameFactory from '../../lib/get-class-name-factory';
-import { Loader } from '../Loader';
+import { Loader } from '../Loader/index.tsrx';
 
 const getClassName = getClassNameFactory('IconButton', styles);
 

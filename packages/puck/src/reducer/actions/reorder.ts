@@ -1,6 +1,6 @@
 import { Data } from '../../types';
-import { ReorderAction } from '../actions';
-import { PrivateAppState } from '../../types/Internal';
+import { ReorderAction } from '../actions.tsrx';
+import { PrivateAppState } from '../../types/Internal.tsrx';
 import { moveAction } from './move';
 import { AppStore } from '../../store';
 

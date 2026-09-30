@@ -1,6 +1,7 @@
+import type { FC } from '../react-shim.js';
 import { DropZoneProps } from '../components/DropZone/types';
-import { Metadata } from './Data';
-import { WithChildren, WithPuckProps } from './Utils';
+import { Metadata } from './Data.tsrx';
+import { WithChildren, WithPuckProps } from './Utils.tsrx';
 
 export type PuckContext = {
 	renderDropZone: FC<DropZoneProps>;

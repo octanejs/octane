@@ -1,5 +1,5 @@
 import { AppState, Data } from '../../types';
-import { PrivateAppState } from '../../types/Internal';
+import { PrivateAppState } from '../../types/Internal.tsrx';
 
 export const makeStatePublic = <UserData extends Data>(
 	state: PrivateAppState<UserData>,

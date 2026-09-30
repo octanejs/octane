@@ -8,18 +8,23 @@ import {
 	useMemo,
 	useRef,
 } from '../../react-shim.js';
-import { DraggableComponent } from '../DraggableComponent';
+import { DraggableComponent } from '../DraggableComponent/index.tsrx';
 import { setupZone } from '../../lib/data/setup-zone';
 import { rootDroppableId } from '../../lib/root-droppable-id';
 import { getClassNameFactory } from '../../lib';
 import styles from './styles.module.css';
-import { DropZoneContext, DropZoneProvider, ZoneStoreContext, dropZoneContext } from './context';
+import {
+	DropZoneContext,
+	DropZoneProvider,
+	ZoneStoreContext,
+	dropZoneContext,
+} from './context.tsrx';
 import { useAppStore, useAppStoreApi } from '../../store';
 import { DropZoneProps } from './types';
 import { ComponentData, Config, DragAxis, Metadata, PuckContext, WithPuckProps } from '../../types';
 
 import { useDroppable, UseDroppableInput } from '@octanejs/dnd-kit';
-import { DrawerItemInner } from '../Drawer';
+import { DrawerItemInner } from '../Drawer/index.tsrx';
 import { pointerIntersection } from '@dnd-kit/collision';
 import { UniqueIdentifier } from '@dnd-kit/abstract';
 import { useMinEmptyHeight } from './lib/use-min-empty-height';
@@ -28,20 +33,22 @@ import { useContentIdsWithPreview } from './lib/use-content-with-preview';
 import { useDragAxis } from './lib/use-drag-axis';
 import { useContextStore } from '../../lib/use-context-store';
 import { useShallow } from '@octanejs/zustand/shallow';
-import { renderContext } from '../Render';
-import { useSlots } from '../../lib/use-slots';
-import { ContextSlotRender, SlotRenderPure } from '../SlotRender';
+import { renderContext } from '../Render/index.tsrx';
+import { useSlots } from '../../lib/use-slots.tsrx';
+import { ContextSlotRender, SlotRenderPure } from '../SlotRender/index.tsrx';
 import { expandNode } from '../../lib/data/flatten-node';
-import { useFieldTransforms } from '../../lib/field-transforms/use-field-transforms';
+import { useFieldTransforms } from '../../lib/field-transforms/use-field-transforms.tsrx';
 import {
 	getInlineTextTransform,
-} from '../../lib/field-transforms/default-transforms/inline-text-transform';
-import { getSlotTransform } from '../../lib/field-transforms/default-transforms/slot-transform';
+} from '../../lib/field-transforms/default-transforms/inline-text-transform.tsrx';
+import {
+	getSlotTransform,
+} from '../../lib/field-transforms/default-transforms/slot-transform.tsrx';
 import { FieldTransforms } from '../../types/API/FieldTransforms';
 
 const getClassName = getClassNameFactory('DropZone', styles);
 
-export { DropZoneProvider, dropZoneContext } from './context';
+export { DropZoneProvider, dropZoneContext } from './context.tsrx';
 
 const getRandomColor = () => `#${Math.floor(Math.random() * 16777215).toString(16)}`;
 

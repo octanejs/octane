@@ -1,7 +1,7 @@
-import { DefaultComponents } from './Config';
-import { WithDeepSlots } from './Internal';
-import { DefaultComponentProps, DefaultRootFieldProps } from './Props';
-import { AsFieldProps, WithId } from './Utils';
+import { DefaultComponents } from './Config.tsrx';
+import { WithDeepSlots } from './Internal.tsrx';
+import { DefaultComponentProps, DefaultRootFieldProps } from './Props.tsrx';
+import { AsFieldProps, WithId } from './Utils.tsrx';
 
 export type BaseData<Props extends { [key: string]: any } = { [key: string]: any }> = {
 	readOnly?: Partial<Record<keyof Props, boolean>>;

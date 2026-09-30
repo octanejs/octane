@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { useEffect } from '../react-shim.js';
 import { create } from '@octanejs/zustand';
 import { subscribeWithSelector } from '@octanejs/zustand/middleware';

@@ -16,17 +16,18 @@ import './styles.css';
 import getClassNameFactory from '../../lib/get-class-name-factory';
 import { Copy, CornerLeftUp, Trash } from '@octanejs/lucide';
 import { useAppStore, useAppStoreApi } from '../../store';
-import { Loader } from '../Loader';
-import { ActionBar } from '../ActionBar';
+import { Loader } from '../Loader/index.tsrx';
+import { ActionBar } from '../ActionBar/index.tsrx';
 
 import { createPortal } from 'octane';
 
-import { dropZoneContext, DropZoneProvider } from '../DropZone';
+import { dropZoneContext, DropZoneProvider } from '../DropZone/index.tsrx';
 import { createDynamicCollisionDetector } from '../../lib/dnd/collision/dynamic';
 import { DragAxis } from '../../types';
 import { UniqueIdentifier } from '@dnd-kit/abstract';
+import { Feedback } from '@dnd-kit/dom';
 import { getDeepScrollPosition } from '../../lib/get-deep-scroll-position';
-import { DropZoneContext, ZoneStoreContext } from '../DropZone/context';
+import { DropZoneContext, ZoneStoreContext } from '../DropZone/context.tsrx';
 import { useShallow } from '@octanejs/zustand/shallow';
 import { getItem } from '../../lib/data/get-item';
 import { useSortable } from '@octanejs/dnd-kit/sortable';
@@ -189,7 +190,8 @@ export const DraggableComponent = ({
 			duration: 200,
 			easing: 'cubic-bezier(0.2, 0, 0, 1)',
 		},
-		feedback: 'clone',
+		// @dnd-kit 0.4 moved `feedback` from the sortable input to the Feedback plugin.
+		plugins: (defaults) => [...defaults, Feedback.configure({ feedback: 'clone' })],
 	});
 
 	useEffect(() => {
@@ -214,7 +216,7 @@ export const DraggableComponent = ({
 		return cleanup;
 	}, [permissions.drag, zoneCompound]);
 
-	const ref = useRef<HTMLElement>(null);
+	const ref = useRef<HTMLElement | null>(null);
 
 	const refSetter = useCallback((el: HTMLElement | null) => {
 		sortableRef(el);

@@ -1,13 +1,13 @@
 import { memo, useCallback, useMemo, useState } from '../../../../react-shim.js';
 import { useAppStore, useAppStoreApi } from '../../../../store';
 import { ChevronDown, ChevronUp, Globe, PanelLeft, PanelRight } from '@octanejs/lucide';
-import { Heading } from '../../../Heading';
-import { IconButton } from '../../../IconButton/IconButton';
-import { MenuBar } from '../../../MenuBar';
+import { Heading } from '../../../Heading/index.tsrx';
+import { IconButton } from '../../../IconButton/IconButton.tsrx';
+import { MenuBar } from '../../../MenuBar/index.tsrx';
 import { Button } from '../../../Button';
 import { Config, Overrides, UserGenerics } from '../../../../types';
-import { DefaultOverride } from '../../../DefaultOverride';
-import { usePropsContext } from '../..';
+import { DefaultOverride } from '../../../DefaultOverride/index.tsrx';
+import { usePropsContext } from '../../index.tsrx';
 import { getClassNameFactory } from '../../../../lib';
 import styles from './styles.module.css';
 

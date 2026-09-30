@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useRef } from '../../../../react-shim.js';
+import React, { type FC, useCallback, useEffect, useRef } from '../../../../react-shim.js';
 import getClassNameFactory from '../../../../lib/get-class-name-factory';
 import styles from './styles.module.css';
 import './styles.css';
-import { useCanvasFrame } from '../../../../lib/frame-context';
+import { useCanvasFrame } from '../../../../lib/frame-context.tsrx';
 import { useResetAutoZoom } from '../../../../lib';
 
 const getClassName = getClassNameFactory('ResizeHandle', styles);
@@ -23,7 +23,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({
 	const { frameRef } = useCanvasFrame();
 	const resetAutoZoom = useResetAutoZoom(frameRef);
 
-	const handleRef = useRef<HTMLDivElement>(null);
+	const handleRef = useRef<HTMLDivElement | null>(null);
 	const isDragging = useRef(false);
 	const startX = useRef(0);
 	const startWidth = useRef(0);
