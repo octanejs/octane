@@ -176,6 +176,12 @@ packages/tanstack-devtools/src/*.tsrx
 packages/tanstack-devtools/src/*.tsrx.d.ts
 packages/tanstack-devtools/tests/_fixtures/*.tsrx
 
+# TanStack Query Devtools' TSRX component modules: the TSRX Prettier plugin
+# drops parentheses around arrow-function operands and reindents JSDoc blocks on
+# round-trip, which breaks the copied upstream source. Keep the source stable.
+packages/tanstack-query-devtools/src/*.tsrx
+packages/tanstack-query-devtools/tests/_fixtures/*.tsrx
+
 # Byte-exact evidence pinned from input-otp; formatting would invalidate provenance.
 packages/input-otp/upstream/
 

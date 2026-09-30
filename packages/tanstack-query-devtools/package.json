@@ -1,0 +1,61 @@
+{
+  "name": "@octanejs/tanstack-query-devtools",
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "TanStack Query devtools bindings for Octane — reuses @tanstack/query-devtools and ports the React adapter's ReactQueryDevtools and ReactQueryDevtoolsPanel components.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/tanstack-query-devtools"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE.upstream"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./production": "./src/production.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tanstack/query-devtools": "5.102.8"
+  },
+  "peerDependencies": {
+    "@octanejs/tanstack-query": "workspace:*",
+    "octane": "workspace:^0.7.0"
+  },
+  "devDependencies": {
+    "@octanejs/tanstack-query": "workspace:*",
+    "@octanejs/testing-library": "workspace:*",
+    "@tanstack/react-query": "5.102.8",
+    "@tanstack/react-query-devtools": "5.102.8",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}
