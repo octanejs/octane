@@ -200,6 +200,8 @@ describe('Strong asynchronous effect updates', () => {
 		`const controller = new AbortController(); api.get(props.id, { ...props.options, signal: controller.signal }).then(setData); return () => controller.abort();`,
 		`const controller = new AbortController(); const signal = controller.signal; (async () => { const r = await fetch('/api', { signal }); setData(await r.json()); })(); return () => controller.abort();`,
 		`const controller = new AbortController(); api.get(props.id).then(value => { if (!controller.signal.aborted) setData(value); }); return () => controller.abort();`,
+		`const controller = new AbortController(); const alias = controller; api.get(props.id, { signal: alias.signal }).then(setData); return () => controller.abort();`,
+		`const controller = new AbortController(); const alias = controller; api.get(props.id, { signal: controller.signal }).then(setData); return () => alias.abort();`,
 	])('accepts cleanup that cancels or ignores the result: %s', (body) => {
 		accepts(app(`useEffect(() => { ${body} });`));
 	});
