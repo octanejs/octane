@@ -1834,6 +1834,15 @@ rather than client-rendering a whole boundary, so attribute-level value patches
 do not report: production React does not detect those at all, and reporting
 Octane's extra detection would make the channel incomparable.
 
+A `<Hydrate>` boundary replays captured interaction events as constructed,
+untrusted copies that keep the captured event's `timeStamp`, including through
+nested boundaries. React replays only the continuous events (`focusin`,
+`dragenter`, `mouseover`, `pointerover`, `gotpointercapture`) that arrive
+before their target hydrates, as `new nativeEvent.constructor(type,
+nativeEvent)` copies, and their `timeStamp` is the replay time. React never
+replays a discrete event: it tries to hydrate the target synchronously and then
+dispatches the original event to whatever has hydrated.
+
 `hydrateRoot` has no `formState` option: resuming `useActionState` from an MPA
 form POST requires React's server-action state serialization, which is part of
 the RSC model Octane does not implement (the matching `useActionState`
