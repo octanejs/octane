@@ -724,6 +724,10 @@ export function App(props) @{
 		],
 		['a nested await', `useEffect(() => { (async () => { await (await null); ${write}; })(); });`],
 		[
+			'a conditional await whose other branch is settled',
+			`useEffect(() => { let active = true; (async () => { await (props.flag ? await props.load() : null); if (active) ${write}; })(); return () => { active = false; }; });`,
+		],
+		[
 			'a short-circuited await',
 			`useEffect(() => { (async () => { await (null && (await props.load())); ${write}; })(); });`,
 		],
@@ -1382,6 +1386,14 @@ export function App(props) @{
 			`useEffect(() => { addEventListener('resize', () => setWidth(1)); });`,
 		],
 		['a global handler property', `useEffect(() => { onresize = () => setWidth(1); });`],
+		[
+			'a helper removal for another event',
+			`function listen(target, type, handler) { target.addEventListener(type, handler); } function unlisten(target, type, handler) { target.removeEventListener(type, handler); } useEffect(() => { const onResize = () => setWidth(1); listen(window, 'resize', onResize); return () => unlisten(window, 'scroll', onResize); });`,
+		],
+		[
+			'a helper removal without capture',
+			`function listen(target, type, handler, capture) { target.addEventListener(type, handler, capture); } function unlisten(target, type, handler) { target.removeEventListener(type, handler); } useEffect(() => { const onResize = () => setWidth(1); listen(window, 'resize', onResize, true); return () => unlisten(window, 'resize', onResize); });`,
+		],
 		[
 			'a helper removal for another handler',
 			`function listen(target, type, handler) { target.addEventListener(type, handler); } function unlisten(target, type, handler) { target.removeEventListener(type, handler); } useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); listen(window, 'resize', first); return () => unlisten(window, 'resize', second); });`,

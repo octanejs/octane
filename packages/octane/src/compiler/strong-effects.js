@@ -256,8 +256,11 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		const node = unwrap(expression);
 		if (node?.type === 'Literal') return node.value;
 		if (node?.type === 'Identifier') {
-			if (node.name === 'undefined' && bindingOf(node) === null) return undefined;
-			return depth < 8 ? staticValue(stableInitOf(node), depth + 1) : UNKNOWN;
+			const binding = bindingOf(node);
+			if (node.name === 'undefined' && binding === null) return undefined;
+			if (depth >= 8 || binding == null) return UNKNOWN;
+			// A helper parameter holds the argument of the call being visited.
+			return staticValue(frameArgument(binding) ?? stableInit(binding), depth + 1);
 		}
 		if (node?.type === 'UnaryExpression') {
 			if (node.operator === 'void') return undefined;
