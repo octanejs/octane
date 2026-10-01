@@ -2308,7 +2308,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				// A default replaces only `undefined`; otherwise the parameter is the
 				// state value the updater, reducer, or helper received.
 				value =
-					value?.kind === 'prop' || value?.kind === 'snapshot'
+					value?.kind === 'prop' || value?.kind === 'snapshot' || value?.kind === 'derived-state'
 						? value
 						: value.kind === 'constant' && value.primitive === undefined
 							? defaultValue

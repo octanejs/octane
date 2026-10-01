@@ -663,6 +663,14 @@ describe('Strong stale deferred state updates', () => {
 			`export function A({ save }) { const [n, setN] = useState(0); function apply(value) { setN(value); } return <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b>; }`,
 		],
 		[
+			'an expression passed to a defaulted Effect Event parameter after await',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value = 0) => setN(value)); return <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b>; }`,
+		],
+		[
+			'a derived value passed to a defaulted helper parameter after await',
+			`export function A({ save }) { const [n, setN] = useState(0); function apply(value = 0) { setN(value); } return <b onClick={async () => { const next = n + 1; await save(); apply(next); }}>{n}</b>; }`,
+		],
+		[
 			'an awaited snapshot passed to an inline callback',
 			`export function A() { const [n, setN] = useState(0); return <b onClick={async () => { ((apply, value) => apply(value))(setN, await Promise.resolve(n)); }}>{n}</b>; }`,
 		],
