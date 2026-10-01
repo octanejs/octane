@@ -127,12 +127,14 @@ const OCTANE_IMPORT =
  * Does the module import a runtime binding from octane? TypeScript erases an
  * `import type` clause and a named clause whose every specifier is
  * `type`-marked, so neither leaves anything for the compiler to slot. A
- * default or namespace binding, or any unmarked specifier, survives.
+ * default or namespace binding, or any unmarked specifier, survives. Comments
+ * in the clause are not specifiers, so they are dropped before it is read.
  *
  * @param {string} source
  */
 function importsOctaneAtRuntime(source) {
-	for (const [, clause] of source.matchAll(OCTANE_IMPORT)) {
+	for (const [, authored] of source.matchAll(OCTANE_IMPORT)) {
+		const clause = authored.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, ' ').trim();
 		if (/^type\b/.test(clause)) continue;
 		const named = /^\{([\s\S]*)\}$/.exec(clause);
 		if (named === null) return true;

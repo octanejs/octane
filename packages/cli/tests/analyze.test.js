@@ -276,6 +276,11 @@ describe('octane analyze Strong coverage', () => {
 			// Every specifier is type-marked, so TypeScript erases the import.
 			'src/inline-types.ts':
 				"import { type OctaneNode, type Root } from 'octane';\nexport type Pair = [OctaneNode, Root];\n",
+			// Comments are not specifiers, so these imports are still erased.
+			'src/commented-types.ts':
+				"import /* types */ type { Root } from 'octane';\n" +
+				"import {\n  type OctaneNode, // rendered\n  /* host */ type Context,\n} from 'octane';\n" +
+				'export type All = [Root, OctaneNode, Context<unknown>];\n',
 			'src/mixed.ts':
 				"import { type OctaneNode, useState } from 'octane';\nexport function useNode(): OctaneNode { return useState(null)[0]; }\n",
 			'src/math.ts': 'export const add = (a: number, b: number) => a + b;\n',
