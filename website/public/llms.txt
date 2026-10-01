@@ -502,7 +502,8 @@ Strong modules reject these statically provable patterns:
 - Including a known Effect Event in explicit hook dependencies (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`).
 - Mutating a provable state snapshot during render (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`).
 - Mutating a binding declared outside a retained keyed `@for` row from that row (`OCTANE_STRONG_RETAINED_ROW_MUTATION`). Fresh setup-local and row-local scratch data remain valid.
-- Reading a known clock or random source during render (`OCTANE_STRONG_RENDER_IMPURE_CALL`).
+- Reading a known clock or random source during render, including `crypto.randomUUID()` and callbacks that known array methods such as `map` run synchronously (`OCTANE_STRONG_RENDER_IMPURE_CALL`). Use `useId()` for element IDs and a stable item ID for keys.
+- Formatting a provable `Date` or `Intl` value during render without an explicit locale and time zone (`OCTANE_STRONG_RENDER_LOCALE_FORMAT`).
 - Declaring a built-in hook value or its dependent effect outside the sole nested `@{…}` block that uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
 - Declaring a named native event handler outside the sole deeper nested `@{…}` block containing its direct `onX` use (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`).
 

@@ -8,6 +8,7 @@ import { analyzeStrongHTML } from './strong-html.js';
 import { analyzeStrongDOM } from './strong-dom.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { createStrongTemplatePolicy } from './strong-template-policy.js';
+import { createStrongRenderPolicy } from './strong-render-policy.js';
 
 const STATE_HOOKS = new Set(['useState', 'useReducer', 'useLinkedState']);
 const EFFECT_HOOKS = new Set(['useEffect', 'useLayoutEffect', 'useInsertionEffect']);
@@ -76,6 +77,8 @@ const PROP_BINDING = { kind: 'prop' };
 const FETCH_BINDING = { kind: 'fetch' };
 const UNDEFINED_BINDING = { kind: 'constant', value: UNDEFINED_VALUE, primitive: undefined };
 const GLOBAL_OBJECT_BINDING = { kind: 'global-object' };
+// Array callbacks receive (item, index, array) or (accumulator, item, index, array).
+const ARRAY_CALLBACK_ARGUMENTS = [OTHER_BINDING, OTHER_BINDING, OTHER_BINDING, OTHER_BINDING];
 const AMBIENT_GLOBAL_BINDINGS = new Map(
 	[
 		'window',
@@ -1525,6 +1528,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		filename,
 		options,
 	});
+	const renderPolicy = createStrongRenderPolicy({
+		ast,
+		moduleScope,
+		report,
+		reportImpureCall,
+		resolve,
+		resolveScope,
+		unwrap,
+		staticPrimitiveValue,
+		isReassigned,
+	});
 
 	function predeclareHoistedVars(node, scope) {
 		if (!mayHaveHoistedVars || node == null) return;
@@ -1838,12 +1852,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
-	function reportImpureCall(node) {
-		report(
-			STRONG_RENDER_IMPURE_CALL,
-			node,
-			'Strong mode does not allow nondeterministic calls during render. Read time or randomness outside render and pass the result as a prop or state snapshot.',
-		);
+	function reportImpureCall(
+		node,
+		message = 'Strong mode does not allow nondeterministic calls during render. Read time or randomness outside render and pass the result as a prop or state snapshot.',
+	) {
+		report(STRONG_RENDER_IMPURE_CALL, node, renderPolicy.impureMessage(node, message));
 	}
 
 	function unshadowedGlobal(node, scope, name) {
@@ -3878,6 +3891,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			return;
 		}
 		templatePolicy.visit(node, scope, readAccess);
+		renderPolicy.visit(node, scope);
 
 		switch (node.type) {
 			case 'ImportDeclaration':
@@ -4274,6 +4288,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					return;
 				}
 				let executionPhase = phaseAfter(node.callee, phase, true, node.optional === true);
+				// A known array method runs its callback now; in render, so does the callback.
+				const arrayCallbackIndex =
+					hook === null && executionPhase === 'render'
+						? renderPolicy.arrayCallbackIndex(callee, scope)
+						: -1;
 				const synchronousCallbackIndex =
 					hook === 'useLinkedState'
 						? 1
@@ -4285,12 +4304,23 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				for (let index = 0; index < (node.arguments?.length ?? 0); index++) {
 					const argument = node.arguments[index];
 					if (
-						(index !== synchronousCallbackIndex && !(index === 0 && component !== null)) ||
+						(index !== synchronousCallbackIndex &&
+							(index !== arrayCallbackIndex || unwrap(argument)?.generator === true) &&
+							!(index === 0 && component !== null)) ||
 						!FUNCTION_TYPES.has(unwrap(argument)?.type)
 					) {
 						visit(argument, scope, executionPhase);
 					}
 					executionPhase = phaseAfter(argument, executionPhase);
+				}
+				const arrayCallback = node.arguments?.[arrayCallbackIndex];
+				if (arrayCallback !== undefined && arrayCallback.type !== 'SpreadElement') {
+					visitCallable(
+						callableValue(arrayCallback, scope),
+						unwrap(arrayCallback),
+						executionPhase === 'render' ? 'render' : 'deferred',
+						ARRAY_CALLBACK_ARGUMENTS,
+					);
 				}
 				const dependencyIndex =
 					hook === 'useImperativeHandle'
@@ -4363,6 +4393,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					if (currentFunctionChecksImpureCalls && impureStandardCall(callee, scope)) {
 						reportImpureCall(callee);
 					}
+					if (currentFunctionChecksImpureCalls) renderPolicy.call(node, callee, scope);
 					if (callee?.type === 'MemberExpression') {
 						const method = callee.computed
 							? staticPrimitiveValue(callee.property, scope)
@@ -4436,6 +4467,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					unshadowedGlobal(callee, scope, 'Date')
 				) {
 					reportImpureCall(callee);
+				}
+				if (executionPhase === 'render' && currentFunctionChecksImpureCalls) {
+					renderPolicy.construct(node, scope);
 				}
 				if (inlineConstructor) {
 					visitCallback(callee, scope, executionPhase, argumentValues(node.arguments, scope));
