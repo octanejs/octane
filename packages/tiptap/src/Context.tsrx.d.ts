@@ -1,9 +1,19 @@
-import type { OctaneNode } from 'octane';
+import type { Editor } from '@tiptap/core';
+import type { Context, OctaneNode } from 'octane';
 import type { Octane } from 'octane/jsx-runtime';
 
 import type { EditorContentProps } from './EditorContent.tsrx';
-import type { EditorContextValue } from './Context';
 import type { UseEditorOptions } from './useEditor';
+
+/** The editor value shared by the legacy TipTap context API. */
+export type EditorContextValue = {
+	editor: Editor | null;
+};
+
+export declare const EditorContext: Context<EditorContextValue>;
+
+/** Read the editor from the nearest `EditorProvider` or `Tiptap` component. */
+export declare function useCurrentEditor(): EditorContextValue;
 
 export interface EditorConsumerProps {
 	children: (value: EditorContextValue) => OctaneNode;

@@ -3,7 +3,7 @@
 import type { Editor } from '@tiptap/core';
 import { createContext, useContext, useMemo, type Context, type OctaneNode } from 'octane';
 
-import { EditorContext } from './Context';
+import { EditorContext } from './Context.tsrx';
 import { EditorContent, type EditorContentProps } from './EditorContent.tsrx';
 import { splitSlot, subSlot } from './internal';
 import {
