@@ -255,6 +255,32 @@ describe('Strong managed DOM writes through refs', () => {
 		);
 	});
 
+	it('treats a host whose only child is a scoped style block as empty', () => {
+		// Sibling-scoped <style> is extracted; it is not part of the host's child list.
+		expectStrongValid(
+			`${IMPORTS}export function Chart() @{
+  const host = useRef(null);
+  useEffect(() => { host.current.appendChild(document.createElement('canvas')); });
+  <div ref={host} class="chart">
+    <style>.chart { height: 200px; }</style>
+  </div>
+}`,
+			'/src/Chart.tsrx',
+		);
+		expectStrongError(
+			`${IMPORTS}export function Chart({ label }) @{
+  const host = useRef(null);
+  useEffect(() => { host.current.textContent = label; });
+  <div ref={host} class="chart">
+    <style>.chart { height: 200px; }</style>
+    {label as string}
+  </div>
+}`,
+			'/src/Chart.tsrx',
+			MANAGED_DOM_WRITE,
+		);
+	});
+
 	it('checks the TSRX ref attribute shorthand', () => {
 		expectStrongError(
 			`${IMPORTS}export function App({ label }) @{
