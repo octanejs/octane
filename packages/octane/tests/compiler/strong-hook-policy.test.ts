@@ -9,8 +9,9 @@ const EVERY_RENDER = 'OCTANE_STRONG_UNTRACKED_EFFECT';
 const MANUAL_MEMO = 'OCTANE_STRONG_MANUAL_MEMO';
 const app = (
 	setup: string,
+	output = '<div />',
 ) => `import { useEffect, useLayoutEffect, useInsertionEffect, useImperativeHandle, useMemo, useCallback, useEffectEvent, useRef, useState } from 'octane';
-export function App(props) @{ ${setup} <div /> }`;
+export function App(props) @{ ${setup} ${output} }`;
 const strong = (source: string) => `"use strong";\n${source}`;
 
 describe('Strong compiler-owned hook policies', () => {
@@ -58,7 +59,9 @@ describe('Strong compiler-owned hook policies', () => {
 		'const event = useEffectEvent(() => console.log(props.value)); useEffect(() => { event(); }, []);',
 		'const ref = useRef(null); useEffect(() => { console.log(ref.current, props.value); }, [ref, props.value]);',
 	])('reports equivalent explicit dependencies as a non-fatal redundancy hint', (setup) => {
-		const result = compile(strong(app(setup)), '/src/App.tsrx');
+		// Effect setup may read refs attached to an element, not value refs.
+		const output = setup.includes('useRef') ? '<div ref={ref} />' : undefined;
+		const result = compile(strong(app(setup, output)), '/src/App.tsrx');
 		expect(result.diagnostics).toEqual(
 			expect.arrayContaining([expect.objectContaining({ code: REDUNDANT, severity: 'hint' })]),
 		);
@@ -71,7 +74,7 @@ const LIMIT = 10;
 export function App(props) @{
   const ref = useRef(null);
   useEffect(() => observe(LIMIT, ref.current, props.value), [observe, LIMIT, ref, props.value]);
-  <div />
+  <div ref={ref} />
 }`);
 		expect(compile(source, '/src/App.tsrx').diagnostics).toEqual(
 			expect.arrayContaining([expect.objectContaining({ code: REDUNDANT, severity: 'hint' })]),

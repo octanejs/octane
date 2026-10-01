@@ -241,6 +241,13 @@ A Strong module cannot:
 - Update state after an `await` or promise callback in an effect unless the
   returned cleanup aborts the request's `AbortController` or sets a flag the
   update checks (`OCTANE_STRONG_EFFECT_DATA_FETCH`).
+- Call a state getter, read an unattached ref's `current`, or read a reassigned
+  module variable in synchronous effect setup
+  (`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`). Read the snapshot or use
+  `useEffectEvent`.
+- Add a platform event listener, interval, observer, connection, or geolocation
+  watch in effect setup without releasing it in the returned cleanup
+  (`OCTANE_STRONG_EFFECT_RESOURCE_LEAK`).
 - Call a known third-tuple state getter while rendering
   (`OCTANE_STRONG_RENDER_STATE_GETTER_CALL`). Render from the state snapshot;
   use the getter in events, effects, or deferred work.
