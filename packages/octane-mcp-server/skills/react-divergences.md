@@ -43,7 +43,12 @@ may not update state synchronously, including through `startTransition`,
 non-promise (`OCTANE_STRONG_EFFECT_STATE_UPDATE`). A state update after an
 `await` or promise callback needs cleanup that aborts the request's
 `AbortController` or sets a flag the update checks
-(`OCTANE_STRONG_EFFECT_DATA_FETCH`). Use `useLinkedState` for prop-driven state;
+(`OCTANE_STRONG_EFFECT_DATA_FETCH`). Effect setup may not call a state getter,
+read an unattached ref's `current`, or read a reassigned module variable
+(`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`); use the snapshot or `useEffectEvent`.
+Platform listeners, intervals, observers, connections, and geolocation watches
+acquired in setup must be released by the cleanup
+(`OCTANE_STRONG_EFFECT_RESOURCE_LEAK`). Use `useLinkedState` for prop-driven state;
 use a lazy `useState` initializer or an explicit third `useReducer` initializer
 for deliberate initial capture. In `.tsrx`, render lists
 with keyed `@for` and stable item IDs, never position keys. Strong `.tsx` keeps
@@ -64,7 +69,8 @@ reassigned module-scope `let` or `var` during render is an error too
 without a witnessed render input. Pass the ref directly to a `ref` prop and
 render from the state tuple's first member. Move changing module values into
 state or context, or pass an immutable snapshot as a prop. Read the ref or call
-the getter in an event, effect, or deferred callback.
+the getter in an event, effect cleanup, Effect Event, or deferred callback;
+effect setup may read refs attached to elements.
 Compatibility modules keep their existing behavior.
 
 Reading unshadowed `window`, `document`, `localStorage`, `sessionStorage`,
