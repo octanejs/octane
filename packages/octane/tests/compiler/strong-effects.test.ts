@@ -255,6 +255,14 @@ describe('Strong asynchronous effect updates', () => {
 			`await fetch('/a', { signal }); while (props.more) { await api.get(props.id); if (props.fast) break; await fetch('/b', { signal }); } setData(1);`,
 		],
 		[
+			'a labeled continue that leaves an inner loop after an unsigned request',
+			`await fetch('/a', { signal }); outer: for (const id of props.ids) { while (props.more) { await api.get(id); if (props.skip) continue outer; await fetch('/b', { signal }); } } setData(1);`,
+		],
+		[
+			'a break before a signed loop test after an unsigned request',
+			`while (await fetch('/a', { signal })) { await api.get(props.id); if (props.fast) break; } setData(1);`,
+		],
+		[
 			'a loop that continues after an unsigned request',
 			`await fetch('/a', { signal }); for (const id of props.ids) { await api.get(id); if (props.skip) continue; await fetch('/b', { signal }); } setData(1);`,
 		],
@@ -305,6 +313,14 @@ describe('Strong asynchronous effect updates', () => {
 		[
 			'a request selected by a literal operand',
 			`await (null ?? fetch('/a', { signal })); setData(1);`,
+		],
+		[
+			'a while test reached by a continue',
+			`while (await fetch('/a', { signal })) { await api.get(props.id); if (props.skip) continue; } setData(1);`,
+		],
+		[
+			'a for test reached by a continue',
+			`for (; await fetch('/a', { signal }); ) { await api.get(props.id); if (props.skip) continue; } setData(1);`,
 		],
 	])('accepts an abort proof that covers %s', (_label, body) => {
 		accepts(app(aborted(body)));
