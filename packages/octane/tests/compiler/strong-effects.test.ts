@@ -263,6 +263,10 @@ describe('Strong asynchronous effect updates', () => {
 			`while (await fetch('/a', { signal })) { await api.get(props.id); if (props.fast) break; } setData(1);`,
 		],
 		[
+			'a labeled block that breaks after an unsigned request',
+			`done: { await api.get(props.id); if (props.fast) break done; await fetch('/b', { signal }); } setData(1);`,
+		],
+		[
 			'a loop that continues after an unsigned request',
 			`await fetch('/a', { signal }); for (const id of props.ids) { await api.get(id); if (props.skip) continue; await fetch('/b', { signal }); } setData(1);`,
 		],
@@ -313,6 +317,10 @@ describe('Strong asynchronous effect updates', () => {
 		[
 			'a request selected by a literal operand',
 			`await (null ?? fetch('/a', { signal })); setData(1);`,
+		],
+		[
+			'the cases that leave a switch with a labeled continue',
+			`outer: for (const id of props.ids) { switch (id) { case 0: await api.get(id); continue outer; default: await fetch('/a', { signal }); } setData(id); }`,
 		],
 		[
 			'a while test reached by a continue',

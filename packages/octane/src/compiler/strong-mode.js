@@ -3916,6 +3916,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	// Only paths that reach the next statement share its flow.
+	// `loop` is true for a loop, false for a switch, and null for a labeled block.
 	function enterJumpTarget(loop) {
 		const labels = pendingLabels;
 		pendingLabels = null;
@@ -3941,17 +3942,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (currentEffect === null) return;
 		const flow = effectPolicy.saveFlow();
 		const label = node.label?.name ?? null;
+		// A jump skips every target between it and the one it names: it never
+		// reaches the code after them. Only a labeled jump can name a block.
 		for (let target = jumpTargets; target !== null; target = target.next) {
 			const own =
 				label === null
-					? node.type === 'BreakStatement' || target.loop
+					? target.loop === true || (target.loop === false && node.type === 'BreakStatement')
 					: target.labels?.includes(label) === true;
 			if (own) {
 				(node.type === 'ContinueStatement' ? target.continues : target.breaks).push(flow);
 				return;
 			}
-			// Jumping to an outer label leaves this target.
-			if (label !== null) target.breaks.push(flow);
 		}
 	}
 
@@ -4847,9 +4848,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					body?.type === 'DoWhileStatement'
 				) {
 					pendingLabels = labels;
+					visit(node.body, scope, phase);
+					pendingLabels = null;
+					return;
 				}
+				// `label: { … break label; … }` leaves the labeled statement.
+				pendingLabels = labels;
+				const blockTarget = enterJumpTarget(null);
 				visit(node.body, scope, phase);
-				pendingLabels = null;
+				if (blockTarget !== null) {
+					effectPolicy.restoreFlow(exitJumpTarget(blockTarget, effectPolicy.saveFlow()));
+				}
 				return;
 			}
 			case 'TryStatement': {
