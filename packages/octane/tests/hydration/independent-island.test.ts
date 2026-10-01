@@ -438,6 +438,8 @@ function Unrelated() {
 				expect(choose.mock.calls).toEqual([['load']]);
 				nestedButton.click();
 				await vi.waitFor(() => expect(nestedActive).toBe(true));
+				// The nested click replays from the island's post-paint passive work.
+				await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
 				expect(modules).toEqual([loadManifest.moduleId, nestedManifest.moduleId]);
 				expect(choose.mock.calls).toEqual([['load'], ['nested']]);
 				expect(host.querySelector('[data-nested]')).toBe(nestedButton);
