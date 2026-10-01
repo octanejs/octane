@@ -1,9 +1,9 @@
 # Upstream
 
 - Repository: https://github.com/TanStack/router
-- Release tag: `@tanstack/react-router@1.170.18`
+- Release tag: `@tanstack/react-router@1.170.41`
 - Commit: `58c005fcb1a0618ec8c5b96b2b5fe3ccab5736c5`
-- Package: `@tanstack/react-router@1.170.18`
+- Package: `@tanstack/react-router@1.170.41`
 - Source root: `packages/react-router/src`
 - Test root: `packages/react-router/tests`
 - License: MIT

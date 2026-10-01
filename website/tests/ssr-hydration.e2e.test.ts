@@ -1595,13 +1595,17 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 				// Let hydrateStart's post-networkidle tail (router match commit +
 				// hydrateRoot) finish before firing the event.
 				await page.waitForTimeout(500);
-				// A hash replaceState is the smallest router event: it reloads and bumps
-				// the router's loadedAt without changing matches. The hydrated tree must
-				// update in place — a remount would replace every DOM node (and lose all
-				// component state) on the first interaction after page load.
+				// A hash replaceState is the smallest router event: it reloads and
+				// commits a new location without changing matches. The hydrated tree
+				// must update in place — a remount would replace every DOM node (and
+				// lose all component state) on the first interaction after page load.
 				const survived = await page.evaluate(async () => {
 					const router = (window as any).__TSR_ROUTER__;
-					const before = router.stores.loadedAt.get() as number;
+					// router-core 1.171.34 dropped the `stores.loadedAt` counter; the
+					// committed location (`stores.location`, updated on every load) is the
+					// equivalent "the router processed the event" signal — its href gains
+					// the new hash.
+					const before = router.stores.location.get().href as string;
 					const header = document.querySelector('header');
 					const main = document.querySelector('main');
 					history.replaceState(history.state, '', '#post-hydration');
@@ -1609,12 +1613,12 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 					// without this the assertion could pass vacuously (event fired
 					// before the router subscribed to history).
 					const deadline = Date.now() + 5000;
-					while (router.stores.loadedAt.get() === before && Date.now() < deadline) {
+					while (router.stores.location.get().href === before && Date.now() < deadline) {
 						await new Promise((resolve) => setTimeout(resolve, 25));
 					}
 					await new Promise((resolve) => setTimeout(resolve, 100));
 					return {
-						processed: router.stores.loadedAt.get() !== before,
+						processed: router.stores.location.get().href !== before,
 						header: document.querySelector('header') === header,
 						main: document.querySelector('main') === main,
 					};

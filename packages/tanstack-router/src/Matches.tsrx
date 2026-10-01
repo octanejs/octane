@@ -14,7 +14,7 @@ import { useLayoutEffect, createElement, Suspense } from 'octane';
 import { setupScrollRestoration, rootRouteId } from '@tanstack/router-core';
 import { useStore } from './useStore.ts';
 import { useRouter, matchContext as MatchContext } from './context.ts';
-import { useTransitioner } from './Transitioner.tsrx';
+import { useTransitioner, settleOwner } from './Transitioner.tsrx';
 import { Match } from './Match.tsrx';
 import { CatchBoundary, ErrorComponent } from './CatchBoundary.tsrx';
 import { SafeFragment } from './SafeFragment.tsrx';
@@ -44,14 +44,25 @@ export function Matches() @{
 
 function MatchesInner() @{
 	const router = useRouter();
-	const matchId = useStore(router.stores.firstId, (id: any) => id as string | undefined);
-	const resetKey = useStore(router.stores.loadedAt, (l: any) => l as number | string);
+	// router-core 1.171.34 dropped the `firstId`/`loadedAt` stores: the root match
+	// is `matches[0]` and the global error boundary resets on its identity. While a
+	// navigation transition is pending, render the matches router-core expects
+	// (`acknowledgement[0]`) so the committed tree equals what it awaits, then
+	// settle that render acknowledgement from a layout effect once it lands.
+	const acknowledgement: Array<any> = (router as any)._rendered ??= [];
+	const matches = useStore(router.stores.matches, (m: any) => acknowledgement[0] ?? m);
+	const rootMatch = matches[0];
+	const routeId = rootMatch?.routeId as string | undefined;
 	const CatchWrap = router.options.disableGlobalCatchBoundary ? SafeFragment : CatchBoundary;
 
-	<MatchContext value={matchId}>
-		<CatchWrap getResetKey={() => resetKey} errorComponent={ErrorComponent}>
-			@if (matchId) {
-				<Match matchId={matchId} />
+	useLayoutEffect(() => {
+		if (acknowledgement[0] === matches) settleOwner(acknowledgement, true);
+	}, [acknowledgement, matches]);
+
+	<MatchContext value={routeId}>
+		<CatchWrap getResetKey={() => rootMatch} errorComponent={ErrorComponent}>
+			@if (routeId) {
+				<Match routeId={routeId} />
 			}
 		</CatchWrap>
 	</MatchContext>

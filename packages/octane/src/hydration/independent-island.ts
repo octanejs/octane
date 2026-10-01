@@ -29,6 +29,7 @@ import {
 	type HydrationIntentBoundary,
 	type HydrationReplayIntent,
 } from './event-capture.js';
+import { isHydrationLifecycleEvent } from './interaction-config.js';
 import { idle } from './idle.js';
 import { media } from './media.js';
 import type { HydrationStrategy } from './types.js';
@@ -228,8 +229,16 @@ export function registerIndependentHydrationIsland(
 		const status = hydrationMarkerInteractionStatus(element, eventType);
 		if (status === 'never') return status;
 		if (intent !== undefined) {
-			appendHydrationReplayIntent(queue, intent);
-			if (queue === intents) activate();
+			// A held queue already carries the captured press its activator owes.
+			if (queue !== intents) appendHydrationReplayIntent(queue, intent);
+			// Pointer movement and cancellation extend a loading or retained press;
+			// they never start or retry activation themselves.
+			else if (!isHydrationLifecycleEvent(eventType)) {
+				appendHydrationReplayIntent(intents, intent);
+				activate();
+			} else if (active || intents.length !== 0) {
+				appendHydrationReplayIntent(intents, intent);
+			}
 		}
 		return status;
 	};
