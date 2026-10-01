@@ -202,6 +202,16 @@ function unwrap(node) {
 	return value;
 }
 
+function literalOperand(expression) {
+	const node = unwrap(expression);
+	if (node?.type === 'Literal') return { value: node.value };
+	return node?.type === 'UnaryExpression' &&
+		node.operator === 'void' &&
+		unwrap(node.argument)?.type === 'Literal'
+		? { value: undefined }
+		: null;
+}
+
 function optionalChainCanSkip(node) {
 	let current = node;
 	while (current != null) {
@@ -1916,12 +1926,27 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				);
 			case 'BinaryExpression':
 				return alwaysAwaits(node.left) || alwaysAwaits(node.right);
-			case 'LogicalExpression':
-				return alwaysAwaits(node.left);
-			case 'ConditionalExpression':
+			case 'LogicalExpression': {
+				// A literal left operand decides whether the right one runs.
+				const left = literalOperand(node.left);
+				const right =
+					left !== null &&
+					(node.operator === '??'
+						? left.value == null
+						: node.operator === '&&'
+							? Boolean(left.value)
+							: !left.value);
+				return alwaysAwaits(node.left) || (right && alwaysAwaits(node.right));
+			}
+			case 'ConditionalExpression': {
+				const test = literalOperand(node.test);
 				return (
-					alwaysAwaits(node.test) || (alwaysAwaits(node.consequent) && alwaysAwaits(node.alternate))
+					alwaysAwaits(node.test) ||
+					(test === null
+						? alwaysAwaits(node.consequent) && alwaysAwaits(node.alternate)
+						: alwaysAwaits(test.value ? node.consequent : node.alternate))
 				);
+			}
 			case 'UnaryExpression':
 			case 'UpdateExpression':
 				return alwaysAwaits(node.argument);

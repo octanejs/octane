@@ -690,6 +690,10 @@ export function App(props) @{
 		],
 		['a nested await', `useEffect(() => { (async () => { await (await null); ${write}; })(); });`],
 		[
+			'a short-circuited await',
+			`useEffect(() => { (async () => { await (null && (await props.load())); ${write}; })(); });`,
+		],
+		[
 			'a sequence ending in a settled promise',
 			`useEffect(() => { (async () => { await (0, Promise.resolve()); ${write}; })(); });`,
 		],
@@ -724,6 +728,14 @@ export function App(props) @{
 		[
 			'a timer with an unknown delay',
 			`useEffect(() => { setTimeout(() => ${write}, props.delay); });`,
+		],
+		[
+			'an await that a literal operand always runs',
+			`useEffect(() => { let active = true; (async () => { await (null ?? (await props.load())); if (active) ${write}; })(); return () => { active = false; }; });`,
+		],
+		[
+			'an await that a literal test always runs',
+			`useEffect(() => { let active = true; (async () => { await (true ? await props.load() : null); if (active) ${write}; })(); return () => { active = false; }; });`,
 		],
 		[
 			'a conditional await that may be pending',
