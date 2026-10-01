@@ -130,6 +130,14 @@ export type BindingOperation = readonly [
 	unitlessOrGroup?: boolean | number,
 ];
 
+/** @internal The channels a scalar adopter accepts, with their normalizer and writer. */
+export type BindingScalarChannels = readonly [
+	accepts: (binding: BindingOperation) => boolean,
+	normalize: (binding: BindingOperation, value: unknown) => string | null,
+	/** Returns the value left in the DOM, which the legacy handoff publishes. */
+	write: (node: Element, binding: BindingOperation, value: string | null) => string | null,
+];
+
 /** @internal Whole styles carry canonical snapshots; scalar channels remain strings. */
 export type BindingValue = string | null | BindingStyleSnapshot;
 
@@ -150,6 +158,8 @@ export interface CompiledBindings<Props> {
 	readonly connectProjection?: typeof __createBindingProjections;
 	readonly projectionGroups?: readonly BindingProjectionGroup[];
 	readonly createControls?: typeof __createBindingControls;
+	/** Present when a scalar artifact binds a URL; the general adopter sanitizes itself. */
+	readonly url?: BindingScalarChannels;
 	project(props: Props): readonly unknown[];
 }
 
@@ -330,7 +340,8 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 
 /**
  * Fixed scalar channels need no capability, restoration, or sanitization. The
- * scalar adopter retains only these; every richer kind extends them below.
+ * scalar adopter retains only these, plus URLs through the artifact's `url`
+ * capability; every richer kind extends them below.
  */
 function isFixedScalarChannel(binding: BindingOperation): boolean {
 	const kind = binding[1];
@@ -361,7 +372,11 @@ function normalizeFixedScalar(binding: BindingOperation, value: unknown): string
 	}
 }
 
-function writeFixedScalar(node: Element, binding: BindingOperation, value: string | null): void {
+function writeFixedScalar(
+	node: Element,
+	binding: BindingOperation,
+	value: string | null,
+): string | null {
 	const name = binding[2];
 	if (binding[1] === 'text') {
 		const text = node.firstChild;
@@ -373,6 +388,7 @@ function writeFixedScalar(node: Element, binding: BindingOperation, value: strin
 		// Native boolean/type attributes reflect synchronously to their properties.
 		node.setAttribute(name, value);
 	}
+	return value;
 }
 
 function normalize(binding: BindingOperation, value: unknown): BindingValue {
@@ -405,7 +421,12 @@ function normalize(binding: BindingOperation, value: unknown): BindingValue {
 	}
 }
 
-function write(node: Element, binding: BindingOperation, value: string | null): void {
+/** Fixed scalar and URL channels return the value they left in the DOM. */
+function write(
+	node: Element,
+	binding: BindingOperation,
+	value: string | null,
+): string | null | void {
 	const name = binding[2];
 	if (binding[1] === 'classToken') {
 		node.classList.toggle(name, value !== null);
@@ -418,6 +439,7 @@ function write(node: Element, binding: BindingOperation, value: string | null): 
 		} else if (value === null) {
 			if (node.hasAttribute(name)) node.removeAttribute(name);
 		} else if (node.getAttribute(name) !== value) node.setAttribute(name, value);
+		return value;
 	} else if (binding[1] === 'styleProperty') {
 		const style = (node as HTMLElement | SVGElement).style;
 		if (value === null) {
@@ -430,10 +452,21 @@ function write(node: Element, binding: BindingOperation, value: string | null): 
 			if (style.getPropertyValue(name) !== text || style.getPropertyPriority(name) !== priority)
 				style.setProperty(name, text, priority);
 		}
-	} else writeFixedScalar(node, binding, value);
+	} else return writeFixedScalar(node, binding, value);
 }
 
 export { normalize as __normalizeBinding, write as __writeBinding };
+
+/**
+ * @internal Widens the scalar adopter's channels to sanitized URLs through the
+ * general channel rules. The compiler attaches it only to artifacts that bind
+ * a URL, so URL-free views never load the sanitizer.
+ */
+export const __bindingURL: BindingScalarChannels = [
+	(binding) => binding[1] === 'url' || isFixedScalarChannel(binding),
+	normalize as BindingScalarChannels[1],
+	write as BindingScalarChannels[2],
+];
 
 /** @internal Optional native style restoration; the default scalar path does not allocate it. */
 export function __createBindingStyleRestoration(
@@ -667,6 +700,7 @@ export function __adoptBindings<Props>(
 			if (next[i] === previous[i]) continue;
 			const binding = bindings[i]!;
 			if (binding[1] === 'classToken') previous[i] = next[i]!;
+			let written: string | null | void;
 			if (binding[1] === 'styleObject') {
 				const projection = projections?.get(i);
 				if (projection) projection.writeStyle(i, next[i]!);
@@ -681,21 +715,23 @@ export function __adoptBindings<Props>(
 				if (!style)
 					styles.set(i, (style = __createBindingStyleRestoration(nodes[binding[0]]!, binding)));
 				style.write(next[i] as string | null);
-			} else write(nodes[binding[0]]!, binding, next[i] as string | null);
+			} else written = write(nodes[binding[0]]!, binding, next[i] as string | null);
 			if (!disposed) {
 				previous[i] = next[i]!;
-				// Only fixed scalar channels participate in this legacy handoff.
-				// New grouped/style/control channels keep the native lease protocol.
+				// Only fixed scalar and URL channels participate in this legacy handoff,
+				// publishing the value left in the DOM. New grouped/style/control
+				// channels keep the native lease protocol.
 				if (
 					binding[1] === 'attr' ||
 					binding[1] === 'boolean' ||
 					binding[1] === 'aria' ||
 					binding[1] === 'class' ||
+					binding[1] === 'url' ||
 					binding[1] === 'styleProperty' ||
 					binding[1] === 'text'
 				) {
 					const [node, name] = owned[i]!;
-					let published = next[i] as string | null;
+					let published = written as string | null;
 					if (binding[1] === 'styleProperty') {
 						const style = (node as HTMLElement | SVGElement).style;
 						const value = style.getPropertyValue(binding[2]);
@@ -1103,10 +1139,11 @@ export function __adoptBindings<Props>(
 
 /**
  * @internal Compiler-selected adopter for fixed nodes whose every channel is a
- * fixed scalar. It shares node resolution, channel claims, legacy claim
- * publication, signal connections and native transition preview with
- * `__adoptBindings`, but retains none of the projection, control, class-group,
- * style-restoration, host-handoff or addressed-topology integrations.
+ * fixed scalar, or a URL whose sanitizer the artifact carries. It shares node
+ * resolution, channel claims, legacy claim publication, signal connections and
+ * native transition preview with `__adoptBindings`, but retains none of the
+ * projection, control, class-group, style-restoration, host-handoff or
+ * addressed-topology integrations.
  */
 export function __adoptScalarBindings<Props>(
 	root: Element,
@@ -1114,13 +1151,19 @@ export function __adoptScalarBindings<Props>(
 	source: BindingSource<Props>,
 	options?: BindingOptions,
 ): BindingHandle {
+	// A URL artifact carries the sanitizing channel; every other one is fixed.
+	const [
+		accepts = isFixedScalarChannel,
+		normalizeChannel = normalizeFixedScalar,
+		writeChannel = writeFixedScalar,
+	] = descriptor.url ?? [];
 	// The compiler selects this entry only with proof. Refuse a richer artifact
 	// rather than silently dropping its sanitization or ownership behavior.
 	if (
 		descriptor.addressed ||
 		descriptor.handoff ||
 		descriptor.connectProjection ||
-		!descriptor.bindings.every(isFixedScalarChannel)
+		!descriptor.bindings.every(accepts)
 	)
 		throw new TypeError(formatClientError(330));
 	if (!source || typeof source.getSnapshot !== 'function' || typeof source.subscribe !== 'function')
@@ -1176,13 +1219,13 @@ export function __adoptScalarBindings<Props>(
 			const i = indices ? indices[position]! : position;
 			if (next[i] === previous[i]) continue;
 			const binding = bindings[i]!;
-			writeFixedScalar(nodes[binding[0]]!, binding, next[i]!);
+			const published = writeChannel(nodes[binding[0]]!, binding, next[i]!);
 			if (!disposed) {
 				previous[i] = next[i];
 				const node = owned[i]![0];
 				let claims = domBindingClaims.get(node);
 				if (claims === undefined) domBindingClaims.set(node, (claims = new Map()));
-				claims.set(owned[i]![1], next[i]!);
+				claims.set(owned[i]![1], published);
 			}
 		}
 	};
@@ -1257,16 +1300,13 @@ export function __adoptScalarBindings<Props>(
 							}
 						}
 					}
-					next = resolved.map((value, index) => normalizeFixedScalar(bindings[index]!, value));
+					next = resolved.map((value, index) => normalizeChannel(bindings[index]!, value));
 				} else {
 					indices = [...signalUpdates!];
 					signalUpdates!.clear();
 					next = [];
 					for (const index of indices)
-						next[index] = normalizeFixedScalar(
-							bindings[index]!,
-							signalConnections!.get(index)!.get(),
-						);
+						next[index] = normalizeChannel(bindings[index]!, signalConnections!.get(index)!.get());
 				}
 				// Invalidation during another channel's coercion settles only connected
 				// values, without fetching or projecting the application source again.
@@ -1274,10 +1314,7 @@ export function __adoptScalarBindings<Props>(
 					const pending = [...signalUpdates];
 					signalUpdates.clear();
 					for (const index of pending) {
-						next[index] = normalizeFixedScalar(
-							bindings[index]!,
-							signalConnections!.get(index)!.get(),
-						);
+						next[index] = normalizeChannel(bindings[index]!, signalConnections!.get(index)!.get());
 						if (indices && !indices.includes(index)) indices.push(index);
 					}
 				}
