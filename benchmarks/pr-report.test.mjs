@@ -39,6 +39,31 @@ test('timing deltas inside the combined margin of error are not verdicts', () =>
 	assert.equal(verdict(fastestUnmoved), 'within noise');
 });
 
+// Identical runtime code on CI produced select 0.18ms -> 0.26ms: under one 0.1ms timer tick.
+test('sub-millisecond timing changes within one timer tick are not verdicts', () => {
+	const base = suite('js-framework', [
+		{ name: 'octane-tsrx', ops: { select: timed(0.18, 0.1, 31) } },
+	]);
+	const head = suite('js-framework', [
+		{ name: 'octane-tsrx', ops: { select: timed(0.26, 0.2, 26) } },
+	]);
+	assert.equal(compareSuite('js-framework', base, head).timing[0].verdict, 'within noise');
+});
+
+test('timing verdicts never turn the headline red', () => {
+	const base = {
+		'js-framework': suite('js-framework', [{ name: 'octane-tsrx', ops: { run: timed(10, 9, 2) } }]),
+	};
+	const head = {
+		'js-framework': suite('js-framework', [
+			{ name: 'octane-tsrx', ops: { run: timed(13, 12, 2) } },
+		]),
+	};
+	const body = renderReport({ suites: ['js-framework'], base, head });
+	assert.match(body, /🟡 js-framework: 1 timed operation\(s\) possibly slower/);
+	assert.doesNotMatch(body, /🔴/);
+});
+
 test('the report flags regressions and failed pull request suites', () => {
 	const base = {
 		'js-framework': suite('js-framework', [{ name: 'octane-tsrx', ops: { run: timed(10, 9, 2) } }]),
@@ -52,7 +77,6 @@ test('the report flags regressions and failed pull request suites', () => {
 	};
 	const body = renderReport({ suites: ['js-framework', 'bundle-size'], base, head });
 	assert.ok(body.startsWith(COMMENT_MARKER));
-	assert.match(body, /🔴 js-framework: 1 operation\(s\) slower/);
 	assert.match(body, /❌ bundle-size failed on this pull request/);
 	assert.match(body, /void-root lost/);
 });

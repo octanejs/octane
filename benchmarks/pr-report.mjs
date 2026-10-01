@@ -6,8 +6,9 @@
 //
 // Deterministic operations (bytes, DOM-operation and call counts) report every
 // change exactly. A timing operation is only called faster or slower outside its
-// combined relative margin of error, never under a 5% floor, and only when the
-// fastest sample moved the same way: one shared CI runner cannot resolve less.
+// combined relative margin of error, never under a 5% floor, by more than one
+// 0.1ms Chromium timer tick, and only when the fastest sample moved the same
+// way. Even then one shared CI runner is noisy, so timing verdicts stay yellow.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 export const COMMENT_MARKER = '<!-- octane-pr-bench -->';
 export const SUITES = ['js-framework', 'bundle-size', 'bundle-reachability'];
 const TIMING_FLOOR_PERCENT = 5;
+const TIMER_TICK_MS = 0.1;
 const DETAIL_LIMIT = 2000;
 const COMMENT_LIMIT = 60_000; // GitHub rejects comment bodies over 65,536 characters
 
@@ -67,8 +69,10 @@ export function compareSuite(suite, base, head) {
 			const row = { target: target.name, op, before, after, percent };
 			if (isTiming(headStat) && isTiming(baseStat)) {
 				const noise = Math.max(TIMING_FLOOR_PERCENT, Math.hypot(rmeOf(baseStat), rmeOf(headStat)));
-				const verdict =
-					percent > noise && headStat.min > baseStat.min
+				const resolvable = Math.abs(after - before) > TIMER_TICK_MS;
+				const verdict = !resolvable
+					? 'within noise'
+					: percent > noise && headStat.min > baseStat.min
 						? 'slower'
 						: percent < -noise && headStat.min < baseStat.min
 							? 'faster'
@@ -89,7 +93,7 @@ const formatSigned = (value, format) =>
 	(value > 0 ? '+' : value < 0 ? '−' : '±') + format(Math.abs(value));
 const formatPercent = (percent) => formatSigned(percent, (value) => `${value.toFixed(1)}%`);
 const ICON = {
-	slower: '🔴',
+	slower: '🟡',
 	larger: '🔴',
 	faster: '🟢',
 	smaller: '🟢',
@@ -162,7 +166,7 @@ export function renderReport({ suites = SUITES, base, head, baseSha, headSha, ru
 		const larger = deterministic.filter((row) => row.verdict === 'larger').length;
 		const slower = timing.filter((row) => row.verdict === 'slower').length;
 		if (larger) flagged.push(`🔴 ${suite}: ${larger} value(s) increased`);
-		if (slower) flagged.push(`🔴 ${suite}: ${slower} operation(s) slower`);
+		if (slower) flagged.push(`🟡 ${suite}: ${slower} timed operation(s) possibly slower`);
 		const moved = timing.filter((row) => row.verdict !== 'within noise');
 		if (moved.length) sections.push(...renderTiming(moved), '');
 		if (timing.length) {
@@ -191,7 +195,7 @@ export function renderReport({ suites = SUITES, base, head, baseSha, headSha, ru
 				: '🟢 No size increases and no timing regressions outside noise.',
 			'',
 			`Compares ${shortSha(baseSha, 'the base')} with ${shortSha(headSha, 'the merge commit')} on the same runner. ` +
-				`Timing verdicts require a change beyond the combined margin of error (at least ${TIMING_FLOOR_PERCENT}%) ` +
+				`Timing verdicts require a change beyond the combined margin of error (at least ${TIMING_FLOOR_PERCENT}%) and one ${TIMER_TICK_MS}ms timer tick, ` +
 				`with the fastest sample moving the same way.${runUrl ? ` [Workflow run](${runUrl})` : ''}`,
 			...sections,
 		].join('\n') + '\n';
