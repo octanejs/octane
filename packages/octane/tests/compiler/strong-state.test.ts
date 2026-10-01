@@ -366,6 +366,26 @@ describe('Strong state mutation outside render', () => {
 			`export function A() { const tuple = useState([]); return <b onClick={() => { tuple[0].push(1); tuple[1]([...tuple[0]]); }}>{tuple[0].length}</b>; }`,
 		],
 		[
+			'a tuple passed to a helper',
+			`function add(pair) { pair[0].push(1); } export function A() { const tuple = useState([]); return <b onClick={() => { add(tuple); tuple[1]([...tuple[0]]); }}>{tuple[0].length}</b>; }`,
+		],
+		[
+			'an Effect Event called with the state',
+			`export function A() { const [items, setItems] = useState([]); const add = useEffectEvent((list) => { list.push(1); }); return <b onClick={() => { add(items); setItems([...items]); }}>{items.length}</b>; }`,
+		],
+		[
+			'a helper parameter with a default',
+			`function add(list = []) { list.push(1); return list; } export function A() { const [items, setItems] = useState([]); return <b onClick={() => setItems([...add(items)])}>{items.length}</b>; }`,
+		],
+		[
+			'a destructured helper parameter with a default',
+			`function add({ list } = { list: [] }) { list.push(1); } export function A() { const [s, setS] = useState({ list: [] }); return <b onClick={() => { add(s); setS({ ...s }); }}>{s.list.length}</b>; }`,
+		],
+		[
+			'a linked-state array',
+			`export function A(props) { const [items, setItems] = useLinkedState(props.id, () => []); return <b onClick={() => { items.push(1); setItems([...items]); }}>{items.length}</b>; }`,
+		],
+		[
 			'an updater that mutates the state it receives',
 			`export function A() { const [items, setItems] = useState([]); return <b onClick={() => setItems((prev) => { prev.push(1); return prev; })}>{items.length}</b>; }`,
 		],
@@ -380,6 +400,14 @@ describe('Strong state mutation outside render', () => {
 		[
 			'a useOptimistic reducer that mutates its base state',
 			`export function A() { const [s] = useState({ list: [] }); const [shown, add] = useOptimistic(s, (current, item) => { current.list.push(item); return current; }); return <b onClick={() => add(1)}>{shown.list.length}</b>; }`,
+		],
+		[
+			'a destructured updater parameter with a default',
+			`export function A() { const [s, setS] = useState({ list: [] }); return <b onClick={() => setS(({ list } = { list: [] }) => { list.push(1); return { list }; })}>{s.list.length}</b>; }`,
+		],
+		[
+			'a reducer state parameter with a default',
+			`function reducer(state = [], action) { state.push(action); return [...state]; } export function A() { const [items, dispatch] = useReducer(reducer, []); return <b onClick={() => dispatch(1)}>{items.length}</b>; }`,
 		],
 	])('rejects %s', (_label, body) => {
 		expect(rejected(body)).toBe(SNAPSHOT_MUTATION);
@@ -648,6 +676,23 @@ describe('Strong stale deferred state updates', () => {
       {m}
     </b>
   );
+}`),
+			),
+		).toBeNull();
+	});
+
+	it('keeps Effect Events called from timers and promises legal', () => {
+		expect(
+			strongCode(
+				tsx(`export function A({ load }) {
+  const [n, setN] = useState(0);
+  const tick = useEffectEvent(() => setN(n + 1));
+  useEffect(() => {
+    const id = setInterval(tick, 1000);
+    load().then(() => tick());
+    return () => clearInterval(id);
+  });
+  return <b onClick={() => setTimeout(() => tick(), 100)}>{n}</b>;
 }`),
 			),
 		).toBeNull();

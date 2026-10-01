@@ -1537,6 +1537,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	// Updaters and reducers run while their owner renders, and deferred code
 	// reads a render snapshot that later updates may already have replaced.
 	let insidePureCallback = false;
+	// An Effect Event reads the latest committed values, not a stale snapshot.
+	let effectEventDepth = 0;
 	const statePolicy = createStrongStatePolicy({
 		report,
 		resolve,
@@ -2300,8 +2302,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				const defaultValue = usesDefault
 					? expressionBinding(parameter.right, parameterScope)
 					: null;
+				// A default replaces only `undefined`; otherwise the parameter is the
+				// state value the updater, reducer, or helper received.
 				value =
-					value?.kind === 'prop'
+					value?.kind === 'prop' || value?.kind === 'snapshot'
 						? value
 						: value.kind === 'constant' && value.primitive === undefined
 							? defaultValue
@@ -2331,14 +2335,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				bindStateGetterPattern(parameter, value, parameterScope, bindGetter);
 				bindAmbientPattern(parameter, value, parameterScope, bindGetter);
 				if (value?.kind === 'prop') bindPropPattern(parameter, bindGetter);
-				if (value?.kind === 'snapshot' && parameter.type !== 'Identifier') {
-					bindSnapshotPattern(
-						parameter,
-						value,
-						bindGetter,
-						snapshotPatternProperty(parameterScope),
-					);
-				}
+			}
+			if (value?.kind === 'snapshot' && parameter.type !== 'Identifier') {
+				bindSnapshotPattern(parameter, value, bindGetter, snapshotPatternProperty(parameterScope));
 			}
 			if (parameter.type === 'Identifier' && !isReassigned(parameter)) {
 				parameterScope.bindings.set(parameter.name, value);
@@ -3732,10 +3731,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				// Effect Events observe current values without subscribing the calling effect.
 				// Their writes still participate in fetch and cross-effect state flow checks.
 				collectEffectReads = false;
+				effectEventDepth++;
 				try {
 					visitCallable(value.callback, origin, phase, args);
 				} finally {
 					collectEffectReads = enclosingCollectEffectReads;
+					effectEventDepth--;
 				}
 			}
 		} else if (value?.kind === 'setter') {
@@ -4448,7 +4449,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					visitStateCallback(node, hook, pureCallbackIndex, updaterSetters, scope);
 				}
 				if (hook === null) {
-					if (executionPhase === 'deferred') {
+					if (executionPhase === 'deferred' && effectEventDepth === 0) {
 						statePolicy.checkStaleUpdate(callee, node.arguments, scope);
 					}
 					if (insidePureCallback && executionPhase === 'render') {
@@ -4589,15 +4590,24 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					}
 				} else if (hook === null) {
 					// Deferred code can reach a state update through a local helper, and
-					// any helper can write to a state value passed to it.
-					const callback = callableValue(callee, scope);
+					// any helper can write to a state value passed to it, directly or
+					// through its tuple. An Effect Event reads the latest committed
+					// values, so it is followed only for the state it receives.
+					let callback = callableValue(callee, scope);
+					const effectEvent = callback?.kind === 'effect-event';
+					if (effectEvent) callback = callback.callback;
 					if (callback?.kind === 'callback' || callback?.kind === 'callback-choice') {
 						const args = argumentValues(node.arguments, scope);
 						if (
-							executionPhase === 'deferred' ||
-							args?.some((value) => value?.kind === 'snapshot')
+							(executionPhase === 'deferred' && !effectEvent) ||
+							args?.some((value) => value?.kind === 'snapshot' || value?.kind === 'state-tuple')
 						) {
-							visitCallable(callback, callee, executionPhase, args);
+							if (effectEvent) effectEventDepth++;
+							try {
+								visitCallable(callback, callee, executionPhase, args);
+							} finally {
+								if (effectEvent) effectEventDepth--;
+							}
 						}
 					}
 				}

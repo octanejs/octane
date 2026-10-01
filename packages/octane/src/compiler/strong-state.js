@@ -170,6 +170,15 @@ export function createStrongStatePolicy(api) {
 		return null;
 	}
 
+	// A lazy initializer or linked-state reconciler that returns a literal.
+	function returnedShape(fn, scope) {
+		const body = fn.body;
+		if (body?.type !== 'BlockStatement') return literalShape(body, scope);
+		return body.body?.length === 1 && body.body[0].type === 'ReturnStatement'
+			? literalShape(body.body[0].argument, scope)
+			: null;
+	}
+
 	function shapeKind(shape) {
 		const node = shape?.node;
 		if (node?.type === 'ArrayExpression') return 'array';
@@ -233,15 +242,16 @@ export function createStrongStatePolicy(api) {
 		initialShape(hook, node, scope) {
 			if (hook === 'useState') {
 				const initial = unwrap(node.arguments?.[0]);
-				if (!FUNCTIONS.has(initial?.type)) return literalShape(initial, scope);
-				const body = initial.body;
-				if (body?.type !== 'BlockStatement') return literalShape(body, scope);
-				return body.body?.length === 1 && body.body[0].type === 'ReturnStatement'
-					? literalShape(body.body[0].argument, scope)
-					: null;
+				return FUNCTIONS.has(initial?.type)
+					? returnedShape(initial, scope)
+					: literalShape(initial, scope);
 			}
 			if (hook === 'useReducer' && node.arguments?.length === 2) {
 				return literalShape(node.arguments[1], scope);
+			}
+			if (hook === 'useLinkedState') {
+				const reconcile = unwrap(node.arguments?.[1]);
+				return FUNCTIONS.has(reconcile?.type) ? returnedShape(reconcile, scope) : null;
 			}
 			return null;
 		},

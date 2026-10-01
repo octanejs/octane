@@ -5741,7 +5741,7 @@ export function App(props) @{
   const [count, setCount] = useState(0);
   const ref = useRef(0);
   const update = () => setCount(count + 1);
-  const event = useEffectEvent(() => setCount((current) => current + 1));
+  const event = useEffectEvent(() => setCount(count + 1));
   const memoized = () => setCount((current) => current + 1);
   useEffect(() => {
     props.subscribe(update);
