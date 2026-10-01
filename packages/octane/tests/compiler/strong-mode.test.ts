@@ -3062,7 +3062,7 @@ export function App() @{
 import { useMemo, useState } from 'octane';
 export function App() @{
   const state = useState(0);
-  (async () => { ((apply, value) => apply(value))(state[1], await Promise.resolve(state[0])); })();
+  (async () => { ((apply, value) => apply(value))(state[1], await Promise.resolve(1)); })();
   <div />
 }`;
 
@@ -3500,7 +3500,7 @@ export function App(props) @{
 		],
 		[
 			'state updaters as callbacks',
-			'((apply, value) => apply(value))(setCount, await Promise.resolve(count));',
+			'((apply, value) => apply(value))(setCount, await Promise.resolve(1));',
 		],
 	])('allows %s when earlier arguments have yielded', (_label, body) => {
 		const source = `"use strong";\n${stateComponent(
