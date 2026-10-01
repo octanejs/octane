@@ -915,8 +915,15 @@ These patterns become compile errors:
   (`OCTANE_STRONG_RETAINED_ROW_MUTATION`). Fresh scratch data built in ordinary
   setup or owned entirely by one row remains valid.
 - Calling unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`,
-  or `new Date()` without arguments during render
-  (`OCTANE_STRONG_RENDER_IMPURE_CALL`).
+  `new Date()` without arguments, `crypto.randomUUID()`, or
+  `crypto.getRandomValues()` during render (`OCTANE_STRONG_RENDER_IMPURE_CALL`).
+  Callbacks that known array methods such as `map`, `filter`, `forEach`, and
+  `sort` run synchronously are part of render. Use `useId()` for element IDs and
+  a stable item ID for keys.
+- Formatting a provable `Date` with a runtime locale or time zone during render,
+  or constructing an `Intl` formatter without an explicit locale (and, for
+  `DateTimeFormat`, a `timeZone`) (`OCTANE_STRONG_RENDER_LOCALE_FORMAT`). Server
+  and browser output would differ.
 - Declaring a built-in hook value outside the sole nested `@{…}` block that
   uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
 - Declaring a named callback outside the sole nested `@{…}` block containing
