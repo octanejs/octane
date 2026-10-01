@@ -7,6 +7,12 @@ import { createRendererRegionResolver } from './renderer-boundaries.js';
 import { analyzeStrongHTML } from './strong-html.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { createStrongTemplatePolicy } from './strong-template-policy.js';
+import {
+	createStrongStatePolicy,
+	SNAPSHOT_MUTATION_MESSAGE,
+	STRONG_SNAPSHOT_MUTATION,
+} from './strong-state.js';
+import { analyzeStrongWriteOnlyState } from './strong-write-only-state.js';
 
 const STATE_HOOKS = new Set(['useState', 'useReducer', 'useLinkedState']);
 const EFFECT_HOOKS = new Set(['useEffect', 'useLayoutEffect', 'useInsertionEffect']);
@@ -246,16 +252,18 @@ function addPatternNames(pattern, bindings, value, overwrite = true) {
 	}
 }
 
-function bindSnapshotPattern(pattern, value, bind) {
+function bindSnapshotPattern(pattern, value, bind, property = null) {
 	if (pattern?.type === 'Identifier') {
 		bind(pattern, value);
 	} else if (pattern?.type === 'ObjectPattern') {
-		for (const property of pattern.properties ?? []) {
-			if (property.type === 'Property') {
+		for (const entry of pattern.properties ?? []) {
+			if (entry.type === 'Property') {
 				bindSnapshotPattern(
-					property.value,
-					value.state ? { kind: 'snapshot', state: value.state } : SNAPSHOT_BINDING,
+					entry.value,
+					property?.(value, entry) ??
+						(value.state ? { kind: 'snapshot', state: value.state } : SNAPSHOT_BINDING),
 					bind,
+					property,
 				);
 			}
 		}
@@ -265,6 +273,7 @@ function bindSnapshotPattern(pattern, value, bind) {
 				element,
 				value.state ? { kind: 'snapshot', state: value.state } : SNAPSHOT_BINDING,
 				bind,
+				property,
 			);
 		}
 	}
@@ -1524,6 +1533,25 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		filename,
 		options,
 	});
+	// Updaters and reducers run while their owner renders, and deferred code
+	// reads a render snapshot that later updates may already have replaced.
+	let insidePureCallback = false;
+	const statePolicy = createStrongStatePolicy({
+		report,
+		resolve,
+		unwrap,
+		createScope,
+		snapshotBinding,
+		callableValue,
+		staticPrimitiveValue,
+		ambientPropertyKey,
+		isGlobalObject(node, scope) {
+			const object = ambientReference(node, scope);
+			return object === GLOBAL_OBJECT_BINDING || object === AMBIENT_GLOBAL_BINDINGS.get('window');
+		},
+		fetchFunction,
+		hookOf: (call) => importedHook(call?.callee, moduleScope),
+	});
 
 	function predeclareHoistedVars(node, scope) {
 		if (!mayHaveHoistedVars || node == null) return;
@@ -1572,6 +1600,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	predeclareHoistedVars(ast, moduleScope);
 
 	function report(code, node, message, suggestions = []) {
+		if (insidePureCallback) {
+			const pure = statePolicy.pureDiagnostic(code);
+			if (pure !== null) {
+				code = pure.code;
+				message = pure.message;
+				suggestions = [];
+			}
+		}
 		let codes = reportedDiagnostics.get(node);
 		if (codes?.has(code)) return;
 		if (codes === undefined) reportedDiagnostics.set(node, (codes = new Set()));
@@ -1794,10 +1830,15 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		);
 	}
 
-	function reportSnapshotWrite(target, scope) {
+	function reportSnapshotMutationIn(node, phase) {
+		if (phase === 'render') reportSnapshotMutation(node);
+		else if (phase !== 'module') report(STRONG_SNAPSHOT_MUTATION, node, SNAPSHOT_MUTATION_MESSAGE);
+	}
+
+	function reportSnapshotWrite(target, scope, phase) {
 		const member = unwrap(target);
 		if (member?.type === 'MemberExpression' && snapshotBinding(member.object, scope) !== null) {
-			reportSnapshotMutation(member);
+			reportSnapshotMutationIn(member, phase);
 		}
 	}
 
@@ -2289,6 +2330,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				bindStateGetterPattern(parameter, value, parameterScope, bindGetter);
 				bindAmbientPattern(parameter, value, parameterScope, bindGetter);
 				if (value?.kind === 'prop') bindPropPattern(parameter, bindGetter);
+				if (value?.kind === 'snapshot' && parameter.type !== 'Identifier') {
+					bindSnapshotPattern(
+						parameter,
+						value,
+						bindGetter,
+						snapshotPatternProperty(parameterScope),
+					);
+				}
 			}
 			if (parameter.type === 'Identifier' && !isReassigned(parameter)) {
 				parameterScope.bindings.set(parameter.name, value);
@@ -2428,10 +2477,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		} else if (pattern?.type === 'MemberExpression') {
 			visit(pattern, scope, executionPhase, false);
 			executionPhase = phaseAfter(pattern, executionPhase, true);
-			if (executionPhase === 'render') {
-				reportSnapshotWrite(pattern, scope);
-				reportRetainedRowMutation(pattern, scope);
-			}
+			reportSnapshotWrite(pattern, scope, executionPhase);
+			if (executionPhase === 'render') reportRetainedRowMutation(pattern, scope);
 		}
 		return executionPhase;
 	}
@@ -2486,7 +2533,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const snapshot =
 			stateTuple === null && declarationKind === 'const' ? snapshotBinding(initial, scope) : null;
 		if (declaration.id?.type === 'ArrayPattern' && stateTuple) {
-			bindSnapshotPattern(declaration.id.elements?.[0], stateTuple.snapshot, bind);
+			bindSnapshotPattern(
+				declaration.id.elements?.[0],
+				stateTuple.snapshot,
+				bind,
+				snapshotPatternProperty(scope),
+			);
 			const element = declaration.id.elements?.[1];
 			const setter = element?.type === 'AssignmentPattern' ? element.left : element;
 			bind(setter, stateTuple.setter);
@@ -2504,7 +2556,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if ((key === 1 || key === '1') && setter?.type === 'Identifier') {
 					bind(setter, stateTuple.setter);
 				} else if (key === 0 || key === '0') {
-					bindSnapshotPattern(value, stateTuple.snapshot, bind);
+					bindSnapshotPattern(value, stateTuple.snapshot, bind, snapshotPatternProperty(scope));
 				}
 			}
 			bindStateGetterPattern(declaration.id, stateTuple, scope, bind);
@@ -2582,7 +2634,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 			}
 		} else if (snapshot !== null) {
-			bindSnapshotPattern(declaration.id, snapshot, bind);
+			bindSnapshotPattern(declaration.id, snapshot, bind, snapshotPatternProperty(scope));
 		}
 		// Proven callable, tuple and option bindings must keep their original
 		// semantics. Projection provenance fills only otherwise unknown values.
@@ -2606,6 +2658,28 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
+	// A property of a literal-initialized state keeps the literal's shape, so
+	// known mutators on nested arrays and collections remain provable.
+	function snapshotProperty(snapshot, key) {
+		if (snapshot.shape == null) return null;
+		const shape = statePolicy.memberShape(snapshot.shape, key);
+		return shape === null
+			? null
+			: { kind: 'snapshot', state: snapshot.state, shape, array: statePolicy.shapeIsArray(shape) };
+	}
+
+	function snapshotPatternProperty(scope) {
+		return (snapshot, property) =>
+			snapshotProperty(
+				snapshot,
+				property.computed
+					? staticPrimitiveValue(property.key, scope)
+					: property.key?.type === 'Identifier'
+						? property.key.name
+						: property.key?.value,
+			);
+	}
+
 	function stateTupleBinding(expression, scope) {
 		const node = unwrap(expression);
 		if (node?.type === 'Identifier') {
@@ -2619,12 +2693,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		// about arbitrary methods on object snapshots or opaque hook outputs.
 		let tuple = stateTuples.get(node);
 		if (tuple === undefined) {
+			const shape = statePolicy.initialShape(hook, node, scope);
 			tuple = {
 				kind: 'state-tuple',
 				snapshot: {
 					kind: 'snapshot',
 					state: node,
-					array: hook === 'useState' && unwrap(node.arguments?.[0])?.type === 'ArrayExpression',
+					array: statePolicy.shapeIsArray(shape),
+					shape,
 				},
 				setter: { kind: 'setter', state: node },
 				getter: STATE_GETTER_BINDING,
@@ -2647,11 +2723,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			if (key === 0 || key === '0') return tuple.snapshot;
 		}
 		const parent = snapshotBinding(node.object, scope);
-		return parent === null
-			? null
-			: parent.state
-				? { kind: 'snapshot', state: parent.state }
-				: SNAPSHOT_BINDING;
+		if (parent === null) return null;
+		if (!parent.state) return SNAPSHOT_BINDING;
+		return (
+			(parent.shape == null
+				? null
+				: snapshotProperty(
+						parent,
+						node.computed
+							? staticPrimitiveValue(node.property, scope)
+							: node.property?.type === 'Identifier'
+								? node.property.name
+								: null,
+					)) ?? { kind: 'snapshot', state: parent.state }
+		);
 	}
 
 	function bindDeclaration(declaration, declarationKind, scope, phase) {
@@ -3675,6 +3760,52 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
+	// Octane evaluates queued updaters and reducers while their owner renders and
+	// can replay them over held transition values, so their bodies follow the
+	// render checks. The state they receive is the owner's state value.
+	function visitPureCallback(value, origin, args) {
+		const enclosingPure = insidePureCallback;
+		const enclosingEffect = currentEffect;
+		const enclosingEffectControl = currentEffectControl;
+		const enclosingRetainedRowScope = currentRetainedRowScope;
+		const checkImpureCalls = currentFunctionChecksImpureCalls;
+		const checkRenderReads = currentFunctionChecksRenderReads;
+		insidePureCallback = true;
+		currentEffect = null;
+		currentEffectControl = null;
+		currentRetainedRowScope = null;
+		currentFunctionChecksImpureCalls = currentFunctionChecksRenderReads = true;
+		try {
+			visitCallable(value, origin, 'render', args);
+		} finally {
+			insidePureCallback = enclosingPure;
+			currentEffect = enclosingEffect;
+			currentEffectControl = enclosingEffectControl;
+			currentRetainedRowScope = enclosingRetainedRowScope;
+			currentFunctionChecksImpureCalls = checkImpureCalls;
+			currentFunctionChecksRenderReads = checkRenderReads;
+		}
+	}
+
+	function visitStateCallback(node, hook, index, setters, scope) {
+		const args = node.arguments ?? [];
+		if (args.slice(0, index + 1).some((argument) => argument.type === 'SpreadElement')) return;
+		const callback = callableValue(args[index], scope);
+		if (callback === null) return;
+		const origin = unwrap(args[index]);
+		if (hook === 'useReducer') {
+			visitPureCallback(callback, origin, [stateTupleBinding(node, scope).snapshot, OTHER_BINDING]);
+		} else if (hook === 'useOptimistic') {
+			const passthrough = snapshotBinding(args[0], scope) ?? OTHER_BINDING;
+			visitPureCallback(callback, origin, [passthrough, OTHER_BINDING]);
+		} else {
+			for (const setter of setters) {
+				const snapshot = stateTuples.get(setter.state)?.snapshot ?? OTHER_BINDING;
+				visitPureCallback(callback, origin, [snapshot]);
+			}
+		}
+	}
+
 	function containsEffectEvent(value) {
 		return (
 			value?.kind === 'effect-event' ||
@@ -3987,7 +4118,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				const enclosingEffect = currentEffect;
 				currentEffect = null;
 				try {
-					visitFunction(node, scope, phase === 'module' ? 'render' : 'deferred');
+					// A nested callback runs at an unknown later time. Only timer and
+					// promise callbacks, like code after an await, are provably deferred.
+					visitFunction(
+						node,
+						scope,
+						phase === 'module'
+							? 'render'
+							: statePolicy.isAsynchronousCallback(node)
+								? 'deferred'
+								: 'event',
+					);
 				} finally {
 					currentEffect = enclosingEffect;
 				}
@@ -4021,11 +4162,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'AccessorProperty':
 				visit(node.decorators, scope, phase);
 				if (node.computed) visit(node.key, scope, phase);
-				visit(
-					node.value,
-					scope,
-					node.type === 'MethodDefinition' || node.static ? phase : 'deferred',
-				);
+				visit(node.value, scope, node.type === 'MethodDefinition' || node.static ? phase : 'event');
 				return;
 			case 'BlockStatement':
 			case 'JSXCodeBlock': {
@@ -4281,15 +4418,49 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 							: hook === 'useState' || hook === 'useMemo' || EFFECT_HOOKS.has(hook)
 								? 0
 								: -1;
+				const updaterSetters =
+					hook === null && node.arguments?.length > 0
+						? statePolicy.updaterSetters(callee, scope)
+						: [];
+				const pureCallbackIndex =
+					hook === 'useReducer'
+						? 0
+						: hook === 'useOptimistic'
+							? 1
+							: updaterSetters.length !== 0
+								? 0
+								: -1;
+				const asynchronousCall = hook === null && statePolicy.enterCall(node, callee, scope);
 				for (let index = 0; index < (node.arguments?.length ?? 0); index++) {
 					const argument = node.arguments[index];
 					if (
-						(index !== synchronousCallbackIndex && !(index === 0 && component !== null)) ||
+						(index !== synchronousCallbackIndex &&
+							index !== pureCallbackIndex &&
+							!(index === 0 && component !== null)) ||
 						!FUNCTION_TYPES.has(unwrap(argument)?.type)
 					) {
 						visit(argument, scope, executionPhase);
 					}
 					executionPhase = phaseAfter(argument, executionPhase);
+				}
+				if (pureCallbackIndex !== -1) {
+					visitStateCallback(node, hook, pureCallbackIndex, updaterSetters, scope);
+				}
+				if (hook === null) {
+					if (executionPhase === 'deferred') {
+						statePolicy.checkStaleUpdate(callee, node.arguments, scope);
+					}
+					if (insidePureCallback && executionPhase === 'render') {
+						statePolicy.checkPureCall(callee, scope);
+					}
+					if (asynchronousCall && currentEffect === null) {
+						for (const argument of node.arguments ?? []) {
+							const value = unwrap(argument);
+							if (!FUNCTION_TYPES.has(value?.type)) {
+								visitCallable(callableValue(argument, scope), value, 'deferred');
+							}
+						}
+					}
 				}
 				const dependencyIndex =
 					hook === 'useImperativeHandle'
@@ -4358,21 +4529,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					}
 					return;
 				}
-				if (executionPhase === 'render') {
-					if (currentFunctionChecksImpureCalls && impureStandardCall(callee, scope)) {
-						reportImpureCall(callee);
-					}
-					if (callee?.type === 'MemberExpression') {
-						const method = callee.computed
-							? staticPrimitiveValue(callee.property, scope)
-							: callee.property?.name;
-						if (ARRAY_MUTATORS.has(method)) {
-							if (snapshotBinding(callee.object, scope)?.array === true) {
-								reportSnapshotMutation(callee);
-							}
-							reportRetainedRowMutation(callee.object, scope);
-						}
-					}
+				if (
+					executionPhase === 'render' &&
+					currentFunctionChecksImpureCalls &&
+					impureStandardCall(callee, scope)
+				) {
+					reportImpureCall(callee);
+				}
+				const mutation = statePolicy.snapshotMutation(callee, node.arguments, scope);
+				if (mutation !== null) reportSnapshotMutationIn(mutation, executionPhase);
+				if (executionPhase === 'render' && callee?.type === 'MemberExpression') {
+					const method = callee.computed
+						? staticPrimitiveValue(callee.property, scope)
+						: callee.property?.name;
+					if (ARRAY_MUTATORS.has(method)) reportRetainedRowMutation(callee.object, scope);
 				}
 				if (currentEffect !== null && hook === null) {
 					if (effectOwnsWrites && fetchFunction(callee, scope)) currentEffect.started.add(node);
@@ -4388,7 +4558,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						if (request !== null && currentEffect.started.has(request)) fetchContinuation = true;
 						try {
 							for (const argument of node.arguments ?? [])
-								visitCallable(callableValue(argument, scope), unwrap(argument), 'deferred');
+								visitCallable(
+									callableValue(argument, scope),
+									unwrap(argument),
+									asynchronousCall ? 'deferred' : 'event',
+								);
 						} finally {
 							fetchContinuation = before;
 							effectOwnsWrites = beforeOwnsWrites;
@@ -4411,6 +4585,19 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 								? null
 								: argumentValues(node.arguments, scope),
 						);
+					}
+				} else if (hook === null) {
+					// Deferred code can reach a state update through a local helper, and
+					// any helper can write to a state value passed to it.
+					const callback = callableValue(callee, scope);
+					if (callback?.kind === 'callback' || callback?.kind === 'callback-choice') {
+						const args = argumentValues(node.arguments, scope);
+						if (
+							executionPhase === 'deferred' ||
+							args?.some((value) => value?.kind === 'snapshot')
+						) {
+							visitCallable(callback, callee, executionPhase, args);
+						}
 					}
 				}
 				return;
@@ -4507,11 +4694,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 				visit(node.right, scope, rightPhase);
 				const executionPhase = phaseAfter(node.right, rightPhase);
-				if (executionPhase === 'render') {
-					if (currentRef(node.left, scope)) reportRef(node.left);
-					reportSnapshotWrite(node.left, scope);
-					reportRetainedRowMutation(node.left, scope);
-				}
+				if (executionPhase === 'render' && currentRef(node.left, scope)) reportRef(node.left);
+				reportSnapshotWrite(node.left, scope, executionPhase);
+				if (executionPhase === 'render') reportRetainedRowMutation(node.left, scope);
 				// Compound and logical assignments read the old value before the
 				// right side, even when an await defers the eventual write.
 				if (
@@ -4534,7 +4719,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 				return;
 			}
-			case 'UpdateExpression':
+			case 'UpdateExpression': {
 				if (
 					phaseAfter(node.argument, phase) === 'render' &&
 					currentFunctionChecksImpureCalls &&
@@ -4554,16 +4739,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 				if (phase === 'render' && currentRef(node.argument, scope)) reportRef(node.argument);
 				visit(node.argument, scope, phase, false);
-				if (phaseAfter(node.argument, phase, true) === 'render') {
-					reportSnapshotWrite(node.argument, scope);
-					reportRetainedRowMutation(node.argument, scope);
-				}
+				const writePhase = phaseAfter(node.argument, phase, true);
+				reportSnapshotWrite(node.argument, scope, writePhase);
+				if (writePhase === 'render') reportRetainedRowMutation(node.argument, scope);
 				return;
+			}
 			case 'UnaryExpression':
 				visit(node.argument, scope, phase, node.operator !== 'delete');
-				if (node.operator === 'delete' && phaseAfter(node.argument, phase, true) === 'render') {
-					reportSnapshotWrite(node.argument, scope);
-					reportRetainedRowMutation(node.argument, scope);
+				if (node.operator === 'delete') {
+					const writePhase = phaseAfter(node.argument, phase, true);
+					reportSnapshotWrite(node.argument, scope, writePhase);
+					if (writePhase === 'render') reportRetainedRowMutation(node.argument, scope);
 				}
 				return;
 			case 'CatchClause': {
@@ -4739,6 +4925,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		diagnostics.push(...strongLocalityDiagnostics(ast, source, filename, isReassigned, hookNames));
 	}
 	templatePolicy.finish();
+	const stateDiagnostic = (code, node, message) => diagnostic(code, filename, node, message);
+	diagnostics.push(...analyzeStrongWriteOnlyState(ast, strongHookAnalysis, stateDiagnostic));
 	for (const policy of analyzeStrongHookPolicies(ast, options)) {
 		diagnostics.push({
 			...diagnostic(policy.code, filename, policy.node, policy.message),
