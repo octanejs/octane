@@ -1577,6 +1577,10 @@ export function App(props) @{
 			`function listen(target, handler, options) { target.addEventListener('resize', handler, options); } useEffect(() => { const onResize = () => setWidth(1); listen(window, onResize, { capture: true }); return () => window.removeEventListener('resize', onResize); });`,
 		],
 		[
+			'a stored helper remover for another handler',
+			`function subscribe(handler, other) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', other); } useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); const stop = subscribe(first, second); return stop; });`,
+		],
+		[
 			'a returned helper remover for another handler',
 			`function subscribe(handler, other) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', other); } useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); return subscribe(first, second); });`,
 		],
@@ -1608,6 +1612,22 @@ export function App(props) @{
 		[
 			'a remover returned by a helper',
 			`function subscribe(handler) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', handler); } useEffect(() => { const onResize = () => setWidth(1); return subscribe(onResize); });`,
+		],
+		[
+			'a helper remover stored before it is returned',
+			`function subscribe(handler) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', handler); } useEffect(() => { const onResize = () => setWidth(1); const stop = subscribe(onResize); return stop; });`,
+		],
+		[
+			'a remover returned through nested helpers',
+			`function subscribe(handler) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', handler); } function watch(handler) { return subscribe(handler); } useEffect(() => { const onResize = () => setWidth(1); const stop = watch(onResize); return stop; });`,
+		],
+		[
+			'a stored helper abort',
+			`function listen(handler, controller) { window.addEventListener('resize', handler, { signal: controller.signal }); return () => controller.abort(); } useEffect(() => { const controller = new AbortController(); const stop = listen(() => setWidth(1), controller); return stop; });`,
+		],
+		[
+			'removers from two calls of one helper',
+			`function subscribe(handler) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', handler); } useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); const stopFirst = subscribe(first); const stopSecond = subscribe(second); return props.flag ? stopFirst : stopSecond; });`,
 		],
 		[
 			'a remover returned by a helper from an expression body',

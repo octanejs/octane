@@ -704,9 +704,9 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 	// before starting work; this is a bounded proof, not a path-sensitive one.
 	function cleanupOf(record) {
 		const result = emptyCleanup();
-		for (const fn of record.cleanupFunctions) {
-			mergeCleanup(result, scan(fn, null, record.cleanupFrames?.get(fn) ?? null));
-		}
+		record.cleanupFunctions.forEach((fn, index) => {
+			mergeCleanup(result, scan(fn, null, record.cleanupFrames[index]));
+		});
 		return result;
 	}
 
@@ -1132,7 +1132,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			record.continuations = [];
 			record.acquisitions = [];
 			record.cleanupFunctions = [];
-			record.cleanupFrames = null;
+			record.cleanupFrames = [];
 			record.opaqueCleanup = false;
 			record.setupScopes = new Set();
 			const saved = { flow, guards };
@@ -1187,18 +1187,25 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				controllers: flow.controllers,
 			});
 		},
-		// `call` is the local helper call that returned the cleanup, whose
-		// parameters the cleanup may close over.
-		cleanup(record, callbacks, call = null) {
+		// A cleanup returned through local helper calls closes over their
+		// parameters, so it is scanned with each call's arguments.
+		cleanup(record, callbacks) {
 			if (callbacks === null) {
 				record.opaqueCleanup = true;
 				return;
 			}
-			const outer =
-				call === null ? null : { parameters: parametersOf(call.fn), args: call.args, next: frames };
 			for (const callback of callbacks) {
-				record.cleanupFunctions.push(callback);
-				if (outer !== null) (record.cleanupFrames ??= new Map()).set(callback, outer);
+				const owners = callback.owners ?? [];
+				let outer = owners.length === 0 ? null : frames;
+				for (let index = owners.length - 1; index >= 0; index--) {
+					const { call, fn } = owners[index];
+					const args = call.arguments?.some((argument) => argument.type === 'SpreadElement')
+						? null
+						: call.arguments;
+					outer = { parameters: parametersOf(fn), args, next: outer };
+				}
+				record.cleanupFunctions.push(callback.node);
+				record.cleanupFrames.push(outer);
 			}
 		},
 		acquire,

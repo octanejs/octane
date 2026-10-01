@@ -4037,27 +4037,22 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				return;
 		}
 		let callback = callableValue(value, scope);
-		let call = null;
-		if (callback === null && isCallableValue(callShapes.get(value))) {
+		if (callback === null && isCallableValue(callShapes.get(value)))
 			callback = callShapes.get(value);
-			// The returned cleanup may close over the helper's parameters.
-			const helper = callableValue(value.callee, scope);
-			if (helper?.kind === 'callback') call = { fn: helper.node, args: value.arguments };
-		}
 		if (callback === null) {
 			if (staticExpressionValue(value, scope) === UNKNOWN_VALUE) {
 				effectPolicy.cleanup(currentEffect, null);
 			}
 			return;
 		}
-		effectPolicy.cleanup(currentEffect, cleanupFunctions(callback, []), call);
+		effectPolicy.cleanup(currentEffect, cleanupFunctions(callback, []));
 		if (callback.kind === 'callback-choice' && !callback.complete) {
 			effectPolicy.cleanup(currentEffect, null);
 		}
 	}
 
 	function cleanupFunctions(value, functions) {
-		if (value?.kind === 'callback') functions.push(value.node);
+		if (value?.kind === 'callback') functions.push(value);
 		else if (value?.kind === 'callback-choice') {
 			for (const callback of value.values) cleanupFunctions(callback, functions);
 		} else if (value?.kind === 'effect-event') cleanupFunctions(value.callback, functions);
