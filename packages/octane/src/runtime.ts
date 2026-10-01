@@ -22388,7 +22388,25 @@ function applyRefValue(ref: any, el: object | null, prevTarget?: object | null):
 		return;
 	}
 	if (Array.isArray(ref)) {
-		for (let i = 0; i < ref.length; i++) applyRefValue(ref[i], el, prevTarget);
+		if (el !== null) {
+			for (let i = 0; i < ref.length; i++) applyRefValue(ref[i], el, prevTarget);
+			return;
+		}
+		// Release every owner after a cleanup failure, keeping update-depth errors fatal.
+		let error: unknown;
+		let failed = false;
+		for (let i = 0; i < ref.length; i++) {
+			try {
+				applyRefValue(ref[i], el, prevTarget);
+			} catch (caught) {
+				if (caught instanceof MaximumUpdateDepthError) throw caught;
+				if (!failed) {
+					error = caught;
+					failed = true;
+				}
+			}
+		}
+		if (failed) throw error;
 		return;
 	}
 	ref.current = el;
@@ -26692,6 +26710,11 @@ function fireEventSlot(
 	const previousBlock = CURRENT_BLOCK;
 	CURRENT_SCOPE = null;
 	CURRENT_BLOCK = null;
+	// Native read collection belongs to that render too. Pause it, so the
+	// handler's reads are not render dependencies and its signal writes are not
+	// render writes. A pure computation's own write guard stays in force, and
+	// Effect Event permission and signal ownership are unchanged.
+	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
 	const invoke = (): void => {
 		if (typeof slot === 'function') {
 			slot(event);
@@ -26741,6 +26764,7 @@ function fireEventSlot(
 	} catch (err) {
 		reportListenerError(err);
 	} finally {
+		if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
 		CURRENT_SCOPE = previousScope;
 		CURRENT_BLOCK = previousBlock;
 	}
@@ -26858,6 +26882,32 @@ function finishCaptureDispatch(event: Event, type: DelegatedEventType): void {
 	else queueMicrotask(fallback);
 }
 
+// Closing the event's signal batch publishes its listeners' writes to their
+// subscribers and consumers. Like the listeners themselves (fireEventSlot), that
+// publication is outside a render whose DOM patch dispatched the event: it must
+// not schedule as a render-phase update or run under the render's write guard.
+function closeNativeEventBatch(
+	event: Event,
+	batch: ReturnType<typeof beginNativeEventBatch>,
+	waitsForBubble: boolean,
+): void {
+	if (batch === null) return;
+	const previousScope = CURRENT_SCOPE;
+	const previousBlock = CURRENT_BLOCK;
+	CURRENT_SCOPE = null;
+	CURRENT_BLOCK = null;
+	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
+	try {
+		endNativeEventBatch(event, batch, waitsForBubble, reportListenerError);
+	} catch (error) {
+		reportListenerError(error);
+	} finally {
+		if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
+		CURRENT_SCOPE = previousScope;
+		CURRENT_BLOCK = previousBlock;
+	}
+}
+
 function dispatchDelegated(this: Node, event: Event): void {
 	const type = _delegated.get(event.type) ?? _delegatedCapture.get(event.type);
 	if (type === undefined) return;
@@ -26944,11 +26994,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 		}
 		// Only this bubble queue sets currentTarget here; the capture queue clears its own.
 		if (propagationStarted) clearCurrentTarget(event);
-		try {
-			endNativeEventBatch(event, nativeBatch, false, reportListenerError);
-		} catch (error) {
-			reportListenerError(error);
-		}
+		closeNativeEventBatch(event, nativeBatch, false);
 		_dispatchDepth--;
 		maybeFlushDiscrete(type);
 	}
@@ -27005,16 +27051,11 @@ function dispatchDelegatedCapture(
 			endDelegatedPropagation(event, stop, immediate);
 			clearCurrentTarget(event);
 		}
-		try {
-			endNativeEventBatch(
-				event,
-				nativeBatch,
-				event.bubbles && !event.cancelBubble && (type.flags & EVENT_BUBBLE) !== 0,
-				reportListenerError,
-			);
-		} catch (error) {
-			reportListenerError(error);
-		}
+		closeNativeEventBatch(
+			event,
+			nativeBatch,
+			event.bubbles && !event.cancelBubble && (type.flags & EVENT_BUBBLE) !== 0,
+		);
 		_dispatchDepth--;
 		finishCaptureDispatch(event, type);
 	}
@@ -36732,9 +36773,11 @@ interface TrySlot {
 	 * callback refs invoked with null). React treats ref attachment like a layout
 	 * effect — destroyed on hide, recreated on reveal — even though the DOM node is
 	 * preserved. Captured on the FIRST hide (a re-suspend during a partial resolve
-	 * doesn't re-detach). The list keeps the detached identities alive as a hide
-	 * sentinel; reveal re-enumerates the CURRENT ref manifests so superseded refs
-	 * cannot reattach. null = nothing detached.
+	 * doesn't re-detach). A primary hiding inside an already-hidden primary takes
+	 * the sentinel without detaching: the enclosing hide owns those refs. The list
+	 * keeps the detached identities alive as a hide sentinel; reveal re-enumerates
+	 * the CURRENT ref manifests so superseded refs cannot reattach. null = nothing
+	 * detached.
 	 */
 	detachedRefs: SuspenseRefEntry[] | null;
 	domParent: Node;
@@ -38291,6 +38334,16 @@ function hideTryContentAndMountPendingInner(
 		// exact canceled pairs also tell the detach walk which current refs never
 		// committed, without retaining a witness for every callback ref in the app.
 		const uncommittedRefs = discardSubtreeRefAttaches(persistent);
+		// Inside a primary whose hide already detached it, nothing here is attached
+		// (React skips the disappear pass for an Offscreen hidden by an ancestor).
+		// Take the reveal sentinel with the hide itself, not the deferred action:
+		// an abandoned enclosing retry drops that action but keeps this primary
+		// hidden, and its reveal must still attach refs from current manifests.
+		if (state.detachedRefs === null && enclosingPrimaryDetachedRefs(state.parentBlock)) {
+			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK)
+				TRANSITION_JOURNAL.push(JOURNAL_PROP, state, 'detachedRefs', null);
+			state.detachedRefs = [];
+		}
 		invalidatePendingSuspenseEffects(persistent);
 		journalRootProperty(persistent, 'inactive', persistent.inactive);
 		persistent.inactive = true;
@@ -38317,6 +38370,15 @@ function hideTryContentAndMountPendingInner(
 	// only after the pending arm is coherent, then re-check for reentrant teardown.
 	if (resumeThenable !== undefined) attachResume(state, resumeThenable);
 	return !state.parentBlock.disposed && state.branch === 2;
+}
+
+/** Whether an enclosing Suspense primary's committed hide owns this block's refs. */
+function enclosingPrimaryDetachedRefs(block: Block | null): boolean {
+	for (let p = block; p !== null; p = p.parentBlock) {
+		const slot = (p as any).__trySlot as TrySlot | undefined;
+		if (slot !== undefined && slot.tryBlock === p && slot.detachedRefs !== null) return true;
+	}
+	return false;
 }
 
 function deactivateSuspensePrimary(

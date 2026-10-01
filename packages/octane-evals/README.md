@@ -9,9 +9,10 @@ public and potentially present in model training data.
 
 ## Included user-app training corpus
 
-`datasets/train/user-apps-v1` contains twenty-one executable application-authoring
-tasks. They ask a model to write an Octane app from a normal user request; none
-asks it to repair or modify the Octane monorepo.
+`datasets/train/user-apps-v1` contains thirty-five executable application tasks.
+They ask a model to write an Octane app from a normal user request, or to repair
+one that Strong mode rejects; none asks it to repair or modify the Octane
+monorepo.
 
 | Area | Concrete coverage |
 | --- | --- |
@@ -21,6 +22,7 @@ asks it to repair or modify the Octane monorepo.
 | Core platform | Suspense/error handling, SSR, hydration, controlled inputs, and `useId` |
 | Scoped styles | Sibling-scoped `<style>` blocks (a block styles its siblings and everything below them) for nested `@{ … }` template scopes and control-flow branches, exported themes, `apply` composition, and `$class` in class props |
 | Integrations | Zustand, Hook Form, i18next, and TanStack Query through their public `@octanejs/*` APIs |
+| Strong mode repairs | Managed DOM writes, raw HTML, own-markup queries, render randomness, locale formatting, effect state and data flow, ambient reads, snapshot mutation, and ref reads, each with recorded workarounds the grader must reject |
 
 Representative executable tasks include
 [`octane.composed-team-board`](./datasets/train/user-apps-v1/tasks/octane.composed-team-board/prompt.md),
@@ -39,7 +41,7 @@ Every task directory contains:
 - `reference/src/App.tsrx`: the public target answer for training and corpus
   regression testing.
 
-Run all twenty-one reference answers with:
+Run all thirty-five reference answers with:
 
 ```bash
 pnpm --filter @octanejs/evals test:user-apps
