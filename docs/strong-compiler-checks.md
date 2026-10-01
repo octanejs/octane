@@ -250,6 +250,46 @@ The event check retains the existing DOM ownership and input-type analysis.
 Dynamic spreads and dynamic input types may need the existing development
 runtime diagnostic. Strong mode adds no runtime phase guards.
 
+## DOM ownership
+
+| Diagnostic | What it detects | Replacement |
+| --- | --- | --- |
+| `OCTANE_STRONG_MANAGED_DOM_WRITE` | A write through a ref to what the template owns on its element: `textContent`, `innerText`, `append`, `appendChild`, `insertBefore`, `prepend`, `removeChild`, `replaceChild`, or `replaceChildren` when the template renders children; `className`, `classList` mutators, or `classList.value` when it sets a class; `setAttribute`, `removeAttribute`, or `toggleAttribute` for an attribute it sets; `style`, `style.cssText`, or a `style` property it sets. | Render the value from state or props in the template. |
+| `OCTANE_STRONG_RAW_HTML_WRITE` | `innerHTML`, `outerHTML`, `insertAdjacentHTML()`, or `setHTMLUnsafe()` on an element Octane renders. | `dangerouslySetInnerHTML={trustHTML(html)}` for trusted or already sanitized HTML. |
+| `OCTANE_STRONG_OWN_MARKUP_QUERY` | `document.getElementById()`, `querySelector()`, `querySelectorAll()`, or `getElementsByClassName()` with a literal selector that matches a literal `id` or class rendered by the same component. | Attach a ref to the element and use `ref.current` in the event or effect. |
+
+A DOM write is reported only when the ref provably names exactly one intrinsic
+DOM element in the same component. The ref must come from `useRef` in the
+function (or keyed `@for` row) that renders the element. It may be used only as
+that element's `ref` prop, including inside a `ref={[a, b]}` list, and through
+`.current` reads, `const { current } = ref`, and unreassigned local aliases. Any
+other use withdraws the proof: a component's `ref` prop, an argument to a helper,
+a `.current` assignment, or a second element. An inline callback ref's parameter
+is that element. Writes in effects, layout effects, event handlers, and nested
+helpers are all checked. Writes that the template does not own stay valid, such
+as `textContent` on an element without rendered children, mounting a third-party
+widget into an empty container, a `style` property the template's `style` does
+not set, `focus()`, and measurement.
+
+Queries are matched only for a single compound selector, such as `#id`, `.class`,
+or `li.item.active`, against literal `id` and `class` values. A string element of
+a `class` array counts as literal. Portal targets and markup rendered by another
+component are not matched. Nor are dynamic selectors, selectors with combinators,
+or element-scoped queries such as `panel.querySelector()`.
+
+```tsx
+"use strong";
+import { useEffect, useRef } from 'octane';
+
+export function Search({ open }) {
+  const input = useRef(null);
+  useEffect(() => {
+    if (open) input.current.focus();
+  });
+  return <input ref={input} className={open ? 'search open' : 'search'} />;
+}
+```
+
 ## Trusted HTML
 
 `OCTANE_STRONG_UNTRUSTED_HTML` rejects visibly raw values supplied to a Strong

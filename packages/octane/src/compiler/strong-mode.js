@@ -5,6 +5,7 @@ import {
 } from './hook-deps.js';
 import { createRendererRegionResolver } from './renderer-boundaries.js';
 import { analyzeStrongHTML } from './strong-html.js';
+import { analyzeStrongDOM } from './strong-dom.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { createStrongTemplatePolicy } from './strong-template-policy.js';
 import { createStrongEffectPolicy } from './strong-effects.js';
@@ -5980,6 +5981,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		});
 	}
 	diagnostics.push(...analyzeStrongHTML(ast, source, filename, options));
+	diagnostics.push(...analyzeStrongDOM(ast, source, filename, options));
 	const nativeChangeAnalysis = analyzeNativeChangeDiagnostics(ast, source, filename, {
 		...options,
 		strong: true,

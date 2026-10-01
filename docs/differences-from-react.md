@@ -593,6 +593,14 @@ still run during server rendering: guard unavailable browser APIs and ensure the
 server and client agree on initial output. A `typeof window` guard inside an
 ordinary render calculation does not make the calculation snapshot-safe.
 
+Strong modules also keep the DOM that Octane renders under the template's
+control. A ref write to children, a class, an attribute, or a `style` property
+that the template sets on the same element reports
+`OCTANE_STRONG_MANAGED_DOM_WRITE`, and raw HTML written to a rendered element
+reports `OCTANE_STRONG_RAW_HTML_WRITE`. A document query for a literal `id` or
+class the same component renders reports `OCTANE_STRONG_OWN_MARKUP_QUERY`. React
+accepts all three.
+
 The directive is also an author assertion for production memoization, not just a
 request for diagnostics. Render output must not observe changing data through a
 stable ref, state getter, module variable, external store object, or hidden hook.
