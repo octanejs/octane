@@ -18839,6 +18839,10 @@ class HydrationCapability {
 		// Text already repaired from newer captures is not a server/client mismatch.
 		if (this.staleServerValues) return;
 		if (process.env.NODE_ENV === 'production' && ROOT_ERROR_HANDLERS === null) return;
+		// Nor is the placeholder of a template that mismatch recovery cloned fresh:
+		// its host holds the client template's text, and the rebuild has already
+		// been reported structurally.
+		if (this.freshNodes.has(domNode(node).parentNode!)) return;
 		if (!this.textWarnings.has(node)) this.textWarnings.set(node, { loc, server });
 	}
 
