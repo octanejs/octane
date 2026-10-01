@@ -57,6 +57,18 @@ test('the report flags regressions and failed pull request suites', () => {
 	assert.match(body, /void-root lost/);
 });
 
+test('a suite that failed on the base commit keeps the headline from reporting green', () => {
+	const head = {
+		'bundle-size': suite('bundle-size', [{ name: 'octane-tsrx', ops: { js_gzip: bytes(1000) } }]),
+	};
+	const base = {
+		'bundle-size': { ...suite('bundle-size', []), harnessExit: 1, failed: 'build broke' },
+	};
+	const body = renderReport({ suites: ['bundle-size'], base, head });
+	assert.match(body, /⚠️ bundle-size failed on the base commit and was not compared/);
+	assert.doesNotMatch(body, /🟢 No size increases/);
+});
+
 test('an unchanged pull request reports no regressions', () => {
 	const results = {
 		'bundle-size': suite('bundle-size', [{ name: 'octane-tsrx', ops: { js_gzip: bytes(1000) } }]),

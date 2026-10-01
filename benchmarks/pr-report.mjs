@@ -150,6 +150,7 @@ export function renderReport({ suites = SUITES, base, head, baseSha, headSha, ru
 			continue;
 		}
 		if (baseFailure) {
+			flagged.push(`⚠️ ${suite} failed on the base commit and was not compared`);
 			sections.push(
 				'⚠️ The suite failed on the base commit, so there is nothing to compare.',
 				'',
