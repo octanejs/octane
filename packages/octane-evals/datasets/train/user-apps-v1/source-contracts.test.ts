@@ -179,7 +179,34 @@ function containsNode(container: AstNode, node: AstNode): boolean {
 
 type Contract = (ast: AstNode, source: string) => void;
 
+// A Strong repair keeps its module in Strong mode. The grader also compiles it
+// with `strong: true`, so deleting the directive cannot hide a violation.
+const strongRepair: Contract = (ast) => {
+	expectExports(ast, ['App']);
+	const [first] = (ast.body as AstNode[] | undefined) ?? [];
+	expect((first?.expression as AstNode | undefined)?.value, 'leading "use strong" directive').toBe(
+		'use strong',
+	);
+};
+const STRONG_REPAIR_TASKS = [
+	'octane.strong-managed-text',
+	'octane.strong-managed-class',
+	'octane.strong-raw-html',
+	'octane.strong-own-query',
+	'octane.strong-row-keys',
+	'octane.strong-random-id',
+	'octane.strong-shuffle',
+	'octane.strong-date-format',
+	'octane.strong-derived-name',
+	'octane.strong-user-fetch',
+	'octane.strong-viewport-width',
+	'octane.strong-sorted-tags',
+	'octane.strong-click-tally',
+	'octane.strong-save-counter',
+];
+
 const contracts: Record<string, Contract> = {
+	...Object.fromEntries(STRONG_REPAIR_TASKS.map((taskId) => [taskId, strongRepair])),
 	'tsrx.counter': (ast) => {
 		expectExports(ast, ['App']);
 		expect(calls(ast, 'useState')).toHaveLength(1);

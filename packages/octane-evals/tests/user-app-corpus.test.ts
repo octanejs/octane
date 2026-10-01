@@ -14,6 +14,9 @@ const gradingCommandTimeoutMs = 20_000;
 // The verifier gives its nested Vitest run 60 seconds, so this wrapper must leave
 // enough time for that timeout to surface its own actionable error under CI load.
 const starterVerificationTimeoutMs = 70_000;
+// Grades every recorded Strong repair workaround in concurrent Vitest runs.
+const strongRepairVerificationTimeoutMs = 150_000;
+const STRONG_REPAIR_FAMILY = 'octane.strong-repair';
 
 interface UserAppCatalog {
 	environment: {
@@ -51,6 +54,18 @@ const REQUIRED_COVERAGE = {
 		'theme-composition',
 		'class-map',
 	],
+	strongRepairs: [
+		'managed-dom-write',
+		'raw-html-write',
+		'own-markup-query',
+		'render-randomness',
+		'locale-formatting',
+		'effect-state-update',
+		'effect-data-fetch',
+		'ambient-read',
+		'snapshot-mutation',
+		'ref-read',
+	],
 } as const;
 
 function readCatalog(): UserAppCatalog {
@@ -66,8 +81,16 @@ function readWorkspace(directory: string, root = directory): WorkspaceDigestFile
 	});
 }
 
-function readGrader(grader: string): WorkspaceDigestFile[] {
+function readGrader(grader: string, familyId: string): WorkspaceDigestFile[] {
 	return [
+		...(familyId === STRONG_REPAIR_FAMILY
+			? [
+					{
+						path: 'shared/strong-repair.ts',
+						content: readFileSync(join(corpusRoot, 'strong-repair.ts')),
+					},
+				]
+			: []),
 		{ path: 'task/grader.test.ts', content: readFileSync(grader) },
 		{
 			path: 'shared/source-contracts.test.ts',
@@ -119,7 +142,9 @@ describe('public user-app training corpus', () => {
 			expect(task.environment.baseCommit).toBe(catalog.environment.baseCommit);
 			expect(task.environment.lockfileHash).toBe(catalog.environment.lockfileHash);
 			expect(task.environment.overlayLockfileHash).toBe(overlayLockfileDigest);
-			expect(task.grader.graderDigest).toBe(digestWorkspaceFiles(readGrader(grader)));
+			expect(task.grader.graderDigest).toBe(
+				digestWorkspaceFiles(readGrader(grader, task.familyId)),
+			);
 			expect(readFileSync(join(starterRoot, 'src', 'App.tsrx'), 'utf8')).not.toBe(
 				readFileSync(reference, 'utf8'),
 			);
@@ -208,6 +233,15 @@ describe('public user-app training corpus', () => {
 			},
 		);
 	}, 30_000);
+
+	it('rejects every recorded Strong repair workaround and keeps the ledger current', () => {
+		execFileSync(process.execPath, ['scripts/verify-strong-repair-corpus.mjs', '--check'], {
+			cwd: packageRoot,
+			stdio: 'pipe',
+			timeout: strongRepairVerificationTimeoutMs,
+			killSignal: 'SIGKILL',
+		});
+	}, 160_000);
 
 	it('keeps every incomplete starter behaviorally unresolved', () => {
 		execFileSync(process.execPath, ['scripts/verify-user-app-starters.mjs'], {
