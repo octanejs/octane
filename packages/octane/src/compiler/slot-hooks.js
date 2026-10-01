@@ -1323,7 +1323,7 @@ function collectPureFactoryCalls(ast, source, names) {
 	return calls;
 }
 
-function parseHookSource(source, id) {
+export function parseHookSource(source, id) {
 	try {
 		return { ast: parseModule(source, id), canPrint: true };
 	} catch (error) {

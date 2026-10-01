@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -197,5 +198,237 @@ export function Hint({ value }) @{
 
 		expect(result.code).toBe(1);
 		expect(result.stderr).toMatch(/Could not resolve `octane\/compiler`/);
+	});
+});
+
+describe('octane analyze Strong coverage', () => {
+	const EFFECT_UPDATE =
+		"import { useState, useEffect } from 'octane';\n" +
+		'export function App({ value }) @{\n' +
+		'  const [current, setCurrent] = useState(0);\n' +
+		'  useEffect(() => { setCurrent(value); });\n' +
+		'  <p>{current as string}</p>\n' +
+		'}\n';
+	const PLAIN = 'export function Plain() @{ <div /> }\n';
+	const STRONG = `"use strong";\n${PLAIN}`;
+
+	/**
+	 * A project that resolves the workspace's own octane and config loader, the
+	 * way an installed app resolves them, so the coverage check exercises the
+	 * real compiler policy rather than a stub.
+	 *
+	 * @param {Record<string, string | object>} files
+	 */
+	function app(files) {
+		const created = project(files);
+		mkdirSync(path.join(created.root, 'node_modules/@octanejs'), { recursive: true });
+		symlinkSync(OCTANE, path.join(created.root, 'node_modules/octane'), 'dir');
+		symlinkSync(
+			path.join(WORKSPACE, 'packages/app-core'),
+			path.join(created.root, 'node_modules/@octanejs/app-core'),
+			'dir',
+		);
+		return created;
+	}
+
+	/**
+	 * @param {string} root
+	 * @param {string[]} [extra]
+	 */
+	const run = (root, extra = []) => runCli(['analyze', '--cwd', root, ...extra, '--json']);
+
+	/** @param {string} root */
+	const baseline = (root) =>
+		JSON.parse(readFileSync(path.join(root, 'octane-strong-baseline.json'), 'utf8'));
+
+	const CONFIG_STRONG = { 'octane.config.ts': 'export default { compiler: { strong: true } };\n' };
+
+	it('analyzes modules under compiler.strong from octane.config', async () => {
+		const strict = app({ ...CONFIG_STRONG, 'src/App.tsrx': EFFECT_UPDATE });
+		const loose = app({ 'src/App.tsrx': EFFECT_UPDATE });
+
+		const report = (await run(strict.root)).json();
+		expect(report.findings).toEqual([
+			expect.objectContaining({
+				file: 'src/App.tsrx',
+				code: 'OCTANE_STRONG_EFFECT_STATE_UPDATE',
+				line: 4,
+			}),
+		]);
+		expect(report.findings[0].message).toMatch(/^Strong mode does not allow/);
+		expect((await run(loose.root)).json().findings).toEqual([]);
+	});
+
+	it('records every Octane module that compiles without Strong mode', async () => {
+		const { root } = app({
+			'tsconfig.json': { compilerOptions: { jsx: 'preserve', jsxImportSource: 'octane' } },
+			'src/Strong.tsrx': STRONG,
+			'src/Loose.tsrx': PLAIN,
+			'src/Card.tsx': 'export function Card() { return <div />; }\n',
+			'src/Host.tsx': '/** @jsxImportSource react */\nexport function Host() { return <div />; }\n',
+			'src/use-count.ts':
+				"import { useState } from 'octane';\nexport function useCount() { return useState(0); }\n",
+			'src/strong-hook.ts':
+				"'use strong';\nimport { useState } from 'octane';\nexport function useOne() { return useState(1); }\n",
+			'src/types.ts': "import type { OctaneNode } from 'octane';\nexport type Node = OctaneNode;\n",
+			'src/no-semi.ts':
+				"import { add } from './math'\nimport type { OctaneNode } from 'octane'\nexport type Sum = OctaneNode\n",
+			'src/math.ts': 'export const add = (a: number, b: number) => a + b;\n',
+			'src/env.d.ts': "import 'octane';\n",
+		});
+
+		const result = await run(root, ['--strong-baseline', 'init']);
+		expect(result.exitCode).toBe(0);
+		expect(baseline(root)).toEqual({
+			version: 1,
+			exceptions: ['src/Card.tsx', 'src/Loose.tsrx', 'src/use-count.ts'],
+		});
+		expect(result.json().strongCoverage).toEqual({
+			baseline: 'octane-strong-baseline.json',
+			modules: 5,
+			strong: 2,
+			exceptions: 3,
+			regressions: [],
+			stale: [],
+		});
+		expect((await run(root)).exitCode).toBe(0);
+	});
+
+	it('leaves tsx that tsconfig hands to another JSX library out of coverage', async () => {
+		const { root } = app({
+			'tsconfig.json': { compilerOptions: { jsx: 'react-jsx', jsxImportSource: 'react' } },
+			'src/Host.tsx': 'export function Host() { return <div />; }\n',
+			'src/Island.tsx':
+				'/** @jsxImportSource octane */\nexport function Island() { return <div />; }\n',
+		});
+
+		await run(root, ['--strong-baseline', 'init']);
+		expect(baseline(root).exceptions).toEqual(['src/Island.tsx']);
+	});
+
+	it('fails on a module that is neither Strong nor a recorded exception', async () => {
+		const { root, write } = app({
+			'src/Strong.tsrx': STRONG,
+			'octane-strong-baseline.json': { version: 1, exceptions: [] },
+		});
+		expect((await run(root)).exitCode).toBe(0);
+
+		// Deleting the directive is the cheapest way out of every Strong rule.
+		write('src/Strong.tsrx', PLAIN);
+		write('src/New.tsrx', PLAIN);
+		const result = await run(root);
+		expect(result.exitCode).toBe(3);
+		expect(result.json().strongCoverage.regressions).toEqual(['src/New.tsrx', 'src/Strong.tsrx']);
+		const [finding] = result.json().findings;
+		expect(finding).toMatchObject({
+			code: 'OCTANE_STRONG_COVERAGE_REGRESSION',
+			severity: 'error',
+			line: 1,
+		});
+		expect(finding.message).toContain('Add "use strong" before its imports');
+	});
+
+	it('does not extend compiler.strong to another package in the project', async () => {
+		const { root } = app({
+			...CONFIG_STRONG,
+			'src/Covered.tsrx': PLAIN,
+			'packages/inner/package.json': { name: 'inner', dependencies: { octane: '*' } },
+			'packages/inner/src/Inner.tsrx': PLAIN,
+			'octane-strong-baseline.json': { version: 1, exceptions: [] },
+		});
+
+		const result = await run(root);
+		expect(result.json().findings).toEqual([
+			expect.objectContaining({
+				file: 'packages/inner/src/Inner.tsrx',
+				code: 'OCTANE_STRONG_COVERAGE_REGRESSION',
+			}),
+		]);
+		expect(result.json().findings[0].message).toContain(
+			'does not reach modules of another package',
+		);
+	});
+
+	it('fails on stale names, and update removes only those', async () => {
+		const { root } = app({
+			'src/Now.tsrx': STRONG,
+			'src/Still.tsrx': PLAIN,
+			'src/Fresh.tsrx': PLAIN,
+			'octane-strong-baseline.json': {
+				version: 1,
+				exceptions: ['src/Gone.tsrx', 'src/Now.tsrx', 'src/Still.tsrx'],
+			},
+		});
+
+		const before = await run(root);
+		expect(before.exitCode).toBe(3);
+		expect(
+			before
+				.json()
+				.findings.filter((/** @type {any} */ f) => f.code === 'OCTANE_STRONG_COVERAGE_STALE')
+				.map((/** @type {any} */ f) => [f.file, f.line]),
+		).toEqual([
+			['octane-strong-baseline.json', 4],
+			['octane-strong-baseline.json', 5],
+		]);
+
+		const updated = await run(root, ['--strong-baseline', 'update']);
+		// The regression is still reported, and update never records it.
+		expect(updated.exitCode).toBe(3);
+		expect(updated.json().findings.map((/** @type {any} */ f) => f.code)).toEqual([
+			'OCTANE_STRONG_COVERAGE_REGRESSION',
+		]);
+		expect(baseline(root).exceptions).toEqual(['src/Still.tsrx']);
+	});
+
+	it('checks named files for regressions without judging the rest of the baseline', async () => {
+		const { root } = app({
+			'src/Named.tsrx': PLAIN,
+			'octane-strong-baseline.json': { version: 1, exceptions: ['src/Gone.tsrx'] },
+		});
+
+		const result = await runCli([
+			'analyze',
+			'--cwd',
+			root,
+			path.join(root, 'src/Named.tsrx'),
+			'--json',
+		]);
+		expect(result.json().findings.map((/** @type {any} */ f) => f.code)).toEqual([
+			'OCTANE_STRONG_COVERAGE_REGRESSION',
+		]);
+		expect(result.json().strongCoverage.stale).toEqual([]);
+	});
+
+	it('refuses baseline writes that would not be a ratchet', async () => {
+		const { root } = app({
+			'src/A.tsrx': PLAIN,
+			'octane-strong-baseline.json': { version: 1, exceptions: [] },
+		});
+		const fresh = app({ 'src/A.tsrx': PLAIN });
+
+		expect((await run(root, ['--strong-baseline', 'init'])).exitCode).toBe(2);
+		expect((await run(fresh.root, ['--strong-baseline', 'update'])).exitCode).toBe(2);
+		expect(
+			(
+				await runCli([
+					'analyze',
+					'--cwd',
+					fresh.root,
+					path.join(fresh.root, 'src/A.tsrx'),
+					'--strong-baseline',
+					'init',
+				])
+			).exitCode,
+		).toBe(2);
+		expect(existsSync(path.join(fresh.root, 'octane-strong-baseline.json'))).toBe(false);
+		expect(baseline(root).exceptions).toEqual([]);
+	});
+
+	it('writes nothing under --dry-run', async () => {
+		const { root } = app({ 'src/A.tsrx': PLAIN });
+		const result = await run(root, ['--strong-baseline', 'init', '--dry-run']);
+		expect(result.exitCode).toBe(0);
+		expect(existsSync(path.join(root, 'octane-strong-baseline.json'))).toBe(false);
 	});
 });
