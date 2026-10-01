@@ -3795,6 +3795,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	function staleValue(value) {
+		if (value?.kind === 'state-tuple') {
+			return value.snapshot.stale === true
+				? value
+				: { ...value, snapshot: { ...value.snapshot, stale: true } };
+		}
 		return (value?.kind === 'snapshot' || value?.kind === 'derived-state') && value.stale !== true
 			? { ...value, stale: true }
 			: value;

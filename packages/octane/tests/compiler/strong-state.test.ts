@@ -639,6 +639,14 @@ describe('Strong stale deferred state updates', () => {
 			`export function A({ save }) { const [n, setN] = useState(0); const set = (value) => setN(value + 1); const apply = useEffectEvent((value) => set(value)); return <b onClick={async () => { await save(); apply(n); }}>{n}</b>; }`,
 		],
 		[
+			'a stale tuple passed to an Effect Event',
+			`export function A({ save }) { const tuple = useState(0); const apply = useEffectEvent((pair) => pair[1](pair[0] + 1)); return <b onClick={async () => { await save(); apply(tuple); }}>{tuple[0]}</b>; }`,
+		],
+		[
+			'a stale tuple destructured by an Effect Event',
+			`export function A({ save }) { const tuple = useState(0); const apply = useEffectEvent(([value, set]) => set(value + 1)); return <b onClick={async () => { await save(); apply(tuple); }}>{tuple[0]}</b>; }`,
+		],
+		[
 			'a timer created inside an Effect Event',
 			`export function A() { const [n, setN] = useState(0); const later = useEffectEvent(() => { setTimeout(() => setN(n + 1), 100); }); useEffect(() => later()); return <b>{n}</b>; }`,
 		],
