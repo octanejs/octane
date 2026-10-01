@@ -7,6 +7,7 @@ const IMPURE_UPDATER = 'OCTANE_STRONG_IMPURE_UPDATER';
 const SNAPSHOT_MUTATION = 'OCTANE_STRONG_SNAPSHOT_MUTATION';
 const RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
 const STALE_STATE_UPDATE = 'OCTANE_STRONG_STALE_STATE_UPDATE';
+const WRITE_ONLY_STATE = 'OCTANE_STRONG_WRITE_ONLY_STATE';
 
 const IMPORTS =
 	"import { useState, useReducer, useLinkedState, useEffect, useRef, useSyncExternalStore, useOptimistic, useEffectEvent } from 'octane';";
@@ -747,6 +748,149 @@ export function useSave(save) {
 			tsx(`export function A({ save }) {
   const [n, setN] = useState(0);
   return <b onClick={async () => { await save(); setN((p) => p + 1); setTimeout(() => setN((p) => p - 1)); }}>{n}</b>;
+}`),
+			'/src/App.tsx',
+		);
+	});
+});
+
+describe('Strong write-only state', () => {
+	it.each([
+		[
+			'an elided value with an updater',
+			`export function A({ store }) { const [, force] = useState(0); useEffect(() => store.subscribe(() => force(x => x + 1))); return <p>{store.value}</p>; }`,
+		],
+		[
+			'an unused value binding',
+			`export function A({ store }) { const [tick, force] = useState(0); useEffect(() => store.subscribe(() => force((x) => x + 1))); return <p>{store.value}</p>; }`,
+		],
+		[
+			'an unused getter',
+			`export function A({ store }) { const [, force, read] = useState(0); useEffect(() => store.subscribe(() => force((x) => x + 1))); return <p>{store.value}</p>; }`,
+		],
+		[
+			'a linked state tuple',
+			`export function A(props) { const [, force] = useLinkedState(props.id, () => 0); return <p onClick={() => force(1)}>{props.id}</p>; }`,
+		],
+	])('rejects %s', (_label, body) => {
+		expect(rejected(body)).toBe(WRITE_ONLY_STATE);
+	});
+
+	// The likely rewrites keep a value that nothing renders.
+	it.each([
+		[
+			'the useReducer force-update idiom',
+			`const [, forceUpdate] = useReducer((x) => x + 1, 0); useEffect(() => store.subscribe(forceUpdate));`,
+		],
+		[
+			'selecting the setter by index',
+			`const force = useState(0)[1]; useEffect(() => store.subscribe(() => force({})));`,
+		],
+		[
+			'object destructuring',
+			`const { 1: force } = useState(0); useEffect(() => store.subscribe(() => force({})));`,
+		],
+		[
+			'reading the value only to write it',
+			`const [tick, force] = useState(0); useEffect(() => store.subscribe(() => force(tick + 1)));`,
+		],
+	])('rejects the rewrite %s', (_label, setup) => {
+		expect(rejected(`export function A({ store }) { ${setup} return <p>{store.value}</p>; }`)).toBe(
+			WRITE_ONLY_STATE,
+		);
+	});
+
+	it.each([
+		["import { useState as useCell, useEffect } from 'octane';", 'useCell(0)'],
+		["import * as Octane from 'octane'; const { useEffect } = Octane;", 'Octane.useState(0)'],
+		["import * as Octane from 'octane'; const { useEffect } = Octane;", 'Octane?.useState(0)'],
+	])('recognizes %s', (imports, hook) => {
+		const body = `export function A({ store }) { const [, force] = ${hook}; useEffect(() => store.subscribe(() => force({}))); return <p>{store.value}</p>; }`;
+		expect(rejected(body, imports)).toBe(WRITE_ONLY_STATE);
+	});
+
+	it('keeps read values, getters, whole tuples, unused tuples, and shadowed hooks legal', () => {
+		expect(
+			strongCode(
+				tsx(`function useLocal() { return [0, () => {}]; }
+export function A({ store }) {
+  const [, setCount, getCount] = useState(0);
+  const [Icon, setIcon] = useState(() => 'i');
+  const [value, setValue] = useState('');
+  const [{ label }, setLabel] = useState({ label: 'a' });
+  const tuple = useState(0);
+  const [unused, setUnused] = useState(0);
+  const [, setLocal] = useLocal();
+  const [, setShadowed] = (() => { const useState = (value) => [value, () => {}]; return useState(0); })();
+  return (
+    <p
+      onClick={() => {
+        setCount(1);
+        console.log(getCount());
+        setIcon('b');
+        setValue('x');
+        setLabel({ label: 'b' });
+        tuple[1](2);
+        setLocal();
+        setShadowed();
+      }}
+    >
+      <Icon />
+      <input value={value} />
+      {label}
+    </p>
+  );
+}`),
+			),
+		).toBeNull();
+	});
+
+	it('checks .tsrx components and plain .ts custom hooks', () => {
+		const tsrx = `"use strong";
+import { useState, useEffect } from 'octane';
+export function A(props) @{
+  const [, force] = useState(0);
+  useEffect(() => props.store.subscribe(() => force((x) => x + 1)));
+  <p>{props.store.value as string}</p>
+}`;
+		const hook = `"use strong";
+import { useState } from 'octane';
+export function useForceUpdate() {
+  const [, force] = useState(0);
+  return () => force((x) => x + 1);
+}`;
+		const shorthand = `"use strong";
+import { useState } from 'octane';
+export function A() @{
+  const [value, setValue] = useState('');
+  <input {value} onInput={(event) => setValue(event.currentTarget.value)} />
+}`;
+		expect(strongCode(tsrx, '/src/A.tsrx')).toBe(WRITE_ONLY_STATE);
+		expect(strongCode(shorthand, '/src/A.tsrx')).toBeNull();
+		expect(() => slotHooks(hook, '/src/useForceUpdate.ts')).toThrow(WRITE_ONLY_STATE);
+		expect(() =>
+			slotHooks(hook.replace('"use strong";\n', ''), '/src/useForceUpdate.ts'),
+		).not.toThrow();
+	});
+
+	it('locates the tuple and names the replacement', () => {
+		const source = tsx(
+			`export function A({ store }) { const [, force] = useState(0); useEffect(() => store.subscribe(() => force(x => x + 1))); return <p>{store.value}</p>; }`,
+			IMPORTS,
+			true,
+		);
+		const diagnostic = volarDiagnostic(source, '/src/App.tsx', WRITE_ONLY_STATE);
+		expect(diagnostic.start.offset).toBe(source.indexOf('[, force]'));
+		expect(diagnostic.message).toContain(
+			'useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)',
+		);
+	});
+
+	it('preserves emitted client and server code for read state', () => {
+		expectUnchangedOutput(
+			tsx(`export function A() {
+  const [count, setCount] = useState(0);
+  return <b onClick={() => setCount(count + 1)}>{count}</b>;
 }`),
 			'/src/App.tsx',
 		);

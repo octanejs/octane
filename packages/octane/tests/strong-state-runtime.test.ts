@@ -32,6 +32,21 @@ function deferred<T = void>() {
 	return { promise, resolve, reject };
 }
 
+function createStore(value: number) {
+	const listeners = new Set<() => void>();
+	return {
+		value,
+		subscribe(listener: () => void) {
+			listeners.add(listener);
+			return () => listeners.delete(listener);
+		},
+		set(next: number) {
+			this.value = next;
+			for (const listener of listeners) listener();
+		},
+	};
+}
+
 describe('state updaters and reducers can run more than once', () => {
 	for (const reducer of [false, true]) {
 		const kind = reducer ? 'reducer action' : 'state updater';
@@ -220,4 +235,37 @@ describe('deferred updates computed from a render snapshot', () => {
 			}
 		});
 	}
+});
+
+describe('write-only state as a store subscription', () => {
+	const mutator = `function Mutator({ store }) { useLayoutEffect(() => { store.set(2); }); return null; }`;
+
+	it('misses a store change made before its passive subscription', async () => {
+		const { A } = fixture(
+			`${mutator}
+export function A({ store }) { const [, force] = useState(0); useEffect(() => store.subscribe(() => force((x) => x + 1))); return <p>{store.value}<Mutator store={store} /></p>; }`,
+		);
+		const root = mount(A, { store: createStore(1) });
+		try {
+			await act(() => {});
+			expect(root.find('p').textContent).toBe('1');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('renders that change through useSyncExternalStore', async () => {
+		const { A } = fixture(
+			`${mutator}
+export function A({ store }) { const value = useSyncExternalStore(store.subscribe, () => store.value, () => 0); return <p>{value}<Mutator store={store} /></p>; }`,
+			true,
+		);
+		const root = mount(A, { store: createStore(1) });
+		try {
+			await act(() => {});
+			expect(root.find('p').textContent).toBe('2');
+		} finally {
+			root.unmount();
+		}
+	});
 });

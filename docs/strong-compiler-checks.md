@@ -71,6 +71,7 @@ export function Editor({ user }) {
 | `OCTANE_STRONG_IMPURE_UPDATER` | A `useState` or `useLinkedState` updater, a `useReducer` reducer, or a `useOptimistic` reducer calls `fetch`, schedules a timer, microtask, or promise callback, updates state, calls a state getter or Effect Event, reads or writes `useRef.current`, reads a browser global or reassigned module variable, or calls `Date.now()`, `Math.random()`, `performance.now()`, or `new Date()`. Inline functions, local and same-module declarations, and synchronous helpers are followed. | Do the side effect or nondeterministic read in the event handler, effect, or Action, and pass its result in: `const now = Date.now(); setValue((current) => current + now)`. |
 | `OCTANE_STRONG_SNAPSHOT_MUTATION` | A state value is mutated outside render: in an event handler, effect, cleanup, deferred callback, or an updater or reducer's own state argument. Covers assignments, updates, `delete`, destructuring targets, `Object.assign` and `Reflect.set`-style targets, array mutators on state initialized with an array literal (including nested literal properties), and `Map`/`Set` mutators on state created with `new Map()` or `new Set()`. | Pass a new value, for example `setItems([...items, item])` or `setItems((current) => [...current, item])`. Keep mutable objects in `useRef`. |
 | `OCTANE_STRONG_STALE_STATE_UPDATE` | After an `await`, or in a timer or promise callback, a setter or dispatch argument reads the render snapshot of the same state, including through a local computed from it, a copied alias, or a closure. | Use the updater form, `setValue((current) => current + 1)`, compute from the state a reducer receives, or read the latest value with the state getter (the third tuple member). |
+| `OCTANE_STRONG_WRITE_ONLY_STATE` | A state tuple whose value is elided, unused, or read only to compute its own next value, whose getter is absent or unused, and whose setter is used. This is the force-update pattern, including `useReducer((x) => x + 1, 0)` and `useState(0)[1]`. | Subscribe with `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)` and render its snapshot, or remove the unused state. |
 
 Octane evaluates queued updaters and reducers while their owner renders, and it
 can run the same function more than once. A functional update staged by a
@@ -98,6 +99,12 @@ updates in subscription callbacks and other callbacks whose timing the compiler
 cannot prove. An Effect Event reads the latest committed values, so state it
 captures is current in its own body; a snapshot passed to it as an argument, or
 read in a timer or promise callback it creates, is still checked.
+
+A write-only state tuple exists only to schedule renders for an external
+source. It reads that source during render and subscribes afterwards, so a
+change between render and subscription is never rendered. `useSyncExternalStore`
+re-checks the snapshot after commit and when it subscribes, and it takes a
+server snapshot for SSR and hydration.
 
 These are bounded source checks. They follow supported aliases, namespace
 imports, optional calls, local closures, and same-module declarations. Imported

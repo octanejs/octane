@@ -1205,7 +1205,7 @@ import { useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
   ${setup}
-  <div>@if (props.show) { <button ${use}>run</button> }</div>
+  <div>@if (props.show) { <button ${use}>{count as string}</button> }</div>
 }`;
 			expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 		}
@@ -2570,7 +2570,7 @@ export function App(props) @{
   const [count, setCount] = useState(0);
   const ref = useRef(0);
   ${setup}
-  <div />
+  <div>{count as string}</div>
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -2622,7 +2622,7 @@ import { useLinkedState, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
   ${setup}
-  <div />
+  <div>{count as string}</div>
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -3121,7 +3121,7 @@ export function App() @{
 		const source = `"use strong";
 import { useEffect, useState } from 'octane';
 export function App(props) @{
-  const [, setCount] = useState(0);
+  const [count, setCount] = useState(0);
   (async () => {
     await Promise.resolve();
     const selected = (props.trace, setCount);
@@ -3134,7 +3134,7 @@ export function App(props) @{
       (props.trace, setCount)(1);
     })();
   });
-  <div />
+  <div>{count as string}</div>
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -5821,7 +5821,7 @@ import { makeCallback } from './external';
 function useCallback(callback) { return () => {}; }
 function useEffectEvent(callback) { return () => {}; }
 export function App(props) @{
-  const [, setCount] = useState(0);
+  const [count, setCount] = useState(0);
   const ref = useRef(0);
   const ignored = useCallback(() => setCount(1));
   const unrelated = useEffectEvent(() => { ref.current = 1; });
@@ -5836,7 +5836,7 @@ export function App(props) @{
   safe();
   const event = octaneEvent(() => props.value);
   useEffect(() => { props.register(event); });
-  <div />
+  <div>{count as string}</div>
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();

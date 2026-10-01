@@ -882,6 +882,9 @@ These patterns become compile errors:
   after an `await` or in a timer or promise callback
   (`OCTANE_STRONG_STALE_STATE_UPDATE`). Use the updater form or the state
   getter.
+- A state tuple whose value and getter are never read
+  (`OCTANE_STRONG_WRITE_ONLY_STATE`). Use `useSyncExternalStore` for external
+  data.
 - Mutating a binding declared outside a retained keyed `@for` row from that row
   (`OCTANE_STRONG_RETAINED_ROW_MUTATION`). Fresh scratch data built in ordinary
   setup or owned entirely by one row remains valid.
