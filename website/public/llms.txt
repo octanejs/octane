@@ -497,6 +497,7 @@ Strong modules reject these statically provable patterns:
 - Calling one of those updaters synchronously while an effect is being set up (`OCTANE_STRONG_EFFECT_STATE_UPDATE`).
 - Writing to a `useRef` object's `current` during render (`OCTANE_STRONG_RENDER_REF_WRITE`).
 - Writing through a ref to children, a class, an attribute, or a `style` property that the template sets on that element (`OCTANE_STRONG_MANAGED_DOM_WRITE`), or writing raw HTML to a rendered element (`OCTANE_STRONG_RAW_HTML_WRITE`).
+- Querying the document for a literal `id` or class the same component renders (`OCTANE_STRONG_OWN_MARKUP_QUERY`); attach a ref instead.
 - Calling a known `useEffectEvent` result during render (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
 - Including a known Effect Event in explicit hook dependencies (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`).
 - Mutating a provable state snapshot during render (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`).

@@ -97,6 +97,7 @@ runtime diagnostic. Strong mode adds no runtime phase guards.
 | --- | --- | --- |
 | `OCTANE_STRONG_MANAGED_DOM_WRITE` | A write through a ref to what the template owns on its element: `textContent`, `innerText`, `append`, `appendChild`, `insertBefore`, `prepend`, `removeChild`, `replaceChild`, or `replaceChildren` when the template renders children; `className`, `classList` mutators, or `classList.value` when it sets a class; `setAttribute`, `removeAttribute`, or `toggleAttribute` for an attribute it sets; `style`, `style.cssText`, or a `style` property it sets. | Render the value from state or props in the template. |
 | `OCTANE_STRONG_RAW_HTML_WRITE` | `innerHTML`, `outerHTML`, `insertAdjacentHTML()`, or `setHTMLUnsafe()` on an element Octane renders. | `dangerouslySetInnerHTML={trustHTML(html)}` for trusted or already sanitized HTML. |
+| `OCTANE_STRONG_OWN_MARKUP_QUERY` | `document.getElementById()`, `querySelector()`, `querySelectorAll()`, or `getElementsByClassName()` with a literal selector that matches a literal `id` or class rendered by the same component. | Attach a ref to the element and use `ref.current` in the event or effect. |
 
 A DOM write is reported only when the ref provably names exactly one intrinsic
 DOM element in the same component. The ref must come from `useRef` in the
@@ -110,6 +111,12 @@ helpers are all checked. Writes that the template does not own stay valid, such
 as `textContent` on an element without rendered children, mounting a third-party
 widget into an empty container, a `style` property the template's `style` does
 not set, `focus()`, and measurement.
+
+Queries are matched only for a single compound selector, such as `#id`, `.class`,
+or `li.item.active`, against literal `id` and `class` values. A string element of
+a `class` array counts as literal. Portal targets and markup rendered by another
+component are not matched. Nor are dynamic selectors, selectors with combinators,
+or element-scoped queries such as `panel.querySelector()`.
 
 ```tsx
 "use strong";

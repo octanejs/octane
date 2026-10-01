@@ -4,6 +4,7 @@ import { createRendererRegionResolver } from './renderer-boundaries.js';
 
 export const STRONG_MANAGED_DOM_WRITE = 'OCTANE_STRONG_MANAGED_DOM_WRITE';
 export const STRONG_RAW_HTML_WRITE = 'OCTANE_STRONG_RAW_HTML_WRITE';
+export const STRONG_OWN_MARKUP_QUERY = 'OCTANE_STRONG_OWN_MARKUP_QUERY';
 
 const SKIP_KEYS = new Set([
 	'type',
@@ -46,6 +47,12 @@ const RAW_HTML_METHODS = new Set(['insertAdjacentHTML', 'setHTMLUnsafe']);
 const CLASS_LIST_MUTATORS = new Set(['add', 'remove', 'replace', 'toggle']);
 const ATTRIBUTE_METHODS = new Set(['setAttribute', 'removeAttribute', 'toggleAttribute']);
 const STYLE_METHODS = new Set(['setProperty', 'removeProperty']);
+const QUERY_METHODS = new Set([
+	'getElementById',
+	'getElementsByClassName',
+	'querySelector',
+	'querySelectorAll',
+]);
 // Props that never become attributes the element owns.
 const NON_ATTRIBUTE_PROPS = new Set([
 	'key',
@@ -67,24 +74,32 @@ const WRITE_NAMES = [
 	...ATTRIBUTE_METHODS,
 	'style',
 ];
+// A selector with one optional tag and at least one #id/.class part. Combinators,
+// attribute selectors, pseudo-classes and CSS escapes are not proven.
+const COMPOUND_SELECTOR = /^([a-zA-Z][\w-]*)?((?:[#.][a-zA-Z_-][\w-]*)+)$/;
 
 const MANAGED_MESSAGE_END =
 	'Keep refs for reading, focus, measurement, and DOM the template does not render.';
 
-// Every checked write reaches an element through a `ref={…}` prop. Unicode, hex
-// and identity escapes or line continuations can spell a DOM name without its
-// plain text.
+// Every checked write reaches an element through a `ref={…}` prop, and every
+// checked query names a document method. Unicode, hex and identity escapes or
+// line continuations can spell those names without their plain text.
 const ESCAPED_NAME = /\\(?:[ux]|[ac-eg-mo-qswyzA-Z]|[\r\n\u2028\u2029])/;
 // `ref={…}`, or the TSRX attribute shorthand `{ref}`.
 const REF_PROP = /\bref\s*=\s*\{|\{\s*ref\s*\}/;
 const WRITE_ACCESS = new RegExp(`(?:\\.|\\[\\s*['"\`])\\s*(?:${WRITE_NAMES.join('|')})\\b`);
+const QUERY_METHOD = /\b(?:getElementById|getElementsByClassName|querySelector)/;
 
 function mayWrite(text) {
 	return REF_PROP.test(text) && WRITE_ACCESS.test(text);
 }
 
 export function mayHaveStrongDOM(source) {
-	return ESCAPED_NAME.test(source) || mayWrite(source);
+	return (
+		ESCAPED_NAME.test(source) ||
+		mayWrite(source) ||
+		(source.includes('document') && QUERY_METHOD.test(source))
+	);
 }
 
 function unwrap(node) {
@@ -154,6 +169,22 @@ function styleKeys(value) {
 	return keys;
 }
 
+function literalClasses(value) {
+	const expression = value?.type === 'JSXExpressionContainer' ? unwrap(value.expression) : value;
+	const classes = new Set();
+	const text = staticString(expression);
+	if (text !== null) {
+		for (const name of text.split(/\s+/)) if (name) classes.add(name);
+	} else if (expression?.type === 'ArrayExpression') {
+		// Octane composes class arrays clsx-style; a string element is always present.
+		for (const element of expression.elements) {
+			const part = staticString(element);
+			if (part !== null) for (const name of part.split(/\s+/)) if (name) classes.add(name);
+		}
+	}
+	return classes;
+}
+
 // JSX drops whitespace-only text that contains a line break.
 function rendersChild(child) {
 	if (child.type === 'JSXText') return !/^\s*$/.test(child.value) || !/[\r\n]/.test(child.value);
@@ -162,12 +193,37 @@ function rendersChild(child) {
 	return true;
 }
 
+function parseSelector(method, text) {
+	if (method === 'getElementById') return text ? { tag: null, id: text, classes: [] } : null;
+	if (method === 'getElementsByClassName') {
+		const classes = text.split(/\s+/).filter(Boolean);
+		return classes.length ? { tag: null, id: null, classes } : null;
+	}
+	const match = COMPOUND_SELECTOR.exec(text.trim());
+	if (match === null) return null;
+	const parts = match[2].match(/[#.][^#.]+/g);
+	const ids = parts.filter((part) => part[0] === '#').map((part) => part.slice(1));
+	if (ids.length > 1) return null;
+	return {
+		tag: match[1]?.toLowerCase() ?? null,
+		id: ids[0] ?? null,
+		classes: parts.filter((part) => part[0] === '.').map((part) => part.slice(1)),
+	};
+}
+
+function selectorText(selector) {
+	return `${selector.tag ?? ''}${selector.id === null ? '' : `#${selector.id}`}${selector.classes
+		.map((name) => `.${name}`)
+		.join('')}`;
+}
+
 /**
  * Strong DOM ownership checks. A ref proves which rendered intrinsic element it
  * names only when its binding is used solely as that one element's `ref` prop and
  * through `.current` reads; any other use (a component ref prop, a helper call, a
- * `.current` write) withdraws the proof. This pass never annotates the parser
- * tree or changes emitted code.
+ * `.current` write) withdraws the proof. Queries prove their target only through
+ * a literal selector and a literal id or class rendered by the same component.
+ * This pass never annotates the parser tree or changes emitted code.
  */
 export function analyzeStrongDOM(ast, source, filename, options = {}) {
 	if (!mayHaveStrongDOM(source)) return [];
@@ -206,8 +262,11 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 		}
 	}
 	const elementParameters = new Map();
+	const elements = [];
 	const writes = [];
+	const queries = [];
 	const boundaries = [];
+	const functions = [];
 	// TSRX row and catch bindings are not scopes in the shared hook analysis.
 	const templateNames = [];
 
@@ -284,6 +343,26 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 		return null;
 	}
 
+	function documentValue(expression, depth = 0) {
+		const value = unwrap(expression);
+		if (value?.type === 'Identifier') {
+			const binding = bindingOf(value);
+			if (binding === null) return value.name === 'document';
+			if (!binding || depth > 16) return false;
+			const declaration = declarations.get(binding);
+			return declaration !== undefined && !declaration.current
+				? documentValue(declaration.init, depth + 1)
+				: false;
+		}
+		if (value?.type !== 'MemberExpression' || propertyName(value) !== 'document') return false;
+		const object = unwrap(value.object);
+		return (
+			object?.type === 'Identifier' &&
+			(object.name === 'window' || object.name === 'globalThis') &&
+			bindingOf(object) === null
+		);
+	}
+
 	function recordElement(node) {
 		const opening = node.openingElement;
 		const tag = opening.name.name;
@@ -292,8 +371,11 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 			tag: tag.toLowerCase(),
 			attributes: new Set(),
 			styleKeys: null,
+			classes: new Set(),
+			id: null,
 			children: (node.children ?? []).some(rendersChild),
 			boundary: boundaries.at(-1),
+			root: functions[0],
 		};
 		for (const attribute of opening.attributes) {
 			if (attribute.type !== 'JSXAttribute') continue;
@@ -310,7 +392,17 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 			).toLowerCase();
 			element.attributes.add(name);
 			if (name === 'style') element.styleKeys = styleKeys(attribute.value);
+			if (name === 'class')
+				for (const value of literalClasses(attribute.value)) element.classes.add(value);
+			if (name === 'id') {
+				element.id = staticString(
+					attribute.value?.type === 'JSXExpressionContainer'
+						? attribute.value.expression
+						: attribute.value,
+				);
+			}
 		}
+		elements.push(element);
 		return element;
 	}
 
@@ -413,11 +505,13 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 			case 'FunctionExpression':
 			case 'ArrowFunctionExpression':
 				boundaries.push(node);
+				functions.push(node);
 				try {
 					for (const parameter of node.params) visitPattern(parameter);
 					visit(node.body);
 				} finally {
 					boundaries.pop();
+					functions.pop();
 				}
 				return;
 			case 'VariableDeclarator': {
@@ -560,7 +654,15 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 				return;
 			case 'CallExpression': {
 				const callee = unwrap(node.callee);
-				if (callee?.type === 'MemberExpression') recordWrite(callee, callee, node.arguments);
+				if (callee?.type === 'MemberExpression') {
+					recordWrite(callee, callee, node.arguments);
+					const method = propertyName(callee);
+					const text = QUERY_METHODS.has(method) ? staticString(node.arguments[0]) : null;
+					if (text !== null && documentValue(callee.object)) {
+						const selector = parseSelector(method, text);
+						if (selector !== null) queries.push({ node, selector, method, root: functions[0] });
+					}
+				}
 				visit(node.callee);
 				visit(node.arguments);
 				return;
@@ -614,11 +716,14 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 		}
 	}
 
-	// A ref and its aliases belong to one top-level statement's functions, so
-	// statements without those spellings are skipped.
+	// Refs, their aliases and a query's markup all belong to one top-level
+	// statement's functions, so statements without those spellings are skipped.
+	const mayQuery = source.includes('document') || ESCAPED_NAME.test(source);
 	for (const statement of ast.body ?? []) {
 		const text = source.slice(statement.start, statement.end);
-		if (ESCAPED_NAME.test(text) || mayWrite(text)) visit(statement);
+		if (ESCAPED_NAME.test(text) || mayWrite(text) || (mayQuery && QUERY_METHOD.test(text))) {
+			visit(statement);
+		}
 	}
 
 	function report(code, node, message) {
@@ -709,5 +814,22 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 		}
 	}
 
+	for (const query of queries) {
+		if (query.root === undefined) continue;
+		const { selector } = query;
+		const match = elements.find(
+			(element) =>
+				element.root === query.root &&
+				(selector.tag === null || selector.tag === element.tag) &&
+				(selector.id === null || selector.id === element.id) &&
+				selector.classes.every((name) => element.classes.has(name)),
+		);
+		if (match === undefined) continue;
+		report(
+			STRONG_OWN_MARKUP_QUERY,
+			query.node,
+			`Strong mode does not allow \`document.${query.method}()\` to find the \`${selectorText(selector)}\` <${match.tag}> this component renders. Attach a ref instead: \`const element = useRef(null)\`, \`ref={element}\` on the <${match.tag}>, then use \`element.current\` in the effect or event. Portal targets and markup rendered elsewhere stay queryable.`,
+		);
+	}
 	return diagnostics;
 }

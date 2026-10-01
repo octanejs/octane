@@ -5,6 +5,7 @@ import { compileToVolarMappings } from '../../src/compiler/volar.js';
 
 const MANAGED_DOM_WRITE = 'OCTANE_STRONG_MANAGED_DOM_WRITE';
 const RAW_HTML_WRITE = 'OCTANE_STRONG_RAW_HTML_WRITE';
+const OWN_MARKUP_QUERY = 'OCTANE_STRONG_OWN_MARKUP_QUERY';
 
 const IMPORTS = "import { useEffect, useLayoutEffect, useRef, useState } from 'octane';\n";
 const MODES = [
@@ -440,5 +441,104 @@ export function useUppercase(ref, label) {
 			expect(strong.code).toBe(standard.code);
 			expect(strong.diagnostics).toEqual(standard.diagnostics);
 		}
+	});
+});
+
+describe('Strong queries for a component’s own markup', () => {
+	const query = (call: string, element: string) =>
+		`${IMPORTS}export function App({ on }) {
+  useEffect(() => { ${call}; });
+  return ${element};
+}`;
+
+	it.each([
+		['getElementById', "document.getElementById('x').focus()", '<input id="x" />'],
+		[
+			'a class selector',
+			"document.querySelector('.box').classList.add('on')",
+			'<div class="box" />',
+		],
+		['an id selector', "document.querySelector('#search').focus()", '<input id="search" />'],
+		[
+			'a compound selector',
+			"document.querySelectorAll('li.item.active')",
+			'<ul><li className="item active" /></ul>',
+		],
+		['getElementsByClassName', "document.getElementsByClassName('a b')", '<p class="a b c" />'],
+		['class arrays', "document.querySelector('.box')", "<div class={['box', on && 'on']} />"],
+		['template literal selectors', 'document.getElementById(`x`)', '<input id={`x`} />'],
+		['window.document', "window.document.getElementById('x')", '<input id="x" />'],
+		['globalThis.document', "globalThis.document.querySelector('#x')", '<input id="x" />'],
+		['optional calls', "document.getElementById?.('x')?.focus()", '<input id="x" />'],
+	])('rejects %s', (_label, call, element) => {
+		expectStrongError(query(call, element), '/src/App.tsx', OWN_MARKUP_QUERY);
+	});
+
+	it('follows document aliases, event handlers, and .tsrx @for rows', () => {
+		expectStrongError(
+			`const doc = document;
+export function App() {
+  return <button id="save" onClick={() => doc.getElementById('save').blur()}>Save</button>;
+}`,
+			'/src/App.tsx',
+			OWN_MARKUP_QUERY,
+		);
+		expectStrongError(
+			`${IMPORTS}export function List({ items }) @{
+  useEffect(() => { document.querySelector('.row').scrollIntoView(); });
+  <ul>
+    @for (const item of items; key item.id) {
+      <li class="row">{item.name as string}</li>
+    }
+  </ul>
+}`,
+			'/src/List.tsrx',
+			OWN_MARKUP_QUERY,
+		);
+	});
+
+	it('names a ref as the replacement', () => {
+		const message = messageOf(
+			query("document.getElementById('x').focus()", '<input id="x" />'),
+			'/src/App.tsx',
+			OWN_MARKUP_QUERY,
+		);
+		expect(message).toContain('ref={element}');
+		expect(message).toContain('#x');
+	});
+
+	it.each([
+		['portal targets', "document.getElementById('modal-root')", '<input id="x" />'],
+		['dynamic selectors', 'document.getElementById(on)', '<input id="x" />'],
+		[
+			'selectors with combinators',
+			"document.querySelector('.list .item')",
+			'<ul class="list"><li class="item" /></ul>',
+		],
+		[
+			'classes the component does not render',
+			"document.querySelector('.box.other')",
+			'<div class="box" />',
+		],
+		['a mismatched tag', "document.querySelector('span.box')", '<div class="box" />'],
+		['dynamic ids', "document.getElementById('x')", '<input id={on} />'],
+		['element-scoped queries', "document.body.querySelector('#x')", '<input id="x" />'],
+	])('allows %s', (_label, call, element) => {
+		expectStrongValid(query(call, element), '/src/App.tsx');
+	});
+
+	it('scopes markup to one component and respects a shadowed document', () => {
+		expectStrongValid(
+			`${IMPORTS}export function Toolbar() {
+  useEffect(() => { document.getElementById('editor').focus(); });
+  return <button>Focus</button>;
+}
+export function Editor() { return <textarea id="editor" />; }
+export function Frame({ document }) {
+  useEffect(() => { document.getElementById('x').focus(); });
+  return <input id="x" />;
+}`,
+			'/src/App.tsx',
+		);
 	});
 });

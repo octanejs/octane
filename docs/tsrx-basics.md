@@ -868,6 +868,8 @@ These patterns become compile errors:
   (`OCTANE_STRONG_MANAGED_DOM_WRITE`), or writing raw HTML to an element Octane
   renders (`OCTANE_STRONG_RAW_HTML_WRITE`). Render the value in the template, or
   use `dangerouslySetInnerHTML={trustHTML(html)}`.
+- Querying the document for a literal `id` or class that the same component
+  renders (`OCTANE_STRONG_OWN_MARKUP_QUERY`). Attach a ref instead.
 - Calling a statically known `useEffectEvent` result during render
   (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
 - Including a statically known Effect Event in an explicit hook dependency list
