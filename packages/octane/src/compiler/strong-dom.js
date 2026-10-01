@@ -186,8 +186,11 @@ function literalClasses(value) {
 }
 
 // JSX drops whitespace-only text that contains a line break.
+// Literal normalization leaves '' for text it removed, which renders nothing.
 function rendersChild(child) {
-	if (child.type === 'JSXText') return !/^\s*$/.test(child.value) || !/[\r\n]/.test(child.value);
+	if (child.type === 'JSXText') {
+		return child.value !== '' && (!/^\s*$/.test(child.value) || !/[\r\n]/.test(child.value));
+	}
 	if (child.type === 'JSXExpressionContainer')
 		return child.expression?.type !== 'JSXEmptyExpression';
 	return true;
