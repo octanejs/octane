@@ -3273,6 +3273,14 @@ export function App(props) @{
 			'statements after awaited finally blocks',
 			'try {} finally { await Promise.resolve(); } setCount(1);',
 		],
+		[
+			'catch branches entered only after yielding',
+			'try { await Promise.resolve(); } catch {} setCount(1);',
+		],
+		[
+			'finally blocks entered only after yielding',
+			'try { await Promise.resolve(); } finally { setCount(1); }',
+		],
 	])('allows updates after guaranteed awaits in nested %s', (_label, body) => {
 		expectYieldedUpdates(body);
 	});
@@ -3576,11 +3584,15 @@ export function App(props) @{
 		],
 		[
 			'catch branches that can continue without yielding',
-			'try { await Promise.resolve(); } catch {} setCount(1);',
+			'try { JSON.parse("{}"); await Promise.resolve(); } catch {} setCount(1);',
 		],
 		[
 			'finally blocks that can run synchronously',
-			'try { await Promise.resolve(); } finally { setCount(1); }',
+			'try { if (count > 0) return; await Promise.resolve(); } finally { setCount(1); }',
+		],
+		[
+			'catch branches after awaited calls with synchronous arguments',
+			'try { await Promise.resolve(JSON.parse("1")); } catch { setCount(1); }',
 		],
 	])('still rejects %s', (_label, body) => {
 		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
