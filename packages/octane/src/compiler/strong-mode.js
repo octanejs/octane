@@ -5105,7 +5105,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 				if (executionPhase === 'render' && currentFunctionChecksImpureCalls) {
 					if (impureStandardCall(callee, scope)) reportImpureCall(callee);
-					renderPolicy.call(node, callee, scope);
+					renderPolicy.call(node, callee, scope, !insidePureCallback);
 				}
 				const mutation = statePolicy.snapshotMutation(callee, node.arguments, scope);
 				if (mutation !== null) reportSnapshotMutationIn(mutation, executionPhase);
@@ -5233,7 +5233,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					reportImpureCall(callee);
 				}
 				if (executionPhase === 'render' && currentFunctionChecksImpureCalls) {
-					renderPolicy.construct(node, scope);
+					renderPolicy.construct(node, scope, !insidePureCallback);
 				}
 				if (inlineConstructor) {
 					visitCallback(callee, scope, executionPhase, argumentValues(node.arguments, scope));

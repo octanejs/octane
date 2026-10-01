@@ -269,6 +269,37 @@ const numbers = new Intl.NumberFormat();`,
 			'/src/App.tsx',
 			RENDER_LOCALE_FORMAT,
 		);
+		expectStrongError(
+			`const format = new Intl.DateTimeFormat();
+export function App({ t }) { const local = format; const again = local; return <p>{again.format(t)}</p>; }`,
+			'/src/App.tsx',
+			RENDER_LOCALE_FORMAT,
+		);
+	});
+
+	it('leaves locale formatting in updaters and reducers to the updater checks', () => {
+		// Updaters and reducers run on the client after an event, and a replay on
+		// the same client formats the same way, so locale formatting there is
+		// stable. Randomness is not, and still reports as an impure updater.
+		expectStrongValid(
+			`${IMPORTS}import { useReducer } from 'octane';
+const format = new Intl.DateTimeFormat();
+function stamp(log, t) { return [...log, new Date(t).toLocaleString(), format.format(t)]; }
+export function App({ t }) {
+  const [log, setLog] = useState([]);
+  const [last, record] = useReducer((current, next) => new Date(next).toLocaleTimeString(), '');
+  return <button onClick={() => { setLog((current) => stamp(current, t)); record(t); }}>{log.length}{last}</button>;
+}`,
+			'/src/App.tsx',
+		);
+		expectStrongError(
+			`${IMPORTS}export function App() {
+  const [ids, setIds] = useState([]);
+  return <button onClick={() => setIds((current) => [...current, crypto.randomUUID()])}>{ids.length}</button>;
+}`,
+			'/src/App.tsx',
+			'OCTANE_STRONG_IMPURE_UPDATER',
+		);
 	});
 
 	it('checks .tsrx @for rows and plain custom-hook modules', () => {
