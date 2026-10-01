@@ -542,12 +542,40 @@ list is also a compile error. Strong modules use normal const declarations for
 automatic memoization. Manual memo hooks and non-equivalent explicit dependencies
 are errors; equivalent arrays keep their behavior and produce a hint.
 
+Inside an async function, code after a guaranteed `await` is not synchronous. In
+effect work, an `await` that resumes without waiting, such as `await null`, does
+not count. A `catch` clause is synchronous only when its `try` block can throw,
+or can await a settled rejection, before its first guaranteed `await`. A
+`finally` clause, or code after the `try` statement, is synchronous only when
+the `try` or `catch` can finish before one. Calls, `new`, `throw`, and iteration
+can throw; property reads and operators do not count. The awaited call itself,
+and any call it chains from through `then`, `catch`, or `finally`, is trusted to
+report failure by rejecting. So is each call written as an element of an array
+literal passed to an awaited `Promise.all`, `Promise.allSettled`, `Promise.any`,
+or `Promise.race`, unless the module declares its own `Promise`. The callees and
+arguments of trusted calls still evaluate first. So in `try { const data = await
+Promise.all([api.a(id), api.b(id)]); if (!ignore) setData(data); } catch (error)
+{ if (!ignore) setError(error); }` the `catch` runs after a yield, while `await
+api.get(toKey(id))` or `await Promise.all(ids.map(load))` leaves it synchronous.
+An update after a yield in an effect still needs cleanup that cancels or ignores
+it (`OCTANE_STRONG_EFFECT_DATA_FETCH`).
+
 The compiler also rejects render-time writes through a provable state snapshot
 (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`) and direct calls to known
-non-idempotent globals such as `Date.now()` and `Math.random()`
-(`OCTANE_STRONG_RENDER_IMPURE_CALL`). These checks follow supported aliases and
-synchronous helpers; they do not prove arbitrary method bodies or imported code
-pure. Lazy state initialization may obtain an initial timestamp or random value.
+non-idempotent globals such as `Date.now()`, `Math.random()`, and
+`crypto.randomUUID()` (`OCTANE_STRONG_RENDER_IMPURE_CALL`), including inside
+callbacks that known array methods run synchronously. These checks follow
+supported aliases and synchronous helpers; they do not prove arbitrary method
+bodies or imported code pure. Lazy state initialization may obtain an initial
+timestamp or random value. Locale- and time-zone-dependent formatting of a
+provable `Date` or an `Intl` service during render reports
+`OCTANE_STRONG_RENDER_LOCALE_FORMAT`; pass an explicit locale and `timeZone`.
+State values stay immutable outside render too
+(`OCTANE_STRONG_SNAPSHOT_MUTATION`), updaters and reducers follow the render
+checks because Octane may replay them (`OCTANE_STRONG_IMPURE_UPDATER`), and a
+deferred update may not compute from its own render snapshot
+(`OCTANE_STRONG_STALE_STATE_UPDATE`). See the
+[Strong compiler check reference](./strong-compiler-checks.md#state-values-updaters-and-subscriptions).
 
 Reading unshadowed `window`, `document`, `localStorage`, `sessionStorage`,
 `navigator`, `location`, or `matchMedia` during render reports
@@ -568,6 +596,14 @@ events, effects, and deferred callbacks remain supported. Lazy `useState` and
 still run during server rendering: guard unavailable browser APIs and ensure the
 server and client agree on initial output. A `typeof window` guard inside an
 ordinary render calculation does not make the calculation snapshot-safe.
+
+Strong modules also keep the DOM that Octane renders under the template's
+control. A ref write to children, a class, an attribute, or a `style` property
+that the template sets on the same element reports
+`OCTANE_STRONG_MANAGED_DOM_WRITE`, and raw HTML written to a rendered element
+reports `OCTANE_STRONG_RAW_HTML_WRITE`. A document query for a literal `id` or
+class the same component renders reports `OCTANE_STRONG_OWN_MARKUP_QUERY`. React
+accepts all three.
 
 The directive is also an author assertion for production memoization, not just a
 request for diagnostics. Render output must not observe changing data through a

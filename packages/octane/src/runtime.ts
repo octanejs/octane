@@ -46452,7 +46452,10 @@ export function preload(href: string, options: { as: string } & Record<string, u
 	if (as === 'font') options = { ...options, crossOrigin: '' };
 	// Connection/integrity options seed the matching future preinit (React's
 	// resource map carries them onto the initialized resource).
-	if (as === 'style' || as === 'script') stashPreloadTransfer(as, rawHref, options);
+	// A deduped preload must retain the first call's options, even when that
+	// call supplied no transferable metadata.
+	if ((as === 'style' || as === 'script') && !_resourceHints.has('preload:' + as + ':' + rawHref))
+		stashPreloadTransfer(as, rawHref, options);
 	// After the matching external resource is already live (a Float resource or
 	// preinit), a preload adds nothing. Inline style resources share the sheet
 	// identity namespace but cannot consume an external stylesheet preload, so

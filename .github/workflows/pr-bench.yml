@@ -1,0 +1,123 @@
+name: PR bench
+
+# Measures every ready pull request against its base commit on the SAME runner
+# and renders benchmarks/pr-report.mjs's Markdown report. Fork pull requests get
+# a read-only token here, so this job only uploads the report; the trusted
+# "PR bench comment" workflow posts it. Absolute numbers stay runner-specific:
+# the report compares base and merge commit from this one run only.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - ".changeset/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    name: benchmark report
+    if: github.event.pull_request.draft == false
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 60
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      # Only Octane rows are reported; timing other frameworks would only add runtime.
+      JS_FRAMEWORK_TARGETS: '[{"name":"octane-tsrx","url":"http://localhost:5176/","ready":"#run"},{"name":"octane-jsx","url":"http://localhost:5177/","ready":"#run"}]'
+
+    steps:
+      - name: Checkout merge commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Check out base commit
+        run: |
+          echo "BASE_TREE=$RUNNER_TEMP/base" >> "$GITHUB_ENV"
+          echo "RESULTS=$RUNNER_TEMP/pr-bench" >> "$GITHUB_ENV"
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          git worktree add --detach "$RUNNER_TEMP/base" "$BASE_SHA"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: |
+          pnpm install --prod false --frozen-lockfile
+          pnpm --dir "$BASE_TREE" install --prod false --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: |
+          pnpm --filter octane-js-framework-benchmarks exec playwright install --with-deps chromium
+          pnpm --dir "$BASE_TREE" --filter octane-js-framework-benchmarks exec playwright install chromium
+
+      # A failing suite is recorded in its result JSON and rendered in the
+      # report, so both trees always run to completion before the verdict.
+      # Byte suites are deterministic and run once per tree. js-framework runs
+      # base, head, head, base so runner drift over the job cancels out.
+      - name: Benchmark bundle size
+        id: bytes
+        run: |
+          (cd "$BASE_TREE" && node benchmarks/bench.mjs --results-dir="$RESULTS/base" bundle-size bundle-reachability) \
+            || echo "::warning::base bundle benchmarks failed"
+          status=0
+          node benchmarks/bench.mjs --results-dir="$RESULTS/head" bundle-size bundle-reachability || status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Benchmark js-framework
+        id: timing
+        env:
+          TARGETS: ${{ env.JS_FRAMEWORK_TARGETS }}
+        run: |
+          status=0
+          for round in base:1 head:1 head:2 base:2; do
+            side=${round%%:*}
+            tree=$GITHUB_WORKSPACE
+            if [ "$side" = base ]; then tree=$BASE_TREE; fi
+            if (cd "$tree" && node benchmarks/bench.mjs --results-dir="$RESULTS/$side-js-${round##*:}" js-framework); then :
+            elif [ "$side" = head ]; then status=1
+            else echo "::warning::base js-framework round failed"; fi
+          done
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Render report
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          MERGE_SHA: ${{ github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          mkdir -p "$RESULTS/report"
+          HEAD_SHA="$MERGE_SHA" node benchmarks/pr-report.mjs \
+            --base="$RESULTS/base" --head="$RESULTS/head" --rounds=2 \
+            --out="$RESULTS/report/report.md"
+          printf '%s\n' "$PR_NUMBER" > "$RESULTS/report/pr-number"
+          printf '%s\n' "$HEAD_SHA" > "$RESULTS/report/head-sha"
+          cat "$RESULTS/report/report.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr-bench-report
+          path: |
+            ${{ env.RESULTS }}/report/
+            ${{ env.RESULTS }}/*/*.json
+          retention-days: 14
+
+      - name: Fail when the merge commit's benchmarks failed
+        if: steps.bytes.outputs.status != '0' || steps.timing.outputs.status != '0'
+        run: exit 1

@@ -3,7 +3,7 @@ import { type FloatingMenuPluginProps, FloatingMenuPlugin } from '@tiptap/extens
 import type { PluginKey } from '@tiptap/pm/state';
 import { createPortal, useEffect, useLayoutEffect, useRef, useState } from 'octane';
 
-import { useCurrentEditor } from '../Context';
+import { useCurrentEditor } from '../Context.tsrx';
 import { subSlot } from '../internal';
 import { getAutoPluginKey } from './getAutoPluginKey';
 import {
