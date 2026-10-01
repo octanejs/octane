@@ -552,6 +552,12 @@ bodies or imported code pure. Lazy state initialization may obtain an initial
 timestamp or random value. Locale- and time-zone-dependent formatting of a
 provable `Date` or an `Intl` service during render reports
 `OCTANE_STRONG_RENDER_LOCALE_FORMAT`; pass an explicit locale and `timeZone`.
+State values stay immutable outside render too
+(`OCTANE_STRONG_SNAPSHOT_MUTATION`), updaters and reducers follow the render
+checks because Octane may replay them (`OCTANE_STRONG_IMPURE_UPDATER`), and a
+deferred update may not compute from its own render snapshot
+(`OCTANE_STRONG_STALE_STATE_UPDATE`). See the
+[Strong compiler check reference](./strong-compiler-checks.md#state-values-updaters-and-subscriptions).
 
 Reading unshadowed `window`, `document`, `localStorage`, `sessionStorage`,
 `navigator`, `location`, or `matchMedia` during render reports
