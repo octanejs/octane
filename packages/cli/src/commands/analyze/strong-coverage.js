@@ -116,12 +116,34 @@ export async function loadStrongPolicy(project, { required }) {
 }
 
 /**
- * A runtime (not type-only) import of octane or one of its subpaths. The
- * clause may span lines but never reaches into the next `import`, so a
- * semicolon-free module cannot borrow a later type-only import's specifier.
+ * An import of octane or one of its subpaths, capturing its clause. The clause
+ * may span lines but never reaches into the next `import`, so a semicolon-free
+ * module cannot borrow a later import's specifier.
  */
 const OCTANE_IMPORT =
-	/^\s*import\s+(?!type\b)(?:(?!\bimport\b)[^;])*?\bfrom\s*['"]octane(?:\/[^'"]*)?['"]/m;
+	/^\s*import\s+((?:(?!\bimport\b)[^;])*?)\s*\bfrom\s*['"]octane(?:\/[^'"]*)?['"]/gm;
+
+/**
+ * Does the module import a runtime binding from octane? TypeScript erases an
+ * `import type` clause and a named clause whose every specifier is
+ * `type`-marked, so neither leaves anything for the compiler to slot. A
+ * default or namespace binding, or any unmarked specifier, survives.
+ *
+ * @param {string} source
+ */
+function importsOctaneAtRuntime(source) {
+	for (const [, clause] of source.matchAll(OCTANE_IMPORT)) {
+		if (/^type\b/.test(clause)) continue;
+		const named = /^\{([\s\S]*)\}$/.exec(clause);
+		if (named === null) return true;
+		const specifiers = named[1]
+			.split(',')
+			.map((specifier) => specifier.trim())
+			.filter(Boolean);
+		if (!specifiers.every((specifier) => /^type\s/.test(specifier))) return true;
+	}
+	return false;
+}
 
 /**
  * @param {string | undefined} source a JSX import source
@@ -153,7 +175,7 @@ export function isOctaneModule(absolute, source, jsxImportSource, policy) {
 		if (pragma !== null) return isOctaneJsxSource(pragma);
 		return jsxImportSource === undefined || isOctaneJsxSource(jsxImportSource);
 	}
-	if (extension === '.ts' || extension === '.js') return OCTANE_IMPORT.test(source);
+	if (extension === '.ts' || extension === '.js') return importsOctaneAtRuntime(source);
 	return false;
 }
 

@@ -273,6 +273,11 @@ describe('octane analyze Strong coverage', () => {
 			'src/types.ts': "import type { OctaneNode } from 'octane';\nexport type Node = OctaneNode;\n",
 			'src/no-semi.ts':
 				"import { add } from './math'\nimport type { OctaneNode } from 'octane'\nexport type Sum = OctaneNode\n",
+			// Every specifier is type-marked, so TypeScript erases the import.
+			'src/inline-types.ts':
+				"import { type OctaneNode, type Root } from 'octane';\nexport type Pair = [OctaneNode, Root];\n",
+			'src/mixed.ts':
+				"import { type OctaneNode, useState } from 'octane';\nexport function useNode(): OctaneNode { return useState(null)[0]; }\n",
 			'src/math.ts': 'export const add = (a: number, b: number) => a + b;\n',
 			'src/env.d.ts': "import 'octane';\n",
 		});
@@ -281,13 +286,13 @@ describe('octane analyze Strong coverage', () => {
 		expect(result.exitCode).toBe(0);
 		expect(baseline(root)).toEqual({
 			version: 1,
-			exceptions: ['src/Card.tsx', 'src/Loose.tsrx', 'src/use-count.ts'],
+			exceptions: ['src/Card.tsx', 'src/Loose.tsrx', 'src/mixed.ts', 'src/use-count.ts'],
 		});
 		expect(result.json().strongCoverage).toEqual({
 			baseline: 'octane-strong-baseline.json',
-			modules: 5,
+			modules: 6,
 			strong: 2,
-			exceptions: 3,
+			exceptions: 4,
 			regressions: [],
 			stale: [],
 		});
