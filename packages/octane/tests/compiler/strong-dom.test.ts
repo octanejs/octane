@@ -319,6 +319,11 @@ describe('Strong managed DOM writes through refs', () => {
 			'<div ref={r} class="chart" />',
 		],
 		[
+			'mounting into a formatted empty container',
+			"r.current.replaceChildren(document.createElement('canvas'));",
+			'<div ref={r} class="chart">\n    </div>',
+		],
+		[
 			'className when the template sets no class',
 			"r.current.className = 'on';",
 			'<p ref={r} id="x" />',
