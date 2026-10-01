@@ -1569,6 +1569,16 @@ export function App(props) @{
 }`;
 
 	it.each([
+		'props.on ? element : null',
+		'props.on && element',
+		'[element] as const',
+		'(element as any)',
+	])('treats a ref passed as %s to an element as a platform target', (ref) => {
+		const setup = `useEffect(() => { element.current.addEventListener('click', () => setWidth(1)); });`;
+		rejects(app(setup).replace('<div ref={element}>', `<div ref={${ref}}>`), LEAK);
+	});
+
+	it.each([
 		[
 			'a window listener',
 			`useEffect(() => { window.addEventListener('resize', () => setWidth(window.innerWidth)); });`,
@@ -1743,6 +1753,10 @@ export function App(props) @{
 			`function listen(target, handler, options) { target.addEventListener('resize', handler, options); } useEffect(() => { const onResize = () => setWidth(1); listen(window, onResize, { capture: true }); return () => window.removeEventListener('resize', onResize); });`,
 		],
 		[
+			'a listener on a conditional platform target',
+			`useEffect(() => { const target = props.wide ? window : document; target.addEventListener('resize', () => setWidth(1)); });`,
+		],
+		[
 			'a named function timer that reschedules itself',
 			`useEffect(() => { setTimeout(function tick() { setWidth(1); setTimeout(tick, 1000); }, 1000); });`,
 		],
@@ -1782,6 +1796,10 @@ export function App(props) @{
 		[
 			'an aborted listener signal',
 			`useEffect(() => { const controller = new AbortController(); window.addEventListener('resize', () => setWidth(1), { signal: controller.signal }); return () => controller.abort(); });`,
+		],
+		[
+			'a removed listener on a conditional platform target',
+			`useEffect(() => { const target = props.wide ? window : document; const onResize = () => setWidth(1); target.addEventListener('resize', onResize); return () => target.removeEventListener('resize', onResize); });`,
 		],
 		[
 			'a named function timer that stores each reschedule',

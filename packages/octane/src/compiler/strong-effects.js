@@ -889,6 +889,14 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			}
 			return platformTarget(node.object, depth + 1);
 		}
+		if (node.type === 'ConditionalExpression' || node.type === 'LogicalExpression') {
+			// Either value may be the target, as in `enabled ? window : document`.
+			const only = selected(node);
+			if (only !== null) return platformTarget(only, depth + 1);
+			return node.type === 'ConditionalExpression'
+				? platformTarget(node.consequent, depth + 1) || platformTarget(node.alternate, depth + 1)
+				: platformTarget(node.left, depth + 1) || platformTarget(node.right, depth + 1);
+		}
 		if (node.type === 'CallExpression') {
 			const name = globalFunction(node.callee);
 			if (name === 'matchMedia') return true;
@@ -1210,26 +1218,39 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				const call = parents[at];
 				const position = DEPENDENCY_ARGUMENTS.get(callNames.get(call));
 				if (position !== undefined && call.arguments?.[position] === list) return;
-			}
-			// falls through
-			case 'JSXExpressionContainer': {
-				let attribute = parents[index - 1];
-				let element = parents[index - 2];
-				if (parent.type === 'ArrayExpression') {
-					attribute = parents[index - 2];
-					element = parents[index - 3];
-					if (parents[index - 1]?.type !== 'JSXExpressionContainer') attribute = null;
-				}
-				if (attribute?.type === 'JSXAttribute' && attribute.name?.name === 'ref') {
-					const name = element?.type === 'JSXOpeningElement' ? element.name : null;
-					if (name?.type === 'JSXIdentifier' && /^[a-z]/.test(name.name)) {
-						references.host.add(root);
-					}
-				}
 				break;
 			}
 		}
+		if (hostRefPosition(parents, index, child)) references.host.add(root);
 		references.escaped.add(root);
+	}
+
+	// A ref given to an intrinsic element's `ref`: directly, in an array, as
+	// either value of a conditional or logical expression, or through a cast.
+	function hostRefPosition(parents, index, child) {
+		let at = index;
+		let current = child;
+		while (at >= 0) {
+			const node = parents[at];
+			if (
+				TRANSPARENT.has(node.type) ||
+				node.type === 'ArrayExpression' ||
+				node.type === 'LogicalExpression' ||
+				(node.type === 'ConditionalExpression' && node.test !== current) ||
+				(node.type === 'SequenceExpression' && node.expressions?.at(-1) === current)
+			) {
+				current = node;
+				at--;
+				continue;
+			}
+			break;
+		}
+		if (parents[at]?.type !== 'JSXExpressionContainer') return false;
+		const attribute = parents[at - 1];
+		if (attribute?.type !== 'JSXAttribute' || attribute.name?.name !== 'ref') return false;
+		const element = parents[at - 2];
+		const name = element?.type === 'JSXOpeningElement' ? element.name : null;
+		return name?.type === 'JSXIdentifier' && /^[a-z]/.test(name.name);
 	}
 
 	return {
