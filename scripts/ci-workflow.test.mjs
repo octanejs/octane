@@ -1680,12 +1680,18 @@ describe('Pull request benchmark report', () => {
 	test('posts the report from the default branch without running pull request code', () => {
 		assert.match(
 			prBenchCommentWorkflow,
-			/workflow_run:\n {4}workflows: \[PR bench\]\n {4}types: \[completed\]/,
+			/workflow_run:\n {4}workflows: \[PR bench, CI\]\n {4}types: \[completed\]/,
 		);
 		assert.match(prBenchCommentWorkflow, /^permissions: \{\}$/m);
-		assert.doesNotMatch(prBenchCommentWorkflow, /actions\/checkout|pnpm|node benchmarks/);
-		assert.ok(prBenchCommentWorkflow.includes('pull.head.sha !== run.head_sha'));
-		assert.ok(prBenchCommentWorkflow.includes('const MARKER = "<!-- octane-pr-bench -->";'));
+		assert.equal(prBenchCommentWorkflow.match(/actions\/checkout@/g)?.length, 1);
+		assert.ok(
+			prBenchCommentWorkflow.includes('ref: ${{ github.event.repository.default_branch }}'),
+		);
+		assert.doesNotMatch(prBenchCommentWorkflow, /pnpm|node benchmarks|head_branch|head\.ref/);
+		assert.ok(prBenchCommentWorkflow.includes('candidate.head.sha === sha'));
+		assert.ok(prBenchCommentWorkflow.includes('read("head-sha").trim() !== sha'));
+		assert.ok(prBenchCommentWorkflow.includes('comment.body?.startsWith(COMMENT_MARKER)'));
+		assert.match(packageJson.scripts['ci:workflow:test'], /benchmarks\/ci-timing\.test\.mjs/);
 	});
 });
 
