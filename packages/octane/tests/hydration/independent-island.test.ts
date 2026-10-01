@@ -4,6 +4,7 @@ import {
 	bootstrapIndependentHydration,
 	type IndependentHydrateActivationContext,
 } from '../../src/hydration/independent-island.js';
+import { hasPendingWork } from '../../src/index.js';
 import { renderToString } from '../../src/runtime.server.js';
 import { createScope } from 'octane/signals';
 import { evaluateCompiledFixtureCode } from '../_server-fixture.js';
@@ -316,6 +317,9 @@ function Unrelated() {
 				expect(choose.mock.calls).toEqual([['load']]);
 				nestedButton.click();
 				await vi.waitFor(() => expect(nestedActive).toBe(true));
+				// The activator returns before the captured click replays: the nested
+				// island's notify passive effect dispatches it after paint.
+				await expect.poll(() => hasPendingWork()).toBe(false);
 				expect(modules).toEqual([loadManifest.moduleId, nestedManifest.moduleId]);
 				expect(choose.mock.calls).toEqual([['load'], ['nested']]);
 				expect(host.querySelector('[data-nested]')).toBe(nestedButton);
