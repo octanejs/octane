@@ -1537,11 +1537,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	// Updaters and reducers run while their owner renders, and deferred code
 	// reads a render snapshot that later updates may already have replaced.
 	let insidePureCallback = false;
-	// An Effect Event reads the latest committed values, not a stale snapshot.
-	let effectEventDepth = 0;
+	// An Effect Event reads the latest committed values when it is called, so
+	// state it captures is current in its own body; arguments are not.
+	const effectEventFunctions = new Set();
 	const statePolicy = createStrongStatePolicy({
 		report,
 		resolve,
+		resolveScope,
 		unwrap,
 		createScope,
 		snapshotBinding,
@@ -2376,10 +2378,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			let functionScope;
 			if ((node.params ?? []).every((parameter) => parameter.type === 'Identifier')) {
 				functionScope = createFunctionScope(node, parentScope, args);
+				if (effectEventFunctions.has(node)) functionScope.effectEventBoundary = true;
 			} else {
 				// Defaults run before the body environment exists. In particular,
 				// body var/function declarations cannot shadow an outer default read.
 				const parameterScope = visitParameters(node, parentScope, phase, args);
+				if (effectEventFunctions.has(node)) parameterScope.effectEventBoundary = true;
 				functionScope = createScope(parameterScope, 'function');
 				const names = new Map();
 				for (const parameter of node.params ?? []) addPatternNames(parameter, names, OTHER_BINDING);
@@ -3731,12 +3735,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				// Effect Events observe current values without subscribing the calling effect.
 				// Their writes still participate in fetch and cross-effect state flow checks.
 				collectEffectReads = false;
-				effectEventDepth++;
 				try {
-					visitCallable(value.callback, origin, phase, args);
+					visitEffectEventCallback(value.callback, origin, phase, args);
 				} finally {
 					collectEffectReads = enclosingCollectEffectReads;
-					effectEventDepth--;
 				}
 			}
 		} else if (value?.kind === 'setter') {
@@ -3747,6 +3749,24 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			if (phase === 'render' || phase === 'effect') reportSetter(origin, phase);
 		} else if (value?.kind === 'getter' && phase === 'render' && currentFunctionChecksRenderReads) {
 			reportStateGetterCall(origin);
+		}
+	}
+
+	function effectEventNodes(value, nodes = []) {
+		if (value?.kind === 'callback') nodes.push(value.node);
+		else if (value?.kind === 'callback-choice') {
+			for (const callback of value.values) effectEventNodes(callback, nodes);
+		}
+		return nodes;
+	}
+
+	function visitEffectEventCallback(value, origin, phase, args) {
+		const nodes = effectEventNodes(value).filter((node) => !effectEventFunctions.has(node));
+		for (const node of nodes) effectEventFunctions.add(node);
+		try {
+			visitCallable(value, origin, phase, args);
+		} finally {
+			for (const node of nodes) effectEventFunctions.delete(node);
 		}
 	}
 
@@ -4449,8 +4469,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					visitStateCallback(node, hook, pureCallbackIndex, updaterSetters, scope);
 				}
 				if (hook === null) {
-					if (executionPhase === 'deferred' && effectEventDepth === 0) {
-						statePolicy.checkStaleUpdate(callee, node.arguments, scope);
+					if (executionPhase === 'deferred') {
+						statePolicy.checkStaleUpdate(
+							callee,
+							node.arguments,
+							scope,
+							effectEventFunctions.has(currentFunction),
+						);
 					}
 					if (insidePureCallback && executionPhase === 'render') {
 						statePolicy.checkPureCall(callee, scope);
@@ -4602,12 +4627,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 							(executionPhase === 'deferred' && !effectEvent) ||
 							args?.some((value) => value?.kind === 'snapshot' || value?.kind === 'state-tuple')
 						) {
-							if (effectEvent) effectEventDepth++;
-							try {
-								visitCallable(callback, callee, executionPhase, args);
-							} finally {
-								if (effectEvent) effectEventDepth--;
-							}
+							if (effectEvent) visitEffectEventCallback(callback, callee, executionPhase, args);
+							else visitCallable(callback, callee, executionPhase, args);
 						}
 					}
 				}

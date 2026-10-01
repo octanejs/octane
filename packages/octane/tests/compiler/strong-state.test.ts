@@ -609,6 +609,14 @@ describe('Strong stale deferred state updates', () => {
 			`export function A({ load }) { const [items, setItems] = useState([]); useEffect(() => { (async () => { const item = await load(); setItems([...items, item]); })(); }); return <b>{items.length}</b>; }`,
 		],
 		[
+			'a snapshot passed to an Effect Event after await',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value + 1)); return <b onClick={async () => { await save(); apply(n); }}>{n}</b>; }`,
+		],
+		[
+			'a timer created inside an Effect Event',
+			`export function A() { const [n, setN] = useState(0); const later = useEffectEvent(() => { setTimeout(() => setN(n + 1), 100); }); useEffect(() => later()); return <b>{n}</b>; }`,
+		],
+		[
 			'a reducer dispatch after await',
 			`export function A({ save }) { const [s, d] = useReducer((s, a) => a, 0); return <b onClick={async () => { await save(); d(s + 1); }}>{s}</b>; }`,
 		],
@@ -687,8 +695,10 @@ describe('Strong stale deferred state updates', () => {
 				tsx(`export function A({ load }) {
   const [n, setN] = useState(0);
   const tick = useEffectEvent(() => setN(n + 1));
+  const step = useEffectEvent(() => { const next = n + 1; setN(next); });
   useEffect(() => {
     const id = setInterval(tick, 1000);
+    setTimeout(step, 500);
     load().then(() => tick());
     return () => clearInterval(id);
   });

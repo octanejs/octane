@@ -104,6 +104,7 @@ const STALE_REDUCER_MESSAGE =
  * @param {{
  *   report: (code: string, node: any, message: string) => void,
  *   resolve: (scope: any, name: string) => any,
+ *   resolveScope: (scope: any, name: string) => any,
  *   unwrap: (node: any) => any,
  *   createScope: (parent: any, kind: string, statements?: any[], params?: any[]) => any,
  *   snapshotBinding: (node: any, scope: any) => any,
@@ -119,6 +120,7 @@ export function createStrongStatePolicy(api) {
 	const {
 		report,
 		resolve,
+		resolveScope,
 		unwrap,
 		createScope,
 		snapshotBinding,
@@ -130,6 +132,7 @@ export function createStrongStatePolicy(api) {
 		hookOf,
 	} = api;
 	const asynchronousCallbacks = new WeakSet();
+	let freshCaptures = false;
 
 	function unshadowed(node, scope, names) {
 		const value = unwrap(node);
@@ -297,21 +300,44 @@ export function createStrongStatePolicy(api) {
 		},
 
 		/** Report a deferred setter or dispatch computed from its own render snapshot. */
-		checkStaleUpdate(callee, args, scope) {
-			for (const setter of setterValues(callableValue(callee, scope))) {
-				for (const argument of args ?? []) {
-					const read = readsState(argument, scope, setter.state, new Set());
-					if (read === null) continue;
-					report(
-						STRONG_STALE_STATE_UPDATE,
-						read,
-						hookOf(setter.state) === 'useReducer' ? STALE_REDUCER_MESSAGE : STALE_MESSAGE,
-					);
-					break;
+		checkStaleUpdate(callee, args, scope, insideEffectEvent = false) {
+			freshCaptures = insideEffectEvent;
+			try {
+				for (const setter of setterValues(callableValue(callee, scope))) {
+					for (const argument of args ?? []) {
+						const read = readsState(argument, scope, setter.state, new Set());
+						if (read === null) continue;
+						report(
+							STRONG_STALE_STATE_UPDATE,
+							read,
+							hookOf(setter.state) === 'useReducer' ? STALE_REDUCER_MESSAGE : STALE_MESSAGE,
+						);
+						break;
+					}
 				}
+			} finally {
+				freshCaptures = false;
 			}
 		},
 	};
+
+	// In an Effect Event's own body, state captured from the component is the
+	// latest committed value. A parameter can still carry a stale snapshot; a
+	// local derived inside the body is treated as current.
+	function freshRead(scope, name) {
+		if (!freshCaptures) return false;
+		if (resolve(scope, name)?.kind === 'derived-state') return true;
+		for (let current = resolveScope(scope, name); current != null; current = current.parent) {
+			if (current.effectEventBoundary === true) return false;
+		}
+		return true;
+	}
+
+	function memberRoot(node) {
+		let value = unwrap(node);
+		while (value?.type === 'MemberExpression') value = unwrap(value.object);
+		return value?.type === 'Identifier' ? value : null;
+	}
 
 	function readsBinding(binding, state, active) {
 		if (binding?.kind === 'snapshot') return binding.state === state;
@@ -392,13 +418,21 @@ export function createStrongStatePolicy(api) {
 		if (node == null || node.type?.startsWith('TS')) return null;
 		switch (node.type) {
 			case 'Identifier':
+				if (freshRead(scope, node.name)) return null;
 				return readsBinding(resolve(scope, node.name), state, active) ? node : null;
-			case 'MemberExpression':
-				if (snapshotBinding(node, scope)?.state === state) return node;
+			case 'MemberExpression': {
+				const root = memberRoot(node);
+				if (
+					snapshotBinding(node, scope)?.state === state &&
+					!(root !== null && freshRead(scope, root.name))
+				) {
+					return node;
+				}
 				return (
 					readsState(node.object, scope, state, active) ??
 					(node.computed ? readsState(node.property, scope, state, active) : null)
 				);
+			}
 			case 'Property':
 				return (
 					(node.computed ? readsState(node.key, scope, state, active) : null) ??
