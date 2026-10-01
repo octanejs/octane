@@ -2,6 +2,7 @@ import type { HydrationInteractionEvents, HydrationPrefetchStrategy } from './ty
 import {
 	HYDRATE_DEFAULT_INTERACTION_EVENTS,
 	HYDRATE_INTERACTION_EVENTS_ATTR,
+	isHydrationLifecycleEvent,
 } from './interaction-config.js';
 
 const interactionType = 'interaction';
@@ -29,8 +30,11 @@ export function interaction(
 			if (!callback) return;
 
 			const onIntent = () => callback();
+			// Pointer movement and cancellation only extend captured intent.
 			for (const eventName of events) {
-				element.addEventListener(eventName, onIntent, true);
+				if (!isHydrationLifecycleEvent(eventName)) {
+					element.addEventListener(eventName, onIntent, true);
+				}
 			}
 
 			return () => {
