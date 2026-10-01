@@ -305,6 +305,8 @@ async function validateCachedSemantics(compilers) {
 		'document',
 		'navigator',
 		'Node',
+		'Text',
+		'Comment',
 		'Element',
 		'HTMLElement',
 		'SVGElement',
