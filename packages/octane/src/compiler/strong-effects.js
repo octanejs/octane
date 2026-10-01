@@ -1277,20 +1277,28 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		hiddenDependency(node, kind) {
 			report(STRONG_EFFECT_HIDDEN_DEPENDENCY, node, HIDDEN_MESSAGES[kind]);
 		},
-		// The stable initializer of a `const` or `let` declared in the function
-		// that reads it: its temporal dead zone means the initializer already ran
-		// on the same path. A hoisted `var` may still be undefined.
+		// The stable initializer of a binding declared in the function that reads
+		// it, once that initializer has run on every path to the read: a `const`
+		// or `let` by its temporal dead zone, and a hoisted `var` only when it is
+		// declared directly in the function body above the read.
 		localInit(expression) {
 			const node = unwrap(expression);
 			if (node?.type !== 'Identifier') return null;
 			const scope = nodeScopes.get(node);
 			const binding = bindingOf(node);
 			if (scope === undefined || binding == null || binding.scope == null) return null;
-			const kind = declarator(binding)?.kind;
-			return (kind === 'const' || kind === 'let') &&
-				functionScopeOf(binding.scope) === functionScopeOf(scope)
-				? stableInit(binding)
-				: null;
+			const info = declarator(binding);
+			const fn = functionScopeOf(scope);
+			if (info === null || functionScopeOf(binding.scope) !== fn) return null;
+			if (info.kind === 'var') {
+				// The function body is a block scope directly inside the function scope.
+				const declScope = nodeScopes.get(info.decl);
+				const direct = declScope === fn || (declScope?.kind === 'block' && declScope.parent === fn);
+				if (!direct || node.start < info.decl.end) return null;
+			} else if (info.kind !== 'const' && info.kind !== 'let') {
+				return null;
+			}
+			return stableInit(binding);
 		},
 		// A provably known operand value, as `{ value }`, or null.
 		literal(expression) {

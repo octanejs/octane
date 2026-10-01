@@ -842,6 +842,10 @@ export function App(props) @{
 			`useEffect(() => { let active = true; (async () => { await ready; if (active) ${write}; var ready = props.flag ? await props.load() : props.pending; })(); return () => { active = false; }; });`,
 		],
 		[
+			'an await of a var declared in a branch above it',
+			`useEffect(() => { let active = true; (async () => { if (props.ready) { var ready = props.flag ? await props.load() : props.pending; } await ready; if (active) ${write}; })(); return () => { active = false; }; });`,
+		],
+		[
 			'an await of a hoisted var holding pending work',
 			`useEffect(() => { let active = true; (async () => { await ready; if (active) ${write}; var ready = props.pending; })(); return () => { active = false; }; });`,
 		],
@@ -904,6 +908,10 @@ export function App(props) @{
 		[
 			'an await of a var declared above it',
 			`useEffect(() => { let active = true; (async () => { var ready = props.pending; await ready; if (active) ${write}; })(); return () => { active = false; }; });`,
+		],
+		[
+			'a stored var await whose every branch waits',
+			`useEffect(() => { let active = true; (async () => { var ready = props.flag ? await props.load() : props.pending; await ready; if (active) ${write}; })(); return () => { active = false; }; });`,
 		],
 		[
 			'an await of each var in a loop',
