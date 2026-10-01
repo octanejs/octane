@@ -857,6 +857,13 @@ These patterns become compile errors:
   effect, unless the returned cleanup aborts the request's `AbortController` or
   sets a flag the update checks (`OCTANE_STRONG_EFFECT_DATA_FETCH`). Read
   asynchronous render data with `use()` or a query binding.
+- Calling a state getter, reading `current` from a ref that is never attached or
+  passed anywhere, or reading a reassigned module variable in synchronous effect
+  setup (`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`). Read the render snapshot, or
+  move the non-reactive read into a `useEffectEvent` callback.
+- Adding a platform event listener, interval, observer, connection, or
+  geolocation watch in effect setup without releasing it in the returned cleanup
+  (`OCTANE_STRONG_EFFECT_RESOURCE_LEAK`).
 - Calling a known third-tuple state getter during render
   (`OCTANE_STRONG_RENDER_STATE_GETTER_CALL`). Render from the first tuple member;
   read the latest scheduled state in an event, effect, or deferred callback.
@@ -873,6 +880,13 @@ These patterns become compile errors:
 - Reading a `useRef` object's `current` during render
   (`OCTANE_STRONG_RENDER_REF_READ`). Pass the ref to a `ref` prop as usual; read
   its current value in an event or effect, or use state for render output.
+- Writing through a ref to children, a class, an attribute, or a `style`
+  property that the template renders on that element
+  (`OCTANE_STRONG_MANAGED_DOM_WRITE`), or writing raw HTML to an element Octane
+  renders (`OCTANE_STRONG_RAW_HTML_WRITE`). Render the value in the template, or
+  use `dangerouslySetInnerHTML={trustHTML(html)}`.
+- Querying the document for a literal `id` or class that the same component
+  renders (`OCTANE_STRONG_OWN_MARKUP_QUERY`). Attach a ref instead.
 - Calling a statically known `useEffectEvent` result during render
   (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
 - Including a statically known Effect Event in an explicit hook dependency list
@@ -901,8 +915,15 @@ These patterns become compile errors:
   (`OCTANE_STRONG_RETAINED_ROW_MUTATION`). Fresh scratch data built in ordinary
   setup or owned entirely by one row remains valid.
 - Calling unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`,
-  or `new Date()` without arguments during render
-  (`OCTANE_STRONG_RENDER_IMPURE_CALL`).
+  `new Date()` without arguments, `crypto.randomUUID()`, or
+  `crypto.getRandomValues()` during render (`OCTANE_STRONG_RENDER_IMPURE_CALL`).
+  Callbacks that known array methods such as `map`, `filter`, `forEach`, and
+  `sort` run synchronously are part of render. Use `useId()` for element IDs and
+  a stable item ID for keys.
+- Formatting a provable `Date` with a runtime locale or time zone during render,
+  or constructing an `Intl` formatter without an explicit locale (and, for
+  `DateTimeFormat`, a `timeZone`) (`OCTANE_STRONG_RENDER_LOCALE_FORMAT`). Server
+  and browser output would differ.
 - Declaring a built-in hook value outside the sole nested `@{…}` block that
   uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
 - Declaring a named callback outside the sole nested `@{…}` block containing
@@ -1083,9 +1104,10 @@ including statically selected or spread literals; they do not assume an aliased
 or externally produced array is unchanged.
 
 Update state in event handlers instead. When state should reset or adjust after
-an input changes, use `useLinkedState`. Effects that connect to external systems,
-genuinely deferred callbacks, effect cleanup, and refs used for DOM elements,
-timers, or event callbacks remain valid. Obtain changing timestamps or random
+an input changes, use `useLinkedState`. Effects that connect to external systems
+and release what they acquire, genuinely deferred callbacks, effect cleanup, and
+refs attached to DOM elements remain valid. Refs that hold timers or callbacks
+remain valid in events, cleanup, deferred callbacks, and Effect Events. Obtain changing timestamps or random
 values in events or effects and put them in state. A lazy state initializer such
 as `useState(() => new Date())` may also capture the initial value.
 
