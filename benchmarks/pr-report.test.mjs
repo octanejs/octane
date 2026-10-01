@@ -60,6 +60,17 @@ test('runner drift across base, head, head, base rounds cancels out', () => {
 	assert.equal(compareSuite('js-framework', base, head).timing[0].verdict, 'within noise');
 });
 
+// A base harness that predates `score` must not turn every timing change into a red size row.
+test('a timing operation stays a timing row when only one side carries a score', () => {
+	const base = suite('js-framework', [
+		{ name: 'octane-tsrx', ops: { run: { median: 10, min: 9, samples: 3 } } },
+	]);
+	const head = suite('js-framework', [{ name: 'octane-tsrx', ops: { run: timed(10.5, 9.5, 3) } }]);
+	const { deterministic, timing } = compareSuite('js-framework', base, head);
+	assert.equal(deterministic.length, 0);
+	assert.equal(timing[0].verdict, 'within noise');
+});
+
 test('a failed round fails the merged suite', () => {
 	const ok = suite('js-framework', [{ name: 'octane-tsrx', ops: { run: timed(10, 9, 3) } }]);
 	assert.equal(mergeRounds([ok, { ...ok, harnessExit: 1, failed: 'gate' }]).failed, 'gate');
@@ -91,7 +102,7 @@ test('timing verdicts never turn the headline red', () => {
 	assert.doesNotMatch(body, /🔴/);
 });
 
-test('the report flags regressions and failed pull request suites', () => {
+test('a suite that failed on the pull request is reported with its error', () => {
 	const base = {
 		'js-framework': suite('js-framework', [{ name: 'octane-tsrx', ops: { run: timed(10, 9, 2) } }]),
 		'bundle-size': suite('bundle-size', [{ name: 'octane-tsrx', ops: { js_gzip: bytes(1000) } }]),

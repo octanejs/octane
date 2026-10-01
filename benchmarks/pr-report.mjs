@@ -72,7 +72,7 @@ export function compareSuite(suite, base, head) {
 			}
 			const percent = before === 0 ? 0 : ((after - before) / before) * 100;
 			const row = { target: target.name, op, before, after, percent };
-			if (isTiming(headStat) && isTiming(baseStat)) {
+			if (isTiming(headStat) || isTiming(baseStat)) {
 				const noise = Math.max(TIMING_FLOOR_PERCENT, Math.hypot(rmeOf(baseStat), rmeOf(headStat)));
 				const resolvable = Math.abs(after - before) > TIMER_TICK_MS;
 				const verdict = !resolvable
