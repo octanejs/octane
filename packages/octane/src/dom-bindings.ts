@@ -700,7 +700,7 @@ export function __adoptBindings<Props>(
 			if (next[i] === previous[i]) continue;
 			const binding = bindings[i]!;
 			if (binding[1] === 'classToken') previous[i] = next[i]!;
-			let written: string | null | void;
+			let written: string | null | void = undefined;
 			if (binding[1] === 'styleObject') {
 				const projection = projections?.get(i);
 				if (projection) projection.writeStyle(i, next[i]!);
