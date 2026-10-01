@@ -77,6 +77,7 @@ function Content() @{
 		const scope = createScope({ scopeKey: 'controlled-widget-' + dev + '-' + primary });
 		const draft$ = scope.signal$('draft', '');
 		const sent: string[] = [];
+		const sentTimeStamps: number[] = [];
 		const sentAfterLayout: boolean[] = [];
 		let committed = false;
 		let waiting = primary !== 'ready';
@@ -91,8 +92,9 @@ function Content() @{
 			layout() {
 				committed = true;
 			},
-			send() {
+			send(event: MouseEvent) {
 				sent.push(scope.get(draft$));
+				sentTimeStamps.push(event.timeStamp);
 				sentAfterLayout.push(committed);
 				scope.set(draft$, '');
 			},
@@ -146,7 +148,10 @@ function Content() @{
 			input.value = 'entered before activation';
 			scope.set(draft$, input.value);
 			input.dispatchEvent(new InputEvent('input', { bubbles: true }));
-			host.querySelector('button')!.click();
+			const click = new MouseEvent('click', { bubbles: true, cancelable: true, composed: true });
+			// The replayed command must still report when the user clicked.
+			Object.defineProperty(click, 'timeStamp', { value: 12.5 });
+			host.querySelector('button')!.dispatchEvent(click);
 			release();
 			await vi.waitFor(() => expect(waitStarted).toBe(true));
 			if (primary !== 'ready') {
@@ -164,6 +169,7 @@ function Content() @{
 				}
 			}
 			await vi.waitFor(() => expect(sent).toEqual(['entered before activation']));
+			expect(sentTimeStamps).toEqual([12.5]);
 			await settle();
 			expect(scope.get(draft$)).toBe('');
 			expect(input.value).toBe('');

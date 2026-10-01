@@ -278,6 +278,14 @@ describe.sequential('Chromium IME and touch-emulation replay', () => {
 				]),
 			);
 			expect(hydrated.trustedEvents.some((event) => event.type === 'compositionend')).toBe(false);
+			// Each replay keeps the clock of the trusted input it stands in for.
+			for (const replayed of hydrated.handledEvents.filter((event) => !event.isTrusted)) {
+				const original = pending.trustedEvents.find(
+					(event) => event.type === replayed.type && event.data === replayed.data,
+				);
+				expect(original).toBeDefined();
+				expect(replayed.timeStamp).toBe(original!.timeStamp);
+			}
 
 			await cdp.send('Input.imeSetComposition', {
 				text: '한국',
