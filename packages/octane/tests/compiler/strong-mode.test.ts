@@ -19,6 +19,7 @@ const DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
 const HOOK_LOCALITY = 'OCTANE_STRONG_HOOK_LOCALITY';
 const EVENT_HANDLER_LOCALITY = 'OCTANE_STRONG_EVENT_HANDLER_LOCALITY';
 const MANUAL_MEMO = 'OCTANE_STRONG_MANUAL_MEMO';
+const EFFECT_DATA_FETCH = 'OCTANE_STRONG_EFFECT_DATA_FETCH';
 
 describe('Strong mode immutable render inputs', () => {
 	const component = (
@@ -372,6 +373,32 @@ export function Counter() @{
   ${setup}
   <button onClick={() => setCount(count + 1)}>{count as string}</button>
 }`;
+}
+
+// Inside an effect, awaiting a settled promise resumes before the next paint,
+// so it is still setup. Effect variants of the yield matrices await a pending
+// load instead; an update after that yield is an asynchronous continuation.
+function pending(body: string): string {
+	return body.replaceAll('Promise.resolve(', 'load(');
+}
+
+function pendingEffectComponent(effect: string): string {
+	return `import { load } from './load';\n${stateComponent(effect, 'useState, useEffect')}`;
+}
+
+function expectYieldedUpdates(body: string) {
+	const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
+	const effect = `"use strong";\n${pendingEffectComponent(
+		`useEffect(() => { (async () => { ${pending(body)} })(); });`,
+	)}`;
+	const asyncEffect = `"use strong";\n${pendingEffectComponent(
+		`useEffect(async () => { ${pending(body)} });`,
+	)}`;
+
+	expect(() => compile(render, '/src/Counter.tsrx')).not.toThrow();
+	// Deferred, so not a setup update; uncancelled, so it needs cleanup.
+	expect(() => compile(effect, '/src/Counter.tsrx')).toThrow(EFFECT_DATA_FETCH);
+	expect(() => compile(asyncEffect, '/src/Counter.tsrx')).toThrow(EFFECT_DATA_FETCH);
 }
 
 describe('Strong mode template locality', () => {
@@ -3120,6 +3147,7 @@ export function App() @{
 	it('keeps selected callbacks legal after async render and effect work has yielded', () => {
 		const source = `"use strong";
 import { useEffect, useState } from 'octane';
+import { load } from './load';
 export function App(props) @{
   const [count, setCount] = useState(0);
   (async () => {
@@ -3129,10 +3157,12 @@ export function App(props) @{
     (props.enabled ? setCount : () => {})(1);
   })();
   useEffect(() => {
+    const controller = new AbortController();
     (async () => {
-      await Promise.resolve();
+      await load(controller.signal);
       (props.trace, setCount)(1);
     })();
+    return () => controller.abort();
   });
   <div>{count as string}</div>
 }`;
@@ -3140,11 +3170,11 @@ export function App(props) @{
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
-	it('allows cleanup callbacks and asynchronous state updates from effects', () => {
+	it('allows cleanup callbacks and deferred state updates from effects', () => {
 		const source = `"use strong";\n${stateComponent(
 			`useEffect(() => {
-      setTimeout(() => setCount((current) => current + 1), 0);
-      Promise.resolve().then(() => setCount((current) => current + 1));
+      setTimeout(() => setCount((current) => current + 1), 100);
+      requestAnimationFrame(() => setCount((current) => current + 1));
       return () => setCount(count + 1);
     });`,
 			'useState, useEffect',
@@ -3153,10 +3183,21 @@ export function App(props) @{
 		expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
 	});
 
-	it('allows state updates after an async function has yielded', () => {
-		const effect = `"use strong";\n${stateComponent(
-			'useEffect(() => { (async () => { await Promise.resolve(); setCount(1); })(); });',
+	it('treats zero-delay effect callbacks as setup', () => {
+		const source = `"use strong";\n${stateComponent(
+			`useEffect(() => {
+      setTimeout(() => setCount((current) => current + 1), 0);
+      Promise.resolve().then(() => setCount((current) => current + 1));
+    });`,
 			'useState, useEffect',
+		)}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx')).toThrow(EFFECT_STATE_UPDATE);
+	});
+
+	it('allows state updates after an async function has yielded', () => {
+		const effect = `"use strong";\n${pendingEffectComponent(
+			'useEffect(() => { const controller = new AbortController(); (async () => { await load(controller.signal); setCount(1); })(); return () => controller.abort(); });',
 		)}`;
 		const render = `"use strong";\n${stateComponent(
 			'(async () => { await Promise.resolve(); setCount(1); })();',
@@ -3167,9 +3208,8 @@ export function App(props) @{
 		const awaitedArgument = `"use strong";\n${stateComponent(
 			'(async () => { setCount(await Promise.resolve(1)); })();',
 		)}`;
-		const effectAwaitedArgument = `"use strong";\n${stateComponent(
-			'useEffect(() => { (async () => { setCount(await Promise.resolve(1)); })(); });',
-			'useState, useEffect',
+		const effectAwaitedArgument = `"use strong";\n${pendingEffectComponent(
+			'useEffect(() => { let active = true; (async () => { const next = await load(1); if (active) setCount(next); })(); return () => { active = false; }; });',
 		)}`;
 		const conditional = `"use strong";\n${stateComponent(
 			'(async () => { if (false) await Promise.resolve(); setCount(1); })();',
@@ -3234,19 +3274,7 @@ export function App(props) @{
 			'try {} finally { await Promise.resolve(); } setCount(1);',
 		],
 	])('allows updates after guaranteed awaits in nested %s', (_label, body) => {
-		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
-		const effect = `"use strong";\n${stateComponent(
-			`useEffect(() => { (async () => { ${body} })(); });`,
-			'useState, useEffect',
-		)}`;
-		const asyncEffect = `"use strong";\n${stateComponent(
-			`useEffect(async () => { ${body} });`,
-			'useState, useEffect',
-		)}`;
-
-		for (const source of [render, effect, asyncEffect]) {
-			expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
-		}
+		expectYieldedUpdates(body);
 	});
 
 	it.each([
@@ -3374,19 +3402,7 @@ export function App(props) @{
 			'let value; [value = setCount(1)] = await Promise.resolve([]);',
 		],
 	])('allows expression updates after guaranteed yields in %s', (_label, body) => {
-		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
-		const effect = `"use strong";\n${stateComponent(
-			`useEffect(() => { (async () => { ${body} })(); });`,
-			'useState, useEffect',
-		)}`;
-		const asyncEffect = `"use strong";\n${stateComponent(
-			`useEffect(async () => { ${body} });`,
-			'useState, useEffect',
-		)}`;
-
-		for (const source of [render, effect, asyncEffect]) {
-			expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
-		}
+		expectYieldedUpdates(body);
 	});
 
 	it.each([
@@ -3480,9 +3496,8 @@ export function App(props) @{
 		['inline constructors invoked before an await', 'new (function Update() { setCount(1); })();'],
 	])('still rejects expression updates in %s', (_label, body) => {
 		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
-		const effect = `"use strong";\n${stateComponent(
-			`useEffect(async () => { ${body} });`,
-			'useState, useEffect',
+		const effect = `"use strong";\n${pendingEffectComponent(
+			`useEffect(async () => { ${pending(body)} });`,
 		)}`;
 
 		expect(() => compile(render, '/src/Counter.tsrx')).toThrow(RENDER_STATE_UPDATE);
@@ -3569,9 +3584,8 @@ export function App(props) @{
 		],
 	])('still rejects %s', (_label, body) => {
 		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
-		const effect = `"use strong";\n${stateComponent(
-			`useEffect(async () => { ${body} });`,
-			'useState, useEffect',
+		const effect = `"use strong";\n${pendingEffectComponent(
+			`useEffect(async () => { ${pending(body)} });`,
 		)}`;
 
 		expect(() => compile(render, '/src/Counter.tsrx')).toThrow(RENDER_STATE_UPDATE);
@@ -3725,19 +3739,7 @@ export function App(props) @{
 			'for (let index = 0; index < 1; setCount(await Promise.resolve(++index))) {}',
 		],
 	])('allows updates after guaranteed yields in %s', (_label, body) => {
-		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
-		const effect = `"use strong";\n${stateComponent(
-			`useEffect(() => { (async () => { ${body} })(); });`,
-			'useState, useEffect',
-		)}`;
-		const asyncEffect = `"use strong";\n${stateComponent(
-			`useEffect(async () => { ${body} });`,
-			'useState, useEffect',
-		)}`;
-
-		for (const source of [render, effect, asyncEffect]) {
-			expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
-		}
+		expectYieldedUpdates(body);
 	});
 
 	it.each([
@@ -3859,9 +3861,8 @@ export function App(props) @{
 		],
 	])('still rejects updates in %s', (_label, body) => {
 		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
-		const effect = `"use strong";\n${stateComponent(
-			`useEffect(async () => { ${body} });`,
-			'useState, useEffect',
+		const effect = `"use strong";\n${pendingEffectComponent(
+			`useEffect(async () => { ${pending(body)} });`,
 		)}`;
 
 		expect(() => compile(render, '/src/Counter.tsrx')).toThrow(RENDER_STATE_UPDATE);
@@ -3903,43 +3904,45 @@ export function App() @{
 		expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
 	});
 
+	// A cancellable effect: its async work awaits loads that receive the
+	// controller's signal, and the returned cleanup aborts them.
+	const cancellable = (body: string) => `useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+    (async () => { ${body} })();
+    return () => controller.abort();
+  });`;
+	const cancellableHook = (body: string) => `"use strong";
+import { useEffect, useState } from 'octane';
+import { load } from './load';
+export function useCounter() {
+  const [count, setCount] = useState(0);
+  ${cancellable(body)}
+  return count;
+}`;
+	const loopBody =
+		'for await (const value of load(signal)) { setCount(value); } for (const value of await load(signal, [])) {} setCount((current) => current + 1);';
+	const nestedBody =
+		'try { const delta = await load(signal, 1); setCount((current) => current + delta); } catch { await load(signal); setCount(0); }';
+	const expressionBody =
+		'(await load(signal, count > 0)) ? setCount(1) : setCount(2); load(signal, await load(signal, count), setCount(3)); const { value = setCount(4) } = await load(signal, {});';
+
 	it.each([
 		{ mode: 'client', dev: true },
 		{ mode: 'client', dev: false },
 		{ mode: 'server', dev: true },
 		{ mode: 'server', dev: false },
 	])('preserves yielding loop heads during $mode compilation with dev=$dev', (options) => {
-		const source = `"use strong";\n${stateComponent(
-			`useEffect(async () => {
-      for await (const value of [count]) {
-        setCount(value);
-      }
-      for (const value of await Promise.resolve([])) {}
-      setCount((current) => current + 1);
-    });`,
-			'useState, useEffect',
-		)}`;
+		const source = `"use strong";\n${pendingEffectComponent(cancellable(loopBody))}`;
 
 		expect(() => compile(source, '/src/Counter.tsrx', options)).not.toThrow();
 	});
 
 	it('applies yielding loop rules to plain TypeScript custom hooks', () => {
-		const source = `"use strong";
-import { useEffect, useState } from 'octane';
-export function useCounter() {
-  const [count, setCount] = useState(0);
-  useEffect(async () => {
-    for await (const value of [count]) {
-      setCount(value);
-    }
-    for (const value of await Promise.resolve([])) {}
-    setCount((current) => current + 1);
-  });
-  return count;
-}`;
+		const source = cancellableHook(loopBody);
 		const synchronous = source.replace(
-			'for await (const value of [count])',
-			'for await (const value of (setCount(count + 1), [count]))',
+			'for await (const value of load(signal))',
+			'for await (const value of (setCount(count + 1), load(signal)))',
 		);
 
 		expect(() => slotHooks(source, '/src/useCounter.ts')).not.toThrow();
@@ -3947,17 +3950,12 @@ export function useCounter() {
 	});
 
 	it('publishes editor errors only for synchronous updates in yielding loops', () => {
-		const source = `"use strong";\n${stateComponent(
-			`useEffect(async () => {
-      for await (const value of [count]) {
-        setCount(value);
-      }
-    });`,
-			'useState, useEffect',
+		const source = `"use strong";\n${pendingEffectComponent(
+			cancellable('for await (const value of load(signal)) { setCount(value); }'),
 		)}`;
 		const synchronous = source.replace(
-			'for await (const value of [count])',
-			'for await (const value of (setCount(count + 1), [count]))',
+			'for await (const value of load(signal))',
+			'for await (const value of (setCount(count + 1), load(signal)))',
 		);
 		const valid = compileToVolarMappings(source, '/src/Counter.tsrx');
 		const rejected = compileToVolarMappings(synchronous, '/src/Counter.tsrx');
@@ -3978,45 +3976,16 @@ export function useCounter() {
 		{ mode: 'server', dev: true },
 		{ mode: 'server', dev: false },
 	])('preserves nested async effect updates during $mode compilation with dev=$dev', (options) => {
-		const source = `"use strong";\n${stateComponent(
-			`useEffect(() => {
-      (async () => {
-        try {
-          const delta = await Promise.resolve(1);
-          setCount((current) => current + delta);
-        } catch {
-          await Promise.resolve();
-          setCount(0);
-        }
-      })();
-    });`,
-			'useState, useEffect',
-		)}`;
+		const source = `"use strong";\n${pendingEffectComponent(cancellable(nestedBody))}`;
 
 		expect(() => compile(source, '/src/Counter.tsrx', options)).not.toThrow();
 	});
 
 	it('accepts nested async effect updates in plain TypeScript custom hooks', () => {
-		const source = `"use strong";
-import { useEffect, useState } from 'octane';
-export function useCounter() {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    (async () => {
-      try {
-        const delta = await Promise.resolve(1);
-        setCount((current) => current + delta);
-      } catch {
-        await Promise.resolve();
-        setCount(0);
-      }
-    })();
-  });
-  return count;
-}`;
+		const source = cancellableHook(nestedBody);
 		const synchronous = source.replace(
-			'const delta = await Promise.resolve(1);\n        setCount((current) => current + delta);',
-			'setCount(count + 1);\n        await Promise.resolve();',
+			'const delta = await load(signal, 1); setCount((current) => current + delta);',
+			'setCount(count + 1); await load(signal);',
 		);
 
 		expect(() => slotHooks(source, '/src/useCounter.ts')).not.toThrow();
@@ -4024,24 +3993,18 @@ export function useCounter() {
 	});
 
 	it('does not publish editor errors for legitimately deferred nested async updates', () => {
-		const source = `"use strong";\n${stateComponent(
-			`useEffect(async () => {
-      try {
-        const delta = await Promise.resolve(1);
-        setCount((current) => current + delta);
-      } catch {
-        await Promise.resolve();
-        setCount(0);
-      }
-    });`,
-			'useState, useEffect',
-		)}`;
+		const source = `"use strong";\n${pendingEffectComponent(cancellable(nestedBody))}`;
 		const result = compileToVolarMappings(source, '/src/Counter.tsrx');
 		const synchronous = source.replace(
-			'const delta = await Promise.resolve(1);\n        setCount((current) => current + delta);',
-			'setCount(count + 1);\n        await Promise.resolve();',
+			'const delta = await load(signal, 1); setCount((current) => current + delta);',
+			'setCount(count + 1); await load(signal);',
 		);
 		const rejected = compileToVolarMappings(synchronous, '/src/Counter.tsrx');
+		// An async effect callback returns a promise, so it cannot cancel its updates.
+		const uncancellable = compileToVolarMappings(
+			`"use strong";\n${pendingEffectComponent(`useEffect(async () => { ${pending('const next = await Promise.resolve(1); setCount((current) => current + next);')} });`)}`,
+			'/src/Counter.tsrx',
+		);
 
 		expect(result.diagnostics).toEqual([]);
 		expect(result.errors).toEqual([]);
@@ -4051,6 +4014,9 @@ export function useCounter() {
 		expect(rejected.errors).toContainEqual(
 			expect.objectContaining({ code: EFFECT_STATE_UPDATE, type: 'usage' }),
 		);
+		expect(uncancellable.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			EFFECT_DATA_FETCH,
+		]);
 	});
 
 	it.each([
@@ -4061,33 +4027,17 @@ export function useCounter() {
 	])(
 		'preserves yielded expression evaluation during $mode compilation with dev=$dev',
 		(options) => {
-			const source = `"use strong";\n${stateComponent(
-				`useEffect(async () => {
-      (await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);
-      Promise.resolve(await Promise.resolve(count), setCount(3));
-      const { value = setCount(4) } = await Promise.resolve({});
-    });`,
-				'useState, useEffect',
-			)}`;
+			const source = `"use strong";\n${pendingEffectComponent(cancellable(expressionBody))}`;
 
 			expect(() => compile(source, '/src/Counter.tsrx', options)).not.toThrow();
 		},
 	);
 
 	it('applies yielded expression ordering to plain TypeScript custom hooks', () => {
-		const source = `"use strong";
-import { useEffect, useState } from 'octane';
-export function useCounter() {
-  const [count, setCount] = useState(0);
-  useEffect(async () => {
-    (await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);
-    Promise.resolve(await Promise.resolve(count), setCount(3));
-  });
-  return count;
-}`;
+		const source = cancellableHook(expressionBody);
 		const synchronous = source.replace(
-			'(await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);',
-			'count > 0 ? setCount(1) : await Promise.resolve(count);',
+			'(await load(signal, count > 0)) ? setCount(1) : setCount(2);',
+			'count > 0 ? setCount(1) : await load(signal, count);',
 		);
 
 		expect(() => slotHooks(source, '/src/useCounter.ts')).not.toThrow();
@@ -4095,15 +4045,12 @@ export function useCounter() {
 	});
 
 	it('publishes editor errors only for synchronously evaluated expression updates', () => {
-		const source = `"use strong";\n${stateComponent(
-			`useEffect(async () => {
-      (await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);
-    });`,
-			'useState, useEffect',
+		const source = `"use strong";\n${pendingEffectComponent(
+			cancellable('(await load(signal, count > 0)) ? setCount(1) : setCount(2);'),
 		)}`;
 		const synchronous = source.replace(
-			'(await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);',
-			'count > 0 ? setCount(1) : await Promise.resolve(count);',
+			'(await load(signal, count > 0)) ? setCount(1) : setCount(2);',
+			'count > 0 ? setCount(1) : await load(signal, count);',
 		);
 		const valid = compileToVolarMappings(source, '/src/Counter.tsrx');
 		const rejected = compileToVolarMappings(synchronous, '/src/Counter.tsrx');
@@ -5745,8 +5692,8 @@ export function App(props) @{
   const memoized = () => setCount((current) => current + 1);
   useEffect(() => {
     props.subscribe(update);
-    setTimeout(event, 0);
-    queueMicrotask(memoized);
+    setTimeout(event, 100);
+    requestAnimationFrame(memoized);
     return () => { update(); event(); memoized(); };
   });
   useEffect(() => { ref.current = count; });
@@ -5762,10 +5709,17 @@ export function App(props) @{
   const memoized = () => setCount(1);
   (async () => { await Promise.resolve(); update(); event(); memoized(); })();
   useEffect(() => {
-    (async () => { await Promise.resolve(); update(); event(); memoized(); })();
+    const controller = new AbortController();
+    (async () => { await load(controller.signal); update(); event(); memoized(); })();
+    return () => controller.abort();
   });`;
 
-		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+		expect(() =>
+			compile(
+				`"use strong";\nimport { load } from './load';\n${component(setup)}`,
+				'/src/App.tsrx',
+			),
+		).not.toThrow();
 	});
 
 	it('does not execute a factory-returned callback until the result is invoked', () => {
@@ -6100,7 +6054,7 @@ export function App(props) @{
 		],
 		[
 			'asynchronous callbacks after yielding',
-			'const update = async () => { await Promise.resolve(); setCount(1); }; useEffect(() => { update(); });',
+			'const update = async (signal) => { await props.load(signal); setCount(1); }; useEffect(() => { const controller = new AbortController(); update(controller.signal); return () => controller.abort(); });',
 		],
 		[
 			'optional calls after yielding',

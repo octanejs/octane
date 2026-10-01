@@ -776,13 +776,14 @@ describe('Strong stale deferred state updates', () => {
   const viaImmediateCall = useEffectEvent(() => { (() => setN(n + 1))(); });
   const apply = useEffectEvent((value) => setN(value));
   useEffect(() => {
+    let active = true;
     const id = setInterval(tick, 1000);
     setTimeout(step, 500);
     setTimeout(viaHelper, 500);
     setTimeout(viaCapturedArgument, 500);
     setTimeout(viaImmediateCall, 500);
-    load().then(() => tick());
-    return () => clearInterval(id);
+    load().then(() => { if (active) tick(); });
+    return () => { active = false; clearInterval(id); };
   });
   return <b onClick={() => { apply(n + 1); set(n + 1); setTimeout(() => tick(), 100); }}>{n}</b>;
 }`),

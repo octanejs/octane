@@ -233,7 +233,14 @@ Strong `.tsx` modules retain standard keyed JSX mapping.
 A Strong module cannot:
 
 - Call a state setter or reducer dispatcher while rendering.
-- Call one synchronously while an effect is being set up.
+- Call one synchronously while an effect is being set up
+  (`OCTANE_STRONG_EFFECT_STATE_UPDATE`), including through a same-module custom
+  hook's returned updater and through `startTransition`, a `useTransition` start
+  function, `queueMicrotask`, `Promise.resolve().then`, a zero-delay
+  `setTimeout`, or awaiting a non-promise.
+- Update state after an `await` or promise callback in an effect unless the
+  returned cleanup aborts the request's `AbortController` or sets a flag the
+  update checks (`OCTANE_STRONG_EFFECT_DATA_FETCH`).
 - Call a known third-tuple state getter while rendering
   (`OCTANE_STRONG_RENDER_STATE_GETTER_CALL`). Render from the state snapshot;
   use the getter in events, effects, or deferred work.

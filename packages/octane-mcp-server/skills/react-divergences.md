@@ -37,8 +37,13 @@ Ordinary two-item destructures keep the allocation-free React shape.
 Strong modules use inferred dependencies and automatic memoization: omit effect
 dependency arguments, and replace `useMemo` / `useCallback` with normal const
 calculations / callbacks. Equivalent explicit arrays are hints; conflicting
-arrays and `null` are errors. Avoid fetch-to-state effects without cleanup and
-chains of effects linked by state. Use `useLinkedState` for prop-driven state;
+arrays and `null` are errors. Avoid chains of effects linked by state. An effect
+may not update state synchronously, including through `startTransition`,
+`queueMicrotask`, a settled promise, a zero-delay timer, or an await of a
+non-promise (`OCTANE_STRONG_EFFECT_STATE_UPDATE`). A state update after an
+`await` or promise callback needs cleanup that aborts the request's
+`AbortController` or sets a flag the update checks
+(`OCTANE_STRONG_EFFECT_DATA_FETCH`). Use `useLinkedState` for prop-driven state;
 use a lazy `useState` initializer or an explicit third `useReducer` initializer
 for deliberate initial capture. In `.tsrx`, render lists
 with keyed `@for` and stable item IDs, never position keys. Strong `.tsx` keeps
