@@ -1017,16 +1017,30 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 			}
 		}
 		if (owner === undefined || owner.documentOwner !== documentOwner) {
-			const identity = {
+			const instanceKey = resolveSignalInstanceKey(scope);
+			const signalSite = scope.block.forSlot?.signalSite;
+			const identity: {
+				scopeKey: string;
+				documentOwner: SignalOwner;
+				instanceOwner: object;
+				instanceKey: string;
+				enclosingOwner?: SignalRendererOwnerIdentity;
+			} = {
 				scopeKey: documentOwner.scopeKey,
 				documentOwner,
 				instanceOwner: scope as object,
 				instanceKey:
-					resolveSignalInstanceKey(scope) ??
-					(scope.block.forSlot?.signalSite !== undefined
-						? structuralSignalInstanceKey(scope, scope.block.forSlot.signalSite, undefined, false)
+					instanceKey ??
+					(signalSite !== undefined
+						? structuralSignalInstanceKey(scope, signalSite, undefined, false)
 						: rootSignalInstanceKey(ids)),
 			};
+			// Directive arms and inline rows own only the declarations they evaluate,
+			// and retire them on removal. A captured declaration of the enclosing
+			// component still resolves to that component's cell.
+			const parent = instanceKey === undefined ? (scope.parent ?? scope.block.parentBlock) : null;
+			if (parent !== null && !(parent instanceof LiteBlockImpl))
+				identity.enclosingOwner = scopeSignalOwner(parent) as SignalRendererOwnerIdentity;
 			// A retry owner must not keep an abandoned renderer tree alive. This
 			// existing opaque identity object is also its own facade-state token.
 			identity.instanceOwner = identity;
