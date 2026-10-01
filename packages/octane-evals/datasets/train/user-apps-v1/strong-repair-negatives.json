@@ -32,7 +32,7 @@
   "octane.strong-sorted-tags/mutating-updater": "rejected-by-strong",
   "octane.strong-user-fetch/api-client": "compiles-keeps-bug",
   "octane.strong-user-fetch/empty-cleanup": "compiles-keeps-bug",
-  "octane.strong-viewport-width/fresh-snapshot": "compiles-keeps-bug",
+  "octane.strong-viewport-width/fresh-snapshot": "rejected-by-strong",
   "octane.strong-viewport-width/interval-without-clear": "compiles-keeps-bug",
   "octane.strong-viewport-width/listener-without-cleanup": "compiles-keeps-bug",
   "octane.strong-viewport-width/optional-window": "compiles-keeps-bug",
