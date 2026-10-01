@@ -11,8 +11,8 @@
     "start": "node serve.mjs"
   },
   "dependencies": {
-    "@tanstack/react-router": "1.170.18",
-    "@tanstack/react-start": "1.168.28",
+    "@tanstack/react-router": "1.170.41",
+    "@tanstack/react-start": "1.168.60",
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "srvx": "^0.11.22"
