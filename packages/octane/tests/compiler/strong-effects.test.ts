@@ -340,6 +340,19 @@ useEffect(() => { const controller = new AbortController(); load(controller, set
 		);
 	});
 
+	it.each([
+		'api.get(props.controller)',
+		'api.get({ controller: props.id })',
+		'api.get({ signal: props.signal })',
+	])('ignores a name that only spells a controller or signal: %s', (request) => {
+		rejects(
+			app(
+				`useEffect(() => { const controller = new AbortController(); const { signal } = controller; ${request}.then(setData); return () => controller.abort(); });`,
+			),
+			FETCH,
+		);
+	});
+
 	it('names the replacement for async effect callbacks', () => {
 		const result = compileToVolarMappings(
 			app(`useEffect(async () => { setData(await api.get(props.id)); });`),
