@@ -12758,7 +12758,9 @@ export function preload(href: string, options: { as: string } & Record<string, u
 		// matching the client's unified identity set.
 		if (as === 'script' && (HEAD.hints.has('script:' + value) || HEAD.hints.has('module:' + value)))
 			return;
-		if (as === 'style' || as === 'script') {
+		// Match the metadata to the accepted hint, including an option-free
+		// first preload; a later equivalent call cannot seed new options.
+		if ((as === 'style' || as === 'script') && !HEAD.hints.has('preload:' + as + ':' + value)) {
 			let subset: Record<string, unknown> | null = null;
 			for (const k of ['crossOrigin', 'integrity', 'nonce', 'fetchPriority', 'referrerPolicy']) {
 				const v = (options as any)[k];

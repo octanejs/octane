@@ -163,6 +163,59 @@ describe('resource hints — client', () => {
 		expect(link.getAttribute('crossorigin')).toBe('anonymous');
 	});
 
+	for (const as of ['script', 'style']) {
+		const extension = as === 'script' ? 'js' : 'css';
+		const selector = (href: string) =>
+			as === 'script'
+				? 'script[src="' + href + '"]'
+				: 'link[rel="stylesheet"][href="' + href + '"]';
+
+		it(as + ' inherits the first preload options despite conflicting duplicates', () => {
+			const href = '/first-preload-conflict.' + extension;
+			preload(href, { as, integrity: 'sha-first', crossOrigin: 'anonymous' });
+			preload(href, { as, integrity: 'sha-later', crossOrigin: 'use-credentials' });
+			expect(
+				document.head
+					.querySelector('link[rel="preload"][href="' + href + '"]')!
+					.getAttribute('integrity'),
+			).toBe('sha-first');
+			preinit(href, { as });
+			const resource = document.head.querySelector(selector(href))!;
+			expect(resource.getAttribute('integrity')).toBe('sha-first');
+			expect(resource.getAttribute('crossorigin')).toBe('anonymous');
+		});
+
+		it(as + ' preserves first preload options when a duplicate omits them', () => {
+			const href = '/first-preload-omitted.' + extension;
+			preload(href, { as, integrity: 'sha-first' });
+			preload(href, { as, crossOrigin: 'anonymous' });
+			preinit(href, { as });
+			const resource = document.head.querySelector(selector(href))!;
+			expect(resource.getAttribute('integrity')).toBe('sha-first');
+			expect(resource.hasAttribute('crossorigin')).toBe(false);
+		});
+
+		it(as + ' does not inherit options absent from the first preload', () => {
+			const href = '/first-preload-empty.' + extension;
+			preload(href, { as });
+			preload(href, { as, integrity: 'sha-later', crossOrigin: 'anonymous' });
+			preinit(href, { as });
+			const resource = document.head.querySelector(selector(href))!;
+			expect(resource.hasAttribute('integrity')).toBe(false);
+			expect(resource.hasAttribute('crossorigin')).toBe(false);
+		});
+
+		it(as + ' honors explicit preinit options over the first preload', () => {
+			const href = '/first-preload-override.' + extension;
+			preload(href, { as, integrity: 'sha-first', crossOrigin: 'anonymous' });
+			preload(href, { as, integrity: 'sha-later' });
+			preinit(href, { as, integrity: 'sha-init', crossOrigin: 'use-credentials' });
+			const resource = document.head.querySelector(selector(href))!;
+			expect(resource.getAttribute('integrity')).toBe('sha-init');
+			expect(resource.getAttribute('crossorigin')).toBe('use-credentials');
+		});
+	}
+
 	it('preconnect identity includes the CORS mode', () => {
 		preconnect('https://x.example');
 		preconnect('https://x.example', { crossOrigin: 'anonymous' });
@@ -253,6 +306,26 @@ describe('resource hints — server', () => {
 		).toHaveLength(1);
 	});
 
+	for (const as of ['script', 'style']) {
+		it(as + ' retains first client preload options for an SSR-emitted hint', () => {
+			const href = '/adopted-preload.' + (as === 'script' ? 'js' : 'css');
+			const App = () => {
+				Server.preload(href, { as, integrity: 'sha-first' });
+				return Server.createElement('div', null, 'ready');
+			};
+			const { html } = Server.renderToString(App);
+			document.head.insertAdjacentHTML('afterbegin', html.split('<div')[0]);
+			preload(href, { as, integrity: 'sha-first' });
+			preload(href, { as, integrity: 'sha-later' });
+			preinit(href, { as });
+			const selector =
+				as === 'script'
+					? 'script[src="' + href + '"]'
+					: 'link[rel="stylesheet"][href="' + href + '"]';
+			expect(document.head.querySelector(selector)!.getAttribute('integrity')).toBe('sha-first');
+		});
+	}
+
 	it('SSR mirrors the unified identity and image keying', async () => {
 		const App = () => {
 			Server.preinit('/srv.css', { as: 'style', precedence: 'low' });
@@ -291,6 +364,78 @@ describe('resource hints — server', () => {
 		expect(r.html).toContain('imagesrcset="/sr@2x.png 2x"');
 		expect(r.html).not.toContain('href="/sr.png"');
 	});
+
+	for (const as of ['script', 'style']) {
+		const extension = as === 'script' ? 'js' : 'css';
+		const selector = (href: string) =>
+			as === 'script'
+				? 'script[src="' + href + '"]'
+				: 'link[rel="stylesheet"][href="' + href + '"]';
+
+		it('SSR ' + as + ' inherits the first preload options despite conflicting duplicates', () => {
+			const href = '/first-preload-conflict.' + extension;
+			const App = () => {
+				Server.preload(href, { as, integrity: 'sha-first', crossOrigin: 'anonymous' });
+				Server.preload(href, { as, integrity: 'sha-later', crossOrigin: 'use-credentials' });
+				Server.preinit(href, { as });
+				return Server.createElement('div', null, 'ready');
+			};
+			const { html } = Server.renderToString(App);
+			const output = document.createElement('div');
+			output.innerHTML = html;
+			const resource = output.querySelector(selector(href))!;
+			expect(resource.getAttribute('integrity')).toBe('sha-first');
+			expect(resource.getAttribute('crossorigin')).toBe('anonymous');
+		});
+
+		it('SSR ' + as + ' preserves first preload options when a duplicate omits them', () => {
+			const href = '/first-preload-omitted.' + extension;
+			const App = () => {
+				Server.preload(href, { as, integrity: 'sha-first' });
+				Server.preload(href, { as, crossOrigin: 'anonymous' });
+				Server.preinit(href, { as });
+				return Server.createElement('div', null, 'ready');
+			};
+			const { html } = Server.renderToString(App);
+			const output = document.createElement('div');
+			output.innerHTML = html;
+			const resource = output.querySelector(selector(href))!;
+			expect(resource.getAttribute('integrity')).toBe('sha-first');
+			expect(resource.hasAttribute('crossorigin')).toBe(false);
+		});
+
+		it('SSR ' + as + ' does not inherit options absent from the first preload', () => {
+			const href = '/first-preload-empty.' + extension;
+			const App = () => {
+				Server.preload(href, { as });
+				Server.preload(href, { as, integrity: 'sha-later', crossOrigin: 'anonymous' });
+				Server.preinit(href, { as });
+				return Server.createElement('div', null, 'ready');
+			};
+			const { html } = Server.renderToString(App);
+			const output = document.createElement('div');
+			output.innerHTML = html;
+			const resource = output.querySelector(selector(href))!;
+			expect(resource.hasAttribute('integrity')).toBe(false);
+			expect(resource.hasAttribute('crossorigin')).toBe(false);
+		});
+
+		it('SSR ' + as + ' honors explicit preinit options over the first preload', () => {
+			const href = '/first-preload-override.' + extension;
+			const App = () => {
+				Server.preload(href, { as, integrity: 'sha-first', crossOrigin: 'anonymous' });
+				Server.preload(href, { as, integrity: 'sha-later' });
+				Server.preinit(href, { as, integrity: 'sha-init', crossOrigin: 'use-credentials' });
+				return Server.createElement('div', null, 'ready');
+			};
+			const { html } = Server.renderToString(App);
+			const output = document.createElement('div');
+			output.innerHTML = html;
+			const resource = output.querySelector(selector(href))!;
+			expect(resource.getAttribute('integrity')).toBe('sha-init');
+			expect(resource.getAttribute('crossorigin')).toBe('use-credentials');
+		});
+	}
 
 	it('SSR preloads no-op across BOTH executable script forms', async () => {
 		const App = () => {
