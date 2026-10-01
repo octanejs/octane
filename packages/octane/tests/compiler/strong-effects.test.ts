@@ -932,6 +932,15 @@ export function App(props) @{
 		accepts(app(setup));
 	});
 
+	it.each([
+		'const ready = await ready;',
+		'const first = await second; const second = await first;',
+	])('analyzes a self-referencing stored await without overflowing: %s', (body) => {
+		expect(() =>
+			errors(app(`useEffect(() => { (async () => { ${body} ${write}; })(); });`)),
+		).not.toThrow();
+	});
+
 	it('names the zero-delay APIs and the replacement', () => {
 		const result = compileToVolarMappings(
 			app(`useEffect(() => { startTransition(() => ${write}); });`),
