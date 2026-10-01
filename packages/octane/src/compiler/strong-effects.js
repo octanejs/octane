@@ -972,8 +972,18 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 	function rescheduleKeys(node, name) {
 		const callback = functionOf(node.arguments?.[0]);
 		const self = unwrap(node.arguments?.[0]);
-		if (callback === null || self?.type !== 'Identifier') return null;
-		const binding = bindingOf(self);
+		// A named function expression reschedules itself through its own name.
+		const ownScope =
+			self?.type === 'FunctionExpression' && self.id
+				? analysis.functionScopes.get(self)
+				: undefined;
+		const binding =
+			self?.type === 'Identifier'
+				? bindingOf(self)
+				: ownScope !== undefined
+					? lookup(ownScope, self.id.name)
+					: null;
+		if (callback === null || binding == null) return null;
 		const keys = [];
 		const visit = (value) => {
 			if (value == null || typeof value !== 'object') return;
@@ -1069,6 +1079,22 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		};
 		const { roots, aliases, declarations, owners } = references;
 		const names = new Set();
+		// A stored value may come from either arm of a conditional or logical
+		// expression, as in `const id = enabled ? setInterval(tick, ms) : null`.
+		const own = (value, key) => {
+			const node = unwrap(value);
+			if (node == null) return;
+			owners.set(node, key);
+			if (node.type === 'ConditionalExpression') {
+				own(node.consequent, key);
+				own(node.alternate, key);
+			} else if (node.type === 'LogicalExpression') {
+				own(node.left, key);
+				own(node.right, key);
+			} else if (node.type === 'SequenceExpression') {
+				own(node.expressions?.at(-1), key);
+			}
+		};
 		for (const { decl, bindings } of declarators) {
 			const init = unwrap(decl.init);
 			const binding = bindings[0]?.binding;
@@ -1080,7 +1106,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				}
 			}
 			if (decl.id?.type === 'Identifier' && binding && init != null) {
-				owners.set(init, `b${binding.id}`);
+				own(init, `b${binding.id}`);
 			}
 		}
 		// Stable aliases share their root's classification.
@@ -1118,7 +1144,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			}
 			if (node.type === 'AssignmentExpression' && node.operator === '=') {
 				const key = keyOf(node.left);
-				if (key !== null) owners.set(unwrap(node.right), key);
+				if (key !== null) own(node.right, key);
 			}
 			if (node.type === 'Identifier' && names.has(node.name)) classify(node, parents);
 			parents.push(node);

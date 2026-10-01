@@ -1719,6 +1719,14 @@ export function App(props) @{
 			`function listen(target, handler, options) { target.addEventListener('resize', handler, options); } useEffect(() => { const onResize = () => setWidth(1); listen(window, onResize, { capture: true }); return () => window.removeEventListener('resize', onResize); });`,
 		],
 		[
+			'a named function timer that reschedules itself',
+			`useEffect(() => { setTimeout(function tick() { setWidth(1); setTimeout(tick, 1000); }, 1000); });`,
+		],
+		[
+			'a conditionally created interval',
+			`useEffect(() => { const id = props.enabled ? setInterval(() => setWidth(1), 1000) : null; });`,
+		],
+		[
 			'a stored helper remover for another handler',
 			`function subscribe(handler, other) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', other); } useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); const stop = subscribe(first, second); return stop; });`,
 		],
@@ -1750,6 +1758,18 @@ export function App(props) @{
 		[
 			'an aborted listener signal',
 			`useEffect(() => { const controller = new AbortController(); window.addEventListener('resize', () => setWidth(1), { signal: controller.signal }); return () => controller.abort(); });`,
+		],
+		[
+			'a named function timer that stores each reschedule',
+			`useEffect(() => { let id = setTimeout(function tick() { setWidth(1); id = setTimeout(tick, 1000); }, 1000); return () => clearTimeout(id); });`,
+		],
+		[
+			'a cleared conditional interval',
+			`useEffect(() => { const id = props.enabled ? setInterval(() => setWidth(1), 1000) : null; return () => clearInterval(id); });`,
+		],
+		[
+			'a cleared logical interval',
+			`useEffect(() => { const id = props.enabled && setInterval(() => setWidth(1), 1000); return () => clearInterval(id); });`,
 		],
 		[
 			'a remover returned by a helper',
