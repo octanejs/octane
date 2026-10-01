@@ -94,9 +94,15 @@ export function createStrongRenderPolicy({
 		return aliasValue(value, scope) === DATE;
 	}
 
+	// A spread in the locale or options position can supply both, so neither is
+	// provably absent.
+	function visibleArguments(node) {
+		const args = node.arguments ?? [];
+		return args.slice(0, 2).some((argument) => argument.type === 'SpreadElement') ? null : args;
+	}
+
 	function missingValue(argument, scope) {
 		if (argument == null) return true;
-		if (argument.type === 'SpreadElement') return false;
 		const value = unwrap(argument);
 		return (
 			(value?.type === 'ArrayExpression' && value.elements.length === 0) ||
@@ -133,13 +139,14 @@ export function createStrongRenderPolicy({
 		}
 		const name = propertyName(callee, scope);
 		if (!INTL_SERVICES.has(name)) return null;
-		const args = node.arguments ?? [];
+		const args = visibleArguments(node);
 		return {
 			kind: 'intl',
 			name,
 			implicit:
-				missingValue(args[0], scope) ||
-				(name === 'DateTimeFormat' && missingTimeZone(args[1], scope)),
+				args !== null &&
+				(missingValue(args[0], scope) ||
+					(name === 'DateTimeFormat' && missingTimeZone(args[1], scope))),
 		};
 	}
 
@@ -252,8 +259,12 @@ export function createStrongRenderPolicy({
 			}
 			const locale = DATE_LOCALE_METHODS.has(name);
 			if ((!locale && !DATE_ZONE_METHODS.has(name)) || !isDate(member.object, scope)) return;
-			const args = node.arguments ?? [];
-			if (locale && (missingValue(args[0], scope) || missingTimeZone(args[1], scope))) {
+			const args = visibleArguments(node);
+			if (
+				locale &&
+				args !== null &&
+				(missingValue(args[0], scope) || missingTimeZone(args[1], scope))
+			) {
 				report(
 					STRONG_RENDER_LOCALE_FORMAT,
 					member,

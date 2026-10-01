@@ -295,7 +295,7 @@ const numbers = new Intl.NumberFormat();`,
 		expectStrongValid(
 			`${IMPORTS}const utc = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', dateStyle: 'medium' });
 const count = new Intl.NumberFormat('en-US');
-export function App({ t, n, date, locale, timeZone, options }) {
+export function App({ t, n, date, locale, timeZone, options, args, rest }) {
   const [label] = useState(() => new Date(t).toLocaleString());
   const [clicked, setClicked] = useState('');
   useEffect(() => { console.log(new Date(t).toLocaleString()); });
@@ -304,6 +304,8 @@ export function App({ t, n, date, locale, timeZone, options }) {
       {new Date(t).toLocaleString('en-US', { timeZone: 'UTC' })}
       {new Date(t).toLocaleDateString(locale, { timeZone })}
       {new Date(t).toLocaleDateString('en-US', options)}
+      {new Date(t).toLocaleString(...args)}{new Date(t).toLocaleString('en-US', ...rest)}
+      {new Intl.DateTimeFormat(...args).format(t)}{Intl.NumberFormat(...args).format(n)}
       {new Date(t).toISOString()}{new Date(t).toUTCString()}{new Date(t).getTime()}
       {new Date(2024, 0, 1).toDateString()}
       {new Intl.DateTimeFormat(locale, { timeZone, month: 'long' }).format(t)}
