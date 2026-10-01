@@ -109,10 +109,10 @@ export function descriptorClassificationFromSharedAst(source, id) {
 	};
 }
 
-function configurePlugin(mode) {
+function configurePlugin(mode, pluginOptions = {}) {
 	const dev = mode === 'dev-client';
 	const server = mode === 'production-server';
-	const plugin = octane({ hmr: dev });
+	const plugin = octane({ ...pluginOptions, hmr: dev });
 	const command = dev ? 'serve' : 'build';
 	plugin.config({ root: SOURCE_ROOT }, { command, mode: 'production' });
 	plugin.configResolved({
@@ -226,6 +226,9 @@ export function createTransformCase({
 		classificationChecksum,
 		async run() {
 			const { context, watched } = contextFor(id);
+			// Start a new watch generation so every sample measures an uncached
+			// preflight instead of the summary kept from the previous sample.
+			plugin.watchChange(id);
 			const started = performance.now();
 			const result = await plugin.transform.call(context, source, id, { ssr: server });
 			const elapsed = performance.now() - started;
@@ -239,6 +242,52 @@ export function createTransformCase({
 			return { elapsed, snapshot };
 		},
 	};
+}
+
+/**
+ * One production plugin instance shared by several Vite environments, as with
+ * Vite's `builder.sharedPlugins` or a dev server. Each transform names its
+ * environment and consumer, so the plugin sees the same signals Vite sends.
+ */
+export function createSharedPluginCase({
+	componentCount = 8,
+	id = path.join(HERE, 'generated', `shared-${componentCount}.tsrx`),
+	mode = 'production-client',
+	pluginOptions,
+}) {
+	const { plugin } = configurePlugin(mode, pluginOptions);
+	const defaultSource = sourceFor(componentCount);
+	return {
+		id,
+		source: defaultSource,
+		async transform({ environment, consumer = 'client', source = defaultSource, moduleId = id }) {
+			const { context } = contextFor(moduleId);
+			return plugin.transform.call(
+				{ ...context, environment: { name: environment, config: { consumer } } },
+				source,
+				moduleId,
+				{ ssr: consumer === 'server' },
+			);
+		},
+		watchChange(moduleId = id) {
+			plugin.watchChange(moduleId);
+		},
+	};
+}
+
+/**
+ * Host-owned TypeScript under `requireDirective`: Octane only classifies these
+ * modules for adapter facts and then passes them through unchanged.
+ */
+export function hostOwnedTypeScriptModules(moduleCount, functionCount = 150) {
+	return Array.from({ length: moduleCount }, (_, module) => ({
+		id: path.join(HERE, 'generated', 'host', `module-${module}.ts`),
+		source: Array.from(
+			{ length: functionCount },
+			(_, index) =>
+				`export function compute${index}(value: number): number { const answer = value + ${module + index}; return answer; }`,
+		).join('\n'),
+	}));
 }
 
 export { stableJson, valueDigest };

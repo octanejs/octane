@@ -450,6 +450,164 @@ export function App(props: { label: Label }) @{ <p>{props.label}</p> }`;
 		).rejects.toThrow();
 	});
 
+	it('keeps every environment of a shared plugin byte-identical to a fresh transform', async () => {
+		const leafId = `${ROOT}/src/Leaf.tsrx`;
+		const slotId = `${ROOT}/src/Slot.tsrx`;
+		const appId = `${ROOT}/src/App.tsrx`;
+		const helperId = `${ROOT}/src/helper.ts`;
+		const leafSource = 'export default function Leaf() @{ <i>leaf</i> }';
+		const slotSource = `
+			import { descriptorChildren } from 'octane';
+			function Impl(props) { return props.children; }
+			export const Slot = descriptorChildren(Impl);`;
+		// The marked app needs graph facts the plain app never asks for, so a
+		// summary reused across a source edit or environment changes its output.
+		const markedApp = `
+			import Leaf from './Leaf.tsrx';
+			import { Slot } from './Slot.tsrx';
+			export function App() @{ <main><Leaf /><Slot><b>slotted</b></Slot></main> }`;
+		const plainApp = 'export function App() @{ <main>plain</main> }';
+		// The adapter parser rejects source-phase imports, so its failed preflight
+		// is reused while the authoritative compiler still compiles the module.
+		const unparsedApp = `
+			import source wasm from './module.wasm';
+			export function App() @{ <main>{wasm.name as string}</main> }`;
+		const helperSource = 'export function compute(value: number): number { return value + 1; }';
+		const environments = {
+			server: { name: 'ssr', config: { consumer: 'server' } },
+			client: { name: 'client', config: { consumer: 'client' } },
+			worker: { name: 'worker', config: { consumer: 'client' } },
+		} as const;
+		type EnvironmentName = keyof typeof environments;
+		const createPlugin = () => {
+			const plugin = octane({ hmr: false, requireDirective: true });
+			configure(plugin, 'build');
+			return plugin;
+		};
+		const graphs = new Map<string, Map<string, { code: string; meta?: object }>>();
+		for (const consumer of ['client', 'server'] as const) {
+			const graph = new Map();
+			for (const [id, source] of [
+				[leafId, leafSource],
+				[slotId, slotSource],
+			]) {
+				const result = await (createPlugin().transform as any).call(
+					{ environment: { name: consumer, config: { consumer } } },
+					source,
+					id,
+				);
+				graph.set(id, { id, code: result.code, meta: result.meta });
+			}
+			graphs.set(consumer, graph);
+		}
+		const transformIn = (
+			plugin: Plugin,
+			environmentName: EnvironmentName,
+			source: string,
+			id: string,
+			withGraph = true,
+		) => {
+			const environment = environments[environmentName];
+			const graph = graphs.get(environment.config.consumer)!;
+			const requests: Record<string, string> = { './Leaf.tsrx': leafId, './Slot.tsrx': slotId };
+			const context = withGraph
+				? {
+						environment,
+						resolve: async (request: string) =>
+							requests[request] === undefined ? null : { id: requests[request] },
+						load: async ({ id: requested }: { id: string }) => graph.get(requested) ?? null,
+						getModuleInfo: (requested: string) => graph.get(requested) ?? null,
+					}
+				: { environment };
+			return Promise.resolve((plugin.transform as any).call(context, source, id));
+		};
+
+		// Semantic control: the marked app compiles differently once its imported
+		// void and descriptor-children facts resolve through the graph.
+		const clientMarked = await transformIn(createPlugin(), 'client', markedApp, appId);
+		expect(isChildrenBlock(clientMarked.code, componentChildren(clientMarked.code, 'Slot'))).toBe(
+			false,
+		);
+		expect(clientMarked.code).not.toBe(
+			(await transformIn(createPlugin(), 'client', markedApp, appId, false)).code,
+		);
+
+		// Each source edit or environment switch below would inherit missing graph
+		// facts from the previous summary if the shared plugin reused it.
+		const shared = createPlugin();
+		for (const [environmentName, source, id] of [
+			['client', plainApp, appId],
+			['worker', markedApp, appId],
+			['server', plainApp, appId],
+			['server', markedApp, appId],
+			['client', markedApp, appId],
+			['worker', markedApp, appId],
+			['server', markedApp, appId],
+			['client', unparsedApp, appId],
+			['worker', unparsedApp, appId],
+			['client', helperSource, helperId],
+			['worker', helperSource, helperId],
+			['server', helperSource, helperId],
+		] as const) {
+			const label = `${environmentName} ${id} ${
+				source === plainApp ? 'plain' : source === unparsedApp ? 'unparsed' : 'marked'
+			}`;
+			expect(JSON.stringify(await transformIn(shared, environmentName, source, id)), label).toBe(
+				JSON.stringify(await transformIn(createPlugin(), environmentName, source, id)),
+			);
+		}
+	});
+
+	it('still rejects a client-only import on the server after a shared development client transform', async () => {
+		// Development leaves both void-root and CSS-module specialization off, so
+		// the environment alone keeps client facts from replacing the server-only
+		// import facts behind this diagnostic.
+		const sceneId = `${ROOT}/src/Scene.object.tsrx`;
+		const appId = `${ROOT}/src/App.tsrx`;
+		const appSource = `
+			import Scene from './Scene.object.tsrx';
+			export function App() @{ <main><Scene /></main> }`;
+		const createPlugin = () => {
+			const plugin = octane({
+				renderers: {
+					registry: { object: { module: '/src/object-renderer.js', server: 'client-only' } },
+					rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+				},
+			});
+			configure(plugin, 'serve');
+			return plugin;
+		};
+		const transformIn = (plugin: Plugin, consumer: 'client' | 'server', withGraph = true) =>
+			Promise.resolve(
+				(plugin.transform as any).call(
+					{
+						environment: { name: consumer === 'server' ? 'ssr' : 'client', config: { consumer } },
+						...(withGraph
+							? {
+									resolve: async (request: string) =>
+										request === './Scene.object.tsrx' ? { id: sceneId } : null,
+								}
+							: null),
+					},
+					appSource,
+					appId,
+				),
+			);
+
+		const leaked = /Client-only export "default".*is used by server code/;
+		// Semantic control: the diagnostic depends on resolving the client-only
+		// import that only server preflight collects.
+		await expect(transformIn(createPlugin(), 'server')).rejects.toThrow(leaked);
+		expect(await transformIn(createPlugin(), 'server', false)).not.toBeNull();
+
+		const shared = createPlugin();
+		const freshClient = JSON.stringify(await transformIn(createPlugin(), 'client'));
+		expect(JSON.stringify(await transformIn(shared, 'client'))).toBe(freshClient);
+		await expect(transformIn(shared, 'server')).rejects.toThrow(leaked);
+		expect(JSON.stringify(await transformIn(shared, 'client'))).toBe(freshClient);
+		await expect(transformIn(shared, 'server')).rejects.toThrow(leaked);
+	});
+
 	it('carries descriptor-children export metadata through the Vite module graph', async () => {
 		const childId = `${ROOT}/src/Slot.tsrx`;
 		const barrelId = `${ROOT}/src/index.ts`;

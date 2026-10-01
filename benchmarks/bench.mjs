@@ -1285,7 +1285,8 @@ const SUITES = [
 	},
 	{
 		// Real Vite client/server transforms plus exact-root counts at both parser
-		// boundaries, paired with shared-AST/reparsed classification controls.
+		// boundaries, paired with shared-AST/reparsed classification controls and
+		// shared-plugin reuse across client environments.
 		name: 'tsrx-vite-preflight-parsing',
 		cwd: 'tsrx-vite-preflight-parsing',
 		servers: [],
