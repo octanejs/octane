@@ -3139,20 +3139,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (callShapes.has(unwrap(declaration.init))) {
 			bindDeclarationValue(declaration, declarationKind, scope);
 		}
-		if (
-			hiddenEffectRead(phase) &&
-			declaration.id?.type === 'ObjectPattern' &&
-			declaration.id.properties?.some(
-				(property) =>
-					property.type === 'RestElement' ||
-					(property.computed
-						? staticPrimitiveValue(property.key, scope)
-						: (property.key?.name ?? property.key?.value)) === 'current',
-			) &&
-			valueRefRead(declaration.init, scope)
-		) {
-			effectPolicy.hiddenDependency(unwrap(declaration.init), 'ref');
-		}
+		checkRefPattern(declaration.id, declaration.init, scope, phase);
 		return visitPatternExpressions(
 			declaration.id,
 			scope,
@@ -4009,6 +3996,24 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			effectPolicy.hiddenDependency(node, 'module');
 		} else if (readCurrentRef(node, scope) && valueRefRead(node.object, scope)) {
 			effectPolicy.hiddenDependency(node, 'ref');
+		}
+	}
+
+	// Destructuring `current` from a value ref in effect setup reads it too.
+	function checkRefPattern(pattern, value, scope, phase) {
+		if (
+			hiddenEffectRead(phase) &&
+			pattern?.type === 'ObjectPattern' &&
+			pattern.properties?.some(
+				(property) =>
+					property.type === 'RestElement' ||
+					(property.computed
+						? staticPrimitiveValue(property.key, scope)
+						: (property.key?.name ?? property.key?.value)) === 'current',
+			) &&
+			valueRefRead(value, scope)
+		) {
+			effectPolicy.hiddenDependency(unwrap(value), 'ref');
 		}
 	}
 
@@ -5272,6 +5277,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'AssignmentExpression': {
 				if (node.left?.type === 'ArrayPattern' || node.left?.type === 'ObjectPattern') {
 					visit(node.right, scope, phase);
+					checkRefPattern(node.left, node.right, scope, phase);
 					visitPatternExpressions(
 						node.left,
 						scope,

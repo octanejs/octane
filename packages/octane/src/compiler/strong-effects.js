@@ -1157,6 +1157,20 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				if (parent.id === child || parent.id?.type === 'ObjectPattern') return;
 				if (references.declarations.has(parent.id)) return;
 				break;
+			case 'AssignmentExpression': {
+				// `({ current } = ref);` reads properties too, when its value is unused.
+				let at = index - 1;
+				while (at >= 0 && TRANSPARENT.has(parents[at].type)) at--;
+				if (
+					parent.right === child &&
+					parent.operator === '=' &&
+					parent.left?.type === 'ObjectPattern' &&
+					parents[at]?.type === 'ExpressionStatement'
+				) {
+					return;
+				}
+				break;
+			}
 			case 'LabeledStatement':
 			case 'BreakStatement':
 			case 'ContinueStatement':

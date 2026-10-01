@@ -1375,6 +1375,10 @@ export function App(props) @{
 			`const last = useRef(0); useEffect(() => { const { current } = last; props.log(current); });`,
 		],
 		[
+			'a ref destructured by assignment',
+			`const last = useRef(0); useEffect(() => { let current; ({ current } = last); props.log(current); });`,
+		],
+		[
 			'a ref alias',
 			`const last = useRef(0); const alias = last; useEffect(() => { props.log(alias.current); });`,
 		],
@@ -1488,6 +1492,10 @@ export function App(props) @{
 		[
 			'a local first-run flag',
 			`useEffect(() => { let didInit = false; if (didInit) return; didInit = true; });`,
+		],
+		[
+			'a ref whose destructuring assignment value escapes',
+			`const last = useRef(0); useEffect(() => { let current; props.log(({ current } = last)); });`,
 		],
 	])('keeps %s legal', (_label, setup, output = '<div />') => {
 		accepts(app(setup, output));
