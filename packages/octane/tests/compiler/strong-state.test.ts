@@ -370,6 +370,14 @@ describe('Strong state mutation outside render', () => {
 			`function add(pair) { pair[0].push(1); } export function A() { const tuple = useState([]); return <b onClick={() => { add(tuple); tuple[1]([...tuple[0]]); }}>{tuple[0].length}</b>; }`,
 		],
 		[
+			'a destructured tuple parameter',
+			`function add([items, setItems]) { items.push(1); setItems([...items]); } export function A() { const tuple = useState([]); return <b onClick={() => add(tuple)}>{tuple[0].length}</b>; }`,
+		],
+		[
+			'an object-destructured tuple parameter with a default',
+			`function add({ 0: items = [] }) { items.push(1); } export function A() { const tuple = useState([]); return <b onClick={() => add(tuple)}>{tuple[0].length}</b>; }`,
+		],
+		[
 			'an Effect Event called with the state',
 			`export function A() { const [items, setItems] = useState([]); const add = useEffectEvent((list) => { list.push(1); }); return <b onClick={() => { add(items); setItems([...items]); }}>{items.length}</b>; }`,
 		],
@@ -613,6 +621,14 @@ describe('Strong stale deferred state updates', () => {
 			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value + 1)); return <b onClick={async () => { await save(); apply(n); }}>{n}</b>; }`,
 		],
 		[
+			'a value computed from a stale Effect Event argument',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => { const next = value + 1; setN(next); }); return <b onClick={async () => { await save(); apply(n); }}>{n}</b>; }`,
+		],
+		[
+			'a stale Effect Event argument forwarded to a helper',
+			`export function A({ save }) { const [n, setN] = useState(0); const set = (value) => setN(value + 1); const apply = useEffectEvent((value) => set(value)); return <b onClick={async () => { await save(); apply(n); }}>{n}</b>; }`,
+		],
+		[
 			'a timer created inside an Effect Event',
 			`export function A() { const [n, setN] = useState(0); const later = useEffectEvent(() => { setTimeout(() => setN(n + 1), 100); }); useEffect(() => later()); return <b>{n}</b>; }`,
 		],
@@ -696,9 +712,17 @@ describe('Strong stale deferred state updates', () => {
   const [n, setN] = useState(0);
   const tick = useEffectEvent(() => setN(n + 1));
   const step = useEffectEvent(() => { const next = n + 1; setN(next); });
+  const bump = () => setN(n + 1);
+  const set = (value) => setN(value + 1);
+  const viaHelper = useEffectEvent(() => bump());
+  const viaCapturedArgument = useEffectEvent(() => set(n));
+  const viaImmediateCall = useEffectEvent(() => { (() => setN(n + 1))(); });
   useEffect(() => {
     const id = setInterval(tick, 1000);
     setTimeout(step, 500);
+    setTimeout(viaHelper, 500);
+    setTimeout(viaCapturedArgument, 500);
+    setTimeout(viaImmediateCall, 500);
     load().then(() => tick());
     return () => clearInterval(id);
   });

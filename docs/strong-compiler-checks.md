@@ -98,8 +98,10 @@ computed from the render snapshot can overwrite a newer update. A synchronous
 handler such as `onClick={() => setCount(count + 1)}` remains valid, as do
 updates in subscription callbacks and other callbacks whose timing the compiler
 cannot prove. An Effect Event reads the latest committed values, so state it
-captures is current in its own body; a snapshot passed to it as an argument, or
-read in a timer or promise callback it creates, is still checked.
+captures is current in its body and in helpers it calls synchronously. A
+snapshot passed to it from deferred code is still checked, including values
+computed from that argument, as is state read in a timer or promise callback it
+creates.
 
 A write-only state tuple exists only to schedule renders for an external
 source. It reads that source during render and subscribes afterwards, so a

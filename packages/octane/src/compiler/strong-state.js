@@ -104,7 +104,6 @@ const STALE_REDUCER_MESSAGE =
  * @param {{
  *   report: (code: string, node: any, message: string) => void,
  *   resolve: (scope: any, name: string) => any,
- *   resolveScope: (scope: any, name: string) => any,
  *   unwrap: (node: any) => any,
  *   createScope: (parent: any, kind: string, statements?: any[], params?: any[]) => any,
  *   snapshotBinding: (node: any, scope: any) => any,
@@ -120,7 +119,6 @@ export function createStrongStatePolicy(api) {
 	const {
 		report,
 		resolve,
-		resolveScope,
 		unwrap,
 		createScope,
 		snapshotBinding,
@@ -321,27 +319,24 @@ export function createStrongStatePolicy(api) {
 		},
 	};
 
-	// In an Effect Event's own body, state captured from the component is the
-	// latest committed value. A parameter can still carry a stale snapshot; a
-	// local derived inside the body is treated as current.
-	function freshRead(scope, name) {
-		if (!freshCaptures) return false;
-		if (resolve(scope, name)?.kind === 'derived-state') return true;
-		for (let current = resolveScope(scope, name); current != null; current = current.parent) {
-			if (current.effectEventBoundary === true) return false;
-		}
-		return true;
-	}
-
-	function memberRoot(node) {
-		let value = unwrap(node);
-		while (value?.type === 'MemberExpression') value = unwrap(value.object);
-		return value?.type === 'Identifier' ? value : null;
-	}
-
+	// Inside an Effect Event invocation, captured state is the latest committed
+	// value; only a snapshot tagged stale by a deferred caller is reported, and a
+	// local derived there is stale only through such an input.
 	function readsBinding(binding, state, active) {
-		if (binding?.kind === 'snapshot') return binding.state === state;
-		if (binding?.kind === 'derived-state') return binding.states.has(state);
+		if (binding?.kind === 'snapshot') {
+			return binding.state === state && (!freshCaptures || binding.stale === true);
+		}
+		if (binding?.kind === 'derived-state') {
+			if (!binding.states.has(state)) return false;
+			if (!freshCaptures || binding.stale === true) return true;
+			if (binding.init == null || active.has(binding)) return false;
+			active.add(binding);
+			try {
+				return readsState(binding.init, binding.scope, state, active) !== null;
+			} finally {
+				active.delete(binding);
+			}
+		}
 		// Calling or passing a local closure evaluates its captured snapshot reads.
 		if (binding?.kind === 'callback-choice') {
 			return binding.values.some((value) => readsBinding(value, state, active));
@@ -418,14 +413,10 @@ export function createStrongStatePolicy(api) {
 		if (node == null || node.type?.startsWith('TS')) return null;
 		switch (node.type) {
 			case 'Identifier':
-				if (freshRead(scope, node.name)) return null;
 				return readsBinding(resolve(scope, node.name), state, active) ? node : null;
 			case 'MemberExpression': {
-				const root = memberRoot(node);
-				if (
-					snapshotBinding(node, scope)?.state === state &&
-					!(root !== null && freshRead(scope, root.name))
-				) {
+				const snapshot = snapshotBinding(node, scope);
+				if (snapshot?.state === state && (!freshCaptures || snapshot.stale === true)) {
 					return node;
 				}
 				return (
