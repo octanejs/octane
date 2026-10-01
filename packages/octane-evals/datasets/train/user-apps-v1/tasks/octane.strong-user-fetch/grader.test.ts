@@ -24,8 +24,13 @@ beforeEach(() => {
 					const abort = () => reject(new DOMException('The operation was aborted.', 'AbortError'));
 					if (signal?.aborted) return abort();
 					signal?.addEventListener('abort', abort, { once: true });
+					// A real Response, so a repair may check `ok` or `status` before reading JSON.
 					responses.set(id, () =>
-						resolve({ json: () => Promise.resolve({ name: USERS[id] }) } as Response),
+						resolve(
+							new Response(JSON.stringify({ name: USERS[id] }), {
+								headers: { 'Content-Type': 'application/json' },
+							}),
+						),
 					);
 				}),
 		),
