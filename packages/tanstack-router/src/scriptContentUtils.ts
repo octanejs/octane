@@ -1,64 +1,37 @@
-import { deepEqual } from '@tanstack/router-core';
+import { composeSsrBodyScripts, deepEqual, getSsrBodyScriptParts } from '@tanstack/router-core';
 import { isServer } from '@tanstack/router-core/isServer';
 import { useRouter } from './context';
 import { splitSlot, subSlot } from './internal';
 import { useStore } from './useStore';
-import type { AnyRouteMatch, AnyRouter, RouterManagedTag } from '@tanstack/router-core';
+import type { AnyRouteMatch, RouterManagedTag } from '@tanstack/router-core';
 
-function getScripts(router: AnyRouter, matches: Array<AnyRouteMatch>) {
-	const nonce = router.options.ssr?.nonce;
-	const scripts: Array<RouterManagedTag> = matches
-		.flatMap((match) => match.scripts ?? [])
-		.filter((script) => script !== undefined)
-		.map(({ children, ...attrs }) => ({
-			tag: 'script',
-			attrs: { ...attrs, nonce },
-			children,
-		}));
-
-	const manifest = router.ssr?.manifest;
-	if (manifest) {
-		for (const match of matches) {
-			for (const asset of manifest.routes[match.routeId]?.scripts ?? []) {
-				scripts.push({
-					tag: 'script',
-					attrs: { ...asset.attrs, nonce },
-					children: asset.children,
-				});
-			}
-		}
-	}
-
-	return scripts;
-}
+// router-core 1.171.34 composes body scripts through `getSsrBodyScriptParts` +
+// `composeSsrBodyScripts`, and the initial hydration `<Scripts>` take moved from
+// the removed `serverSsr.takeBufferedScripts()` (a single buffered tag) to
+// `serverSsr.takeInitialHydrationScriptTags()` (hydration tags plus the streaming
+// boundary), which `composeSsrBodyScripts` interleaves.
+const routeScriptAttrs = { suppressHydrationWarning: true };
 
 export function useScripts(...args: Array<unknown>): Array<RouterManagedTag> {
 	const [, slot] = splitSlot(args);
 	const router = useRouter();
+	const nonce = router.options.ssr?.nonce;
+	const getScripts = (matches: Array<AnyRouteMatch>) =>
+		composeSsrBodyScripts(
+			getSsrBodyScriptParts(matches, router.ssr?.manifest, nonce, routeScriptAttrs),
+		);
 
 	if (isServer ?? router.isServer) {
-		const scripts = getScripts(router, router.stores.matches.get());
-		const buffered = router.serverSsr?.takeBufferedScripts();
-		if (!buffered || buffered.tag !== 'script') {
-			return scripts;
-		}
-		return [
-			{
-				tag: 'script',
-				attrs: buffered.attrs,
-				children:
-					typeof buffered.children === 'string'
-						? buffered.children.replace(/;document\.currentScript\.remove\(\)$/, '')
-						: buffered.children,
-			},
-			...scripts,
-		];
+		return composeSsrBodyScripts(
+			getSsrBodyScriptParts(
+				router.stores.matches.get(),
+				router.ssr?.manifest,
+				nonce,
+				routeScriptAttrs,
+			),
+			router.serverSsr?.takeInitialHydrationScriptTags(),
+		);
 	}
 
-	return useStore(
-		router.stores.matches,
-		(matches: Array<AnyRouteMatch>) => getScripts(router, matches),
-		deepEqual,
-		subSlot(slot, 'body:scripts'),
-	);
+	return useStore(router.stores.matches, getScripts, deepEqual, subSlot(slot, 'body:scripts'));
 }

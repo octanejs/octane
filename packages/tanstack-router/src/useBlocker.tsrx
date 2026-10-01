@@ -120,21 +120,23 @@ export function useBlocker(
 		const blockerFnComposed = async (blockerFnArgs: BlockerFnArgs) => {
 			function getLocation(location: HistoryLocation): ShouldBlockFnLocation {
 				const parsedLocation = router.parseLocation(location);
-				const matchedRoutes = router.getMatchedRoutes(parsedLocation.pathname);
-				if (matchedRoutes.foundRoute === undefined) {
+				// router-core 1.171.34 getMatchedRoutes returns a tuple
+				// [matchedRoutes, rawParams, foundRoute] instead of an object.
+				const [, routeParams, foundRoute] = router.getMatchedRoutes(parsedLocation.pathname);
+				if (foundRoute === undefined) {
 					return {
 						routeId: '__notFound__',
 						fullPath: parsedLocation.pathname,
 						pathname: parsedLocation.pathname,
-						params: matchedRoutes.routeParams,
+						params: routeParams,
 						search: router.options.parseSearch(location.search),
 					};
 				}
 				return {
-					routeId: matchedRoutes.foundRoute.id,
-					fullPath: matchedRoutes.foundRoute.fullPath,
+					routeId: foundRoute.id,
+					fullPath: foundRoute.fullPath,
 					pathname: parsedLocation.pathname,
-					params: matchedRoutes.routeParams,
+					params: routeParams,
 					search: router.options.parseSearch(location.search),
 				};
 			}

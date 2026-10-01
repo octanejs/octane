@@ -232,9 +232,22 @@ export async function loadServerRouter(
 		// `router.load()` prefetches this route's data into it before render().
 		router = makeRouter({ history, isServer: true, queryClient });
 		await router.load();
-		const redirect = router.state.redirect;
-		const href = redirect?.options?.href ?? redirect?.href;
-		if (!redirect || !href || href === target) return router;
+		// router-core 1.171.34 performs the canonical-URL normalization inside its
+		// server load handler (and no longer surfaces it as `router.state.redirect`).
+		// A manual SSR server reproduces that one check: the canonical href applies
+		// each route's `validateSearch`, so `/` resolves to `/?page=1`. When it
+		// differs from the loaded location, follow it and reload at the target.
+		const next = router.latestLocation;
+		const canonical = router.buildLocation({
+			to: next.pathname,
+			search: true,
+			params: true,
+			hash: true,
+			state: true,
+			_includeValidateSearch: true,
+		});
+		const href = canonical.publicHref;
+		if (!href || href === next.publicHref || href === target) return router;
 		target = href; // follow the server redirect (e.g. `/` → `/?page=1`)
 	}
 	return router;

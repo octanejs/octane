@@ -195,10 +195,14 @@ export function useLinkProps(...args: any[]): Record<string, any> {
 			if (!pathIsFuzzyEqual) return false;
 		}
 		if (activeOptions?.includeSearch ?? true) {
-			const searchTest = deepEqual(currentLocation.search, next.search, {
-				partial: !activeOptions?.exact,
-				ignoreUndefined: !activeOptions?.explicitUndefined,
-			});
+			// router-core 1.171.34 deepEqual: positional (partial, explicitUndefined)
+			// instead of an options object; the 4th arg is explicitUndefined directly.
+			const searchTest = deepEqual(
+				currentLocation.search,
+				next.search,
+				!activeOptions?.exact,
+				activeOptions?.explicitUndefined,
+			);
 			if (!searchTest) return false;
 		}
 		if (activeOptions?.includeHash) return currentLocation.hash === next.hash;

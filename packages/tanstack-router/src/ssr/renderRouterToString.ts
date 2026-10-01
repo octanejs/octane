@@ -1,11 +1,17 @@
 import { renderToString as octaneRenderToString } from 'octane/server';
+import { renderSsrHtmlResponse } from '@tanstack/router-core/ssr/server';
 import type { ComponentBody } from 'octane';
 import type { AnyRouter } from '@tanstack/router-core';
 
 type RouterApp = ComponentBody<{ router: AnyRouter }>;
 type ServerComponent = Parameters<typeof octaneRenderToString>[0];
 
-// eslint-disable-next-line @typescript-eslint/require-await -- framework render handlers share an async contract
+// router-core 1.171.34 owns HTML serialization: `renderSsrHtmlResponse` runs the
+// framework render, pipes the result through `transformHtmlStringWithRouter`
+// (which prepends `<!DOCTYPE html>` and injects the dehydrated router scripts at
+// the `<Scripts>` boundary), derives the HTTP status, and cleans up `serverSsr`.
+// Dehydration already ran in start-server-core's request handler. Octane only
+// supplies the rendered document HTML with its scoped CSS folded into `<head>`.
 export async function renderRouterToString({
 	router,
 	responseHeaders,
@@ -15,44 +21,26 @@ export async function renderRouterToString({
 	responseHeaders: Headers;
 	App: RouterApp;
 }) {
-	try {
-		const result = octaneRenderToString(
-			App as unknown as ServerComponent,
-			{ router },
-			{ nonce: router.options.ssr?.nonce },
-		);
-		router.serverSsr!.setRenderFinished();
-
-		return new Response(
-			finalizeBufferedHtml(result.html, result.css, router.serverSsr!.takeBufferedHtml()),
-			{
-				status: router.stores.statusCode.get(),
-				headers: responseHeaders,
-			},
-		);
-	} catch (error) {
-		console.error('Render to string error:', error);
-		return new Response('Internal Server Error', {
-			status: 500,
-			headers: responseHeaders,
-		});
-	} finally {
-		router.serverSsr?.cleanup();
-	}
+	return renderSsrHtmlResponse({
+		router,
+		responseHeaders,
+		render: () => {
+			const result = octaneRenderToString(
+				App as unknown as ServerComponent,
+				{ router },
+				{ nonce: router.options.ssr?.nonce },
+			);
+			return foldCssIntoHead(result.html, result.css);
+		},
+	});
 }
 
-export function finalizeBufferedHtml(renderedHtml: string, css: string, injectedHtml?: string) {
-	let html = renderedHtml;
-
-	if (css) {
-		html = html.includes('</head>') ? html.replace('</head>', `${css}</head>`) : `${css}${html}`;
-	}
-
-	if (injectedHtml) {
-		html = html.includes('</body>')
-			? html.replace('</body>', `${injectedHtml}</body>`)
-			: `${html}${injectedHtml}`;
-	}
-
-	return `<!DOCTYPE html>${html}`;
+// Fold octane's scoped-style output into the document head. Unlike the previous
+// implementation this adds no `<!DOCTYPE html>` and no router-script injection —
+// `transformHtmlStringWithRouter` now owns both.
+export function foldCssIntoHead(renderedHtml: string, css: string) {
+	if (!css) return renderedHtml;
+	return renderedHtml.includes('</head>')
+		? renderedHtml.replace('</head>', `${css}</head>`)
+		: `${css}${renderedHtml}`;
 }

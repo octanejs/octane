@@ -1296,7 +1296,7 @@
       "name": "@octanejs/tanstack-router",
       "version": "0.1.60",
       "category": "Routing",
-      "upstream": { "package": "@tanstack/react-router", "version": "1.170.18" },
+      "upstream": { "package": "@tanstack/react-router", "version": "1.170.41" },
       "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
       "divergences": [
         "Refs are props — `createLink`'s `forwardRef` becomes a `ref` prop.",
@@ -1310,7 +1310,7 @@
       "name": "@octanejs/tanstack-router-ssr-query",
       "version": "0.0.51",
       "category": "Routing",
-      "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.1" },
+      "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.3" },
       "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
       "divergences": [],
       "ssr": "Supported — this package IS the SSR integration (dehydrates query state into the router stream and wraps the app in the query provider).",

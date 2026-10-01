@@ -1,7 +1,7 @@
 {
   "upstream": {
     "package": "@tanstack/react-router-ssr-query",
-    "version": "1.167.1"
+    "version": "1.167.3"
   },
   "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
   "divergences": [],

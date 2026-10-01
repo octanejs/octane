@@ -1,5 +1,5 @@
 {
-  "upstream": { "package": "@tanstack/react-router", "version": "1.170.18" },
+  "upstream": { "package": "@tanstack/react-router", "version": "1.170.41" },
   "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
   "divergences": [
     "Refs are props — `createLink`'s `forwardRef` becomes a `ref` prop.",

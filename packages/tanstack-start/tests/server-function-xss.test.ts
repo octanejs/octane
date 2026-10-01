@@ -6,23 +6,18 @@ import { describe, expect, it } from 'vitest';
 // Regression guard for CVE-2026-102989 / GHSA-qx66-fv34-fjm8: a critical
 // unauthenticated reflected XSS in TanStack Start's server-function response
 // handling. `@octanejs/tanstack-start` does not fork that handler — it drives
-// requests through `@tanstack/start-server-core` — so the fix is applied as a
-// pnpm patch (patches/@tanstack__start-server-core@1.169.17.patch) that backports
-// the upstream fix first released in start-server-core >= 1.169.39.
-//
-// SCOPE: the pnpm patch rewrites only the copy resolved inside this repository,
-// so it protects the monorepo's own apps and CI. It does not ship in the
-// published package; the consumer-facing fix is tracked separately. See the
-// patchedDependencies comment in pnpm-workspace.yaml.
+// requests through `@tanstack/start-server-core` — so the fix ships by depending
+// on `@tanstack/start-server-core >= 1.169.39`, the first release to carry the
+// upstream fix. (This replaced the earlier repo-only pnpm patch once the binding
+// adopted router-core 1.171.34.)
 //
 // `handleServerAction` is an internal module (not a public export) that resolves
 // server functions through a compiler-generated virtual module, so it cannot be
 // driven from a unit test. Instead this guards the security property on the
 // dependency the repository resolves: client input is restricted to the public
 // {data, context, method} fields, and a non-Response result is never returned as
-// the raw HTTP response on the non-server-function path. The guard passes whether
-// the fix comes from our patch or a future upstream version, and fails if the
-// vulnerable behaviour is reintroduced (e.g. the patch stops applying).
+// the raw HTTP response on the non-server-function path. The guard passes on any
+// fixed upstream version and fails if a vulnerable version is ever reintroduced.
 
 const bindingPackageJson = join(process.cwd(), 'packages/tanstack-start/package.json');
 const requireFromBinding = createRequire(bindingPackageJson);

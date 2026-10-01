@@ -1,16 +1,18 @@
 // useMatchRoute / MatchRoute — port of react-router's Matches.tsx matcher pair.
-// The hook subscribes to `matchRouteDeps` (location href + resolved href +
-// status) so the matcher re-evaluates per navigation, and returns
-// `matchRoute(opts)` → false | matched params. The component renders its
-// children when matched — a render-prop child ALWAYS renders, receiving the
-// params (false when unmatched).
+// router-core 1.171.34 dropped the `matchRouteDeps` store; upstream now
+// subscribes to the location href, resolved-location href, and status directly
+// so the matcher re-evaluates per navigation, and returns `matchRoute(opts)` →
+// false | matched params. The component renders its children when matched — a
+// render-prop child ALWAYS renders, receiving the params (false when unmatched).
 import { useCallback, isChildrenBlock } from 'octane';
 import { useRouter } from './context.ts';
 import { useStore } from './useStore.ts';
 
 export function useMatchRoute() {
 	const router = useRouter();
-	useStore(router.stores.matchRouteDeps, (d) => d);
+	useStore(router.stores.location, (l: any) => l.href as string);
+	useStore(router.stores.resolvedLocation, (l: any) => l?.href as string | undefined);
+	useStore(router.stores.status, (s: any) => s as string);
 	return useCallback((opts: Record<string, any>) => {
 		const { pending, caseSensitive, fuzzy, includeSearch, ...rest } = opts;
 		return router.matchRoute(rest as any, { pending, caseSensitive, fuzzy, includeSearch });

@@ -1,37 +1,22 @@
-import { createElement, useEffect, useId, useState } from 'octane';
-import { isServer } from '@tanstack/router-core/isServer';
+import { createElement, useId } from 'octane';
 import type { RouterManagedTag } from '@tanstack/router-core';
 import { getAssetKeys } from './assetKeys.ts';
-import { useRouter } from './context.ts';
 import { useScripts } from './scriptContentUtils.ts';
 
+// router-core 1.171.34 owns the hydration-script lifecycle: the server appends
+// the initial hydration tags (and the streaming boundary) through
+// `useScripts()` / `takeInitialHydrationScriptTags()`, and those tags remove
+// themselves (`document.currentScript.remove()`) as they run. By the time the
+// client hydrates, the DOM holds only the body scripts, which is exactly what
+// the client renders — so there is no client-only barrier to prepend (the former
+// `$tsr-stream-barrier` belonged to the removed buffered-script model and left a
+// client <script> the server never rendered).
 export function Scripts() @{
 	const owner = useId();
-	const router = useRouter();
-	const scripts = useScripts();
-	const [hydrating, setHydrating] = useState(true);
-	useEffect(() => {
-		setHydrating(false);
-	}, []);
-	const renderScripts: Array<RouterManagedTag> =
-		!(isServer ?? router.isServer) && hydrating
-			? [
-					{
-						tag: 'script',
-						attrs: {
-							nonce: router.options.ssr?.nonce,
-							className: '$tsr',
-							id: '$tsr-stream-barrier',
-							suppressHydrationWarning: true,
-						},
-						children: '',
-					},
-					...scripts,
-				]
-			: scripts;
-	const keys = getAssetKeys('body', owner, renderScripts);
+	const scripts: Array<RouterManagedTag> = useScripts();
+	const keys = getAssetKeys('body', owner, scripts);
 	<>
-		{renderScripts.map((script, index) => {
+		{scripts.map((script, index) => {
 			const { assetKey, managedKey } = keys[index]!;
 			return createElement('script', {
 				...script.attrs,

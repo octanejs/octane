@@ -18,7 +18,7 @@ import type { OctaneNode } from 'octane';
 import type { ErrorInfo, ErrorRouteComponent } from './route.ts';
 
 export function CatchBoundary(props: {
-	getResetKey: () => number | string;
+	getResetKey: () => unknown;
 	children: OctaneNode;
 	errorComponent?: ErrorRouteComponent;
 	onCatch?: (error: Error, errorInfo: ErrorInfo) => void;
@@ -41,7 +41,7 @@ export function CatchBoundary(props: {
 function CatchErrorView(props: {
 	error: any;
 	reset: () => void;
-	getResetKey?: () => number | string;
+	getResetKey?: () => unknown;
 	errorComponent?: ErrorRouteComponent;
 	onCatch?: (error: Error, errorInfo: ErrorInfo) => void;
 }) @{

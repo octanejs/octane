@@ -67,17 +67,19 @@ describe('@octanejs/tanstack-router-ssr-query', () => {
 
 		const dehydrated = await router.options.dehydrate?.();
 
+		// router-ssr-query-core 1.169.3 dehydrates under `query: { initial, stream }`
+		// (previously `dehydratedQueryClient.queries` + a top-level `queryStream`).
 		expect(dehydrated).toEqual(
 			expect.objectContaining({
-				dehydratedQueryClient: expect.objectContaining({
-					queries: expect.arrayContaining([
+				query: expect.objectContaining({
+					initial: expect.arrayContaining([
 						expect.objectContaining({
 							queryKey: ['router-ssr-proof'],
 							state: expect.objectContaining({ data: 'server-cached' }),
 						}),
 					]),
+					stream: expect.any(ReadableStream),
 				}),
-				queryStream: expect.any(ReadableStream),
 			}),
 		);
 	});
@@ -93,7 +95,7 @@ describe('@octanejs/tanstack-router-ssr-query', () => {
 		await expect(router.options.dehydrate?.()).resolves.toEqual(
 			expect.objectContaining({
 				original: 'preserved',
-				queryStream: expect.any(ReadableStream),
+				query: expect.objectContaining({ stream: expect.any(ReadableStream) }),
 			}),
 		);
 	});
