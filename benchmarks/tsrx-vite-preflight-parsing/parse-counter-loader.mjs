@@ -17,7 +17,7 @@ export function parseModule(source, filename, ...rest) {
 	const counter = globalThis[counterKey];
 	if (
 		counter !== undefined &&
-		source === counter.source &&
+		counter.sources.includes(source) &&
 		counter.ids.includes(filename)
 	) {
 		counter.${kind}++;
