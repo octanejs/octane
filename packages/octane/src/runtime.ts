@@ -22378,7 +22378,25 @@ function applyRefValue(ref: any, el: object | null, prevTarget?: object | null):
 		return;
 	}
 	if (Array.isArray(ref)) {
-		for (let i = 0; i < ref.length; i++) applyRefValue(ref[i], el, prevTarget);
+		if (el !== null) {
+			for (let i = 0; i < ref.length; i++) applyRefValue(ref[i], el, prevTarget);
+			return;
+		}
+		// Release every owner after a cleanup failure, keeping update-depth errors fatal.
+		let error: unknown;
+		let failed = false;
+		for (let i = 0; i < ref.length; i++) {
+			try {
+				applyRefValue(ref[i], el, prevTarget);
+			} catch (caught) {
+				if (caught instanceof MaximumUpdateDepthError) throw caught;
+				if (!failed) {
+					error = caught;
+					failed = true;
+				}
+			}
+		}
+		if (failed) throw error;
 		return;
 	}
 	ref.current = el;
