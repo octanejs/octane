@@ -3,16 +3,26 @@ import {
 	forEachRuntimeAstChild,
 	isIdentifierReference,
 } from './compile-universal.js';
+import {
+	collectDescriptorChildrenBindings,
+	findReturnedJsxTemplateBodies,
+} from './descriptor-lowering.js';
 
-/** Only private contexts whose complete authored lifetime stays in template bodies. */
-export function findPrivateCompiledContexts(ast) {
+/**
+ * Only private contexts whose complete authored lifetime stays in template
+ * bodies. `isDescriptorChildrenImport` is the bundler's proof that an imported
+ * component keeps descriptor children, as the compile option of that name.
+ */
+export function findPrivateCompiledContexts(ast, isDescriptorChildrenImport) {
 	return new Map(
-		[...findPrivateCompiledContextProofs(ast)].map(([name, context]) => [name, context.callee]),
+		[...findPrivateCompiledContextProofs(ast, isDescriptorChildrenImport)].map(
+			([name, context]) => [name, context.callee],
+		),
 	);
 }
 
 /** Definition and exact provider tags accepted by the same closed-module proof. */
-export function findPrivateCompiledContextProofs(ast) {
+export function findPrivateCompiledContextProofs(ast, isDescriptorChildrenImport) {
 	const imports = new Map();
 	for (const statement of ast.body ?? []) {
 		if (
@@ -71,6 +81,28 @@ export function findPrivateCompiledContextProofs(ast) {
 		}
 	}
 	if (contexts.size === 0) return new Map();
+	// A provider is proven only where its tag lowers to a compiled component
+	// call whose children are a compiled body. Children of a descriptorChildren
+	// component and the returned-JSX form of a directly called `@{ … }` function
+	// lower to element descriptors instead, which only the public provider renders.
+	const descriptorChildren = collectDescriptorChildrenBindings(ast, isDescriptorChildrenImport);
+	const returnedJsx = findReturnedJsxTemplateBodies(ast);
+	const keepsDescriptorChildren = (element) => {
+		const name = element.openingElement?.name;
+		return (
+			name?.type === 'JSXIdentifier' &&
+			descriptorChildren.has(name.name) &&
+			(lexical.nodeScopes.get(name) === undefined || moduleBinding(name))
+		);
+	};
+	// A function's `@{ … }` body renders a template unless the function also
+	// has a returned-JSX form. A child block with setup is its own render body;
+	// a render-only child block is transparent grouping in its position.
+	const rendersTemplate = (block, parent, key, direct) =>
+		key === 'body' &&
+		['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(parent?.type)
+			? !returnedJsx.has(block)
+			: direct || (block.body?.length ?? 0) > 0;
 	let opaque = false;
 	const providerChildren = (element) =>
 		!(element.openingElement.attributes ?? []).some(
@@ -144,10 +176,12 @@ export function findPrivateCompiledContextProofs(ast) {
 		forEachRuntimeAstChild(node, (child, childKey) => {
 			const childDirect =
 				node.type === 'JSXCodeBlock'
-					? childKey === 'render'
+					? childKey === 'render' && rendersTemplate(node, parent, key, direct)
 					: direct &&
 						((node.type === 'JSXElement' &&
-							['children', 'openingElement', 'closingElement'].includes(childKey)) ||
+							(childKey === 'openingElement' ||
+								childKey === 'closingElement' ||
+								(childKey === 'children' && !keepsDescriptorChildren(node)))) ||
 							(node.type === 'JSXFragment' && childKey === 'children') ||
 							((node.type === 'JSXOpeningElement' || node.type === 'JSXClosingElement') &&
 								childKey === 'name'));
