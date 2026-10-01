@@ -48,6 +48,11 @@ const vercelPreviewWorkflow = readFileSync(
 	path.join(REPO, '.github/workflows/vercel-preview.yml'),
 	'utf8',
 );
+const prBenchWorkflow = readFileSync(path.join(REPO, '.github/workflows/pr-bench.yml'), 'utf8');
+const prBenchCommentWorkflow = readFileSync(
+	path.join(REPO, '.github/workflows/pr-bench-comment.yml'),
+	'utf8',
+);
 const websiteVercelConfig = JSON.parse(
 	readFileSync(path.join(REPO, 'website/vercel.json'), 'utf8'),
 );
@@ -1648,6 +1653,114 @@ describe('Review readiness label', () => {
 		});
 
 		assert.match(result.failures.join('\n'), /remove failed with 500/);
+	});
+});
+
+describe('Pull request benchmark report', () => {
+	test('measures base and merge commit in one unprivileged job', () => {
+		assert.match(prBenchWorkflow, /^on:\n {2}pull_request:\n/m);
+		assert.match(prBenchWorkflow, /^permissions:\n {2}contents: read$/m);
+		assert.match(prBenchWorkflow, /if: github\.event\.pull_request\.draft == false/);
+		for (const results of ['base', 'head']) {
+			assert.ok(
+				prBenchWorkflow.includes(
+					`node benchmarks/bench.mjs --results-dir="$RESULTS/${results}" bundle-size bundle-reachability`,
+				),
+			);
+		}
+		assert.ok(prBenchWorkflow.includes('for round in base:1 head:1 head:2 base:2; do'));
+		assert.ok(prBenchWorkflow.includes('TARGETS: ${{ env.JS_FRAMEWORK_TARGETS }}'));
+		assert.ok(
+			prBenchWorkflow.includes('--results-dir="$RESULTS/$side-js-${round##*:}" js-framework'),
+		);
+		assert.ok(prBenchWorkflow.includes('--base="$RESULTS/base" --head="$RESULTS/head" --rounds=2'));
+		assert.match(packageJson.scripts['ci:workflow:test'], /benchmarks\/pr-report\.test\.mjs/);
+	});
+
+	test('posts the report from the default branch without running pull request code', () => {
+		assert.match(
+			prBenchCommentWorkflow,
+			/workflow_run:\n {4}workflows: \[PR bench, CI\]\n {4}types: \[completed\]/,
+		);
+		assert.match(prBenchCommentWorkflow, /^permissions: \{\}$/m);
+		assert.equal(prBenchCommentWorkflow.match(/actions\/checkout@/g)?.length, 1);
+		assert.ok(
+			prBenchCommentWorkflow.includes('ref: ${{ github.event.repository.default_branch }}'),
+		);
+		assert.doesNotMatch(prBenchCommentWorkflow, /pnpm|node benchmarks|head_branch|head\.ref/);
+		assert.ok(prBenchCommentWorkflow.includes('candidate.head.sha === sha'));
+		assert.ok(prBenchCommentWorkflow.includes('read("head-sha").trim() !== sha'));
+		assert.ok(prBenchCommentWorkflow.includes('comment.body?.startsWith(COMMENT_MARKER)'));
+		assert.match(packageJson.scripts['ci:workflow:test'], /benchmarks\/ci-timing\.test\.mjs/);
+	});
+
+	// A newer cancelled rerun, or a draft run that skipped every job but concluded success, used to hide real data.
+	test('picks the newest completed run for the commit that produced data', async () => {
+		const sha = 'a'.repeat(40);
+		const run = (id, path, conclusion) => ({
+			id,
+			path: `.github/workflows/${path}`,
+			head_sha: sha,
+			conclusion,
+		});
+		const listed = {
+			'pr-bench.yml': [
+				run(30, 'pr-bench.yml', 'cancelled'),
+				run(20, 'pr-bench.yml', 'success'),
+				run(9, 'pr-bench.yml', 'failure'),
+			],
+			'ci.yml': [run(60, 'ci.yml', 'success'), run(12, 'ci.yml', 'failure')],
+		};
+		const artifacts = new Set([9, 30, 70]);
+		const gated = new Set([12]);
+		const queries = [];
+		const outputs = {};
+		const execute = new AsyncFunction(
+			'github',
+			'context',
+			'core',
+			stepScript(prBenchCommentWorkflow, 'Find runs for the commit'),
+		);
+		const github = {
+			rest: {
+				actions: {
+					listWorkflowRuns: async (query) => {
+						queries.push(query);
+						return { data: { workflow_runs: listed[query.workflow_id] } };
+					},
+					listWorkflowRunArtifacts: async ({ run_id }) => ({
+						data: { artifacts: artifacts.has(run_id) ? [{ expired: false }] : [] },
+					}),
+					listJobsForWorkflowRun: async ({ run_id }) => ({
+						data: {
+							jobs: [
+								{
+									name: 'classify changeset release',
+									conclusion: gated.has(run_id) ? 'success' : 'skipped',
+								},
+							],
+						},
+					}),
+				},
+			},
+		};
+		const core = { setOutput: (name, value) => (outputs[name] = value) };
+		const context = (workflow_run) => ({
+			repo: { owner: 'o', repo: 'r' },
+			payload: { workflow_run },
+		});
+
+		await execute(github, context(run(60, 'ci.yml', 'success')), core);
+		assert.deepEqual(outputs, { bench: '9', ci: '12' });
+		assert.ok(queries.every((query) => query.status === 'completed' && query.head_sha === sha));
+
+		await execute(github, context(run(70, 'pr-bench.yml', 'failure')), core);
+		assert.deepEqual(outputs, { bench: '70', ci: '12' });
+
+		gated.clear();
+		artifacts.clear();
+		await execute(github, context(run(60, 'ci.yml', 'success')), core);
+		assert.deepEqual(outputs, { bench: '', ci: '' });
 	});
 });
 
