@@ -599,10 +599,12 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 
 	// A helper called from cleanup is scanned with its call's arguments, so its
 	// parameters name what the caller passed. Only unframed scans are cached.
-	function scan(fn, args = null) {
+	// `outer` holds the frames a cleanup closed over, such as the arguments of
+	// the helper call that returned it.
+	function scan(fn, args = null, outer = null) {
 		const parameters = args === null ? [] : parametersOf(fn);
 		const framed = parameters.length !== 0;
-		const cacheable = !framed && frames === null;
+		const cacheable = !framed && outer === null && frames === null;
 		if (cacheable && scans.has(fn)) return scans.get(fn);
 		if (activeScans.has(fn)) return emptyCleanup();
 		const result = emptyCleanup();
@@ -610,6 +612,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		if (cacheable) scans.set(fn, result);
 		activeScans.add(fn);
 		const enclosingFrames = frames;
+		if (outer !== null) frames = outer;
 		if (framed) frames = { parameters, args, next: frames };
 		const visit = (node) => {
 			if (node == null || typeof node !== 'object') return;
@@ -698,7 +701,9 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 	// before starting work; this is a bounded proof, not a path-sensitive one.
 	function cleanupOf(record) {
 		const result = emptyCleanup();
-		for (const fn of record.cleanupFunctions) mergeCleanup(result, scan(fn));
+		for (const fn of record.cleanupFunctions) {
+			mergeCleanup(result, scan(fn, null, record.cleanupFrames?.get(fn) ?? null));
+		}
 		return result;
 	}
 
@@ -1124,6 +1129,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			record.continuations = [];
 			record.acquisitions = [];
 			record.cleanupFunctions = [];
+			record.cleanupFrames = null;
 			record.opaqueCleanup = false;
 			record.setupScopes = new Set();
 			const saved = { flow, guards };
@@ -1178,12 +1184,19 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				controllers: flow.controllers,
 			});
 		},
-		cleanup(record, callbacks) {
+		// `call` is the local helper call that returned the cleanup, whose
+		// parameters the cleanup may close over.
+		cleanup(record, callbacks, call = null) {
 			if (callbacks === null) {
 				record.opaqueCleanup = true;
 				return;
 			}
-			for (const callback of callbacks) record.cleanupFunctions.push(callback);
+			const outer =
+				call === null ? null : { parameters: parametersOf(call.fn), args: call.args, next: frames };
+			for (const callback of callbacks) {
+				record.cleanupFunctions.push(callback);
+				if (outer !== null) (record.cleanupFrames ??= new Map()).set(callback, outer);
+			}
 		},
 		acquire,
 		construct,
