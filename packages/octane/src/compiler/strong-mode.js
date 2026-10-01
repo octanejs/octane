@@ -2339,6 +2339,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			}
 			if (value?.kind === 'snapshot' && parameter.type !== 'Identifier') {
 				bindSnapshotPattern(parameter, value, bindGetter, snapshotPatternProperty(parameterScope));
+			} else if (value?.kind === 'state-tuple') {
+				bindTuplePattern(parameter, value, parameterScope, bindGetter);
 			}
 			if (parameter.type === 'Identifier' && !isReassigned(parameter)) {
 				parameterScope.bindings.set(parameter.name, value);
@@ -2681,6 +2683,31 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						? property.key.name
 						: property.key?.value,
 			);
+	}
+
+	// A destructured tuple parameter binds its state value and setter like a
+	// declaration; a default replaces only `undefined`.
+	function bindTuplePattern(pattern, tuple, scope, bind) {
+		const project = snapshotPatternProperty(scope);
+		const target = (node) => (node?.type === 'AssignmentPattern' ? node.left : node);
+		if (pattern?.type === 'ArrayPattern') {
+			bindSnapshotPattern(target(pattern.elements?.[0]), tuple.snapshot, bind, project);
+			bind(target(pattern.elements?.[1]), tuple.setter);
+		} else if (pattern?.type === 'ObjectPattern') {
+			for (const property of pattern.properties ?? []) {
+				if (property.type !== 'Property') continue;
+				const key = property.computed
+					? staticPrimitiveValue(property.key, scope)
+					: property.key?.type === 'Identifier'
+						? property.key.name
+						: property.key?.value;
+				if (key === 0 || key === '0') {
+					bindSnapshotPattern(target(property.value), tuple.snapshot, bind, project);
+				} else if (key === 1 || key === '1') {
+					bind(target(property.value), tuple.setter);
+				}
+			}
+		}
 	}
 
 	function stateTupleBinding(expression, scope) {

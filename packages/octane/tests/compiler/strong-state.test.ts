@@ -367,6 +367,14 @@ describe('Strong state mutation outside render', () => {
 			`function add(pair) { pair[0].push(1); } export function A() { const tuple = useState([]); return <b onClick={() => { add(tuple); tuple[1]([...tuple[0]]); }}>{tuple[0].length}</b>; }`,
 		],
 		[
+			'a destructured tuple parameter',
+			`function add([items, setItems]) { items.push(1); setItems([...items]); } export function A() { const tuple = useState([]); return <b onClick={() => add(tuple)}>{tuple[0].length}</b>; }`,
+		],
+		[
+			'an object-destructured tuple parameter with a default',
+			`function add({ 0: items = [] }) { items.push(1); } export function A() { const tuple = useState([]); return <b onClick={() => add(tuple)}>{tuple[0].length}</b>; }`,
+		],
+		[
 			'an Effect Event called with the state',
 			`export function A() { const [items, setItems] = useState([]); const add = useEffectEvent((list) => { list.push(1); }); return <b onClick={() => { add(items); setItems([...items]); }}>{items.length}</b>; }`,
 		],
