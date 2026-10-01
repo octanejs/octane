@@ -15,7 +15,7 @@ same application behavior share a family. Dataset splits happen by family,
 never by individual row.
 
 Capabilities are `authoring`, `migration`, `api-integration`,
-`ssr-hydration`, and `divergence-recognition`. Difficulty is `introductory`,
+`ssr-hydration`, `divergence-recognition`, and `repair`. Difficulty is `introductory`,
 `standard`, or `advanced`; it describes the expected application work, not the
 model success rate.
 
@@ -84,7 +84,10 @@ been recorded. The benchmark's own license does not relicense embedded code.
 2. Write a prompt that describes observable application behavior without
    dictating the implementation. State allowed paths, available context, and
    each public validation command's stable ID and command text.
-3. Confirm the incomplete starter compiles but fails the intended behavior.
+3. Confirm the incomplete starter compiles but fails the intended behavior. A
+   Strong repair starter is the exception: it must fail Strong compilation with
+   the error its prompt quotes. Its grader imports the submission inside each
+   test, so the compile check still records a failed assertion.
 4. Write deterministic graders against rendered output and user-observable
    behavior. Add a narrow parsed-AST source contract only when the task names an
    Octane syntax or API pattern that cannot be distinguished behaviorally (for
@@ -94,7 +97,9 @@ been recorded. The benchmark's own license does not relicense embedded code.
    alternative.
 6. Confirm both solutions pass the task repeatedly.
 7. Try plausible React-shaped, wrong, and partial implementations; strengthen
-   the tests until each is rejected for the intended reason.
+   the tests until each is rejected for the intended reason. For a Strong
+   repair, commit the workarounds under `negatives/` so the rejection stays
+   checked.
 8. Run the task from the immutable evaluation image with network access removed.
 9. Have two reviewers independently check clarity, scope, provenance, and test
    validity. Adjudicate disagreements before release.
@@ -107,7 +112,8 @@ A held-out task is ready for comparable model scoring only when all answers are
 yes. Public training exemplars may ship without private review evidence, but
 must not be presented as uncontaminated benchmark results:
 
-- Does the starter compile and fail only the intended behavior?
+- Does the starter compile and fail only the intended behavior? (For a Strong
+  repair: does it fail only the quoted Strong error?)
 - Is the prompt solvable from the declared context without private knowledge?
 - Do multiple valid implementations pass?
 - Do realistic wrong implementations fail?

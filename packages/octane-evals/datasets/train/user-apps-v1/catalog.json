@@ -64,6 +64,22 @@
       "theme-apply": ["octane.theme-apply"],
       "theme-composition": ["octane.theme-apply"],
       "class-map": ["octane.theme-apply"]
+    },
+    "strongRepairs": {
+      "managed-dom-write": ["octane.strong-managed-text", "octane.strong-managed-class"],
+      "raw-html-write": ["octane.strong-raw-html"],
+      "own-markup-query": ["octane.strong-own-query"],
+      "render-randomness": [
+        "octane.strong-row-keys",
+        "octane.strong-random-id",
+        "octane.strong-shuffle"
+      ],
+      "locale-formatting": ["octane.strong-date-format"],
+      "effect-state-update": ["octane.strong-derived-name", "octane.strong-save-counter"],
+      "effect-data-fetch": ["octane.strong-user-fetch"],
+      "ambient-read": ["octane.strong-viewport-width"],
+      "snapshot-mutation": ["octane.strong-sorted-tags"],
+      "ref-read": ["octane.strong-click-tally"]
     }
   },
   "tasks": [
@@ -349,6 +365,174 @@
       "portShape": "stateful-binding",
       "sourcePath": "packages/tanstack-query/README.md",
       "tags": ["tanstack-query", "async", "server-state"]
+    },
+    {
+      "taskId": "octane.strong-managed-text",
+      "familyId": "octane.strong-repair",
+      "title": "Repair a Strong-mode profile heading",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "managed-dom-write", "refs", "ssr"]
+    },
+    {
+      "taskId": "octane.strong-managed-class",
+      "familyId": "octane.strong-repair",
+      "title": "Repair Strong-mode tab selection classes",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "managed-dom-write", "refs", "class-composition", "ssr"]
+    },
+    {
+      "taskId": "octane.strong-raw-html",
+      "familyId": "octane.strong-repair",
+      "title": "Repair Strong-mode trusted release notes",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "raw-html-write", "trusted-html", "ssr"]
+    },
+    {
+      "taskId": "octane.strong-own-query",
+      "familyId": "octane.strong-repair",
+      "title": "Repair Strong-mode search panel focus",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "own-markup-query", "refs", "focus"]
+    },
+    {
+      "taskId": "octane.strong-row-keys",
+      "familyId": "octane.strong-repair",
+      "title": "Repair Strong-mode task row keys",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "render-randomness", "keyed-reconciliation", "for"]
+    },
+    {
+      "taskId": "octane.strong-random-id",
+      "familyId": "octane.strong-repair",
+      "title": "Repair Strong-mode form field IDs",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "render-randomness", "use-id", "ssr"]
+    },
+    {
+      "taskId": "octane.strong-shuffle",
+      "familyId": "octane.strong-repair",
+      "title": "Repair a Strong-mode answer shuffle",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "render-randomness", "state-updates", "native-events"]
+    },
+    {
+      "taskId": "octane.strong-date-format",
+      "familyId": "octane.strong-repair",
+      "title": "Repair Strong-mode post dates",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "locale-formatting", "ssr", "for"]
+    },
+    {
+      "taskId": "octane.strong-derived-name",
+      "familyId": "octane.strong-repair",
+      "title": "Repair a Strong-mode derived name",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "introductory",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "effect-state-update", "derived-state", "ssr"]
+    },
+    {
+      "taskId": "octane.strong-user-fetch",
+      "familyId": "octane.strong-repair",
+      "title": "Repair a Strong-mode user loader",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "advanced",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "effect-data-fetch", "effects", "async"]
+    },
+    {
+      "taskId": "octane.strong-viewport-width",
+      "familyId": "octane.strong-repair",
+      "title": "Repair a Strong-mode viewport width",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "advanced",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "ambient-read", "external-store", "ssr"]
+    },
+    {
+      "taskId": "octane.strong-sorted-tags",
+      "familyId": "octane.strong-repair",
+      "title": "Repair Strong-mode sorted tags",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "snapshot-mutation", "state-updates", "keyed-reconciliation"]
+    },
+    {
+      "taskId": "octane.strong-click-tally",
+      "familyId": "octane.strong-repair",
+      "title": "Repair Strong-mode click tallies",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "ref-read", "state-updates", "component-composition"]
+    },
+    {
+      "taskId": "octane.strong-save-counter",
+      "familyId": "octane.strong-repair",
+      "title": "Repair a Strong-mode save counter",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "advanced",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-09-30",
+      "publishedAt": "2026-09-30",
+      "tags": ["strong-mode", "effect-state-update", "async", "state-updates"]
     }
   ]
 }
