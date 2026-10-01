@@ -7626,21 +7626,23 @@ function mapCallToForOf(expr, ctx) {
 	// in the existing environment proof so the receiver/method remain available.
 	if (!directReceiver) ctx.currentComponentLocals?.add(receiverName);
 	if (methodName !== null) ctx.currentComponentLocals?.add(methodName);
-	const forNode = Object.assign(
-		b.for_of(b.const(params[0], null), b.id(receiverName), b.block([bodyEl])),
-		{
-			key: keyExpr,
-			index: params[1] || null,
-			empty: null,
-			nativeArrayMap: {
-				receiver: expr.callee.object,
-				receiverName,
-				methodName,
-				directReceiver,
-				callback: arrow,
-			},
+	// A callback parameter is writable. An identifier becomes the row helper's own
+	// parameter, so its header kind is never emitted and stays `const`; a
+	// destructured one is re-declared in the row prologue with the header's kind.
+	const itemDeclaration =
+		params[0].type === 'Identifier' ? b.const(params[0], null) : b.let(params[0], null);
+	const forNode = Object.assign(b.for_of(itemDeclaration, b.id(receiverName), b.block([bodyEl])), {
+		key: keyExpr,
+		index: params[1] || null,
+		empty: null,
+		nativeArrayMap: {
+			receiver: expr.callee.object,
+			receiverName,
+			methodName,
+			directReceiver,
+			callback: arrow,
 		},
-	);
+	});
 	return inheritOriginLoc(forNode, expr);
 }
 
@@ -33228,11 +33230,12 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 
 	// Destructured header `const {x,y} of …` — synthesize a destructure stmt
 	// at the top of the body so the user fields bind from the synthetic item.
+	// It keeps the header's kind: a `let` header's fields stay writable.
 	const destructureInjection = isDestructured
 		? [
 				inheritOriginLoc(
 					// leftDeclId: ObjectPattern / ArrayPattern (lazy flag dropped by printer)
-					b.const(leftDeclId, b.id(itemName)),
+					b.declaration(node.left.kind, [b.declarator(leftDeclId, b.id(itemName))]),
 					leftDeclId,
 				),
 			]
