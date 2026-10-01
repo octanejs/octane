@@ -246,6 +246,18 @@ describe('Strong asynchronous effect updates', () => {
 			'a catch handler after an unsigned request',
 			`try { await fetch('/a', { signal }); } catch { await api.get(props.id); } setData(1);`,
 		],
+		[
+			'a switch case that breaks inside a branch after an unsigned request',
+			`switch (props.mode) { case 'a': await api.get(props.id); if (props.fast) break; await fetch('/b', { signal }); break; default: await fetch('/c', { signal }); } setData(1);`,
+		],
+		[
+			'a loop that breaks inside a branch after an unsigned request',
+			`await fetch('/a', { signal }); while (props.more) { await api.get(props.id); if (props.fast) break; await fetch('/b', { signal }); } setData(1);`,
+		],
+		[
+			'a loop that continues after an unsigned request',
+			`await fetch('/a', { signal }); for (const id of props.ids) { await api.get(id); if (props.skip) continue; await fetch('/b', { signal }); } setData(1);`,
+		],
 	])('rejects an abort proof that does not cover %s', (_label, body) => {
 		rejects(app(aborted(body)), FETCH);
 	});
@@ -286,6 +298,14 @@ describe('Strong asynchronous effect updates', () => {
 			`await api.warm(); try { await fetch('/a', { signal }); } catch { return; } finally { api.log(); } setData(1);`,
 		],
 		['a for test', `for (; await fetch('/a', { signal }); ) { setData(1); }`],
+		[
+			'a switch case that breaks inside a branch after a signed request',
+			`switch (props.mode) { case 'a': await fetch('/a', { signal }); if (props.fast) break; await fetch('/b', { signal }); break; default: await fetch('/c', { signal }); } setData(1);`,
+		],
+		[
+			'a request selected by a literal operand',
+			`await (null ?? fetch('/a', { signal })); setData(1);`,
+		],
 	])('accepts an abort proof that covers %s', (_label, body) => {
 		accepts(app(aborted(body)));
 	});
@@ -842,6 +862,14 @@ export function App(props) @{
 			`useEffect(() => { (async () => { const ready = props.flag ? props.pending : null; await ready; ${write}; })(); });`,
 		],
 		[
+			'an await of a condition and work',
+			`useEffect(() => { let active = true; (async () => { await (props.flag && props.load()); if (active) ${write}; })(); return () => { active = false; }; });`,
+		],
+		[
+			'a settled promise of a condition and pending work',
+			`useEffect(() => { Promise.resolve(props.flag && props.pending).then(() => ${write}); });`,
+		],
+		[
 			'a stored await whose other branch awaits',
 			`useEffect(() => { (async () => { const ready = props.flag ? await props.load() : null; await ready; ${write}; })(); });`,
 		],
@@ -936,6 +964,10 @@ export function App(props) @{
 		[
 			'an await of each var in a loop',
 			`useEffect(() => { let active = true; (async () => { for (var ready of props.pending) { await ready; if (active) ${write}; } })(); return () => { active = false; }; });`,
+		],
+		[
+			'an await of pending work or a fallback request',
+			`useEffect(() => { let active = true; (async () => { await (props.pending || props.load()); if (active) ${write}; })(); return () => { active = false; }; });`,
 		],
 		[
 			'a stored await whose every branch waits',
@@ -1165,6 +1197,16 @@ export function App(props) @{
 			'an alias of a stored object member',
 			`function useThing() { const [value, setValue] = useState(0); return { value, setValue }; }`,
 			`const thing = useThing(); const setValue = thing.setValue; ${update}`,
+		],
+		[
+			'an alias of a stored hook result',
+			`function useThing() { const [value, setValue] = useState(0); return { value, setValue }; }`,
+			`const thing = useThing(); const alias = thing; useEffect(() => { alias.setValue(props.value); });`,
+		],
+		[
+			'a stored hook result passed to a helper',
+			`function useThing() { const [value, setValue] = useState(0); return [value, setValue]; } function apply(pair, next) { pair[1](next); }`,
+			`const thing = useThing(); useEffect(() => { apply(thing, props.value); });`,
 		],
 		[
 			'a stored transition start member',

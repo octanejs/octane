@@ -1441,6 +1441,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	let returnCollector = null;
 	let renderOwner = null;
 	let currentEffect = null;
+	// Enclosing switches and loops of the function being visited, innermost
+	// first. Each collects the abort-proof flows that jump out of it.
+	let jumpTargets = null;
 	let currentFunction = null;
 	let collectEffectReads = true;
 	let effectOwnsWrites = true;
@@ -1959,6 +1962,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (node?.type === 'ConditionalExpression' || node?.type === 'LogicalExpression') {
 			const only = effectPolicy.selected(node);
 			if (only !== null) return awaitYields(only);
+			// A falsy left operand of `&&` is the awaited value, and it is never a
+			// thenable: that path resumes in a microtask.
+			if (node.operator === '&&') return false;
 			return node.type === 'ConditionalExpression'
 				? awaitYields(node.consequent) && awaitYields(node.alternate)
 				: awaitYields(node.left) && awaitYields(node.right);
@@ -2421,6 +2427,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const enclosingOwner = renderOwner;
 		// A caller resumes synchronously when its callee first yields.
 		const enclosingFlow = effectPolicy.saveFlow();
+		const enclosingJumpTargets = jumpTargets;
+		jumpTargets = null;
 		if (currentEffect !== null && phase === 'effect')
 			effectPolicy.setupFunction(currentEffect, node);
 		currentFunction = node;
@@ -2482,6 +2490,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			currentFunction = enclosingFunction;
 			renderOwner = enclosingOwner;
 			effectPolicy.restoreFlow(enclosingFlow);
+			jumpTargets = enclosingJumpTargets;
 			currentFunctionIsAsync = enclosingFunctionIsAsync;
 			currentFunctionChecksImpureCalls = enclosingFunctionChecksImpureCalls;
 			currentFunctionChecksRenderReads = enclosingFunctionChecksRenderReads;
@@ -2668,7 +2677,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					value?.kind === 'linked-key' ||
 					value?.kind === 'constant' ||
 					value?.kind === 'transition-start' ||
-					value?.kind === 'transition-tuple'
+					value?.kind === 'transition-tuple' ||
+					value?.kind === 'returned-array' ||
+					value?.kind === 'returned-object'
 				) {
 					target.bindings.set(declaration.id.name, value);
 				} else if (value == null && initial.name === 'undefined') {
@@ -3640,7 +3651,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				binding?.kind === 'state-tuple' ||
 				binding?.kind === 'constant' ||
 				binding?.kind === 'linked-key' ||
-				binding?.kind === 'transition-start'
+				binding?.kind === 'transition-start' ||
+				binding?.kind === 'transition-tuple' ||
+				binding?.kind === 'returned-array' ||
+				binding?.kind === 'returned-object'
 			) {
 				return binding;
 			}
@@ -3913,6 +3927,34 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	// Only paths that reach the next statement share its flow.
+	function enterJumpTarget(loop) {
+		if (currentEffect === null) return null;
+		jumpTargets = { loop, flows: [], next: jumpTargets };
+		return jumpTargets;
+	}
+
+	// The flow after a switch or loop also joins every jump out of it, such as
+	// a `break` inside an `if`.
+	function exitJumpTarget(target, flow) {
+		if (target === null) return flow;
+		jumpTargets = target.next;
+		if (target.flows.length === 0) return flow;
+		return flow === null
+			? target.flows.reduce(effectPolicy.joinFlow)
+			: target.flows.reduce(effectPolicy.joinFlow, flow);
+	}
+
+	function recordJump(node) {
+		if (currentEffect === null) return;
+		const flow = effectPolicy.saveFlow();
+		for (let target = jumpTargets; target !== null; target = target.next) {
+			if (node.type === 'ContinueStatement' && !target.loop) continue;
+			target.flows.push(flow);
+			// A labeled jump may leave any enclosing target.
+			if (node.label == null) return;
+		}
+	}
+
 	function joinBranchFlows(node, branches, consequent, alternate) {
 		if (branches === 1) return consequent;
 		if (branches === 2) return alternate;
@@ -4471,6 +4513,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				return;
 			case 'BreakStatement':
 			case 'ContinueStatement':
+				recordJump(node);
 				return;
 			case 'Identifier':
 				if (readAccess && collectEffectReads && currentEffect !== null) {
@@ -4847,6 +4890,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				// Each case starts from the switch, or also from the case falling into it.
 				const before = currentEffect === null ? undefined : effectPolicy.saveFlow();
 				const exits = [];
+				const switchTarget = enterJumpTarget(false);
 				for (const branch of branches) {
 					if (before !== undefined) {
 						effectPolicy.restoreFlow(
@@ -4886,6 +4930,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 				if (before !== undefined) {
 					if (!branches.some((branch) => branch.test == null)) exits.push(before);
+					const jumped = exitJumpTarget(switchTarget, null);
+					if (jumped !== null) exits.push(jumped);
 					if (exits.length !== 0) effectPolicy.restoreFlow(exits.reduce(effectPolicy.joinFlow));
 				}
 				return;
@@ -5346,11 +5392,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (before !== undefined && !alwaysAwaits(node.test)) {
 					effectPolicy.enterLoopBody([node.body, node.update]);
 				}
+				const forTarget = enterJumpTarget(true);
 				visit(node.body, loop, executionPhase);
 				visit(node.update, loop, executionPhase);
 				// The body may not run.
 				if (before !== undefined) {
-					effectPolicy.restoreFlow(effectPolicy.joinFlow(before, effectPolicy.saveFlow()));
+					effectPolicy.restoreFlow(
+						exitJumpTarget(forTarget, effectPolicy.joinFlow(before, effectPolicy.saveFlow())),
+					);
 				}
 				return;
 			}
@@ -5430,6 +5479,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				} else {
 					visit(node.left, loop, executionPhase, false);
 				}
+				const iterationTarget = enterJumpTarget(true);
 				visit(node.body, loop, executionPhase);
 				if (before !== undefined) {
 					// An async loop ends on an iterator yield; another may not run its body.
@@ -5438,6 +5488,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					} else {
 						effectPolicy.restoreFlow(effectPolicy.joinFlow(before, effectPolicy.saveFlow()));
 					}
+					effectPolicy.restoreFlow(exitJumpTarget(iterationTarget, effectPolicy.saveFlow()));
 				}
 				return;
 			}
@@ -5449,14 +5500,18 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						: phase;
 				const before = currentEffect === null ? undefined : effectPolicy.saveFlow();
 				if (before !== undefined && !alwaysAwaits(node.test)) effectPolicy.enterLoopBody(node.body);
+				const whileTarget = enterJumpTarget(true);
 				visit(node.body, scope, executionPhase);
 				if (before !== undefined) {
-					effectPolicy.restoreFlow(effectPolicy.joinFlow(before, effectPolicy.saveFlow()));
+					effectPolicy.restoreFlow(
+						exitJumpTarget(whileTarget, effectPolicy.joinFlow(before, effectPolicy.saveFlow())),
+					);
 				}
 				return;
 			}
 			case 'DoWhileStatement': {
 				if (currentEffect !== null) effectPolicy.enterLoopBody([node.body, node.test]);
+				const doTarget = enterJumpTarget(true);
 				visit(node.body, scope, phase);
 				const executionPhase =
 					currentFunctionIsAsync &&
@@ -5466,6 +5521,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						? 'deferred'
 						: phase;
 				visit(node.test, scope, executionPhase);
+				if (doTarget !== null)
+					effectPolicy.restoreFlow(exitJumpTarget(doTarget, effectPolicy.saveFlow()));
 				return;
 			}
 		}

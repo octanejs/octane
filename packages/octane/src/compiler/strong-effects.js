@@ -336,8 +336,12 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			case 'SequenceExpression':
 				return maySettle(node.expressions?.at(-1), depth);
 			case 'ConditionalExpression':
-			case 'LogicalExpression':
 				return someResult(node, maySettle, depth);
+			case 'LogicalExpression':
+				// A falsy left operand of `&&` is the value, and it is never a thenable.
+				return (
+					(node.operator === '&&' && selected(node) === null) || someResult(node, maySettle, depth)
+				);
 			case 'CallExpression':
 				return settledPromise(node);
 			default:
@@ -503,15 +507,20 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			case 'SequenceExpression':
 				return requestControllers(node.expressions?.at(-1), depth + 1);
 			case 'ConditionalExpression':
-				return sharedControllers(
-					requestControllers(node.consequent, depth + 1),
-					requestControllers(node.alternate, depth + 1),
-				);
-			case 'LogicalExpression':
-				return sharedControllers(
-					requestControllers(node.left, depth + 1),
-					requestControllers(node.right, depth + 1),
-				);
+			case 'LogicalExpression': {
+				// A known test or left operand leaves only the operand it selects.
+				const only = selected(node);
+				if (only !== null) return requestControllers(only, depth + 1);
+				return node.type === 'ConditionalExpression'
+					? sharedControllers(
+							requestControllers(node.consequent, depth + 1),
+							requestControllers(node.alternate, depth + 1),
+						)
+					: sharedControllers(
+							requestControllers(node.left, depth + 1),
+							requestControllers(node.right, depth + 1),
+						);
+			}
 			case 'Identifier': {
 				const init = stableInitOf(node);
 				return init === null ? null : requestControllers(init, depth + 1);
