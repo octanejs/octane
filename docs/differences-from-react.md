@@ -542,6 +542,18 @@ list is also a compile error. Strong modules use normal const declarations for
 automatic memoization. Manual memo hooks and non-equivalent explicit dependencies
 are errors; equivalent arrays keep their behavior and produce a hint.
 
+Inside an async function, code after a guaranteed `await` is not synchronous. A
+`catch` clause is synchronous only when its `try` block can throw before its
+first guaranteed `await`. A `finally` clause, or code after the `try` statement,
+is synchronous only when the `try` or `catch` can finish before one. Calls,
+`new`, `throw`, and iteration can throw; property reads and operators do not
+count. The awaited call itself, and any call it chains from through `then`,
+`catch`, or `finally`, is trusted to report failure by rejecting. Its callee and
+arguments still evaluate first. So an effect may run
+`try { setData(await api.get(id)); } catch (error) { setError(error); }`, but
+`await api.get(toKey(id))` or `await Promise.all([a(), b()])` leaves the `catch`
+synchronous.
+
 The compiler also rejects render-time writes through a provable state snapshot
 (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`) and direct calls to known
 non-idempotent globals such as `Date.now()` and `Math.random()`

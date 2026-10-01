@@ -65,6 +65,12 @@ const NULLISH_VALUE = UNDEFINED_VALUE | NULL_VALUE;
 const FALSY_VALUE = 4;
 const TRUTHY_VALUE = 8;
 const UNKNOWN_VALUE = NULLISH_VALUE | FALSY_VALUE | TRUTHY_VALUE;
+// Ways a statement can finish before its first guaranteed await: by throwing, by
+// return/break/continue, or by completing normally.
+const SYNC_THROW = 1;
+const SYNC_EXIT = 2;
+const SYNC_NORMAL = 4;
+const SYNC_ANY = SYNC_THROW | SYNC_EXIT | SYNC_NORMAL;
 const UNKNOWN_PRIMITIVE = Symbol('unknown primitive');
 const NO_RETURN_VALUE = Symbol('no return value');
 const NORMAL_COMPLETIONS = new Set(['normal']);
@@ -2028,8 +2034,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (statement.finalizer != null && statementAlwaysAwaits(statement.finalizer)) return 0;
 				return (
 					doWhileSynchronousControl(statement.block, nestedBreaks, nestedLoops, labels) |
-					doWhileSynchronousControl(statement.handler?.body, nestedBreaks, nestedLoops, labels) |
-					doWhileSynchronousControl(statement.finalizer, nestedBreaks, nestedLoops, labels)
+					(catchRunsSynchronously(statement)
+						? doWhileSynchronousControl(statement.handler.body, nestedBreaks, nestedLoops, labels)
+						: 0) |
+					(tryClausesSyncOutcome(statement) !== 0
+						? doWhileSynchronousControl(statement.finalizer, nestedBreaks, nestedLoops, labels)
+						: 0)
 				);
 			default:
 				return 0;
@@ -2127,10 +2137,233 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				return (
 					(statement.finalizer != null && statementAlwaysAwaits(statement.finalizer)) ||
 					(statementAlwaysAwaits(statement.block) &&
-						(statement.handler == null || statementAlwaysAwaits(statement.handler.body)))
+						(!catchRunsSynchronously(statement) || statementAlwaysAwaits(statement.handler.body)))
 				);
 			default:
 				return false;
+		}
+	}
+
+	// A catch clause runs synchronously only when its try block can throw before
+	// the block's first guaranteed await.
+	function catchRunsSynchronously(statement) {
+		return (
+			statement.handler != null && (statementsSyncOutcome(statement.block?.body) & SYNC_THROW) !== 0
+		);
+	}
+
+	// How the try block, and a catch clause it enters synchronously, can finish
+	// before yielding. A finally clause runs synchronously only when this is nonzero.
+	function tryClausesSyncOutcome(statement) {
+		const block = statementsSyncOutcome(statement.block?.body);
+		if (statement.handler == null || (block & SYNC_THROW) === 0) return block;
+		return (
+			(block & ~SYNC_THROW) |
+			(patternThrowsBeforeAwait(statement.handler.param) ? SYNC_THROW : 0) |
+			statementsSyncOutcome(statement.handler.body?.body)
+		);
+	}
+
+	function statementsSyncOutcome(statements) {
+		let outcome = 0;
+		for (const statement of statements ?? []) {
+			const next = statementSyncOutcome(statement);
+			outcome |= next & ~SYNC_NORMAL;
+			if ((next & SYNC_NORMAL) === 0) return outcome;
+		}
+		return outcome | SYNC_NORMAL;
+	}
+
+	function expressionSyncOutcome(expression) {
+		return (
+			(throwsBeforeAwait(expression) ? SYNC_THROW : 0) |
+			(alwaysAwaits(expression) ? 0 : SYNC_NORMAL)
+		);
+	}
+
+	function statementSyncOutcome(statement) {
+		switch (statement?.type) {
+			case 'FunctionDeclaration':
+				return SYNC_NORMAL;
+			case 'ExpressionStatement':
+				return expressionSyncOutcome(statement.expression);
+			case 'VariableDeclaration': {
+				if (statement.kind !== 'const' && statement.kind !== 'let' && statement.kind !== 'var') {
+					return SYNC_ANY;
+				}
+				let outcome = 0;
+				for (const declaration of statement.declarations ?? []) {
+					if (throwsBeforeAwait(declaration.init)) outcome |= SYNC_THROW;
+					if (alwaysAwaits(declaration.init)) return outcome;
+					if (patternThrowsBeforeAwait(declaration.id)) outcome |= SYNC_THROW;
+					if (patternAlwaysAwaits(declaration.id)) return outcome;
+				}
+				return outcome | SYNC_NORMAL;
+			}
+			case 'ReturnStatement':
+				return (
+					(throwsBeforeAwait(statement.argument) ? SYNC_THROW : 0) |
+					(alwaysAwaits(statement.argument) ? 0 : SYNC_EXIT)
+				);
+			case 'ThrowStatement':
+				return throwsBeforeAwait(statement.argument) || !alwaysAwaits(statement.argument)
+					? SYNC_THROW
+					: 0;
+			case 'BreakStatement':
+			case 'ContinueStatement':
+				return SYNC_EXIT;
+			case 'BlockStatement':
+				return statementsSyncOutcome(statement.body);
+			case 'IfStatement': {
+				const test = expressionSyncOutcome(statement.test);
+				if ((test & SYNC_NORMAL) === 0) return test;
+				return (
+					(test & SYNC_THROW) |
+					statementSyncOutcome(statement.consequent) |
+					(statement.alternate == null ? SYNC_NORMAL : statementSyncOutcome(statement.alternate))
+				);
+			}
+			case 'LabeledStatement': {
+				// A break to this label completes the labeled statement normally.
+				const body = statementSyncOutcome(statement.body);
+				return (body & SYNC_EXIT) !== 0 ? body | SYNC_NORMAL : body;
+			}
+			case 'TryStatement': {
+				const clauses = tryClausesSyncOutcome(statement);
+				if (statement.finalizer == null || clauses === 0) return clauses;
+				// A finally clause that completes normally resumes the pending completion.
+				const finalizer = statementsSyncOutcome(statement.finalizer.body);
+				return (finalizer & ~SYNC_NORMAL) | ((finalizer & SYNC_NORMAL) !== 0 ? clauses : 0);
+			}
+			default:
+				// Loops, switches, classes, using declarations and unmodelled syntax.
+				return SYNC_ANY;
+		}
+	}
+
+	// Whether evaluating an expression can throw before it passes a guaranteed
+	// await. As elsewhere in Strong analysis, property reads and implicit
+	// coercions do not run code; invocations, iteration and unmodelled syntax can.
+	function throwsBeforeAwait(expression) {
+		const node = unwrap(expression);
+		if (node == null) return false;
+		switch (node.type) {
+			case 'Literal':
+			case 'Identifier':
+			case 'FunctionExpression':
+			case 'ArrowFunctionExpression':
+				return false;
+			case 'AwaitExpression':
+				return awaitedOperandThrows(node.argument);
+			case 'ImportExpression':
+				// Dynamic import reports every failure through its promise.
+				return expressionsThrowBeforeAwait([node.source, node.options]);
+			case 'CallExpression':
+			case 'NewExpression':
+				return invocationThrowsBeforeAwait(node, false);
+			case 'MemberExpression':
+				return (
+					throwsBeforeAwait(node.object) ||
+					(node.computed === true && !alwaysAwaits(node.object) && throwsBeforeAwait(node.property))
+				);
+			case 'SequenceExpression':
+			case 'TemplateLiteral':
+				return expressionsThrowBeforeAwait(node.expressions);
+			case 'ArrayExpression':
+				return expressionsThrowBeforeAwait(node.elements);
+			case 'SpreadElement':
+				// Array and argument spreads run the iterator protocol.
+				return throwsBeforeAwait(node.argument) || !alwaysAwaits(node.argument);
+			case 'ObjectExpression':
+				return expressionsThrowBeforeAwait(
+					(node.properties ?? []).flatMap((property) =>
+						property.type === 'SpreadElement'
+							? [property.argument]
+							: [property.computed === true ? property.key : null, property.value],
+					),
+				);
+			case 'UnaryExpression':
+			case 'UpdateExpression':
+				return throwsBeforeAwait(node.argument);
+			case 'BinaryExpression':
+			case 'LogicalExpression':
+				return expressionsThrowBeforeAwait([node.left, node.right]);
+			case 'ConditionalExpression':
+				return (
+					throwsBeforeAwait(node.test) ||
+					(!alwaysAwaits(node.test) &&
+						(throwsBeforeAwait(node.consequent) || throwsBeforeAwait(node.alternate)))
+				);
+			case 'AssignmentExpression': {
+				const target = unwrap(node.left);
+				if (target?.type !== 'ObjectPattern' && target?.type !== 'ArrayPattern') {
+					return expressionsThrowBeforeAwait([node.left, node.right]);
+				}
+				return (
+					throwsBeforeAwait(node.right) ||
+					(!alwaysAwaits(node.right) && patternThrowsBeforeAwait(target))
+				);
+			}
+			default:
+				// Tagged templates, classes, yield, JSX and unmodelled syntax.
+				return true;
+		}
+	}
+
+	function expressionsThrowBeforeAwait(expressions) {
+		for (const expression of expressions ?? []) {
+			if (throwsBeforeAwait(expression)) return true;
+			if (alwaysAwaits(expression)) return false;
+		}
+		return false;
+	}
+
+	// Strong trusts an awaited call, and each call it chains from through
+	// then/catch/finally, to report failure by rejecting. The callee and the
+	// arguments of those calls still evaluate before the function yields.
+	function awaitedOperandThrows(expression) {
+		const node = unwrap(expression);
+		return node?.type === 'CallExpression' || node?.type === 'NewExpression'
+			? invocationThrowsBeforeAwait(node, true)
+			: throwsBeforeAwait(node);
+	}
+
+	function invocationThrowsBeforeAwait(node, awaited) {
+		const callee = unwrap(node.callee);
+		const chained =
+			awaited &&
+			callee?.type === 'MemberExpression' &&
+			callee.computed !== true &&
+			(callee.property?.name === 'then' ||
+				callee.property?.name === 'catch' ||
+				callee.property?.name === 'finally');
+		if (chained ? awaitedOperandThrows(callee.object) : throwsBeforeAwait(callee)) return true;
+		if (alwaysAwaits(callee)) return false;
+		if (expressionsThrowBeforeAwait(node.arguments)) return true;
+		return !awaited && !(node.arguments ?? []).some(alwaysAwaits);
+	}
+
+	function patternThrowsBeforeAwait(pattern) {
+		if (pattern == null) return false;
+		switch (pattern.type) {
+			case 'Identifier':
+				return false;
+			case 'ObjectPattern':
+				for (const property of pattern.properties ?? []) {
+					const key = property.computed === true ? property.key : null;
+					if (throwsBeforeAwait(key)) return true;
+					if (alwaysAwaits(key)) return false;
+					const target = property.type === 'RestElement' ? property.argument : property.value;
+					if (patternThrowsBeforeAwait(target)) return true;
+					if (patternAlwaysAwaits(target)) return false;
+				}
+				return false;
+			case 'AssignmentPattern':
+				// A default evaluates only for undefined values, before the binding.
+				return throwsBeforeAwait(pattern.right) || patternThrowsBeforeAwait(pattern.left);
+			default:
+				// Array patterns run the iterator protocol.
+				return true;
 		}
 	}
 
@@ -4176,14 +4409,21 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						]);
 				}
 				visit(node.block, scope, phase);
-				visit(node.handler, scope, phase);
+				// In an async function, catch runs synchronously only if the try block can
+				// throw before it yields, and finally only if try/catch can finish first.
+				const asyncTry = currentFunctionIsAsync && phase !== 'deferred';
+				visit(node.handler, scope, asyncTry && !catchRunsSynchronously(node) ? 'deferred' : phase);
 				// An abrupt finally replaces pending exits from try/catch. Restore the
 				// earlier paths before recording any new exits from finally itself.
 				for (const [control, breaks, continues] of pendingControls ?? []) {
 					control.breakContinuation = breaks;
 					control.continueContinuation = continues;
 				}
-				visit(node.finalizer, scope, phase);
+				visit(
+					node.finalizer,
+					scope,
+					asyncTry && tryClausesSyncOutcome(node) === 0 ? 'deferred' : phase,
+				);
 				return;
 			}
 			case 'JSXSwitchExpression': {

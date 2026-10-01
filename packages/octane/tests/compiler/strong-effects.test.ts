@@ -394,3 +394,209 @@ describe('Strong effect review regressions', () => {
 		).not.toThrow();
 	});
 });
+
+describe('Strong effect try clauses', () => {
+	const EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
+	const setup = (body: string) =>
+		`const [data, setData] = useState(null); const [error, setError] = useState(null); const [loading, setLoading] = useState(true); useEffect(() => { let ignore = false; (async () => { ${body} })(); return () => { ignore = true; }; });`;
+	const load = (body: string) => `import { useState, useEffect } from 'octane';
+import { api } from './api';
+export function App(props) @{
+  ${setup(body)}
+  <div />
+}`;
+	const hook = (body: string) =>
+		`import { useState, useEffect } from 'octane'; import { api } from './api'; export function useData(props) { ${setup(body)} return [data, error, loading]; }`;
+
+	it('accepts a catch-clause update for an awaited call that rejects', () => {
+		const source = load(
+			'try { const v = await api.get(props.id); if (!ignore) setData(v); } catch (e) { if (!ignore) setError(e); }',
+		);
+		for (const mode of ['client', 'server'] as const) {
+			for (const dev of [false, true]) {
+				const standard = compile(source, '/src/App.tsrx', { mode, dev });
+				const strong = compile(source, '/src/App.tsrx', { mode, dev, strong: true });
+				expect(strong.code).toBe(standard.code);
+			}
+		}
+		expect(compileToVolarMappings(`"use strong";\n${source}`, '/src/App.tsrx').diagnostics).toEqual(
+			[],
+		);
+	});
+
+	it.each([
+		[
+			'awaited promise calls chained through then',
+			'try { setData(await api.get(props.id).then((response) => response.data)); } catch (e) { setError(e); }',
+		],
+		[
+			'awaited fetches',
+			'try { const response = await fetch(`/api/${props.id}`); setData(await response.json()); } catch (e) { setError(e); }',
+		],
+		[
+			'awaited dynamic imports',
+			"try { setData(await import('./data')); } catch (e) { setError(e); }",
+		],
+		[
+			'awaited promises created before the try',
+			'const request = api.get(props.id); try { setData(await request); } catch (e) { setError(e); }',
+		],
+		[
+			'property reads, object destructuring and assignments before the await',
+			'let key; try { const { id, ...query } = props; key = props.scope ?? id; setData(await api.get(`item:${key}`, { query })); } catch (e) { setError(e); }',
+		],
+		[
+			"object literals in the awaited call's arguments",
+			'try { setData(await api.get({ id: props.id, ...props.query })); } catch (e) { setError(e); }',
+		],
+		[
+			'awaited promise constructors',
+			'try { await new Promise((resolve) => setTimeout(resolve, props.delay)); setData(await api.get(props.id)); } catch (e) { setError(e); }',
+		],
+		[
+			'early exits before the await',
+			'try { if (!props.id) return; setData(await api.get(props.id)); } catch (e) { setError(e); }',
+		],
+		[
+			'function declarations before the await',
+			'try { function pick(value) { return value.data; } setData(pick(await api.get(props.id))); } catch (e) { setError(e); }',
+		],
+		[
+			'catch clauses that rethrow after yielding',
+			'try { try { setData(await api.get(props.id)); } catch (inner) { api.log(inner); throw inner; } } catch (e) { setError(e); }',
+		],
+		[
+			'finally blocks entered only after yielding',
+			'try { setData(await api.get(props.id)); } catch (e) { setError(e); } finally { setLoading(false); }',
+		],
+		[
+			'statements after a try whose catch runs only after yielding',
+			'try { setData(await api.get(props.id)); } catch (e) { setError(e); } setLoading(false);',
+		],
+		[
+			'nested try/finally blocks entered only after yielding',
+			'try { try { setData(await api.get(props.id)); } finally { setLoading(false); } } catch (e) { setError(e); }',
+		],
+		[
+			'nested finally blocks that yield before rethrowing',
+			'try { try { api.reset(); } finally { setData(await api.get(props.id)); } } catch (e) { setError(e); }',
+		],
+		[
+			'do-while exits from catch clauses entered only after yielding',
+			'do { try { setData(await api.get(props.id)); } catch (e) { break; } } while (props.retry); setLoading(false);',
+		],
+	])('allows updates in try clauses reached only after yielding: %s', (_label, body) => {
+		const source = load(body);
+		expect(compile(source, '/src/App.tsrx', { strong: true }).code).toBe(
+			compile(source, '/src/App.tsrx').code,
+		);
+		expect(compileToVolarMappings(`"use strong";\n${source}`, '/src/App.tsrx').diagnostics).toEqual(
+			[],
+		);
+		expect(slotHooks(`"use strong"; ${hook(body)}`, '/src/useData.ts')?.code).toBe(
+			`"use strong"; ${slotHooks(hook(body), '/src/useData.ts')!.code}`,
+		);
+	});
+
+	it.each([
+		[
+			'throws before the await',
+			"try { if (!props.id) throw new Error('missing'); setData(await api.get(props.id)); } catch (e) { setError(e); }",
+			'setError(e)',
+		],
+		[
+			'calls before the await',
+			'try { const key = api.key(props.id); setData(await api.get(key)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			"calls in the awaited call's arguments",
+			'try { setData(await api.get(api.key(props.id))); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			"calls in the awaited call's receiver",
+			'try { setData(await api.client().get(props.id)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'calls inside an awaited Promise combinator',
+			'try { setData(await Promise.all([api.get(props.id)])); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			"spreads in the awaited call's arguments",
+			'try { setData(await api.get(...props.ids)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'array destructuring before the await',
+			'try { const [first] = props.ids; setData(await api.get(first)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'destructuring defaults before the await',
+			'try { const { id = api.defaultId() } = props; setData(await api.get(id)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'calls after a block that breaks to its label',
+			'try { done: { break done; } api.reset(); setData(await api.get(props.id)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'catch bindings that destructure synchronously',
+			'try { try { api.reset(); } catch ([reason]) { setData(await api.get(reason)); } } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'conditional calls before the await',
+			'try { props.cached ? api.reset() : setData(await api.get(props.id)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'finally blocks reached by an early exit',
+			'try { if (!props.id) return; setData(await api.get(props.id)); } finally { setLoading(false); }',
+			'setLoading(false)',
+		],
+		[
+			'statements after a catch clause entered synchronously',
+			'try { api.reset(); setData(await api.get(props.id)); } catch (e) {} setLoading(false);',
+			'setLoading(false)',
+		],
+		[
+			'nested finally blocks that throw synchronously',
+			'try { try { api.reset(); } finally { api.log(); } setData(await api.get(props.id)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'nested finally blocks reached by an early exit',
+			'try { try { if (!props.id) return; setData(await api.get(props.id)); } finally { api.log(); } } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+	])('still rejects try clauses that can run synchronously: %s', (_label, body, update) => {
+		const source = load(body);
+		rejects(source, EFFECT_STATE_UPDATE);
+		const strong = `"use strong";\n${source}`;
+		const start = strong.indexOf(update);
+		expect(compileToVolarMappings(strong, '/src/App.tsrx').diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: EFFECT_STATE_UPDATE,
+				start: expect.objectContaining({ offset: start }),
+			}),
+		);
+		expect(slotHooks(hook(body), '/src/useData.ts')).not.toBeNull();
+		expect(() => slotHooks(`"use strong"; ${hook(body)}`, '/src/useData.ts')).toThrow(
+			EFFECT_STATE_UPDATE,
+		);
+	});
+
+	it('still reports an uncancelled fetch whose catch clause updates state', () => {
+		rejects(
+			component(
+				`const [error, setError] = useState(null); useEffect(() => { (async () => { try { await fetch('/api'); } catch (e) { setError(e); } })(); });`,
+			),
+			FETCH,
+		);
+	});
+});
