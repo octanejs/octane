@@ -1323,6 +1323,23 @@ export function App(props) @{
 			'a local helper',
 			`useEffect(() => { const listen = () => window.addEventListener('resize', () => setWidth(1)); listen(); });`,
 		],
+		[
+			'a target passed to a helper',
+			`function listen(target, type, handler) { target.addEventListener(type, handler); } useEffect(() => { listen(window, 'resize', () => setWidth(1)); });`,
+		],
+		[
+			'a destructured document property',
+			`useEffect(() => { const { body } = document; body.addEventListener('click', () => setWidth(1)); });`,
+		],
+		[
+			'the global addEventListener',
+			`useEffect(() => { addEventListener('resize', () => setWidth(1)); });`,
+		],
+		['a global handler property', `useEffect(() => { onresize = () => setWidth(1); });`],
+		[
+			'a helper removal for another handler',
+			`function listen(target, type, handler) { target.addEventListener(type, handler); } function unlisten(target, type, handler) { target.removeEventListener(type, handler); } useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); listen(window, 'resize', first); return () => unlisten(window, 'resize', second); });`,
+		],
 	])('rejects %s without release', (_label, setup) => {
 		rejects(app(setup), LEAK);
 	});
@@ -1437,6 +1454,26 @@ export function App(props) @{
 		[
 			'a listener added by an event handler',
 			`const onClick = () => window.addEventListener('resize', () => setWidth(1));`,
+		],
+		[
+			'listeners added and removed by helpers',
+			`function listen(target, type, handler) { target.addEventListener(type, handler); } function unlisten(target, type, handler) { target.removeEventListener(type, handler); } useEffect(() => { const onResize = () => setWidth(1); listen(window, 'resize', onResize); return () => unlisten(window, 'resize', onResize); });`,
+		],
+		[
+			'a removed destructured document property listener',
+			`useEffect(() => { const { body } = document; const onClick = () => setWidth(1); body.addEventListener('click', onClick); return () => body.removeEventListener('click', onClick); });`,
+		],
+		[
+			'a window listener removed globally',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize); return () => removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a global listener removed from the window',
+			`useEffect(() => { const onResize = () => setWidth(1); addEventListener('resize', onResize); return () => window.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a reset global handler property',
+			`useEffect(() => { onresize = () => setWidth(1); return () => { window.onresize = null; }; });`,
 		],
 	])('accepts %s', (_label, setup) => {
 		accepts(app(setup));

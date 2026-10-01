@@ -139,6 +139,15 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 	let frames = null;
 	let parameterLists = null;
 	const scans = new WeakMap();
+	const activeScans = new Set();
+
+	function parametersOf(fn) {
+		if (parameterLists === null) {
+			parameterLists = new Map();
+			for (const record of functions) parameterLists.set(record.node, record.parameters ?? []);
+		}
+		return parameterLists.get(fn) ?? [];
+	}
 
 	function frameArgument(binding) {
 		for (let frame = frames; frame !== null; frame = frame.next) {
@@ -217,6 +226,12 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			const binding = bindingOf(node);
 			if (binding === undefined) return null;
 			if (binding === null) return GLOBAL_OBJECTS.has(node.name) ? 'g:window' : `g:${node.name}`;
+			// A helper parameter names the argument of the call being visited.
+			const argument = depth < 8 ? frameArgument(binding) : null;
+			if (argument !== null) {
+				const key = keyOf(argument, depth + 1);
+				if (key !== null) return key;
+			}
 			if (!binding.reassigned && depth < 8) {
 				const info = declarator(binding);
 				const init = info === null ? null : unwrap(info.decl.init);
@@ -544,12 +559,20 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		for (const value of child.properties) result.properties.add(value);
 	}
 
-	function scan(fn) {
-		let result = scans.get(fn);
-		if (result !== undefined) return result;
-		result = emptyCleanup();
+	// A helper called from cleanup is scanned with its call's arguments, so its
+	// parameters name what the caller passed. Only unframed scans are cached.
+	function scan(fn, args = null) {
+		const parameters = args === null ? [] : parametersOf(fn);
+		const framed = parameters.length !== 0;
+		const cacheable = !framed && frames === null;
+		if (cacheable && scans.has(fn)) return scans.get(fn);
+		if (activeScans.has(fn)) return emptyCleanup();
+		const result = emptyCleanup();
 		// Cache first: a cleanup helper cycle then sees a partial result.
-		scans.set(fn, result);
+		if (cacheable) scans.set(fn, result);
+		activeScans.add(fn);
+		const enclosingFrames = frames;
+		if (framed) frames = { parameters, args, next: frames };
 		const visit = (node) => {
 			if (node == null || typeof node !== 'object') return;
 			if (Array.isArray(node)) {
@@ -566,6 +589,8 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 						let values = result.flags.get(binding);
 						if (values === undefined) result.flags.set(binding, (values = new Set()));
 						values.add(value === UNKNOWN ? UNKNOWN : Boolean(value));
+					} else if (binding === null) {
+						result.properties.add(keyOf(left));
 					}
 				} else if (left?.type === 'MemberExpression') {
 					const key = keyOf(left);
@@ -575,7 +600,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				const callee = unwrap(node.callee);
 				const inline = functionOf(callee);
 				if (inline !== null && inline !== fn && inline.async !== true && !inline.generator) {
-					mergeCleanup(result, scan(inline));
+					mergeCleanup(result, scan(inline, node.arguments ?? []));
 				}
 				const name = globalFunction(callee);
 				if (
@@ -585,6 +610,13 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				) {
 					const key = keyOf(node.arguments?.[0]);
 					if (key !== null) result.cleared.add(key);
+				} else if (name === 'removeEventListener') {
+					result.removed.push({
+						target: 'g:window',
+						type: eventType(node.arguments?.[0]),
+						handler: keyOf(node.arguments?.[1]),
+						capture: captureOf(node.arguments?.[2]),
+					});
 				} else if (callee?.type === 'MemberExpression') {
 					const method = memberName(callee);
 					const object = keyOf(callee.object);
@@ -615,7 +647,12 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) visit(node[key]);
 			}
 		};
-		visit(FUNCTIONS.has(fn.type) ? fn.body : fn);
+		try {
+			visit(FUNCTIONS.has(fn.type) ? fn.body : fn);
+		} finally {
+			frames = enclosingFrames;
+			activeScans.delete(fn);
+		}
 		return result;
 	}
 
@@ -714,8 +751,13 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		if (node.type === 'Identifier') {
 			const binding = bindingOf(node);
 			if (binding === null) return EVENT_TARGET_GLOBALS.has(node.name);
-			const init = stableInit(binding);
-			return init !== null && platformTarget(init, depth + 1);
+			if (binding === undefined) return false;
+			const argument = frameArgument(binding);
+			if (argument !== null) return platformTarget(argument, depth + 1);
+			// A destructured property of a platform object is one too.
+			const info = binding.reassigned ? null : declarator(binding);
+			const init = info === null ? null : unwrap(info.decl.init);
+			return init != null && platformTarget(init, depth + 1);
 		}
 		if (node.type === 'MemberExpression') {
 			const object = unwrap(node.object);
@@ -751,19 +793,30 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			}
 			return;
 		}
-		if (callee?.type !== 'MemberExpression') return;
-		const method = memberName(callee);
-		if (method === 'addEventListener' && platformTarget(callee.object)) {
+		// The global addEventListener is the window's.
+		const target =
+			name === 'addEventListener'
+				? 'g:window'
+				: callee?.type === 'MemberExpression' &&
+					  memberName(callee) === 'addEventListener' &&
+					  platformTarget(callee.object)
+					? keyOf(callee.object)
+					: undefined;
+		if (target !== undefined) {
 			record.acquisitions.push({
 				kind: 'listener',
 				node,
-				target: keyOf(callee.object),
+				target,
 				type: eventType(node.arguments?.[0]),
 				handler: keyOf(node.arguments?.[1]),
 				capture: captureOf(node.arguments?.[2]),
 				signal: listenerSignal(node.arguments?.[2]),
 			});
-		} else if (method === 'watchPosition' && keyOf(callee.object) === 'g:navigator.geolocation') {
+			return;
+		}
+		if (callee?.type !== 'MemberExpression') return;
+		const method = memberName(callee);
+		if (method === 'watchPosition' && keyOf(callee.object) === 'g:navigator.geolocation') {
 			record.acquisitions.push({ kind: 'watch', node, handle: ownerKey(node) });
 		}
 	}
@@ -773,18 +826,22 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		if (kind !== null) record.acquisitions.push({ kind, node, handle: ownerKey(node) });
 	}
 
-	// `target.onresize = handler` installs a platform event handler property.
+	// `target.onresize = handler`, or the window's global `onresize = handler`,
+	// installs a platform event handler property.
 	function assign(record, node) {
 		const left = unwrap(node.left);
-		if (node.operator !== '=' || left?.type !== 'MemberExpression') return;
-		const name = memberName(left);
-		if (name === null || !/^on[a-z]+$/.test(name) || !platformTarget(left.object)) return;
+		if (node.operator !== '=') return;
+		const global = left?.type === 'Identifier' && bindingOf(left) === null;
+		if (!global && left?.type !== 'MemberExpression') return;
+		const name = global ? left.name : memberName(left);
+		if (name === null || !/^on[a-z]+$/.test(name)) return;
+		if (!global && !platformTarget(left.object)) return;
 		if (staticValue(node.right) === null || staticValue(node.right) === undefined) return;
 		record.acquisitions.push({
 			kind: 'property',
 			node: left,
 			handle: keyOf(left),
-			target: keyOf(left.object),
+			target: global ? 'g:window' : keyOf(left.object),
 		});
 	}
 
@@ -868,6 +925,17 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 	// It also records which declaration or assignment target owns a call result.
 	function refs() {
 		if (references !== null) return references;
+		// Ownership keys must not depend on the call being visited.
+		const enclosingFrames = frames;
+		frames = null;
+		try {
+			return buildReferences();
+		} finally {
+			frames = enclosingFrames;
+		}
+	}
+
+	function buildReferences() {
 		references = {
 			roots: new Set(),
 			aliases: new Map(),
@@ -1039,12 +1107,8 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		guard: pushGuard,
 		statementGuard,
 		enterCall(fn, args) {
-			if (parameterLists === null) {
-				parameterLists = new Map();
-				for (const record of functions) parameterLists.set(record.node, record.parameters ?? []);
-			}
 			const saved = frames;
-			frames = { parameters: parameterLists.get(fn) ?? [], args, next: frames };
+			frames = { parameters: parametersOf(fn), args, next: frames };
 			return saved;
 		},
 		exitCall(saved) {
