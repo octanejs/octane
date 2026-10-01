@@ -1856,6 +1856,16 @@ Development recursively compares unambiguous static structure and attributes,
 warns, and rebuilds. It stops at dynamic holes, so unmatched static descendants
 outside an inspected range can remain. This is not React's full hydration walk.
 
+A deferred `<Hydrate>` boundary replays a pointer press's later events instead
+of dropping them. React 19.2 hydrates a dehydrated boundary synchronously on a
+discrete event such as `pointerup` or `pointercancel`, and drops that event if the
+boundary is still suspended. It never delivers `pointermove` to a dehydrated
+subtree's handlers. An Octane `interaction()` boundary that selects
+`pointermove`, `pointerup`, or `pointercancel` captures them after a selected
+press wakes it, then replays untrusted copies in order once it hydrates (see
+[Pointer press lifecycle](./deferred-hydration.md#pointer-press-lifecycle)).
+Neither framework cancels the native default of these events.
+
 ## Hot module updates remount the edited component
 
 React Fast Refresh diffs the new element tree against the existing fiber tree, so

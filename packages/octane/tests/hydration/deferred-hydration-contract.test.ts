@@ -230,6 +230,222 @@ describe('deferred hydration contract edges', () => {
 		observation!.cleanup();
 	});
 
+	const POINTER_LIFECYCLE = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] as const;
+	type PointerRecord = {
+		type: string;
+		pointerId: number;
+		clientX: number;
+		isTrusted: boolean;
+		defaultPrevented: boolean;
+	};
+
+	function pointerRecord(event: Event): PointerRecord {
+		const pointer = event as PointerEvent;
+		return {
+			type: pointer.type,
+			pointerId: pointer.pointerId,
+			clientX: pointer.clientX,
+			isTrusted: pointer.isTrusted,
+			defaultPrevented: pointer.defaultPrevented,
+		};
+	}
+
+	function dispatchPointer(target: Element, type: string, clientX: number): PointerEvent {
+		const event = new PointerEvent(type, {
+			bubbles: true,
+			cancelable: type !== 'pointercancel',
+			composed: true,
+			pointerId: 31,
+			pointerType: 'touch',
+			clientX,
+		});
+		target.dispatchEvent(event);
+		return event;
+	}
+
+	// Records which originals still reach a page listener after capture ran.
+	function observePropagation(ownerDocument: Document): { types: string[]; stop(): void } {
+		const types: string[] = [];
+		const listener = (event: Event) => types.push(event.type);
+		for (const type of POINTER_LIFECYCLE) ownerDocument.addEventListener(type, listener);
+		return {
+			types,
+			stop() {
+				for (const type of POINTER_LIFECYCLE) ownerDocument.removeEventListener(type, listener);
+			},
+		};
+	}
+
+	it('replays an opted-in pointer press lifecycle captured before hydrateRoot with native defaults', () => {
+		const when = interaction({ events: POINTER_LIFECYCLE });
+		container.innerHTML = renderToString(eventReplayServer.DeferredHydrationEventReplay, {
+			when,
+		}).html;
+		const target = container.querySelector('#hydration-replay-target')!;
+
+		initializeHydrationEventCapture(document);
+		const propagation = observePropagation(document);
+		let originals: PointerEvent[];
+		try {
+			originals = [
+				// Hovering before a press is not intent, even when movement is selected.
+				dispatchPointer(target, 'pointermove', 1),
+				dispatchPointer(target, 'pointerdown', 2),
+				dispatchPointer(target, 'pointermove', 3),
+				dispatchPointer(target, 'pointerup', 4),
+				dispatchPointer(target, 'pointerdown', 5),
+				dispatchPointer(target, 'pointermove', 6),
+				dispatchPointer(target, 'pointercancel', 7),
+			];
+		} finally {
+			propagation.stop();
+		}
+		expect(propagation.types).toEqual(['pointermove']);
+		expect(originals.map((event) => event.defaultPrevented)).toEqual(originals.map(() => false));
+
+		const replayed: PointerRecord[] = [];
+		root = hydrateRoot(container, eventReplayClient.DeferredHydrationEventReplay, {
+			when,
+			onHydrated() {
+				for (const type of POINTER_LIFECYCLE) {
+					target.addEventListener(type, (event) => replayed.push(pointerRecord(event)));
+				}
+			},
+		});
+		flushSync(() => {});
+		flushEffects();
+
+		expect(container.querySelector('#hydration-replay-target')).toBe(target);
+		expect(replayed).toEqual(
+			originals.slice(1).map((event) => ({
+				type: event.type,
+				pointerId: 31,
+				clientX: event.clientX,
+				isTrusted: false,
+				defaultPrevented: false,
+			})),
+		);
+	});
+
+	for (const selection of ['default', 'lifecycle-only'] as const) {
+		it(`keeps a mounted ${selection} boundary dormant on pointer movement and cancellation`, () => {
+			const when =
+				selection === 'default'
+					? interaction()
+					: interaction({ events: ['pointermove', 'pointercancel'] });
+			const onHydrated = vi.fn();
+			container.innerHTML = renderToString(server.EarlyInteractionHydration, { when }).html;
+			const button = container.querySelector('#early-interaction')!;
+			initializeHydrationEventCapture(document);
+			root = hydrateRoot(container, client.EarlyInteractionHydration, { when, onHydrated });
+			flushSync(() => {});
+			flushEffects();
+
+			const propagation = observePropagation(document);
+			let move: PointerEvent;
+			try {
+				move = dispatchPointer(button, 'pointermove', 1);
+				dispatchPointer(button, 'pointercancel', 2);
+			} finally {
+				propagation.stop();
+			}
+			flushSync(() => {});
+			flushEffects();
+
+			expect(onHydrated).not.toHaveBeenCalled();
+			expect(propagation.types).toEqual(['pointermove', 'pointercancel']);
+			expect(move.defaultPrevented).toBe(false);
+		});
+	}
+
+	it('captures an opted-in press lifecycle while a mounted boundary is still activating', async () => {
+		const when = interaction({ events: POINTER_LIFECYCLE });
+		const pending = deferred<void>();
+		container.innerHTML = renderToString(server.ActivationSuspendingHydration, {
+			when,
+			suspend: false,
+			shellLabel: 'Shell',
+		}).html;
+		const original = container.querySelector('#activation-content')!;
+		const replayed: PointerRecord[] = [];
+		const onHydrated = vi.fn(() => {
+			for (const type of POINTER_LIFECYCLE) {
+				original.addEventListener(type, (event) => replayed.push(pointerRecord(event)));
+			}
+		});
+		root = hydrateRoot(container, client.ActivationSuspendingHydration, {
+			when,
+			suspend: true,
+			promise: pending.promise,
+			shellLabel: 'Shell',
+			onHydrated,
+		});
+		flushSync(() => {});
+		flushEffects();
+
+		const propagation = observePropagation(document);
+		let originals: PointerEvent[];
+		try {
+			originals = [
+				dispatchPointer(original, 'pointerdown', 1),
+				dispatchPointer(original, 'pointermove', 2),
+				dispatchPointer(original, 'pointermove', 3),
+				dispatchPointer(original, 'pointerup', 4),
+			];
+		} finally {
+			propagation.stop();
+		}
+		flushSync(() => {});
+		flushEffects();
+		expect(onHydrated).not.toHaveBeenCalled();
+		expect(propagation.types).toEqual([]);
+		expect(originals.map((event) => event.defaultPrevented)).toEqual(originals.map(() => false));
+
+		await act(() => pending.resolve());
+
+		expect(onHydrated).toHaveBeenCalledOnce();
+		expect(container.querySelector('#activation-content')).toBe(original);
+		expect(replayed).toEqual(
+			originals.map((event) => ({
+				type: event.type,
+				pointerId: 31,
+				clientX: event.clientX,
+				isTrusted: false,
+				defaultPrevented: false,
+			})),
+		);
+	});
+
+	it('listens for pointer movement only after an opted-in boundary captures intent', () => {
+		const iframe = document.createElement('iframe');
+		document.body.appendChild(iframe);
+		try {
+			const foreignDocument = iframe.contentDocument!;
+			const foreignWindow = iframe.contentWindow! as Window & typeof globalThis;
+			foreignDocument.body.innerHTML =
+				'<div data-octane-hydrate-id="default" data-octane-hydrate-when="interaction"><button id="default-press">Default</button></div>' +
+				'<div data-octane-hydrate-id="opted" data-octane-hydrate-when="interaction" data-octane-hydrate-interaction-events="pointerdown pointermove"><button id="opted-press">Opted</button></div>';
+			const addEventListener = vi.spyOn(foreignDocument, 'addEventListener');
+			const movementListeners = () =>
+				addEventListener.mock.calls.filter(([type]) => type === 'pointermove').length;
+			const press = (id: string) =>
+				foreignDocument
+					.getElementById(id)!
+					.dispatchEvent(
+						new foreignWindow.PointerEvent('pointerdown', { bubbles: true, cancelable: true }),
+					);
+
+			initializeHydrationEventCapture(foreignDocument);
+			press('default-press');
+			expect(movementListeners()).toBe(0);
+			press('opted-press');
+			press('opted-press');
+			expect(movementListeners()).toBe(1);
+		} finally {
+			iframe.remove();
+		}
+	});
+
 	it('preserves replay event subclasses from another document realm', () => {
 		const iframe = document.createElement('iframe');
 		document.body.appendChild(iframe);

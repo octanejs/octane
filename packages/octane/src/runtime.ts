@@ -141,6 +141,7 @@ import type {
 import {
 	HYDRATE_DEFAULT_INTERACTION_EVENTS,
 	HYDRATE_INTERACTION_EVENTS_ATTR,
+	isHydrationLifecycleEvent,
 } from './hydration/interaction-config.js';
 import {
 	HYDRATE_SUPPORTED_INTERACTION_EVENTS,
@@ -15040,7 +15041,10 @@ function handleRegisteredHydrationIntent(
 	const status = hydrateStrategyInteractionEvents(strategy)?.includes(eventType)
 		? 'handles'
 		: 'dormant';
-	if (intent !== undefined) queueHydrateIntent(state, intent);
+	// Pointer movement and cancellation extend a requested activation; alone,
+	// they never wake the boundary.
+	if (intent !== undefined && (state.activationRequested || !isHydrationLifecycleEvent(eventType)))
+		queueHydrateIntent(state, intent);
 	return status;
 }
 
@@ -15063,6 +15067,7 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 	const onIntent = (event: Event) => {
 		if (wasEarlyHydrationIntentHandled(event)) return;
 		if (state.hydrated) return;
+		if (!state.activationRequested && isHydrationLifecycleEvent(event.type)) return;
 		const rawTarget = event.target;
 		let target =
 			rawTarget instanceof Element

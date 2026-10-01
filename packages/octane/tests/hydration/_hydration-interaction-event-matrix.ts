@@ -189,6 +189,23 @@ export const HYDRATION_INTERACTION_EVENT_CASES = [
 		composed: true,
 		sequence: 22,
 	},
+	// Pointer lifecycle events only extend intent an earlier case captured.
+	{
+		type: 'pointermove',
+		family: 'pointer',
+		bubbles: true,
+		cancelable: true,
+		composed: true,
+		sequence: 23,
+	},
+	{
+		type: 'pointercancel',
+		family: 'pointer',
+		bubbles: true,
+		cancelable: false,
+		composed: true,
+		sequence: 24,
+	},
 ] as const satisfies ReadonlyArray<HydrationInteractionEventCase>;
 
 type AssertNever<T extends never> = T;
@@ -223,6 +240,8 @@ export function hydrationInteractionPreventsDefault(
 		testCase.type !== 'beforeinput' &&
 		testCase.type !== 'mousedown' &&
 		testCase.type !== 'pointerdown' &&
+		testCase.type !== 'pointermove' &&
+		testCase.type !== 'pointerup' &&
 		testCase.type !== 'touchend' &&
 		testCase.type !== 'touchstart'
 	);
