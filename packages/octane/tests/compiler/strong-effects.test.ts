@@ -223,6 +223,10 @@ describe('Strong asynchronous effect updates', () => {
 			`const r = await fetch('/a', { signal }); for (const id of props.ids) { setData(r); await api.get(id); }`,
 		],
 		[
+			'an unsigned request inside a signed loop',
+			`while (await fetch('/a', { signal })) { await api.get(props.id); setData(1); }`,
+		],
+		[
 			'a catch handler after an unsigned request',
 			`try { await fetch('/a', { signal }); } catch { await api.get(props.id); } setData(1);`,
 		],
@@ -244,6 +248,16 @@ describe('Strong asynchronous effect updates', () => {
 			'the latest request',
 			`await api.warm(); const r = await fetch('/a', { signal }); setData(r);`,
 		],
+		[
+			'a try block whose handler exits',
+			`await api.warm(); try { await fetch('/a', { signal }); } catch { return; } setData(1);`,
+		],
+		[
+			'the cases that leave a switch',
+			`for (const id of props.ids) { switch (id) { case 0: await api.get(id); continue; default: await fetch('/a', { signal }); break; } setData(id); }`,
+		],
+		['a while test', `while (await fetch('/a', { signal })) { setData(1); }`],
+		['a for test', `for (; await fetch('/a', { signal }); ) { setData(1); }`],
 	])('accepts an abort proof that covers %s', (_label, body) => {
 		accepts(app(aborted(body)));
 	});

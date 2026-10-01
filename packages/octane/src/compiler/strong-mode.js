@@ -4407,7 +4407,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					const afterBlock = effectPolicy.saveFlow();
 					effectPolicy.restoreFlow(effectPolicy.joinFlow(before, afterBlock));
 					visit(node.handler, scope, phase);
-					effectPolicy.restoreFlow(effectPolicy.joinFlow(afterBlock, effectPolicy.saveFlow()));
+					// Only a path that completes normally reaches the next statement.
+					const blockExits = branchAlwaysExits(node.block);
+					const handlerExits = branchAlwaysExits(node.handler.body);
+					if (handlerExits && !blockExits) effectPolicy.restoreFlow(afterBlock);
+					else if (blockExits === handlerExits) {
+						effectPolicy.restoreFlow(effectPolicy.joinFlow(afterBlock, effectPolicy.saveFlow()));
+					}
 				} else {
 					visit(node.handler, scope, phase);
 				}
@@ -4476,10 +4482,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						last?.type === 'ThrowStatement'
 							? null
 							: executionPhase;
+					// return, throw, and continue never reach the statement after the switch.
 					if (
 						before !== undefined &&
 						last?.type !== 'ReturnStatement' &&
 						last?.type !== 'ThrowStatement' &&
+						last?.type !== 'ContinueStatement' &&
 						(fallthroughPhase === null || branch === branches[branches.length - 1])
 					) {
 						exits.push(effectPolicy.saveFlow());
@@ -4879,7 +4887,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					executionPhase = 'deferred';
 				}
 				const before = currentEffect === null ? undefined : effectPolicy.saveFlow();
-				if (before !== undefined) effectPolicy.enterLoopBody([node.test, node.body, node.update]);
+				// A test that always yields runs right before every iteration.
+				if (before !== undefined && !alwaysAwaits(node.test)) {
+					effectPolicy.enterLoopBody([node.body, node.update]);
+				}
 				visit(node.body, loop, executionPhase);
 				visit(node.update, loop, executionPhase);
 				// The body may not run.
@@ -4982,7 +4993,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						? 'deferred'
 						: phase;
 				const before = currentEffect === null ? undefined : effectPolicy.saveFlow();
-				if (before !== undefined) effectPolicy.enterLoopBody([node.test, node.body]);
+				if (before !== undefined && !alwaysAwaits(node.test)) effectPolicy.enterLoopBody(node.body);
 				visit(node.body, scope, executionPhase);
 				if (before !== undefined) {
 					effectPolicy.restoreFlow(effectPolicy.joinFlow(before, effectPolicy.saveFlow()));
