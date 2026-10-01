@@ -15,7 +15,8 @@ const projects = [];
 const passthrough = [];
 const args = process.argv.slice(2);
 for (let index = 0; index < args.length; index++) {
-	if (args[index] === '-p' || args[index] === '--project') projects.push(path.resolve(args[++index]));
+	if (args[index] === '-p' || args[index] === '--project')
+		projects.push(path.resolve(args[++index]));
 	else if (args[index] !== '--noEmit') passthrough.push(args[index]);
 }
 if (projects.length === 0) {
