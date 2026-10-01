@@ -1,57 +1,66 @@
-// The navigation engine — port of react-router's Transitioner. It runs as a
-// hook because a rendered sibling would put an SSR marker before a root route's
+// The navigation engine — port of react-router's Transitioner. It runs as a hook
+// because a rendered sibling would place an SSR marker before a root route's
 // document-level <html> node and outside the #__app hydration range.
-// It (1) supplies `router.startTransition` so every navigation state update rides
-// an octane transition (concurrent navigation: the current page holds while the
-// next route suspends), (2) subscribes to history so back/forward and `Link`
-// clicks reload the matches, (3) kicks off the initial `router.load()` (skipped
-// when hydrating SSR — ssr-client triggers it) and commits a canonical-URL
-// replace when the mounted URL isn't in canonical form, and (4) drives the router
-// EVENT LIFECYCLE: `onLoad` when a load settles, `onBeforeRouteMount` /
-// `onResolved` when all pending work (load + transition + pending matches)
-// drains, then commits `status: 'idle'` + `resolvedLocation`. router-core's
-// scroll restoration, devtools, and `router.subscribe` consumers all key off
-// these events, and `useRouterState` selectors on `resolvedLocation` depend on
-// the commit.
-import { useEffect, useLayoutEffect, useRef, useState, startTransition } from 'octane';
-import { batch } from '@tanstack/store';
+//
+// router-core 1.171.34 owns the navigation lifecycle end to end: `load` drives
+// `startViewTransition` → `startTransition(commit, matches)`, awaits the render
+// acknowledgement, then emits `onLoad`/`onBeforeRouteMount`/`onResolved`/
+// `onRendered` and commits `status`/`resolvedLocation` itself. The binding's only
+// remaining jobs are:
+//   1. Supply `router.startTransition(fn, expected)` as that render
+//      ACKNOWLEDGEMENT — a promise router-core awaits that resolves `true` only
+//      once `MatchesInner` has rendered the `expected` matches (via `settleOwner`).
+//      Running `fn` inside an octane transition is what lets the current page hold
+//      while the next route suspends.
+//   2. Subscribe to history so back/forward and `Link` clicks reload; replace a
+//      non-canonical mounted URL (mirrors the server-side check in beforeLoad);
+//      and kick off the initial load — or, when hydrating an already-resolved SSR
+//      location, acknowledge the first render so `onRendered` consumers (scroll
+//      restoration, devtools) fire.
+import { useLayoutEffect, useState, startTransition } from 'octane';
 import { getLocationChangeInfo, trimPathRight } from '@tanstack/router-core';
 import { useRouter } from './context.ts';
-import { useStore } from './useStore.ts';
-import { usePrevious } from './utils.ts';
+
+// Resolve the pending render acknowledgement with whether the expected matches
+// rendered, then clear the slot. `owner` is `router._rendered`: `[expected, resolve]`.
+export function settleOwner(owner: Array<any>, rendered: boolean) {
+	const settle = owner[1] as ((rendered: boolean) => void) | undefined;
+	owner.length = 0;
+	settle?.(rendered);
+}
 
 export function useTransitioner() {
-	const router = useRouter();
-	const mountLoadForRouter = useRef({ router, mounted: false });
-	const [isTransitioning, setIsTransitioning] = useState(false);
+	const router = useRouter() as any;
+	const [, forceRender] = useState<object>();
 
-	const isLoading = useStore(router.stores.isLoading, (v) => v);
-	const hasPending = useStore(router.stores.hasPending, (v) => v);
+	const acknowledgement: Array<any> = router._rendered ??= [];
 
-	const previousIsLoading = usePrevious(isLoading);
-	const isAnyPending = isLoading || isTransitioning || hasPending;
-	const previousIsAnyPending = usePrevious(isAnyPending);
-	const isPagePending = isLoading || hasPending;
-	const previousIsPagePending = usePrevious(isPagePending);
+	router.startTransition = (fn: () => void, expected: unknown) => new Promise<boolean>((
+		resolve,
+	) => {
+		// A newer transition supersedes an unrendered older one.
+		settleOwner(acknowledgement, false);
+		acknowledgement.push(expected, resolve);
+		// Force `MatchesInner` to re-read: it renders `acknowledgement[0]` and
+		// settles this promise from a layout effect once that commit lands.
+		forceRender({});
+		startTransition(fn);
+	});
 
-	router.startTransition = (fn: () => void) => {
-		setIsTransitioning(true);
-		startTransition(() => {
-			fn();
-			setIsTransitioning(false);
-		});
-	};
-
-	// Subscribe to location changes and load the new location. On mount, also
-	// verify the current URL is in canonical form (search serialization,
-	// trailing slash) and replace it if not — mirroring the server-side redirect
-	// check in router.beforeLoad.
-	useEffect(() => {
+	useLayoutEffect(() => {
 		const unsub = router.history.subscribe(() => router.load());
 
+		// octane has no StrictMode double-invoke, so this layout effect runs once per
+		// mounted router and re-runs only when the router (or its history) is swapped
+		// on a live provider — exactly when the new router needs its initial load.
+		// Upstream guards this block with a dev-only `mounted` ref purely to absorb
+		// React's StrictMode double-invoke; keeping that ref here would instead skip
+		// the swapped-in router's load.
+		router.updateLatestLocation?.();
+		const location = router.latestLocation;
 		const nextLocation = router.buildLocation(
 			{
-				to: router.latestLocation.pathname,
+				to: location.pathname,
 				search: true,
 				params: true,
 				hash: true,
@@ -59,70 +68,32 @@ export function useTransitioner() {
 				_includeValidateSearch: true,
 			} as any,
 		);
-		if (
-			trimPathRight(router.latestLocation.publicHref) !== trimPathRight(nextLocation.publicHref)
-		) {
-			router.commitLocation({ ...nextLocation, replace: true });
+		if (trimPathRight(location.publicHref) !== trimPathRight(nextLocation.publicHref)) {
+			router.commitLocation({ ...nextLocation, replace: true, ignoreBlocker: true });
+			return unsub;
 		}
 
-		return () => unsub();
+		const resolvedLocation = router.stores.resolvedLocation.get();
+		if (
+			resolvedLocation?.href === location.href &&
+				resolvedLocation.state.__TSR_key === location.state.__TSR_key
+		) {
+			// Already resolved (SSR hydration): emit `onRendered` for scroll
+			// restoration and devtools. The match tree has already committed by the
+			// time this layout effect runs (child effects fire before the parent's),
+			// so emit directly rather than through the acknowledgement/settle path:
+			// hydration acknowledges the matches already on screen, which — unlike a
+			// navigation that commits the *next* matches — triggers no re-render for
+			// `MatchesInner`'s settle effect to run on.
+			router.emit({
+				type: 'onRendered',
+				...getLocationChangeInfo(resolvedLocation, resolvedLocation),
+			});
+		} else if (!router._tx) {
+			router.load({ sync: true }).catch((err: unknown) => {
+				console.error(err);
+			});
+		}
+		return unsub;
 	}, [router, router.history]);
-
-	// Initial load. Skipped when hydrating from SSR (ssr-client triggers it) and
-	// on re-runs for the same router instance.
-	useLayoutEffect(() => {
-		if (
-			typeof window !== 'undefined' && router.ssr ||
-				mountLoadForRouter.current.router === router && mountLoadForRouter.current.mounted
-		) {
-			return;
-		}
-		mountLoadForRouter.current = { router, mounted: true };
-		router.load().catch((err: unknown) => {
-			console.error(err);
-		});
-	}, [router]);
-
-	// The router was loading and now it's not — the new matches are in state.
-	useLayoutEffect(() => {
-		if (previousIsLoading && !isLoading) {
-			router.emit({
-				type: 'onLoad',
-				...getLocationChangeInfo(
-					router.stores.location.get(),
-					router.stores.resolvedLocation.get(),
-				),
-			});
-		}
-	}, [previousIsLoading, router, isLoading]);
-
-	useLayoutEffect(() => {
-		if (previousIsPagePending && !isPagePending) {
-			router.emit({
-				type: 'onBeforeRouteMount',
-				...getLocationChangeInfo(
-					router.stores.location.get(),
-					router.stores.resolvedLocation.get(),
-				),
-			});
-		}
-	}, [isPagePending, previousIsPagePending, router]);
-
-	// Everything pending has drained — resolve the navigation: emit onResolved and
-	// commit status idle + resolvedLocation (what `onRendered` and scroll
-	// restoration key off).
-	useLayoutEffect(() => {
-		if (previousIsAnyPending && !isAnyPending) {
-			const changeInfo = getLocationChangeInfo(
-				router.stores.location.get(),
-				router.stores.resolvedLocation.get(),
-			);
-			router.emit({ type: 'onResolved', ...changeInfo });
-
-			batch(() => {
-				router.stores.status.set('idle');
-				router.stores.resolvedLocation.set(router.stores.location.get());
-			});
-		}
-	}, [isAnyPending, previousIsAnyPending, router]);
 }

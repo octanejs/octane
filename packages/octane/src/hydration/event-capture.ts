@@ -3,9 +3,11 @@ import {
 	EARLY_HYDRATION_INTENTS_KEY,
 	HYDRATE_DEFAULT_INTERACTION_EVENTS,
 	HYDRATE_INTERACTION_EVENTS_ATTR,
+	HYDRATE_LIFECYCLE_INTERACTION_EVENTS,
 	HYDRATE_NATIVE_DEFAULT_INTERACTION_EVENTS,
 	HYDRATE_SELECTION_ATTR,
 	HYDRATE_SUPPORTED_INTERACTION_EVENTS,
+	isHydrationLifecycleEvent,
 } from './interaction-config.js';
 import { HYDRATE_INDEPENDENT_ATTR } from '../hydration-markers.js';
 import { hasBindingHandoffEvent } from '../dom-binding-handoff.js';
@@ -45,9 +47,10 @@ function isHydrationElement(target: EventTarget | null): target is Element {
 export { HYDRATE_SUPPORTED_INTERACTION_EVENTS } from './interaction-config.js';
 
 /**
- * @internal Keep trusted focusing, touch activation, editing, and IME work on
- * the original event. Replaying an untrusted clone cannot restore those native
- * default actions; discrete activation events still need navigation guarded.
+ * @internal Keep trusted focusing, touch activation, pointer movement and
+ * release, editing, and IME work on the original event. Replaying an untrusted
+ * clone cannot restore those native default actions; discrete activation events
+ * still need navigation guarded.
  */
 export function shouldPreventHydrationInteractionDefault(event: Event): boolean {
 	return event.cancelable && !HYDRATE_NATIVE_DEFAULT_INTERACTION_EVENTS.includes(event.type);
@@ -169,6 +172,20 @@ const HYDRATE_DELEGATED_DYNAMIC_MARKERS = /* @__PURE__ */ new WeakSet<Element>()
 const HYDRATE_HANDLED_INTENT_EVENTS = /* @__PURE__ */ new WeakSet<Event>();
 const HYDRATE_INTENT_DOCUMENTS = /* @__PURE__ */ new WeakSet<Document>();
 let independentHydrationDocuments: WeakSet<Document> | undefined;
+// Created on the first captured intent whose boundary chain selects a pointer
+// lifecycle event, so other pages never listen for high-frequency movement.
+let lifecycleHydrationMarkers: WeakSet<Element> | undefined;
+
+function selectsHydrationLifecycleEvent(markers: Element[]): boolean {
+	for (let i = 0; i < markers.length; i++) {
+		for (let j = 0; j < HYDRATE_LIFECYCLE_INTERACTION_EVENTS.length; j++) {
+			if (markerStatus(markers[i], HYDRATE_LIFECYCLE_INTERACTION_EVENTS[j]) === 'handles') {
+				return true;
+			}
+		}
+	}
+	return false;
+}
 
 /**
  * @internal Resolve an event target to an element-only path beneath a marker.
@@ -296,6 +313,9 @@ function handleEarlyHydrationIntent(
 		break;
 	}
 	if (candidate === null) return;
+	// Movement and cancellation only extend a press this path already captured.
+	const lifecycle = isHydrationLifecycleEvent(event.type);
+	if (lifecycle && !lifecycleHydrationMarkers?.has(candidate)) return;
 
 	// Preserve conservative intent only until a dynamic child's concrete
 	// strategy has been registered by the runtime.
@@ -313,6 +333,21 @@ function handleEarlyHydrationIntent(
 
 	const path = hydrationEventPathWithin(candidate, event.target);
 	if (path === null) return;
+	if (
+		!lifecycle &&
+		!lifecycleHydrationMarkers?.has(candidate) &&
+		selectsHydrationLifecycleEvent(markers)
+	) {
+		(lifecycleHydrationMarkers ??= new WeakSet()).add(candidate);
+		// The platform ignores a repeated registration of this capture listener.
+		for (let i = 0; i < HYDRATE_LIFECYCLE_INTERACTION_EVENTS.length; i++) {
+			target.ownerDocument.addEventListener(
+				HYDRATE_LIFECYCLE_INTERACTION_EVENTS[i],
+				handleEarlyHydrationIntent,
+				true,
+			);
+		}
+	}
 	const sequence =
 		independent !== null && capturedSelection === undefined
 			? advanceIndependentIntentSequence(target.ownerDocument)

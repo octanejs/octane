@@ -1,38 +1,26 @@
 import { renderToReadableStream } from 'octane/server';
-import { prerender } from 'octane/static';
 import { isbot } from 'isbot';
-import { createSsrStreamResponse } from '@tanstack/router-core/ssr/server';
-import { finalizeBufferedHtml } from './renderRouterToString';
+import {
+	createSsrStreamResponse,
+	getSsrStatus,
+	transformReadableStreamWithRouter,
+	waitForRequest,
+} from '@tanstack/router-core/ssr/server';
 import type { ComponentBody } from 'octane';
-import type { StreamInjectionSource } from 'octane/server';
 import type { AnyRouter } from '@tanstack/router-core';
 
 type RouterApp = ComponentBody<{ router: AnyRouter }>;
 type ServerComponent = Parameters<typeof renderToReadableStream>[0];
 
-// The router's data stream is merged through octane's native
-// `StreamOptions.injection` (octane >= 0.1.11) instead of router-core's
-// `transformStreamWithRouter` text transform. Octane emits tag-complete
-// chunks and owns the document tail, so the byte-level re-parse
-// (closing-tag scans, leftover buffers, the held-`</body>` tail that also
-// buffered every post-shell suspense segment until stream end) is
-// unnecessary — boundary segments stream out of order for document renders,
-// and the transform's 64 KiB tail cap on segment volume disappears.
-// Octane's document mode also emits `<!DOCTYPE html>` and folds the leading
-// renderer-owned styles into `<head>`, replacing the `prependDoctype` and
-// `relocateLeadingOctaneStylesToHead` transforms this file previously piped
-// the stream through.
-//
-// The serialization timeout is preserved: it arms when octane reports the
-// render finished (`renderComplete`) and fails the stream if serialization
-// never completes. The script barrier lifts when octane subscribes — octane
-// only subscribes after the shell (which carries the barrier anchor) is on
-// the wire, matching the transform's lift-after-marker-flush.
-// (`setRenderFinished` lifts it as a backstop regardless, exactly as
-// before.)
-
-const SERIALIZATION_TIMEOUT_MS = 60_000;
-
+// router-core 1.171.34 redesigned SSR serialization: the previous
+// `ServerSsr` buffered-HTML / script-barrier pull API (which octane bridged to
+// its native `StreamOptions.injection`) is gone. Octane now renders a plain HTML
+// stream and pipes it through router-core's `transformReadableStreamWithRouter`,
+// which injects the dehydrated router scripts at the `<Scripts>` boundary and
+// prepends `<!DOCTYPE html>`; `createSsrStreamResponse` owns the request-lifetime
+// teardown. Dehydration already ran in start-server-core's request handler. Bots
+// wait for every suspense boundary (`stream.allReady`) before the response is
+// produced so crawlers receive the fully-resolved document.
 export async function renderRouterToStream({
 	request,
 	router,
@@ -44,147 +32,129 @@ export async function renderRouterToStream({
 	responseHeaders: Headers;
 	App: RouterApp;
 }) {
-	if (isbot(request.headers.get('User-Agent'))) {
-		return renderRouterForBot({ request, router, responseHeaders, App });
+	const signal = request.signal;
+	if (signal.aborted) {
+		router.serverSsr?.cleanup();
+		throw signal.reason;
 	}
 
-	const serverSsr = router.serverSsr;
-	if (!serverSsr) {
-		throw new Error('Invariant failed: router.serverSsr is required');
-	}
-
-	const renderController = new AbortController();
-	const onRequestAbort = () => renderController.abort(request.signal.reason);
-	if (request.signal.aborted) {
-		onRequestAbort();
-	} else {
-		request.signal.addEventListener('abort', onRequestAbort, { once: true });
-		serverSsr.onCleanup(() => {
-			request.signal.removeEventListener('abort', onRequestAbort);
-		});
-	}
-
-	let serializationTimeout: ReturnType<typeof setTimeout> | undefined;
-	let stopSerializationListener: (() => void) | undefined;
-	let settleDone!: () => void;
-	let failDone!: (reason: unknown) => void;
-	const done = new Promise<void>((resolve, reject) => {
-		settleDone = resolve;
-		failDone = reject;
-	});
-	if (serverSsr.isSerializationFinished()) {
-		settleDone();
-	} else {
-		stopSerializationListener = serverSsr.onSerializationFinished(() => settleDone());
-	}
-	const releaseInjection = () => {
-		if (serializationTimeout !== undefined) {
-			clearTimeout(serializationTimeout);
-			serializationTimeout = undefined;
-		}
-		stopSerializationListener?.();
-		stopSerializationListener = undefined;
-	};
-
-	const injection: StreamInjectionSource = {
-		take: () => serverSsr.takeBufferedHtml() ?? '',
-		subscribe(notify) {
-			serverSsr.liftScriptBarrier();
-			return serverSsr.onInjectedHtml(notify);
-		},
-		done,
-		renderComplete() {
-			serverSsr.setRenderFinished();
-			if (!serverSsr.isSerializationFinished() && serializationTimeout === undefined) {
-				serializationTimeout = setTimeout(() => {
-					failDone(new Error('Serialization timeout after app render finished'));
-				}, SERIALIZATION_TIMEOUT_MS);
-			}
-		},
-	};
+	let rendererTeardown = false;
+	const bot = isbot(request.headers.get('User-Agent'));
 
 	try {
 		const stream = await renderToReadableStream(
 			App as unknown as ServerComponent,
 			{ router },
 			{
-				signal: renderController.signal,
+				signal,
 				nonce: router.options.ssr?.nonce,
-				injection,
-				onError(error) {
-					if (!isAbortError(request, error)) {
+				onError(error: unknown) {
+					if (!rendererTeardown && !signal.aborted && !isAbortError(request, error)) {
 						console.error('Error in renderToReadableStream:', error);
 					}
 				},
 			},
 		);
 
-		// The renderer's stream is the response body verbatim. `allReady` settles
-		// in every terminal state (close, abort, fatal, consumer cancel) — the
-		// single place to release the injection wiring and the router's SSR state.
-		stream.allReady.then(
-			() => {
-				releaseInjection();
-				serverSsr.cleanup();
-			},
-			() => {
-				releaseInjection();
-				serverSsr.cleanup();
+		const rendererAbort = bot ? new AbortController() : undefined;
+		const responseStream = transformReadableStreamWithRouter(
+			router,
+			finalizeDocumentShell(stream as unknown as ReadableStream<Uint8Array>),
+			{
+				rendererSafePoint: 'script-close',
+				signal,
+				onAbort: (reason: unknown) => {
+					rendererTeardown = true;
+					rendererAbort?.abort(reason);
+				},
 			},
 		);
 
+		if (rendererAbort) {
+			await waitForRequest(stream.allReady, rendererAbort.signal);
+		}
+
 		return createSsrStreamResponse(
 			router,
-			new Response(stream as unknown as BodyInit, {
-				status: router.stores.statusCode.get(),
+			new Response(responseStream, {
+				status: getSsrStatus(router),
 				headers: responseHeaders,
 			}),
 		);
 	} catch (error) {
-		renderController.abort(error);
-		releaseInjection();
 		router.serverSsr?.cleanup();
 		throw error;
 	}
 }
 
-async function renderRouterForBot({
-	request,
-	router,
-	responseHeaders,
-	App,
-}: {
-	request: Request;
-	router: AnyRouter;
-	responseHeaders: Headers;
-	App: RouterApp;
-}) {
-	try {
-		const result = await prerender(
-			App as unknown as Parameters<typeof prerender>[0],
-			{ router },
-			{
-				signal: request.signal,
-				nonce: router.options.ssr?.nonce,
-				onError(error) {
-					if (!isAbortError(request, error)) {
-						console.error('Error in prerender:', error);
+// Finalize octane's streamed document shell for the router-core stream path.
+// octane (without its former native injection) emits the deduped scoped-style
+// tags (`<style data-octane=…>`) ahead of the document shell (before `<html>`)
+// and no `<!DOCTYPE html>`, and router-core's *stream* transform injects router
+// scripts but neither moves those styles nor adds the doctype (only its string
+// transform does). So, for a document render, fold the leading style run into the
+// shell `<head>` and prepend the doctype — what octane's native-injection
+// document mode (and, before it, an explicit relocate transform) used to do. Only
+// the shell prefix (through `</head>`) is buffered; everything after streams
+// straight through, preserving out-of-order boundary flushing. A non-document
+// render (no `</head>`) passes through unchanged.
+export function finalizeDocumentShell(
+	source: ReadableStream<Uint8Array>,
+): ReadableStream<Uint8Array> {
+	const reader = source.getReader();
+	const decoder = new TextDecoder();
+	const encoder = new TextEncoder();
+	let prefix = '';
+	let finalized = false;
+	return new ReadableStream<Uint8Array>({
+		async pull(controller) {
+			if (finalized) {
+				const { value, done } = await reader.read();
+				// Keep decoding through the same streaming decoder rather than passing
+				// raw bytes: the decoder may hold the leading bytes of a multi-byte
+				// character split across the chunk that contained `</head>`, and raw
+				// passthrough would drop them and corrupt the rest of the stream.
+				if (done) {
+					const tail = decoder.decode();
+					if (tail) controller.enqueue(encoder.encode(tail));
+					controller.close();
+				} else {
+					controller.enqueue(encoder.encode(decoder.decode(value, { stream: true })));
+				}
+				return;
+			}
+			for (;;) {
+				const { value, done } = await reader.read();
+				if (value) prefix += decoder.decode(value, { stream: true });
+				if (prefix.includes('</head>')) {
+					const htmlStart = prefix.search(/<html[\s/>]/i);
+					if (htmlStart >= 0) {
+						if (htmlStart > 0) {
+							const leading = prefix.slice(0, htmlStart);
+							const doc = prefix.slice(htmlStart);
+							const headClose = doc.indexOf('</head>');
+							prefix = doc.slice(0, headClose) + leading + doc.slice(headClose);
+						}
+						if (!/^\s*<!doctype/i.test(prefix)) prefix = '<!DOCTYPE html>' + prefix;
 					}
-				},
-			},
-		);
-		router.serverSsr!.setRenderFinished();
-
-		return new Response(
-			finalizeBufferedHtml(result.html, result.css, router.serverSsr!.takeBufferedHtml()),
-			{
-				status: router.stores.statusCode.get(),
-				headers: responseHeaders,
-			},
-		);
-	} finally {
-		router.serverSsr?.cleanup();
-	}
+					controller.enqueue(encoder.encode(prefix));
+					prefix = '';
+					finalized = true;
+					return;
+				}
+				if (done) {
+					if (prefix) controller.enqueue(encoder.encode(prefix));
+					prefix = '';
+					finalized = true;
+					controller.close();
+					return;
+				}
+			}
+		},
+		cancel(reason) {
+			return reader.cancel(reason);
+		},
+	});
 }
 
 function isAbortError(request: Request, error: unknown) {

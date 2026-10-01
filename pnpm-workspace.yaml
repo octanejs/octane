@@ -271,14 +271,14 @@ catalogs:
     '@tanstack/devtools': 0.14.2
     '@tanstack/devtools-event-bus': 0.4.2
     '@tanstack/devtools-event-client': 0.5.0
-    '@tanstack/history': 1.162.0
+    '@tanstack/history': 1.162.4
     '@tanstack/query-core': ^5.102.8
     '@tanstack/react-query': ^5.102.8
-    '@tanstack/react-router': 1.170.18
+    '@tanstack/react-router': 1.170.41
     '@tanstack/react-store': ^0.11.1
     '@tanstack/react-table': 8.21.3
     '@tanstack/react-virtual': 3.14.5
-    '@tanstack/router-core': 1.171.15
+    '@tanstack/router-core': 1.171.34
     '@tanstack/store': ^0.9.3
     '@tanstack/table-core': 8.21.3
     '@tanstack/virtual-core': 3.17.3
@@ -622,28 +622,17 @@ minimumReleaseAgeExclude:
   - cn@0.2.6
   - '@tanstack/react-virtual@3.14.12'
   - '@tanstack/virtual-core@3.17.10'
+  - '@tanstack/react-router@1.170.41'
+  - '@tanstack/router-core@1.171.34'
+  - '@tanstack/start-client-core@1.170.34'
+  - '@tanstack/start-server-core@1.169.39'
+  - '@tanstack/start-storage-context@1.167.36'
 
 # The JSX type-only, generic-arrow, and typed-default mapping fixes formerly
 # patched into @tsrx/core are published in the required @tsrx/core >= 0.1.69,
 # and the parameter-property and bodyless-method mapping fix
 # (https://github.com/tsrx-org/tsrx/pull/143) in @tsrx/core >= 0.3.0.
 patchedDependencies:
-  # Backport the fix for CVE-2026-102989 (GHSA-qx66-fv34-fjm8): a critical
-  # unauthenticated reflected XSS in TanStack Start server-function response
-  # handling. Restricts client-supplied server-function input to the public
-  # {data, context, method} fields and stops a non-Response result being
-  # returned as the raw HTTP response on the non-server-fn path. Mirrors the
-  # upstream fix first released in @tanstack/start-server-core >= 1.169.39.
-  #
-  # SCOPE: this patch only rewrites the copy resolved inside THIS repository, so
-  # it protects the monorepo's own apps (website, examples) and CI. It does NOT
-  # ship in the published @octanejs/tanstack-start tarball, so external consumers
-  # who install from npm still resolve the unpatched @tanstack/start-server-core.
-  # The consumer-facing fix is tracked in octanejs/octane#1478 (adopt
-  # start-server-core >= 1.169.39 via the router-core 1.171.34 port, or republish
-  # a patched core). Drop this patch once that lands.
-  # Guarded by packages/tanstack-start/tests/server-function-xss.test.ts.
-  '@tanstack/start-server-core@1.169.17': patches/@tanstack__start-server-core@1.169.17.patch
   # Print labeled statements and empty statement bodies instead of deleting
   # them, and throw on a node type with no printer instead of writing a
   # placeholder comment. Backports tsrx-org/tsrx#322 and the empty-body part of

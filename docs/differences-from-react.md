@@ -1847,6 +1847,15 @@ nativeEvent)` copies, and their `timeStamp` is the replay time. React never
 replays a discrete event: it tries to hydrate the target synchronously and then
 dispatches the original event to whatever has hydrated.
 
+That includes the rest of a pointer press. An `interaction()` boundary that
+selects `pointermove`, `pointerup`, or `pointercancel` captures them after a
+selected press wakes it and replays them in order once it hydrates (see
+[Pointer press lifecycle](./deferred-hydration.md#pointer-press-lifecycle)).
+React drops a `pointerup` or `pointercancel` whose target is still suspended
+after that synchronous attempt, and never delivers `pointermove` to a dehydrated
+subtree's handlers. Neither framework cancels the native default of these
+events.
+
 `hydrateRoot` has no `formState` option: resuming `useActionState` from an MPA
 form POST requires React's server-action state serialization, which is part of
 the RSC model Octane does not implement (the matching `useActionState`
