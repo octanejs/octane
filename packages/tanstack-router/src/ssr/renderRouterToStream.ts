@@ -98,7 +98,9 @@ export async function renderRouterToStream({
 // the shell prefix (through `</head>`) is buffered; everything after streams
 // straight through, preserving out-of-order boundary flushing. A non-document
 // render (no `</head>`) passes through unchanged.
-function finalizeDocumentShell(source: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+export function finalizeDocumentShell(
+	source: ReadableStream<Uint8Array>,
+): ReadableStream<Uint8Array> {
 	const reader = source.getReader();
 	const decoder = new TextDecoder();
 	const encoder = new TextEncoder();
@@ -108,8 +110,17 @@ function finalizeDocumentShell(source: ReadableStream<Uint8Array>): ReadableStre
 		async pull(controller) {
 			if (finalized) {
 				const { value, done } = await reader.read();
-				if (done) controller.close();
-				else controller.enqueue(value);
+				// Keep decoding through the same streaming decoder rather than passing
+				// raw bytes: the decoder may hold the leading bytes of a multi-byte
+				// character split across the chunk that contained `</head>`, and raw
+				// passthrough would drop them and corrupt the rest of the stream.
+				if (done) {
+					const tail = decoder.decode();
+					if (tail) controller.enqueue(encoder.encode(tail));
+					controller.close();
+				} else {
+					controller.enqueue(encoder.encode(decoder.decode(value, { stream: true })));
+				}
 				return;
 			}
 			for (;;) {

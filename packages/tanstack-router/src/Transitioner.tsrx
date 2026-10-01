@@ -17,7 +17,7 @@
 //      and kick off the initial load — or, when hydrating an already-resolved SSR
 //      location, acknowledge the first render so `onRendered` consumers (scroll
 //      restoration, devtools) fire.
-import { useLayoutEffect, useRef, useState, startTransition } from 'octane';
+import { useLayoutEffect, useState, startTransition } from 'octane';
 import { getLocationChangeInfo, trimPathRight } from '@tanstack/router-core';
 import { useRouter } from './context.ts';
 
@@ -32,7 +32,6 @@ export function settleOwner(owner: Array<any>, rendered: boolean) {
 export function useTransitioner() {
 	const router = useRouter() as any;
 	const [, forceRender] = useState<object>();
-	const mounted = useRef(false);
 
 	const acknowledgement: Array<any> = router._rendered ??= [];
 
@@ -50,9 +49,13 @@ export function useTransitioner() {
 
 	useLayoutEffect(() => {
 		const unsub = router.history.subscribe(() => router.load());
-		if (mounted.current) return unsub;
-		mounted.current = true;
 
+		// octane has no StrictMode double-invoke, so this layout effect runs once per
+		// mounted router and re-runs only when the router (or its history) is swapped
+		// on a live provider — exactly when the new router needs its initial load.
+		// Upstream guards this block with a dev-only `mounted` ref purely to absorb
+		// React's StrictMode double-invoke; keeping that ref here would instead skip
+		// the swapped-in router's load.
 		router.updateLatestLocation?.();
 		const location = router.latestLocation;
 		const nextLocation = router.buildLocation(
@@ -75,15 +78,16 @@ export function useTransitioner() {
 			resolvedLocation?.href === location.href &&
 				resolvedLocation.state.__TSR_key === location.state.__TSR_key
 		) {
-			// Already resolved (SSR hydration): acknowledge the first render so
-			// router-core emits `onRendered` for scroll restoration and devtools.
-			acknowledgement.push(router.stores.matches.get(), (rendered: boolean) => {
-				if (rendered) {
-					router.emit({
-						type: 'onRendered',
-						...getLocationChangeInfo(resolvedLocation, resolvedLocation),
-					});
-				}
+			// Already resolved (SSR hydration): emit `onRendered` for scroll
+			// restoration and devtools. The match tree has already committed by the
+			// time this layout effect runs (child effects fire before the parent's),
+			// so emit directly rather than through the acknowledgement/settle path:
+			// hydration acknowledges the matches already on screen, which — unlike a
+			// navigation that commits the *next* matches — triggers no re-render for
+			// `MatchesInner`'s settle effect to run on.
+			router.emit({
+				type: 'onRendered',
+				...getLocationChangeInfo(resolvedLocation, resolvedLocation),
 			});
 		} else if (!router._tx) {
 			router.load({ sync: true }).catch((err: unknown) => {

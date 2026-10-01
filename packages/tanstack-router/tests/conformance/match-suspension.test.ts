@@ -85,6 +85,62 @@ describe('@octanejs/tanstack-router — match suspension across match states', (
 		r.unmount();
 	});
 
+	// router-core emits `onRendered` (scroll restoration, devtools) once the match
+	// tree is on screen. On an already-resolved SSR location the client does not
+	// re-load, so the acknowledgement is settled from the hydration layout effect.
+	// Per react-router's Transitioner hydration branch.
+	it('emits onRendered after hydrating an already-resolved SSR location', async () => {
+		const router = makeMatchSuspensionRouter('/');
+		failOnRenderLoop(router);
+
+		const [rootMatch, homeMatch] = router.matchRoutes(router.stores.location.get());
+		(window as any).$_TSR = {
+			router: {
+				manifest: undefined,
+				lastMatchId: homeMatch.id,
+				matches: [
+					{ i: rootMatch.id, u: Date.now(), s: 'success', ssr: true },
+					{ i: homeMatch.id, u: Date.now(), s: 'success', ssr: true },
+				],
+			},
+			buffer: [],
+		};
+
+		const rendered: Array<unknown> = [];
+		const unsub = router.subscribe('onRendered', (event: unknown) => rendered.push(event));
+
+		const r = mount(RouterClient as any, { router });
+		await flush();
+
+		expect(r.findAll('.home').length).toBe(1);
+		expect(rendered.length).toBeGreaterThan(0);
+		unsub();
+		r.unmount();
+	});
+
+	// Swapping the router instance on a live RouterProvider must load the new
+	// router. octane has no StrictMode double-invoke, so the Transitioner carries no
+	// persistent mounted-guard that would skip the swapped-in router's initial load.
+	it('loads a router swapped onto a live RouterProvider', async () => {
+		const routerA = makeMatchSuspensionRouter('/');
+		await routerA.load();
+		const r = mount(RouterProvider as any, { router: routerA });
+		await flush();
+		expect(r.findAll('.home').length).toBe(1);
+
+		// The replacement router has not loaded yet: its match store is empty, so
+		// nothing renders until the Transitioner runs its initial load for it.
+		const routerB = makeMatchSuspensionRouter('/');
+		expect(routerB.stores.matches.get().length).toBe(0);
+
+		r.update(RouterProvider as any, { router: routerB });
+		await flush();
+
+		expect(routerB.stores.matches.get().length).toBeGreaterThan(0);
+		expect(r.findAll('.home').length).toBe(1);
+		r.unmount();
+	});
+
 	it('keeps a redirected match suspended until the redirect target loads', async () => {
 		const guard = createDeferred<void>();
 		const router = makeMatchSuspensionRouter('/', { guard });
