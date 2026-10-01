@@ -707,6 +707,46 @@ export function App(props) @{
 		}
 	});
 
+	it('keeps a live nested-boundary event behind the parent replay that targets it', async () => {
+		vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
+			setTimeout(() => callback(performance.now()), 16),
+		);
+		try {
+			const received: Array<[string, number]> = [];
+			const record = (event: Event) => received.push([event.type, event.timeStamp]);
+			const props = {
+				outerWhen: interaction({ events: 'click' }),
+				// Only the nested boundary captures keydown.
+				innerWhen: interaction({ events: ['click', 'keydown'] }),
+				onTargetClick: record,
+				onTargetKeyDown: record,
+			};
+			container.innerHTML = renderToString(server.NestedInteractionHydration, props).html;
+			const target = container.querySelector('#interaction-target') as HTMLButtonElement;
+			const dispatch = (event: Event, timeStamp: number) => {
+				Object.defineProperty(event, 'timeStamp', { value: timeStamp });
+				target.dispatchEvent(event);
+			};
+
+			root = hydrateRoot(container, client.NestedInteractionHydration, props);
+			await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
+			// Parent-first: the outer boundary captures this click and owes it to the inner one.
+			dispatch(new MouseEvent('click', { bubbles: true, cancelable: true }), 10);
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			dispatch(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'a' }), 20);
+			await vi.waitFor(() => expect(received).toHaveLength(2));
+			await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
+
+			expect(received).toEqual([
+				['click', 10],
+				['keydown', 20],
+			]);
+			expect(container.querySelector('#interaction-target')).toBe(target);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it('runs setup and cleanup for a custom interaction strategy', async () => {
 		const setup = vi.fn();
 		const cleanup = vi.fn();

@@ -105,7 +105,11 @@ export function NestedInteractionHydration(props) @{
 	<Hydrate when={props.outerWhen} split={false} onHydrated={props.onOuterHydrated}>
 		<section id="interaction-parent">
 			<Hydrate when={props.innerWhen} split={false} onHydrated={props.onInnerHydrated}>
-				<button id="interaction-target" onClick={props.onTargetClick}>{'Open reviews'}</button>
+				<button
+					id="interaction-target"
+					onClick={props.onTargetClick}
+					onKeyDown={props.onTargetKeyDown}
+				>{'Open reviews'}</button>
 			</Hydrate>
 		</section>
 	</Hydrate>
