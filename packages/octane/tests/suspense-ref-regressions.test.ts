@@ -1,9 +1,10 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { act, mount } from './_helpers';
-import { createRoot, hydrateRoot, type FragmentInstance } from '../src/index.js';
+import { createRoot, flushSync, hydrateRoot, type FragmentInstance } from '../src/index.js';
 import { renderToString } from 'octane/server';
 import { loadServerFixture } from './_server-fixture.js';
 import {
+	NestedSupersededReveal,
 	RootHostRef,
 	RootFragmentRef,
 	SuspendedHostRefUpdate,
@@ -106,6 +107,60 @@ for (const [name, Component] of Object.entries({ RootHostRef, RootFragmentRef })
 			}
 		});
 	}
+}
+
+for (const hydrate of [false, true]) {
+	it(`publishes nested refs before layout effects after an update supersedes their first hidden retry (hydrate=${hydrate})`, async () => {
+		const outer = deferred<string>();
+		const inner = deferred<string>();
+		const trace: string[] = [];
+		const props = {
+			show: true,
+			outer: outer.promise,
+			inner: inner.promise,
+			trace: (entry: string) => {
+				trace.push(entry);
+			},
+		};
+		const initial = { ...props, show: false };
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		if (hydrate) {
+			container.innerHTML = renderToString(server.NestedSupersededReveal, initial).html;
+		}
+		// Outside act, a settled retry waits out the fallback throttle with its
+		// completed render staged. Holding timers keeps that window open.
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+		const root = hydrate
+			? hydrateRoot(container, NestedSupersededReveal, initial)
+			: createRoot(container);
+		try {
+			flushSync(() => root.render(NestedSupersededReveal, props));
+			expect(container.querySelector('.nested-outer-fallback')?.textContent).toBe('outer');
+
+			outer.resolve('gate');
+			await vi.advanceTimersByTimeAsync(0);
+			expect(container.querySelector('.nested-outer-fallback')?.textContent).toBe('outer');
+			// The inner boundary first suspended in that staged retry. This update
+			// keeps the @try inputs, so it replaces the staged retry with a fresh one
+			// instead of restarting the primary.
+			flushSync(() => container.querySelector<HTMLButtonElement>('.nested-rerender')!.click());
+			expect(container.querySelector('.nested-outer-fallback')).toBeNull();
+			expect(container.querySelector('.nested-gate')?.textContent).toBe('gate');
+			expect(container.querySelector('.nested-inner-fallback')?.textContent).toBe('inner');
+			expect(trace).toEqual([]);
+
+			await act(() => inner.resolve('nested-late'));
+			expect(container.querySelector('.nested-inner-fallback')).toBeNull();
+			// The early host mounted before the inner suspension and is preserved;
+			// the late host mounts in the reveal. Both refs are set by layout time.
+			expect(trace).toEqual(['nested-early:nested-early', 'nested-late:nested-late']);
+		} finally {
+			root.unmount();
+			container.remove();
+			vi.useRealTimers();
+		}
+	});
 }
 
 function deferred<T>() {

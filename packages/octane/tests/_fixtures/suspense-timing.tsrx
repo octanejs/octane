@@ -143,6 +143,73 @@ export function TimedNested(props: NestedTimingProps) @{
 	</TimingSuspense>
 }
 
+export interface NestedRefRevealProps {
+	outer: Promise<string>;
+	inner: Promise<string>;
+	onLayout: (value: string) => void;
+}
+
+function NestedRefHost(props: { label: string; onLayout: (value: string) => void }) @{
+	const host = useRef<HTMLSpanElement | null>(null);
+	useLayoutEffect(() => {
+		props.onLayout(props.label + ':' + (host.current?.getAttribute('data-value') ?? 'null'));
+	}, [props.label, props.onLayout]);
+	<span data-value={props.label} ref={host}>{props.label as string}</span>
+}
+
+function NestedRefLate(props: { promise: Promise<string>; onLayout: (value: string) => void }) @{
+	const label = use(props.promise);
+	<NestedRefHost label={label} onLayout={props.onLayout} />
+}
+
+export function NestedRefReveal(props: NestedRefRevealProps) @{
+	const [renders, setRenders] = useState(0);
+	<main>
+		<button onClick={() => setRenders(renders + 1)}>{'rerender ' + renders}</button>
+		@try {
+			<>
+				<TimedContent promise={props.outer} label="gate" />
+				@try {
+					<>
+						<NestedRefHost label="early" onLayout={props.onLayout} />
+						<NestedRefLate promise={props.inner} onLayout={props.onLayout} />
+					</>
+				} @pending {
+					<span data-fallback="inner">{'inner loading'}</span>
+				}
+			</>
+		} @pending {
+			<span data-fallback="outer">{'outer loading'}</span>
+		}
+	</main>
+}
+
+export interface NestedRefRehideProps {
+	outer: Promise<string>;
+	inner: Promise<string>;
+	onRef: (node: HTMLSpanElement | null) => void;
+}
+
+export function NestedRefRehide(props: NestedRefRehideProps) @{
+	<main>
+		@try {
+			<>
+				@try {
+					<>
+						<span data-value="nested" ref={props.onRef}>{'nested'}</span>
+						<TimedContent promise={props.inner} label="inner" />
+					</>
+				} @pending {
+					<span data-fallback="inner">{'inner loading'}</span>
+				}
+				<TimedContent promise={props.outer} label="outer" />
+			</>
+		} @pending {
+			<span data-fallback="outer">{'outer loading'}</span>
+		}
+	</main>
+}
+
 export interface RawTimingProps {
 	read: () => string;
 	label: string;

@@ -1,4 +1,4 @@
-import { Fragment, use, type FragmentInstance } from 'octane';
+import { Fragment, use, useLayoutEffect, useRef, useState, type FragmentInstance } from 'octane';
 
 type ElementRef = (element: Element | null) => void;
 type RootRefProps = {
@@ -83,4 +83,55 @@ export function SupersededRefOrder(props: {
 		}
 		<RenderProbe value={props.sentinel} />
 	</>
+}
+
+function NestedRevealHost(props: { name: string; trace: (entry: string) => void }) @{
+	const host = useRef<HTMLElement | null>(null);
+	useLayoutEffect(() => {
+		props.trace(`${props.name}:${host.current?.className ?? 'null'}`);
+	});
+	<b class={props.name} ref={host}>{props.name as string}</b>
+}
+
+function NestedRevealLate(props: { promise: Promise<string>; trace: (entry: string) => void }) @{
+	const name = use(props.promise);
+	<NestedRevealHost name={name} trace={props.trace} />
+}
+
+function NestedRevealGate(props: { promise: Promise<string> }) @{
+	const value = use(props.promise);
+	<span class="nested-gate">{value as string}</span>
+}
+
+// The nested boundary first suspends inside its ancestor's paced retry. A state
+// update with unchanged @try inputs supersedes that retry, so the nested primary
+// stays hidden although the hide staged with the retry never commits.
+export function NestedSupersededReveal(props: {
+	show: boolean;
+	outer: Promise<string>;
+	inner: Promise<string>;
+	trace: (entry: string) => void;
+}) @{
+	const [renders, setRenders] = useState(0);
+	const rerender = () => setRenders(renders + 1);
+	<div class="nested-reveal">
+		<button class="nested-rerender" onClick={rerender}>{String(renders)}</button>
+		@if (props.show) {
+			@try {
+				<>
+					<NestedRevealGate promise={props.outer} />
+					@try {
+						<>
+							<NestedRevealHost name="nested-early" trace={props.trace} />
+							<NestedRevealLate promise={props.inner} trace={props.trace} />
+						</>
+					} @pending {
+						<span class="nested-inner-fallback">{'inner'}</span>
+					}
+				</>
+			} @pending {
+				<span class="nested-outer-fallback">{'outer'}</span>
+			}
+		}
+	</div>
 }
