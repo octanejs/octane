@@ -1667,16 +1667,14 @@ describe('Pull request benchmark report', () => {
 					`node benchmarks/bench.mjs --results-dir="$RESULTS/${results}" bundle-size bundle-reachability`,
 				),
 			);
-			assert.ok(
-				prBenchWorkflow.includes(
-					`TARGETS="$JS_FRAMEWORK_TARGETS" node benchmarks/bench.mjs --results-dir="$RESULTS/${results}" js-framework`,
-				),
-			);
 		}
+		assert.ok(prBenchWorkflow.includes('for round in base:1 head:1 head:2 base:2; do'));
+		assert.ok(prBenchWorkflow.includes('TARGETS: ${{ env.JS_FRAMEWORK_TARGETS }}'));
 		assert.ok(
-			prBenchWorkflow.includes(
-				'node benchmarks/pr-report.mjs --base="$RESULTS/base" --head="$RESULTS/head"',
-			),
+			prBenchWorkflow.includes('--base="$RESULTS/base,$RESULTS/base-js-1,$RESULTS/base-js-2"'),
+		);
+		assert.ok(
+			prBenchWorkflow.includes('--head="$RESULTS/head,$RESULTS/head-js-1,$RESULTS/head-js-2"'),
 		);
 		assert.match(packageJson.scripts['ci:workflow:test'], /benchmarks\/pr-report\.test\.mjs/);
 	});

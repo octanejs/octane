@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { COMMENT_MARKER, compareSuite, renderReport } from './pr-report.mjs';
+import { COMMENT_MARKER, compareSuite, mergeRounds, renderReport } from './pr-report.mjs';
 
 const bytes = (value) => ({ median: value, min: value, samples: 1 });
 const timed = (score, min, rme) => ({ score, median: score, min, rme, scoreRme: rme, samples: 8 });
@@ -48,6 +48,21 @@ test('sub-millisecond timing changes within one timer tick are not verdicts', ()
 		{ name: 'octane-tsrx', ops: { select: timed(0.26, 0.2, 26) } },
 	]);
 	assert.equal(compareSuite('js-framework', base, head).timing[0].verdict, 'within noise');
+});
+
+// Identical code on CI read slower on every row when head always ran after base.
+test('runner drift across base, head, head, base rounds cancels out', () => {
+	const round = (score) =>
+		suite('js-framework', [{ name: 'octane-tsrx', ops: { run: timed(score, score - 0.5, 3) } }]);
+	const base = mergeRounds([round(10), round(13)]);
+	const head = mergeRounds([round(11), round(12)]);
+	assert.equal(compareSuite('js-framework', round(10), round(11)).timing[0].verdict, 'slower');
+	assert.equal(compareSuite('js-framework', base, head).timing[0].verdict, 'within noise');
+});
+
+test('a failed round fails the merged suite', () => {
+	const ok = suite('js-framework', [{ name: 'octane-tsrx', ops: { run: timed(10, 9, 3) } }]);
+	assert.equal(mergeRounds([ok, { ...ok, harnessExit: 1, failed: 'gate' }]).failed, 'gate');
 });
 
 test('timing verdicts never turn the headline red', () => {

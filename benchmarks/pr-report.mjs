@@ -2,7 +2,11 @@
 // from a pull request's base commit and its merge commit on the same runner, and
 // renders the Markdown posted as the pull request's sticky comment.
 //
-// Run: node benchmarks/pr-report.mjs --base=<dir> --head=<dir> [--out=<file>]
+// Run: node benchmarks/pr-report.mjs --base=<dir>[,<dir>] --head=<dir>[,<dir>] [--out=<file>]
+//
+// Several directories per side are rounds of the same commit. CI measures
+// js-framework base, head, head, base so linear runner drift cancels in each
+// side's mean; disagreement between rounds widens the margin of error.
 //
 // Deterministic operations (bytes, DOM-operation and call counts) report every
 // change exactly. A timing operation is only called faster or slower outside its
@@ -205,12 +209,65 @@ export function renderReport({ suites = SUITES, base, head, baseSha, headSha, ru
 		: body;
 }
 
-function readSuites(directory) {
-	return Object.fromEntries(
-		SUITES.map((suite) => {
-			const file = path.join(directory, `${suite}.json`);
-			return [suite, fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null];
+const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+
+function mergeStat(stats) {
+	if (stats.length === 1 || !stats.every(isTiming)) return stats[0];
+	const score = mean(stats.map((stat) => stat.score));
+	const spread =
+		score === 0
+			? 0
+			: ((Math.max(...stats.map((stat) => stat.score)) -
+					Math.min(...stats.map((stat) => stat.score))) /
+					score) *
+				100;
+	return {
+		score,
+		median: mean(stats.map((stat) => stat.median)),
+		min: Math.min(...stats.map((stat) => stat.min)),
+		scoreRme: Math.max(spread, ...stats.map(rmeOf)),
+		samples: stats.reduce((sum, stat) => sum + (Number(stat.samples) || 0), 0),
+	};
+}
+
+export function mergeRounds(rounds) {
+	const results = rounds.filter(Boolean);
+	if (results.length <= 1) return results[0] ?? null;
+	const failed = results.map((result) => failureOf(result)).filter(Boolean);
+	const names = [
+		...new Set(results.flatMap((result) => result.targets.map((target) => target.name))),
+	];
+	return {
+		suite: results[0].suite,
+		iterations: results[0].iterations,
+		harnessExit: failed.length ? 1 : 0,
+		...(failed.length ? { failed: failed.join(' | ') } : null),
+		targets: names.map((name) => {
+			const targets = results
+				.map((result) => result.targets.find((target) => target.name === name))
+				.filter(Boolean);
+			const ops = [...new Set(targets.flatMap((target) => Object.keys(target.ops)))];
+			return {
+				name,
+				ops: Object.fromEntries(
+					ops.map((op) => [op, mergeStat(targets.map((target) => target.ops[op]).filter(Boolean))]),
+				),
+			};
 		}),
+	};
+}
+
+function readSuites(directories) {
+	return Object.fromEntries(
+		SUITES.map((suite) => [
+			suite,
+			mergeRounds(
+				directories.split(',').map((directory) => {
+					const file = path.join(directory, `${suite}.json`);
+					return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
+				}),
+			),
+		]),
 	);
 }
 
@@ -222,7 +279,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 			.map((arg) => [arg.slice(2, arg.indexOf('=')), arg.slice(arg.indexOf('=') + 1)]),
 	);
 	if (!options.base || !options.head) {
-		console.error('usage: node benchmarks/pr-report.mjs --base=<dir> --head=<dir> [--out=<file>]');
+		console.error(
+			'usage: node benchmarks/pr-report.mjs --base=<dir>[,<dir>] --head=<dir>[,<dir>] [--out=<file>]',
+		);
 		process.exit(2);
 	}
 	const body = renderReport({

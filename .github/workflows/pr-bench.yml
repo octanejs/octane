@@ -68,20 +68,31 @@ jobs:
 
       # A failing suite is recorded in its result JSON and rendered in the
       # report, so both trees always run to completion before the verdict.
-      - name: Benchmark base commit
-        working-directory: ${{ env.BASE_TREE }}
+      # Byte suites are deterministic and run once per tree. js-framework runs
+      # base, head, head, base so runner drift over the job cancels out.
+      - name: Benchmark bundle size
+        id: bytes
         run: |
-          status=0
-          node benchmarks/bench.mjs --results-dir="$RESULTS/base" bundle-size bundle-reachability || status=$?
-          TARGETS="$JS_FRAMEWORK_TARGETS" node benchmarks/bench.mjs --results-dir="$RESULTS/base" js-framework || status=$?
-          if [ "$status" != 0 ]; then echo "::warning::base benchmarks exited $status"; fi
-
-      - name: Benchmark merge commit
-        id: head
-        run: |
+          (cd "$BASE_TREE" && node benchmarks/bench.mjs --results-dir="$RESULTS/base" bundle-size bundle-reachability) \
+            || echo "::warning::base bundle benchmarks failed"
           status=0
           node benchmarks/bench.mjs --results-dir="$RESULTS/head" bundle-size bundle-reachability || status=$?
-          TARGETS="$JS_FRAMEWORK_TARGETS" node benchmarks/bench.mjs --results-dir="$RESULTS/head" js-framework || status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Benchmark js-framework
+        id: timing
+        env:
+          TARGETS: ${{ env.JS_FRAMEWORK_TARGETS }}
+        run: |
+          status=0
+          for round in base:1 head:1 head:2 base:2; do
+            side=${round%%:*}
+            tree=$GITHUB_WORKSPACE
+            if [ "$side" = base ]; then tree=$BASE_TREE; fi
+            if (cd "$tree" && node benchmarks/bench.mjs --results-dir="$RESULTS/$side-js-${round##*:}" js-framework); then :
+            elif [ "$side" = head ]; then status=1
+            else echo "::warning::base js-framework round failed"; fi
+          done
           echo "status=$status" >> "$GITHUB_OUTPUT"
 
       - name: Render report
@@ -91,7 +102,10 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           mkdir -p "$RESULTS/report"
-          HEAD_SHA="$MERGE_SHA" node benchmarks/pr-report.mjs --base="$RESULTS/base" --head="$RESULTS/head" --out="$RESULTS/report/report.md"
+          HEAD_SHA="$MERGE_SHA" node benchmarks/pr-report.mjs \
+            --base="$RESULTS/base,$RESULTS/base-js-1,$RESULTS/base-js-2" \
+            --head="$RESULTS/head,$RESULTS/head-js-1,$RESULTS/head-js-2" \
+            --out="$RESULTS/report/report.md"
           printf '%s\n' "$PR_NUMBER" > "$RESULTS/report/pr-number"
           printf '%s\n' "$HEAD_SHA" > "$RESULTS/report/head-sha"
           cat "$RESULTS/report/report.md" >> "$GITHUB_STEP_SUMMARY"
@@ -102,10 +116,9 @@ jobs:
           name: pr-bench-report
           path: |
             ${{ env.RESULTS }}/report/
-            ${{ env.RESULTS }}/base/*.json
-            ${{ env.RESULTS }}/head/*.json
+            ${{ env.RESULTS }}/*/*.json
           retention-days: 14
 
       - name: Fail when the merge commit's benchmarks failed
-        if: steps.head.outputs.status != '0'
+        if: steps.bytes.outputs.status != '0' || steps.timing.outputs.status != '0'
         run: exit 1
