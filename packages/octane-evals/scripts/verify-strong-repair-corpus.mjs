@@ -16,7 +16,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // - each starter fails Strong compilation with the exact error its prompt quotes,
 //   and each reference compiles;
 // - each recorded workaround (`tasks/<id>/negatives/<name>/src/App.tsrx`), the
-//   rewrites agents reach for when a Strong error blocks them, fails its grader.
+//   rewrites agents reach for when a Strong error blocks them, fails its grader;
+// - each recorded alternative answer (`tasks/<id>/alternatives/<name>/src/App.tsrx`)
+//   passes it, so a grader cannot quietly reject a valid fix.
 // The ledger records which workarounds still compile in Strong mode. A rejection
 // that relies only on the behavioral checks is a visible compiler gap and a
 // candidate compiler fixture.
@@ -62,22 +64,23 @@ for (const task of tasks) {
 }
 const slots = [];
 for (const task of tasks) {
-	const root = join(tasksRoot, task.taskId, 'negatives');
-	const names = existsSync(root)
-		? readdirSync(root, { withFileTypes: true })
-				.filter((entry) => entry.isDirectory())
-				.map((entry) => entry.name)
-				.sort()
-		: [];
-	names.forEach((name, index) => {
-		(slots[index] ??= []).push({ taskId: task.taskId, name, directory: join(root, name) });
+	const entries = ['negatives', 'alternatives'].flatMap((kind) => {
+		const root = join(tasksRoot, task.taskId, kind);
+		return existsSync(root)
+			? readdirSync(root, { withFileTypes: true })
+					.filter((entry) => entry.isDirectory())
+					.map((entry) => entry.name)
+					.sort()
+					.map((name) => ({ taskId: task.taskId, kind, name, directory: join(root, name) }))
+			: [];
 	});
+	entries.forEach((entry, index) => (slots[index] ??= []).push(entry));
 }
 
 // A submission alias is keyed by task ID, so one Vitest run can grade at most one
 // negative per task. Independent slots run concurrently.
 function gradeSlot(entries) {
-	const aliasRoot = mkdtempSync(join(tmpdir(), 'octane-eval-negatives-'));
+	const aliasRoot = mkdtempSync(join(tmpdir(), 'octane-eval-strong-repair-'));
 	const reportPath = join(aliasRoot, 'report.json');
 	for (const entry of entries) symlinkSync(entry.directory, join(aliasRoot, entry.taskId), 'dir');
 	const graders = entries.map((entry) => join(tasksRoot, entry.taskId, 'grader.test.ts'));
@@ -120,13 +123,22 @@ function gradeSlot(entries) {
 
 const graded = (await Promise.all(slots.map(gradeSlot))).flat();
 const ledger = {};
-for (const { taskId, name, directory, result } of graded) {
+for (const { taskId, kind, name, directory, result } of graded) {
 	const key = `${taskId}/${name}`;
 	const assertions = result?.assertionResults ?? [];
 	const compile = assertions.find((assertion) => assertion.title === STRONG_COMPILE_TEST);
 	const behavior = assertions.filter((assertion) => assertion.title !== STRONG_COMPILE_TEST);
 	if (!result || !compile || behavior.length === 0) {
 		problems.push(`${key}: the task grader did not run its Strong and behavior checks.`);
+		continue;
+	}
+	if (kind === 'alternatives') {
+		const failed = assertions.filter((assertion) => assertion.status !== 'passed');
+		if (failed.length > 0) {
+			problems.push(
+				`${key}: the grader rejects this valid alternative (${failed.map((assertion) => assertion.title).join('; ')}). Fix the grader or ${relative(repositoryRoot, directory)}.`,
+			);
+		}
 		continue;
 	}
 	const compiles = compile.status === 'passed';
@@ -145,6 +157,8 @@ if (problems.length > 0) {
 const sorted = Object.fromEntries(Object.entries(ledger).sort(([a], [b]) => (a < b ? -1 : 1)));
 const content = `${JSON.stringify(sorted, null, 2)}\n`;
 const gaps = Object.values(sorted).filter((status) => status === 'compiles-keeps-bug').length;
+const workarounds = Object.keys(sorted).length;
+const alternatives = graded.length - workarounds;
 if (process.argv.includes('--check')) {
 	if (!existsSync(ledgerPath) || readFileSync(ledgerPath, 'utf8') !== content) {
 		console.error(
@@ -153,11 +167,11 @@ if (process.argv.includes('--check')) {
 		process.exit(1);
 	}
 	console.log(
-		`verified ${tasks.length} Strong repair tasks and ${graded.length} workarounds (${gaps} compile and keep the bug)`,
+		`verified ${tasks.length} Strong repair tasks, ${alternatives} alternative answers, and ${workarounds} workarounds (${gaps} compile and keep the bug)`,
 	);
 } else {
 	writeFileSync(ledgerPath, content);
 	console.log(
-		`wrote ${relative(repositoryRoot, ledgerPath)}: ${graded.length} workarounds, ${gaps} compile and keep the bug`,
+		`wrote ${relative(repositoryRoot, ledgerPath)}: ${workarounds} workarounds, ${gaps} compile and keep the bug (${alternatives} alternative answers pass)`,
 	);
 }

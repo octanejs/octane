@@ -98,8 +98,8 @@ been recorded. The benchmark's own license does not relicense embedded code.
 6. Confirm both solutions pass the task repeatedly.
 7. Try plausible React-shaped, wrong, and partial implementations; strengthen
    the tests until each is rejected for the intended reason. For a Strong
-   repair, commit the workarounds under `negatives/` so the rejection stays
-   checked.
+   repair, commit the workarounds under `negatives/` and independent valid
+   answers under `alternatives/`, so both outcomes stay checked.
 8. Run the task from the immutable evaluation image with network access removed.
 9. Have two reviewers independently check clarity, scope, provenance, and test
    validity. Adjudicate disagreements before release.

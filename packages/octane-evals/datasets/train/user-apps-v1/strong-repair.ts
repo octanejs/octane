@@ -45,7 +45,20 @@ export function expectStrongCompile(source: string): void {
 	expect(strongCompileErrors(source)).toEqual([]);
 }
 
-/** Evaluate the Strong server build of a submission. */
+// A real server has none of these. The graders run in jsdom, so the server build
+// sees them shadowed as undefined, and `typeof window === 'undefined'` holds.
+const BROWSER_GLOBALS = [
+	'window',
+	'self',
+	'document',
+	'navigator',
+	'location',
+	'localStorage',
+	'sessionStorage',
+	'matchMedia',
+];
+
+/** Evaluate the Strong server build of a submission without browser globals. */
 export function serverModule(source: string): Record<string, any> {
 	const { code } = compile(source, 'App.tsrx', { mode: 'server', strong: true } as any);
 	const commonJs = ts.transpileModule(code, {
@@ -57,7 +70,7 @@ export function serverModule(source: string): Record<string, any> {
 		if (specifier === 'octane/internal/server') return ServerHelpers;
 		throw new Error(`Unsupported server-eval import: ${specifier}`);
 	};
-	new Function('require', 'module', 'exports', commonJs)(
+	new Function('require', 'module', 'exports', ...BROWSER_GLOBALS, commonJs)(
 		requireServerRuntime,
 		module,
 		module.exports,
