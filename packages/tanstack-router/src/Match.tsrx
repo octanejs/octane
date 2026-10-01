@@ -149,13 +149,13 @@ function MatchInner(props: { routeId: string }) {
 		// suspends on the transaction's promise so the current page holds; outside a
 		// transaction (e.g. an initial client load) it shows the route's pending UI.
 		//
-		// OCTANE DIVERGENCE: a client-only (`ssr: false`/`data-only`) pending match
-		// renders its pending UI in place inside <ClientOnly> rather than throwing
-		// to the outer Suspense. Octane's Suspense keeps the suspended subtree's DOM
-		// hidden on fallback, so throwing would leave the hidden <ClientOnly>
-		// fallback in the tree alongside the visible Suspense fallback — two pending
-		// elements. React's <ClientOnly> swaps fallback→children, so upstream can
-		// always throw.
+		// Octane-specific divergence from react-router: a client-only
+		// (`ssr: false`/`data-only`) pending match renders its pending UI in place
+		// inside <ClientOnly> rather than throwing to the outer Suspense. Octane's
+		// Suspense keeps the suspended subtree's DOM hidden on fallback, so throwing
+		// would leave the hidden <ClientOnly> fallback in the tree alongside the
+		// visible Suspense fallback — two pending elements. React's <ClientOnly>
+		// swaps fallback→children, so upstream can always throw.
 		const resolvedNoSsr = match.ssr === false || match.ssr === 'data-only';
 		const tx = (router as any)._tx;
 		if (tx && !resolvedNoSsr) throw tx[5];
