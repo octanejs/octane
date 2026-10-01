@@ -313,6 +313,20 @@ useEffect(() => { const controller = new AbortController(); load(controller, set
 			app(`function read(controller, set, id) { api.get(id).then((value) => { if (!controller.signal.aborted) set(value); }); }
 useEffect(() => { const controller = new AbortController(); const alias = controller; read(alias, setData, props.id); return () => { controller.abort(); }; });`),
 		);
+		const request = `async function request(controller) { const r = await fetch('/api', { signal: controller.signal }); return r.json(); }`;
+		accepts(
+			app(`${request}
+useEffect(() => { const controller = new AbortController(); (async () => { const value = await request(controller); setData(value); })(); return () => controller.abort(); });`),
+		);
+		accepts(
+			app(`${request}
+useEffect(() => { const controller = new AbortController(); request(controller).then(setData); return () => controller.abort(); });`),
+		);
+		rejects(
+			app(`${request}
+useEffect(() => { const controller = new AbortController(); const other = new AbortController(); request(controller).then(setData); return () => other.abort(); });`),
+			FETCH,
+		);
 		// Aborting a different controller, or none, still leaves the update unguarded.
 		rejects(
 			app(`${load} ${stop}

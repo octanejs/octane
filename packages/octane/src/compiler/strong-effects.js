@@ -419,7 +419,9 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			return into;
 		}
 		if (FUNCTIONS.has(node.type)) return into;
-		const controller = signalController(node);
+		// A request can read the signal of a controller passed to it.
+		const controller =
+			signalController(node) ?? (node.type === 'Identifier' ? controllerOf(bindingOf(node)) : null);
 		if (controller !== null) (into ??= new Set()).add(controller);
 		for (const key in node) {
 			if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) into = signalsIn(node[key], into);
