@@ -255,7 +255,24 @@ function mouseEventInit(
 	};
 }
 
+// A constructed event reads the clock when it is created, and jsdom's clock has
+// millisecond resolution. Each original therefore carries a distinct capture
+// time that no replay-time construction could report by coincidence.
+export function hydrationInteractionTimeStamp(testCase: HydrationInteractionEventCase): number {
+	return 1000 + testCase.sequence * 12.5;
+}
+
 export function createHydrationInteractionEvent(
+	ownerWindow: EventWindow,
+	relatedTarget: EventTarget,
+	testCase: HydrationInteractionEventCase,
+): Event {
+	const event = createHydrationInteractionEventOfFamily(ownerWindow, relatedTarget, testCase);
+	Object.defineProperty(event, 'timeStamp', { value: hydrationInteractionTimeStamp(testCase) });
+	return event;
+}
+
+function createHydrationInteractionEventOfFamily(
 	ownerWindow: EventWindow,
 	relatedTarget: EventTarget,
 	testCase: HydrationInteractionEventCase,
@@ -374,6 +391,8 @@ export type HydrationReplayRecord = {
 	composed: boolean;
 	defaultPreventedBefore: boolean;
 	defaultPreventedAfter: boolean;
+	timeStamp: number;
+	isTrusted: boolean;
 	detail: number | null;
 	relatedTargetId: string | null;
 	screenX: number | null;
@@ -456,6 +475,8 @@ function hydrationReplayRecord(
 		composed: event.composed,
 		defaultPreventedBefore,
 		defaultPreventedAfter: event.defaultPrevented,
+		timeStamp: event.timeStamp,
+		isTrusted: event.isTrusted,
 		detail: numberProperty(event, 'detail'),
 		relatedTargetId: elementId((event as unknown as Record<string, unknown>).relatedTarget ?? null),
 		screenX: numberProperty(event, 'screenX'),
@@ -535,6 +556,9 @@ export function expectedHydrationReplayMetadata(
 ): Partial<HydrationReplayRecord> {
 	const sequence = testCase.sequence;
 	const button = testCase.type === 'auxclick' ? 1 : testCase.type === 'contextmenu' ? 2 : 0;
+	// A replay is a constructed, untrusted event that still reports when the
+	// original input happened.
+	const origin = { timeStamp: hydrationInteractionTimeStamp(testCase), isTrusted: false };
 	const modifiers = {
 		ctrlKey: sequence % 2 === 0,
 		shiftKey: sequence % 3 === 0,
@@ -544,17 +568,20 @@ export function expectedHydrationReplayMetadata(
 	switch (testCase.family) {
 		case 'composition':
 			return {
+				...origin,
 				constructorName: 'CompositionEvent',
 				data: `composition-${sequence}`,
 			};
 		case 'focus':
 			return {
+				...origin,
 				constructorName: 'FocusEvent',
 				detail: sequence,
 				relatedTargetId: 'hydration-replay-related',
 			};
 		case 'input':
 			return {
+				...origin,
 				constructorName: 'InputEvent',
 				data: `input-${sequence}`,
 				inputType: 'insertCompositionText',
@@ -562,6 +589,7 @@ export function expectedHydrationReplayMetadata(
 			};
 		case 'keyboard':
 			return {
+				...origin,
 				constructorName: 'KeyboardEvent',
 				detail: sequence,
 				key: `key-${sequence}`,
@@ -573,6 +601,7 @@ export function expectedHydrationReplayMetadata(
 			};
 		case 'mouse':
 			return {
+				...origin,
 				constructorName: 'MouseEvent',
 				detail: sequence,
 				screenX: 100 + sequence,
@@ -586,6 +615,7 @@ export function expectedHydrationReplayMetadata(
 			};
 		case 'pointer':
 			return {
+				...origin,
 				constructorName: 'PointerEvent',
 				detail: sequence,
 				screenX: 100 + sequence,
@@ -609,9 +639,10 @@ export function expectedHydrationReplayMetadata(
 			};
 		case 'touch':
 			if (options.touchEventConstructorName === 'Event') {
-				return { constructorName: 'Event' };
+				return { ...origin, constructorName: 'Event' };
 			}
 			return {
+				...origin,
 				constructorName: 'TouchEvent',
 				touches: testCase.type === 'touchend' ? 0 : 1,
 				targetTouches: testCase.type === 'touchend' ? 0 : 1,
