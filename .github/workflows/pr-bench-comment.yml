@@ -1,0 +1,80 @@
+name: PR bench comment
+
+# Posts the report uploaded by "PR bench" as one sticky pull request comment.
+# workflow_run executes this file from the default branch with a write token,
+# so it never checks out or runs pull request code. The artifact is untrusted
+# data: the pull request number must match the run's head commit, and the body
+# must carry the report marker and fit GitHub's comment limit.
+
+on:
+  workflow_run:
+    workflows: [PR bench]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  comment:
+    name: post benchmark report
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion != 'cancelled'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+
+    steps:
+      - name: Download report
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: pr-bench-report
+          path: ${{ runner.temp }}/pr-bench
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Post or update sticky comment
+        if: steps.download.outcome == 'success'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          REPORT_DIR: ${{ runner.temp }}/pr-bench/report
+        with:
+          script: |
+            const fs = require("node:fs");
+            const path = require("node:path");
+            const MARKER = "<!-- octane-pr-bench -->";
+            const { owner, repo } = context.repo;
+            const run = context.payload.workflow_run;
+            const read = (name) => fs.readFileSync(path.join(process.env.REPORT_DIR, name), "utf8");
+
+            const number = Number(read("pr-number").trim());
+            if (!Number.isSafeInteger(number) || number <= 0) {
+              core.setFailed("Report artifact has no valid pull request number.");
+              return;
+            }
+            const { data: pull } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+            if (pull.head.sha !== run.head_sha || read("head-sha").trim() !== run.head_sha) {
+              core.notice(`Pull request #${number} moved past ${run.head_sha}; skipping a stale report.`);
+              return;
+            }
+            const body = read("report.md");
+            if (!body.startsWith(MARKER) || body.length > 65000) {
+              core.setFailed("Report artifact is not a benchmark report.");
+              return;
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: number,
+              per_page: 100,
+            });
+            const existing = comments.find(
+              (comment) => comment.user?.type === "Bot" && comment.body?.startsWith(MARKER),
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: number, body });
+            }

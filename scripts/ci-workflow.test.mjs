@@ -48,6 +48,11 @@ const vercelPreviewWorkflow = readFileSync(
 	path.join(REPO, '.github/workflows/vercel-preview.yml'),
 	'utf8',
 );
+const prBenchWorkflow = readFileSync(path.join(REPO, '.github/workflows/pr-bench.yml'), 'utf8');
+const prBenchCommentWorkflow = readFileSync(
+	path.join(REPO, '.github/workflows/pr-bench-comment.yml'),
+	'utf8',
+);
 const websiteVercelConfig = JSON.parse(
 	readFileSync(path.join(REPO, 'website/vercel.json'), 'utf8'),
 );
@@ -1648,6 +1653,43 @@ describe('Review readiness label', () => {
 		});
 
 		assert.match(result.failures.join('\n'), /remove failed with 500/);
+	});
+});
+
+describe('Pull request benchmark report', () => {
+	test('measures base and merge commit in one unprivileged job', () => {
+		assert.match(prBenchWorkflow, /^on:\n {2}pull_request:\n/m);
+		assert.match(prBenchWorkflow, /^permissions:\n {2}contents: read$/m);
+		assert.match(prBenchWorkflow, /if: github\.event\.pull_request\.draft == false/);
+		for (const results of ['base', 'head']) {
+			assert.ok(
+				prBenchWorkflow.includes(
+					`node benchmarks/bench.mjs --results-dir="$RESULTS/${results}" bundle-size bundle-reachability`,
+				),
+			);
+			assert.ok(
+				prBenchWorkflow.includes(
+					`TARGETS="$JS_FRAMEWORK_TARGETS" node benchmarks/bench.mjs --results-dir="$RESULTS/${results}" js-framework`,
+				),
+			);
+		}
+		assert.ok(
+			prBenchWorkflow.includes(
+				'node benchmarks/pr-report.mjs --base="$RESULTS/base" --head="$RESULTS/head"',
+			),
+		);
+		assert.match(packageJson.scripts['ci:workflow:test'], /benchmarks\/pr-report\.test\.mjs/);
+	});
+
+	test('posts the report from the default branch without running pull request code', () => {
+		assert.match(
+			prBenchCommentWorkflow,
+			/workflow_run:\n {4}workflows: \[PR bench\]\n {4}types: \[completed\]/,
+		);
+		assert.match(prBenchCommentWorkflow, /^permissions: \{\}$/m);
+		assert.doesNotMatch(prBenchCommentWorkflow, /actions\/checkout|pnpm|node benchmarks/);
+		assert.ok(prBenchCommentWorkflow.includes('pull.head.sha !== run.head_sha'));
+		assert.ok(prBenchCommentWorkflow.includes('const MARKER = "<!-- octane-pr-bench -->";'));
 	});
 });
 
