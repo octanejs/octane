@@ -121,7 +121,7 @@ import {
 	isDirectSignalHandleExpression,
 	lowerNativeAttributeReads,
 } from './native-attribute-reads.js';
-import { prepareDomBindings } from './dom-bindings.js';
+import { isScalarTextAssertion, prepareDomBindings } from './dom-bindings.js';
 import { parseDomBindingRequest } from './dom-binding-request.js';
 import {
 	createTemplateIr,
@@ -12355,6 +12355,8 @@ function compileServerComponent(node, ctx) {
 	const prevLocals = ctx.currentComponentLocals;
 	const prevKnownStr = ctx.knownStringLocals;
 	const prevKnownChildStr = ctx.knownStringChildLocals;
+	const prevScalarBindingView = ctx.ssrScalarBindingView;
+	ctx.ssrScalarBindingView = node._octaneScalarBindingClaims === true;
 	ctx.currentComponentLocals = collectComponentLocals(node);
 	ctx.knownStringLocals = collectKnownStringLocals(node);
 	ctx.knownStringChildLocals = ctx.hasStringChildProofs
@@ -12385,6 +12387,7 @@ function compileServerComponent(node, ctx) {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.knownStringLocals = prevKnownStr;
 		ctx.knownStringChildLocals = prevKnownChildStr;
+		ctx.ssrScalarBindingView = prevScalarBindingView;
 	}
 
 	// SSR parallel-use mirror: attach the compiled fetch plan so a PARENT's warm
@@ -14332,13 +14335,19 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		const childHelper =
 			tag === 'pre' || tag === 'textarea' || tag === 'listing' ? 'ssrChildTextPre' : 'ssrChildText';
 		ctx.runtimeNeeded.add(childHelper);
+		const value = resolveStyleExpr(
+			rewriteJsxValues(rewriteHookCalls(onlyChild0.expression, ctx, name), ctx),
+			cssHash,
+		);
 		childrenExpr = ssrCall(
 			childHelper,
 			[
-				resolveStyleExpr(
-					rewriteJsxValues(rewriteHookCalls(onlyChild0.expression, ctx, name), ctx),
-					cssHash,
-				),
+				// A fixed binding view adopts `{value as number}` as one text leaf that
+				// reads a signal handle's value; serialize that value, not a framed
+				// handle. The renderer's only-child hole hydrates the same text.
+				ctx.ssrScalarBindingView && isScalarTextAssertion(onlyChild0.expression)
+					? ssrSignalValue(value, ctx, onlyChild0, true)
+					: value,
 				b.id('__s'),
 			],
 			onlyChild0,
