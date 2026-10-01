@@ -142,6 +142,12 @@ import {
 	needsTypeScriptStatementLowering,
 } from './typescript-lowering.js';
 import { findPrivateCompiledContexts } from './private-context.js';
+import {
+	collectDescriptorChildrenBindings,
+	collectOctaneImportLocals,
+	findDirectlyCalledNames,
+	findDirectlyCalledTemplateFunctions,
+} from './descriptor-lowering.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
 // static bakes and dynamic writes MUST agree on which attributes render, under
@@ -10209,6 +10215,7 @@ function compileInternal(
 						cleanFilename,
 						hydrateBoundaryPathFromId(filename),
 						analyzedAst,
+						options?.isDescriptorChildrenImport,
 					)
 				: prepareServerHydrateBoundaries(source, cleanFilename, analyzedAst);
 		if (hydratePreparation !== null) {
@@ -10435,7 +10442,7 @@ function compileInternal(
 	const rootFactories = localVoidRootsEnabled ? findRootFactoryImports(ast) : new Map();
 	const authoredVoidRootIds = new Set();
 	const privateCompiledContexts = localVoidRootsEnabled
-		? findPrivateCompiledContexts(ast)
+		? findPrivateCompiledContexts(ast, options?.isDescriptorChildrenImport)
 		: new Map();
 	const splitPrivateContexts = localVoidRootsEnabled
 		? privateCompiledContextsForHydrateAst(parsedAst)
@@ -14760,69 +14767,6 @@ function bindingChildMarker(node) {
 function ssrBindingRange(content, site, kind, ctx, origin) {
 	ctx.runtimeNeeded.add('ssrBindingBlock');
 	return ssrCall('ssrBindingBlock', [content, b.literal(bindingMarker(site, kind))], origin);
-}
-
-// ---------------------------------------------------------------------------
-// Server control flow — @if/@for/@switch/@try lowered to HTML-string builders.
-// Each branch/item/case body is compiled (via ssrCompileSub) into a server
-// sub-function returning a string, and the chosen branch's output is wrapped in
-// `_$ssrBlock(…)` (BLOCK_OPEN/BLOCK_CLOSE markers) so a future client hydrate
-// cursor can find the boundaries. Expressions (test/items/discriminant) are
-// printed and evaluated at render time.
-// ---------------------------------------------------------------------------
-
-// Compile a list of body statements into a server sub-function `function NAME(__s,
-// …params, __extra) { return <html>; }`. Returns { fnName, fn }; the caller pushes
-// `fn` into the enclosing inlinedSubs.
-function collectDescriptorChildrenBindings(ast, isDescriptorChildrenImport) {
-	const markerNames = new Set();
-	const bindings = new Set();
-	for (const statement of ast.body || []) {
-		if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type') continue;
-		for (const specifier of statement.specifiers || []) {
-			if (specifier.importKind === 'type' || !specifier.local?.name) continue;
-			const imported =
-				specifier.type === 'ImportDefaultSpecifier'
-					? 'default'
-					: (specifier.imported?.name ?? specifier.imported?.value);
-			if (statement.source.value === 'octane' && imported === 'descriptorChildren') {
-				markerNames.add(specifier.local.name);
-			}
-			// Public transport boundaries work with the standalone compiler too,
-			// where no bundler module-graph metadata is available (the playground).
-			if (
-				imported === 'ReactCompat' &&
-				(statement.source.value === 'octane/react' ||
-					statement.source.value === 'octane/react/server')
-			) {
-				bindings.add(specifier.local.name);
-			}
-			if (
-				typeof imported === 'string' &&
-				typeof isDescriptorChildrenImport === 'function' &&
-				isDescriptorChildrenImport(statement.source.value, imported) === true
-			) {
-				bindings.add(specifier.local.name);
-			}
-		}
-	}
-	for (const statement of ast.body || []) {
-		const declaration =
-			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
-		if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
-		for (const item of declaration.declarations || []) {
-			if (
-				item.id?.type === 'Identifier' &&
-				item.init?.type === 'CallExpression' &&
-				item.init.callee?.type === 'Identifier' &&
-				markerNames.has(item.init.callee.name) &&
-				item.init.arguments?.length === 1
-			) {
-				bindings.add(item.id.name);
-			}
-		}
-	}
-	return bindings;
 }
 
 // ---------------------------------------------------------------------------
@@ -34503,20 +34447,6 @@ function collectOctaneComponentWrapperLocals(moduleBody) {
 	return collectOctaneImportLocals(moduleBody, ['memo', 'lazy']);
 }
 
-// Local names of the given `octane` named imports.
-function collectOctaneImportLocals(moduleBody, importedNames) {
-	const names = new Set();
-	for (const stmt of moduleBody) {
-		if (stmt.type !== 'ImportDeclaration' || stmt.source?.value !== 'octane') continue;
-		for (const spec of stmt.specifiers || []) {
-			if (spec.type !== 'ImportSpecifier') continue;
-			const imported = spec.imported?.name ?? spec.imported?.value;
-			if (importedNames.includes(imported) && spec.local?.name) names.add(spec.local.name);
-		}
-	}
-	return names;
-}
-
 // Identifier names referenced outside component positions. JSX tags
 // (JSXIdentifier / TSRX Element `id`), export clauses, and bare arguments to
 // octane's `memo`/`lazy` stay excluded. Everything collected here — a direct
@@ -34725,137 +34655,11 @@ function lowerJsxReturnBranchComponents(ast) {
  * JSX.
  */
 function lowerDirectlyCalledTemplateFunctions(ast) {
-	// Template function expressions, found anywhere.
-	const expressions = new Set();
-	// Nested template function node → [binding name, the function declaring it].
-	const candidates = new Map();
-	walkWithEnclosingFunctions(ast.body, (node, functions) => {
-		const type = node.type;
-		if (type === 'ArrowFunctionExpression' || type === 'FunctionExpression') {
-			if (isLowerableTemplateFunction(node)) expressions.add(node);
-			return;
-		}
-		if (functions.length === 0) return;
-		let fn = null;
-		let name;
-		if (type === 'FunctionDeclaration') {
-			fn = node;
-			name = node.id?.name;
-		} else if (type === 'VariableDeclarator' && node.id?.type === 'Identifier') {
-			const init = unwrapTsExpr(node.init);
-			if (init?.type === 'ArrowFunctionExpression' || init?.type === 'FunctionExpression') {
-				fn = init;
-				name = node.id.name;
-			}
-		}
-		if (fn !== null && name !== undefined && isLowerableTemplateFunction(fn)) {
-			candidates.set(fn, [name, functions[functions.length - 1]]);
-		}
-	});
-	if (expressions.size === 0 && candidates.size === 0) return ast;
-
-	let renderingCallees = null;
-	// True when the callee never calls the call's function arguments: the runtime
-	// renders them, or an `Object` static stores or returns them.
-	const keepsArguments = (call) => {
-		const callee = unwrapTsExpr(call.callee);
-		if (isObjectPassThroughCallee(callee)) return true;
-		if (callee?.type !== 'Identifier') return false;
-		if (callee.name === 'createPortal') return true;
-		renderingCallees ??= collectOctaneImportLocals(ast.body, ['memo', 'createElement']);
-		return renderingCallees.has(callee.name);
-	};
-	const lowered = new Set();
-	const names = new Set([...candidates.values()].map(([name]) => name));
-	// Function node → candidate names that code inside it calls or passes on.
-	const calledIn = new Map();
-	const markCalled = (functions, name) => {
-		for (const fn of functions) {
-			let called = calledIn.get(fn);
-			if (called === undefined) calledIn.set(fn, (called = new Set()));
-			called.add(name);
-		}
-	};
-	walkWithEnclosingFunctions(ast.body, (node, functions) => {
-		const type = node.type;
-		if (
-			type !== 'CallExpression' &&
-			type !== 'OptionalCallExpression' &&
-			type !== 'NewExpression'
-		) {
-			return;
-		}
-		const name = directlyCalledName(node);
-		if (name !== null && names.has(name)) markCalled(functions, name);
-		// The callee calls a function passed to it, as `rows.map(fn)` does with
-		// the row index where a Scope would go.
-		const args = node.arguments;
-		for (let i = 0; i < args.length; i++) {
-			const arg = unwrapTsExpr(args[i]);
-			if (expressions.has(arg)) {
-				if (!keepsArguments(node)) lowered.add(arg);
-			} else if (arg?.type === 'Identifier' && names.has(arg.name) && !keepsArguments(node)) {
-				markCalled(functions, arg.name);
-			}
-		}
-	});
-	for (const [fn, [name, owner]] of candidates) {
-		if (calledIn.get(owner)?.has(name)) lowered.add(fn);
-	}
+	const lowered = findDirectlyCalledTemplateFunctions(ast);
 	if (lowered.size === 0) return ast;
 	const lower = (node) =>
 		mapAst(node, (n) => (lowered.has(n) ? returnedJsxFunction(n, lower) : null));
 	return lower(ast);
-}
-
-function isLowerableTemplateFunction(fn) {
-	return fn.body?.type === 'JSXCodeBlock' && !fn.async && !fn.generator;
-}
-
-// The `Object` statics that return their first argument and call none of their
-// arguments. `Object.groupBy` calls its callback, so it is not one of them.
-const OBJECT_PASS_THROUGH_METHODS = new Set([
-	'assign',
-	'defineProperties',
-	'defineProperty',
-	'freeze',
-	'preventExtensions',
-	'seal',
-	'setPrototypeOf',
-]);
-
-/** `Object.assign`, `Object.freeze`, or another pass-through `Object` static. */
-function isObjectPassThroughCallee(callee) {
-	return (
-		callee?.type === 'MemberExpression' &&
-		!callee.computed &&
-		callee.object?.type === 'Identifier' &&
-		callee.object.name === 'Object' &&
-		OBJECT_PASS_THROUGH_METHODS.has(callee.property?.name)
-	);
-}
-
-/**
- * The name a call invokes as a function, or null. `helper(…)` and
- * `helper?.(…)` call it, and so do `helper.call(…)`, `helper.apply(…)`, and
- * `rows.map(helper)`, which passes the row index where a render body takes its
- * Scope. Optional calls are an `optional` CallExpression inside a
- * ChainExpression, or Babel's OptionalCallExpression and
- * OptionalMemberExpression.
- */
-function directlyCalledName(node) {
-	if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return null;
-	let callee = unwrapTsExpr(node.callee);
-	if (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') {
-		const method = callee.computed ? callee.property?.value : callee.property?.name;
-		callee =
-			method === 'call' || method === 'apply'
-				? unwrapTsExpr(callee.object)
-				: method === 'map'
-					? unwrapTsExpr(node.arguments[0])
-					: null;
-	}
-	return callee?.type === 'Identifier' ? callee.name : null;
 }
 
 /**
@@ -34909,11 +34713,7 @@ function splitDirectlyCalledComponents(ast) {
 		if (isSplittableComponent(node)) (names ??= new Set()).add(node.id.name);
 	}
 	if (names === null) return ast;
-	const called = new Set();
-	walkWithEnclosingFunctions(statements, (node) => {
-		const name = directlyCalledName(node);
-		if (name !== null && names.has(name)) called.add(name);
-	});
+	const called = findDirectlyCalledNames(statements, names);
 	if (called.size === 0) return ast;
 	const used = collectIdentifierNames(statements);
 	const out = [];
@@ -34983,28 +34783,6 @@ function withDirectCallGuard(fn, node, ctx) {
 			body: [...body.slice(0, bound), directCallGuard(node, ctx), ...body.slice(bound)],
 		},
 	};
-}
-
-/** Visit every node with the functions that enclose it, outermost first. */
-function walkWithEnclosingFunctions(root, visit) {
-	const functions = [];
-	const walk = (node) => {
-		if (node == null || typeof node !== 'object') return;
-		if (Array.isArray(node)) {
-			for (const child of node) walk(child);
-			return;
-		}
-		visit(node, functions);
-		const isFunction = isFunctionNode(node);
-		if (isFunction) functions.push(node);
-		for (const key in node) {
-			if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
-			const child = node[key];
-			if (child !== null && typeof child === 'object') walk(child);
-		}
-		if (isFunction) functions.pop();
-	};
-	walk(root);
 }
 
 function isJsxNode(node) {

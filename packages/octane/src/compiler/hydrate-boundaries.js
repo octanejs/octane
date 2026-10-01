@@ -84,8 +84,8 @@ function privateContextCaptureBoundary(boundary) {
 	});
 }
 
-function originalSplitContextProofs(analysis, moduleMovePlan) {
-	const contexts = findPrivateCompiledContextProofs(analysis.ast);
+function originalSplitContextProofs(analysis, moduleMovePlan, isDescriptorChildrenImport) {
+	const contexts = findPrivateCompiledContextProofs(analysis.ast, isDescriptorChildrenImport);
 	if (contexts.size === 0) return contexts;
 	const captured = new Set();
 	for (const boundary of analysis.boundaries) {
@@ -2264,7 +2264,13 @@ export function hydrateBoundaryPathFromId(id) {
  * split child. Server modules deliberately bypass this pass and retain their
  * real children.
  */
-export function prepareHydrateBoundaries(source, filename, boundaryPath = null, parsedAst = null) {
+export function prepareHydrateBoundaries(
+	source,
+	filename,
+	boundaryPath = null,
+	parsedAst = null,
+	isDescriptorChildrenImport,
+) {
 	if (!source.includes('Hydrate') || !source.includes('octane')) {
 		if (boundaryPath === null) return null;
 		throw extractionError(
@@ -2291,7 +2297,7 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null, 
 	}
 	const request = sameSourceRequest(filename);
 	const moduleMovePlan = createModuleMovePlanAst(analysis, request);
-	const contexts = originalSplitContextProofs(analysis, moduleMovePlan);
+	const contexts = originalSplitContextProofs(analysis, moduleMovePlan, isDescriptorChildrenImport);
 	const captureBindings = new Map();
 	const independentWidgets = independentWidgetMetadata(analysis, filename, moduleMovePlan);
 	let independentIndex = 0;

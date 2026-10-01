@@ -114,6 +114,24 @@ test('split Context proof declines authored identity escapes, overrides and unpr
 			JSON.stringify(options),
 		);
 	}
+	// Under a descriptorChildren component the split provider receives element
+	// descriptors, so neither module may compile the closed provider.
+	const descriptor = source
+		.replace(
+			"const Theme=createContext('default');",
+			"const Theme=createContext('default');\nconst Frame=descriptorChildren(Ordinary);\nfunction Ordinary(props) @{<div>{props.children}</div>}",
+		)
+		.replace(
+			'{createContext,Hydrate,useContext}',
+			'{createContext,descriptorChildren,Hydrate,useContext}',
+		)
+		.replace(
+			'<Hydrate when={props.when}><Theme value={props.value}><p>{props.value as string}</p></Theme></Hydrate>',
+			'<Hydrate when={props.when}><Frame><Theme value={props.value}><p>{props.value as string}</p></Theme></Frame></Hydrate>',
+		);
+	assert.notEqual(descriptor, source);
+	assert.equal(facts(descriptor).factory, false);
+	assert.equal(facts(descriptor, true).providers.includes('componentSlotVoid'), false);
 	const unsupported = source.replace('when={props.when}', 'when={props.when} data:note="name"');
 	assert.equal(
 		compile(unsupported, filename, { dev: false, hmr: false }).code.includes(

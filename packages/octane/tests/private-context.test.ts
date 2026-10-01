@@ -283,6 +283,93 @@ export function App(props) @{ <Theme value={props.value}>{props.dynamic ? () => 
 		}
 	});
 
+	// Children of a descriptorChildren component, and the returned-JSX form of a
+	// directly called `@{ … }` function, reach the provider as element
+	// descriptors in every compile mode.
+	const descriptorPrelude = `import {Activity,createContext,descriptorChildren,memo,Suspense,useContext,ViewTransition} from 'octane';
+const Message=createContext('default');
+const Frame=descriptorChildren(FrameBody);
+function FrameBody(props) @{ <div>{props.children}</div> }
+function Plain(props) @{ <section>{props.children}</section> }
+const Box=memo(function Box(props) @{ <section>{props.children}</section> });
+function Value() @{ <span class="value">{useContext(Message) as string}</span> }
+`;
+	const provider = '<Message value={props.v}><Value /></Message>';
+	const descriptorProviders: Record<string, string> = {
+		'a descriptorChildren child': `export function App(props) @{ <Frame>${provider}</Frame> }`,
+		'a host element under descriptorChildren': `export function App(props) @{ <Frame><p>${provider}</p></Frame> }`,
+		'a fragment under descriptorChildren': `export function App(props) @{ <Frame><>${provider}</></Frame> }`,
+		'a render-only block under descriptorChildren': `export function App(props) @{ <Frame>@{ ${provider} }</Frame> }`,
+		'a setup block under descriptorChildren': `export function App(props) @{ <Frame>@{ const v = props.v; <Message value={v}><Value /></Message> }</Frame> }`,
+		'a component under descriptorChildren': `export function App(props) @{ <Frame><Plain>${provider}</Plain></Frame> }`,
+		'a memo component under descriptorChildren': `export function App(props) @{ <Frame><Box>${provider}</Box></Frame> }`,
+		'Suspense under descriptorChildren': `export function App(props) @{ <Frame><Suspense fallback={<i>wait</i>}>${provider}</Suspense></Frame> }`,
+		'ViewTransition under descriptorChildren': `export function App(props) @{ <Frame><ViewTransition>${provider}</ViewTransition></Frame> }`,
+		'Activity under descriptorChildren': `export function App(props) @{ <Frame><Activity mode="visible">${provider}</Activity></Frame> }`,
+		'a directly called @{} function': `function Helper(props) @{ ${provider} }
+export function App(props) @{ <div>{Helper(props)}</div> }`,
+		'a directly called arrow component': `const Helper = (props) => @{ ${provider} };
+export function App(props) @{ <div>{Helper(props)}</div> }`,
+		'a directly called nested @{} function': `export function App(props) @{
+	function helper(v) @{ <Message value={v}><Value /></Message> }
+	<div>{helper(props.v)}</div>
+}`,
+		'an @{} function passed to a call': `function wrap(component) { return component; }
+const Wrapped = wrap((props) => @{ ${provider} });
+export function App(props) @{ <div><Wrapped v={props.v} /></div> }`,
+		'an @{} callback mapped by a non-array': `export function App(props) @{ <div>{({ map: (render) => [render(props.v)] }).map((v) => @{ <Message value={v}><Value /></Message> })}</div> }`,
+	};
+	for (const dev of [false, true]) {
+		it.each(Object.entries(descriptorProviders))(
+			`provides through %s (dev=${dev})`,
+			async (name, app) => {
+				const module = loadCompiledFixtureSource(descriptorPrelude + app, {
+					id: 'descriptor-provider.tsrx',
+					mode: 'client',
+					compileOptions: { ...compileOptions, dev },
+				});
+				const host = container();
+				const root = createRoot(host);
+				try {
+					await act(async () => root.render(module.App, { v: 'first' }));
+					expect(host.querySelector('.value')?.textContent, name).toBe('first');
+					await act(async () => root.render(module.App, { v: 'second' }));
+					expect(host.querySelector('.value')?.textContent, name).toBe('second');
+				} finally {
+					root.unmount();
+				}
+				expect(host.childNodes.length).toBe(0);
+			},
+		);
+	}
+
+	it('hydrates a provider under descriptorChildren and keeps it live', () => {
+		const app = descriptorPrelude + descriptorProviders['a descriptorChildren child'];
+		const module = loadCompiledFixtureSource(app, {
+			id: 'descriptor-provider.tsrx',
+			mode: 'client',
+			compileOptions,
+		});
+		const server = loadCompiledFixtureSource(app, {
+			id: 'descriptor-provider.tsrx',
+			mode: 'server',
+			compileOptions,
+		});
+		const host = container();
+		host.innerHTML = Server.renderToString(server.App, { v: 'server' }).html;
+		const label = host.querySelector('.value')!;
+		expect(label.textContent).toBe('server');
+		const root = hydrateRoot(host, module.App, { v: 'server' });
+		try {
+			flushSync(() => root.render(module.App, { v: 'client' }));
+			expect(host.querySelector('.value')).toBe(label);
+			expect(label.textContent).toBe('client');
+		} finally {
+			root.unmount();
+		}
+		expect(host.childNodes.length).toBe(0);
+	});
+
 	it.each([
 		'export function exposed() { return Theme; }',
 		'export const holder = {Theme};',
