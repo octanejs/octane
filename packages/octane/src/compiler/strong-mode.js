@@ -4668,8 +4668,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				} else if (hook === null) {
 					// Deferred code can reach a state update through a local helper, and
 					// any helper can write to a state value passed to it, directly or
-					// through its tuple. An Effect Event reads the latest committed
-					// values, so it is followed only for the state it receives.
+					// through its tuple. An Effect Event is followed only for the state
+					// it receives: its body reads captured state as current, and a
+					// snapshot passed in from deferred code is tagged stale.
 					let callback = callableValue(callee, scope);
 					const effectEvent = callback?.kind === 'effect-event';
 					if (effectEvent) callback = callback.callback;

@@ -482,6 +482,19 @@ describe('Strong state mutation outside render', () => {
 		).toBe(RENDER_SNAPSHOT_MUTATION);
 	});
 
+	it('follows an Effect Event for the state it receives without treating its captures as stale', () => {
+		expect(
+			strongCode(
+				tsx(`export function A({ save }) {
+  const [items, setItems] = useState([]);
+  const [count, setCount] = useState(0);
+  const record = useEffectEvent((list) => { setCount(count + list.length); });
+  return <b onClick={async () => { await save(); record(items); setItems((current) => [...current, 1]); }}>{count}</b>;
+}`),
+			),
+		).toBeNull();
+	});
+
 	it('keeps copies, refs, props, object methods, and shadowed globals legal', () => {
 		expect(
 			strongCode(
