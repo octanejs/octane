@@ -2773,6 +2773,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	function transitionStart(expression, scope) {
 		const node = unwrap(expression);
 		if (node?.type === 'Identifier') return resolve(scope, node.name)?.kind === 'transition-start';
+		if (returnedMember(node, scope)?.kind === 'transition-start') return true;
 		if (node?.type !== 'MemberExpression' || node.computed !== true) return false;
 		const object = unwrap(node.object);
 		const key = staticPrimitiveValue(node.property, scope);
@@ -2895,7 +2896,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (shape === TRANSITION_TUPLE_BINDING) {
 			bindTransitionPattern(pattern, scope, bind);
 		} else if (pattern?.type === 'Identifier') {
-			if (shape.kind !== 'returned-array' && shape.kind !== 'returned-object') bind(pattern, shape);
+			// A stored array or object keeps its members for later member access.
+			bind(pattern, shape);
 		} else if (pattern?.type === 'ArrayPattern' && shape.kind === 'returned-array') {
 			pattern.elements?.forEach((element, index) => {
 				const value = shape.elements[index];
@@ -2911,6 +2913,28 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (value != null) bind(target, value);
 			}
 		}
+	}
+
+	// A member of a same-module hook's returned array or object, read from the
+	// stored result or from the call itself.
+	function returnedMember(expression, scope) {
+		const node = unwrap(expression);
+		if (node?.type !== 'MemberExpression') return null;
+		const object = unwrap(node.object);
+		const shape =
+			object?.type === 'Identifier'
+				? resolve(scope, object.name)
+				: object?.type === 'CallExpression'
+					? callShapes.get(object)
+					: null;
+		if (shape?.kind !== 'returned-array' && shape?.kind !== 'returned-object') return null;
+		const key = node.computed
+			? staticPrimitiveValue(node.property, scope)
+			: (node.property?.name ?? null);
+		if (typeof key !== 'string' && typeof key !== 'number') return null;
+		if (shape.kind === 'returned-object') return shape.properties.get(String(key)) ?? null;
+		const index = Number(key);
+		return Number.isInteger(index) && index >= 0 ? (shape.elements[index] ?? null) : null;
 	}
 
 	// Each call of a custom hook owns separate state. Keep the provenance, but
@@ -3499,6 +3523,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const setter = stateTupleUpdater(node, scope);
 		if (setter !== null) return setter;
 		if (stateTupleGetter(node, scope)) return STATE_GETTER_BINDING;
+		const member = returnedMember(node, scope);
+		if (isCallableValue(member)) return member;
 		if (node?.type === 'SequenceExpression') {
 			return callableValue(node.expressions?.[node.expressions.length - 1], scope);
 		}

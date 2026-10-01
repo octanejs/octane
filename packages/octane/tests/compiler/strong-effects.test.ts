@@ -776,6 +776,14 @@ export function App(props) @{
 		],
 		['window.setTimeout', `useEffect(() => { window.setTimeout(() => ${write}, 0); });`],
 		[
+			'a queueMicrotask destructured from window',
+			`useEffect(() => { const { queueMicrotask: defer } = window; defer(() => ${write}); });`,
+		],
+		[
+			'a setTimeout destructured from globalThis',
+			`useEffect(() => { const { setTimeout } = globalThis; setTimeout(() => ${write}, 0); });`,
+		],
+		[
 			'a cleared zero-delay timer',
 			`useEffect(() => { const timer = setTimeout(() => ${write}, 0); return () => clearTimeout(timer); });`,
 		],
@@ -938,6 +946,10 @@ export function App(props) @{
 			`useEffect(() => { let active = true; (async () => { await (props.flag ? await props.load() : props.pending); if (active) ${write}; })(); return () => { active = false; }; });`,
 		],
 		['a string timer', `useEffect(() => { setTimeout('tick()', 0); });`],
+		[
+			'a requestAnimationFrame destructured from window',
+			`useEffect(() => { const { requestAnimationFrame: frame } = window; const id = frame(() => ${write}); return () => cancelAnimationFrame(id); });`,
+		],
 		['an external subscription', `useEffect(() => props.subscribe(() => ${write}));`],
 		[
 			'a shadowed queueMicrotask',
@@ -1140,6 +1152,26 @@ export function App(props) @{
 			`const [value, setValue] = useState(0); const transition = useStart(); useEffect(() => { transition[1](() => setValue(props.value)); });`,
 		],
 		[
+			'a stored array member',
+			`function useThing() { const [value, setValue] = useState(0); return [value, setValue]; }`,
+			`const thing = useThing(); useEffect(() => { thing[1](props.value); });`,
+		],
+		[
+			'a stored object member',
+			`function useThing() { const [value, setValue] = useState(0); return { value, setValue }; }`,
+			`const thing = useThing(); useEffect(() => { thing.setValue(props.value); });`,
+		],
+		[
+			'an alias of a stored object member',
+			`function useThing() { const [value, setValue] = useState(0); return { value, setValue }; }`,
+			`const thing = useThing(); const setValue = thing.setValue; ${update}`,
+		],
+		[
+			'a stored transition start member',
+			`function useStart() { const [pending, start] = useTransition(); return { pending, start }; }`,
+			`const [value, setValue] = useState(0); const transition = useStart(); useEffect(() => { transition.start(() => setValue(props.value)); });`,
+		],
+		[
 			'a direct returned transition index',
 			`function useStart() { return useTransition(); }`,
 			`const [value, setValue] = useState(0); useEffect(() => { useStart()[1](() => setValue(props.value)); });`,
@@ -1187,6 +1219,11 @@ export function App(props) @{
 			'an imported custom hook',
 			`import { useThing } from './thing';`,
 			`const [value, setValue] = useThing(); ${update}`,
+		],
+		[
+			'a stored non-state member',
+			`function useThing(log) { return { value: 0, run: () => log() }; }`,
+			`const thing = useThing(props.log); useEffect(() => { thing.run(); });`,
 		],
 		[
 			'a hook with different returns',

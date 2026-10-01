@@ -237,7 +237,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				const init = info === null ? null : unwrap(info.decl.init);
 				if (init?.type === 'Identifier' || init?.type === 'MemberExpression') {
 					const base = keyOf(init, depth + 1);
-					if (base !== null) return info.path.length === 0 ? base : `${base}.${info.path[0]}`;
+					if (base !== null) return info.path.length === 0 ? base : memberKey(base, info.path[0]);
 				}
 			}
 			return `b${binding.id}`;
@@ -245,11 +245,16 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		if (node?.type === 'MemberExpression') {
 			const property = memberName(node);
 			const object = property === null ? null : keyOf(node.object, depth);
-			if (object === null) return null;
-			if (object === 'g:window') return GLOBAL_OBJECTS.has(property) ? object : `g:${property}`;
-			return `${object}.${property}`;
+			return object === null ? null : memberKey(object, property);
 		}
 		return null;
+	}
+
+	// A property of the global object names the global itself, whether it is
+	// read as `window.name` or destructured as `const { name } = window`.
+	function memberKey(object, property) {
+		if (object === 'g:window') return GLOBAL_OBJECTS.has(property) ? object : `g:${property}`;
+		return `${object}.${property}`;
 	}
 
 	function staticValue(expression, depth = 0) {
