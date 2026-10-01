@@ -38,16 +38,21 @@ describe(TASK, () => {
 		const { save, pending } = deferredSaves();
 		const view = render(App, { props: { save } });
 		const button = view.container.querySelector('button')!;
+		const label = () => view.container.querySelector('p')!.textContent;
 
+		// A save counts when its call resolves, not when it starts.
 		fireEvent.click(button);
 		fireEvent.click(button);
 		expect(pending).toHaveLength(2);
+		expect(label()).toBe('Saved 0 times');
 		await settle(pending[0]);
+		expect(label()).toBe('Saved 1 times');
 		await settle(pending[1]);
-		expect(view.container.querySelector('p')!.textContent).toBe('Saved 2 times');
+		expect(label()).toBe('Saved 2 times');
 
 		fireEvent.click(button);
+		expect(label()).toBe('Saved 2 times');
 		await settle(pending[2]);
-		expect(view.container.querySelector('p')!.textContent).toBe('Saved 3 times');
+		expect(label()).toBe('Saved 3 times');
 	});
 });

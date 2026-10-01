@@ -25,6 +25,7 @@
   "octane.strong-raw-html/template-fragment": "compiles-keeps-bug",
   "octane.strong-row-keys/index-key": "rejected-by-strong",
   "octane.strong-row-keys/index-of-key": "compiles-keeps-bug",
+  "octane.strong-save-counter/count-on-click": "compiles-keeps-bug",
   "octane.strong-save-counter/stale-after-await": "rejected-by-strong",
   "octane.strong-shuffle/for-each-shuffle": "rejected-by-strong",
   "octane.strong-shuffle/lazy-shuffle": "compiles-keeps-bug",
