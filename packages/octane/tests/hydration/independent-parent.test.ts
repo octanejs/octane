@@ -4,7 +4,7 @@ import {
 	bootstrapIndependentHydration,
 	type IndependentHydrateActivationContext,
 } from '../../src/hydration/independent-island.js';
-import { flushSync, hydrateRoot, type Root } from '../../src/index.js';
+import { flushSync, hasPendingWork, hydrateRoot, type Root } from '../../src/index.js';
 import { renderToString } from '../../src/runtime.server.js';
 import * as Signals from '../../src/signals/index.js';
 import { evaluateCompiledFixtureCode, loadCompiledFixtureSource } from '../_server-fixture.js';
@@ -125,6 +125,10 @@ ${widgetDeclarations}`;
 					button = replacement;
 				}
 				await expect.poll(() => activated).toBe(true);
+				// The activator returns before the captured click replays: the island's
+				// notify passive effect dispatches it after paint. Wait for that drain so
+				// the exact count also proves a stale target never replays.
+				await expect.poll(() => hasPendingWork()).toBe(false);
 				expect(record).toHaveBeenCalledTimes(stale ? 0 : 1);
 				expect(container.querySelector('input')).toBe(input);
 				expect(input.id).toBe(inputId);
