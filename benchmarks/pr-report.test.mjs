@@ -65,6 +65,18 @@ test('a failed round fails the merged suite', () => {
 	assert.equal(mergeRounds([ok, { ...ok, harnessExit: 1, failed: 'gate' }]).failed, 'gate');
 });
 
+test('a round that wrote no result fails the merged suite instead of being dropped', () => {
+	const ok = suite('js-framework', [{ name: 'octane-tsrx', ops: { run: timed(10, 9, 3) } }]);
+	const merged = mergeRounds([ok, null]);
+	assert.equal(merged.failed, 'round 2 produced no result');
+	const body = renderReport({
+		suites: ['js-framework'],
+		base: { 'js-framework': merged },
+		head: { 'js-framework': ok },
+	});
+	assert.doesNotMatch(body, /🟢/);
+});
+
 test('timing verdicts never turn the headline red', () => {
 	const base = {
 		'js-framework': suite('js-framework', [{ name: 'octane-tsrx', ops: { run: timed(10, 9, 2) } }]),

@@ -103,8 +103,7 @@ jobs:
         run: |
           mkdir -p "$RESULTS/report"
           HEAD_SHA="$MERGE_SHA" node benchmarks/pr-report.mjs \
-            --base="$RESULTS/base,$RESULTS/base-js-1,$RESULTS/base-js-2" \
-            --head="$RESULTS/head,$RESULTS/head-js-1,$RESULTS/head-js-2" \
+            --base="$RESULTS/base" --head="$RESULTS/head" --rounds=2 \
             --out="$RESULTS/report/report.md"
           printf '%s\n' "$PR_NUMBER" > "$RESULTS/report/pr-number"
           printf '%s\n' "$HEAD_SHA" > "$RESULTS/report/head-sha"

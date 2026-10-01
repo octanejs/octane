@@ -2,11 +2,12 @@
 // from a pull request's base commit and its merge commit on the same runner, and
 // renders the Markdown posted as the pull request's sticky comment.
 //
-// Run: node benchmarks/pr-report.mjs --base=<dir>[,<dir>] --head=<dir>[,<dir>] [--out=<file>]
+// Run: node benchmarks/pr-report.mjs --base=<dir> --head=<dir> [--rounds=<n>] [--out=<file>]
 //
-// Several directories per side are rounds of the same commit. CI measures
-// js-framework base, head, head, base so linear runner drift cancels in each
-// side's mean; disagreement between rounds widens the margin of error.
+// With --rounds, js-framework is read from <dir>-js-1 … <dir>-js-<n> instead of
+// <dir>. CI measures base, head, head, base so linear runner drift cancels in
+// each side's mean; disagreement between rounds widens the margin of error, and
+// a missing round fails the suite rather than silently shrinking the sample.
 //
 // Deterministic operations (bytes, DOM-operation and call counts) report every
 // change exactly. A timing operation is only called faster or slower outside its
@@ -231,9 +232,12 @@ function mergeStat(stats) {
 }
 
 export function mergeRounds(rounds) {
+	if (rounds.length === 1) return rounds[0];
 	const results = rounds.filter(Boolean);
-	if (results.length <= 1) return results[0] ?? null;
-	const failed = results.map((result) => failureOf(result)).filter(Boolean);
+	if (results.length === 0) return null;
+	const failed = rounds
+		.map((result, index) => (result ? failureOf(result) : `round ${index + 1} produced no result`))
+		.filter(Boolean);
 	const names = [
 		...new Set(results.flatMap((result) => result.targets.map((target) => target.name))),
 	];
@@ -257,16 +261,21 @@ export function mergeRounds(rounds) {
 	};
 }
 
-function readSuites(directories) {
+const TIMING_SUITES = new Set(['js-framework']);
+
+function readSuites(directory, rounds) {
+	const read = (dir, suite) => {
+		const file = path.join(dir, `${suite}.json`);
+		return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
+	};
 	return Object.fromEntries(
 		SUITES.map((suite) => [
 			suite,
-			mergeRounds(
-				directories.split(',').map((directory) => {
-					const file = path.join(directory, `${suite}.json`);
-					return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
-				}),
-			),
+			rounds > 1 && TIMING_SUITES.has(suite)
+				? mergeRounds(
+						Array.from({ length: rounds }, (_, i) => read(`${directory}-js-${i + 1}`, suite)),
+					)
+				: read(directory, suite),
 		]),
 	);
 }
@@ -280,13 +289,18 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 	);
 	if (!options.base || !options.head) {
 		console.error(
-			'usage: node benchmarks/pr-report.mjs --base=<dir>[,<dir>] --head=<dir>[,<dir>] [--out=<file>]',
+			'usage: node benchmarks/pr-report.mjs --base=<dir> --head=<dir> [--rounds=<n>] [--out=<file>]',
 		);
 		process.exit(2);
 	}
+	const rounds = Number(options.rounds ?? 1);
+	if (!Number.isSafeInteger(rounds) || rounds < 1) {
+		console.error('--rounds must be a positive integer');
+		process.exit(2);
+	}
 	const body = renderReport({
-		base: readSuites(options.base),
-		head: readSuites(options.head),
+		base: readSuites(options.base, rounds),
+		head: readSuites(options.head, rounds),
 		baseSha: process.env.BASE_SHA,
 		headSha: process.env.HEAD_SHA,
 		runUrl: process.env.RUN_URL,
