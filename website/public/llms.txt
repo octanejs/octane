@@ -494,7 +494,8 @@ Put `"use strong"` before a module's imports, or enable `compiler: { strong: tru
 Strong modules reject these statically provable patterns:
 
 - Calling a `useState`, `useReducer`, or `useLinkedState` updater during render (`OCTANE_STRONG_RENDER_STATE_UPDATE`).
-- Calling one of those updaters synchronously while an effect is being set up (`OCTANE_STRONG_EFFECT_STATE_UPDATE`).
+- Calling one of those updaters synchronously while an effect is being set up (`OCTANE_STRONG_EFFECT_STATE_UPDATE`), including through a same-module custom hook's returned updater and through `startTransition`, a `useTransition` start function, `queueMicrotask`, `Promise.resolve().then`, a zero-delay `setTimeout`, or awaiting a non-promise.
+- Updating state after an `await` or promise callback in an effect unless the returned cleanup aborts the request's `AbortController` or sets a flag the update checks (`OCTANE_STRONG_EFFECT_DATA_FETCH`).
 - Writing to a `useRef` object's `current` during render (`OCTANE_STRONG_RENDER_REF_WRITE`).
 - Writing through a ref to children, a class, an attribute, or a `style` property that the template sets on that element (`OCTANE_STRONG_MANAGED_DOM_WRITE`), or writing raw HTML to a rendered element (`OCTANE_STRONG_RAW_HTML_WRITE`).
 - Querying the document for a literal `id` or class the same component renders (`OCTANE_STRONG_OWN_MARKUP_QUERY`); attach a ref instead.
