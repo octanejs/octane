@@ -12,6 +12,10 @@ const overlayLockfileHash = sha256(readFileSync(join(repositoryRoot, 'pnpm-lock.
 const image = 'node@sha256:752ea8a2f758c34002a0461bd9f1cee4f9a3c36d48494586f60ffce1fc708e0e';
 const trainingSystemPrompt =
 	'Build the requested feature as a standalone Octane application. Return only the complete contents of src/App.tsrx.';
+const repairSystemPrompt =
+	'Repair the Octane application so it compiles and meets the request. Return only the complete contents of src/App.tsrx.';
+// Strong repair graders share one helper, so it belongs to each of their digests.
+const STRONG_REPAIR_FAMILY = 'octane.strong-repair';
 
 const packageVersions = {
 	octane: packageVersion('packages/octane/package.json'),
@@ -64,8 +68,16 @@ function workspaceDigest(directory) {
 	return sha256(canonicalJson(files));
 }
 
-function graderDigest(graderPath) {
+function graderDigest(task, graderPath) {
 	const files = [
+		...(task.familyId === STRONG_REPAIR_FAMILY
+			? [
+					{
+						path: 'shared/strong-repair.ts',
+						digest: sha256(readFileSync(join(corpusRoot, 'strong-repair.ts'))),
+					},
+				]
+			: []),
 		{ path: 'task/grader.test.ts', digest: sha256(readFileSync(graderPath)) },
 		{
 			path: 'shared/source-contracts.test.ts',
@@ -108,7 +120,7 @@ const manifests = orderedTasks.map((task) => {
 		schemaVersion: '1.1',
 		benchmarkVersion: catalog.benchmarkVersion,
 		taskId: task.taskId,
-		familyId: task.taskId,
+		familyId: task.familyId ?? task.taskId,
 		title: task.title,
 		prompt: { statement: prompt, outputType: 'completion', allowedPaths: ['src/App.tsrx'] },
 		suite: task.suite,
@@ -169,7 +181,7 @@ const manifests = orderedTasks.map((task) => {
 		},
 		grader: {
 			graderVersion: catalog.benchmarkVersion,
-			graderDigest: graderDigest(graderPath),
+			graderDigest: graderDigest(task, graderPath),
 			scoringPolicyDigest,
 			publicCommands: [
 				{
@@ -191,7 +203,10 @@ const trainingExamples = orderedTasks.map((task) => {
 		schemaVersion: '1.1',
 		taskId: task.taskId,
 		messages: [
-			{ role: 'system', content: trainingSystemPrompt },
+			{
+				role: 'system',
+				content: task.capability === 'repair' ? repairSystemPrompt : trainingSystemPrompt,
+			},
 			{
 				role: 'user',
 				content: `${prompt}\n\nStarter src/App.tsrx:\n\n\`\`\`tsx\n${starter}\n\`\`\``,

@@ -4385,6 +4385,14 @@
     "note": "One shared read-only preflight AST must classify descriptor imports and exports no slower than 0.65x two equivalent string-based parses; both targets publish the same classification checksum before timing is accepted."
   },
   {
+    "suite": "tsrx-vite-preflight-parsing",
+    "op": "transform",
+    "target": "host-typescript-second-environment",
+    "reference": "host-typescript-first-environment",
+    "maxRatio": 0.25,
+    "note": "A second client environment of one shared Vite plugin instance must reuse the unchanged preflight of 64 host-owned TypeScript modules instead of reparsing them; both passes must return the unchanged pass-through result for every module."
+  },
+  {
     "suite": "hydration-range-compaction",
     "op": "hydrate_per_100_wrappers",
     "target": "wrappers-512",

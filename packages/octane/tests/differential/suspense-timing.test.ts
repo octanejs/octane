@@ -31,6 +31,8 @@ import type {
 	TimingProps,
 	TimingPairProps,
 	NestedTimingProps,
+	NestedRefRevealProps,
+	NestedRefRehideProps,
 	RawTimingProps,
 	InitialStateTimingProps,
 	ActivityTimingProps,
@@ -65,6 +67,8 @@ type FixtureName =
 	| 'UncaughtTimedBoundary'
 	| 'TimedPair'
 	| 'TimedNested'
+	| 'NestedRefReveal'
+	| 'NestedRefRehide'
 	| 'RawTimedBoundary'
 	| 'InitialStateTimedBoundary'
 	| 'StatefulFallbackTimedBoundary'
@@ -90,6 +94,8 @@ type Props =
 	| DescriptorRetryProps
 	| TimingPairProps
 	| NestedTimingProps
+	| NestedRefRevealProps
+	| NestedRefRehideProps
 	| RawTimingProps
 	| InitialStateTimingProps
 	| ActivityTimingProps
@@ -3024,6 +3030,72 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		expect(visible(root)).toBe('first ready|second loading');
 		await advance(200);
 		expect(visible(root)).toBe('first ready|second ready');
+	});
+
+	// A nested boundary can first suspend inside its parent's throttled retry.
+	// When an update with the same inputs replaces that retry, the nested primary
+	// stays hidden; its later reveal still sets refs before layout effects run.
+	it('sets nested refs before layout effects after an update replaces their first retry', async () => {
+		const outer = deferred();
+		const inner = deferred();
+		const layouts: string[] = [];
+		const root = mount(runtime, 'NestedRefReveal', {
+			outer: outer.promise,
+			inner: inner.promise,
+			onLayout: (value) => layouts.push(value),
+		});
+		expect(visible(root)).toBe('outer loading');
+		await advance(100);
+		outer.resolve('gate');
+		await advance();
+		expect(visible(root)).toBe('outer loading');
+		root.click('button');
+		expect(visible(root)).toBe('gate|inner loading');
+		expect(layouts).toEqual([]);
+		await advance(100);
+		inner.resolve('late');
+		await advance(300);
+		expect(visible(root)).toBe('gate|early|late');
+		expect(layouts).toEqual(['early:early', 'late:late']);
+	});
+
+	// A parent's hide already detached the nested ref. When the nested boundary
+	// suspends during the parent's reveal, the ref is not detached a second time.
+	// Under the visible parent, its own later suspension detaches it as usual.
+	it('detaches a nested ref once when it suspends as its hidden parent reveals', async () => {
+		const calls: Array<string | null> = [];
+		const onRef = (node: HTMLSpanElement | null) => {
+			calls.push(node === null ? null : node.getAttribute('data-value'));
+		};
+		const root = mount(runtime, 'NestedRefRehide', {
+			outer: fulfilled('outer'),
+			inner: fulfilled('inner'),
+			onRef,
+		});
+		expect(calls).toEqual(['nested']);
+		const outer = deferred();
+		root.update({ outer: outer.promise, inner: fulfilled('inner'), onRef });
+		expect(visible(root)).toBe('outer loading');
+		expect(calls).toEqual(['nested', null]);
+		const inner = deferred();
+		root.update({ outer: fulfilled('outer ready'), inner: inner.promise, onRef });
+		await advance();
+		expect(visible(root)).toBe('inner loading|outer ready');
+		expect(calls).toEqual(['nested', null]);
+		inner.resolve('inner ready');
+		await advance(300);
+		expect(visible(root)).toBe('nested|inner ready|outer ready');
+		expect(calls).toEqual(['nested', null, 'nested']);
+		const next = deferred();
+		root.update({ outer: fulfilled('outer ready'), inner: next.promise, onRef });
+		expect(visible(root)).toBe('inner loading|outer ready');
+		expect(calls).toEqual(['nested', null, 'nested', null]);
+		next.resolve('inner next');
+		await advance(300);
+		expect(visible(root)).toBe('nested|inner next|outer ready');
+		expect(calls).toEqual(['nested', null, 'nested', null, 'nested']);
+		root.unmount();
+		expect(calls).toEqual(['nested', null, 'nested', null, 'nested', null]);
 	});
 
 	it('uses the same retry deadline when a resource reader throws its pending promise', async () => {
