@@ -273,8 +273,32 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		return UNKNOWN;
 	}
 
-	// Values that are never thenables: awaiting one resumes in a microtask.
-	function nonPromise(expression, depth = 0) {
+	// The operand a conditional or logical expression evaluates to when its
+	// test or left operand is a known value, as in `null && pending`.
+	function selected(node) {
+		if (node.type === 'ConditionalExpression') {
+			const test = staticValue(node.test);
+			return test === UNKNOWN ? null : test ? node.consequent : node.alternate;
+		}
+		const left = staticValue(node.left);
+		if (left === UNKNOWN) return null;
+		const keepsLeft =
+			node.operator === '??' ? left != null : node.operator === '&&' ? !left : Boolean(left);
+		return keepsLeft ? node.left : node.right;
+	}
+
+	// Some value a conditional or logical expression can evaluate to passes `check`.
+	function someResult(node, check, depth) {
+		const only = selected(node);
+		if (only !== null) return check(only, depth);
+		return node.type === 'ConditionalExpression'
+			? check(node.consequent, depth) || check(node.alternate, depth)
+			: check(node.left, depth) || check(node.right, depth);
+	}
+
+	// Awaiting the value may resume in a microtask, before the next paint: some
+	// value it can evaluate to is a non-thenable or an already settled promise.
+	function maySettle(expression, depth = 0) {
 		const node = unwrap(expression);
 		if (node == null) return true;
 		switch (node.type) {
@@ -300,60 +324,43 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			case 'Identifier': {
 				if (node.name === 'undefined' && bindingOf(node) === null) return true;
 				const init = depth < 8 ? stableInitOf(node) : null;
-				return init !== null && nonPromise(init, depth + 1);
+				return init !== null && maySettle(init, depth + 1);
 			}
 			case 'SequenceExpression':
-				return nonPromise(node.expressions?.at(-1), depth);
+				return maySettle(node.expressions?.at(-1), depth);
 			case 'ConditionalExpression':
-				return nonPromise(node.consequent, depth) && nonPromise(node.alternate, depth);
 			case 'LogicalExpression':
-				return nonPromise(node.left, depth) && nonPromise(node.right, depth);
+				return someResult(node, maySettle, depth);
+			case 'CallExpression':
+				return settledPromise(node);
 			default:
 				return false;
 		}
 	}
 
-	// A promise that settles without waiting on anything else.
-	function zeroDelayPromise(expression, depth = 0) {
+	// A promise that may settle without waiting on anything else.
+	function maySettlePromise(expression, depth = 0) {
 		const node = unwrap(expression);
 		switch (node?.type) {
 			case 'Identifier':
-				return depth < 8 && zeroDelayPromise(stableInitOf(node), depth + 1);
+				return depth < 8 && maySettlePromise(stableInitOf(node), depth + 1);
 			case 'SequenceExpression':
-				return zeroDelayPromise(node.expressions?.at(-1), depth);
+				return maySettlePromise(node.expressions?.at(-1), depth);
 			case 'ConditionalExpression':
-				return zeroDelayPromise(node.consequent, depth) && zeroDelayPromise(node.alternate, depth);
 			case 'LogicalExpression':
-				return zeroDelayPromise(node.left, depth) && zeroDelayPromise(node.right, depth);
-			case 'CallExpression': {
-				const callee = unwrap(node.callee);
-				if (callee?.type !== 'MemberExpression' || keyOf(callee.object) !== 'g:Promise')
-					return false;
-				const method = memberName(callee);
-				if (method === 'reject') return true;
-				return method === 'resolve' && nonPromise(node.arguments?.[0]);
-			}
+				return someResult(node, maySettlePromise, depth);
+			case 'CallExpression':
+				return settledPromise(node);
 			default:
 				return false;
 		}
 	}
 
-	// Awaiting a settled value resumes in a microtask, before the next paint.
-	function settled(expression, depth = 0) {
-		const node = unwrap(expression);
-		switch (node?.type) {
-			case 'SequenceExpression':
-				return settled(node.expressions?.at(-1), depth);
-			case 'ConditionalExpression':
-				return settled(node.consequent, depth) && settled(node.alternate, depth);
-			case 'LogicalExpression':
-				return settled(node.left, depth) && settled(node.right, depth);
-			case 'Identifier': {
-				const init = depth < 8 ? stableInitOf(node) : null;
-				if (init !== null) return settled(init, depth + 1);
-			}
-		}
-		return nonPromise(node, depth) || zeroDelayPromise(node, depth);
+	function settledPromise(node) {
+		const callee = unwrap(node.callee);
+		if (callee?.type !== 'MemberExpression' || keyOf(callee.object) !== 'g:Promise') return false;
+		const method = memberName(callee);
+		return method === 'reject' || (method === 'resolve' && maySettle(node.arguments?.[0]));
 	}
 
 	function globalFunction(callee) {
@@ -391,9 +398,16 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		return info?.path.length === 0 ? signalController(init, depth + 1) : null;
 	}
 
-	function controllerOf(binding) {
-		const init = stableInit(binding);
-		return init?.type === 'NewExpression' && globalFunction(init.callee) === 'AbortController'
+	// The AbortController a binding holds: one created by `new AbortController()`,
+	// reached through stable aliases and the arguments of the helpers being visited.
+	function controllerOf(binding, depth = 0) {
+		if (binding == null || depth > 8) return null;
+		const argument = frameArgument(binding);
+		const source = unwrap(argument ?? stableInit(binding));
+		if (source?.type === 'Identifier') return controllerOf(bindingOf(source), depth + 1);
+		return argument === null &&
+			source?.type === 'NewExpression' &&
+			globalFunction(source.callee) === 'AbortController'
 			? binding
 			: null;
 	}
@@ -1199,12 +1213,13 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			}
 			return callee?.type === 'MemberExpression' &&
 				CONTINUATIONS.has(memberName(callee)) &&
-				zeroDelayPromise(callee.object)
+				maySettlePromise(callee.object)
 				? 'yield'
 				: false;
 		},
+		// Awaiting the argument may resume before the next paint.
 		zeroDelayAwait(argument) {
-			return settled(argument);
+			return maySettle(argument);
 		},
 		// A useRef whose identity never leaves property accesses and stable
 		// aliases holds a plain value, not an attached element or instance.
@@ -1216,5 +1231,11 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		hiddenDependency(node, kind) {
 			report(STRONG_EFFECT_HIDDEN_DEPENDENCY, node, HIDDEN_MESSAGES[kind]);
 		},
+		// A provably known operand value, as `{ value }`, or null.
+		literal(expression) {
+			const value = staticValue(expression);
+			return value === UNKNOWN ? null : { value };
+		},
+		selected,
 	};
 }

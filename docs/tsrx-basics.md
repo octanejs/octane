@@ -851,7 +851,8 @@ These patterns become compile errors:
   same-module custom hook, and callbacks that run before the next paint:
   `startTransition`, a `useTransition` start function, `queueMicrotask`,
   `Promise.resolve().then`, a `setTimeout` without a positive delay, and code
-  after awaiting a value that is not a pending promise.
+  after an `await` that resumes without waiting on any path, such as
+  `await (flag ? load() : null)`.
 - Updating state after an `await` or in a promise callback started by an
   effect, unless the returned cleanup aborts the request's `AbortController` or
   sets a flag the update checks (`OCTANE_STRONG_EFFECT_DATA_FETCH`). Read
