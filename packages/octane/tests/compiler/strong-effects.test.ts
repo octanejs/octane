@@ -471,6 +471,14 @@ export function App(props) @{
 			'awaited promise constructors',
 			'try { await new Promise((resolve) => setTimeout(resolve, props.delay)); setData(await api.get(props.id)); } catch (e) { setError(e); }',
 		],
+		[
+			'this receivers of the awaited call',
+			'try { setData(await this.api.get(props.id)); } catch (e) { setError(e); }',
+		],
+		[
+			"import.meta reads in the awaited call's arguments",
+			'try { setData(await api.get(import.meta.env.VITE_API, props.id)); } catch (e) { setError(e); }',
+		],
 		...['all', 'allSettled', 'any', 'race'].map((combinator) => [
 			`calls inside an awaited Promise.${combinator}`,
 			`try { const [user, posts] = await Promise.${combinator}([api.user(props.id), api.posts(props.id).then((response) => response.items)]); setData({ user, posts }); } catch (e) { setError(e); }`,
@@ -641,6 +649,7 @@ export function App(props) @{
 	it.each([
 		["import Promise from 'bluebird';", ''],
 		['enum Promise { Pending }', ''],
+		['namespace Promise { export const all = (values) => values; }', ''],
 		['', 'function wrap(Promise) { return Promise; }'],
 		['', 'class Promise {}'],
 		['', 'try {} catch (Promise) {}'],
@@ -651,6 +660,16 @@ export function App(props) @{
 			rejects(`${imports}\n${load(body)}`, EFFECT_STATE_UPDATE);
 		},
 	);
+
+	it('does not trust Promise combinator elements after a TypeScript import-equals Promise', () => {
+		const source = `import Promise = require('bluebird'); ${hook(
+			'try { setData(await Promise.all([api.get(props.id)])); } catch (e) { setError(e); }',
+		)}`;
+		expect(slotHooks(source, '/src/useData.ts')).not.toBeNull();
+		expect(() => slotHooks(`"use strong"; ${source}`, '/src/useData.ts')).toThrow(
+			EFFECT_STATE_UPDATE,
+		);
+	});
 
 	it('checks a catch clause reached after yielding for stale state updates', () => {
 		rejects(

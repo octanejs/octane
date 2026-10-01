@@ -259,8 +259,8 @@ function addPatternNames(pattern, bindings, value, overwrite = true) {
 	}
 }
 
-// Whether a declaration, parameter, import or catch binding anywhere in the tree
-// binds `name`.
+// Whether a declaration, parameter, import, namespace or catch binding anywhere
+// in the tree binds `name`.
 function bindsName(root, name) {
 	const bindings = new Map();
 	(function collect(node) {
@@ -282,6 +282,8 @@ function bindsName(root, name) {
 			case 'ClassDeclaration':
 			case 'ClassExpression':
 			case 'TSEnumDeclaration':
+			case 'TSModuleDeclaration':
+			case 'TSImportEqualsDeclaration':
 				addPatternNames(node.id, bindings, true);
 				break;
 			case 'ImportSpecifier':
@@ -2333,6 +2335,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		switch (node.type) {
 			case 'Literal':
 			case 'Identifier':
+			case 'ThisExpression':
+			case 'Super':
+			case 'MetaProperty':
 			case 'FunctionExpression':
 			case 'ArrowFunctionExpression':
 				return false;
