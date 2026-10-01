@@ -48,21 +48,29 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const sha = context.payload.workflow_run.head_sha;
-            const latest = async (workflow_id) => {
+            const trigger = context.payload.workflow_run;
+            // A newer in-progress, cancelled, or failed rerun must not hide a completed success.
+            const completed = async (workflow_id) => {
               const { data } = await github.rest.actions.listWorkflowRuns({
                 owner,
                 repo,
                 workflow_id,
                 head_sha: sha,
                 event: "pull_request",
-                per_page: 1,
+                status: "completed",
+                per_page: 100,
               });
-              return data.workflow_runs[0];
+              const runs = data.workflow_runs.filter((run) => run.conclusion !== "cancelled");
+              if (trigger.path.endsWith(`/${workflow_id}`) && !runs.some((run) => run.id === trigger.id)) {
+                runs.push(trigger);
+              }
+              runs.sort((a, b) => b.id - a.id);
+              return runs.find((run) => run.conclusion === "success") ?? runs[0];
             };
-            const bench = await latest("pr-bench.yml");
-            const ci = await latest("ci.yml");
-            core.setOutput("bench", bench?.status === "completed" ? String(bench.id) : "");
-            core.setOutput("ci", ci?.status === "completed" ? String(ci.id) : "");
+            const bench = await completed("pr-bench.yml");
+            const ci = await completed("ci.yml");
+            core.setOutput("bench", bench ? String(bench.id) : "");
+            core.setOutput("ci", ci ? String(ci.id) : "");
 
       - name: Download benchmark report
         id: download

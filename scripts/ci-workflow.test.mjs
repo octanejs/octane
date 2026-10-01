@@ -1693,6 +1693,58 @@ describe('Pull request benchmark report', () => {
 		assert.ok(prBenchCommentWorkflow.includes('comment.body?.startsWith(COMMENT_MARKER)'));
 		assert.match(packageJson.scripts['ci:workflow:test'], /benchmarks\/ci-timing\.test\.mjs/);
 	});
+
+	// A newer in-progress, cancelled, or failed rerun used to hide the completed success.
+	test('picks the completed successful run for the commit over newer reruns', async () => {
+		const sha = 'a'.repeat(40);
+		const run = (id, path, conclusion) => ({
+			id,
+			path: `.github/workflows/${path}`,
+			head_sha: sha,
+			conclusion,
+		});
+		const listed = {
+			'pr-bench.yml': [run(20, 'pr-bench.yml', 'cancelled'), run(9, 'pr-bench.yml', 'success')],
+			'ci.yml': [run(60, 'ci.yml', 'failure'), run(12, 'ci.yml', 'success')],
+		};
+		const queries = [];
+		const outputs = {};
+		const execute = new AsyncFunction(
+			'github',
+			'context',
+			'core',
+			stepScript(prBenchCommentWorkflow, 'Find runs for the commit'),
+		);
+		const github = {
+			rest: {
+				actions: {
+					listWorkflowRuns: async (query) => {
+						queries.push(query);
+						return { data: { workflow_runs: listed[query.workflow_id] } };
+					},
+				},
+			},
+		};
+		const core = { setOutput: (name, value) => (outputs[name] = value) };
+		const trigger = { ...run(70, 'pr-bench.yml', 'success'), status: 'completed' };
+		await execute(
+			github,
+			{ repo: { owner: 'o', repo: 'r' }, payload: { workflow_run: trigger } },
+			core,
+		);
+		assert.deepEqual(outputs, { bench: '70', ci: '12' });
+		assert.ok(queries.every((query) => query.status === 'completed' && query.head_sha === sha));
+
+		await execute(
+			github,
+			{
+				repo: { owner: 'o', repo: 'r' },
+				payload: { workflow_run: { ...trigger, id: 5, conclusion: 'failure' } },
+			},
+			core,
+		);
+		assert.deepEqual(outputs, { bench: '9', ci: '12' });
+	});
 });
 
 describe('Vercel preview workflow', () => {
