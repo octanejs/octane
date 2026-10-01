@@ -5,8 +5,8 @@ repository-owned `@octanejs/tanstack-start` package (native
 `StreamOptions.injection` stream path) as its Nitro `.output` deployment
 server; `octane-minimal` is the same Octane app built **without** Nitro
 (`octane/vite.config.minimal.ts`) behind `octane/serve.mjs`; `react` runs
-`@tanstack/react-start` from npm, pinned to the corresponding TanStack release
-family (react-start 1.168.28, react-router 1.170.18), behind
+`@tanstack/react-start` from npm, pinned to the first release patched for
+CVE-2026-102989 (react-start 1.168.60, react-router 1.170.41), behind
 `react/serve.mjs`. The two `serve.mjs` hosts are line-for-line mirrors
 (node:http static fast-path + srvx `toNodeHandler`), so `octane-minimal` vs
 `react` isolates the Octane Start/renderer stack and `octane-nitro` vs
@@ -173,5 +173,8 @@ reverses the numbers outright.
 Ratio guards for the stable ops live in `benchmarks/baselines/ratios.json`
 (the known-bad warm gaps get loose "only catch further regression" ceilings —
 fixes should tighten them). Version skew note: the Octane Start integration
-rides router-core 1.171.15 while the react flavor pins react-router 1.170.18 —
-same release family, minor drift.
+rides router-core 1.171.15 while the react flavor pins react-router 1.170.41
+(router-core 1.171.34), the first family patched for CVE-2026-102989. Older
+react-start pins are refused by Vercel's deploy gate for the whole workspace,
+so the React side cannot stay family-matched until `@octanejs/tanstack-start`
+moves to the patched line (#1478).
