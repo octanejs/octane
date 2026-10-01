@@ -548,11 +548,14 @@ first guaranteed `await`. A `finally` clause, or code after the `try` statement,
 is synchronous only when the `try` or `catch` can finish before one. Calls,
 `new`, `throw`, and iteration can throw; property reads and operators do not
 count. The awaited call itself, and any call it chains from through `then`,
-`catch`, or `finally`, is trusted to report failure by rejecting. Its callee and
-arguments still evaluate first. So an effect may run
-`try { setData(await api.get(id)); } catch (error) { setError(error); }`, but
-`await api.get(toKey(id))` or `await Promise.all([a(), b()])` leaves the `catch`
-synchronous.
+`catch`, or `finally`, is trusted to report failure by rejecting. So is each
+call written as an element of an array literal passed to an awaited
+`Promise.all`, `Promise.allSettled`, `Promise.any`, or `Promise.race`, unless
+the module declares its own `Promise`. The callees and arguments of trusted
+calls still evaluate first. So an effect may run
+`try { setData(await Promise.all([api.a(id), api.b(id)])); } catch (error) { setError(error); }`,
+but `await api.get(toKey(id))` or `await Promise.all(ids.map(load))` leaves the
+`catch` synchronous.
 
 The compiler also rejects render-time writes through a provable state snapshot
 (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`) and direct calls to known

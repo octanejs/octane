@@ -8,7 +8,8 @@ common effect pattern
 `try { setData(await api.get(id)); } catch (error) { setError(error); }` now
 compiles. A `catch` stays synchronous when something before the `try` block's
 first guaranteed `await` can throw, such as a call, `new`, `throw`, or
-iteration. The awaited call, and calls it chains from through `then`, `catch`,
-or `finally`, are trusted to reject rather than throw, but their callee and
-arguments still count. `finally` clauses and statements after the `try` follow
-the same rule.
+iteration. The awaited call, calls it chains from through `then`, `catch`, or
+`finally`, and calls written as array-literal elements of an awaited
+`Promise.all`, `allSettled`, `any`, or `race` are trusted to reject rather than
+throw. Their callees and arguments still count. `finally` clauses and statements
+after the `try` follow the same rule.

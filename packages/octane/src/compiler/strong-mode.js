@@ -19,6 +19,7 @@ const EFFECT_CONTROL_TYPES = new Set([
 	'SwitchStatement',
 	'LabeledStatement',
 ]);
+const PROMISE_COMBINATORS = new Set(['all', 'allSettled', 'any', 'race']);
 const ARRAY_MUTATORS = new Set([
 	'copyWithin',
 	'fill',
@@ -250,6 +251,47 @@ function addPatternNames(pattern, bindings, value, overwrite = true) {
 				addPatternNames(property.argument ?? property.value, bindings, value, overwrite);
 			}
 	}
+}
+
+// Whether a declaration, parameter, import or catch binding anywhere in the tree
+// binds `name`.
+function bindsName(root, name) {
+	const bindings = new Map();
+	(function collect(node) {
+		if (Array.isArray(node)) {
+			for (const child of node) collect(child);
+			return;
+		}
+		if (node === null || typeof node !== 'object' || typeof node.type !== 'string') return;
+		switch (node.type) {
+			case 'VariableDeclarator':
+				addPatternNames(node.id, bindings, true);
+				break;
+			case 'FunctionDeclaration':
+			case 'FunctionExpression':
+			case 'ArrowFunctionExpression':
+				addPatternNames(node.id, bindings, true);
+				for (const parameter of node.params ?? []) addPatternNames(parameter, bindings, true);
+				break;
+			case 'ClassDeclaration':
+			case 'ClassExpression':
+			case 'TSEnumDeclaration':
+				addPatternNames(node.id, bindings, true);
+				break;
+			case 'ImportSpecifier':
+			case 'ImportDefaultSpecifier':
+			case 'ImportNamespaceSpecifier':
+				addPatternNames(node.local, bindings, true);
+				break;
+			case 'CatchClause':
+				addPatternNames(node.param, bindings, true);
+				break;
+		}
+		for (const key in node) {
+			if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) collect(node[key]);
+		}
+	})(root);
+	return bindings.has(name);
 }
 
 function bindSnapshotPattern(pattern, value, bind) {
@@ -2339,8 +2381,52 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				callee.property?.name === 'finally');
 		if (chained ? awaitedOperandThrows(callee.object) : throwsBeforeAwait(callee)) return true;
 		if (alwaysAwaits(callee)) return false;
-		if (expressionsThrowBeforeAwait(node.arguments)) return true;
-		return !awaited && !(node.arguments ?? []).some(alwaysAwaits);
+		const combinator = awaited && isPromiseCombinator(callee);
+		for (let index = 0; index < (node.arguments?.length ?? 0); index++) {
+			const argument = node.arguments[index];
+			const elements =
+				combinator && index === 0 && unwrap(argument)?.type === 'ArrayExpression'
+					? unwrap(argument).elements
+					: null;
+			if (elements !== null ? promiseElementsThrow(elements) : throwsBeforeAwait(argument)) {
+				return true;
+			}
+			if (alwaysAwaits(argument)) return false;
+		}
+		return !awaited;
+	}
+
+	// Promise.all, allSettled, any and race consume each element of an array
+	// literal as a promise, so a call written as an element is trusted like the
+	// awaited call. Spread elements still iterate synchronously.
+	function promiseElementsThrow(elements) {
+		for (const element of elements ?? []) {
+			if (
+				element?.type === 'SpreadElement'
+					? throwsBeforeAwait(element)
+					: awaitedOperandThrows(element)
+			) {
+				return true;
+			}
+			if (alwaysAwaits(element)) return false;
+		}
+		return false;
+	}
+
+	let promiseBound;
+	function isPromiseCombinator(callee) {
+		if (
+			callee?.type !== 'MemberExpression' ||
+			callee.computed === true ||
+			unwrap(callee.object)?.type !== 'Identifier' ||
+			unwrap(callee.object).name !== 'Promise' ||
+			!PROMISE_COMBINATORS.has(callee.property?.name)
+		) {
+			return false;
+		}
+		// Any binding named Promise in the module turns the combinator trust off.
+		promiseBound ??= bindsName(ast, 'Promise');
+		return !promiseBound;
 	}
 
 	function patternThrowsBeforeAwait(pattern) {

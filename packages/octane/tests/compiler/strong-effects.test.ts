@@ -453,6 +453,10 @@ export function App(props) @{
 			'awaited promise constructors',
 			'try { await new Promise((resolve) => setTimeout(resolve, props.delay)); setData(await api.get(props.id)); } catch (e) { setError(e); }',
 		],
+		...['all', 'allSettled', 'any', 'race'].map((combinator) => [
+			`calls inside an awaited Promise.${combinator}`,
+			`try { const [user, posts] = await Promise.${combinator}([api.user(props.id), api.posts(props.id).then((response) => response.items)]); setData({ user, posts }); } catch (e) { setError(e); }`,
+		]),
 		[
 			'early exits before the await',
 			'try { if (!props.id) return; setData(await api.get(props.id)); } catch (e) { setError(e); }',
@@ -520,8 +524,33 @@ export function App(props) @{
 			'setError(e)',
 		],
 		[
-			'calls inside an awaited Promise combinator',
-			'try { setData(await Promise.all([api.get(props.id)])); } catch (e) { setError(e); }',
+			"call arguments inside an awaited Promise combinator's elements",
+			'try { setData(await Promise.all([api.get(api.key(props.id))])); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'non-literal arrays passed to an awaited Promise combinator',
+			'try { setData(await Promise.all(props.ids.map((id) => api.get(id)))); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'spread elements in an awaited Promise combinator',
+			'try { setData(await Promise.all([...props.requests])); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			"calls in an awaited Promise combinator's ignored arguments",
+			'try { setData(await Promise.race([props.request], [api.reset()])); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			"calls inside a non-Promise object's all()",
+			'try { setData(await api.all([api.get(props.id)])); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'calls inside a combinator on a shadowed Promise',
+			'const Promise = api.Promise; try { setData(await Promise.all([api.get(props.id)])); } catch (e) { setError(e); }',
 			'setError(e)',
 		],
 		[
@@ -590,6 +619,20 @@ export function App(props) @{
 			EFFECT_STATE_UPDATE,
 		);
 	});
+
+	it.each([
+		["import Promise from 'bluebird';", ''],
+		['enum Promise { Pending }', ''],
+		['', 'function wrap(Promise) { return Promise; }'],
+		['', 'class Promise {}'],
+		['', 'try {} catch (Promise) {}'],
+	])(
+		'does not trust Promise combinator elements when the module binds Promise: %s%s',
+		(imports, local) => {
+			const body = `${local} try { setData(await Promise.all([api.get(props.id)])); } catch (e) { setError(e); }`;
+			rejects(`${imports}\n${load(body)}`, EFFECT_STATE_UPDATE);
+		},
+	);
 
 	it('still reports an uncancelled fetch whose catch clause updates state', () => {
 		rejects(
