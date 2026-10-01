@@ -562,10 +562,14 @@ it (`OCTANE_STRONG_EFFECT_DATA_FETCH`).
 
 The compiler also rejects render-time writes through a provable state snapshot
 (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`) and direct calls to known
-non-idempotent globals such as `Date.now()` and `Math.random()`
-(`OCTANE_STRONG_RENDER_IMPURE_CALL`). These checks follow supported aliases and
-synchronous helpers; they do not prove arbitrary method bodies or imported code
-pure. Lazy state initialization may obtain an initial timestamp or random value.
+non-idempotent globals such as `Date.now()`, `Math.random()`, and
+`crypto.randomUUID()` (`OCTANE_STRONG_RENDER_IMPURE_CALL`), including inside
+callbacks that known array methods run synchronously. These checks follow
+supported aliases and synchronous helpers; they do not prove arbitrary method
+bodies or imported code pure. Lazy state initialization may obtain an initial
+timestamp or random value. Locale- and time-zone-dependent formatting of a
+provable `Date` or an `Intl` service during render reports
+`OCTANE_STRONG_RENDER_LOCALE_FORMAT`; pass an explicit locale and `timeZone`.
 State values stay immutable outside render too
 (`OCTANE_STRONG_SNAPSHOT_MUTATION`), updaters and reducers follow the render
 checks because Octane may replay them (`OCTANE_STRONG_IMPURE_UPDATER`), and a
