@@ -5532,9 +5532,23 @@ export default defineConfig({
 			{
 				test: {
 					name: 'app-core',
-					include: ['packages/app-core/tests/**/*.test.ts'],
+					include: [
+						'packages/app-core/tests/**/*.test.ts',
+						'!packages/app-core/tests/browser/**/*.test.ts',
+					],
 					environment: 'node',
 					globals: false,
+				},
+			},
+			{
+				testExecution: { group: 'heavy-browser', browsers: ['chromium'] },
+				test: {
+					name: 'app-core-browser',
+					include: ['packages/app-core/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 				},
 			},
 			{

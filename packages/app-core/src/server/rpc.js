@@ -80,7 +80,7 @@ function withRpcCors(response, origin) {
 
 	const headers = new Headers(response.headers);
 	headers.set('Access-Control-Allow-Origin', origin);
-	headers.set('Access-Control-Expose-Headers', 'Octane-RPC-Outcome');
+	headers.append('Access-Control-Expose-Headers', 'Octane-RPC-Outcome');
 	headers.append('Vary', 'Origin');
 	return new Response(response.body, {
 		status: response.status,

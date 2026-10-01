@@ -259,7 +259,17 @@ describe('server-function HTTP security', () => {
 
 	it('preserves authorization middleware responses for a trusted cross-origin request', async () => {
 		const authorization = vi.fn(
-			() => new Response('Unauthorized', { status: 401, headers: { Vary: 'Accept-Encoding' } }),
+			() =>
+				new Response('Unauthorized', {
+					status: 401,
+					headers: {
+						Vary: 'Accept-Encoding',
+						'Access-Control-Expose-Headers': 'Retry-After, X-Request-Id',
+						'Retry-After': '60',
+						'X-Request-Id': 'request-123',
+						'Octane-RPC-Outcome': 'completed',
+					},
+				}),
 		);
 		const { action, handler } = createRpcHandler({
 			allowedOrigins: ['https://trusted.octane.test'],
@@ -273,9 +283,53 @@ describe('server-function HTTP security', () => {
 		expect(await response.text()).toBe('Unauthorized');
 		expect(response.headers.get('access-control-allow-origin')).toBe('https://trusted.octane.test');
 		expect(response.headers.get('vary')).toBe('Accept-Encoding, Origin');
+		expect(response.headers.get('retry-after')).toBe('60');
+		expect(response.headers.get('x-request-id')).toBe('request-123');
+		expect(response.headers.get('octane-rpc-outcome')).toBe('rejected');
+		expect(
+			response.headers
+				.get('access-control-expose-headers')
+				?.toLowerCase()
+				.split(',')
+				.map((name) => name.trim()),
+		).toEqual(expect.arrayContaining(['retry-after', 'x-request-id', 'octane-rpc-outcome']));
 		expect(authorization).toHaveBeenCalledOnce();
 		expect(action).not.toHaveBeenCalled();
 	});
+
+	it.each([
+		['retry-after, OCTANE-rpc-OUTCOME', ['retry-after', 'octane-rpc-outcome']],
+		['*', ['*', 'octane-rpc-outcome']],
+		['', ['octane-rpc-outcome']],
+		[undefined, ['octane-rpc-outcome']],
+	] as const)(
+		'preserves the middleware expose list %s alongside the RPC outcome',
+		async (expose, names) => {
+			const headers = new Headers({ 'Retry-After': '60' });
+			if (expose !== undefined) headers.set('Access-Control-Expose-Headers', expose);
+			const middleware = vi.fn(() => new Response('Rate limited', { status: 429, headers }));
+			const { action, handler } = createRpcHandler({
+				allowedOrigins: ['https://trusted.octane.test'],
+				middlewares: [middleware],
+			});
+			const response = await handler(
+				rpcRequest({ headers: { Origin: 'https://trusted.octane.test' } }),
+			);
+
+			expect(response.status).toBe(429);
+			expect(await response.text()).toBe('Rate limited');
+			expect(response.headers.get('octane-rpc-outcome')).toBe('rejected');
+			expect(
+				response.headers
+					.get('access-control-expose-headers')
+					?.toLowerCase()
+					.split(',')
+					.map((name) => name.trim()),
+			).toEqual(expect.arrayContaining([...names]));
+			expect(middleware).toHaveBeenCalledOnce();
+			expect(action).not.toHaveBeenCalled();
+		},
+	);
 
 	it('exposes only sanitized RPC errors to an explicitly trusted cross-origin browser', async () => {
 		const secret = 'private database password';
