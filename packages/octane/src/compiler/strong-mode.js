@@ -5,6 +5,7 @@ import {
 } from './hook-deps.js';
 import { createRendererRegionResolver } from './renderer-boundaries.js';
 import { analyzeStrongHTML } from './strong-html.js';
+import { analyzeStrongDOM } from './strong-dom.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { createStrongTemplatePolicy } from './strong-template-policy.js';
 import { createStrongEffectPolicy } from './strong-effects.js';
@@ -15,8 +16,13 @@ import {
 } from './strong-state.js';
 import { analyzeStrongWriteOnlyState } from './strong-write-only-state.js';
 import { analyzeStrongExternalStore } from './strong-external-store.js';
+import { createStrongRenderPolicy } from './strong-render-policy.js';
 
-export { STRONG_EFFECT_DATA_FETCH } from './strong-effects.js';
+export {
+	STRONG_EFFECT_DATA_FETCH,
+	STRONG_EFFECT_HIDDEN_DEPENDENCY,
+	STRONG_EFFECT_RESOURCE_LEAK,
+} from './strong-effects.js';
 
 const STATE_HOOKS = new Set(['useState', 'useReducer', 'useLinkedState']);
 const EFFECT_HOOKS = new Set(['useEffect', 'useLayoutEffect', 'useInsertionEffect']);
@@ -85,6 +91,8 @@ const TRANSITION_TUPLE_BINDING = { kind: 'transition-tuple' };
 const UNDEFINED_BINDING = { kind: 'constant', value: UNDEFINED_VALUE, primitive: undefined };
 const GLOBAL_OBJECT_BINDING = { kind: 'global-object' };
 const FETCH_BINDING = { kind: 'fetch' };
+// Array callbacks receive (item, index, array) or (accumulator, item, index, array).
+const ARRAY_CALLBACK_ARGUMENTS = [OTHER_BINDING, OTHER_BINDING, OTHER_BINDING, OTHER_BINDING];
 const AMBIENT_GLOBAL_BINDINGS = new Map(
 	[
 		'window',
@@ -1593,6 +1601,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		filename,
 		options,
 	});
+	const renderPolicy = createStrongRenderPolicy({
+		ast,
+		moduleScope,
+		report,
+		reportImpureCall,
+		resolve,
+		resolveScope,
+		unwrap,
+		staticPrimitiveValue,
+		isReassigned,
+	});
 	const effectPolicy = createStrongEffectPolicy({
 		ast,
 		analysis: strongHookAnalysis.analysis,
@@ -1948,12 +1967,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
-	function reportImpureCall(node) {
-		report(
-			STRONG_RENDER_IMPURE_CALL,
-			node,
-			'Strong mode does not allow nondeterministic calls during render. Read time or randomness outside render and pass the result as a prop or state snapshot.',
-		);
+	function reportImpureCall(
+		node,
+		message = 'Strong mode does not allow nondeterministic calls during render. Read time or randomness outside render and pass the result as a prop or state snapshot.',
+	) {
+		report(STRONG_RENDER_IMPURE_CALL, node, renderPolicy.impureMessage(node, message));
 	}
 
 	function unshadowedGlobal(node, scope, name) {
@@ -2979,7 +2997,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				initial?.type === 'CallExpression' &&
 				importedHook(initial.callee, scope) === 'useRef'
 			) {
-				bind(declaration.id, { kind: 'ref' });
+				bind(declaration.id, { kind: 'ref', declaration: declaration.id });
 			} else if (declarationKind === 'const' && transitionStart(initial, scope)) {
 				target.bindings.set(declaration.id.name, TRANSITION_START_BINDING);
 			} else if (declarationKind === 'const' && stateTupleUpdater(initial, scope)) {
@@ -3463,6 +3481,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (callShapes.has(unwrap(declaration.init))) {
 			bindDeclarationValue(declaration, declarationKind, scope);
 		}
+		checkRefPattern(declaration.id, declaration.init, scope, phase);
 		return visitPatternExpressions(
 			declaration.id,
 			scope,
@@ -4317,6 +4336,47 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		);
 	}
 
+	// Synchronous effect setup must not read inputs that dependency inference
+	// cannot see. Effect Events are the declared non-reactive escape.
+	function hiddenEffectRead(phase) {
+		return phase === 'effect' && currentEffect !== null && collectEffectReads;
+	}
+
+	// Compound assignments and updates read their target before writing it.
+	function reportHiddenUpdateRead(target, scope, phase) {
+		if (!hiddenEffectRead(phase)) return;
+		const node = unwrap(target);
+		if (node?.type === 'Identifier' && mutableModuleRead(node.name, scope)) {
+			effectPolicy.hiddenDependency(node, 'module');
+		} else if (readCurrentRef(node, scope) && valueRefRead(node.object, scope)) {
+			effectPolicy.hiddenDependency(node, 'ref');
+		}
+	}
+
+	// Destructuring `current` from a value ref in effect setup reads it too.
+	function checkRefPattern(pattern, value, scope, phase) {
+		if (
+			hiddenEffectRead(phase) &&
+			pattern?.type === 'ObjectPattern' &&
+			pattern.properties?.some(
+				(property) =>
+					property.type === 'RestElement' ||
+					(property.computed
+						? staticPrimitiveValue(property.key, scope)
+						: (property.key?.name ?? property.key?.value)) === 'current',
+			) &&
+			valueRefRead(value, scope)
+		) {
+			effectPolicy.hiddenDependency(unwrap(value), 'ref');
+		}
+	}
+
+	function valueRefRead(object, scope) {
+		const node = unwrap(object);
+		const binding = node?.type === 'Identifier' ? resolve(scope, node.name) : null;
+		return binding?.kind === 'ref' && effectPolicy.isValueRef(binding.declaration);
+	}
+
 	function visitExplicitStateDependencies(expression, scope, dependencies) {
 		const node = unwrap(expression);
 		if (node?.type === 'ArrayExpression') {
@@ -4472,7 +4532,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	function cleanupFunctions(value, functions) {
-		if (value?.kind === 'callback') functions.push(value.node);
+		if (value?.kind === 'callback') functions.push(value);
 		else if (value?.kind === 'callback-choice') {
 			for (const callback of value.values) cleanupFunctions(callback, functions);
 		} else if (value?.kind === 'effect-event') cleanupFunctions(value.callback, functions);
@@ -4530,8 +4590,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (phase === 'deferred') effectPolicy.continuationWrite(currentEffect, origin);
 			}
 			if (phase === 'render' || phase === 'effect') reportSetter(origin, phase);
-		} else if (value?.kind === 'getter' && phase === 'render' && currentFunctionChecksRenderReads) {
-			reportStateGetterCall(origin);
+		} else if (value?.kind === 'getter') {
+			if (phase === 'render' && currentFunctionChecksRenderReads) reportStateGetterCall(origin);
+			else if (hiddenEffectRead(phase)) effectPolicy.hiddenDependency(origin, 'getter');
 		}
 	}
 
@@ -4800,6 +4861,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 		if (node.type?.startsWith('TS')) return;
 		templatePolicy.visit(node, scope, readAccess);
+		renderPolicy.visit(node, scope);
 
 		switch (node.type) {
 			case 'ImportDeclaration':
@@ -4837,6 +4899,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					mutableModuleRead(node.name, scope)
 				) {
 					reportModuleStateRead(node);
+				}
+				if (readAccess && hiddenEffectRead(phase) && mutableModuleRead(node.name, scope)) {
+					effectPolicy.hiddenDependency(node, 'module');
 				}
 				return;
 			case 'JSXOpeningElement': {
@@ -5099,6 +5164,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					const snapshot = snapshotBinding(node, scope);
 					if (snapshot?.state) currentEffect.reads.add(ownedState(snapshot.state));
 				}
+				if (
+					readAccess &&
+					hiddenEffectRead(phase) &&
+					readCurrentRef(node, scope) &&
+					valueRefRead(node.object, scope)
+				) {
+					effectPolicy.hiddenDependency(node, 'ref');
+				}
 				return;
 			}
 			case 'LabeledStatement': {
@@ -5301,17 +5374,32 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 								? 0
 								: -1;
 				const asynchronousCall = hook === null && statePolicy.enterCall(node, callee, scope);
+				// A known array method runs its callback now; in render, so does the callback.
+				const arrayCallbackIndex =
+					hook === null && pureCallbackIndex === -1 && executionPhase === 'render'
+						? renderPolicy.arrayCallbackIndex(callee, scope)
+						: -1;
 				for (let index = 0; index < (node.arguments?.length ?? 0); index++) {
 					const argument = node.arguments[index];
 					if (
 						(index !== synchronousCallbackIndex &&
 							index !== pureCallbackIndex &&
+							(index !== arrayCallbackIndex || unwrap(argument)?.generator === true) &&
 							!(index === 0 && component !== null)) ||
 						!FUNCTION_TYPES.has(unwrap(argument)?.type)
 					) {
 						visit(argument, scope, executionPhase);
 					}
 					executionPhase = phaseAfter(argument, executionPhase);
+				}
+				const arrayCallback = node.arguments?.[arrayCallbackIndex];
+				if (arrayCallback !== undefined && arrayCallback.type !== 'SpreadElement') {
+					visitCallable(
+						callableValue(arrayCallback, scope),
+						unwrap(arrayCallback),
+						executionPhase === 'render' ? 'render' : 'deferred',
+						ARRAY_CALLBACK_ARGUMENTS,
+					);
 				}
 				if (pureCallbackIndex !== -1) {
 					visitStateCallback(node, hook, pureCallbackIndex, updaterSetters, scope);
@@ -5404,12 +5492,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					}
 					return;
 				}
-				if (
-					executionPhase === 'render' &&
-					currentFunctionChecksImpureCalls &&
-					impureStandardCall(callee, scope)
-				) {
-					reportImpureCall(callee);
+				if (executionPhase === 'render' && currentFunctionChecksImpureCalls) {
+					if (impureStandardCall(callee, scope)) reportImpureCall(callee);
+					renderPolicy.call(node, callee, scope, !insidePureCallback);
 				}
 				const mutation = statePolicy.snapshotMutation(callee, node.arguments, scope);
 				if (mutation !== null) reportSnapshotMutationIn(mutation, executionPhase);
@@ -5448,6 +5533,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 							effectPolicy.restoreFlow(beforeFlow);
 						}
 					}
+					if (executionPhase === 'effect') effectPolicy.acquire(currentEffect, node);
 				}
 				if (
 					executionPhase === 'render' ||
@@ -5536,6 +5622,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				) {
 					reportImpureCall(callee);
 				}
+				if (executionPhase === 'render' && currentFunctionChecksImpureCalls) {
+					renderPolicy.construct(node, scope, !insidePureCallback);
+				}
+				if (currentEffect !== null && executionPhase === 'effect') {
+					effectPolicy.construct(currentEffect, node);
+				}
 				if (inlineConstructor) {
 					visitCallback(callee, scope, executionPhase, argumentValues(node.arguments, scope));
 				} else if (
@@ -5585,6 +5677,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'AssignmentExpression': {
 				if (node.left?.type === 'ArrayPattern' || node.left?.type === 'ObjectPattern') {
 					visit(node.right, scope, phase);
+					checkRefPattern(node.left, node.right, scope, phase);
 					visitPatternExpressions(
 						node.left,
 						scope,
@@ -5631,6 +5724,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				) {
 					reportModuleStateRead(unwrap(node.left));
 				}
+				if (node.operator !== '=') reportHiddenUpdateRead(node.left, scope, phase);
+				if (currentEffect !== null && executionPhase === 'effect') {
+					effectPolicy.assign(currentEffect, node);
+				}
 				return;
 			}
 			case 'UpdateExpression': {
@@ -5652,6 +5749,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					reportModuleStateRead(unwrap(node.argument));
 				}
 				if (phase === 'render' && currentRef(node.argument, scope)) reportRef(node.argument);
+				reportHiddenUpdateRead(node.argument, scope, phase);
 				visit(node.argument, scope, phase, false);
 				const writePhase = phaseAfter(node.argument, phase, true);
 				reportSnapshotWrite(node.argument, scope, writePhase);
@@ -5912,6 +6010,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		});
 	}
 	diagnostics.push(...analyzeStrongHTML(ast, source, filename, options));
+	diagnostics.push(...analyzeStrongDOM(ast, source, filename, options));
 	const nativeChangeAnalysis = analyzeNativeChangeDiagnostics(ast, source, filename, {
 		...options,
 		strong: true,

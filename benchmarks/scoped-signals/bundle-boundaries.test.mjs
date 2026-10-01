@@ -2890,6 +2890,33 @@ test('private context proof declines escaped values and noncompiled child dialec
 			'((value)=>value) satisfies Function',
 			'(((value)=>value))',
 		].map((child) => `function App2() @{ <Theme value="descriptor">{${child}}</Theme> }`),
+		// Element descriptors reach a provider under a descriptorChildren component
+		// and from the returned-JSX form of a directly called template function.
+		...[
+			'<Theme value="descriptor"><span /></Theme>',
+			'<p><Theme value="descriptor"><span /></Theme></p>',
+			'<><Theme value="descriptor"><span /></Theme></>',
+			'@{ <Theme value="descriptor"><span /></Theme> }',
+			'<Ordinary><Theme value="descriptor"><span /></Theme></Ordinary>',
+		].map(
+			(child) =>
+				`const Frame=descriptorChildren(Ordinary);\nfunction Ordinary(props) @{ <div>{props.children}</div> }\nfunction App2() @{ <Frame>${child}</Frame> }`,
+		),
+		'import {ReactCompat} from \'octane/react\';\nfunction App2() @{ <ReactCompat><Theme value="descriptor"><span /></Theme></ReactCompat> }',
+		'function Helper() @{ <Theme value="descriptor"><span /></Theme> }\nconst value=Helper();',
+		'const Helper=() => @{ <Theme value="descriptor"><span /></Theme> };\nconst value=Helper.call(null);',
+		'function App2() @{ function inner() @{ <Theme value="descriptor"><span /></Theme> } <div>{inner()}</div> }',
+		'const Wrapped=wrap(() => @{ <Theme value="descriptor"><span /></Theme> });',
+		'function App2(props) @{ <div>{props.rows.map(() => @{ <Theme value="descriptor"><span /></Theme> })}</div> }',
+	];
+	// Template bodies that stay compiled: a setup block is its own render body,
+	// a shadowed marker name is an ordinary component, and passing a component
+	// to a call that renders it is not a direct call.
+	const retained = [
+		'const Frame=descriptorChildren(Ordinary);\nfunction Ordinary(props) @{ <div>{props.children}</div> }\nfunction App2(props) @{ <Frame>@{ const value=props.value; <Theme value={value}><span /></Theme> }</Frame> }',
+		'const Frame=descriptorChildren(Ordinary);\nfunction Ordinary(props) @{ <div>{props.children}</div> }\nfunction App2(props) @{ const Frame=props.frame; <Frame><Theme value="shadowed"><span /></Theme></Frame> }',
+		'import {memo} from \'octane\';\nconst Memo=memo(function Memo() @{ <Theme value="memo"><span /></Theme> });',
+		'function mount(root) {root.render(App, {});}',
 	];
 	function freeze(value) {
 		if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return;
@@ -2901,6 +2928,28 @@ test('private context proof declines escaped values and noncompiled child dialec
 		freeze(ast);
 		assert.equal(findPrivateCompiledContexts(ast).has('Theme'), extra === '', extra);
 	}
+	for (const extra of retained) {
+		const ast = parseModule(prefix + provider + extra, 'private-context.tsrx');
+		freeze(ast);
+		assert.equal(findPrivateCompiledContexts(ast).has('Theme'), true, extra);
+	}
+	// The bundler proves an imported component keeps descriptor children.
+	const imported = parseModule(
+		prefix +
+			provider +
+			'import {Frame} from \'./frame\';\nfunction App2() @{ <Frame><Theme value="descriptor"><span /></Theme></Frame> }',
+		'private-context.tsrx',
+	);
+	freeze(imported);
+	assert.equal(findPrivateCompiledContexts(imported).has('Theme'), true, 'unproven import');
+	assert.equal(
+		findPrivateCompiledContexts(
+			imported,
+			(request, name) => request === './frame' && name === 'Frame',
+		).has('Theme'),
+		false,
+		'descriptorChildren import',
+	);
 	const ast = parseModule(prefix + provider + 'function decorate(){}', 'private-context.tsrx');
 	const supplied = {
 		...ast,
@@ -2921,7 +2970,9 @@ test('private context proof declines escaped values and noncompiled child dialec
 		false,
 		'unscoped runtime reference',
 	);
-	t.diagnostic(`${escapes.length} authored lifetime/dialect controls on frozen parser ASTs`);
+	t.diagnostic(
+		`${escapes.length} authored lifetime/dialect and ${retained.length} retained controls on frozen parser ASTs`,
+	);
 });
 
 test('private context specialization preserves factory source ranges and deployment boundaries', () => {
