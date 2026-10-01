@@ -1,9 +1,9 @@
 // The read hooks — ports of react-router's useMatch.tsx / useParams / useSearch /
 // useLoaderData / useLoaderDeps / useRouteContext / useNavigate / useCanGoBack /
 // Matches.tsx (useMatches / useParentMatches / useChildMatches). Everything match-
-// shaped funnels through `useMatch`, which subscribes to ONE match store:
-//   - `from` given → `router.stores.getRouteMatchStore(from)` (a cached computed
-//     that resolves a routeId to its current match);
+// shaped funnels through `useMatch`, which subscribes to ONE match store via
+// `router.stores.getMatchStore(routeId)`:
+//   - `from` given → that routeId's match store;
 //   - no `from` → the NEAREST match via `matchContext` (the match id the enclosing
 //     `<Match>` provided) — NOT the leaf match.
 // A missing match throws unless `shouldThrow: false` (upstream invariant).
@@ -89,9 +89,8 @@ export function useMatch(...args: any[]): any {
 	// octane has no rules of hooks, so the nearest-match context is read
 	// unconditionally (upstream reads a dummy context when `from` is given).
 	const nearestMatchId = useContext(matchContext);
-	const matchStore = opts.from
-		? router.stores.getRouteMatchStore(opts.from)
-		: router.stores.matchStores.get(nearestMatchId as string);
+	const routeId = opts.from ?? (nearestMatchId as string);
+	const matchStore = router.stores.getMatchStore(routeId);
 
 	const selector = useStructuralSharing(opts, router, subSlot(slot, 'm'));
 	const matchSelection = useStore(
@@ -302,13 +301,13 @@ export function useParentMatches(opts: any, slot: symbol | undefined): any;
 export function useParentMatches(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
-	const contextMatchId = useContext(matchContext);
+	const contextRouteId = useContext(matchContext);
 	return useMatches(
 		{
 			select: (matches: any[]) => {
 				matches = matches.slice(
 					0,
-					matches.findIndex((d: any) => d.id === contextMatchId),
+					matches.findIndex((d: any) => d.routeId === contextRouteId),
 				);
 				return opts.select ? opts.select(matches) : matches;
 			},
@@ -330,11 +329,11 @@ export function useChildMatches(opts: any, slot: symbol | undefined): any;
 export function useChildMatches(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
-	const contextMatchId = useContext(matchContext);
+	const contextRouteId = useContext(matchContext);
 	return useMatches(
 		{
 			select: (matches: any[]) => {
-				matches = matches.slice(matches.findIndex((d: any) => d.id === contextMatchId) + 1);
+				matches = matches.slice(matches.findIndex((d: any) => d.routeId === contextRouteId) + 1);
 				return opts.select ? opts.select(matches) : matches;
 			},
 			structuralSharing: opts.structuralSharing,

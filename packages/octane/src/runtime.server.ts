@@ -4310,11 +4310,9 @@ function ssrOptionSelected(value: unknown, content: string): string {
 	if (value != null) {
 		key = String(value);
 	} else {
-		// Content carrying markup (nested elements / hydration markers) skips
-		// the text fallback — React flattens simple text children only. The
-		// separator between adjacent texts is not markup; the text is theirs.
-		const text =
-			content.indexOf(TEXT_SEPARATOR) === -1 ? content : content.replaceAll(TEXT_SEPARATOR, '');
+		// Hydration comments do not contribute to an option's visible text.
+		// Actual element markup still prevents the simple-text fallback.
+		const text = content.indexOf('<') === -1 ? content : content.replace(/<!--[\s\S]*?-->/g, '');
 		if (text.indexOf('<') !== -1) return '';
 		key = unescapeOptionText(text);
 	}

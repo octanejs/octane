@@ -141,6 +141,8 @@ import type {
 import {
 	HYDRATE_DEFAULT_INTERACTION_EVENTS,
 	HYDRATE_INTERACTION_EVENTS_ATTR,
+	HYDRATE_LIFECYCLE_INTERACTION_EVENTS,
+	isHydrationLifecycleEvent,
 } from './hydration/interaction-config.js';
 import {
 	HYDRATE_SUPPORTED_INTERACTION_EVENTS,
@@ -15040,7 +15042,10 @@ function handleRegisteredHydrationIntent(
 	const status = hydrateStrategyInteractionEvents(strategy)?.includes(eventType)
 		? 'handles'
 		: 'dormant';
-	if (intent !== undefined) queueHydrateIntent(state, intent);
+	// Pointer movement and cancellation extend a requested activation; alone,
+	// they never wake the boundary.
+	if (intent !== undefined && (state.activationRequested || !isHydrationLifecycleEvent(eventType)))
+		queueHydrateIntent(state, intent);
 	return status;
 }
 
@@ -15057,6 +15062,11 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 		if (nestedEvents !== null) {
 			for (let j = 0; j < nestedEvents.length; j++) events.add(nestedEvents[j]);
 		}
+	}
+	// Document capture owns pointer movement and cancellation: they extend only a
+	// press it captured, not an activation requested for any other reason.
+	for (let i = 0; i < HYDRATE_LIFECYCLE_INTERACTION_EVENTS.length; i++) {
+		events.delete(HYDRATE_LIFECYCLE_INTERACTION_EVENTS[i]);
 	}
 	if (events.size === 0) return () => undefined;
 

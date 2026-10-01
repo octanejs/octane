@@ -99,16 +99,10 @@ describe('@octanejs/tanstack-router — same-route search-param navigation', () 
 		},
 	);
 
-	it('exposes a canonical server redirect after the load settles', async () => {
-		const router = makeSameRouteSearchRouter('/', { isServer: true });
-		await router.load();
-
-		// Server integrations can follow canonical redirects through the public
-		// RouterState snapshot rather than reaching into the reactive store graph.
-		expect(router.state.redirect?.options.href).toBe('/?page=1');
-		// Redirect is a Response in the pinned RouterCore API. The router's
-		// separately exposed status must preserve that same non-success code.
-		expect(router.state.redirect?.status).toBe(307);
-		expect(router.state.statusCode).toBe(router.state.redirect?.status);
-	});
+	// The canonical-server-redirect test was removed with the router-core 1.171.34
+	// adoption: redirects are no longer mirrored onto `router.state`. A server load
+	// records the canonical redirect on the handler-owned `_serverResult` (consumed
+	// by start-server-core's request handler, which emits the redirect HTTP
+	// response), so the behaviour is now a start-server-core / integration concern
+	// rather than an observable router-binding contract.
 });
