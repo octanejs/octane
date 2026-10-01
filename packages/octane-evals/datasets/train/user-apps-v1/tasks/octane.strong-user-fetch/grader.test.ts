@@ -6,14 +6,24 @@ const TASK = 'octane.strong-user-fetch';
 const USERS: Record<string, string> = { '1': 'Ada Lovelace', '2': 'Grace Hopper' };
 let responses: Map<string, () => void>;
 
+function requestURL(input: RequestInfo | URL): string {
+	return typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+}
+
+// Like a real fetch, a request rejects with an AbortError once its signal aborts,
+// so a repair that cancels the superseded request is graded on its behavior.
 beforeEach(() => {
 	responses = new Map();
 	vi.stubGlobal(
 		'fetch',
 		vi.fn(
-			(url: string) =>
-				new Promise((resolve) => {
-					const id = url.split('/').pop()!;
+			(input: RequestInfo | URL, init?: RequestInit) =>
+				new Promise((resolve, reject) => {
+					const id = requestURL(input).split('/').pop()!;
+					const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+					const abort = () => reject(new DOMException('The operation was aborted.', 'AbortError'));
+					if (signal?.aborted) return abort();
+					signal?.addEventListener('abort', abort, { once: true });
 					responses.set(id, () =>
 						resolve({ json: () => Promise.resolve({ name: USERS[id] }) } as Response),
 					);
@@ -42,7 +52,9 @@ describe(TASK, () => {
 		const { App } = await import('@octane-eval-submission/octane.strong-user-fetch/src/App.tsrx');
 		const view = render(App, { props: { userId: '1' } });
 		expect(view.container.textContent).toBe('Loading…');
-		expect(fetch).toHaveBeenCalledWith('/api/users/1');
+		expect(vi.mocked(fetch).mock.calls.map(([input]) => requestURL(input))).toContain(
+			'/api/users/1',
+		);
 		await respond('1');
 		expect(view.container.textContent).toBe('Ada Lovelace');
 	});
