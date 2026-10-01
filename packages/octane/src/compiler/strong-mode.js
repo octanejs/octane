@@ -1931,18 +1931,25 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	// Every path through `await argument` waits on work that may be pending:
 	// the path's own evaluation awaits, or the value it awaits may not be settled.
 	// Like `if (c) await work;`, a path that resumes in a microtask keeps the
-	// following code in synchronous setup.
-	function awaitYields(argument) {
+	// following code in synchronous setup. A local `const` keeps the paths of
+	// its initializer, which ran earlier in the same function.
+	function awaitYields(argument, depth = 0) {
 		const node = unwrap(argument);
+		if (node?.type === 'Identifier' && depth < 8) {
+			const init = effectPolicy.localInit(node);
+			if (init !== null) return awaitYields(init, depth + 1);
+		}
 		if (alwaysAwaits(node)) return true;
 		if (node?.type === 'ConditionalExpression' || node?.type === 'LogicalExpression') {
 			const only = effectPolicy.selected(node);
-			if (only !== null) return awaitYields(only);
+			if (only !== null) return awaitYields(only, depth);
 			return node.type === 'ConditionalExpression'
-				? awaitYields(node.consequent) && awaitYields(node.alternate)
-				: awaitYields(node.left) && awaitYields(node.right);
+				? awaitYields(node.consequent, depth) && awaitYields(node.alternate, depth)
+				: awaitYields(node.left, depth) && awaitYields(node.right, depth);
 		}
-		if (node?.type === 'SequenceExpression') return awaitYields(node.expressions?.at(-1));
+		if (node?.type === 'SequenceExpression') {
+			return awaitYields(node.expressions?.at(-1), depth);
+		}
 		return !effectPolicy.zeroDelayAwait(node);
 	}
 

@@ -1259,6 +1259,16 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		hiddenDependency(node, kind) {
 			report(STRONG_EFFECT_HIDDEN_DEPENDENCY, node, HIDDEN_MESSAGES[kind]);
 		},
+		// The stable initializer of a binding declared in the function that reads
+		// it: that initializer ran earlier on the same path.
+		localInit(expression) {
+			const node = unwrap(expression);
+			if (node?.type !== 'Identifier') return null;
+			const scope = nodeScopes.get(node);
+			const binding = bindingOf(node);
+			if (scope === undefined || binding == null || binding.scope == null) return null;
+			return functionScopeOf(binding.scope) === functionScopeOf(scope) ? stableInit(binding) : null;
+		},
 		// A provably known operand value, as `{ value }`, or null.
 		literal(expression) {
 			const value = staticValue(expression);

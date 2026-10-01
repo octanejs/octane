@@ -834,6 +834,10 @@ export function App(props) @{
 			`useEffect(() => { (async () => { const ready = props.flag ? props.pending : null; await ready; ${write}; })(); });`,
 		],
 		[
+			'a stored await whose other branch awaits',
+			`useEffect(() => { (async () => { const ready = props.flag ? await props.load() : null; await ready; ${write}; })(); });`,
+		],
+		[
 			'a promise that may already be settled',
 			`useEffect(() => { (props.flag ? Promise.resolve() : props.pending).then(() => ${write}); });`,
 		],
@@ -888,6 +892,10 @@ export function App(props) @{
 		[
 			'an await that an undefined operand always runs',
 			`useEffect(() => { let active = true; (async () => { await (undefined ?? (await props.load())); if (active) ${write}; })(); return () => { active = false; }; });`,
+		],
+		[
+			'a stored await whose every branch waits',
+			`useEffect(() => { let active = true; (async () => { const ready = props.flag ? await props.load() : props.pending; await ready; if (active) ${write}; })(); return () => { active = false; }; });`,
 		],
 		[
 			'a conditional await whose every branch waits',
