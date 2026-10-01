@@ -324,7 +324,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			case 'Identifier': {
 				const binding = bindingOf(node);
 				if (node.name === 'undefined' && binding === null) return true;
-				if (binding != null && readBeforeDeclaration(binding, node)) return true;
+				if (binding != null && !varInitialized(binding, node)) return true;
 				const init = depth < 8 ? stableInitOf(node) : null;
 				return init !== null && maySettle(init, depth + 1);
 			}
@@ -340,13 +340,52 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		}
 	}
 
-	// A hoisted `var` read above its declaration in a function may still hold
-	// undefined. Module code finishes before any component runs.
-	function readBeforeDeclaration(binding, reference) {
+	// Where a `var` declarator has run on every path: the rest of the statement
+	// list that holds it, the body of a loop whose head declares it, or the rest
+	// of a `for` statement whose initializer does. Module code finishes before
+	// any component runs. Elsewhere a hoisted `var` may still be undefined.
+	let varRegions = null;
+	function varInitialized(binding, reference) {
 		const info = declarator(binding);
-		if (info?.kind !== 'var') return false;
-		if (functionScopeOf(nodeScopes.get(info.decl))?.kind === 'module') return false;
-		return reference.start < info.decl.start;
+		if (info?.kind !== 'var') return true;
+		if (varRegions === null) {
+			varRegions = new Map();
+			const mark = (declaration, start, end) => {
+				if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'var') return;
+				for (const decl of declaration.declarations ?? []) {
+					varRegions.set(decl, [start ?? decl.end, end]);
+				}
+			};
+			const visit = (node) => {
+				if (node == null || typeof node !== 'object') return;
+				if (Array.isArray(node)) {
+					for (const child of node) visit(child);
+					return;
+				}
+				const list =
+					node.type === 'SwitchCase'
+						? node.consequent
+						: Array.isArray(node.body)
+							? node.body
+							: null;
+				if (list !== null) {
+					for (const statement of list) {
+						mark(statement, node.type === 'Program' ? node.start : null, node.end);
+					}
+				}
+				if (node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
+					mark(node.left, node.body?.start, node.body?.end);
+				} else if (node.type === 'ForStatement') {
+					mark(node.init, null, node.end);
+				}
+				for (const key in node) {
+					if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) visit(node[key]);
+				}
+			};
+			visit(ast);
+		}
+		const region = varRegions.get(info.decl);
+		return region !== undefined && reference.start >= region[0] && reference.end <= region[1];
 	}
 
 	// A promise that may settle without waiting on anything else.
@@ -1279,26 +1318,18 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		},
 		// The stable initializer of a binding declared in the function that reads
 		// it, once that initializer has run on every path to the read: a `const`
-		// or `let` by its temporal dead zone, and a hoisted `var` only when it is
-		// declared directly in the function body above the read.
+		// or `let` by its temporal dead zone, and a hoisted `var` inside the region
+		// where its declaration has run.
 		localInit(expression) {
 			const node = unwrap(expression);
 			if (node?.type !== 'Identifier') return null;
 			const scope = nodeScopes.get(node);
 			const binding = bindingOf(node);
 			if (scope === undefined || binding == null || binding.scope == null) return null;
-			const info = declarator(binding);
-			const fn = functionScopeOf(scope);
-			if (info === null || functionScopeOf(binding.scope) !== fn) return null;
-			if (info.kind === 'var') {
-				// The function body is a block scope directly inside the function scope.
-				const declScope = nodeScopes.get(info.decl);
-				const direct = declScope === fn || (declScope?.kind === 'block' && declScope.parent === fn);
-				if (!direct || node.start < info.decl.end) return null;
-			} else if (info.kind !== 'const' && info.kind !== 'let') {
-				return null;
-			}
-			return stableInit(binding);
+			const kind = declarator(binding)?.kind;
+			if (kind !== 'const' && kind !== 'let' && kind !== 'var') return null;
+			if (functionScopeOf(binding.scope) !== functionScopeOf(scope)) return null;
+			return varInitialized(binding, node) ? stableInit(binding) : null;
 		},
 		// A provably known operand value, as `{ value }`, or null.
 		literal(expression) {
