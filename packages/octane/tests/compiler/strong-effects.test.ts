@@ -227,6 +227,14 @@ describe('Strong asynchronous effect updates', () => {
 			`while (await fetch('/a', { signal })) { await api.get(props.id); setData(1); }`,
 		],
 		[
+			'a finally block after an exiting handler',
+			`await api.warm(); try { await fetch('/a', { signal }); } catch { return; } finally { setData(1); }`,
+		],
+		[
+			'a conditional request without the signal on one side',
+			`const r = await (props.fast ? fetch('/a', { signal }) : api.get(props.id)); setData(r);`,
+		],
+		[
 			'a catch handler after an unsigned request',
 			`try { await fetch('/a', { signal }); } catch { await api.get(props.id); } setData(1);`,
 		],
@@ -257,6 +265,18 @@ describe('Strong asynchronous effect updates', () => {
 			`for (const id of props.ids) { switch (id) { case 0: await api.get(id); continue; default: await fetch('/a', { signal }); break; } setData(id); }`,
 		],
 		['a while test', `while (await fetch('/a', { signal })) { setData(1); }`],
+		[
+			'both sides of a conditional request',
+			`const r = await (props.fast ? fetch('/a', { signal }) : fetch('/b', { signal })); setData(r);`,
+		],
+		[
+			'a conditional request chain',
+			`(props.fast ? fetch('/a', { signal }) : fetch('/b', { signal })).then(setData);`,
+		],
+		[
+			'code after a finally block',
+			`await api.warm(); try { await fetch('/a', { signal }); } catch { return; } finally { api.log(); } setData(1);`,
+		],
 		['a for test', `for (; await fetch('/a', { signal }); ) { setData(1); }`],
 	])('accepts an abort proof that covers %s', (_label, body) => {
 		accepts(app(aborted(body)));

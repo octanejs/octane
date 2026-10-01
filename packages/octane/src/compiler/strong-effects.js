@@ -410,34 +410,56 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		return into;
 	}
 
-	// The call whose promise a continuation follows: the head of a .then chain.
-	function sourceOf(expression, depth = 0) {
-		let node = unwrap(expression);
-		while (node?.type === 'CallExpression') {
-			const callee = unwrap(node.callee);
-			if (callee?.type !== 'MemberExpression' || !CONTINUATIONS.has(memberName(callee))) break;
-			node = unwrap(callee.object);
-		}
-		if (depth < 8 && node?.type === 'AwaitExpression') return sourceOf(node.argument, depth + 1);
-		if (node?.type === 'Identifier' && depth < 8) {
-			const init = stableInitOf(node);
-			if (init !== null) return sourceOf(init, depth + 1);
-		}
-		return node?.type === 'CallExpression' || node?.type === 'NewExpression' ? node : null;
-	}
-
 	// Controllers whose abort rejects the promise a continuation follows: the
 	// request's own signal, or the signal of the request whose result it reads,
-	// as in `(await fetch(url, { signal })).json()`.
+	// as in `(await fetch(url, { signal })).json()`. A value that may come from
+	// either side of a conditional or logical expression keeps the shared ones.
 	function requestControllers(expression, depth = 0) {
-		const source = depth > 8 ? null : sourceOf(expression);
-		if (source === null) return null;
-		let controllers = signalsIn(source.arguments, null);
-		const callee = unwrap(source.callee);
-		if (callee?.type === 'MemberExpression') {
-			const receiver = requestControllers(callee.object, depth + 1);
-			if (receiver !== null)
-				for (const controller of receiver) (controllers ??= new Set()).add(controller);
+		const node = unwrap(expression);
+		if (node == null || depth > 8) return null;
+		switch (node.type) {
+			case 'AwaitExpression':
+				return requestControllers(node.argument, depth + 1);
+			case 'SequenceExpression':
+				return requestControllers(node.expressions?.at(-1), depth + 1);
+			case 'ConditionalExpression':
+				return sharedControllers(
+					requestControllers(node.consequent, depth + 1),
+					requestControllers(node.alternate, depth + 1),
+				);
+			case 'LogicalExpression':
+				return sharedControllers(
+					requestControllers(node.left, depth + 1),
+					requestControllers(node.right, depth + 1),
+				);
+			case 'Identifier': {
+				const init = stableInitOf(node);
+				return init === null ? null : requestControllers(init, depth + 1);
+			}
+			case 'CallExpression':
+			case 'NewExpression': {
+				const callee = unwrap(node.callee);
+				const member = callee?.type === 'MemberExpression';
+				// A .then chain follows the promise at its head.
+				if (node.type === 'CallExpression' && member && CONTINUATIONS.has(memberName(callee))) {
+					return requestControllers(callee.object, depth + 1);
+				}
+				let controllers = signalsIn(node.arguments, null);
+				const receiver = member ? requestControllers(callee.object, depth + 1) : null;
+				if (receiver !== null)
+					for (const controller of receiver) (controllers ??= new Set()).add(controller);
+				return controllers;
+			}
+			default:
+				return null;
+		}
+	}
+
+	function sharedControllers(left, right) {
+		if (left === null || right === null) return null;
+		let controllers = null;
+		for (const controller of left) {
+			if (right.has(controller)) (controllers ??= new Set()).add(controller);
 		}
 		return controllers;
 	}
@@ -446,13 +468,10 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 	// joined code runs in a new segment, so earlier guards no longer hold.
 	function joinFlow(left, right) {
 		if (left === right) return left;
-		let controllers = null;
-		if (left.controllers !== null && right.controllers !== null) {
-			for (const controller of left.controllers) {
-				if (right.controllers.has(controller)) (controllers ??= new Set()).add(controller);
-			}
-		}
-		return { segment: left.segment === right.segment ? left.segment : ++segments, controllers };
+		return {
+			segment: left.segment === right.segment ? left.segment : ++segments,
+			controllers: sharedControllers(left.controllers, right.controllers),
+		};
 	}
 
 	function containsAwait(node) {

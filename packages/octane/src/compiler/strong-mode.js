@@ -4402,11 +4402,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'TryStatement': {
 				const before = currentEffect === null ? undefined : effectPolicy.saveFlow();
 				visit(node.block, scope, phase);
+				const afterBlockFlow = before === undefined ? undefined : effectPolicy.saveFlow();
+				let afterHandlerFlow = afterBlockFlow;
 				if (before !== undefined && node.handler != null) {
 					// The handler can start before or after any yield in the block.
-					const afterBlock = effectPolicy.saveFlow();
+					const afterBlock = afterBlockFlow;
 					effectPolicy.restoreFlow(effectPolicy.joinFlow(before, afterBlock));
 					visit(node.handler, scope, phase);
+					afterHandlerFlow = effectPolicy.saveFlow();
 					// Only a path that completes normally reaches the next statement.
 					const blockExits = branchAlwaysExits(node.block);
 					const handlerExits = branchAlwaysExits(node.handler.body);
@@ -4417,7 +4420,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				} else {
 					visit(node.handler, scope, phase);
 				}
-				visit(node.finalizer, scope, phase);
+				if (before !== undefined && node.finalizer != null) {
+					// finally can follow the block, the handler, or a throw part way
+					// through either, but only normal completion reaches what follows.
+					const completed = effectPolicy.saveFlow();
+					const start = effectPolicy.joinFlow(
+						effectPolicy.joinFlow(before, afterBlockFlow),
+						afterHandlerFlow,
+					);
+					effectPolicy.restoreFlow(start);
+					visit(node.finalizer, scope, phase);
+					if (effectPolicy.saveFlow() === start) effectPolicy.restoreFlow(completed);
+				} else {
+					visit(node.finalizer, scope, phase);
+				}
 				return;
 			}
 			case 'JSXSwitchExpression': {
