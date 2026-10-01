@@ -1016,6 +1016,42 @@ export function App(Deferred) @{ <Deferred when={gate}><b>child</b></Deferred> }
 		).toEqual(new Set());
 	});
 
+	it('limits directive bindings that shadow Hydrate to their own arm', () => {
+		// Only the `@default` arm still renders the imported Hydrate.
+		const arm = `
+import { Hydrate as Deferred } from 'octane';
+import { Custom } from './Custom.tsrx';
+export function App(props) @{
+  @switch (props.kind) {
+    @case 'local': {
+      const Deferred = Custom;
+      <Deferred when={gate}><b>local</b></Deferred>
+    }
+    @default: {
+      <Deferred when={gate}><b>imported</b></Deferred>
+    }
+  }
+}
+`;
+		expect(
+			dynamicImports(compiler().transform(arm, FILE, { environment: 'client' })!.code),
+		).toEqual(new Set(['./App.tsrx?octane-hydrate=0']));
+
+		// `@empty` renders without a row, so the loop binding does not reach it.
+		const empty = `
+import { Hydrate as Deferred } from 'octane';
+export function App(props) @{
+  <ul>
+    @for (const Deferred of props.rows) { <li>{Deferred as string}</li> }
+    @empty { <Deferred when={gate}><b>empty</b></Deferred> }
+  </ul>
+}
+`;
+		expect(
+			dynamicImports(compiler().transform(empty, FILE, { environment: 'client' })!.code),
+		).toEqual(new Set(['./App.tsrx?octane-hydrate=0']));
+	});
+
 	it('preserves nested component hooks and ordinary-function receivers in split children', () => {
 		const source = `
 import { Hydrate, useState } from 'octane';
