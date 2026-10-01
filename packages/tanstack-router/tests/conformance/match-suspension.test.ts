@@ -21,16 +21,17 @@ async function wait(ms: number) {
 	await flush();
 }
 
-// A match that keeps suspending on a settled promise retries on microtasks,
-// where the test timeout can never fire. Every match render reads
-// router.getMatch, so cap it to turn that livelock into a failure.
+// A match that keeps re-suspending retries on microtasks, where the test timeout
+// can never fire. Every match render reads its store via
+// `router.stores.getMatchStore`, so cap it to turn that livelock into a failure.
 function failOnRenderLoop(router: AnyRouter) {
-	const getMatch = router.getMatch;
+	const stores = router.stores as any;
+	const getMatchStore = stores.getMatchStore.bind(stores);
 	let reads = 0;
-	router.getMatch = ((matchId: string) => {
+	stores.getMatchStore = (routeId: string) => {
 		if (++reads > 20_000) throw new Error('route match render loop');
-		return getMatch(matchId);
-	}) as AnyRouter['getMatch'];
+		return getMatchStore(routeId);
+	};
 }
 
 afterEach(() => {
@@ -69,7 +70,7 @@ describe('@octanejs/tanstack-router — match suspension across match states', (
 		// pendingMinMs elapses while the loader is still running.
 		await wait(60);
 
-		expect(router.getMatch(clientMatch.id)?.status).toBe('pending');
+		expect(router.stores.getMatchStore(clientMatch.routeId).get()?.status).toBe('pending');
 		expect(componentRenders).toEqual([]);
 		expect(r.findAll('.client').length).toBe(0);
 		expect(r.findAll('.pending').length).toBe(1);

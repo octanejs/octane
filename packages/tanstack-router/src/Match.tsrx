@@ -1,6 +1,5 @@
 // Renders one route match — port of react-router's Match.tsx (MatchView +
-// MatchInner + OnRendered). `Match` subscribes to the match's routeId and the
-// router's `loadedAt` (the error-boundary reset key), resolves the route's
+// MatchInner). `Match` subscribes to the match's routeId, resolves the route's
 // boundary components, and composes the pipeline exactly like upstream:
 //
 //   Shell > matchContext > Suspense? > CatchBoundary? > CatchNotFound? > MatchInner
@@ -9,22 +8,18 @@
 // component for it — otherwise `SafeFragment` passes through so suspensions and
 // errors bubble to the nearest ancestor boundary (upstream's
 // ResolvedSuspenseBoundary/ResolvedCatchBoundary/ResolvedNotFoundBoundary).
-// `MatchInner` handles the match STATUS: it suspends (a thrown promise, as
-// upstream) on pending/redirected/_displayPending/_forcePending, renders
-// the route's not-found UI for `status === 'notFound'`, throws to the
-// CatchBoundary for `status === 'error'`, and otherwise renders the route
-// component (or `<Outlet/>` for component-less layout routes) keyed by
-// remountDeps. `OnRendered` (rendered by the match directly below the root)
-// emits the router's `onRendered` event after the subtree commits — scroll
-// restoration restores on it.
-import { useRef, useLayoutEffect, createElement, Suspense } from 'octane';
-import {
-	createControlledPromise,
-	getLocationChangeInfo,
-	isNotFound,
-	rootRouteId,
-} from '@tanstack/router-core';
-import type { NotFoundError, ParsedLocation, RootRouteOptions } from '@tanstack/router-core';
+// `MatchInner` handles the match STATUS. router-core 1.171.34 owns the pending
+// lifecycle (pendingMs/pendingMinMs, redirects, min-pending) and exposes a single
+// in-flight transaction: a `pending` match suspends by throwing the transaction's
+// promise (`router._tx[5]`) during a navigation, or renders the route's pending
+// UI otherwise; `notFound` renders the route's not-found UI; `error` throws to the
+// CatchBoundary (server renders the error component inline). Otherwise it renders
+// the route component (or `<Outlet/>` for component-less layout routes) keyed by
+// remountDeps. Per-match error-boundary reset keys off the match object identity
+// (upstream dropped the global `loadedAt` store).
+import { createElement, Suspense } from 'octane';
+import { isNotFound, rootRouteId } from '@tanstack/router-core';
+import type { NotFoundError, RootRouteOptions } from '@tanstack/router-core';
 import type { ErrorInfo, ErrorRouteComponent } from './route.ts';
 import { useStore } from './useStore.ts';
 import { useRouter, matchContext as MatchContext } from './context.ts';
@@ -36,20 +31,19 @@ import { SafeFragment } from './SafeFragment.tsrx';
 import { ClientOnly } from './ClientOnly.tsrx';
 import { ScrollRestorationScript } from './scroll-restoration.tsrx';
 
-export function Match(props: { matchId: string }) @{
+export function Match(props: { routeId: string }) @{
 	const router = useRouter();
-	const matchStore = router.stores.matchStores.get(props.matchId)!;
-	const resetKey = useStore(router.stores.loadedAt, (l: any) => l as number | string);
+	// router-core 1.171.34 keys match stores by routeId (`byRoute`/`getMatchStore`),
+	// not by match-instance id, and dropped the global `loadedAt` reset store —
+	// upstream now resets each route's error boundary on its match object identity.
+	const matchStore = router.stores.getMatchStore(props.routeId);
 	const matchState = useStore(
 		matchStore,
 		(m: any) => ({
 			routeId: m.routeId,
 			ssr: m.ssr,
-			_displayPending: m._displayPending,
 		}),
-		(previous, next) =>
-			previous.routeId === next.routeId && previous.ssr === next.ssr &&
-				previous._displayPending === next._displayPending,
+		(previous, next) => previous.routeId === next.routeId && previous.ssr === next.ssr,
 	);
 	const routeId = matchState.routeId as string;
 	const route = (router.routesById as Record<string, any>)[routeId];
@@ -83,10 +77,10 @@ export function Match(props: { matchId: string }) @{
 	const parentRouteId = route.parentRoute?.id;
 
 	<ShellComponent>
-		<MatchContext value={props.matchId}>
+		<MatchContext value={props.routeId}>
 			<SuspenseWrap fallback={pendingElement}>
 				<CatchWrap
-					getResetKey={() => resetKey}
+					getResetKey={() => matchStore.get()}
 					errorComponent={routeErrorComponent || ErrorComponent}
 					onCatch={(error: Error, errorInfo: ErrorInfo) => {
 						if (isNotFound(error)) {
@@ -109,86 +103,29 @@ export function Match(props: { matchId: string }) @{
 							return createElement(routeNotFoundComponent, error as any);
 						}}
 					>
-						@if (resolvedNoSsr || matchState._displayPending) {
+						@if (resolvedNoSsr) {
 							<ClientOnly fallback={pendingElement}>
-								<MatchInner matchId={props.matchId} />
+								<MatchInner routeId={props.routeId} />
 							</ClientOnly>
 						} @else {
-							<MatchInner matchId={props.matchId} />
+							<MatchInner routeId={props.routeId} />
 						}
 					</NotFoundWrap>
 				</CatchWrap>
 			</SuspenseWrap>
 		</MatchContext>
-		@if (parentRouteId === rootRouteId) {
-			<>
-				<OnRendered />
-				@if (router.options.scrollRestoration) {
-					<ScrollRestorationScript />
-				}
-			</>
+		@if (parentRouteId === rootRouteId && router.options.scrollRestoration) {
+			<ScrollRestorationScript />
 		}
 	</ShellComponent>
 }
 
-function MatchInner(props: { matchId: string }) {
+function MatchInner(props: { routeId: string }) {
 	const router = useRouter();
-	const matchStore = router.stores.matchStores.get(props.matchId)!;
+	const matchStore = router.stores.getMatchStore(props.routeId);
 	const match = useStore(matchStore, (m: any) => m);
 	const routeId = match.routeId as string;
 	const route = (router.routesById as Record<string, any>)[routeId];
-
-	// The live match in the router (if still mounted there) wins over the
-	// snapshot for promise lookups, per upstream getMatchPromise.
-	const getMatchPromise = (key: 'displayPendingPromise' | 'minPendingPromise' | 'loadPromise') =>
-		router.getMatch(match.id)?._nonReactive[key] ?? match._nonReactive[key];
-
-	// Suspend by throwing, like upstream, not with `use()`. Each match state
-	// waits on a different promise, and `use()` is positional: a replay that
-	// finds the match in a new state would get the promise stored for the old
-	// one. Router-core's promises settle to `status: 'resolved'`, which `use()`
-	// reads as still pending, so that stored promise retries forever.
-	if (match._displayPending) {
-		throw getMatchPromise('displayPendingPromise')!;
-	}
-
-	if (match._forcePending) {
-		throw getMatchPromise('minPendingPromise')!;
-	}
-
-	if (match.status === 'pending') {
-		// Once pending UI shows, keep it up for at least pendingMinMs.
-		const pendingMinMs = route.options.pendingMinMs ?? router.options.defaultPendingMinMs;
-		if (pendingMinMs) {
-			const routerMatch = router.getMatch(match.id);
-			if (routerMatch && !routerMatch._nonReactive.minPendingPromise) {
-				const minPendingPromise = createControlledPromise<void>();
-				routerMatch._nonReactive.minPendingPromise = minPendingPromise;
-				setTimeout(() => {
-					minPendingPromise.resolve();
-					routerMatch._nonReactive.minPendingPromise = undefined;
-				}, pendingMinMs);
-			}
-		}
-		throw getMatchPromise('loadPromise')!;
-	}
-
-	if (match.status === 'notFound') {
-		return createElement(RouteNotFound, { routeId, error: match.error });
-	}
-
-	if (match.status === 'redirected') {
-		// Observed mid-transition while a redirect is in flight — stay suspended so
-		// this stale render is abandoned and the redirect completes.
-		const atom = matchStore as unknown as Partial<MatchAtom>;
-		throw typeof atom.subscribe === 'function'
-			? nextMatchUpdate(atom as MatchAtom, match)
-			: getMatchPromise('loadPromise')!;
-	}
-
-	if (match.status === 'error') {
-		throw match.error;
-	}
 
 	const Comp = route.options.component ?? router.options.defaultComponent;
 	const remountFn = route.options.remountDeps ?? router.options.defaultRemountDeps;
@@ -203,75 +140,52 @@ function MatchInner(props: { matchId: string }) {
 			: undefined;
 	const key =
 		remountDeps ? JSON.stringify(remountDeps) : undefined;
-	if (Comp) return createElement(Comp, key !== undefined ? { key } : {});
-	return createElement(Outlet, {});
-}
+	const out =
+		Comp ? createElement(Comp, key !== undefined ? { key } : {}) : createElement(Outlet, {});
 
-interface MatchAtom {
-	get: () => object;
-	subscribe: (cb: () => void) => { unsubscribe: () => void };
-}
-
-const matchUpdates = new WeakMap<object, Promise<void>>();
-
-// Settles on the first store update after `snapshot`. A redirected match waits
-// on this, not on its loadPromise: router-core resolves that promise when it
-// marks the redirect, and a settled promise retries on a microtask until the
-// redirect target has loaded, starving the timers and network callbacks that
-// load waits on. React's scheduler paces those retries; Octane's retry does
-// not. Server atoms cannot subscribe, so the server keeps upstream's promise:
-// a server redirect is answered before the app renders.
-function nextMatchUpdate(store: MatchAtom, snapshot: object): Promise<void> {
-	let update = matchUpdates.get(snapshot);
-	if (update === undefined) {
-		update = new Promise<void>((resolve) => {
-			const subscription = store.subscribe(() => {
-				subscription.unsubscribe();
-				resolve();
-			});
-			// The store may have moved on between this render and the subscription.
-			if (store.get() !== snapshot) {
-				subscription.unsubscribe();
-				resolve();
-			}
-		});
-		matchUpdates.set(snapshot, update);
+	if (match.status === 'pending') {
+		// router-core owns the pending lifecycle (pendingMs, pendingMinMs, redirects
+		// and min-pending timing). During an in-flight navigation a pending match
+		// suspends on the transaction's promise so the current page holds; outside a
+		// transaction (e.g. an initial client load) it shows the route's pending UI.
+		//
+		// OCTANE DIVERGENCE: a client-only (`ssr: false`/`data-only`) pending match
+		// renders its pending UI in place inside <ClientOnly> rather than throwing
+		// to the outer Suspense. Octane's Suspense keeps the suspended subtree's DOM
+		// hidden on fallback, so throwing would leave the hidden <ClientOnly>
+		// fallback in the tree alongside the visible Suspense fallback — two pending
+		// elements. React's <ClientOnly> swaps fallback→children, so upstream can
+		// always throw.
+		const resolvedNoSsr = match.ssr === false || match.ssr === 'data-only';
+		const tx = (router as any)._tx;
+		if (tx && !resolvedNoSsr) throw tx[5];
+		return pendingElementFor(router, route);
 	}
-	return update;
-}
 
-// Emits the router's `onRendered` event once the subtree below the root layout
-// has committed (this component renders as a later sibling of the match content,
-// so its layout effect runs after the subtree's). Tracks the previously-resolved
-// location in a ref because by effect time Transitioner has already advanced
-// `resolvedLocation` to the new location.
-function OnRendered() @{
-	const router = useRouter();
-	const prevResolvedLocationRef = useRef<ParsedLocation<any> | undefined>(undefined);
-	const renderedLocationKey = useStore(
-		router.stores.resolvedLocation,
-		(loc: ParsedLocation<any> | undefined) => loc?.state.__TSR_key,
-	);
+	if (match.status === 'notFound') {
+		return createElement(RouteNotFound, { routeId, error: match.error });
+	}
 
-	useLayoutEffect(() => {
-		const currentResolvedLocation = router.stores.resolvedLocation.get();
-		const previousResolvedLocation = prevResolvedLocationRef.current;
-
-		if (
-			currentResolvedLocation &&
-				(!previousResolvedLocation ||
-					previousResolvedLocation.href !== currentResolvedLocation.href)
-		) {
-			router.emit({
-				type: 'onRendered',
-				...getLocationChangeInfo(
-					router.stores.location.get(),
-					previousResolvedLocation ?? currentResolvedLocation,
-				),
+	if (match.status === 'error') {
+		// On the server there is no CatchBoundary to catch a throw, so render the
+		// error component inline (upstream MatchInner does the same); on the client
+		// throw to the nearest CatchBoundary.
+		if ((router as any).isServer) {
+			const ErrorComp =
+				(route.options.errorComponent ?? router.options.defaultErrorComponent) || ErrorComponent;
+			return createElement(ErrorComp as any, {
+				error: match.error,
+				reset: undefined,
+				info: { componentStack: '' },
 			});
 		}
-		prevResolvedLocationRef.current = currentResolvedLocation;
-	}, [renderedLocationKey, router]);
+		throw match.error;
+	}
 
-	<></>
+	return out;
+}
+
+function pendingElementFor(router: any, route: any) {
+	const PendingComponent = route.options.pendingComponent ?? router.options.defaultPendingComponent;
+	return PendingComponent ? createElement(PendingComponent, {}) : null;
 }

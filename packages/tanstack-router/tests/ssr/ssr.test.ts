@@ -41,8 +41,13 @@ describe('@octanejs/tanstack-router SSR', () => {
 		);
 		expect(normalizedHtml).toContain('<script src="/entry.js"');
 		expect(normalizedHtml).toContain('globalThis.__octaneRouterSsr=true');
-		expect(normalizedHtml).not.toContain('document.currentScript.remove()');
-		expect(normalizedHtml).toContain('</script></div></body></html>');
+		// router-core 1.171.34's hydration scripts self-remove (`document.currentScript
+		// .remove()`) as part of its streaming-cleanup format; this is injected by the
+		// router's own transform and octane hydration adopts the app range without
+		// those scripts. (The former assertion that the output contained no self-remove
+		// pinned Octane's old native-injection behavior.) Real SSR+hydration is covered
+		// by the rsbuild integration test and the document-hydration suite.
+		expect(normalizedHtml).toContain('</body></html>');
 	});
 
 	it("keeps independently rendered document managers from claiming one another's assets", async () => {
@@ -207,7 +212,10 @@ describe('@octanejs/tanstack-router SSR', () => {
 		await router.load();
 		await router.serverSsr.dehydrate();
 
-		const response = await renderRouterToStream({
+		// router-core 1.171.34's streaming handler returns a stream-response wrapper
+		// ({ response, dispose }) so the request handler can tear down the stream on
+		// cleanup; a direct caller unwraps `.response`.
+		const streamResult = await renderRouterToStream({
 			request: new Request('http://localhost/', {
 				headers: { 'user-agent': 'Mozilla/5.0' },
 			}),
@@ -215,6 +223,10 @@ describe('@octanejs/tanstack-router SSR', () => {
 			responseHeaders: new Headers({ 'content-type': 'text/html' }),
 			App: RouterServer,
 		});
+		const response =
+			streamResult instanceof Response
+				? streamResult
+				: (streamResult as { response: Response }).response;
 		const html = await response.text();
 		const doctype = html.indexOf('<!DOCTYPE html>');
 		const document = html.indexOf('<html');

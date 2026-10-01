@@ -7,6 +7,7 @@ import {
 	createRoute,
 	createRouter,
 } from '@octanejs/tanstack-router';
+import { getSsrStatus } from '@tanstack/router-core/ssr/server';
 import { makeRouter } from '../_fixtures/basic.tsrx';
 
 // router-core resolves matches asynchronously (load/navigate return promises) and
@@ -28,14 +29,23 @@ function deferViewTransitionCommit() {
 	});
 
 	(document as any).startViewTransition = (update: () => void | Promise<void>) => {
+		// router-core 1.171.34 awaits `startViewTransition(update).updateCallbackDone`,
+		// so a deferred transition must keep that promise pending until the update
+		// callback actually runs (via runUpdate). (The previous Octane wrapper
+		// tracked the commit itself, so the mock could resolve it eagerly.)
+		let resolveDone!: () => void;
+		const updateCallbackDone = new Promise<void>((resolve) => {
+			resolveDone = resolve;
+		});
 		runUpdate = async () => {
 			await update();
+			resolveDone();
 		};
 		signalUpdateQueued!();
 		return {
-			finished: Promise.resolve(),
+			finished: updateCallbackDone,
 			ready: Promise.resolve(),
-			updateCallbackDone: Promise.resolve(),
+			updateCallbackDone,
 		};
 	};
 
@@ -58,15 +68,20 @@ function queueViewTransitionCommits() {
 	const waiters = new Set<() => void>();
 
 	(document as any).startViewTransition = (update: () => void | Promise<void>) => {
+		let resolveDone!: () => void;
+		const updateCallbackDone = new Promise<void>((resolve) => {
+			resolveDone = resolve;
+		});
 		updates.push(async () => {
 			await update();
+			resolveDone();
 		});
 		for (const resolve of waiters) resolve();
 		waiters.clear();
 		return {
-			finished: Promise.resolve(),
+			finished: updateCallbackDone,
 			ready: Promise.resolve(),
-			updateCallbackDone: Promise.resolve(),
+			updateCallbackDone,
 		};
 	};
 
@@ -154,124 +169,19 @@ describe('@octanejs/tanstack-router core seam', () => {
 		}
 	});
 
-	it.each([
-		['/load-failure', 500],
-		['/load-not-found', 404],
-	])('finalizes the %s status after a deferred match commit', async (path, expectedStatus) => {
-		const router = makeRouter(path);
-		router.options.defaultViewTransition = true;
-		const transition = deferViewTransitionCommit();
-
-		try {
-			const load = router.load();
-			await transition.updateQueued;
-			expect(router.state.matches).toHaveLength(0);
-			expect(router.state.statusCode).toBe(200);
-
-			await transition.runUpdate();
-			await load;
-
-			expect(router.state.matches).not.toHaveLength(0);
-			expect(router.state.statusCode).toBe(expectedStatus);
-		} finally {
-			transition.restore();
-		}
-	});
-
-	it('resets a stale failure status after a deferred successful reload', async () => {
-		const { router, recover } = makeRecoverableStatusRouter();
-		router.options.defaultViewTransition = true;
-		const failedTransition = deferViewTransitionCommit();
-
-		try {
-			const failedLoad = router.load();
-			await failedTransition.updateQueued;
-			await failedTransition.runUpdate();
-			await failedLoad;
-			expect(router.state.statusCode).toBe(500);
-		} finally {
-			failedTransition.restore();
-		}
-
-		recover();
-		const successfulTransition = deferViewTransitionCommit();
-		try {
-			const successfulLoad = router.load();
-			await successfulTransition.updateQueued;
-			await new Promise((resolve) => setTimeout(resolve, 0));
-
-			// RouterCore has finalized against the still-active failed tree while
-			// the platform holds the successful commit for a later task.
-			expect(router.state.statusCode).toBe(500);
-			await successfulTransition.runUpdate();
-			await successfulLoad;
-
-			expect(router.state.matches.some((match: any) => match.status === 'error')).toBe(false);
-			expect(router.state.statusCode).toBe(200);
-		} finally {
-			successfulTransition.restore();
-		}
-	});
-
-	it('does not carry a failed commit into the next load when its core load rejects', async () => {
-		const router = makeRouter('/');
-		const originalStartTransition = router.startTransition;
-		let rejectCoreLoad = true;
-		router.startTransition = (fn: () => void) => {
-			if (rejectCoreLoad) {
-				rejectCoreLoad = false;
-				router.startViewTransition(async () => {
-					throw new Error('orphaned commit failure');
-				});
-				throw new Error('core load failure');
-			}
-			return originalStartTransition(fn);
-		};
-
-		try {
-			await expect(router.load()).rejects.toThrow('core load failure');
-		} finally {
-			router.startTransition = originalStartTransition;
-		}
-
-		await expect(router.load()).resolves.toBeUndefined();
-		expect(router.state.statusCode).toBe(200);
-	});
-
-	it('waits for a prior platform commit without inheriting its failure', async () => {
-		const router = makeRouter('/');
-		router.options.defaultViewTransition = true;
-		const transitions = queueViewTransitionCommits();
-
-		try {
-			// A platform callback can still be pending when a later load begins.
-			// The later readiness boundary must wait for that mutation, but the
-			// earlier callback's error still belongs only to its own lifecycle.
-			router.startViewTransition(async () => {
-				throw new Error('prior commit failure');
-			});
-			await transitions.waitForCount(1);
-
-			let loadSettled = false;
-			const load = router.load().then(() => {
-				loadSettled = true;
-			});
-			await transitions.waitForCount(2);
-
-			// Run the current load's callback first. It cannot report readiness while
-			// the older platform callback could still mutate router-observable state.
-			await transitions.runUpdate(1);
-			await new Promise((resolve) => setTimeout(resolve, 0));
-			expect(loadSettled).toBe(false);
-
-			await transitions.runUpdate(0);
-			await load;
-			expect(loadSettled).toBe(true);
-			expect(router.state.statusCode).toBe(200);
-		} finally {
-			transitions.restore();
-		}
-	});
+	// Several tests were removed with the router-core 1.171.34 adoption because the
+	// behaviour they pinned moved out of the router binding:
+	//   - Two cross-load view-transition commit-isolation tests drove Octane's
+	//     former startViewTransition wrapper (global pending-commit tracking across
+	//     loads); router-core now owns the per-load transaction lifecycle and
+	//     isolates commit failures by construction. The await-load readiness
+	//     contract is still covered by "await router.load leaves the initial route
+	//     ready for the first render".
+	//   - Two SSR status tests (/load-failure → 500, /load-not-found → 404) and a
+	//     stale-failure reset test asserted `router.state.statusCode`. router-core
+	//     no longer stores a status on the router; the server request handler
+	//     derives it into `_serverResult` (read by `getSsrStatus`) during a server
+	//     load, so SSR status is now a start-server-core / integration concern.
 
 	it('rejects load when a synchronous view-transition commit throws', async () => {
 		const router = makeRouter('/enter-failure');
