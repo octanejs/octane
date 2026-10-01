@@ -647,6 +647,34 @@ describe('Strong stale deferred state updates', () => {
 			`export function A({ save }) { const tuple = useState(0); const apply = useEffectEvent(([value, set]) => set(value + 1)); return <b onClick={async () => { await save(); apply(tuple); }}>{tuple[0]}</b>; }`,
 		],
 		[
+			'a derived value passed to an Effect Event after await',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value)); return <b onClick={async () => { const next = n + 1; await save(); apply(next); }}>{n}</b>; }`,
+		],
+		[
+			'an expression passed to an Effect Event after await',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value)); return <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b>; }`,
+		],
+		[
+			'an expression passed to an Effect Event from an effect timer',
+			`export function A() { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value)); useEffect(() => { const id = setTimeout(() => apply(n + 1), 100); return () => clearTimeout(id); }); return <b>{n}</b>; }`,
+		],
+		[
+			'an expression passed to a helper after await',
+			`export function A({ save }) { const [n, setN] = useState(0); function apply(value) { setN(value); } return <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b>; }`,
+		],
+		[
+			'an awaited snapshot passed to an inline callback',
+			`export function A() { const [n, setN] = useState(0); return <b onClick={async () => { ((apply, value) => apply(value))(setN, await Promise.resolve(n)); }}>{n}</b>; }`,
+		],
+		[
+			'state read after an await inside an Effect Event',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent(async () => { await save(); setN(n + 1); }); return <b onClick={() => apply()}>{n}</b>; }`,
+		],
+		[
+			'state read after an await inside an Effect Event called from a timer',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent(async () => { await save(); setN(n + 1); }); useEffect(() => { setTimeout(() => apply(), 100); }); return <b>{n}</b>; }`,
+		],
+		[
 			'a timer created inside an Effect Event',
 			`export function A() { const [n, setN] = useState(0); const later = useEffectEvent(() => { setTimeout(() => setN(n + 1), 100); }); useEffect(() => later()); return <b>{n}</b>; }`,
 		],
@@ -735,6 +763,7 @@ describe('Strong stale deferred state updates', () => {
   const viaHelper = useEffectEvent(() => bump());
   const viaCapturedArgument = useEffectEvent(() => set(n));
   const viaImmediateCall = useEffectEvent(() => { (() => setN(n + 1))(); });
+  const apply = useEffectEvent((value) => setN(value));
   useEffect(() => {
     const id = setInterval(tick, 1000);
     setTimeout(step, 500);
@@ -744,7 +773,7 @@ describe('Strong stale deferred state updates', () => {
     load().then(() => tick());
     return () => clearInterval(id);
   });
-  return <b onClick={() => setTimeout(() => tick(), 100)}>{n}</b>;
+  return <b onClick={() => { apply(n + 1); set(n + 1); setTimeout(() => tick(), 100); }}>{n}</b>;
 }`),
 			),
 		).toBeNull();

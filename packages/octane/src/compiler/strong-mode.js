@@ -3299,6 +3299,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			// helper's parameter is supplied by callers, independently of spelling.
 			if (value?.kind === 'prop') return OTHER_BINDING;
 			if (value?.kind === 'derived-state' && value.prop) return { ...value, prop: false };
+			if (value?.kind === 'other') {
+				// A value computed from state at the call site, like `apply(n + 1)`,
+				// carries that state as a derived local would.
+				const states = projectedStates(argument, scope);
+				if (states !== null)
+					return { kind: 'derived-state', states, prop: false, init: argument, scope };
+			}
 			return value;
 		});
 	}
@@ -4673,9 +4680,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				} else if (hook === null) {
 					// Deferred code can reach a state update through a local helper, and
 					// any helper can write to a state value passed to it, directly or
-					// through its tuple. An Effect Event is followed only for the state
-					// it receives: its body reads captured state as current, and a
-					// snapshot passed in from deferred code is tagged stale.
+					// through its tuple. An Effect Event body reads captured state as
+					// current, so it is followed only for the state it receives.
 					let callback = callableValue(callee, scope);
 					const effectEvent = callback?.kind === 'effect-event';
 					if (effectEvent) callback = callback.callback;
@@ -4683,7 +4689,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						const args = argumentValues(node.arguments, scope);
 						if (
 							(executionPhase === 'deferred' && !effectEvent) ||
-							args?.some((value) => value?.kind === 'snapshot' || value?.kind === 'state-tuple')
+							args?.some(
+								(value) =>
+									value?.kind === 'snapshot' ||
+									value?.kind === 'state-tuple' ||
+									(effectEvent && value?.kind === 'derived-state'),
+							)
 						) {
 							if (effectEvent) visitEffectEventCallback(callback, callee, executionPhase, args);
 							else visitSynchronousCall(callback, callee, executionPhase, args);
