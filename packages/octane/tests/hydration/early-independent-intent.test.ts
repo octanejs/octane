@@ -405,6 +405,111 @@ export function App() @{
 			ordinary,
 		);
 	});
+	it('extends a captured island press with opted-in movement and cancellation once the client claims capture', async () => {
+		const ownerDocument = await earlyDocument();
+		const widget = boundary(ownerDocument, 'press-lifecycle');
+		widget.setAttribute(
+			'data-octane-hydrate-interaction-events',
+			'pointerdown pointermove pointerup pointercancel',
+		);
+		const target = widget.firstElementChild!;
+		const pointer = (type: string): PointerEvent => {
+			const event = new PointerEvent(type, {
+				bubbles: true,
+				cancelable: type !== 'pointercancel',
+				pointerId: 7,
+			});
+			target.dispatchEvent(event);
+			return event;
+		};
+		const propagated: Event[] = [];
+		const onBubble = (event: Event) => propagated.push(event);
+		for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+			ownerDocument.addEventListener(type, onBubble);
+		}
+
+		// The renderer-free inline queue captures activation and release only.
+		const hover = pointer('pointermove');
+		const down = pointer('pointerdown');
+		const inlineMove = pointer('pointermove');
+		const up = pointer('pointerup');
+		initializeIndependentHydrationEventCapture(ownerDocument);
+		const secondDown = pointer('pointerdown');
+		const move = pointer('pointermove');
+		const cancel = pointer('pointercancel');
+
+		expectEvents(
+			takePendingHydrationIntents(widget)?.map((intent) => intent.event),
+			[down, up, secondDown, move, cancel],
+		);
+		expectEvents(propagated, [hover, inlineMove]);
+		expect(
+			[hover, down, inlineMove, up, secondDown, move].map((event) => event.defaultPrevented),
+		).toEqual([false, false, false, false, false, false]);
+	});
+
+	it('hands a loading island its press lifecycle, and never restarts a failed load on movement', async () => {
+		const ownerDocument = await earlyDocument();
+		const widget = boundary(ownerDocument, 'press-loading');
+		widget.setAttribute(
+			'data-octane-hydrate-interaction-events',
+			'pointerdown pointermove pointerup pointercancel',
+		);
+		const target = widget.firstElementChild!;
+		const pointer = (type: string): PointerEvent => {
+			const event = new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 9 });
+			target.dispatchEvent(event);
+			return event;
+		};
+		const attempts: Array<{
+			resolve(module: Record<string, unknown>): void;
+			reject(error: unknown): void;
+		}> = [];
+		const load = vi.fn(
+			() =>
+				new Promise<Record<string, unknown>>((resolve, reject) =>
+					attempts.push({ resolve, reject }),
+				),
+		);
+		const onError = vi.fn();
+		const activated: Event[] = [];
+		const cleanup = registerIndependentHydrationIsland(widget, widgetManifest('press-loading'), {
+			load,
+			loadStyles() {},
+			onError,
+		});
+		try {
+			pointer('pointermove');
+			expect(load).not.toHaveBeenCalled();
+			const firstDown = pointer('pointerdown');
+			await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
+			attempts[0].reject(new Error('offline'));
+			await vi.waitFor(() => expect(onError).toHaveBeenCalledOnce());
+
+			// The failed load keeps the press for a retry. Its movement and
+			// cancellation extend it but do not retry the load themselves.
+			const firstMove = pointer('pointermove');
+			const firstCancel = pointer('pointercancel');
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(load).toHaveBeenCalledOnce();
+
+			const down = pointer('pointerdown');
+			const move = pointer('pointermove');
+			const up = pointer('pointerup');
+			await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+			attempts[1].resolve({
+				default({ intents }: { intents: readonly { event: Event }[] }) {
+					activated.push(...intents.map((intent) => intent.event));
+				},
+			});
+			await vi.waitFor(() =>
+				expectEvents(activated, [firstDown, firstMove, firstCancel, down, move, up]),
+			);
+		} finally {
+			cleanup();
+		}
+	});
+
 	it('does not charge signal-only streaming responses for independent capture', async () => {
 		enableServerSignalBindings();
 		const query$ = __queryAt(

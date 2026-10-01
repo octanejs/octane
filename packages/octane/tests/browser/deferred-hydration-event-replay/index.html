@@ -4,10 +4,25 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Octane deferred hydration event replay</title>
+		<style>
+			#press-lifecycle button {
+				display: block;
+				width: 200px;
+				height: 80px;
+			}
+			#press-hold {
+				touch-action: none;
+			}
+			#press-spacer {
+				height: 3000px;
+			}
+		</style>
 	</head>
 	<body>
 		<div id="root"><!--octane-ssr--></div>
 		<div id="editor-root"><!--octane-editor-ssr--></div>
+		<div id="press-root"><!--octane-press-ssr--></div>
+		<div id="press-spacer"></div>
 		<script type="module" src="/main.ts"></script>
 	</body>
 </html>

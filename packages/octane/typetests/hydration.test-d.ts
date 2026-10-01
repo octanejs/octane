@@ -88,6 +88,7 @@ interaction({
 		'touchend',
 	],
 });
+interaction({ events: ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] });
 // @ts-expect-error — only replay-safe intent events are supported
 interaction({ events: 'scroll' });
 
