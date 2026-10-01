@@ -1,4 +1,4 @@
-import { Hydrate, type HydrateProps } from 'octane';
+import { Hydrate, type HydrateProps, use } from 'octane';
 
 type ReplayProps = { when: HydrateProps['when']; onHydrated?: () => void };
 type NestedReplayProps = {
@@ -34,5 +34,27 @@ export function DeferredHydrationPressLifecycle(props: ReplayProps) @{
 			<button id="press-hold">{'Hold'}</button>
 			<button id="press-pan">{'Pan'}</button>
 		</div>
+	</Hydrate>
+}
+
+type AncestorActivationProps = {
+	outerWhen: HydrateProps['when'];
+	innerWhen: HydrateProps['when'];
+	suspend: boolean;
+	promise?: Promise<void>;
+	onOuterHydrated?: () => void;
+};
+
+function SuspendingAncestorChild(props: { suspend: boolean; promise?: Promise<void> }) @{
+	if (props.suspend) use(props.promise!);
+	<span id="press-ancestor-content">{'Ancestor content'}</span>
+}
+
+export function AncestorActivationPressLifecycle(props: AncestorActivationProps) @{
+	<Hydrate when={props.outerWhen} split={false} onHydrated={props.onOuterHydrated}>
+		<SuspendingAncestorChild suspend={props.suspend} promise={props.promise} />
+		<Hydrate when={props.innerWhen} split={false}>
+			<button id="press-ancestor-hover">{'Hover'}</button>
+		</Hydrate>
 	</Hydrate>
 }

@@ -416,6 +416,51 @@ describe('deferred hydration contract edges', () => {
 		);
 	});
 
+	it('leaves movement alone while an ancestor activates for a reason other than a press', async () => {
+		const pending = deferred<void>();
+		const innerWhen = interaction({ events: POINTER_LIFECYCLE });
+		const serverProps = { outerWhen: condition(false), innerWhen, suspend: false };
+		container.innerHTML = renderToString(
+			eventReplayServer.AncestorActivationPressLifecycle,
+			serverProps,
+		).html;
+		const hover = container.querySelector('#press-ancestor-hover')!;
+		const onOuterHydrated = vi.fn();
+		const clientProps = {
+			...serverProps,
+			suspend: true,
+			promise: pending.promise,
+			onOuterHydrated,
+		};
+		root = hydrateRoot(container, eventReplayClient.AncestorActivationPressLifecycle, clientProps);
+		flushSync(() => {});
+		flushEffects();
+		root.render(eventReplayClient.AncestorActivationPressLifecycle, {
+			...clientProps,
+			outerWhen: condition(true),
+		});
+		flushSync(() => {});
+		flushEffects();
+		expect(onOuterHydrated).not.toHaveBeenCalled();
+
+		// The ancestor is waking, but no press was captured: the nested
+		// boundary's movement selection must not turn hover into intent.
+		const propagation = observePropagation(document);
+		let move: PointerEvent;
+		try {
+			move = dispatchPointer(hover, 'pointermove', 1);
+			dispatchPointer(hover, 'pointercancel', 2);
+		} finally {
+			propagation.stop();
+		}
+		expect(propagation.types).toEqual(['pointermove', 'pointercancel']);
+		expect(move.defaultPrevented).toBe(false);
+
+		await act(() => pending.resolve());
+		expect(onOuterHydrated).toHaveBeenCalledOnce();
+		expect(container.querySelector('#press-ancestor-hover')).toBe(hover);
+	});
+
 	it('listens for pointer movement only after an opted-in boundary captures intent', () => {
 		const iframe = document.createElement('iframe');
 		document.body.appendChild(iframe);
