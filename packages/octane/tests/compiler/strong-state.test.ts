@@ -8,6 +8,7 @@ const SNAPSHOT_MUTATION = 'OCTANE_STRONG_SNAPSHOT_MUTATION';
 const RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
 const STALE_STATE_UPDATE = 'OCTANE_STRONG_STALE_STATE_UPDATE';
 const WRITE_ONLY_STATE = 'OCTANE_STRONG_WRITE_ONLY_STATE';
+const UNCACHED_STORE_SNAPSHOT = 'OCTANE_STRONG_UNCACHED_STORE_SNAPSHOT';
 
 const IMPORTS =
 	"import { useState, useReducer, useLinkedState, useEffect, useRef, useSyncExternalStore, useOptimistic, useEffectEvent } from 'octane';";
@@ -60,11 +61,13 @@ function expectUnchangedOutput(source: string, filename: string): void {
 it('does not mistake receivers named after Object.prototype members for known globals', () => {
 	expect(
 		strongCode(
-			tsx(`export function A({ value }) {
+			tsx(`export function A({ value, store }) {
   const [items, setItems] = useState([]);
+  const snapshot = useSyncExternalStore(store.subscribe, () => constructor.keys(store));
   return (
     <b onClick={() => { toString.call(items); hasOwnProperty.call(items, 'length'); setItems((current) => valueOf.call(current)); }}>
       {items.length}
+      {String(snapshot)}
       {String(value)}
     </b>
   );
@@ -363,6 +366,34 @@ describe('Strong state mutation outside render', () => {
 			`export function A() { const tuple = useState([]); return <b onClick={() => { tuple[0].push(1); tuple[1]([...tuple[0]]); }}>{tuple[0].length}</b>; }`,
 		],
 		[
+			'a tuple passed to a helper',
+			`function add(pair) { pair[0].push(1); } export function A() { const tuple = useState([]); return <b onClick={() => { add(tuple); tuple[1]([...tuple[0]]); }}>{tuple[0].length}</b>; }`,
+		],
+		[
+			'a destructured tuple parameter',
+			`function add([items, setItems]) { items.push(1); setItems([...items]); } export function A() { const tuple = useState([]); return <b onClick={() => add(tuple)}>{tuple[0].length}</b>; }`,
+		],
+		[
+			'an object-destructured tuple parameter with a default',
+			`function add({ 0: items = [] }) { items.push(1); } export function A() { const tuple = useState([]); return <b onClick={() => add(tuple)}>{tuple[0].length}</b>; }`,
+		],
+		[
+			'an Effect Event called with the state',
+			`export function A() { const [items, setItems] = useState([]); const add = useEffectEvent((list) => { list.push(1); }); return <b onClick={() => { add(items); setItems([...items]); }}>{items.length}</b>; }`,
+		],
+		[
+			'a helper parameter with a default',
+			`function add(list = []) { list.push(1); return list; } export function A() { const [items, setItems] = useState([]); return <b onClick={() => setItems([...add(items)])}>{items.length}</b>; }`,
+		],
+		[
+			'a destructured helper parameter with a default',
+			`function add({ list } = { list: [] }) { list.push(1); } export function A() { const [s, setS] = useState({ list: [] }); return <b onClick={() => { add(s); setS({ ...s }); }}>{s.list.length}</b>; }`,
+		],
+		[
+			'a linked-state array',
+			`export function A(props) { const [items, setItems] = useLinkedState(props.id, () => []); return <b onClick={() => { items.push(1); setItems([...items]); }}>{items.length}</b>; }`,
+		],
+		[
 			'an updater that mutates the state it receives',
 			`export function A() { const [items, setItems] = useState([]); return <b onClick={() => setItems((prev) => { prev.push(1); return prev; })}>{items.length}</b>; }`,
 		],
@@ -377,6 +408,14 @@ describe('Strong state mutation outside render', () => {
 		[
 			'a useOptimistic reducer that mutates its base state',
 			`export function A() { const [s] = useState({ list: [] }); const [shown, add] = useOptimistic(s, (current, item) => { current.list.push(item); return current; }); return <b onClick={() => add(1)}>{shown.list.length}</b>; }`,
+		],
+		[
+			'a destructured updater parameter with a default',
+			`export function A() { const [s, setS] = useState({ list: [] }); return <b onClick={() => setS(({ list } = { list: [] }) => { list.push(1); return { list }; })}>{s.list.length}</b>; }`,
+		],
+		[
+			'a reducer state parameter with a default',
+			`function reducer(state = [], action) { state.push(action); return [...state]; } export function A() { const [items, dispatch] = useReducer(reducer, []); return <b onClick={() => dispatch(1)}>{items.length}</b>; }`,
 		],
 	])('rejects %s', (_label, body) => {
 		expect(rejected(body)).toBe(SNAPSHOT_MUTATION);
@@ -444,6 +483,19 @@ describe('Strong state mutation outside render', () => {
 				`export function A() { const [s] = useState({ n: 0 }); Object.assign(s, { n: 1 }); return <b>{s.n}</b>; }`,
 			),
 		).toBe(RENDER_SNAPSHOT_MUTATION);
+	});
+
+	it('follows an Effect Event for the state it receives without treating its captures as stale', () => {
+		expect(
+			strongCode(
+				tsx(`export function A({ save }) {
+  const [items, setItems] = useState([]);
+  const [count, setCount] = useState(0);
+  const record = useEffectEvent((list) => { setCount(count + list.length); });
+  return <b onClick={async () => { await save(); record(items); setItems((current) => [...current, 1]); }}>{count}</b>;
+}`),
+			),
+		).toBeNull();
 	});
 
 	it('keeps copies, refs, props, object methods, and shadowed globals legal', () => {
@@ -578,6 +630,66 @@ describe('Strong stale deferred state updates', () => {
 			`export function A({ load }) { const [items, setItems] = useState([]); useEffect(() => { (async () => { const item = await load(); setItems([...items, item]); })(); }); return <b>{items.length}</b>; }`,
 		],
 		[
+			'a snapshot passed to an Effect Event after await',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value + 1)); return <b onClick={async () => { await save(); apply(n); }}>{n}</b>; }`,
+		],
+		[
+			'a value computed from a stale Effect Event argument',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => { const next = value + 1; setN(next); }); return <b onClick={async () => { await save(); apply(n); }}>{n}</b>; }`,
+		],
+		[
+			'a stale Effect Event argument forwarded to a helper',
+			`export function A({ save }) { const [n, setN] = useState(0); const set = (value) => setN(value + 1); const apply = useEffectEvent((value) => set(value)); return <b onClick={async () => { await save(); apply(n); }}>{n}</b>; }`,
+		],
+		[
+			'a stale tuple passed to an Effect Event',
+			`export function A({ save }) { const tuple = useState(0); const apply = useEffectEvent((pair) => pair[1](pair[0] + 1)); return <b onClick={async () => { await save(); apply(tuple); }}>{tuple[0]}</b>; }`,
+		],
+		[
+			'a stale tuple destructured by an Effect Event',
+			`export function A({ save }) { const tuple = useState(0); const apply = useEffectEvent(([value, set]) => set(value + 1)); return <b onClick={async () => { await save(); apply(tuple); }}>{tuple[0]}</b>; }`,
+		],
+		[
+			'a derived value passed to an Effect Event after await',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value)); return <b onClick={async () => { const next = n + 1; await save(); apply(next); }}>{n}</b>; }`,
+		],
+		[
+			'an expression passed to an Effect Event after await',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value)); return <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b>; }`,
+		],
+		[
+			'an expression passed to an Effect Event from an effect timer',
+			`export function A() { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value)); useEffect(() => { const id = setTimeout(() => apply(n + 1), 100); return () => clearTimeout(id); }); return <b>{n}</b>; }`,
+		],
+		[
+			'an expression passed to a helper after await',
+			`export function A({ save }) { const [n, setN] = useState(0); function apply(value) { setN(value); } return <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b>; }`,
+		],
+		[
+			'an expression passed to a defaulted Effect Event parameter after await',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value = 0) => setN(value)); return <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b>; }`,
+		],
+		[
+			'a derived value passed to a defaulted helper parameter after await',
+			`export function A({ save }) { const [n, setN] = useState(0); function apply(value = 0) { setN(value); } return <b onClick={async () => { const next = n + 1; await save(); apply(next); }}>{n}</b>; }`,
+		],
+		[
+			'an awaited snapshot passed to an inline callback',
+			`export function A() { const [n, setN] = useState(0); return <b onClick={async () => { ((apply, value) => apply(value))(setN, await Promise.resolve(n)); }}>{n}</b>; }`,
+		],
+		[
+			'state read after an await inside an Effect Event',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent(async () => { await save(); setN(n + 1); }); return <b onClick={() => apply()}>{n}</b>; }`,
+		],
+		[
+			'state read after an await inside an Effect Event called from a timer',
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent(async () => { await save(); setN(n + 1); }); useEffect(() => { setTimeout(() => apply(), 100); }); return <b>{n}</b>; }`,
+		],
+		[
+			'a timer created inside an Effect Event',
+			`export function A() { const [n, setN] = useState(0); const later = useEffectEvent(() => { setTimeout(() => setN(n + 1), 100); }); useEffect(() => later()); return <b>{n}</b>; }`,
+		],
+		[
 			'a reducer dispatch after await',
 			`export function A({ save }) { const [s, d] = useReducer((s, a) => a, 0); return <b onClick={async () => { await save(); d(s + 1); }}>{s}</b>; }`,
 		],
@@ -645,6 +757,35 @@ describe('Strong stale deferred state updates', () => {
       {m}
     </b>
   );
+}`),
+			),
+		).toBeNull();
+	});
+
+	it('keeps Effect Events called from timers and promises legal', () => {
+		expect(
+			strongCode(
+				tsx(`export function A({ load }) {
+  const [n, setN] = useState(0);
+  const tick = useEffectEvent(() => setN(n + 1));
+  const step = useEffectEvent(() => { const next = n + 1; setN(next); });
+  const bump = () => setN(n + 1);
+  const set = (value) => setN(value + 1);
+  const viaHelper = useEffectEvent(() => bump());
+  const viaCapturedArgument = useEffectEvent(() => set(n));
+  const viaImmediateCall = useEffectEvent(() => { (() => setN(n + 1))(); });
+  const apply = useEffectEvent((value) => setN(value));
+  useEffect(() => {
+    let active = true;
+    const id = setInterval(tick, 1000);
+    setTimeout(step, 500);
+    setTimeout(viaHelper, 500);
+    setTimeout(viaCapturedArgument, 500);
+    setTimeout(viaImmediateCall, 500);
+    load().then(() => { if (active) tick(); });
+    return () => { active = false; clearInterval(id); };
+  });
+  return <b onClick={() => { apply(n + 1); set(n + 1); setTimeout(() => tick(), 100); }}>{n}</b>;
 }`),
 			),
 		).toBeNull();
@@ -836,6 +977,125 @@ export function A() @{
 			tsx(`export function A() {
   const [count, setCount] = useState(0);
   return <b onClick={() => setCount(count + 1)}>{count}</b>;
+}`),
+			'/src/App.tsx',
+		);
+	});
+});
+
+describe('Strong uncached useSyncExternalStore snapshots', () => {
+	it.each([
+		['an object literal', `() => ({ a: store.a, b: store.b })`],
+		['an array literal', `() => [store.a, store.b]`],
+		['an object spread', `() => ({ ...store.state })`],
+		['a mapped array', `() => store.items.map((item) => item.id)`],
+		['a filtered array', `() => store.items.filter((item) => item.on)`],
+		['Object.keys', `() => Object.keys(store.state)`],
+		['a constructed Map', `() => new Map(store.entries)`],
+		['a block body', `() => { return { a: store.a }; }`],
+		[
+			'branches that both allocate',
+			`() => { if (store.a) return { a: store.a }; else return [store.b]; }`,
+		],
+		['a conditional expression', `() => (store.a ? { a: 1 } : [])`],
+	])('rejects %s', (_label, getSnapshot) => {
+		expect(
+			rejected(
+				`export function A({ store }) { const s = useSyncExternalStore(store.subscribe, ${getSnapshot}); return <p>{String(s)}</p>; }`,
+			),
+		).toBe(UNCACHED_STORE_SNAPSHOT);
+	});
+
+	it('rejects a fresh server snapshot', () => {
+		expect(
+			rejected(
+				`export function A({ store }) { const s = useSyncExternalStore(store.subscribe, () => store.value, () => ({ value: 0 })); return <p>{String(s)}</p>; }`,
+			),
+		).toBe(UNCACHED_STORE_SNAPSHOT);
+	});
+
+	// The likely rewrites move the allocation out of the inline callback.
+	it.each([
+		[
+			'a module selector',
+			`function select(store) { return { a: store.a }; } export function A({ store }) { const s = useSyncExternalStore(store.subscribe, () => select(store)); return <p>{s.a}</p>; }`,
+		],
+		[
+			'a named getSnapshot declaration',
+			`function getSnapshot() { return [globalThis.innerWidth, globalThis.innerHeight]; } export function A({ store }) { const s = useSyncExternalStore(store.subscribe, getSnapshot); return <p>{s[0]}</p>; }`,
+		],
+		[
+			'a local constant',
+			`export function A({ store }) { const getSnapshot = () => { const snapshot = { a: store.a }; return snapshot; }; const s = useSyncExternalStore(store.subscribe, getSnapshot); return <p>{s.a}</p>; }`,
+		],
+	])('rejects the rewrite through %s', (_label, body) => {
+		expect(rejected(body)).toBe(UNCACHED_STORE_SNAPSHOT);
+	});
+
+	it.each([
+		["import { useSyncExternalStore as useStore } from 'octane';", 'useStore'],
+		["import * as Octane from 'octane';", 'Octane.useSyncExternalStore'],
+		["import * as Octane from 'octane';", 'Octane?.useSyncExternalStore'],
+	])('recognizes %s', (imports, hook) => {
+		const body = `export function A({ store }) { const s = ${hook}(store.subscribe, () => [store.a]); return <p>{s[0]}</p>; }`;
+		expect(rejected(body, imports)).toBe(UNCACHED_STORE_SNAPSHOT);
+	});
+
+	it('keeps stable snapshots, primitives, shared fallbacks, and opaque getters legal', () => {
+		expect(
+			strongCode(
+				tsx(`const EMPTY = [];
+export function A({ store }) {
+  const a = useSyncExternalStore(store.subscribe, () => store.state);
+  const b = useSyncExternalStore(store.subscribe, () => JSON.stringify({ a: store.a }));
+  const c = useSyncExternalStore(store.subscribe, () => store.items ?? EMPTY);
+  const d = useSyncExternalStore(store.subscribe, () => (store.x ? store.y : {}));
+  const e = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const f = useSyncExternalStore(store.subscribe, () => { const Map = store.M; return new Map(); });
+  const g = useSyncExternalStore(store.subscribe, () => store.title.slice(0, 3));
+  { const useSyncExternalStore = (subscribe, read) => read(); useSyncExternalStore(store.subscribe, () => ({ fresh: true })); }
+  return <p>{String(a)}{b}{String(c)}{String(d)}{String(e)}{String(f)}{g}</p>;
+}`),
+			),
+		).toBeNull();
+	});
+
+	it('checks .tsrx components and plain .ts custom hooks', () => {
+		const tsrx = `"use strong";
+import { useSyncExternalStore } from 'octane';
+export function A(props) @{
+  const size = useSyncExternalStore(props.store.subscribe, () => ({ width: props.store.width }));
+  <p>{size.width as string}</p>
+}`;
+		const hook = `"use strong";
+import { useSyncExternalStore } from 'octane';
+export function useSelection(store) {
+  return useSyncExternalStore(store.subscribe, () => store.items.filter((item) => item.selected));
+}`;
+		expect(strongCode(tsrx, '/src/A.tsrx')).toBe(UNCACHED_STORE_SNAPSHOT);
+		expect(() => slotHooks(hook, '/src/useSelection.ts')).toThrow(UNCACHED_STORE_SNAPSHOT);
+		expect(() =>
+			slotHooks(hook.replace('"use strong";\n', ''), '/src/useSelection.ts'),
+		).not.toThrow();
+	});
+
+	it('locates the fresh value and names the replacement', () => {
+		const source = tsx(
+			`export function A({ store }) { const s = useSyncExternalStore(store.subscribe, () => ({ a: store.a, b: store.b })); return <p>{s.a}</p>; }`,
+			IMPORTS,
+			true,
+		);
+		const diagnostic = volarDiagnostic(source, '/src/App.tsx', UNCACHED_STORE_SNAPSHOT);
+		expect(diagnostic.start.offset).toBe(source.indexOf('{ a: store.a'));
+		expect(diagnostic.message).toContain('Object.is');
+		expect(diagnostic.message).toContain('its own useSyncExternalStore call');
+	});
+
+	it('preserves emitted client and server code for stable snapshots', () => {
+		expectUnchangedOutput(
+			tsx(`export function A({ store }) {
+  const value = useSyncExternalStore(store.subscribe, () => store.value, () => 0);
+  return <p>{value}</p>;
 }`),
 			'/src/App.tsx',
 		);

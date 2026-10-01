@@ -902,6 +902,8 @@ These patterns become compile errors:
 - A state tuple whose value and getter are never read
   (`OCTANE_STRONG_WRITE_ONLY_STATE`). Use `useSyncExternalStore` for external
   data.
+- A `useSyncExternalStore` snapshot callback that returns a new object or array
+  on every call (`OCTANE_STRONG_UNCACHED_STORE_SNAPSHOT`).
 - Mutating a binding declared outside a retained keyed `@for` row from that row
   (`OCTANE_STRONG_RETAINED_ROW_MUTATION`). Fresh scratch data built in ordinary
   setup or owned entirely by one row remains valid.

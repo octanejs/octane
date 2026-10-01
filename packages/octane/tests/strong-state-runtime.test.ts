@@ -269,3 +269,69 @@ export function A({ store }) { const value = useSyncExternalStore(store.subscrib
 		}
 	});
 });
+
+describe('useSyncExternalStore snapshots', () => {
+	it('loops until the update-depth limit when getSnapshot allocates', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const { A } = fixture(
+			`export function A({ store }) { const s = useSyncExternalStore(store.subscribe, () => ({ a: store.value })); return <p>{s.a}</p>; }`,
+		);
+		const store = createStore(1);
+		let root: ReturnType<typeof mount> | undefined;
+		try {
+			root = mount(A, { store });
+			await expect(act(() => Promise.resolve())).rejects.toThrow('Maximum update depth exceeded');
+			if (process.env.NODE_ENV !== 'production') {
+				expect(error.mock.calls.flat().join(' ')).toContain('result must be cached');
+			}
+		} finally {
+			root?.unmount();
+			error.mockRestore();
+		}
+	});
+
+	it('renders a snapshot the store keeps', async () => {
+		const { A } = fixture(
+			`export function A({ store }) { const value = useSyncExternalStore(store.subscribe, () => store.value, () => 0); return <p>{value}</p>; }`,
+			true,
+		);
+		const store = createStore(1);
+		const root = mount(A, { store });
+		try {
+			await act(() => store.set(3));
+			expect(root.find('p').textContent).toBe('3');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// Report only: caching an inline subscribe is a codegen change that needs
+	// identity and invalidation evidence of its own.
+	it.each([false, true])(
+		'resubscribes an inline subscribe on every render (strong=%s)',
+		async (strong) => {
+			const { A } = fixture(
+				`export function A({ store }) { const [n, setN] = useState(0); const value = useSyncExternalStore((cb) => store.subscribe(cb), () => store.value, () => 0); return <button onClick={() => setN(n + 1)}>{value}{n}</button>; }`,
+				strong,
+			);
+			let subscriptions = 0;
+			const store = createStore(1);
+			const subscribe = store.subscribe.bind(store);
+			store.subscribe = (listener) => {
+				subscriptions++;
+				return subscribe(listener);
+			};
+			const root = mount(A, { store });
+			try {
+				await act(() => {});
+				root.click('button');
+				await act(() => {});
+				root.click('button');
+				await act(() => {});
+				expect(subscriptions).toBe(3);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+});
