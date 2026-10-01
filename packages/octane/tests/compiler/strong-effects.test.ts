@@ -198,6 +198,56 @@ describe('Strong asynchronous effect updates', () => {
 		accepts(app(`useEffect(() => { ${body} });`));
 	});
 
+	const aborted = (body: string) =>
+		`useEffect(() => { const controller = new AbortController(); const { signal } = controller; (async () => { ${body} })(); return () => controller.abort(); });`;
+
+	it.each([
+		[
+			'a later request without the signal',
+			`const r = await fetch('/a', { signal }); const other = await api.get(props.id); setData(other);`,
+		],
+		[
+			'a zero-delay yield after the request',
+			`const r = await fetch('/a', { signal }); await null; setData(r);`,
+		],
+		[
+			'an exclusive branch with the signal',
+			`if (props.fast) { await fetch('/a', { signal }); } else { await api.get(props.id); } setData(1);`,
+		],
+		[
+			'an exclusive branch without the signal',
+			`if (props.fast) { await api.get(props.id); } else { await fetch('/a', { signal }); } setData(1);`,
+		],
+		[
+			'a later loop iteration',
+			`const r = await fetch('/a', { signal }); for (const id of props.ids) { setData(r); await api.get(id); }`,
+		],
+		[
+			'a catch handler after an unsigned request',
+			`try { await fetch('/a', { signal }); } catch { await api.get(props.id); } setData(1);`,
+		],
+	])('rejects an abort proof that does not cover %s', (_label, body) => {
+		rejects(app(aborted(body)), FETCH);
+	});
+
+	it.each([
+		[
+			'both branches',
+			`if (props.fast) { await fetch('/a', { signal }); } else { await fetch('/b', { signal }); } setData(1);`,
+		],
+		['a response body read', `const r = await fetch('/a', { signal }); setData(await r.json());`],
+		[
+			'the request after an exiting branch',
+			`if (props.skip) { await api.get(props.id); return; } const r = await fetch('/a', { signal }); setData(r);`,
+		],
+		[
+			'the latest request',
+			`await api.warm(); const r = await fetch('/a', { signal }); setData(r);`,
+		],
+	])('accepts an abort proof that covers %s', (_label, body) => {
+		accepts(app(aborted(body)));
+	});
+
 	it('follows signals and flags through same-module helpers', () => {
 		accepts(
 			app(`async function load(signal, set) { const r = await fetch('/api', { signal }); set(await r.json()); }
@@ -638,6 +688,19 @@ export function App(props) @{
 			'await Promise.resolve()',
 			`useEffect(() => { (async () => { await Promise.resolve(); ${write}; })(); });`,
 		],
+		['a nested await', `useEffect(() => { (async () => { await (await null); ${write}; })(); });`],
+		[
+			'a sequence ending in a settled promise',
+			`useEffect(() => { (async () => { await (0, Promise.resolve()); ${write}; })(); });`,
+		],
+		[
+			'a conditional settled value',
+			`useEffect(() => { (async () => { await (props.flag ? Promise.resolve() : null); ${write}; })(); });`,
+		],
+		[
+			'a conditional settled promise',
+			`useEffect(() => { (props.flag ? Promise.resolve() : Promise.reject()).catch(() => ${write}); });`,
+		],
 		['an async effect callback', `useEffect(async () => { await null; ${write}; });`],
 		[
 			'a local deferral helper',
@@ -661,6 +724,10 @@ export function App(props) @{
 		[
 			'a timer with an unknown delay',
 			`useEffect(() => { setTimeout(() => ${write}, props.delay); });`,
+		],
+		[
+			'a conditional await that may be pending',
+			`useEffect(() => { let active = true; (async () => { await (props.flag ? Promise.resolve() : props.pending); if (active) ${write}; })(); return () => { active = false; }; });`,
 		],
 		['a string timer', `useEffect(() => { setTimeout('tick()', 0); });`],
 		['an external subscription', `useEffect(() => props.subscribe(() => ${write}));`],
@@ -764,6 +831,16 @@ export function App(props) @{
 			'a repacked array',
 			`function useThing() { const [value, setValue] = useState(0); return [value, setValue]; }`,
 			`const [value, setValue] = useThing(); ${update}`,
+		],
+		[
+			'an array returned on several paths',
+			`function useThing(flag) { const [value, setValue] = useState(0); if (flag) return [value, setValue]; return [value, setValue]; }`,
+			`const [value, setValue] = useThing(props.flag); ${update}`,
+		],
+		[
+			'an object returned on several paths',
+			`function useThing(flag) { const [value, setValue] = useState(0); if (flag) return { value, setValue }; return { value: 0, setValue }; }`,
+			`const { setValue } = useThing(props.flag); ${update}`,
 		],
 		[
 			'a returned object',
@@ -874,6 +951,11 @@ export function App(props) @{
 			`function useThing(flag) { if (flag) return [0, () => {}]; return useState(0); }`,
 			`const [value, setValue] = useThing(props.flag); ${update}`,
 		],
+		[
+			'paths that return different updaters',
+			`function useThing(flag) { const [value, setValue] = useState(0); if (flag) return [value, () => {}]; return [value, setValue]; }`,
+			`const [value, setValue] = useThing(props.flag); ${update}`,
+		],
 	])('does not invent state for %s', (_label, hooks, setup) => {
 		accepts(app(hooks, setup));
 	});
@@ -981,9 +1063,18 @@ export function App(props) @{
 		rejects(app(setup, '<div />', moduleSetup), HIDDEN);
 	});
 
-	it('does not treat a dependency list as attaching a ref', () => {
+	it.each([
+		['a dependency list', '[last]'],
+		['a parenthesized dependency list', '([last])'],
+		['a cast dependency list', '[last] as const'],
+		['a satisfies dependency list', '[last] satisfies unknown[]'],
+	])('does not treat %s as attaching a ref', (_label, dependencies) => {
 		expect(
-			errors(app(`const last = useRef(0); useEffect(() => { props.log(last.current); }, [last]);`)),
+			errors(
+				app(
+					`const last = useRef(0); useEffect(() => { props.log(last.current); }, ${dependencies});`,
+				),
+			),
 		).toContain(HIDDEN);
 	});
 

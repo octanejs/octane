@@ -2727,9 +2727,33 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return shapeMember(node, scope);
 	}
 
+	// Every return must agree. Each `return [value, update]` builds a fresh
+	// shape, so arrays and objects agree on the provenance values they share.
 	function mergeShapes(shapes) {
 		const [first] = shapes;
-		return first != null && shapes.every((shape) => shape === first) ? first : null;
+		if (first == null || shapes.some((shape) => shape?.kind !== first.kind)) return null;
+		if (shapes.every((shape) => shape === first)) return first;
+		if (first.kind === 'returned-array') {
+			const length = Math.min(...shapes.map((shape) => shape.elements.length));
+			const elements = [];
+			for (let index = 0; index < length; index++) {
+				const value = first.elements[index];
+				elements.push(shapes.every((shape) => shape.elements[index] === value) ? value : null);
+			}
+			return elements.some((element) => element !== null)
+				? { kind: 'returned-array', elements }
+				: null;
+		}
+		if (first.kind === 'returned-object') {
+			const properties = new Map();
+			for (const [key, value] of first.properties) {
+				if (value !== null && shapes.every((shape) => shape.properties.get(key) === value)) {
+					properties.set(key, value);
+				}
+			}
+			return properties.size === 0 ? null : { kind: 'returned-object', properties };
+		}
+		return null;
 	}
 
 	function bindReturnedShape(pattern, shape, bind) {
@@ -3604,6 +3628,18 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return states;
 	}
 
+	// Only paths that reach the next statement share its flow.
+	function joinBranchFlows(node, branches, consequent, alternate) {
+		if (branches === 1) return consequent;
+		if (branches === 2) return alternate;
+		if (node.type === 'IfStatement') {
+			const consequentExits = branchAlwaysExits(node.consequent);
+			const alternateExits = node.alternate != null && branchAlwaysExits(node.alternate);
+			if (consequentExits !== alternateExits) return consequentExits ? alternate : consequent;
+		}
+		return effectPolicy.joinFlow(consequent, alternate);
+	}
+
 	function visitEffect(node, scope) {
 		const enclosingEffect = currentEffect;
 		const enclosingOwnsWrites = effectOwnsWrites;
@@ -4193,27 +4229,44 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				const branchPhase = phaseAfter(node.test, phase);
 				const branches = conditionalExpressionBranches(node, scope);
 				const guards = currentEffect === null ? undefined : effectPolicy.saveGuards();
+				const before = guards === undefined ? undefined : effectPolicy.saveFlow();
+				let consequentFlow = before;
 				if ((branches & 1) !== 0) {
 					if (guards !== undefined) effectPolicy.guard(node.test, true);
 					visit(node.consequent, scope, branchPhase);
-					if (guards !== undefined) effectPolicy.restoreGuards(guards);
+					if (guards !== undefined) {
+						effectPolicy.restoreGuards(guards);
+						consequentFlow = effectPolicy.saveFlow();
+						effectPolicy.restoreFlow(before);
+					}
 				}
 				if ((branches & 2) !== 0) {
 					if (guards !== undefined) effectPolicy.guard(node.test, false);
 					visit(node.alternate, scope, branchPhase);
 					if (guards !== undefined) effectPolicy.restoreGuards(guards);
 				}
+				if (before !== undefined) {
+					effectPolicy.restoreFlow(
+						joinBranchFlows(node, branches, consequentFlow, effectPolicy.saveFlow()),
+					);
+				}
 				return;
 			}
 			case 'LogicalExpression':
 				visit(node.left, scope, phase);
-				if ((logicalExpressionBranches(node, scope) & 2) !== 0) {
+				const logicalBranches = logicalExpressionBranches(node, scope);
+				if ((logicalBranches & 2) !== 0) {
+					const before = currentEffect === null ? undefined : effectPolicy.saveFlow();
 					const guards =
 						currentEffect === null || node.operator === '??'
 							? undefined
 							: effectPolicy.guard(node.left, node.operator === '&&');
 					visit(node.right, scope, phaseAfter(node.left, phase));
 					if (guards !== undefined) effectPolicy.restoreGuards(guards);
+					// The right operand may not run.
+					if (before !== undefined && (logicalBranches & 1) !== 0) {
+						effectPolicy.restoreFlow(effectPolicy.joinFlow(before, effectPolicy.saveFlow()));
+					}
 				}
 				return;
 			case 'BinaryExpression':
@@ -4321,11 +4374,21 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'LabeledStatement':
 				visit(node.body, scope, phase);
 				return;
-			case 'TryStatement':
+			case 'TryStatement': {
+				const before = currentEffect === null ? undefined : effectPolicy.saveFlow();
 				visit(node.block, scope, phase);
-				visit(node.handler, scope, phase);
+				if (before !== undefined && node.handler != null) {
+					// The handler can start before or after any yield in the block.
+					const afterBlock = effectPolicy.saveFlow();
+					effectPolicy.restoreFlow(effectPolicy.joinFlow(before, afterBlock));
+					visit(node.handler, scope, phase);
+					effectPolicy.restoreFlow(effectPolicy.joinFlow(afterBlock, effectPolicy.saveFlow()));
+				} else {
+					visit(node.handler, scope, phase);
+				}
 				visit(node.finalizer, scope, phase);
 				return;
+			}
 			case 'JSXSwitchExpression': {
 				visit(node.discriminant, scope, phase);
 				let searchPhase = phaseAfter(node.discriminant, phase);
@@ -4359,7 +4422,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				const fallbackPhase = searchPhase;
 				searchPhase = initialPhase;
 				let fallthroughPhase = null;
+				// Each case starts from the switch, or also from the case falling into it.
+				const before = currentEffect === null ? undefined : effectPolicy.saveFlow();
+				const exits = [];
 				for (const branch of branches) {
+					if (before !== undefined) {
+						effectPolicy.restoreFlow(
+							fallthroughPhase === null
+								? before
+								: effectPolicy.joinFlow(before, effectPolicy.saveFlow()),
+						);
+					}
 					if (currentFunctionIsAsync && searchPhase !== 'deferred' && alwaysAwaits(branch.test)) {
 						searchPhase = 'deferred';
 					}
@@ -4378,6 +4451,18 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						last?.type === 'ThrowStatement'
 							? null
 							: executionPhase;
+					if (
+						before !== undefined &&
+						last?.type !== 'ReturnStatement' &&
+						last?.type !== 'ThrowStatement' &&
+						(fallthroughPhase === null || branch === branches[branches.length - 1])
+					) {
+						exits.push(effectPolicy.saveFlow());
+					}
+				}
+				if (before !== undefined) {
+					if (!branches.some((branch) => branch.test == null)) exits.push(before);
+					if (exits.length !== 0) effectPolicy.restoreFlow(exits.reduce(effectPolicy.joinFlow));
 				}
 				return;
 			}
@@ -4768,8 +4853,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (currentFunctionIsAsync && executionPhase !== 'deferred' && alwaysAwaits(node.test)) {
 					executionPhase = 'deferred';
 				}
+				const before = currentEffect === null ? undefined : effectPolicy.saveFlow();
+				if (before !== undefined) effectPolicy.enterLoopBody([node.test, node.body, node.update]);
 				visit(node.body, loop, executionPhase);
 				visit(node.update, loop, executionPhase);
+				// The body may not run.
+				if (before !== undefined) {
+					effectPolicy.restoreFlow(effectPolicy.joinFlow(before, effectPolicy.saveFlow()));
+				}
 				return;
 			}
 			case 'JSXForExpression': {
@@ -4826,8 +4917,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					}
 				}
 				visit(node.right, loop, phase);
+				const before = currentEffect === null ? undefined : effectPolicy.saveFlow();
+				// Each async iteration resumes from the iterator; others may follow a
+				// yield from the previous iteration.
 				if (currentEffect !== null && node.type === 'ForOfStatement' && node.await === true) {
 					effectPolicy.continuation(node.right);
+				} else if (before !== undefined) {
+					effectPolicy.enterLoopBody(node.body);
 				}
 				const executionPhase =
 					currentFunctionIsAsync &&
@@ -4844,6 +4940,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					visit(node.left, loop, executionPhase, false);
 				}
 				visit(node.body, loop, executionPhase);
+				if (before !== undefined) {
+					// An async loop ends on an iterator yield; another may not run its body.
+					if (node.type === 'ForOfStatement' && node.await === true) {
+						effectPolicy.continuation(node.right);
+					} else {
+						effectPolicy.restoreFlow(effectPolicy.joinFlow(before, effectPolicy.saveFlow()));
+					}
+				}
 				return;
 			}
 			case 'WhileStatement': {
@@ -4852,10 +4956,16 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					currentFunctionIsAsync && phase !== 'deferred' && alwaysAwaits(node.test)
 						? 'deferred'
 						: phase;
+				const before = currentEffect === null ? undefined : effectPolicy.saveFlow();
+				if (before !== undefined) effectPolicy.enterLoopBody([node.test, node.body]);
 				visit(node.body, scope, executionPhase);
+				if (before !== undefined) {
+					effectPolicy.restoreFlow(effectPolicy.joinFlow(before, effectPolicy.saveFlow()));
+				}
 				return;
 			}
 			case 'DoWhileStatement': {
+				if (currentEffect !== null) effectPolicy.enterLoopBody([node.body, node.test]);
 				visit(node.body, scope, phase);
 				const executionPhase =
 					currentFunctionIsAsync &&

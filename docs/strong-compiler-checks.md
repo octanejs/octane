@@ -76,7 +76,9 @@ An asynchronous state update is cancelled or ignored when one of these holds:
 
 - The cleanup calls `abort()` on an `AbortController` created in the effect,
   and the controller's `signal` reaches the request whose result the update
-  follows. The signal can be passed directly, through
+  follows: the most recent awaited request, or one whose result it reads, as in
+  `response.json()`. Where branches meet, every path must carry the signal. The
+  signal can be passed directly, through
   `const { signal } = controller`, in an options object, or through a
   same-module helper's parameter. `controller.signal.aborted` also works as a
   guard.
