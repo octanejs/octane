@@ -1232,7 +1232,7 @@ import { useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
   ${setup}
-  <div>@if (props.show) { <button ${use}>run</button> }</div>
+  <div>@if (props.show) { <button ${use}>{count as string}</button> }</div>
 }`;
 			expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 		}
@@ -1655,8 +1655,8 @@ import { useState } from 'octane';
 export function App() @{
   const [count, setCount] = useState(0);
   const later = () => setCount(count + 1);
-  setTimeout(() => setCount(count + 1), 0);
-  Promise.resolve().then(() => setCount(count + 1));
+  setTimeout(() => setCount((current) => current + 1), 0);
+  Promise.resolve().then(() => setCount((current) => current + 1));
   {
     const setCount = () => {};
     setCount();
@@ -2597,7 +2597,7 @@ export function App(props) @{
   const [count, setCount] = useState(0);
   const ref = useRef(0);
   ${setup}
-  <div />
+  <div>{count as string}</div>
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -2649,7 +2649,7 @@ import { useLinkedState, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
   ${setup}
-  <div />
+  <div>{count as string}</div>
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -2842,7 +2842,7 @@ export function App() @{ const [, update] = Octane.useState(0); Octane['useMemo'
 import { useMemo, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
-  const apply = () => setTimeout(() => setCount(count + 1), 0);
+  const apply = () => setTimeout(() => setCount((current) => current + 1), 0);
   const external = props.calculate;
   apply();
   external(count);
@@ -3149,7 +3149,7 @@ export function App() @{
 import { useEffect, useState } from 'octane';
 import { load } from './load';
 export function App(props) @{
-  const [, setCount] = useState(0);
+  const [count, setCount] = useState(0);
   (async () => {
     await Promise.resolve();
     const selected = (props.trace, setCount);
@@ -3164,7 +3164,7 @@ export function App(props) @{
     })();
     return () => controller.abort();
   });
-  <div />
+  <div>{count as string}</div>
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -3173,8 +3173,8 @@ export function App(props) @{
 	it('allows cleanup callbacks and deferred state updates from effects', () => {
 		const source = `"use strong";\n${stateComponent(
 			`useEffect(() => {
-      setTimeout(() => setCount(count + 1), 100);
-      requestAnimationFrame(() => setCount(count + 1));
+      setTimeout(() => setCount((current) => current + 1), 100);
+      requestAnimationFrame(() => setCount((current) => current + 1));
       return () => setCount(count + 1);
     });`,
 			'useState, useEffect',
@@ -3186,8 +3186,8 @@ export function App(props) @{
 	it('treats zero-delay effect callbacks as setup', () => {
 		const source = `"use strong";\n${stateComponent(
 			`useEffect(() => {
-      setTimeout(() => setCount(count + 1), 0);
-      Promise.resolve().then(() => setCount(count + 1));
+      setTimeout(() => setCount((current) => current + 1), 0);
+      Promise.resolve().then(() => setCount((current) => current + 1));
     });`,
 			'useState, useEffect',
 		)}`;
@@ -3244,7 +3244,7 @@ export function App(props) @{
 		['statements after standalone blocks', '{ await Promise.resolve(); } setCount(1);'],
 		[
 			'deeply nested blocks',
-			'{ { const next = await Promise.resolve(count + 1); setCount(next); } }',
+			'{ { const delta = await Promise.resolve(1); setCount((current) => current + delta); } }',
 		],
 		['conditional branches', 'if (count > -1) { await Promise.resolve(); setCount(1); }'],
 		[
@@ -3258,7 +3258,7 @@ export function App(props) @{
 		],
 		[
 			'try blocks',
-			'try { const next = await Promise.resolve(count + 1); setCount(next); } catch {}',
+			'try { const delta = await Promise.resolve(1); setCount((current) => current + delta); } catch {}',
 		],
 		[
 			'catch blocks',
@@ -3596,11 +3596,11 @@ export function App(props) @{
 		['async iterator bodies', 'for await (const value of [count]) { setCount(value); }'],
 		[
 			'statements after empty async iterations',
-			'for await (const value of []) {} setCount(count + 1);',
+			'for await (const value of []) {} setCount((current) => current + 1);',
 		],
 		[
 			'async iterator destructuring defaults',
-			'for await (const { value = setCount(count + 1) } of [{}]) {}',
+			'for await (const { value = setCount((current) => current + 1) } of [{}]) {}',
 		],
 		[
 			'ordinary iterator bodies after an awaited iterable',
@@ -3608,19 +3608,19 @@ export function App(props) @{
 		],
 		[
 			'statements after empty awaited iterables',
-			'for (const value of await Promise.resolve([])) {} setCount(count + 1);',
+			'for (const value of await Promise.resolve([])) {} setCount((current) => current + 1);',
 		],
 		[
 			'ordinary iterator destructuring defaults after an awaited iterable',
-			'for (const { value = setCount(count + 1) } of await Promise.resolve([{}])) {}',
+			'for (const { value = setCount((current) => current + 1) } of await Promise.resolve([{}])) {}',
 		],
 		[
 			'for-in bodies after an awaited object',
-			'for (const key in await Promise.resolve({ count })) { setCount(count + 1); }',
+			'for (const key in await Promise.resolve({ count })) { setCount((current) => current + 1); }',
 		],
 		[
 			'statements after empty awaited for-in objects',
-			'for (const key in await Promise.resolve({})) {} setCount(count + 1);',
+			'for (const key in await Promise.resolve({})) {} setCount((current) => current + 1);',
 		],
 		[
 			'for-loop bodies after an awaited initializer',
@@ -3628,7 +3628,7 @@ export function App(props) @{
 		],
 		[
 			'statements after skipped loops with an awaited initializer',
-			'for (let index = await Promise.resolve(count); index < 0; index++) {} setCount(count + 1);',
+			'for (let index = await Promise.resolve(count); index < 0; index++) {} setCount((current) => current + 1);',
 		],
 		[
 			'for-loop bodies after an awaited test',
@@ -3636,96 +3636,99 @@ export function App(props) @{
 		],
 		[
 			'statements after an awaited false for-loop test',
-			'for (let index = 0; await Promise.resolve(index < 0); index++) {} setCount(count + 1);',
+			'for (let index = 0; await Promise.resolve(index < 0); index++) {} setCount((current) => current + 1);',
 		],
 		[
 			'while-loop bodies after an awaited test',
-			'while (await Promise.resolve(count > -1)) { setCount(count); break; }',
+			'while (await Promise.resolve(count > -1)) { setCount((current) => current); break; }',
 		],
 		[
 			'statements after an awaited false while-loop test',
-			'while (await Promise.resolve(false)) {} setCount(count + 1);',
+			'while (await Promise.resolve(false)) {} setCount((current) => current + 1);',
 		],
 		[
 			'statements after an awaited false do-while test',
-			'do {} while (await Promise.resolve(false)); setCount(count + 1);',
+			'do {} while (await Promise.resolve(false)); setCount((current) => current + 1);',
 		],
 		[
 			'labeled do-while loops with awaited tests',
-			'outer: do {} while (await Promise.resolve(false)); setCount(count + 1);',
+			'outer: do {} while (await Promise.resolve(false)); setCount((current) => current + 1);',
 		],
-		['labeled await expressions', 'completed: await Promise.resolve(); setCount(count + 1);'],
+		[
+			'labeled await expressions',
+			'completed: await Promise.resolve(); setCount((current) => current + 1);',
+		],
 		[
 			'labeled blocks with unavoidable awaits',
-			'completed: { await Promise.resolve(); } setCount(count + 1);',
+			'completed: { await Promise.resolve(); } setCount((current) => current + 1);',
 		],
 		[
 			'nested labeled blocks with unavoidable awaits',
-			'outer: { inner: { await Promise.resolve(); } } setCount(count + 1);',
+			'outer: { inner: { await Promise.resolve(); } } setCount((current) => current + 1);',
 		],
 		[
 			'labeled while loops with awaited tests',
-			'outer: while (await Promise.resolve(false)) {} setCount(count + 1);',
+			'outer: while (await Promise.resolve(false)) {} setCount((current) => current + 1);',
 		],
 		[
 			'switch cases after an awaited discriminant',
-			'switch (await Promise.resolve(count)) { case 0: setCount(count + 1); break; }',
+			'switch (await Promise.resolve(count)) { case 0: setCount((current) => current + 1); break; }',
 		],
 		[
 			'statements after awaited switch discriminants',
-			'switch (await Promise.resolve(count)) {} setCount(count + 1);',
+			'switch (await Promise.resolve(count)) {} setCount((current) => current + 1);',
 		],
 		[
 			'switch case updates after an awaited case label',
-			'switch (count) { case await Promise.resolve(0): setCount(count + 1); break; }',
+			'switch (count) { case await Promise.resolve(0): setCount((current) => current + 1); break; }',
 		],
 		[
 			'statements after an unavoidable awaited first case label',
-			'switch (count) { case await Promise.resolve(0): break; } setCount(count + 1);',
+			'switch (count) { case await Promise.resolve(0): break; } setCount((current) => current + 1);',
 		],
 		[
 			'switch case updates after their own awaits',
-			'switch (count) { case 0: await Promise.resolve(); setCount(count + 1); break; }',
+			'switch (count) { case 0: await Promise.resolve(); setCount((current) => current + 1); break; }',
 		],
 		[
 			'statements after switches where every branch awaits',
-			'switch (count) { case 0: await Promise.resolve(); break; default: await Promise.resolve(); } setCount(count + 1);',
+			'switch (count) { case 0: await Promise.resolve(); break; default: await Promise.resolve(); } setCount((current) => current + 1);',
 		],
 		[
 			'fall-through switch branches with a shared unavoidable await',
-			'switch (count) { case 0: case 1: await Promise.resolve(); setCount(count + 1); break; default: await Promise.resolve(); }',
+			'switch (count) { case 0: case 1: await Promise.resolve(); setCount((current) => current + 1); break; default: await Promise.resolve(); }',
 		],
 		[
 			'labeled switches with an awaited discriminant',
-			'outer: switch (await Promise.resolve(count)) { case 0: break outer; } setCount(count + 1);',
+			'outer: switch (await Promise.resolve(count)) { case 0: break outer; } setCount((current) => current + 1);',
 		],
 		[
 			'do-while tests after an awaited loop body',
-			'do { await Promise.resolve(); } while (false); setCount(count + 1);',
+			'do { await Promise.resolve(); } while (false); setCount((current) => current + 1);',
 		],
 		[
 			'continue paths that still reach the awaited do-while test',
-			'do { if (count > 0) continue; } while (await Promise.resolve(false)); setCount(count + 1);',
+			'do { if (count > 0) continue; } while (await Promise.resolve(false)); setCount((current) => current + 1);',
 		],
 		[
 			'do-while test updates after yielding paths while other paths break',
-			'do { if (count > 0) break; await Promise.resolve(); } while ((setCount(count + 1), false));',
+			'do { if (count > 0) break; await Promise.resolve(); } while ((setCount((current) => current + 1), false));',
 		],
 		[
 			'breaks belonging to a nested while loop',
-			'do { while (true) { break; } } while (await Promise.resolve(false)); setCount(count + 1);',
+			'do { while (true) { break; } } while (await Promise.resolve(false)); setCount((current) => current + 1);',
 		],
 		[
 			'breaks belonging to a nested for loop',
-			'do { for (;;) { break; } } while (await Promise.resolve(false)); setCount(count + 1);',
+			'do { for (;;) { break; } } while (await Promise.resolve(false)); setCount((current) => current + 1);',
 		],
 		[
 			'breaks belonging to a nested switch',
-			'do { switch (count) { case 0: break; default: break; } } while (await Promise.resolve(false)); setCount(count + 1);',
+			'do { switch (count) { case 0: break; default: break; } } while (await Promise.resolve(false)); setCount((current) => current + 1);',
 		],
 		[
 			'breaks after an unavoidable await in the do-while body',
-			'do { await Promise.resolve(); break; } while (false); setCount(count + 1);',
+			'do { await Promise.resolve(); break; } while (false); setCount((current) => current + 1);',
 		],
 		[
 			'nested yielding loop heads',
@@ -3918,9 +3921,9 @@ export function useCounter() {
   return count;
 }`;
 	const loopBody =
-		'for await (const value of load(signal)) { setCount(value); } for (const value of await load(signal, [])) {} setCount(count + 1);';
+		'for await (const value of load(signal)) { setCount(value); } for (const value of await load(signal, [])) {} setCount((current) => current + 1);';
 	const nestedBody =
-		'try { const next = await load(signal, count + 1); setCount(next); } catch { await load(signal); setCount(0); }';
+		'try { const delta = await load(signal, 1); setCount((current) => current + delta); } catch { await load(signal); setCount(0); }';
 	const expressionBody =
 		'(await load(signal, count > 0)) ? setCount(1) : setCount(2); load(signal, await load(signal, count), setCount(3)); const { value = setCount(4) } = await load(signal, {});';
 
@@ -3981,7 +3984,7 @@ export function useCounter() {
 	it('accepts nested async effect updates in plain TypeScript custom hooks', () => {
 		const source = cancellableHook(nestedBody);
 		const synchronous = source.replace(
-			'const next = await load(signal, count + 1); setCount(next);',
+			'const delta = await load(signal, 1); setCount((current) => current + delta);',
 			'setCount(count + 1); await load(signal);',
 		);
 
@@ -3993,13 +3996,13 @@ export function useCounter() {
 		const source = `"use strong";\n${pendingEffectComponent(cancellable(nestedBody))}`;
 		const result = compileToVolarMappings(source, '/src/Counter.tsrx');
 		const synchronous = source.replace(
-			'const next = await load(signal, count + 1); setCount(next);',
+			'const delta = await load(signal, 1); setCount((current) => current + delta);',
 			'setCount(count + 1); await load(signal);',
 		);
 		const rejected = compileToVolarMappings(synchronous, '/src/Counter.tsrx');
 		// An async effect callback returns a promise, so it cannot cancel its updates.
 		const uncancellable = compileToVolarMappings(
-			`"use strong";\n${pendingEffectComponent(`useEffect(async () => { ${pending('const next = await Promise.resolve(count + 1); setCount(next);')} });`)}`,
+			`"use strong";\n${pendingEffectComponent(`useEffect(async () => { ${pending('const next = await Promise.resolve(1); setCount((current) => current + next);')} });`)}`,
 			'/src/Counter.tsrx',
 		);
 
@@ -5687,8 +5690,8 @@ export function App(props) @{
   const [count, setCount] = useState(0);
   const ref = useRef(0);
   const update = () => setCount(count + 1);
-  const event = useEffectEvent(() => setCount(count + 1));
-  const memoized = () => setCount(count + 1);
+  const event = useEffectEvent(() => setCount((current) => current + 1));
+  const memoized = () => setCount((current) => current + 1);
   useEffect(() => {
     props.subscribe(update);
     setTimeout(event, 100);
@@ -5774,7 +5777,7 @@ import { makeCallback } from './external';
 function useCallback(callback) { return () => {}; }
 function useEffectEvent(callback) { return () => {}; }
 export function App(props) @{
-  const [, setCount] = useState(0);
+  const [count, setCount] = useState(0);
   const ref = useRef(0);
   const ignored = useCallback(() => setCount(1));
   const unrelated = useEffectEvent(() => { ref.current = 1; });
@@ -5789,7 +5792,7 @@ export function App(props) @{
   safe();
   const event = octaneEvent(() => props.value);
   useEffect(() => { props.register(event); });
-  <div />
+  <div>{count as string}</div>
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();

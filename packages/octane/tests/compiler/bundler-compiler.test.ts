@@ -809,7 +809,7 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 			'export function useCount(value) { const [current, update] = useState(value); update(value); return current; }';
 		const deferredHook =
 			"import { useState } from 'octane';\n" +
-			'export function useCount(value) { const [current, update] = useState(value); return () => update(value); }';
+			'export function useCount(value) { const [current, update] = useState(value); return [current, () => update(value)]; }';
 
 		expect(() => compiler.transform(eagerHook, '/project/src/use-count.ts')).toThrow(
 			/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/,
