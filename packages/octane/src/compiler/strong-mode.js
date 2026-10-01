@@ -252,6 +252,14 @@ function addPatternNames(pattern, bindings, value, overwrite = true) {
 	}
 }
 
+// A part of a state value keeps its state identity and stale tag.
+function childSnapshot(value) {
+	if (!value.state) return SNAPSHOT_BINDING;
+	return value.stale === true
+		? { kind: 'snapshot', state: value.state, stale: true }
+		: { kind: 'snapshot', state: value.state };
+}
+
 function bindSnapshotPattern(pattern, value, bind, property = null) {
 	if (pattern?.type === 'Identifier') {
 		bind(pattern, value);
@@ -260,8 +268,7 @@ function bindSnapshotPattern(pattern, value, bind, property = null) {
 			if (entry.type === 'Property') {
 				bindSnapshotPattern(
 					entry.value,
-					property?.(value, entry) ??
-						(value.state ? { kind: 'snapshot', state: value.state } : SNAPSHOT_BINDING),
+					property?.(value, entry) ?? childSnapshot(value),
 					bind,
 					property,
 				);
@@ -269,12 +276,7 @@ function bindSnapshotPattern(pattern, value, bind, property = null) {
 		}
 	} else if (pattern?.type === 'ArrayPattern') {
 		for (const element of pattern.elements ?? []) {
-			bindSnapshotPattern(
-				element,
-				value.state ? { kind: 'snapshot', state: value.state } : SNAPSHOT_BINDING,
-				bind,
-				property,
-			);
+			bindSnapshotPattern(element, childSnapshot(value), bind, property);
 		}
 	}
 	// Rest copies and default expressions can produce new mutable values.
@@ -1536,13 +1538,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	// Updaters and reducers run while their owner renders, and deferred code
 	// reads a render snapshot that later updates may already have replaced.
 	let insidePureCallback = false;
-	// An Effect Event reads the latest committed values when it is called, so
-	// state it captures is current in its own body; arguments are not.
-	const effectEventFunctions = new Set();
+	// Functions running synchronously inside an Effect Event invocation. An
+	// Effect Event reads the latest committed values, so state these bodies
+	// capture is current; a snapshot passed in from deferred code is tagged stale.
+	const freshFunctions = new Set();
 	const statePolicy = createStrongStatePolicy({
 		report,
 		resolve,
-		resolveScope,
 		unwrap,
 		createScope,
 		snapshotBinding,
@@ -2379,12 +2381,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			let functionScope;
 			if ((node.params ?? []).every((parameter) => parameter.type === 'Identifier')) {
 				functionScope = createFunctionScope(node, parentScope, args);
-				if (effectEventFunctions.has(node)) functionScope.effectEventBoundary = true;
 			} else {
 				// Defaults run before the body environment exists. In particular,
 				// body var/function declarations cannot shadow an outer default read.
 				const parameterScope = visitParameters(node, parentScope, phase, args);
-				if (effectEventFunctions.has(node)) parameterScope.effectEventBoundary = true;
 				functionScope = createScope(parameterScope, 'function');
 				const names = new Map();
 				for (const parameter of node.params ?? []) addPatternNames(parameter, names, OTHER_BINDING);
@@ -2657,8 +2657,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				// initializer check.
 				const states =
 					declaration.id?.type === 'Identifier' ? projectedStates(initial, scope) : null;
-				if (states !== null) bind(declaration.id, { kind: 'derived-state', states, prop });
-				else if (prop) bindPropPattern(declaration.id, bind);
+				if (states !== null) {
+					// The initializer lets an Effect Event tell a stale input from a captured one.
+					bind(declaration.id, { kind: 'derived-state', states, prop, init: initial, scope });
+				} else if (prop) bindPropPattern(declaration.id, bind);
 			}
 		}
 	}
@@ -2670,7 +2672,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const shape = statePolicy.memberShape(snapshot.shape, key);
 		return shape === null
 			? null
-			: { kind: 'snapshot', state: snapshot.state, shape, array: statePolicy.shapeIsArray(shape) };
+			: {
+					kind: 'snapshot',
+					state: snapshot.state,
+					shape,
+					array: statePolicy.shapeIsArray(shape),
+					stale: snapshot.stale === true,
+				};
 	}
 
 	function snapshotPatternProperty(scope) {
@@ -2765,7 +2773,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 							: node.property?.type === 'Identifier'
 								? node.property.name
 								: null,
-					)) ?? { kind: 'snapshot', state: parent.state }
+					)) ?? childSnapshot(parent)
 		);
 	}
 
@@ -3786,14 +3794,32 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return nodes;
 	}
 
-	function visitEffectEventCallback(value, origin, phase, args) {
-		const nodes = effectEventNodes(value).filter((node) => !effectEventFunctions.has(node));
-		for (const node of nodes) effectEventFunctions.add(node);
+	function staleValue(value) {
+		return (value?.kind === 'snapshot' || value?.kind === 'derived-state') && value.stale !== true
+			? { ...value, stale: true }
+			: value;
+	}
+
+	function visitFresh(value, origin, phase, args) {
+		const nodes = effectEventNodes(value).filter((node) => !freshFunctions.has(node));
+		for (const node of nodes) freshFunctions.add(node);
 		try {
 			visitCallable(value, origin, phase, args);
 		} finally {
-			for (const node of nodes) effectEventFunctions.delete(node);
+			for (const node of nodes) freshFunctions.delete(node);
 		}
+	}
+
+	function visitEffectEventCallback(value, origin, phase, args) {
+		// Deferred code outside an Effect Event passes its render snapshot in.
+		const stale = phase === 'deferred' && !freshFunctions.has(currentFunction);
+		visitFresh(value, origin, phase, stale ? args?.map(staleValue) : args);
+	}
+
+	// A helper called synchronously from an Effect Event runs with its values.
+	function visitSynchronousCall(value, origin, phase, args) {
+		if (freshFunctions.has(currentFunction)) visitFresh(value, origin, phase, args);
+		else visitCallable(value, origin, phase, args);
 	}
 
 	function visitSynchronousHookCallback(value, scope, phase, stateInitializer = false) {
@@ -4500,7 +4526,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 							callee,
 							node.arguments,
 							scope,
-							effectEventFunctions.has(currentFunction),
+							freshFunctions.has(currentFunction),
 						);
 					}
 					if (insidePureCallback && executionPhase === 'render') {
@@ -4630,7 +4656,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				) {
 					const callback = callableValue(callee, scope);
 					if (callback !== null) {
-						visitCallable(
+						visitSynchronousCall(
 							callback,
 							callee,
 							executionPhase,
@@ -4654,7 +4680,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 							args?.some((value) => value?.kind === 'snapshot' || value?.kind === 'state-tuple')
 						) {
 							if (effectEvent) visitEffectEventCallback(callback, callee, executionPhase, args);
-							else visitCallable(callback, callee, executionPhase, args);
+							else visitSynchronousCall(callback, callee, executionPhase, args);
 						}
 					}
 				}
