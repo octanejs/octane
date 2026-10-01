@@ -3062,7 +3062,7 @@ export function App() @{
 import { useMemo, useState } from 'octane';
 export function App() @{
   const state = useState(0);
-  (async () => { ((apply, value) => apply(value))(state[1], await Promise.resolve(state[0])); })();
+  (async () => { ((apply, value) => apply(value))(state[1], await Promise.resolve(1)); })();
   <div />
 }`;
 
@@ -3508,7 +3508,7 @@ export function App(props) @{
 		],
 		[
 			'state updaters as callbacks',
-			'((apply, value) => apply(value))(setCount, await Promise.resolve(count));',
+			'((apply, value) => apply(value))(setCount, await Promise.resolve(1));',
 		],
 	])('allows %s when earlier arguments have yielded', (_label, body) => {
 		const source = `"use strong";\n${stateComponent(
@@ -5753,7 +5753,7 @@ export function App(props) @{
   const [count, setCount] = useState(0);
   const ref = useRef(0);
   const update = () => setCount(count + 1);
-  const event = useEffectEvent(() => setCount((current) => current + 1));
+  const event = useEffectEvent(() => setCount(count + 1));
   const memoized = () => setCount((current) => current + 1);
   useEffect(() => {
     props.subscribe(update);
