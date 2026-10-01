@@ -144,6 +144,7 @@ import {
 } from './hydration/interaction-config.js';
 import {
 	HYDRATE_SUPPORTED_INTERACTION_EVENTS,
+	holdHydrationReplays,
 	hydrationEventPathWithin,
 	initializeHydrationEventCapture,
 	isHydrationSelectionIntentCurrent,
@@ -158,6 +159,7 @@ import {
 	wasEarlyHydrationIntentHandled,
 	type HydrationIntentBoundary,
 	type HydrationIntentBoundaryStatus,
+	type HydrationReplayHold,
 	type HydrationReplayIntent,
 } from './hydration/event-capture.js';
 import { isRestoredHydrationTextarea } from './hydration/control-capture.js';
@@ -15024,9 +15026,18 @@ function hydrateStrategyInteractionEvents(
 }
 
 function queueHydrateIntent(state: HydrateSlot, intent: HydrationReplayIntent): void {
-	if (state.hydrated || resolveHydrateStrategy(state)._t === 'never') return;
+	if (!state.hydrated && resolveHydrateStrategy(state)._t === 'never') return;
 	if (!intent.earlyBinding) state.replays.push(intent);
 	requestHydrateBoundary(state);
+}
+
+/**
+ * A boundary hydrates in render but replays its captured intent from a passive
+ * effect after commit. Until that replay drains, later intent must queue behind
+ * it: let through, it would reach the hydrated handlers first.
+ */
+function hydrateBoundaryReleased(state: HydrateSlot): boolean {
+	return state.hydrated && state.replays.length === 0;
 }
 
 function handleRegisteredHydrationIntent(
@@ -15034,9 +15045,9 @@ function handleRegisteredHydrationIntent(
 	eventType: string,
 	intent?: HydrationReplayIntent,
 ): HydrationIntentBoundaryStatus {
-	if (state.hydrated) return 'hydrated';
+	if (hydrateBoundaryReleased(state)) return 'hydrated';
 	const strategy = resolveHydrateStrategy(state);
-	if (strategy._t === 'never') return 'never';
+	if (strategy._t === 'never' && !state.hydrated) return 'never';
 	const status = hydrateStrategyInteractionEvents(strategy)?.includes(eventType)
 		? 'handles'
 		: 'dormant';
@@ -15061,8 +15072,7 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 	if (events.size === 0) return () => undefined;
 
 	const onIntent = (event: Event) => {
-		if (wasEarlyHydrationIntentHandled(event)) return;
-		if (state.hydrated) return;
+		if (wasEarlyHydrationIntentHandled(event) || hydrateBoundaryReleased(state)) return;
 		const rawTarget = event.target;
 		let target =
 			rawTarget instanceof Element
@@ -46312,8 +46322,13 @@ export function createIndependentHydrateActivator(
 ): IndependentHydrateActivator {
 	return (context: IndependentHydrateActivationContext) => {
 		const { captures, element, manifest, signalOwner, initialDocumentSignals } = context;
-		let intents: readonly HydrationReplayIntent[] | null =
-			context.intents.length === 0 ? null : context.intents;
+		// The island appends later intent here until this replay takes it or the
+		// root unmounts. Suspended retries replace the root block, not its owner.
+		let intents: HydrationReplayIntent[] | null =
+			context.intents.length === 0 ? null : context.intents.slice();
+		let rootOwner: RootRenderOwner | undefined;
+		const hold: HydrationReplayHold = () =>
+			intents !== null && rootOwner !== undefined && !rootOwner.disposed ? intents : null;
 		const notify =
 			intents === null
 				? null
@@ -46375,6 +46390,7 @@ export function createIndependentHydrateActivator(
 			tryBlock(scope, 0, scope.block.parentNode, content, null, null, scope.block.endMarker);
 		};
 		const adapter: ComponentBody = (_props, scope) => {
+			rootOwner = scope.block.idState.renderOwner;
 			componentSlotVoid(
 				scope,
 				0,
@@ -46393,6 +46409,8 @@ export function createIndependentHydrateActivator(
 			...(initialDocumentSignals === undefined ? {} : { initialDocumentSignals }),
 		});
 		if (notify !== null) {
+			// A root that failed during hydrateRoot owes nothing; never capture for it.
+			if (hold() !== null) holdHydrationReplays(element, hold);
 			const unmount = root.unmount;
 			root.unmount = () => {
 				intents = null;

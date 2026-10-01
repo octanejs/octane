@@ -18,6 +18,7 @@ import {
 } from '../independent-hydration-protocol.js';
 import {
 	appendHydrationReplayIntent,
+	heldHydrationReplays,
 	hydrationMarkerInteractionStatus,
 	initializeIndependentHydrationEventCapture,
 	isHydrationSelectionIntentCurrent,
@@ -219,13 +220,16 @@ export function registerIndependentHydrationIsland(
 			});
 	};
 	const boundary: HydrationIntentBoundary = (eventType, intent) => {
-		if (hydrated || replayReady) return 'hydrated';
+		// An activated island still captures while its activator owes replays, so
+		// later input queues behind them instead of overtaking them.
+		const queue = hydrated || replayReady ? heldHydrationReplays(element) : intents;
+		if (queue === null) return 'hydrated';
 		if (disposed) return 'never';
 		const status = hydrationMarkerInteractionStatus(element, eventType);
 		if (status === 'never') return status;
 		if (intent !== undefined) {
-			appendHydrationReplayIntent(intents, intent);
-			activate();
+			appendHydrationReplayIntent(queue, intent);
+			if (queue === intents) activate();
 		}
 		return status;
 	};

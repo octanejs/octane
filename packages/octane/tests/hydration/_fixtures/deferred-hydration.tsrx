@@ -1,4 +1,5 @@
-import { Hydrate, use, useEffect, useId } from 'octane';
+import { Hydrate, use, useEffect, useId, useState } from 'octane';
+import type { HydrateWhen } from 'octane/hydration';
 
 function DeferredReviews(props) @{
 	const id = useId();
@@ -107,5 +108,26 @@ export function NestedInteractionHydration(props) @{
 				<button id="interaction-target" onClick={props.onTargetClick}>{'Open reviews'}</button>
 			</Hydrate>
 		</section>
+	</Hydrate>
+}
+
+type ChooseOption = (option: string, timeStamp: number) => void;
+
+function ReplayOrderOptions(props: { onChoose?: ChooseOption }) @{
+	const [selected, setSelected] = useState('none');
+	const choose = (option: string, event: MouseEvent) => {
+		props.onChoose?.(option, event.timeStamp);
+		setSelected(option);
+	};
+	<section id="replay-order">
+		<button id="option-a" onClick={(event) => choose('A', event)}>{'A'}</button>
+		<button id="option-b" onClick={(event) => choose('B', event)}>{'B'}</button>
+		<output>{selected as string}</output>
+	</section>
+}
+
+export function ReplayOrderHydration(props: { when: HydrateWhen; onChoose?: ChooseOption }) @{
+	<Hydrate when={props.when} split={false}>
+		<ReplayOrderOptions onChoose={props.onChoose} />
 	</Hydrate>
 }
