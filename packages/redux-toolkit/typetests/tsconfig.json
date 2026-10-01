@@ -5,6 +5,8 @@
     "target": "esnext",
     "moduleResolution": "bundler",
     "lib": ["dom", "dom.iterable", "esnext"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
     "skipLibCheck": true,
     "types": ["node"],
     "noEmit": true,

@@ -13,7 +13,7 @@
   },
   "scripts": {
     "test": "vitest run --project tanstack-router-ssr-query",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.octane.json"
+    "typecheck": "octane-tsc -p tsconfig.octane.json"
   },
   "dependencies": {
     "@tanstack/router-ssr-query-core": "1.169.1",

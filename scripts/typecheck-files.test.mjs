@@ -43,14 +43,8 @@ if (args.includes('--showConfig')) {
   process.exitCode = Number(process.env.TYPECHECK_EXIT_CODE || 0);
 }
 `;
-	await Promise.all([
-		writeFile(path.join(bin, 'tsgo'), checker),
-		writeFile(path.join(bin, 'tsrx-tsc'), checker),
-	]);
-	await Promise.all([
-		chmod(path.join(bin, 'tsgo'), 0o755),
-		chmod(path.join(bin, 'tsrx-tsc'), 0o755),
-	]);
+	await writeFile(path.join(bin, 'octane-tsc'), checker);
+	await chmod(path.join(bin, 'octane-tsc'), 0o755);
 
 	return {
 		root,
@@ -231,7 +225,7 @@ describe('typecheck-files command', () => {
 			const result = run(fixture.root, fixture.env);
 			assert.equal(result.status, 0, result.stderr);
 			const [invocation] = await invocations(fixture.log);
-			assert.equal(invocation.checker, 'tsgo');
+			assert.equal(invocation.checker, 'octane-tsc');
 			assert.equal(invocation.config.extends, path.join(fixture.root, 'tsconfig.json'));
 			assert.deepEqual(invocation.config.files.sort(), [
 				path.join(fixture.root, 'globals.d.ts'),
@@ -266,7 +260,7 @@ describe('typecheck-files command', () => {
 			const result = run(fixture.root, fixture.env, ['src']);
 			assert.equal(result.status, 0, result.stderr);
 			const [invocation] = await invocations(fixture.log);
-			assert.equal(invocation.checker, 'tsrx-tsc');
+			assert.equal(invocation.checker, 'octane-tsc');
 			assert.deepEqual(invocation.config.files.sort(), [
 				path.join(fixture.root, 'globals.d.ts'),
 				path.join(fixture.root, 'src', 'compiler.js'),

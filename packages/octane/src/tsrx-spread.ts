@@ -14,11 +14,17 @@ export function normalize_spread_props<T>(props: T): T {
 	return props;
 }
 
+// An index signature makes 'ref' a key of T without declaring one, and its
+// value type (often unknown) would then flow into the explicit ref attribute.
+type DeclaredKeys<T> = keyof {
+	[K in keyof T as string extends K ? never : number extends K ? never : K]: unknown;
+};
+
 // Distribute over unions so a ref-less alternative cannot erase a declared ref.
 // Keep unknown untouched: intersecting it with the optional ref shape would
 // incorrectly make an unsafe spread look like a valid object.
 type SpreadPropsWithRef<T> = T extends {}
-	? T & { ref?: 'ref' extends keyof T ? T['ref'] : undefined }
+	? T & { ref?: 'ref' extends DeclaredKeys<T> ? T['ref'] : undefined }
 	: T extends null | undefined
 		? never
 		: T;

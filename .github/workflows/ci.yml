@@ -903,9 +903,8 @@ jobs:
 
       # The type-only lowerings rewrite some constructs into a generated binding
       # plus references to it. A position no hoisting pass reaches keeps the
-      # references and drops the declaration, so editors and tsrx-tsc report
-      # TS2304 on source that compiles and runs correctly. Packages typechecked
-      # through tsgo cannot catch this — tsgo does not read .tsrx at all.
+      # references and drops the declaration, so editors and octane-tsc report
+      # TS2304 on source that compiles and runs correctly.
       - name: Disallow undeclared generated names in the virtual TSX
         run: pnpm virtual-tsx:check
 
@@ -1187,7 +1186,7 @@ jobs:
           echo "three=$RESOLVED_THREE_VERSION @types/three=$TYPES_VERSION"
           test "$RESOLVED_THREE_VERSION" = "$THREE_VERSION"
           test "$THREE_RELEASE_LINE" = "$TYPES_RELEASE_LINE"
-          pnpm exec tsgo --noEmit -p packages/three/tsconfig.json
+          pnpm exec octane-tsc -p packages/three/tsconfig.json
           pnpm exec tsc --noEmit -p packages/three/typetests/tsconfig.json
           OCTANE_THREE_COMPAT_VERSION="$THREE_VERSION" pnpm --dir packages/three test:compat
 
@@ -1209,7 +1208,7 @@ jobs:
           echo "typed pair: three=$TYPED_THREE_VERSION @types/three=$RESOLVED_TYPES_VERSION"
           test "${TYPED_THREE_VERSION%.*}" = "$TYPES_RELEASE_LINE"
           test "$RESOLVED_TYPES_VERSION" = "$TYPES_VERSION"
-          pnpm exec tsgo --noEmit -p packages/three/tsconfig.json
+          pnpm exec octane-tsc -p packages/three/tsconfig.json
           pnpm exec tsc --noEmit -p packages/three/typetests/tsconfig.json
           OCTANE_THREE_COMPAT_VERSION="$TYPED_THREE_VERSION" pnpm --dir packages/three test:compat
 
