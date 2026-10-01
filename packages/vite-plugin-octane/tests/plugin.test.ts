@@ -822,6 +822,14 @@ export default {
 		routes: [
 			{
 				type: 'server',
+				path: '/warm',
+				methods: ['GET'],
+				before: [],
+				after: [],
+				handler: () => new Response('warm'),
+			},
+			{
+				type: 'server',
 				path: '/stream',
 				methods: ['GET', 'HEAD'],
 				before: [],
@@ -873,6 +881,10 @@ export default {
 							);
 						},
 					);
+					// Armed with the request, not the response: Node holds a HEAD
+					// response's headers until it ends, so a HEAD that waits on its
+					// producer never reaches the response callback. The route is warm
+					// by now, so the bound covers dispatch and settling, not startup.
 					const bound = setTimeout(
 						() => client.destroy(new Error(`${method} did not settle without its producer`)),
 						2000,
@@ -885,6 +897,14 @@ export default {
 
 		try {
 			await server.listen();
+			// The first routed request pays for the cold SSR loads of
+			// octane.config.ts and octane/server, which a loaded runner can stretch
+			// past the exchange bound. Pay it on a sibling route, outside any bound.
+			const address = server.httpServer?.address();
+			if (!address || typeof address !== 'object') throw new Error('no dev server address');
+			const warm = await fetch(`http://127.0.0.1:${address.port}/warm`);
+			expect(await warm.text()).toBe('warm');
+
 			const failed = await exchange('GET', () => {
 				void control.promise.then(({ fail }) => fail());
 			});
