@@ -36709,9 +36709,11 @@ interface TrySlot {
 	 * callback refs invoked with null). React treats ref attachment like a layout
 	 * effect — destroyed on hide, recreated on reveal — even though the DOM node is
 	 * preserved. Captured on the FIRST hide (a re-suspend during a partial resolve
-	 * doesn't re-detach). The list keeps the detached identities alive as a hide
-	 * sentinel; reveal re-enumerates the CURRENT ref manifests so superseded refs
-	 * cannot reattach. null = nothing detached.
+	 * doesn't re-detach). A primary hiding inside an already-hidden primary takes
+	 * the sentinel without detaching: the enclosing hide owns those refs. The list
+	 * keeps the detached identities alive as a hide sentinel; reveal re-enumerates
+	 * the CURRENT ref manifests so superseded refs cannot reattach. null = nothing
+	 * detached.
 	 */
 	detachedRefs: SuspenseRefEntry[] | null;
 	domParent: Node;
@@ -38268,6 +38270,16 @@ function hideTryContentAndMountPendingInner(
 		// exact canceled pairs also tell the detach walk which current refs never
 		// committed, without retaining a witness for every callback ref in the app.
 		const uncommittedRefs = discardSubtreeRefAttaches(persistent);
+		// Inside a primary whose hide already detached it, nothing here is attached
+		// (React skips the disappear pass for an Offscreen hidden by an ancestor).
+		// Take the reveal sentinel with the hide itself, not the deferred action:
+		// an abandoned enclosing retry drops that action but keeps this primary
+		// hidden, and its reveal must still attach refs from current manifests.
+		if (state.detachedRefs === null && enclosingPrimaryDetachedRefs(state.parentBlock)) {
+			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK)
+				TRANSITION_JOURNAL.push(JOURNAL_PROP, state, 'detachedRefs', null);
+			state.detachedRefs = [];
+		}
 		invalidatePendingSuspenseEffects(persistent);
 		journalRootProperty(persistent, 'inactive', persistent.inactive);
 		persistent.inactive = true;
@@ -38294,6 +38306,15 @@ function hideTryContentAndMountPendingInner(
 	// only after the pending arm is coherent, then re-check for reentrant teardown.
 	if (resumeThenable !== undefined) attachResume(state, resumeThenable);
 	return !state.parentBlock.disposed && state.branch === 2;
+}
+
+/** Whether an enclosing Suspense primary's committed hide owns this block's refs. */
+function enclosingPrimaryDetachedRefs(block: Block | null): boolean {
+	for (let p = block; p !== null; p = p.parentBlock) {
+		const slot = (p as any).__trySlot as TrySlot | undefined;
+		if (slot !== undefined && slot.tryBlock === p && slot.detachedRefs !== null) return true;
+	}
+	return false;
 }
 
 function deactivateSuspensePrimary(
