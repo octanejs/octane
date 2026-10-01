@@ -154,7 +154,9 @@ export function createStrongRenderPolicy({
 		const value = unwrap(expression);
 		if (value?.type === 'NewExpression' && unshadowed(value.callee, scope, 'Date')) return DATE;
 		const intl = intlService(value, scope);
-		if (intl !== null) return intl;
+		// A formatter built during render is reported at its constructor; one built
+		// at module scope is reported wherever render uses it, including via aliases.
+		if (intl !== null) return { ...intl, module: scope === moduleScope };
 		if (unshadowed(value, scope, 'crypto')) return CRYPTO;
 		return aliasValue(value, scope);
 	}
@@ -170,7 +172,7 @@ export function createStrongRenderPolicy({
 			if (names === undefined) values.set(scope, (names = new Map()));
 			if (!names.has(id.name)) {
 				recorded++;
-				if (scope === moduleScope && value.kind === 'intl' && value.implicit) moduleFormatters++;
+				if (value.kind === 'intl' && value.implicit && value.module) moduleFormatters++;
 			}
 			names.set(id.name, value);
 		}
@@ -228,7 +230,9 @@ export function createStrongRenderPolicy({
 		},
 
 		/** Checks a call that the visitor has proven runs during render. */
-		call(node, callee, scope) {
+		// `checkLocale` is false inside updaters and reducers: they run on the client
+		// after an event, and a replay there formats the same way.
+		call(node, callee, scope, checkLocale) {
 			const member = unwrap(callee);
 			const name = propertyName(member, scope);
 			if (typeof name !== 'string') return;
@@ -241,6 +245,7 @@ export function createStrongRenderPolicy({
 				}
 				return;
 			}
+			if (!checkLocale) return;
 			if (INTL_SERVICES.has(name)) {
 				const service = intlService(node, scope);
 				if (service?.implicit) reportIntl(callee, service);
@@ -248,11 +253,7 @@ export function createStrongRenderPolicy({
 			}
 			if (moduleFormatters !== 0) {
 				const alias = aliasValue(member.object, scope);
-				if (
-					alias?.kind === 'intl' &&
-					alias.implicit &&
-					resolveScope(scope, unwrap(member.object).name) === moduleScope
-				) {
+				if (alias?.kind === 'intl' && alias.implicit && alias.module) {
 					reportIntl(member, alias, true);
 					return;
 				}
@@ -280,7 +281,8 @@ export function createStrongRenderPolicy({
 		},
 
 		/** Checks a `new` expression that the visitor has proven runs during render. */
-		construct(node, scope) {
+		construct(node, scope, checkLocale) {
+			if (!checkLocale) return;
 			const callee = unwrap(node.callee);
 			if (callee?.type !== 'MemberExpression' || !INTL_SERVICES.has(propertyName(callee, scope)))
 				return;
