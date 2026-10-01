@@ -49,8 +49,8 @@ jobs:
             const { owner, repo } = context.repo;
             const sha = context.payload.workflow_run.head_sha;
             const trigger = context.payload.workflow_run;
-            // A newer in-progress, cancelled, or failed rerun must not hide a completed success.
-            const completed = async (workflow_id) => {
+            // A draft run skips every job yet concludes success, so pick by data, not conclusion.
+            const newestWith = async (workflow_id, hasData) => {
               const { data } = await github.rest.actions.listWorkflowRuns({
                 owner,
                 repo,
@@ -65,10 +65,30 @@ jobs:
                 runs.push(trigger);
               }
               runs.sort((a, b) => b.id - a.id);
-              return runs.find((run) => run.conclusion === "success") ?? runs[0];
+              for (const run of runs) if (await hasData(run.id)) return run;
+              return undefined;
             };
-            const bench = await completed("pr-bench.yml");
-            const ci = await completed("ci.yml");
+            const bench = await newestWith("pr-bench.yml", async (run_id) => {
+              const { data } = await github.rest.actions.listWorkflowRunArtifacts({
+                owner,
+                repo,
+                run_id,
+                name: "pr-bench-report",
+              });
+              return data.artifacts.some((artifact) => !artifact.expired);
+            });
+            const ci = await newestWith("ci.yml", async (run_id) => {
+              const { data } = await github.rest.actions.listJobsForWorkflowRun({
+                owner,
+                repo,
+                run_id,
+                filter: "latest",
+                per_page: 100,
+              });
+              return data.jobs.some(
+                (job) => job.name === "classify changeset release" && job.conclusion === "success",
+              );
+            });
             core.setOutput("bench", bench ? String(bench.id) : "");
             core.setOutput("ci", ci ? String(ci.id) : "");
 

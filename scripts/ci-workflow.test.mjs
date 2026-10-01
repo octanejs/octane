@@ -1694,8 +1694,8 @@ describe('Pull request benchmark report', () => {
 		assert.match(packageJson.scripts['ci:workflow:test'], /benchmarks\/ci-timing\.test\.mjs/);
 	});
 
-	// A newer in-progress, cancelled, or failed rerun used to hide the completed success.
-	test('picks the completed successful run for the commit over newer reruns', async () => {
+	// A newer cancelled rerun, or a draft run that skipped every job but concluded success, used to hide real data.
+	test('picks the newest completed run for the commit that produced data', async () => {
 		const sha = 'a'.repeat(40);
 		const run = (id, path, conclusion) => ({
 			id,
@@ -1704,9 +1704,15 @@ describe('Pull request benchmark report', () => {
 			conclusion,
 		});
 		const listed = {
-			'pr-bench.yml': [run(20, 'pr-bench.yml', 'cancelled'), run(9, 'pr-bench.yml', 'success')],
-			'ci.yml': [run(60, 'ci.yml', 'failure'), run(12, 'ci.yml', 'success')],
+			'pr-bench.yml': [
+				run(30, 'pr-bench.yml', 'cancelled'),
+				run(20, 'pr-bench.yml', 'success'),
+				run(9, 'pr-bench.yml', 'failure'),
+			],
+			'ci.yml': [run(60, 'ci.yml', 'success'), run(12, 'ci.yml', 'failure')],
 		};
+		const artifacts = new Set([9, 30, 70]);
+		const gated = new Set([12]);
 		const queries = [];
 		const outputs = {};
 		const execute = new AsyncFunction(
@@ -1722,28 +1728,39 @@ describe('Pull request benchmark report', () => {
 						queries.push(query);
 						return { data: { workflow_runs: listed[query.workflow_id] } };
 					},
+					listWorkflowRunArtifacts: async ({ run_id }) => ({
+						data: { artifacts: artifacts.has(run_id) ? [{ expired: false }] : [] },
+					}),
+					listJobsForWorkflowRun: async ({ run_id }) => ({
+						data: {
+							jobs: [
+								{
+									name: 'classify changeset release',
+									conclusion: gated.has(run_id) ? 'success' : 'skipped',
+								},
+							],
+						},
+					}),
 				},
 			},
 		};
 		const core = { setOutput: (name, value) => (outputs[name] = value) };
-		const trigger = { ...run(70, 'pr-bench.yml', 'success'), status: 'completed' };
-		await execute(
-			github,
-			{ repo: { owner: 'o', repo: 'r' }, payload: { workflow_run: trigger } },
-			core,
-		);
-		assert.deepEqual(outputs, { bench: '70', ci: '12' });
+		const context = (workflow_run) => ({
+			repo: { owner: 'o', repo: 'r' },
+			payload: { workflow_run },
+		});
+
+		await execute(github, context(run(60, 'ci.yml', 'success')), core);
+		assert.deepEqual(outputs, { bench: '9', ci: '12' });
 		assert.ok(queries.every((query) => query.status === 'completed' && query.head_sha === sha));
 
-		await execute(
-			github,
-			{
-				repo: { owner: 'o', repo: 'r' },
-				payload: { workflow_run: { ...trigger, id: 5, conclusion: 'failure' } },
-			},
-			core,
-		);
-		assert.deepEqual(outputs, { bench: '9', ci: '12' });
+		await execute(github, context(run(70, 'pr-bench.yml', 'failure')), core);
+		assert.deepEqual(outputs, { bench: '70', ci: '12' });
+
+		gated.clear();
+		artifacts.clear();
+		await execute(github, context(run(60, 'ci.yml', 'success')), core);
+		assert.deepEqual(outputs, { bench: '', ci: '' });
 	});
 });
 
