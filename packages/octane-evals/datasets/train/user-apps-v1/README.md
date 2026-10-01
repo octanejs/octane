@@ -53,13 +53,15 @@ checks with server-rendered HTML, prop updates, races, or cleanup.
 Each task also records the workarounds agents reach for under
 `negatives/<name>/src/App.tsrx`. Every workaround must fail its grader.
 `strong-repair-negatives.json` records whether each one is already
-`rejected-by-strong` or still `compiles-keeps-bug`. Valid answers that differ
-from the reference live under `alternatives/<name>/src/App.tsrx` and must pass,
-so a grader cannot quietly reject a correct fix. Server checks evaluate the
-server build with browser globals such as `window` undefined, as on a real
-server. The second group is the
+`rejected-by-strong` or still `compiles-keeps-bug`. The second group is the
 compiler's backlog of missing checks, and each entry is a candidate compiler
 fixture.
+
+Valid answers that differ from the reference live under
+`alternatives/<name>/src/App.tsrx` and must pass, so a grader cannot quietly
+reject a correct fix. Server checks run the server build in a separate realm
+that has Node's server globals and no browser bindings. As on a real server,
+`window` is undeclared and `globalThis.window` is `undefined`.
 
 ```bash
 # Check prompts, starters, references, and every workaround, then refresh the ledger.

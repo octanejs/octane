@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 import ts from 'typescript';
 import { expect } from 'vitest';
 import { compile } from 'octane/compiler';
@@ -45,20 +46,34 @@ export function expectStrongCompile(source: string): void {
 	expect(strongCompileErrors(source)).toEqual([]);
 }
 
-// A real server has none of these. The graders run in jsdom, so the server build
-// sees them shadowed as undefined, and `typeof window === 'undefined'` holds.
-const BROWSER_GLOBALS = [
-	'window',
-	'self',
-	'document',
-	'navigator',
-	'location',
-	'localStorage',
-	'sessionStorage',
-	'matchMedia',
+// The graders run in jsdom, but a real server has no browser bindings at all:
+// `window` is undeclared and `globalThis.window` is undefined. The server build
+// runs in its own realm that carries only these Node server globals, so guards
+// behave as they do in production and an unguarded browser read throws.
+const SERVER_GLOBALS = [
+	'console',
+	'setTimeout',
+	'clearTimeout',
+	'setInterval',
+	'clearInterval',
+	'queueMicrotask',
+	'structuredClone',
+	'URL',
+	'URLSearchParams',
+	'TextEncoder',
+	'TextDecoder',
+	'AbortController',
+	'AbortSignal',
+	'performance',
+	'crypto',
+	'fetch',
+	'Headers',
+	'Request',
+	'Response',
+	'process',
 ];
 
-/** Evaluate the Strong server build of a submission without browser globals. */
+/** Evaluate the Strong server build of a submission in a realm without browser globals. */
 export function serverModule(source: string): Record<string, any> {
 	const { code } = compile(source, 'App.tsrx', { mode: 'server', strong: true } as any);
 	const commonJs = ts.transpileModule(code, {
@@ -70,11 +85,17 @@ export function serverModule(source: string): Record<string, any> {
 		if (specifier === 'octane/internal/server') return ServerHelpers;
 		throw new Error(`Unsupported server-eval import: ${specifier}`);
 	};
-	new Function('require', 'module', 'exports', ...BROWSER_GLOBALS, commonJs)(
-		requireServerRuntime,
-		module,
-		module.exports,
+	const realm = vm.createContext(
+		Object.fromEntries(
+			SERVER_GLOBALS.filter((name) => name in globalThis).map((name) => [
+				name,
+				(globalThis as Record<string, unknown>)[name],
+			]),
+		),
 	);
+	vm.runInContext(`(function (require, module, exports) {\n${commonJs}\n})`, realm, {
+		filename: 'App.server.js',
+	})(requireServerRuntime, module, module.exports);
 	return module.exports;
 }
 

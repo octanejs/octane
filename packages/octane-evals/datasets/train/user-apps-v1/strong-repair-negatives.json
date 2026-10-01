@@ -35,5 +35,6 @@
   "octane.strong-viewport-width/fresh-snapshot": "compiles-keeps-bug",
   "octane.strong-viewport-width/interval-without-clear": "compiles-keeps-bug",
   "octane.strong-viewport-width/listener-without-cleanup": "compiles-keeps-bug",
+  "octane.strong-viewport-width/optional-window": "compiles-keeps-bug",
   "octane.strong-viewport-width/typeof-guard": "rejected-by-strong"
 }
