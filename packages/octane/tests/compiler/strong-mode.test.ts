@@ -4198,14 +4198,20 @@ export function App() {
 		expect(() => compile(source, '/src/App.tsx')).toThrow(RENDER_STATE_UPDATE);
 	});
 
-	it('keeps opaque crypto methods outside the bounded purity diagnostics', () => {
-		const source = `"use strong";
+	it('rejects random crypto calls in render but keeps other crypto methods opaque', () => {
+		const random = `"use strong";
 export function App() @{
 	  const value = crypto.randomUUID();
 	  <p>{value as string}</p>
 }`;
+		const opaque = `"use strong";
+export function App() @{
+	  const subtle = crypto.subtle;
+	  <button onClick={() => subtle.digest('SHA-256', new Uint8Array(crypto.getRandomValues(new Uint8Array(4))))}>{crypto.randomUUID.name as string}</button>
+}`;
 
-		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(random, '/src/App.tsrx')).toThrow(RENDER_IMPURE_CALL);
+		expect(() => compile(opaque, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('reports the original filename, location, stable code, and migration guidance', () => {

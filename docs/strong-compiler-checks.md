@@ -64,6 +64,30 @@ export function Editor({ user }) {
 }
 ```
 
+## Render determinism
+
+| Diagnostic | What it detects | Replacement |
+| --- | --- | --- |
+| `OCTANE_STRONG_RENDER_IMPURE_CALL` | Unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`, `new Date()`, `crypto.randomUUID()`, or `crypto.getRandomValues()` during render, including inside callbacks that known array methods run synchronously. A `key` or `@for` key built from one of these gets its own message. | Read time or randomness outside render and pass a snapshot. Use `useId()` for element IDs. Give each list item a stable ID from its data, such as `item.id`. |
+| `OCTANE_STRONG_RENDER_LOCALE_FORMAT` | During render, `toLocaleString()`, `toLocaleDateString()`, or `toLocaleTimeString()` on a provable `Date` without both a locale and a visible `timeZone` option; `toString()` or `toTimeString()` on a provable `Date`; an `Intl` service constructed without a locale (a `DateTimeFormat` also needs a `timeZone`); or a call on a module-level formatter created that way. | Pass an explicit locale and time zone, for example `toLocaleString('en-US', { timeZone: 'UTC' })` or `new Intl.DateTimeFormat(locale, { timeZone })`. Otherwise format in an event or effect and render the stored text. |
+
+The array methods whose callbacks run in the caller's phase are `every`,
+`filter`, `find`, `findIndex`, `findLast`, `findLastIndex`, `flatMap`,
+`forEach`, `map`, `reduce`, `reduceRight`, `some`, `sort`, `toSorted`, and the
+mapping function of `Array.from`. During render every other render rule applies
+inside them too, so `items.forEach(setSelected)` is a render state update. The
+same callbacks in events, effects, and lazy state initializers keep their
+existing rules.
+
+A `Date` is provable when it is built with `new Date(...)` from an unshadowed
+`Date`, directly or through an unreassigned local alias. A date passed as a prop
+is not provable. Formatting a date built from local parts with `toDateString()`
+gives the same text in every time zone and stays valid. The `Intl` check covers
+`Collator`, `DateTimeFormat`, `DisplayNames`, `DurationFormat`, `ListFormat`,
+`NumberFormat`, `PluralRules`, `RelativeTimeFormat`, and `Segmenter`, with or
+without `new`. An options value the compiler cannot see, such as an identifier,
+is not reported.
+
 ## Lists, host props, and compatibility APIs
 
 | Diagnostic | What it detects | Replacement |
