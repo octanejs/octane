@@ -8,6 +8,7 @@ const SNAPSHOT_MUTATION = 'OCTANE_STRONG_SNAPSHOT_MUTATION';
 const RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
 const STALE_STATE_UPDATE = 'OCTANE_STRONG_STALE_STATE_UPDATE';
 const WRITE_ONLY_STATE = 'OCTANE_STRONG_WRITE_ONLY_STATE';
+const UNCACHED_STORE_SNAPSHOT = 'OCTANE_STRONG_UNCACHED_STORE_SNAPSHOT';
 
 const IMPORTS =
 	"import { useState, useReducer, useLinkedState, useEffect, useRef, useSyncExternalStore, useOptimistic, useEffectEvent } from 'octane';";
@@ -60,11 +61,13 @@ function expectUnchangedOutput(source: string, filename: string): void {
 it('does not mistake receivers named after Object.prototype members for known globals', () => {
 	expect(
 		strongCode(
-			tsx(`export function A({ value }) {
+			tsx(`export function A({ value, store }) {
   const [items, setItems] = useState([]);
+  const snapshot = useSyncExternalStore(store.subscribe, () => constructor.keys(store));
   return (
     <b onClick={() => { toString.call(items); hasOwnProperty.call(items, 'length'); setItems((current) => valueOf.call(current)); }}>
       {items.length}
+      {String(snapshot)}
       {String(value)}
     </b>
   );
@@ -836,6 +839,125 @@ export function A() @{
 			tsx(`export function A() {
   const [count, setCount] = useState(0);
   return <b onClick={() => setCount(count + 1)}>{count}</b>;
+}`),
+			'/src/App.tsx',
+		);
+	});
+});
+
+describe('Strong uncached useSyncExternalStore snapshots', () => {
+	it.each([
+		['an object literal', `() => ({ a: store.a, b: store.b })`],
+		['an array literal', `() => [store.a, store.b]`],
+		['an object spread', `() => ({ ...store.state })`],
+		['a mapped array', `() => store.items.map((item) => item.id)`],
+		['a filtered array', `() => store.items.filter((item) => item.on)`],
+		['Object.keys', `() => Object.keys(store.state)`],
+		['a constructed Map', `() => new Map(store.entries)`],
+		['a block body', `() => { return { a: store.a }; }`],
+		[
+			'branches that both allocate',
+			`() => { if (store.a) return { a: store.a }; else return [store.b]; }`,
+		],
+		['a conditional expression', `() => (store.a ? { a: 1 } : [])`],
+	])('rejects %s', (_label, getSnapshot) => {
+		expect(
+			rejected(
+				`export function A({ store }) { const s = useSyncExternalStore(store.subscribe, ${getSnapshot}); return <p>{String(s)}</p>; }`,
+			),
+		).toBe(UNCACHED_STORE_SNAPSHOT);
+	});
+
+	it('rejects a fresh server snapshot', () => {
+		expect(
+			rejected(
+				`export function A({ store }) { const s = useSyncExternalStore(store.subscribe, () => store.value, () => ({ value: 0 })); return <p>{String(s)}</p>; }`,
+			),
+		).toBe(UNCACHED_STORE_SNAPSHOT);
+	});
+
+	// The likely rewrites move the allocation out of the inline callback.
+	it.each([
+		[
+			'a module selector',
+			`function select(store) { return { a: store.a }; } export function A({ store }) { const s = useSyncExternalStore(store.subscribe, () => select(store)); return <p>{s.a}</p>; }`,
+		],
+		[
+			'a named getSnapshot declaration',
+			`function getSnapshot() { return [globalThis.innerWidth, globalThis.innerHeight]; } export function A({ store }) { const s = useSyncExternalStore(store.subscribe, getSnapshot); return <p>{s[0]}</p>; }`,
+		],
+		[
+			'a local constant',
+			`export function A({ store }) { const getSnapshot = () => { const snapshot = { a: store.a }; return snapshot; }; const s = useSyncExternalStore(store.subscribe, getSnapshot); return <p>{s.a}</p>; }`,
+		],
+	])('rejects the rewrite through %s', (_label, body) => {
+		expect(rejected(body)).toBe(UNCACHED_STORE_SNAPSHOT);
+	});
+
+	it.each([
+		["import { useSyncExternalStore as useStore } from 'octane';", 'useStore'],
+		["import * as Octane from 'octane';", 'Octane.useSyncExternalStore'],
+		["import * as Octane from 'octane';", 'Octane?.useSyncExternalStore'],
+	])('recognizes %s', (imports, hook) => {
+		const body = `export function A({ store }) { const s = ${hook}(store.subscribe, () => [store.a]); return <p>{s[0]}</p>; }`;
+		expect(rejected(body, imports)).toBe(UNCACHED_STORE_SNAPSHOT);
+	});
+
+	it('keeps stable snapshots, primitives, shared fallbacks, and opaque getters legal', () => {
+		expect(
+			strongCode(
+				tsx(`const EMPTY = [];
+export function A({ store }) {
+  const a = useSyncExternalStore(store.subscribe, () => store.state);
+  const b = useSyncExternalStore(store.subscribe, () => JSON.stringify({ a: store.a }));
+  const c = useSyncExternalStore(store.subscribe, () => store.items ?? EMPTY);
+  const d = useSyncExternalStore(store.subscribe, () => (store.x ? store.y : {}));
+  const e = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const f = useSyncExternalStore(store.subscribe, () => { const Map = store.M; return new Map(); });
+  const g = useSyncExternalStore(store.subscribe, () => store.title.slice(0, 3));
+  { const useSyncExternalStore = (subscribe, read) => read(); useSyncExternalStore(store.subscribe, () => ({ fresh: true })); }
+  return <p>{String(a)}{b}{String(c)}{String(d)}{String(e)}{String(f)}{g}</p>;
+}`),
+			),
+		).toBeNull();
+	});
+
+	it('checks .tsrx components and plain .ts custom hooks', () => {
+		const tsrx = `"use strong";
+import { useSyncExternalStore } from 'octane';
+export function A(props) @{
+  const size = useSyncExternalStore(props.store.subscribe, () => ({ width: props.store.width }));
+  <p>{size.width as string}</p>
+}`;
+		const hook = `"use strong";
+import { useSyncExternalStore } from 'octane';
+export function useSelection(store) {
+  return useSyncExternalStore(store.subscribe, () => store.items.filter((item) => item.selected));
+}`;
+		expect(strongCode(tsrx, '/src/A.tsrx')).toBe(UNCACHED_STORE_SNAPSHOT);
+		expect(() => slotHooks(hook, '/src/useSelection.ts')).toThrow(UNCACHED_STORE_SNAPSHOT);
+		expect(() =>
+			slotHooks(hook.replace('"use strong";\n', ''), '/src/useSelection.ts'),
+		).not.toThrow();
+	});
+
+	it('locates the fresh value and names the replacement', () => {
+		const source = tsx(
+			`export function A({ store }) { const s = useSyncExternalStore(store.subscribe, () => ({ a: store.a, b: store.b })); return <p>{s.a}</p>; }`,
+			IMPORTS,
+			true,
+		);
+		const diagnostic = volarDiagnostic(source, '/src/App.tsx', UNCACHED_STORE_SNAPSHOT);
+		expect(diagnostic.start.offset).toBe(source.indexOf('{ a: store.a'));
+		expect(diagnostic.message).toContain('Object.is');
+		expect(diagnostic.message).toContain('its own useSyncExternalStore call');
+	});
+
+	it('preserves emitted client and server code for stable snapshots', () => {
+		expectUnchangedOutput(
+			tsx(`export function A({ store }) {
+  const value = useSyncExternalStore(store.subscribe, () => store.value, () => 0);
+  return <p>{value}</p>;
 }`),
 			'/src/App.tsx',
 		);

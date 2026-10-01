@@ -13,6 +13,7 @@ import {
 	STRONG_SNAPSHOT_MUTATION,
 } from './strong-state.js';
 import { analyzeStrongWriteOnlyState } from './strong-write-only-state.js';
+import { analyzeStrongExternalStore } from './strong-external-store.js';
 
 const STATE_HOOKS = new Set(['useState', 'useReducer', 'useLinkedState']);
 const EFFECT_HOOKS = new Set(['useEffect', 'useLayoutEffect', 'useInsertionEffect']);
@@ -4926,7 +4927,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 	templatePolicy.finish();
 	const stateDiagnostic = (code, node, message) => diagnostic(code, filename, node, message);
-	diagnostics.push(...analyzeStrongWriteOnlyState(ast, strongHookAnalysis, stateDiagnostic));
+	diagnostics.push(
+		...analyzeStrongWriteOnlyState(ast, strongHookAnalysis, stateDiagnostic),
+		...analyzeStrongExternalStore(ast, strongHookAnalysis, stateDiagnostic),
+	);
 	for (const policy of analyzeStrongHookPolicies(ast, options)) {
 		diagnostics.push({
 			...diagnostic(policy.code, filename, policy.node, policy.message),
