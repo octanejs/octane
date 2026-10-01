@@ -350,7 +350,10 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		if (info?.kind !== 'var') return true;
 		if (varRegions === null) {
 			varRegions = new Map();
-			const mark = (declaration, start, end) => {
+			const mark = (statement, start, end) => {
+				// `export var` declares in the module like a bare `var`.
+				const declaration =
+					statement?.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
 				if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'var') return;
 				for (const decl of declaration.declarations ?? []) {
 					varRegions.set(decl, [start ?? decl.end, end]);

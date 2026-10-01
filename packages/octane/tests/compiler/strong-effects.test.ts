@@ -952,6 +952,16 @@ export function App(props) @{
 		accepts(app(setup));
 	});
 
+	it('treats module vars as initialized before an effect runs', () => {
+		const effect = `useEffect(() => { let active = true; (async () => { await ready; if (active) ${write}; })(); return () => { active = false; }; });`;
+		const module = (declaration: string) =>
+			app(effect).replace('export function App', `${declaration}\nexport function App`);
+		accepts(module('export var ready = globalThis.pending;'));
+		accepts(module('var ready = globalThis.pending;'));
+		// A module var declared in a branch may never run.
+		rejects(module('if (globalThis.enabled) var ready = globalThis.pending;'), UPDATE);
+	});
+
 	it.each([
 		'const ready = await ready;',
 		'const first = await second; const second = await first;',
