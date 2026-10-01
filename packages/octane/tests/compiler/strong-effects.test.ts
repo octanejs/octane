@@ -838,6 +838,14 @@ export function App(props) @{
 			`useEffect(() => { (async () => { const ready = props.flag ? await props.load() : null; await ready; ${write}; })(); });`,
 		],
 		[
+			'an await of a hoisted var before its initializer',
+			`useEffect(() => { let active = true; (async () => { await ready; if (active) ${write}; var ready = props.flag ? await props.load() : props.pending; })(); return () => { active = false; }; });`,
+		],
+		[
+			'an await of a hoisted var holding pending work',
+			`useEffect(() => { let active = true; (async () => { await ready; if (active) ${write}; var ready = props.pending; })(); return () => { active = false; }; });`,
+		],
+		[
 			'a promise that may already be settled',
 			`useEffect(() => { (props.flag ? Promise.resolve() : props.pending).then(() => ${write}); });`,
 		],
@@ -892,6 +900,14 @@ export function App(props) @{
 		[
 			'an await that an undefined operand always runs',
 			`useEffect(() => { let active = true; (async () => { await (undefined ?? (await props.load())); if (active) ${write}; })(); return () => { active = false; }; });`,
+		],
+		[
+			'an await of a var declared above it',
+			`useEffect(() => { let active = true; (async () => { var ready = props.pending; await ready; if (active) ${write}; })(); return () => { active = false; }; });`,
+		],
+		[
+			'an await of each var in a loop',
+			`useEffect(() => { let active = true; (async () => { for (var ready of props.pending) { await ready; if (active) ${write}; } })(); return () => { active = false; }; });`,
 		],
 		[
 			'a stored await whose every branch waits',
