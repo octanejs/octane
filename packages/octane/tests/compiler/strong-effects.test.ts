@@ -7,6 +7,8 @@ const FETCH = 'OCTANE_STRONG_EFFECT_DATA_FETCH';
 const CHAIN = 'OCTANE_STRONG_EFFECT_CHAIN';
 const PROPS = 'OCTANE_STRONG_UNLINKED_PROP_STATE';
 const UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
+const HIDDEN = 'OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY';
+const LEAK = 'OCTANE_STRONG_EFFECT_RESOURCE_LEAK';
 const component = (setup: string, params = 'props', output = '<div />') => `
 import { useState, useReducer, useLinkedState, useEffect, useLayoutEffect, useInsertionEffect, useEffectEvent, useRef } from 'octane';
 export function App(${params}) @{
@@ -727,6 +729,292 @@ describe('Strong effect review regressions', () => {
 	});
 });
 
+describe('Strong effect try clauses', () => {
+	const EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
+	const setup = (body: string) =>
+		`const [data, setData] = useState(null); const [error, setError] = useState(null); const [loading, setLoading] = useState(true); useEffect(() => { let ignore = false; (async () => { ${body} })(); return () => { ignore = true; }; });`;
+	const load = (body: string) => `import { useState, useEffect } from 'octane';
+import { api } from './api';
+export function App(props) @{
+  ${setup(body)}
+  <div data-loading={loading}>{data}{error}</div>
+}`;
+	const hook = (body: string) =>
+		`import { useState, useEffect } from 'octane'; import { api } from './api'; export function useData(props) { ${setup(body)} return [data, error, loading]; }`;
+
+	it('accepts a catch-clause update for an awaited call that rejects', () => {
+		const source = load(
+			'try { const v = await api.get(props.id); if (!ignore) setData(v); } catch (e) { if (!ignore) setError(e); }',
+		);
+		for (const mode of ['client', 'server'] as const) {
+			for (const dev of [false, true]) {
+				const standard = compile(source, '/src/App.tsrx', { mode, dev });
+				const strong = compile(source, '/src/App.tsrx', { mode, dev, strong: true });
+				expect(strong.code).toBe(standard.code);
+			}
+		}
+		expect(compileToVolarMappings(`"use strong";\n${source}`, '/src/App.tsrx').diagnostics).toEqual(
+			[],
+		);
+	});
+
+	it.each([
+		[
+			'awaited promise calls chained through then',
+			'try { const value = await api.get(props.id).then((response) => response.data); if (!ignore) setData(value); } catch (e) { if (!ignore) setError(e); }',
+		],
+		[
+			'awaited fetches',
+			'try { const response = await fetch(`/api/${props.id}`); const value = await response.json(); if (!ignore) setData(value); } catch (e) { if (!ignore) setError(e); }',
+		],
+		[
+			'awaited dynamic imports',
+			"try { const value = await import('./data'); if (!ignore) setData(value); } catch (e) { if (!ignore) setError(e); }",
+		],
+		[
+			'awaited promises created before the try',
+			'const request = api.get(props.id); try { const value = await request; if (!ignore) setData(value); } catch (e) { if (!ignore) setError(e); }',
+		],
+		[
+			'property reads, object destructuring and assignments before the await',
+			'let key; try { const { id, ...query } = props; key = props.scope ?? id; const value = await api.get(`item:${key}`, { query }); if (!ignore) setData(value); } catch (e) { if (!ignore) setError(e); }',
+		],
+		[
+			"object literals in the awaited call's arguments",
+			'try { const value = await api.get({ id: props.id, ...props.query }); if (!ignore) setData(value); } catch (e) { if (!ignore) setError(e); }',
+		],
+		[
+			'awaited promise constructors',
+			'try { await new Promise((resolve) => setTimeout(resolve, props.delay)); const value = await api.get(props.id); if (!ignore) setData(value); } catch (e) { if (!ignore) setError(e); }',
+		],
+		[
+			'this receivers of the awaited call',
+			'try { const value = await this.api.get(props.id); if (!ignore) setData(value); } catch (e) { if (!ignore) setError(e); }',
+		],
+		[
+			"import.meta reads in the awaited call's arguments",
+			'try { const value = await api.get(import.meta.env.VITE_API, props.id); if (!ignore) setData(value); } catch (e) { if (!ignore) setError(e); }',
+		],
+		...['all', 'allSettled', 'any', 'race'].map((combinator) => [
+			`calls inside an awaited Promise.${combinator}`,
+			`try { const [user, posts] = await Promise.${combinator}([api.user(props.id), api.posts(props.id).then((response) => response.items)]); if (!ignore) setData({ user, posts }); } catch (e) { if (!ignore) setError(e); }`,
+		]),
+		[
+			'early exits before the await',
+			'try { if (!props.id) return; const value = await api.get(props.id); if (!ignore) setData(value); } catch (e) { if (!ignore) setError(e); }',
+		],
+		[
+			'function declarations before the await',
+			'try { function pick(value) { return value.data; } const value = await api.get(props.id); if (!ignore) setData(pick(value)); } catch (e) { if (!ignore) setError(e); }',
+		],
+		[
+			'catch clauses that rethrow after yielding',
+			'try { try { const value = await api.get(props.id); if (!ignore) setData(value); } catch (inner) { api.log(inner); throw inner; } } catch (e) { if (!ignore) setError(e); }',
+		],
+		[
+			'finally blocks entered only after yielding',
+			'try { const value = await api.get(props.id); if (!ignore) setData(value); } catch (e) { if (!ignore) setError(e); } finally { if (!ignore) setLoading(false); }',
+		],
+		[
+			'statements after a try whose catch runs only after yielding',
+			'try { const value = await api.get(props.id); if (!ignore) setData(value); } catch (e) { if (!ignore) setError(e); } if (!ignore) setLoading(false);',
+		],
+		[
+			'nested try/finally blocks entered only after yielding',
+			'try { try { const value = await api.get(props.id); if (!ignore) setData(value); } finally { if (!ignore) setLoading(false); } } catch (e) { if (!ignore) setError(e); }',
+		],
+		[
+			'nested finally blocks that yield before rethrowing',
+			'try { try { api.reset(); } finally { const value = await api.get(props.id); if (!ignore) setData(value); } } catch (e) { if (!ignore) setError(e); }',
+		],
+		[
+			'do-while exits from catch clauses entered only after yielding',
+			'do { try { const value = await api.get(props.id); if (!ignore) setData(value); } catch (e) { break; } } while (props.retry); if (!ignore) setLoading(false);',
+		],
+	])('allows updates in try clauses reached only after yielding: %s', (_label, body) => {
+		const source = load(body);
+		expect(compile(source, '/src/App.tsrx', { strong: true }).code).toBe(
+			compile(source, '/src/App.tsrx').code,
+		);
+		expect(compileToVolarMappings(`"use strong";\n${source}`, '/src/App.tsrx').diagnostics).toEqual(
+			[],
+		);
+		expect(slotHooks(`"use strong"; ${hook(body)}`, '/src/useData.ts')?.code).toBe(
+			`"use strong"; ${slotHooks(hook(body), '/src/useData.ts')!.code}`,
+		);
+	});
+
+	it.each([
+		[
+			'throws before the await',
+			"try { if (!props.id) throw new Error('missing'); setData(await api.get(props.id)); } catch (e) { setError(e); }",
+			'setError(e)',
+		],
+		[
+			'settled awaits that reject',
+			'try { await Promise.reject(props.error); } catch (e) { if (!ignore) setError(e); }',
+			'setError(e)',
+		],
+		[
+			'calls before the await',
+			'try { const key = api.key(props.id); setData(await api.get(key)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			"calls in the awaited call's arguments",
+			'try { setData(await api.get(api.key(props.id))); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			"calls in the awaited call's receiver",
+			'try { setData(await api.client().get(props.id)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			"call arguments inside an awaited Promise combinator's elements",
+			'try { setData(await Promise.all([api.get(api.key(props.id))])); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'non-literal arrays passed to an awaited Promise combinator',
+			'try { setData(await Promise.all(props.ids.map((id) => api.get(id)))); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'spread elements in an awaited Promise combinator',
+			'try { setData(await Promise.all([...props.requests])); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			"calls in an awaited Promise combinator's ignored arguments",
+			'try { setData(await Promise.race([props.request], [api.reset()])); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			"calls inside a non-Promise object's all()",
+			'try { setData(await api.all([api.get(props.id)])); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'calls inside a combinator on a shadowed Promise',
+			'const Promise = api.Promise; try { setData(await Promise.all([api.get(props.id)])); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			"spreads in the awaited call's arguments",
+			'try { setData(await api.get(...props.ids)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'array destructuring before the await',
+			'try { const [first] = props.ids; setData(await api.get(first)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'destructuring defaults before the await',
+			'try { const { id = api.defaultId() } = props; setData(await api.get(id)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'calls after a block that breaks to its label',
+			'try { done: { break done; } api.reset(); setData(await api.get(props.id)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'catch bindings that destructure synchronously',
+			'try { try { api.reset(); } catch ([reason]) { setData(await api.get(reason)); } } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'conditional calls before the await',
+			'try { props.cached ? api.reset() : setData(await api.get(props.id)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'finally blocks reached by an early exit',
+			'try { if (!props.id) return; setData(await api.get(props.id)); } finally { setLoading(false); }',
+			'setLoading(false)',
+		],
+		[
+			'statements after a catch clause entered synchronously',
+			'try { api.reset(); setData(await api.get(props.id)); } catch (e) {} setLoading(false);',
+			'setLoading(false)',
+		],
+		[
+			'nested finally blocks that throw synchronously',
+			'try { try { api.reset(); } finally { api.log(); } setData(await api.get(props.id)); } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+		[
+			'nested finally blocks reached by an early exit',
+			'try { try { if (!props.id) return; setData(await api.get(props.id)); } finally { api.log(); } } catch (e) { setError(e); }',
+			'setError(e)',
+		],
+	])('still rejects try clauses that can run synchronously: %s', (_label, body, update) => {
+		const source = load(body);
+		rejects(source, EFFECT_STATE_UPDATE);
+		const strong = `"use strong";\n${source}`;
+		const start = strong.indexOf(update);
+		expect(compileToVolarMappings(strong, '/src/App.tsrx').diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: EFFECT_STATE_UPDATE,
+				start: expect.objectContaining({ offset: start }),
+			}),
+		);
+		expect(slotHooks(hook(body), '/src/useData.ts')).not.toBeNull();
+		expect(() => slotHooks(`"use strong"; ${hook(body)}`, '/src/useData.ts')).toThrow(
+			EFFECT_STATE_UPDATE,
+		);
+	});
+
+	it.each([
+		["import Promise from 'bluebird';", ''],
+		['enum Promise { Pending }', ''],
+		['namespace Promise { export const all = (values) => values; }', ''],
+		['', 'function wrap(Promise) { return Promise; }'],
+		['', 'class Promise {}'],
+		['', 'try {} catch (Promise) {}'],
+	])(
+		'does not trust Promise combinator elements when the module binds Promise: %s%s',
+		(imports, local) => {
+			const body = `${local} try { setData(await Promise.all([api.get(props.id)])); } catch (e) { setError(e); }`;
+			rejects(`${imports}\n${load(body)}`, EFFECT_STATE_UPDATE);
+		},
+	);
+
+	it('does not trust Promise combinator elements after a TypeScript import-equals Promise', () => {
+		const source = `import Promise = require('bluebird'); ${hook(
+			'try { setData(await Promise.all([api.get(props.id)])); } catch (e) { setError(e); }',
+		)}`;
+		expect(slotHooks(source, '/src/useData.ts')).not.toBeNull();
+		expect(() => slotHooks(`"use strong"; ${source}`, '/src/useData.ts')).toThrow(
+			EFFECT_STATE_UPDATE,
+		);
+	});
+
+	it('checks a catch clause reached after yielding for stale state updates', () => {
+		rejects(
+			component(
+				'const [count, setCount] = useState(0); useEffect(() => { (async () => { try { await api.save(count); } catch (e) { setCount(count + 1); } })(); return () => {}; });',
+				'props',
+				'<div>{count as string}</div>',
+			),
+			'OCTANE_STRONG_STALE_STATE_UPDATE',
+		);
+	});
+
+	it('still reports an uncancelled fetch whose catch clause updates state', () => {
+		rejects(
+			component(
+				`const [error, setError] = useState(null); useEffect(() => { (async () => { try { await fetch('/api'); } catch (e) { setError(e); } })(); });`,
+				'props',
+				'<div>{error}</div>',
+			),
+			FETCH,
+		);
+	});
+});
+
 describe('Strong zero-delay effect updates', () => {
 	const app = (setup: string) => `
 import * as Octane from 'octane';
@@ -842,6 +1130,10 @@ export function App(props) @{
 			`useEffect(() => { (async () => { await Promise.resolve(); ${write}; })(); });`,
 		],
 		['a nested await', `useEffect(() => { (async () => { await (await null); ${write}; })(); });`],
+		[
+			'a conditional await whose other branch is settled',
+			`useEffect(() => { let active = true; (async () => { await (props.flag ? await props.load() : null); if (active) ${write}; })(); return () => { active = false; }; });`,
+		],
 		[
 			'a short-circuited await',
 			`useEffect(() => { (async () => { await (null && (await props.load())); ${write}; })(); });`,
@@ -1250,6 +1542,13 @@ export function App(props) @{
 			app(hooks, `const [value, setValue] = useThing(); setValue(1);`),
 			'OCTANE_STRONG_RENDER_STATE_UPDATE',
 		);
+		rejects(
+			app(
+				hooks,
+				`const [value, setValue, getValue] = useThing(); useEffect(() => { props.log(getValue()); });`,
+			),
+			HIDDEN,
+		);
 	});
 
 	it.each([
@@ -1344,6 +1643,655 @@ export function A({ v }) { const [x, setX] = useThing(); useEffect(() => { setX(
 	});
 });
 
+describe('Strong hidden effect dependencies', () => {
+	const app = (setup: string, output = '<div />', moduleSetup = '') => `
+import * as Octane from 'octane';
+import { useState, useEffect, useLayoutEffect, useInsertionEffect, useRef, useEffectEvent } from 'octane';
+import { measure } from './measure';
+${moduleSetup}
+export function App(props) @{
+  const [count, setCount, getCount] = useState(0);
+  ${setup}
+  ${output}
+}`;
+
+	it.each([
+		['a state getter', `useEffect(() => { props.log(getCount()); });`],
+		[
+			'a tuple getter index',
+			`const state = useState(0); useEffect(() => { props.log(state[2]()); });`,
+		],
+		['a getter alias', `const read = getCount; useEffect(() => { props.log(read()); });`],
+		[
+			'a getter in a helper',
+			`const read = () => getCount(); useEffect(() => { props.log(read()); });`,
+		],
+		[
+			'a getter in a zero-delay callback',
+			`useEffect(() => { queueMicrotask(() => props.log(getCount())); });`,
+		],
+		['a getter in a layout effect', `useLayoutEffect(() => { props.log(getCount()); });`],
+		['a getter in an insertion effect', `useInsertionEffect(() => { props.log(getCount()); });`],
+		[
+			'a previous-value ref',
+			`const last = useRef(0); useEffect(() => { props.log(last.current); last.current = count; });`,
+		],
+		[
+			'a first-run guard',
+			`const first = useRef(true); useEffect(() => { if (first.current) { first.current = false; return; } props.track(props.value); });`,
+		],
+		[
+			'a destructured ref',
+			`const last = useRef(0); useEffect(() => { const { current } = last; props.log(current); });`,
+		],
+		[
+			'a ref destructured by assignment',
+			`const last = useRef(0); useEffect(() => { let current; ({ current } = last); props.log(current); });`,
+		],
+		[
+			'a ref alias',
+			`const last = useRef(0); const alias = last; useEffect(() => { props.log(alias.current); });`,
+		],
+		[
+			'a ref read in a helper',
+			`const last = useRef(0); const read = () => last.current; useEffect(() => { props.log(read()); });`,
+		],
+		['a compound ref update', `const runs = useRef(0); useEffect(() => { runs.current += 1; });`],
+		['a ref increment', `const runs = useRef(0); useEffect(() => { runs.current++; });`],
+		[
+			'an optional ref read',
+			`const last = useRef(0); useEffect(() => { props.log(last?.current); });`,
+		],
+		[
+			'a computed ref read',
+			`const last = useRef(0); useEffect(() => { props.log(last['current']); });`,
+		],
+		[
+			'a namespace ref',
+			`const last = Octane.useRef(0); useEffect(() => { props.log(last.current); });`,
+		],
+	])('rejects %s in effect setup', (_label, setup) => {
+		rejects(app(setup), HIDDEN);
+	});
+
+	it.each([
+		[
+			'a didInit guard',
+			`useEffect(() => { if (didInit) return; didInit = true; props.init(); });`,
+			'let didInit = false;',
+		],
+		[
+			'a previous-value module variable',
+			`useEffect(() => { props.log(last); last = count; });`,
+			'let last = 0;',
+		],
+		['a module counter', `useEffect(() => { runs++; });`, 'let runs = 0;'],
+		[
+			'a module read in a helper',
+			`useEffect(() => { props.log(readLast()); });`,
+			'let last = 0; function readLast() { return last; } export function bump() { last++; }',
+		],
+	])('rejects %s in effect setup', (_label, setup, moduleSetup) => {
+		rejects(app(setup, '<div />', moduleSetup), HIDDEN);
+	});
+
+	it.each([
+		['a dependency list', '[last]'],
+		['a parenthesized dependency list', '([last])'],
+		['a cast dependency list', '[last] as const'],
+		['a satisfies dependency list', '[last] satisfies unknown[]'],
+	])('does not treat %s as attaching a ref', (_label, dependencies) => {
+		expect(
+			errors(
+				app(
+					`const last = useRef(0); useEffect(() => { props.log(last.current); }, ${dependencies});`,
+				),
+			),
+		).toContain(HIDDEN);
+	});
+
+	it.each([
+		['ref writes', `const last = useRef(0); useEffect(() => { last.current = count; });`],
+		[
+			'an element ref',
+			`const element = useRef(null); useEffect(() => { element.current.focus(); });`,
+			'<div ref={element} />',
+		],
+		[
+			'an element ref in an array',
+			`const element = useRef(null); useEffect(() => { props.log(element.current); });`,
+			'<div ref={[element, props.forwarded]} />',
+		],
+		[
+			'a ref passed to a component',
+			`const element = useRef(null); useEffect(() => { props.log(element.current); });`,
+			'<props.Input inputRef={element} />',
+		],
+		[
+			'a ref passed to a call',
+			`const element = useRef(null); useEffect(() => { measure(element); props.log(element.current); });`,
+		],
+		[
+			'a ref attached through a reassignable alias',
+			`const element = useRef(null); let target = element; if (props.other) target = props.other; useEffect(() => { props.log(element.current); });`,
+			'<div ref={target} />',
+		],
+		[
+			'a ref held in a container',
+			`const refs = [useRef(0)]; useEffect(() => { props.log(refs[0].current); });`,
+		],
+		[
+			'a ref read in cleanup',
+			`const last = useRef(0); useEffect(() => { return () => props.log(last.current); });`,
+		],
+		[
+			'a ref read in a subscription',
+			`const last = useRef(0); useEffect(() => props.subscribe(() => props.log(last.current)));`,
+		],
+		[
+			'a ref read in an Effect Event',
+			`const last = useRef(0); const report = useEffectEvent((next) => { props.log(last.current); last.current = next; }); useEffect(() => { report(count); });`,
+		],
+		[
+			'a getter in an Effect Event',
+			`const read = useEffectEvent(() => props.log(getCount())); useEffect(() => { read(); });`,
+		],
+		['a getter in cleanup', `useEffect(() => { return () => { props.log(getCount()); }; });`],
+		['a snapshot', `useEffect(() => { props.log(count); });`],
+		['a shadowed getter', `useEffect(() => { const getCount = () => 1; props.log(getCount()); });`],
+		[
+			'a local first-run flag',
+			`useEffect(() => { let didInit = false; if (didInit) return; didInit = true; });`,
+		],
+		[
+			'a ref whose destructuring assignment value escapes',
+			`const last = useRef(0); useEffect(() => { let current; props.log(({ current } = last)); });`,
+		],
+	])('keeps %s legal', (_label, setup, output = '<div />') => {
+		accepts(app(setup, output));
+	});
+
+	it.each([
+		['an unreassigned module let', 'let LIMIT = 10;'],
+		['a module constant', 'const LIMIT = 10;'],
+	])('keeps %s legal', (_label, moduleSetup) => {
+		accepts(app(`useEffect(() => { props.log(LIMIT); });`, '<div />', moduleSetup));
+	});
+
+	it('enforces TSX components and plain TypeScript custom hooks', () => {
+		const tsx = `"use strong";
+import { useState, useEffect, useRef } from 'octane';
+export function A({ log }) { const [c, setC] = useState(0); const last = useRef(0); useEffect(() => { log(last.current); last.current = c; }); return <button onClick={() => setC(c + 1)}>{c}</button>; }`;
+		expect(() => compile(tsx, '/src/A.tsx')).toThrow(HIDDEN);
+		const ts = `"use strong";
+import { useRef, useEffect } from 'octane';
+export function usePreviousLog(value, log) { const last = useRef(value); useEffect(() => { log(last.current); last.current = value; }); }`;
+		expect(() => slotHooks(ts, '/src/use-previous-log.ts')).toThrow(HIDDEN);
+	});
+
+	it('names the snapshot and Effect Event replacements', () => {
+		const result = compileToVolarMappings(
+			app(
+				`const first = useRef(true); useEffect(() => { if (first.current) { first.current = false; return; } props.track(props.value); });`,
+			),
+			'/src/App.tsrx',
+			{ strong: true },
+		);
+		const error = result.diagnostics.find((diagnostic) => diagnostic.code === HIDDEN);
+		expect(error?.message).toContain('useEffectEvent');
+		expect(error?.message).toContain('never double-invokes');
+		expect(error?.start.line).toBe(8);
+	});
+});
+
+describe('Strong effect resource cleanup', () => {
+	const app = (setup: string) => `
+import { useState, useEffect, useLayoutEffect, useRef } from 'octane';
+export function App(props) @{
+  const [width, setWidth] = useState(0);
+  const element = useRef(null);
+  ${setup}
+  <div ref={element}>{width as string}</div>
+}`;
+
+	it.each([
+		'props.on ? element : null',
+		'props.on && element',
+		'[element] as const',
+		'(element as any)',
+	])('treats a ref passed as %s to an element as a platform target', (ref) => {
+		const setup = `useEffect(() => { element.current.addEventListener('click', () => setWidth(1)); });`;
+		rejects(app(setup).replace('<div ref={element}>', `<div ref={${ref}}>`), LEAK);
+	});
+
+	it.each([
+		[
+			'a window listener',
+			`useEffect(() => { window.addEventListener('resize', () => setWidth(window.innerWidth)); });`,
+		],
+		[
+			'a globalThis listener',
+			`useEffect(() => { globalThis.addEventListener('resize', () => setWidth(1)); });`,
+		],
+		[
+			'a document listener',
+			`useEffect(() => { document.addEventListener('keydown', () => setWidth(1)); });`,
+		],
+		[
+			'a body listener',
+			`useEffect(() => { document.body.addEventListener('click', () => setWidth(1)); });`,
+		],
+		[
+			'an element listener',
+			`useEffect(() => { element.current.addEventListener('scroll', () => setWidth(1)); });`,
+		],
+		[
+			'an element alias listener',
+			`useEffect(() => { const node = element.current; node.addEventListener('scroll', () => setWidth(1)); });`,
+		],
+		[
+			'a media query listener',
+			`useEffect(() => { const query = window.matchMedia('(min-width: 600px)'); query.addEventListener('change', () => setWidth(1)); });`,
+		],
+		[
+			'a one-shot listener',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize, { once: true }); });`,
+		],
+		[
+			'a listener removed with a new function',
+			`useEffect(() => { window.addEventListener('resize', () => setWidth(1)); return () => window.removeEventListener('resize', () => setWidth(1)); });`,
+		],
+		[
+			'a listener removed with another handler',
+			`useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); window.addEventListener('resize', first); return () => window.removeEventListener('resize', second); });`,
+		],
+		[
+			'a listener removed for another event',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize); return () => window.removeEventListener('scroll', onResize); });`,
+		],
+		[
+			'a capture listener removed without capture',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize, true); return () => window.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a capture listener removed from another target',
+			`useEffect(() => { const onKey = () => setWidth(1); document.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); });`,
+		],
+		[
+			'a signal that is never aborted',
+			`useEffect(() => { const controller = new AbortController(); window.addEventListener('resize', () => setWidth(1), { signal: controller.signal }); });`,
+		],
+		[
+			'a handler property',
+			`useEffect(() => { window.onresize = () => setWidth(window.innerWidth); });`,
+		],
+		[
+			'an interval',
+			`useEffect(() => { setInterval(() => setWidth((value) => value + 1), 1000); });`,
+		],
+		[
+			'an uncleared interval ID',
+			`useEffect(() => { const id = setInterval(() => setWidth(1), 1000); });`,
+		],
+		[
+			'an interval cleared by another ID',
+			`useEffect(() => { const id = setInterval(() => setWidth(1), 1000); const other = 1; return () => clearInterval(other); });`,
+		],
+		[
+			'a window interval with an empty cleanup',
+			`useEffect(() => { window.setInterval(() => setWidth(1), 1000); return () => {}; });`,
+		],
+		[
+			'a self-rescheduling timeout',
+			`useEffect(() => { const tick = () => { setWidth((value) => value + 1); setTimeout(tick, 1000); }; setTimeout(tick, 1000); });`,
+		],
+		[
+			'a timeout loop that loses its ID',
+			`useEffect(() => { let id = 0; const tick = () => { setWidth((value) => value + 1); setTimeout(tick, 1000); }; id = setTimeout(tick, 1000); return () => clearTimeout(id); });`,
+		],
+		[
+			'an animation frame loop',
+			`useEffect(() => { function loop() { setWidth((value) => value + 1); requestAnimationFrame(loop); } requestAnimationFrame(loop); });`,
+		],
+		[
+			'a chained ResizeObserver',
+			`useEffect(() => { new ResizeObserver(([entry]) => setWidth(entry.contentRect.height)).observe(element.current); });`,
+		],
+		[
+			'a ResizeObserver',
+			`useEffect(() => { const observer = new ResizeObserver(() => setWidth(1)); observer.observe(element.current); });`,
+		],
+		[
+			'an IntersectionObserver',
+			`useEffect(() => { const observer = new IntersectionObserver(() => setWidth(1)); observer.observe(element.current); return () => {}; });`,
+		],
+		[
+			'a MutationObserver',
+			`useEffect(() => { const observer = new MutationObserver(() => setWidth(1)); observer.observe(element.current, { childList: true }); });`,
+		],
+		[
+			'a PerformanceObserver',
+			`useEffect(() => { const observer = new PerformanceObserver(() => setWidth(1)); observer.observe({ type: 'paint' }); });`,
+		],
+		[
+			'a WebSocket',
+			`useEffect(() => { const socket = new WebSocket(props.url); socket.onmessage = (event) => setWidth(event.data); });`,
+		],
+		[
+			'an EventSource',
+			`useEffect(() => { const source = new EventSource(props.url); source.addEventListener('message', () => setWidth(1)); });`,
+		],
+		[
+			'a BroadcastChannel',
+			`useEffect(() => { const channel = new BroadcastChannel('x'); channel.onmessage = () => setWidth(1); });`,
+		],
+		[
+			'a geolocation watch',
+			`useEffect(() => { navigator.geolocation.watchPosition((position) => setWidth(position.coords.latitude)); });`,
+		],
+		[
+			'a geolocation watch cleared by another ID',
+			`useEffect(() => { const id = navigator.geolocation.watchPosition(() => setWidth(1)); return () => navigator.geolocation.clearWatch(0); });`,
+		],
+		[
+			'an async effect callback',
+			`useEffect(async () => { window.addEventListener('resize', () => setWidth(1)); });`,
+		],
+		[
+			'a layout effect',
+			`useLayoutEffect(() => { window.addEventListener('resize', () => setWidth(1)); });`,
+		],
+		[
+			'a zero-delay callback',
+			`useEffect(() => { queueMicrotask(() => window.addEventListener('resize', () => setWidth(1))); });`,
+		],
+		[
+			'a local helper',
+			`useEffect(() => { const listen = () => window.addEventListener('resize', () => setWidth(1)); listen(); });`,
+		],
+		[
+			'a target passed to a helper',
+			`function listen(target, type, handler) { target.addEventListener(type, handler); } useEffect(() => { listen(window, 'resize', () => setWidth(1)); });`,
+		],
+		[
+			'a destructured document property',
+			`useEffect(() => { const { body } = document; body.addEventListener('click', () => setWidth(1)); });`,
+		],
+		[
+			'the global addEventListener',
+			`useEffect(() => { addEventListener('resize', () => setWidth(1)); });`,
+		],
+		['a global handler property', `useEffect(() => { onresize = () => setWidth(1); });`],
+		[
+			'a helper removal for another event',
+			`function listen(target, type, handler) { target.addEventListener(type, handler); } function unlisten(target, type, handler) { target.removeEventListener(type, handler); } useEffect(() => { const onResize = () => setWidth(1); listen(window, 'resize', onResize); return () => unlisten(window, 'scroll', onResize); });`,
+		],
+		[
+			'a helper removal without capture',
+			`function listen(target, type, handler, capture) { target.addEventListener(type, handler, capture); } function unlisten(target, type, handler) { target.removeEventListener(type, handler); } useEffect(() => { const onResize = () => setWidth(1); listen(window, 'resize', onResize, true); return () => unlisten(window, 'resize', onResize); });`,
+		],
+		[
+			'an aliased capture option removed without capture',
+			`useEffect(() => { const options = { capture: true }; const onResize = () => setWidth(1); window.addEventListener('resize', onResize, options); return () => window.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a helper capture option removed without capture',
+			`function listen(target, handler, options) { target.addEventListener('resize', handler, options); } useEffect(() => { const onResize = () => setWidth(1); listen(window, onResize, { capture: true }); return () => window.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a listener on a conditional platform target',
+			`useEffect(() => { const target = props.wide ? window : document; target.addEventListener('resize', () => setWidth(1)); });`,
+		],
+		[
+			'a named function timer that reschedules itself',
+			`useEffect(() => { setTimeout(function tick() { setWidth(1); setTimeout(tick, 1000); }, 1000); });`,
+		],
+		[
+			'a conditionally created interval',
+			`useEffect(() => { const id = props.enabled ? setInterval(() => setWidth(1), 1000) : null; });`,
+		],
+		[
+			'a stored helper remover for another handler',
+			`function subscribe(handler, other) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', other); } useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); const stop = subscribe(first, second); return stop; });`,
+		],
+		[
+			'a returned helper remover for another handler',
+			`function subscribe(handler, other) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', other); } useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); return subscribe(first, second); });`,
+		],
+		[
+			'a helper removal for another handler',
+			`function listen(target, type, handler) { target.addEventListener(type, handler); } function unlisten(target, type, handler) { target.removeEventListener(type, handler); } useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); listen(window, 'resize', first); return () => unlisten(window, 'resize', second); });`,
+		],
+	])('rejects %s without release', (_label, setup) => {
+		rejects(app(setup), LEAK);
+	});
+
+	it.each([
+		[
+			'a removed listener',
+			`useEffect(() => { const onResize = () => setWidth(window.innerWidth); window.addEventListener('resize', onResize); return () => window.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a removed capture listener',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize, true); return () => window.removeEventListener('resize', onResize, true); });`,
+		],
+		[
+			'a capture option object',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize, { capture: true, passive: true }); return () => window.removeEventListener('resize', onResize, { capture: true }); });`,
+		],
+		[
+			'an aborted listener signal',
+			`useEffect(() => { const controller = new AbortController(); window.addEventListener('resize', () => setWidth(1), { signal: controller.signal }); return () => controller.abort(); });`,
+		],
+		[
+			'a removed listener on a conditional platform target',
+			`useEffect(() => { const target = props.wide ? window : document; const onResize = () => setWidth(1); target.addEventListener('resize', onResize); return () => target.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a named function timer that stores each reschedule',
+			`useEffect(() => { let id = setTimeout(function tick() { setWidth(1); id = setTimeout(tick, 1000); }, 1000); return () => clearTimeout(id); });`,
+		],
+		[
+			'a cleared conditional interval',
+			`useEffect(() => { const id = props.enabled ? setInterval(() => setWidth(1), 1000) : null; return () => clearInterval(id); });`,
+		],
+		[
+			'a cleared logical interval',
+			`useEffect(() => { const id = props.enabled && setInterval(() => setWidth(1), 1000); return () => clearInterval(id); });`,
+		],
+		[
+			'a remover returned by a helper',
+			`function subscribe(handler) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', handler); } useEffect(() => { const onResize = () => setWidth(1); return subscribe(onResize); });`,
+		],
+		[
+			'a helper remover stored before it is returned',
+			`function subscribe(handler) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', handler); } useEffect(() => { const onResize = () => setWidth(1); const stop = subscribe(onResize); return stop; });`,
+		],
+		[
+			'a remover returned through nested helpers',
+			`function subscribe(handler) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', handler); } function watch(handler) { return subscribe(handler); } useEffect(() => { const onResize = () => setWidth(1); const stop = watch(onResize); return stop; });`,
+		],
+		[
+			'a stored helper abort',
+			`function listen(handler, controller) { window.addEventListener('resize', handler, { signal: controller.signal }); return () => controller.abort(); } useEffect(() => { const controller = new AbortController(); const stop = listen(() => setWidth(1), controller); return stop; });`,
+		],
+		[
+			'removers from two calls of one helper',
+			`function subscribe(handler) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', handler); } useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); const stopFirst = subscribe(first); const stopSecond = subscribe(second); return props.flag ? stopFirst : stopSecond; });`,
+		],
+		[
+			'a remover returned by a helper from an expression body',
+			`function subscribe(handler) { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', handler); } const onResize = () => setWidth(1); useEffect(() => subscribe(onResize));`,
+		],
+		[
+			'an aliased capture option',
+			`useEffect(() => { const options = { capture: true }; const onResize = () => setWidth(1); window.addEventListener('resize', onResize, options); return () => window.removeEventListener('resize', onResize, options); });`,
+		],
+		[
+			'an aliased listener signal',
+			`useEffect(() => { const controller = new AbortController(); const options = { signal: controller.signal }; window.addEventListener('resize', () => setWidth(1), options); return () => controller.abort(); });`,
+		],
+		[
+			'a listener signal passed to a helper',
+			`function listen(handler, options) { window.addEventListener('resize', handler, options); } useEffect(() => { const controller = new AbortController(); listen(() => setWidth(1), { signal: controller.signal }); return () => controller.abort(); });`,
+		],
+		[
+			'a controller passed to listener and cleanup helpers',
+			`function listen(handler, controller) { window.addEventListener('resize', handler, { signal: controller.signal }); } function stop(controller) { controller.abort(); } useEffect(() => { const controller = new AbortController(); listen(() => setWidth(1), controller); return () => stop(controller); });`,
+		],
+		[
+			'a removed element listener',
+			`useEffect(() => { const onScroll = () => setWidth(1); element.current.addEventListener('scroll', onScroll); return () => element.current.removeEventListener('scroll', onScroll); });`,
+		],
+		[
+			'a removed element alias listener',
+			`useEffect(() => { const node = element.current; const onScroll = () => setWidth(1); node.addEventListener('scroll', onScroll); return () => node.removeEventListener('scroll', onScroll); });`,
+		],
+		[
+			'a removed media query listener',
+			`useEffect(() => { const query = window.matchMedia('(x)'); const onChange = () => setWidth(1); query.addEventListener('change', onChange); return () => query.removeEventListener('change', onChange); });`,
+		],
+		[
+			'optional listener calls',
+			`useEffect(() => { const onResize = () => setWidth(1); window?.addEventListener('resize', onResize); return () => window?.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a conditional removal',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize); return () => { if (onResize) window.removeEventListener('resize', onResize); }; });`,
+		],
+		[
+			'a removal in a cleanup helper',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize); return () => stop(); function stop() { window.removeEventListener('resize', onResize); } });`,
+		],
+		[
+			'a reset handler property',
+			`useEffect(() => { window.onresize = () => setWidth(1); return () => { window.onresize = null; }; });`,
+		],
+		[
+			'a cleared interval',
+			`useEffect(() => { const id = setInterval(() => setWidth((value) => value + 1), 1000); return () => clearInterval(id); });`,
+		],
+		[
+			'a window interval',
+			`useEffect(() => { const id = window.setInterval(() => setWidth(1), 1000); return () => window.clearInterval(id); });`,
+		],
+		[
+			'an interval cleared with clearTimeout',
+			`useEffect(() => { const id = setInterval(() => setWidth(1), 1000); return () => clearTimeout(id); });`,
+		],
+		[
+			'an interval kept in a ref',
+			`const timer = useRef(0); useEffect(() => { timer.current = setInterval(() => setWidth(1), 1000); return () => clearInterval(timer.current); });`,
+		],
+		[
+			'a cancelled timeout loop',
+			`useEffect(() => { let id = 0; const tick = () => { setWidth((value) => value + 1); id = setTimeout(tick, 1000); }; id = setTimeout(tick, 1000); return () => clearTimeout(id); });`,
+		],
+		[
+			'a cancelled animation loop',
+			`useEffect(() => { let frame = 0; function loop() { setWidth((value) => value + 1); frame = requestAnimationFrame(loop); } frame = requestAnimationFrame(loop); return () => cancelAnimationFrame(frame); });`,
+		],
+		[
+			'a disconnected observer',
+			`useEffect(() => { const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.height)); observer.observe(element.current); return () => observer.disconnect(); });`,
+		],
+		[
+			'an unobserved observer',
+			`useEffect(() => { const observer = new ResizeObserver(() => setWidth(1)); observer.observe(element.current); return () => observer.unobserve(element.current); });`,
+		],
+		[
+			'an optional disconnect',
+			`useEffect(() => { const observer = new ResizeObserver(() => setWidth(1)); observer.observe(element.current); return () => { observer?.disconnect(); }; });`,
+		],
+		[
+			'a closed WebSocket',
+			`useEffect(() => { const socket = new WebSocket(props.url); socket.onmessage = (event) => setWidth(event.data); return () => socket.close(); });`,
+		],
+		[
+			'a closed EventSource',
+			`useEffect(() => { const source = new EventSource(props.url); source.addEventListener('message', () => setWidth(1)); return () => source.close(); });`,
+		],
+		[
+			'a cleared geolocation watch',
+			`useEffect(() => { const id = navigator.geolocation.watchPosition(() => setWidth(1)); return () => navigator.geolocation.clearWatch(id); });`,
+		],
+		[
+			'a same-module subscription helper',
+			`function subscribeResize(notify) { window.addEventListener('resize', notify); return () => window.removeEventListener('resize', notify); } useEffect(() => subscribeResize(() => setWidth(1)));`,
+		],
+		['a store subscription', `useEffect(() => { props.store.subscribe(() => setWidth(1)); });`],
+		[
+			'a user EventTarget',
+			`useEffect(() => { props.emitter.addEventListener('change', () => setWidth(1)); });`,
+		],
+		['a one-shot timeout', `useEffect(() => { setTimeout(() => setWidth(1), 1000); });`],
+		[
+			'a one-shot animation frame',
+			`useEffect(() => { requestAnimationFrame(() => setWidth(1)); });`,
+		],
+		[
+			'a listener added by an event handler',
+			`const onClick = () => window.addEventListener('resize', () => setWidth(1));`,
+		],
+		[
+			'listeners added and removed by helpers',
+			`function listen(target, type, handler) { target.addEventListener(type, handler); } function unlisten(target, type, handler) { target.removeEventListener(type, handler); } useEffect(() => { const onResize = () => setWidth(1); listen(window, 'resize', onResize); return () => unlisten(window, 'resize', onResize); });`,
+		],
+		[
+			'a removed destructured document property listener',
+			`useEffect(() => { const { body } = document; const onClick = () => setWidth(1); body.addEventListener('click', onClick); return () => body.removeEventListener('click', onClick); });`,
+		],
+		[
+			'a window listener removed globally',
+			`useEffect(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize); return () => removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a global listener removed from the window',
+			`useEffect(() => { const onResize = () => setWidth(1); addEventListener('resize', onResize); return () => window.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a reset global handler property',
+			`useEffect(() => { onresize = () => setWidth(1); return () => { window.onresize = null; }; });`,
+		],
+	])('accepts %s', (_label, setup) => {
+		accepts(app(setup));
+	});
+
+	it('names the release for each resource', () => {
+		const messages = compileToVolarMappings(
+			app(`useEffect(() => {
+    window.addEventListener('resize', () => setWidth(1));
+    setInterval(() => setWidth(2), 1000);
+    new ResizeObserver(() => setWidth(3)).observe(element.current);
+    new WebSocket(props.url);
+    navigator.geolocation.watchPosition(() => setWidth(4));
+  });`),
+			'/src/App.tsrx',
+			{ strong: true },
+		)
+			.diagnostics.filter((diagnostic) => diagnostic.code === LEAK)
+			.map((diagnostic) => diagnostic.message);
+		expect(messages).toEqual([
+			expect.stringContaining('removeEventListener'),
+			expect.stringContaining('clearInterval'),
+			expect.stringContaining('disconnect()'),
+			expect.stringContaining('close()'),
+			expect.stringContaining('clearWatch'),
+		]);
+	});
+
+	it('enforces TSX components and plain TypeScript custom hooks', () => {
+		const tsx = `"use strong";
+import { useState, useEffect, useRef } from 'octane';
+export function A() { const r = useRef(null); const [h, setH] = useState(0); useEffect(() => { new ResizeObserver(([e]) => setH(e.contentRect.height)).observe(r.current); }); return <div ref={r}>{h}</div>; }`;
+		expect(() => compile(tsx, '/src/A.tsx')).toThrow(LEAK);
+		const ts = `"use strong";
+import { useState, useEffect } from 'octane';
+export function useWidth() { const [w, setW] = useState(0); useEffect(() => { window.addEventListener('resize', () => setW(window.innerWidth)); }); return w; }`;
+		expect(() => slotHooks(ts, '/src/use-width.ts')).toThrow(LEAK);
+	});
+});
+
 describe('Strong effect checks keep valid output unchanged', () => {
 	const source = `
 import { useState, useEffect, useRef, useEffectEvent } from 'octane';
@@ -1415,9 +2363,9 @@ export function App(props) @{
 		const lines = Object.fromEntries(
 			result.diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.start.line]),
 		);
-		expect(lines).toEqual({ [UPDATE]: 7, [FETCH]: 8 });
+		expect(lines).toEqual({ [UPDATE]: 7, [FETCH]: 8, [HIDDEN]: 9, [LEAK]: 10 });
 		expect(result.errors.map((error) => error.code)).toEqual(
-			expect.arrayContaining([UPDATE, FETCH]),
+			expect.arrayContaining([UPDATE, FETCH, HIDDEN, LEAK]),
 		);
 	});
 });

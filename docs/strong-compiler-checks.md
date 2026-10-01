@@ -11,6 +11,8 @@ support explicit dependencies, manual memo hooks, and ordinary raw HTML props.
 | --- | --- | --- |
 | `OCTANE_STRONG_EFFECT_STATE_UPDATE` | Effect setup calls a state updater synchronously. This includes updaters and callbacks returned by same-module custom hooks, and callbacks that run before the next paint: `startTransition`, a `useTransition` start function, `queueMicrotask`, `.then`/`.catch`/`.finally` on `Promise.resolve(value)` or `Promise.reject()`, `setTimeout` without a positive delay, and code after an `await` that resumes without waiting on any path, such as `await null` or `await (flag ? load() : null)`. | Derive the value during render, or use `useLinkedState` when state follows another value. `requestAnimationFrame`, timers with a positive delay, and external subscription callbacks remain event-driven. |
 | `OCTANE_STRONG_EFFECT_DATA_FETCH` | A state update runs after an `await`, or in a `.then`, `.catch`, or `.finally` callback, of work the effect started, and the returned cleanup does not provably cancel or ignore it. An async effect callback returns a promise, so it cannot return cleanup. | Read asynchronous render data with `use()` or a query binding. For external synchronization, abort an `AbortController` whose `signal` is passed to the request, or set a flag declared in the effect from its cleanup and check it before the update. See [Effect cleanup](#effect-cleanup). |
+| `OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY` | Synchronous effect setup calls a state getter, reads `current` from a value ref, or reads a reassigned module `let` or `var`. None of these is an inferred dependency, so the effect does not re-run when they change. | Read the render snapshot, or move the non-reactive read into a `useEffectEvent` callback. Octane never double-invokes effects, so first-run and `didInit` guards are unnecessary. |
+| `OCTANE_STRONG_EFFECT_RESOURCE_LEAK` | Effect setup acquires a platform listener, timer, observer, connection, or geolocation watch that the returned cleanup does not release. | Release it in the returned cleanup; see [Effect cleanup](#effect-cleanup). |
 | `OCTANE_STRONG_EFFECT_CHAIN` | An effect reads state written by another effect's own execution or promise continuation in the same component. | Derive the value during render, use `useLinkedState`, or combine the external synchronization. External subscription and timer callbacks remain event-driven updates. |
 | `OCTANE_STRONG_UNLINKED_PROP_STATE` | An eager `useState` initializer or two-argument `useReducer` initial state is derived from component props. | Use `useLinkedState(source, reconcile)` for state that follows a source. Use `useState(() => initialValue)` or an explicit third `useReducer` initializer for a deliberate initial capture. |
 | `OCTANE_STRONG_EXPLICIT_DEPENDENCIES` | An explicit dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. | Omit the dependency argument. An equivalent array produces a **hint**, not an error; its authored behavior is preserved. |
@@ -109,11 +111,35 @@ export function Profile({ id }) {
 }
 ```
 
+A platform resource acquired during synchronous setup must be released by the
+returned cleanup:
+
+| Acquired in setup | Released in cleanup |
+| --- | --- |
+| `addEventListener` on `window` (including the global function), `document`, their properties and query results, a `matchMedia` list, an element held by a ref attached to an intrinsic element, or a connection created in the effect, whether called directly, through a destructured property, or through a same-module helper | `removeEventListener` with the same target, event type, handler identity, and capture flag, or `abort()` on the `AbortController` whose `signal` was passed in the listener options. Options and controllers are followed through stable aliases and same-module helper arguments. |
+| An `on<event>` handler property on one of those targets, or the global one such as `onresize` | Assigning the property again, such as `null`, or closing the connection |
+| `setInterval`, or a `setTimeout` or `requestAnimationFrame` callback that schedules itself again | `clearInterval`, `clearTimeout`, or `cancelAnimationFrame` with the stored ID; a self-rescheduling timer must store every ID in that variable |
+| `ResizeObserver`, `IntersectionObserver`, `MutationObserver`, or `PerformanceObserver` | `disconnect()` or `unobserve()` |
+| `WebSocket`, `EventSource`, or `BroadcastChannel` | `close()` |
+| `navigator.geolocation.watchPosition` | `navigator.geolocation.clearWatch(id)` |
+
+Only platform APIs count. `store.subscribe(listener)` and `addEventListener` on
+a user object stay legal without a visible release, as do one-shot timers and
+`requestAnimationFrame` callbacks.
+
 The proofs stay bounded. A cleanup returned on any path counts, the cleanup's
 own conditions are not evaluated, and aborting a request does not stop its
 `.catch` handler from running: guard updates there with the flag or
-`signal.aborted`. A cleanup returned by an imported helper is opaque and does
-not count.
+`signal.aborted`. An imported helper is opaque, so a resource it acquires
+internally is not seen, and neither is a cleanup it returns. Work started after
+an `await`, or in a timer or subscription callback, is not checked for resource
+release.
+
+A value ref is a `useRef` object whose identity is only used for property
+access, stable aliases, and explicit dependency lists. Attaching it with a
+`ref` attribute, passing it to a call, component, or hook, storing it in a
+container, or returning it makes it an instance ref, which effect setup may
+read.
 
 ## State values, updaters, and subscriptions
 

@@ -496,6 +496,8 @@ Strong modules reject these statically provable patterns:
 - Calling a `useState`, `useReducer`, or `useLinkedState` updater during render (`OCTANE_STRONG_RENDER_STATE_UPDATE`).
 - Calling one of those updaters synchronously while an effect is being set up (`OCTANE_STRONG_EFFECT_STATE_UPDATE`), including through a same-module custom hook's returned updater and through `startTransition`, a `useTransition` start function, `queueMicrotask`, `Promise.resolve().then`, a zero-delay `setTimeout`, or awaiting a non-promise.
 - Updating state after an `await` or promise callback in an effect unless the returned cleanup aborts the request's `AbortController` or sets a flag the update checks (`OCTANE_STRONG_EFFECT_DATA_FETCH`).
+- Calling a state getter, reading an unattached ref's `current`, or reading a reassigned module variable in synchronous effect setup (`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`). Read the snapshot or use `useEffectEvent`.
+- Adding a platform listener, interval, observer, connection, or geolocation watch in effect setup without releasing it in the returned cleanup (`OCTANE_STRONG_EFFECT_RESOURCE_LEAK`).
 - Writing to a `useRef` object's `current` during render (`OCTANE_STRONG_RENDER_REF_WRITE`).
 - Calling a known `useEffectEvent` result during render (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
 - Including a known Effect Event in explicit hook dependencies (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`).
@@ -514,7 +516,7 @@ The checks follow provable synchronous calls through local helpers, `useCallback
 
 The analysis is deliberately bounded. Unknown factory returns and complex control flow remain opaque, and unknown calls are assumed pure instead of disabling Strong memoization. Dependency checks follow literal arrays, including statically selected or spread literals; they do not assume an aliased or externally produced array is unchanged. A call that hides ref contents, a state getter, mutable module or global data, a live external store, a clock, randomness, mutation, or another changing source violates the Strong contract. Keep live accessors in compatibility mode, or pass an actual snapshot into a separate Strong component.
 
-Update state in event handlers, or use `useLinkedState` when editable state should follow a changing input. Genuinely deferred callbacks, effect cleanup, effects that synchronize external systems, and normal DOM or timer refs remain valid when they run outside rendering. Do not rely on render-operation counts: production, development, HMR, profiling, server rendering, hydration, retries, and aborted work can evaluate different amounts of code.
+Update state in event handlers, or use `useLinkedState` when editable state should follow a changing input. Genuinely deferred callbacks, effect cleanup, effects that synchronize external systems and release what they acquire, and refs attached to DOM elements remain valid outside rendering. Do not rely on render-operation counts: production, development, HMR, profiling, server rendering, hydration, retries, and aborted work can evaluate different amounts of code.
 
 See the [Strong mode guide](https://octanejs.dev/docs/build-tools#strong-mode).
 

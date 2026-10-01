@@ -3273,6 +3273,14 @@ export function App(props) @{
 			'statements after awaited finally blocks',
 			'try {} finally { await Promise.resolve(); } setCount(1);',
 		],
+		[
+			'catch branches entered only after yielding',
+			'try { await Promise.resolve(); } catch {} setCount(1);',
+		],
+		[
+			'finally blocks entered only after yielding',
+			'try { await Promise.resolve(); } finally { setCount(1); }',
+		],
 	])('allows updates after guaranteed awaits in nested %s', (_label, body) => {
 		expectYieldedUpdates(body);
 	});
@@ -3576,11 +3584,15 @@ export function App(props) @{
 		],
 		[
 			'catch branches that can continue without yielding',
-			'try { await Promise.resolve(); } catch {} setCount(1);',
+			'try { JSON.parse("{}"); await Promise.resolve(); } catch {} setCount(1);',
 		],
 		[
 			'finally blocks that can run synchronously',
-			'try { await Promise.resolve(); } finally { setCount(1); }',
+			'try { if (count > 0) return; await Promise.resolve(); } finally { setCount(1); }',
+		],
+		[
+			'catch branches after awaited calls with synchronous arguments',
+			'try { await Promise.resolve(JSON.parse("1")); } catch { setCount(1); }',
 		],
 	])('still rejects %s', (_label, body) => {
 		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
@@ -4551,14 +4563,15 @@ export function App() @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_GETTER_CALL);
 	});
 
-	it('keeps getters live in events, effects, cleanup, and deferred callbacks', () => {
+	it('keeps getters live in events, Effect Events, cleanup, and deferred callbacks', () => {
 		const source = `"use strong";
-import { useState, useEffect, useCallback } from 'octane';
+import { useState, useEffect, useEffectEvent, useCallback } from 'octane';
 export function App(props) @{
   const [count, setCount, getCount] = useState(0);
   const readLater = () => getCount();
+  const readEvent = useEffectEvent(() => props.record(getCount()));
   useEffect(() => {
-    props.record(getCount());
+    readEvent();
     return () => { props.record(getCount()); };
   });
   setTimeout(() => props.record(getCount()), 0);
@@ -4912,15 +4925,16 @@ export const App = ${wrapped};`;
 		);
 	});
 
-	it('keeps module reads in events, effects, cleanup, and deferred work legal', () => {
+	it('keeps module reads in events, Effect Events, cleanup, and deferred work legal', () => {
 		const source = `"use strong";
-import { useEffect } from 'octane';
+import { useEffect, useEffectEvent } from 'octane';
 let revision = 0;
 function advance() { revision++; }
 function readRevision() { return revision; }
 export function App(props) @{
+  const record = useEffectEvent(() => props.record(readRevision()));
   useEffect(() => {
-    props.record(readRevision());
+    record();
     return () => props.record(revision);
   });
   setTimeout(() => props.record(revision), 0);
