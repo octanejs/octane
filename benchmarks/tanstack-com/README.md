@@ -21,8 +21,11 @@ re-publish or redistribute it. Docs content is a pinned snapshot of
 [TanStack/router](https://github.com/TanStack/router) `docs/` at `edf55759`
 (MIT), vendored under `content/repos/router/`.
 
-Version pins are family-matched to the octane side (react-start 1.168.26,
-react-router 1.170.16 vs our vendored 1.168.28/1.170.18).
+The React side pins react-start 1.168.60 and react-router 1.170.41, the first
+release patched for CVE-2026-102989, ahead of our vendored 1.168.28/1.170.18.
+Older react-start pins are refused by Vercel's deploy gate for the whole
+workspace, so the React side cannot stay family-matched until
+`@octanejs/tanstack-start` moves to the patched line (#1478).
 
 ## Bench deltas from upstream
 
