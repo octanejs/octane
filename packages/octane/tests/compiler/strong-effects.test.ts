@@ -6,11 +6,11 @@ import { compileToVolarMappings } from '../../src/compiler/volar.js';
 const FETCH = 'OCTANE_STRONG_EFFECT_DATA_FETCH';
 const CHAIN = 'OCTANE_STRONG_EFFECT_CHAIN';
 const PROPS = 'OCTANE_STRONG_UNLINKED_PROP_STATE';
-const component = (setup: string, params = 'props') => `
+const component = (setup: string, params = 'props', output = '<div />') => `
 import { useState, useReducer, useLinkedState, useEffect, useLayoutEffect, useInsertionEffect, useEffectEvent } from 'octane';
 export function App(${params}) @{
   ${setup}
-  <div />
+  ${output}
 }`;
 
 function rejects(source: string, code: string) {
@@ -76,9 +76,13 @@ export function App() @{
 		`useEffect(() => (fetch('/api').then(setData), () => {}));`,
 	])('preserves cleanup, subscriptions and non-fetch work: %s', (setup) => {
 		expect(() =>
-			compile(component(`const [data, setData] = useState(null); ${setup}`), '/src/App.tsrx', {
-				strong: true,
-			}),
+			compile(
+				component(`const [data, setData] = useState(null); ${setup}`, 'props', '<div>{data}</div>'),
+				'/src/App.tsrx',
+				{
+					strong: true,
+				},
+			),
 		).not.toThrow();
 	});
 
@@ -87,6 +91,8 @@ export function App() @{
 			compile(
 				component(
 					`const [data, setData] = useState(null); useEffect(() => { const setData = consume; fetch('/api').then(setData); });`,
+					'props',
+					'<div>{data}</div>',
 				),
 				'/src/App.tsrx',
 				{ strong: true },
@@ -122,7 +128,11 @@ describe('Strong effect chains', () => {
 	])('preserves independent effects: %s', (setup) => {
 		expect(() =>
 			compile(
-				component(`const [first, setFirst] = useState(0); const [second] = useState(0); ${setup}`),
+				component(
+					`const [first, setFirst] = useState(0); const [second] = useState(0); ${setup}`,
+					'props',
+					'<div>{first as string}</div>',
+				),
 				'/src/App.tsrx',
 				{ strong: true },
 			),
@@ -290,9 +300,13 @@ describe('Strong effect review regressions', () => {
 	])('does not join a completed fetch branch through %s', (exit) => {
 		const setup = `useEffect(() => { (async () => { if (props.fetch) { await fetch('/telemetry'); ${exit} } await ready; setData(1); })(); });`;
 		expect(() =>
-			compile(component(`const [data, setData] = useState(null); ${setup}`), '/src/Review.tsrx', {
-				strong: true,
-			}),
+			compile(
+				component(`const [data, setData] = useState(null); ${setup}`, 'props', '<div>{data}</div>'),
+				'/src/Review.tsrx',
+				{
+					strong: true,
+				},
+			),
 		).not.toThrow();
 	});
 
@@ -314,9 +328,13 @@ describe('Strong effect review regressions', () => {
 	])('does not visit unreachable writes after %s', (exit) => {
 		const setup = `useEffect(() => { (async () => { await fetch('/telemetry'); ${exit} setData(1); })(); });`;
 		expect(() =>
-			compile(component(`const [data, setData] = useState(null); ${setup}`), '/src/Review.tsrx', {
-				strong: true,
-			}),
+			compile(
+				component(`const [data, setData] = useState(null); ${setup}`, 'props', '<div>{data}</div>'),
+				'/src/Review.tsrx',
+				{
+					strong: true,
+				},
+			),
 		).not.toThrow();
 	});
 
