@@ -1532,6 +1532,14 @@ export function App(props) @{
 			`function listen(target, type, handler, capture) { target.addEventListener(type, handler, capture); } function unlisten(target, type, handler) { target.removeEventListener(type, handler); } useEffect(() => { const onResize = () => setWidth(1); listen(window, 'resize', onResize, true); return () => unlisten(window, 'resize', onResize); });`,
 		],
 		[
+			'an aliased capture option removed without capture',
+			`useEffect(() => { const options = { capture: true }; const onResize = () => setWidth(1); window.addEventListener('resize', onResize, options); return () => window.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a helper capture option removed without capture',
+			`function listen(target, handler, options) { target.addEventListener('resize', handler, options); } useEffect(() => { const onResize = () => setWidth(1); listen(window, onResize, { capture: true }); return () => window.removeEventListener('resize', onResize); });`,
+		],
+		[
 			'a helper removal for another handler',
 			`function listen(target, type, handler) { target.addEventListener(type, handler); } function unlisten(target, type, handler) { target.removeEventListener(type, handler); } useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); listen(window, 'resize', first); return () => unlisten(window, 'resize', second); });`,
 		],
@@ -1555,6 +1563,22 @@ export function App(props) @{
 		[
 			'an aborted listener signal',
 			`useEffect(() => { const controller = new AbortController(); window.addEventListener('resize', () => setWidth(1), { signal: controller.signal }); return () => controller.abort(); });`,
+		],
+		[
+			'an aliased capture option',
+			`useEffect(() => { const options = { capture: true }; const onResize = () => setWidth(1); window.addEventListener('resize', onResize, options); return () => window.removeEventListener('resize', onResize, options); });`,
+		],
+		[
+			'an aliased listener signal',
+			`useEffect(() => { const controller = new AbortController(); const options = { signal: controller.signal }; window.addEventListener('resize', () => setWidth(1), options); return () => controller.abort(); });`,
+		],
+		[
+			'a listener signal passed to a helper',
+			`function listen(handler, options) { window.addEventListener('resize', handler, options); } useEffect(() => { const controller = new AbortController(); listen(() => setWidth(1), { signal: controller.signal }); return () => controller.abort(); });`,
+		],
+		[
+			'a controller passed to listener and cleanup helpers',
+			`function listen(handler, controller) { window.addEventListener('resize', handler, { signal: controller.signal }); } function stop(controller) { controller.abort(); } useEffect(() => { const controller = new AbortController(); listen(() => setWidth(1), controller); return () => stop(controller); });`,
 		],
 		[
 			'a removed element listener',

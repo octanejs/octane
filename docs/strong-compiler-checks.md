@@ -115,7 +115,7 @@ returned cleanup:
 
 | Acquired in setup | Released in cleanup |
 | --- | --- |
-| `addEventListener` on `window` (including the global function), `document`, their properties and query results, a `matchMedia` list, an element held by a ref attached to an intrinsic element, or a connection created in the effect, whether called directly, through a destructured property, or through a same-module helper | `removeEventListener` with the same target, event type, handler identity, and capture flag, or `abort()` on the `AbortController` whose `signal` was passed in the listener options |
+| `addEventListener` on `window` (including the global function), `document`, their properties and query results, a `matchMedia` list, an element held by a ref attached to an intrinsic element, or a connection created in the effect, whether called directly, through a destructured property, or through a same-module helper | `removeEventListener` with the same target, event type, handler identity, and capture flag, or `abort()` on the `AbortController` whose `signal` was passed in the listener options. Options and controllers are followed through stable aliases and same-module helper arguments. |
 | An `on<event>` handler property on one of those targets, or the global one such as `onresize` | Assigning the property again, such as `null`, or closing the connection |
 | `setInterval`, or a `setTimeout` or `requestAnimationFrame` callback that schedules itself again | `clearInterval`, `clearTimeout`, or `cancelAnimationFrame` with the stored ID; a self-rescheduling timer must store every ID in that variable |
 | `ResizeObserver`, `IntersectionObserver`, `MutationObserver`, or `PerformanceObserver` | `disconnect()` or `unobserve()` |

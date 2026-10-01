@@ -738,8 +738,18 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		return typeof value === 'string' ? value : UNKNOWN;
 	}
 
-	function captureOf(expression) {
+	// A listener options argument, through stable aliases and the arguments of
+	// the helpers being visited.
+	function optionsOf(expression, depth = 0) {
 		const node = unwrap(expression);
+		if (node?.type !== 'Identifier' || depth > 8) return node;
+		const binding = bindingOf(node);
+		const source = binding == null ? null : (frameArgument(binding) ?? stableInit(binding));
+		return source === null ? node : optionsOf(source, depth + 1);
+	}
+
+	function captureOf(expression) {
+		const node = optionsOf(expression);
 		if (node == null) return false;
 		if (node.type === 'ObjectExpression') {
 			let capture = false;
@@ -758,7 +768,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 	}
 
 	function listenerSignal(expression) {
-		const node = unwrap(expression);
+		const node = optionsOf(expression);
 		if (node?.type !== 'ObjectExpression') return null;
 		for (const property of node.properties ?? []) {
 			if (
