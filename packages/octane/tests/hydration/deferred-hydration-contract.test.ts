@@ -446,6 +446,67 @@ describe('deferred hydration contract edges', () => {
 		}
 	});
 
+	it('replays through a nested dormant boundary with each original event clock', async () => {
+		const outerWhen = interaction({ events: HYDRATION_INTERACTION_EVENT_TYPES });
+		const innerWhen = interaction({ events: HYDRATION_INTERACTION_EVENT_TYPES });
+		container.innerHTML = renderToString(eventReplayServer.NestedDeferredHydrationEventReplay, {
+			outerWhen,
+			innerWhen,
+		}).html;
+		const parent = container.querySelector('#hydration-replay-parent')!;
+		const target = container.querySelector('#hydration-replay-target')!;
+		const relatedTarget = container.querySelector('#hydration-replay-related')!;
+
+		initializeHydrationEventCapture(document);
+		for (const testCase of HYDRATION_INTERACTION_EVENT_CASES) {
+			target.dispatchEvent(
+				createHydrationInteractionEvent(document.defaultView!, relatedTarget, testCase),
+			);
+		}
+
+		const order: string[] = [];
+		const outerReplays: string[] = [];
+		let observation: ReturnType<typeof observeHydrationReplays> | undefined;
+		const recordOuterReplay = (event: Event) => {
+			if (observation === undefined) outerReplays.push(event.type);
+		};
+		root = hydrateRoot(container, eventReplayClient.NestedDeferredHydrationEventReplay, {
+			outerWhen,
+			innerWhen,
+			onOuterHydrated() {
+				order.push('outer hydrated');
+				for (const type of HYDRATION_INTERACTION_EVENT_TYPES) {
+					window.addEventListener(type, recordOuterReplay, true);
+				}
+			},
+			onHydrated() {
+				order.push('inner hydrated');
+				observation = observeHydrationReplays(parent, target);
+			},
+		});
+		flushSync(() => {});
+		await act(() => {});
+		for (const type of HYDRATION_INTERACTION_EVENT_TYPES) {
+			window.removeEventListener(type, recordOuterReplay, true);
+		}
+
+		expect(order).toEqual(['outer hydrated', 'inner hydrated']);
+		// The inner boundary was still dormant when the outer one replayed, so the
+		// inner replay is a clone of the outer replay rather than of the original.
+		expect(outerReplays).toEqual(HYDRATION_INTERACTION_EVENT_TYPES);
+		const targetRecords = observation!.records.filter((record) => record.phase === 'target');
+		expect(targetRecords.map((record) => record.type)).toEqual(HYDRATION_INTERACTION_EVENT_TYPES);
+		for (let i = 0; i < HYDRATION_INTERACTION_EVENT_CASES.length; i++) {
+			const testCase = HYDRATION_INTERACTION_EVENT_CASES[i];
+			expect(targetRecords[i]).toMatchObject({
+				type: testCase.type,
+				targetIsOriginal: true,
+				...expectedHydrationReplayMetadata(testCase),
+			});
+		}
+		observation!.cleanup();
+	});
+
 	it('preserves replay event subclasses from another document realm', () => {
 		const iframe = document.createElement('iframe');
 		document.body.appendChild(iframe);

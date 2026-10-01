@@ -1040,8 +1040,12 @@ unresolved ancestor chain, after which Octane replays a same-type event for the
 target boundary. A `never()` ancestor keeps every deferred descendant inert.
 Replay preserves supported platform event classes and their captured keyboard,
 pointer, mouse, touch, input, composition, and focus data where the browser can
-construct that event. A replayed event is still programmatic: it cannot restore
-the original event's trusted status or expired transient user activation.
+construct that event. Each replay also reports the captured event's
+`timeStamp`, including after replay through nested boundaries, so the time
+between a replayed `pointerdown` and `pointerup`, or how long an input has been
+held, matches the original input. A replayed event is still programmatic: it
+cannot restore the original event's trusted status or expired transient user
+activation.
 
 If activation races a pending renderer-owned streamed Suspense reveal, the
 boundary waits for that reveal or its client-render degradation before adopting

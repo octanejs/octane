@@ -15676,6 +15676,19 @@ function discardHydratePresentation(state: HydrateSlot, capture: OffscreenCaptur
 }
 
 function cloneHydrationReplayEvent(event: Event, target: Element): Event {
+	const clone = constructHydrationReplayEvent(event, target);
+	// No event init dictionary carries `timeStamp`: every constructor stamps the
+	// replay-time clock. Consumers measure input against the original clock (how
+	// long a press is held, pointerdown to pointerup), so the replay keeps it as an
+	// own property shadowing Event.prototype's getter, configurable like the
+	// getter. A boundary that replays its parent's replay reads that own property,
+	// so nested replay still reports the original input's time. `isTrusted` is
+	// untouched: the clone is a constructed, untrusted event.
+	Object.defineProperty(clone, 'timeStamp', { value: event.timeStamp, configurable: true });
+	return clone;
+}
+
+function constructHydrationReplayEvent(event: Event, target: Element): Event {
 	// Event constructors are realm-specific, so the clone is always built with the
 	// TARGET's constructors: hydrating an iframe-owned root from its parent realm
 	// must still replay an event the iframe's own code recognizes. A detached

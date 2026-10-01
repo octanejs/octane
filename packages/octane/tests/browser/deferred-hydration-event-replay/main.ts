@@ -31,6 +31,7 @@ type BrowserEditorEvent = {
 	type: string;
 	constructorName: string;
 	isTrusted: boolean;
+	timeStamp: number;
 	data: string | null;
 	inputType: string | null;
 	isComposing: boolean | null;
@@ -89,6 +90,7 @@ function editorEvent(event: Event): BrowserEditorEvent {
 		type: event.type,
 		constructorName: event.constructor.name,
 		isTrusted: event.isTrusted,
+		timeStamp: event.timeStamp,
 		data: typeof input.data === 'string' ? input.data : null,
 		inputType: typeof input.inputType === 'string' ? input.inputType : null,
 		isComposing: typeof input.isComposing === 'boolean' ? input.isComposing : null,
