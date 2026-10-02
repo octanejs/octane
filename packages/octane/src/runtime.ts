@@ -11696,10 +11696,15 @@ export function componentSlotLite<P>(
 				endMarker = hydration.close(open);
 				adoptedClose = endMarker;
 				hydration.node = getNextSibling(open);
-			} else if (anchor === undefined) {
+			} else if (
+				anchor === undefined ||
+				(hydration.isClose(anchor) && (comp as any).$$singleRoot !== true)
+			) {
 				// The server frames an anchorless call (see componentSlotImpl), so the
 				// host's server content is something else: rebuild this call in place of
-				// the server nodes from its claim.
+				// the server nodes from its claim. So does a call anchored at its
+				// parent's end whose component may render more than one root; a single
+				// root still compares itself with the server node at the cursor.
 				unframed = open;
 			}
 		}
@@ -11724,12 +11729,19 @@ export function componentSlotLite<P>(
 				props,
 				invocationSite,
 				unframed,
+				anchor ?? null,
 			);
 			return;
 		}
-	} else {
+	} else if (hydration !== null) {
 		// Re-render: the parent's host/anchor are stable across renders so no
 		// need to rebuild the LiteBlockImpl. Skip the allocation on warm path.
+		// A claim whose unframed render suspended completes here.
+		const claim = hydration.unframedClaim(scope.block);
+		if (claim !== undefined) {
+			renderUnframedLite(hydration, claim, parentScope, slotKey, host, comp, props, invocationSite);
+			return;
+		}
 	}
 	const prevScope = CURRENT_SCOPE;
 	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
@@ -11774,10 +11786,9 @@ export function componentSlotLite<P>(
 	if (hydration !== null && adoptedClose !== null) hydration.node = getNextSibling(adoptedClose);
 }
 
-// An anchorless lite call whose server range is missing: render it between
-// fresh markers without adopting, then report and discard the server nodes from
-// `stale`, as componentSlot does for a missing range. The body renders through
-// componentSlotLite again, which finds the registered scope.
+// A lite call whose server range is missing: render it between fresh markers
+// without adopting, then report and discard the server nodes from `stale`, as
+// componentSlot does for a missing range.
 function mountUnframedLite<P>(
 	hydration: HydrationCapability,
 	parentScope: Scope,
@@ -11787,26 +11798,48 @@ function mountUnframedLite<P>(
 	props: P,
 	invocationSite: string | undefined,
 	stale: Node | null,
+	anchor: Node | null,
 ): void {
 	hydration.save(host);
 	const start = (STAGED_DOM?.view(document) ?? document).createComment('comp');
 	const end = (STAGED_DOM?.view(document) ?? document).createComment('/comp');
-	(STAGED_DOM?.view(host) ?? host).insertBefore(start, null);
-	(STAGED_DOM?.view(host) ?? host).insertBefore(end, null);
+	const before = hydration.unframedBefore(stale, anchor);
+	(STAGED_DOM?.view(host) ?? host).insertBefore(start, before);
+	(STAGED_DOM?.view(host) ?? host).insertBefore(end, before);
 	hydration.markFresh(start);
 	hydration.markFresh(end);
 	(parentScope.slots[slotKey] as Scope).block.endMarker = end;
+	renderUnframedLite(
+		hydration,
+		{ start, end, scope: parentScope, slotKey, stale, anchor },
+		parentScope,
+		slotKey,
+		host,
+		comp,
+		props,
+		invocationSite,
+	);
+}
+
+// The body renders through componentSlotLite again, which finds the registered
+// scope and, with hydration inactive, renders it as ordinary client DOM.
+function renderUnframedLite<P>(
+	hydration: HydrationCapability,
+	claim: UnframedClaim,
+	parentScope: Scope,
+	slotKey: number,
+	host: Node,
+	comp: ComponentBody<P>,
+	props: P,
+	invocationSite: string | undefined,
+): void {
 	hydration.renderUnframed(
 		() => componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite),
 		undefined,
-		start,
-		end,
-		parentScope,
-		slotKey,
-		stale,
-		null,
+		(parentScope.slots[slotKey] as Scope).block,
+		claim,
 	);
-	hydration.node = getNextSibling(end);
+	hydration.node = getNextSibling(claim.end);
 }
 
 // Keep the fresh-subtree callback's extra captures out of ordinary lite dispatch.
@@ -15807,7 +15840,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			// already-adopted siblings without treating their range as fresh DOM.
 			hydration.node = preserved.cursor;
 			try {
-				renderBlock(preserved.source);
+				hydration.renderSuspended(preserved.source);
 			} catch (error) {
 				if (!isSuspenseException(error)) throw error;
 				preserveSuspendedHydrateActivation(state, hydration, error.thenable);
@@ -18665,6 +18698,29 @@ interface HydratedLiteRange {
 	end: Comment;
 }
 
+/**
+ * A component call that found no server range where it hydrates: the fresh
+ * `start`/`end` markers its slot minted, the server node `stale` that stood at
+ * the slot's claim, and the slot's `anchor`. `scope`/`slotKey` locate the call
+ * for diagnostics.
+ */
+interface UnframedClaim {
+	start: Node;
+	end: Node;
+	scope: Scope;
+	slotKey: number;
+	stale: Node | null;
+	anchor: Node | null;
+}
+
+/** What a nested fragment rebuilt over the server node `cursor` replaces. */
+interface RebuiltFragment {
+	cursor: Node;
+	template: Node;
+	block: Block | undefined;
+	loc: string | undefined;
+}
+
 interface PendingHydrationClassWrite {
 	next: string | null;
 	absentIsEmpty: boolean;
@@ -18785,6 +18841,10 @@ class HydrationCapability {
 	private abandoned = false;
 	private readonly freshNodes = new WeakSet<Node>();
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
+	/** Unframed claims whose render suspended, by the block that claimed (renderUnframed). */
+	private unframedClaims: WeakMap<Block, UnframedClaim> | null = null;
+	/** Fragments that rebuildFragment built, by root, until drainFrag places them. */
+	private rebuiltFragments: WeakMap<Node, RebuiltFragment> | null = null;
 	/** Pairs discovered while matching an outer range; released with this hydration pass. */
 	private matchingCloses: WeakMap<Node, Comment> | null = null;
 	/** First unclaimed root sibling after a compiled root clone; undefined until known. */
@@ -18968,57 +19028,124 @@ class HydrationCapability {
 	}
 
 	/**
-	 * First render, by `render(target)`, of a component whose server range was
-	 * missing, between the fresh `start`/`end` markers its slot minted before
-	 * `anchor`. The server emits that range only when the render completes;
-	 * when it throws, the boundary that catches it renders its catch arm in
-	 * that place. So the server nodes from `stale` stay until the body has run,
-	 * and the body, which adopts nothing, still consumes its positional seeds
-	 * as the server's render did. A seeded rejection then reaches its boundary
-	 * with the server's catch arm intact, and only the fresh markers are
-	 * removed. Any other outcome reports the mismatch and discards those server
-	 * nodes, unless `stale` is client-built: the rebuild that built it already
-	 * reported and discarded the server's.
+	 * Render, by `render(target)`, a component whose server range was missing,
+	 * between the fresh markers of its slot's `claim` (unframedBefore placed
+	 * them). The server emits that range only when the render completes; when
+	 * it throws, the boundary that catches it renders its catch arm in that
+	 * place. So the server nodes from `claim.stale` stay until the body has
+	 * run, and the body, which adopts nothing, still consumes its positional
+	 * seeds as the server's render did. A seeded rejection then reaches its
+	 * boundary with the server's catch arm intact, and only the fresh markers
+	 * are removed. A suspension leaves the server nodes too, and `owner`, the
+	 * claiming block, keeps the claim until a later attempt renders it through
+	 * here again (unframedClaim). Once a render completes, it reports the
+	 * mismatch and discards the server nodes that stood in the range's place,
+	 * but not a later sibling's range, unless `stale` is client-built: the
+	 * rebuild that built it already reported and discarded the server's.
 	 */
 	renderUnframed<T>(
 		render: (target: T) => void,
 		target: T,
-		start: Node,
-		end: Node,
-		scope: Scope,
-		slotKey: number,
-		stale: Node | null,
-		anchor: Node | null,
+		owner: Block,
+		claim: UnframedClaim,
 	): void {
 		const previousReplay = this.replayDepth;
 		const previousNative = setNativeAdoptionResolver(null);
 		this.replayDepth = ++this.depth;
 		let rejected = false;
+		let suspended = false;
 		try {
 			render(target);
 		} catch (error) {
 			rejected = this.isRejection(error);
+			suspended = isSuspenseException(error);
 			throw error;
 		} finally {
 			this.depth--;
 			this.replayDepth = previousReplay;
 			setNativeAdoptionResolver(previousNative);
-			if (rejected) {
-				removeRange(start, getNextSibling(end));
+			const stale = claim.stale;
+			if (suspended) {
+				(this.unframedClaims ??= new WeakMap()).set(owner, claim);
 				this.node = stale;
-			} else if (stale === null || !this.isFresh(stale)) {
-				noteRecoverableHydrationError(() => new Error(formatClientError(55)));
-				if (process.env.NODE_ENV !== 'production') {
-					const loc = siteLoc(scope, slotKey);
-					if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
-				}
-				let node = stale;
-				while (node !== null && node !== anchor && node !== start && !isBlockClose(node)) {
-					const next = getNextSibling(node);
-					(STAGED_DOM?.view(node as ChildNode) ?? (node as ChildNode)).remove();
-					node = next;
+			} else {
+				this.unframedClaims?.delete(owner);
+				if (rejected) {
+					removeRange(claim.start, getNextSibling(claim.end));
+					this.node = stale;
+				} else if (stale === null || !this.isFresh(stale)) {
+					noteRecoverableHydrationError(() => new Error(formatClientError(55)));
+					if (process.env.NODE_ENV !== 'production') {
+						const loc = siteLoc(claim.scope, claim.slotKey);
+						if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
+					}
+					const parent = stale === null ? null : domNode(stale).parentNode;
+					if (parent !== null) this.save(parent);
+					// The elements and text the server rendered in the range's place end
+					// at a marker: a later sibling's range or boundary, or the end of the
+					// enclosing range.
+					let node = parent === null ? null : stale;
+					while (
+						node !== null &&
+						node !== claim.anchor &&
+						!this.freshNodes.has(node) &&
+						(node.nodeType !== 8 || isTextSeparator(node) || isEmptyTextSlot(node))
+					) {
+						const next = getNextSibling(node);
+						(STAGED_DOM?.view(node as ChildNode) ?? (node as ChildNode)).remove();
+						node = next;
+					}
 				}
 			}
+		}
+	}
+
+	/**
+	 * Where an unframed claim at the server node `stale` places its fresh
+	 * markers: in that node's place, so that the component renders ahead of the
+	 * later siblings' server ranges that follow it. A claim at no server node
+	 * or at a client-built one, or one anchored at a node within its parent's
+	 * range rather than at the range's end, keeps its `anchor`.
+	 */
+	unframedBefore(stale: Node | null, anchor: Node | null): Node | null {
+		return stale !== null &&
+			!this.freshNodes.has(stale) &&
+			!isBlockClose(stale) &&
+			(anchor === null || isBlockClose(anchor))
+			? stale
+			: anchor;
+	}
+
+	/** The claim that `block`'s suspended unframed render left for its next render. */
+	unframedClaim(block: Block): UnframedClaim | undefined {
+		return this.unframedClaims?.get(block);
+	}
+
+	/**
+	 * Resume `source`, the block that a preserved activation suspended in. Inside
+	 * a component whose unframed render suspended, it renders without adopting,
+	 * as that render did, and the component completes its claim when its own
+	 * slot renders it again.
+	 */
+	renderSuspended(source: Block): void {
+		const claims = this.unframedClaims;
+		let unframed = false;
+		if (claims !== null)
+			for (let block: Block | null = source; block !== null && !unframed; block = block.parentBlock)
+				unframed = claims.has(block);
+		if (!unframed) {
+			renderBlock(source);
+			return;
+		}
+		const previousReplay = this.replayDepth;
+		const previousNative = setNativeAdoptionResolver(null);
+		this.replayDepth = ++this.depth;
+		try {
+			renderBlock(source);
+		} finally {
+			this.depth--;
+			this.replayDepth = previousReplay;
+			setNativeAdoptionResolver(previousNative);
 		}
 	}
 
@@ -19969,36 +20096,57 @@ class HydrationCapability {
 
 	/**
 	 * The server rendered something other than this nested fragment at the
-	 * cursor (a text value, another component's roots). Report it once and build
-	 * the fragment on the client. The fragment's block owns the server nodes from
-	 * the cursor up to its end marker, where drainFrag inserts the fresh roots, so
-	 * discard them. When the end marker does not follow the cursor inside the
-	 * block's range, discard only the cursor node or its range, as a single-root
-	 * mismatch does.
+	 * cursor (a text value, another component's roots): build the fragment on
+	 * the client. Its holes render before drainFrag places it, and a hole that
+	 * suspends abandons the attempt, so the server nodes and the cursor stay
+	 * for the attempt that completes, which reports and discards them once
+	 * (placeRebuilt).
 	 */
 	private rebuildFragment(template: Node, cursor: Node, loc: string | undefined): Node {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		const root = this.freshClone(template);
+		// The compiled mount inserts into its scope's block, which for a lite
+		// component is the scope's own range rather than CURRENT_BLOCK's.
+		(this.rebuiltFragments ??= new WeakMap()).set(root, {
+			cursor,
+			template,
+			block: CURRENT_SCOPE?.block,
+			loc,
+		});
+		return root;
+	}
+
+	/**
+	 * drainFrag is about to place `root`. If rebuildFragment built it, report
+	 * the mismatch once and discard the server nodes it replaces. The
+	 * fragment's block owns the server nodes from the cursor up to its end
+	 * marker, where drainFrag inserts the fresh roots. When the end marker does
+	 * not follow the cursor inside the block's range, discard only the cursor
+	 * node or its range, as a single-root mismatch does.
+	 */
+	placeRebuilt(root: Node): void {
+		const rebuilt = this.rebuiltFragments?.get(root);
+		if (rebuilt === undefined) return;
+		this.rebuiltFragments!.delete(root);
+		const { cursor, block } = rebuilt;
 		// Captures that changed before a dormant boundary activated legitimately
 		// differ from the server's; still rebuild, but there is nothing to report.
 		if (!this.staleServerValues) {
 			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 			if (process.env.NODE_ENV !== 'production')
 				warnHydrationStructuralMismatch(
-					loc ?? componentSourceLoc(CURRENT_BLOCK?.body) ?? CURRENT_SCOPE?.locFile,
-					`a fragment starting with ${describeHydrationNode(getFirstChild(template))}`,
+					rebuilt.loc ?? componentSourceLoc(CURRENT_BLOCK?.body) ?? CURRENT_SCOPE?.locFile,
+					`a fragment starting with ${describeHydrationNode(getFirstChild(rebuilt.template))}`,
 					describeHydrationNode(cursor),
 				);
 		}
-		// The compiled mount inserts into its scope's block, which for a lite
-		// component is the scope's own range rather than CURRENT_BLOCK's.
-		const block = CURRENT_SCOPE?.block;
 		const parent = block?.parentNode;
 		const end = block?.endMarker ?? null;
 		const cursorParent = domNode(cursor).parentNode!;
 		this.save(cursorParent);
 		if (parent == null || cursor === end || cursorParent !== parent) {
 			if (parent != null) this.save(parent);
-			return this.freshClone(template);
+			return;
 		}
 		let node: Node | null = cursor;
 		// Reaching the block's own start first means the cursor lies before its range.
@@ -20009,7 +20157,6 @@ class HydrationCapability {
 			this.node = end;
 			removeHydrationRange(cursor, (STAGED_DOM?.view(end!) ?? end!).previousSibling!);
 		} else this.discardCursor(cursor);
-		return this.freshClone(template);
 	}
 
 	/** Discard a mismatched server node (or the marker range it opens) and step past it. */
@@ -20615,7 +20762,11 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
  * in place — nothing to move.
  */
 export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
-	if (activeHydration() !== null && (root as any).__oct_vfrag === true) return;
+	const hydration = activeHydration();
+	if (hydration !== null) {
+		if ((root as any).__oct_vfrag === true) return;
+		hydration.placeRebuilt(root);
+	}
 	if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss(false);
 	if (root.nodeType === 11) {
 		(STAGED_DOM?.view(parent) ?? parent).insertBefore(root, anchor);
@@ -31511,17 +31662,19 @@ function componentSlotImpl(
 			// server content is something else. (The single-root path would compare
 			// the body's template with the cursor, which may still sit on the host or
 			// an ancestor.)
+			let before = anchor ?? null;
 			if (hydration !== null) {
 				unframed = hydrationCursor;
 				hydration.save(domParent);
+				before = hydration.unframedBefore(hydrationCursor, before);
 			}
 			start = (STAGED_DOM?.view(document) ?? document).createComment('comp');
 			end = (STAGED_DOM?.view(document) ?? document).createComment('/comp');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
 			// mid-range insertion (e.g. when this slot lives in a multi-root template
 			// and must sit before its enclosing block's endMarker).
-			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(start, anchor ?? null);
-			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(end, anchor ?? null);
+			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(start, before);
+			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(end, before);
 			if (hydration !== null) {
 				hydration.markFresh(start);
 				hydration.markFresh(end);
@@ -31897,26 +32050,27 @@ function componentSlotImpl(
 			state.block = b;
 			if (unframed === undefined) renderBlock(b);
 			else
-				hydration!.renderUnframed(
-					renderBlock,
-					b,
-					b.startMarker!,
-					b.endMarker!,
-					parentScope,
+				hydration!.renderUnframed(renderBlock, b, b, {
+					start: b.startMarker!,
+					end: b.endMarker!,
+					scope: parentScope,
 					slotKey,
-					unframed,
-					state.anchor,
-				);
+					stale: unframed,
+					anchor: state.anchor,
+				});
 		}
 	} else if (state.block) {
+		// A claim whose unframed render suspended completes here.
+		const claim = hydration === null ? undefined : hydration.unframedClaim(state.block);
 		// `memo(Component)` — skip the body when new props shallow-equal the
 		// committed props (React.memo's contract; see tryMemoBail). A string comp
 		// is never memo-wrapped, so it falls through to the re-render below.
-		if (tryMemoBail(state.block, identity, props)) return;
+		if (claim === undefined && tryMemoBail(state.block, identity, props)) return;
 		if (state.block.props !== renderProps)
 			journalRootProperty(state.block, 'props', state.block.props);
 		state.block.props = renderProps;
-		renderBlock(state.block);
+		if (claim === undefined) renderBlock(state.block);
+		else hydration!.renderUnframed(renderBlock, state.block, state.block, claim);
 	}
 	// Hydration: advance the cursor PAST this component's adopted range so the next
 	// sibling adopts from the right node. The body itself doesn't reliably leave the
