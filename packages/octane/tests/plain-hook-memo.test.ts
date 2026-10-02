@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { flushSync } from 'octane';
+import { slotHooks } from '../src/compiler/slot-hooks.js';
 import { act, mount } from './_helpers';
 import { loadPlainHookFixtureSource } from './_server-fixture';
 
@@ -430,6 +431,66 @@ describe('memo hooks in plain modules', () => {
 			expect(root.html()).toBe('<p>miss</p>');
 			expect(observed.at(-1)).toBe(miss);
 			expect(computed).toEqual([undefined, null, miss]);
+			root.unmount();
+		});
+
+		it(`lowers memos in a module whose template literals, switch, and catch print through a parent (inline=${inlineHookMemo})`, () => {
+			const source = `
+				import * as Octane from 'octane';
+				import { createElement, useMemo, useState } from 'octane';
+				function format(kind: string, count: number): string {
+					switch (kind) {
+						case 'raw':
+							return String.raw\`\\n\${count}\`;
+						default:
+							try {
+								return \`\${kind}:\\t\${\`[\${count}]\`}\`;
+							} catch {
+								return 'unreachable';
+							}
+					}
+				}
+				export function App(props) {
+					const [count, setCount] = useState(1);
+					const label = useMemo(() => ({ text: format(props.kind, count) }), [props.kind, count]);
+					const increment = Octane.useCallback(() => setCount((value) => value + 1), []);
+					props.observe(label, increment);
+					return createElement('button', { onClick: increment }, label.text);
+				}
+			`;
+			// Only the inline tier reprints the Program, so only it returns a source map.
+			expect(slotHooks(source, 'plain-hook-memo.ts', { inlineHookMemo })?.map != null).toBe(
+				inlineHookMemo,
+			);
+			const { App } = load(source);
+			const observed: Array<[{ text: string }, () => void]> = [];
+			const props = { kind: 'plain', observe: (...values: any[]) => observed.push(values as any) };
+			const root = mount(App, props);
+			const [first, increment] = observed.at(-1)!;
+			expect(root.find('button').textContent).toBe('plain:\t[1]');
+			root.update(App, props);
+			expect(observed.at(-1)![0]).toBe(first);
+			root.click('button');
+			expect(root.find('button').textContent).toBe('plain:\t[2]');
+			expect(observed.at(-1)![0]).not.toBe(first);
+			expect(observed.at(-1)![1]).toBe(increment);
+			root.update(App, { ...props, kind: 'raw' });
+			expect(root.find('button').textContent).toBe('\\n2');
+			root.unmount();
+		});
+
+		it(`short-circuits an optional chain that continues through a non-null assertion (inline=${inlineHookMemo})`, () => {
+			const { App } = load(`
+				import { createElement, useMemo } from 'octane';
+				export function App(props) {
+					const label = useMemo(() => props.box?.item!.label ?? 'none', [props.box]);
+					return createElement('p', null, label);
+				}
+			`);
+			const root = mount(App, { box: undefined });
+			expect(root.html()).toBe('<p>none</p>');
+			root.update(App, { box: { item: { label: 'boxed' } } });
+			expect(root.html()).toBe('<p>boxed</p>');
 			root.unmount();
 		});
 	}

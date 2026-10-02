@@ -55,19 +55,19 @@ function mapChildren(node, visit) {
 }
 
 function walkNodes(root, visit) {
-	function walk(node) {
+	function walk(node, parent, field) {
 		if (node === null || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
-			for (const child of node) walk(child);
+			for (const child of node) walk(child, parent, field);
 			return;
 		}
-		if (visit(node) === false) return;
+		if (visit(node, parent, field) === false) return;
 		for (const key in node) {
 			if (META_KEYS.has(key) || key.startsWith('_octane')) continue;
-			walk(node[key]);
+			walk(node[key], node, key);
 		}
 	}
-	walk(root);
+	walk(root, null, null);
 }
 
 function collectUsedNames(ast) {
@@ -280,16 +280,116 @@ function collectComments(ast) {
 	return [...comments.values()].sort((left, right) => left.start - right.start);
 }
 
+// esrap's visitor for each listed parent field prints these nodes itself, so
+// they have no visitor of their own. They are printable only in those fields.
+// TSTemplateLiteralType.quasis is deliberately absent: esrap 2.3 drops the
+// final quasi (the parser emits template literal types as a TSLiteralType
+// over a TemplateLiteral, so authored code never reaches that visitor).
+const PARENT_PRINTED = new Map([
+	['TemplateElement', ['TemplateLiteral.quasis']],
+	['SwitchCase', ['SwitchStatement.cases']],
+	['CatchClause', ['TryStatement.handler']],
+	['ImportDefaultSpecifier', ['ImportDeclaration.specifiers']],
+	['ImportNamespaceSpecifier', ['ImportDeclaration.specifiers']],
+	[
+		'ImportAttribute',
+		[
+			'ImportDeclaration.attributes',
+			'ExportNamedDeclaration.attributes',
+			'ExportAllDeclaration.attributes',
+		],
+	],
+	['TSDeclareMethod', ['MethodDefinition.value']],
+]);
+
+// esrap 2.3 has a visitor for each of these shapes, but it would print other
+// code: a build error, different runtime behavior, or lost authored types.
+function misprints(node) {
+	switch (node.type) {
+		case 'TSModuleDeclaration':
+			// It reads `global`, not the parser's `kind`, and writes `global global`.
+			return node.kind === 'global' && node.global !== true;
+		case 'ImportDeclaration':
+			// `import type {} from 'x'` would become the side-effect `import 'x'`.
+			return node.importKind === 'type' && node.specifiers.length === 0;
+		case 'ChainExpression':
+			return nonNullEndsChain(node);
+		case 'AssignmentExpression':
+		case 'AssignmentPattern':
+			// An assignment target cast loses its parentheses: `x as T = value`.
+			return isTypeCast(node.left);
+		case 'UpdateExpression':
+			return isTypeCast(node.argument);
+		case 'MethodDefinition':
+			// It writes `abstract` before the accessibility and `override` before `static`.
+			return (node.abstract && node.accessibility != null) || (node.static && node.override);
+		case 'Property':
+			// A concise method writes its own parameters, without type parameters.
+			return (
+				node.value.type === 'FunctionExpression' &&
+				(node.method || node.kind !== 'init') &&
+				node.value.typeParameters != null
+			);
+		case 'ArrayPattern':
+			return node.typeAnnotation != null;
+		case 'ClassDeclaration':
+		case 'ClassExpression':
+			// The parser reads `extends Base<T>` before a line-broken body as an
+			// instantiation expression, printed as `extends (Base<T>)`.
+			return node.superClass?.type === 'TSInstantiationExpression';
+		case 'TaggedTemplateExpression':
+			return node.typeArguments != null;
+	}
+	return false;
+}
+
+function isTypeCast(node) {
+	return node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression';
+}
+
+// esrap parenthesizes a non-null assertion used as a member object or callee.
+// Followed by a non-optional link, with an optional link below it, `a?.b!.c`
+// would print as `(a?.b!).c` and throw where it short-circuited on a nullish
+// `a`. (`(a?.b!)?.c` still short-circuits, so an optional link above is safe.)
+function nonNullEndsChain(chain) {
+	let wrapped = false;
+	let node = chain.expression;
+	while (true) {
+		if (node.type === 'TSNonNullExpression') {
+			node = node.expression;
+		} else if (node.type === 'MemberExpression' || node.type === 'CallExpression') {
+			if (wrapped && node.optional) return true;
+			const inner = node.type === 'MemberExpression' ? node.object : node.callee;
+			if (inner.type === 'TSNonNullExpression' && !node.optional) wrapped = true;
+			node = inner;
+		} else {
+			return false;
+		}
+	}
+}
+
 function canPrintProgram(ast, visitors) {
 	let supported = true;
-	walkNodes(ast, (node) => {
-		if (typeof node.type === 'string' && typeof visitors[node.type] !== 'function') {
+	walkNodes(ast, (node, parent, field) => {
+		if (
+			typeof node.type === 'string' &&
+			typeof visitors[node.type] !== 'function' &&
+			!PARENT_PRINTED.get(node.type)?.includes(`${parent?.type}.${field}`)
+		) {
 			supported = false;
-			return false;
 		}
 		return supported;
 	});
 	return supported;
+}
+
+function printsFaithfully(program) {
+	let faithful = true;
+	walkNodes(program, (node) => {
+		if (misprints(node)) faithful = false;
+		return faithful;
+	});
+	return faithful;
 }
 
 /**
@@ -389,6 +489,9 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 						...transformed.body.slice(start),
 					],
 	};
+	// Check the Program as printed: the hook lowering above can replace an
+	// authored shape that esrap would misprint.
+	if (!printsFaithfully(program)) return null;
 	// One TS-preserving print, with real mappings. Never feed this generated code
 	// back through the surgical pass or parse it into a second compiler pipeline.
 	try {

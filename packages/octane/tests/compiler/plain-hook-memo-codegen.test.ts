@@ -10,6 +10,24 @@ import { decodeMappings } from '../_source-map.js';
 const SOURCE = `import { useMemo } from 'octane';
 export function useValue(value) { return useMemo(() => ({ value }), [value]); }`;
 
+// The leading statements of `code` that correspond to `authored`, as syntax
+// trees with each leaf's text (template quasis keep their raw escapes), so a
+// reprint may change layout and optional semicolons but not the syntax.
+function authoredShapes(code: string, authored: string) {
+	const count = ts.createSourceFile('authored.ts', authored, ts.ScriptTarget.Latest).statements
+		.length;
+	const ast = ts.createSourceFile('output.ts', code, ts.ScriptTarget.Latest, true);
+	function shape(node: ts.Node): unknown {
+		const children: unknown[] = [];
+		ts.forEachChild(node, (child) => {
+			children.push(shape(child));
+		});
+		const kind = ts.SyntaxKind[node.kind];
+		return children.length > 0 ? [kind, ...children] : `${kind} ${node.getText(ast)}`;
+	}
+	return ast.statements.slice(0, count).map(shape);
+}
+
 describe('plain-module memo compilation', () => {
 	it.each([false, true])(
 		'preserves parenthesized types with native fallback %s',
@@ -83,6 +101,111 @@ export function useValue<T>(value: T) {
 				.flat()
 				.some((segment) => segment[2] === originalLine),
 		).toBe(true);
+	});
+
+	it('reprints syntax that a parent printer owns without changing it', () => {
+		// esrap prints each of these node types from its parent's visitor:
+		// template elements, import specifiers and attributes, switch cases,
+		// catch clauses, and method overload signatures.
+		const authored = `import { useMemo } from 'octane';
+import format, * as formats from './format';
+import data from './data.json' with { type: 'json' };
+export { formatted } from './formatted' with { type: 'json' };
+export * from './all' with { type: 'json' };
+class Formatter {
+  read(): string;
+  read(value?: string) { return value ?? formats.fallback; }
+}
+function describe(kind: string, count: number): string {
+  switch (kind) {
+    case 'raw':
+      return String.raw\`\\n\${count}\\u0041\`;
+    default:
+      try {
+        return \`\${format(kind)}:\\t\${\`[\${count}]\`}\\\`\`;
+      } catch (error: unknown) {
+        return new Formatter().read(String(error ?? data));
+      }
+  }
+}
+type Key = \`key-\${string}-end\`;
+`;
+		const out = slotHooks(
+			`${authored}export function useLabel(kind: Key, count: number) {
+  return useMemo(() => describe(kind, count), [kind, count]);
+}`,
+			'parent-printed.ts',
+			{ inlineHookMemo: true },
+		);
+		expect(out?.map).not.toBeNull();
+		expect(authoredShapes(out!.code, authored)).toEqual(authoredShapes(authored, authored));
+	});
+
+	it.each([
+		[
+			'tagged template type arguments',
+			`function tag<T>(strings: TemplateStringsArray, ...values: T[]) { return strings.raw.join(''); }
+export const tagged = tag<number>\`a\${1}\`;`,
+		],
+		['a global augmentation', 'declare global { interface Window { label: string } }'],
+		['an empty type-only import', "import type {} from './globals';"],
+		[
+			'a non-null assertion inside an optional chain',
+			'export const read = (box?: { item?: { label: string } }) => box?.item!.label;',
+		],
+		[
+			'a static override method',
+			`class Base { static read() { return 1; } }
+export class Derived extends Base { static override read() { return 2; } }`,
+		],
+		[
+			'an abstract method with an accessibility',
+			'export abstract class Shape { protected abstract area(): number; }',
+		],
+		[
+			'object method type parameters',
+			'export const box = { wrap<T>(value: T) { return [value]; } };',
+		],
+		['an array pattern annotation', 'export const first = ([head]: number[]) => head;'],
+		[
+			'a generic superclass before a line-broken body',
+			'class Base<T> { value?: T; }\nexport class Box<T>\n\textends Base<T>\n{}',
+		],
+		[
+			'a cast assignment target',
+			'export function clear(ref: { current: number }) { (ref.current as unknown) = undefined; }',
+		],
+		[
+			'a cast update target',
+			'export function bump(ref: { current: unknown }) { (ref.current as number)++; }',
+		],
+		[
+			'a cast destructuring default target',
+			'export function fill(ref: { current?: number }) { [(ref.current as number) = 1] = []; }',
+		],
+	])('keeps %s intact beside an inlined memo', (_label, syntax) => {
+		const authored = `import { useMemo } from 'octane';\n${syntax}\n`;
+		const out = slotHooks(
+			`${authored}export function useValue(value) { return useMemo(() => ({ value }), [value]); }`,
+			'misprinted.ts',
+			{ inlineHookMemo: true },
+		);
+		expect(out).not.toBeNull();
+		expect(authoredShapes(out!.code, authored)).toEqual(authoredShapes(authored, authored));
+	});
+
+	it('inlines memos beside non-null assertions that leave optional chains intact', () => {
+		for (const expression of [
+			'box!.item?.label',
+			'box?.item.label!',
+			'box?.item!?.label',
+			'(box?.item)!.label',
+		]) {
+			const source = `import { useMemo } from 'octane';
+export const read = (box?: { item: { label?: string } }) => ${expression};
+export function useValue(value) { return useMemo(() => ({ value }), [value]); }`;
+			expect(slotHooks(source, 'non-null-chain.ts', { inlineHookMemo: true })?.map).not.toBeNull();
+		}
 	});
 
 	it('keeps the direct slot pass surgical unless memo lowering is requested', () => {
