@@ -39,6 +39,12 @@ function container(html: string) {
 
 const text = (nodes: Element[]) => nodes.map((node) => node.textContent);
 
+// Hydration keeps the server's nodes, so each one must be the same object.
+function expectAdopted(current: Element[], server: Element[]) {
+	expect(current).toHaveLength(server.length);
+	current.forEach((node, index) => expect(node).toBe(server[index]));
+}
+
 describe('bare-left @for row bindings', () => {
 	it('binds each row its own name, shadowing the outer one only inside the row', () => {
 		const picks: string[] = [];
@@ -111,10 +117,51 @@ describe('bare-left @for row bindings', () => {
 		);
 		cleanups.push(() => root.unmount());
 		flushSync(() => {});
-		expect([...host.querySelectorAll('button')]).toEqual(buttons);
+		expectAdopted([...host.querySelectorAll('button')], buttons);
 		flushSync(() => buttons[1].click());
 		expect(picks).toEqual(['y:untitled']);
 		expect(buttons[1].textContent).toBe('untitled 1');
+		expect(errors).toEqual([]);
+	});
+
+	it('lets a row reassign its own bare-left binding', () => {
+		const rows = { rows: [{ id: 'x', label: 'first' }, { id: 'y' }] };
+		const scores = {
+			scores: [['ann', 3], ['bo']] satisfies [string, number?][],
+			factor: 2,
+		};
+		const relabeled = mount(client.Relabeled, rows);
+		cleanups.push(() => relabeled.unmount());
+		expect(text(relabeled.findAll('li'))).toEqual(['first!', 'untitled!']);
+		relabeled.update(client.Relabeled, { rows: [{ id: 'y', label: 'renamed' }, { id: 'x' }] });
+		expect(text(relabeled.findAll('li'))).toEqual(['renamed!', 'untitled!']);
+
+		const weighted = mount(client.Weighted, scores);
+		cleanups.push(() => weighted.unmount());
+		expect(text(weighted.findAll('li'))).toEqual(['ann:6', 'bo:2']);
+		weighted.update(client.Weighted, { ...scores, factor: 10 });
+		expect(text(weighted.findAll('li'))).toEqual(['ann:30', 'bo:10']);
+
+		const errors: unknown[] = [];
+		const options = { onRecoverableError: (error: unknown) => errors.push(error) };
+		const relabeledHost = container(renderToString(server.Relabeled, rows).html);
+		const relabeledItems = [...relabeledHost.querySelectorAll('li')];
+		expect(text(relabeledItems)).toEqual(['first!', 'untitled!']);
+		const weightedHost = container(renderToString(server.Weighted, scores).html);
+		const weightedItems = [...weightedHost.querySelectorAll('li')];
+		expect(text(weightedItems)).toEqual(['ann:6', 'bo:2']);
+
+		const relabeledRoot = hydrateRoot(relabeledHost, client.Relabeled, rows, options);
+		cleanups.push(() => relabeledRoot.unmount());
+		const weightedRoot = hydrateRoot(weightedHost, client.Weighted, scores, options);
+		cleanups.push(() => weightedRoot.unmount());
+		flushSync(() => {});
+		expectAdopted([...relabeledHost.querySelectorAll('li')], relabeledItems);
+		expect(text(relabeledItems)).toEqual(['first!', 'untitled!']);
+		expectAdopted([...weightedHost.querySelectorAll('li')], weightedItems);
+		expect(text(weightedItems)).toEqual(['ann:6', 'bo:2']);
+		flushSync(() => weightedRoot.render(client.Weighted, { ...scores, factor: 10 }));
+		expect(text(weightedItems)).toEqual(['ann:30', 'bo:10']);
 		expect(errors).toEqual([]);
 	});
 
@@ -145,7 +192,7 @@ describe('bare-left @for row bindings', () => {
 			expect(onHydrated).toHaveBeenCalledTimes(boundaries);
 		}, SPLIT_CHILD_LOAD);
 
-		expect([...host.querySelectorAll('button')]).toEqual(buttons);
+		expectAdopted([...host.querySelectorAll('button')], buttons);
 		expect(text(buttons)).toEqual(['a', 'b']);
 		await act(() => buttons[1].click());
 		expect(picks).toEqual([pick]);

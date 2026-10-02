@@ -48,6 +48,26 @@ export function Scores(props: { scores: [string, ...number[]][] }) @{
 	</ul>
 }
 
+// A bare-left binding is the row's own writable item: reassigning it in the
+// row changes only that row's output.
+export function Relabeled(props: { rows: Row[] }) @{
+	<ul>
+		@for ({ id, label = 'untitled' } of props.rows; key id) {
+			label = `${label}!`;
+			<li data-id={id}>{label as string}</li>
+		}
+	</ul>
+}
+
+export function Weighted(props: { scores: [string, number?][]; factor: number }) @{
+	<ul>
+		@for ([name, points = 1] of props.scores; key name) {
+			points *= props.factor;
+			<li data-name={name}>{`${name}:${points}`}</li>
+		}
+	</ul>
+}
+
 export type SplitProps = {
 	when: HydrateProps['when'];
 	rows: Row[];
