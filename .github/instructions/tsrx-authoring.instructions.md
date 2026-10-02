@@ -85,6 +85,11 @@ setup.
 @try { } @pending { } @catch (e) { }
 ```
 
+An `@for` header may omit the keyword: `@for (item of items)` or
+`@for ({ id } of items)` binds each row's own item, as a `let` header does,
+and shadows any outer name. A header cannot assign an existing target such as
+`obj.x`; the compiler rejects it.
+
 An arm ends early with `return;` or `return null;` (or `continue;` in an `@for`
 body) from anywhere in its setup; only that arm's output is skipped. A value
 return or a `break` that targets the directive is a compile error. A child
