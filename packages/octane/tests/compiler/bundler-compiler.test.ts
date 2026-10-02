@@ -556,34 +556,30 @@ export function Styled(props) @{ 'use dom bindings'; <div sx={${expression}}/> }
 			export const Marked = descriptorChildren(Impl);
 		`;
 		const ordinary = 'export const Ordinary = 1;';
-		expect(() =>
+		const prepare = (source: string, transformedSource = source, ast = parseModule(source, id)) =>
 			(compiler as any)._prepareDescriptorChildrenExports(
+				authority,
+				(compiler as any)._analyzeDescriptorChildrenExports(authority, source, id, ast),
+				transformedSource,
+				id,
+			);
+		expect(() =>
+			(compiler as any)._analyzeDescriptorChildrenExports(
 				Symbol('unowned'),
 				marked,
 				id,
 				parseModule(marked, id),
 			),
 		).toThrow(/Invalid descriptor-children preflight input/);
-		const proof = (compiler as any)._prepareDescriptorChildrenExports(
-			authority,
-			marked,
-			id,
-			parseModule(marked, id),
-		);
+		const proof = prepare(marked);
 
 		const mismatched = compiler.transform(ordinary, id, {
 			_descriptorChildrenExportsProof: proof,
 		} as any);
 		expect(mismatched?.descriptorChildrenExports).toEqual([]);
 
-		const matchingProof = (compiler as any)._prepareDescriptorChildrenExports(
-			authority,
-			marked,
-			id,
-			parseModule(marked, id),
-		);
 		const matching = compiler.transform(marked, id, {
-			_descriptorChildrenExportsProof: matchingProof,
+			_descriptorChildrenExportsProof: prepare(marked),
 		} as any);
 		expect(matching?.descriptorChildrenExports).toEqual(['Marked']);
 
@@ -591,12 +587,7 @@ export function Styled(props) @{ 'use dom bindings'; <div sx={${expression}}/> }
 		// proof or changing the module query must preserve the fallback's exports.
 		const unicodeSets = `${marked}\nconst unicodeSets = /[a&&b]/v;`;
 		expect(compiler.transform(unicodeSets, id)?.descriptorChildrenExports).toEqual(['Marked']);
-		const oneShotProof = (compiler as any)._prepareDescriptorChildrenExports(
-			authority,
-			unicodeSets,
-			id,
-			parseCompilerModule(unicodeSets, id),
-		);
+		const oneShotProof = prepare(unicodeSets, unicodeSets, parseCompilerModule(unicodeSets, id));
 		const firstUse = compiler.transform(unicodeSets, id, {
 			_descriptorChildrenExportsProof: oneShotProof,
 		} as any);
@@ -610,16 +601,64 @@ export function Styled(props) @{ 'use dom bindings'; <div sx={${expression}}/> }
 		} as any);
 		expect(changedSource?.descriptorChildrenExports).toEqual([]);
 
-		const idProof = (compiler as any)._prepareDescriptorChildrenExports(
-			authority,
-			unicodeSets,
-			id,
-			parseCompilerModule(unicodeSets, id),
-		);
+		const idProof = prepare(unicodeSets, unicodeSets, parseCompilerModule(unicodeSets, id));
 		const mismatchedId = compiler.transform(unicodeSets, `${id}?changed`, {
 			_descriptorChildrenExportsProof: idProof,
 		} as any);
 		expect(mismatchedId?.descriptorChildrenExports).toEqual(['Marked']);
+	});
+
+	it('reuses a descriptor-export analysis only for its compiler, exact source, and module id', () => {
+		const authority = Symbol('test descriptor preflight');
+		const options = { _descriptorPreflightAuthority: authority, root: '/project' } as any;
+		const compiler = createOctaneCompiler(options);
+		const id = '/project/src/App.tsrx';
+		const source = 'export const Ordinary = 1;';
+		// The trusted authority supplies the AST. Classifying a marked module under
+		// this ordinary source makes a used proof report Marked, while the
+		// compiler's own string fallback reports nothing.
+		const marked = `
+			import { descriptorChildren } from 'octane';
+			function Impl(props) { return props.children; }
+			export const Marked = descriptorChildren(Impl);
+		`;
+		const receipt = (compiler as any)._analyzeDescriptorChildrenExports(
+			authority,
+			source,
+			id,
+			parseModule(marked, id),
+		);
+		const prepare = (target = compiler, preparedSource = source, preparedId = id) =>
+			(target as any)._prepareDescriptorChildrenExports(
+				authority,
+				receipt,
+				preparedSource,
+				preparedId,
+			);
+		const exportsWith = (proof: unknown) =>
+			(
+				compiler.transform(source, id, { _descriptorChildrenExportsProof: proof } as any) as {
+					descriptorChildrenExports?: string[];
+				} | null
+			)?.descriptorChildrenExports;
+
+		expect(() =>
+			(compiler as any)._prepareDescriptorChildrenExports(Symbol('unowned'), receipt, source, id),
+		).toThrow(/Invalid descriptor-children preflight input/);
+		expect(exportsWith(null)).toEqual([]);
+
+		// One receipt can serve every environment, but each transform consumes its
+		// own proof.
+		const first = prepare();
+		const second = prepare();
+		expect(second).not.toBe(first);
+		expect(exportsWith(first)).toEqual(['Marked']);
+		expect(exportsWith(first)).toEqual([]);
+		expect(exportsWith(second)).toEqual(['Marked']);
+
+		expect(prepare(createOctaneCompiler(options))).toBeNull();
+		expect(prepare(compiler, `${source}\n`)).toBeNull();
+		expect(prepare(compiler, source, `${id}?hydrate=Island`)).toBeNull();
 	});
 
 	it('enforces project-wide Strong mode on both client and server without claiming dependencies', () => {
@@ -815,6 +854,77 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 			/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/,
 		);
 		expect(() => compiler.transform(deferredHook, '/project/src/use-count.js')).not.toThrow();
+	});
+
+	it('reports the same Strong decision for a module as transform enforces', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-strong-module-status-'));
+		try {
+			writeFileSync(
+				join(root, 'package.json'),
+				JSON.stringify({ name: 'application', private: true }),
+			);
+			const nested = join(root, 'packages', 'nested');
+			mkdirSync(join(root, 'src'), { recursive: true });
+			mkdirSync(nested, { recursive: true });
+			writeFileSync(
+				join(nested, 'package.json'),
+				JSON.stringify({ name: '@example/nested', dependencies: { octane: '*' } }),
+			);
+			const app = createOctaneCompiler({ root, strong: true });
+			const perModule = createOctaneCompiler({ root, strong: false });
+			const hook =
+				"import { useState } from 'octane';\n" +
+				'export function useBroken() { const [value, update] = useState(0); update(value); }\n';
+			const cases = [
+				[app, RENDER_STATE_UPDATE, join(root, 'src/App.tsrx'), true, false, true],
+				[app, RENDER_STATE_UPDATE, join(nested, 'App.tsrx'), false, false, false],
+				[app, `'use strong';\n${RENDER_STATE_UPDATE}`, join(nested, 'App.tsrx'), true, true, false],
+				[app, RENDER_STATE_UPDATE, join(root, 'node_modules/x/App.tsrx'), false, false, false],
+				[perModule, RENDER_STATE_UPDATE, join(root, 'src/App.tsrx'), false, false, false],
+				[
+					perModule,
+					`// note\n'use client';\n"use strong";\n${RENDER_STATE_UPDATE}`,
+					join(root, 'src/App.tsrx'),
+					true,
+					true,
+					false,
+				],
+				[
+					perModule,
+					`${RENDER_STATE_UPDATE}export const label = 'use strong';\n`,
+					join(root, 'src/App.tsrx'),
+					false,
+					false,
+					false,
+				],
+				[perModule, `'use strong';\n${hook}`, join(root, 'src/use-broken.ts'), true, true, false],
+				[
+					perModule,
+					hook.replace('{ const', "{ 'use strong'; const"),
+					join(root, 'src/use-broken.ts'),
+					false,
+					false,
+					false,
+				],
+			] as const;
+
+			for (const [compiler, source, filename, strong, directive, config] of cases) {
+				expect(compiler.strongModuleStatus(source, filename)).toEqual({
+					strong,
+					directive,
+					config,
+				});
+				let message = '';
+				try {
+					compiler.transform(source, filename);
+				} catch (error) {
+					message = String(error);
+				}
+				expect(/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/.test(message)).toBe(strong);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	it('keeps Strong directives subordinate to mixed-toolchain ownership', () => {

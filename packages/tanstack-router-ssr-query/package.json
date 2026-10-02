@@ -13,10 +13,10 @@
   },
   "scripts": {
     "test": "vitest run --project tanstack-router-ssr-query",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.octane.json"
+    "typecheck": "octane-tsc -p tsconfig.octane.json"
   },
   "dependencies": {
-    "@tanstack/router-ssr-query-core": "1.169.1",
+    "@tanstack/router-ssr-query-core": "1.169.3",
     "@tanstack/query-core": "catalog:default"
   },
   "peerDependencies": {
@@ -29,7 +29,7 @@
     "@octanejs/tanstack-router": "workspace:*",
     "@tanstack/react-query": "catalog:default",
     "@tanstack/react-router": "catalog:default",
-    "@tanstack/react-router-ssr-query": "1.167.1",
+    "@tanstack/react-router-ssr-query": "1.167.3",
     "@tsrx/react": "catalog:default",
     "@types/react": "catalog:default",
     "@types/react-dom": "catalog:default",

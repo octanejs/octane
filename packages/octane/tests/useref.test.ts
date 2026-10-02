@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { mount, nextPaint } from './_helpers';
-import { createRoot, flushSync, hydrateRoot } from '../src/index.js';
+import { act, createElement, createRoot, flushSync, hydrateRoot } from '../src/index.js';
 import { renderToString } from 'octane/server';
 import { loadServerFixture } from './_server-fixture.js';
 import {
@@ -17,7 +17,8 @@ import {
 	ImperativeValue,
 	LazyInit,
 } from './_fixtures/useref.tsrx';
-import { ArrayRefsOneEl } from './_fixtures/useref-multi.tsrx';
+import { ArrayRefsOneEl, ArrayRefHost } from './_fixtures/useref-multi.tsrx';
+import { RefCallbackLoop } from './conformance/_fixtures/update-reconciliation.tsrx';
 
 describe('useRef — mutation API', () => {
 	it('persists ref.current across renders', () => {
@@ -169,6 +170,205 @@ describe('useRef — DOM ref attribute', () => {
 		expect(objRef.current).not.toBe(null);
 		r.unmount();
 		expect(objRef.current).toBe(null);
+	});
+});
+
+describe.each(['descriptor', 'compiled', 'hydrated'] as const)('host ref arrays — %s', (mode) => {
+	function renderRefs(refs: any[], errors: unknown[]) {
+		const container = document.createElement('div');
+		document.body.append(container);
+		const options = { onUncaughtError: (error: unknown) => errors.push(error) };
+		let root: ReturnType<typeof createRoot>;
+		if (mode === 'hydrated') {
+			const server = loadServerFixture('packages/octane/tests/_fixtures/useref-multi.tsrx');
+			container.innerHTML = renderToString(server.ArrayRefHost, { refs }).html;
+			const original = container.querySelector('.array-host');
+			root = hydrateRoot(container, ArrayRefHost, { refs }, options);
+			flushSync(() => {});
+			expect(container.querySelector('.array-host')).toBe(original);
+		} else {
+			root = createRoot(container, options);
+			if (mode === 'descriptor') {
+				root.render(createElement('div', { class: 'array-host', ref: refs }, 'host'));
+			} else {
+				root.render(ArrayRefHost, { refs });
+			}
+			flushSync(() => {});
+		}
+		const element = container.querySelector('.array-host');
+		expect(element).not.toBeNull();
+		return { root, container, element };
+	}
+
+	it.each(['unmount', 'empty render', 'ref replacement'] as const)(
+		'releases every owner after an earlier callback cleanup throws on %s',
+		(action) => {
+			const failure = new Error('cleanup failed');
+			const errors: unknown[] = [];
+			const consoleErrors: unknown[] = [];
+			const consoleError = vi.spyOn(console, 'error').mockImplementation((error) => {
+				consoleErrors.push(error);
+			});
+			const objectRef: { current: Element | null } = { current: null };
+			let resourceAttached = false;
+			const cleanup = vi.fn(() => {
+				resourceAttached = false;
+			});
+			const legacyRef = vi.fn();
+			const refs = [
+				() => () => {
+					throw failure;
+				},
+				objectRef,
+				() => {
+					resourceAttached = true;
+					return cleanup;
+				},
+				legacyRef,
+			];
+			const { root, container, element } = renderRefs(refs, errors);
+			try {
+				expect(element).not.toBeNull();
+				expect(objectRef.current).toBe(element);
+				expect(resourceAttached).toBe(true);
+				expect(legacyRef).toHaveBeenCalledWith(element);
+				if (action === 'unmount') root.unmount();
+				else {
+					if (action === 'empty render') root.render(null);
+					else if (mode === 'descriptor') {
+						root.render(createElement('div', { class: 'array-host', ref: [] }, 'host'));
+					} else root.render(ArrayRefHost, { refs: [] });
+					flushSync(() => {});
+				}
+				if (action !== 'ref replacement') expect(container.textContent).toBe('');
+				// Root unmount reports through its callback; updates can use the
+				// existing console fallback after the old owner is removed.
+				expect(action === 'unmount' ? errors : [...errors, ...consoleErrors]).toEqual([failure]);
+				expect.soft(objectRef.current).toBeNull();
+				expect.soft(resourceAttached).toBe(false);
+				expect.soft(legacyRef).toHaveBeenLastCalledWith(null);
+				expect.soft(cleanup).toHaveBeenCalledTimes(1);
+				root.unmount();
+				expect(cleanup).toHaveBeenCalledTimes(1);
+			} finally {
+				root.unmount();
+				container.remove();
+				consoleError.mockRestore();
+			}
+		},
+	);
+
+	it.each([new Error('first cleanup failed'), undefined])(
+		'releases nested owners and preserves the first thrown value (%s)',
+		(firstFailure) => {
+			const errors: unknown[] = [];
+			const objectRef: { current: Element | null } = { current: null };
+			const first = vi.fn(() => {
+				throw firstFailure;
+			});
+			const second = vi.fn(() => {
+				throw new Error('second cleanup failed');
+			});
+			const last = vi.fn();
+			const refs = [null, [() => first, objectRef, []], undefined, () => second, () => last];
+			const { root, container, element } = renderRefs(refs, errors);
+			try {
+				expect(objectRef.current).toBe(element);
+				root.unmount();
+				expect(container.textContent).toBe('');
+				expect(errors).toEqual([firstFailure]);
+				expect.soft(objectRef.current).toBeNull();
+				expect.soft(second).toHaveBeenCalledTimes(1);
+				expect.soft(last).toHaveBeenCalledTimes(1);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it('releases later owners after an earlier legacy null callback throws', () => {
+		const failure = new Error('null callback failed');
+		const errors: unknown[] = [];
+		const objectRef: { current: Element | null } = { current: null };
+		const last = vi.fn();
+		const refs = [
+			(value: Element | null) => {
+				if (value === null) throw failure;
+			},
+			objectRef,
+			last,
+		];
+		const { root, container, element } = renderRefs(refs, errors);
+		try {
+			expect(objectRef.current).toBe(element);
+			root.unmount();
+			expect(errors).toEqual([failure]);
+			expect.soft(objectRef.current).toBeNull();
+			expect.soft(last).toHaveBeenLastCalledWith(null);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+
+	it('keeps the update-depth guard fatal after an earlier cleanup failure', async () => {
+		const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const loopRoot = createRoot(document.createElement('div'));
+		let mounted: ReturnType<typeof renderRefs> | undefined;
+		try {
+			// Capture a real framework guard through the public update-loop fixture.
+			let depthError: unknown;
+			try {
+				await act(() => loopRoot.render(RefCallbackLoop));
+			} catch (error) {
+				depthError = error;
+			}
+			expect(depthError).toBeInstanceOf(Error);
+			expect((depthError as Error).message).toMatch(
+				/Maximum update depth exceeded|Minified Octane error #1;/,
+			);
+			mounted = renderRefs(
+				[
+					() => () => {
+						throw new Error('first cleanup failed');
+					},
+					() => () => {
+						throw depthError;
+					},
+				],
+				[],
+			);
+			expect(() => mounted!.root.unmount()).toThrow(depthError as Error);
+		} finally {
+			mounted?.root.unmount();
+			loopRoot.unmount();
+			mounted?.container.remove();
+			warning.mockRestore();
+		}
+	});
+
+	it('detaches nonthrowing nested owners without reporting an error', () => {
+		const errors: unknown[] = [];
+		const objectRef: { current: Element | null } = { current: null };
+		const cleanup = vi.fn();
+		const legacyRef = vi.fn();
+		const { root, container, element } = renderRefs(
+			[null, [objectRef, () => cleanup], legacyRef],
+			errors,
+		);
+		try {
+			expect(objectRef.current).toBe(element);
+			expect(legacyRef).toHaveBeenCalledWith(element);
+			root.unmount();
+			expect(objectRef.current).toBeNull();
+			expect(legacyRef).toHaveBeenLastCalledWith(null);
+			expect(cleanup).toHaveBeenCalledTimes(1);
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
 	});
 });
 

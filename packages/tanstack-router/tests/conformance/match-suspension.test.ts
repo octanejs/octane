@@ -21,16 +21,17 @@ async function wait(ms: number) {
 	await flush();
 }
 
-// A match that keeps suspending on a settled promise retries on microtasks,
-// where the test timeout can never fire. Every match render reads
-// router.getMatch, so cap it to turn that livelock into a failure.
+// A match that keeps re-suspending retries on microtasks, where the test timeout
+// can never fire. Every match render reads its store via
+// `router.stores.getMatchStore`, so cap it to turn that livelock into a failure.
 function failOnRenderLoop(router: AnyRouter) {
-	const getMatch = router.getMatch;
+	const stores = router.stores as any;
+	const getMatchStore = stores.getMatchStore.bind(stores);
 	let reads = 0;
-	router.getMatch = ((matchId: string) => {
+	stores.getMatchStore = (routeId: string) => {
 		if (++reads > 20_000) throw new Error('route match render loop');
-		return getMatch(matchId);
-	}) as AnyRouter['getMatch'];
+		return getMatchStore(routeId);
+	};
 }
 
 afterEach(() => {
@@ -69,7 +70,7 @@ describe('@octanejs/tanstack-router — match suspension across match states', (
 		// pendingMinMs elapses while the loader is still running.
 		await wait(60);
 
-		expect(router.getMatch(clientMatch.id)?.status).toBe('pending');
+		expect(router.stores.getMatchStore(clientMatch.routeId).get()?.status).toBe('pending');
 		expect(componentRenders).toEqual([]);
 		expect(r.findAll('.client').length).toBe(0);
 		expect(r.findAll('.pending').length).toBe(1);
@@ -81,6 +82,62 @@ describe('@octanejs/tanstack-router — match suspension across match states', (
 		expect(r.findAll('.pending').length).toBe(0);
 		expect(componentRenders).not.toEqual([]);
 		expect(componentRenders.every((entry) => entry.data === 'client data')).toBe(true);
+		r.unmount();
+	});
+
+	// router-core emits `onRendered` (scroll restoration, devtools) once the match
+	// tree is on screen. On an already-resolved SSR location the client does not
+	// re-load, so the acknowledgement is settled from the hydration layout effect.
+	// Per react-router's Transitioner hydration branch.
+	it('emits onRendered after hydrating an already-resolved SSR location', async () => {
+		const router = makeMatchSuspensionRouter('/');
+		failOnRenderLoop(router);
+
+		const [rootMatch, homeMatch] = router.matchRoutes(router.stores.location.get());
+		(window as any).$_TSR = {
+			router: {
+				manifest: undefined,
+				lastMatchId: homeMatch.id,
+				matches: [
+					{ i: rootMatch.id, u: Date.now(), s: 'success', ssr: true },
+					{ i: homeMatch.id, u: Date.now(), s: 'success', ssr: true },
+				],
+			},
+			buffer: [],
+		};
+
+		const rendered: Array<unknown> = [];
+		const unsub = router.subscribe('onRendered', (event: unknown) => rendered.push(event));
+
+		const r = mount(RouterClient as any, { router });
+		await flush();
+
+		expect(r.findAll('.home').length).toBe(1);
+		expect(rendered.length).toBeGreaterThan(0);
+		unsub();
+		r.unmount();
+	});
+
+	// Swapping the router instance on a live RouterProvider must load the new
+	// router. octane has no StrictMode double-invoke, so the Transitioner carries no
+	// persistent mounted-guard that would skip the swapped-in router's initial load.
+	it('loads a router swapped onto a live RouterProvider', async () => {
+		const routerA = makeMatchSuspensionRouter('/');
+		await routerA.load();
+		const r = mount(RouterProvider as any, { router: routerA });
+		await flush();
+		expect(r.findAll('.home').length).toBe(1);
+
+		// The replacement router has not loaded yet: its match store is empty, so
+		// nothing renders until the Transitioner runs its initial load for it.
+		const routerB = makeMatchSuspensionRouter('/');
+		expect(routerB.stores.matches.get().length).toBe(0);
+
+		r.update(RouterProvider as any, { router: routerB });
+		await flush();
+
+		expect(routerB.stores.matches.get().length).toBeGreaterThan(0);
+		expect(r.findAll('.home').length).toBe(1);
 		r.unmount();
 	});
 

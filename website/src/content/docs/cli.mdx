@@ -118,7 +118,16 @@ src/Form.tsrx
 
 `--code <CODE>` narrows to one diagnostic, `--strict` fails the run on warnings
 as well as errors, and a file that will not parse is reported as an error
-without stopping the rest of the run.
+without stopping the rest of the run. Modules that `compiler.strong` in
+`octane.config.ts` reaches are analyzed in Strong mode, as the build compiles
+them.
+
+`--strong-baseline init` records every module that compiles without Strong mode
+in `octane-strong-baseline.json`. While that file exists, every run fails on a
+module that is neither Strong nor listed, such as one whose `"use strong"` was
+deleted, and on a listed name that is now Strong or gone. `--strong-baseline
+update` removes those names and never adds one, so a new exception is always a
+reviewed edit to the file.
 
 <h2 id="create">octane create</h2>
 

@@ -233,6 +233,8 @@ export interface SignalRendererOwnerIdentity extends SignalOwnerIdentity {
 	readonly documentOwner: SignalOwner;
 	readonly instanceOwner: object;
 	readonly instanceKey: string;
+	/** A directive arm's or inline row's enclosing owner. Component instances have none. */
+	readonly enclosingOwner?: SignalRendererOwnerIdentity;
 }
 
 export type SignalOwner = Scope | SignalOwnerIdentity | SignalRendererOwnerIdentity;

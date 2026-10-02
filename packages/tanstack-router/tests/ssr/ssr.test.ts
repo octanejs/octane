@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'octane/server';
 import { attachRouterServerSsrUtils } from '@tanstack/router-core/ssr/server';
 import { getScrollRestorationScriptForRouter } from '@tanstack/router-core/scroll-restoration-script';
 import { RouterServer, renderRouterToStream, renderRouterToString } from '../../src/ssr/server';
+import { finalizeDocumentShell } from '../../src/ssr/renderRouterToStream';
 import { ManagedHeadOwners, makeSsrRouter } from '../_fixtures/ssr.tsrx';
 import { renderReactHeadContent } from './_react-head-oracle.js';
 import type { ServerManifest } from '@tanstack/router-core';
@@ -41,8 +42,13 @@ describe('@octanejs/tanstack-router SSR', () => {
 		);
 		expect(normalizedHtml).toContain('<script src="/entry.js"');
 		expect(normalizedHtml).toContain('globalThis.__octaneRouterSsr=true');
-		expect(normalizedHtml).not.toContain('document.currentScript.remove()');
-		expect(normalizedHtml).toContain('</script></div></body></html>');
+		// router-core 1.171.34's hydration scripts self-remove (`document.currentScript
+		// .remove()`) as part of its streaming-cleanup format; this is injected by the
+		// router's own transform and octane hydration adopts the app range without
+		// those scripts. (The former assertion that the output contained no self-remove
+		// pinned Octane's old native-injection behavior.) Real SSR+hydration is covered
+		// by the rsbuild integration test and the document-hydration suite.
+		expect(normalizedHtml).toContain('</body></html>');
 	});
 
 	it("keeps independently rendered document managers from claiming one another's assets", async () => {
@@ -207,7 +213,10 @@ describe('@octanejs/tanstack-router SSR', () => {
 		await router.load();
 		await router.serverSsr.dehydrate();
 
-		const response = await renderRouterToStream({
+		// router-core 1.171.34's streaming handler returns a stream-response wrapper
+		// ({ response, dispose }) so the request handler can tear down the stream on
+		// cleanup; a direct caller unwraps `.response`.
+		const streamResult = await renderRouterToStream({
 			request: new Request('http://localhost/', {
 				headers: { 'user-agent': 'Mozilla/5.0' },
 			}),
@@ -215,6 +224,10 @@ describe('@octanejs/tanstack-router SSR', () => {
 			responseHeaders: new Headers({ 'content-type': 'text/html' }),
 			App: RouterServer,
 		});
+		const response =
+			streamResult instanceof Response
+				? streamResult
+				: (streamResult as { response: Response }).response;
 		const html = await response.text();
 		const doctype = html.indexOf('<!DOCTYPE html>');
 		const document = html.indexOf('<html');
@@ -230,5 +243,48 @@ describe('@octanejs/tanstack-router SSR', () => {
 		expect(html.slice(0, document)).not.toContain('<style data-octane=');
 		expect(html.slice(style, headClose)).toContain('nonce="octane-csp"');
 		expect(html.slice(style, headClose)).toContain('rgb(12, 34, 56)');
+	});
+
+	// The document-shell finalizer buffers and rewrites the prefix through
+	// `</head>`, then streams the body. A multi-byte UTF-8 character whose bytes
+	// straddle the chunk boundary at `</head>` must survive: the finalizer keeps
+	// decoding through one streaming decoder instead of passing raw bytes, so the
+	// held leading bytes are joined to the continuation in the next chunk.
+	it('preserves a multi-byte character split across the head boundary while streaming', async () => {
+		const coffee = new TextEncoder().encode('☕'); // E2 98 95
+		// Chunk 1 holds the whole shell through `</head>` plus the first two bytes of
+		// `☕`; chunk 2 carries its final byte and the rest of the body.
+		const chunk1 = new Uint8Array([
+			...new TextEncoder().encode('<html><head></head><body>caf'),
+			coffee[0]!,
+			coffee[1]!,
+		]);
+		const chunk2 = new Uint8Array([coffee[2]!, ...new TextEncoder().encode('</body></html>')]);
+		const source = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(chunk1);
+				controller.enqueue(chunk2);
+				controller.close();
+			},
+		});
+
+		const reader = finalizeDocumentShell(source).getReader();
+		const parts: Array<Uint8Array> = [];
+		for (;;) {
+			const { value, done } = await reader.read();
+			if (done) break;
+			if (value) parts.push(value);
+		}
+		const merged = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+		let offset = 0;
+		for (const part of parts) {
+			merged.set(part, offset);
+			offset += part.length;
+		}
+		const html = new TextDecoder('utf-8', { fatal: false }).decode(merged);
+
+		expect(html).toBe('<!DOCTYPE html><html><head></head><body>caf☕</body></html>');
+		expect(html).toContain('caf☕');
+		expect(html).not.toContain('�'); // no replacement character from a dropped byte
 	});
 });

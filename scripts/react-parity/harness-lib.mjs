@@ -373,7 +373,7 @@ export function validateManifest(manifest, { surfacePolicy } = {}) {
 			if (lane.execution.kind !== 'vitest-full' && lane.execution.fileParallelism !== undefined)
 				fail(`lane ${lane.id} fileParallelism is only valid for Vitest full-suite execution`);
 			if (lane.execution.kind === 'typescript') {
-				if (!['tsc', 'tsgo', 'tsrx-tsc'].includes(lane.execution.compiler))
+				if (!['tsc', 'tsrx-tsc'].includes(lane.execution.compiler))
 					fail(`lane ${lane.id} execution compiler is unsupported`);
 				exactPath(lane.execution.project, `lane ${lane.id} execution project`);
 				if (lane.execution.inventory !== undefined)
@@ -1131,7 +1131,6 @@ export async function verifyManifestTestSelections(manifest, root) {
 export function buildTypeScriptCompilerArgv(compiler, project) {
 	const compilerEntrypoints = {
 		tsc: 'node_modules/typescript/bin/tsc',
-		tsgo: 'node_modules/@typescript/native-preview/bin/tsgo',
 		'tsrx-tsc': 'node_modules/@tsrx/typescript-plugin/dist/tsc.js',
 	};
 	return [process.execPath, compilerEntrypoints[compiler], '--noEmit', '-p', project];
