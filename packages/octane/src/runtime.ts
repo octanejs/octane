@@ -18869,6 +18869,32 @@ class HydrationCapability {
 	}
 
 	/**
+	 * A list's first hydrating fill when the server rendered none of its items
+	 * but the client has some. Discard whatever the server's @empty arm
+	 * rendered and report the list once, at its own site. Each item then finds
+	 * the cursor at `end`, which this remembers as rebuilt, so discardItems
+	 * builds it quietly as a client mount would, and a later attempt that finds
+	 * its own items here rebuilds them quietly too.
+	 */
+	discardEmptyList(scope: Scope, slotKey: number, start: Node, end: Node): void {
+		const first = getNextSibling(start)!;
+		this.discard(
+			scope,
+			slotKey,
+			first,
+			end,
+			HYDRATION_REBUILT?.has(end) === true,
+			process.env.NODE_ENV !== 'production' ? 'a populated list' : '',
+			// Only an @empty arm leaves content between the markers.
+			process.env.NODE_ENV !== 'production'
+				? first === end
+					? 'an empty list'
+					: 'an empty list (@empty)'
+				: null,
+		);
+	}
+
+	/**
 	 * STRUCTURAL recovery for a list where the SERVER rendered MORE items than the
 	 * client now renders: after its first fill adopts the client's items, the
 	 * cursor sits on the first unconsumed server item (or at `end`). Discard
@@ -18891,10 +18917,11 @@ class HydrationCapability {
 	/**
 	 * Remove the server content from `from` up to `end` that a child slot's
 	 * value cannot adopt, and point the cursor at `end`. Reports the structural
-	 * mismatch (`expected`, and the `actual` server node, describe it in
-	 * development) unless it is `quiet`, as it is when an earlier attempt already
-	 * rebuilt this content, or the captures legitimately changed before a dormant
-	 * boundary activated. Remembers `end` for later attempts.
+	 * mismatch (`expected`, and the `actual` server node or a description of
+	 * it, describe it in development) unless it is `quiet`, as it is when an
+	 * earlier attempt already rebuilt this content, or the captures legitimately
+	 * changed before a dormant boundary activated. Remembers `end` for later
+	 * attempts.
 	 */
 	private discard(
 		scope: Scope | null,
@@ -18903,7 +18930,7 @@ class HydrationCapability {
 		end: Node | null,
 		quiet: boolean,
 		expected: string,
-		actual: Node | null,
+		actual: Node | string | null,
 	): true {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 		if (!quiet && !this.staleServerValues) {
@@ -18914,7 +18941,12 @@ class HydrationCapability {
 				const loc =
 					(scope !== null && (siteLoc(scope, slotKey) || componentSourceLoc(scope.block.body))) ||
 					(domNode((from ?? end)!).parentNode as any)?.__oct_loc;
-				if (loc) warnHydrationStructuralMismatch(loc, expected, describeHydrationNode(actual));
+				if (loc)
+					warnHydrationStructuralMismatch(
+						loc,
+						expected,
+						typeof actual === 'string' ? actual : describeHydrationNode(actual),
+					);
 			}
 		}
 		removeRange(from, end);
@@ -42519,10 +42551,11 @@ export function forBlock<T>(
 		} else unmountBlock(state.emptyBlock);
 		state.emptyBlock = null;
 	}
-	// Hydrating + the SERVER rendered the @empty body (the node right after `start` is NOT an
-	// item's `<!--[-->`) but the client now has items — a STRUCTURAL mismatch. Discard the
-	// stale @empty DOM and point the cursor at `end` so the reconcile client-mounts the items
-	// into a clean range (mountItem's no-marker guard handles the build).
+	// Hydrating + the SERVER rendered no items (its open marker says so, or, on a legacy
+	// marker, the node right after `start` is NOT an item's `<!--[-->` but @empty content)
+	// but the client now has items — a STRUCTURAL mismatch. Discard any stale @empty DOM,
+	// report the list once, and point the cursor at `end` so the reconcile client-mounts the
+	// items into a clean range (mountItem's no-marker guard builds them without reporting).
 	if (
 		!isEmpty &&
 		hydration !== null &&
@@ -42533,12 +42566,7 @@ export function forBlock<T>(
 				getNextSibling(state.start) !== state.end &&
 				!hydration.isOpen(getNextSibling(state.start))))
 	) {
-		if (process.env.NODE_ENV !== 'production') {
-			const mmLoc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
-			if (mmLoc) hydration.warnStructural(mmLoc, 'a populated list', 'an empty list (@empty)');
-		}
-		removeRange(getNextSibling(state.start), state.end);
-		hydration.node = state.end;
+		hydration.discardEmptyList(parentScope, slotKey, state.start, state.end);
 	}
 	const f = flags || 0;
 	let pure = (f & 1) !== 0;
