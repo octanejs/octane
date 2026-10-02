@@ -26166,8 +26166,8 @@ function planJsx(
 		};
 	}
 
-	// Emit ONE template containing all top-level JSX (wrapping multiple roots in
-	// a synthetic <octane-frag>).
+	// Emit ONE template containing all top-level JSX (the runtime parses
+	// multiple roots inside a synthetic <octane-frag>).
 	// We walk the tree, building HTML and a list of bindings.
 	const elementBindings = []; // ordered list of bindings (per dynamic site)
 	const forCalls = []; // forBlock calls — emitted after the mount/append
@@ -26345,18 +26345,19 @@ function planJsx(
 		ctx.runtimeNeeded.add('clone');
 		// Template namespace strategy:
 		//   - HTML single-root: parse the element directly, no flag.
-		//   - HTML multi-root: wrap in <octane-frag> so template() returns the wrap.
+		//   - HTML multi-root: raw markup + its root count; the runtime parses it
+		//     inside an <octane-frag> wrapper and drains the wrapper's children.
 		//   - SVG/MathML single-root: pass ns flag; runtime wraps with <svg>/<math>
 		//     so the HTML5 parser places children in foreign content, then returns
 		//     the inner root.
-		//   - SVG/MathML multi-root: pass ns + frag=1; runtime wraps and returns
-		//     the wrap itself (caller drains its children — no <octane-frag>).
+		//   - SVG/MathML multi-root: pass ns + the root count; runtime wraps and
+		//     returns the wrap itself (caller drains its children — no <octane-frag>).
 		//   - Opaque component bodies/children whose root tags pin the namespace
 		//     statically (every root exists in exactly one namespace — see
 		//     staticNsForOpaqueRoot) compile like fixed HTML/SVG/MathML templates:
 		//     the parse is identical at every destination, so pay nothing per
 		//     clone. Only genuinely ambiguous roots (`a`, `title`, custom/unknown
-		//     tags, mixed fragments) pass flag 3 (+ frag=1 for multiple roots);
+		//     tags, mixed fragments) pass flag 3 (+ the root count for several);
 		//     clone() resolves and caches the concrete namespace from the render
 		//     block's actual parent.
 		// Multi-root fragments at an HTML parent imply SVG only when EVERY element
@@ -26379,11 +26380,6 @@ function planJsx(
 				: (parentNs === 'html' || parentNs === 'opaque') && fragImpliesSvg
 					? 'svg'
 					: parentNs;
-		// A resolved-HTML multi-root ships raw markup + frag=1 (parseTemplate adds
-		// the <octane-frag> wrapper) instead of the fixed-HTML path's pre-wrapped
-		// string: same parsed DOM, but the template literal stays as small as the
-		// opaque form it replaces.
-		let resolvedFrag = false;
 		if (tplNs === 'opaque') {
 			// Component-destination template whose root tags didn't imply SVG:
 			// resolve the namespace statically when every root pins the same one.
@@ -26400,7 +26396,6 @@ function planJsx(
 					resolved = ns;
 				}
 				tplNs = resolved === null ? 'html' : resolved;
-				resolvedFrag = tplNs !== 'opaque';
 			}
 		}
 		// Binding planning precedes the final template namespace. An inherited
@@ -26413,23 +26408,11 @@ function planJsx(
 			}
 		}
 		const flag = nsFlag(tplNs);
-		// A raw multi-root template passes its root count, which hydration reads
-		// without parsing the template to find where the roots it adopted end.
-		const fragArg = !single && (flag !== 0 || resolvedFrag) ? htmlIdx : 0;
-		let template = rootTemplate;
-		if (!single && flag === 0 && !resolvedFrag) {
-			template = templateElement(
-				'octane-frag',
-				'html',
-				false,
-				createTemplateIr(),
-				rootTemplate,
-				null,
-				null,
-				true,
-			);
-		}
-		const tpl = allocTemplate(ctx, template, flag, fragArg);
+		// A multi-root template ships raw markup and its root count; parseTemplate
+		// adds the wrapper the HTML parser needs. Hydration reads the count without
+		// parsing the template to find where the roots it adopted end.
+		const fragArg = single ? 0 : htmlIdx;
+		const tpl = allocTemplate(ctx, rootTemplate, flag, fragArg);
 		// DEV: pass the root element's source location so a STRUCTURAL hydration mismatch
 		// (swapped @if/@switch branch, changed tag) warns with `file:line:col`. Single-root
 		// only (a multi-root <octane-frag> wrapper has no source position); prod omits it.
