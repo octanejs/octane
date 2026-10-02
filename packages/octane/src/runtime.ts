@@ -27349,13 +27349,7 @@ function publishManualFormPending(rec: SubmitDispatchRec): void {
 	const form = rec.form;
 	let data: FormData | null = null;
 	try {
-		data = new FormData(form);
-		const submitter = rec.event.submitter as HTMLInputElement | null;
-		if (submitter && (STAGED_DOM?.view(submitter) ?? submitter).name)
-			data.append(
-				(STAGED_DOM?.view(submitter) ?? submitter).name,
-				(STAGED_DOM?.view(submitter) ?? submitter).value ?? '',
-			);
+		data = new FormData(form, rec.event.submitter);
 	} catch {
 		/* jsdom quirks — status still activates with data: null */
 	}
@@ -27480,19 +27474,8 @@ function handleFormSubmit(
 	if (ACTIVE_SUBMIT_DISPATCH !== null && ACTIVE_SUBMIT_DISPATCH.form === form)
 		ACTIVE_SUBMIT_DISPATCH.intercepted = true;
 
-	const data = new FormData(form);
-	// Include the activating submitter's name/value (FormData(form, submitter)
-	// isn't universally available; append manually for parity).
-	if (
-		submitter &&
-		(STAGED_DOM?.view(submitter as HTMLInputElement) ?? (submitter as HTMLInputElement)).name
-	) {
-		data.append(
-			(STAGED_DOM?.view(submitter as HTMLInputElement) ?? (submitter as HTMLInputElement)).name,
-			(STAGED_DOM?.view(submitter as HTMLInputElement) ?? (submitter as HTMLInputElement)).value ??
-				'',
-		);
-	}
+	// Construct all successful controls in document order before formdata fires.
+	const data = new FormData(form, submitter);
 
 	const fn = action as (formData: FormData) => unknown;
 	// Track in-flight submissions per form. A useActionState dispatcher returns a
