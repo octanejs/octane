@@ -11523,10 +11523,11 @@ function compileInternal(
 		} else if (
 			node.type === 'ImportDeclaration' &&
 			node.source.value === 'octane' &&
-			node.phase !== 'defer'
+			node.phase == null
 		) {
 			// Preserve ALL user-imported names from octane (Portal, createContext,
 			// use, custom helpers, etc.) — merged into the single prelude import.
+			// A `defer` or `source` phase import stays its own declaration.
 			addUserImportSpecifiers(ctx, node);
 		} else {
 			// Style blocks anywhere in a non-component statement: assigned blocks
@@ -12211,9 +12212,9 @@ function compileServer(
 					: compileServerComponent({ ...node.declaration, default: true }, ctx)),
 			);
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
-			// Preserve the authored deferred namespace while routing it to the server runtime.
-			// Other user imports are merged into the eager server runtime prelude.
-			if (node.phase === 'defer') {
+			// Preserve an authored `defer` or `source` phase import while routing it to the
+			// server runtime. Other user imports are merged into the eager server runtime prelude.
+			if (node.phase != null) {
 				bodyNodes.push({
 					...node,
 					source: { ...node.source, value: 'octane/server', raw: '"octane/server"' },
