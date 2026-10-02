@@ -45,6 +45,7 @@ import { get_route_entry_export_name, get_route_entry_path } from '../routes.js'
  * @property {string} [clientBuildFile] - Required completed client metadata, resolved beside the server entry
  * @property {Record<string, unknown>} [independentHydrationManifest] - Completed client-build independent Hydrate manifest
  * @property {string} [independentHydrationManifestFile] - Optional JSON manifest resolved beside the built server entry
+ * @property {string | null} [islandsEntry] - Template URL of the renderer-free bootstrap for `hydrate: 'islands'` routes
  * @property {Record<string, string>} [moduleImports] - Stable module ID → bundler import specifier
  * @property {((id: string) => string)} [resolveImport] - Fallback module-specifier mapper
  * @property {string} [configImportPath] - Bundler import specifier for octane.config.ts
@@ -73,6 +74,7 @@ export function generateServerEntry(options) {
 		clientBuildFile,
 		independentHydrationManifest,
 		independentHydrationManifestFile,
+		islandsEntry = null,
 		moduleImports = {},
 		resolveImport,
 		configImportPath,
@@ -328,6 +330,7 @@ export const manifest = {
 	clientAssets,
 	clientBuild,
 	independentHydration,
+	islandsEntry: ${JSON.stringify(islandsEntry)},
 };
 
 export const rendererDeps = {
@@ -450,6 +453,7 @@ export const handler = createHandler(
 		clientAssets,
 		clientBuild,
 		independentHydration,
+		islandsEntry: ${JSON.stringify(islandsEntry)},
 	},
 	{
 		renderToReadableStream,
