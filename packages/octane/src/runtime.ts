@@ -18246,8 +18246,6 @@ function initDomOperations(): void {
 		// De-opt child scans and uncontrolled form baselines also read absent symbols.
 		seedExpando(elementProto, DEOPT_DESC, false);
 		seedExpando(elementProto, DEFAULT_VALUE_BASELINE, false);
-		// Every handler publication reads the host's renderer before claiming it.
-		seedExpando(elementProto, '$$eventOwner', false);
 		if (process.env.NODE_ENV !== 'production') {
 			seedExpando(elementProto, '__oct_loc');
 		}
@@ -26266,6 +26264,8 @@ export function delegateEvents(eventNames: string[]): void {
 	// They must move together even if the render that first needs a type rolls back.
 	// Seedable prototype may not exist at compiled-module load in exotic hosts.
 	const canSeed = typeof Element !== 'undefined' && Object.isExtensible(Element.prototype);
+	// Every handler publication reads its host's renderer before claiming it.
+	if (canSeed) seedExpando(Element.prototype, '$$eventOwner', false);
 	for (let i = 0; i < eventNames.length; i++) {
 		const name = eventNames[i];
 		if (_delegated.has(name)) continue;
@@ -26655,13 +26655,14 @@ function snapshotDelegatedSlots(
 		(type.flags & EVENT_DISABLED_MOUSE) !== 0 ||
 		(!capture && (type.flags & EVENT_DISABLED_ENTER) !== 0);
 	let found = false;
-	let owner: Block | undefined;
+	let retired: number;
 	for (let index = base; index < CAPTURE_PATH.length; index++) {
 		const node = CAPTURE_PATH[index];
 		const slot = node[key] as EventSlot;
 		// A host whose Block retired before this delivery began starts no handler, as
 		// React never calls an unmounted component's handlers. A host retiring during
 		// the delivery keeps its handlers to its end, like a removed portal's route.
+		// An unclaimed host reads `undefined`, which is not above zero.
 		const active =
 			slot != null &&
 			((suppressDisabled &&
@@ -26670,9 +26671,7 @@ function snapshotDelegatedSlots(
 					node.localName === 'input' ||
 					node.localName === 'select' ||
 					node.localName === 'textarea')) ||
-				((owner = node.$$eventOwner) !== undefined &&
-					owner.retired !== 0 &&
-					owner.retired <= epoch))
+				((retired = node.$$eventOwner?.retired) > 0 && retired <= epoch))
 				? null
 				: slot;
 		CAPTURE_SLOTS[index] = active;
