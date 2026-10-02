@@ -30,20 +30,21 @@ describe('discrete events dispatched during an in-progress flush', () => {
 		};
 
 		// Click "go" and commit the page swap → teardown removes the hero section →
-		// (patched) blur fires mid-walk → its setState must defer to the ambient
-		// flush, not commit re-entrantly.
+		// (patched) blur fires mid-walk → the live ancestor's setState must defer to
+		// the ambient flush, not commit re-entrantly.
 		await act(() => {
 			(r.find('.go') as HTMLElement).click();
 		});
 
 		expect(blurFired).toBe(true);
 		// The swap committed exactly once: home branch fully gone, docs branch
-		// present once, and the blur handler's update also landed (blurs === 1).
+		// present once, and the live ancestor's update also landed (blurs === 1).
+		// The disposed link's handler never ran (retiredBlurs === 0).
 		expect(container.querySelectorAll('.hero').length).toBe(0);
 		expect(container.querySelectorAll('.strip').length).toBe(0);
 		const docs = container.querySelectorAll('.docs');
 		expect(docs.length).toBe(1);
-		expect(docs[0].textContent).toBe('docs 1');
+		expect(docs[0].textContent).toBe('docs 1 0');
 		r.unmount();
 	});
 });
