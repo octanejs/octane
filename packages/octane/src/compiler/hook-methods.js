@@ -5,12 +5,16 @@ function unwrapNonNullExpression(node) {
 	return node;
 }
 
-/** Static hook methods need a call boundary, never an extra positional argument. */
+/**
+ * Static hook methods need a call boundary, never an extra positional argument.
+ * A call the scope analysis placed in module initialization needs none.
+ */
 export function hookMethodName(node, hookLocals) {
 	if (
 		node?.type !== 'CallExpression' ||
 		node._octaneImportedHook ||
-		node._octaneHookRuntimeImportedHook
+		node._octaneHookRuntimeImportedHook ||
+		node._octaneModuleInitCall
 	)
 		return null;
 	const callee = unwrapNonNullExpression(node.callee);
