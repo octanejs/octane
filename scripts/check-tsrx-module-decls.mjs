@@ -54,12 +54,12 @@ if (violations.length > 0) {
 	console.error(
 		"\nIt resolves every .tsrx import it covers to `any`, including this package's own exports.",
 	);
-	console.error('Typecheck the package with `tsrx-tsc --noEmit` instead: it reads .tsrx directly,');
 	console.error(
-		'so no declaration is needed. See the bindings:typecheck script for packages on it.',
+		'Typecheck the package with `octane-tsc -p <tsconfig>` instead: it reads .tsrx directly,',
 	);
+	console.error('so no declaration is needed. See the root typecheck script for packages on it.');
 	console.error(
-		'If the package must stay on tsgo, write a per-module sidecar (packages/tanstack-query/src/QueryClientProvider.tsrx.d.ts).',
+		'If a plain-tsc consumer must import it, write a per-module sidecar (packages/tanstack-query/src/QueryClientProvider.tsrx.d.ts).',
 	);
 	process.exit(1);
 }
