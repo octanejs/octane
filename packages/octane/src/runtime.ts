@@ -11828,8 +11828,9 @@ function mountUnframedLite<P>(
 	hydration.save(host);
 	const start = (STAGED_DOM?.view(document) ?? document).createComment('comp');
 	const end = (STAGED_DOM?.view(document) ?? document).createComment('/comp');
-	(STAGED_DOM?.view(host) ?? host).insertBefore(start, null);
-	(STAGED_DOM?.view(host) ?? host).insertBefore(end, null);
+	const before = hydration.unframedBefore(stale, null);
+	(STAGED_DOM?.view(host) ?? host).insertBefore(start, before);
+	(STAGED_DOM?.view(host) ?? host).insertBefore(end, before);
 	hydration.markFresh(start);
 	hydration.markFresh(end);
 	(parentScope.slots[slotKey] as Scope).block.endMarker = end;
@@ -19079,16 +19080,17 @@ class HydrationCapability {
 
 	/**
 	 * First render, by `render(target)`, of a component whose server range was
-	 * missing, between the fresh `start`/`end` markers its slot minted before
-	 * `anchor`. The server emits that range only when the render completes;
-	 * when it throws, the boundary that catches it renders its catch arm in
-	 * that place. So the server nodes from `stale` stay until the body has run,
-	 * and the body, which adopts nothing, still consumes its positional seeds
-	 * as the server's render did. A seeded rejection then reaches its boundary
-	 * with the server's catch arm intact, and only the fresh markers are
-	 * removed. Any other outcome reports the mismatch and discards those server
-	 * nodes, unless `stale` is client-built: the rebuild that built it already
-	 * reported and discarded the server's.
+	 * missing, between the fresh `start`/`end` markers its slot minted where
+	 * `unframedBefore` put them. The server emits that range only when the
+	 * render completes; when it throws, the boundary that catches it renders
+	 * its catch arm in that place. So the server nodes from `stale` stay until
+	 * the body has run, and the body, which adopts nothing, still consumes its
+	 * positional seeds as the server's render did. A seeded rejection then
+	 * reaches its boundary with the server's catch arm intact, and only the
+	 * fresh markers are removed. Any other outcome reports the mismatch and
+	 * discards the server nodes it replaces (`unframedReplaces`), unless `stale`
+	 * is client-built: the rebuild that built it already reported and discarded
+	 * the server's.
 	 */
 	renderUnframed<T>(
 		render: (target: T) => void,
@@ -19123,9 +19125,9 @@ class HydrationCapability {
 					if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
 				}
 				let node = stale;
-				while (node !== null && node !== anchor && node !== start && !isBlockClose(node)) {
+				while (this.unframedReplaces(node, anchor)) {
 					const next = getNextSibling(node);
-					(STAGED_DOM?.view(node as ChildNode) ?? (node as ChildNode)).remove();
+					(STAGED_DOM?.view(node) ?? node).remove();
 					node = next;
 				}
 			}
@@ -19249,6 +19251,33 @@ class HydrationCapability {
 		}
 		if (adopted) this.node = getNextSibling(root);
 		return adopted;
+	}
+
+	/**
+	 * Whether `node` is a server node that a component whose server range is
+	 * missing replaces: one ahead of `anchor` that neither delimits a block nor
+	 * was built on the client. A block open starts the range of a later sibling
+	 * call, which claims it, and a block close ends the range that encloses the
+	 * component.
+	 */
+	private unframedReplaces(node: Node | null, anchor: Node | null): node is ChildNode {
+		return (
+			node !== null &&
+			node !== anchor &&
+			!isBlockOpen(node) &&
+			!isBlockClose(node) &&
+			!this.freshNodes.has(node)
+		);
+	}
+
+	/**
+	 * Where a component whose server range is missing mints its fresh markers:
+	 * in place of the server nodes from `stale` that it replaces, so that it
+	 * stays ahead of the later siblings that adopt their server ranges, or else
+	 * before `anchor`.
+	 */
+	unframedBefore(stale: Node | null, anchor: Node | null): Node | null {
+		return this.unframedReplaces(stale, anchor) ? stale : anchor;
 	}
 
 	/** Read the `<!--oct-catch:T:C-->` comment ahead of a caught arm's range. */
@@ -31937,23 +31966,26 @@ function componentSlotImpl(
 			// component threw there and a boundary rendered its catch arm instead.
 			// Park hydration on the fresh close marker so the client body builds
 			// rather than adopting an unrelated sibling. The server nodes stay until
-			// the body has run (HydrationCapability.renderUnframed).
+			// the body has run (HydrationCapability.renderUnframed), and the fresh
+			// markers go where they stand, ahead of any later sibling's server range.
 			// An anchorless call needs the range even when it renders a single root:
 			// the server frames every child of an all-component host, so the host's
 			// server content is something else. (The single-root path would compare
 			// the body's template with the cursor, which may still sit on the host or
 			// an ancestor.)
+			let before = anchor ?? null;
 			if (hydration !== null) {
 				unframed = hydrationCursor;
 				hydration.save(domParent);
+				before = hydration.unframedBefore(unframed, before);
 			}
 			start = (STAGED_DOM?.view(document) ?? document).createComment('comp');
 			end = (STAGED_DOM?.view(document) ?? document).createComment('/comp');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
 			// mid-range insertion (e.g. when this slot lives in a multi-root template
 			// and must sit before its enclosing block's endMarker).
-			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(start, anchor ?? null);
-			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(end, anchor ?? null);
+			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(start, before);
+			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(end, before);
 			if (hydration !== null) {
 				hydration.markFresh(start);
 				hydration.markFresh(end);
