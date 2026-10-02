@@ -1,0 +1,82 @@
+diff --git a/src/transform/imports.js b/src/transform/imports.js
+index 7963ff23f9d5aee7813cd635432c7de7d737bccf..f11f3f8560272b585064e035058baa470c61680c 100644
+--- a/src/transform/imports.js
++++ b/src/transform/imports.js
+@@ -5,7 +5,7 @@
+  * Add TSRX import-phase support to an esrap TS/TSX visitor set. esrap 2.3
+  * understands the rest of ImportDeclaration but does not print its Stage 3
+  * `phase` field yet, so delegating would silently turn a deferred import into
+- * an eager one.
++ * an eager one, and a source-phase import into a default or namespace import.
+  *
+  * @template {ESRap.Visitors} T
+  * @param {T} visitors
+@@ -28,22 +28,27 @@ export function with_deferred_imports(visitors) {
+ 		 * @param {ESRap.Context} context
+ 		 */
+ 		ImportDeclaration(node, context) {
+-			if (node.phase !== 'defer') {
++			const phase = import_phase(node);
++			if (phase === null) {
+ 				print_import_declaration(node, context);
+ 				return;
+ 			}
+ 
+ 			const [specifier] = node.specifiers;
+-			if (node.specifiers.length !== 1 || specifier.type !== 'ImportNamespaceSpecifier') {
+-				throw new Error('`import defer` only supports a namespace import.');
++			if (phase === 'defer') {
++				if (node.specifiers.length !== 1 || specifier.type !== 'ImportNamespaceSpecifier') {
++					throw new Error('`import defer` only supports a namespace import.');
++				}
++			} else if (node.specifiers.length !== 1 || specifier.type !== 'ImportDefaultSpecifier') {
++				throw new Error('`import source` only supports a default import.');
+ 			}
+ 
+ 			if (node.loc) context.location(node.loc.start.line, node.loc.start.column);
+-			context.write('import defer ');
++			context.write(`import ${phase} `);
+ 			if (specifier.loc) {
+ 				context.location(specifier.loc.start.line, specifier.loc.start.column);
+ 			}
+-			context.write('* as ');
++			if (phase === 'defer') context.write('* as ');
+ 			context.visit(specifier.local);
+ 			context.write(' from ');
+ 			context.visit(node.source);
+@@ -68,13 +73,14 @@ export function with_deferred_imports(visitors) {
+ 		 * @param {ESRap.Context} context
+ 		 */
+ 		ImportExpression(node, context) {
+-			if (node.phase !== 'defer') {
++			const phase = import_phase(node);
++			if (phase === null) {
+ 				print_import_expression(node, context);
+ 				return;
+ 			}
+ 
+ 			if (node.loc) context.location(node.loc.start.line, node.loc.start.column);
+-			context.write('import.defer(');
++			context.write(`import.${phase}(`);
+ 			context.visit(node.source);
+ 
+ 			const options = node.options ?? node.arguments?.[0];
+@@ -88,3 +94,18 @@ export function with_deferred_imports(visitors) {
+ 		},
+ 	});
+ }
++
++/**
++ * The phase an import must print with, or `null` for an ordinary evaluation
++ * import that esrap prints correctly. An unknown phase throws rather than
++ * falling through to esrap, which would print it as an evaluation import.
++ *
++ * @param {AST.ImportDeclaration | AST.ImportExpression} node
++ * @returns {'defer' | 'source' | null}
++ */
++function import_phase(node) {
++	const phase = /** @type {{ phase?: unknown }} */ (node).phase;
++	if (phase == null) return null;
++	if (phase === 'defer' || phase === 'source') return phase;
++	throw new Error(`Unsupported import phase \`${String(phase)}\`.`);
++}
