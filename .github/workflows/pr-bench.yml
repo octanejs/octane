@@ -58,8 +58,11 @@ jobs:
       - name: Install dependencies
         run: |
           bun install --frozen-lockfile
-          bun install --cwd "$BASE_TREE" --frozen-lockfile \
-            || echo "::warning::base install failed; the report omits base results"
+          if [ -f "$BASE_TREE/bun.lock" ]; then
+            bun install --cwd "$BASE_TREE" --frozen-lockfile
+          else # base predates the Bun switch; drop once main has bun.lock
+            corepack enable pnpm && (cd "$BASE_TREE" && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile)
+          fi || echo "::warning::base install failed; the report omits base results"
 
       - name: Install Playwright Chromium
         run: |
