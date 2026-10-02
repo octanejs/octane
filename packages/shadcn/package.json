@@ -160,7 +160,7 @@
     "registry:serve": "node scripts/serve-registry.mjs",
     "coverage:build": "node scripts/build-coverage-table.mjs",
     "coverage:check": "node scripts/build-coverage-table.mjs --check",
-    "typecheck": "node scripts/typecheck.mjs"
+    "typecheck": "octane-tsc -p tsconfig.json -p tsconfig.consumer.json"
   },
   "dependencies": {
     "@octanejs/aria": "workspace:*",

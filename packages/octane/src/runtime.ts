@@ -1701,6 +1701,24 @@ function hydrationMismatchMode(el: Element): 0 | 1 | 2 {
 }
 
 /**
+ * Hydration diagnostics held while a hydrating try body renders. A body that
+ * throws to its catch arm is replaced by that arm, so what it adopted before it
+ * threw is discarded. That is often the server's own catch arm, rendered because
+ * the server's body threw the same way, and none of it is a mismatch. A body's
+ * held diagnostics are dropped when it throws to its catch arm (see
+ * HydrationCapability.renderTryBody); otherwise they pass to the enclosing hold,
+ * and publish once the outermost one is released. The array is allocated only
+ * when a diagnostic is held.
+ */
+let HYDRATION_DIAGNOSTIC_HOLDS = 0;
+let HELD_HYDRATION_DIAGNOSTICS: Array<() => void> | null = null;
+
+/** DEV-only: log a hydration-mismatch warning unless a try body holds it. */
+function logHydrationMismatch(message: string): void {
+	if (currentHydration?.holds(() => console.error(message)) !== true) console.error(message);
+}
+
+/**
  * DEV-only hydration-mismatch warning. Gated on `loc` being non-empty — the dev source
  * location (`el.__oct_loc` / `siteLoc(...)`) only exists in `dev`-compiled output, so in
  * production `loc` is empty and this no-ops (the patch/recovery already ran regardless).
@@ -1713,7 +1731,7 @@ function warnHydrationValueMismatch(
 ): void {
 	if (process.env.NODE_ENV === 'production') return; // build-time stripped
 	if (!loc) return;
-	console.error(
+	logHydrationMismatch(
 		`Octane hydration mismatch at ${loc}: server rendered ${what} ` +
 			`${JSON.stringify(serverVal)} but the client rendered ${JSON.stringify(clientVal)}. ` +
 			`The client value was used. If this difference is intentional (e.g. a timestamp or ` +
@@ -1728,7 +1746,7 @@ function warnHydrationKeptServerValue(
 	clientVal: unknown,
 ): void {
 	if (process.env.NODE_ENV === 'production' || !loc) return;
-	console.error(
+	logHydrationMismatch(
 		`Octane hydration mismatch at ${loc}: server rendered ${what} ` +
 			`${JSON.stringify(serverVal)} but the client rendered ${JSON.stringify(clientVal)}. ` +
 			'The server value was kept. If this difference is intentional, add ' +
@@ -1766,7 +1784,7 @@ function warnHydrationStructuralMismatch(
 ): void {
 	if (process.env.NODE_ENV === 'production') return; // build-time stripped
 	if (!loc) return;
-	console.error(
+	logHydrationMismatch(
 		`Octane hydration mismatch at ${loc}: the client expected ${expected} but the server ` +
 			`rendered ${actual}. The mismatched subtree was rebuilt on the client.`,
 	);
@@ -18614,6 +18632,63 @@ class HydrationCapability {
 	}
 
 	/**
+	 * Hold hydration diagnostics while a try body renders (see
+	 * HYDRATION_DIAGNOSTIC_HOLDS). Returns the mark that releaseDiagnostics
+	 * drops back to.
+	 */
+	holdDiagnostics(): number {
+		HYDRATION_DIAGNOSTIC_HOLDS++;
+		return HELD_HYDRATION_DIAGNOSTICS?.length ?? 0;
+	}
+
+	/**
+	 * Hold a diagnostic's `publish` when a try body holds diagnostics. A method,
+	 * so that bundles which never hydrate do not retain the hold.
+	 */
+	holds(publish: () => void): boolean {
+		if (HYDRATION_DIAGNOSTIC_HOLDS === 0) return false;
+		(HELD_HYDRATION_DIAGNOSTICS ??= []).push(publish);
+		return true;
+	}
+
+	/**
+	 * End a try body's hold. A body `caught` by its catch arm drops what it
+	 * held; otherwise its diagnostics pass to the enclosing hold, or publish
+	 * when none remains.
+	 */
+	releaseDiagnostics(mark: number, caught: boolean): void {
+		HYDRATION_DIAGNOSTIC_HOLDS--;
+		const held = HELD_HYDRATION_DIAGNOSTICS;
+		if (held === null) return;
+		if (caught) held.length = mark;
+		if (HYDRATION_DIAGNOSTIC_HOLDS !== 0) return;
+		HELD_HYDRATION_DIAGNOSTICS = null;
+		for (let i = 0; i < held.length; i++) held[i]();
+	}
+
+	/**
+	 * Render a hydrating try body under a diagnostic hold. When the boundary
+	 * `catches` and the body throws an application error, the catch arm
+	 * replaces the region, so the hold drops what the body reported.
+	 */
+	renderTryBody(block: Block, catches: boolean): void {
+		const mark = this.holdDiagnostics();
+		let caught = false;
+		try {
+			renderBlock(block);
+		} catch (error) {
+			caught =
+				catches &&
+				!isHostContextRequest(error) &&
+				!isSuspenseException(error) &&
+				!isAdoptionControl(error);
+			throw error;
+		} finally {
+			this.releaseDiagnostics(mark, caught);
+		}
+	}
+
+	/**
 	 * First render of a component whose server range was missing, into the
 	 * fresh `block` componentSlot minted before `anchor`. The server emits that
 	 * range only when the render completes; when it throws, the boundary that
@@ -19701,7 +19776,13 @@ class HydrationCapability {
 		if (domBindingClaims.get(el)?.get('class') === rawServer) return false;
 		if (mode === 0) return true;
 		if (mode === 1) return false;
-		if (process.env.NODE_ENV !== 'production' && !this.staleServerValues)
+		if (
+			process.env.NODE_ENV !== 'production' &&
+			!this.staleServerValues &&
+			// Class writes flush after the render. A boundary whose body adopted
+			// `el` and then threw to its catch arm has removed it since.
+			domNode(this.rootBlock.parentNode).contains(el)
+		)
 			warnHydrationValueMismatch((el as any).__oct_loc, 'attribute `class`', server, next);
 		return true;
 	}
@@ -37116,7 +37197,8 @@ function renderPassthroughTry(state: TrySlot): void {
 	const hydration = activeHydration();
 	const beforeOwner = hydration?.passthroughRanges === true;
 	try {
-		renderBlock(block);
+		if (hydration !== null) hydration.renderTryBody(block, state.catchBody !== null);
+		else renderBlock(block);
 		state.hasResolved = true;
 	} catch (error) {
 		if (isSuspenseException(error)) {
@@ -37207,7 +37289,8 @@ export function errorBlock(
 		current.body = state.tryBody;
 		current.extra = state.env;
 		try {
-			renderBlock(current);
+			if (hydration !== null) hydration.renderTryBody(current, true);
+			else renderBlock(current);
 		} catch (error) {
 			if (isHostContextRequest(error) || isSuspenseException(error) || isAdoptionControl(error))
 				throw error;
@@ -37268,7 +37351,8 @@ export function errorBlock(
 	const previousNative = freshBoundary ? setNativeAdoptionResolver(null) : undefined;
 	if (freshBoundary) hydration!.depth++;
 	try {
-		renderBlock(body);
+		if (hydration !== null) hydration.renderTryBody(body, true);
+		else renderBlock(body);
 		state.hasResolved = true;
 	} catch (error) {
 		if (isHostContextRequest(error) || isSuspenseException(error) || isAdoptionControl(error))
@@ -37570,9 +37654,13 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 	const refDetachCheckpoint = refDetachQueue.length;
 	let didThrow = false;
 	let renderError: unknown;
+	// Render-phase updates drained during hydration re-render a try body that
+	// is still hydrating.
+	const hydration = activeHydration();
 	if (capture !== null) WIP_CAPTURE = capture;
 	try {
-		renderBlock(block);
+		if (hydration !== null) hydration.renderTryBody(block, state.catchBody !== null);
+		else renderBlock(block);
 	} catch (error) {
 		didThrow = true;
 		renderError = error;
@@ -37809,6 +37897,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 	currentHydration = hydration;
 	WIP_CAPTURE = capture;
 	const previousNative = setNativeAdoptionResolver(null);
+	const diagnostics = hydration.holdDiagnostics();
 	let suspended: TrackedThenable<unknown> | null = null;
 	let failed = false;
 	let failure: unknown;
@@ -37852,6 +37941,15 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		state.tryBlock = null;
 		discardOffscreenCapture(capture);
 	} finally {
+		// The catch arm below replaces the attempt's region.
+		hydration.releaseDiagnostics(
+			diagnostics,
+			failed &&
+				suspended === null &&
+				state.catchBody !== null &&
+				!isAdoptionControl(failure) &&
+				!isHostContextRequest(failure),
+		);
 		setNativeAdoptionResolver(previousNative);
 		WIP_CAPTURE = previousCapture;
 		currentHydration = previousHydration;
@@ -38061,7 +38159,8 @@ function mountTry(state: TrySlot): void {
 	// adoption. A live child must not borrow an ancestor's historical data.
 	if (freshBoundary) hydration!.depth++;
 	try {
-		renderBlock(b);
+		if (hydration !== null) hydration.renderTryBody(b, state.catchBody !== null);
+		else renderBlock(b);
 		state.hasResolved = true;
 		if (wasPending) recordSuspenseCommit(state);
 	} catch (err) {
@@ -45295,11 +45394,13 @@ let RECOVERABLE_REPORTED: WeakSet<Block> | null = null;
  * fires. `block` defaults to the currently rendering block — hydration
  * recovery always runs under the mount that discovered the mismatch — and the
  * report is delivered on a microtask so a user callback can never re-enter the
- * in-progress hydration walk.
+ * in-progress hydration walk. A hydrating try body holds it until the body
+ * settles (HYDRATION_DIAGNOSTIC_HOLDS).
  */
 function noteRecoverableHydrationError(makeError: () => Error, block: Block | null = null): void {
 	if (ROOT_ERROR_HANDLERS === null) return;
 	const from = block ?? CURRENT_BLOCK;
+	if (currentHydration?.holds(() => noteRecoverableHydrationError(makeError, from))) return;
 	const h = rootErrorHandlersFor(from)?.onRecoverableError;
 	if (h === undefined) return;
 	let root = from!;

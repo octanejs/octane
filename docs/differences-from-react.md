@@ -1833,7 +1833,10 @@ structural or text recovery — a rebuilt subtree, corrected text, or a discarde
 stale server range —
 coalesced to one report per root per microtask burst. A boundary that retries
 hydration after suspending does not report content that an earlier attempt
-already rebuilt. Octane recovers per site
+already rebuilt. A try body that throws to its `@catch` arm or `<ErrorBoundary>`
+fallback reports nothing for what it adopted before it threw, in development or
+production: the catch arm replaces that content, and where the server's body
+threw the same way, the server rendered its catch arm there. Octane recovers per site
 rather than client-rendering a whole boundary, so attribute-level value patches
 do not report: production React does not detect those at all, and reporting
 Octane's extra detection would make the channel incomparable.

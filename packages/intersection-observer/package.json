@@ -31,7 +31,7 @@
   },
   "scripts": {
     "test": "pnpm upstream:materialize && vitest run --root ../.. --config vitest.config.js --project intersection-observer",
-    "typecheck": "tsrx-tsc --noEmit",
+    "typecheck": "octane-tsc -p tsconfig.json",
     "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
     "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
