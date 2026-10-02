@@ -5,15 +5,22 @@ import {
 	CandidateUnsupportedError,
 	assertAlive,
 	attachObserver,
+	createDeclarationView,
 	derivedValueState,
 	errorState,
 	invalidateNode,
 	isThenable,
+	linkReads,
 	pendingState,
+	promoteDeclarationView,
 	publishNode,
 	readNode,
+	readsDuring,
+	readsMatch,
+	reevaluateNode,
 	refreshNode,
 	readyState,
+	releaseDeclarationView,
 	signalBatch,
 	subscribeNode,
 	untrack,
@@ -24,6 +31,7 @@ import {
 	type SignalCandidateFrame,
 } from './graph.js';
 import { SIGNAL_DEPENDENT_NODE, type SignalDependencyNotify } from './read-protocol.js';
+import { RedeclarableBinding } from './redeclaration.js';
 import {
 	SIGNAL_OWNER_RESOLVE,
 	type DerivedCompute,
@@ -40,8 +48,9 @@ export function createDeclaredDerivedCell<T>(
 	key: string,
 	compute: DerivedCompute<T>,
 	options?: DerivedOptions,
+	sequence?: number,
 ): DerivedSignal<T> {
-	return createDerivedCellWith(owner, key, compute, options, DerivedBinding);
+	return createDerivedCellWith(owner, key, compute, options, DerivedBinding, sequence);
 }
 
 interface AttemptDependency {
@@ -111,11 +120,19 @@ function resolveHandle<T>(handle$: SignalHandle<T>, owner: Scope): ScopedNode<T>
 	return resolved;
 }
 
-export class DerivedBinding<T> {
+export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 	private current: DerivedAttempt<T> | undefined;
 	private compute: DerivedCompute<T> | undefined;
 	private frozen = false;
 	private candidate: SignalCandidateFrame | undefined;
+	/** The latest evaluation produced asynchronous work rather than a value. */
+	private asynchronous = false;
+	/** A later render's computation, evaluated privately until that render is accepted. */
+	declare private view?: { readonly node: ScopedNode<T>; readonly binding: DerivedBinding<T> };
+	/** A render's computation that produced the committed value, and what it read. */
+	declare private probed?: { readonly compute: DerivedCompute<T>; readonly reads: ScopedNode[] };
+	/** A view's first result, already produced by the render's probe. */
+	declare private seeded?: { readonly result: unknown };
 
 	constructor(
 		readonly owner: Scope & GraphOwner,
@@ -123,8 +140,119 @@ export class DerivedBinding<T> {
 		compute: DerivedCompute<T>,
 		private readonly options?: DerivedOptions,
 	) {
+		super();
 		this.compute = compute;
 		node.compute = () => this.evaluate();
+	}
+
+	protected committedDefinition(): DerivedCompute<T> | undefined {
+		return this.compute;
+	}
+
+	/**
+	 * Asynchronous work has no selection identity, so a new closure cannot be
+	 * matched with the attempt it would repeat: restarting it would refetch on
+	 * every redeclaring render and loop on a suspended retry. Such a cell adopts
+	 * the closure for its next dependency-driven restart instead.
+	 */
+	protected installDefinition(compute: DerivedCompute<T>, sequence: number): void {
+		const probed = this.probed;
+		this.probed = undefined;
+		const view = this.view;
+		// The accepted render kept the committed value while this view started
+		// asynchronous work. Adopt that attempt rather than starting another.
+		if (view !== undefined && view.binding.compute === compute) {
+			this.acceptView(view.node, sequence, compute);
+			return;
+		}
+		this.compute = compute;
+		this.sequence = sequence;
+		if (this.asynchronous) return;
+		// The render already evaluated this computation against the same inputs.
+		if (probed?.compute === compute && readsMatch(this.node, probed.reads)) return;
+		signalBatch(() => reevaluateNode(this.node));
+	}
+
+	protected presentDefinition(compute: DerivedCompute<T>): ScopedNode | undefined {
+		// A frozen document keeps presenting committed values. The new closure is
+		// installed at acceptance and evaluated when reads resume.
+		if (this.asynchronous || this.frozen || this.owner.readBarrier !== undefined) return undefined;
+		// A zero-argument computation runs once here. An equal synchronous value
+		// needs no view; any other result seeds the view, so the closure never
+		// runs twice and asynchronous work never starts twice.
+		let probe: { value: unknown; reads: ScopedNode[] } | undefined;
+		if (compute.length === 0) {
+			try {
+				probe = readsDuring(this.owner, compute as () => unknown);
+			} catch {
+				// A suspended or failing computation reports itself through a view.
+			}
+		}
+		if (probe !== undefined && !this.producesWork(probe.value)) {
+			const state = untrack(() => refreshNode(this.node));
+			if (state.snapshot.status === 'ready' && Object.is(state.snapshot.value, probe.value)) {
+				this.probed = { compute, reads: probe.reads };
+				return undefined;
+			}
+		}
+		this.releaseView();
+		const node: ScopedNode<T> = createDeclarationView(this.node, (target, frame) =>
+			binding.forkCandidate(target, frame),
+		);
+		const binding: DerivedBinding<T> = new DerivedBinding(this.owner, node, compute, this.options);
+		this.view = { node, binding };
+		if (probe !== undefined) binding.seeded = { result: probe.value };
+		refreshNode(node);
+		if (probe !== undefined) linkReads(node, probe.reads);
+		// A render that may be discarded never presents asynchronous work: its
+		// retry could not be matched with this attempt and would start another.
+		return binding.asynchronous ? undefined : node;
+	}
+
+	/** Whether a result is asynchronous work rather than a value. */
+	private producesWork(result: unknown): boolean {
+		if (this.options?.sync) return false;
+		try {
+			return isThenable(result) || asyncIterator(result) !== undefined;
+		} catch {
+			return true;
+		}
+	}
+
+	protected acceptView(node: ScopedNode, sequence: number, compute: DerivedCompute<T>): void {
+		const view = this.view;
+		if (view?.node !== node) return;
+		this.view = undefined;
+		const fork = view.binding;
+		const previous = this.current;
+		const current = fork.current;
+		this.compute = compute;
+		this.sequence = sequence;
+		this.asynchronous = fork.asynchronous;
+		this.current = current;
+		if (current) current.binding = this;
+		this.node.invalidateAttempt = current ? () => this.invalidateGraph() : undefined;
+		fork.current = undefined;
+		fork.node.invalidateAttempt = undefined;
+		signalBatch(() => {
+			promoteDeclarationView(node, this.node);
+			fork.dispose();
+			if (previous !== current) this.stop(previous);
+		});
+	}
+
+	protected discardDefinition(): void {
+		if (this.view?.binding.asynchronous) this.releaseView();
+	}
+
+	private releaseView(): void {
+		const view = this.view;
+		if (view === undefined) return;
+		this.view = undefined;
+		signalBatch(() => {
+			releaseDeclarationView(view.node);
+			view.binding.dispose();
+		});
 	}
 
 	forkCandidate(target: ScopedNode<T>, frame: SignalCandidateFrame): CandidateProducer {
@@ -315,15 +443,20 @@ export class DerivedBinding<T> {
 		this.current = undefined;
 		this.node.invalidateAttempt = undefined;
 		const compute = this.compute!;
+		const seeded = this.seeded;
+		this.seeded = undefined;
 		// A zero-argument synchronous computation is the common path. Do not pay
 		// for an attempt, promise, AbortController, or context unless the authored
 		// computation accepts the attempt API or actually returns async work.
 		let current = compute.length ? attempt(this) : undefined;
 		let result: T | PromiseLike<T | AsyncIterable<T>> | AsyncIterable<T>;
 		try {
-			result = current
-				? compute(DerivedBinding.context(current))
-				: (compute as () => T | PromiseLike<T | AsyncIterable<T>> | AsyncIterable<T>)();
+			result =
+				seeded !== undefined
+					? (seeded.result as T)
+					: current
+						? compute(DerivedBinding.context(current))
+						: (compute as () => T | PromiseLike<T | AsyncIterable<T>> | AsyncIterable<T>)();
 		} catch (error) {
 			this.stop(current);
 			if (isThenable(error)) throw error;
@@ -331,6 +464,7 @@ export class DerivedBinding<T> {
 		}
 		if (this.options?.sync) {
 			this.stop(current, false);
+			this.asynchronous = false;
 			return derivedValueState(this.node, result as T);
 		}
 		let iteratorFactory: (() => AsyncIterator<T>) | undefined;
@@ -344,8 +478,10 @@ export class DerivedBinding<T> {
 		}
 		if (!thenable && !iteratorFactory) {
 			this.stop(current, false);
+			this.asynchronous = false;
 			return derivedValueState(this.node, result as T);
 		}
+		this.asynchronous = true;
 		current ??= attempt(this);
 		this.current = current;
 		this.node.invalidateAttempt = () => this.invalidateGraph();
@@ -573,6 +709,9 @@ export class DerivedBinding<T> {
 	}
 
 	dispose(): void {
+		this.forgetStaged();
+		this.probed = undefined;
+		this.releaseView();
 		this.stop(this.current);
 		this.current = undefined;
 		this.compute = undefined;

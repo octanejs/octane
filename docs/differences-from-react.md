@@ -1836,12 +1836,22 @@ throwing.
 `hydrateRoot`'s `onRecoverableError` option fires (dev AND prod) after a
 structural or text recovery — a rebuilt subtree, corrected text, or a discarded
 stale server range —
-coalesced to one report per root per microtask burst. A boundary that retries
-hydration after suspending does not report content that an earlier attempt
-already rebuilt. A try body that throws to its `@catch` arm or `<ErrorBoundary>`
-fallback reports nothing for what it adopted before it threw, in development or
-production: the catch arm replaces that content, and where the server's body
-threw the same way, the server rendered its catch arm there. Octane recovers per site
+coalesced to one report per root per microtask burst. Like React, which reports
+recoverable errors when a render commits, a root's hydrating attempt reports
+only if it commits. One that suspends leaves the server content untouched until
+a later attempt commits and reports the mismatch once; one that ends in an
+uncaught error reports nothing for the recovery it discarded. A suspended
+attempt also leaves the server's text and style values as rendered, so the
+attempt that commits reports each corrected text once and, in development, warns
+about each value mismatch once. A boundary that
+retries hydration after suspending does not report content that an earlier
+attempt already rebuilt. A try body that throws to its `@catch` arm or
+`<ErrorBoundary>` fallback reports nothing for what it adopted before it threw,
+in development or production: the catch arm replaces that content, and where the
+server's body threw the same way, the server rendered its catch arm there.
+A resolved `@try` arm keeps its server text and attribute values the same way
+while its hydration is suspended, and the attempt that commits reports each
+mismatch once. Octane recovers per site
 rather than client-rendering a whole boundary, so attribute-level value patches
 do not report: production React does not detect those at all, and reporting
 Octane's extra detection would make the channel incomparable.
