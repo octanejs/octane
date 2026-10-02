@@ -74,6 +74,19 @@ const SHAPES = [
 		otherArm: '<b class="server">server</b><i>w</i>',
 	},
 	{
+		shape: 'a keyed call after the shared root',
+		name: 'KeyedLast',
+		props: { k: 'a', tail: 't' },
+		html: '<i>t</i><u>a</u>',
+		codes: [55],
+		warnings: () => [
+			structural(siteOf('function KeyedLast(', '<Under'), 'a component range', '<b>'),
+		],
+		update: { k: 'b', tail: 'w' },
+		updated: '<i>w</i><u>b</u>',
+		otherArm: '<i>w</i><b class="server">server</b>',
+	},
+	{
 		shape: 'a dynamic call before the shared root',
 		name: 'Dynamic',
 		props: { tail: 't' },

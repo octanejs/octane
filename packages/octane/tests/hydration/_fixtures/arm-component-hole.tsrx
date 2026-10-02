@@ -42,6 +42,23 @@ export function Keyed(props: { server?: boolean; k: string; tail: string }) @{
 	</section>
 }
 
+// The keyed call follows the shared root, where the cursor still rests.
+export function KeyedLast(props: { server?: boolean; k: string; tail: string }) @{
+	<section>
+		@if (props.server) {
+			<>
+				<i>{props.tail as string}</i>
+				<b class="server">{'server'}</b>
+			</>
+		} @else {
+			<>
+				<i>{props.tail as string}</i>
+				<Under key={props.k} v={props.k} />
+			</>
+		}
+	</section>
+}
+
 export function Dynamic(props: { server?: boolean; over?: boolean; tail: string }) @{
 	const C = props.over ? Over : Under;
 	<section>

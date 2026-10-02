@@ -11720,9 +11720,10 @@ export function componentSlotLite<P>(
 			// `<!--[-->…<!--]-->` range and mountTry/renderBlock parked the cursor on
 			// the `<!--[-->`. The FIRST appended child finds the cursor parked AFTER the
 			// just-cloned (empty) host, so descend to host.firstChild; later siblings
-			// (and the sole-hole case) already have the cursor on the open marker. An
-			// anchor on another server node stands where the range belonged.
-			const open = hydration.slotCursor(anchor, parentScope.block, host);
+			// (and the sole-hole case) already have the cursor on the open marker.
+			let open: Node | null = hydration.node;
+			if (open === null || (STAGED_DOM?.view(open) ?? open).parentNode !== host)
+				open = getFirstChild(host);
 			if (open !== null && hydration.isOpen(open)) {
 				adoptedOpen = open;
 				endMarker = hydration.close(open);
@@ -11733,7 +11734,16 @@ export function componentSlotLite<P>(
 				// host's server content is something else: rebuild this call in place of
 				// the server nodes from its claim.
 				unframed = open;
-			} else inPlace = open;
+			} else if (anchor === null || anchor === parentScope.block.endMarker) inPlace = open;
+			else {
+				// A hole of a template the parent adopted: walking that template found
+				// this call's server node, but the cursor stays where the adoption left
+				// it, on a root before that node. A templateless body anchors at its
+				// block's end marker instead, with the cursor on the call's server
+				// node, and a walk that ran off the end of its host found no node.
+				hydration.node = anchor;
+				inPlace = anchor;
+			}
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
 		stampSignalInstance(scope, parentScope, invocationSite, undefined, false);
@@ -11756,7 +11766,7 @@ export function componentSlotLite<P>(
 				props,
 				invocationSite,
 				unframed,
-				null,
+				anchor ?? null,
 			);
 			return;
 		}
@@ -11774,9 +11784,15 @@ export function componentSlotLite<P>(
 			);
 			return;
 		}
-	} else {
+	} else if (hydration !== null) {
 		// Re-render: the parent's host/anchor are stable across renders so no
 		// need to rebuild the LiteBlockImpl. Skip the allocation on warm path.
+		// A claim whose unframed render suspended completes here.
+		const claim = hydration.unframedClaim(scope.block);
+		if (claim !== undefined) {
+			renderUnframedLite(hydration, claim, parentScope, slotKey, host, comp, props, invocationSite);
+			return;
+		}
 	}
 	const prevScope = CURRENT_SCOPE;
 	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
@@ -11830,11 +11846,9 @@ export function componentSlotLite<P>(
 	}
 }
 
-// A lite call whose server range is missing, anchorless or at the server node
-// `anchor` stands in for (slotCursor): render it between fresh markers without
-// adopting, then report and discard the server nodes from `stale`, as
-// componentSlot does for a missing range. The body renders through
-// componentSlotLite again, which finds the registered scope.
+// A lite call whose server range is missing: render it between fresh markers
+// without adopting, then report and discard the server nodes from `stale`, as
+// componentSlot does for a missing range.
 function mountUnframedLite<P>(
 	hydration: HydrationCapability,
 	parentScope: Scope,
@@ -11855,28 +11869,48 @@ function mountUnframedLite<P>(
 	hydration.markFresh(start);
 	hydration.markFresh(end);
 	(parentScope.slots[slotKey] as Scope).block.endMarker = end;
+	renderUnframedLite(
+		hydration,
+		{ start, end, scope: parentScope, slotKey, stale, anchor },
+		parentScope,
+		slotKey,
+		host,
+		comp,
+		props,
+		invocationSite,
+	);
+}
+
+// The body renders through componentSlotLite again, which finds the registered
+// scope and, with hydration inactive, renders it as ordinary client DOM.
+function renderUnframedLite<P>(
+	hydration: HydrationCapability,
+	claim: UnframedClaim,
+	parentScope: Scope,
+	slotKey: number,
+	host: Node,
+	comp: ComponentBody<P>,
+	props: P,
+	invocationSite: string | undefined,
+): void {
 	hydration.renderUnframed(
 		() => componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite),
 		undefined,
-		start,
-		end,
-		parentScope,
-		slotKey,
-		stale,
-		anchor === null ? null : { anchor },
+		(parentScope.slots[slotKey] as Scope).block,
+		claim,
 	);
-	hydration.node = getNextSibling(end);
+	hydration.node = getNextSibling(claim.end);
 }
 
 // An anchored lite call without a server range, at the server node `root`: its
 // body may adopt that node in place (HydrationCapability.renderInPlace). The body
 // renders through componentSlotLite again, which finds the registered scope. A
 // separate function keeps the callback's captures out of ordinary lite dispatch.
-// When `root` is the node at the call's position (slotCursor), the enclosing
-// template claims the server nodes after it, and only a body of one root can
-// take its place: the body's end marker would be `root`, which the first of
-// several roots replaces. Any other body renders unframed in its place, as
-// componentSlot renders a call it cannot prove single-root.
+// When `root` is the element or text a template hole's walk found (the call's
+// anchor), the template claims the server nodes after it, and only a body of
+// one root can take its place: the body's end marker is `root`, which the first
+// of several roots replaces. Any other body renders unframed in place of `root`
+// alone, as componentSlot renders a call it cannot prove single-root.
 function renderLiteInPlace<P>(
 	hydration: HydrationCapability,
 	parentScope: Scope,
@@ -11888,7 +11922,12 @@ function renderLiteInPlace<P>(
 	anchor: Node | undefined,
 	root: Node,
 ): void {
-	if (root === hydration.positional && (comp as any).$$singleRoot !== true) {
+	if (
+		root === anchor &&
+		root.nodeType !== 8 &&
+		root !== parentScope.block.endMarker &&
+		(comp as any).$$singleRoot !== true
+	) {
 		mountUnframedLite(
 			hydration,
 			parentScope,
@@ -11898,15 +11937,18 @@ function renderLiteInPlace<P>(
 			props,
 			invocationSite,
 			root,
-			root,
+			getNextSibling(root),
 		);
 		return;
 	}
-	hydration.renderInPlace(
-		() => componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite, anchor),
-		undefined,
-		root,
-	);
+	if (
+		hydration.renderInPlace(
+			() => componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite, anchor),
+			undefined,
+			root,
+		)
+	)
+		hydration.parkPast(root, parentScope);
 }
 
 // Keep the fresh-subtree callback's extra captures out of ordinary lite dispatch.
@@ -15910,7 +15952,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			// already-adopted siblings without treating their range as fresh DOM.
 			hydration.node = preserved.cursor;
 			try {
-				renderBlock(preserved.source);
+				hydration.renderSuspended(preserved.source);
 			} catch (error) {
 				if (!isSuspenseException(error)) throw error;
 				preserveSuspendedHydrateActivation(state, hydration, error.thenable);
@@ -18455,7 +18497,8 @@ interface LazyTemplateRecord {
 	ns: 0 | 1 | 2 | 3;
 	/**
 	 * Raw multi-root markup: the number of roots, as the compiler counts them.
-	 * 0 = one root, or HTML roots pre-wrapped in `<octane-frag>`.
+	 * 0 = one root, or HTML roots already wrapped in `<octane-frag>`, which the
+	 * compiler no longer emits.
 	 */
 	frag: number;
 	parsed: Array<Node | null>;
@@ -18498,9 +18541,9 @@ function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Node {
 	initDomOperations();
 	const t = (STAGED_DOM?.view(document) ?? document).createElement('template');
 	if (ns === 0) {
-		// Fixed HTML multi-root templates arrive pre-wrapped by the compiler. Opaque
-		// multi-root templates carry raw markup because their eventual namespace is
-		// unknown, so add the equivalent wrapper only after HTML wins at clone time.
+		// Multi-root templates carry raw markup: an opaque one because its eventual
+		// namespace is unknown until clone time. Add the wrapper the HTML parser
+		// needs here. Markup that arrives already wrapped parses the same way.
 		(STAGED_DOM?.view(t) ?? t).innerHTML = frag ? `<octane-frag>${html}</octane-frag>` : html;
 		const root = getFirstChild(t.content) as Element;
 		// Multi-root HTML templates arrive wrapped in a synthetic <octane-frag>. The
@@ -18566,10 +18609,10 @@ function lazyRootDescriptor(lazy: LazyTemplateRecord): string | 3 | 8 {
 }
 
 /**
- * Is this lazy template a multi-root fragment? SVG/MathML/opaque fragments carry
- * `frag`; HTML multi-root templates arrive from the compiler pre-wrapped in
- * `<octane-frag>` with frag=0, so the wrapper tag is the discriminant there
- * (mirrors parseTemplate's `__oct_frag` stamping of the parsed root).
+ * Is this lazy template a multi-root fragment? Compiled fragments carry `frag`;
+ * HTML roots already wrapped in `<octane-frag>` with frag=0 are discriminated
+ * by the wrapper tag (mirrors parseTemplate's `__oct_frag` stamping of the
+ * parsed root).
  */
 function isLazyFragment(lazy: LazyTemplateRecord): boolean {
 	return lazy.frag !== 0 || lazyRootDescriptor(lazy) === 'octane-frag';
@@ -18577,8 +18620,8 @@ function isLazyFragment(lazy: LazyTemplateRecord): boolean {
 
 /**
  * How many roots a multi-root template has. The compiler passes the count as
- * a raw fragment's `frag`; a parsed or pre-wrapped template counts its
- * children.
+ * `frag`; a parsed template, or markup already wrapped in `<octane-frag>`,
+ * counts its children.
  */
 function templateRootCount(template: Node | LazyTemplateRecord): number {
 	let parsed: Node;
@@ -18614,8 +18657,8 @@ function lazyRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
 
 /**
  * lazyRootMatches for a nested fragment's FIRST logical root, read from the
- * template source. A raw fragment's cached descriptor is that root; a
- * fixed-HTML fragment's starts after its synthetic `<octane-frag>` wrapper. A
+ * template source. A raw fragment's cached descriptor is that root; markup
+ * already wrapped in `<octane-frag>` has it after the wrapper. A
  * leading `<!>` is a dynamic hole whose server form (text, a marker range, or
  * nothing) cannot decide a mismatch, so the first static element root after
  * the leading holes decides, as in fragmentRootMatches.
@@ -18707,6 +18750,29 @@ function resolveLazyTemplate(lazy: LazyTemplateRecord): Node {
 interface HydratedLiteRange {
 	start: Comment;
 	end: Comment;
+}
+
+/**
+ * A component call that found no server range where it hydrates: the fresh
+ * `start`/`end` markers its slot minted, the server node `stale` that stood at
+ * the slot's claim, and the slot's `anchor`. `scope`/`slotKey` locate the call
+ * for diagnostics.
+ */
+interface UnframedClaim {
+	start: Node;
+	end: Node;
+	scope: Scope;
+	slotKey: number;
+	stale: Node | null;
+	anchor: Node | null;
+}
+
+/** What a nested fragment rebuilt over the server node `cursor` replaces. */
+interface RebuiltFragment {
+	cursor: Node;
+	template: Node;
+	scope: Scope | null;
+	loc: string | undefined;
 }
 
 interface PendingHydrationClassWrite {
@@ -18846,15 +18912,12 @@ class HydrationCapability {
 	 */
 	rebuiltTail: Node | null = null;
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
+	/** Unframed claims whose render suspended, by the block that claimed (renderUnframed). */
+	private unframedClaims: WeakMap<Block, UnframedClaim> | null = null;
+	/** Fragments that rebuildFragment built, by root, until drainFrag places them. */
+	private rebuiltFragments: WeakMap<Node, RebuiltFragment> | null = null;
 	/** The server node renderInPlace's body may adopt, until a template does. */
 	private inPlace: Node | null = null;
-	/**
-	 * The anchor slotCursor last found at its call's position, else null. Every
-	 * call that consults slotCursor renders next, so the call's first render
-	 * (renderInPlace, renderUnframed, renderLiteInPlace) reads it before any
-	 * other call can replace it.
-	 */
-	positional: Node | null = null;
 	/**
 	 * What a hydrating update built on the client where its slot had already
 	 * rendered: blocks (renderUpdate), and child slots whose list it built.
@@ -19102,69 +19165,141 @@ class HydrationCapability {
 	}
 
 	/**
-	 * First render, by `render(target)`, of a component whose server range was
-	 * missing, between the fresh `start`/`end` markers its slot minted where
-	 * `unframedBefore` put them. The server emits that range only when the
-	 * render completes; when it throws, the boundary that catches it renders
-	 * its catch arm in that place. So the server nodes from `stale` stay until
-	 * the body has run, and the body, which adopts nothing, still consumes its
-	 * positional seeds as the server's render did. A seeded rejection then
-	 * reaches its boundary with the server's catch arm intact, and only the
-	 * fresh markers are removed. Any other outcome reports the mismatch and
-	 * discards the server nodes it replaces (`unframedReplaces`) before the
-	 * `slot`'s anchor, unless `stale` is client-built: the rebuild that built
-	 * it already reported and discarded the server's. When `stale` is that
-	 * anchor itself (slotCursor), it is the server's whole content at the
-	 * call's position, and the anchor moves past it. A discard that reaches
-	 * the end of the enclosing server range reports once for that range
-	 * (firstAtRangeEnd).
+	 * Render, by `render(target)`, a component whose server range was missing,
+	 * between the fresh markers of its slot's `claim` (unframedBefore placed
+	 * them). The server emits that range only when the render completes; when
+	 * it throws, the boundary that catches it renders its catch arm in that
+	 * place. So the server nodes from `claim.stale` stay until the body has
+	 * run, and the body, which adopts nothing, still consumes its positional
+	 * seeds as the server's render did. A seeded rejection then reaches its
+	 * boundary with the server's catch arm intact, and only the fresh markers
+	 * are removed. A suspension leaves the server nodes too, and `owner`, the
+	 * claiming block, keeps the claim until a later attempt renders it through
+	 * here again (unframedClaim). Once a render completes, it reports the
+	 * mismatch and discards the server nodes that stood in the range's place,
+	 * but not a later sibling's range, unless `stale` is client-built: the
+	 * rebuild that built it already reported and discarded the server's. A
+	 * discard that reaches the end of the enclosing server range reports once
+	 * for that range (firstAtRangeEnd).
 	 */
 	renderUnframed<T>(
 		render: (target: T) => void,
 		target: T,
-		start: Node,
-		end: Node,
-		scope: Scope,
-		slotKey: number,
-		stale: Node | null,
-		slot: { anchor: Node | null } | null,
+		owner: Block,
+		claim: UnframedClaim,
 	): void {
-		if (slot !== null && stale !== null && stale === this.positional)
-			slot.anchor = getNextSibling(stale);
-		const anchor = slot === null ? null : slot.anchor;
 		const previousReplay = this.replayDepth;
 		const previousNative = setNativeAdoptionResolver(null);
 		this.replayDepth = ++this.depth;
 		let rejected = false;
+		let suspended = false;
 		try {
 			render(target);
 		} catch (error) {
 			rejected = this.isRejection(error);
+			suspended = isSuspenseException(error);
 			throw error;
 		} finally {
 			this.depth--;
 			this.replayDepth = previousReplay;
 			setNativeAdoptionResolver(previousNative);
-			if (rejected) {
-				removeRange(start, getNextSibling(end));
+			const stale = claim.stale;
+			if (suspended) {
+				(this.unframedClaims ??= new WeakMap()).set(owner, claim);
 				this.node = stale;
-			} else if (stale === null || !this.isFresh(stale)) {
-				let node = stale;
-				while (this.unframedReplaces(node, anchor)) {
-					const next = getNextSibling(node);
-					(STAGED_DOM?.view(node) ?? node).remove();
-					node = next;
-				}
-				// The discard stops at `anchor`, at a later sibling's range, or at the
-				// end of the enclosing server range, which may be `anchor` itself.
-				if (!isBlockClose(node) || this.firstAtRangeEnd(node)) {
-					noteRecoverableHydrationError(() => new Error(formatClientError(55)));
-					if (process.env.NODE_ENV !== 'production') {
-						const loc = siteLoc(scope, slotKey);
-						if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
+			} else {
+				this.unframedClaims?.delete(owner);
+				if (rejected) {
+					removeRange(claim.start, getNextSibling(claim.end));
+					this.node = stale;
+				} else if (stale === null || !this.isFresh(stale)) {
+					const node = stale === null ? null : this.discardInPlace(stale, claim.anchor);
+					// The discard stops at `anchor`, at a later sibling's range or
+					// boundary, or at the end of the enclosing server range, which may
+					// be `anchor` itself.
+					if (!isBlockClose(node) || this.firstAtRangeEnd(node)) {
+						noteRecoverableHydrationError(() => new Error(formatClientError(55)));
+						if (process.env.NODE_ENV !== 'production') {
+							const loc = siteLoc(claim.scope, claim.slotKey);
+							if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
+						}
 					}
 				}
 			}
+		}
+	}
+
+	/**
+	 * Where an unframed claim at the server node `stale` places its fresh
+	 * markers: in that node's place, so that the component renders ahead of the
+	 * later siblings' server ranges that follow it. A claim at no server node
+	 * or at a client-built one, or one anchored at a node within its parent's
+	 * range rather than at the range's end, keeps its `anchor`.
+	 */
+	unframedBefore(stale: Node | null, anchor: Node | null): Node | null {
+		return stale !== null &&
+			!this.freshNodes.has(stale) &&
+			!isBlockClose(stale) &&
+			(anchor === null || isBlockClose(anchor))
+			? stale
+			: anchor;
+	}
+
+	/**
+	 * Remove the server nodes from `from` that stood where a client slot without
+	 * a server range of its own renders: the elements and text up to the next
+	 * marker, which is a later sibling's range or boundary or the end of the
+	 * enclosing range, or up to `anchor` or a client-built node. Returns the
+	 * node it stopped at.
+	 */
+	private discardInPlace(from: Node, anchor: Node | null): Node | null {
+		const parent = domNode(from).parentNode;
+		if (parent === null) return null;
+		this.save(parent);
+		let node: Node | null = from;
+		while (
+			node !== null &&
+			node !== anchor &&
+			!this.freshNodes.has(node) &&
+			(node.nodeType !== 8 || isTextSeparator(node) || isEmptyTextSlot(node))
+		) {
+			const next = getNextSibling(node);
+			(STAGED_DOM?.view(node as ChildNode) ?? (node as ChildNode)).remove();
+			node = next;
+		}
+		return node;
+	}
+
+	/** The claim that `block`'s suspended unframed render left for its next render. */
+	unframedClaim(block: Block): UnframedClaim | undefined {
+		return this.unframedClaims?.get(block);
+	}
+
+	/**
+	 * Resume `source`, the block that a preserved activation suspended in. Inside
+	 * a component whose unframed render suspended, it renders without adopting,
+	 * as that render did, and the component completes its claim when its own
+	 * slot renders it again.
+	 */
+	renderSuspended(source: Block): void {
+		const claims = this.unframedClaims;
+		let unframed = false;
+		if (claims !== null)
+			for (let block: Block | null = source; block !== null && !unframed; block = block.parentBlock)
+				unframed = claims.has(block);
+		if (!unframed) {
+			renderBlock(source);
+			return;
+		}
+		const previousReplay = this.replayDepth;
+		const previousNative = setNativeAdoptionResolver(null);
+		this.replayDepth = ++this.depth;
+		try {
+			renderBlock(source);
+		} finally {
+			this.depth--;
+			this.replayDepth = previousReplay;
+			setNativeAdoptionResolver(previousNative);
 		}
 	}
 
@@ -19271,77 +19406,20 @@ class HydrationCapability {
 	 * adopts, and the root's own holes move it into the root's children, but
 	 * the next sibling's server content starts after the root, so step past it.
 	 * A body that rebuilt `root` or rendered nothing there leaves the cursor
-	 * where it put it. When `root` is the call's anchor (slotCursor), the
-	 * enclosing template claims the server nodes after it, so a root rebuilt
-	 * over it leaves no tail to sweep. Returns whether the body adopted `root`.
+	 * where it put it. Returns whether the body adopted `root`.
 	 */
 	renderInPlace<T>(render: (target: T) => void, target: T, root: Node): boolean {
-		const positional = root === this.positional;
 		const outer = this.inPlace;
 		this.inPlace = root;
 		let adopted = false;
 		try {
 			render(target);
 			adopted = this.inPlace === null;
-			if (positional) this.rebuiltTail = null;
 		} finally {
 			this.inPlace = outer;
 		}
 		if (adopted) this.node = getNextSibling(root);
 		return adopted;
-	}
-
-	/**
-	 * Whether `node` is a server node that a component whose server range is
-	 * missing replaces: one ahead of `anchor` that neither delimits a block nor
-	 * was built on the client. A block open starts the range of a later sibling
-	 * call, which claims it, and a block close ends the range that encloses the
-	 * component.
-	 */
-	private unframedReplaces(node: Node | null, anchor: Node | null): node is ChildNode {
-		return (
-			node !== null &&
-			node !== anchor &&
-			!isBlockOpen(node) &&
-			!isBlockClose(node) &&
-			!this.freshNodes.has(node)
-		);
-	}
-
-	/**
-	 * Where a component whose server range is missing mints its fresh markers:
-	 * in place of the server nodes from `stale` that it replaces, so that it
-	 * stays ahead of the later siblings that adopt their server ranges, or else
-	 * before `anchor`.
-	 */
-	unframedBefore(stale: Node | null, anchor: Node | null): Node | null {
-		return this.unframedReplaces(stale, anchor) ? stale : anchor;
-	}
-
-	/**
-	 * The server node at a component call's position in `parent`, when its
-	 * `anchor` opens no range. An anchored call's `<!>` resolves, through the
-	 * enclosing template's walk, to the server node at that position, so an
-	 * element or text anchor is the node standing where the call's range
-	 * belonged: the server rendered another arm, whose roots the template
-	 * adopted. The cursor can still lag on an earlier root of that template,
-	 * which claims its roots without moving it, so it moves to the anchor,
-	 * which the call's first render remembers. Without an anchor, or with a
-	 * marker or `block`'s end (the call is its sole hole), the cursor holds the
-	 * position: mountTry/renderBlock parked it on the range's `<!--[-->`, or
-	 * the first appended call finds that at `parent`'s first child.
-	 */
-	slotCursor(anchor: Node | null | undefined, block: Block, parent: Node): Node | null {
-		if (
-			anchor != null &&
-			anchor.nodeType !== 8 &&
-			anchor !== block.endMarker &&
-			domNode(anchor).parentNode === parent
-		)
-			return (this.node = this.positional = anchor);
-		this.positional = null;
-		const node = this.node;
-		return node !== null && domNode(node).parentNode === parent ? node : getFirstChild(parent);
 	}
 
 	/** Read the `<!--oct-catch:T:C-->` comment ahead of a caught arm's range. */
@@ -19760,8 +19838,9 @@ class HydrationCapability {
 	}
 
 	/**
-	 * A slot of `parent` claimed the server range that `close` ends. Step the
-	 * cursor past it to the next sibling's server content.
+	 * A slot of `parent` claimed the server range that `close` ends, or adopted
+	 * `close` in place as its root. Step the cursor past it to the next
+	 * sibling's server content.
 	 */
 	parkPast(close: Node, parent: Scope): void {
 		const next = (this.node = getNextSibling(close));
@@ -19773,27 +19852,36 @@ class HydrationCapability {
 
 	/**
 	 * First render of an @if or @switch arm into the server range it adopted,
-	 * `block`'s own. When the arm's content is its own slots and the last of
-	 * them claimed a server range, returns the node that claim parked the
-	 * cursor on: whatever the server rendered from there belongs to no client
-	 * node (discardArmTail). Null when the arm cloned a template of its own, or
-	 * a later slot adopted without claiming a range, since the cursor then
-	 * rests on the roots they adopted.
+	 * `block`'s own. Returns the node from which whatever the server rendered
+	 * belongs to no client node (discardArmTail), with the cursor parked on it:
+	 * the first node after the roots of the arm's own template, which records
+	 * them as the range's content (claimRoots), or else where the arm's last
+	 * slot parked the cursor after the range it claimed, or after the single
+	 * root it adopted in place (renderInPlace). Null when a later slot adopted
+	 * without either, such as a component that adopted a fragment or text in
+	 * place, since the cursor then rests on the roots it adopted.
 	 */
 	renderAdoptedArm(block: Block): Node | null {
 		const outerArm = this.arm;
 		const outerTail = this.armTail;
 		const outerSlots = this.armSlots;
+		const outerClaim = this.beginClaim(getNextSibling(block.startMarker!));
 		this.arm = block;
 		this.armTail = null;
+		let parked: Node | null = null;
+		let claimed: Node | null | undefined;
 		try {
 			renderBlock(block);
-			return this.arm === block && this.armSlots === block.slots.length ? this.armTail : null;
+			if (this.arm === block && this.armSlots === block.slots.length) parked = this.armTail;
 		} finally {
+			claimed = this.endClaim(outerClaim);
 			this.arm = outerArm;
 			this.armTail = outerTail;
 			this.armSlots = outerSlots;
 		}
+		// The cursor rests on the roots the arm's own template adopted, or inside
+		// them: step it past them, as a range claim parks it.
+		return claimed == null ? parked : (this.node = claimed);
 	}
 
 	/**
@@ -19804,7 +19892,8 @@ class HydrationCapability {
 	 * something, a server range at the cursor or just after that marker is one
 	 * that nothing in the arm claimed: the server rendered another arm here,
 	 * longer than this one. So is any server content at `parked`, where the
-	 * arm's last slot parked the cursor after its range (renderAdoptedArm).
+	 * arm parked the cursor after its own template's roots, or after its last
+	 * slot's range or in-place root (renderAdoptedArm).
 	 * Discard the server content from there up to `end`, stopping at any
 	 * client nodes that mismatch recovery built there, and report it once.
 	 *
@@ -19813,7 +19902,7 @@ class HydrationCapability {
 	 * empty client branch, as an arm with no body is. The cursor does not move
 	 * past the elements and text that a template adopts, so at an element or
 	 * text node it cannot otherwise tell what the arm adopted from what the
-	 * server rendered for another arm. Both stay.
+	 * server rendered for another arm: `parked` does, and anything else stays.
 	 */
 	discardArmTail(scope: Scope, slotKey: number, first: Node, end: Node, parked: Node | null): void {
 		let from = this.node;
@@ -20436,20 +20525,53 @@ class HydrationCapability {
 
 	/**
 	 * The server rendered something other than this nested fragment at the
-	 * cursor (a text value, another component's roots). Report it once and build
-	 * the fragment on the client. The fragment's block owns the server nodes from
-	 * the cursor up to its end marker, where drainFrag inserts the fresh roots, so
-	 * discard them. When the end marker does not follow the cursor inside the
-	 * block's range, discard only the cursor node or its range, as a single-root
-	 * mismatch does.
+	 * cursor (a text value, another component's roots): build the fragment on
+	 * the client. Its holes render before drainFrag places it, and a hole that
+	 * suspends abandons the attempt, so the server nodes and the cursor stay
+	 * for the attempt that completes, which reports and discards them once
+	 * (placeRebuilt).
 	 */
 	private rebuildFragment(template: Node, cursor: Node, loc: string | undefined): Node {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		const root = this.freshClone(template);
+		// The compiled mount inserts into its scope's block, which for a lite
+		// component is the scope's own range rather than CURRENT_BLOCK's.
+		(this.rebuiltFragments ??= new WeakMap()).set(root, {
+			cursor,
+			template,
+			scope: CURRENT_SCOPE,
+			loc,
+		});
+		return root;
+	}
+
+	/**
+	 * drainFrag is about to place `root`. If rebuildFragment built it, report
+	 * the mismatch once, discard the server nodes it replaces, and return where
+	 * it goes when that is not drainFrag's anchor. The fragment's block owns
+	 * the server nodes from the cursor up to its end marker, where drainFrag
+	 * inserts the fresh roots. When the end marker does not follow the cursor
+	 * inside the block's range, discard only the cursor node or its range, as a
+	 * single-root mismatch does.
+	 */
+	placeRebuilt(root: Node): Node | null | undefined {
+		const rebuilt = this.rebuiltFragments?.get(root);
+		if (rebuilt === undefined) return undefined;
+		this.rebuiltFragments!.delete(root);
+		const { cursor, scope, template } = rebuilt;
+		const block = scope?.block;
+		// A lite call that claimed no server range renders at the cursor, among
+		// its later siblings' server content, before the end marker it shares
+		// with them (renderInPlace).
+		const inPlace = block instanceof LiteBlockImpl && !this.liteRanges.has(scope!);
 		// Captures that changed before a dormant boundary activated legitimately
 		// differ from the server's; still rebuild, but there is nothing to report.
 		if (!this.staleServerValues) {
 			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 			if (process.env.NODE_ENV !== 'production') {
+				// Name the lite call itself: its scope holds no locations of its own.
+				const owner = inPlace ? scope!.parent : null;
+				const site = owner === null ? '' : siteLoc(owner, owner.slots.indexOf(scope));
 				// A leading hole matches any server node: name the static root that
 				// did not match, and what the server rendered in its place.
 				let expected = getFirstChild(template);
@@ -20459,7 +20581,7 @@ class HydrationCapability {
 					actual = actual === null ? null : this.sibling(actual, 1);
 				}
 				warnHydrationStructuralMismatch(
-					loc ?? componentSourceLoc(CURRENT_BLOCK?.body) ?? CURRENT_SCOPE?.locFile,
+					rebuilt.loc || site || componentSourceLoc(CURRENT_BLOCK?.body) || CURRENT_SCOPE?.locFile,
 					expected === getFirstChild(template) || expected === null
 						? `a fragment starting with ${describeHydrationNode(getFirstChild(template))}`
 						: `a fragment with ${describeHydrationNode(expected)} after its leading holes`,
@@ -20467,16 +20589,18 @@ class HydrationCapability {
 				);
 			}
 		}
-		// The compiled mount inserts into its scope's block, which for a lite
-		// component is the scope's own range rather than CURRENT_BLOCK's.
-		const block = CURRENT_SCOPE?.block;
 		const parent = block?.parentNode;
 		const end = block?.endMarker ?? null;
 		const cursorParent = domNode(cursor).parentNode!;
 		this.save(cursorParent);
 		if (parent == null || cursor === end || cursorParent !== parent) {
 			if (parent != null) this.save(parent);
-			return this.freshClone(template);
+			return undefined;
+		}
+		if (inPlace) {
+			const node = this.discardInPlace(cursor, end);
+			this.reachedRangeEnd(node);
+			return (this.node = node);
 		}
 		let node: Node | null = cursor;
 		// Reaching the block's own start first means the cursor lies before its range.
@@ -20488,7 +20612,7 @@ class HydrationCapability {
 			removeHydrationRange(cursor, (STAGED_DOM?.view(end!) ?? end!).previousSibling!);
 			this.reachedRangeEnd(end);
 		} else this.discardCursor(cursor);
-		return this.freshClone(template);
+		return undefined;
 	}
 
 	/**
@@ -21222,7 +21346,11 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
  * in place — nothing to move.
  */
 export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
-	if (activeHydration() !== null && (root as any).__oct_vfrag === true) return;
+	const hydration = activeHydration();
+	if (hydration !== null) {
+		if ((root as any).__oct_vfrag === true) return;
+		anchor = hydration.placeRebuilt(root) ?? anchor;
+	}
 	if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss(false);
 	if (root.nodeType === 11) {
 		(STAGED_DOM?.view(parent) ?? parent).insertBefore(root, anchor);
@@ -32075,9 +32203,10 @@ function componentSlotImpl(
 			// its host), or a non-open marker (the slot is the sole hole of a
 			// control-flow arm, so its anchor is the arm's end marker). In these cases
 			// mountTry/renderBlock parked the cursor on the server range's `<!--[-->`;
-			// adopt from it, the same way childSlot's cursor branch does. An anchor on
-			// another server node stands where the range belonged (slotCursor).
-			const c = hydration.slotCursor(anchor, parentBlock, domParent);
+			// adopt from it, the same way childSlot's cursor branch does.
+			let c: Node | null = hydration.node;
+			if (c === null || (STAGED_DOM?.view(c) ?? c).parentNode !== domParent)
+				c = getFirstChild(domParent);
 			hydrationCursor = c;
 			if (c !== null && hydration.isOpen(c)) open = c;
 		}
@@ -32101,6 +32230,11 @@ function componentSlotImpl(
 			// self-delimits (set as block.startMarker/endMarker after render below).
 			// The `2` form resolves cross-module callees by their definition-site
 			// stamp; a string tag or unstamped component falls through to markers.
+			// Hydrating, a hole of a template the parent adopted renders in place of
+			// the server node that template's walk found, not of the node at the
+			// cursor (see componentSlotLite's anchored miss).
+			if (hydration !== null && anchor != null && anchor !== parentBlock.endMarker)
+				hydrationCursor = hydration.node = anchor;
 			start = null;
 			end = null;
 		} else {
@@ -32116,7 +32250,20 @@ function componentSlotImpl(
 			// the server frames every child of an all-component host, so the host's
 			// server content is something else. (The single-root path would compare
 			// the body's template with the cursor, which may still sit on the host or
-			// an ancestor.)
+			// an ancestor.) A hole of a template the parent adopted stands where the
+			// range belonged: the element or text its walk found, not the node at
+			// the cursor (see componentSlotLite's anchored miss). The call replaces
+			// exactly that node, and the slot anchors after it, since the template
+			// claims the nodes that follow.
+			if (
+				hydration !== null &&
+				anchor != null &&
+				anchor.nodeType !== 8 &&
+				anchor !== parentBlock.endMarker
+			) {
+				hydrationCursor = anchor;
+				anchor = getNextSibling(anchor);
+			}
 			let before = anchor ?? null;
 			if (hydration !== null) {
 				unframed = hydrationCursor;
@@ -32509,6 +32656,8 @@ function componentSlotImpl(
 					b.endMarker = last;
 				}
 			}
+			// An arm that ends with this root cannot read its end off the cursor.
+			if (adopted) hydration!.parkPast(hydrationCursor!, parentScope);
 		} else {
 			const b = createBlock(
 				'dynamic',
@@ -32533,30 +32682,31 @@ function componentSlotImpl(
 			if (state.inherited) b.exclusiveMarkers = true;
 			state.block = b;
 			if (unframed !== undefined)
-				hydration!.renderUnframed(
-					renderBlock,
-					b,
-					b.startMarker!,
-					b.endMarker!,
-					parentScope,
+				hydration!.renderUnframed(renderBlock, b, b, {
+					start: b.startMarker!,
+					end: b.endMarker!,
+					scope: parentScope,
 					slotKey,
-					unframed,
-					state,
-				);
+					stale: unframed,
+					anchor: state.anchor,
+				});
 			// The server may have rendered more in the frame, for another component.
 			else if (adoptedFrame) hydration!.renderClaimed(b, parentScope, slotKey);
 			else if (replaced) hydration!.renderUpdate(b);
 			else renderBlock(b);
 		}
 	} else if (state.block) {
+		// A claim whose unframed render suspended completes here.
+		const claim = hydration === null ? undefined : hydration.unframedClaim(state.block);
 		// `memo(Component)` — skip the body when new props shallow-equal the
 		// committed props (React.memo's contract; see tryMemoBail). A string comp
 		// is never memo-wrapped, so it falls through to the re-render below.
-		if (tryMemoBail(state.block, identity, props)) return;
+		if (claim === undefined && tryMemoBail(state.block, identity, props)) return;
 		if (state.block.props !== renderProps)
 			journalRootProperty(state.block, 'props', state.block.props);
 		state.block.props = renderProps;
-		renderBlock(state.block);
+		if (claim === undefined) renderBlock(state.block);
+		else hydration!.renderUnframed(renderBlock, state.block, state.block, claim);
 	}
 	// Hydration: advance the cursor PAST this component's adopted range so the next
 	// sibling adopts from the right node. The body itself doesn't reliably leave the
