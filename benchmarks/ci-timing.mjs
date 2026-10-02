@@ -35,7 +35,8 @@ export function summarizeJobs(jobs) {
 		if (job.conclusion !== 'success' || !job.started_at || !job.completed_at) continue;
 		const started = Date.parse(job.started_at);
 		const completed = Date.parse(job.completed_at);
-		durations.set(job.name, (completed - started) / 1000);
+		const setup = job.steps?.find((step) => step.name === 'Set up job')?.completed_at;
+		durations.set(job.name, (completed - (setup ? Date.parse(setup) : started)) / 1000); // runner provisioning is queue time, not job cost
 		start = Math.min(start, started);
 		end = Math.max(end, completed);
 	}
@@ -145,7 +146,7 @@ export function renderCiTiming({ head, baselines, headSha, runUrl, conclusion })
 		...(summary.length ? summary : ['⚪ No job outside the range of recent `main` runs.']),
 		'',
 		`Compares the CI run for ${commit}${runUrl ? ` ([run](${runUrl}))` : ''} with the last ${baselines.length} successful \`main\` push runs. ` +
-			`A job is only slower or faster outside the whole \`main\` range, by at least ${MIN_PERCENT}% and ${MIN_SECONDS}s.`,
+			`A job is only slower or faster outside the whole \`main\` range, by at least ${MIN_PERCENT}% and ${MIN_SECONDS}s. Job time excludes runner setup.`,
 		...(conclusion && conclusion !== 'success'
 			? ['', `The run concluded \`${conclusion}\`; only successful jobs are timed.`]
 			: []),
