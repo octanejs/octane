@@ -138,7 +138,9 @@ describe.each([true, false])('suspended root rebuilt during hydration (dev=%s)',
 	it('removes a clone it inserted before suspending and keeps adopted user state', async () => {
 		const expected = await control('RootForm');
 		expect(expected.recoverable).toBe(1);
-		expect(expected.structural).toHaveLength(dev ? 2 : 0);
+		// <s> rebuilt over <b>, and <i> finds the range end that recovery
+		// reached: one diagnostic.
+		expect(expected.structural).toHaveLength(dev ? 1 : 0);
 
 		const resume = suspend('RootForm');
 		const serverBranch = container.querySelector('b.server');

@@ -18668,7 +18668,9 @@ let currentHydration: HydrationCapability | null = null;
  * the earlier attempt's own content, or nothing, and the mismatch is already
  * reported. The end is the one node that every attempt at a return slot
  * shares: the slot borrows its component's range, or mints its own range
- * inside it, depending on what the failed attempt left.
+ * inside it, depending on what the failed attempt left. Within one attempt, a
+ * later sibling that finds the cursor on the end is part of the same recovery
+ * (firstAtRangeEnd).
  */
 let HYDRATION_REBUILT: WeakSet<Node> | null = null;
 
@@ -18999,7 +19001,8 @@ class HydrationCapability {
 	 * fresh markers are removed. Any other outcome reports the mismatch and
 	 * discards the server nodes it replaces (`unframedReplaces`), unless `stale`
 	 * is client-built: the rebuild that built it already reported and discarded
-	 * the server's.
+	 * the server's. A discard that reaches the end of the enclosing server range
+	 * reports once for that range (firstAtRangeEnd).
 	 */
 	renderUnframed<T>(
 		render: (target: T) => void,
@@ -19028,16 +19031,20 @@ class HydrationCapability {
 				removeRange(start, getNextSibling(end));
 				this.node = stale;
 			} else if (stale === null || !this.isFresh(stale)) {
-				noteRecoverableHydrationError(() => new Error(formatClientError(55)));
-				if (process.env.NODE_ENV !== 'production') {
-					const loc = siteLoc(scope, slotKey);
-					if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
-				}
 				let node = stale;
 				while (this.unframedReplaces(node, anchor)) {
 					const next = getNextSibling(node);
 					(STAGED_DOM?.view(node) ?? node).remove();
 					node = next;
+				}
+				// The discard stops at `anchor`, at a later sibling's range, or at the
+				// end of the enclosing server range, which may be `anchor` itself.
+				if (!isBlockClose(node) || this.firstAtRangeEnd(node)) {
+					noteRecoverableHydrationError(() => new Error(formatClientError(55)));
+					if (process.env.NODE_ENV !== 'production') {
+						const loc = siteLoc(scope, slotKey);
+						if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
+					}
 				}
 			}
 		}
@@ -19559,6 +19566,28 @@ class HydrationCapability {
 		if (rebuilt || this.staleServerValues) return false;
 		noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 		return true;
+	}
+
+	/**
+	 * Mismatch recovery reached `close`, the end of a server range, having
+	 * discarded the server content before it or found none left. The client
+	 * builds the rest of the range, so each later claim in it finds the cursor
+	 * on `close` for the same reason: one recovery, which only the first claim
+	 * reports. Returns whether this is that claim, and remembers `close`.
+	 */
+	private firstAtRangeEnd(close: Node): boolean {
+		const rebuilt = HYDRATION_REBUILT?.has(close) === true;
+		this.remember((HYDRATION_REBUILT ??= new WeakSet()), close);
+		return !rebuilt;
+	}
+
+	/**
+	 * A reported recovery left the cursor on `node`. When that is the end of the
+	 * server range, the rest of the range is the client's: later claims there
+	 * are part of the same recovery (firstAtRangeEnd).
+	 */
+	private reachedRangeEnd(node: Node | null): void {
+		if (isBlockClose(node)) this.remember((HYDRATION_REBUILT ??= new WeakSet()), node);
 	}
 
 	/**
@@ -20101,7 +20130,7 @@ class HydrationCapability {
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 				);
 			if (template === null) template = resolveLazyTemplate(lazy!);
-			if (!this.staleServerValues) {
+			if (this.firstAtRangeEnd(cursor) && !this.staleServerValues) {
 				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 				if (process.env.NODE_ENV !== 'production')
 					warnHydrationStructuralMismatch(
@@ -20152,8 +20181,10 @@ class HydrationCapability {
 			const parent = domNode(cursor).parentNode!;
 			this.save(parent);
 			if (template === null) template = resolveLazyTemplate(lazy!);
-			// A retry over a node whose replacement never committed already reported it.
-			if (cursor !== this.replaced) {
+			const atRangeEnd = isBlockClose(cursor);
+			// A retry over a node whose replacement never committed already reported
+			// it, and a range end reports once (firstAtRangeEnd).
+			if (cursor !== this.replaced && (!atRangeEnd || this.firstAtRangeEnd(cursor))) {
 				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 				if (process.env.NODE_ENV !== 'production' && loc)
 					warnHydrationStructuralMismatch(
@@ -20162,7 +20193,7 @@ class HydrationCapability {
 						describeHydrationNode(cursor),
 					);
 			}
-			if (isBlockClose(cursor)) return this.freshClone(template);
+			if (atRangeEnd) return this.freshClone(template);
 			// Recovery discards only a node this template renders into. The compiled
 			// mount inserts into its scope's block, which for a lite component is
 			// its lite host rather than CURRENT_BLOCK's parent. A cursor left
@@ -20181,6 +20212,7 @@ class HydrationCapability {
 			// than at its block's end.
 			this.node = getNextSibling(isBlockOpen(cursor) ? this.close(cursor) : cursor);
 			this.replaced = cursor;
+			this.reachedRangeEnd(this.node);
 			// A lite call that found no server range inserts before the node it
 			// found there, which the rebuilt root replaces. A lite block is only that
 			// insertion context, so point it past the node: when the node was its
@@ -20291,6 +20323,7 @@ class HydrationCapability {
 		if (node === end) {
 			this.node = end;
 			removeHydrationRange(cursor, (STAGED_DOM?.view(end!) ?? end!).previousSibling!);
+			this.reachedRangeEnd(end);
 		} else this.discardCursor(cursor);
 		return this.freshClone(template);
 	}
