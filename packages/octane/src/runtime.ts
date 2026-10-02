@@ -35595,31 +35595,30 @@ export function bindSignalChild(
 		const type = typeof value;
 		// An ordinary marker-bounded hole keeps textHoleUpdate's fast path: its
 		// token is the last primitive, and a changed primitive rewrites the slot's
-		// Text node. Objects never become the token, so it is never read later.
+		// Text node. Objects never become the token, so it is never read later. A
+		// pass that already queued this block skips child writes, so its token must
+		// not claim a primitive that never reached the DOM.
 		const primitiveToken =
 			slotKey !== 0 &&
 			!onlyChild &&
 			bindingMarker === undefined &&
-			ownsHost === undefined &&
 			value !== null &&
 			type !== 'object' &&
-			type !== 'function';
-		// A pass that already queued this block skips child writes; its token must
-		// not claim a primitive that never reached the DOM.
-		const skipped = CURRENT_BLOCK?.pending === true && !CURRENT_BLOCK.crossRenderUpdate;
-		if (primitiveToken && prior === null && !skipped) {
+			type !== 'function' &&
+			!(CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate);
+		if (primitiveToken && prior === null) {
 			const state = parentScope.slots[slotKey] as ChildSlot | undefined;
+			const node = state?.text;
 			if (
-				state !== undefined &&
-				state.text !== null &&
-				state.block === null &&
-				state.forSlot === null &&
-				state.hostNode === null &&
-				state.portal === null &&
-				state.implicitSignal === undefined &&
+				node != null &&
+				state!.block === null &&
+				state!.forSlot === null &&
+				state!.hostNode === null &&
+				state!.portal === null &&
+				state!.implicitSignal === undefined &&
 				!dangerouslySetInnerHTMLOwnsChild(domParent, value)
 			) {
-				if (previous !== value) setText(state.text, value === true ? '' : value);
+				if (previous !== value) setText(node, value === true ? '' : value);
 				return value;
 			}
 		}
@@ -35637,7 +35636,7 @@ export function bindSignalChild(
 			if (WIP_CAPTURE === null) finish(false);
 			else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
 		}
-		return primitiveToken && !skipped ? value : text;
+		return primitiveToken ? value : text;
 	}
 	if (prior !== null && !prior.disposed && prior.handle === value) {
 		const next = readSignalBinding(value);
