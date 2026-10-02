@@ -21,9 +21,20 @@ export const signalsRuntimeTests = [
 	'packages/octane/tests/hydration/initial-document-signals.test.ts',
 ];
 export const signalsBrowserTests = ['packages/octane/tests/browser/signals*/**/*.test.ts'];
+export const signalsMutationTests = ['packages/octane/tests/mutations/**/*.test.ts'];
 
 export function scopedSignalsProjects(octane, defaultExclude = []) {
 	return [
+		{
+			test: {
+				name: 'octane-signals-mutations',
+				include: signalsMutationTests,
+				environment: 'node',
+				globals: false,
+				testTimeout: 75_000,
+				hookTimeout: 75_000,
+			},
+		},
 		{
 			test: {
 				name: 'octane-signals-node',
@@ -36,7 +47,12 @@ export function scopedSignalsProjects(octane, defaultExclude = []) {
 			test: {
 				name: mode === 'dev' ? 'octane-signals' : `octane-signals-${mode}`,
 				include: signalsRuntimeTests,
-				exclude: [...defaultExclude, ...signalsNodeTests, ...signalsProfileTests],
+				exclude: [
+					...defaultExclude,
+					...signalsNodeTests,
+					...signalsProfileTests,
+					...signalsMutationTests,
+				],
 				environment: 'jsdom',
 				setupFiles: ['packages/octane/tests/_per-test-setup.ts'],
 				globals: false,
