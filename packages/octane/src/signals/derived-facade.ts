@@ -1,5 +1,6 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import { createDeclaredDerivedCell } from './computations.js';
+import { signalDeclarationSequence } from './engine.js';
 import { declarationKey, DerivedDescriptor, descriptorKey, signalOptionsKey } from './facade.js';
 import { runWithSignalOwner } from './owner-context.js';
 import type { DerivedCompute, DerivedOptions, DerivedSignal, SignalOptions } from './types.js';
@@ -15,6 +16,8 @@ export function __derivedAt<T>(
 	const explicit = signalOptionsKey(options);
 	site ??= explicit;
 	const key = declarationKey(site, descriptorKey(site, explicit));
+	// A render that declares this site again may capture new values in compute.
+	const sequence = signalDeclarationSequence(site);
 	return new DerivedDescriptor(
 		key,
 		'derived',
@@ -23,7 +26,7 @@ export function __derivedAt<T>(
 				? (context: Parameters<DerivedCompute<T>>[0]) =>
 						runWithSignalOwner(owner, () => compute(context))
 				: () => runWithSignalOwner(owner, () => (compute as () => ReturnType<DerivedCompute<T>>)());
-			return createDeclaredDerivedCell(owner, key, wrapped, options);
+			return createDeclaredDerivedCell(owner, key, wrapped, options, sequence);
 		},
 		site,
 	);

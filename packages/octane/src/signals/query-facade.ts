@@ -1,5 +1,5 @@
 import { formatClientError } from '../error-codes.client.generated.js';
-import { createResourceCellWith } from './engine.js';
+import { createResourceCellWith, signalDeclarationSequence } from './engine.js';
 import { declarationKey, Descriptor, descriptorKey, signalOptionsKey } from './facade.js';
 import { runWithSignalOwner } from './owner-context.js';
 import { initializeResource, query as createQueryRequest } from './requests.js';
@@ -55,6 +55,8 @@ export function __queryAt<A, T>(
 			options?: QueryOptions,
 		) => (selection: A) => import('./types.js').QueryRequest<T>
 	)(key, load as unknown as (selection: A, context: QueryContext) => unknown, options);
+	// A render that declares this site again may capture new values in select.
+	const sequence = signalDeclarationSequence(site);
 	return new QueryDescriptor(
 		key,
 		'async',
@@ -67,6 +69,8 @@ export function __queryAt<A, T>(
 					return selection === skip ? skip : request(selection);
 				},
 				initializeResource,
+				false,
+				sequence,
 			) as QuerySignal<T>,
 		site,
 	);
