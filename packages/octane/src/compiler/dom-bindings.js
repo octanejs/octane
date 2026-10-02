@@ -1277,18 +1277,27 @@ function literalData(value) {
 	return Array.isArray(value) ? b.array(value.map(literalData)) : b.literal(value);
 }
 
-// Mirrors the runtime's fixed scalar channels. Richer kinds, addressed targets,
+// Mirrors the runtime's fixed scalar channels, plus URLs, whose sanitizer the
+// artifact carries as its `url` capability. Richer kinds, addressed targets,
 // host handoff and grouped projections keep the general fixed-layout adopter.
-const FIXED_SCALAR_CHANNELS = new Set(['attr', 'boolean', 'aria', 'class', 'text']);
+const SCALAR_ADOPTER_CHANNELS = new Set(['attr', 'boolean', 'aria', 'class', 'text', 'url']);
 
 function scalarAdopter(plan) {
 	return !plan.addressed &&
 		!plan.hostHandoff &&
 		plan.styleIndices.length === 0 &&
 		plan.projectionGroups.length === 0 &&
-		plan.bindings.every((binding) => FIXED_SCALAR_CHANNELS.has(binding[1]))
+		plan.bindings.every((binding) => SCALAR_ADOPTER_CHANNELS.has(binding[1]))
 		? '__adoptScalarBindings'
 		: '__adoptBindings';
+}
+
+/** Whether the selected scalar adopter needs the artifact's URL capability. */
+function scalarURL(plan) {
+	return (
+		scalarAdopter(plan) === '__adoptScalarBindings' &&
+		plan.bindings.some((binding) => binding[1] === 'url')
+	);
 }
 
 function scalarProperties(
@@ -1299,6 +1308,7 @@ function scalarProperties(
 	styleFactory = null,
 	controlFactory = null,
 	projectionFactory = null,
+	urlCapability = null,
 ) {
 	return [
 		b.prop('init', b.id('id'), b.literal(plan.id)),
@@ -1327,6 +1337,7 @@ function scalarProperties(
 					b.prop('init', b.id('connectProjection'), projectionFactory),
 				]
 			: []),
+		...(urlCapability ? [b.prop('init', b.id('url'), urlCapability)] : []),
 	];
 }
 
@@ -1533,6 +1544,7 @@ function projectProgram(ast, plan, filename, lexical) {
 		const adopt = allocate('_$adoptBindingProgram');
 		const mount = allocate('_$mountBindingProgram');
 		const adoptScalar = plan.scalar ? allocate('_$adoptScalarBindings') : null;
+		const urlCapability = plan.scalar && scalarURL(plan.scalar) ? allocate('_bindingURL') : null;
 		const signalFactory = plan.signals ? allocate('_bindingSignals') : null;
 		const styleFactory = plan.styles ? allocate('_bindingStyles') : null;
 		const controlFactory = plan.controls ? allocate('_bindingControls') : null;
@@ -1590,6 +1602,7 @@ function projectProgram(ast, plan, filename, lexical) {
 					styleFactory ? b.id(styleFactory) : null,
 					controlFactory ? b.id(controlFactory) : null,
 					projectionFactory ? b.id(projectionFactory) : null,
+					urlCapability ? b.id(urlCapability) : null,
 				),
 			);
 		return {
@@ -1654,7 +1667,13 @@ function projectProgram(ast, plan, filename, lexical) {
 				...(adoptScalar
 					? [
 							inheritHookMemoOrigin(
-								b.imports([[scalarAdopter(plan.scalar), adoptScalar]], 'octane/dom-bindings'),
+								b.imports(
+									[
+										[scalarAdopter(plan.scalar), adoptScalar],
+										...(urlCapability ? [['__bindingURL', urlCapability]] : []),
+									],
+									'octane/dom-bindings',
+								),
 								plan.fn,
 							),
 						]
@@ -1753,9 +1772,13 @@ function projectProgram(ast, plan, filename, lexical) {
 		);
 	}
 	const adopt = lexical.domBindingAllocateName('_$adoptBindings');
+	const urlCapability = scalarURL(plan) ? lexical.domBindingAllocateName('_bindingURL') : null;
 	importNodes.push(
 		inheritHookMemoOrigin(
-			b.imports([[scalarAdopter(plan), adopt]], 'octane/dom-bindings'),
+			b.imports(
+				[[scalarAdopter(plan), adopt], ...(urlCapability ? [['__bindingURL', urlCapability]] : [])],
+				'octane/dom-bindings',
+			),
 			plan.fn,
 		),
 	);
@@ -1775,6 +1798,7 @@ function projectProgram(ast, plan, filename, lexical) {
 							styleFactory ? b.id(styleFactory) : null,
 							controlFactory ? b.id(controlFactory) : null,
 							projectionFactory ? b.id(projectionFactory) : null,
+							urlCapability ? b.id(urlCapability) : null,
 						),
 					]),
 				),
