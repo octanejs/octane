@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act, flushSync, hydrateRoot, lazy } from '../../src/index.js';
 import type { ComponentBody } from '../../src/index.js';
+import { condition, load } from 'octane/hydration';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
@@ -123,8 +124,15 @@ describe.each([
 		expect(warnings()).toEqual(dev ? [report()] : []);
 	});
 
-	it('reports the list once when a pending sibling replays the hydration attempt', async () => {
-		container.innerHTML = ServerRT.renderToString(server.ListThenChild, {
+	it.each([
+		{ attempt: 'the root', name: 'ListThenChild', tail: '<i><s>x</s><s>y</s>ok</i><u>tail</u>' },
+		{
+			attempt: 'a @try boundary',
+			name: 'TryListThenChild',
+			tail: '<section><i><s>x</s><s>y</s>ok</i><u>tail</u></section>',
+		},
+	])('reports the list once when a pending sibling replays $attempt', async ({ name, tail }) => {
+		container.innerHTML = ServerRT.renderToString(server[name], {
 			items: [],
 			Child: server.Tail,
 		}).html;
@@ -137,18 +145,41 @@ describe.each([
 		await act(() => {
 			root = hydrateRoot(
 				container,
-				client.ListThenChild,
+				client[name],
 				{ items: ['x', 'y'], Child },
 				{ onRecoverableError: (error: unknown) => recoverable.push((error as Error).message) },
 			);
 		});
 		await act(async () => deliver({ default: client.Tail }));
 
-		expect(markup(container.firstElementChild!)).toBe('<i><s>x</s><s>y</s>ok</i><u>tail</u>');
+		expect(markup(container.firstElementChild!)).toBe(tail);
 		expect(container.querySelector('i')).toBe(host);
 		expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
 		expect(warnings()).toEqual(
-			dev ? [mismatch(forLoc('function ListThenChild('), 'a populated list', 'an empty list')] : [],
+			dev ? [mismatch(forLoc(`function ${name}(`), 'a populated list', 'an empty list')] : [],
 		);
+	});
+
+	// Captures that changed before a dormant boundary activated legitimately
+	// differ from the server's: rebuild the list, but report nothing.
+	it('rebuilds a dormant boundary whose list filled before activation without reporting', async () => {
+		const serverProps = { items: [] as string[], when: condition(false) };
+		container.innerHTML = ServerRT.renderToString(server.DormantList, serverProps).html;
+		const host = container.querySelector('i')!;
+		const recoverable: string[] = [];
+		const active = hydrateRoot(container, client.DormantList, serverProps, {
+			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
+		});
+		root = active;
+		flushSync(() => {});
+		expect(markup(host.parentElement!)).toBe('<i>ok</i>');
+
+		await act(() => active.render(client.DormantList, { items: ['x', 'y'], when: load() }));
+		await act(async () => {});
+
+		expect(container.querySelector('i')).toBe(host);
+		expect(markup(host.parentElement!)).toBe('<i><s>x</s><s>y</s>ok</i>');
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
 	});
 });
