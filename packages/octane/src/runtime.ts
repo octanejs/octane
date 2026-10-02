@@ -20232,15 +20232,18 @@ class HydrationCapability {
 			const atRangeEnd = isBlockClose(cursor);
 			// A retry over a node whose replacement never committed already reported
 			// it, and a range end reports once (firstAtRangeEnd).
-			if (cursor !== this.replaced && (!atRangeEnd || this.firstAtRangeEnd(cursor))) {
-				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
-				if (process.env.NODE_ENV !== 'production' && loc)
-					warnHydrationStructuralMismatch(
-						loc,
-						describeHydrationNode(template),
-						describeHydrationNode(cursor),
-					);
-			}
+			if (
+				cursor !== this.replaced &&
+				(!atRangeEnd || this.firstAtRangeEnd(cursor)) &&
+				this.reportStructural() &&
+				process.env.NODE_ENV !== 'production' &&
+				loc
+			)
+				warnHydrationStructuralMismatch(
+					loc,
+					describeHydrationNode(template),
+					describeHydrationNode(cursor),
+				);
 			if (atRangeEnd) return this.freshClone(template);
 			// Recovery discards only a node this template renders into. The compiled
 			// mount inserts into its scope's block, which for a lite component is
