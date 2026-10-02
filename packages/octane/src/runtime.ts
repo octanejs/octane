@@ -18524,9 +18524,10 @@ let currentHydration: HydrationCapability | null = null;
 let HYDRATION_REBUILT: WeakSet<Node> | null = null;
 
 /**
- * The hosts whose children hydrateOnlyChild rebuilt, for the same reason. They
- * are kept apart because a range's end can be an element, the next sibling a
- * hole inserts before, which must not read as a host that was rebuilt.
+ * The hosts whose children hydrateOnlyChild rebuilt, or a runtime host's child
+ * slot rendered without a server range (reclaimOwnedHost), for the same reason.
+ * They are kept apart because a range's end can be an element, the next sibling
+ * a hole inserts before, which must not read as a host that was rebuilt.
  */
 let HYDRATION_REBUILT_HOSTS: WeakSet<Node> | null = null;
 
@@ -18946,6 +18947,18 @@ class HydrationCapability {
 
 	warnStructural(loc: string | undefined, expected: string, actual: string): void {
 		warnHydrationStructuralMismatch(loc, expected, actual);
+	}
+
+	/**
+	 * Report a structural mismatch that recovery rebuilds on the client, unless
+	 * the captures changed before a dormant boundary activated. Returns whether
+	 * it reported, so callers warn only then. A method, so that bundles which
+	 * never hydrate do not retain the report.
+	 */
+	reportStructural(): boolean {
+		if (this.staleServerValues) return false;
+		noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+		return true;
 	}
 
 	/**
@@ -19815,6 +19828,36 @@ class HydrationCapability {
 		}
 		this.remember((HYDRATION_REBUILT_HOSTS ??= new WeakSet()), el);
 		this.suspend(render);
+	}
+
+	/**
+	 * A child slot's first hydrating render of all of a runtime host's children
+	 * (`el`, which its host body adopted) when the server framed no range there:
+	 * it rendered other children, which the value adopts or replaces from the
+	 * cursor, and the slot mints its own marker in `el`. A suspended attempt
+	 * leaves that content for the next attempt, which adopts the same server
+	 * host. What `el` then holds is the earlier attempt's content, minted
+	 * markers included, whatever node it begins with, and its mismatches are
+	 * already reported. Discard it and return true, so that the value builds as
+	 * a client mount would. Otherwise remember `el` for later attempts.
+	 */
+	reclaimOwnedHost(el: Node): boolean {
+		const rebuilt = HYDRATION_REBUILT_HOSTS?.has(el) === true;
+		if (rebuilt && PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		// A root attempt that rolls back restores the server children.
+		this.save(el);
+		if (!rebuilt) {
+			this.remember((HYDRATION_REBUILT_HOSTS ??= new WeakSet()), el);
+			return false;
+		}
+		let stale = getFirstChild(el);
+		while (stale !== null) {
+			const next = getNextSibling(stale);
+			(STAGED_DOM?.view(el) ?? el).removeChild(stale);
+			stale = next;
+		}
+		this.node = null;
+		return true;
 	}
 
 	/**
@@ -33530,6 +33573,23 @@ function deoptHostChildren(
 	);
 }
 
+// DEV: the source location of a runtime host's block. A createElement host has
+// none of its own, so name the hole of the nearest compiled ancestor whose
+// child slot renders it, or renders the runtime host that contains it.
+function runtimeHostSiteLoc(block: Block): string {
+	for (let child = block, scope = block.parentBlock; scope !== null; scope = scope.parentBlock) {
+		const locs = scope.locs;
+		if (locs !== undefined) {
+			for (const key in locs) {
+				if ((scope.slots[+key] as ChildSlot | undefined)?.block === child)
+					return siteLoc(scope, +key);
+			}
+		}
+		child = scope;
+	}
+	return '';
+}
+
 // Stable render body for a HOST element produced via `createElement` (the de-opt
 // path) whose subtree contains COMPONENT descriptors — e.g. a `.tsx` component that
 // returns `<div className="n"><Node/><Node/></div>` from inside control flow (so the
@@ -33578,13 +33638,14 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 	}
 	if (el === null && hydration !== null && hydration.node !== null) {
 		// STRUCTURAL mismatch: the server rendered something other than this host element at
-		// the cursor (different tag, a component's `<!--[-->…<!--]-->` range, text, …). Warn,
-		// discard the divergent server node/range, advance the cursor, then build the correct
+		// the cursor (different tag, a component's `<!--[-->…<!--]-->` range, text, …). Report
+		// it, discard the divergent server node/range, advance the cursor, then build the correct
 		// element fresh with hydration SUSPENDED for its subtree (so children client-mount
 		// rather than mis-adopt). Recovery runs in dev + prod; the warning is dev-only.
 		hydration.save(block.parentNode);
-		if (process.env.NODE_ENV !== 'production') {
-			const mmLoc = (domNode(hydration.node).parentNode as any)?.__oct_loc;
+		if (hydration.reportStructural() && process.env.NODE_ENV !== 'production') {
+			const mmLoc =
+				(domNode(hydration.node).parentNode as any)?.__oct_loc || runtimeHostSiteLoc(block);
 			if (mmLoc)
 				hydration.warnStructural(mmLoc, `<${String(d.type)}>`, hydration.describe(hydration.node));
 		}
@@ -35115,18 +35176,22 @@ export function childSlot(
 			// `Text` node (no start needed); the component path lazily mints a start
 			// marker when first required. Saves one comment per `{expr}` text hole.
 			start = null;
-			// Hydrating without a server range, as a return slot does. An owned
-			// host's text, such as an only-child hole's, is its owner's to judge.
+			// Hydrating without a server range, as a return slot does. A runtime
+			// host's children (`ownsHost`) adopt or replace the server's from the
+			// cursor, unless an earlier attempt already rendered them there.
 			// A compiled map's rows are the compiler's to frame.
-			if (hydration !== null && ownsHost === undefined)
-				rebuild = hydration.discardServerText(
-					parentScope,
-					slotKey,
-					domParent,
-					anchor ?? null,
-					value,
-					preparedList !== null && compiledMapBody === undefined && mappedFallback !== true,
-				);
+			if (hydration !== null)
+				rebuild =
+					ownsHost === undefined
+						? hydration.discardServerText(
+								parentScope,
+								slotKey,
+								domParent,
+								anchor ?? null,
+								value,
+								preparedList !== null && compiledMapBody === undefined && mappedFallback !== true,
+							)
+						: hydration.reclaimOwnedHost(ownsHost);
 			end = (STAGED_DOM?.view(document) ?? document).createComment('');
 			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(end, anchor ?? null);
 			if (hydration !== null && parentBlock === hydration.rootBlock)
