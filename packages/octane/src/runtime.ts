@@ -553,12 +553,10 @@ type SignalInstanceKey =
 	| string
 	| { parentScope: Scope; invocationSite: string | undefined; key: unknown; hasKey: boolean };
 // Compiled fragment renderers (`_frag$N`) and value-position host descriptors
-// carry this invocation site. They are a representation of their enclosing
-// component's JSX, not authored component invocations: the server renders the
-// same JSX inline, and a `.tsrx` body has no such renderer. Their Blocks add no
-// key segment and share the enclosing owner, so instance keys agree across
-// representations and with SSR. The compiler and runtime.server.ts spell it the
-// same way.
+// carry this invocation site. They represent their enclosing component's JSX,
+// not authored component invocations: the server renders that JSX inline, and a
+// `.tsrx` body has no such renderer. The compiler and runtime.server.ts spell it
+// the same way.
 const RENDERER_INVOCATION_SITE = 'r:';
 // Parent links, root namespaces, and keyed item identities are lifetime-stable.
 // Keep their recipe until a real owner is needed: scalar-only components avoid
@@ -906,38 +904,15 @@ function stampSignalInstanceKey(scope: Scope, key: SignalInstanceKey): void {
 		scope.signalInstanceResolved = key;
 		return;
 	}
-	if (key.invocationSite === RENDERER_INVOCATION_SITE) {
-		stampRendererSignalInstance(scope, key.parentScope);
-		return;
-	}
-	scope.signalInstanceParent = key.parentScope;
-	scope.signalInstanceSite = key.invocationSite;
-	scope.signalInstanceValue = key.key;
-	scope.signalInstanceHasKey = key.hasKey;
-	scope.signalInstanceResolved = undefined;
-}
-
-// A renderer stays unstamped, so it never resolves a key of its own. Its parent
-// scope rides the otherwise unused value field: keys below it continue from
-// there, which may be a stamped lite scope its Block chain would skip.
-function stampRendererSignalInstance(scope: Scope, parentScope: Scope): void {
-	scope.signalInstanceParent = null;
-	scope.signalInstanceSite = RENDERER_INVOCATION_SITE;
-	scope.signalInstanceValue = parentScope;
-	scope.signalInstanceHasKey = false;
-	scope.signalInstanceResolved = undefined;
-}
-
-function rendererSignalParent(scope: Scope): Scope | null {
-	return scope.signalInstanceParent === null &&
-		scope.signalInstanceSite === RENDERER_INVOCATION_SITE
-		? (scope.signalInstanceValue as Scope)
-		: null;
-}
-
-// A stamped scope's key, or the scope a renderer was stamped below.
-function signalInstanceLink(scope: Scope): string | Scope | undefined {
-	return resolveSignalInstanceKey(scope) ?? rendererSignalParent(scope) ?? undefined;
+	// A renderer adds no key segment: it carries its parent's identity, and
+	// stays unstamped below an unstamped parent so keys walk on through it.
+	const parent = key.parentScope;
+	const renderer = key.invocationSite === RENDERER_INVOCATION_SITE;
+	scope.signalInstanceParent = renderer ? parent.signalInstanceParent : parent;
+	scope.signalInstanceSite = renderer ? parent.signalInstanceSite : key.invocationSite;
+	scope.signalInstanceValue = renderer ? parent.signalInstanceValue : key.key;
+	scope.signalInstanceHasKey = renderer ? parent.signalInstanceHasKey : key.hasKey;
+	scope.signalInstanceResolved = renderer ? parent.signalInstanceResolved : undefined;
 }
 
 function structuralSignalInstanceKey(
@@ -946,40 +921,28 @@ function structuralSignalInstanceKey(
 	key: unknown,
 	hasKey: boolean,
 ): string {
-	let base: string | undefined;
+	let base = resolveSignalInstanceKey(parentScope);
 	const itemTokens: SignalIdentityToken[] = [];
 	const visited = new Set<Block>();
-	let from: Scope | null = parentScope;
-	while (from !== null) {
-		let link = signalInstanceLink(from);
-		let scope: Scope | null = from;
-		while (link === undefined && scope !== null) {
-			const block = scope.block;
-			if (!visited.has(block)) {
-				visited.add(block);
-				if (block.forSlot !== null)
-					itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
-				link = signalInstanceLink(block);
-			}
-			scope = scope.parent;
-			if (link === undefined && scope !== null) link = signalInstanceLink(scope);
+	let scope: Scope | null = parentScope;
+	while (base === undefined && scope !== null) {
+		const block = scope.block;
+		if (!visited.has(block)) {
+			visited.add(block);
+			if (block.forSlot !== null) itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
+			base = resolveSignalInstanceKey(block);
 		}
-		let block: Block | null = from.block;
-		while (link === undefined && block !== null) {
-			if (!visited.has(block)) {
-				visited.add(block);
-				if (block.forSlot !== null)
-					itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
-			}
-			link = signalInstanceLink(block);
-			block = block.parentBlock;
+		scope = scope.parent;
+		if (base === undefined && scope !== null) base = resolveSignalInstanceKey(scope);
+	}
+	let block: Block | null = parentScope.block;
+	while (base === undefined && block !== null) {
+		if (!visited.has(block)) {
+			visited.add(block);
+			if (block.forSlot !== null) itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
 		}
-		if (typeof link === 'string') {
-			base = link;
-			break;
-		}
-		// Item keys between here and a renderer belong to the next authored level.
-		from = link ?? null;
+		base = resolveSignalInstanceKey(block);
+		block = block.parentBlock;
 	}
 	base ??= rootSignalInstanceKey(parentScope.block.idState);
 	itemTokens.reverse();
@@ -1015,10 +978,6 @@ function stampSignalInstance(
 	hasKey: boolean,
 ): void {
 	if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
-		if (invocationSite === RENDERER_INVOCATION_SITE) {
-			stampRendererSignalInstance(scope, parentScope);
-			return;
-		}
 		scope.signalInstanceParent = parentScope;
 		scope.signalInstanceSite = invocationSite;
 		scope.signalInstanceValue = key;
@@ -1037,15 +996,6 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 	}
 	if (documentOwner === undefined) return;
 	let owner = SCOPE_SIGNAL_OWNERS.get(scope);
-	if (owner === undefined || owner === false) {
-		// A renderer evaluates its enclosing component's JSX, so it shares that
-		// owner. Like a row's host fragment, it neither caches nor retires it.
-		const enclosing = rendererSignalParent(scope);
-		if (enclosing !== null) {
-			if (owner === undefined) SCOPE_SIGNAL_OWNERS.set(scope, false);
-			return scopeSignalOwner(enclosing);
-		}
-	}
 	if (
 		(owner === undefined || owner === false) &&
 		scope.block.forSlot === null &&
@@ -1064,7 +1014,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 				SCOPE_SIGNAL_OWNERS.set(scope, false);
 				return scopeSignalOwner(parent);
 			}
-			parent = rendererSignalParent(parent) ?? parent.parent ?? parent.block.parentBlock;
+			parent = parent.parent ?? parent.block.parentBlock;
 		}
 	}
 	const retired = owner === null;
