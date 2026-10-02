@@ -19067,6 +19067,17 @@ class HydrationCapability {
 		return this.freshNodes.has(node);
 	}
 
+	/**
+	 * Whether a slot at `anchor` in `parent` sits inside a client-built
+	 * replacement. Such a slot has no server range of its own, while the cursor
+	 * still points at the server siblings that follow the replacement, so the
+	 * slot must mount as client DOM. Callers ask only once no server range was
+	 * found, which keeps the lookup off the adoption path.
+	 */
+	inFreshRange(anchor: Node | null | undefined, parent: Node): boolean {
+		return (anchor != null && this.freshNodes.has(anchor)) || this.freshNodes.has(parent);
+	}
+
 	/** Keep a client-owned root anchor alive while stale server siblings are swept. */
 	protectRootAnchor(node: Node): void {
 		this.rootCleanupBoundary = node;
@@ -37111,6 +37122,10 @@ export function errorBlock(
 		} else if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
+		} else if (hydration !== null && hydration.inFreshRange(anchor, domParent)) {
+			return hydration.suspend(() =>
+				errorBlock(parentScope, slotKey, domParent, tryBody, catchBody, anchor, env),
+			);
 		} else {
 			start = (STAGED_DOM?.view(document) ?? document).createComment('try');
 			end = (STAGED_DOM?.view(document) ?? document).createComment('/try');
@@ -37385,6 +37400,20 @@ export function tryBlock(
 		} else if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
+		} else if (hydration !== null && hydration.inFreshRange(anchor, domParent)) {
+			return hydration.suspend(() =>
+				tryBlock(
+					parentScope,
+					slotKey,
+					domParent,
+					tryBody,
+					catchBody,
+					pendingBody,
+					anchor,
+					env,
+					propagateSuspense,
+				),
+			);
 		} else {
 			start = (STAGED_DOM?.view(document) ?? document).createComment('try');
 			end = (STAGED_DOM?.view(document) ?? document).createComment('/try');
@@ -41285,6 +41314,11 @@ export function ifBlock(
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
+		} else if (hydration !== null && !passthrough && hydration.inFreshRange(anchor, domParent)) {
+			hydration.suspend(() =>
+				ifBlock(parentScope, slotKey, domParent, cond, thenBody, elseBody, anchor, env),
+			);
+			return;
 		}
 		state = {
 			__kind: 'ifBlockSlot',
@@ -41772,6 +41806,11 @@ export function activityBlock(
 		if (open !== null) {
 			bStart = open;
 			bEnd = hydration!.close(open);
+		} else if (hydration !== null && hydration.inFreshRange(anchor, domParent)) {
+			hydration.suspend(() =>
+				activityBlock(parentScope, slotKey, domParent, mode, body, anchor, env),
+			);
+			return;
 		} else {
 			bStart = (STAGED_DOM?.view(document) ?? document).createComment('activity');
 			bEnd = (STAGED_DOM?.view(document) ?? document).createComment('/activity');
@@ -42224,6 +42263,11 @@ export function switchBlock(
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
+		} else if (hydration !== null && !passthrough && hydration.inFreshRange(anchor, domParent)) {
+			hydration.suspend(() =>
+				switchBlock(parentScope, slotKey, domParent, discriminant, cases, defaultBody, anchor, env),
+			);
+			return;
 		}
 		state = {
 			__kind: 'switchBlockSlot',
@@ -42358,15 +42402,38 @@ export function forBlock<T>(
 			start = anchor as Comment;
 			end = hydration.close(anchor as Node);
 			hydration.node = getNextSibling(start);
-		} else if (hydration !== null && hydration.isOpen(hydration.node)) {
+		} else if (
+			hydration !== null &&
+			hydration.isOpen(hydration.node) &&
+			(STAGED_DOM?.view(hydration.node) ?? hydration.node).parentNode === domParent
+		) {
 			// Hydration (sole hole, no `<!>` anchor): the @for is the only root of its
 			// owning body (e.g. a `@try { @for }` arm or a component whose body is a
 			// bare @for), so the compiler emitted no anchor — but mountTry/renderBlock
 			// parked the CURSOR on the server's `<!--[-->`. Adopt from the cursor, the
-			// same way childSlot does for a sole renderable hole.
+			// same way childSlot does for a sole renderable hole. A cursor outside
+			// `domParent` belongs to another range (resolveOpen applies the same rule).
 			start = hydration.node as Comment;
 			end = hydration.close(hydration.node as Node);
 			hydration.node = getNextSibling(start);
+		} else if (hydration !== null && hydration.inFreshRange(anchor, domParent)) {
+			hydration.suspend(() =>
+				forBlock(
+					parentScope,
+					slotKey,
+					domParent,
+					items,
+					getKey,
+					itemBody,
+					flags,
+					deps,
+					emptyBody,
+					anchor,
+					ownEnd,
+					signalSite,
+				),
+			);
+			return;
 		} else {
 			start = (STAGED_DOM?.view(document) ?? document).createComment('for');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
