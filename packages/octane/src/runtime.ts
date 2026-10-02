@@ -32103,9 +32103,10 @@ function componentSlotImpl(
 				// adopted the server node at the cursor in place, so the client-mount
 				// before/after probe cannot observe an insertion. Stamp the adopted
 				// cursor itself as the block boundary; a later return-shape switch can
-				// then unmount that host normally. A render that threw keeps this stamp.
-				// A closing marker bounds the enclosing range: a root is never adopted
-				// from it.
+				// then unmount that host normally. A render that threw keeps this stamp,
+				// unless it threw after rebuilding over that node, which its root
+				// replaces on commit. A closing marker bounds the enclosing range: a
+				// root is never adopted from it.
 				const rebuilt =
 					cursorBefore !== undefined ? hydration!.freshAfter(cursorBefore, domParent) : null;
 				const last =
@@ -32118,7 +32119,8 @@ function componentSlotImpl(
 					rebuilt === null &&
 					hydrationCursor !== null &&
 					(STAGED_DOM?.view(hydrationCursor) ?? hydrationCursor).parentNode === domParent &&
-					!hydration!.isClose(hydrationCursor)
+					!hydration!.isClose(hydrationCursor) &&
+					!hydration!.replaces(hydrationCursor)
 				) {
 					b.startMarker = hydrationCursor;
 					b.endMarker = hydrationCursor;
