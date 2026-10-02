@@ -20164,15 +20164,17 @@ class HydrationCapability {
 			this.save(parent);
 			if (template === null) template = resolveLazyTemplate(lazy!);
 			// A retry over a node whose replacement never committed already reported it.
-			if (cursor !== this.replaced) {
-				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
-				if (process.env.NODE_ENV !== 'production' && loc)
-					warnHydrationStructuralMismatch(
-						loc,
-						describeHydrationNode(template),
-						describeHydrationNode(cursor),
-					);
-			}
+			if (
+				cursor !== this.replaced &&
+				this.reportStructural() &&
+				process.env.NODE_ENV !== 'production' &&
+				loc
+			)
+				warnHydrationStructuralMismatch(
+					loc,
+					describeHydrationNode(template),
+					describeHydrationNode(cursor),
+				);
 			if (isBlockClose(cursor)) return this.freshClone(template);
 			// Recovery discards only a node this block renders into. A cursor left
 			// outside that parent (an earlier claim ran off the end of its host) is
