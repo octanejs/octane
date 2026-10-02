@@ -172,6 +172,19 @@ export function CachedValuePositionSignalRoundTrip(props: { label$: SignalHandle
 	</section>
 }
 
+const valuePositionRawRows: ValuePositionRow[] = [
+	{ id: 1, label: 'first' },
+	{ id: 2, label: 'second' },
+];
+
+export function CachedValuePositionSpreadHost(props: { attrs: Record<string, unknown> }) @{
+	const stableRows = useMemo(() => buildValuePositionRows(valuePositionRawRows), []);
+	const output = selectValuePositionOutput(stableRows, true);
+	<ValuePositionTheme value="spread">
+		<div id="memo-value-spread-host" {...props.attrs}>{output}</div>
+	</ValuePositionTheme>
+}
+
 export function EscapedValuePositionRows() @{
 	const [items] = useState<ValuePositionRow[]>([
 		{ id: 1, label: 'first' },

@@ -27537,11 +27537,13 @@ function planJsx(
 							),
 						),
 					);
-				if (cc.onlyChildText && cc.autoMemoValue === true) {
+				if (cc.onlyChildText && cc.autoMemoValue === true && !cc.potentialDangerouslySetInnerHTML) {
 					// A calculated value can still hold a signal handle, so it keeps the
 					// signal-capable binding. Only an unchanged compiler-owned plain data
 					// array may skip it, exactly as on the ordinary only-child path below;
 					// every other value fails compilerCacheArray and rebinds each render.
+					// A host that may receive raw HTML never skips it: the binding is
+					// where children and dangerouslySetInnerHTML are kept exclusive.
 					const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
 					const update = () => b.block([bindChild(V()), b.stmt(b.assignment('=', chp(), V()))]);
 					ctx.runtimeNeeded.add('compilerCacheArray');

@@ -10,6 +10,7 @@ import {
 	CachedValuePositionMemoContext,
 	CachedValuePositionRoundTrip,
 	CachedValuePositionSignalRoundTrip,
+	CachedValuePositionSpreadHost,
 	CachedValuePositionSuspense,
 	CachedValuePositionTransition,
 	drainValuePositionActivityEffects,
@@ -137,6 +138,23 @@ describe('cached value-position children', () => {
 		} finally {
 			root.unmount();
 			scope.dispose();
+		}
+	});
+
+	it('rejects raw HTML that a host spread adds beside unchanged cached rows', () => {
+		const root = mount(CachedValuePositionSpreadHost, { attrs: { title: 'rows' } });
+		try {
+			expect(root.findAll('.memo-value-row')).toHaveLength(2);
+			root.update(CachedValuePositionSpreadHost, { attrs: { title: 'still rows' } });
+			expect(root.find('#memo-value-spread-host').getAttribute('title')).toBe('still rows');
+			expect(root.findAll('.memo-value-row')).toHaveLength(2);
+			expect(() =>
+				root.update(CachedValuePositionSpreadHost, {
+					attrs: { dangerouslySetInnerHTML: { __html: '<b>raw</b>' } },
+				}),
+			).toThrow(/dangerouslySetInnerHTML/);
+		} finally {
+			root.unmount();
 		}
 	});
 
