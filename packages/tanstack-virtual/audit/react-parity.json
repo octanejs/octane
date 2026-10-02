@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "bun@1.4.2",
       "lockfile": "bun.lock",
-      "lockfileSha256": "aa404a0a6304023d5005ee6786e6ba3ddfe18df0fb9fae108f2a8be3aa95b699"
+      "lockfileSha256": "7434c4232afc09c22dc2c870a1b0e23193093331427ea9635752fd7cfc6fdd27"
     }
   },
   "lanes": [
@@ -157,7 +157,7 @@
         {
           "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "23bfcd3ad08ac13b98aa002a8c55fb05f986d98096f557f716c9124e1df2da65"
+          "sha256": "0b5095c65106282731bc6ce6c7d25a7d9ab5a4bc859eef06241ae7624c9c4dc4"
         },
         {
           "path": "packages/tanstack-virtual/audit/upstream.lock.json",
@@ -332,7 +332,7 @@
         {
           "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "23bfcd3ad08ac13b98aa002a8c55fb05f986d98096f557f716c9124e1df2da65"
+          "sha256": "0b5095c65106282731bc6ce6c7d25a7d9ab5a4bc859eef06241ae7624c9c4dc4"
         },
         {
           "path": "packages/tanstack-virtual/audit/upstream.lock.json",

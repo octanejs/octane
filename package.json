@@ -682,6 +682,7 @@
     "@solid-primitives/resize-observer>solid-js": "1.9.14"
   },
   "patchedDependencies": {
+    "@tsrx/core@0.4.0": "patches/@tsrx__core@0.4.0.patch",
     "@tsrx/prettier-plugin@0.4.10": "patches/@tsrx__prettier-plugin@0.4.10.patch",
     "@vitest/browser@4.1.10": "patches/@vitest__browser@4.1.10.patch",
     "@vitest/mocker@4.1.10": "patches/@vitest__mocker@4.1.10.patch"

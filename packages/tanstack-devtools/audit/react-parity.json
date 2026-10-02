@@ -43,7 +43,7 @@
       "arch": "any",
       "packageManager": "bun@1.4.2",
       "lockfile": "bun.lock",
-      "lockfileSha256": "aa404a0a6304023d5005ee6786e6ba3ddfe18df0fb9fae108f2a8be3aa95b699"
+      "lockfileSha256": "7434c4232afc09c22dc2c870a1b0e23193093331427ea9635752fd7cfc6fdd27"
     }
   },
   "lanes": [

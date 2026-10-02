@@ -1669,7 +1669,9 @@ describe('Pull request benchmark report', () => {
 		assert.ok(prBenchWorkflow.includes('for round in base:1 head:1 head:2 base:2; do'));
 		assert.ok(prBenchWorkflow.includes('TARGETS: ${{ env.JS_FRAMEWORK_TARGETS }}'));
 		assert.ok(
-			prBenchWorkflow.includes('--results-dir="$RESULTS/$side-js-${round##*:}" js-framework'),
+			prBenchWorkflow.includes(
+				'--results-dir="$RESULTS/$side-js-${round##*:}" --servers=octane-tsrx-jsbench,octane-jsx-jsbench js-framework',
+			),
 		);
 		assert.ok(prBenchWorkflow.includes('--base="$RESULTS/base" --head="$RESULTS/head" --rounds=2'));
 		assert.match(packageJson.scripts['ci:workflow:test'], /benchmarks\/pr-report\.test\.mjs/);
