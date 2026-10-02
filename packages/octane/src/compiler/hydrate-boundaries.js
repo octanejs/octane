@@ -84,8 +84,8 @@ function privateContextCaptureBoundary(boundary) {
 	});
 }
 
-function originalSplitContextProofs(analysis, moduleMovePlan) {
-	const contexts = findPrivateCompiledContextProofs(analysis.ast);
+function originalSplitContextProofs(analysis, moduleMovePlan, isDescriptorChildrenImport) {
+	const contexts = findPrivateCompiledContextProofs(analysis.ast, isDescriptorChildrenImport);
 	if (contexts.size === 0) return contexts;
 	const captured = new Set();
 	for (const boundary of analysis.boundaries) {
@@ -980,6 +980,7 @@ export function analyzeHydrateBoundaries(source, filename = 'unknown.tsrx', pars
 		if (node.type === 'CatchClause') {
 			const inner = new Set(shadowed);
 			addRelevantBindings(node.param, inner, relevantBindings);
+			addRelevantBindings(node.resetParam, inner, relevantBindings);
 			walk(node.body, inner, parentBoundary);
 			return;
 		}
@@ -1006,13 +1007,25 @@ export function analyzeHydrateBoundaries(source, filename = 'unknown.tsrx', pars
 					addRelevantBindings(item.id, inner, relevantBindings);
 				}
 			}
+			addRelevantBindings(node.index, inner, relevantBindings);
 			walk(node.right, shadowed, parentBoundary);
 			walk(declaration, inner, parentBoundary);
 			walk(node.test, inner, parentBoundary);
 			walk(node.update, inner, parentBoundary);
 			walk(node.key, inner, parentBoundary);
 			walk(node.body, inner, parentBoundary);
-			walk(node.empty, inner, parentBoundary);
+			walk(node.empty, shadowed, parentBoundary);
+			return;
+		}
+
+		if (node.type === 'JSXSwitchExpression') {
+			walk(node.discriminant, shadowed, parentBoundary);
+			for (const branch of node.cases ?? []) {
+				walk(branch.test, shadowed, parentBoundary);
+				const inner = new Set(shadowed);
+				addRelevantDirectBindings(branch.consequent, inner, relevantBindings);
+				walk(branch.consequent, inner, parentBoundary);
+			}
 			return;
 		}
 
@@ -1187,6 +1200,7 @@ function collectCaptures(
 		if (node.type === 'CatchClause') {
 			const bindings = new Set();
 			collectBindingNames(node.param, bindings);
+			collectBindingNames(node.resetParam, bindings);
 			scopes.push(bindings);
 			visitPatternDefaults(node.param);
 			visit(node.body);
@@ -1204,6 +1218,7 @@ function collectCaptures(
 			if (declaration?.type === 'VariableDeclaration') {
 				for (const item of declaration.declarations ?? []) collectBindingNames(item.id, bindings);
 			}
+			collectBindingNames(node.index, bindings);
 			visit(node.right);
 			scopes.push(bindings);
 			if (declaration?.type === 'VariableDeclaration') {
@@ -1213,8 +1228,31 @@ function collectCaptures(
 			visit(node.update);
 			visit(node.key);
 			visit(node.body);
-			visit(node.empty);
 			scopes.pop();
+			// `@empty` renders without a row, so it reads the enclosing scope.
+			visit(node.empty);
+			return;
+		}
+		if (node.type === 'SwitchStatement') {
+			visit(node.discriminant);
+			const bindings = new Set();
+			for (const branch of node.cases ?? []) {
+				for (const binding of directScopeBindings(branch.consequent)) bindings.add(binding);
+			}
+			scopes.push(bindings);
+			visit(node.cases);
+			scopes.pop();
+			return;
+		}
+		if (node.type === 'JSXSwitchExpression') {
+			// Unlike a JS `switch`, each template arm is its own block scope.
+			visit(node.discriminant);
+			for (const branch of node.cases ?? []) {
+				visit(branch.test);
+				scopes.push(directScopeBindings(branch.consequent));
+				visit(branch.consequent);
+				scopes.pop();
+			}
 			return;
 		}
 		if (node.type === 'VariableDeclarator') {
@@ -2264,7 +2302,13 @@ export function hydrateBoundaryPathFromId(id) {
  * split child. Server modules deliberately bypass this pass and retain their
  * real children.
  */
-export function prepareHydrateBoundaries(source, filename, boundaryPath = null, parsedAst = null) {
+export function prepareHydrateBoundaries(
+	source,
+	filename,
+	boundaryPath = null,
+	parsedAst = null,
+	isDescriptorChildrenImport,
+) {
 	if (!source.includes('Hydrate') || !source.includes('octane')) {
 		if (boundaryPath === null) return null;
 		throw extractionError(
@@ -2291,7 +2335,7 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null, 
 	}
 	const request = sameSourceRequest(filename);
 	const moduleMovePlan = createModuleMovePlanAst(analysis, request);
-	const contexts = originalSplitContextProofs(analysis, moduleMovePlan);
+	const contexts = originalSplitContextProofs(analysis, moduleMovePlan, isDescriptorChildrenImport);
 	const captureBindings = new Map();
 	const independentWidgets = independentWidgetMetadata(analysis, filename, moduleMovePlan);
 	let independentIndex = 0;

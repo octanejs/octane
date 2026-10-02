@@ -11,8 +11,8 @@ import {
 } from './binding-surface-policy.mjs';
 import { createEvidenceMatrix, inspectShippedSources } from './react-port/evidence-lib.mjs';
 
-function fixture(t) {
-	const root = mkdtempSync(path.join(tmpdir(), 'binding-surfaces-'));
+function fixture(t, prefix = 'binding-surfaces-') {
+	const root = mkdtempSync(path.join(tmpdir(), prefix));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	const write = (file, value) => {
 		mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
@@ -58,6 +58,17 @@ test('observed dependency and hook exports keep focused evidence without engine 
 	assert.equal(policy.requiresLifecycleEvidence, true);
 	assert.equal(requiresUpstreamEvidence(policy), false);
 	assert.deepEqual(scopeUpstreamInventory(policy, [{ path: 'tests/engine.test.ts' }]), []);
+});
+
+test('adapter lifecycle references survive native paths with spaces', (t) => {
+	const { root, write } = fixture(t, 'binding surfaces Ω-');
+	write(
+		'src/hook.ts',
+		"import { useEffect as effect } from 'octane'; export function useEngine() { effect(() => () => {}); }\n",
+	);
+	const policy = readBindingSurfacePolicy(root);
+	assert.equal(policy.valid, true, policy.issues.join('\n'));
+	assert.equal(policy.requiresLifecycleEvidence, true);
 });
 
 test('default expression adapters are observed through named re-exports', (t) => {

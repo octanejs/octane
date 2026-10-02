@@ -21,7 +21,13 @@ import {
 } from '../../src/signals/index.js';
 // Compile-tooling setup is separate from the behavior checks. Cold scenarios
 // still load a fresh runtime graph and fixture helper after resetModules().
+// Every module those scenarios import is loaded once here, during collection:
+// a module's first load waits on the shared Vite transform queue, which a
+// loaded run can stall for seconds inside the first scenario's test timeout.
 import '../_server-fixture.js';
+import '../_server-stream.js';
+import '../_fixtures/signals-async-controls.js';
+import '../../src/hydration/streamed-signals.js';
 
 function currentInstanceKey(): string {
 	return (currentSignalOwner() as { instanceKey?: string } | null)?.instanceKey ?? 'missing';

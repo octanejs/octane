@@ -7,7 +7,10 @@ import {
 	observeHydrationReplays,
 	type HydrationReplayRecord,
 } from '../../hydration/_hydration-interaction-event-matrix.js';
-import { DeferredHydrationEventReplay } from '../../hydration/_fixtures/deferred-hydration-event-replay.tsrx';
+import {
+	DeferredHydrationEventReplay,
+	DeferredHydrationPressLifecycle,
+} from '../../hydration/_fixtures/deferred-hydration-event-replay.tsrx';
 import { ActivationSuspendingEditorHydration } from '../../hydration/_fixtures/deferred-hydration-contract.tsrx';
 
 type OriginalEventOutcome = {
@@ -28,6 +31,7 @@ type BrowserEditorEvent = {
 	type: string;
 	constructorName: string;
 	isTrusted: boolean;
+	timeStamp: number;
 	data: string | null;
 	inputType: string | null;
 	isComposing: boolean | null;
@@ -45,12 +49,48 @@ type BrowserEditorState = {
 	handledEvents: BrowserEditorEvent[];
 };
 
+type BrowserPressEvent = {
+	type: string;
+	targetId: string | null;
+	isTrusted: boolean;
+	defaultPrevented: boolean;
+	pointerId: number;
+	pointerType: string;
+	clientX: number;
+	clientY: number;
+};
+
+type BrowserPressState = {
+	onHydratedCount: number;
+	originals: BrowserPressEvent[];
+	propagated: string[];
+	replays: BrowserPressEvent[];
+	scrollY: number;
+};
+
+const PRESS_EVENTS = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] as const;
+
+function pressEvent(event: Event): BrowserPressEvent {
+	const pointer = event as PointerEvent;
+	return {
+		type: pointer.type,
+		targetId: (pointer.target as Element | null)?.id ?? null,
+		isTrusted: pointer.isTrusted,
+		defaultPrevented: pointer.defaultPrevented,
+		pointerId: pointer.pointerId,
+		pointerType: pointer.pointerType,
+		clientX: Math.round(pointer.clientX),
+		clientY: Math.round(pointer.clientY),
+	};
+}
+
 function editorEvent(event: Event): BrowserEditorEvent {
 	const input = event as InputEvent;
 	return {
 		type: event.type,
 		constructorName: event.constructor.name,
 		isTrusted: event.isTrusted,
+		timeStamp: event.timeStamp,
 		data: typeof input.data === 'string' ? input.data : null,
 		inputType: typeof input.inputType === 'string' ? input.inputType : null,
 		isComposing: typeof input.isComposing === 'boolean' ? input.isComposing : null,
@@ -87,6 +127,31 @@ for (const eventName of [
 		},
 		true,
 	);
+}
+
+// The press boundary stays without a client root until a test hydrates it, so
+// trusted input exercises the capture installed before hydrateRoot(). Window
+// capture sees each trusted original before Octane's document capture does;
+// the document bubble listener sees only the originals capture left alone.
+const pressContainer = document.querySelector('#press-root')!;
+const pressOriginals: Event[] = [];
+const pressPropagated: string[] = [];
+const pressReplays: BrowserPressEvent[] = [];
+for (const eventName of PRESS_EVENTS) {
+	window.addEventListener(
+		eventName,
+		(event) => {
+			if (event.isTrusted && pressContainer.contains(event.target as Node)) {
+				pressOriginals.push(event);
+			}
+		},
+		true,
+	);
+	document.addEventListener(eventName, (event) => {
+		if (event.isTrusted && pressContainer.contains(event.target as Node)) {
+			pressPropagated.push(event.type);
+		}
+	});
 }
 
 initializeHydrationEventCapture(document);
@@ -154,6 +219,39 @@ if (editorMode !== null) {
 	};
 }
 
+let pressRoot: ReturnType<typeof hydrateRoot> | undefined;
+let onPressHydratedCount = 0;
+window.__deferredHydrationPress = {
+	hydrate() {
+		pressRoot = hydrateRoot(pressContainer, DeferredHydrationPressLifecycle, {
+			when: interaction({ events: PRESS_EVENTS }),
+			onHydrated() {
+				onPressHydratedCount++;
+				for (const target of pressContainer.querySelectorAll('button')) {
+					for (const eventName of PRESS_EVENTS) {
+						target.addEventListener(eventName, (event) => {
+							pressReplays.push(pressEvent(event));
+						});
+					}
+				}
+			},
+		});
+		flushSync(() => {});
+	},
+	state() {
+		return {
+			onHydratedCount: onPressHydratedCount,
+			originals: pressOriginals.map(pressEvent),
+			propagated: pressPropagated.slice(),
+			replays: pressReplays.map((event) => ({ ...event })),
+			scrollY: Math.round(window.scrollY),
+		};
+	},
+	unmount() {
+		pressRoot?.unmount();
+	},
+};
+
 function state(): BrowserReplayState {
 	return {
 		hash: location.hash,
@@ -181,6 +279,11 @@ declare global {
 		__deferredHydrationEditor?: {
 			resolve(): void;
 			state(): BrowserEditorState;
+			unmount(): void;
+		};
+		__deferredHydrationPress: {
+			hydrate(): void;
+			state(): BrowserPressState;
 			unmount(): void;
 		};
 	}

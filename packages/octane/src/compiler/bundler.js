@@ -10,6 +10,7 @@
 // Namespace imports of node builtins — same browser-evaluation contract as
 // vite.js: keep `octane/compiler`'s pure `compile` entry loadable in
 // browser dev servers, where these resolve to an externalized shim.
+import * as nodeCrypto from 'node:crypto';
 import * as nodeFs from 'node:fs';
 import * as nodeModule from 'node:module';
 import * as nodePath from 'node:path';
@@ -34,7 +35,14 @@ import {
 import { findLeadingJsxImportSourcePragma } from './pragma.js';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
 import { formatCompileDiagnostic } from './native-change-diagnostics.js';
-import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
+import {
+	findVoidComponentImports,
+	findVoidRootImports,
+	parseHookSource,
+	slotHooks,
+} from './slot-hooks.js';
+import { parseModule as parseAuthoredModule } from '#octane/compiler-parser';
+import { declaresStrongMode } from './strong-mode.js';
 import { rewriteServerRuntimeRequests } from './runtime-requests.js';
 import { assertNativeReadOptions } from './native-read-diagnostics.js';
 import { findCssModuleImportRequests } from './css-module-imports.js';
@@ -46,6 +54,9 @@ import {
 } from './client-only-server.js';
 
 export { findVoidComponentImports, findVoidRootImports };
+// Tooling that decides module ownership the way `transform` does (the CLI's
+// Strong coverage check) reads the pragma with the same scanner.
+export { findLeadingJsxImportSourcePragma };
 export {
 	isPlainCssModuleId,
 	readCssModuleExports,
@@ -81,9 +92,17 @@ export const OCTANE_RUNTIME_REQUESTS = Object.freeze({
 // Vite can classify descriptor exports from its transform-local preflight AST,
 // but the neutral compiler must never trust caller-supplied facts or a naked
 // authored AST. Only opaque objects registered here can bypass the established
-// string classifier, and each proof is consumed once for its exact source/id.
+// string classifier. An analysis receipt records this compiler's classification
+// of one exact source digest and id, so the authority may reuse it across
+// environments without retaining the source or AST. Each transform still gets a
+// fresh proof, consumed once for its exact source/id.
+const descriptorChildrenExportAnalyses = new WeakMap();
 const descriptorChildrenExportProofs = new WeakMap();
 const descriptorChildrenExportAuthorities = new WeakMap();
+
+function descriptorSourceDigest(source) {
+	return nodeCrypto.createHash('sha256').update(source).digest('base64url');
+}
 
 function consumeDescriptorChildrenExportProof(proof, source, id) {
 	if (proof === null || typeof proof !== 'object') return null;
@@ -713,6 +732,37 @@ class OctaneBundlerCompiler {
 		);
 	}
 
+	/**
+	 * How Strong mode reaches one module that Octane compiles: through its own
+	 * `"use strong"` directive, through this compiler's application `strong`
+	 * policy, both, or neither. `transform` makes the same decision inline;
+	 * tooling reads it here (`octane analyze` builds its Strong coverage check
+	 * on it) so the policy is never re-derived outside the compiler. Whether
+	 * Octane compiles the module at all (`exclude`, `requireDirective`) is a
+	 * separate question this does not answer.
+	 *
+	 * @param {string} code
+	 * @param {string} id
+	 * @returns {{ strong: boolean, directive: boolean, config: boolean }}
+	 */
+	strongModuleStatus(code, id) {
+		const file = cleanModuleId(id);
+		const config =
+			this.defaults.strong === true &&
+			this._hasApplicationStrongPolicy(file, {
+				dependencies: new Set(),
+				missingDependencies: new Set(),
+			});
+		const directive =
+			code.includes('use strong') &&
+			declaresStrongMode(
+				/\.(?:tsrx|tsx|jsx)$/.test(file)
+					? parseAuthoredModule(code, file)
+					: parseHookSource(code, file).ast,
+			);
+		return { strong: config || directive, directive, config };
+	}
+
 	_isInstalledOctaneSource(file, collected) {
 		// Project-owned TS/JS/TSX is always eligible. A linked package is commonly
 		// handed to bundlers as its real path, without a node_modules segment, so
@@ -1001,8 +1051,8 @@ class OctaneBundlerCompiler {
 		return findStaticRuntimeImportRequests(code, this._canonicalModuleId(id));
 	}
 
-	/** @internal Create a one-transform descriptor-export proof from a read-only AST. */
-	_prepareDescriptorChildrenExports(authority, source, id, ast) {
+	/** @internal Classify descriptor exports from a read-only AST into a reusable receipt. */
+	_analyzeDescriptorChildrenExports(authority, source, id, ast) {
 		if (
 			authority === null ||
 			authority !== descriptorChildrenExportAuthorities.get(this) ||
@@ -1014,12 +1064,41 @@ class OctaneBundlerCompiler {
 		) {
 			throw new TypeError('Invalid descriptor-children preflight input.');
 		}
-		const proof = Object.freeze({});
-		descriptorChildrenExportProofs.set(proof, {
-			source,
+		const exports = findDescriptorChildrenExports(ast, id);
+		const receipt = Object.freeze({});
+		descriptorChildrenExportAnalyses.set(receipt, {
+			compiler: this,
+			digest: descriptorSourceDigest(source),
 			id,
-			exports: Object.freeze(findDescriptorChildrenExports(ast, id)),
+			// Parser names can be V8 slices of the whole source; copy them so a
+			// cached receipt never keeps that source alive.
+			exports: Object.freeze(exports.length === 0 ? exports : structuredClone(exports)),
 		});
+		return receipt;
+	}
+
+	/** @internal Mint a one-transform proof from a receipt for this exact source/id. */
+	_prepareDescriptorChildrenExports(authority, receipt, source, id) {
+		if (
+			authority === null ||
+			authority !== descriptorChildrenExportAuthorities.get(this) ||
+			typeof source !== 'string' ||
+			typeof id !== 'string'
+		) {
+			throw new TypeError('Invalid descriptor-children preflight input.');
+		}
+		const analysis = descriptorChildrenExportAnalyses.get(receipt);
+		// A receipt from another compiler, module query, or source falls back to
+		// the compiler's own string classifier rather than transferring facts.
+		if (
+			analysis?.compiler !== this ||
+			analysis.id !== id ||
+			analysis.digest !== descriptorSourceDigest(source)
+		) {
+			return null;
+		}
+		const proof = Object.freeze({});
+		descriptorChildrenExportProofs.set(proof, { source, id, exports: analysis.exports });
 		return proof;
 	}
 

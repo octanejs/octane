@@ -1425,15 +1425,17 @@ export function Scalar(props) @{ 'use dom bindings';
   <span hidden={!props.showStatus}><b>{props.status as string}</b></span>
  </button>
 }`,
-		// A URL channel needs sanitization, so the general adopter stays selected.
+		// A URL channel selects the scalar adopter with the artifact's sanitizer.
 		Link: `export function Link(props) @{ 'use dom bindings';
  <a href={props.href} class={props.classes}><b>{props.status as string}</b></a>
 }`,
 	};
-	// An adopt-only scalar artifact omits these. The general adopter retains URL
-	// sanitization and the host-handoff sidecar protocol in every artifact.
+	// An adopt-only scalar artifact omits these. The general adopter retains the
+	// host-handoff sidecar protocol in every artifact, and URL sanitization even
+	// in views without a URL.
 	const generalOnly =
-		/\/src\/(?:sanitize-url\.js|stream-protocol\.ts|signals\/(?:native-read-seeds|control-handoff)\.ts)$/;
+		/\/src\/(?:stream-protocol\.ts|signals\/(?:native-read-seeds|control-handoff)\.ts)$/;
+	const sanitizer = /\/src\/sanitize-url\.js$/;
 	const bundle = async (view, mode, legacy = false, mount = false) => {
 		const entry =
 			mode === 'server'
@@ -1493,6 +1495,9 @@ export default {...current, ${mount ? 'adoptScalar' : 'adopt'}: __adoptBindings}
 			resolved: Object.keys(result.metafile.inputs),
 			generalBytes: Object.entries(output.inputs)
 				.filter(([id]) => generalOnly.test(id.replaceAll('\\', '/')))
+				.reduce((total, [, input]) => total + input.bytesInOutput, 0),
+			sanitizerBytes: Object.entries(output.inputs)
+				.filter(([id]) => sanitizer.test(id.replaceAll('\\', '/')))
 				.reduce((total, [, input]) => total + input.bytesInOutput, 0),
 		};
 	};
@@ -1599,20 +1604,24 @@ export default {...current, ${mount ? 'adoptScalar' : 'adopt'}: __adoptBindings}
 				`${view}: selected and general adopters diverged`,
 			);
 			assert.ok(legacy.generalBytes > 0, `${view}: the general adopter control lost its leaves`);
-			if (view === 'Link') {
-				assert.ok(selected.generalBytes > 0, 'URL views must keep the general adopter');
-				continue;
-			}
 			// A mountable artifact's structural program writes these channels itself.
-			if (!mount)
-				assert.equal(selected.generalBytes, 0, 'The scalar adopter retained general-only leaves');
+			if (!mount) {
+				assert.equal(
+					selected.generalBytes,
+					0,
+					`${view}: the scalar adopter retained general-only leaves`,
+				);
+				if (view === 'Link')
+					assert.ok(selected.sanitizerBytes > 0, 'URL views must keep URL sanitization');
+				else assert.equal(selected.sanitizerBytes, 0, 'A URL-free view loaded URL sanitization');
+			}
 			t.diagnostic(
 				JSON.stringify({ view, mount, selectedGzip: selected.gzip, generalGzip: legacy.gzip }),
 			);
-			// Measured 0.50 for the adopt-only artifact and 0.83 with mounting.
+			// Measured 0.50 (Scalar) and 0.57 (Link) adopt-only, 0.82 for both with mounting.
 			assert.ok(
-				selected.gzip / legacy.gzip < (mount ? 0.88 : 0.6),
-				`selected/general gzip ratio: ${selected.gzip}/${legacy.gzip}`,
+				selected.gzip / legacy.gzip < (mount ? 0.88 : view === 'Link' ? 0.65 : 0.6),
+				`${view}: selected/general gzip ratio: ${selected.gzip}/${legacy.gzip}`,
 			);
 		}
 	}
@@ -2881,6 +2890,33 @@ test('private context proof declines escaped values and noncompiled child dialec
 			'((value)=>value) satisfies Function',
 			'(((value)=>value))',
 		].map((child) => `function App2() @{ <Theme value="descriptor">{${child}}</Theme> }`),
+		// Element descriptors reach a provider under a descriptorChildren component
+		// and from the returned-JSX form of a directly called template function.
+		...[
+			'<Theme value="descriptor"><span /></Theme>',
+			'<p><Theme value="descriptor"><span /></Theme></p>',
+			'<><Theme value="descriptor"><span /></Theme></>',
+			'@{ <Theme value="descriptor"><span /></Theme> }',
+			'<Ordinary><Theme value="descriptor"><span /></Theme></Ordinary>',
+		].map(
+			(child) =>
+				`const Frame=descriptorChildren(Ordinary);\nfunction Ordinary(props) @{ <div>{props.children}</div> }\nfunction App2() @{ <Frame>${child}</Frame> }`,
+		),
+		'import {ReactCompat} from \'octane/react\';\nfunction App2() @{ <ReactCompat><Theme value="descriptor"><span /></Theme></ReactCompat> }',
+		'function Helper() @{ <Theme value="descriptor"><span /></Theme> }\nconst value=Helper();',
+		'const Helper=() => @{ <Theme value="descriptor"><span /></Theme> };\nconst value=Helper.call(null);',
+		'function App2() @{ function inner() @{ <Theme value="descriptor"><span /></Theme> } <div>{inner()}</div> }',
+		'const Wrapped=wrap(() => @{ <Theme value="descriptor"><span /></Theme> });',
+		'function App2(props) @{ <div>{props.rows.map(() => @{ <Theme value="descriptor"><span /></Theme> })}</div> }',
+	];
+	// Template bodies that stay compiled: a setup block is its own render body,
+	// a shadowed marker name is an ordinary component, and passing a component
+	// to a call that renders it is not a direct call.
+	const retained = [
+		'const Frame=descriptorChildren(Ordinary);\nfunction Ordinary(props) @{ <div>{props.children}</div> }\nfunction App2(props) @{ <Frame>@{ const value=props.value; <Theme value={value}><span /></Theme> }</Frame> }',
+		'const Frame=descriptorChildren(Ordinary);\nfunction Ordinary(props) @{ <div>{props.children}</div> }\nfunction App2(props) @{ const Frame=props.frame; <Frame><Theme value="shadowed"><span /></Theme></Frame> }',
+		'import {memo} from \'octane\';\nconst Memo=memo(function Memo() @{ <Theme value="memo"><span /></Theme> });',
+		'function mount(root) {root.render(App, {});}',
 	];
 	function freeze(value) {
 		if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return;
@@ -2892,6 +2928,28 @@ test('private context proof declines escaped values and noncompiled child dialec
 		freeze(ast);
 		assert.equal(findPrivateCompiledContexts(ast).has('Theme'), extra === '', extra);
 	}
+	for (const extra of retained) {
+		const ast = parseModule(prefix + provider + extra, 'private-context.tsrx');
+		freeze(ast);
+		assert.equal(findPrivateCompiledContexts(ast).has('Theme'), true, extra);
+	}
+	// The bundler proves an imported component keeps descriptor children.
+	const imported = parseModule(
+		prefix +
+			provider +
+			'import {Frame} from \'./frame\';\nfunction App2() @{ <Frame><Theme value="descriptor"><span /></Theme></Frame> }',
+		'private-context.tsrx',
+	);
+	freeze(imported);
+	assert.equal(findPrivateCompiledContexts(imported).has('Theme'), true, 'unproven import');
+	assert.equal(
+		findPrivateCompiledContexts(
+			imported,
+			(request, name) => request === './frame' && name === 'Frame',
+		).has('Theme'),
+		false,
+		'descriptorChildren import',
+	);
 	const ast = parseModule(prefix + provider + 'function decorate(){}', 'private-context.tsrx');
 	const supplied = {
 		...ast,
@@ -2912,7 +2970,9 @@ test('private context proof declines escaped values and noncompiled child dialec
 		false,
 		'unscoped runtime reference',
 	);
-	t.diagnostic(`${escapes.length} authored lifetime/dialect controls on frozen parser ASTs`);
+	t.diagnostic(
+		`${escapes.length} authored lifetime/dialect and ${retained.length} retained controls on frozen parser ASTs`,
+	);
 });
 
 test('private context specialization preserves factory source ranges and deployment boundaries', () => {

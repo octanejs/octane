@@ -149,6 +149,17 @@ function compiledCodeFingerprint(code) {
 	return nodeCrypto.createHash('sha256').update(code).digest('base64url');
 }
 
+const NO_PREFLIGHT_FACTS = Object.freeze([]);
+
+// Parser string values can be V8 slices of the whole authored source. Copy the
+// small fact lists a preflight cache entry keeps so it never retains the source.
+function retainedPreflightFacts(facts) {
+	if (facts.length === 0) return NO_PREFLIGHT_FACTS;
+	const copy = structuredClone(facts);
+	for (const fact of copy) Object.freeze(fact);
+	return Object.freeze(copy);
+}
+
 function createCssModuleProofState() {
 	return { modules: new Map(), inFlight: new Set(), consumed: new Map() };
 }
@@ -674,6 +685,14 @@ export function octane(options = {}) {
 	const descriptorSourceCache = new Map();
 	const descriptorExportCache = new Map();
 	const descriptorGraphCache = new Map();
+	// Preflight facts depend only on the exact authored source, the query-bearing
+	// module ID, the current compiler, the transform environment, and the
+	// specialization flags in the key. Several Vite environments can share this
+	// plugin instance, so an unchanged module is parsed and classified once per
+	// key. Entries keep a source digest and small detached fact lists, never the
+	// source or AST. A compiler reset and every watch event clear the cache, so it
+	// is bounded by the modules transformed in one watch generation.
+	const preflightCache = new Map();
 	// Vite can share a plugin instance between client and server environments.
 	// CSS naming/virtual providers can differ between them, so never key a proof
 	// merely by its path or share a previous build's final-module snapshot.
@@ -768,6 +787,7 @@ export function octane(options = {}) {
 
 	const resetCompiler = (root) => {
 		resetTextTypes();
+		preflightCache.clear();
 		descriptorSourceCache.clear();
 		descriptorExportCache.clear();
 		descriptorGraphCache.clear();
@@ -785,6 +805,60 @@ export function octane(options = {}) {
 			requireDirective,
 			warn,
 		});
+	};
+
+	// Parse authored source once, synchronously classify every applicable adapter
+	// concern, then let the AST fall out of scope before any graph loading begins.
+	// Compilation keeps its independent authoritative parser.
+	const preflightFor = (authoredSource, id, server, specializeVoidRoots) => {
+		const environment = server ? 'server' : 'client';
+		const key = `${environment}\0${specializeCssModuleConstants}\0${specializeVoidRoots}\0${id}`;
+		const digest = compiledCodeFingerprint(authoredSource);
+		const cached = preflightCache.get(key);
+		if (cached !== undefined && cached.digest === digest) return cached;
+		let ast;
+		try {
+			ast = parseModule(authoredSource, id);
+		} catch {
+			// Every adapter classifier uses this exact parser/source/id and would
+			// return an empty result after repeating the same failed parse. Preserve
+			// those facts without the retries. The compiler receives no descriptor
+			// proof, so its canonical-id fallback and authoritative diagnostics stay
+			// unchanged.
+			const failed = {
+				digest,
+				cssRequests: NO_PREFLIGHT_FACTS,
+				descriptorExportsReceipt: null,
+				descriptorImports: NO_PREFLIGHT_FACTS,
+				serverImportRequests: NO_PREFLIGHT_FACTS,
+				voidImports: NO_PREFLIGHT_FACTS,
+			};
+			preflightCache.set(key, failed);
+			return failed;
+		}
+		const preflight = {
+			digest,
+			cssRequests: specializeCssModuleConstants
+				? retainedPreflightFacts(
+						compiler.findCssModuleImportRequests(authoredSource, id, environment, ast),
+					)
+				: NO_PREFLIGHT_FACTS,
+			descriptorExportsReceipt: compiler._analyzeDescriptorChildrenExports(
+				DESCRIPTOR_PREFLIGHT_AUTHORITY,
+				authoredSource,
+				id,
+				ast,
+			),
+			descriptorImports: retainedPreflightFacts(findDescriptorChildrenImports(ast, id)),
+			serverImportRequests: server
+				? retainedPreflightFacts(compiler.findServerImportRequests(ast, id))
+				: NO_PREFLIGHT_FACTS,
+			voidImports: specializeVoidRoots
+				? retainedPreflightFacts(findVoidComponentImports(ast, id))
+				: NO_PREFLIGHT_FACTS,
+		};
+		preflightCache.set(key, preflight);
+		return preflight;
 	};
 
 	return {
@@ -878,6 +952,9 @@ export function octane(options = {}) {
 			compiler.invalidate(id);
 			// A one-shot build can receive a watch event mid-build and must fail closed.
 			textTypeProject?.invalidate(cleanModuleId(id));
+			// Edited sources already miss by digest. A manifest edit can change the
+			// ownership behind CSS-module discovery, so start a new generation.
+			preflightCache.clear();
 			// A barrel can cache a classification reached through this source, so
 			// invalidate the small descriptor graph as a unit on authored edits.
 			descriptorSourceCache.clear();
@@ -941,46 +1018,12 @@ export function octane(options = {}) {
 					? forceSsr
 					: transformOptions?.ssr === true || this.environment?.config?.consumer === 'server';
 			const environment = server ? 'server' : 'client';
-			// Parse authored source once, synchronously classify every applicable
-			// adapter concern, then let the AST fall out of scope before any graph
-			// loading begins. Compilation keeps its independent authoritative parser.
-			const preflight = (() => {
-				const authoredSource = code;
-				let ast;
-				try {
-					ast = parseModule(authoredSource, id);
-				} catch {
-					// Every adapter classifier uses this exact parser/source/id and would
-					// return an empty result after repeating the same failed parse. Preserve
-					// those facts without the retries. The compiler receives no descriptor
-					// proof, so its canonical-id fallback and authoritative diagnostics stay
-					// unchanged.
-					return {
-						cssRequests: [],
-						descriptorExportsProof: null,
-						descriptorImports: [],
-						serverImportRequests: [],
-						voidImports: [],
-					};
-				}
-				return {
-					cssRequests: specializeCssModuleConstants
-						? compiler.findCssModuleImportRequests(code, id, environment, ast)
-						: [],
-					descriptorExportsProof: compiler._prepareDescriptorChildrenExports(
-						DESCRIPTOR_PREFLIGHT_AUTHORITY,
-						code,
-						id,
-						ast,
-					),
-					descriptorImports: findDescriptorChildrenImports(ast, id),
-					serverImportRequests: server ? compiler.findServerImportRequests(ast, id) : [],
-					voidImports:
-						specializeProductionRoots && !server && !hmrEnabled && !profileEnabled
-							? findVoidComponentImports(ast, id)
-							: [],
-				};
-			})();
+			const preflight = preflightFor(
+				code,
+				id,
+				server,
+				specializeProductionRoots && !server && !hmrEnabled && !profileEnabled,
+			);
 			const cssRequests = preflight.cssRequests;
 			const loadCssImports = () =>
 				loadCssModuleImports(
@@ -1000,10 +1043,20 @@ export function octane(options = {}) {
 				const propagatedExports = [...descriptorProven]
 					.filter((key) => key.startsWith('export\0'))
 					.map((key) => key.slice('export\0'.length));
-				const result = compiler.transform(code, id, {
-					...(preflight.descriptorExportsProof === null
+				// Mint this transform's one-use proof from the reusable receipt.
+				const descriptorExportsProof =
+					preflight.descriptorExportsReceipt === null
 						? null
-						: { _descriptorChildrenExportsProof: preflight.descriptorExportsProof }),
+						: compiler._prepareDescriptorChildrenExports(
+								DESCRIPTOR_PREFLIGHT_AUTHORITY,
+								preflight.descriptorExportsReceipt,
+								code,
+								id,
+							);
+				const result = compiler.transform(code, id, {
+					...(descriptorExportsProof === null
+						? null
+						: { _descriptorChildrenExportsProof: descriptorExportsProof }),
 					environment,
 					...(typedTextEnabled ? { textTypeFacts: textFactsFor(code, id, environment) } : null),
 					hmr: !server && hmrEnabled ? 'vite' : false,

@@ -122,8 +122,45 @@ Available strategies:
 `touchstart`, `touchend`, `beforeinput`, `input`, `compositionstart`,
 `compositionupdate`, `compositionend`, and `click` by default. Supported custom
 events also include `auxclick`, `contextmenu`, `dblclick`, `keydown`, `keyup`,
-`mousedown`, `mouseenter`, `mouseover`, `mouseup`, `pointerover`, and
-`pointerup`.
+`mousedown`, `mouseenter`, `mouseover`, `mouseup`, `pointerover`, `pointerup`,
+and the pointer lifecycle events `pointermove` and `pointercancel`.
+
+Capture never cancels `mousedown`, `pointerdown`, `pointermove`, `pointerup`,
+`touchstart`, `touchend`, or the editing and IME events, so focus, touch
+activation, text entry, and the rest of a pointer press keep their native
+behavior. It cancels the other cancelable events it captures, such as `click`
+and `keydown`, so a link or form control cannot act before its handler hydrates.
+The replayed `click` still runs its native activation.
+
+#### Pointer press lifecycle
+
+A boundary that hydrates on a press can also select `pointermove`, `pointerup`,
+and `pointercancel`. The hydrated handler then learns whether a press that began
+before hydration is still held, has moved, was released, or was cancelled by the
+browser, for example when a touch turned into a scroll:
+
+```tsrx
+<Hydrate when={interaction({
+	events: ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'],
+})}>
+	<HoldToConfirm />
+</Hydrate>
+```
+
+`pointermove` and `pointercancel` only extend an interaction that another
+selected event already captured. Moving or cancelling never starts hydration or
+prefetch by itself, so selecting `pointermove` does not make a boundary hydrate
+on hover. After a selected event wakes the boundary, Octane captures movement
+and cancellation until the boundary hydrates and replays them in order with the
+rest of the press. Every captured move is replayed, so a long load during
+continuous movement replays one event per move the browser dispatched.
+
+Octane registers its document listeners for these two events only after a
+boundary that selects one captures intent, so a page that does not opt in never
+listens for pointer movement. An independent widget's inline early capture,
+which runs before any client module, queues the press and release but not
+movement or cancellation. Those are captured once client code registers the
+widget or calls `initializeHydrationEventCapture()`.
 
 #### Capture interactions before `hydrateRoot()`
 
@@ -1003,8 +1040,12 @@ unresolved ancestor chain, after which Octane replays a same-type event for the
 target boundary. A `never()` ancestor keeps every deferred descendant inert.
 Replay preserves supported platform event classes and their captured keyboard,
 pointer, mouse, touch, input, composition, and focus data where the browser can
-construct that event. A replayed event is still programmatic: it cannot restore
-the original event's trusted status or expired transient user activation.
+construct that event. Each replay also reports the captured event's
+`timeStamp`, including after replay through nested boundaries, so the time
+between a replayed `pointerdown` and `pointerup`, or how long an input has been
+held, matches the original input. A replayed event is still programmatic: it
+cannot restore the original event's trusted status or expired transient user
+activation.
 
 If activation races a pending renderer-owned streamed Suspense reveal, the
 boundary waits for that reveal or its client-render degradation before adopting

@@ -8,7 +8,7 @@
     "dev": "vite dev --port 3000",
     "build": "vite build",
     "build:minimal": "vite build --config vite.config.minimal.ts",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "typecheck": "octane-tsc -p tsconfig.json",
     "start": "node .output/server/index.mjs",
     "start:minimal": "node serve.mjs"
   },
