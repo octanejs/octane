@@ -18686,7 +18686,9 @@ let currentHydration: HydrationCapability | null = null;
  * the earlier attempt's own content, or nothing, and the mismatch is already
  * reported. The end is the one node that every attempt at a return slot
  * shares: the slot borrows its component's range, or mints its own range
- * inside it, depending on what the failed attempt left.
+ * inside it, depending on what the failed attempt left. Within one attempt, a
+ * later sibling that finds the cursor on the end is part of the same recovery
+ * (firstAtRangeEnd).
  */
 let HYDRATION_REBUILT: WeakSet<Node> | null = null;
 
@@ -18978,7 +18980,8 @@ class HydrationCapability {
 	 * with the server's catch arm intact, and only the fresh markers are
 	 * removed. Any other outcome reports the mismatch and discards those server
 	 * nodes, unless `stale` is client-built: the rebuild that built it already
-	 * reported and discarded the server's.
+	 * reported and discarded the server's. A discard that reaches the end of the
+	 * enclosing server range reports once for that range (firstAtRangeEnd).
 	 */
 	renderUnframed<T>(
 		render: (target: T) => void,
@@ -19007,16 +19010,21 @@ class HydrationCapability {
 				removeRange(start, getNextSibling(end));
 				this.node = stale;
 			} else if (stale === null || !this.isFresh(stale)) {
-				noteRecoverableHydrationError(() => new Error(formatClientError(55)));
-				if (process.env.NODE_ENV !== 'production') {
-					const loc = siteLoc(scope, slotKey);
-					if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
-				}
 				let node = stale;
 				while (node !== null && node !== anchor && node !== start && !isBlockClose(node)) {
 					const next = getNextSibling(node);
 					(STAGED_DOM?.view(node as ChildNode) ?? (node as ChildNode)).remove();
 					node = next;
+				}
+				// The fresh markers sit right before `anchor`, so reaching them
+				// discarded everything up to it.
+				const close = node === start ? anchor : node;
+				if (!isBlockClose(close) || this.firstAtRangeEnd(close)) {
+					noteRecoverableHydrationError(() => new Error(formatClientError(55)));
+					if (process.env.NODE_ENV !== 'production') {
+						const loc = siteLoc(scope, slotKey);
+						if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
+					}
 				}
 			}
 		}
@@ -19380,6 +19388,19 @@ class HydrationCapability {
 		if (rebuilt || this.staleServerValues) return false;
 		noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 		return true;
+	}
+
+	/**
+	 * Mismatch recovery reached `close`, the end of a server range, having
+	 * discarded the server content before it or found none left. The client
+	 * builds the rest of the range, so each later claim in it finds the cursor
+	 * on `close` for the same reason: one recovery, which only the first claim
+	 * reports. Returns whether this is that claim, and remembers `close`.
+	 */
+	private firstAtRangeEnd(close: Node): boolean {
+		const rebuilt = HYDRATION_REBUILT?.has(close) === true;
+		this.remember((HYDRATION_REBUILT ??= new WeakSet()), close);
+		return !rebuilt;
 	}
 
 	/**
@@ -19873,7 +19894,7 @@ class HydrationCapability {
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 				);
 			if (template === null) template = resolveLazyTemplate(lazy!);
-			if (!this.staleServerValues) {
+			if (this.firstAtRangeEnd(cursor) && !this.staleServerValues) {
 				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 				if (process.env.NODE_ENV !== 'production')
 					warnHydrationStructuralMismatch(
@@ -19923,15 +19944,18 @@ class HydrationCapability {
 			if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 			const parent = domNode(cursor).parentNode!;
 			this.save(parent);
-			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 			if (template === null) template = resolveLazyTemplate(lazy!);
-			if (process.env.NODE_ENV !== 'production' && loc)
-				warnHydrationStructuralMismatch(
-					loc,
-					describeHydrationNode(template),
-					describeHydrationNode(cursor),
-				);
-			if (isBlockClose(cursor)) return this.freshClone(template);
+			const atRangeEnd = isBlockClose(cursor);
+			if (!atRangeEnd || this.firstAtRangeEnd(cursor)) {
+				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+				if (process.env.NODE_ENV !== 'production' && loc)
+					warnHydrationStructuralMismatch(
+						loc,
+						describeHydrationNode(template),
+						describeHydrationNode(cursor),
+					);
+			}
+			if (atRangeEnd) return this.freshClone(template);
 			// Recovery discards only a node this block renders into. A cursor left
 			// outside that parent (an earlier claim ran off the end of its host) is
 			// an ancestor's adopted content, possibly the host itself; removing it
@@ -20008,6 +20032,9 @@ class HydrationCapability {
 		if (node === end) {
 			this.node = end;
 			removeHydrationRange(cursor, (STAGED_DOM?.view(end!) ?? end!).previousSibling!);
+			// The rest of the range is the client's, so later claims at its end
+			// stay quiet (firstAtRangeEnd).
+			if (isBlockClose(end)) this.remember((HYDRATION_REBUILT ??= new WeakSet()), end);
 		} else this.discardCursor(cursor);
 		return this.freshClone(template);
 	}
