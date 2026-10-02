@@ -19077,8 +19077,8 @@ class HydrationCapability {
 	 * positional seeds as the server's render did. A seeded rejection then
 	 * reaches its boundary with the server's catch arm intact, and only the
 	 * fresh markers are removed. Any other outcome reports the mismatch and
-	 * discards the server nodes the component `replaces`, unless `stale` is
-	 * client-built: the rebuild that built it already reported and discarded
+	 * discards the server nodes it replaces (`unframedReplaces`), unless `stale`
+	 * is client-built: the rebuild that built it already reported and discarded
 	 * the server's.
 	 */
 	renderUnframed<T>(
@@ -19114,7 +19114,7 @@ class HydrationCapability {
 					if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
 				}
 				let node = stale;
-				while (this.replaces(node, anchor)) {
+				while (this.unframedReplaces(node, anchor)) {
 					const next = getNextSibling(node);
 					(STAGED_DOM?.view(node) ?? node).remove();
 					node = next;
@@ -19249,7 +19249,7 @@ class HydrationCapability {
 	 * call, which claims it, and a block close ends the range that encloses the
 	 * component.
 	 */
-	private replaces(node: Node | null, anchor: Node | null): node is ChildNode {
+	private unframedReplaces(node: Node | null, anchor: Node | null): node is ChildNode {
 		return (
 			node !== null &&
 			node !== anchor &&
@@ -19266,7 +19266,7 @@ class HydrationCapability {
 	 * before `anchor`.
 	 */
 	unframedBefore(stale: Node | null, anchor: Node | null): Node | null {
-		return this.replaces(stale, anchor) ? stale : anchor;
+		return this.unframedReplaces(stale, anchor) ? stale : anchor;
 	}
 
 	/** Read the `<!--oct-catch:T:C-->` comment ahead of a caught arm's range. */
