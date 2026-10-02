@@ -19054,13 +19054,24 @@ class HydrationCapability {
 	}
 
 	/**
-	 * A speculative attempt is about to overwrite the server's `value` of a text
-	 * node (`name` null) or an attribute. A freshly cloned node holds the client
-	 * template's value, not the server's, so it has nothing to restore.
+	 * Hydration is about to overwrite the server's value of a text node (`name`
+	 * null) or an attribute. A speculative attempt records it for rollback. A
+	 * freshly cloned node holds the client template's value, not the server's,
+	 * so it has nothing to restore.
 	 */
-	repaired(target: Node, name: string | null, value: string | null): void {
-		if (this.freshNodes.has(name === null ? domNode(target).parentNode! : target)) return;
-		(this.repairs ??= []).push(target, name, value);
+	repaired(target: Node, name: string | null): void {
+		if (
+			!this.speculative ||
+			this.freshNodes.has(name === null ? domNode(target).parentNode! : target)
+		)
+			return;
+		const node: any = STAGED_DOM?.view(target) ?? target;
+		// Reading by qualified name also finds a namespaced attribute.
+		(this.repairs ??= []).push(
+			target,
+			name,
+			name === null ? node.nodeValue : node.getAttribute(name),
+		);
 	}
 
 	/**
@@ -19628,7 +19639,7 @@ class HydrationCapability {
 				// built fresh holds the client template's placeholder: there is no server
 				// text to keep, and the rebuild was already reported structurally.
 				if (!suppressed || this.freshNodes.has(el)) {
-					if (this.speculative) this.repaired(first, null, server);
+					this.repaired(first, null);
 					(STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue = text;
 				}
 			}
@@ -19763,7 +19774,7 @@ class HydrationCapability {
 				// As in htext: a fresh mismatch clone has no server text to keep. Its
 				// template's `<!>` reads as the server's empty slot, swapped for '' above.
 				if (!suppressed || this.freshNodes.has(host!)) {
-					if (this.speculative) this.repaired(posNode, null, server);
+					this.repaired(posNode, null);
 					(STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue = text;
 				}
 			}
@@ -19842,7 +19853,7 @@ class HydrationCapability {
 				server,
 				next,
 			);
-		if (this.speculative) this.repaired(el, name, server);
+		this.repaired(el, name);
 		return true;
 	}
 
@@ -19895,8 +19906,7 @@ class HydrationCapability {
 				// value that never existed in either the server or final client output.
 				if ((STAGED_DOM?.view(el) ?? el).getAttribute('class') === rawTarget) continue;
 				if (!this.allowClass(el, write.next, write.absentIsEmpty)) continue;
-				if (this.speculative)
-					this.repaired(el, 'class', (STAGED_DOM?.view(el) ?? el).getAttribute('class'));
+				this.repaired(el, 'class');
 				if (write.remove) (STAGED_DOM?.view(el) ?? el).removeAttribute('class');
 				else if (write.useAttribute)
 					(STAGED_DOM?.view(el) ?? el).setAttribute('class', write.next!);
@@ -19957,8 +19967,7 @@ class HydrationCapability {
 		const expectsStyleAttribute = expected !== '';
 		if (before === expected && hadStyleAttribute === expectsStyleAttribute) return true;
 
-		if (this.speculative)
-			this.repaired(el, 'style', (STAGED_DOM?.view(el) ?? el).getAttribute('style'));
+		this.repaired(el, 'style');
 		if (expectsStyleAttribute) style.cssText = expected;
 		else (STAGED_DOM?.view(el) ?? el).removeAttribute('style');
 		if (mode === 2 && process.env.NODE_ENV !== 'production' && !this.staleServerValues) {
