@@ -1859,6 +1859,13 @@ after that synchronous attempt, and never delivers `pointermove` to a dehydrated
 subtree's handlers. Neither framework cancels the native default of these
 events.
 
+Octane replays after the boundary's hydration commits and its effects run,
+which can be a frame later. A boundary or independent island keeps capturing
+its interaction events until that replay runs, so one arriving in between is
+replayed after the captured ones instead of reaching the hydrated handlers
+first. Handlers see those events in the order the user produced them, as in
+React.
+
 `hydrateRoot` has no `formState` option: resuming `useActionState` from an MPA
 form POST requires React's server-action state serialization, which is part of
 the RSC model Octane does not implement (the matching `useActionState`
