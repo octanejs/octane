@@ -10763,10 +10763,14 @@ export function renderBlock(block: Block): void {
 	// A replacement dynamic range owns client DOM even while its parent adopts
 	// server siblings. Fresh control-flow markers can instead be replay scaffolding
 	// whose body must still read the server rejection seed before adopting a catch.
+	// A component that renders in place of a server node may adopt it.
 	if (
 		hydration !== null &&
 		(!hydration.owns(block) ||
-			(block.kind === 'dynamic' && block.endMarker !== null && hydration.isFresh(block.endMarker)))
+			(block.kind === 'dynamic' &&
+				block.endMarker !== null &&
+				hydration.isFresh(block.endMarker) &&
+				!hydration.framesInPlace(block.endMarker)))
 	) {
 		hydration.suspend(() => renderBlock(block));
 		return;
@@ -18770,6 +18774,15 @@ class HydrationCapability {
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** The server node renderInPlace's body may adopt, until a template does. */
 	private inPlace: Node | null = null;
+	/** Whether a template that does not match inPlace leaves it to renderUnframed. */
+	private inPlaceUnframed = false;
+	/** Where the server nodes a template adopted at inPlace end; undefined until one does. */
+	private inPlaceEnd: Node | null | undefined = undefined;
+	/**
+	 * Whether a clone may claim the root's remainder or inPlace. Both claims are
+	 * rare, so adopt()'s common path tests only this flag.
+	 */
+	private claiming = true;
 	/** Pairs discovered while matching an outer range; released with this hydration pass. */
 	private matchingCloses: WeakMap<Node, Comment> | null = null;
 	/** First unclaimed root sibling after a compiled root clone; undefined until known. */
@@ -18957,11 +18970,18 @@ class HydrationCapability {
 	 * fresh `block` componentSlot minted before `anchor`. The server emits that
 	 * range only when the render completes; when it throws, the boundary that
 	 * catches it renders its catch arm in that place. So the server nodes from
-	 * `stale` stay until the body has run, and the body, which adopts nothing,
-	 * still consumes its positional seeds as the server's render did. A seeded
-	 * rejection then reaches its boundary with the server's catch arm intact,
-	 * and only the fresh markers are removed. Any other outcome reports the
-	 * mismatch and discards those server nodes.
+	 * `stale` stay until the body has run, and the body still consumes its
+	 * positional seeds as the server's render did. A seeded rejection then
+	 * reaches its boundary with the server's catch arm intact, and only the
+	 * fresh markers are removed.
+	 *
+	 * The server also renders a component's content without a range where it
+	 * rendered that content inline, as another `@if` arm does. So when `stale`
+	 * is an element or text, the block renders in its place, and a template
+	 * that matches adopts it, with the server nodes after it that the
+	 * template's other roots match, between the fresh markers. Otherwise the
+	 * body adopts nothing, and an outcome other than a seeded rejection reports
+	 * the mismatch and discards the server nodes from `stale`.
 	 */
 	renderUnframed(
 		block: Block,
@@ -18972,20 +18992,38 @@ class HydrationCapability {
 	): void {
 		const start = block.startMarker!;
 		const end = block.endMarker!;
+		const parent = domNode(end).parentNode!;
+		// A clone at a root-level node claims the root's remainder instead.
+		const inPlace =
+			stale !== null &&
+			(stale.nodeType === 1 || stale.nodeType === 3) &&
+			domNode(stale).parentNode === parent &&
+			this.rootRemainder !== undefined;
 		const previousReplay = this.replayDepth;
-		const previousNative = setNativeAdoptionResolver(null);
-		this.replayDepth = ++this.depth;
+		const previousNative = inPlace ? null : setNativeAdoptionResolver(null);
+		if (inPlace) {
+			domNode(parent).insertBefore(start, stale);
+			domNode(parent).insertBefore(end, stale);
+			this.node = stale;
+		} else this.replayDepth = ++this.depth;
 		let rejected = false;
+		let adopted = false;
 		try {
-			renderBlock(block);
+			if (inPlace) adopted = this.renderInPlace(renderBlock, block, stale, true);
+			else renderBlock(block);
 		} catch (error) {
 			rejected = this.isRejection(error);
 			throw error;
 		} finally {
-			this.depth--;
-			this.replayDepth = previousReplay;
-			setNativeAdoptionResolver(previousNative);
-			if (rejected) {
+			if (!inPlace) {
+				this.depth--;
+				this.replayDepth = previousReplay;
+				setNativeAdoptionResolver(previousNative);
+			}
+			if (adopted) {
+				// Frame the adopted nodes, as the server's range would have.
+				domNode(parent).insertBefore(end, this.node);
+			} else if (rejected) {
 				removeRange(start, getNextSibling(end));
 				this.node = stale;
 			} else {
@@ -19007,24 +19045,44 @@ class HydrationCapability {
 	/**
 	 * First render, by `render(target)`, of a component call that found `root`
 	 * at the cursor instead of a server range of its own. Its template adopts
-	 * `root` in place when they match. clone() leaves the cursor on a root it
-	 * adopts, and the root's own holes move it into the root's children, but
-	 * the next sibling's server content starts after the root, so step past it.
-	 * A body that rebuilt `root` or rendered nothing there leaves the cursor
-	 * where it put it. Returns whether the body adopted `root`.
+	 * `root` in place when they match, and a template with several roots also
+	 * adopts the server nodes after `root` that its other roots match. clone()
+	 * leaves the cursor on the first root it adopts, and the roots' own holes
+	 * move it into their content, but the next sibling's server content starts
+	 * after the last root, so step past it. A body that rebuilt `root` or
+	 * rendered nothing there leaves the cursor where it put it. When `unframed`,
+	 * a template that does not match leaves `root` and the nodes after it to
+	 * renderUnframed. Returns whether the body adopted `root`.
 	 */
-	renderInPlace<T>(render: (target: T) => void, target: T, root: Node): boolean {
+	renderInPlace<T>(render: (target: T) => void, target: T, root: Node, unframed = false): boolean {
 		const outer = this.inPlace;
+		const outerUnframed = this.inPlaceUnframed;
+		const outerEnd = this.inPlaceEnd;
 		this.inPlace = root;
-		let adopted = false;
+		this.inPlaceUnframed = unframed;
+		this.inPlaceEnd = undefined;
+		this.claiming = true;
+		let end: Node | null | undefined;
 		try {
 			render(target);
-			adopted = this.inPlace === null;
+			end = this.inPlaceEnd;
 		} finally {
 			this.inPlace = outer;
+			this.inPlaceUnframed = outerUnframed;
+			this.inPlaceEnd = outerEnd;
+			this.claiming = outer !== null || this.rootRemainder === undefined;
 		}
-		if (adopted) this.node = getNextSibling(root);
-		return adopted;
+		if (end === undefined) return false;
+		this.node = end;
+		return true;
+	}
+
+	/**
+	 * Whether `end` closes the fresh range renderUnframed placed before the
+	 * server node it renders in place of, whose body may adopt that node.
+	 */
+	framesInPlace(end: Node): boolean {
+		return this.inPlaceUnframed && this.inPlace !== null && getNextSibling(end) === this.inPlace;
 	}
 
 	/** Read the `<!--oct-catch:T:C-->` comment ahead of a caught arm's range. */
@@ -19704,7 +19762,9 @@ class HydrationCapability {
 
 	/** Record the first node outside a root-owned range exactly once. */
 	claimRootRemainder(node: Node | null): void {
-		if (this.rootRemainder === undefined) this.rootRemainder = node;
+		if (this.rootRemainder !== undefined) return;
+		this.rootRemainder = node;
+		this.claiming = this.inPlace !== null;
 	}
 
 	private freshClone<T extends Node>(template: T): T {
@@ -19814,11 +19874,13 @@ class HydrationCapability {
 		const cursor = this.node;
 		const isFragment =
 			template !== null ? (template as any).__oct_frag === true : isLazyFragment(lazy!);
+		const claiming = this.claiming;
 		// Lite/no-template wrappers can render the logical root while sharing the
 		// public root Block, and return-based wrappers render it in a child Block.
 		// Identify the first top-level cursor by DOM ownership, then claim its
 		// remainder ONCE so later lite descendant clones cannot overwrite it.
 		const claimsRoot =
+			claiming &&
 			this.rootRemainder === undefined &&
 			(cursor !== null
 				? (STAGED_DOM?.view(cursor) ?? cursor).parentNode === this.rootBlock.parentNode
@@ -19884,6 +19946,12 @@ class HydrationCapability {
 				? !hydrationNodeMatches(cursor, template, partialStyles)
 				: !lazyRootMatches(cursor, lazy!))
 		) {
+			// renderUnframed reports and discards the server nodes there once the
+			// body has run: a body that throws leaves them to its boundary.
+			if (claiming && cursor === this.inPlace && this.inPlaceUnframed) {
+				this.inPlace = null;
+				return this.freshClone(template ?? resolveLazyTemplate(lazy!));
+			}
 			if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 			const parent = domNode(cursor).parentNode!;
 			this.save(parent);
@@ -19913,6 +19981,21 @@ class HydrationCapability {
 			return this.freshClone(template);
 		}
 		if (isFragment) {
+			// In place of a server node, nothing frames the fragment's server nodes:
+			// compare every root to find where they end.
+			if (claiming && cursor === this.inPlace) {
+				const fragment = template ?? resolveLazyTemplate(lazy!);
+				const remainder = this.fragmentRemainder(fragment, cursor, partialStyles);
+				if (remainder !== undefined) {
+					this.inPlace = null;
+					this.inPlaceEnd = remainder;
+					return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
+				}
+				if (this.inPlaceUnframed) {
+					this.inPlace = null;
+					return this.freshClone(fragment);
+				}
+			}
 			// A nested fragment has no server wrapper, so its first logical root must
 			// be the cursor itself. A root claim already compared every root above.
 			if (
@@ -19928,7 +20011,10 @@ class HydrationCapability {
 			this.claimRootRemainder(
 				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 			);
-		if (cursor === this.inPlace) this.inPlace = null;
+		if (claiming && cursor === this.inPlace) {
+			this.inPlace = null;
+			this.inPlaceEnd = getNextSibling(cursor);
+		}
 		return cursor;
 	}
 
