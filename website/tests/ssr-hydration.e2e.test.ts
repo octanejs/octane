@@ -2458,6 +2458,81 @@ describe(
 			30_000,
 		);
 
+		// The playground writes its workspace into the URL hash 400ms after an
+		// example switch or an edit, and the router turns that write into a
+		// navigation. Its scroll restoration used to end every one of those by
+		// putting each element scrolled since the previous navigation back where
+		// it was when this one started — the editors included. A scroll made
+		// while the router loaded the new hash was undone, so the control-flow
+		// probe above could find a keyword and then click whatever line the
+		// restore moved under the pointer. Scroll the source editor inside that
+		// load, then require the scroll to survive it.
+		it.concurrent(
+			'playground keeps editor scroll through its own URL hash update',
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					// The restore only covers elements that scrolled since the previous
+					// navigation, so scroll the source editor first.
+					await page.evaluate(async () => {
+						const scroller = document.querySelectorAll('.pg-editor .cm-scroller')[0];
+						const scrolled = new Promise((resolve) =>
+							scroller.addEventListener('scroll', resolve, { once: true }),
+						);
+						scroller.scrollTop = 120;
+						await scrolled;
+					});
+					// Armed before the switch: the hash write lands 400ms after it.
+					const armed = page.evaluate(() => {
+						const router = (window as any).__TSR_ROUTER__;
+						const scroller = document.querySelectorAll('.pg-editor .cm-scroller')[0];
+						return new Promise<{ hash: string; before: number; set: number; after: number }>(
+							(resolve, reject) => {
+								let before = -1;
+								let set = -1;
+								const stopBefore = router.subscribe('onBeforeLoad', () => {
+									stopBefore();
+									// After every listener of this event, so after the
+									// router's own snapshot of the scroll positions.
+									queueMicrotask(() => {
+										before = scroller.scrollTop;
+										scroller.scrollTop = before + 200;
+										set = scroller.scrollTop;
+									});
+								});
+								const stopRendered = router.subscribe('onRendered', () => {
+									stopRendered();
+									requestAnimationFrame(() =>
+										requestAnimationFrame(() =>
+											resolve({
+												hash: location.hash,
+												before,
+												set,
+												after: scroller.scrollTop,
+											}),
+										),
+									);
+								});
+								setTimeout(() => reject(new Error('the hash write never navigated')), 10_000);
+							},
+						);
+					});
+					await page.selectOption('.pg-select', 'suspense');
+					const result = await armed;
+					expect(result.hash.length, 'the example switch wrote no hash').toBeGreaterThan(1);
+					expect(result.set, 'the source editor did not scroll').not.toBe(result.before);
+					expect(result.after, 'the hash navigation restored the source editor scroll').toBe(
+						result.set,
+					);
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			30_000,
+		);
+
 		it.concurrent(
 			'playground refreshes the active AST when another workspace file fails',
 			async () => {
