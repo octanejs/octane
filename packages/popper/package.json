@@ -38,7 +38,7 @@
     "upstream:verify": "node audit/upstream-inventory.mjs",
     "test:audit": "node --test tests/audit/upstream-inventory.test.mjs",
     "test:type-parity": "node ../../scripts/react-parity/popper-types.mjs",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p typetests/tsconfig.public-api.json && tsc --noEmit -p typetests/tsconfig.pristine.json"
+    "typecheck": "octane-tsc -p tsconfig.json -p typetests/tsconfig.adapted.json -p typetests/tsconfig.public-api.json && tsc --noEmit -p typetests/tsconfig.pristine.json"
   },
   "dependencies": {
     "react-fast-compare": "^3.2.2"

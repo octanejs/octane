@@ -45,7 +45,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --config vitest.config.js --project animejs --project animejs-ssr",
-    "typecheck": "tsrx-tsc --noEmit"
+    "typecheck": "octane-tsc -p tsconfig.json"
   },
   "dependencies": {
     "animejs": "catalog:default"

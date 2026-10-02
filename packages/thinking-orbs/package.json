@@ -32,7 +32,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+    "typecheck": "octane-tsc -p tsconfig.json"
   },
   "peerDependencies": {
     "octane": "workspace:^0.7.0"
