@@ -511,6 +511,10 @@ const THINKING_ORBS_SOURCE_ALIASES = [
 ];
 const PUCK_SOURCE_ALIASES = [
 	{
+		find: /^react-dom$/, // @measured/puck imports react-dom undeclared; Bun's hidden hoist would serve react-dom-upstream@15
+		replacement: resolve(import.meta.dirname, 'packages/puck/node_modules/react-dom/index.js'),
+	},
+	{
 		find: /^@octanejs\/puck$/,
 		replacement: resolve(import.meta.dirname, 'packages/puck/src/index.ts'),
 	},
@@ -9444,6 +9448,7 @@ export default defineConfig({
 					testTimeout: 30_000,
 					setupFiles: ['packages/puck/tests/_setup.ts'],
 					globals: false,
+					server: { deps: { inline: ['@measured/puck'] } },
 				},
 				aliases: PUCK_SOURCE_ALIASES,
 			}),
