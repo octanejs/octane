@@ -46,17 +46,16 @@ export function useProbe(value: string) {
 	return useMemo(() => ({ value }), [value]);
 }`;
 // An instance field initializer runs with each construction, possibly during a
-// render, so its hook method keeps a boundary exactly as a constructor would.
-const modelSource = `import { useMemo, useState } from 'octane';
-const cells = {
-	useCell(initial: string) {
-		const [value, setValue] = useState(initial);
-		return useMemo(() => [value, setValue] as const, [value]);
-	},
-};
+// render, so its hook call keeps a boundary exactly as a constructor's would.
+const modelSource = (call: string) => `import { useMemo, useState } from 'octane';
+function useCell(initial: string) {
+	const [value, setValue] = useState(initial);
+	return useMemo(() => [value, setValue] as const, [value]);
+}
+const cells = { useCell };
 class Model {
-	first = cells.useCell('first');
-	second = cells.useCell('second');
+	first = ${call}('first');
+	second = ${call}('second');
 }
 export function usePair() {
 	const model = new Model();
@@ -181,40 +180,43 @@ export function read(store) { return [store?.useValue()!.value, store?.useValue?
 			});
 		}
 	}
-	for (const inlineHookMemo of [false, true]) {
-		it(`keeps a boundary for hook methods in instance field initializers (inline=${inlineHookMemo})`, () => {
-			const id = '/project/src/model.ts';
-			const transformed = slotHooks(modelSource, id, {
-				environment: 'client',
-				inlineHookMemo,
-				dev: false,
-				hmr: false,
+	for (const call of ['cells.useCell', 'useCell']) {
+		for (const inlineHookMemo of [false, true]) {
+			it(`keeps a boundary for ${call}() in instance field initializers (inline=${inlineHookMemo})`, () => {
+				const id = '/project/src/model.ts';
+				const source = modelSource(call);
+				const transformed = slotHooks(source, id, {
+					environment: 'client',
+					inlineHookMemo,
+					dev: false,
+					hmr: false,
+				});
+				expect(transformed?.map !== null).toBe(inlineHookMemo);
+				const load = (mode: 'client' | 'server') =>
+					loadCompiledFixtureSource(componentSource, {
+						id: '/project/src/Pair.tsrx',
+						mode,
+						runtimeModules: {
+							'./compiler-transitive-hook': loadPlainHookFixtureSource(source, {
+								id,
+								mode,
+								inlineHookMemo,
+							}),
+						},
+					}).Pair;
+				expect(renderToString(load('server'), undefined).html).toBe(
+					'<div><button>first</button><output>second</output></div>',
+				);
+				const view = mount(load('client'));
+				try {
+					expect(view.container.textContent).toBe('firstsecond');
+					view.click('button');
+					expect(view.container.textContent).toBe('updatedsecond');
+				} finally {
+					view.unmount();
+				}
 			});
-			expect(transformed?.map !== null).toBe(inlineHookMemo);
-			const load = (mode: 'client' | 'server') =>
-				loadCompiledFixtureSource(componentSource, {
-					id: '/project/src/Pair.tsrx',
-					mode,
-					runtimeModules: {
-						'./compiler-transitive-hook': loadPlainHookFixtureSource(modelSource, {
-							id,
-							mode,
-							inlineHookMemo,
-						}),
-					},
-				}).Pair;
-			expect(renderToString(load('server'), undefined).html).toBe(
-				'<div><button>first</button><output>second</output></div>',
-			);
-			const view = mount(load('client'));
-			try {
-				expect(view.container.textContent).toBe('firstsecond');
-				view.click('button');
-				expect(view.container.textContent).toBe('updatedsecond');
-			} finally {
-				view.unmount();
-			}
-		});
+		}
 	}
 	it.each([false, true])('isolates store method calls and preserves this (dev=%s)', (dev) => {
 		const compiler = createOctaneCompiler({ root: '/project' });

@@ -273,6 +273,21 @@ function canonicalOctaneHookName(call, scope) {
 	return null;
 }
 
+// The full compiler gives every `use[A-Z]` identifier call a withSlot boundary
+// by name. The plain pass keeps lexical provenance: a hook-named binding this
+// module declares (a function, value, or parameter) is a custom-hook call site,
+// so two calls to one local hook keep independent state. Unbound globals and
+// differently named helpers keep their authored call. `useContext` needs no
+// boundary because context identity, not a slot, keys it.
+function isLocalCustomHookBinding(binding) {
+	return (
+		binding != null &&
+		!binding.imported &&
+		binding.name !== 'useContext' &&
+		/^use[A-Z]/.test(binding.name)
+	);
+}
+
 // A call evaluated while the module initializes runs outside every render, so it
 // needs no boundary. The plain pass appends its slot constants after the
 // module body, where such a call would read them before initialization. Static
@@ -660,10 +675,14 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 			const name = canonicalHookName(node, scope, onlyImported);
 			const config = DEPENDENCY_HOOKS.get(name);
 			const hookRuntimeImportedName = canonicalHookName(node, scope, true);
-			const customHookImport =
+			const calleeBinding =
 				node.optional !== true && callee?.type === 'Identifier'
-					? resolveBinding(scope, callee.name)?.customHookImport
+					? resolveBinding(scope, callee.name)
 					: null;
+			let customHookCall =
+				calleeBinding?.customHookImport ??
+				(onlyImported && isLocalCustomHookBinding(calleeBinding) ? calleeBinding.name : null);
+			if (customHookCall !== null && !withinFunction(scope)) customHookCall = null;
 			// The full compiler declares its slots before the module body.
 			const moduleInitHookMethod =
 				onlyImported &&
@@ -675,13 +694,13 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 				octaneImportedName !== null ||
 				unboundCallee ||
 				hookRuntimeImportedName !== null ||
-				customHookImport ||
+				customHookCall ||
 				moduleInitHookMethod
 			) {
 				const props = {};
 				if (octaneImportedName !== null) props._octaneImportedHook = octaneImportedName;
 				if (unboundCallee) props._octaneUnboundCallee = true;
-				if (customHookImport) props._octaneCustomHookCall = customHookImport;
+				if (customHookCall) props._octaneCustomHookCall = customHookCall;
 				if (moduleInitHookMethod) props._octaneModuleInitCall = true;
 				if (octaneImportedName === null && hookRuntimeImportedName !== null) {
 					props._octaneHookRuntimeImportedHook = hookRuntimeImportedName;
@@ -770,10 +789,10 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 	};
 	if (bindingsOnly) return analysis;
 	if (onlyImported) annotateLocalHookAliases(analysis);
-	// The plain-TS pass slots base hooks and imported/aliased hook values. Local
-	// custom-hook functions still own their authored slot boundaries.
-	// Restrict custom-call inference to the full TSRX/TSX compiler, which emits
-	// that boundary for every plain-identifier custom hook call.
+	// The plain-TS pass slots base hooks and gives imported, aliased, and
+	// module-declared custom hooks a call boundary, but never rewrites a
+	// wrapper's arguments. Restrict custom-call inference to the full TSRX/TSX
+	// compiler, which emits that boundary for every plain-identifier hook call.
 	const customHooks = onlyImported ? new Map() : discoverCustomDependencyHooks(analysis);
 	for (const record of calls) {
 		if (record.trustedConfig !== undefined) continue;
@@ -825,7 +844,11 @@ function annotateLocalHookAliases(analysis) {
 		if (value.type === 'Identifier') {
 			const binding = resolveBinding(analysis.nodeScopes.get(value), value.name);
 			if (!binding || binding.reassigned || seen.has(binding)) return false;
-			if (/^use[A-Z]/.test(binding.hookRuntimeImport ?? '') || binding.customHookImport)
+			if (
+				/^use[A-Z]/.test(binding.hookRuntimeImport ?? '') ||
+				binding.customHookImport ||
+				isLocalCustomHookBinding(binding)
+			)
 				return true;
 			seen.add(binding);
 			return referencesHook(values.get(binding), seen);
@@ -858,7 +881,8 @@ function annotateLocalHookAliases(analysis) {
 		return false;
 	}
 	for (const { call, scope } of analysis.calls) {
-		if (call.optional === true || call.callee.type !== 'Identifier') continue;
+		if (call.optional === true || call.callee.type !== 'Identifier' || !withinFunction(scope))
+			continue;
 		const binding = directCallBinding(call, scope);
 		if (!values.has(binding) || !referencesHook(values.get(binding), new Set([binding]))) continue;
 		analysis.callAnnotations.set(call, {
