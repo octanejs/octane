@@ -20194,11 +20194,14 @@ class HydrationCapability {
 					);
 			}
 			if (atRangeEnd) return this.freshClone(template);
-			// Recovery discards only a node this block renders into. A cursor left
+			// Recovery discards only a node this template renders into. The compiled
+			// mount inserts into its scope's block, which for a lite component is
+			// its lite host rather than CURRENT_BLOCK's parent. A cursor left
 			// outside that parent (an earlier claim ran off the end of its host) is
 			// an ancestor's adopted content, possibly the host itself; removing it
 			// would blank the region the block is about to be inserted into.
-			const target = CURRENT_BLOCK?.parentNode;
+			const block = CURRENT_SCOPE?.block;
+			const target = block?.parentNode;
 			if (!claimsRoot && target != null && parent !== target) {
 				this.save(target);
 				return this.freshClone(template);
@@ -20210,6 +20213,11 @@ class HydrationCapability {
 			this.node = getNextSibling(isBlockOpen(cursor) ? this.close(cursor) : cursor);
 			this.replaced = cursor;
 			this.reachedRangeEnd(this.node);
+			// A lite call that found no server range inserts before the node it
+			// found there, which the rebuilt root replaces. A lite block is only that
+			// insertion context, so point it past the node: when the node was its
+			// host's last child, the root is appended in its place.
+			if (block instanceof LiteBlockImpl && block.endMarker === cursor) block.endMarker = this.node;
 			if (claimsRoot)
 				this.claimRootRemainder(
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,

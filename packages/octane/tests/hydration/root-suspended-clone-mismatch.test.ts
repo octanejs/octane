@@ -167,15 +167,16 @@ describe.each([true, false])('suspended root rebuilt during hydration (dev=%s)',
 	});
 
 	// Each recovery kind before the root suspends: a resolved arm that committed,
-	// a renderable or only-child hole over server text, and list shapes the
-	// server rendered differently. The retry rebuilds, and reports, exactly what
-	// the discarded attempt did.
+	// a renderable or only-child hole over server text, list shapes the server
+	// rendered differently, and a lite call's template in its host. The retry
+	// rebuilds, and reports, exactly what the discarded attempt did.
 	it.each<Component>([
 		'RootNestedArm',
 		'RootHole',
 		'RootOnlyChild',
 		'RootFewerItems',
 		'RootEmptyList',
+		'RootLiteHost',
 	])(
 		'%s keeps the server content while pending and reports as if it never suspended',
 		async (component) => {
