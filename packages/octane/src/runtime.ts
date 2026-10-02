@@ -1806,25 +1806,6 @@ function warnHydrationKeptServerValue(
 	);
 }
 
-/**
- * Publish a value diagnostic, or hold it while `hydration` is a speculative
- * attempt: a discarded attempt reports nothing, and the one that commits
- * finds the same mismatch and reports it once.
- */
-function warnHeldHydrationMismatch(
-	hydration: HydrationCapability,
-	warn: typeof warnHydrationValueMismatch,
-	loc: string | undefined,
-	what: string,
-	serverVal: unknown,
-	clientVal: unknown,
-): void {
-	if (!loc) return;
-	if (hydration.speculative)
-		(hydration.heldWarnings ??= []).push(warn, loc, what, serverVal, clientVal);
-	else warn(loc, what, serverVal, clientVal);
-}
-
 /** DEV-only human-readable description of the server node at the cursor (for warnings). */
 function describeHydrationNode(node: Node | null): string {
 	if (node === null) return 'nothing';
@@ -3819,8 +3800,8 @@ function journalRootSlot(
 	if (PRESENTATION_HYDRATION?.revision === undefined) journalRootRange(parent, before, after);
 }
 
-function journalRootRange(parent: Node, before: Node | null, after: Node | null): void {
-	const leases = ROOT_RENDER_TRANSACTION?.owner.bindingLeases;
+/** `parent`'s children after `before` (or from its first) up to, not including, `after`. */
+function collectRootRange(parent: Node, before: Node | null, after: Node | null): Node[] {
 	const nodes: Node[] = [];
 	for (
 		let node = before === null ? getFirstChild(parent) : getNextSibling(before);
@@ -3828,6 +3809,37 @@ function journalRootRange(parent: Node, before: Node | null, after: Node | null)
 		node = getNextSibling(node)
 	)
 		nodes.push(node);
+	return nodes;
+}
+
+/** Make the range collectRootRange read hold exactly `nodes` again, in order. */
+function restoreRootRange(
+	parent: Node,
+	before: Node | null,
+	after: Node | null,
+	nodes: Node[],
+): void {
+	// A newer undo can already have removed a speculative slot, including its
+	// markers. That bounded snapshot no longer owns a range in this parent;
+	// walking to a bound that is gone would erase unrelated committed siblings.
+	if (
+		(before !== null && (STAGED_DOM?.view(before) ?? before).parentNode !== parent) ||
+		(after !== null && (STAGED_DOM?.view(after) ?? after).parentNode !== parent)
+	)
+		return;
+	const retained = new Set(nodes);
+	let node = before === null ? getFirstChild(parent) : getNextSibling(before);
+	while (node !== null && node !== after) {
+		const next = getNextSibling(node);
+		if (!retained.has(node)) (STAGED_DOM?.view(parent) ?? parent).removeChild(node);
+		node = next;
+	}
+	restoreRootNodes(parent, nodes, after);
+}
+
+function journalRootRange(parent: Node, before: Node | null, after: Node | null): void {
+	const leases = ROOT_RENDER_TRANSACTION?.owner.bindingLeases;
+	const nodes = collectRootRange(parent, before, after);
 	journalUndo(() => {
 		let restore = nodes;
 		// An early owner can publish while renderer preparation is suspended.
@@ -3851,27 +3863,7 @@ function journalRootRange(parent: Node, before: Node | null, after: Node | null)
 			}
 			restore = [...restore.slice(0, start), ...current, ...restore.slice(end + 1)];
 		}
-		// A newer undo can already have removed a speculative slot, including its
-		// markers. That bounded snapshot no longer owns a range in this parent;
-		// falling back to firstChild/null would erase unrelated committed siblings.
-		if (
-			(before !== null && (STAGED_DOM?.view(before) ?? before).parentNode !== parent) ||
-			(after !== null && (STAGED_DOM?.view(after) ?? after).parentNode !== parent)
-		)
-			return;
-		let node =
-			before !== null && (STAGED_DOM?.view(before) ?? before).parentNode === parent
-				? getNextSibling(before)
-				: getFirstChild(parent);
-		const anchor =
-			after !== null && (STAGED_DOM?.view(after) ?? after).parentNode === parent ? after : null;
-		const retained = new Set(restore);
-		while (node !== null && node !== anchor) {
-			const next = getNextSibling(node);
-			if (!retained.has(node)) (STAGED_DOM?.view(parent) ?? parent).removeChild(node);
-			node = next;
-		}
-		restoreRootNodes(parent, restore, anchor);
+		restoreRootRange(parent, before, after, restore);
 	});
 }
 
@@ -18730,15 +18722,6 @@ class HydrationCapability {
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
 	readonly classWrites = new Map<Element, PendingHydrationClassWrite>();
 	private readonly textWarnings = new Map<Text, PendingHydrationTextWarning>();
-	/**
-	 * A resolved Suspense arm's attempt, which a suspension discards so that a
-	 * later attempt adopts the same server nodes. Each server value it repairs
-	 * goes on `repairs`, flat `[node, attribute or null for text, value]`, and
-	 * its value diagnostics wait in `heldWarnings` until it settles.
-	 */
-	speculative = false;
-	private repairs: unknown[] | null = null;
-	heldWarnings: unknown[] | null = null;
 	/** Skip component-frame adoption until the declared container owner. */
 	passthroughRanges = false;
 	/** A slot lent a server range whose first render has yet to claim it. */
@@ -18746,6 +18729,20 @@ class HydrationCapability {
 	nativeAdoption?: NativeAdoptionState;
 	retryPresentation?: () => void;
 	presentation?: boolean;
+	/**
+	 * Whether this attempt is discarded if it suspends: the initial adoption of
+	 * a Suspense arm the server resolved, which keeps showing that server arm
+	 * until an attempt commits. Recovery records the nodes it changes (`save`)
+	 * and the server values it overwrites (`repaired`), so that a discarded
+	 * attempt leaves the server arm as it was, and the attempt that commits
+	 * finds and reports each mismatch once. The attempt's diagnostics wait in
+	 * its hold (HYDRATION_DIAGNOSTIC_HOLDS) meanwhile.
+	 */
+	speculative = false;
+	/** The parents whose children this attempt recorded. */
+	private saved: Set<Node> | null = null;
+	/** Restores what this attempt's recovery changed, newest last. */
+	private undo: (() => void)[] | null = null;
 
 	constructor(
 		public rootBlock: Block,
@@ -18759,10 +18756,19 @@ class HydrationCapability {
 	 * Runs before mismatch recovery changes `parent`'s children, by removing
 	 * server nodes or inserting client ones. A root's hydrating attempt journals
 	 * them, so the rollback of an attempt that suspends restores the server DOM
-	 * its retry adopts and reports.
+	 * its retry adopts and reports. A speculative attempt records them for its
+	 * own rollback, once, within its arm's range when `parent` is the arm's parent.
 	 */
 	save(parent: Node): void {
 		if (inRootHydrationAttempt()) journalRootChildren(parent);
+		if (!this.speculative || (this.saved ??= new Set()).has(parent)) return;
+		this.saved.add(parent);
+		const arm = this.rootBlock;
+		const ranged = parent === domNode(arm.startMarker!).parentNode;
+		const before = ranged ? arm.startMarker : null;
+		const after = ranged ? arm.endMarker : null;
+		const nodes = collectRootRange(parent, before, after);
+		(this.undo ??= []).push(() => restoreRootRange(parent, before, after, nodes));
 	}
 
 	/**
@@ -18776,11 +18782,34 @@ class HydrationCapability {
 		return true;
 	}
 
-	/** Remember `node` in `set` for later attempts, unless its root attempt rolls back. */
+	/**
+	 * Remember `node` in `set` for later attempts, unless its root attempt rolls
+	 * back or this speculative attempt is discarded.
+	 */
 	private remember(set: WeakSet<Node>, node: Node): void {
 		if (set.has(node)) return;
 		set.add(node);
 		if (inRootHydrationAttempt()) journalUndo(() => set.delete(node));
+		if (this.speculative) (this.undo ??= []).push(() => set.delete(node));
+	}
+
+	/**
+	 * The attempt's recovery stands. An enclosing speculative attempt can still
+	 * be discarded, so it inherits the record.
+	 */
+	settle(outer: HydrationCapability | null): void {
+		const undo = this.undo;
+		this.speculative = false;
+		this.saved = this.undo = null;
+		if (undo !== null && outer?.speculative) (outer.undo ??= []).push(...undo);
+	}
+
+	/** The attempt is discarded: restore what its recovery changed. */
+	rollback(): void {
+		const undo = this.undo;
+		this.speculative = false;
+		this.saved = this.undo = null;
+		if (undo !== null) for (let i = undo.length - 1; i >= 0; i--) undo[i]();
 	}
 
 	isActive(): boolean {
@@ -19261,6 +19290,24 @@ class HydrationCapability {
 	}
 
 	/**
+	 * Report a control-flow or list range whose server content before `end` was
+	 * discarded so the client could build its own arm there. Returns whether it
+	 * reported, so callers warn only then. A suspended boundary's next attempt
+	 * finds the earlier attempt's content before the same `end` (a list's open
+	 * marker still names the server's arm), and captures that changed before a
+	 * dormant boundary activated legitimately differ from the server's: neither
+	 * is a mismatch to report. A root attempt that rolls back restores the server
+	 * content and forgets `end`, so its retry reports.
+	 */
+	reportRebuiltRange(end: Node): boolean {
+		const rebuilt = HYDRATION_REBUILT?.has(end) === true;
+		this.remember((HYDRATION_REBUILT ??= new WeakSet()), end);
+		if (rebuilt || this.staleServerValues) return false;
+		noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+		return true;
+	}
+
+	/**
 	 * STRUCTURAL recovery for a list where the SERVER rendered MORE items than the
 	 * client now renders: after its first fill adopts the client's items, the
 	 * cursor sits on the first unconsumed server item (or at `end`). Discard
@@ -19362,66 +19409,20 @@ class HydrationCapability {
 			this.freshNodes.has(name === null ? domNode(target).parentNode! : target)
 		)
 			return;
-		const node: any = STAGED_DOM?.view(target) ?? target;
+		let node: any = STAGED_DOM?.view(target) ?? target;
 		// Reading by qualified name also finds a namespaced attribute.
-		(this.repairs ??= []).push(
-			target,
-			name,
-			name === null ? node.nodeValue : node.getAttribute(name),
-		);
-	}
-
-	/**
-	 * This attempt rendered. A speculative attempt that encloses it can still be
-	 * discarded, so that one takes over the repairs and pending diagnostics;
-	 * otherwise they are final and publish.
-	 */
-	settle(outer: HydrationCapability | null): void {
-		if (outer?.speculative === true) {
-			if (this.repairs !== null) outer.repairs = (outer.repairs ?? []).concat(this.repairs);
-			if (process.env.NODE_ENV !== 'production' && this.heldWarnings !== null)
-				outer.heldWarnings = (outer.heldWarnings ?? []).concat(this.heldWarnings);
-			for (const [node, pending] of this.textWarnings)
-				if (!outer.textWarnings.has(node)) outer.textWarnings.set(node, pending);
-		} else {
-			if (process.env.NODE_ENV !== 'production' && this.heldWarnings !== null) {
-				const held = this.heldWarnings;
-				for (let i = 0; i < held.length; i += 5)
-					(held[i] as typeof warnHydrationValueMismatch)(
-						held[i + 1] as string | undefined,
-						held[i + 2] as string,
-						held[i + 3],
-						held[i + 4],
-					);
-			}
-			this.flushTextWarnings();
-		}
-		this.repairs = this.heldWarnings = null;
-	}
-
-	/**
-	 * A speculative attempt was discarded. Put back the server values it
-	 * repaired, newest first, so the attempt that commits finds and reports the
-	 * same mismatches, and drop the diagnostics it held.
-	 */
-	rollback(): void {
-		const repairs = this.repairs;
-		this.repairs = this.heldWarnings = null;
-		this.textWarnings.clear();
-		if (repairs === null) return;
-		for (let i = repairs.length - 3; i >= 0; i -= 3) {
-			const target: any = STAGED_DOM?.view(repairs[i] as Node) ?? repairs[i];
-			const name = repairs[i + 1] as string | null;
-			const value = repairs[i + 2] as string | null;
-			if (name === null) target.nodeValue = value;
+		const value: string | null = name === null ? node.nodeValue : node.getAttribute(name);
+		(this.undo ??= []).push(() => {
+			node = STAGED_DOM?.view(target) ?? target;
+			if (name === null) node.nodeValue = value;
 			// Removal by qualified name also finds a namespaced attribute.
-			else if (value === null) target.removeAttribute(name);
+			else if (value === null) node.removeAttribute(name);
 			else {
 				const ns = attrNamespace(name);
-				if (ns === null) target.setAttribute(name, value);
-				else target.setAttributeNS(ns, name, value);
+				if (ns === null) node.setAttribute(name, value);
+				else node.setAttributeNS(ns, name, value);
 			}
-		}
+		});
 	}
 
 	/**
@@ -20184,14 +20185,7 @@ class HydrationCapability {
 		if (this.isFresh(el)) return true;
 		if (mode === 1) return false;
 		if (process.env.NODE_ENV !== 'production' && mode === 2 && !this.staleServerValues)
-			warnHeldHydrationMismatch(
-				this,
-				warnHydrationValueMismatch,
-				(el as any).__oct_loc,
-				`attribute \`${name}\``,
-				server,
-				next,
-			);
+			warnHydrationValueMismatch((el as any).__oct_loc, `attribute \`${name}\``, server, next);
 		this.repaired(el, name);
 		return true;
 	}
@@ -20213,14 +20207,7 @@ class HydrationCapability {
 			// `el` and then threw to its catch arm has removed it since.
 			domNode(this.rootBlock.parentNode).contains(el)
 		)
-			warnHeldHydrationMismatch(
-				this,
-				warnHydrationValueMismatch,
-				(el as any).__oct_loc,
-				'attribute `class`',
-				server,
-				next,
-			);
+			warnHydrationValueMismatch((el as any).__oct_loc, 'attribute `class`', server, next);
 		return true;
 	}
 
@@ -20319,14 +20306,7 @@ class HydrationCapability {
 			!this.staleServerValues &&
 			!this.isFresh(el)
 		) {
-			warnHeldHydrationMismatch(
-				this,
-				warnHydrationValueMismatch,
-				(el as any).__oct_loc,
-				'style',
-				before,
-				expected,
-			);
+			warnHydrationValueMismatch((el as any).__oct_loc, 'style', before, expected);
 		}
 		return true;
 	}
@@ -22759,9 +22739,7 @@ export function setHTML(el: Element, value: any): void {
 		}
 		if (isHydrationSuppressed(el)) return;
 		if (process.env.NODE_ENV !== 'production')
-			warnHeldHydrationMismatch(
-				hydration,
-				warnHydrationKeptServerValue,
+			warnHydrationKeptServerValue(
 				(el as any).__oct_loc,
 				'`dangerouslySetInnerHTML` content',
 				server,
@@ -33282,6 +33260,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// so just build + append each child. Skips the keyed-match Map / Set / reorder
 	// bookkeeping below, which is the hot path for large initial mounts.
 	if (firstChild === null) {
+		saveDeoptChildren(el);
 		for (let i = 0; i < next.length; i++) {
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
 			if (node !== null) {
@@ -33369,9 +33348,12 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		if (keep === null || !keep.has(n)) {
 			const hydration = activeHydration();
 			if (hydration !== null && !hydration.isFresh(el)) {
+				hydration.save(el);
 				noteRecoverableHydrationError(() => new Error(formatClientError(62)), ownerBlock);
 			}
-			if (journal) {
+			// A speculative attempt's own record restores this removal if the
+			// attempt is discarded; a deferred removal would still run at commit.
+			if (journal && hydration?.speculative !== true) {
 				journalRootChildren(el);
 				deferRootRange(el, n, n, () => detachDeoptTreeRefs(n, null));
 			} else {
@@ -33388,6 +33370,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		const want = result[i];
 		const at = hasForeign ? nextDeoptOwnedChild(cursor, hydrationOwnsUnstamped === true) : cursor;
 		if (at !== want) {
+			saveDeoptChildren(el);
 			if (journal) journalRootChildren(el);
 			if (renderingFocus === null) (STAGED_DOM?.view(el) ?? el).insertBefore(want, at);
 			else {
@@ -33399,6 +33382,16 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		// detaching want. Read its successor only after that movement completes.
 		cursor = getNextSibling(want);
 	}
+}
+
+/**
+ * Before reconcileDeoptChildren inserts or moves children of a server host it
+ * is hydrating: a speculative attempt records them, so that one which suspends
+ * leaves the server's children as they were (HydrationCapability.save).
+ */
+function saveDeoptChildren(el: Element): void {
+	const hydration = activeHydration();
+	if (hydration !== null && !hydration.isFresh(el)) hydration.save(el);
 }
 
 // Resume point of an owned-children walk after a foreign portal range: the first
@@ -33865,6 +33858,8 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		// element fresh with hydration SUSPENDED for its subtree (so children client-mount
 		// rather than mis-adopt). Recovery runs in dev + prod; the warning is dev-only.
 		hydration.save(block.parentNode);
+		if (!hydration.staleServerValues)
+			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 		if (process.env.NODE_ENV !== 'production') {
 			const mmLoc = (domNode(hydration.node).parentNode as any)?.__oct_loc;
 			if (mmLoc)
@@ -38261,6 +38256,8 @@ interface InitialSuspenseHydration {
 	idStart: number;
 	seedRaw: string | null;
 	nativeRaw: string | null;
+	/** The captures changed before a dormant boundary activated; see staleServerValues. */
+	stale?: true;
 }
 
 // Server metadata gives each resolved arm an independent adoption scope. The
@@ -38395,7 +38392,9 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 	hydration.claimRootRemainder(initial.end);
 	hydration.protectRootAnchor(initial.end);
 	const previousHydration = currentHydration;
-	if (previousHydration?.staleServerValues) hydration.staleServerValues = true;
+	// Only the activation knows; a retry runs outside it, over the restored arm.
+	if (previousHydration?.staleServerValues || initial.stale)
+		hydration.staleServerValues = initial.stale = true;
 	if (previousHydration?.retryPresentation !== undefined)
 		hydration.retryPresentation = previousHydration.retryPresentation;
 	const previousCapture = WIP_CAPTURE;
@@ -38418,6 +38417,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		renderBlock(block);
 		drainHydrationRenderPhaseUpdates(block);
 		hydration.flushClassWrites();
+		hydration.flushTextWarnings();
 		hydration.settle(previousHydration);
 		state.hasResolved = true;
 	} catch (error) {
@@ -38425,10 +38425,8 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		failure = error;
 		if (isSuspenseException(error)) suspended = error.thenable;
 		// The next attempt, or the server catch arm adopted below, finds the
-		// server's values as it left them. That catch arm commits directly, so
-		// this capability stops holding its reports.
+		// server arm as the server rendered it: undo this attempt's recovery.
 		hydration.rollback();
-		hydration.speculative = false;
 		// None of this attempt's refs or effects committed. Dispose its scopes
 		// without detaching the actual server nodes that the next attempt adopts.
 		const refs: SuspenseRefEntry[] = [];
@@ -38452,15 +38450,9 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		state.tryBlock = null;
 		discardOffscreenCapture(capture);
 	} finally {
-		// The catch arm below replaces the attempt's region.
-		hydration.releaseDiagnostics(
-			diagnostics,
-			failed &&
-				suspended === null &&
-				state.catchBody !== null &&
-				!isAdoptionControl(failure) &&
-				!isHostContextRequest(failure),
-		);
+		// A failed attempt's recovery was undone: the attempt that commits, or
+		// the catch arm that replaces this one, reports what it finds.
+		hydration.releaseDiagnostics(diagnostics, failed);
 		setNativeAdoptionResolver(previousNative);
 		WIP_CAPTURE = previousCapture;
 		currentHydration = previousHydration;
@@ -41762,7 +41754,10 @@ function renderBranchSlot(
 						// STRUCTURAL mismatch — discard the server range and client-build the
 						// branch fresh into the borrowed slot markers below.
 						hydration.save(domParent);
-						if (process.env.NODE_ENV !== 'production') {
+						if (
+							hydration.reportRebuiltRange(state.end as Node) &&
+							process.env.NODE_ENV !== 'production'
+						) {
 							const mmLoc = siteLoc(parentScope, slotKey);
 							if (mmLoc)
 								hydration.warnStructural(
@@ -41821,7 +41816,10 @@ function renderBranchSlot(
 				// stale server range so the empty branch leaves a clean range + siblings stay
 				// aligned (structural mismatch).
 				hydration.save(domParent);
-				if (process.env.NODE_ENV !== 'production') {
+				if (
+					hydration.reportRebuiltRange(state.end as Node) &&
+					process.env.NODE_ENV !== 'production'
+				) {
 					const mmLoc = siteLoc(parentScope, slotKey);
 					if (mmLoc)
 						hydration.warnStructural(
