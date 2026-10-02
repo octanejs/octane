@@ -1929,10 +1929,28 @@ function hydrationNodeMatches(
  * Does the server node at the cursor match a nested fragment's FIRST logical
  * root? A leading template comment is a dynamic hole whose server form (text,
  * a marker range, or nothing) cannot decide a mismatch, as in fragmentRemainder.
+ * The first static element root after the leading `<!>` holes decides instead,
+ * compared with the server node that the compiled walk reaches from the cursor
+ * (HydrationCapability.sibling steps over each hole's server form). Otherwise
+ * another fragment's server nodes would stand for this one's: a hole's slot
+ * would take one of them as its anchor, and the static roots would never be
+ * built. Matches when no static element root follows the leading holes, and
+ * under a passthrough root (HydrationCapability.passthroughRoot).
  */
-function fragmentRootMatches(server: Node, fragment: Node, partialStyles?: string): boolean {
-	const first = getFirstChild(fragment)!;
-	return first.nodeType === 8 || hydrationNodeMatches(server, first, partialStyles, '0');
+function fragmentRootMatches(
+	server: Node,
+	fragment: Node,
+	hydration: HydrationCapability,
+	partialStyles?: string,
+): boolean {
+	let root: Node | null = getFirstChild(fragment)!;
+	if (root.nodeType !== 8) return hydrationNodeMatches(server, root, partialStyles, '0');
+	if (hydration.passthroughRoot) return true;
+	let holes = 0;
+	for (; root !== null && root.nodeType === 8; holes++) root = getNextSibling(root);
+	if (root === null || root.nodeType !== 1) return true;
+	const at = hydration.sibling(server, holes);
+	return at !== null && hydrationNodeMatches(at, root, partialStyles, String(holes));
 }
 
 /** Remove the server nodes from `start` to `end` (inclusive). Used to discard a divergent range. */
@@ -18657,16 +18675,28 @@ function lazyRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
  * template source. A raw fragment's cached descriptor is that root; a
  * fixed-HTML fragment's starts after its synthetic `<octane-frag>` wrapper. A
  * leading `<!>` is a dynamic hole whose server form (text, a marker range, or
- * nothing) cannot decide a mismatch.
+ * nothing) cannot decide a mismatch, so the first static element root after
+ * the leading holes decides, as in fragmentRootMatches.
  */
-function lazyFragmentRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
-	const root =
-		lazy.frag !== 0
-			? lazyRootDescriptor(lazy)
-			: templateRootDescriptor(lazy.html, 13 /* '<octane-frag>'.length */);
-	if (root === 8) return true;
+function lazyFragmentRootMatches(
+	server: Node,
+	lazy: LazyTemplateRecord,
+	hydration: HydrationCapability,
+): boolean {
+	// A fixed-HTML fragment's roots follow its `<octane-frag>` wrapper.
+	const start = lazy.frag !== 0 ? 0 : 13;
+	let root = start === 0 ? lazyRootDescriptor(lazy) : templateRootDescriptor(lazy.html, start);
 	if (root === 3) return server.nodeType === 3;
-	return server.nodeType === 1 && (server as Element).localName === root;
+	if (root !== 8) return server.nodeType === 1 && (server as Element).localName === root;
+	if (hydration.passthroughRoot) return true;
+	const html = lazy.html;
+	let at = start;
+	while (html.startsWith('<!>', at)) at += 3;
+	// Past the last root, the descriptor is a number too.
+	root = templateRootDescriptor(html, at);
+	if (typeof root === 'number') return true;
+	const node = hydration.sibling(server, (at - start) / 3);
+	return node !== null && node.nodeType === 1 && (node as Element).localName === root;
 }
 
 /**
@@ -18895,6 +18925,13 @@ class HydrationCapability {
 	private claimEnd: Node | null | undefined = undefined;
 	/** Skip component-frame adoption until the declared container owner. */
 	passthroughRanges = false;
+	/**
+	 * The root is a HYDRATION_RANGE_BOUNDARY passthrough root. Its owner adopts
+	 * the first server range in the container, so the owner's content can sit
+	 * one range level off its server nodes: a nested fragment's static roots
+	 * need not follow the server forms of its leading holes there.
+	 */
+	passthroughRoot = false;
 	/** A slot lent a server range whose first render has yet to claim it. */
 	lentSlot: ChildSlot | null = null;
 	nativeAdoption?: NativeAdoptionState;
@@ -20198,12 +20235,13 @@ class HydrationCapability {
 		}
 		if (isFragment) {
 			// A nested fragment has no server wrapper, so its first logical root must
-			// be the cursor itself. A root claim already compared every root above.
+			// be the cursor itself, or follow the server forms of its leading holes.
+			// A root claim already compared every root above.
 			if (
 				claimsRoot ||
 				(template !== null
-					? fragmentRootMatches(cursor, template, partialStyles)
-					: lazyFragmentRootMatches(cursor, lazy!))
+					? fragmentRootMatches(cursor, template, this, partialStyles)
+					: lazyFragmentRootMatches(cursor, lazy!, this))
 			) {
 				if (cursor === this.claimFrom) this.claimRoots(cursor, template ?? lazy!);
 				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
@@ -20268,12 +20306,23 @@ class HydrationCapability {
 		// differ from the server's; still rebuild, but there is nothing to report.
 		if (!this.staleServerValues) {
 			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
-			if (process.env.NODE_ENV !== 'production')
+			if (process.env.NODE_ENV !== 'production') {
+				// A leading hole matches any server node: name the static root that
+				// did not match, and what the server rendered in its place.
+				let expected = getFirstChild(template);
+				let actual: Node | null = cursor;
+				while (expected !== null && expected.nodeType === 8) {
+					expected = getNextSibling(expected);
+					actual = actual === null ? null : this.sibling(actual, 1);
+				}
 				warnHydrationStructuralMismatch(
 					loc ?? componentSourceLoc(CURRENT_BLOCK?.body) ?? CURRENT_SCOPE?.locFile,
-					`a fragment starting with ${describeHydrationNode(getFirstChild(template))}`,
-					describeHydrationNode(cursor),
+					expected === getFirstChild(template) || expected === null
+						? `a fragment starting with ${describeHydrationNode(getFirstChild(template))}`
+						: `a fragment with ${describeHydrationNode(expected)} after its leading holes`,
+					describeHydrationNode(expected === null ? cursor : actual),
 				);
+			}
 		}
 		// The compiled mount inserts into its scope's block, which for a lite
 		// component is the scope's own range rather than CURRENT_BLOCK's.
@@ -47832,7 +47881,7 @@ function hydrateRootWithOutputHandler(
 		}
 		if (nativeManifest !== undefined)
 			hydration.nativeAdoption = ownNativeAdoption(rootBlock, nativeManifest);
-		hydration.passthroughRanges =
+		hydration.passthroughRoot = hydration.passthroughRanges =
 			(body as ComponentBody & { [HYDRATION_RANGE_BOUNDARY]?: 'passthrough' | 'owner' })[
 				HYDRATION_RANGE_BOUNDARY
 			] === 'passthrough';
