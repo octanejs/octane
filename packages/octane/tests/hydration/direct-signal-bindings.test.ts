@@ -757,6 +757,32 @@ export function App(props) @{ <p>{'n:'}{props.value}<Tag kind="x" /></p> }`,
 		owner.dispose();
 	});
 
+	it('writes a signal-capable text hole that a pending render pass skipped', () => {
+		// An earlier hole updates this component's own state mid-render, so the
+		// rest of that pass skips its writes. The repeated pass renders the same
+		// value and must still write it.
+		const app = loadCompiledFixtureSource(
+			`import { useState } from 'octane';
+function Tag({ kind }) @{ <i class={kind}>{'t'}</i> }
+export function App(props) @{
+	const [seen, setSeen] = useState(0);
+	const sync = () => {
+		if (seen < props.version) setSeen(props.version);
+		return '';
+	};
+	<p>{sync() as string}{'n:'}{props.value}<Tag kind="x" /></p>
+}`,
+			{ id: '/src/pending-text-hole.tsrx', mode: 'client', compileOptions: { hmr: false } },
+		);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		root = createRoot(container);
+		root.render(app.App, { value: 'a', version: 0 });
+		expect(container.textContent).toBe('n:at');
+		flushSync(() => root!.render(app.App, { value: 'b', version: 1 }));
+		expect(container.textContent).toBe('n:bt');
+	});
+
 	it('publishes an authoritative storage candidate into an active writable binding', () => {
 		enableSignalBindings();
 		const container = document.createElement('div');

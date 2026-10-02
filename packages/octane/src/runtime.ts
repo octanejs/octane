@@ -28002,43 +28002,35 @@ function fireEventSlot(
 // Only a handler entering another signal owner needs a callback; the ordinary
 // dispatch calls this directly.
 function invokeEventSlot(slot: EventSlot, event: Event): void {
-	if (typeof slot === 'function') {
-		slot(event);
-		return;
-	}
-	if (process.env.NODE_ENV !== 'production' && isInvalidEventListenerSlot(slot)) {
+	if (typeof slot === 'function') slot(event);
+	else if (process.env.NODE_ENV !== 'production' && isInvalidEventListenerSlot(slot))
 		invokeInvalidEventListener(`\`${slot.name}\``, slot.value, event);
-		return;
-	}
-	if (isHandlerBundle(slot)) {
-		const bundle = slot;
-		const a = bundle.args;
+	else if (isHandlerBundle(slot)) {
+		const a = slot.args;
 		if (typeof a !== 'number') {
 			switch (a.length) {
 				case 0:
-					bundle.fn();
+					slot.fn();
 					break;
 				case 1:
-					bundle.fn(a[0]);
+					slot.fn(a[0]);
 					break;
 				case 2:
-					bundle.fn(a[0], a[1]);
+					slot.fn(a[0], a[1]);
 					break;
 				default:
-					bundle.fn.apply(null, a);
+					slot.fn.apply(null, a);
 			}
 		} else if (a === 1) {
-			bundle.fn(bundle.a0);
+			slot.fn(slot.a0);
 		} else if (a === 2) {
-			bundle.fn(bundle.a0, bundle.a1);
+			slot.fn(slot.a0, slot.a1);
 		} else if (a === -1) {
-			bundle.fn(event, bundle.a0);
+			slot.fn(event, slot.a0);
 		} else {
-			bundle.fn(event, bundle.a0, bundle.a1);
+			slot.fn(event, slot.a0, slot.a1);
 		}
-		return;
-	}
-	invokeInvalidEventListener(`${event.type} event`, slot, event);
+	} else invokeInvalidEventListener(`${event.type} event`, slot, event);
 }
 
 function invokeInvalidEventListener(label: string, listener: unknown, event: Event): void {
@@ -35652,11 +35644,10 @@ export function bindSignalChild(
 			value !== null &&
 			type !== 'object' &&
 			type !== 'function';
-		if (
-			primitiveToken &&
-			prior === null &&
-			!(CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate)
-		) {
+		// A pass that already queued this block skips child writes; its token must
+		// not claim a primitive that never reached the DOM.
+		const skipped = CURRENT_BLOCK?.pending === true && !CURRENT_BLOCK.crossRenderUpdate;
+		if (primitiveToken && prior === null && !skipped) {
 			const state = parentScope.slots[slotKey] as ChildSlot | undefined;
 			if (
 				state !== undefined &&
@@ -35686,7 +35677,7 @@ export function bindSignalChild(
 			if (WIP_CAPTURE === null) finish(false);
 			else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
 		}
-		return primitiveToken ? value : text;
+		return primitiveToken && !skipped ? value : text;
 	}
 	if (prior !== null && !prior.disposed && prior.handle === value) {
 		const next = readSignalBinding(value);

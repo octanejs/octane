@@ -27,7 +27,7 @@
   "root-chained-jsx": {
     "raw": 85952,
     "gzip": 28512,
-    "brotli": 25312
+    "brotli": 25344
   },
   "root-static": {
     "raw": 201472,
