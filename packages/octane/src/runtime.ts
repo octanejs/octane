@@ -42509,7 +42509,7 @@ export function forBlock<T>(
 		} else if (
 			hydration !== null &&
 			hydration.isOpen(hydration.node) &&
-			(STAGED_DOM?.view(hydration.node) ?? hydration.node).parentNode === domParent
+			domNode(hydration.node).parentNode === domParent
 		) {
 			// Hydration (sole hole, no `<!>` anchor): the @for is the only root of its
 			// owning body (e.g. a `@try { @for }` arm or a component whose body is a
