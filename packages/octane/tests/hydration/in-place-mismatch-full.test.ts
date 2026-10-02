@@ -5,12 +5,13 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// A single-root component call that renders through the full component slot
-// and finds no server range of its own renders its template against the server
-// element at the cursor. When that element does not match, hydration rebuilds
-// the component's root in its place: it reports the mismatch once, keeps the
-// server siblings around it adopted, and the rebuilt root later unmounts and
-// remounts with the rest of its arm.
+// A single-root component call inside a host element that finds no server
+// range of its own renders its template against the server element at the
+// cursor. When that element does not match, hydration rebuilds the component's
+// root in its place: it reports the mismatch once, keeps the server siblings
+// around it adopted, and the rebuilt root later unmounts and remounts with the
+// rest of its arm. A hooked call renders through the full component slot, and
+// so does a production compile's call whose output reads only constants.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -33,14 +34,9 @@ const STRUCTURAL = /the client expected <p> but the server rendered <u>\. The mi
 const SERVER_SECTION = '<em>e</em><u>u</u><b>p</b><hr>';
 
 const CALLS = [
-	{ call: 'a hooked component', name: 'Full', rebuilt: '<p>p</p>', production: false },
-	// A development compile renders this hookless call through the lite slot.
-	{
-		call: 'a constant-output component',
-		name: 'ConstantOutput',
-		rebuilt: '<p>c</p>',
-		production: true,
-	},
+	{ call: 'a hooked component', name: 'Full', rebuilt: '<p>p</p>' },
+	// A development compile renders this hookless call through the lite slot instead.
+	{ call: 'a constant-output component', name: 'ConstantOutput', rebuilt: '<p>c</p>' },
 ];
 
 describe.each([
@@ -83,7 +79,7 @@ describe.each([
 			.map((call: unknown[]) => String(call[0]))
 			.filter((message: string) => message.includes('hydration mismatch'));
 
-	it.each(CALLS.filter((call) => !dev || !call.production))(
+	it.each(CALLS)(
 		'rebuilds the root of $call over the server element',
 		async ({ name, rebuilt }) => {
 			container.innerHTML = ServerRT.renderToString(server[name], { on: false }).html;
