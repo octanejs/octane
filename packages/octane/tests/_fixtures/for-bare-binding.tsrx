@@ -50,11 +50,13 @@ export function Scores(props: { scores: [string, ...number[]][] }) @{
 
 // A bare-left binding is the row's own writable item: reassigning it in the
 // row changes only that row's output.
-export function Relabeled(props: { rows: Row[] }) @{
+export function Relabeled(props: { rows: Row[]; onPick: (value: string) => void }) @{
 	<ul>
 		@for ({ id, label = 'untitled' } of props.rows; key id) {
 			label = `${label}!`;
-			<li data-id={id}>{label as string}</li>
+			<li data-id={id}>
+				<button onClick={() => props.onPick(label)}>{label as string}</button>
+			</li>
 		}
 	</ul>
 }

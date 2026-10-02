@@ -20,9 +20,11 @@ import { Rows, type RowsProps } from './_fixtures/for-bare-binding.object.tsrx';
 const server = loadServerFixture<typeof client>(
 	'packages/octane/tests/_fixtures/for-bare-binding.tsrx',
 );
-// A split child loads through Vite's real module graph, which can take longer
-// than vi.waitFor's 1s default on a loaded runner.
-const SPLIT_CHILD_LOAD = { timeout: 4000 };
+// Each Hydrate child is a separate query module that Vite compiles on its first
+// request. A loaded run can queue that request behind other files' transforms
+// for several seconds, far beyond vi.waitFor's 1s default; the split tests'
+// own timeout leaves room for this bound.
+const SPLIT_CHILD_LOAD = { timeout: 10_000 };
 
 const cleanups: (() => void)[] = [];
 afterEach(() => {
@@ -125,7 +127,9 @@ describe('bare-left @for row bindings', () => {
 	});
 
 	it('lets a row reassign its own bare-left binding', () => {
-		const rows = { rows: [{ id: 'x', label: 'first' }, { id: 'y' }] };
+		const picks: string[] = [];
+		const onPick = (value: string) => picks.push(value);
+		const rows = { rows: [{ id: 'x', label: 'first' }, { id: 'y' }], onPick };
 		const scores = {
 			scores: [['ann', 3], ['bo']] satisfies [string, number?][],
 			factor: 2,
@@ -133,8 +137,16 @@ describe('bare-left @for row bindings', () => {
 		const relabeled = mount(client.Relabeled, rows);
 		cleanups.push(() => relabeled.unmount());
 		expect(text(relabeled.findAll('li'))).toEqual(['first!', 'untitled!']);
-		relabeled.update(client.Relabeled, { rows: [{ id: 'y', label: 'renamed' }, { id: 'x' }] });
+		// The row's handler reads the reassigned value, not the destructured one.
+		relabeled.click('[data-id="y"] button');
+		expect(picks).toEqual(['untitled!']);
+		relabeled.update(client.Relabeled, {
+			rows: [{ id: 'y', label: 'renamed' }, { id: 'x' }],
+			onPick,
+		});
 		expect(text(relabeled.findAll('li'))).toEqual(['renamed!', 'untitled!']);
+		relabeled.click('[data-id="y"] button');
+		expect(picks).toEqual(['untitled!', 'renamed!']);
 
 		const weighted = mount(client.Weighted, scores);
 		cleanups.push(() => weighted.unmount());
@@ -158,6 +170,8 @@ describe('bare-left @for row bindings', () => {
 		flushSync(() => {});
 		expectAdopted([...relabeledHost.querySelectorAll('li')], relabeledItems);
 		expect(text(relabeledItems)).toEqual(['first!', 'untitled!']);
+		flushSync(() => relabeledItems[0].querySelector('button')!.click());
+		expect(picks).toEqual(['untitled!', 'renamed!', 'first!']);
 		expectAdopted([...weightedHost.querySelectorAll('li')], weightedItems);
 		expect(text(weightedItems)).toEqual(['ann:6', 'bo:2']);
 		flushSync(() => weightedRoot.render(client.Weighted, { ...scores, factor: 10 }));
@@ -168,36 +182,40 @@ describe('bare-left @for row bindings', () => {
 	it.each([
 		['wraps the rows', 'SplitAroundRows', 'row:b'],
 		['sits inside each row', 'SplitInsideRows', 'label:b'],
-	] as const)('hydrates a split <Hydrate> that %s', async (_, view, pick) => {
-		const input = { rows: [{ id: 'a' }, { id: 'b' }], labels: ['a', 'b'] };
-		const host = container(
-			renderToString(server[view], { ...input, when: load(), onPick: () => {} }).html,
-		);
-		const buttons = [...host.querySelectorAll('button')];
-		expect(text(buttons)).toEqual(['a', 'b']);
+	] as const)(
+		'hydrates a split <Hydrate> that %s',
+		async (_, view, pick) => {
+			const input = { rows: [{ id: 'a' }, { id: 'b' }], labels: ['a', 'b'] };
+			const host = container(
+				renderToString(server[view], { ...input, when: load(), onPick: () => {} }).html,
+			);
+			const buttons = [...host.querySelectorAll('button')];
+			expect(text(buttons)).toEqual(['a', 'b']);
 
-		const picks: string[] = [];
-		const errors: unknown[] = [];
-		const onHydrated = vi.fn();
-		const root = hydrateRoot(
-			host,
-			client[view],
-			{ ...input, when: load(), onHydrated, onPick: (value: string) => picks.push(value) },
-			{ onRecoverableError: (error) => errors.push(error) },
-		);
-		cleanups.push(() => root.unmount());
-		const boundaries = view === 'SplitAroundRows' ? 1 : 2;
-		await vi.waitFor(async () => {
-			await act(() => {});
-			expect(onHydrated).toHaveBeenCalledTimes(boundaries);
-		}, SPLIT_CHILD_LOAD);
+			const picks: string[] = [];
+			const errors: unknown[] = [];
+			const onHydrated = vi.fn();
+			const root = hydrateRoot(
+				host,
+				client[view],
+				{ ...input, when: load(), onHydrated, onPick: (value: string) => picks.push(value) },
+				{ onRecoverableError: (error) => errors.push(error) },
+			);
+			cleanups.push(() => root.unmount());
+			const boundaries = view === 'SplitAroundRows' ? 1 : 2;
+			await vi.waitFor(async () => {
+				await act(() => {});
+				expect(onHydrated).toHaveBeenCalledTimes(boundaries);
+			}, SPLIT_CHILD_LOAD);
 
-		expectAdopted([...host.querySelectorAll('button')], buttons);
-		expect(text(buttons)).toEqual(['a', 'b']);
-		await act(() => buttons[1].click());
-		expect(picks).toEqual([pick]);
-		expect(errors).toEqual([]);
-	});
+			expectAdopted([...host.querySelectorAll('button')], buttons);
+			expect(text(buttons)).toEqual(['a', 'b']);
+			await act(() => buttons[1].click());
+			expect(picks).toEqual([pick]);
+			expect(errors).toEqual([]);
+		},
+		15_000,
+	);
 
 	it('binds universal rows the same way', () => {
 		const target = createObjectContainer();
