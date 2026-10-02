@@ -79,6 +79,11 @@ describe.each([
 		'the client expected the end of the branch but the server rendered a control-flow ' +
 		'block. The mismatched subtree was rebuilt on the client.';
 
+	const emptyReport = (component: string) =>
+		`Octane hydration mismatch at ${FILE}:${siteLoc(`function ${component}(`, '@if')}: ` +
+		'the client expected an empty branch but the server rendered a control-flow ' +
+		'block. The mismatched subtree was rebuilt on the client.';
+
 	async function hydrate(
 		name: string,
 		serverProps: Record<string, unknown>,
@@ -165,20 +170,45 @@ describe.each([
 		},
 	);
 
-	// The tail check measures from what the arm claimed. An empty client arm
-	// claims nothing, so the server's whole range is the other arm, not a tail
-	// after this one, and it is left to the existing empty-arm handling.
-	it('does not report a client arm that renders nothing over the server arm', async () => {
-		const s = await hydrate('EmptyArm', { on: true }, { on: false });
+	// A client arm that renders nothing claims nothing of the server's other
+	// arm, so the server's whole range is stale. It is discarded and reported as
+	// an empty branch, the same as when the client's @if has no arm to render.
+	it.each([
+		{ name: 'EmptyArm', props: { on: false } },
+		{ name: 'NoElseArm', props: { on: false } },
+	])(
+		'discards the server arm under a client $name that renders nothing and reports it once',
+		async ({ name, props }) => {
+			const s = await hydrate(name, { ...props, on: true }, props);
 
-		expect(s.recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+			expect(container.querySelector('#r')).toBe(s.host);
+			expect(markup(s.host)).toBe('');
+			expect(s.recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+			expect(warnings()).toEqual(dev ? [emptyReport(name)] : []);
 
-		s.render({ on: true });
-		expect(markup(s.host)).toBe('<em>x</em>');
-		s.render({ on: false });
-		expect(markup(s.host)).toBe('');
-	});
+			s.render({ ...props, on: true });
+			expect(markup(s.host)).toBe('<em>x</em>');
+			s.render(props);
+			expect(markup(s.host)).toBe('');
+		},
+	);
+
+	it.each([
+		{ name: 'EmptyArm', props: { on: false } },
+		{ name: 'NoElseArm', props: { on: false } },
+	])(
+		'adopts an empty $name over the same empty server arm without a report',
+		async ({ name, props }) => {
+			const s = await hydrate(name, props, props);
+
+			expect(markup(s.host)).toBe('');
+			expect(s.recoverable).toEqual([]);
+			expect(warnings()).toEqual([]);
+
+			s.render({ ...props, on: true });
+			expect(markup(s.host)).toBe('<em>x</em>');
+		},
+	);
 
 	it('keeps the server content of a boundary that ends the arm while it loads', async () => {
 		container.innerHTML = ServerRT.renderToString(server.TrailingTry, {
@@ -245,6 +275,34 @@ describe.each([
 		expect(container.querySelector('em')).toBe(em);
 		expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
 		expect(warnings()).toEqual(dev ? [tailReport(name, '@if')] : []);
+	});
+
+	it('reports the empty-arm discard once when a pending sibling replays the root', async () => {
+		container.innerHTML = ServerRT.renderToString(server.EmptyArmThenChild, {
+			on: true,
+			Child: server.Tail,
+		}).html;
+		const host = container.querySelector('#r')!;
+		const tail = container.querySelector('u')!;
+		const recoverable: string[] = [];
+		let deliver!: (module: { default: ComponentBody }) => void;
+		const Child = lazy(
+			() => new Promise<{ default: ComponentBody }>((accept) => (deliver = accept)),
+		);
+		await act(() => {
+			root = hydrateRoot(
+				container,
+				client.EmptyArmThenChild,
+				{ on: false, Child },
+				{ onRecoverableError: (error: unknown) => recoverable.push((error as Error).message) },
+			);
+		});
+		await act(async () => deliver({ default: client.Tail }));
+
+		expect(markup(host)).toBe('<u>tail</u>');
+		expect(container.querySelector('u')).toBe(tail);
+		expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+		expect(warnings()).toEqual(dev ? [emptyReport('EmptyArmThenChild')] : []);
 	});
 
 	// Captures that changed before a dormant boundary activated legitimately
