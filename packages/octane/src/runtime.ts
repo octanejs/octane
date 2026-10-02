@@ -236,9 +236,11 @@ import {
 	NATIVE_TRANSITION_CONSUMER,
 	readNativeDomStyle,
 	registerNativeActionResolver,
+	registerSignalDeclarationStage,
 	runNativeBatch,
 	setNativeCandidateResolver,
 	setNativeAdoptionResolver,
+	type SignalDeclarationStage,
 } from './signals/read-protocol.js';
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
 import {
@@ -1373,9 +1375,52 @@ function scheduleNativeRead(target: Block): void {
 	}
 }
 
+interface SignalDeclarationRenderStage extends SignalDeclarationStage {
+	readonly capture: OffscreenCapture;
+	settled: boolean;
+}
+
+/**
+ * A signal facade declared again by a later render stages its new definition
+ * here instead of mutating committed graph state. One stage covers one body
+ * invocation, so a render-phase rerun supersedes its earlier pass. The capture's
+ * commit accepts it; its discard, or a transition journal rollback that unwinds
+ * this render, discards it.
+ */
+function currentSignalDeclarationStage(): SignalDeclarationStage | undefined {
+	const block = CURRENT_BLOCK;
+	const capture = WIP_CAPTURE;
+	// Outside a render, or in a render that publishes without a capture, a
+	// declaration applies immediately.
+	if (block === null || capture === null || ROOT_RENDER_ROLLBACK) return undefined;
+	// Native reads open the invocation frame before a facade can be read.
+	const invocation = NATIVE_READ_DRIVER?.invocation(block);
+	const current = invocation?.invocationData as SignalDeclarationRenderStage | null | undefined;
+	if (current != null && !current.settled && current.capture === capture) return current;
+	const callbacks: Array<(discarded: boolean) => void> = [];
+	const stage: SignalDeclarationRenderStage = {
+		capture,
+		settled: false,
+		settle(callback) {
+			callbacks.push(callback);
+		},
+	};
+	const finish = (discarded: boolean): void => {
+		if (stage.settled) return;
+		stage.settled = true;
+		for (const callback of callbacks) callback(discarded);
+	};
+	// A held transition attempt unwinds its render while the capture survives.
+	if (TRANSITION_JOURNAL !== null) journalUndo(() => finish(true));
+	(capture.renderCleanups ??= []).push(finish);
+	if (invocation !== undefined) invocation.invocationData = stage;
+	return stage;
+}
+
 function ensureNativeReadDriver(): NativeReadDriver {
 	if (NATIVE_READ_DRIVER !== null) return NATIVE_READ_DRIVER;
 	installNativeSignalActionExtension();
+	registerSignalDeclarationStage(currentSignalDeclarationStage);
 	NATIVE_READ_DRIVER = createNativeReadDriver({
 		capture: () => WIP_CAPTURE,
 		cleanup: registerHookCleanup,
@@ -1758,6 +1803,25 @@ function warnHydrationKeptServerValue(
 			'The server value was kept. If this difference is intentional, add ' +
 			'suppressHydrationWarning to the element.',
 	);
+}
+
+/**
+ * Publish a value diagnostic, or hold it while `hydration` is a speculative
+ * attempt: a discarded attempt reports nothing, and the one that commits
+ * finds the same mismatch and reports it once.
+ */
+function warnHeldHydrationMismatch(
+	hydration: HydrationCapability,
+	warn: typeof warnHydrationValueMismatch,
+	loc: string | undefined,
+	what: string,
+	serverVal: unknown,
+	clientVal: unknown,
+): void {
+	if (!loc) return;
+	if (hydration.speculative)
+		(hydration.heldWarnings ??= []).push(warn, loc, what, serverVal, clientVal);
+	else warn(loc, what, serverVal, clientVal);
 }
 
 /** DEV-only human-readable description of the server node at the cursor (for warnings). */
@@ -18636,6 +18700,15 @@ class HydrationCapability {
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
 	readonly classWrites = new Map<Element, PendingHydrationClassWrite>();
 	private readonly textWarnings = new Map<Text, PendingHydrationTextWarning>();
+	/**
+	 * A resolved Suspense arm's attempt, which a suspension discards so that a
+	 * later attempt adopts the same server nodes. Each server value it repairs
+	 * goes on `repairs`, flat `[node, attribute or null for text, value]`, and
+	 * its value diagnostics wait in `heldWarnings` until it settles.
+	 */
+	speculative = false;
+	private repairs: unknown[] | null = null;
+	heldWarnings: unknown[] | null = null;
 	/** Skip component-frame adoption until the declared container owner. */
 	passthroughRanges = false;
 	/** A slot lent a server range whose first render has yet to claim it. */
@@ -19141,12 +19214,31 @@ class HydrationCapability {
 	}
 
 	/**
+	 * A list's first hydrating render when the server rendered items but the
+	 * client has none and builds its @empty arm instead. Discard the server's
+	 * items and report the list once, at its own site. A later attempt that
+	 * finds the earlier attempt's @empty arm here rebuilds it quietly.
+	 */
+	discardPopulatedList(scope: Scope, slotKey: number, start: Node, end: Node): void {
+		this.discard(
+			scope,
+			slotKey,
+			getNextSibling(start),
+			end,
+			HYDRATION_REBUILT?.has(end) === true,
+			process.env.NODE_ENV !== 'production' ? 'an empty list (@empty)' : '',
+			process.env.NODE_ENV !== 'production' ? 'a populated list' : null,
+		);
+	}
+
+	/**
 	 * Remove the server content from `from` up to `end` that a child slot's
 	 * value cannot adopt, and point the cursor at `end`. Reports the structural
-	 * mismatch (`expected`, and the `actual` server node, describe it in
-	 * development) unless it is `quiet`, as it is when an earlier attempt already
-	 * rebuilt this content, or the captures legitimately changed before a dormant
-	 * boundary activated. Remembers `end` for later attempts.
+	 * mismatch (`expected`, and the `actual` server node or a description of
+	 * it, describe it in development) unless it is `quiet`, as it is when an
+	 * earlier attempt already rebuilt this content, or the captures legitimately
+	 * changed before a dormant boundary activated. Remembers `end` for later
+	 * attempts.
 	 */
 	private discard(
 		scope: Scope | null,
@@ -19155,7 +19247,7 @@ class HydrationCapability {
 		end: Node | null,
 		quiet: boolean,
 		expected: string,
-		actual: Node | null,
+		actual: Node | string | null,
 	): true {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 		this.save(domNode((from ?? end)!).parentNode!);
@@ -19167,7 +19259,12 @@ class HydrationCapability {
 				const loc =
 					(scope !== null && (siteLoc(scope, slotKey) || componentSourceLoc(scope.block.body))) ||
 					(domNode((from ?? end)!).parentNode as any)?.__oct_loc;
-				if (loc) warnHydrationStructuralMismatch(loc, expected, describeHydrationNode(actual));
+				if (loc)
+					warnHydrationStructuralMismatch(
+						loc,
+						expected,
+						typeof actual === 'string' ? actual : describeHydrationNode(actual),
+					);
 			}
 		}
 		removeRange(from, end);
@@ -19204,13 +19301,89 @@ class HydrationCapability {
 	}
 
 	/**
+	 * Hydration is about to overwrite the server's value of a text node (`name`
+	 * null) or an attribute. A speculative attempt records it for rollback. A
+	 * freshly cloned node holds the client template's value, not the server's,
+	 * so it has nothing to restore.
+	 */
+	repaired(target: Node, name: string | null): void {
+		if (
+			!this.speculative ||
+			this.freshNodes.has(name === null ? domNode(target).parentNode! : target)
+		)
+			return;
+		const node: any = STAGED_DOM?.view(target) ?? target;
+		// Reading by qualified name also finds a namespaced attribute.
+		(this.repairs ??= []).push(
+			target,
+			name,
+			name === null ? node.nodeValue : node.getAttribute(name),
+		);
+	}
+
+	/**
+	 * This attempt rendered. A speculative attempt that encloses it can still be
+	 * discarded, so that one takes over the repairs and pending diagnostics;
+	 * otherwise they are final and publish.
+	 */
+	settle(outer: HydrationCapability | null): void {
+		if (outer?.speculative === true) {
+			if (this.repairs !== null) outer.repairs = (outer.repairs ?? []).concat(this.repairs);
+			if (process.env.NODE_ENV !== 'production' && this.heldWarnings !== null)
+				outer.heldWarnings = (outer.heldWarnings ?? []).concat(this.heldWarnings);
+			for (const [node, pending] of this.textWarnings)
+				if (!outer.textWarnings.has(node)) outer.textWarnings.set(node, pending);
+		} else {
+			if (process.env.NODE_ENV !== 'production' && this.heldWarnings !== null) {
+				const held = this.heldWarnings;
+				for (let i = 0; i < held.length; i += 5)
+					(held[i] as typeof warnHydrationValueMismatch)(
+						held[i + 1] as string | undefined,
+						held[i + 2] as string,
+						held[i + 3],
+						held[i + 4],
+					);
+			}
+			this.flushTextWarnings();
+		}
+		this.repairs = this.heldWarnings = null;
+	}
+
+	/**
+	 * A speculative attempt was discarded. Put back the server values it
+	 * repaired, newest first, so the attempt that commits finds and reports the
+	 * same mismatches, and drop the diagnostics it held.
+	 */
+	rollback(): void {
+		const repairs = this.repairs;
+		this.repairs = this.heldWarnings = null;
+		this.textWarnings.clear();
+		if (repairs === null) return;
+		for (let i = repairs.length - 3; i >= 0; i -= 3) {
+			const target: any = STAGED_DOM?.view(repairs[i] as Node) ?? repairs[i];
+			const name = repairs[i + 1] as string | null;
+			const value = repairs[i + 2] as string | null;
+			if (name === null) target.nodeValue = value;
+			// Removal by qualified name also finds a namespaced attribute.
+			else if (value === null) target.removeAttribute(name);
+			else {
+				const ns = attrNamespace(name);
+				if (ns === null) target.setAttribute(name, value);
+				else target.setAttributeNS(ns, name, value);
+			}
+		}
+	}
+
+	/**
 	 * Runs before hydration overwrites a server value: `node`'s text, or its
-	 * `attribute`. A root's hydrating attempt that suspends rolls back and
-	 * retries over the server DOM, so it journals the value for the retry to
-	 * find, repair, and report. A freshly cloned template holds the client
-	 * template's value, not the server's, so it has nothing to restore.
+	 * `attribute`. An attempt that suspends is retried over the server DOM, so
+	 * it keeps the value for the retry to find, repair, and report: a root's
+	 * hydrating attempt journals it, and a speculative arm records it
+	 * (repaired). A freshly cloned template holds the client template's value,
+	 * not the server's, so it has nothing to restore.
 	 */
 	private journalRepair(node: Node, attribute: string | null): void {
+		this.repaired(node, attribute);
 		if (!inRootHydrationAttempt()) return;
 		if (attribute !== null) {
 			if (!this.freshNodes.has(node)) journalAttr(node as Element, attribute);
@@ -19693,15 +19866,24 @@ class HydrationCapability {
 	 * After an adopted range's content rendered, up to its `end`: server nodes
 	 * from the last rebuilt root's continuation that no later sibling claimed
 	 * are the rest of the server content that root's mismatch replaced. Remove
-	 * them without a second report.
+	 * them without a second report. Only while that root still stands right
+	 * before them: a rolled-back attempt's root no longer does.
 	 */
 	sweepRebuiltTail(end: Node): void {
 		const tail = this.rebuiltTail;
 		this.rebuiltTail = null;
-		if (tail === null || tail === end || this.node !== tail) return;
+		if (
+			tail === null ||
+			tail === end ||
+			this.node !== tail ||
+			this.rebuiltRoot === null ||
+			domNode(tail).previousSibling !== this.rebuiltRoot
+		)
+			return;
 		let node: Node | null = tail;
 		while (node !== null && node !== end) node = getNextSibling(node);
 		if (node === null) return;
+		this.save(domNode(end).parentNode!);
 		removeRange(tail, end);
 		this.node = end;
 	}
@@ -20031,10 +20213,18 @@ class HydrationCapability {
 		// A clone that mismatch recovery built fresh holds the client template, not
 		// server output: the rebuild was already reported, and there is no server
 		// value for suppression to keep, so the client value applies silently.
-		if (mode === 0 || this.isFresh(el)) return true;
+		if (this.isFresh(el)) return true;
 		if (mode === 1) return false;
-		if (process.env.NODE_ENV !== 'production' && !this.staleServerValues)
-			warnHydrationValueMismatch((el as any).__oct_loc, `attribute \`${name}\``, server, next);
+		if (process.env.NODE_ENV !== 'production' && mode === 2 && !this.staleServerValues)
+			warnHeldHydrationMismatch(
+				this,
+				warnHydrationValueMismatch,
+				(el as any).__oct_loc,
+				`attribute \`${name}\``,
+				server,
+				next,
+			);
+		this.repaired(el, name);
 		return true;
 	}
 
@@ -20049,12 +20239,20 @@ class HydrationCapability {
 		if (mode === 1) return false;
 		if (
 			process.env.NODE_ENV !== 'production' &&
+			mode === 2 &&
 			!this.staleServerValues &&
 			// Class writes flush after the render. A boundary whose body adopted
 			// `el` and then threw to its catch arm has removed it since.
 			domNode(this.rootBlock.parentNode).contains(el)
 		)
-			warnHydrationValueMismatch((el as any).__oct_loc, 'attribute `class`', server, next);
+			warnHeldHydrationMismatch(
+				this,
+				warnHydrationValueMismatch,
+				(el as any).__oct_loc,
+				'attribute `class`',
+				server,
+				next,
+			);
 		return true;
 	}
 
@@ -20153,7 +20351,14 @@ class HydrationCapability {
 			!this.staleServerValues &&
 			!this.isFresh(el)
 		) {
-			warnHydrationValueMismatch((el as any).__oct_loc, 'style', before, expected);
+			warnHeldHydrationMismatch(
+				this,
+				warnHydrationValueMismatch,
+				(el as any).__oct_loc,
+				'style',
+				before,
+				expected,
+			);
 		}
 		return true;
 	}
@@ -22588,12 +22793,15 @@ export function setHTML(el: Element, value: any): void {
 			return;
 		}
 		if (isHydrationSuppressed(el)) return;
-		warnHydrationKeptServerValue(
-			(el as any).__oct_loc,
-			'`dangerouslySetInnerHTML` content',
-			server,
-			expected,
-		);
+		if (process.env.NODE_ENV !== 'production')
+			warnHeldHydrationMismatch(
+				hydration,
+				warnHydrationKeptServerValue,
+				(el as any).__oct_loc,
+				'`dangerouslySetInnerHTML` content',
+				server,
+				expected,
+			);
 		return;
 	}
 	if (el.localName === 'script') {
@@ -38213,6 +38421,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		null,
 		(initial.fresh ??= new WeakSet()),
 	);
+	hydration.speculative = true;
 	if (initial.seedRaw !== null) hydration.seeds = hydration.parseSeeds(initial.seedRaw);
 	// This capability owns one exact arm, never the surrounding root siblings.
 	hydration.claimRootRemainder(initial.end);
@@ -38241,12 +38450,17 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		renderBlock(block);
 		drainHydrationRenderPhaseUpdates(block);
 		hydration.flushClassWrites();
-		hydration.flushTextWarnings();
+		hydration.settle(previousHydration);
 		state.hasResolved = true;
 	} catch (error) {
 		failed = true;
 		failure = error;
 		if (isSuspenseException(error)) suspended = error.thenable;
+		// The next attempt, or the server catch arm adopted below, finds the
+		// server's values as it left them. That catch arm commits directly, so
+		// this capability stops holding its reports.
+		hydration.rollback();
+		hydration.speculative = false;
 		// None of this attempt's refs or effects committed. Dispose its scopes
 		// without detaching the actual server nodes that the next attempt adopts.
 		const refs: SuspenseRefEntry[] = [];
@@ -43030,23 +43244,16 @@ export function forBlock<T>(
 			if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 			// When the SERVER rendered a populated list but the client is empty now, the
 			// content inside the @for range is item blocks (`<!--[-->`), not the @empty body
-			// — a STRUCTURAL mismatch. Discard the server items and build @empty fresh with
-			// hydration suspended (so it client-mounts instead of mis-adopting an item).
+			// — a STRUCTURAL mismatch. Discard the server items, report the list once, and
+			// build @empty fresh with hydration suspended (so it client-mounts instead of
+			// mis-adopting an item).
 			let suspendForEmpty = false;
 			if (
 				hydration !== null &&
 				(serverMarkerState === 1 ||
 					(serverMarkerState === -1 && hydration.isOpen(getNextSibling(state.start))))
 			) {
-				// Prefer the @for's own compiled source loc (siteLoc; for-constructs carry
-				// `loc` in `__s.locs`) — the parent element's `__oct_loc` stamp exists only
-				// when the parent carries dynamic bindings.
-				hydration.save(domParent);
-				if (process.env.NODE_ENV !== 'production') {
-					const mmLoc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
-					if (mmLoc) hydration.warnStructural(mmLoc, 'an empty list (@empty)', 'a populated list');
-				}
-				removeRange(getNextSibling(state.start), state.end);
+				hydration.discardPopulatedList(parentScope, slotKey, state.start, state.end);
 				suspendForEmpty = true;
 			} else if (hydration !== null) {
 				// The server already rendered the @empty content directly inside the
