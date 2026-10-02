@@ -216,4 +216,32 @@ describe.each([
 		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 		expect(warnings()).toHaveLength(dev ? 1 : 0);
 	});
+
+	it('claims the range again for a component that suspended before its template did', async () => {
+		const name = 'SetupFirstBranch';
+		render(name, { server: true, leaf: fulfilled('unused') });
+		await hydrate(name, { leaf: fulfilled('z') });
+		const ready = markup(section());
+		const readyWarnings = warnings();
+		root!.unmount();
+		recoverable = [];
+		errSpy.mockClear();
+
+		render(name, { server: true, leaf: fulfilled('unused') });
+		const em = container.querySelector('em')!;
+		const leaf = pending();
+		await hydrate(name, { leaf: leaf.promise });
+		await act(async () => leaf.resolve('z'));
+
+		expect(markup(section())).toBe('<u>z</u>x<em>e</em>');
+		expect(markup(section())).toBe(ready);
+		expect(section().querySelector('em')).toBe(em);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		// The resumed template rebuilds the fragment as a whole, as it does when its
+		// data is ready, rather than reporting each of its roots.
+		expect(warnings()).toEqual(readyWarnings);
+		expect(warnings()).toEqual(
+			dev ? [rebuilt('a fragment starting with a comment but the server rendered <b>')] : [],
+		);
+	});
 });

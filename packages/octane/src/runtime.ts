@@ -18905,6 +18905,8 @@ class HydrationCapability {
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Unframed claims whose render suspended, by the block that claimed (renderUnframed). */
 	private unframedClaims: WeakMap<Block, UnframedClaim> | null = null;
+	/** Adopted ranges whose first render suspended, by block, with its slot (renderClaimed). */
+	private suspendedClaims: WeakMap<Block, readonly [Scope, number]> | null = null;
 	/** Fragments that rebuildFragment built, by root, until drainFrag places them. */
 	private rebuiltFragments: WeakMap<Node, RebuiltFragment> | null = null;
 	/** The server node renderInPlace's body may adopt, until a template does. */
@@ -19275,7 +19277,8 @@ class HydrationCapability {
 	 * Resume `source`, the block that a preserved activation suspended in. Inside
 	 * a component whose unframed render suspended, it renders without adopting,
 	 * as that render did, and the component completes its claim when its own
-	 * slot renders it again.
+	 * slot renders it again. A source whose first render into its adopted range
+	 * suspended claims that range again, as the render that suspended did.
 	 */
 	renderSuspended(source: Block): void {
 		const claims = this.unframedClaims;
@@ -19284,7 +19287,12 @@ class HydrationCapability {
 			for (let block: Block | null = source; block !== null && !unframed; block = block.parentBlock)
 				unframed = claims.has(block);
 		if (!unframed) {
-			renderBlock(source);
+			const claim = this.suspendedClaims?.get(source);
+			if (claim === undefined) renderBlock(source);
+			else {
+				this.suspendedClaims!.delete(source);
+				this.renderClaimed(source, claim[0], claim[1]);
+			}
 			return;
 		}
 		const previousReplay = this.replayDepth;
@@ -19331,12 +19339,18 @@ class HydrationCapability {
 	 * whose value it is. The server may have rendered another component there,
 	 * or more from this one, whose content starts with what the client renders.
 	 * Remove and report what is left after the client's content (settleClaim).
+	 * A render that suspends leaves the claim to the resume of `block`
+	 * (renderSuspended).
 	 */
 	renderClaimed(block: Block, scope: Scope, slotKey: number): void {
 		const outer = this.beginClaim(getNextSibling(block.startMarker!));
 		let from: Node | null | undefined;
 		try {
 			renderBlock(block);
+		} catch (error) {
+			if (isSuspenseException(error))
+				(this.suspendedClaims ??= new WeakMap()).set(block, [scope, slotKey]);
+			throw error;
 		} finally {
 			from = this.endClaim(outer);
 		}

@@ -177,3 +177,36 @@ export function RebuiltRootBranch(props: { server?: boolean; leaf: Promise<strin
 		</Hydrate>
 	</div>
 }
+
+function UnderValue(props: { v: string }) @{
+	<u>{props.v as string}</u>
+}
+
+// Suspends before its template claims the range it adopted.
+function SetupFirst(props: { leaf: Promise<string> }) @{
+	const v = use(props.leaf);
+	<>
+		<UnderValue v={v} />
+		{'x'}
+	</>
+}
+
+export function SetupFirstBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@if (props.server) {
+					<>
+						<Bold />
+						<Em />
+					</>
+				} @else {
+					<>
+						<SetupFirst leaf={props.leaf} />
+						<Em />
+					</>
+				}
+			</section>
+		</Hydrate>
+	</div>
+}
