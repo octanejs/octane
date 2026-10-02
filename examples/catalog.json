@@ -1053,7 +1053,7 @@
           "id": "renderer-free-islands",
           "title": "Activate every island of an islands-only route without loading the renderer, within its JavaScript budget",
           "kind": "golden",
-          "spec": "e2e/signal-chat.spec.ts",
+          "spec": "e2e/islands-budget.spec.ts",
           "critical": true
         },
         {

@@ -115,7 +115,7 @@ export function parseBindingMarker(data: string): BindingMarker | null {
  * the groups capture because a non-capturing group costs every streamed page.
  */
 export const BINDING_OPEN_TAIL_SOURCE =
-	'f[01];b;[^;]+;[^;]+|b;[^;]+;(root|[^;]+;([tvso\\d]|-1|[1-9]\\d+|y[012]?|k;[sn]:[^]+))';
+	'f[01];b;[^;]+;[^;]+|b;[^;]+;(root|[^;]+;([tvso\\d]|-1|[1-9]\\d+|y[012]|k;[sn]:[^]+))';
 
 export function isBindingOpenComment(data: string): boolean {
 	// The general hydration/early-stream path only counts balanced ranges. Keep
@@ -135,17 +135,8 @@ export function isBindingOpenComment(data: string): boolean {
 	if (data.length === tail + 1) {
 		const code = data.charCodeAt(tail);
 		return (
-			code === 116 ||
-			code === 118 ||
-			code === 115 ||
-			code === 111 ||
-			code === 121 ||
-			(code >= 48 && code <= 57)
+			code === 116 || code === 118 || code === 115 || code === 111 || (code >= 48 && code <= 57)
 		);
-	}
-	if (data.length === tail + 2 && data.charCodeAt(tail) === 121) {
-		const arm = data.charCodeAt(tail + 1);
-		return arm >= 48 && arm <= 50;
 	}
 	if (data.charCodeAt(tail) === 107 && data.charCodeAt(tail + 1) === 59)
 		return (
@@ -153,7 +144,12 @@ export function isBindingOpenComment(data: string): boolean {
 			data.charCodeAt(tail + 3) === 58 &&
 			data.length > tail + 4
 		);
-	if (data.length === tail + 2 && data.endsWith('-1')) return true;
+	// Server HTML always records a `@try` arm; only a client template holds a bare `y`.
+	if (
+		data.length === tail + 2 &&
+		(data.endsWith('-1') || (data[tail] === 'y' && data[tail + 1]! >= '0' && data[tail + 1]! < '3'))
+	)
+		return true;
 	if (data.charCodeAt(tail) < 49 || data.charCodeAt(tail) > 57) return false;
 	for (let index = tail + 1; index < data.length; index++) {
 		const code = data.charCodeAt(index);

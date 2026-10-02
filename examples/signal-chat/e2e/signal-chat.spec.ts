@@ -1,28 +1,7 @@
-import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { gzipSync } from 'node:zlib';
-import { test as base, expect, type APIRequestContext, type Page } from '@playwright/test';
-import { collectBrowserDiagnostics, settleBrowserFrames } from '../../_shared/e2e/browser.ts';
-
-const test = base.extend<{ diagnosticsGate: void }>({
-	diagnosticsGate: [
-		async ({ page }, use, testInfo) => {
-			const diagnostics = collectBrowserDiagnostics(page, {
-				failOnConsoleLevels: ['warning', 'error'],
-				failOnHydrationWarnings: true,
-				hydrationWarningPattern: /hydration.*mismatch|mismatch.*hydrat|recoverable.*hydrat/i,
-			});
-			try {
-				await use();
-				await settleBrowserFrames(page);
-				diagnostics.assertClean(testInfo.title);
-			} finally {
-				diagnostics.stop();
-			}
-		},
-		{ auto: true },
-	],
-});
+import type { APIRequestContext } from '@playwright/test';
+import { settleBrowserFrames } from '../../_shared/e2e/browser.ts';
+import { completedAnswer, configuration, expect, open, test } from './lab.ts';
 
 type TraceEvent = {
 	channel: 'session' | 'answer' | 'history' | 'tools';
@@ -33,22 +12,6 @@ type TraceEvent = {
 	transport: 'document' | 'rpc';
 };
 
-function configuration(options: Record<string, string | number> = {}, eager = false) {
-	const run = randomUUID();
-	const search = new URLSearchParams({
-		run,
-		scenario: 'steady',
-		auth: '40',
-		answer: '60',
-		history: '120',
-		interval: '30',
-		waves: '6',
-		turns: '3',
-	});
-	for (const [key, value] of Object.entries(options)) search.set(key, String(value));
-	return { run, path: `${eager ? '/eager' : '/'}?${search}` };
-}
-
 async function trace(request: APIRequestContext, run: string) {
 	const response = await request.get(`/__lab/trace?run=${encodeURIComponent(run)}`);
 	expect(response.ok()).toBe(true);
@@ -56,57 +19,6 @@ async function trace(request: APIRequestContext, run: string) {
 	expect(result.truncated).toBe(false);
 	return result.events;
 }
-
-async function open(page: Page, path: string) {
-	await page.goto(path, { waitUntil: 'commit' });
-	await expect(page.locator('[data-lab-shell]')).toBeVisible();
-}
-
-async function completedAnswer(page: Page, waves: number) {
-	await expect(page.locator('[data-answer]')).toHaveAttribute('data-revision', String(waves));
-	await expect(page.getByRole('region', { name: 'Conversation', exact: true })).toHaveAttribute(
-		'data-complete',
-		'true',
-	);
-}
-
-// The page is an islands-only route (#1514): its shell never hydrates, and every
-// island is a binding view, so activating them all must not load the renderer.
-test('activates every island without the renderer within the islands-only JavaScript budget', async ({
-	page,
-}) => {
-	test.skip(
-		process.env.OCTANE_EXAMPLE_PREVIEW !== '1',
-		'Development modules are unbundled and unminified.',
-	);
-	const scripts = new Map<string, Promise<Buffer>>();
-	page.on('response', (response) => {
-		if (response.request().resourceType() === 'script')
-			scripts.set(new URL(response.url()).pathname, response.body());
-	});
-	const { path } = configuration({ waves: 2, interval: 20 });
-	await open(page, path);
-	await expect(page.locator('[data-composer-ready="true"]')).toBeHidden();
-	for (const name of ['Activate conversation', 'Activate history', 'Activate tools']) {
-		await page.getByRole('button', { name, exact: true }).click();
-	}
-	await page.getByRole('textbox', { name: 'Message', exact: true }).click();
-	await expect(page.locator('[data-composer-ready="true"]')).toBeVisible();
-	await completedAnswer(page, 2);
-	await expect(page.locator('[data-history]')).toHaveAttribute('data-revision', '2');
-	await page.waitForLoadState('networkidle');
-	const files = [...scripts.keys()];
-	expect(files.some((file) => /\/octane-islands-[^/]+\.js$/.test(file))).toBe(true);
-	expect(files.filter((file) => /\/(?:runtime|octane-hydrate)-[^/]+\.js$/.test(file))).toEqual([]);
-	let gzip = 0;
-	for (const body of await Promise.all(scripts.values()))
-		gzip += gzipSync(body, { level: 9 }).length;
-	test.info().annotations.push({
-		type: 'islands-only JavaScript',
-		description: `${files.length} scripts, ${gzip} bytes gzip-9`,
-	});
-	expect(gzip).toBeLessThanOrEqual(70 * 1024);
-});
 
 test('streams a public shell and independent first results with one ready HTML snapshot', async ({
 	baseURL,
