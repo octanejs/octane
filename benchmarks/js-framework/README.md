@@ -484,17 +484,11 @@ change; see [browser sample preparation](../README.md#browser-sample-preparation
   exits 1. A fully-clean run reports `meta.identityGate: "pass"` for every
   target and exits 0.
 
-  **Known ripple failures.** ripple fails the gate on `prepend100` and
-  `insertmid100` — the two ops that insert a run of 100 *new* keys *before*
-  surviving keys. ripple's keyed reconciler renders those interleaved
-  (`[new0, old0, new1, old1, …]`) even though the data array is unambiguously
-  `[100 new, then survivors]` (verified independent of how the array is built —
-  concat / spread / explicit push loop all give identical correct data yet
-  identical interleaved DOM). This is a genuine **ripple** keyed-reconciler bug,
-  **not** octane and **not** a fixture defect; the fixtures are left faithful and
-  the gate correctly flags them. `append100` is the only insert op ripple renders
-  correctly, because there are no survivors *after* the inserted run. octane-tsrx,
-  octane-jsx, and react pass all 14 ops.
+  **Former ripple failures.** ripple 0.3.x failed the gate on `prepend100` and
+  `insertmid100`, the two ops that insert a run of 100 *new* keys *before*
+  surviving keys: its keyed reconciler interleaved them
+  (`[new0, old0, new1, old1, …]`). The catalog's ripple 0.4.0 passes every op,
+  so `bench.mjs` no longer waives this suite and any identity failure is fatal.
 
 - **Bounded reorder-scratch gate.** After all timing samples, Octane's two
   dialects repeat reverse, rotation, shuffle, and small-displacement operations
