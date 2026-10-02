@@ -2,20 +2,49 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolve } from 'node:path';
 import { createRoot, flushSync, hydrateRoot } from '../../src/index.js';
 import { renderToString } from 'octane/server';
-import { loadServerFixture } from '../_server-fixture.js';
-import * as Client from './_fixtures/catch-destructured-param.tsrx';
+import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
+import * as Fixture from './_fixtures/catch-destructured-param.tsrx';
 
-// A `@catch` parameter may be a destructuring pattern, optionally typed, whose
+// A `@catch` parameter may be a destructuring pattern, annotated or not, whose
 // defaults read component locals. Its bindings belong to the error arm and
 // shadow same-named component locals. Client render, server render, and
 // hydration of server HTML all produce the same error output from them.
 
-type Props = Client.Props;
-type View = keyof typeof Client;
+type Props = Fixture.Props;
 
-const server = loadServerFixture<typeof Client>(
-	resolve(import.meta.dirname, '_fixtures/catch-destructured-param.tsrx'),
-);
+// An unannotated pattern destructures an `unknown` caught value, which
+// TypeScript rejects, so this case is untyped source rather than a typed fixture.
+const UNANNOTATED = `
+function Result(props) @{
+	if (props.state.failed) throw new Error(props.label + ' failed');
+	<p class="ok">{props.label + ' ready'}</p>
+}
+export function UnannotatedPattern(props) @{
+	<div>
+		@try {
+			<Result state={props.state} label={props.label} />
+		} @catch ({ message }, retry) {
+			<button class="retry" onClick={() => { props.state.failed = false; retry(); }}>{message as string}</button>
+		}
+	</div>
+}`;
+
+function loadUnannotated(mode: 'client' | 'server') {
+	return loadCompiledFixtureSource(UNANNOTATED, {
+		id: '/catch-unannotated-pattern.tsrx',
+		mode,
+		compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+	});
+}
+
+const Client = { ...Fixture, UnannotatedPattern: loadUnannotated('client').UnannotatedPattern };
+const server = {
+	...loadServerFixture<typeof Fixture>(
+		resolve(import.meta.dirname, '_fixtures/catch-destructured-param.tsrx'),
+	),
+	UnannotatedPattern: loadUnannotated('server').UnannotatedPattern,
+};
+type View = keyof typeof Client;
 
 let container: HTMLElement;
 let errors: unknown[][];
@@ -94,7 +123,7 @@ for (const how of ['createRoot', 'hydrateRoot'] as const) {
 			};
 		}
 
-		for (const view of ['ObjectPattern', 'TypedPattern'] as const) {
+		for (const view of ['UnannotatedPattern', 'AnnotatedPattern'] as const) {
 			it(`${view}: renders the destructured message and resets through the reset parameter`, () => {
 				const page = mount(view, { state: { failed: true }, label: view });
 				if (how === 'hydrateRoot') expect(page.serverHtml).toContain(`${view} failed`);
