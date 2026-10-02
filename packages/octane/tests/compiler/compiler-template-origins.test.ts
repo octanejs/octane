@@ -230,15 +230,17 @@ describe('compiler template-origin recording (inspect: true)', () => {
 			expect(kinds.has(kind)).toBe(true);
 		}
 
-		const nested = compileInspect().find((template) =>
-			template.html.startsWith('<octane-frag><i>'),
-		)!;
-		const wrapper = nested.ast.parts[0];
-		expect(wrapper.type).toBe('TemplateElement');
-		if (wrapper.type !== 'TemplateElement') throw new Error('expected a template element');
-		expect(wrapper.tag).toBe('octane-frag');
-		expect(wrapper.synthetic).toBe(true);
-		expect(wrapper.children.filter((node) => node.type === 'TemplateElement')).toHaveLength(2);
+		// A multi-root template's roots are its own top-level parts, with no
+		// synthetic wrapper: the runtime adds the one the HTML parser needs.
+		const nested = compileInspect().find((template) => template.html.startsWith('<i>'))!;
+		expect(
+			nested.ast.parts.map((node) =>
+				node.type === 'TemplateElement' ? [node.tag, node.synthetic] : node.type,
+			),
+		).toEqual([
+			['i', false],
+			['b', false],
+		]);
 	});
 
 	it('every origin entry slices cleanly out of both the template HTML and the source', () => {

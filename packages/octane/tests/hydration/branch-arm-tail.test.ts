@@ -74,10 +74,10 @@ describe.each([
 			.map((call: unknown[]) => String(call[0]))
 			.filter((message: string) => message.includes('hydration mismatch'));
 
-	const tailReport = (component: string, directive: string) =>
+	const tailReport = (component: string, directive: string, server = 'a control-flow block') =>
 		`Octane hydration mismatch at ${FILE}:${siteLoc(`function ${component}(`, directive)}: ` +
-		'the client expected the end of the branch but the server rendered a control-flow ' +
-		'block. The mismatched subtree was rebuilt on the client.';
+		`the client expected the end of the branch but the server rendered ${server}. ` +
+		'The mismatched subtree was rebuilt on the client.';
 
 	const emptyReport = (component: string) =>
 		`Octane hydration mismatch at ${FILE}:${siteLoc(`function ${component}(`, '@if')}: ` +
@@ -155,6 +155,105 @@ describe.each([
 		expect(warnings()).toEqual(dev ? [tailReport('CaughtLast', '@if')] : []);
 	});
 
+	// The cursor rests on the elements and text that a template adopts, so the
+	// arm records where its own template's roots end.
+	it.each([
+		{
+			name: 'IfHosts',
+			directive: '@if',
+			from: { on: false },
+			to: { on: true },
+			html: '<em>x</em>',
+			swapped: '<em>x</em><b>z</b>',
+			server: '<b>',
+		},
+		{
+			name: 'SwitchHosts',
+			directive: '@switch',
+			from: { k: 'two' },
+			to: { k: 'one' },
+			html: '<em>x</em><b>z</b>',
+			swapped: '<em>x</em><b>z</b><i>i</i>',
+			server: '<i>',
+		},
+		{
+			name: 'IfTextTail',
+			directive: '@if',
+			from: { on: false },
+			to: { on: true },
+			html: '<em>x</em>',
+			swapped: '<em>x</em>tail',
+			server: 'text "tail"',
+		},
+		{
+			name: 'IfNestedRoot',
+			directive: '@if',
+			from: { on: false },
+			to: { on: true },
+			html: '<p><em>x</em></p>',
+			swapped: '<p><em>x</em></p><b>z</b>',
+			server: '<b>',
+		},
+		{
+			name: 'IfRangeAfterHost',
+			directive: '@if',
+			from: { on: false },
+			to: { on: true },
+			html: '<em>x</em><b>b</b>',
+			swapped: '<em>x</em><b>b</b><em>z</em>',
+			server: 'a control-flow block',
+		},
+		{
+			name: 'IfInheritedHost',
+			directive: '@if',
+			from: { on: false },
+			to: { on: true },
+			html: '<em>x</em>',
+			swapped: '<em>x</em><b>z</b>',
+			server: '<b>',
+		},
+		{
+			name: 'IfLaterHost',
+			directive: '@if',
+			from: { on: false },
+			to: { on: true },
+			html: '<em>x</em><em>y</em>',
+			swapped: '<em>x</em><em>y</em><b>z</b>',
+			server: '<b>',
+		},
+	])(
+		'discards the server content after the roots a $name arm adopts and reports it once',
+		async ({ name, directive, from, to, html, swapped, server: described }) => {
+			const s = await hydrate(name, from, to);
+			const kept = s.nodes.slice(0, html.split('</').length - 1);
+
+			expect(container.querySelector('#r')).toBe(s.host);
+			expect(markup(s.host)).toBe(html);
+			expect([...s.host.querySelectorAll('*')]).toEqual(kept);
+			expect(s.recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+			expect(warnings()).toEqual(dev ? [tailReport(name, directive, described)] : []);
+
+			s.render(from);
+			expect(markup(s.host)).toBe(swapped);
+			s.render(to);
+			expect(markup(s.host)).toBe(html);
+		},
+	);
+
+	it('keeps the roots of its own template when a component in a hole adopts in place', async () => {
+		const s = await hydrate('HoleWithoutRange', { on: false }, { on: true });
+
+		expect(markup(s.host)).toBe('<em>x</em><b>b</b>');
+		expect([...s.host.querySelectorAll('*')]).toEqual(s.nodes);
+		expect(s.recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
+
+		s.render({ on: false });
+		expect(markup(s.host)).toBe('<em>x</em><b>b</b>');
+		s.render({ on: true });
+		expect(markup(s.host)).toBe('<em>x</em><b>b</b>');
+	});
+
 	it('builds the components a longer client arm adds and reports it once', async () => {
 		const s = await hydrate('SwitchComponents', { k: 'one' }, { k: 'two' });
 
@@ -167,8 +266,26 @@ describe.each([
 		{ name: 'IfComponents', props: { on: false }, html: '<em>y</em><em>z</em>' },
 		{ name: 'SwitchComponents', props: { k: 'two' }, html: '<em>x</em><em>z</em>' },
 		{ name: 'TrailingHosts', props: { on: true }, html: '<em>x</em><b>b</b><i>i</i>' },
+		{ name: 'IfHosts', props: { on: true }, html: '<em>x</em>' },
+		{ name: 'IfHosts', props: { on: false }, html: '<em>x</em><b>z</b>' },
+		{ name: 'SwitchHosts', props: { k: 'one' }, html: '<em>x</em><b>z</b>' },
+		{ name: 'SwitchHosts', props: { k: 'two' }, html: '<em>x</em><b>z</b><i>i</i>' },
+		{ name: 'IfTextTail', props: { on: false }, html: '<em>x</em>tail' },
+		{ name: 'IfNestedRoot', props: { on: true }, html: '<p><em>x</em></p>' },
+		{ name: 'IfNestedRoot', props: { on: false }, html: '<p><em>x</em></p><b>z</b>' },
+		{ name: 'IfRangeAfterHost', props: { on: true }, html: '<em>x</em><b>b</b>' },
+		{ name: 'IfRangeAfterHost', props: { on: false }, html: '<em>x</em><b>b</b><em>z</em>' },
+		{ name: 'IfInheritedHost', props: { on: true }, html: '<em>x</em>' },
+		{ name: 'IfLaterHost', props: { on: true }, html: '<em>x</em><em>y</em>' },
+		{ name: 'HoleWithoutRange', props: { on: true }, html: '<em>x</em><b>b</b>' },
+		{
+			name: 'NestedArms',
+			props: { on: true, inner: true },
+			html: '<em>x</em><p><i>i</i></p><b>b</b>',
+		},
+		{ name: 'NestedArms', props: { on: true, inner: false }, html: '<p></p><b>b</b>' },
 	])(
-		'adopts every node of a matching $name arm without a report',
+		'adopts every node of a matching $name arm ($html) without a report',
 		async ({ name, props, html }) => {
 			const s = await hydrate(name, props, props);
 
@@ -338,5 +455,91 @@ describe.each([
 		expect(container.querySelector('em')).toBe(em);
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
+	});
+});
+
+// The production runtime adopts compiled templates straight from their source,
+// without parsing them. NODE_ENV is read at call time, so stubbing it around
+// hydrateRoot exercises those branches. A fragment arm then takes its root count
+// from the compiler, and still never parses a template to find where it ends.
+describe('hydrateRoot — a branch arm shorter than the server arm (production runtime)', () => {
+	const server = loadServerFixture(FIXTURE, { id: FILE });
+	let container: HTMLElement;
+	let root: { unmount(): void } | null;
+	let createElement: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		container = document.createElement('div');
+		document.body.appendChild(container);
+		root = null;
+		vi.stubEnv('NODE_ENV', 'production');
+		createElement = vi.spyOn(document, 'createElement');
+	});
+
+	afterEach(() => {
+		createElement.mockRestore();
+		vi.unstubAllEnvs();
+		root?.unmount();
+		container.remove();
+	});
+
+	async function hydrate(
+		name: string,
+		serverProps: Record<string, unknown>,
+		props: Record<string, unknown>,
+	) {
+		// A fresh module, so that no earlier mount parsed its templates.
+		const client = loadCompiledFixtureSource(SOURCE, {
+			id: FILE,
+			mode: 'client',
+			compileOptions: { dev: false },
+		});
+		container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
+		const host = container.querySelector('#r')!;
+		const nodes = [...host.querySelectorAll('*')];
+		const recoverable: string[] = [];
+		createElement.mockClear();
+		root = hydrateRoot(container, client[name], props, {
+			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
+		});
+		flushSync(() => {});
+		const parsed = createElement.mock.calls.filter(
+			(call: unknown[]) => call[0] === 'template',
+		).length;
+		await act(async () => {});
+		return { host, nodes, recoverable, parsed };
+	}
+
+	it.each([
+		{ name: 'SwitchHosts', from: { k: 'two' }, to: { k: 'one' }, html: '<em>x</em><b>z</b>' },
+		{ name: 'IfRangeAfterHost', from: { on: false }, to: { on: true }, html: '<em>x</em><b>b</b>' },
+	])(
+		'discards the server content after the roots of a $name fragment arm',
+		async ({ name, from, to, html }) => {
+			const s = await hydrate(name, from, to);
+
+			expect(markup(s.host)).toBe(html);
+			expect([...s.host.querySelectorAll('*')]).toEqual(s.nodes.slice(0, 2));
+			// The production runtime reports the structural mismatch by its code.
+			expect(s.recoverable).toEqual([expect.stringMatching(/errors\/51\b/)]);
+			expect(s.parsed).toBe(0);
+		},
+	);
+
+	it.each([
+		{ name: 'SwitchHosts', props: { k: 'one' }, html: '<em>x</em><b>z</b>' },
+		{ name: 'TrailingHosts', props: { on: true }, html: '<em>x</em><b>b</b><i>i</i>' },
+		{
+			name: 'NestedArms',
+			props: { on: true, inner: true },
+			html: '<em>x</em><p><i>i</i></p><b>b</b>',
+		},
+	])('adopts every node of a matching $name fragment arm', async ({ name, props, html }) => {
+		const s = await hydrate(name, props, props);
+
+		expect(markup(s.host)).toBe(html);
+		expect([...s.host.querySelectorAll('*')]).toEqual(s.nodes);
+		expect(s.recoverable).toEqual([]);
+		expect(s.parsed).toBe(0);
 	});
 });

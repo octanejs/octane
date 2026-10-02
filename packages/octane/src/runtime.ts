@@ -11908,11 +11908,14 @@ function renderLiteInPlace<P>(
 	anchor: Node | undefined,
 	root: Node,
 ): void {
-	hydration.renderInPlace(
-		() => componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite, anchor),
-		undefined,
-		root,
-	);
+	if (
+		hydration.renderInPlace(
+			() => componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite, anchor),
+			undefined,
+			root,
+		)
+	)
+		hydration.parkPast(root, parentScope);
 }
 
 // Keep the fresh-subtree callback's extra captures out of ordinary lite dispatch.
@@ -18461,7 +18464,8 @@ interface LazyTemplateRecord {
 	ns: 0 | 1 | 2 | 3;
 	/**
 	 * Raw multi-root markup: the number of roots, as the compiler counts them.
-	 * 0 = one root, or HTML roots pre-wrapped in `<octane-frag>`.
+	 * 0 = one root, or HTML roots already wrapped in `<octane-frag>`, which the
+	 * compiler no longer emits.
 	 */
 	frag: number;
 	parsed: Array<Node | null>;
@@ -18504,9 +18508,9 @@ function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Node {
 	initDomOperations();
 	const t = (STAGED_DOM?.view(document) ?? document).createElement('template');
 	if (ns === 0) {
-		// Fixed HTML multi-root templates arrive pre-wrapped by the compiler. Opaque
-		// multi-root templates carry raw markup because their eventual namespace is
-		// unknown, so add the equivalent wrapper only after HTML wins at clone time.
+		// Multi-root templates carry raw markup: an opaque one because its eventual
+		// namespace is unknown until clone time. Add the wrapper the HTML parser
+		// needs here. Markup that arrives already wrapped parses the same way.
 		(STAGED_DOM?.view(t) ?? t).innerHTML = frag ? `<octane-frag>${html}</octane-frag>` : html;
 		const root = getFirstChild(t.content) as Element;
 		// Multi-root HTML templates arrive wrapped in a synthetic <octane-frag>. The
@@ -18572,10 +18576,10 @@ function lazyRootDescriptor(lazy: LazyTemplateRecord): string | 3 | 8 {
 }
 
 /**
- * Is this lazy template a multi-root fragment? SVG/MathML/opaque fragments carry
- * `frag`; HTML multi-root templates arrive from the compiler pre-wrapped in
- * `<octane-frag>` with frag=0, so the wrapper tag is the discriminant there
- * (mirrors parseTemplate's `__oct_frag` stamping of the parsed root).
+ * Is this lazy template a multi-root fragment? Compiled fragments carry `frag`;
+ * HTML roots already wrapped in `<octane-frag>` with frag=0 are discriminated
+ * by the wrapper tag (mirrors parseTemplate's `__oct_frag` stamping of the
+ * parsed root).
  */
 function isLazyFragment(lazy: LazyTemplateRecord): boolean {
 	return lazy.frag !== 0 || lazyRootDescriptor(lazy) === 'octane-frag';
@@ -18583,8 +18587,8 @@ function isLazyFragment(lazy: LazyTemplateRecord): boolean {
 
 /**
  * How many roots a multi-root template has. The compiler passes the count as
- * a raw fragment's `frag`; a parsed or pre-wrapped template counts its
- * children.
+ * `frag`; a parsed template, or markup already wrapped in `<octane-frag>`,
+ * counts its children.
  */
 function templateRootCount(template: Node | LazyTemplateRecord): number {
 	let parsed: Node;
@@ -18620,8 +18624,8 @@ function lazyRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
 
 /**
  * lazyRootMatches for a nested fragment's FIRST logical root, read from the
- * template source. A raw fragment's cached descriptor is that root; a
- * fixed-HTML fragment's starts after its synthetic `<octane-frag>` wrapper. A
+ * template source. A raw fragment's cached descriptor is that root; markup
+ * already wrapped in `<octane-frag>` has it after the wrapper. A
  * leading `<!>` is a dynamic hole whose server form (text, a marker range, or
  * nothing) cannot decide a mismatch, so the first static element root after
  * the leading holes decides, as in fragmentRootMatches.
@@ -19801,8 +19805,9 @@ class HydrationCapability {
 	}
 
 	/**
-	 * A slot of `parent` claimed the server range that `close` ends. Step the
-	 * cursor past it to the next sibling's server content.
+	 * A slot of `parent` claimed the server range that `close` ends, or adopted
+	 * `close` in place as its root. Step the cursor past it to the next
+	 * sibling's server content.
 	 */
 	parkPast(close: Node, parent: Scope): void {
 		const next = (this.node = getNextSibling(close));
@@ -19814,27 +19819,36 @@ class HydrationCapability {
 
 	/**
 	 * First render of an @if or @switch arm into the server range it adopted,
-	 * `block`'s own. When the arm's content is its own slots and the last of
-	 * them claimed a server range, returns the node that claim parked the
-	 * cursor on: whatever the server rendered from there belongs to no client
-	 * node (discardArmTail). Null when the arm cloned a template of its own, or
-	 * a later slot adopted without claiming a range, since the cursor then
-	 * rests on the roots they adopted.
+	 * `block`'s own. Returns the node from which whatever the server rendered
+	 * belongs to no client node (discardArmTail), with the cursor parked on it:
+	 * the first node after the roots of the arm's own template, which records
+	 * them as the range's content (claimRoots), or else where the arm's last
+	 * slot parked the cursor after the range it claimed, or after the single
+	 * root it adopted in place (renderInPlace). Null when a later slot adopted
+	 * without either, such as a component that adopted a fragment or text in
+	 * place, since the cursor then rests on the roots it adopted.
 	 */
 	renderAdoptedArm(block: Block): Node | null {
 		const outerArm = this.arm;
 		const outerTail = this.armTail;
 		const outerSlots = this.armSlots;
+		const outerClaim = this.beginClaim(getNextSibling(block.startMarker!));
 		this.arm = block;
 		this.armTail = null;
+		let parked: Node | null = null;
+		let claimed: Node | null | undefined;
 		try {
 			renderBlock(block);
-			return this.arm === block && this.armSlots === block.slots.length ? this.armTail : null;
+			if (this.arm === block && this.armSlots === block.slots.length) parked = this.armTail;
 		} finally {
+			claimed = this.endClaim(outerClaim);
 			this.arm = outerArm;
 			this.armTail = outerTail;
 			this.armSlots = outerSlots;
 		}
+		// The cursor rests on the roots the arm's own template adopted, or inside
+		// them: step it past them, as a range claim parks it.
+		return claimed == null ? parked : (this.node = claimed);
 	}
 
 	/**
@@ -19845,7 +19859,8 @@ class HydrationCapability {
 	 * something, a server range at the cursor or just after that marker is one
 	 * that nothing in the arm claimed: the server rendered another arm here,
 	 * longer than this one. So is any server content at `parked`, where the
-	 * arm's last slot parked the cursor after its range (renderAdoptedArm).
+	 * arm parked the cursor after its own template's roots, or after its last
+	 * slot's range or in-place root (renderAdoptedArm).
 	 * Discard the server content from there up to `end`, stopping at any
 	 * client nodes that mismatch recovery built there, and report it once.
 	 *
@@ -19854,7 +19869,7 @@ class HydrationCapability {
 	 * empty client branch, as an arm with no body is. The cursor does not move
 	 * past the elements and text that a template adopts, so at an element or
 	 * text node it cannot otherwise tell what the arm adopted from what the
-	 * server rendered for another arm. Both stay.
+	 * server rendered for another arm: `parked` does, and anything else stays.
 	 */
 	discardArmTail(scope: Scope, slotKey: number, first: Node, end: Node, parked: Node | null): void {
 		let from = this.node;
@@ -32590,6 +32605,8 @@ function componentSlotImpl(
 					b.endMarker = last;
 				}
 			}
+			// An arm that ends with this root cannot read its end off the cursor.
+			if (adopted) hydration!.parkPast(hydrationCursor!, parentScope);
 		} else {
 			const b = createBlock(
 				'dynamic',
