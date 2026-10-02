@@ -28,12 +28,18 @@ export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.
 
 import { resolveHookPath } from './hook-slot-cache.js';
 import {
+	BINDING_OPEN_TAIL_SOURCE,
 	bindingRootMarker,
 	encodeBindingKey,
 	isBindingOpenComment,
 	type BindingKey,
 } from './dom-binding-protocol.js';
-import { formatUseId } from './hydration-markers.js';
+import {
+	formatUseId,
+	HYDRATION_FOR_EMPTY,
+	HYDRATION_FOR_ITEMS,
+	HYDRATION_START,
+} from './hydration-markers.js';
 import {
 	ACTIVITY_TAG,
 	// Children-block tagging shares the client's key so identity holds across
@@ -10841,9 +10847,18 @@ function streamRuntimeJs(): string {
 	return (STREAM_RUNTIME_JS ??=
 		'(function(){if(window.$OCTRC)return;var d=document;var S=window.$OCTS=window.$OCTS||{},E;' +
 		// Legacy `[` / `]` means one physical range; `[N` / `]N` is canonical only
-		// for safe integer N >= 2. Keep this in sync with hydrationMarkerMultiplicity.
+		// for safe integer N >= 2. An open may also carry an @for arm or a
+		// presentation-binding receipt, each closed by a plain `]`; a fallback
+		// that renders a list directly must count those opens too. Keep this in
+		// sync with hydrationMarkerMultiplicity.
 		'var M=function(v,c){if(v===c)return 1;if(!v||v.charAt(0)!==c)return 0;' +
-		'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s;};' +
+		'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s||c==="["&&/^(' +
+		HYDRATION_FOR_EMPTY.slice(HYDRATION_START.length) +
+		'|' +
+		HYDRATION_FOR_ITEMS.slice(HYDRATION_START.length) +
+		'|' +
+		BINDING_OPEN_TAIL_SOURCE +
+		')$/.test(s);};' +
 		// Share parser/range rules with the optional driver; the base swap owns
 		// transport even when animation prepares its carrier before insertion.
 		'var P=function(s){var q=s.firstElementChild;if(q&&q.localName==="script"&&q.hasAttribute("' +
