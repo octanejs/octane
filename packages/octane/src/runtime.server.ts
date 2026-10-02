@@ -2102,11 +2102,20 @@ export function bindPresentationView<T extends Function>(view: T, _id: string): 
 	return markComponentFlags(view, COMPONENT_FLAG_BOUNDARY, view.name);
 }
 
-function serverComponentOutput(out: unknown, scope: SSRScope): string {
+function serverComponentOutput(
+	out: unknown,
+	scope: SSRScope,
+	owner?: SignalRendererOwnerIdentity,
+): string {
 	if (out == null) return '';
 	if (typeof out === 'string') return escapeHtml(out);
 	if (typeof out === 'object' && SERVER_HTML in out) return (out as ServerHtml)[SERVER_HTML];
-	return ssrChild(out, scope);
+	// The client renders a component's returned value inside that component's
+	// own render, so a read the value makes (a scoped JSX child) resolves in the
+	// component's declaration owner. Normalize the server's value there too.
+	return owner === undefined
+		? ssrChild(out, scope)
+		: (invokeServerSignalComponent(ssrChild, out, scope, owner) as string);
 }
 
 export function escapeHtml(v: unknown): string {
@@ -5090,37 +5099,6 @@ function invokeServerSignalComponent(
 	);
 }
 
-// The client renders a component's returned value inside that component's own
-// render, so a read the value makes (a scoped JSX child, a signal hole) resolves
-// in the component's declaration owner. Normalize the server's value there too.
-const renderReturnedServerValue: ServerComponent = (out, scope) => ssrChild(out, scope);
-
-function serverComponentOutputInOwner(
-	out: unknown,
-	scope: SSRScope,
-	owner: SignalRendererOwnerIdentity | undefined,
-): string {
-	if (owner === undefined || out === null || (typeof out !== 'object' && typeof out !== 'function'))
-		return serverComponentOutput(out, scope);
-	// Compiled HTML has nothing left to read.
-	if (SERVER_HTML in out) return (out as ServerHtml)[SERVER_HTML];
-	const injection = (RESOLVED?.resourceOptions as StreamOptions | undefined)?.injection;
-	let previousOwner: SignalOwner | null | undefined;
-	if (
-		injection?.observeSignalAttempt !== undefined ||
-		(previousOwner = enterSynchronousSignalOwner(owner)) === undefined
-	)
-		return invokeServerSignalComponent(renderReturnedServerValue, out, scope, owner) as string;
-	const previousActive = SERVER_SIGNAL_OWNER_ACTIVE;
-	SERVER_SIGNAL_OWNER_ACTIVE = true;
-	try {
-		return ssrChild(out, scope);
-	} finally {
-		SERVER_SIGNAL_OWNER_ACTIVE = previousActive;
-		restoreSynchronousSignalOwner(previousOwner);
-	}
-}
-
 function invokeComponentBody(
 	comp: ServerComponent,
 	props: any,
@@ -5252,7 +5230,7 @@ function renderComponentFramed(
 			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 			HOOK_PASS = previousHookPass;
 		}
-		const inner = serverComponentOutputInOwner(out, scope, previous.owner);
+		const inner = serverComponentOutput(out, scope, previous.owner);
 		// Wrap the child's output in a hydration block range so the client's
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
 		// become the slot's start/end markers, exactly like control-flow blocks).
@@ -8963,7 +8941,7 @@ function runFullFramedPass(
 		// `.ts` root (the shape every @octanejs binding produces) returns a
 		// createElement descriptor that must render through ssrChild.
 		const out = invokeComponentBody(component, props, root, FRAME);
-		body = serverComponentOutputInOwner(out, root, serverSignalOwner(FRAME));
+		body = serverComponentOutput(out, root, serverSignalOwner(FRAME));
 		if (markers && out !== null && typeof out === 'object') {
 			const marker = (out as { [BINDING_HTML_ROOT]?: string })[BINDING_HTML_ROOT];
 			if (marker !== undefined) body = ssrBindingBlock(body, marker);
