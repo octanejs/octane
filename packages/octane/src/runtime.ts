@@ -1721,7 +1721,7 @@ let HELD_HYDRATION_DIAGNOSTICS: Array<() => void> | null = null;
  */
 function logHydrationMismatch(message: string, structural = false): void {
 	if (currentHydration?.holds(() => logHydrationMismatch(message, structural)) === true) return;
-	if (!structural || !holdRootHydrationDiagnostic(() => console.error(message)))
+	if (!structural || currentHydration?.awaitsCommit(() => console.error(message)) !== true)
 		console.error(message);
 }
 
@@ -3833,13 +3833,6 @@ function inRootHydrationAttempt(): boolean {
 		!ROOT_RENDER_ROLLBACK &&
 		PRESENTATION_HYDRATION?.revision === undefined
 	);
-}
-
-/** Whether `publish`, a hydration diagnostic, waits for the root attempt's commit. */
-function holdRootHydrationDiagnostic(publish: () => void): boolean {
-	if (!inRootHydrationAttempt()) return false;
-	(ROOT_RENDER_TRANSACTION!.commit ??= []).push(publish);
-	return true;
 }
 
 /** Do not detach an unchanged focused host merely to restore its own position. */
@@ -18646,6 +18639,17 @@ class HydrationCapability {
 	 */
 	save(parent: Node): void {
 		if (inRootHydrationAttempt()) journalRootChildren(parent);
+	}
+
+	/**
+	 * Whether `publish`, a hydration diagnostic, waits for the commit of a root's
+	 * hydrating attempt. A method, like `holds`, so that bundles which never
+	 * hydrate do not retain it.
+	 */
+	awaitsCommit(publish: () => void): boolean {
+		if (!inRootHydrationAttempt()) return false;
+		(ROOT_RENDER_TRANSACTION!.commit ??= []).push(publish);
+		return true;
 	}
 
 	/** Remember `node` in `set` for later attempts, unless its root attempt rolls back. */
@@ -45440,8 +45444,8 @@ function noteRecoverableHydrationError(makeError: () => Error, block: Block | nu
 	if (h === undefined) return;
 	let root = from!;
 	while (root.parentBlock !== null) root = root.parentBlock;
-	if (!holdRootHydrationDiagnostic(() => reportRecoverableHydrationError(h, root, makeError)))
-		reportRecoverableHydrationError(h, root, makeError);
+	const report = () => reportRecoverableHydrationError(h, root, makeError);
+	if (currentHydration?.awaitsCommit(report) !== true) report();
 }
 
 function reportRecoverableHydrationError(
