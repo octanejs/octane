@@ -102,13 +102,16 @@ describe('slotHooks surgical pass', () => {
 		expect(code).toContain('[key: string]: number;');
 		expect(code).toContain('export type Pair<A, B> = { a: A; b: B };');
 		expect(code).toContain('export const widen = <T>(x: T): T => x;');
-		// custom-hook calls are NOT wrapped here (the .tsrx/.tsx caller does that)
-		expect(code).not.toContain('withSlot(');
-		// Apart from inferred dependency arrays, the transform remains surgical:
+		// Apart from inferred dependency arrays and the call boundary around the
+		// module's own nested custom-hook call, the transform remains surgical:
 		// stripping slots restores every original byte. (Default = no HMR → one
 		// runtime-reserved Symbol range; Symbol.for is dev-serve only.)
 		const stripped = code
-			.replace(/^import \{ hookSlots as _\$hookSlots \} from 'octane';\n/gm, '')
+			.replace(
+				/^import \{ hookSlots as _\$hookSlots, withSlot as _\$withSlot \} from 'octane';\n/gm,
+				'',
+			)
+			.replace(/_\$withSlot\(_h\$\d+, (\w+), /g, '$1(')
 			.replace(/^const _hs\$ = \/\* @__PURE__ \*\/ _\$hookSlots\(\d+\);\n/gm, '')
 			.replace(/^const _h\$\d+ = \/\* @__PURE__ \*\/ Symbol\(_hs\$(?: \+ \d+)?\);\n/gm, '')
 			.replace(/, _h\$\d+(?=[),])/g, '');
@@ -153,8 +156,12 @@ describe('slotHooks surgical pass', () => {
 		];
 
 		// A memo hit must never skip a nested built-in or custom hook. These
-		// arguments remain unchanged until they can be analyzed as hook-free.
-		for (const source of sources) expect(slotHooks(source, 'nested-hook.ts')).toBeNull();
+		// arguments stay inline until they can be analyzed as hook-free; the local
+		// custom hook gains only its own call boundary.
+		for (const source of sources) {
+			const code = slotHooks(source, 'nested-hook.ts')?.code ?? source;
+			expect(code).toContain('const value = use(load(');
+		}
 	});
 });
 

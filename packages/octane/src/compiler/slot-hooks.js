@@ -6,10 +6,11 @@
 // whole-AST memo path, which preserves TypeScript and supplies a source map.
 //
 // This pass parses the module (for byte offsets), slots Octane base hooks and
-// gives imported custom hooks their own withSlot boundary. Imported aliases can
-// point directly at a base hook, so the enclosing component's boundary alone
-// cannot distinguish their call sites. Local helpers retain their authored slot
-// policy; explicitly manual modules opt out of all injected slots. In
+// gives imported and module-declared custom hooks their own withSlot boundary.
+// Imported aliases can point directly at a base hook, and one local hook can be
+// called twice by another, so the enclosing component's boundary alone cannot
+// distinguish their call sites. Helpers without a hook name retain their
+// authored call; explicitly manual modules opt out of all injected slots. In
 // production it reserves a collision-free runtime range because these arbitrary
 // helpers can execute in a Scope alongside code from any other source module.
 

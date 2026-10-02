@@ -7,10 +7,9 @@ function useSharedEffect(label: string, log: string[]): void {
 	}, [label, log]);
 }
 
-// The surgical plain-TypeScript transform slots the base hook, but does not
-// wrap nested custom-hook calls. Both invocations therefore enqueue through the
-// same effective runtime slot and must remain independently observable.
+// A plain-TypeScript loop repeats one custom-hook call site. Both invocations
+// therefore enqueue through the same effective runtime slot and must remain
+// independently observable.
 export function useRepeatedSharedEffects(log: string[]): void {
-	useSharedEffect('first', log);
-	useSharedEffect('second', log);
+	for (const label of ['first', 'second']) useSharedEffect(label, log);
 }

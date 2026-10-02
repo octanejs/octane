@@ -235,7 +235,7 @@ describe('imported hook aliases in plain modules', () => {
 			import { useCell as cell } from './aliases';
 			import type { useOther } from './types';
 			export function probe(cell) { return cell(1); }
-			export function other(useOther) { return useOther(2); }`;
+			export function other() { return useOther(2); }`;
 		expect(slotHooks(source, 'shadowed-import.ts')).toBeNull();
 	});
 
