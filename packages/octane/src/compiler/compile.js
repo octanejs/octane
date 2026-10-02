@@ -32797,16 +32797,32 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	let catchBodyStmts = null;
 	if (node.handler) {
 		const handler = node.handler;
-		const errName = handler.param?.name || '_err';
 		const resetName = handler.resetParam?.name || '_reset';
 		const catchStmts = handler.body.body;
 		// The catch body sees `err` and `reset` as bindings unpacked from the
 		// tryBlock-supplied props object. We synthesize a small destructuring
 		// VariableDeclaration at the top of the body so the user's identifiers
 		// resolve. The body is otherwise compiled like any component body.
+		// `err` unpacks into the authored binding, which may be a destructuring
+		// pattern (`@catch ({ message = fallback }: Error)`) whose defaults read
+		// component locals; the env analysis below sees those reads as captures.
+		// Its annotation is type-only, so a typed binding is copied without it.
+		const param = handler.param;
+		const errBinding =
+			param == null
+				? b.id('_err')
+				: param.typeAnnotation
+					? { ...param, typeAnnotation: null }
+					: param;
 		const destructure = b.const(
 			b.object_pattern([
-				b.prop('init', b.id('err'), b.id(errName), false, errName === 'err'),
+				b.prop(
+					'init',
+					b.id('err'),
+					errBinding,
+					false,
+					errBinding.type === 'Identifier' && errBinding.name === 'err',
+				),
 				b.prop('init', b.id('reset'), b.id(resetName), false, resetName === 'reset'),
 			]),
 			b.id('__props'),
