@@ -1,17 +1,15 @@
 name: PR bench comment
 
-# Posts one sticky pull request comment combining the "PR bench" report with
-# CI job durations measured against recent `main` runs. workflow_run executes
-# this file from the default branch with a write token, so it only checks out
-# the default branch's report scripts and never runs pull request code. Either
-# workflow finishing rebuilds the whole comment from the latest data for the
-# commit, so the second to finish posts both sections. The artifact is
-# untrusted data: the pull request must still point at the run's head commit,
-# and the report must carry the marker and fit GitHub's comment limit.
+# Posts the "PR bench" report as one sticky pull request comment. workflow_run
+# executes this file from the default branch with a write token, so it only
+# checks out the default branch's report script and never runs pull request
+# code. The artifact is untrusted data: the pull request must still point at
+# the run's head commit, and the report must carry the marker and fit GitHub's
+# comment limit.
 
 on:
   workflow_run:
-    workflows: [PR bench, CI]
+    workflows: [PR bench]
     types: [completed]
 
 permissions: {}
@@ -37,7 +35,6 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
           sparse-checkout: |
-            benchmarks/ci-timing.mjs
             benchmarks/pr-report.mjs
           sparse-checkout-cone-mode: false
 
@@ -77,25 +74,11 @@ jobs:
               });
               return data.artifacts.some((artifact) => !artifact.expired);
             });
-            const ci = await newestWith("ci.yml", async (run_id) => {
-              const { data } = await github.rest.actions.listJobsForWorkflowRun({
-                owner,
-                repo,
-                run_id,
-                filter: "latest",
-                per_page: 100,
-              });
-              return data.jobs.some(
-                (job) => job.name === "classify changeset release" && job.conclusion === "success",
-              );
-            });
             core.setOutput("bench", bench ? String(bench.id) : "");
-            core.setOutput("ci", ci ? String(ci.id) : "");
 
       - name: Download benchmark report
         id: download
         if: steps.runs.outputs.bench != ''
-        continue-on-error: true
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: pr-bench-report
@@ -104,11 +87,10 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Post or update sticky comment
+        if: steps.download.outcome == 'success'
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           REPORT_DIR: ${{ runner.temp }}/pr-bench/report
-          BENCH_DOWNLOADED: ${{ steps.download.outcome == 'success' }}
-          CI_RUN: ${{ steps.runs.outputs.ci }}
         with:
           script: |
             const fs = require("node:fs");
@@ -116,7 +98,6 @@ jobs:
             const { pathToFileURL } = require("node:url");
             const load = (file) =>
               import(pathToFileURL(path.join(process.env.GITHUB_WORKSPACE, file)).href);
-            const timing = await load("benchmarks/ci-timing.mjs");
             const { COMMENT_MARKER } = await load("benchmarks/pr-report.mjs");
             const { owner, repo } = context.repo;
             const sha = context.payload.workflow_run.head_sha;
@@ -133,65 +114,17 @@ jobs:
               return;
             }
 
-            let bench = null;
-            if (process.env.BENCH_DOWNLOADED === "true") {
-              const read = (name) => fs.readFileSync(path.join(process.env.REPORT_DIR, name), "utf8");
-              const body = read("report.md");
-              if (
-                Number(read("pr-number").trim()) !== pull.number ||
-                read("head-sha").trim() !== sha ||
-                !timing.isBenchReport(body)
-              ) {
-                core.setFailed("Report artifact is not a benchmark report for this pull request.");
-                return;
-              }
-              bench = body;
-            }
-
-            const jobsOf = (run_id) =>
-              github.paginate(github.rest.actions.listJobsForWorkflowRun, {
-                owner,
-                repo,
-                run_id,
-                filter: "latest",
-                per_page: 100,
-              });
-            let ciTiming = null;
-            if (process.env.CI_RUN) {
-              const run_id = Number(process.env.CI_RUN);
-              const jobs = await jobsOf(run_id);
-              if (timing.ranGatedJobs(jobs)) {
-                const { data: ciRun } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id });
-                const { data: mainRuns } = await github.rest.actions.listWorkflowRuns({
-                  owner,
-                  repo,
-                  workflow_id: "ci.yml",
-                  branch: pull.base.ref,
-                  event: "push",
-                  status: "success",
-                  per_page: 4 * timing.BASELINE_RUNS,
-                });
-                const summaries = [];
-                for (const run of mainRuns.workflow_runs) {
-                  summaries.push(timing.summarizeJobs(await jobsOf(run.id)));
-                }
-                const baselines = timing.selectBaselines(summaries);
-                if (baselines.length) {
-                  ciTiming = timing.renderCiTiming({
-                    head: timing.summarizeJobs(jobs),
-                    baselines,
-                    headSha: sha,
-                    runUrl: ciRun.html_url,
-                    conclusion: ciRun.conclusion,
-                  });
-                }
-              }
-            }
-            if (!bench && !ciTiming) {
-              core.notice("Neither a benchmark report nor a timed CI run exists for this commit yet.");
+            const read = (name) => fs.readFileSync(path.join(process.env.REPORT_DIR, name), "utf8");
+            const body = read("report.md");
+            if (
+              Number(read("pr-number").trim()) !== pull.number ||
+              read("head-sha").trim() !== sha ||
+              !body.startsWith(COMMENT_MARKER) ||
+              body.length > 65_000 // GitHub rejects comment bodies over 65,536 characters
+            ) {
+              core.setFailed("Report artifact is not a benchmark report for this pull request.");
               return;
             }
-            const body = timing.composeComment({ bench, ciTiming });
 
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner,
