@@ -1833,7 +1833,10 @@ structural or text recovery — a rebuilt subtree, corrected text, or a discarde
 stale server range —
 coalesced to one report per root per microtask burst. A boundary that retries
 hydration after suspending does not report content that an earlier attempt
-already rebuilt. Octane recovers per site
+already rebuilt. A try body that throws to its `@catch` arm or `<ErrorBoundary>`
+fallback reports nothing for what it adopted before it threw, in development or
+production: the catch arm replaces that content, and where the server's body
+threw the same way, the server rendered its catch arm there. Octane recovers per site
 rather than client-rendering a whole boundary, so attribute-level value patches
 do not report: production React does not detect those at all, and reporting
 Octane's extra detection would make the channel incomparable.
@@ -1855,6 +1858,13 @@ React drops a `pointerup` or `pointercancel` whose target is still suspended
 after that synchronous attempt, and never delivers `pointermove` to a dehydrated
 subtree's handlers. Neither framework cancels the native default of these
 events.
+
+Octane replays after the boundary's hydration commits and its effects run,
+which can be a frame later. A boundary or independent island keeps capturing
+its interaction events until that replay runs, so one arriving in between is
+replayed after the captured ones instead of reaching the hydrated handlers
+first. Handlers see those events in the order the user produced them, as in
+React.
 
 `hydrateRoot` has no `formState` option: resuming `useActionState` from an MPA
 form POST requires React's server-action state serialization, which is part of

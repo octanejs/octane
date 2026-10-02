@@ -25,6 +25,7 @@ import { isSignalHandle } from './handle-protocol.js';
 export { isSignalHandle, isWritableSignal } from './handle-protocol.js';
 import {
 	captureSignalOwner,
+	currentExplicitSignalOwner,
 	currentSignalOwner,
 	installSignalOwnerRetirement,
 	runWithSignalOwner,
@@ -296,10 +297,43 @@ function requireSite(site: string | undefined): string {
 	throw new Error(formatClientError(159));
 }
 
+/** The renderer instance or inline row that evaluated an instance declaration. */
+function declarationOwner(site: string | undefined): SignalRendererOwnerIdentity | undefined {
+	if (!site?.startsWith('i:')) return;
+	let owner = currentExplicitSignalOwner();
+	if (owner === null) return;
+	if (isScope(owner)) owner = scopeOwners.get(owner) ?? owner;
+	return isRendererOwner(owner) ? owner : undefined;
+}
+
+/**
+ * A component that receives a handle owns its cell, but its directive arms and
+ * inline rows are part of its template: they own only the declarations they
+ * evaluate. Reading a handle declared by an enclosing owner resolves that
+ * owner's cell, and any other handle the component's cell, so one declaration
+ * and selection is not repeated for every arm or row.
+ */
+function readerOwner(
+	declared: SignalRendererOwnerIdentity | undefined,
+	reader: SignalOwner,
+): SignalOwner {
+	if (declared === undefined || declared === reader) return reader;
+	let owner = isScope(reader) ? (scopeOwners.get(reader) ?? reader) : reader;
+	if (owner === declared || !isRendererOwner(owner)) return owner;
+	for (let enclosing = owner.enclosingOwner; enclosing !== undefined;) {
+		if (enclosing === declared) return declared;
+		owner = enclosing;
+		enclosing = enclosing.enclosingOwner;
+	}
+	return owner;
+}
+
 /** @internal Shared owner resolution for statically selected signal factories. */
 export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerBoundSignal<T> {
 	readonly [SIGNAL_HANDLE] = true as const;
 	private readonly cells = new WeakMap<Scope, H>();
+	// Identity-only token: renderer owners never retain their renderer tree.
+	private readonly owner: SignalRendererOwnerIdentity | undefined;
 	/** A render's private presentation of a redeclared cell, until it is accepted or released. */
 	declare private view?: H;
 	declare private viewOwner?: Scope;
@@ -309,11 +343,13 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		readonly kind: H['kind'],
 		private readonly create: (owner: Scope) => H,
 		private readonly site: string | undefined,
-	) {}
+	) {
+		this.owner = declarationOwner(site);
+	}
 
 	[SIGNAL_OWNER_RESOLVE](owner: Scope): H {
 		requireSite(this.site);
-		return this.resolvedCell(resolveDescriptorOwner(this.site, owner));
+		return this.resolvedCell(resolveDescriptorOwner(this.site, readerOwner(this.owner, owner)));
 	}
 
 	private resolvedCell(target: Scope): H {
@@ -335,7 +371,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	}
 
 	protected resolve(): H {
-		const token = requireOwner();
+		const token = readerOwner(this.owner, requireOwner());
 		const owner = resolveDescriptorOwner(this.site, token);
 		// This path already normalized the owner. Retain its validation order,
 		// but do not repeat document/instance routing for every cached read.
@@ -384,7 +420,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 
 	subscribe(notify: () => void): () => void {
 		const token = requireOwner();
-		const scope = resolveDescriptorOwner(this.site, token);
+		const scope = resolveDescriptorOwner(this.site, readerOwner(this.owner, token));
 		const run = captureSignalOwner(token);
 		return this[SIGNAL_OWNER_RESOLVE](scope).subscribe(
 			forwardNativeTransitionConsumer(notify, () => run(notify)),

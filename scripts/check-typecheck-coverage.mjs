@@ -23,8 +23,8 @@ function resolveProject(project) {
 for (const project of record.requiredProjects) {
 	const absolute = resolveProject(project);
 	const checkers = projects.get(absolute);
-	if (!checkers?.has('tsrx-tsc')) {
-		errors.push(`${project} is not reached by the root typecheck with tsrx-tsc`);
+	if (!checkers?.has('octane-tsc')) {
+		errors.push(`${project} is not reached by the root typecheck with octane-tsc`);
 	}
 }
 

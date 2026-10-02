@@ -4,6 +4,7 @@ import {
 	bootstrapIndependentHydration,
 	type IndependentHydrateActivationContext,
 } from '../../src/hydration/independent-island.js';
+import { hasPendingWork } from '../../src/index.js';
 import { renderToString } from '../../src/runtime.server.js';
 import { createScope } from 'octane/signals';
 import { evaluateCompiledFixtureCode } from '../_server-fixture.js';
@@ -185,6 +186,127 @@ function Content() @{
 	});
 
 	it.each(
+		[false, true].flatMap((dev) => ['ready', 'pending'].map((primary) => ({ dev, primary }))),
+	)(
+		'replays a captured click before a live click that arrives before the replay (%j)',
+		async ({ dev, primary }) => {
+			const source = `import { Hydrate, useState } from 'octane';
+import { interaction } from 'octane/hydration';
+import { choose, wait } from './actions';
+export function App() @{
+  <Hydrate independent when={interaction({ events: 'click' })}>
+    <Options />
+  </Hydrate>
+}
+function Options() @{
+  wait();
+  const [selected, setSelected] = useState('none');
+  <section>
+    <button type="button" data-option="A" onClick={(event) => { choose('A', event); setSelected('A'); }}>A</button>
+    <button type="button" data-option="B" onClick={(event) => { choose('B', event); setSelected('B'); }}>B</button>
+    <output>{selected as string}</output>
+  </section>
+}`;
+			const file = '/project/src/ReplayOrderWidget.tsrx';
+			const choices: Array<[string, number]> = [];
+			let waiting = primary === 'pending';
+			let resume!: () => void;
+			const ready = new Promise<void>((resolve) => {
+				resume = resolve;
+			});
+			const server = evaluateCompiledFixtureCode(
+				compile(source, file, { mode: 'server', dev }).code,
+				file,
+				'server',
+				{ './actions': { choose() {}, wait() {} } },
+			);
+			const widget = evaluateCompiledFixtureCode(
+				compile(source, file + '?octane-hydrate=0', { mode: 'client', dev }).code,
+				file,
+				'client',
+				{
+					'./actions': {
+						choose(option: string, event: MouseEvent) {
+							choices.push([option, event.timeStamp]);
+						},
+						wait() {
+							if (waiting) throw ready;
+						},
+					},
+				},
+			);
+			const host = document.createElement('main');
+			host.innerHTML = renderToString(server.App, undefined, {
+				independentHydration: {
+					buildId: 'replay-order-build',
+					resolve: (moduleId) => ({ moduleId, styles: [] }),
+				},
+			}).html;
+			document.body.append(host);
+			const optionA = host.querySelector<HTMLButtonElement>('[data-option="A"]')!;
+			const optionB = host.querySelector<HTMLButtonElement>('[data-option="B"]')!;
+			const click = (target: HTMLElement, timeStamp: number) => {
+				const event = new MouseEvent('click', { bubbles: true, cancelable: true, composed: true });
+				Object.defineProperty(event, 'timeStamp', { value: timeStamp });
+				target.dispatchEvent(event);
+			};
+			// One real frame between the island commit and its post-paint replay.
+			vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
+				setTimeout(() => callback(performance.now()), 16),
+			);
+			let liveClicked = false;
+			const choicesBeforeLiveClick: Array<[string, number]>[] = [];
+			const errors: unknown[] = [];
+			const cleanup = bootstrapIndependentHydration(host, {
+				buildId: 'replay-order-build',
+				loadStyles() {},
+				async loadModule() {
+					return {
+						default(context: IndependentHydrateActivationContext) {
+							const root = widget.default(context);
+							// A click the browser queued while the activation task ran.
+							setTimeout(() => {
+								choicesBeforeLiveClick.push([...choices]);
+								click(optionB, 20);
+								liveClicked = true;
+							}, 0);
+							return root;
+						},
+					};
+				},
+				onError: (error) => errors.push(error),
+			});
+			try {
+				click(optionA, 10);
+				await vi.waitFor(() => expect(liveClicked).toBe(true));
+				expect(choicesBeforeLiveClick).toEqual([[]]);
+				if (primary === 'pending') {
+					waiting = false;
+					resume();
+				}
+				await vi.waitFor(() => expect(choices.length).toBeGreaterThan(0));
+				await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
+
+				expect(choices).toEqual([
+					['A', 10],
+					['B', 20],
+				]);
+				expect(host.querySelector('[data-option="A"]')).toBe(optionA);
+				expect(host.querySelector('output')!.textContent).toBe('B');
+				// Once the replay drains, later clicks reach the hydrated handlers directly.
+				click(optionA, 30);
+				expect(choices.at(-1)).toEqual(['A', 30]);
+				await vi.waitFor(() => expect(host.querySelector('output')!.textContent).toBe('A'));
+				expect(errors).toEqual([]);
+			} finally {
+				vi.unstubAllGlobals();
+				cleanup();
+				host.remove();
+			}
+		},
+	);
+
+	it.each(
 		[false, true].flatMap((dev) =>
 			['template', 'tsx', 'return-tsrx'].map((authoring) => ({ dev, authoring })),
 		),
@@ -316,6 +438,8 @@ function Unrelated() {
 				expect(choose.mock.calls).toEqual([['load']]);
 				nestedButton.click();
 				await vi.waitFor(() => expect(nestedActive).toBe(true));
+				// The nested click replays from the island's post-paint passive work.
+				await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
 				expect(modules).toEqual([loadManifest.moduleId, nestedManifest.moduleId]);
 				expect(choose.mock.calls).toEqual([['load'], ['nested']]);
 				expect(host.querySelector('[data-nested]')).toBe(nestedButton);

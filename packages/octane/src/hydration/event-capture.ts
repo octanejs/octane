@@ -172,6 +172,11 @@ const HYDRATE_DELEGATED_DYNAMIC_MARKERS = /* @__PURE__ */ new WeakSet<Element>()
 const HYDRATE_HANDLED_INTENT_EVENTS = /* @__PURE__ */ new WeakSet<Event>();
 const HYDRATE_INTENT_DOCUMENTS = /* @__PURE__ */ new WeakSet<Document>();
 let independentHydrationDocuments: WeakSet<Document> | undefined;
+let hydrationReplayHolds: WeakMap<Element, HydrationReplayHold> | undefined;
+
+/** @internal An activated island's undelivered replays, or null once replayed or unmounted. */
+export type HydrationReplayHold = () => HydrationReplayIntent[] | null;
+
 // Created on the first captured intent whose boundary chain selects a pointer
 // lifecycle event, so other pages never listen for high-frequency movement.
 let lifecycleHydrationMarkers: WeakSet<Element> | undefined;
@@ -524,6 +529,24 @@ export function unregisterHydrationIntentBoundary(
 	boundary: HydrationIntentBoundary,
 ): void {
 	if (HYDRATE_BOUNDARIES.get(marker) === boundary) HYDRATE_BOUNDARIES.delete(marker);
+}
+
+/**
+ * @internal An island's activator replays captured intent only after its root
+ * commits. Until then, later intent for the island must queue behind that
+ * replay: let through, it would reach the hydrated handlers first.
+ */
+export function holdHydrationReplays(marker: Element, hold: HydrationReplayHold): void {
+	(hydrationReplayHolds ??= new WeakMap()).set(marker, hold);
+}
+
+/** @internal The queue live intent for an activated island must join, if any. */
+export function heldHydrationReplays(marker: Element): HydrationReplayIntent[] | null {
+	const hold = hydrationReplayHolds?.get(marker);
+	if (hold === undefined) return null;
+	const queue = hold();
+	if (queue === null) hydrationReplayHolds!.delete(marker);
+	return queue;
 }
 
 /** @internal Consume intent captured before the runtime boundary was registered. */
