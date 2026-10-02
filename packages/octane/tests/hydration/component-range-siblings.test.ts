@@ -211,6 +211,14 @@ describe.each([
 			actual: 'text "server"',
 		},
 		{
+			when: 'a component follows a rebuilt single-root clone',
+			name: 'Content',
+			server: { value: 'server' },
+			client: { value: 'SingleThenTally' },
+			expected: '<i>',
+			actual: 'text "server"',
+		},
+		{
 			when: 'an @if arm follows the first component',
 			name: 'Content',
 			server: { value: 'server' },

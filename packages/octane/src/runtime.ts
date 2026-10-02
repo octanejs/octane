@@ -19634,6 +19634,15 @@ class HydrationCapability {
 	}
 
 	/**
+	 * A reported recovery left the cursor on `node`. When that is the end of the
+	 * server range, the rest of the range is the client's: later claims there
+	 * are part of the same recovery (firstAtRangeEnd).
+	 */
+	private reachedRangeEnd(node: Node | null): void {
+		if (isBlockClose(node)) this.remember((HYDRATION_REBUILT ??= new WeakSet()), node);
+	}
+
+	/**
 	 * STRUCTURAL recovery for a list where the SERVER rendered MORE items than the
 	 * client now renders: after its first fill adopts the client's items, the
 	 * cursor sits on the first unconsumed server item (or at `end`). Discard
@@ -20212,6 +20221,7 @@ class HydrationCapability {
 			// than at its block's end.
 			this.node = getNextSibling(isBlockOpen(cursor) ? this.close(cursor) : cursor);
 			this.replaced = cursor;
+			this.reachedRangeEnd(this.node);
 			if (claimsRoot)
 				this.claimRootRemainder(
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
@@ -20317,9 +20327,7 @@ class HydrationCapability {
 		if (node === end) {
 			this.node = end;
 			removeHydrationRange(cursor, (STAGED_DOM?.view(end!) ?? end!).previousSibling!);
-			// The rest of the range is the client's, so later claims at its end
-			// stay quiet (firstAtRangeEnd).
-			if (isBlockClose(end)) this.remember((HYDRATION_REBUILT ??= new WeakSet()), end);
+			this.reachedRangeEnd(end);
 		} else this.discardCursor(cursor);
 		return this.freshClone(template);
 	}

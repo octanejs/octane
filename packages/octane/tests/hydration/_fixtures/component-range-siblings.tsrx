@@ -62,6 +62,13 @@ function TallyThenSingle() @{
 	</>
 }
 
+function SingleThenTally() @{
+	<>
+		<Single />
+		<Tally name="inner" />
+	</>
+}
+
 function TallyThenIf() @{
 	<>
 		<Tally name="inner" />
@@ -76,6 +83,7 @@ const CONTENT: Record<string, ComponentType<{}>> = {
 	TallyThenPlain,
 	PlainThenTally,
 	TallyThenSingle,
+	SingleThenTally,
 	TallyThenIf,
 };
 
