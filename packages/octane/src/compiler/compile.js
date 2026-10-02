@@ -27514,9 +27514,7 @@ function planJsx(
 				ctx.runtimeNeeded.add('bindSignalChild');
 				const tokenKey = `_sigch$${cc.id}`;
 				bag.constField(tokenKey, b.literal(null));
-				pushAfterStmt(
-					cc.id,
-					org,
+				const bindChild = (value) =>
 					b.stmt(
 						b.assignment(
 							'=',
@@ -27527,7 +27525,7 @@ function planJsx(
 								bagFieldNode(bag, tokenKey),
 								b.literal(slotIndex),
 								hostExpr(),
-								cc.valueExpr,
+								value,
 								b.literal(cc.signalSite),
 								childAnchor ?? b.literal(null),
 								...optionalCallArgs(
@@ -27538,8 +27536,40 @@ function planJsx(
 								),
 							),
 						),
-					),
-				);
+					);
+				if (cc.onlyChildText && cc.autoMemoValue === true && !cc.potentialDangerouslySetInnerHTML) {
+					// A calculated value can still hold a signal handle, so it keeps the
+					// signal-capable binding. Only an unchanged compiler-owned plain data
+					// array may skip it, exactly as on the ordinary only-child path below;
+					// every other value fails compilerCacheArray and rebinds each render.
+					// A host that may receive raw HTML never skips it: the binding is
+					// where children and dangerouslySetInnerHTML are kept exclusive.
+					const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
+					const update = () => b.block([bindChild(V()), b.stmt(b.assignment('=', chp(), V()))]);
+					ctx.runtimeNeeded.add('compilerCacheArray');
+					const cached = emitAutoMemoRegion(
+						ctx,
+						['_v'],
+						slotIndex,
+						update(),
+						// Array → handle or scalar → the same array must rebind the list.
+						b.binary('!==', chp(), V()),
+						true,
+						undefined,
+						null,
+						true,
+					);
+					pushAfterStmt(
+						cc.id,
+						org,
+						b.block([
+							b.const('_v', cc.valueExpr),
+							b.if(b.call('_$compilerCacheArray', V(), chp()), cached, update()),
+						]),
+					);
+					continue;
+				}
+				pushAfterStmt(cc.id, org, bindChild(cc.valueExpr));
 				continue;
 			}
 			// MARKERLESS only-child renderable: append a primitive as a single Text
