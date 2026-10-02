@@ -48,3 +48,12 @@ export function PendingValues(props) @{
 		<Reader read={props.read} />
 	</>
 }
+
+export function PendingSprite(props: { href?: string; read: () => string }) @{
+	<>
+		<svg>
+			<use id="pending-use" xlinkHref={props.href} />
+		</svg>
+		<Reader read={props.read} />
+	</>
+}
