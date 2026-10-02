@@ -18726,13 +18726,14 @@ class HydrationCapability {
 	 */
 	settleServerCatch(caught: ServerCatch, slot: TrySlot | ErrorSlot, adopted: boolean): void {
 		const { start, end } = slot;
+		const { marker } = caught;
 		if (!adopted) this.rebuiltSlot(slot.parentBlock, end);
 		const settle = (discarded: boolean): void => {
-			if ((STAGED_DOM?.view(caught.marker) ?? caught.marker).parentNode === null) return;
+			if ((STAGED_DOM?.view(marker) ?? marker).parentNode === null) return;
 			if (discarded) {
-				removeRange(getNextSibling(start), caught.marker);
+				removeRange(getNextSibling(start), marker);
 				removeRange(getNextSibling(caught.end), end);
-			} else removeRange(caught.marker, adopted ? caught.start : getNextSibling(caught.end));
+			} else removeRange(marker, adopted ? caught.start : getNextSibling(caught.end));
 		};
 		if (WIP_CAPTURE === null) settle(false);
 		else (WIP_CAPTURE.renderCleanups ??= []).push(settle);
