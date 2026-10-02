@@ -1930,10 +1930,28 @@ function hydrationNodeMatches(
  * Does the server node at the cursor match a nested fragment's FIRST logical
  * root? A leading template comment is a dynamic hole whose server form (text,
  * a marker range, or nothing) cannot decide a mismatch, as in fragmentRemainder.
+ * The first static element root after the leading `<!>` holes decides instead,
+ * compared with the server node that the compiled walk reaches from the cursor
+ * (HydrationCapability.sibling steps over each hole's server form). Otherwise
+ * another fragment's server nodes would stand for this one's: a hole's slot
+ * would take one of them as its anchor, and the static roots would never be
+ * built. Matches when no static element root follows the leading holes, and
+ * under a passthrough root (HydrationCapability.passthroughRoot).
  */
-function fragmentRootMatches(server: Node, fragment: Node, partialStyles?: string): boolean {
-	const first = getFirstChild(fragment)!;
-	return first.nodeType === 8 || hydrationNodeMatches(server, first, partialStyles, '0');
+function fragmentRootMatches(
+	server: Node,
+	fragment: Node,
+	hydration: HydrationCapability,
+	partialStyles?: string,
+): boolean {
+	let root: Node | null = getFirstChild(fragment)!;
+	if (root.nodeType !== 8) return hydrationNodeMatches(server, root, partialStyles, '0');
+	if (hydration.passthroughRoot) return true;
+	let holes = 0;
+	for (; root !== null && root.nodeType === 8; holes++) root = getNextSibling(root);
+	if (root === null || root.nodeType !== 1) return true;
+	const at = hydration.sibling(server, holes);
+	return at !== null && hydrationNodeMatches(at, root, partialStyles, String(holes));
 }
 
 /** Remove the server nodes from `start` to `end` (inclusive). Used to discard a divergent range. */
@@ -2577,10 +2595,21 @@ function nativeCandidateForAction(batch: TransitionActionBatch): SignalActionFra
 function ensureNativeActionResolver(): void {
 	if (nativeActionResolverInstalled) return;
 	nativeActionResolverInstalled = true;
-	registerNativeActionResolver(() => {
-		const batch = transitionActionBatchForUpdate();
-		return batch === null ? undefined : nativeCandidateForAction(batch);
-	});
+	registerNativeActionResolver(resolveNativeActionCandidate);
+}
+
+function resolveNativeActionCandidate(): SignalActionFrame | undefined {
+	const batch = transitionActionBatchForUpdate();
+	return batch === null ? undefined : nativeCandidateForAction(batch);
+}
+
+// Installed only inside runTransition's synchronous slice, where the active batch
+// is that transition's own: a nested transition joins its parent's batch. Reading
+// it here instead of capturing it keeps every transition free of a closure.
+function resolveTransitionNativeCandidate(): SignalActionFrame | undefined {
+	const candidate = nativeCandidateForAction(ACTIVE_TRANSITION_ACTION_BATCH!);
+	swapActiveSignalCandidate(candidate);
+	return candidate;
 }
 
 function createTransitionActionBatch(): TransitionActionBatch {
@@ -18594,16 +18623,28 @@ function lazyRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
  * template source. A raw fragment's cached descriptor is that root; a
  * fixed-HTML fragment's starts after its synthetic `<octane-frag>` wrapper. A
  * leading `<!>` is a dynamic hole whose server form (text, a marker range, or
- * nothing) cannot decide a mismatch.
+ * nothing) cannot decide a mismatch, so the first static element root after
+ * the leading holes decides, as in fragmentRootMatches.
  */
-function lazyFragmentRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
-	const root =
-		lazy.frag !== 0
-			? lazyRootDescriptor(lazy)
-			: templateRootDescriptor(lazy.html, 13 /* '<octane-frag>'.length */);
-	if (root === 8) return true;
+function lazyFragmentRootMatches(
+	server: Node,
+	lazy: LazyTemplateRecord,
+	hydration: HydrationCapability,
+): boolean {
+	// A fixed-HTML fragment's roots follow its `<octane-frag>` wrapper.
+	const start = lazy.frag !== 0 ? 0 : 13;
+	let root = start === 0 ? lazyRootDescriptor(lazy) : templateRootDescriptor(lazy.html, start);
 	if (root === 3) return server.nodeType === 3;
-	return server.nodeType === 1 && (server as Element).localName === root;
+	if (root !== 8) return server.nodeType === 1 && (server as Element).localName === root;
+	if (hydration.passthroughRoot) return true;
+	const html = lazy.html;
+	let at = start;
+	while (html.startsWith('<!>', at)) at += 3;
+	// Past the last root, the descriptor is a number too.
+	root = templateRootDescriptor(html, at);
+	if (typeof root === 'number') return true;
+	const node = hydration.sibling(server, (at - start) / 3);
+	return node !== null && node.nodeType === 1 && (node as Element).localName === root;
 }
 
 /**
@@ -18718,7 +18759,9 @@ let currentHydration: HydrationCapability | null = null;
  * the earlier attempt's own content, or nothing, and the mismatch is already
  * reported. The end is the one node that every attempt at a return slot
  * shares: the slot borrows its component's range, or mints its own range
- * inside it, depending on what the failed attempt left.
+ * inside it, depending on what the failed attempt left. Within one attempt, a
+ * later sibling that finds the cursor on the end is part of the same recovery
+ * (firstAtRangeEnd).
  */
 let HYDRATION_REBUILT: WeakSet<Node> | null = null;
 
@@ -18859,6 +18902,13 @@ class HydrationCapability {
 	private claimEnd: Node | null | undefined = undefined;
 	/** Skip component-frame adoption until the declared container owner. */
 	passthroughRanges = false;
+	/**
+	 * The root is a HYDRATION_RANGE_BOUNDARY passthrough root. Its owner adopts
+	 * the first server range in the container, so the owner's content can sit
+	 * one range level off its server nodes: a nested fragment's static roots
+	 * need not follow the server forms of its leading holes there.
+	 */
+	passthroughRoot = false;
 	/** A slot lent a server range whose first render has yet to claim it. */
 	lentSlot: ChildSlot | null = null;
 	/**
@@ -19055,7 +19105,9 @@ class HydrationCapability {
 	 * here again (unframedClaim). Once a render completes, it reports the
 	 * mismatch and discards the server nodes that stood in the range's place,
 	 * but not a later sibling's range, unless `stale` is client-built: the
-	 * rebuild that built it already reported and discarded the server's.
+	 * rebuild that built it already reported and discarded the server's. A
+	 * discard that reaches the end of the enclosing server range reports once
+	 * for that range (firstAtRangeEnd).
 	 */
 	renderUnframed<T>(
 		render: (target: T) => void,
@@ -19088,12 +19140,17 @@ class HydrationCapability {
 					removeRange(claim.start, getNextSibling(claim.end));
 					this.node = stale;
 				} else if (stale === null || !this.isFresh(stale)) {
-					noteRecoverableHydrationError(() => new Error(formatClientError(55)));
-					if (process.env.NODE_ENV !== 'production') {
-						const loc = siteLoc(claim.scope, claim.slotKey);
-						if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
+					const node = stale === null ? null : this.discardInPlace(stale, claim.anchor);
+					// The discard stops at `anchor`, at a later sibling's range or
+					// boundary, or at the end of the enclosing server range, which may
+					// be `anchor` itself.
+					if (!isBlockClose(node) || this.firstAtRangeEnd(node)) {
+						noteRecoverableHydrationError(() => new Error(formatClientError(55)));
+						if (process.env.NODE_ENV !== 'production') {
+							const loc = siteLoc(claim.scope, claim.slotKey);
+							if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
+						}
 					}
-					if (stale !== null) this.discardInPlace(stale, claim.anchor);
 				}
 			}
 		}
@@ -19665,6 +19722,28 @@ class HydrationCapability {
 	}
 
 	/**
+	 * Mismatch recovery reached `close`, the end of a server range, having
+	 * discarded the server content before it or found none left. The client
+	 * builds the rest of the range, so each later claim in it finds the cursor
+	 * on `close` for the same reason: one recovery, which only the first claim
+	 * reports. Returns whether this is that claim, and remembers `close`.
+	 */
+	private firstAtRangeEnd(close: Node): boolean {
+		const rebuilt = HYDRATION_REBUILT?.has(close) === true;
+		this.remember((HYDRATION_REBUILT ??= new WeakSet()), close);
+		return !rebuilt;
+	}
+
+	/**
+	 * A reported recovery left the cursor on `node`. When that is the end of the
+	 * server range, the rest of the range is the client's: later claims there
+	 * are part of the same recovery (firstAtRangeEnd).
+	 */
+	private reachedRangeEnd(node: Node | null): void {
+		if (isBlockClose(node)) this.remember((HYDRATION_REBUILT ??= new WeakSet()), node);
+	}
+
+	/**
 	 * STRUCTURAL recovery for a list where the SERVER rendered MORE items than the
 	 * client now renders: after its first fill adopts the client's items, the
 	 * cursor sits on the first unconsumed server item (or at `end`). Discard
@@ -20204,7 +20283,7 @@ class HydrationCapability {
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 				);
 			if (template === null) template = resolveLazyTemplate(lazy!);
-			if (!this.staleServerValues) {
+			if (this.firstAtRangeEnd(cursor) && !this.staleServerValues) {
 				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 				if (process.env.NODE_ENV !== 'production')
 					warnHydrationStructuralMismatch(
@@ -20255,8 +20334,10 @@ class HydrationCapability {
 			const parent = domNode(cursor).parentNode!;
 			this.save(parent);
 			if (template === null) template = resolveLazyTemplate(lazy!);
-			// A retry over a node whose replacement never committed already reported it.
-			if (cursor !== this.replaced) {
+			const atRangeEnd = isBlockClose(cursor);
+			// A retry over a node whose replacement never committed already reported
+			// it, and a range end reports once (firstAtRangeEnd).
+			if (cursor !== this.replaced && (!atRangeEnd || this.firstAtRangeEnd(cursor))) {
 				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 				if (process.env.NODE_ENV !== 'production' && loc)
 					warnHydrationStructuralMismatch(
@@ -20265,12 +20346,15 @@ class HydrationCapability {
 						describeHydrationNode(cursor),
 					);
 			}
-			if (isBlockClose(cursor)) return this.freshClone(template);
-			// Recovery discards only a node this block renders into. A cursor left
+			if (atRangeEnd) return this.freshClone(template);
+			// Recovery discards only a node this template renders into. The compiled
+			// mount inserts into its scope's block, which for a lite component is
+			// its lite host rather than CURRENT_BLOCK's parent. A cursor left
 			// outside that parent (an earlier claim ran off the end of its host) is
 			// an ancestor's adopted content, possibly the host itself; removing it
 			// would blank the region the block is about to be inserted into.
-			const target = CURRENT_BLOCK?.parentNode;
+			const block = CURRENT_SCOPE?.block;
+			const target = block?.parentNode;
 			if (!claimsRoot && target != null && parent !== target) {
 				this.save(target);
 				return this.freshClone(template);
@@ -20281,6 +20365,12 @@ class HydrationCapability {
 			// than at its block's end.
 			this.node = getNextSibling(isBlockOpen(cursor) ? this.close(cursor) : cursor);
 			this.replaced = cursor;
+			this.reachedRangeEnd(this.node);
+			// A lite call that found no server range inserts before the node it
+			// found there, which the rebuilt root replaces. A lite block is only that
+			// insertion context, so point it past the node: when the node was its
+			// host's last child, the root is appended in its place.
+			if (block instanceof LiteBlockImpl && block.endMarker === cursor) block.endMarker = this.node;
 			if (claimsRoot)
 				this.claimRootRemainder(
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
@@ -20290,12 +20380,13 @@ class HydrationCapability {
 		}
 		if (isFragment) {
 			// A nested fragment has no server wrapper, so its first logical root must
-			// be the cursor itself. A root claim already compared every root above.
+			// be the cursor itself, or follow the server forms of its leading holes.
+			// A root claim already compared every root above.
 			if (
 				claimsRoot ||
 				(template !== null
-					? fragmentRootMatches(cursor, template, partialStyles)
-					: lazyFragmentRootMatches(cursor, lazy!))
+					? fragmentRootMatches(cursor, template, this, partialStyles)
+					: lazyFragmentRootMatches(cursor, lazy!, this))
 			) {
 				if (cursor === this.claimFrom) this.claimRoots(cursor, template ?? lazy!);
 				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
@@ -20380,7 +20471,7 @@ class HydrationCapability {
 		const rebuilt = this.rebuiltFragments?.get(root);
 		if (rebuilt === undefined) return undefined;
 		this.rebuiltFragments!.delete(root);
-		const { cursor, scope } = rebuilt;
+		const { cursor, scope, template } = rebuilt;
 		const block = scope?.block;
 		// A lite call that claimed no server range renders at the cursor, among
 		// its later siblings' server content, before the end marker it shares
@@ -20394,10 +20485,20 @@ class HydrationCapability {
 				// Name the lite call itself: its scope holds no locations of its own.
 				const owner = inPlace ? scope!.parent : null;
 				const site = owner === null ? '' : siteLoc(owner, owner.slots.indexOf(scope));
+				// A leading hole matches any server node: name the static root that
+				// did not match, and what the server rendered in its place.
+				let expected = getFirstChild(template);
+				let actual: Node | null = cursor;
+				while (expected !== null && expected.nodeType === 8) {
+					expected = getNextSibling(expected);
+					actual = actual === null ? null : this.sibling(actual, 1);
+				}
 				warnHydrationStructuralMismatch(
 					rebuilt.loc || site || componentSourceLoc(CURRENT_BLOCK?.body) || CURRENT_SCOPE?.locFile,
-					`a fragment starting with ${describeHydrationNode(getFirstChild(rebuilt.template))}`,
-					describeHydrationNode(cursor),
+					expected === getFirstChild(template) || expected === null
+						? `a fragment starting with ${describeHydrationNode(getFirstChild(template))}`
+						: `a fragment with ${describeHydrationNode(expected)} after its leading holes`,
+					describeHydrationNode(expected === null ? cursor : actual),
 				);
 			}
 		}
@@ -20409,7 +20510,11 @@ class HydrationCapability {
 			if (parent != null) this.save(parent);
 			return undefined;
 		}
-		if (inPlace) return (this.node = this.discardInPlace(cursor, end));
+		if (inPlace) {
+			const node = this.discardInPlace(cursor, end);
+			this.reachedRangeEnd(node);
+			return (this.node = node);
+		}
 		let node: Node | null = cursor;
 		// Reaching the block's own start first means the cursor lies before its range.
 		if (end !== null)
@@ -20418,6 +20523,7 @@ class HydrationCapability {
 		if (node === end) {
 			this.node = end;
 			removeHydrationRange(cursor, (STAGED_DOM?.view(end!) ?? end!).previousSibling!);
+			this.reachedRangeEnd(end);
 		} else this.discardCursor(cursor);
 		return undefined;
 	}
@@ -28071,52 +28177,13 @@ function fireEventSlot(
 	// render writes. A pure computation's own write guard stays in force, and
 	// Effect Event permission and signal ownership are unchanged.
 	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
-	const invoke = (): void => {
-		if (typeof slot === 'function') {
-			slot(event);
-			return;
-		}
-		if (process.env.NODE_ENV !== 'production' && isInvalidEventListenerSlot(slot)) {
-			invokeInvalidEventListener(`\`${slot.name}\``, slot.value, event);
-			return;
-		}
-		if (isHandlerBundle(slot)) {
-			const bundle = slot;
-			const a = bundle.args;
-			if (typeof a !== 'number') {
-				switch (a.length) {
-					case 0:
-						bundle.fn();
-						break;
-					case 1:
-						bundle.fn(a[0]);
-						break;
-					case 2:
-						bundle.fn(a[0], a[1]);
-						break;
-					default:
-						bundle.fn.apply(null, a);
-				}
-			} else if (a === 1) {
-				bundle.fn(bundle.a0);
-			} else if (a === 2) {
-				bundle.fn(bundle.a0, bundle.a1);
-			} else if (a === -1) {
-				bundle.fn(event, bundle.a0);
-			} else {
-				bundle.fn(event, bundle.a0, bundle.a1);
-			}
-			return;
-		}
-		invokeInvalidEventListener(`${event.type} event`, slot, event);
-	};
 	try {
 		const owner =
 			recorded instanceof ScopeImpl || recorded instanceof BlockImpl
 				? scopeSignalOwner(recorded)
 				: recorded;
-		if (owner === undefined || currentSignalOwner() === owner) invoke();
-		else runWithSignalOwner(owner, invoke);
+		if (owner === undefined || currentSignalOwner() === owner) invokeEventSlot(slot, event);
+		else runWithSignalOwner(owner, () => invokeEventSlot(slot, event));
 	} catch (err) {
 		reportListenerError(err);
 	} finally {
@@ -28124,6 +28191,40 @@ function fireEventSlot(
 		CURRENT_SCOPE = previousScope;
 		CURRENT_BLOCK = previousBlock;
 	}
+}
+
+// Only a handler entering another signal owner needs a callback; the ordinary
+// dispatch calls this directly.
+function invokeEventSlot(slot: EventSlot, event: Event): void {
+	if (typeof slot === 'function') slot(event);
+	else if (process.env.NODE_ENV !== 'production' && isInvalidEventListenerSlot(slot))
+		invokeInvalidEventListener(`\`${slot.name}\``, slot.value, event);
+	else if (isHandlerBundle(slot)) {
+		const a = slot.args;
+		if (typeof a !== 'number') {
+			switch (a.length) {
+				case 0:
+					slot.fn();
+					break;
+				case 1:
+					slot.fn(a[0]);
+					break;
+				case 2:
+					slot.fn(a[0], a[1]);
+					break;
+				default:
+					slot.fn.apply(null, a);
+			}
+		} else if (a === 1) {
+			slot.fn(slot.a0);
+		} else if (a === 2) {
+			slot.fn(slot.a0, slot.a1);
+		} else if (a === -1) {
+			slot.fn(event, slot.a0);
+		} else {
+			slot.fn(event, slot.a0, slot.a1);
+		}
+	} else invokeInvalidEventListener(`${event.type} event`, slot, event);
 }
 
 function invokeInvalidEventListener(label: string, listener: unknown, event: Event): void {
@@ -35726,6 +35827,36 @@ export function bindSignalChild(
 			: null;
 	const cachedText = prior?.text ?? (previous instanceof Text ? previous : null);
 	if (!isSignalHandle(value)) {
+		const type = typeof value;
+		// An ordinary marker-bounded hole keeps textHoleUpdate's fast path: its
+		// token is the last primitive, and a changed primitive rewrites the slot's
+		// Text node. Objects never become the token, so it is never read later. A
+		// pass that already queued this block skips child writes, so its token must
+		// not claim a primitive that never reached the DOM.
+		const primitiveToken =
+			slotKey !== 0 &&
+			!onlyChild &&
+			bindingMarker === undefined &&
+			value !== null &&
+			type !== 'object' &&
+			type !== 'function' &&
+			!(CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate);
+		if (primitiveToken && prior === null) {
+			const state = parentScope.slots[slotKey] as ChildSlot | undefined;
+			const node = state?.text;
+			if (
+				node != null &&
+				state!.block === null &&
+				state!.forSlot === null &&
+				state!.hostNode === null &&
+				state!.portal === null &&
+				state!.implicitSignal === undefined &&
+				!dangerouslySetInnerHTMLOwnsChild(domParent, value)
+			) {
+				if (previous !== value) setText(node, value === true ? '' : value);
+				return value;
+			}
+		}
 		const text = onlyChild
 			? childTextHole(parentScope, slotKey, domParent, value, cachedText)
 			: (bindingMarker === undefined
@@ -35740,7 +35871,7 @@ export function bindSignalChild(
 			if (WIP_CAPTURE === null) finish(false);
 			else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
 		}
-		return text;
+		return primitiveToken ? value : text;
 	}
 	if (prior !== null && !prior.disposed && prior.handle === value) {
 		const next = readSignalBinding(value);
@@ -41042,11 +41173,7 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 		tickTransitionCount(+1);
 		try {
 			const previousCandidate = activeCandidate;
-			const nativeResolver = setNativeCandidateResolver(() => {
-				const candidate = nativeCandidateForAction(actionBatch);
-				swapActiveSignalCandidate(candidate);
-				return candidate;
-			});
+			const nativeResolver = setNativeCandidateResolver(resolveTransitionNativeCandidate);
 			try {
 				result = fn();
 			} finally {
@@ -47964,7 +48091,7 @@ function hydrateRootWithOutputHandler(
 		}
 		if (nativeManifest !== undefined)
 			hydration.nativeAdoption = ownNativeAdoption(rootBlock, nativeManifest);
-		hydration.passthroughRanges =
+		hydration.passthroughRoot = hydration.passthroughRanges =
 			(body as ComponentBody & { [HYDRATION_RANGE_BOUNDARY]?: 'passthrough' | 'owner' })[
 				HYDRATION_RANGE_BOUNDARY
 			] === 'passthrough';
