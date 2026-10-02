@@ -598,6 +598,11 @@ export function inspectNativeNode(node: ScopedNode, read: SignalReadMode): Nativ
 }
 
 function createNativeSource(node: ScopedNode, read: SignalReadMode): NativeReadSource {
+	const view = declarationViews?.get(node);
+	return view === undefined ? createGraphSource(node, read) : createViewSource(node, view, read);
+}
+
+function createGraphSource(node: ScopedNode, read: SignalReadMode): NativeReadSource {
 	return {
 		getVersion: () => (activeCandidate && !activeCandidate.observes(node) ? NaN : node.revision),
 		subscribe: (notify) => {
@@ -821,6 +826,62 @@ export function invalidateNode(node: ScopedNode): void {
 	if (node.subs) graph.propagate(node.subs, executionDepth !== 0);
 }
 
+/**
+ * Run a redeclared definition once without subscribing anyone, reporting the
+ * nodes it read. A caller whose result and reads match the committed cell can
+ * adopt the definition without a private view or a second evaluation.
+ */
+export function readsDuring<T>(owner: GraphOwner, run: () => T): { value: T; reads: ScopedNode[] } {
+	const probe = new ScopedNode(owner, '', 'derived');
+	const previousNode = activeNode;
+	const previousOwners = activeOwners;
+	const previousObserver = setNativeReadObserver(null);
+	activeNode = probe;
+	activeOwners = undefined;
+	trackingCycle++;
+	pureDepth++;
+	try {
+		const value = run();
+		const reads: ScopedNode[] = [];
+		for (let link = probe.deps; link; link = link.nextDep) reads.push(link.dep as ScopedNode);
+		return { value, reads };
+	} finally {
+		pureDepth--;
+		activeNode = previousNode;
+		activeOwners = previousOwners;
+		setNativeReadObserver(previousObserver);
+		while (probe.deps) graph.unlink(probe.deps, probe);
+	}
+}
+
+/** The committed cell already depends on exactly these nodes, in this order. */
+export function readsMatch(node: ScopedNode, reads: readonly ScopedNode[]): boolean {
+	let index = 0;
+	for (let link = node.deps; link; link = link.nextDep)
+		if (link.dep !== reads[index++]) return false;
+	return index === reads.length;
+}
+
+/** A private node evaluated from a probe's result depends on what the probe read. */
+export function linkReads(node: ScopedNode, reads: readonly ScopedNode[]): void {
+	for (const dep of reads) graph.link(dep, node, ++trackingCycle);
+}
+
+/**
+ * Re-run a computation whose definition changed, relinking its dependencies.
+ * Unlike invalidateNode, an unchanged result keeps its revision, so readers
+ * that already presented it are not rendered again.
+ */
+export function reevaluateNode(node: ScopedNode): void {
+	const revision = node.revision;
+	node.flags |= ReactiveFlags.Dirty;
+	refreshNode(node);
+	if (node.revision !== revision && node.subs) {
+		graph.propagate(node.subs, executionDepth !== 0);
+		graph.shallowPropagate(node.subs);
+	}
+}
+
 export function derivedState<T>(node: ScopedNode<T>, read: () => T): NodeState<T> {
 	const value = pure(read);
 	if (isThenable(value)) throw new TypeError(formatClientError(166));
@@ -920,6 +981,181 @@ export function stopObserver(observer: SignalObserver): void {
 	observer.notify = undefined;
 	observer.previous = undefined;
 	while (observer.deps) graph.unlink(observer.deps, observer);
+}
+
+/**
+ * A redeclared facade presents one render's new definition through a private
+ * node in the same owner. It is not registered by key, so committed readers,
+ * seeds and candidate frames never observe it. Acceptance installs its state in
+ * the canonical node and moves the render's consumers there; its native sources
+ * then forward, so witnesses taken during the render stay valid.
+ */
+interface DeclarationView {
+	readonly canonical: ScopedNode;
+	/** A candidate frame forks a view exactly like the cell it presents. */
+	readonly fork: DeclarationViewFork;
+	retired: boolean;
+	promoted: boolean;
+	viewRevision: number;
+	canonicalRevision: number;
+}
+
+type DeclarationViewFork = (
+	target: ScopedNode,
+	frame: SignalCandidateFrame,
+) => CandidateProducer | undefined;
+
+let declarationViews: WeakMap<ScopedNode, DeclarationView> | undefined;
+
+function nativeSourceField(read: SignalReadMode) {
+	return read === 'value'
+		? ('nativeSource' as const)
+		: read === 'latest'
+			? ('nativeLatestSource' as const)
+			: ('nativeSnapshotSource' as const);
+}
+
+function createViewSource(
+	view: ScopedNode,
+	record: DeclarationView,
+	read: SignalReadMode,
+): NativeReadSource {
+	const own = createGraphSource(view, read);
+	const canonical = (): NativeReadSource =>
+		(record.canonical[nativeSourceField(read)] ??= createNativeSource(record.canonical, read));
+	return {
+		getVersion: () =>
+			record.promoted
+				? canonical().getVersion() === record.canonicalRevision
+					? record.viewRevision
+					: NaN
+				: record.retired
+					? NaN
+					: own.getVersion(),
+		subscribe: (notify) => (record.promoted ? canonical() : own).subscribe(notify),
+		serialize: (version) =>
+			record.promoted
+				? version === record.viewRevision
+					? canonical().serialize?.(record.canonicalRevision)
+					: undefined
+				: own.serialize?.(version),
+		inspect: () => (record.promoted ? canonical() : own).inspect!(),
+	};
+}
+
+export function createDeclarationView<T>(
+	canonical: ScopedNode<T>,
+	fork: (target: ScopedNode<T>, frame: SignalCandidateFrame) => CandidateProducer | undefined,
+): ScopedNode<T> {
+	const view = new ScopedNode<T>(canonical.owner, canonical.key, canonical.kind);
+	// Retained values survive a changed definition, as they survive a changed selection.
+	view.last = canonical.last;
+	view.lastState = canonical.lastState;
+	view.hasLast = canonical.hasLast;
+	const record: DeclarationView = {
+		canonical,
+		fork: fork as DeclarationViewFork,
+		retired: false,
+		promoted: false,
+		viewRevision: NaN,
+		canonicalRevision: NaN,
+	};
+	// Its native sources forward once accepted; they are created on first read.
+	(declarationViews ??= new WeakMap()).set(view, record);
+	return view;
+}
+
+export function isDeclarationView(node: unknown): boolean {
+	return declarationViews?.has(node as ScopedNode) === true;
+}
+
+/** The fork of a live view, or undefined for any other unregistered node. */
+export function declarationViewFork(node: ScopedNode): DeclarationViewFork | undefined {
+	const record = declarationViews?.get(node);
+	return record === undefined || record.retired ? undefined : record.fork;
+}
+
+/** A promoted or released view no longer stands for its render's handle. */
+export function isRetiredDeclarationView(node: unknown): boolean {
+	return declarationViews?.get(node as ScopedNode)?.retired === true;
+}
+
+function retireDeclarationView(view: ScopedNode, record: DeclarationView): void {
+	record.retired = true;
+	queued.delete(view);
+	view.compute = undefined;
+	view.invalidateAttempt = undefined;
+	while (view.deps) graph.unlink(view.deps, view);
+	view.flags = ReactiveFlags.Mutable | ReactiveFlags.Watching;
+}
+
+/** The caller has already transferred producer authority from the view's binding. */
+export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void {
+	const record = declarationViews?.get(view);
+	if (record === undefined || record.retired || record.canonical !== node) return;
+	queued.delete(view);
+	while (node.deps) graph.unlink(node.deps, node);
+	for (let link = view.deps; link; link = link.nextDep) graph.link(link.dep, node, ++trackingCycle);
+	const state = view.state;
+	const currentChanged =
+		state !== undefined &&
+		(node.state?.snapshot !== state.snapshot || !sameState(node.state, state));
+	const retainedChanged =
+		node.hasLast !== view.hasLast ||
+		!Object.is(node.last, view.last) ||
+		(view.lastState ? !sameState(node.lastState, view.lastState) : node.lastState !== undefined);
+	if (currentChanged) commitState(node, state);
+	if (node.lastState?.owners !== view.lastState?.owners) releaseRetainedOwners(node);
+	node.last = view.last;
+	node.lastState = view.lastState;
+	node.hasLast = view.hasLast;
+	if (node.state && node.state.snapshot.status !== 'ready') retainOwners(node);
+	if (!currentChanged && retainedChanged) node.revision++;
+	releaseRetainedOwners(view);
+	// A view nobody read has no state to install; the cell evaluates its new definition.
+	const unevaluated = state === undefined;
+	node.flags =
+		ReactiveFlags.Mutable | ReactiveFlags.Watching | (unevaluated ? ReactiveFlags.Dirty : 0);
+	// Committed consumers learn the accepted state first. The render's own
+	// consumers already presented it; move them without another notification.
+	if ((currentChanged || retainedChanged || unevaluated) && node.subs) {
+		graph.propagate(node.subs, executionDepth !== 0);
+		graph.shallowPropagate(node.subs);
+	}
+	retireDeclarationView(view, record);
+	for (let link = view.subs; link;) {
+		const next = link.nextSub;
+		const sub = link.sub;
+		graph.unlink(link, sub);
+		if (sub instanceof SignalObserver) sub.node = node;
+		graph.link(node, sub, ++trackingCycle);
+		link = next;
+	}
+	record.promoted = true;
+	record.viewRevision = view.revision;
+	record.canonicalRevision = node.revision;
+}
+
+/** Discard a view nobody accepted. Its remaining consumers belong to discarded renders. */
+export function releaseDeclarationView(view: ScopedNode): void {
+	const record = declarationViews?.get(view);
+	if (record === undefined || record.retired) return;
+	retireDeclarationView(view, record);
+	let retries: (() => void)[] | undefined;
+	while (view.subs) {
+		const sub = view.subs.sub;
+		if (sub instanceof SignalObserver) {
+			if (sub.native && sub.notify) (retries ??= []).push(sub.notify);
+			stopObserver(sub);
+		} else graph.unlink(view.subs, sub);
+	}
+	releaseRetention(view);
+	// A retained retry read re-renders against the current definition. A newer
+	// render usually releases the view, so notify after it rather than inside it.
+	if (retries)
+		queueMicrotask(() => {
+			for (const retry of retries) untrack(retry);
+		});
 }
 
 export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): void {

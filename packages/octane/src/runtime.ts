@@ -236,9 +236,11 @@ import {
 	NATIVE_TRANSITION_CONSUMER,
 	readNativeDomStyle,
 	registerNativeActionResolver,
+	registerSignalDeclarationStage,
 	runNativeBatch,
 	setNativeCandidateResolver,
 	setNativeAdoptionResolver,
+	type SignalDeclarationStage,
 } from './signals/read-protocol.js';
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
 import {
@@ -1373,9 +1375,52 @@ function scheduleNativeRead(target: Block): void {
 	}
 }
 
+interface SignalDeclarationRenderStage extends SignalDeclarationStage {
+	readonly capture: OffscreenCapture;
+	settled: boolean;
+}
+
+/**
+ * A signal facade declared again by a later render stages its new definition
+ * here instead of mutating committed graph state. One stage covers one body
+ * invocation, so a render-phase rerun supersedes its earlier pass. The capture's
+ * commit accepts it; its discard, or a transition journal rollback that unwinds
+ * this render, discards it.
+ */
+function currentSignalDeclarationStage(): SignalDeclarationStage | undefined {
+	const block = CURRENT_BLOCK;
+	const capture = WIP_CAPTURE;
+	// Outside a render, or in a render that publishes without a capture, a
+	// declaration applies immediately.
+	if (block === null || capture === null || ROOT_RENDER_ROLLBACK) return undefined;
+	// Native reads open the invocation frame before a facade can be read.
+	const invocation = NATIVE_READ_DRIVER?.invocation(block);
+	const current = invocation?.invocationData as SignalDeclarationRenderStage | null | undefined;
+	if (current != null && !current.settled && current.capture === capture) return current;
+	const callbacks: Array<(discarded: boolean) => void> = [];
+	const stage: SignalDeclarationRenderStage = {
+		capture,
+		settled: false,
+		settle(callback) {
+			callbacks.push(callback);
+		},
+	};
+	const finish = (discarded: boolean): void => {
+		if (stage.settled) return;
+		stage.settled = true;
+		for (const callback of callbacks) callback(discarded);
+	};
+	// A held transition attempt unwinds its render while the capture survives.
+	if (TRANSITION_JOURNAL !== null) journalUndo(() => finish(true));
+	(capture.renderCleanups ??= []).push(finish);
+	if (invocation !== undefined) invocation.invocationData = stage;
+	return stage;
+}
+
 function ensureNativeReadDriver(): NativeReadDriver {
 	if (NATIVE_READ_DRIVER !== null) return NATIVE_READ_DRIVER;
 	installNativeSignalActionExtension();
+	registerSignalDeclarationStage(currentSignalDeclarationStage);
 	NATIVE_READ_DRIVER = createNativeReadDriver({
 		capture: () => WIP_CAPTURE,
 		cleanup: registerHookCleanup,

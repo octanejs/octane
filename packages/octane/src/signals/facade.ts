@@ -5,12 +5,19 @@ import {
 	createDeclaredSignalCell,
 	createScope,
 	failScopeStreamedResult,
+	signalDeclarationSequence,
 	ScopeImpl,
 } from './engine.js';
 import { createDeclaredScalarCell } from './scalar-computations.js';
 import { ScopeDisposedError, SignalStreamError } from './errors.js';
 import { scopeStreams } from './scope-streams.js';
-import { isThenable, readSignalBinding as readBinding, untrack } from './graph.js';
+import {
+	isDeclarationView,
+	isRetiredDeclarationView,
+	isThenable,
+	readSignalBinding as readBinding,
+	untrack,
+} from './graph.js';
 import { readEarlySignalValue } from './early-values.js';
 import { NATIVE_DOM_VALUE, forwardNativeTransitionConsumer } from './read-protocol.js';
 import { isSignalHandle } from './handle-protocol.js';
@@ -327,6 +334,9 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	private readonly cells = new WeakMap<Scope, H>();
 	// Identity-only token: renderer owners never retain their renderer tree.
 	private readonly owner: SignalRendererOwnerIdentity | undefined;
+	/** A render's private presentation of a redeclared cell, until it is accepted or released. */
+	declare private view?: H;
+	declare private viewOwner?: Scope;
 
 	constructor(
 		readonly key: string,
@@ -345,8 +355,17 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	private resolvedCell(target: Scope): H {
 		let cell = this.cells.get(target);
 		if (!cell) {
+			// An accepted view resolves to its canonical cell from now on. A render
+			// declares in one owner, so one slot covers the common case; another
+			// owner's view is found again through its cell's staged declaration.
+			const view = this.view;
+			if (view !== undefined && this.viewOwner === target && !isRetiredDeclarationView(view))
+				return view;
 			cell = this.create(target);
-			this.cells.set(target, cell);
+			if (isDeclarationView(cell)) {
+				this.view = cell;
+				this.viewOwner = target;
+			} else this.cells.set(target, cell);
 		}
 		return cell;
 	}
@@ -485,12 +504,16 @@ export function __derivedScalarAt<T>(
 	const explicit = signalOptionsKey(options);
 	site ??= explicit;
 	const key = descriptorKey(site, explicit);
+	const sequence = signalDeclarationSequence(site);
 	return new DerivedDescriptor(
 		key,
 		'derived',
 		(owner) =>
-			createDeclaredScalarCell(owner, key, () =>
-				runWithSignalOwner(owner, () => (compute as () => T)()),
+			createDeclaredScalarCell(
+				owner,
+				key,
+				() => runWithSignalOwner(owner, () => (compute as () => T)()),
+				sequence,
 			),
 		site,
 	);

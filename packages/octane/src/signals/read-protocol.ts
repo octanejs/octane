@@ -36,6 +36,28 @@ export function forwardNativeTransitionConsumer<T extends () => void>(
 	return wrapped;
 }
 
+/**
+ * One authored render that may still be discarded. A redeclared facade stages
+ * its new definition here instead of mutating committed graph state.
+ */
+export interface SignalDeclarationStage {
+	/** Runs once: `false` when the renderer accepts the render, `true` when it discards it. */
+	settle(callback: (discarded: boolean) => void): void;
+}
+
+let declarationStageResolver: (() => SignalDeclarationStage | undefined) | undefined;
+
+/** A renderer reports its speculative render; no resolver means declarations apply at once. */
+export function registerSignalDeclarationStage(
+	resolver: () => SignalDeclarationStage | undefined,
+): void {
+	declarationStageResolver = resolver;
+}
+
+export function currentSignalDeclarationStage(): SignalDeclarationStage | undefined {
+	return declarationStageResolver?.();
+}
+
 let nativeActionResolver: (() => SignalCandidateFrame | undefined) | undefined;
 let nativeCandidateResolver: (() => SignalCandidateFrame | undefined) | null | undefined;
 
