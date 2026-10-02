@@ -14778,6 +14778,8 @@ interface PreservedHydrateActivation {
 	capture: OffscreenCapture;
 	source: Block | null;
 	cursor: Node | null;
+	/** The source mounted inside client-built DOM, which it resumes as. */
+	fresh: boolean;
 }
 
 // Allocate bookkeeping only when an already-visible SSR arm really suspends.
@@ -14929,8 +14931,9 @@ function findSuspendedHydrateBlock(scope: Scope, thenable: TrackedThenable<unkno
 function preserveSuspendedHydrateActivation(
 	state: HydrateSlot,
 	hydration: HydrationCapability,
-	thenable: TrackedThenable<unknown>,
+	suspension: SuspenseException,
 ): void {
+	const thenable = suspension.thenable;
 	const suspendedBlock = findSuspendedHydrateBlock(state.block, thenable);
 	const activation: PreservedHydrateActivation = {
 		hydration,
@@ -14939,7 +14942,9 @@ function preserveSuspendedHydrateActivation(
 		capture: WIP_CAPTURE!,
 		source: suspendedBlock === state.block ? null : suspendedBlock,
 		cursor: hydration.resumeAt(),
+		fresh: hydration.freshSuspension === suspension,
 	};
+	hydration.freshSuspension = null;
 	const activations = (preservedHydrateActivations ??= new WeakMap());
 	if (!activations.has(state)) preservedHydrateActivationCount++;
 	activations.set(state, activation);
@@ -15129,7 +15134,7 @@ function createHydrateBoundaryBody(
 			// The SSR arm is already the visible content. Let its adopted try block
 			// remain connected and retry adoption in the same hydration capability
 			// once application data settles, without ever mounting a cloned fallback.
-			preserveSuspendedHydrateActivation(state, hydration, error.thenable);
+			preserveSuspendedHydrateActivation(state, hydration, error);
 			return;
 		}
 		state.hydrated = true;
@@ -15893,12 +15898,16 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			// ranges on an ordinary parent replay. Complete the actually suspended
 			// leaf at its saved cursor first, then let its ancestors reconcile the
 			// already-adopted siblings without treating their range as fresh DOM.
+			// A leaf that mounted inside a mismatch's client-built replacement has
+			// no server DOM to adopt and completes as a client render.
+			const source = preserved.source;
 			hydration.node = preserved.cursor;
 			try {
-				renderBlock(preserved.source);
+				if (preserved.fresh) hydration.suspend(() => renderBlock(source));
+				else renderBlock(source);
 			} catch (error) {
 				if (!isSuspenseException(error)) throw error;
-				preserveSuspendedHydrateActivation(state, hydration, error.thenable);
+				preserveSuspendedHydrateActivation(state, hydration, error);
 				return;
 			}
 		}
@@ -18858,6 +18867,8 @@ class HydrationCapability {
 	 * does not claim. Undefined until the template adopts claimFrom.
 	 */
 	private claimEnd: Node | null | undefined = undefined;
+	/** The last suspension thrown out of a client-built subtree (suspend). */
+	freshSuspension: SuspenseException | null = null;
 	/** Skip component-frame adoption until the declared container owner. */
 	passthroughRanges = false;
 	/**
@@ -18992,6 +19003,9 @@ class HydrationCapability {
 		const previousNative = setNativeAdoptionResolver(null);
 		try {
 			return fn();
+		} catch (error) {
+			if (isSuspenseException(error)) this.freshSuspension = error;
+			throw error;
 		} finally {
 			setNativeAdoptionResolver(previousNative);
 			this.depth--;

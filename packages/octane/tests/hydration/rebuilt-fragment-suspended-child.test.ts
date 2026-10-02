@@ -193,4 +193,27 @@ describe.each([
 			expect(warnings()).toEqual([]);
 		},
 	);
+
+	it('completes a child of a rebuilt root inside it, as when its data is ready', async () => {
+		// The server's range holds a node after the one the root replaced, with the
+		// tag the child starts with. The child is client-built inside the root and
+		// must not adopt it when it resumes.
+		const name = 'RebuiltRootBranch';
+		render(name, { server: true, leaf: fulfilled('unused') });
+		await hydrate(name, { leaf: fulfilled('z') });
+		const ready = markup(section());
+		root!.unmount();
+		recoverable = [];
+		errSpy.mockClear();
+
+		render(name, { server: true, leaf: fulfilled('unused') });
+		const leaf = pending();
+		await hydrate(name, { leaf: leaf.promise });
+		await act(async () => leaf.resolve('z'));
+
+		expect(markup(section().querySelector('p')!)).toBe('<em>z</em><s>s</s>');
+		expect(markup(section())).toBe(ready);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toHaveLength(dev ? 1 : 0);
+	});
 });

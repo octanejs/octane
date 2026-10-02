@@ -135,3 +135,45 @@ export function HoleThenTextBranch(props: { server?: boolean; leaf: Promise<stri
 		</Hydrate>
 	</div>
 }
+
+function BoldThenEm() @{
+	<>
+		<b class="server">{'server'}</b>
+		<em>{'tail'}</em>
+	</>
+}
+
+function EmPair(props: { leaf: Promise<string> }) @{
+	<>
+		<em>{use(props.leaf) as string}</em>
+		<s>{'s'}</s>
+	</>
+}
+
+// A rebuilt single root. Its suspending child starts with the tag of the server
+// node that follows the one the root replaced.
+function Para(props: { leaf: Promise<string> }) @{
+	<p>
+		<EmPair leaf={props.leaf} />
+	</p>
+}
+
+export function RebuiltRootBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@if (props.server) {
+					<>
+						<BoldThenEm />
+						<Em />
+					</>
+				} @else {
+					<>
+						<Para leaf={props.leaf} />
+						<Em />
+					</>
+				}
+			</section>
+		</Hydrate>
+	</div>
+}
