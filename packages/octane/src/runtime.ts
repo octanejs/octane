@@ -16797,7 +16797,7 @@ function getHydrationSeedFactory(thenable: TrackedThenable): HydrationSeedFactor
 
 /** Compiler-owned direct use() creations consult their server-proven site outcome first. */
 export function seedOrCreate<T>(site: string, factory: () => T): T {
-	const hydration = activeHydration();
+	const hydration = seedHydration();
 	return hydration === null ? factory() : hydration.seedOrCreate(site, factory);
 }
 
@@ -16812,7 +16812,7 @@ function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): 
 	// the same render order the server produced them in) and mark the thenable
 	// fulfilled, so this render and every later one return synchronously — no
 	// re-suspend, no client re-fetch. Folds out for client-only builds.
-	const hydration = activeHydration();
+	const hydration = seedHydration();
 	if (
 		!hasExternalHydrationOwner(thenable) &&
 		hydration !== null &&
@@ -16983,7 +16983,7 @@ export function useBatch(items: any[], warm?: () => void): void {
 	}
 	// Hydrating: every use() adopts a server seed synchronously — nothing to
 	// batch, and warming would duplicate fetches the server already resolved.
-	const hydration = activeHydration();
+	const hydration = seedHydration();
 	if (hydration !== null && hydration.seeds !== null) return;
 	let pending: TrackedThenable<any>[] | null = null;
 	for (let i = 0; i < items.length; i++) {
@@ -18486,6 +18486,12 @@ function activeHydration(): HydrationCapability | null {
 	return hydration !== null && hydration.isActive() ? hydration : null;
 }
 
+/** The hydration whose positional `use()` seeds the current render consumes. */
+function seedHydration(): HydrationCapability | null {
+	const hydration = currentHydration;
+	return hydration !== null && hydration.consumesSeeds() ? hydration : null;
+}
+
 /** Direct-child scoped CSS resources are renderer-owned hydration sidecars. */
 function isRendererHydrationStyle(node: Node): boolean {
 	return (
@@ -18553,6 +18559,8 @@ class HydrationCapability {
 	/** Parent captures changed before this dormant boundary activated. */
 	staleServerValues = false;
 	depth = 0;
+	/** Depth of a render that adopts nothing but still consumes positional seeds. */
+	replayDepth = -1;
 	seedCursor = 0;
 	hasAdjacentRangePair = false;
 	private abandoned = false;
@@ -18585,6 +18593,10 @@ class HydrationCapability {
 
 	isActive(): boolean {
 		return this.depth === 0 && !this.abandoned;
+	}
+
+	consumesSeeds(): boolean {
+		return (this.depth === 0 || this.depth === this.replayDepth) && !this.abandoned;
 	}
 
 	owns(block: Block): boolean {
@@ -18659,6 +18671,58 @@ class HydrationCapability {
 			throw error;
 		} finally {
 			this.releaseDiagnostics(mark, caught);
+		}
+	}
+
+	/**
+	 * First render of a component whose server range was missing, into the
+	 * fresh `block` componentSlot minted before `anchor`. The server emits that
+	 * range only when the render completes; when it throws, the boundary that
+	 * catches it renders its catch arm in that place. So the server nodes from
+	 * `stale` stay until the body has run, and the body, which adopts nothing,
+	 * still consumes its positional seeds as the server's render did. A seeded
+	 * rejection then reaches its boundary with the server's catch arm intact,
+	 * and only the fresh markers are removed. Any other outcome reports the
+	 * mismatch and discards those server nodes.
+	 */
+	renderUnframed(
+		block: Block,
+		scope: Scope,
+		slotKey: number,
+		stale: Node | null,
+		anchor: Node | null,
+	): void {
+		const start = block.startMarker!;
+		const end = block.endMarker!;
+		const previousReplay = this.replayDepth;
+		const previousNative = setNativeAdoptionResolver(null);
+		this.replayDepth = ++this.depth;
+		let rejected = false;
+		try {
+			renderBlock(block);
+		} catch (error) {
+			rejected = this.isRejection(error);
+			throw error;
+		} finally {
+			this.depth--;
+			this.replayDepth = previousReplay;
+			setNativeAdoptionResolver(previousNative);
+			if (rejected) {
+				removeRange(start, getNextSibling(end));
+				this.node = stale;
+			} else {
+				noteRecoverableHydrationError(() => new Error(formatClientError(55)));
+				if (process.env.NODE_ENV !== 'production') {
+					const loc = siteLoc(scope, slotKey);
+					if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
+				}
+				let node = stale;
+				while (node !== null && node !== anchor && node !== start && !isBlockClose(node)) {
+					const next = getNextSibling(node);
+					(STAGED_DOM?.view(node as ChildNode) ?? (node as ChildNode)).remove();
+					node = next;
+				}
+			}
 		}
 	}
 
@@ -18924,6 +18988,10 @@ class HydrationCapability {
 		// Text already repaired from newer captures is not a server/client mismatch.
 		if (this.staleServerValues) return;
 		if (process.env.NODE_ENV === 'production' && ROOT_ERROR_HANDLERS === null) return;
+		// Nor is the placeholder of a template that mismatch recovery cloned fresh:
+		// its host holds the client template's text, and the rebuild has already
+		// been reported structurally.
+		if (this.freshNodes.has(domNode(node).parentNode!)) return;
 		if (!this.textWarnings.has(node)) this.textWarnings.set(node, { loc, server });
 	}
 
@@ -30691,6 +30759,9 @@ function componentSlotImpl(
 	}
 	let state = parentScope.slots[slotKey] as CompSlot | undefined;
 	let hydrationCursor: Node | null = null;
+	// The server node that stood where hydration expected this call's range.
+	// Undefined when the claim found the range (or claimed none).
+	let unframed: Node | null | undefined;
 	if (state === undefined) {
 		let start: Comment | null = null;
 		let end: Comment | null = null;
@@ -30787,26 +30858,14 @@ function componentSlotImpl(
 			start = null;
 			end = null;
 		} else {
-			if (hydration !== null) {
-				// A non-single-root component requires the server's component range.
-				// If it is absent, the server rendered a different child shape (most
-				// importantly a DOM node where the client function returns null). Own
-				// the slot up to its next static anchor, discard that stale range, and
-				// park hydration on the fresh close marker so the client body builds
-				// rather than adopting an unrelated sibling.
-				const stale = hydrationCursor;
-				const loc = siteLoc(parentScope, slotKey);
-				noteRecoverableHydrationError(() => new Error(formatClientError(55)));
-				if (process.env.NODE_ENV !== 'production' && loc) {
-					warnHydrationStructuralMismatch(loc, 'a component range', describeHydrationNode(stale));
-				}
-				let node = stale;
-				while (node !== null && node !== anchor && !isBlockClose(node)) {
-					const next = getNextSibling(node);
-					(STAGED_DOM?.view(node as ChildNode) ?? (node as ChildNode)).remove();
-					node = next;
-				}
-			}
+			// A non-single-root component requires the server's component range. If
+			// it is absent, the server rendered a different child shape (most
+			// importantly a DOM node where the client function returns null), or the
+			// component threw there and a boundary rendered its catch arm instead.
+			// Park hydration on the fresh close marker so the client body builds
+			// rather than adopting an unrelated sibling. The server nodes stay until
+			// the body has run (HydrationCapability.renderUnframed).
+			if (hydration !== null) unframed = hydrationCursor;
 			start = (STAGED_DOM?.view(document) ?? document).createComment('comp');
 			end = (STAGED_DOM?.view(document) ?? document).createComment('/comp');
 			// insertBefore(_, null) === appendChild — covers both end-of-parent and
@@ -31187,7 +31246,8 @@ function componentSlotImpl(
 			// markers, never remove them (the branch-block precedent).
 			if (state.inherited) b.exclusiveMarkers = true;
 			state.block = b;
-			renderBlock(b);
+			if (unframed === undefined) renderBlock(b);
+			else hydration!.renderUnframed(b, parentScope, slotKey, unframed, state.anchor);
 		}
 	} else if (state.block) {
 		// `memo(Component)` — skip the body when new props shallow-equal the
@@ -37300,7 +37360,8 @@ function switchErrorToCatchInner(
 		unmountBlock(previous, !adopting);
 		if (state.parentBlock.disposed || state.block !== null) return;
 	}
-	const rejection = hydration?.isRejection(error) === true;
+	// A replay that adopts nothing still reads rejection seeds (renderUnframed).
+	const rejection = currentHydration?.isRejection(error) === true;
 	const caughtError = rejection ? error.reason : error;
 	state.hasResolved = false;
 	setTryBranch(state, 0);
@@ -40376,8 +40437,9 @@ function switchToCatchInner(
 	}
 	// Preserve the internal wrapper while bubbling through catch-less boundaries,
 	// then expose the original decoded reason only to the boundary that actually
-	// owns a catch arm (including primitive and null rejection reasons).
-	const hydrationRejection = hydration?.isRejection(err) === true;
+	// owns a catch arm (including primitive and null rejection reasons). A
+	// replay that adopts nothing still reads rejection seeds (renderUnframed).
+	const hydrationRejection = currentHydration?.isRejection(err) === true;
 	const caughtError = hydrationRejection ? err.reason : err;
 	setTryBranch(state, 0);
 	state.err = caughtError;
