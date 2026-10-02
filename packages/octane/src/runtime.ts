@@ -19736,13 +19736,13 @@ class HydrationCapability {
 	/**
 	 * Where the content of a markerless branch that rendered at `cursor` ends:
 	 * at the node its render left the cursor on in `parent`, else `after`.
-	 * clone() parks the cursor on a root it adopted, so a `completed` render
-	 * that left it on `cursor` adopted that node in place.
+	 * clone() parks the cursor on a root it adopted, so a render that left it
+	 * on `cursor` adopted that node in place.
 	 */
-	markerlessEnd(cursor: Node, parent: Node, after: Node | null, completed: boolean): Node | null {
+	markerlessEnd(cursor: Node, parent: Node, after: Node | null): Node | null {
 		const node = this.node;
 		if (node === null || domNode(node).parentNode !== parent) return after;
-		return completed && node === cursor ? getNextSibling(cursor) : node;
+		return node === cursor ? getNextSibling(cursor) : node;
 	}
 
 	/** Discard a mismatched server node (or the marker range it opens) and step past it. */
@@ -41661,7 +41661,7 @@ function renderBranchSlot(
 			// Markerless client mount — pick the boundary by what the branch renders.
 			// This applies both on first mount and after an anchor-only empty arm:
 			// a single host can self-mark without first manufacturing a pair.
-			let before = after
+			const before = after
 				? (STAGED_DOM?.view(after) ?? after).previousSibling
 				: (STAGED_DOM?.view(domParent) ?? domParent).lastChild;
 			// Hydrating, the server rendered no range for this slot but other
@@ -41671,7 +41671,7 @@ function renderBranchSlot(
 			// leaves the cursor, not at `after`.
 			const cursor =
 				hydration !== null && !state.borrowed ? hydration.markerlessCursor(domParent, after) : null;
-			if (cursor !== null) before = domNode(cursor).previousSibling;
+			const contentBefore = cursor === null ? before : domNode(cursor).previousSibling;
 			const b = createBlock(
 				'control-flow',
 				parentBlock,
@@ -41690,21 +41690,23 @@ function renderBranchSlot(
 				// A branch that throws before inserting anything stays unfinalized so
 				// a same-branch retry finalizes it. One that already inserted its
 				// root owns that DOM now: finalize it so teardown can remove it (a
-				// discarded keyed item otherwise strands the partial row). A
-				// hydrating branch always takes its place now, because a retry could
-				// no longer tell its content from the server siblings after it.
+				// discarded keyed item otherwise strands the partial row). Hydrating,
+				// that is a root rebuilt in the cursor's place; a node adopted there
+				// is left as it was for the next attempt to adopt again.
+				const rebuilt = cursor === null ? null : hydration!.freshAfter(contentBefore, domParent);
 				if (
-					cursor !== null ||
-					(before ? getNextSibling(before) : getFirstChild(domParent)) !== after
+					cursor === null
+						? (before ? getNextSibling(before) : getFirstChild(domParent)) !== after
+						: rebuilt !== null && rebuilt !== cursor
 				)
 					finalizeMarkerlessBranch(
 						state,
 						domParent,
 						b,
 						marker,
-						before,
+						contentBefore,
 						after,
-						cursor === null ? after : hydration!.markerlessEnd(cursor, domParent, after, false),
+						cursor === null ? after : hydration!.markerlessEnd(cursor, domParent, after),
 					);
 				throw error;
 			}
@@ -41713,9 +41715,9 @@ function renderBranchSlot(
 				domParent,
 				b,
 				marker,
-				before,
+				contentBefore,
 				after,
-				cursor === null ? after : hydration!.markerlessEnd(cursor, domParent, after, true),
+				cursor === null ? after : hydration!.markerlessEnd(cursor, domParent, after),
 			);
 			replaceSharedBlockBoundary(
 				parentBlock,

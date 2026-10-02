@@ -192,4 +192,30 @@ describe.each([
 		expect(container.querySelector('em')).toBe(em);
 		expectOneRebuild('ReaderLeaf');
 	});
+	it('resumes a @switch arm that adopted the server node in place before suspending', async () => {
+		container.innerHTML = (
+			await prerender(server.AdoptedSwitchSeedBranch, {
+				server: true,
+				k: 'a',
+				leaf: Promise.resolve('unused'),
+				sibling: Promise.resolve('sibling'),
+			})
+		).html;
+		const u = container.querySelector('u');
+		let resolveLeaf!: (value: string) => void;
+		const leaf = new Promise<string>((resolve) => (resolveLeaf = resolve));
+		// The server seed settles this reader during hydration.
+		const sibling = new Promise<string>(() => {});
+		await hydrate('AdoptedSwitchSeedBranch', { k: 'a', leaf, sibling });
+		await act(async () => resolveLeaf('z'));
+
+		expect(markup(container.firstElementChild!)).toBe('<em>sibling</em><u>z</u><em>e</em>');
+		expect(container.querySelector('u')).toBe(u);
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
+
+		// The switch owns the adopted `<u>`, so leaving the case removes it.
+		flushSync(() => root!.render(client.AdoptedSwitchSeedBranch, { k: 'b', leaf, sibling }));
+		expect(markup(container.firstElementChild!)).toBe('<em>sibling</em><em>e</em>');
+	});
 });

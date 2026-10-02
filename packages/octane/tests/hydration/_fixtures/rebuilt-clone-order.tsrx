@@ -167,3 +167,38 @@ export function SeedBranch(props: {
 		}
 	</div>
 }
+
+// The client's @switch arm adopts the server `<u>` in place, then suspends
+// on a value the server rendered no seed for. The seeded UseEm before it
+// consumes the boundary's only seed.
+export function AdoptedSwitchSeedBranch(props: {
+	server?: boolean;
+	k: string;
+	leaf: Promise<string>;
+	sibling: Promise<string>;
+}) @{
+	<div>
+		@try {
+			<>
+				<UseEm value={props.sibling} />
+				@if (props.server) {
+					<>
+						<u>{'z'}</u>
+						<Em />
+					</>
+				} @else {
+					<>
+						@switch (props.k) {
+							@case 'a': {
+								<u>{use(props.leaf) as string}</u>
+							}
+						}
+						<Em />
+					</>
+				}
+			</>
+		} @pending {
+			<p>{'pending'}</p>
+		}
+	</div>
+}
