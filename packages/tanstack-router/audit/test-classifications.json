@@ -77,6 +77,11 @@
       "reason": "Checks the broader Octane Router contract; it is not same-scenario React execution."
     },
     {
+      "path": "packages/tanstack-router/tests/conformance/scroll-restoration-hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks hydrateRoot adoption and removal of the server scroll restoration script against router-core's browser build; React's script removes itself before hydration, so there is no same-scenario React execution."
+    },
+    {
       "path": "packages/tanstack-router/tests/conformance/same-route-search.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane same-route search updates; it is not same-scenario React execution."
