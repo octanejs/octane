@@ -12,6 +12,6 @@ CDN AMD `loader.config({ paths: { vs } })` is documented as an alternate in the
 package README — this example does not use it.
 
 ```bash
-pnpm --filter monaco-playground-example dev
-pnpm --filter monaco-playground-example test:e2e
+bun run --filter monaco-playground-example dev
+bun run --filter monaco-playground-example test:e2e
 ```

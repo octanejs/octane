@@ -64,7 +64,7 @@ The interpretation is generic:
 [`vitest.ci-sharded.config.js`](../vitest.ci-sharded.config.js) reads this
 metadata and derives the ordinary-shard view. It also removes `testExecution`
 from the project passed through that config. The base config remains the
-canonical local project: `pnpm vitest run --project <name>` still sees every
+canonical local project: `bunx vitest run --project <name>` still sees every
 file in its normal `test.include`.
 
 Use separate Vitest projects when tests genuinely require different
@@ -76,7 +76,7 @@ A package that commits `audit/upstream.lock.json` commits its pinned pristine
 `upstream/` tree byte-exact; the lock records each file's upstream git blob
 sha, so the committed copy verifies offline against the pinned upstream
 commit. Its adapted `tests/upstream/` suite is regenerated, never committed:
-`scripts/react-parity/check.mjs` runs `pnpm react-port:materialize run`
+`scripts/react-parity/check.mjs` runs `bun run react-port:materialize run`
 (verify pristine, then rebuild adapted from the lock's mechanical rewrites
 plus the committed divergence patches) before any verifier, contract walk, or
 lane reads those paths. Derived adapted copies are never tracked; only
@@ -125,7 +125,7 @@ override it.
 ## Manifest and project ownership
 
 Each binding parity manifest lives at
-`packages/<name>/audit/react-parity.json`. `pnpm react-parity:check` discovers
+`packages/<name>/audit/react-parity.json`. `bun run react-parity:check` discovers
 these manifests automatically; the workflow must not enumerate packages.
 
 A lock-derived adapted suite can declare `materializedTests: "packages/<name>"`.
@@ -275,8 +275,8 @@ The always-on lint job covers the cheap control plane, including lightweight
 documentation changes:
 
 ```bash
-pnpm react-parity:test
-pnpm react-parity:validate
+bun run react-parity:test
+bun run react-parity:validate
 ```
 
 `react-parity:validate` checks manifest schemas and direct evidence hashes,
@@ -289,13 +289,13 @@ The generic React parity workers run the complete package suites on Node 24. CI
 currently requests four native Vitest file shards:
 
 ```bash
-pnpm react-parity:check --shard 1/4
-pnpm react-parity:check --shard 2/4
-pnpm react-parity:check --shard 3/4
-pnpm react-parity:check --shard 4/4
+bun run react-parity:check --shard 1/4
+bun run react-parity:check --shard 2/4
+bun run react-parity:check --shard 3/4
+bun run react-parity:check --shard 4/4
 ```
 
-`pnpm react-parity:check` without `--shard` retains the complete single-runner
+`bun run react-parity:check` without `--shard` retains the complete single-runner
 local view. The workflow's stable `React parity checks` aggregate succeeds only
 after every worker succeeds.
 
@@ -334,7 +334,7 @@ multiply nested worker pools.
 workspace into its temporary application; it must not run a nested package
 install or install another browser revision. When the upstream application has
 its own committed manifest and lockfile, declare them as `dependencySource` and
-let `pnpm sync` generate the active fixture instead of copying dependency
+let `bun run sync` generate the active fixture instead of copying dependency
 versions by hand. Active workspace declarations use the default Playwright
 catalog, and the workspace override keeps transitive `playwright` and
 `@playwright/test` consumers on that same revision. Historical package manifests
@@ -371,19 +371,19 @@ matching top-level awaited preload.
 3. Add or update `packages/<name>/audit/react-parity.json`; do not add the
    package to the workflow or hash `vitest.config.js` as support evidence.
 4. Refresh hashes and inventories with the package's parity tooling. Run
-   `pnpm react-parity:lockfiles:generate` after an intentional lockfile change;
-   the root `pnpm sync` command also runs this generator.
+   `bun run react-parity:lockfiles:generate` after an intentional lockfile change;
+   the root `bun run sync` command also runs this generator.
 5. Prove both views:
 
    ```bash
-   pnpm vitest run --project <project> <representative-local-file>
-	pnpm vitest run --config vitest.ci-sharded.config.js --project <project>
+   bunx vitest run --project <project> <representative-local-file>
+	bunx vitest run --config vitest.ci-sharded.config.js --project <project>
 	node scripts/react-parity/harness.mjs validate --lane <full-runtime-lane>
-	pnpm react-parity:validate
-	pnpm react-parity:test
-	pnpm react-parity:check
+	bun run react-parity:validate
+	bun run react-parity:test
+	bun run react-parity:check
    ```
 
-6. Run `pnpm ci:workflow:test`. Its regression coverage verifies that the
+6. Run `bun run ci:workflow:test`. Its regression coverage verifies that the
    workflow stays package-agnostic, fully owned projects disappear from the
    ordinary shards, and mixed projects retain only their non-parity tests.

@@ -51,7 +51,7 @@ const REPOSITORY_TREE_URL = 'https://github.com/octanejs/octane/tree/main';
 // beyond the package that owns the example directory itself. Keep this in step
 // with what `pluginOctane` pulls in.
 const TOOLCHAIN_PACKAGES = ['packages/lynx', 'packages/octane', 'packages/rspack-plugin-octane'];
-const PNPM_EXECUTABLE = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+const BUN_EXECUTABLE = process.platform === 'win32' ? 'bun.exe' : 'bun';
 
 const examples = JSON.parse(
 	readFileSync(join(WEBSITE_ROOT, 'src/content/lynx-examples.json'), 'utf-8'),
@@ -191,8 +191,8 @@ function buildIfStale(example, assetPrefix) {
 	// example folder, so run it from that package with --root.
 	console.info(`  building ${example.id} (assetPrefix ${assetPrefix})`);
 	execFileSync(
-		PNPM_EXECUTABLE,
-		['exec', 'rspeedy', 'build', '--root', relative(owner, sourceRoot)],
+		BUN_EXECUTABLE,
+		['x', '--no-install', 'rspeedy', 'build', '--root', relative(owner, sourceRoot)],
 		{
 			cwd: owner,
 			stdio: 'inherit',

@@ -1,8 +1,8 @@
 # React parity coverage (generated)
 
 <!-- GENERATED FILE — do not edit. Refresh with:
-pnpm react-parity:generate -- --baseline stable --react-root /path/to/react-v19.2.7
-pnpm react-parity:generate -- --baseline canary --react-root /path/to/react-main
+bun run react-parity:generate -- --baseline stable --react-root /path/to/react-v19.2.7
+bun run react-parity:generate -- --baseline canary --react-root /path/to/react-main
 -->
 
 This report separates distinct Octane tests, React upstream scenarios, renderer/mode registrations, and CI executions. Those numbers are different units and must not be added together or described interchangeably as “ported React tests.”

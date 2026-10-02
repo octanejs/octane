@@ -14,7 +14,7 @@
   "ssr": "Dedicated Node coverage verifies SSRProvider, labelled relationships, snapshots, LTR/RTL locales, TokenField markup, and a closed PreviewTrigger. Vite-compiled server markup hydrates in place with interactive state updates. Other advanced families retain client and type/export coverage.",
   "verified": "2026-09-07",
   "notes": [
-    "`pnpm --filter @octanejs/aria exports:check` compares the installed pinned React Aria Components declarations with the Octane components barrel in both directions.",
+    "`bun run --filter @octanejs/aria exports:check` compares the installed pinned React Aria Components declarations with the Octane components barrel in both directions.",
     "The coordinated release has client, SSR, hydration, and React differential coverage. All 96 upstream TokenFieldValue cases also execute against both pristine source and the Octane adaptation; the broader React Spectrum suite remains recorded-unverified."
   ],
   "docs": [

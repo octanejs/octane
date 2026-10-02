@@ -15,7 +15,7 @@
 
 The byte-exact tagged adapter directory is vendored under `upstream/` and pinned by
 `audit/upstream.lock.json`: each committed file verifies offline against its upstream git blob
-sha at the pinned commit (`pnpm react-port:materialize run --check --package-dir
+sha at the pinned commit (`bun run react-port:materialize run --check --package-dir
 packages/tanstack-devtools`). The upstream MIT license is retained byte-exact as
 `LICENSE.upstream`, hash-matched to the lock.
 The lock authenticates all nine adapter files, including both source files. The tagged package contains

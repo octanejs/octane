@@ -101,8 +101,8 @@ describe('macOS Lynx Explorer native demo', () => {
 		);
 		expect(plan.bundleUrl).toBe('http://127.0.0.1:43219/main.lynx.bundle');
 		expect(plan.demoCommand).toMatchObject({
-			args: ['lynx:demo'],
-			command: 'pnpm',
+			args: ['run', 'lynx:demo'],
+			command: 'bun',
 			cwd: '/workspace/octane',
 			env: {
 				OCTANE_LYNX_DEMO_PORT: '43219',
@@ -532,7 +532,7 @@ describe('macOS Lynx Explorer native demo', () => {
 				},
 				async (child) => child !== demo,
 			),
-		).rejects.toThrow(/Could not stop the pnpm lynx:demo process group/);
+		).rejects.toThrow(/Could not stop the bun run lynx:demo process group/);
 
 		expect(disposed).toBe(true);
 	});
@@ -708,8 +708,8 @@ describe('macOS Lynx Explorer native demo', () => {
 				children.push(child);
 				if (children.length === 1) {
 					order.push('demo');
-					expect(command).toBe('pnpm');
-					expect(args).toEqual(['lynx:demo']);
+					expect(command).toBe('bun');
+					expect(args).toEqual(['run', 'lynx:demo']);
 				} else {
 					order.push('explorer');
 					expect(command).toBe('/tmp/LynxExplorer');

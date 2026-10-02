@@ -69,7 +69,7 @@ const baselineMeta = {
 	platform: process.platform,
 	arch: process.arch,
 	lockfileSha256: createHash('sha256')
-		.update(fs.readFileSync(path.join(REPO, 'pnpm-lock.yaml')))
+		.update(fs.readFileSync(path.join(REPO, 'bun.lock')))
 		.digest('hex'),
 	toolchain: {
 		vite: packageVersion(repoRequire, 'vite'),

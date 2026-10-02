@@ -7,7 +7,7 @@ This port targets `@monaco-editor/react@4.7.0` at git commit
 - package version: `4.7.0`
 - vendored commit: `eb120e66378471315620fe5339b73ba003f199ad`, pinned by
   `audit/upstream.lock.json` (each committed `upstream/` file verifies offline
-  against its upstream git blob sha: `pnpm react-port:materialize run --check
+  against its upstream git blob sha: `bun run react-port:materialize run --check
   --package-dir packages/monaco-editor`); the upstream MIT license is retained
   byte-exact as `LICENSE.upstream`, hash-matched to the lock
 - loader: `@monaco-editor/loader@1.7.0` (framework-neutral; imported, not vendored)
@@ -19,7 +19,7 @@ This port targets `@monaco-editor/react@4.7.0` at git commit
 React-parity evidence lives under `audit/` and is regenerated with:
 
 ```bash
-pnpm --filter @octanejs/monaco-editor parity:generate
+bun run --filter @octanejs/monaco-editor parity:generate
 ```
 
 | File | Role |

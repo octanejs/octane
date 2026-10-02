@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
 	cpSync,
 	existsSync,
 	mkdtempSync,
 	mkdirSync,
 	readFileSync,
-	readdirSync,
 	rmSync,
 	writeFileSync,
 } from 'node:fs';
@@ -18,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import { LYNX_TOOLCHAIN_LANES } from '../src/toolchain-lanes.js';
 import { verifyCompatibilityConsumer } from './compatibility-consumer.mjs';
-import { renderPackedExampleWorkspace } from '../../../scripts/package-pack-canaries.mjs';
+import { packPackage } from '../../../scripts/pack-package.mjs';
 
 const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../..');
 const FIXTURE = resolve(import.meta.dirname, '../tests/_fixtures/application');
@@ -50,24 +49,8 @@ function packWorkspacePackages(directory) {
 	return Object.fromEntries(
 		Object.entries(WORKSPACE_PACKAGES).map(([name, packageRoot]) => {
 			const destination = join(directory, name.replaceAll('/', '-').replaceAll('@', ''));
-			mkdirSync(destination, { recursive: true });
-			execFileSync('pnpm', ['--dir', packageRoot, 'pack', '--pack-destination', destination], {
-				cwd: WORKSPACE_ROOT,
-				stdio: ['ignore', 'pipe', 'inherit'],
-				timeout: 300_000,
-			});
-			const archives = readdirSync(destination).filter((entry) => entry.endsWith('.tgz'));
-			assert.equal(archives.length, 1, `${name} should produce exactly one archive`);
-			return [name, join(destination, archives[0])];
+			return [name, packPackage(packageRoot, destination, { root: WORKSPACE_ROOT }).archive];
 		}),
-	);
-}
-
-function renderOverrides(archives) {
-	return renderPackedExampleWorkspace(
-		Object.fromEntries(
-			Object.entries(archives).map(([name, archive]) => [name, `file:${archive}`]),
-		),
 	);
 }
 
@@ -91,35 +74,47 @@ function installConsumer(root, lane, archives) {
 					'@octanejs/rspeedy-plugin': archiveSpecs['@octanejs/rspeedy-plugin'],
 					octane: archiveSpecs.octane,
 				},
+				overrides: archiveSpecs,
 			},
 			null,
 			2,
 		)}\n`,
 		'utf8',
 	);
-	writeFileSync(join(root, 'pnpm-workspace.yaml'), renderOverrides(archives), 'utf8');
-	execFileSync(
-		'pnpm',
+	const install = spawnSync(
+		'bun',
 		[
 			'install',
 			'--prefer-offline',
 			'--ignore-scripts',
-			'--lockfile=false',
-			'--config.auto-install-peers=false',
-			'--strict-peer-dependencies',
+			'--no-save',
+			'--linker',
+			'isolated',
+			'--omit',
+			'peer',
 		],
 		{
 			cwd: root,
+			encoding: 'utf8',
 			env: { ...process.env, CI: '1' },
-			stdio: ['ignore', 'inherit', 'inherit'],
+			stdio: ['ignore', 'pipe', 'pipe'],
 			timeout: 180_000,
 		},
 	);
-	assert.equal(existsSync(join(root, 'pnpm-lock.yaml')), false, 'smoke created a lockfile');
+	process.stdout.write(install.stdout ?? '');
+	process.stderr.write(install.stderr ?? '');
+	if (install.error) throw install.error;
+	assert.equal(install.status, 0, 'bun install failed');
+	assert.doesNotMatch(
+		`${install.stdout}${install.stderr}`,
+		/incorrect peer dependency/,
+		'bun install reported unmet peer dependencies', // Bun has no --strict-peer-dependencies
+	);
+	assert.equal(existsSync(join(root, 'bun.lock')), false, 'smoke created a lockfile');
 }
 
 const lanes = parseArguments(process.argv.slice(2));
-const repositoryLockfile = join(WORKSPACE_ROOT, 'pnpm-lock.yaml');
+const repositoryLockfile = join(WORKSPACE_ROOT, 'bun.lock');
 const lockfileBefore = readFileSync(repositoryLockfile);
 
 if (lanes.length > 1) {

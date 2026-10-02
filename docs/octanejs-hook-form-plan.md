@@ -67,7 +67,7 @@ forwardRef→ref-as-prop, `react-dom/server` → `octane/server`'s
   byte-identical DOM asserted after typing/validation/submit/reset/array-op
   steps. The shared rig gained a native `input(selector, value)` driver.
 - `typetests/` — upstream `__typetest__` (Path/FieldPath type machinery, zod
-  resolver inference) vendored; wired into `pnpm typecheck`.
+  resolver inference) vendored; wired into `bun run typecheck`.
 
 Committed tests execute normally. Intentional divergences use ordinary passing
 assertions with `// OCTANE DIVERGENCE:` notes; genuine gaps are fixed before

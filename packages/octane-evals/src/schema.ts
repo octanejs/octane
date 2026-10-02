@@ -111,7 +111,7 @@ export interface TaskEnvironment {
 	image: string;
 	platform: string;
 	node: string;
-	pnpm: string;
+	bun: string;
 	packageVersions: Record<string, string>;
 	/** Lockfile from the pinned framework base commit. */
 	lockfileHash: string;
@@ -803,7 +803,7 @@ function validateEnvironment(
 		'image',
 		'platform',
 		'node',
-		'pnpm',
+		'bun',
 		'packageVersions',
 		'lockfileHash',
 		'overlayLockfileHash',
@@ -828,8 +828,8 @@ function validateEnvironment(
 		validator,
 	);
 	validateExactSemver(
-		validator.string(record, 'pnpm', '$.environment'),
-		'$.environment.pnpm',
+		validator.string(record, 'bun', '$.environment'),
+		'$.environment.bun',
 		validator,
 	);
 	const packageVersions = validator.recordOfStrings(record, 'packageVersions', '$.environment', {

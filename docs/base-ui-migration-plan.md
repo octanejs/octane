@@ -805,8 +805,8 @@ when an exported component consumes them.
 
 Ordered so that each phase unblocks the next, with the cheap export-surface wins
 pulled forward. Every phase exits on: differential parity for the new components,
-dedicated behavior tests for anything the rig cannot see, `pnpm typecheck`,
-`pnpm format:check`, full `pnpm test`, a changeset, and a `status.json` update.
+dedicated behavior tests for anything the rig cannot see, `bun run typecheck`,
+`bun run format:check`, full `bun run test`, a changeset, and a `status.json` update.
 
 - **Phase 3a — Zero-dependency backlog** (DONE): `Button`, `DirectionProvider`,
   `CSPProvider` (+ `CSPContext`), `unstable-use-media-query`. ✅
@@ -896,7 +896,7 @@ dedicated behavior tests for anything the rig cannot see, `pnpm typecheck`,
 - **Phase 4 — Navigation + composite + Select**: Tabs, Accordion, Collapsible, Toolbar,
   NavigationMenu, ScrollArea, Select. *Exit:* rig + roving-focus/keyboard tests.
 - **Phase 5 — Long tail + polish**: Autocomplete, Combobox; SSR/hydration; README +
-  divergence notes; changeset; parity-plan + memory. *Exit:* full `pnpm test`/typecheck/
+  divergence notes; changeset; parity-plan + memory. *Exit:* full `bun run test`/typecheck/
   format green.
 
 ## Reused from the octane ecosystem
@@ -922,7 +922,7 @@ dedicated behavior tests for anything the rig cannot see, `pnpm typecheck`,
 
 ## Verification
 
-Per phase: the `base-ui` vitest project (differential + unit) green; `pnpm typecheck`;
-`pnpm format:check`. Differential parity vs real `@base-ui/react` is the gold
+Per phase: the `base-ui` vitest project (differential + unit) green; `bun run typecheck`;
+`bun run format:check`. Differential parity vs real `@base-ui/react` is the gold
 standard. Re-clone the source: `git clone https://github.com/mui/base-ui .base-ui && git -C
 .base-ui checkout v1.6.0`.

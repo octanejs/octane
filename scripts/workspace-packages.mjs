@@ -67,7 +67,7 @@ const OCTANE_025_CONSUMERS = new Set([
 const OCTANE_037_CONSUMERS = new Set(['@octanejs/base-ui', '@octanejs/floating-ui']);
 
 // These packages consume compiler/runtime/server APIs from the coordinated core
-// release. pnpm publishes workspace:^ as ^<the released sibling version>,
+// release. Publishing packs workspace:^ as ^<the released sibling version>,
 // while source installs keep resolving the current workspace before versioning.
 const OCTANE_CURRENT_CORE_CONSUMERS = new Set([
 	'@octanejs/app-core',
@@ -548,7 +548,7 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 		// Every sibling edge resolves through the workspace. A published range
 		// instead installs the sibling from npm, so the package builds against a
 		// stale copy of source that lives in this checkout, and `changeset version`
-		// rewrites the range on release, desyncing pnpm-lock.yaml and failing the
+		// rewrites the range on release, desyncing bun.lock and failing the
 		// release job's frozen install.
 		for (const section of ['dependencies', 'devDependencies', 'peerDependencies']) {
 			for (const [dependency, range] of Object.entries(pkg.manifest[section] ?? {})) {
@@ -581,7 +581,7 @@ export function renderWorkspaceInventory(packages = getWorkspacePackages()) {
 	const frameworkIntegrations = publishable.filter((pkg) => pkg.role === 'framework integration');
 	let md = `# Package inventory (generated)
 
-<!-- GENERATED FILE — do not edit. Regenerate with \`pnpm packages:inventory\`. -->
+<!-- GENERATED FILE — do not edit. Regenerate with \`bun run packages:inventory\`. -->
 
 This inventory is derived from the manifests directly under \`packages/\`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
@@ -627,7 +627,7 @@ function runCli() {
 		const current = existsSync(INVENTORY_PATH) ? readFileSync(INVENTORY_PATH, 'utf8') : '';
 		if (current !== expected) {
 			console.error(
-				'docs/packages.md is stale — run `pnpm packages:inventory` and commit the result.',
+				'docs/packages.md is stale — run `bun run packages:inventory` and commit the result.',
 			);
 			process.exit(1);
 		}

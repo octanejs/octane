@@ -30,11 +30,10 @@ if (write) {
 	verifyTiptapTypes(REPO);
 }
 
-const pristine = spawnSync(
-	'pnpm',
-	['exec', 'tsc', '--noEmit', '-p', config.lanes.pristine.project],
-	{ cwd: REPO, encoding: 'utf8' },
-);
+const pristine = spawnSync('bun', ['run', 'tsc', '--noEmit', '-p', config.lanes.pristine.project], {
+	cwd: REPO,
+	encoding: 'utf8',
+});
 if (pristine.status !== 0) {
 	process.stderr.write(pristine.stdout || '');
 	process.stderr.write(pristine.stderr || '');
@@ -42,8 +41,8 @@ if (pristine.status !== 0) {
 }
 
 const adapted = spawnSync(
-	'pnpm',
-	['exec', 'tsrx-tsc', '--noEmit', '-p', config.lanes.adapted.project],
+	'bun',
+	['run', 'tsrx-tsc', '--noEmit', '-p', config.lanes.adapted.project],
 	{ cwd: REPO, encoding: 'utf8' },
 );
 if (adapted.status !== 0) {

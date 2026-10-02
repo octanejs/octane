@@ -222,8 +222,8 @@ must remain out of production bundles.
 - Website decoder tests cover any new argument shape without interpreting argument
   text as JSON or HTML.
 - Bundle measurements compare the same fixtures and settings before and after.
-- `pnpm typecheck`, the relevant behavioral suites, package builds, and repository-
-  wide `pnpm format:check` pass.
+- `bun run typecheck`, the relevant behavioral suites, package builds, and repository-
+  wide `bun run format:check` pass.
 - Framework-fundamental diffs receive an adversarial review for retained strings,
   wrong code-to-callsite mappings, user-error rewriting, hot-path allocation, and
   build-tool differences.

@@ -1,6 +1,6 @@
 # Redact-derived adversarial contract audit (generated)
 
-<!-- GENERATED FILE — do not edit. Regenerate with `pnpm redact-audit:generate`. -->
+<!-- GENERATED FILE — do not edit. Regenerate with `bun run redact-audit:generate`. -->
 
 This is a source-backed extraction ledger for consumer-observable failure modes found in [TanStack Redact](https://github.com/TanStack/redact). Redact is an adversity source, not an implementation target or a blanket compatibility promise. Classifications describe whether each contract transfers to Octane; statuses describe the current Octane evidence or follow-up.
 
@@ -52,7 +52,7 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 - A `documented` entry is terminal only for an explained divergence/non-goal or a portable process policy backed exclusively by documentation/benchmark references.
 - Keep resolved, divergent, and non-goal entries in the ledger so future audits do not rediscover them or silently import Redact-specific behavior.
 - Choose tests by observable. Final markup alone cannot prove identity, focus, selection, scroll, live properties, lifecycle ordering, or global error behavior.
-- Update the authored JSON, then run `pnpm redact-audit:generate`; never hand-edit this report.
+- Update the authored JSON, then run `bun run redact-audit:generate`; never hand-edit this report.
 
 ## Summary
 
@@ -604,7 +604,7 @@ Targets: `packages/octane/src/runtime.ts`, `docs/ssr.md`.
 - [discovers a parent package and routes raw dependency imports to the SSR runtime](../packages/octane/tests/compiler/vite-integration.test.ts) — modes: `vite-ssr`, `production-compile`; observables: `package-resolution`, `markup`
 - [builds client and server graphs with maps, raw dependencies, and one target runtime](../packages/rspack-plugin-octane/tests/rspack.test.ts) — modes: `rspack`; observables: `package-resolution`
 - [builds routed client/server environments and serves the production SSR handler](../packages/rsbuild-plugin-octane/tests/rsbuild.integration.test.ts) — modes: `rsbuild`, `production-compile`; observables: `package-resolution`, `markup`
-- command: `pnpm packages:pack:check` — modes: `packaged-consumer`, `vite-client`, `vite-ssr`, `production-compile`; observables: `package-resolution`, `markup`
+- command: `bun run packages:pack:check` — modes: `packaged-consumer`, `vite-client`, `vite-ssr`, `production-compile`; observables: `package-resolution`, `markup`
 
 **Rationale.** The exact React/RSC aliases are Redact-only. Octane's packed canary proves the external Vite boundary, while Rspack and Rsbuild remain honestly labeled workspace integration evidence rather than external packed coverage.
 
@@ -724,7 +724,7 @@ Targets: `packages/octane/src/runtime.ts`, `docs/ssr.md`.
 
 - [requires committed names while permitting additive exports](../packages/octane/tests/public-exports.test.ts) — modes: `production-compile`; observables: `package-resolution`
 - [publishes every subpath advertised to source consumers](../packages/octane/tests/public-exports.test.ts) — modes: `production-compile`, `packaged-consumer`; observables: `package-resolution`
-- command: `pnpm packages:pack:check` — modes: `packaged-consumer`, `production-compile`; observables: `package-resolution`
+- command: `bun run packages:pack:check` — modes: `packaged-consumer`, `production-compile`; observables: `package-resolution`
 
 **Rationale.** The audit found four source-advertised subpaths missing from the packed manifest. The package now publishes them, typechecks all four from an outside-workspace tarball consumer, executes the two value-bearing TSRX helpers there, and locks every JavaScript subpath to an additive-friendly required export subset.
 

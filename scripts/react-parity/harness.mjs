@@ -43,9 +43,9 @@ await verifyManifestFiles(manifest, root);
 if (action === 'validate') {
 	const selected = laneId ? manifest.lanes.filter((lane) => lane.id === laneId) : manifest.lanes;
 	if (selected.length === 0) throw new Error(`Unknown lane: ${laneId}`);
-	const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
+	const bunVersion = execFileSync('bun', ['--version'], { encoding: 'utf8' });
 	for (const lane of selected) {
-		await verifyLaneEnvironment(manifest, lane, root, pnpmVersion);
+		await verifyLaneEnvironment(manifest, lane, root, bunVersion);
 	}
 	await verifyManifestTestSelections({ ...manifest, lanes: selected }, root);
 	console.log(`valid: ${manifestPath}`);
@@ -77,10 +77,10 @@ if (action === 'validate') {
 		}
 		throw new Error(`Unknown lane: ${laneId}`);
 	}
-	const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
+	const bunVersion = execFileSync('bun', ['--version'], { encoding: 'utf8' });
 	for (const lane of selected) {
 		const laneStartedAt = Date.now();
-		await verifyLaneEnvironment(manifest, lane, root, pnpmVersion);
+		await verifyLaneEnvironment(manifest, lane, root, bunVersion);
 		const runs =
 			lane.execution?.kind === 'typescript'
 				? buildTypeScriptCompilerRuns(lane)

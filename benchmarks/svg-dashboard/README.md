@@ -141,10 +141,10 @@ node benchmarks/bench.mjs svg-dashboard --quick
 Standalone (servers first):
 
 ```bash
-pnpm --filter octane-tsrx-svg-dashboard-bench preview   # :5302
-pnpm --filter react-svg-dashboard-bench preview         # :5303
-pnpm --filter solid-svg-dashboard-bench preview         # :5304
-pnpm --filter svelte-svg-dashboard-bench preview        # :5305
+bun run --filter octane-tsrx-svg-dashboard-bench preview   # :5302
+bun run --filter react-svg-dashboard-bench preview         # :5303
+bun run --filter solid-svg-dashboard-bench preview         # :5304
+bun run --filter svelte-svg-dashboard-bench preview        # :5305
 node benchmarks/svg-dashboard/run.mjs 20
 ```
 

@@ -92,7 +92,7 @@ an independently compressed response and sums the app and framework buckets; it 
 inspect a server's content encoding. The framework bucket includes the Octane workspace
 runtime or the reference framework's dependencies together with bundler virtual helpers.
 
-`pnpm --filter octane-weather-app-benchmarks bench:work` is an untimed production
+`bun run --filter octane-weather-app-benchmarks bench:work` is an untimed production
 regression gate for Octane's compressed JavaScript and bookkeeping DOM nodes. Start the
 Octane production preview first. The gate verifies London weather, all seven forecast
 rows, expansion and collapse with preserved row identity, a live Tokyo search, rejected
@@ -100,7 +100,7 @@ invalid-city input, Paris recovery, local storage, and the existing application 
 before enforcing its gzip and comment budgets. It never substitutes marker counts for
 those observable correctness controls.
 
-`pnpm --filter octane-weather-app-benchmarks bench:delivery` runs a separate,
+`bun run --filter octane-weather-app-benchmarks bench:delivery` runs a separate,
 explicitly labeled client-rendered versus streamed-server-shell delivery experiment.
 Octane and React both use their native streaming renderer and hydrate an equivalent
 server-rendered shell; the existing seven-framework client-rendered Lighthouse suite and
@@ -113,10 +113,10 @@ mock after hydration and must satisfy the same weather and interaction checks.
 ```bash
 node benchmarks/bench.mjs weather-app
 node benchmarks/bench.mjs --quick weather-app weather-app-lighthouse bundle-size
-pnpm --filter octane-tsrx-weather-app-bench build
-pnpm --filter octane-tsrx-weather-app-bench preview
-pnpm --filter octane-weather-app-benchmarks bench:work
-pnpm --filter octane-weather-app-benchmarks bench:delivery
+bun run --filter octane-tsrx-weather-app-bench build
+bun run --filter octane-tsrx-weather-app-bench preview
+bun run --filter octane-weather-app-benchmarks bench:work
+bun run --filter octane-weather-app-benchmarks bench:delivery
 ```
 
 ## Attribution

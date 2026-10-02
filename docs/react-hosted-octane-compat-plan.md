@@ -173,7 +173,7 @@ do not accept as a component return. The compat declaration package may supply a
 branded JSX-facing view and augment the Octane `use()`/`useContext()` overloads
 with `React.Context<T>` while keeping React types out of the core package.
 The Phase 0 typing spike (`packages/octane/typetests/react-hosted-jsx.test-d.tsx`,
-gated by `pnpm typecheck`) proved the shape: raw `ComponentBody` is rejected by
+gated by `bun run typecheck`) proved the shape: raw `ComponentBody` is rejected by
 React 19 JSX (arity + void return); a branded facade
 `(props: P) => OctaneRenderedNode` is accepted zero-cast with exact prop checking
 and intersects cleanly with `ComponentBody` so one declaration serves both hosts;
@@ -1108,7 +1108,7 @@ fresh Octane server pass.
   `universal-renderer-boundaries.test.ts` stays green and no Octane hot path
   changed.
 - `packages/octane/typetests/react-hosted-jsx.test-d.tsx` — the §3 typing
-  spike (checked by `pnpm typecheck`): raw `ComponentBody` is rejected by
+  spike (checked by `bun run typecheck`): raw `ComponentBody` is rejected by
   React JSX; a branded facade type is accepted zero-cast with exact prop
   checking and stays valid as an Octane body; children typing cannot
   statically discriminate octane vs React elements (JSX.Element erasure), so

@@ -23,7 +23,7 @@ under `upstream-artifact/`, hash-pinned by `audit/upstream-contract.json`. The
 pinned license is republished at the package root as `LICENSE.upstream`. All of
 it is audit input only and must remain excluded from the published package.
 
-Run `pnpm --dir packages/window upstream:verify` to verify the lock-pinned tree
+Run `bun run --cwd packages/window upstream:verify` to verify the lock-pinned tree
 and all 57 vendored artifacts, the exact file set, the published declaration
 bundle, the 14 upstream test artifacts and their 117 test registrations, package
 metadata, and the complete root export inventory.

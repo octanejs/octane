@@ -23,7 +23,7 @@ const TARGETS = [
 // The timed run uses minified assets. Rebuild only for this untimed observer so
 // precise coverage can identify runtime functions by their original names.
 for (const target of TARGETS) {
-	execFileSync('pnpm', ['exec', 'vite', 'build', '--minify', 'false'], {
+	execFileSync('bun', ['run', 'vite', 'build', '--minify', 'false'], {
 		cwd: fileURLToPath(new URL(`${target.name}/`, import.meta.url)),
 		stdio: 'inherit',
 	});

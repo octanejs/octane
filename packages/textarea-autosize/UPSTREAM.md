@@ -13,7 +13,7 @@ The npm artifact supplies the published distribution and package-condition bound
 byte-pinned evidence (tarball and artifact declarations) lives under `upstream-artifact/`. The exact repository commit supplies the source and two upstream Jest
 artifacts absent from the tarball, vendored under `upstream/` and pinned by
 `audit/upstream.lock.json`: each committed file verifies offline against its upstream git blob
-sha (`pnpm react-port:materialize run --check --package-dir packages/textarea-autosize`). The
+sha (`bun run react-port:materialize run --check --package-dir packages/textarea-autosize`). The
 upstream MIT license is retained byte-exact as `LICENSE.upstream`, hash-matched to the lock.
 Both evidence trees are excluded from publication.
 

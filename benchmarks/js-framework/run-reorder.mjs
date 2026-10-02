@@ -36,12 +36,12 @@
 // single 1000-row click.
 //
 // Usage (same servers as run.mjs):
-//   pnpm --filter octane-tsrx-jsbench dev   # :5176
-//   pnpm --filter octane-jsx-jsbench dev    # :5177
-//   pnpm --filter react-jsbench dev         # :5175
-//   pnpm --filter ripple-jsbench dev        # :5178
-//   pnpm --filter solid-jsbench dev         # :5179
-//   pnpm --filter vue-vapor-jsbench dev     # :5180
+//   bun run --filter octane-tsrx-jsbench dev   # :5176
+//   bun run --filter octane-jsx-jsbench dev    # :5177
+//   bun run --filter react-jsbench dev         # :5175
+//   bun run --filter ripple-jsbench dev        # :5178
+//   bun run --filter solid-jsbench dev         # :5179
+//   bun run --filter vue-vapor-jsbench dev     # :5180
 //   node benchmarks/js-framework/run-reorder.mjs [iterations]   # default 8
 //   BENCH_JSON=results/reorder.json node run-reorder.mjs        # machine-readable copy
 //

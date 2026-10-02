@@ -46,15 +46,15 @@ remote surface.
 ## Develop
 
 ```bash
-pnpm --filter website-mcp dev        # dev SSR on http://localhost:5180
-pnpm --filter website-mcp test       # content/search/tool tests + built-handler e2e
+bun run --filter website-mcp dev        # dev SSR on http://localhost:5180
+bun run --filter website-mcp test       # content/search/tool tests + built-handler e2e
 ```
 
 ## Build & preview
 
 ```bash
-pnpm --filter website-mcp build      # → dist/client + dist/server + .vercel/output
-pnpm --filter website-mcp preview    # octane-preview: serves the PRODUCTION build on :3000
+bun run --filter website-mcp build      # → dist/client + dist/server + .vercel/output
+bun run --filter website-mcp preview    # octane-preview: serves the PRODUCTION build on :3000
 ```
 
 Smoke-test the production build locally:
@@ -78,7 +78,7 @@ Project settings in the Vercel dashboard (domain: `mcp.octanejs.dev`):
 | ---------------- | --------------------------------------------------------------------------- |
 | Root Directory   | `website-mcp` (enable "Include files outside the Root Directory" — workspace deps) |
 | Framework Preset | Other (vercel.json supplies the build command)                              |
-| Install Command  | default (`pnpm install` at the repo root)                                   |
+| Install Command  | default (`bun install` at the repo root)                                   |
 | Node.js Version  | 22.x or 24.x                                                                |
 
 No environment variables are required.

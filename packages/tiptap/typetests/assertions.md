@@ -12,7 +12,7 @@ the type program permits Octane's own transitive migration type dependencies.
 
 Executable structural verification lives in
 `scripts/react-parity/tiptap-types-lib.mjs` and is wired through
-`pnpm react-parity:validate` / `pnpm react-parity:check`. Inventories are
+`bun run react-parity:validate` / `bun run react-parity:check`. Inventories are
 `packages/tiptap/audit/pristine-types.json` and
 `packages/tiptap/audit/adapted-types.json`; regenerate with
 `node scripts/react-parity/tiptap-types.mjs --write`.

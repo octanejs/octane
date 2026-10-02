@@ -6,9 +6,9 @@
 
 <!-- What you ran, and anything you deliberately left unverified. -->
 
-- [ ] `pnpm format:check`
-- [ ] `pnpm typecheck`
-- [ ] `pnpm test`
+- [ ] `bun run format:check`
+- [ ] `bun run typecheck`
+- [ ] `bun run test`
 - [ ] targeted tests:
 
 ## Risk / follow-ups

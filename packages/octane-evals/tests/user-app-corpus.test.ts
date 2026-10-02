@@ -113,9 +113,7 @@ describe('public user-app training corpus', () => {
 		const tasks = parsePublicTaskManifestJsonl(
 			readFileSync(join(corpusRoot, 'manifest.jsonl'), 'utf8'),
 		);
-		const overlayLockfileDigest = sha256Digest(
-			readFileSync(join(repositoryRoot, 'pnpm-lock.yaml')),
-		);
+		const overlayLockfileDigest = sha256Digest(readFileSync(join(repositoryRoot, 'bun.lock')));
 		expect(tasks).toHaveLength(catalog.tasks.length);
 		expect(new Set(tasks.map((task) => task.suite))).toEqual(
 			new Set(['tsrx', 'octane', 'integration']),
@@ -213,8 +211,9 @@ describe('public user-app training corpus', () => {
 
 	it('grades a relative submission from the public command invocation directory', () => {
 		execFileSync(
-			'pnpm',
+			'bun',
 			[
+				'run',
 				'--filter',
 				'@octanejs/evals',
 				'grade:user-app',
@@ -226,7 +225,7 @@ describe('public user-app training corpus', () => {
 			],
 			{
 				cwd: join(corpusRoot, 'tasks', 'tsrx.counter', 'reference'),
-				env: { ...process.env, OCTANE_EVAL_SANDBOX: '1' },
+				env: { ...process.env, npm_config_local_prefix: undefined, OCTANE_EVAL_SANDBOX: '1' }, // Bun keeps an inherited invocation root
 				stdio: 'pipe',
 				timeout: gradingCommandTimeoutMs,
 				killSignal: 'SIGKILL',

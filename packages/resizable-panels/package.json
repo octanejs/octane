@@ -29,7 +29,7 @@
     ".": "./src/index.tsrx"
   },
   "scripts": {
-    "test": "pnpm upstream:materialize && vitest run --root ../.. --project resizable-panels && vitest run --root ../.. --project resizable-panels-server && pnpm test:upstream && vitest run --root ../.. --project resizable-panels-browser",
+    "test": "bun run upstream:materialize && vitest run --root ../.. --project resizable-panels && vitest run --root ../.. --project resizable-panels-server && bun run test:upstream && vitest run --root ../.. --project resizable-panels-browser",
     "test:upstream": "vitest run --config vitest.pristine.config.ts",
     "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs && node audit/verify-provenance.mjs",

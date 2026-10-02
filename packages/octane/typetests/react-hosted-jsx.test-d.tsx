@@ -1,7 +1,7 @@
 /**
  * Typing contract for the React-hosted compat surface —
  * react-hosted-octane-compat-plan.md §3, pinned against the SHIPPED
- * `octane/react` types (checked by `pnpm typecheck`; the @ts-expect-error
+ * `octane/react` types (checked by `bun run typecheck`; the @ts-expect-error
  * lines fail the build if a claim stops holding):
  *
  *  1. A raw compiled Octane component type (`ComponentBody`: three required

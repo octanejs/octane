@@ -47,7 +47,7 @@
   },
   "scripts": {
     "build:cjs": "node ../../scripts/build-package-commonjs.mjs",
-    "prepack": "pnpm build:cjs",
+    "prepack": "bun run build:cjs",
     "test": "vitest run"
   },
   "dependencies": {

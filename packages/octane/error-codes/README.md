@@ -40,7 +40,7 @@ at `/errors/<code>`; it must not fetch a mutable external error map. Consequentl
 published numbers and their argument shapes are a compatibility contract even
 though Octane does not support versioned React diagnostic catalogs.
 
-Run `pnpm error-codes:generate` after editing the catalog. CI uses
-`pnpm error-codes:check` to validate the schema and generated runtime modules,
+Run `bun run error-codes:generate` after editing the catalog. CI uses
+`bun run error-codes:check` to validate the schema and generated runtime modules,
 and compares the catalog with the PR base (or previous main commit) to reject
 published-code deletion, renumbering, message/argument drift, and reactivation.

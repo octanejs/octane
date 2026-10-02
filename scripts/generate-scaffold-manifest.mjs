@@ -12,7 +12,7 @@
 // against the snapshot here instead, in both modes: regenerating the JSON
 // while leaving the README describing the old file set would defeat the point.
 //
-// Regenerate with `pnpm scaffold:manifest`; CI runs `pnpm scaffold:manifest:check`.
+// Regenerate with `bun run scaffold:manifest`; CI runs `bun run scaffold:manifest:check`.
 
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -161,7 +161,7 @@ async function main() {
 	const templates = Object.fromEntries(Object.keys(MODES).map((mode) => [mode, filesFor(mode)]));
 
 	// Formatted through prettier, because generated baselines share the repo-wide
-	// `pnpm format:check` gate. Emitting hand-chosen indentation here would make
+	// `bun run format:check` gate. Emitting hand-chosen indentation here would make
 	// the two gates contradict each other.
 	const serialized = await format(JSON.stringify({ templates }), {
 		...(await resolveConfig(OUTPUT)),
@@ -177,7 +177,7 @@ async function main() {
 			// Treated as a mismatch below.
 		}
 		if (current !== serialized) {
-			console.error(`${relative} is out of date. Run \`pnpm scaffold:manifest\`.`);
+			console.error(`${relative} is out of date. Run \`bun run scaffold:manifest\`.`);
 			process.exitCode = 1;
 		} else {
 			console.log(`${relative} is up to date.`);

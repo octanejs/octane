@@ -26,10 +26,10 @@ All campaign, chart, and activity data is locally seeded. The application makes 
 From the repository root:
 
 ```bash
-pnpm --dir examples/pulseboard dev
-pnpm --dir examples/pulseboard typecheck
-pnpm --dir examples/pulseboard build
-pnpm --dir examples/pulseboard test:e2e
+bun run --cwd examples/pulseboard dev
+bun run --cwd examples/pulseboard typecheck
+bun run --cwd examples/pulseboard build
+bun run --cwd examples/pulseboard test:e2e
 ```
 
 The five Playwright journeys run against real Chromium and assert public behavior: route and range state, browser-measured SVG layout, pointer and keyboard chart readings, table accessibility state, bounded virtual DOM with an on-screen incident, retained data through failures, empty-state restoration, and page/console diagnostics.

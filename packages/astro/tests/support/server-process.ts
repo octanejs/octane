@@ -35,7 +35,7 @@ export async function reserveFreePort(): Promise<{ port: number; release: () => 
 }
 
 // Spawn a detached process group so stopServer() can kill the whole tree.
-// `pnpm exec …` is a wrapper: signalling just the wrapper can orphan the
+// `bun x …` is a wrapper: signalling just the wrapper can orphan the
 // real node process underneath.
 export function spawnDetached(
 	cwd: string,
@@ -43,10 +43,9 @@ export function spawnDetached(
 	env: NodeJS.ProcessEnv = {},
 	stdio: 'ignore' | 'pipe' = 'ignore',
 ): ChildProcess {
-	// Ignore stdin always — a piped stdin keeps some wrappers (pnpm) waiting.
 	const stdioOption =
 		stdio === 'pipe' ? (['ignore', 'pipe', 'pipe'] as const) : ('ignore' as const);
-	return spawn('pnpm', args, {
+	return spawn('bun', ['x', '--no-install', ...args], {
 		cwd,
 		stdio: stdioOption,
 		detached: true,
@@ -55,7 +54,7 @@ export function spawnDetached(
 }
 
 // Spawn a server in its OWN process group so stopServer() can kill the whole
-// tree. `pnpm exec …` is a wrapper: signalling just the wrapper can orphan the
+// tree. `bun x …` is a wrapper: signalling just the wrapper can orphan the
 // real node server underneath.
 export function spawnServer(
 	cwd: string,

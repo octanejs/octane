@@ -1,6 +1,6 @@
 # React-parity gaps (generated)
 
-<!-- GENERATED FILE — do not edit. Regenerate with `pnpm parity:gaps`. -->
+<!-- GENERATED FILE — do not edit. Regenerate with `bun run parity:gaps`. -->
 
 This is a compatibility audit for executable `it.fails(...)` and
 `test.fails(...)` pins under `packages/octane/tests`. Committed tests must

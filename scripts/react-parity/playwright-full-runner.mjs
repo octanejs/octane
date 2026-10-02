@@ -272,7 +272,7 @@ export function validateDependencyWorkspace(root, config) {
 function linkDependencyWorkspace(workRoot, nodeModules) {
 	symlinkSync(nodeModules, join(workRoot, 'node_modules'), 'dir');
 	return {
-		// Invoke bins through their physical workspace path. pnpm's .bin links are
+		// Invoke bins through their physical workspace path. Package-manager .bin links are
 		// relative, so resolving them through the temporary node_modules symlink
 		// would incorrectly make those links relative to the OS temp directory.
 		playwright: join(nodeModules, '.bin', 'playwright'),

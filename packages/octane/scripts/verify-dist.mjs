@@ -716,7 +716,7 @@ export async function verifyDist(pkgDir) {
 	const pkg = readPackage(pkgDir);
 	const dist = join(pkgDir, 'dist');
 
-	// Development consumes the source export map, while pnpm replaces it with
+	// Development consumes the source export map, while scripts/pack-package.mjs replaces it with
 	// publishConfig.exports in the tarball. Every advertised source subpath must
 	// therefore survive that replacement.
 	const missingSubpaths = missingPublishedPublicSubpaths(pkg.exports, pkg.publishConfig.exports);

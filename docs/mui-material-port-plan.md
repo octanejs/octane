@@ -383,7 +383,7 @@ Use four complementary layers.
 
 Add compile-only type tests and a package-tarball test alongside those layers.
 Each phase runs its focused Vitest project while iterating, then the required
-repository-wide `pnpm typecheck`, `pnpm test`, `pnpm format:check`, generated
+repository-wide `bun run typecheck`, `bun run test`, `bun run format:check`, generated
 status checks, and package checks before handoff.
 
 ## Known divergences and risk policy

@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "octane-preview --port 5237 --strictPort",
     "typecheck": "octane-tsc -p tsconfig.json",
-    "test:e2e": "pnpm test:capture && pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e": "bun run test:capture && bun run build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
     "test:capture": "node --test scripts/capture.test.mjs",
     "test:e2e:dev": "playwright test --config e2e/playwright.config.ts",
     "capture": "node scripts/capture.mjs"

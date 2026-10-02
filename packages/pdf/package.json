@@ -42,7 +42,7 @@
     "./dist/Page/TextLayer.css": "./dist/Page/TextLayer.css"
   },
   "scripts": {
-    "test": "pnpm upstream:verify && vitest run --root ../.. --project pdf --project pdf-ssr --project pdf-parity --project pdf-packed",
+    "test": "bun run upstream:verify && vitest run --root ../.. --project pdf --project pdf-ssr --project pdf-parity --project pdf-packed",
     "test:browser": "vitest run --root ../.. --project pdf-browser",
     "test:feasibility": "vitest run --root ../.. --project pdf-feasibility --project pdf-feasibility-ssr --project pdf-feasibility-hydration",
     "test:parity": "vitest run --root ../.. --project pdf-parity",

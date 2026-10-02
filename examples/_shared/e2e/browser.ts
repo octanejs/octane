@@ -3,7 +3,7 @@
  *
  * Keep these types structural: examples own their Playwright dependency, while
  * this sibling directory intentionally has no package or dependency graph of
- * its own under pnpm.
+ * its own in the workspace.
  */
 export interface BrowserConsoleMessage {
 	type(): string;

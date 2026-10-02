@@ -32,8 +32,8 @@ descriptor flattening), not at the compiler.
 ## Running
 
 ```bash
-pnpm --filter octane-deopt-dbmon-bench build && pnpm --filter octane-deopt-dbmon-bench preview &   # :5209
-pnpm --filter octane-tsrx-dbmon-bench  build && pnpm --filter octane-tsrx-dbmon-bench  preview &   # :5196
+bun run --filter octane-deopt-dbmon-bench build && bun run --filter octane-deopt-dbmon-bench preview &   # :5209
+bun run --filter octane-tsrx-dbmon-bench  build && bun run --filter octane-tsrx-dbmon-bench  preview &   # :5196
 
 TARGETS='[{"name":"octane-tsrx","url":"http://localhost:5196/"},
           {"name":"octane-deopt","url":"http://localhost:5209/"}]' \

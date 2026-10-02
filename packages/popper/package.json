@@ -34,7 +34,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "pnpm upstream:verify && pnpm test:audit && pnpm test:type-parity && pnpm typecheck && vitest run --root ../.. --project popper --project popper-ssr --project popper-hydration --project popper-differential",
+    "test": "bun run upstream:verify && bun run test:audit && bun run test:type-parity && bun run typecheck && vitest run --root ../.. --project popper --project popper-ssr --project popper-hydration --project popper-differential",
     "upstream:verify": "node audit/upstream-inventory.mjs",
     "test:audit": "node --test tests/audit/upstream-inventory.test.mjs",
     "test:type-parity": "node ../../scripts/react-parity/popper-types.mjs",

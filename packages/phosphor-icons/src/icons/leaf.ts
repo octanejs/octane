@@ -1,5 +1,5 @@
 // Generated from @phosphor-icons/core@2.1.1 metadata and SVG assets.
-// Run `pnpm phosphor-icons:generate`; do not edit by hand.
+// Run `bun run phosphor-icons:generate`; do not edit by hand.
 
 import createIcon from '../createIcon';
 import type { IconWeights } from '../types';

@@ -35,8 +35,8 @@ const { verifyScenario } = await import(
 );
 const hash = (v) => createHash('sha256').update(v).digest('hex');
 assert.equal(
-	hash(fs.readFileSync(path.join(sourceRoot, 'pnpm-lock.yaml'))),
-	hash(fs.readFileSync(path.join(toolingRoot, 'pnpm-lock.yaml'))),
+	hash(fs.readFileSync(path.join(sourceRoot, 'bun.lock'))),
+	hash(fs.readFileSync(path.join(toolingRoot, 'bun.lock'))),
 );
 const root = path.join(auditRoot, 'fixtures');
 fs.mkdirSync(root, { recursive: true });
@@ -187,7 +187,7 @@ const report = {
 	label,
 	node: process.version,
 	tooling,
-	lockSHA: hash(fs.readFileSync(path.join(sourceRoot, 'pnpm-lock.yaml'))),
+	lockSHA: hash(fs.readFileSync(path.join(sourceRoot, 'bun.lock'))),
 	runnerSHA: hash(fs.readFileSync(import.meta.filename)),
 	sourceHashes: Object.fromEntries(
 		[...sourceHashes].map(([file, digest]) => [path.relative(sourceRoot, file), digest]),

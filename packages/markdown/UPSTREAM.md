@@ -19,7 +19,7 @@ the provenance verifier. `upstream/` contains the canonical runtime source,
 test suite, JSX loader, TypeScript configuration, package metadata, and
 license from the pinned commit, pinned by `audit/upstream.lock.json`: each
 committed file verifies offline against its upstream git blob sha
-(`pnpm react-port:materialize run --check --package-dir packages/markdown`),
+(`bun run react-port:materialize run --check --package-dir packages/markdown`),
 and the verifier's negative controls exercise that layer. The upstream MIT
 license is retained byte-exact as `LICENSE.upstream`, hash-matched to the
 lock. The npm
@@ -27,7 +27,7 @@ artifact does not publish `test.jsx` or `script/load-jsx.js`, so the canonical
 repository supplies that test boundary. The runtime source and license present
 in both artifacts are byte-identical.
 
-Run `pnpm --dir packages/markdown upstream:verify`. The verifier locks all
+Run `bun run --cwd packages/markdown upstream:verify`. The verifier locks all
 16 vendored files, package identity and license, the public API, and all 87
 `test.jsx` registrations. Its negative controls must reject source drift,
 license drift, a renamed upstream test, a removed inventory row, and a missing

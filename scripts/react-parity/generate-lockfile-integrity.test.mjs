@@ -9,7 +9,7 @@ import { loadRequiredVitestLanes } from './vitest-batch-lib.mjs';
 
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 
-function manifest(lockfile = 'pnpm-lock.yaml') {
+function manifest(lockfile = 'bun.lock') {
 	return {
 		schemaVersion: 1,
 		provenance: {
@@ -38,7 +38,7 @@ function manifest(lockfile = 'pnpm-lock.yaml') {
 				node: '>=22',
 				platform: 'any',
 				arch: 'any',
-				packageManager: 'pnpm@11.15.1',
+				packageManager: 'bun@1.4.2',
 				lockfile,
 				lockfileSha256: '0'.repeat(64),
 			},
@@ -76,7 +76,7 @@ test('refreshes discovered lockfile integrity and is idempotent', async (t) => {
 	const { manifestPath, root } = await fixture();
 	t.after(() => rm(root, { recursive: true, force: true }));
 	const lockfile = 'lockfileVersion: 9\n';
-	await writeFile(path.join(root, 'pnpm-lock.yaml'), lockfile);
+	await writeFile(path.join(root, 'bun.lock'), lockfile);
 	const original = await readFile(manifestPath, 'utf8');
 
 	assert.deepEqual(await generateLockfileIntegrity(root), [
@@ -158,7 +158,7 @@ test('discovers focused imported evidence and refreshes its lockfile only with v
 		}),
 	);
 	const lockfile = 'lockfileVersion: 9\n';
-	await writeFile(path.join(root, 'pnpm-lock.yaml'), lockfile);
+	await writeFile(path.join(root, 'bun.lock'), lockfile);
 	assert.deepEqual(
 		(await loadRequiredVitestLanes(root)).map((lane) => lane.id),
 		['adapted'],

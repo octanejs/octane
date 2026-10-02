@@ -46,6 +46,6 @@ the pinned Ink surface documented in [UPSTREAM.md](./UPSTREAM.md).
 ## Development
 
 ```sh
-pnpm --filter @octanejs/ink typecheck
-pnpm --filter @octanejs/ink test
+bun run --filter @octanejs/ink typecheck
+bun run --filter @octanejs/ink test
 ```

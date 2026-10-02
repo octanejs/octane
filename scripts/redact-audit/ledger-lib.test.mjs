@@ -223,7 +223,7 @@ test('accepts registered package scripts as command evidence', (t) => {
 		JSON.stringify({ scripts: { 'pack:check': 'node scripts/pack-check.mjs' } }),
 	);
 	mkdirSync(path.join(root, '.github/workflows'), { recursive: true });
-	writeFileSync(path.join(root, '.github/workflows/ci.yml'), 'run: pnpm pack:check\n');
+	writeFileSync(path.join(root, '.github/workflows/ci.yml'), 'run: bun run pack:check\n');
 	const ledger = fixture(testFile);
 	ledger.entries[0].applicableModes.push('packaged-consumer');
 	ledger.entries[0].evidence.push({

@@ -25,7 +25,7 @@ assert.equal(
 );
 function hashFileLock(root) {
 	return createHash('sha256')
-		.update(fs.readFileSync(path.join(root, 'pnpm-lock.yaml')))
+		.update(fs.readFileSync(path.join(root, 'bun.lock')))
 		.digest('hex');
 }
 const req = createRequire(path.join(tooling, 'packages/octane/package.json'));
@@ -51,7 +51,7 @@ const report = {
 	runnerSHA: hash(fs.readFileSync(import.meta.filename)),
 	scratch,
 	fixtureSHA: hash(authored),
-	lockSHA: hash(fs.readFileSync(path.join(tooling, 'pnpm-lock.yaml'))),
+	lockSHA: hash(fs.readFileSync(path.join(tooling, 'bun.lock'))),
 	variants: [],
 };
 for (const [label, root] of [

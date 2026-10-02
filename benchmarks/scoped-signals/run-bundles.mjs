@@ -190,8 +190,8 @@ try {
 		baselineArchive: fs.existsSync(archive)
 			? { path: archive, sha256: sha256(fs.readFileSync(archive)) }
 			: null,
-		baselineLockfileSha256: sha256(git('show', `${baselineRef}:pnpm-lock.yaml`)),
-		candidateLockfileSha256: sha256(fs.readFileSync(path.join(REPO, 'pnpm-lock.yaml'))),
+		baselineLockfileSha256: sha256(git('show', `${baselineRef}:bun.lock`)),
+		candidateLockfileSha256: sha256(fs.readFileSync(path.join(REPO, 'bun.lock'))),
 		packageManifests: manifests,
 		node: process.version,
 		platform: process.platform,

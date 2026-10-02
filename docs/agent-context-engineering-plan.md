@@ -168,7 +168,7 @@ packages. Missing from the list: `aria`, `dexie`, `styled-components`,
 `router`, `react-compat`, `react-wrapper`, `devtools`, `lynx`, and more.
 
 Meanwhile `docs/packages.md` is **generated and CI-gated**
-(`pnpm packages:inventory:check`). The always-loaded copy is the stale one; the
+(`bun run packages:inventory:check`). The always-loaded copy is the stale one; the
 verified copy is the one nobody loads. Hand-maintained inventory inside an
 always-on prompt is a rot generator with a per-session token bill.
 
@@ -178,14 +178,14 @@ CI already hard-gates ~15 rules that `CLAUDE.md` *also* states in prose:
 
 | Prose rule in CLAUDE.md | Gate |
 | --- | --- |
-| "do not use `skip`, `todo`, or expected-failure modifiers" | `pnpm test:markers:check` |
-| "`docs/parity-gaps.md` should remain at zero" | `pnpm parity:gaps:check` |
-| "regenerate after changing RuleSync content" | `pnpm rules:check` + `git diff --exit-code` |
-| "stay on the `patch` track" | `pnpm changeset:check` |
-| "`pnpm bindings:status` to regenerate after a scope change" | `pnpm bindings:status:check` |
+| "do not use `skip`, `todo`, or expected-failure modifiers" | `bun run test:markers:check` |
+| "`docs/parity-gaps.md` should remain at zero" | `bun run parity:gaps:check` |
+| "regenerate after changing RuleSync content" | `bun run rules:check` + `git diff --exit-code` |
+| "stay on the `patch` track" | `bun run changeset:check` |
+| "`bun run bindings:status` to regenerate after a scope change" | `bun run bindings:status:check` |
 | "regenerate the evals corpus in the same commit" | corpus freshness tests |
 | "never mutate a parsed AST" | `OCTANE_COMPILE_FROZEN_AST` deep-freeze: **throws at the offending line** |
-| "run `pnpm format:check` before handoff" | CI `format:check` |
+| "run `bun run format:check` before handoff" | CI `format:check` |
 | slot-keyed hook in a plain JS loop | **compile error** |
 | React-style `onChange` on a text host | `OCTANE_NATIVE_TEXT_ONCHANGE` diagnostic |
 
@@ -431,7 +431,7 @@ byte-identical to `CLAUDE.md`; that is fine and intended. Just confirm each
 target still has a live consumer: `.gemini/`, `.agents/`, `.codex/` cost
 nothing at runtime but they do cost review attention on every rules change.
 
-**Verification:** `pnpm rules:check`, `pnpm format:check`, `git diff` on
+**Verification:** `bun run rules:check`, `bun run format:check`, `git diff` on
 generated targets, and a `grep` proving no source references the deleted paths.
 
 ---
@@ -489,11 +489,11 @@ needs `{expr as string}` unless provably a string; control flow is `@if`/`@for
 
 ## Working here
 
-`pnpm test`, `pnpm typecheck`, `pnpm format:check`. Run `format:check`
+`bun run test`, `bun run typecheck`, `bun run format:check`. Run `format:check`
 repo-wide, not on touched files: generated baselines and docs share the gate.
 
 RuleSync owns the generated agent files: edit `.rulesync/rules/`, then
-`pnpm rules:generate`.
+`bun run rules:generate`.
 
 Framework-fundamental work (runtime, compiler, scheduler, reconciler,
 SSR/hydration) follows `.rulesync/rules/core-engineering.md`.
@@ -571,7 +571,7 @@ for things currently expressed as prose the agent must remember to do:
 
 **3.4: Shared `.claude/settings.json`** (currently only an untracked
 `settings.local.json`): commit a shared allowlist for the read-only repo
-commands every agent runs (`pnpm test`, `pnpm typecheck`, `pnpm format:check`,
+commands every agent runs (`bun run test`, `bun run typecheck`, `bun run format:check`,
 `git log/diff/show`, the `:check` scripts). Removes a permission prompt per
 session per maintainer, and is the hook host for Phase 4.
 
@@ -583,7 +583,7 @@ The highest-value phase. Each item removes prose *and* closes a real hole.
 
 **4.1: Ban wildcard `declare module '*.tsrx'`.** The §2.6 control case.
 
-- Add `scripts/check-tsrx-module-decls.mjs` + `pnpm tsrx-decls:check`, wired
+- Add `scripts/check-tsrx-module-decls.mjs` + `bun run tsrx-decls:check`, wired
   into `ci.yml` beside the other `:check` gates.
 - Fix the two live violations. `packages/lexical/src/tsrx-modules.d.ts` needs
   per-module `.d.ts` sidecars matching the pattern already documented in
@@ -606,7 +606,7 @@ Each diagnostic added here is a line that can leave `CLAUDE.md` permanently.
 
 **4.3: A `PreToolUse`/`PostToolUse` hook for the regeneration triggers.**
 `.claude/settings.json` hook on `Edit|Write` matching `.rulesync/**` →
-non-blocking reminder to run `pnpm rules:generate`; matching `pnpm-lock.yaml` →
+non-blocking reminder to run `bun run rules:generate`; matching `bun.lock` →
 reminder for `corpus:generate`. These are pure *triggers* (bucket P/M), and a
 hook fires them at the right moment instead of asking the model to hold them in
 context for the whole session.
@@ -701,7 +701,7 @@ runner manifest so the valid set is self-documenting and cannot drift.
 Context bloat is not a one-time cleanup; it is a slow leak. Add the gates that
 make the leak visible.
 
-**7.1: `pnpm context:budget:check`.** Fails CI if resident agent context
+**7.1: `bun run context:budget:check`.** Fails CI if resident agent context
 (`CLAUDE.md` + the frontmatter descriptions of every `.claude/skills/*`) exceeds
 a committed budget (proposal: **2,500 tokens**). Same shape as the existing
 `bundle-size` benchmark gate: a size limit on a shared resource, which this

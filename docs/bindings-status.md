@@ -1,12 +1,12 @@
 # @octanejs/\* bindings status (generated)
 
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
-     regenerate with `pnpm bindings:status`. -->
+     regenerate with `bun run bindings:status`. -->
 
 The central status table for the 109 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
-with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
+with the version in its `package.json`. CI runs `bun run bindings:status:check`,
 so a scope change that isn't reflected here fails the build.
 
 The bindings deliberately sit at different maturity levels: some have broad
@@ -200,7 +200,7 @@ SSR / hydration: Dedicated Node coverage verifies SSRProvider, labelled relation
 
 Scope/evidence last checked: 2026-09-07.
 
-- `pnpm --filter @octanejs/aria exports:check` compares the installed pinned React Aria Components declarations with the Octane components barrel in both directions.
+- `bun run --filter @octanejs/aria exports:check` compares the installed pinned React Aria Components declarations with the Octane components barrel in both directions.
 - The coordinated release has client, SSR, hydration, and React differential coverage. All 96 upstream TokenFieldValue cases also execute against both pristine source and the Octane adaptation; the broader React Spectrum suite remains recorded-unverified.
 
 See also: [`packages/aria/UPSTREAM.md`](../packages/aria/UPSTREAM.md), [`docs/aria-migration-plan.md`](aria-migration-plan.md), [`packages/aria/audit/release-1.20.0.json`](../packages/aria/audit/release-1.20.0.json)

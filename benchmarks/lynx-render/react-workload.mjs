@@ -111,7 +111,7 @@ function compileProductionApp(tempDir) {
 }
 
 export async function createReactWorkload(workload, tempDir) {
-	// ReactLynx aliases its exact internal-preact fork to `preact`. Under pnpm,
+	// ReactLynx aliases its exact internal-preact fork to `preact`. Under Bun's isolated linker,
 	// imports originating inside that fork can otherwise escape its virtual
 	// dependency and resolve the workspace's unrelated stock Preact instead.
 	// Preserve the real published fork and its ESM conditions while giving only

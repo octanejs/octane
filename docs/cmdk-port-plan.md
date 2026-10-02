@@ -206,7 +206,7 @@ validation. Each phase carries a hard exit criterion and gets a
 ## Evidence
 
 One test layer per bullet, following the sonner/nuqs layout; every test must run
-(no `skip`/`todo`/`fails` — `pnpm test:markers:check` enforces it, and
+(no `skip`/`todo`/`fails` — `bun run test:markers:check` enforces it, and
 `docs/binding-parity-gaps.md` must stay at 0 pins).
 
 - **Unit** — `command-score` scoring and `defaultFilter` against upstream
@@ -234,7 +234,7 @@ items up front — they are the easiest to miss.
 
 1. `pnpm-workspace.yaml` — add `cmdk` (and confirm `react`/`react-dom`/`esbuild`/
    `@tsrx/react`/`vitest` catalog entries exist) to `catalogs: default:`.
-2. `pnpm install` → regenerates `pnpm-lock.yaml`.
+2. `bun install` → regenerates `bun.lock`.
 3. Root `package.json` — append
    `&& tsgo --noEmit -p packages/cmdk/tsconfig.json` to the `typecheck` script.
 4. `vitest.config.js` — add the jsdom project (with `globalSetup` for
@@ -246,16 +246,16 @@ items up front — they are the easiest to miss.
 6. `website/src/content/bindings.json` — add `@octanejs/cmdk` to exactly one
    category (e.g. UI and interaction).
 7. `website/public/llms.txt` — add to the prose bindings list.
-8. `docs/packages.md` — `pnpm packages:inventory`.
-9. `docs/bindings-status.md` — `pnpm bindings:status`.
-10. `docs/binding-parity-gaps.md` — `pnpm binding-parity:gaps` (new row at 0).
-11. `packages/octane-evals` corpus — `pnpm --dir packages/octane-evals corpus:generate`
-    (required because `pnpm-lock.yaml` changed; manifests digest the lockfile).
+8. `docs/packages.md` — `bun run packages:inventory`.
+9. `docs/bindings-status.md` — `bun run bindings:status`.
+10. `docs/binding-parity-gaps.md` — `bun run binding-parity:gaps` (new row at 0).
+11. `packages/octane-evals` corpus — `bun run --cwd packages/octane-evals corpus:generate`
+    (required because `bun.lock` changed; manifests digest the lockfile).
 12. `.rulesync/rules/project.md` — add to the bindings list, then
-    `pnpm rules:generate` (regenerates `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`/
+    `bun run rules:generate` (regenerates `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`/
     copilot/cursor — never hand-edit those).
 13. `docs/cmdk-port-plan.md` — this file, referenced from `status.json` `docs`.
-14. Final gate: `pnpm format:check` (repo-wide), `pnpm typecheck`, `pnpm test`.
+14. Final gate: `bun run format:check` (repo-wide), `bun run typecheck`, `bun run test`.
 
 No changeset is required for a brand-new binding (the nuqs commit added none) —
 add one only if the port requires a fix inside `packages/octane`.

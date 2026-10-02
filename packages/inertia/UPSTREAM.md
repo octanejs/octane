@@ -8,7 +8,7 @@ The snapshot is review evidence for the Octane adapter and is excluded from the
 published package by the package manifest's `files` list. Update it only when
 intentionally moving the pinned Inertia release. It is pinned by
 `audit/upstream.lock.json`: each committed file verifies offline against its
-upstream git blob sha (`pnpm react-port:materialize run --check --package-dir
+upstream git blob sha (`bun run react-port:materialize run --check --package-dir
 packages/inertia`), and the upstream MIT license is retained byte-exact as
 `LICENSE.upstream`, hash-matched to the lock.
 

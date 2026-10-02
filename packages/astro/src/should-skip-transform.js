@@ -64,7 +64,7 @@ function isOctaneAstroIntegrationPath(clean) {
 }
 
 /**
- * Registry / pnpm layouts for packages the Octane compiler must still see.
+ * Registry / isolated-linker layouts for packages the Octane compiler must still see.
  * `@octanejs/astro` is handled by `isOctaneAstroIntegrationPath` instead.
  *
  * @param {string} clean

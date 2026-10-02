@@ -8,7 +8,7 @@ const repositoryRoot = resolve(packageRoot, '..', '..');
 const corpusRoot = join(packageRoot, 'datasets', 'train', 'user-apps-v1');
 const catalog = JSON.parse(readFileSync(join(corpusRoot, 'catalog.json'), 'utf8'));
 const { baseCommit, lockfileHash } = catalog.environment;
-const overlayLockfileHash = sha256(readFileSync(join(repositoryRoot, 'pnpm-lock.yaml')));
+const overlayLockfileHash = sha256(readFileSync(join(repositoryRoot, 'bun.lock')));
 const image = 'node@sha256:752ea8a2f758c34002a0461bd9f1cee4f9a3c36d48494586f60ffce1fc708e0e';
 const trainingSystemPrompt =
 	'Build the requested feature as a standalone Octane application. Return only the complete contents of src/App.tsrx.';
@@ -151,7 +151,7 @@ const manifests = orderedTasks.map((task) => {
 			image,
 			platform: 'linux/amd64',
 			node: '22.18.0',
-			pnpm: '11.1.1',
+			bun: '1.4.2',
 			packageVersions: selectedVersions,
 			lockfileHash,
 			overlayLockfileHash,
@@ -186,7 +186,7 @@ const manifests = orderedTasks.map((task) => {
 			publicCommands: [
 				{
 					id: 'behavior',
-					command: `pnpm --filter @octanejs/evals grade:user-app -- --task ${task.taskId} --submission .`,
+					command: `bun run --filter @octanejs/evals grade:user-app -- --task ${task.taskId} --submission .`,
 				},
 			],
 		},

@@ -24,12 +24,12 @@
 //   unmount      — tear the whole table down.
 //
 // Servers must be running first (production preview recommended):
-//   pnpm --filter octane-tsrx-dbmon-bench preview   # :5196
-//   pnpm --filter octane-jsx-dbmon-bench  preview   # :5197
-//   pnpm --filter react-dbmon-bench       preview   # :5198
-//   pnpm --filter ripple-dbmon-bench      preview   # :5199
-//   pnpm --filter solid-dbmon-bench       preview   # :5200
-//   pnpm --filter vue-vapor-dbmon-bench   preview   # :5220
+//   bun run --filter octane-tsrx-dbmon-bench preview   # :5196
+//   bun run --filter octane-jsx-dbmon-bench  preview   # :5197
+//   bun run --filter react-dbmon-bench       preview   # :5198
+//   bun run --filter ripple-dbmon-bench      preview   # :5199
+//   bun run --filter solid-dbmon-bench       preview   # :5200
+//   bun run --filter vue-vapor-dbmon-bench   preview   # :5220
 // (swap `preview` → `dev` for the unminified dev build).
 //
 // Usage:  node run.mjs [iter]   # default 30

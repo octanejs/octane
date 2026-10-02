@@ -28,7 +28,7 @@ const config: Config = {
 Re-port upstream source after updates:
 
 ```bash
-pnpm port:upstream <path-to-puck>/packages/core   # from packages/puck
+bun run port:upstream <path-to-puck>/packages/core   # from packages/puck
 ```
 
 ## Compatibility
@@ -44,7 +44,7 @@ Runs on the workspace catalog's `@dnd-kit/*@0.5.0` through `@octanejs/dnd-kit`. 
 ## Tests
 
 ```bash
-pnpm vitest run --project puck
+bunx vitest run --project puck
 ```
 
 Organized per the hook-form / react-parity contract:

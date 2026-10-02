@@ -83,7 +83,7 @@ const report = renderReport(ledger);
 if (CHECK) {
 	if (!existsSync(REPORT_PATH) || readFileSync(REPORT_PATH, 'utf8') !== report) {
 		console.error(
-			'docs/redact-adversarial-audit.md is stale — run `pnpm redact-audit:generate` and commit the result.',
+			'docs/redact-adversarial-audit.md is stale — run `bun run redact-audit:generate` and commit the result.',
 		);
 		process.exit(1);
 	}

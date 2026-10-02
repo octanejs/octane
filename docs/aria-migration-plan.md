@@ -515,8 +515,8 @@ the whole hooks tier follows the same pattern.
 - **jsdom gaps**: pointer-capture, `getBoundingClientRect` zeros, and
   ResizeObserver stubs follow the patterns already established in the radix
   Slider/ScrollArea and tanstack-virtual ports.
-- Full gates before any hand-off: `pnpm test`, `pnpm typecheck`,
-  `pnpm format:check`.
+- Full gates before any hand-off: `bun run test`, `bun run typecheck`,
+  `bun run format:check`.
 
 ## 6. Risks & open questions
 

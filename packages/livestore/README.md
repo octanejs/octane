@@ -43,4 +43,4 @@ LiveStore is Apache-2.0 licensed. This adaptation preserves that license and
 documents Octane-specific changes in this repository.
 
 Maintainers can verify the pinned evidence with
-`pnpm --dir packages/livestore upstream:verify`.
+`bun run --cwd packages/livestore upstream:verify`.

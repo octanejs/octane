@@ -289,8 +289,8 @@ together with the scalar runner. Use the combined closure for their shared cost:
 independently compressed gzip/Brotli byte counts must not be added together.
 
 Prepare an archive containing `packages/octane/src`,
-`packages/octane/package.json`, and the root `package.json`,
-`pnpm-workspace.yaml`, and `pnpm-lock.yaml` from the exact baseline revision.
+`packages/octane/package.json`, and the root `package.json` and
+`bun.lock` from the exact baseline revision.
 Preserving the package topology also keeps compiler-based checks from treating
 an isolated monorepo package as a consumer application. Pass its extracted
 package directory and the same revision:

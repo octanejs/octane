@@ -435,8 +435,8 @@ test('initial document history crosses the wire once for a matching eager root a
 				dependencyEvidence(name),
 			]),
 		),
-		lockfileSha256: hash(fs.readFileSync(path.join(REPO, 'pnpm-lock.yaml'))),
-		baselineLockfileSha256: baseline ? hash(git('show', `${BASELINE}:pnpm-lock.yaml`)) : null,
+		lockfileSha256: hash(fs.readFileSync(path.join(REPO, 'bun.lock'))),
+		baselineLockfileSha256: baseline ? hash(git('show', `${BASELINE}:bun.lock`)) : null,
 		runnerSha256: hash(fs.readFileSync(import.meta.filename)),
 		fixtureSha256: hash(authored),
 		compiler: {

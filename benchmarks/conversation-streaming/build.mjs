@@ -230,7 +230,7 @@ export async function buildFixture(outputDirectory) {
 			sourceHashes,
 			consumed,
 			runnerSha256: hash(fs.readFileSync(import.meta.filename)),
-			lockSha256: hash(fs.readFileSync(path.join(REPO, 'pnpm-lock.yaml'))),
+			lockSha256: hash(fs.readFileSync(path.join(REPO, 'bun.lock'))),
 			server: assetSizes(path.join(distDir, 'server/entry.js')),
 			compression: { gzipLevel: 9, brotliQuality: 11, perPhysicalFile: true },
 		},

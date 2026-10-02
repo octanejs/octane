@@ -58,7 +58,7 @@ const metadata = {
 	workingTree: !options.revision,
 	sourceSha256: hashOctaneSources(source.packageRoot),
 	compilerSourceSha256: hashFiles(source.packageRoot, ['src/compiler']),
-	lockfileSha256: hash(fs.readFileSync(path.join(repo, 'pnpm-lock.yaml'))),
+	lockfileSha256: hash(fs.readFileSync(path.join(repo, 'bun.lock'))),
 	harnessSha256: hashFiles(repo, harnessFiles),
 	node: process.version,
 	platform: process.platform,
@@ -229,7 +229,7 @@ try {
 		'Harness changed during measurements',
 	);
 	assert.equal(
-		hash(fs.readFileSync(path.join(repo, 'pnpm-lock.yaml'))),
+		hash(fs.readFileSync(path.join(repo, 'bun.lock'))),
 		metadata.lockfileSha256,
 		'Lockfile changed during measurements',
 	);

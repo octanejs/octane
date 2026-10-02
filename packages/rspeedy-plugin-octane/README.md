@@ -28,7 +28,7 @@ Android Explorer, or iOS Explorer, or state-preserving HMR on those targets.
 On macOS arm64 or x64, the native acceptance path is one command:
 
 ```bash
-pnpm lynx:demo:native
+bun run lynx:demo:native
 ```
 
 The launcher selects the matching official Lynx 3.9.0 macOS Explorer artifact,
@@ -49,7 +49,7 @@ run `codesign`; integrity comes from the pinned release URL and checksum.
 For an Android/iOS device, simulator, or a separately installed Explorer, run:
 
 ```bash
-pnpm lynx:demo
+bun run lynx:demo
 ```
 
 The command starts the pinned Rspeedy development server, builds
@@ -172,7 +172,7 @@ and production builds prove that peer is compatible. The current registry check
 recomputes the newest versions selected by the upstream build graph before
 accepting the recorded graph.
 
-`pnpm test:compat` packs Octane, the Lynx renderer, and both compiler plugins,
+`bun run test:compat` packs Octane, the Lynx renderer, and both compiler plugins,
 then installs each lane into an external temporary consumer without creating a
 lockfile. It checks exact versions and dependency edges, one physical core
 graph, strict build-tool peer satisfaction, the absence of DOM and

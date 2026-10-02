@@ -6,7 +6,7 @@
 // produce docs/bindings-status.md keeps `octane bindings`, `octane add`, and
 // `octane explain` from drifting into a hand-maintained second copy.
 //
-// Regenerate with `pnpm cli:data`; CI runs `pnpm cli:data:check`.
+// Regenerate with `bun run cli:data`; CI runs `bun run cli:data:check`.
 
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -76,7 +76,7 @@ const data = {
 };
 
 // Formatted through prettier, because generated baselines share the repo-wide
-// `pnpm format:check` gate. Emitting hand-chosen indentation here would make the
+// `bun run format:check` gate. Emitting hand-chosen indentation here would make the
 // two gates contradict each other.
 const serialized = await format(JSON.stringify(data), {
 	...(await resolveConfig(OUTPUT)),
@@ -91,7 +91,7 @@ if (process.argv.includes('--check')) {
 		// Treated as a mismatch below.
 	}
 	if (current !== serialized) {
-		console.error(`${path.relative(REPO, OUTPUT)} is out of date. Run \`pnpm cli:data\`.`);
+		console.error(`${path.relative(REPO, OUTPUT)} is out of date. Run \`bun run cli:data\`.`);
 		process.exit(1);
 	}
 	console.log(`${path.relative(REPO, OUTPUT)} is up to date.`);

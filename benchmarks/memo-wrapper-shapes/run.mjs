@@ -27,7 +27,7 @@ if (suppliedDist && (suppliedClient || suppliedServer)) {
 	throw new Error('Use BENCH_DIST_DIR or the two runtime URLs, not both.');
 }
 if (!suppliedDist && !suppliedClient && !suppliedServer) {
-	const build = spawnSync('pnpm', ['--filter', 'octane', 'build'], {
+	const build = spawnSync('bun', ['run', '--filter', 'octane', 'build'], {
 		cwd: REPO,
 		stdio: 'inherit',
 	});

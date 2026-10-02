@@ -1524,8 +1524,8 @@ export function renderCoverageReport({ upstreams, inventories, ledger }) {
 	const ledgerById = new Map(ledger.entries.map((entry) => [entry.caseId, entry]));
 	let markdown = `# React parity coverage (generated)\n\n`;
 	markdown += `<!-- GENERATED FILE — do not edit. Refresh with:\n`;
-	markdown += `pnpm react-parity:generate -- --baseline stable --react-root /path/to/react-v19.2.7\n`;
-	markdown += `pnpm react-parity:generate -- --baseline canary --react-root /path/to/react-main\n`;
+	markdown += `bun run react-parity:generate -- --baseline stable --react-root /path/to/react-v19.2.7\n`;
+	markdown += `bun run react-parity:generate -- --baseline canary --react-root /path/to/react-main\n`;
 	markdown += `-->\n\n`;
 	markdown += `This report separates distinct Octane tests, React upstream scenarios, renderer/mode registrations, and CI executions. Those numbers are different units and must not be added together or described interchangeably as “ported React tests.”\n\n`;
 	markdown += `## Octane test baseline\n\n`;

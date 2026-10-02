@@ -88,7 +88,7 @@ and expose the same button + table contract:
 
 ```bash
 # 1. From the repo root, install + sync workspaces:
-pnpm install
+bun install
 
 # 2. Production-build, preview, and drive all eight targets:
 node benchmarks/bench.mjs --quick js-framework js-framework-reorder
@@ -161,8 +161,8 @@ a wall-time or measured heap-allocation comparison.
 ```bash
 # From the repo root, build the separate fixture under the ignored
 # octane-tsrx/dist/unkeyed-work directory:
-pnpm --filter octane-tsrx-jsbench exec vite build --config vite.config.unkeyed.js
-pnpm --filter octane-tsrx-jsbench exec vite preview --config vite.config.unkeyed.js --host 127.0.0.1 --port 5316 --strictPort
+bun run --filter octane-tsrx-jsbench exec vite build --config vite.config.unkeyed.js
+bun run --filter octane-tsrx-jsbench exec vite preview --config vite.config.unkeyed.js --host 127.0.0.1 --port 5316 --strictPort
 
 # In another terminal, require the numeric-key candidate:
 WORK_MODE=unkeyed WORK_REQUIRE_NUMERIC=1 TARGET_URL=http://127.0.0.1:5316/unkeyed-work.html node benchmarks/js-framework/style-work.mjs
@@ -510,7 +510,7 @@ Run it against the same eight targets as `run.mjs`:
 ```bash
 node run-reorder.mjs           # 8 iterations
 node run-reorder.mjs 16        # longer sample
-# or: pnpm --filter octane-js-framework-benchmarks bench:reorder
+# or: bun run --filter octane-js-framework-benchmarks bench:reorder
 ```
 
 A bad number here points at `reconcileKeyed` (`packages/octane/src/runtime.ts`):
@@ -566,7 +566,7 @@ octane's compiler optimizes (both dialects compile to the same output):
   code size and `optimize` flags are NOT what you'd ship — useful for iteration,
   not for absolute scoring.
 - For "publishable" numbers, build first
-  (`pnpm --filter octane-tsrx-jsbench build`, likewise `octane-jsx-jsbench`),
-  then `pnpm --filter octane-tsrx-jsbench preview` to serve the production output,
+  (`bun run --filter octane-tsrx-jsbench build`, likewise `octane-jsx-jsbench`),
+  then `bun run --filter octane-tsrx-jsbench preview` to serve the production output,
   then run the harness against that.
 - Chromium is the default browser; results on Firefox / WebKit differ.

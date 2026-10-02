@@ -121,7 +121,7 @@ output.set(
 	) + '\n',
 );
 await mkdir(outputDir, { recursive: true });
-// pnpm does not expose the transitive scheduler dependency at repository root.
+// Bun's isolated linker does not expose the transitive scheduler dependency at repository root.
 // Reuse this exact installation's dependencies without installing or copying
 // them; React must resolve to the same module instance as the fixture imports.
 await mkdir(path.join(outputDir, 'node_modules'), { recursive: true });

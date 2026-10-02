@@ -29,7 +29,7 @@
 // that cleared the wrong span usually throws) and fails the run.
 //
 // Server must be running first (production preview recommended):
-//   pnpm --filter octane-tsrx-list-clear-bench preview   # :5298
+//   bun run --filter octane-tsrx-list-clear-bench preview   # :5298
 // (swap `preview` → `dev` for the unminified dev build).
 //
 // Usage:  node run.mjs [iter]   # default 20

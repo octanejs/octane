@@ -272,7 +272,7 @@ In this repository:
 
 ## Packages
 
-This is a pnpm monorepo. [`docs/packages.md`](./docs/packages.md) is the
+This is a Bun workspace monorepo. [`docs/packages.md`](./docs/packages.md) is the
 generated inventory; the shape of it is:
 
 - [`octane`](./packages/octane) is the runtime and the compiler together:
@@ -327,9 +327,9 @@ Bug reports, regression tests, docs, bindings, and core fixes are all welcome.
 test policy, the generated files, and how pull requests are labelled and landed.
 
 ```bash
-pnpm install
-pnpm test
-pnpm typecheck
+bun install
+bun run test
+bun run typecheck
 ```
 
 ## License

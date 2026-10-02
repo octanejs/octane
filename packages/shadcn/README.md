@@ -20,7 +20,7 @@ Upstream pin: `shadcn-ui/ui@7c9eaba1` + CLI `shadcn@4.21.0`.
   tokens (`@octanejs/shadcn/theme.css`).
 - **Two consumption modes**: import from the package subpaths, or install
   components AS SOURCE with the upstream shadcn CLI against the generated
-  registry (`registry/` — `pnpm registry:build` / `registry:check`).
+  registry (`registry/` — `bun run registry:build` / `registry:check`).
 - **Three primitive bases in one registry**, selected the way shadcn selects its
   own: `components.json`'s `style` field, substituted into the registry URL. See
   [Installing with the shadcn CLI](#installing-with-the-shadcn-cli).
@@ -116,7 +116,7 @@ adaptations and styling remain intact; `@octanejs/shadcn/cn` re-exports the same
 
 <!-- END COVERAGE -->
 
-The table is generated from the sources by `pnpm coverage:build` and gated by `coverage:check`,
+The table is generated from the sources by `bun run coverage:build` and gated by `coverage:check`,
 so it cannot drift as families land.
 
 ## Installing with the shadcn CLI
@@ -161,8 +161,8 @@ A registry URL without the `{style}` segment resolves to the default style, so
 ### Serving it locally
 
 ```bash
-pnpm --dir packages/shadcn registry:build   # regenerate from src/
-pnpm --dir packages/shadcn registry:serve   # http://localhost:4517
+bun run --cwd packages/shadcn registry:build   # regenerate from src/
+bun run --cwd packages/shadcn registry:serve   # http://localhost:4517
 ```
 
 Then point `components.json` at `http://localhost:4517/styles/{style}/{name}.json`, which is

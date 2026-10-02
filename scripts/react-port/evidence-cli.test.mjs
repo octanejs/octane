@@ -132,8 +132,8 @@ test('mixed cleanup binds type projects and crosswalks to the same pinned copied
 		assertApprovedGateCommand(
 			['upstream-types-pristine'],
 			[
-				'pnpm',
-				'exec',
+				'bun',
+				'x',
 				'tsc',
 				'--noEmit',
 				'-p',
@@ -393,9 +393,9 @@ function createReadyBatch({ cleanRoomDependency = false, workRootPath = '.react-
 	);
 	const fixtureBin = path.join(workspaceRoot, '.fixture-bin');
 	mkdirSync(fixtureBin);
-	const fixturePnpm = path.join(fixtureBin, 'pnpm');
+	const fixtureBun = path.join(fixtureBin, 'bun');
 	writeFileSync(
-		fixturePnpm,
+		fixtureBun,
 		`#!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, writeFileSync } from 'node:fs';
@@ -442,7 +442,7 @@ if (process.env.FIXTURE_STDERR) process.stderr.write(process.env.FIXTURE_STDERR)
 process.exit(Number(process.env.FIXTURE_EXIT ?? 0));
 `,
 	);
-	chmodSync(fixturePnpm, 0o755);
+	chmodSync(fixtureBun, 0o755);
 	return { workspaceRoot, workRoot, batchDirectory };
 }
 
@@ -686,7 +686,7 @@ describe('evidence CLI', () => {
 	test('maps every command gate family to a specific repository command', () => {
 		const node = { bindingDirectory: 'packages/widget' };
 		for (const [gateIds, command] of [
-			[['package-tests'], ['pnpm', '--dir', 'packages/widget', 'test']],
+			[['package-tests'], ['bun', 'run', '--cwd', 'packages/widget', 'test']],
 			[
 				['public-exports'],
 				['node', 'scripts/react-port/public-exports.mjs', '--package-dir', 'packages/widget'],
@@ -703,20 +703,13 @@ describe('evidence CLI', () => {
 			],
 			[
 				['upstream-types-pristine'],
-				[
-					'pnpm',
-					'exec',
-					'tsc',
-					'--noEmit',
-					'-p',
-					'packages/widget/typetests/tsconfig.pristine.json',
-				],
+				['bun', 'x', 'tsc', '--noEmit', '-p', 'packages/widget/typetests/tsconfig.pristine.json'],
 			],
 			[
 				['upstream-types-adapted'],
 				[
-					'pnpm',
-					'exec',
+					'bun',
+					'x',
 					'tsrx-tsc',
 					'--noEmit',
 					'-p',
@@ -725,14 +718,14 @@ describe('evidence CLI', () => {
 			],
 			[
 				['public-types'],
-				['pnpm', 'exec', 'tsrx-tsc', '--noEmit', '-p', 'packages/widget/tests/types/tsconfig.json'],
+				['bun', 'x', 'tsrx-tsc', '--noEmit', '-p', 'packages/widget/tests/types/tsconfig.json'],
 			],
 			[
 				['packed-source-types-node', 'packed-source-types-browser', 'package-pack'],
-				['pnpm', 'packages:pack:check'],
+				['bun', 'run', 'packages:pack:check'],
 			],
-			[['generated-data'], ['pnpm', 'sync']],
-			[['format'], ['pnpm', 'format:check']],
+			[['generated-data'], ['bun', 'run', 'sync']],
+			[['format'], ['bun', 'run', 'format:check']],
 		]) {
 			assert.doesNotThrow(() => assertApprovedGateCommand(gateIds, command, node));
 		}
@@ -740,7 +733,7 @@ describe('evidence CLI', () => {
 			() =>
 				assertApprovedGateCommand(
 					['package-tests', 'format'],
-					['pnpm', '--dir', 'packages/widget', 'test'],
+					['bun', 'run', '--cwd', 'packages/widget', 'test'],
 					node,
 				),
 			/approved command for format/i,
@@ -750,8 +743,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['upstream-types-pristine'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsrx-tsc',
 						'--noEmit',
 						'-p',
@@ -765,14 +758,7 @@ describe('evidence CLI', () => {
 			() =>
 				assertApprovedGateCommand(
 					['upstream-types-adapted'],
-					[
-						'pnpm',
-						'exec',
-						'tsc',
-						'--noEmit',
-						'-p',
-						'packages/widget/typetests/tsconfig.adapted.json',
-					],
+					['bun', 'x', 'tsc', '--noEmit', '-p', 'packages/widget/typetests/tsconfig.adapted.json'],
 					node,
 				),
 			/approved command for upstream-types-adapted/i,
@@ -793,7 +779,7 @@ describe('evidence CLI', () => {
 		assert.doesNotThrow(() =>
 			assertApprovedGateCommand(
 				['authored-source-types'],
-				['pnpm', 'exec', 'tsrx-tsc', '--noEmit', '-p', 'packages/widget/tsconfig.json'],
+				['bun', 'x', 'tsrx-tsc', '--noEmit', '-p', 'packages/widget/tsconfig.json'],
 				node,
 				validation,
 			),
@@ -806,7 +792,7 @@ describe('evidence CLI', () => {
 			() =>
 				assertApprovedGateCommand(
 					['authored-source-types'],
-					['pnpm', 'exec', 'tsrx-tsc', '--noEmit', '-p', 'packages/widget/tsconfig.json'],
+					['bun', 'x', 'tsrx-tsc', '--noEmit', '-p', 'packages/widget/tsconfig.json'],
 					node,
 					validation,
 				),
@@ -824,7 +810,7 @@ describe('evidence CLI', () => {
 			() =>
 				assertApprovedGateCommand(
 					['authored-source-types'],
-					['pnpm', 'exec', 'tsrx-tsc', '--noEmit', '-p', 'packages/widget/tsconfig.json'],
+					['bun', 'x', 'tsrx-tsc', '--noEmit', '-p', 'packages/widget/tsconfig.json'],
 					node,
 					validation,
 				),
@@ -840,7 +826,7 @@ describe('evidence CLI', () => {
 			() =>
 				assertApprovedGateCommand(
 					['package-tests'],
-					['pnpm', '--dir', 'packages/widget', 'test'],
+					['bun', 'run', '--cwd', 'packages/widget', 'test'],
 					node,
 					validation,
 				),
@@ -861,8 +847,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['upstream-types-pristine'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsc',
 						'--noEmit',
 						'-p',
@@ -900,8 +886,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['public-types'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsrx-tsc',
 						'--noEmit',
 						'-p',
@@ -945,8 +931,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['upstream-types-pristine'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsc',
 						'--noEmit',
 						'-p',
@@ -966,8 +952,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['upstream-types-pristine'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsc',
 						'--noEmit',
 						'-p',
@@ -986,8 +972,8 @@ describe('evidence CLI', () => {
 			assertApprovedGateCommand(
 				['upstream-types-pristine'],
 				[
-					'pnpm',
-					'exec',
+					'bun',
+					'x',
 					'tsc',
 					'--noEmit',
 					'-p',
@@ -1015,8 +1001,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['public-types'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsrx-tsc',
 						'--noEmit',
 						'-p',
@@ -1041,8 +1027,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['public-types'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsrx-tsc',
 						'--noEmit',
 						'-p',
@@ -1095,8 +1081,8 @@ describe('evidence CLI', () => {
 			assertApprovedGateCommand(
 				['public-types'],
 				[
-					'pnpm',
-					'exec',
+					'bun',
+					'x',
 					'tsrx-tsc',
 					'--noEmit',
 					'-p',
@@ -1129,8 +1115,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['public-types'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsrx-tsc',
 						'--noEmit',
 						'-p',
@@ -1211,8 +1197,8 @@ describe('evidence CLI', () => {
 			assertApprovedGateCommand(
 				['public-types'],
 				[
-					'pnpm',
-					'exec',
+					'bun',
+					'x',
 					'tsrx-tsc',
 					'--noEmit',
 					'-p',
@@ -1277,8 +1263,8 @@ describe('evidence CLI', () => {
 					assertApprovedGateCommand(
 						['public-types'],
 						[
-							'pnpm',
-							'exec',
+							'bun',
+							'x',
 							'tsrx-tsc',
 							'--noEmit',
 							'-p',
@@ -1313,8 +1299,8 @@ describe('evidence CLI', () => {
 			assertApprovedGateCommand(
 				['public-types'],
 				[
-					'pnpm',
-					'exec',
+					'bun',
+					'x',
 					'tsrx-tsc',
 					'--noEmit',
 					'-p',
@@ -1348,8 +1334,8 @@ describe('evidence CLI', () => {
 					assertApprovedGateCommand(
 						['public-types'],
 						[
-							'pnpm',
-							'exec',
+							'bun',
+							'x',
 							'tsrx-tsc',
 							'--noEmit',
 							'-p',
@@ -1381,8 +1367,8 @@ describe('evidence CLI', () => {
 			assertApprovedGateCommand(
 				['public-types'],
 				[
-					'pnpm',
-					'exec',
+					'bun',
+					'x',
 					'tsrx-tsc',
 					'--noEmit',
 					'-p',
@@ -1416,8 +1402,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['public-types'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsrx-tsc',
 						'--noEmit',
 						'-p',
@@ -1437,8 +1423,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['public-types'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsrx-tsc',
 						'--noEmit',
 						'-p',
@@ -1458,8 +1444,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['public-types'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsrx-tsc',
 						'--noEmit',
 						'-p',
@@ -1478,8 +1464,8 @@ describe('evidence CLI', () => {
 			assertApprovedGateCommand(
 				['public-types'],
 				[
-					'pnpm',
-					'exec',
+					'bun',
+					'x',
 					'tsrx-tsc',
 					'--noEmit',
 					'-p',
@@ -1505,8 +1491,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['upstream-types-pristine'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsc',
 						'--noEmit',
 						'-p',
@@ -1531,8 +1517,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['upstream-types-pristine'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsc',
 						'--noEmit',
 						'-p',
@@ -1564,8 +1550,8 @@ describe('evidence CLI', () => {
 					assertApprovedGateCommand(
 						['public-types'],
 						[
-							'pnpm',
-							'exec',
+							'bun',
+							'x',
 							'tsrx-tsc',
 							'--noEmit',
 							'-p',
@@ -1646,8 +1632,8 @@ describe('evidence CLI', () => {
 			assertApprovedGateCommand(
 				['public-types'],
 				[
-					'pnpm',
-					'exec',
+					'bun',
+					'x',
 					'tsrx-tsc',
 					'--noEmit',
 					'-p',
@@ -1677,8 +1663,8 @@ describe('evidence CLI', () => {
 		);
 
 		const command = [
-			'pnpm',
-			'exec',
+			'bun',
+			'x',
 			'tsrx-tsc',
 			'--noEmit',
 			'-p',
@@ -1716,8 +1702,8 @@ describe('evidence CLI', () => {
 			"import * as Widget from '@octanejs/widget';\nWidget.widget satisfies boolean;\n// @ts-expect-error widget is not callable\nWidget.widget();\n",
 		);
 		const command = [
-			'pnpm',
-			'exec',
+			'bun',
+			'x',
 			'tsrx-tsc',
 			'--noEmit',
 			'-p',
@@ -1755,8 +1741,8 @@ describe('evidence CLI', () => {
 				assertApprovedGateCommand(
 					['public-types'],
 					[
-						'pnpm',
-						'exec',
+						'bun',
+						'x',
 						'tsrx-tsc',
 						'--noEmit',
 						'-p',
@@ -1783,8 +1769,8 @@ describe('evidence CLI', () => {
 			upstreamTestInventory: [],
 		};
 		const command = [
-			'pnpm',
-			'exec',
+			'bun',
+			'x',
 			'tsrx-tsc',
 			'--noEmit',
 			'-p',
@@ -1867,8 +1853,9 @@ describe('evidence CLI', () => {
 			'--gate',
 			'package-tests',
 			'--',
-			'pnpm',
-			'--dir',
+			'bun',
+			'run',
+			'--cwd',
 			'packages/widget',
 			'test',
 		]);
@@ -1902,8 +1889,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -1932,8 +1920,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -1976,8 +1965,9 @@ describe('evidence CLI', () => {
 					'--gate',
 					'package-tests',
 					'--',
-					'pnpm',
-					'--dir',
+					'bun',
+					'run',
+					'--cwd',
 					'packages/widget',
 					'test',
 				],
@@ -2011,8 +2001,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2051,8 +2042,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2088,8 +2080,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2127,8 +2120,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2172,8 +2166,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2220,8 +2215,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2314,8 +2310,9 @@ describe('evidence CLI', () => {
 					'--gate',
 					'package-tests',
 					'--',
-					'pnpm',
-					'--dir',
+					'bun',
+					'run',
+					'--cwd',
 					'packages/widget',
 					'test',
 				],
@@ -2376,8 +2373,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2417,8 +2415,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2456,8 +2455,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2498,8 +2498,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2533,8 +2534,9 @@ describe('evidence CLI', () => {
 			'--gate',
 			'package-tests',
 			'--',
-			'pnpm',
-			'--dir',
+			'bun',
+			'run',
+			'--cwd',
 			'packages/widget',
 			'test',
 		]);
@@ -2563,8 +2565,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2596,8 +2599,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2619,7 +2623,7 @@ describe('evidence CLI', () => {
 			try {
 				assertApprovedGateCommand(
 					['package-tests'],
-					['pnpm', '--dir', `packages/${directory}`, 'test'],
+					['bun', 'run', '--cwd', `packages/${directory}`, 'test'],
 					{ bindingDirectory: `packages/${directory}` },
 					{ workspaceRoot },
 				);
@@ -2651,8 +2655,9 @@ describe('evidence CLI', () => {
 			'--gate',
 			'package-tests',
 			'--',
-			'pnpm',
-			'--dir',
+			'bun',
+			'run',
+			'--cwd',
 			'packages/widget',
 			'test',
 		]);
@@ -2679,8 +2684,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2721,8 +2727,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2765,8 +2772,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2810,7 +2818,7 @@ describe('evidence CLI', () => {
 		);
 	});
 
-	test('accepts one leading pnpm separator while preserving the run command separator', () => {
+	test('accepts one leading script separator while preserving the run command separator', () => {
 		const { workspaceRoot, workRoot, batchDirectory } = createReadyBatch();
 		const common = ['--work-root', workRoot, '--batch', 'fixture-batch', '--node', 'pkg:widget'];
 		const initialized = runEvidence(['--', 'init', ...common, '--category', 'thin-core']);
@@ -2825,8 +2833,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2854,8 +2863,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2891,8 +2901,9 @@ describe('evidence CLI', () => {
 			'--gate',
 			'package-tests',
 			'--',
-			'pnpm',
-			'--dir',
+			'bun',
+			'run',
+			'--cwd',
 			'packages/widget',
 			'test',
 		]);
@@ -2913,8 +2924,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -2939,7 +2951,7 @@ describe('evidence CLI', () => {
 			'--status',
 			'passed',
 			'--command',
-			'pnpm typecheck',
+			'bun run typecheck',
 			'--observed',
 			'claimed pass',
 		]);
@@ -3064,8 +3076,8 @@ describe('evidence CLI', () => {
 					'--gate',
 					'authored-source-types',
 					'--',
-					'pnpm',
-					'exec',
+					'bun',
+					'x',
 					'tsrx-tsc',
 					'--noEmit',
 					'-p',
@@ -3095,8 +3107,8 @@ describe('evidence CLI', () => {
 				'--gate',
 				'authored-source-types',
 				'--',
-				'pnpm',
-				'exec',
+				'bun',
+				'x',
 				'tsrx-tsc',
 				'--noEmit',
 				'-p',
@@ -3126,8 +3138,9 @@ describe('evidence CLI', () => {
 				'--gate',
 				'package-tests',
 				'--',
-				'pnpm',
-				'--dir',
+				'bun',
+				'run',
+				'--cwd',
 				'packages/widget',
 				'test',
 			],
@@ -3161,7 +3174,8 @@ describe('evidence CLI', () => {
 				'--gate',
 				'packed-source-types-node',
 				'--',
-				'pnpm',
+				'bun',
+				'run',
 				'packages:pack:check',
 			],
 			{ env: { FIXTURE_COUNTER: counterPath, FIXTURE_STDOUT: 'both packed projects passed' } },
@@ -3187,8 +3201,8 @@ describe('evidence CLI', () => {
 				'--gate',
 				'upstream-types-adapted',
 				'--',
-				'pnpm',
-				'exec',
+				'bun',
+				'x',
 				'tsrx-tsc',
 				'--noEmit',
 				'-p',
@@ -3505,7 +3519,7 @@ describe('evidence CLI', () => {
 		const inputRoot = mkdtempSync(path.join(tmpdir(), 'react-port-evidence-success-'));
 		const packageDirectory = createCompletePackage(workspaceRoot);
 		for (const [gateId, commandArguments] of [
-			['package-tests', ['pnpm', '--dir', 'packages/widget', 'test']],
+			['package-tests', ['bun', 'run', '--cwd', 'packages/widget', 'test']],
 			[
 				'public-exports',
 				['node', 'scripts/react-port/public-exports.mjs', '--package-dir', 'packages/widget'],
@@ -3513,8 +3527,8 @@ describe('evidence CLI', () => {
 			[
 				'upstream-types-pristine',
 				[
-					'pnpm',
-					'exec',
+					'bun',
+					'x',
 					'tsc',
 					'--noEmit',
 					'-p',
@@ -3524,8 +3538,8 @@ describe('evidence CLI', () => {
 			[
 				'upstream-types-adapted',
 				[
-					'pnpm',
-					'exec',
+					'bun',
+					'x',
 					'tsrx-tsc',
 					'--noEmit',
 					'-p',
@@ -3534,13 +3548,13 @@ describe('evidence CLI', () => {
 			],
 			[
 				'authored-source-types',
-				['pnpm', 'exec', 'tsrx-tsc', '--noEmit', '-p', 'packages/widget/tsconfig.json'],
+				['bun', 'x', 'tsrx-tsc', '--noEmit', '-p', 'packages/widget/tsconfig.json'],
 			],
 			[
 				'public-types',
 				[
-					'pnpm',
-					'exec',
+					'bun',
+					'x',
 					'tsrx-tsc',
 					'--noEmit',
 					'-p',

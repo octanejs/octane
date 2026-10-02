@@ -23,7 +23,7 @@ const profileAllocations = allocationProfilePath !== undefined;
 
 const DIST = path.resolve(process.env.BENCH_OCTANE_DIST ?? path.join(REPO, 'packages/octane/dist'));
 if (!process.env.BENCH_OCTANE_DIST) {
-	const build = spawnSync('pnpm', ['--filter', 'octane', 'build'], {
+	const build = spawnSync('bun', ['run', '--filter', 'octane', 'build'], {
 		cwd: REPO,
 		stdio: 'inherit',
 	});

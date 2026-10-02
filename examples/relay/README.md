@@ -14,7 +14,7 @@ All names, messages, network timing, and incoming events are local fixtures.
 From this directory:
 
 ```bash
-pnpm dev
+bun run dev
 ```
 
 Open `http://127.0.0.1:5224/channels/general`. The dev command runs Vite as
@@ -25,9 +25,9 @@ boundary.
 The maintained gates are:
 
 ```bash
-pnpm typecheck
-pnpm build
-pnpm test:e2e
+bun run typecheck
+bun run build
+bun run test:e2e
 ```
 
 `test:e2e` builds the production client, starts `server.mjs` with

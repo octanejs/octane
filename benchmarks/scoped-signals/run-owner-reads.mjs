@@ -216,12 +216,7 @@ try {
 		['baseline', baselineRoot],
 		['candidate', REPO],
 	]) {
-		for (const file of [
-			'package.json',
-			'pnpm-workspace.yaml',
-			'pnpm-lock.yaml',
-			'packages/octane/package.json',
-		])
+		for (const file of ['package.json', 'bun.lock', 'packages/octane/package.json'])
 			read(path.join(root, file));
 		const manifest = JSON.parse(read(path.join(root, 'packages/octane/package.json')));
 		assert.equal(manifest.name, 'octane');

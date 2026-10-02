@@ -5,7 +5,7 @@
 On an arm64 or x64 Mac, run:
 
 ```bash
-pnpm lynx:demo:native
+bun run lynx:demo:native
 ```
 
 This downloads the matching official Lynx 3.9.0 Explorer archive into
@@ -30,7 +30,7 @@ for Android or iOS acceptance.
 From the repository root, run:
 
 ```bash
-pnpm lynx:demo
+bun run lynx:demo
 ```
 
 Rspeedy compiles the Octane application, serves `main.lynx.bundle`, and prints
@@ -53,7 +53,7 @@ application host.
 Useful non-interactive checks:
 
 ```bash
-pnpm lynx:demo:typecheck
-pnpm lynx:demo:build
-pnpm lynx:demo:check
+bun run lynx:demo:typecheck
+bun run lynx:demo:build
+bun run lynx:demo:check
 ```

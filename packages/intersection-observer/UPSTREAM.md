@@ -13,7 +13,7 @@ authored source and tests. The canonical tag's tree is therefore committed
 byte-exact under `upstream/` and pinned by `audit/upstream.lock.json`, which
 records each file's git blob sha — its content address in the upstream
 repository — so the committed copy verifies offline against the pinned commit
-(`pnpm react-port:materialize run --check`). The adapted suite regenerates into
+(`bun run react-port:materialize run --check`). The adapted suite regenerates into
 `tests/upstream/` (git-ignored) from the pristine bytes plus the lock's
 mechanical `adaptedRewrites` and the committed divergence patches in
 `audit/upstream-patches/`; a mapped file with no patch runs byte-identical to

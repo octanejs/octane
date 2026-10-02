@@ -2,7 +2,7 @@
 // per-suite number load-bearing.
 //
 // It knows how to, for each suite: production-build the fixture apps, start
-// their preview servers (pnpm --filter <pkg> preview), wait for their strict
+// their preview servers (bun run --filter <pkg> preview), wait for their strict
 // ports, run the suite's harness with BENCH_JSON pointed at a temp file, collect
 // the machine-readable results, then kill the servers by port. Suites run
 // SEQUENTIALLY so ports and CPU never contend. The collected JSON per suite
@@ -1548,7 +1548,7 @@ function buildServer(filter, logDir) {
 	if (builtServerFilters.has(filter)) return;
 	const logPath = path.join(logDir, `build-${filter}.log`);
 	const logFd = fs.openSync(logPath, 'w');
-	const res = spawnSync('pnpm', ['--filter', filter, 'build'], {
+	const res = spawnSync('bun', ['run', '--filter', filter, 'build'], {
 		cwd: REPO,
 		stdio: ['ignore', logFd, logFd],
 	});
@@ -1561,7 +1561,7 @@ function buildServer(filter, logDir) {
 	builtServerFilters.add(filter);
 }
 
-// Start `pnpm --filter <filter> preview` detached, logging to the results dir.
+// Start `bun run --filter <filter> preview` detached, logging to the results dir.
 // The corresponding `build` has already run, so browser suites compare
 // production bundles instead of Vite's dev transform/runtime. We track BOTH the
 // child (to signal its process group) and the port (the reliable kill handle —
@@ -1570,7 +1570,7 @@ function buildServer(filter, logDir) {
 function startServer(filter, port, logDir) {
 	const logPath = path.join(logDir, `server-${port}.log`);
 	const logFd = fs.openSync(logPath, 'w');
-	const child = spawn('pnpm', ['--filter', filter, 'preview'], {
+	const child = spawn('bun', ['run', '--filter', filter, 'preview'], {
 		cwd: REPO,
 		detached: true,
 		stdio: ['ignore', logFd, logFd],

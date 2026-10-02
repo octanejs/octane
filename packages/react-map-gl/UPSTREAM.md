@@ -213,5 +213,5 @@ Four, two of them recorded in `audit/react-parity.json` and bound to a case:
 
 `node scripts/generate-parity-manifest.mjs` rebuilds `audit/react-parity.json`
 and the runtime inventories from actual Vitest runs. Editing a lane file without
-rerunning it fails `pnpm react-parity:check` on the integrity hash, which is the
+rerunning it fails `bun run react-parity:check` on the integrity hash, which is the
 point.

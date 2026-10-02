@@ -48,9 +48,9 @@ rendering modes.
 From the repository root:
 
 ```bash
-pnpm --dir examples/flowboard typecheck
-pnpm --dir examples/flowboard build
-pnpm --dir examples/flowboard test:e2e
+bun run --cwd examples/flowboard typecheck
+bun run --cwd examples/flowboard build
+bun run --cwd examples/flowboard test:e2e
 ```
 
 `test:e2e` builds first and drives the production Vite preview. To point the suite

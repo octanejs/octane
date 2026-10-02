@@ -47,24 +47,25 @@ jobs:
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           git worktree add --detach "$RUNNER_TEMP/base" "$BASE_SHA"
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
-          cache: "pnpm"
 
       - name: Install dependencies
         run: |
-          pnpm install --prod false --frozen-lockfile
-          pnpm --dir "$BASE_TREE" install --prod false --frozen-lockfile
+          bun install --frozen-lockfile
+          bun install --cwd "$BASE_TREE" --frozen-lockfile \
+            || echo "::warning::base install failed; the report omits base results"
 
       - name: Install Playwright Chromium
         run: |
-          pnpm --filter octane-js-framework-benchmarks exec playwright install --with-deps chromium
-          pnpm --dir "$BASE_TREE" --filter octane-js-framework-benchmarks exec playwright install chromium
+          bun run --cwd benchmarks/js-framework playwright install --with-deps chromium
+          bun run --cwd "$BASE_TREE/benchmarks/js-framework" playwright install chromium \
+            || echo "::warning::base Playwright install failed"
 
       # A failing suite is recorded in its result JSON and rendered in the
       # report, so both trees always run to completion before the verdict.

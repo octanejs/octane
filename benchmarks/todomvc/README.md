@@ -73,9 +73,9 @@ Every interaction checks keyed row identity, the selected filter, footer counts,
 editor behavior, and controlled-checkbox restoration:
 
 ```bash
-pnpm --filter octane-tsrx-todomvc exec vite build --minify false
-pnpm --filter octane-tsrx-todomvc preview
-pnpm --dir benchmarks/todomvc bench:work
+bun run --filter octane-tsrx-todomvc exec vite build --minify false
+bun run --filter octane-tsrx-todomvc preview
+bun run --cwd benchmarks/todomvc bench:work
 ```
 
 `TARGET_URL` overrides the preview address, and `WORK_JSON` saves the measured

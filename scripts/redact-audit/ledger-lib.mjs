@@ -367,7 +367,7 @@ function validateEvidence(evidenceValue, label, errors, repoRoot) {
 							.map((file) => readFileSync(path.join(workflowsDirectory, file), 'utf8'))
 					: [];
 				const invocation = new RegExp(
-					`\\bpnpm\\s+${evidence.script.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`,
+					`\\bbun\\s+run\\s+${evidence.script.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`,
 				);
 				if (!workflowSources.some((source) => invocation.test(source)))
 					errors.push(
@@ -948,7 +948,7 @@ function referenceMarkdown(reference) {
 function evidenceMarkdown(evidence) {
 	const executable =
 		evidence.kind === 'command'
-			? `command: \`pnpm ${evidence.script}\``
+			? `command: \`bun run ${evidence.script}\``
 			: localFileMarkdown(evidence.file, evidence.testName);
 	return `${executable} — modes: ${evidence.modes
 		.map((mode) => `\`${mode}\``)
@@ -1028,7 +1028,7 @@ export function renderReport(ledger) {
 	const entries = [...ledger.entries].sort((a, b) => a.id.localeCompare(b.id));
 	const { upstream } = ledger;
 	let report = `# Redact-derived adversarial contract audit (generated)\n\n`;
-	report += `<!-- GENERATED FILE — do not edit. Regenerate with \`pnpm redact-audit:generate\`. -->\n\n`;
+	report += `<!-- GENERATED FILE — do not edit. Regenerate with \`bun run redact-audit:generate\`. -->\n\n`;
 	report += `This is a source-backed extraction ledger for consumer-observable failure modes found in [TanStack Redact](${upstream.repository}). Redact is an adversity source, not an implementation target or a blanket compatibility promise. Classifications describe whether each contract transfers to Octane; statuses describe the current Octane evidence or follow-up.\n\n`;
 	report += `The authored source is [\`packages/octane/audit/redact-adversarial-ledger.json\`](../packages/octane/audit/redact-adversarial-ledger.json). Permanent IDs must not be renamed or reused.\n\n`;
 	report += `## Upstream snapshot\n\n`;
@@ -1059,7 +1059,7 @@ export function renderReport(ledger) {
 	report += `- A \`documented\` entry is terminal only for an explained divergence/non-goal or a portable process policy backed exclusively by documentation/benchmark references.\n`;
 	report += `- Keep resolved, divergent, and non-goal entries in the ledger so future audits do not rediscover them or silently import Redact-specific behavior.\n`;
 	report += `- Choose tests by observable. Final markup alone cannot prove identity, focus, selection, scroll, live properties, lifecycle ordering, or global error behavior.\n`;
-	report += `- Update the authored JSON, then run \`pnpm redact-audit:generate\`; never hand-edit this report.\n\n`;
+	report += `- Update the authored JSON, then run \`bun run redact-audit:generate\`; never hand-edit this report.\n\n`;
 	report += `${renderSummary(entries)}\n`;
 	report += `${renderPriorityQueue(entries)}\n`;
 	report += `## Contract ledger\n`;

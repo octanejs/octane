@@ -46,7 +46,7 @@ families. `scripts/check-react-aria-components-exports.mjs` checks runtime and t
 names separately and rejects missing or extra names in either direction:
 
 ```sh
-pnpm --filter @octanejs/aria exports:check
+bun run --filter @octanejs/aria exports:check
 ```
 
 The root behavior hooks and `/stately` remain curated surfaces. This export check

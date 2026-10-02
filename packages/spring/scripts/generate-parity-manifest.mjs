@@ -84,7 +84,7 @@ const adapted = writeInventory(
 	['packages/spring/tests/upstream'],
 );
 
-const lockfileSha256 = sha256(readFileSync(path.join(REPO, 'pnpm-lock.yaml')));
+const lockfileSha256 = sha256(readFileSync(path.join(REPO, 'bun.lock')));
 const summary = summarizeRuntimeInventories([adapted.inventory]);
 const pristineInventoryRelative = 'packages/spring/audit/pristine-wrapper-runtime.json';
 const pristineCaseInventoryRelative = 'packages/spring/audit/pristine-runtime.json';
@@ -132,8 +132,8 @@ const manifest = {
 			node: '>=22',
 			platform: 'any',
 			arch: 'any',
-			packageManager: 'pnpm@11.15.1',
-			lockfile: 'pnpm-lock.yaml',
+			packageManager: 'bun@1.4.2',
+			lockfile: 'bun.lock',
 			lockfileSha256,
 		},
 	},

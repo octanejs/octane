@@ -28,15 +28,15 @@ larger than a contained fix, open an issue and agree on the approach first.
 
 ## Setup
 
-Node.js 22.22.2 or newer (CI runs the suite on 22.22.2 and 24) and pnpm 11. The repo pins
-its pnpm version in `package.json`, so `corepack enable` is the easiest way to
-get the right one.
+Node.js 22.22.2 or newer (CI runs the suite on 22.22.2 and 24) and Bun. The repo pins
+its Bun version in `package.json` `packageManager`; install that release from
+https://bun.sh.
 
 ```bash
 git clone https://github.com/octanejs/octane.git
 cd octane
-pnpm install
-pnpm test
+bun install
+bun run test
 ```
 
 ## Repository layout
@@ -59,9 +59,9 @@ The playground is the quickest way to poke at the runtime by hand, and the
 example apps double as Playwright regression fixtures:
 
 ```bash
-pnpm --filter octane-playground dev
-pnpm examples:check   # manifests, tooling contracts, types, production builds
-pnpm examples:e2e     # browser journeys
+bun run --filter octane-playground dev
+bun run examples:check   # manifests, tooling contracts, types, production builds
+bun run examples:e2e     # browser journeys
 ```
 
 Route a change to the package that owns the behavior. When an application,
@@ -83,7 +83,7 @@ end-to-end evidence.
   never plain `tsc`. Use `OctaneNode` for renderables, not `React.ReactNode`.
 - Never write `declare module '*.tsrx'` in a published package's `src/`. It is
   ambient, ships in the tarball, and turns every import it covers into `any`.
-  `pnpm tsrx-decls:check` enforces this.
+  `bun run tsrx-decls:check` enforces this.
 - Changes to the runtime, compiler, scheduler, reconciler, SSR/hydration, or the
   build pipeline follow
   [`.rulesync/rules/core-engineering.md`](./.rulesync/rules/core-engineering.md):
@@ -139,7 +139,7 @@ own implementation will not think to check.
 - Never weaken an upstream assertion to make it pass. Triage the failure first;
   if it turns out to be a deliberate divergence, keep the case and assert
   Octane's behavior with an `// OCTANE DIVERGENCE:` rationale. Skipped and todo
-  markers are not a tracking mechanism here: `pnpm test:markers:check` rejects
+  markers are not a tracking mechanism here: `bun run test:markers:check` rejects
   them, so an unported case lives in the crosswalk instead.
 - Add negative controls for the parity harness itself: removing, renaming,
   skipping, or failing to execute a recorded case, and changing pinned evidence,
@@ -189,12 +189,12 @@ through both Octane and React, and `hydration/` for server-render-then-adopt
 tests.
 
 ```bash
-pnpm test                                    # full suite
-pnpm test -- --silent=false                  # show test console output
+bun run test                                    # full suite
+bun run test -- --silent=false                  # show test console output
 ./node_modules/.bin/vitest run packages/octane/tests/<file>.test.ts --reporter=verbose
 ```
 
-A committed test must execute and pass. `pnpm test:markers:check` fails CI on
+A committed test must execute and pass. `bun run test:markers:check` fails CI on
 skipped or expected-failure markers, so an intentional divergence is an ordinary
 passing assertion with an `// OCTANE DIVERGENCE:` comment.
 
@@ -205,16 +205,16 @@ run the generator instead of hand-editing the output:
 
 | Output | Source | Command |
 | --- | --- | --- |
-| `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.claude/`, `.github/`, `.cursor/`, `.gemini/` | `.rulesync/rules/*` and `.rulesync/skills/*` | `pnpm rules:generate` |
-| `docs/packages.md` | workspace manifests | `pnpm packages:inventory` |
-| `docs/bindings-status.md` | each binding's `status.json` | `pnpm bindings:status` |
-| `docs/parity-gaps.md` | test pins | `pnpm parity:gaps` |
-| `docs/binding-parity-gaps.md` | binding parity data | `pnpm binding-parity:gaps` |
-| `docs/react-parity-coverage.md` | the React parity ledger | `pnpm react-parity:generate` |
-| Production error catalog and formatters | `octane` error-code sources | `pnpm error-codes:generate` |
-| `@octanejs/cli` data snapshot | binding and error-code catalogs | `pnpm cli:data` |
-| Lucide and Phosphor icon sources | upstream icon sets | `pnpm lucide:generate`, `pnpm phosphor-icons:generate` |
-| shadcn registry | `packages/shadcn` sources | `pnpm shadcn:registry` |
+| `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.claude/`, `.github/`, `.cursor/`, `.gemini/` | `.rulesync/rules/*` and `.rulesync/skills/*` | `bun run rules:generate` |
+| `docs/packages.md` | workspace manifests | `bun run packages:inventory` |
+| `docs/bindings-status.md` | each binding's `status.json` | `bun run bindings:status` |
+| `docs/parity-gaps.md` | test pins | `bun run parity:gaps` |
+| `docs/binding-parity-gaps.md` | binding parity data | `bun run binding-parity:gaps` |
+| `docs/react-parity-coverage.md` | the React parity ledger | `bun run react-parity:generate` |
+| Production error catalog and formatters | `octane` error-code sources | `bun run error-codes:generate` |
+| `@octanejs/cli` data snapshot | binding and error-code catalogs | `bun run cli:data` |
+| Lucide and Phosphor icon sources | upstream icon sets | `bun run lucide:generate`, `bun run phosphor-icons:generate` |
+| shadcn registry | `packages/shadcn` sources | `bun run shadcn:registry` |
 
 Each has a `:check` counterpart that CI runs, so a stale output fails the lint
 job.
@@ -222,10 +222,10 @@ job.
 ## Before you push
 
 ```bash
-pnpm format:files             # write, while iterating
-pnpm format:check             # repo-wide gate, when you need one
-pnpm typecheck
-pnpm test
+bun run format:files             # write, while iterating
+bun run format:check             # repo-wide gate, when you need one
+bun run typecheck
+bun run test
 ```
 
 `format:files` and `format:files:check` default to the union of the staged and
@@ -242,7 +242,7 @@ Add a changeset for user-facing package changes and skip it for docs-only,
 test-only, or internal tooling work:
 
 ```bash
-pnpm changeset
+bun run changeset
 ```
 
 While packages are 0.x, use `patch` for fixes and `minor` for new features or
@@ -326,7 +326,7 @@ The repository ships its own agent context: `AGENTS.md` (and its per-tool
 siblings) plus task skills for branching, issues, bug hunting, core changes,
 performance audits, and binding ports. Point your agent at those rather than
 re-deriving the conventions, and remember they are generated: edit
-`.rulesync/skills/*` and rerun `pnpm rules:generate`.
+`.rulesync/skills/*` and rerun `bun run rules:generate`.
 
 ## Reporting bugs
 

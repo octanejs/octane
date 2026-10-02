@@ -151,7 +151,7 @@ frozen-source controls:
 | Missing native `oxc-tsrx` | 4 | 6 | Same failure with frozen and candidate compiler entry points; complete install still required |
 | Missing Volar runtime dependencies | 3 | 0 | Real preserved dependency packages plus the repository's checked-in parser patch; language cohort passed 4 files / 64 tests |
 | Unpatched parser / old esrap | 1 | 4 | Same four failures on frozen source; included in the repaired language cohort above |
-| Borrowed pnpm install lacks workspace-package layout | 2 | 2 | Real workspace links in ignored scratch make all three transform controls pass on both revisions; normal installed-layout tests still need a complete install |
+| Borrowed bun install lacks workspace-package layout | 2 | 2 | Real workspace links in ignored scratch make all three transform controls pass on both revisions; normal installed-layout tests still need a complete install |
 | Hydration timeout under the broad run | 1 | 1 | Both revisions passed in isolation; full file rerun passed 2 files / 42 tests |
 
 No candidate-only source regression was isolated in that review. The ignored

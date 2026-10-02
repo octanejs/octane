@@ -30,7 +30,7 @@ beforeAll(async () => {
 	} catch (error) {
 		throw new Error(
 			'[@octanejs/select browser] Chromium is required ' +
-				'(run `pnpm exec playwright install chromium`): ' +
+				'(run `bunx playwright install chromium`): ' +
 				(error instanceof Error ? error.message.split('\n')[0] : String(error)),
 		);
 	}

@@ -38,9 +38,9 @@
       "node": ">=22",
       "platform": "any",
       "arch": "any",
-      "packageManager": "pnpm@11.15.1",
-      "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "27f48782633baf71b121e0b6716433c4a293021a80d11f46979754f0d16e8709"
+      "packageManager": "bun@1.4.2",
+      "lockfile": "bun.lock",
+      "lockfileSha256": "aa404a0a6304023d5005ee6786e6ba3ddfe18df0fb9fae108f2a8be3aa95b699"
     }
   },
   "lanes": [
@@ -226,7 +226,7 @@
         {
           "path": "scripts/react-parity/solana-kit-types.mjs",
           "role": "support",
-          "sha256": "1a34130505ba26d71779665ed44515e0aa6db47b77dbe200f820833f33ee232d"
+          "sha256": "cd5d0770aa3dd11cd4ba613fca007968225f8cb0d138bc974ef88a846759f6ff"
         }
       ]
     }

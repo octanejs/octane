@@ -17,7 +17,7 @@ const TARGETS = [
 // Normal benchmark builds stay minified. These diagnostic assets are used only
 // by this untimed work pass, matching the recursive-context work harness.
 for (const target of TARGETS) {
-	execFileSync('pnpm', ['exec', 'vite', 'build', '--minify', 'false'], {
+	execFileSync('bun', ['run', 'vite', 'build', '--minify', 'false'], {
 		cwd: fileURLToPath(new URL(`${target.name}/`, import.meta.url)),
 		stdio: 'inherit',
 	});

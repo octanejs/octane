@@ -1,5 +1,5 @@
 // Formatter fixture for statements the TSRX Prettier plugin used to delete.
-// `pnpm format:check` must leave this file byte-identical, and
+// `bun run format:check` must leave this file byte-identical, and
 // scripts/tsrx-prettier-plugin.test.mjs checks that formatting keeps its AST.
 
 function firstPositive(grid: number[][]): number {

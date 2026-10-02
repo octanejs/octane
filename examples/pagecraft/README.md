@@ -10,7 +10,7 @@ exercised at the same browser boundaries a production editor uses.
 From this directory:
 
 ```bash
-pnpm dev
+bun run dev
 ```
 
 Open `http://127.0.0.1:5226/documents/launch-brief`. The server runs Vite as
@@ -20,9 +20,9 @@ by the production fixture.
 The maintained gates are:
 
 ```bash
-pnpm typecheck
-pnpm build
-pnpm test:e2e
+bun run typecheck
+bun run build
+bun run test:e2e
 ```
 
 `test:e2e` drives all five journeys against the built client, then repeats them

@@ -585,7 +585,7 @@ async function main() {
 				// The missing generated file is reported as stale below.
 			}
 			if (current !== next) {
-				console.error(`${relative(root, filename)} is stale; run pnpm error-codes:generate.`);
+				console.error(`${relative(root, filename)} is stale; run bun run error-codes:generate.`);
 				stale = true;
 			}
 		} else {

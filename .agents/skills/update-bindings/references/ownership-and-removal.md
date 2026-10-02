@@ -51,7 +51,7 @@ already-initialized, authorized `implementing` node, write a closure with the ac
 current source ledger and run:
 
 ```bash
-pnpm react-port:evidence migrate --batch <id> --node pkg:<name> --closure <closure.json>
+bun run react-port:evidence migrate --batch <id> --node pkg:<name> --closure <closure.json>
 ```
 
 The closure includes actual `runtimeDependencies`, `adaptedSources`, `sourceLedger`,

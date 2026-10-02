@@ -34,7 +34,7 @@ benchmarks/signal-favoring/
 ├── gen.mjs            # Source generator for the App fixtures (scaffold; see note below)
 ├── run.mjs            # Playwright harness — drives all adapters
 ├── work.mjs           # untimed Chromium precise-call-coverage gates for Octane
-├── package.json       # umbrella: `pnpm bench`
+├── package.json       # umbrella: `bun run bench`
 └── README.md
 ```
 
@@ -124,7 +124,7 @@ The harness also prints three derived ratios per target:
 
 ```bash
 # 1. From the repo root, install:
-pnpm install
+bun install
 
 # 2. (Optional) regenerate fixtures if you edited gen.mjs:
 node benchmarks/signal-favoring/gen.mjs
@@ -135,7 +135,7 @@ node benchmarks/bench.mjs signal-favoring
 ```
 
 The unified runner also executes `work.mjs` against the already-built Octane
-previews. Run it directly with `pnpm --dir benchmarks/signal-favoring
+previews. Run it directly with `bun run --cwd benchmarks/signal-favoring
 bench:work` when those two previews are already running.
 
 ## Measurement contract

@@ -8,7 +8,7 @@
     "dev": "node server.mjs",
     "build": "vite build",
     "typecheck": "octane-tsc -p tsconfig.json",
-    "test:e2e": "pnpm build && PAGECRAFT_DIST=1 playwright test --config e2e/playwright.config.ts && PAGECRAFT_COLD_DEV=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e": "bun run build && PAGECRAFT_DIST=1 playwright test --config e2e/playwright.config.ts && PAGECRAFT_COLD_DEV=1 playwright test --config e2e/playwright.config.ts",
     "test:e2e:dev": "PAGECRAFT_COLD_DEV=1 playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {

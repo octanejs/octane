@@ -48,7 +48,9 @@ if (!existsSync(grader)) {
 	process.exit(2);
 }
 
-const invocationRoot = process.env.INIT_CWD ? resolve(process.env.INIT_CWD) : process.cwd();
+const invocationRoot = process.env.npm_config_local_prefix
+	? resolve(process.env.npm_config_local_prefix)
+	: process.cwd();
 const submissionRoot = realpathSync(resolve(invocationRoot, submission));
 const submissionFiles = [];
 function collectSubmissionFiles(directory) {

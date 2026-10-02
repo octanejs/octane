@@ -33,7 +33,7 @@ beforeAll(async () => {
 	// Preview must bind after release — otherwise --strictPort fails against the
 	// reservation listener and probes hang on a bare TCP accept.
 	try {
-		build = spawnDetached(PLAYGROUND, ['exec', 'astro', 'build'], process.env, 'pipe');
+		build = spawnDetached(PLAYGROUND, ['astro', 'build'], process.env, 'pipe');
 		try {
 			await waitForExit(build);
 		} catch (error) {
@@ -53,7 +53,6 @@ beforeAll(async () => {
 
 	try {
 		preview = spawnServer(PLAYGROUND, [
-			'exec',
 			'astro',
 			'preview',
 			'--host',
@@ -73,7 +72,7 @@ beforeAll(async () => {
 			preview = undefined;
 			throw new Error(
 				'[astro.e2e] Chromium is required ' +
-					'(run `pnpm --filter @octanejs/astro exec playwright install chromium`): ' +
+					'(run `bunx playwright install chromium`): ' +
 					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
 			);
 		}

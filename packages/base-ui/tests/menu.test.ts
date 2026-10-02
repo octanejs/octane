@@ -36,7 +36,7 @@ async function settle(): Promise<void> {
  * Focus assertions need this rather than a fixed number of `settle()` ticks: the focus manager
  * hands off through `enqueueFocus` (an animation frame), so on a loaded machine the focus can land
  * a few frames later than a four-iteration settle. That made the focus assertions here pass in a
- * `--project base-ui` run and fail inside a full `pnpm test`. Waiting for the condition keeps the
+ * `--project base-ui` run and fail inside a full `bun run test`. Waiting for the condition keeps the
  * assertion exactly as strong while removing the timing dependence — the `expect` after the wait
  * still fails loudly if focus never arrives.
  */

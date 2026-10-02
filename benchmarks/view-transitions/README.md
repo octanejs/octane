@@ -53,7 +53,7 @@ size threshold for the added functionality.
 ## Native behavior regressions
 
 ```sh
-pnpm exec vitest run --project=octane-events-browser packages/octane/tests/browser/view-transition-parity/view-transition-parity.test.ts
+bunx vitest run --project=octane-events-browser packages/octane/tests/browser/view-transition-parity/view-transition-parity.test.ts
 ```
 
 The browser suite runs both development and production compiler modes. It

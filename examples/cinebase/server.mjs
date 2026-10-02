@@ -13,7 +13,7 @@ const host = process.env.HOST ?? '127.0.0.1';
 const port = Number(process.env.PORT ?? 5222);
 
 if (productionClient && !existsSync(path.join(distRoot, 'index.html'))) {
-	throw new Error('CINEBASE_DIST=1 requires a production build; run `pnpm build` first');
+	throw new Error('CINEBASE_DIST=1 requires a production build; run `bun run build` first');
 }
 
 const vite = await createViteServer({

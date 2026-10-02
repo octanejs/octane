@@ -37,7 +37,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "pnpm upstream:verify && vitest run --root ../.. --config vitest.config.js --project waypoint --project waypoint-ssr --project waypoint-differential --project waypoint-browser",
+    "test": "bun run upstream:verify && vitest run --root ../.. --config vitest.config.js --project waypoint --project waypoint-ssr --project waypoint-differential --project waypoint-browser",
     "typecheck": "octane-tsc -p tsconfig.json",
     "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
     "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."

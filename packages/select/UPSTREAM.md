@@ -33,7 +33,7 @@ The MIT license permits copying, modifying, and distributing an Octane port as
 long as the copyright and permission notice are retained. The canonical package
 source, five Jest suites, five snapshots, package metadata, and license are
 preserved under `upstream/`. `upstream/SHA256SUMS` locks all 63 files
-byte-for-byte. Run `pnpm --filter @octanejs/select upstream:verify` to
+byte-for-byte. Run `bun run --filter @octanejs/select upstream:verify` to
 reject a changed, missing, or additional upstream artifact. The six public
 JavaScript entry points and all 20 runtime exports are tracked fail-closed in
 `audit/export-crosswalk.json`.
@@ -63,4 +63,4 @@ The five canonical Jest suites and their snapshots are retained verbatim under `
 | `Creatable.test.tsx` | All 18 cases adapted plus creation metadata, delegated creation, option placement, and suppression differentials |
 | `AsyncCreatable.test.tsx` | All 5 cases adapted plus composed async/creatable public contract and export coverage |
 
-`audit/adapted-runtime.json` inventories only the adapted upstream lane. `audit/test-classifications.json` classifies every authored test under `tests/`, including the five adapted upstream suites, so a missing disposition cannot stay green. Run `pnpm --filter @octanejs/select test` to verify the vendored pin, fail-closed export crosswalk, pristine upstream suite, and Octane runtime lanes; run `pnpm --filter @octanejs/select typecheck` for paired type evidence.
+`audit/adapted-runtime.json` inventories only the adapted upstream lane. `audit/test-classifications.json` classifies every authored test under `tests/`, including the five adapted upstream suites, so a missing disposition cannot stay green. Run `bun run --filter @octanejs/select test` to verify the vendored pin, fail-closed export crosswalk, pristine upstream suite, and Octane runtime lanes; run `bun run --filter @octanejs/select typecheck` for paired type evidence.

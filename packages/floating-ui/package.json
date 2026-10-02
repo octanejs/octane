@@ -49,8 +49,8 @@
   },
   "scripts": {
     "build:cjs": "node ../../scripts/build-package-commonjs.mjs",
-    "prepack": "pnpm build:cjs",
-    "test": "pnpm upstream:verify && node ../../scripts/react-parity/harness.mjs run-required --manifest packages/floating-ui/audit/react-parity.json && ../../node_modules/.bin/vitest run --root ../.. --project floating-ui",
+    "prepack": "bun run build:cjs",
+    "test": "bun run upstream:verify && node ../../scripts/react-parity/harness.mjs run-required --manifest packages/floating-ui/audit/react-parity.json && ../../node_modules/.bin/vitest run --root ../.. --project floating-ui",
     "test:upstream": "node ../../scripts/react-parity/run-pristine.mjs floating-ui",
     "test:adapted-upstream": "vitest run --config tests/adapted-vitest.config.ts",
     "parity:evidence:generate": "node scripts/generate-parity-evidence.mjs",

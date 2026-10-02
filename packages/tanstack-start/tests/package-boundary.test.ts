@@ -187,7 +187,7 @@ export function hydrateStart() {
 	});
 
 	it('does not retain upstream vendor artifacts or workspace registration', () => {
-		const workspace = readFileSync(resolve(repositoryRoot, 'pnpm-workspace.yaml'), 'utf8');
+		const workspace = readFileSync(resolve(repositoryRoot, 'package.json'), 'utf8');
 
 		expect(existsSync(resolve(packageDirectory, 'vendor'))).toBe(false);
 		expect(existsSync(resolve(packageDirectory, 'tanstack-octane-native-injection.patch'))).toBe(

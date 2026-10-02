@@ -35,9 +35,9 @@
       "node": ">=22",
       "platform": "any",
       "arch": "any",
-      "packageManager": "pnpm@11.15.1",
-      "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "27f48782633baf71b121e0b6716433c4a293021a80d11f46979754f0d16e8709"
+      "packageManager": "bun@1.4.2",
+      "lockfile": "bun.lock",
+      "lockfileSha256": "aa404a0a6304023d5005ee6786e6ba3ddfe18df0fb9fae108f2a8be3aa95b699"
     }
   },
   "lanes": [
@@ -67,7 +67,7 @@
         {
           "path": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
           "role": "support",
-          "sha256": "4e452b70de53303509752d35826d1268f8a9788284dd27ccd92dad30831a9399"
+          "sha256": "d9971322152cbff9ac0e3aaabf282b1aaa0d2070041cfa145119fb50d68e2b03"
         },
         {
           "path": "packages/tanstack-hotkeys/tests/upstream-pristine.vitest.config.ts",

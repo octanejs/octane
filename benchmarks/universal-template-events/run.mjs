@@ -22,7 +22,7 @@ if (!Number.isSafeInteger(iterations) || iterations <= 0) {
 
 const runtimeOverride = process.env.BENCH_RUNTIME_URL;
 if (runtimeOverride === undefined) {
-	const build = spawnSync('pnpm', ['--filter', 'octane', 'build'], {
+	const build = spawnSync('bun', ['run', '--filter', 'octane', 'build'], {
 		cwd: REPO,
 		stdio: 'inherit',
 	});

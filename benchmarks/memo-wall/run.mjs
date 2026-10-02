@@ -38,10 +38,10 @@
 // see their fixture comments.
 //
 // Servers must be running first (production preview recommended):
-//   pnpm --filter octane-tsrx-memowall-bench preview   # :5206
-//   pnpm --filter octane-jsx-memowall-bench  preview   # :5207
-//   pnpm --filter react-memowall-bench       preview   # :5208 uncompiled control
-//   pnpm --filter react-compiler-memowall-bench preview # :5226 canonical React
+//   bun run --filter octane-tsrx-memowall-bench preview   # :5206
+//   bun run --filter octane-jsx-memowall-bench  preview   # :5207
+//   bun run --filter react-memowall-bench       preview   # :5208 uncompiled control
+//   bun run --filter react-compiler-memowall-bench preview # :5226 canonical React
 // (swap `preview` → `dev` for the unminified dev build).
 //
 // Usage:  node run.mjs [iter]   # default 20

@@ -70,9 +70,9 @@ those evidence targets belong to examples whose manifests list those modes.
 From the repository root:
 
 ```bash
-pnpm --dir examples/gridlab typecheck
-pnpm --dir examples/gridlab build
-pnpm --dir examples/gridlab test:e2e
+bun run --cwd examples/gridlab typecheck
+bun run --cwd examples/gridlab build
+bun run --cwd examples/gridlab test:e2e
 ```
 
 `test:e2e` builds first and drives the production Vite preview on the reserved

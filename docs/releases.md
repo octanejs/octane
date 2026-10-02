@@ -32,7 +32,7 @@ publish its first version interactively and then authorize this repository's
 publish workflow:
 
 ```bash
-pnpm --filter <package-name> publish --access public --no-git-checks
+bun run --filter <package-name> publish --access public --no-git-checks
 npm trust github <package-name> \
   --file publish.yml \
   --repo octanejs/octane \
@@ -43,7 +43,7 @@ Run this from a clean, validated `main` checkout with npm 11.15 or newer and an
 npm account that owns the package and has two-factor authentication enabled.
 The interactive publish is intentionally not automated with a long-lived token.
 
-`pnpm release:preflight` lists every package that needs this bootstrap and exits
+`bun run release:preflight` lists every package that needs this bootstrap and exits
 before any existing package is published. After bootstrapping, rerun the failed
 Publish workflow, or dispatch `publish.yml` with the ID of any successful CI
 push run on `main`.
@@ -51,7 +51,7 @@ push run on `main`.
 For `@octanejs/electron` after this package lands on `main`:
 
 ```bash
-pnpm --filter @octanejs/electron publish --access public --no-git-checks
+bun run --filter @octanejs/electron publish --access public --no-git-checks
 npm trust github @octanejs/electron \
   --file publish.yml \
   --repo octanejs/octane \

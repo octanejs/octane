@@ -590,5 +590,5 @@ describe('ReactDOMComponent — attribute-name injection (client)', () => {
  * historical record (this family has no skipped or expected-failure tests) — 5
  * covered-by-existing (:1538 :1861 :1870 :3136 :3168), 63 skipped.
  * The live parity backlog is generated into docs/parity-gaps.md
- * (`pnpm parity:gaps`).
+ * (`bun run parity:gaps`).
  * ========================================================================== */

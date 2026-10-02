@@ -31,13 +31,13 @@ tasks. The corpus includes:
 
 ```bash
 # Verify every public reference answer.
-pnpm --filter @octanejs/evals test:user-apps
+bun run --filter @octanejs/evals test:user-apps
 
 # Check that manifest digests still match task bytes.
-pnpm --filter @octanejs/evals corpus:check
+bun run --filter @octanejs/evals corpus:check
 
 # Prove every incomplete starter loads but fails its behavioral grader.
-pnpm --filter @octanejs/evals test:user-app-starters
+bun run --filter @octanejs/evals test:user-app-starters
 ```
 
 ## Strong mode repairs
@@ -65,7 +65,7 @@ that has Node's server globals and no browser bindings. As on a real server,
 
 ```bash
 # Check prompts, starters, references, and every workaround, then refresh the ledger.
-pnpm --filter @octanejs/evals strong-repair:verify
+bun run --filter @octanejs/evals strong-repair:verify
 ```
 
 Reference answers are deliberately public so this release can train models.

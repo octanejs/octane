@@ -57,10 +57,10 @@ for (const name of SKILLS) {
 					assert.ok(existsSync(resolved), `${file}: missing document ${target}`);
 				}
 				for (const [, command, firstArgument] of markdown.matchAll(
-					/\bpnpm ([a-z][\w-]*:[\w:-]+)(?:[ \t]+([^\s`]+))?/g,
+					/\bbun run ([a-z][\w-]*:[\w:-]+)(?:[ \t]+([^\s`]+))?/g,
 				)) {
 					assert.ok(Object.hasOwn(PACKAGE_SCRIPTS, command), `${file}: unknown script ${command}`);
-					assert.notEqual(firstArgument, '--', `${file}: pnpm scripts take arguments directly`);
+					assert.notEqual(firstArgument, '--', `${file}: bun run scripts take arguments directly`);
 				}
 			}
 		});

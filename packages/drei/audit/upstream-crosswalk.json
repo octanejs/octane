@@ -13,7 +13,7 @@
     "readyRequiresZeroGaps": true
   },
   "expectedTotals": { "runtimeExports": 217, "sourceExports": 379, "gaps": 0 },
-  "inventorySha256": "d3af794826c65ace278e9fb0bd11f124dd37878ae7f3f3af505ceda2bb486383",
+  "inventorySha256": "18ef08ea3b38c86f13a0dbb88084250bf046e38b1712ed30432a8be9ca73d4fc",
   "exports": [
     {
       "id": "export:AccumulativeShadows",
@@ -347,7 +347,7 @@
       "name": "CameraControlsImpl",
       "kind": "type",
       "source": {
-        "path": "node_modules/.pnpm/camera-controls@3.1.2_three@0.172.0/node_modules/camera-controls/dist/index.d.ts",
+        "path": "node_modules/camera-controls/dist/index.d.ts",
         "line": 165
       },
       "status": "ported",

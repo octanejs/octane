@@ -38,7 +38,7 @@ benchmarks/portal-swarm/
 ├── preact/       # Vite app, dev :5268 (preact/compat createPortal)
 ├── svelte/       # Vite app, dev :5279 (Svelte attachment portal pattern)
 ├── run.mjs        # Playwright harness — gates + timings
-├── package.json   # umbrella: `pnpm bench`
+├── package.json   # umbrella: `bun run bench`
 └── README.md
 ```
 
@@ -139,7 +139,7 @@ runs the harness:
 ```bash
 node benchmarks/bench.mjs --quick portal-swarm
 node benchmarks/bench.mjs portal-swarm
-BENCH_JSON=out.json pnpm bench   # also write machine-readable results
+BENCH_JSON=out.json bun run bench   # also write machine-readable results
 ```
 
 Swap `build && … preview` for `dev` to measure the unminified dev build. Set

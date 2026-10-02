@@ -16,10 +16,10 @@ The example deliberately exercises browser-heavy framework boundaries:
 From the repository root:
 
 ```bash
-pnpm --dir examples/draftboard dev
-pnpm --dir examples/draftboard typecheck
-pnpm --dir examples/draftboard build
-pnpm --dir examples/draftboard test:e2e
+bun run --cwd examples/draftboard dev
+bun run --cwd examples/draftboard typecheck
+bun run --cwd examples/draftboard build
+bun run --cwd examples/draftboard test:e2e
 ```
 
 The five Playwright journeys run against a real Chromium browser and assert rendered output, focus, URL state, SVG coordinates, survivor DOM identity, persisted documents, and browser diagnostics. Failure fixtures are selected with `?scenario=load-failure,save-failure`; adding `save-race` exposes an on-page persistence gate that can deliberately overlap save attempts and release either the newest or oldest completion. No external service, private test hook, or nondeterministic data is required.

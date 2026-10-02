@@ -292,7 +292,7 @@ const report = {
 		].map((file) => [file, hash(path.join(root, file))]),
 	),
 	runtimeSha256: hash(path.join(repo, 'packages/octane/src/runtime.server.ts')),
-	lockfileSha256: hash(path.join(repo, 'pnpm-lock.yaml')),
+	lockfileSha256: hash(path.join(repo, 'bun.lock')),
 	environment: {
 		node: process.version,
 		platform: os.platform(),

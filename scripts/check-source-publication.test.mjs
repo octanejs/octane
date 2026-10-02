@@ -90,7 +90,7 @@ test('every -p of one octane-tsc call reaches the chain, not only the first', ()
 test('delegated package scripts cannot hide a project from the chain', () => {
 	const delegated = createRepository({
 		...shippedTsrx,
-		rootScripts: { typecheck: 'pnpm --dir packages/demo typecheck' },
+		rootScripts: { typecheck: 'bun run --cwd packages/demo typecheck' },
 		tsconfigs: { 'tsconfig.json': { include: ['src'] } },
 	});
 	writeJson(path.join(delegated.repo, 'packages/demo/package.json'), {
@@ -136,7 +136,7 @@ test('a validation project the typecheck chain never reaches is still checked', 
 	// command parser can follow.
 	const wrapped = createRepository({
 		manifest: { files: ['src'] },
-		rootScripts: { typecheck: 'pnpm --dir packages/demo typecheck' },
+		rootScripts: { typecheck: 'bun run --cwd packages/demo typecheck' },
 		tsconfigs: { 'tsconfig.json': { compilerOptions: { types: ['node'] } } },
 		sources: { 'index.ts': 'export const a = 1;\n' },
 	});

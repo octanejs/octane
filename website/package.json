@@ -6,8 +6,8 @@
   "description": "The official Octane website",
   "scripts": {
     "lynx-examples": "node scripts/prepare-lynx-examples.mjs",
-    "dev": "pnpm lynx-examples && vite --configLoader runner",
-    "build": "pnpm lynx-examples && vite build --configLoader runner",
+    "dev": "bun run lynx-examples && vite --configLoader runner",
+    "build": "bun run lynx-examples && vite build --configLoader runner",
     "preview": "vite preview --configLoader runner --port 3000",
     "start": "node .output/server/index.mjs",
     "typecheck": "octane-tsc -p tsconfig.json"

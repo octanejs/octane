@@ -84,7 +84,7 @@ for (const lane of lanes) {
 	const inventory = { schemaVersion: 1, project: lane.project, roots: lane.roots, files, tests };
 	const output = resolve(root, lane.output);
 	mkdirSync(dirname(output), { recursive: true });
-	// Emitted through Prettier so a later `pnpm format` cannot rewrite these bytes
+	// Emitted through Prettier so a later `bun run format` cannot rewrite these bytes
 	// and silently invalidate the sha256 the parity manifests record for them.
 	writeFileSync(
 		output,

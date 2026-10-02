@@ -16,7 +16,7 @@ the authoritative React source, tests, snapshots, configuration, package
 metadata, and license. The byte-exact `packages/@livestore/react` directory from
 the canonical tag commit is vendored under `upstream/` and pinned by
 `audit/upstream.lock.json`: each committed file verifies offline against its
-upstream git blob sha (`pnpm react-port:materialize run --check --package-dir
+upstream git blob sha (`bun run react-port:materialize run --check --package-dir
 packages/livestore`). The upstream Apache-2.0 license is retained byte-exact
 as `LICENSE.upstream` beside the binding's own MIT `LICENSE`. The tree is
 excluded from the published package by the
@@ -27,7 +27,7 @@ the React-facing binding under the pinned directory is adapted. `src/` mirrors
 the upstream module layout; `.tsx` components become `.tsrx`, while hook modules
 retain their upstream paths.
 
-Run `pnpm --dir packages/livestore upstream:verify` to verify every vendored
+Run `bun run --cwd packages/livestore upstream:verify` to verify every vendored
 byte and the recorded source/test inventory. The pristine React-parity lane
 runs that same verifier before copying or executing the upstream suite.
 

@@ -94,7 +94,7 @@ four compiler-backed Octane SSR tests:
   produces an ordinary class for ordinary Octane DOM and injects through the
   existing CSS channel supplied by the caller.
 
-Run `pnpm --filter @octanejs/select-u1 test` to execute the complete U1
+Run `bun run --filter @octanejs/select-u1 test` to execute the complete U1
 evidence. This result authorizes pinned source/test vendoring and the first
 production parity unit; it does not waive any interaction, accessibility,
 entry-point, browser, type, or release gate below.

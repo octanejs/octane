@@ -44,7 +44,7 @@ changed descriptions, namespace separation, and cache bounds.
 
 ## Reproduce the source-work gates
 
-From the repository root, use the benchmark runner directly (`pnpm bench`
+From the repository root, use the benchmark runner directly (`bun run bench`
 runs a separate news benchmark):
 
 ```sh

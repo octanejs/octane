@@ -123,7 +123,7 @@ node benchmarks/activity/refs.mjs 8
 node benchmarks/activity/refs-work.mjs
 node benchmarks/activity/bundle.mjs
 node benchmarks/activity/caught-reveal-run.mjs 8
-pnpm exec tsrx-tsc --noEmit -p benchmarks/activity/tsconfig.json
+bunx tsrx-tsc --noEmit -p benchmarks/activity/tsconfig.json
 ```
 
 The browser scripts accept `--target=octane-tsrx` or `--target=react`, and `--no-build`

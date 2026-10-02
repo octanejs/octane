@@ -18,7 +18,7 @@ The vendored tree under [`upstream/`](./upstream) is byte-exact at that commit a
 carries upstream's `LICENSE`. It is prettier-ignored and excluded from the
 published `files`, so it is development evidence rather than shipped code.
 [`upstream/SHA256SUMS`](./upstream/SHA256SUMS) pins every vendored byte;
-`pnpm --dir packages/xstate upstream:verify` re-hashes the tree and fails on any
+`bun run --cwd packages/xstate upstream:verify` re-hashes the tree and fails on any
 drift or on an added/removed file.
 
 ## Source boundary

@@ -41,6 +41,6 @@ the binding's `.tsrx` source. When developing against a local checkout, build th
 package before linking it:
 
 ```sh
-pnpm --dir packages/streamdown build
-pnpm --dir /path/to/app add @octanejs/streamdown@link:/path/to/octane/packages/streamdown
+bun run --cwd packages/streamdown build
+bun run --cwd /path/to/app add @octanejs/streamdown@link:/path/to/octane/packages/streamdown
 ```

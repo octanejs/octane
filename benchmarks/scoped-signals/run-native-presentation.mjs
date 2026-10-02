@@ -57,8 +57,7 @@ const compressed = (code) => ({
 const compiled = [];
 for (const file of [
 	'package.json',
-	'pnpm-lock.yaml',
-	'pnpm-workspace.yaml',
+	'bun.lock',
 	'packages/octane/package.json',
 	'packages/stylex/package.json',
 ])

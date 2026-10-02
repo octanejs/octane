@@ -136,7 +136,7 @@ try {
 		runnerSha256: sha256(fs.readFileSync(import.meta.filename)),
 		corpusSha256: sha256(fs.readFileSync(path.join(HERE, 'octane-tsrx/src/data.js'))),
 		compilerSha256: sha256(fs.readFileSync(compilerFile)),
-		lockfileSha256: sha256(fs.readFileSync(path.join(DEPENDENCY_REPO, 'pnpm-lock.yaml'))),
+		lockfileSha256: sha256(fs.readFileSync(path.join(DEPENDENCY_REPO, 'bun.lock'))),
 		bundleSha256: sha256(code),
 		bundleBytes: code.length,
 		warmups: WARMUPS,

@@ -197,7 +197,7 @@ try {
 		platform: process.platform,
 		architecture: process.arch,
 		cpu: os.cpus()[0]?.model,
-		lockfileSha256: sha256(fs.readFileSync(path.join(REPO, 'pnpm-lock.yaml'))),
+		lockfileSha256: sha256(fs.readFileSync(path.join(REPO, 'bun.lock'))),
 		packageManifestSha256: sha256(fs.readFileSync(path.join(packageRoot, 'package.json'))),
 		toolingRoot,
 		dependencyMode: toolingRoot ? 'explicit-tooling-root' : 'workspace-installation',

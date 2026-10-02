@@ -59,10 +59,10 @@ existing harnesses drive them unchanged via the `TARGETS` env:
 
 ```bash
 # servers (dev shown; swap for build && preview for production numbers)
-pnpm --filter octane-tsrx-jsbench dev &        # :5176 (tuned baseline)
-pnpm --filter octane-tsrx-naive-jsbench dev &  # :5213
-pnpm --filter octane-jsx-naive-jsbench dev &   # :5214
-pnpm --filter octane-ts-jsbench dev &          # :5215
+bun run --filter octane-tsrx-jsbench dev &        # :5176 (tuned baseline)
+bun run --filter octane-tsrx-naive-jsbench dev &  # :5213
+bun run --filter octane-jsx-naive-jsbench dev &   # :5214
+bun run --filter octane-ts-jsbench dev &          # :5215
 
 TARGETS='[{"name":"octane-tsrx","url":"http://localhost:5176/","ready":"#run"},
           {"name":"octane-tsrx-naive","url":"http://localhost:5213/","ready":"#run"},
@@ -83,12 +83,12 @@ hook it could observe zero rows before the click had committed:
 
 ```bash
 # Build the existing naive fixtures with readable production helper names.
-pnpm --filter octane-tsrx-naive-jsbench exec vite build --minify false
-pnpm --filter octane-jsx-naive-jsbench exec vite build --minify false
-pnpm --filter octane-tsrx-naive-jsbench preview &
-pnpm --filter octane-jsx-naive-jsbench preview &
-pnpm --dir benchmarks/js-framework bench:style-work
-WORK_DIALECT=jsx pnpm --dir benchmarks/js-framework bench:style-work
+bun run --filter octane-tsrx-naive-jsbench exec vite build --minify false
+bun run --filter octane-jsx-naive-jsbench exec vite build --minify false
+bun run --filter octane-tsrx-naive-jsbench preview &
+bun run --filter octane-jsx-naive-jsbench preview &
+bun run --cwd benchmarks/js-framework bench:style-work
+WORK_DIALECT=jsx bun run --cwd benchmarks/js-framework bench:style-work
 ```
 
 ### Fixed-key inline style literals
@@ -124,8 +124,8 @@ interquartile range within a run, so compare repeated baseline and candidate
 runs before drawing a wall-time conclusion.
 
 ```bash
-pnpm --filter octane-tsrx-naive-jsbench build:style-literals
-pnpm --filter octane-tsrx-naive-jsbench preview:style-literals &
+bun run --filter octane-tsrx-naive-jsbench build:style-literals
+bun run --filter octane-tsrx-naive-jsbench preview:style-literals &
 WORK_MODE=literals WORK_SAMPLES=9 WORK_JSON=/tmp/style-literals.json \
   node benchmarks/js-framework/style-work.mjs
 ```

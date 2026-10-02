@@ -670,7 +670,7 @@ in `tests/suspense.test.ts` (and a server twin):
     re-record; `ssr-throughput` `waterfall-d*` ops improve with the SSR warm
     walk.
 
-Gates per phase: full `pnpm test`, `pnpm typecheck`, `pnpm format:check`;
+Gates per phase: full `bun run test`, `bun run typecheck`, `bun run format:check`;
 `tests/differential/` + `tests/conformance/` after Phases 2–4;
 `node benchmarks/bench.mjs async-waterfall --compare` after Phase 4.
 

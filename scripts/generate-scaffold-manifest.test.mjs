@@ -95,7 +95,7 @@ describe('readmeDisagreements', () => {
 	});
 });
 
-// The generator runs this same comparison, so a `pnpm sync` cannot land a stale
+// The generator runs this same comparison, so a `bun run sync` cannot land a stale
 // README. This repeats it against the committed files so that a README edited
 // on its own — without regenerating anything — still fails here.
 test('the published README describes exactly what the committed manifest lists', () => {

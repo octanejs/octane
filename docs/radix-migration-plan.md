@@ -334,7 +334,7 @@ Radix Checkbox/Switch/RadioGroup/Slider/Select render hidden native inputs and d
 
 ### Phase 5 — Polish
 `ScrollArea`, `Toast`, remaining primitives; SSR/hydration coverage; a changeset (patch track); README + intentional-divergence notes (esp. `className` composition and uncontrolled inputs).
-*Exit:* `pnpm test`, `pnpm typecheck`, `pnpm format:check` green; hydration tests for overlay/portal components.
+*Exit:* `bun run test`, `bun run typecheck`, `bun run format:check` green; hydration tests for overlay/portal components.
 
 ## 4. First milestone (smallest end-to-end proof)
 

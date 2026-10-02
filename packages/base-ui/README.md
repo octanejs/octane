@@ -53,11 +53,11 @@ TypeScript users of the Luxon adapter also need `@types/luxon`.
 From the repository root:
 
 ```sh
-pnpm --dir packages/base-ui test          # Native, differential and SSR tests
-pnpm --dir packages/base-ui test:upstream # Adapted upstream suite in jsdom
-pnpm --dir packages/base-ui test:browser  # Adapted upstream suite in Chromium
-pnpm --dir packages/base-ui test:pristine # Immutable React oracle in jsdom
-pnpm --dir packages/base-ui upstream:verify
+bun run --cwd packages/base-ui test          # Native, differential and SSR tests
+bun run --cwd packages/base-ui test:upstream # Adapted upstream suite in jsdom
+bun run --cwd packages/base-ui test:browser  # Adapted upstream suite in Chromium
+bun run --cwd packages/base-ui test:pristine # Immutable React oracle in jsdom
+bun run --cwd packages/base-ui upstream:verify
 ```
 
 ## Migrating from the Base UI 1.6 binding

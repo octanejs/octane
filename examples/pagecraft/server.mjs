@@ -17,7 +17,7 @@ const port = Number(process.env.PORT ?? 5226);
 const coldDevCache = path.join(root, 'node_modules/.vite-pagecraft-cold');
 
 if (productionClient && !existsSync(path.join(distRoot, 'index.html'))) {
-	throw new Error('PAGECRAFT_DIST=1 requires a production build; run `pnpm build` first');
+	throw new Error('PAGECRAFT_DIST=1 requires a production build; run `bun run build` first');
 }
 
 if (coldDevClient) rmSync(coldDevCache, { recursive: true, force: true });

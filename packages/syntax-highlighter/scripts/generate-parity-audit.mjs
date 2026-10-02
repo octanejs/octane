@@ -226,7 +226,7 @@ const differentialFiles = ['packages/syntax-highlighter/tests/differential/parit
 const browserFiles = ['packages/syntax-highlighter/tests/browser/rendering.browser.test.ts'];
 
 const packageJson = JSON.parse(await readFile(resolve(repoRoot, 'package.json'), 'utf8'));
-const lockfileSha256 = await sha256('pnpm-lock.yaml');
+const lockfileSha256 = await sha256('bun.lock');
 const tarball = 'packages/syntax-highlighter/upstream-artifact/react-syntax-highlighter-16.1.1.tgz';
 const adaptedEvidenceFiles = (await walkFiles('packages/syntax-highlighter/tests/adapted'))
 	.filter((path) => path.endsWith('.test.ts') || path.endsWith('.snap'))
@@ -398,8 +398,8 @@ const manifest = {
 			node: '>=22',
 			platform: 'any',
 			arch: 'any',
-			packageManager: `pnpm@${packageJson.packageManager.split('@').at(-1)}`,
-			lockfile: 'pnpm-lock.yaml',
+			packageManager: `bun@${packageJson.packageManager.split('@').at(-1)}`,
+			lockfile: 'bun.lock',
 			lockfileSha256,
 		},
 	},

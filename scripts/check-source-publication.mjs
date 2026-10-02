@@ -201,9 +201,9 @@ function splitCommands(script) {
 }
 
 /**
- * Walk the root typecheck chain, following `pnpm <script>`,
- * `pnpm --dir <dir> <script>`, and `pnpm --filter <package> <script>` the way
- * pnpm does, and return every `<checker> -p <project>` it reaches, including each `-p` of one call.
+ * Walk the root typecheck chain, following `bun run <script>`,
+ * `bun run --cwd <dir> <script>`, and `bun run --filter <package> <script>` the way
+ * Bun does, and return every `<checker> -p <project>` it reaches, including each `-p` of one call.
  * A package cannot escape this gate by hiding its project behind a delegation.
  */
 export function collectTypecheckProjects(
@@ -237,7 +237,9 @@ export function collectTypecheckProjects(
 	};
 
 	const runCommand = (directory, command) => {
-		const words = command.split(/\s+/).filter((word) => word !== 'pnpm' && word !== 'exec');
+		const words = command
+			.split(/\s+/)
+			.filter((word) => word !== 'bun' && word !== 'run' && word !== 'bunx');
 		const checkerIndex = words.findIndex((word) => CHECKERS.has(word));
 		const projectArguments = words.flatMap((word, index) =>
 			word === '-p' && words[index + 1] ? [words[index + 1]] : [],
@@ -252,8 +254,8 @@ export function collectTypecheckProjects(
 			}
 			return;
 		}
-		if (!command.startsWith('pnpm')) return;
-		const directoryFlag = /--dir\s+(\S+)/.exec(command);
+		if (!command.startsWith('bun run')) return;
+		const directoryFlag = /--cwd\s+(\S+)/.exec(command);
 		const filterFlag = /--filter\s+'?([^\s']+)'?/.exec(command);
 		const target = words.at(-1);
 		if (!target || CHECKERS.has(target)) return;

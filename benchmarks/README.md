@@ -3,7 +3,7 @@
 Benchmark Vite builds use `build.minify: 'esbuild'`. Untimed diagnostic builds
 that inspect function names or generated code keep minification disabled.
 
-A set of self-contained benchmark suites, each a pnpm workspace of fixture apps
+A set of self-contained benchmark suites, each a workspace of fixture apps
 (octane + reference frameworks) plus a Playwright/Node harness. Every suite can
 be run on its own; **`benchmarks/bench.mjs` is the unified runner** that boots the
 servers, drives every harness, collects machine-readable results, and enforces
@@ -69,12 +69,12 @@ node benchmarks/bench.mjs                       # every suite, normal iterations
 node benchmarks/bench.mjs js-framework memo-wall   # only these suites
 node benchmarks/bench.mjs --quick js-framework  # reduced-iteration smoke pass
 node benchmarks/bench.mjs --list                # list suite names
-pnpm bench:all -- --quick                        # same via the root script
+bun run bench:all -- --quick                        # same via the root script
 ```
 
 For server-backed browser suites, the runner first production-builds each fixture
-app (`pnpm --filter <pkg> build`), starts its preview server
-(`pnpm --filter <pkg> preview`), waits for the strict port, runs the harness with
+app (`bun run --filter <pkg> build`), starts its preview server
+(`bun run --filter <pkg> preview`), waits for the strict port, runs the harness with
 `BENCH_JSON` pointed at a temp file, then kills the server **by port**
 (`lsof -ti tcp:<port>`). Suites run **sequentially** so ports and CPU never
 contend. A fixture is built at most once per runner invocation, even if multiple

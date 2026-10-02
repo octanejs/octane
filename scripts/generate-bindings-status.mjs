@@ -15,7 +15,7 @@ import { readBindingSurfacePolicy } from './binding-surface-policy.mjs';
 //   node scripts/generate-bindings-status.mjs           # (re)write the table
 //   node scripts/generate-bindings-status.mjs --check   # exit 1 if stale
 //
-// Wired as `pnpm bindings:status` / `pnpm bindings:status:check` (the latter
+// Wired as `bun run bindings:status` / `bun run bindings:status:check` (the latter
 // runs in CI, like parity:gaps:check) — changing a binding's scope means
 // updating its status.json and regenerating in the same change.
 //
@@ -97,12 +97,12 @@ const upstreamLabel = ({ package: name, version }) =>
 let md = `# @octanejs/\\* bindings status (generated)
 
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
-     regenerate with \`pnpm bindings:status\`. -->
+     regenerate with \`bun run bindings:status\`. -->
 
 The central status table for the ${rows.length} \`@octanejs/*\` framework bindings.
 Each row is sourced from that package's \`packages/<name>/status.json\` — the
 machine-readable status block maintained next to the code it describes — merged
-with the version in its \`package.json\`. CI runs \`pnpm bindings:status:check\`,
+with the version in its \`package.json\`. CI runs \`bun run bindings:status:check\`,
 so a scope change that isn't reflected here fails the build.
 
 The bindings deliberately sit at different maturity levels: some have broad
@@ -149,7 +149,7 @@ if (CHECK) {
 	if (current !== md) {
 		console.error(
 			'docs/bindings-status.md is stale — a status.json or binding package changed.\n' +
-				'Run `pnpm bindings:status` and commit the result.',
+				'Run `bun run bindings:status` and commit the result.',
 		);
 		process.exit(1);
 	}

@@ -162,7 +162,7 @@ const alternatives = graded.length - workarounds;
 if (process.argv.includes('--check')) {
 	if (!existsSync(ledgerPath) || readFileSync(ledgerPath, 'utf8') !== content) {
 		console.error(
-			`${relative(repositoryRoot, ledgerPath)} is stale; run pnpm --filter @octanejs/evals strong-repair:verify`,
+			`${relative(repositoryRoot, ledgerPath)} is stale; run bun run --filter @octanejs/evals strong-repair:verify`,
 		);
 		process.exit(1);
 	}

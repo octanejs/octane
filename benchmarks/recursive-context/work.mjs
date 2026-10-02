@@ -27,7 +27,7 @@ const TARGETS = process.env.RECURSIVE_WORK_TARGETS
 // minification here so Chromium can attribute calls to the original function
 // names; the existing preview servers serve the refreshed assets.
 for (const target of TARGETS) {
-	execFileSync('pnpm', ['exec', 'vite', 'build', '--minify', 'false'], {
+	execFileSync('bun', ['run', 'vite', 'build', '--minify', 'false'], {
 		cwd: fileURLToPath(new URL(`${target.name}/`, import.meta.url)),
 		stdio: 'inherit',
 	});

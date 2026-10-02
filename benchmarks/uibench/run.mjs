@@ -10,13 +10,13 @@
 //     (framework marker comments are deliberately outside the oracle).
 //
 // Servers must be running first (production preview recommended):
-//   pnpm --filter octane-tsrx-uibench-bench preview  # :5315
-//   pnpm --filter react-uibench-bench preview        # :5316
-//   pnpm --filter solid-uibench-bench preview        # :5317
-//   pnpm --filter preact-uibench-bench preview       # :5318
-//   pnpm --filter vue-vapor-uibench-bench preview    # :5319
-//   pnpm --filter ripple-uibench-bench preview       # :5322
-//   pnpm --filter inferno-uibench-bench preview      # :5325
+//   bun run --filter octane-tsrx-uibench-bench preview  # :5315
+//   bun run --filter react-uibench-bench preview        # :5316
+//   bun run --filter solid-uibench-bench preview        # :5317
+//   bun run --filter preact-uibench-bench preview       # :5318
+//   bun run --filter vue-vapor-uibench-bench preview    # :5319
+//   bun run --filter ripple-uibench-bench preview       # :5322
+//   bun run --filter inferno-uibench-bench preview      # :5325
 //
 // Usage: node run.mjs [iterations]
 // Env: TARGETS='[{"name":"octane-tsrx","url":"http://localhost:5315/"}]'

@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
 	cpSync,
 	existsSync,
@@ -22,7 +22,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { LYNX_TOOLCHAIN_LANES } from '../src/toolchain-lanes.js';
-import { renderPackedExampleWorkspace } from '../../../scripts/package-pack-canaries.mjs';
+import { packPackage } from '../../../scripts/pack-package.mjs';
 
 const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../..');
 const APPLICATION_FIXTURE = resolve(import.meta.dirname, '_fixtures/application');
@@ -56,26 +56,9 @@ function packWorkspacePackages(root: string): Record<keyof typeof PACKAGES, stri
 	return Object.fromEntries(
 		Object.entries(PACKAGES).map(([name, directory]) => {
 			const destination = join(root, name.replaceAll('/', '-').replaceAll('@', ''));
-			mkdirSync(destination, { recursive: true });
-			execFileSync('pnpm', ['--dir', directory, 'pack', '--pack-destination', destination], {
-				cwd: WORKSPACE_ROOT,
-				encoding: 'utf8',
-				stdio: ['ignore', 'pipe', 'pipe'],
-				timeout: 120_000,
-			});
-			const archives = readdirSync(destination).filter((entry) => entry.endsWith('.tgz'));
-			expect(archives, `${name} should produce one package archive`).toHaveLength(1);
-			return [name, join(destination, archives[0])];
+			return [name, packPackage(directory, destination, { root: WORKSPACE_ROOT }).archive];
 		}),
 	) as Record<keyof typeof PACKAGES, string>;
-}
-
-function renderOverrides(archives: Record<keyof typeof PACKAGES, string>): string {
-	return renderPackedExampleWorkspace(
-		Object.fromEntries(
-			Object.entries(archives).map(([name, archive]) => [name, `file:${archive}`]),
-		),
-	);
 }
 
 async function decodeNativeBundle(content: Buffer): Promise<Record<string, unknown>> {
@@ -111,13 +94,13 @@ describe('@octanejs/rspeedy-plugin packed consumer', () => {
 							'@octanejs/rspeedy-plugin': archiveSpecs['@octanejs/rspeedy-plugin'],
 							octane: archiveSpecs.octane,
 						},
+						overrides: archiveSpecs,
 					},
 					null,
 					2,
 				)}\n`,
 				'utf8',
 			);
-			writeFileSync(join(consumerRoot, 'pnpm-workspace.yaml'), renderOverrides(archives), 'utf8');
 			writeFileSync(
 				join(consumerRoot, 'build.mjs'),
 				`import { createRspeedy } from '@lynx-js/rspeedy';
@@ -155,15 +138,16 @@ try {
 				'utf8',
 			);
 
-			execFileSync(
-				'pnpm',
+			const install = spawnSync(
+				'bun',
 				[
 					'install',
 					'--prefer-offline',
 					'--ignore-scripts',
-					'--no-frozen-lockfile',
-					'--config.auto-install-peers=false',
-					'--strict-peer-dependencies',
+					'--linker',
+					'isolated',
+					'--omit',
+					'peer',
 				],
 				{
 					cwd: consumerRoot,
@@ -173,6 +157,9 @@ try {
 					timeout: 120_000,
 				},
 			);
+			const installOutput = `${install.stdout}${install.stderr}`;
+			expect(install.status, installOutput).toBe(0);
+			expect(installOutput).not.toMatch(/incorrect peer dependency/); // Bun has no --strict-peer-dependencies
 
 			const consumerRequire = createRequire(join(consumerRoot, 'package.json'));
 			for (const packageName of Object.keys(PACKAGES)) {
@@ -186,7 +173,7 @@ try {
 					`${packageName} must not resolve to source`,
 				).toBe(false);
 			}
-			const virtualStore = join(consumerRoot, 'node_modules/.pnpm');
+			const virtualStore = join(consumerRoot, 'node_modules/.bun');
 			expect(
 				readdirSync(virtualStore).some((entry) => /^(?:react|react-dom|preact)@/.test(entry)),
 			).toBe(false);

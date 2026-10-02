@@ -9,7 +9,7 @@
     "build": "vite build",
     "typecheck": "octane-tsc -p tsconfig.json",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
-    "e2e": "pnpm test:e2e"
+    "e2e": "bun run test:e2e"
   },
   "dependencies": {
     "octane": "workspace:*",

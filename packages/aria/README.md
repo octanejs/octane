@@ -34,7 +34,7 @@ Status, supported surface, and known divergences: `status.json` (rendered into
 Verify the pinned public surface with:
 
 ```bash
-pnpm --filter @octanejs/aria exports:check
+bun run --filter @octanejs/aria exports:check
 ```
 
 ## Notable divergences

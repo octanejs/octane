@@ -42,7 +42,7 @@
     "generate:entrypoints": "node scripts/generate-entrypoints.mjs --write",
     "verify:entrypoints": "node scripts/generate-entrypoints.mjs",
     "test:pristine": "jest --config jest.pristine.config.cjs --runInBand --ci --no-watchman",
-    "typecheck": "pnpm typecheck:pristine && pnpm typecheck:adapted",
+    "typecheck": "bun run typecheck:pristine && bun run typecheck:adapted",
     "typecheck:pristine": "tsc --noEmit -p typetests/pristine/tsconfig.json",
     "typecheck:adapted": "octane-tsc -p typetests/adapted/tsconfig.json",
     "generate:upstream-inventory": "node scripts/upstream-inventory.mjs --write",

@@ -86,7 +86,7 @@ bracket around an empty body skips no driver setup. Ratio guards hold
 Use Node 24 and the repository lockfile dependencies:
 
 ```sh
-pnpm bench:all compiler-output --quick --ratios
+bun run bench:all compiler-output --quick --ratios
 node benchmarks/compiler-output/corpus.mjs /path/to/frozen/baseline
 node benchmarks/compiler-output/state-arity.mjs /path/to/frozen/baseline
 node --jitless benchmarks/compiler-output/state-arity.mjs /path/to/frozen/baseline

@@ -19,7 +19,7 @@ if (!Number.isSafeInteger(iterations) || iterations <= 0) {
 	throw new TypeError(`iterations must be a positive safe integer, received ${rawIterations}.`);
 }
 
-const build = spawnSync('pnpm', ['--filter', 'octane', 'build'], {
+const build = spawnSync('bun', ['run', '--filter', 'octane', 'build'], {
 	cwd: REPO,
 	stdio: 'inherit',
 });

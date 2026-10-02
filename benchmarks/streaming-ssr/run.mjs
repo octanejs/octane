@@ -111,7 +111,7 @@ const provenance = octaneSource && {
 	platform: process.platform,
 	arch: process.arch,
 	build: { target: 'esnext', minify: 'esbuild', hmr: false },
-	lockfileSha256: hash(new URL('../../pnpm-lock.yaml', import.meta.url)),
+	lockfileSha256: hash(new URL('../../bun.lock', import.meta.url)),
 	inputs: Object.fromEntries(
 		[
 			'run.mjs',
@@ -374,7 +374,7 @@ if (provenance) {
 		'Built entry changed during measurement',
 	);
 	assert.equal(
-		hash(new URL('../../pnpm-lock.yaml', import.meta.url)),
+		hash(new URL('../../bun.lock', import.meta.url)),
 		provenance.lockfileSha256,
 		'Lockfile changed during measurement',
 	);

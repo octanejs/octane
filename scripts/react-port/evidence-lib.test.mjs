@@ -94,12 +94,12 @@ describe('evidence matrix', () => {
 		});
 		recordEvidence(legacy, 'package-tests', {
 			status: 'passed',
-			command: 'pnpm test',
+			command: 'bun run test',
 			observed: 'Tests passed before migration',
 		});
 		recordEvidence(legacy, 'format', {
 			status: 'passed',
-			command: 'pnpm format:check',
+			command: 'bun run format:check',
 			observed: 'Formatting passed',
 		});
 		const migrated = migrateEvidenceMatrix(legacy, readBindingSurfacePolicy(root));
@@ -159,7 +159,7 @@ describe('evidence matrix', () => {
 		);
 		recordEvidence(matrix, 'package-tests', {
 			status: 'passed',
-			command: 'pnpm --dir packages/widget test',
+			command: 'bun run --cwd packages/widget test',
 			observed: '12 tests passed',
 		});
 		assert.equal(matrix.gates['package-tests'].status, 'passed');
@@ -177,7 +177,7 @@ describe('evidence matrix', () => {
 		});
 		const result = recordEvidence(matrix, 'package-tests', {
 			status: 'passed',
-			command: 'pnpm --dir packages/widget test',
+			command: 'bun run --cwd packages/widget test',
 			observed: '12 tests passed',
 		});
 		assert.equal(result.status, 'passed');

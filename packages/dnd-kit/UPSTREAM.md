@@ -17,7 +17,7 @@
 
 The byte-exact React adapter source, package/build metadata, and license are vendored under
 `upstream/`, pinned by `audit/upstream.lock.json`: each committed file verifies offline against
-its upstream git blob sha (`pnpm react-port:materialize run --check --package-dir
+its upstream git blob sha (`bun run react-port:materialize run --check --package-dir
 packages/dnd-kit`), and the upstream MIT license is retained byte-exact as `LICENSE.upstream`. The canonical package directory at this pin
 contains no runtime test files, fixtures, snapshots, or dedicated type assertion suite. This is a
 repository-tree observation, not an inference from the published archive.

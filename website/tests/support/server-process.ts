@@ -153,14 +153,14 @@ export async function waitForReadyState(readyFile: string, timeoutMs: number): P
 }
 
 // Spawn a server in its OWN process group so stopServer() can kill the whole
-// tree. `pnpm exec …` is a wrapper: signalling just the wrapper can orphan the
+// tree. `bun x …` is a wrapper: signalling just the wrapper can orphan the
 // real node server underneath, which then squats the port for every later run.
 export function spawnServer(
 	cwd: string,
 	args: string[],
 	env: NodeJS.ProcessEnv = {},
 ): ChildProcess {
-	return spawn('pnpm', args, {
+	return spawn('bun', ['x', '--no-install', ...args], {
 		cwd,
 		stdio: ['ignore', 'pipe', 'pipe'],
 		detached: true,

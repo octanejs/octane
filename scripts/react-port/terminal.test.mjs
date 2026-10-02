@@ -24,7 +24,7 @@ test('rejects path traversal and separators in batch identifiers', () => {
 	}
 });
 
-test('accepts one leading pnpm argument separator', () => {
+test('accepts one leading script argument separator', () => {
 	assert.deepEqual(parseArguments(['--', '--batch', 'fixture']), {
 		workRoot: '.react-port-work',
 		batch: 'fixture',

@@ -16,7 +16,7 @@ Octane's `@octanejs/lynx` renderer. It exercises the full tutorial feature set:
 ## Run it
 
 ```bash
-pnpm --filter @octanejs/rspeedy-plugin exec rspeedy dev --root examples/gallery
+bun run --filter @octanejs/rspeedy-plugin exec rspeedy dev --root examples/gallery
 ```
 
 Scan the QR code (or `open` the printed `main.lynx.bundle?fullscreen=true` URL)

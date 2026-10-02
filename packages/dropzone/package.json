@@ -39,7 +39,7 @@
     "LICENSE.upstream"
   ],
   "scripts": {
-    "test": "pnpm upstream:verify && pnpm test:u2-parity && pnpm test:u3-parity && pnpm test:u4-parity && pnpm test:u5-parity && pnpm test:adoption && pnpm test:packed",
+    "test": "bun run upstream:verify && bun run test:u2-parity && bun run test:u3-parity && bun run test:u4-parity && bun run test:u5-parity && bun run test:adoption && bun run test:packed",
     "test:adoption": "node --test tests/adoption/*.test.mjs",
     "upstream:verify": "node audit/verify-provenance.mjs",
     "test:packed": "node tests/probes/packed-exports.test.mjs",

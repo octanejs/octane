@@ -1,5 +1,5 @@
 /**
- * Type-level pins for the island boundary (checked by `pnpm typecheck`, never
+ * Type-level pins for the island boundary (checked by `bun run typecheck`, never
  * executed or bundled): the .tsrx islands join the program with real octane
  * types, BOTH OctaneCompat authoring forms type-check zero-cast, and a prop
  * mistake at either call site is a TYPE ERROR. If a `@ts-expect-error` line

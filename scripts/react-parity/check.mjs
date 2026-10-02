@@ -455,7 +455,7 @@ for (const relativeFile of CLAIM_FILES) {
 	}
 }
 
-const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
+const bunVersion = execFileSync('bun', ['--version'], { encoding: 'utf8' });
 for (const relativeFile of BINDING_MANIFESTS) {
 	try {
 		const manifest = await loadManifest(path.join(REPO, relativeFile));
@@ -473,7 +473,7 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		}
 		await verifyManifestFiles(manifest, REPO);
 		for (const lane of manifest.lanes) {
-			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
+			await verifyLaneEnvironment(manifest, lane, REPO, bunVersion);
 		}
 	} catch (error) {
 		errors.push(`${relativeFile} is invalid: ${error.message}`);

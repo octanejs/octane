@@ -10,16 +10,16 @@ the browser journeys never depend on a live service.
 From this directory:
 
 ```bash
-pnpm dev
+bun run dev
 ```
 
 Open `http://127.0.0.1:5230/mail/inbox/launch-window`. Every mailbox, message,
 and draft has a deep link. The maintained gates are:
 
 ```bash
-pnpm typecheck
-pnpm build
-pnpm test:e2e
+bun run typecheck
+bun run build
+bun run test:e2e
 ```
 
 `test:e2e` production-builds the TSRX client and drives all seven journeys in

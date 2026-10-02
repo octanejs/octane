@@ -110,7 +110,7 @@ repository commands remain the intended acceptance gates. The pre-CI
 records the follow-up's source snapshots, commands, results, and controlled
 faults against that same setup.
 
-The actual `pnpm sync` was attempted with
+The actual `bun run sync` was attempted with
 `pnpm_config_verify_deps_before_run=warn pnpm sync`, using pnpm's dependency
 verification setting to avoid another automatic full install. Version
 artifacts, Playwright fixtures, parity fingerprints, binding status/gaps, and
@@ -329,7 +329,7 @@ only the measured workloads, not the absence of every leak.
 
 ## Unmet acceptance gates
 
-- Complete locked workspace installation and successful canonical `pnpm sync`,
+- Complete locked workspace installation and successful canonical `bun run sync`,
   formatting, typechecking, testing, and package builds.
 - Remaining compiler/profile/DevTools and existing repository suites, beyond
   the explicitly recorded supplemental cases. Native option forwarding and

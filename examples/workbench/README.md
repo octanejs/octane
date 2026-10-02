@@ -19,15 +19,15 @@ task manifest, runs one, and streams its log back from the backend.
 ## Running it
 
 ```bash
-pnpm dev            # frontend only, in a browser
-pnpm tauri dev      # the real desktop app (needs a Rust toolchain)
-pnpm test:e2e       # production build + Playwright journeys
+bun run dev            # frontend only, in a browser
+bun run tauri dev      # the real desktop app (needs a Rust toolchain)
+bun run test:e2e       # production build + Playwright journeys
 ```
 
 Both halves answer the same three commands (`list_tasks`, `describe_task`,
 `run_task`) and emit the same `workbench:log` event.
 
-- `src-tauri/src/lib.rs` is the real backend, used by `pnpm tauri dev`.
+- `src-tauri/src/lib.rs` is the real backend, used by `bun run tauri dev`.
 - `src/bridge.ts` installs Tauri's own mock IPC when `__TAURI_INTERNALS__` is
   absent, so the dev server, `vite preview`, and every committed journey run in
   an ordinary browser with no Rust toolchain. Its fixtures and 150ms line
@@ -46,5 +46,5 @@ The header badge says which of the two answered.
 
 `src-tauri/Cargo.lock` is not committed: CI never builds the Rust shell, and a
 4k-line generated lockfile would churn in a JavaScript monorepo. Run
-`pnpm tauri build` for a real bundle; `src-tauri/icons/icon.png` is a
-placeholder, so replace it (or run `pnpm tauri icon`) before shipping anything.
+`bun run tauri build` for a real bundle; `src-tauri/icons/icon.png` is a
+placeholder, so replace it (or run `bun run tauri icon`) before shipping anything.

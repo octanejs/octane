@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { spawn } from 'node:child_process';
 
-const CHANGESETS_CLI = fileURLToPath(import.meta.resolve('@changesets/cli/bin.js'));
+const PUBLISH_SCRIPT = fileURLToPath(new URL('./changesets-publish.mjs', import.meta.url));
 
 function run(command, args, options) {
 	return new Promise((resolve, reject) => {
@@ -33,7 +33,7 @@ async function writeExecutable(filePath, source) {
 	await chmod(filePath, 0o755);
 }
 
-test('stale registry data does not crash recovery when pnpm reports an existing version', async () => {
+test('stale registry data does not crash recovery when npm reports an existing version', async () => {
 	const root = await mkdtemp(path.join(os.tmpdir(), 'octane-changesets-publish-'));
 	const binDirectory = path.join(root, 'bin');
 	const packageDirectory = path.join(root, 'packages', 'fixture');
@@ -50,11 +50,15 @@ test('stale registry data does not crash recovery when pnpm reports an existing 
 				path.join(root, 'package.json'),
 				JSON.stringify({
 					name: 'changesets-publish-regression',
-					packageManager: 'pnpm@11.15.1',
+					packageManager: 'bun@1.4.2',
 					private: true,
+					workspaces: { packages: ['packages/*'] },
 				}),
 			),
-			writeFile(path.join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n"),
+			writeFile(
+				path.join(root, 'bun.lock'),
+				JSON.stringify({ lockfileVersion: 2, configVersion: 1, workspaces: { '': {} } }),
+			),
 			writeFile(
 				path.join(packageDirectory, 'package.json'),
 				JSON.stringify({
@@ -79,40 +83,28 @@ test('stale registry data does not crash recovery when pnpm reports an existing 
 			writeExecutable(
 				path.join(binDirectory, 'npm'),
 				`
-if (process.argv[2] === 'info') process.exit(1);
-console.error('unexpected npm command: ' + process.argv.slice(2).join(' '));
-process.exit(2);
-`,
-			),
-			writeExecutable(
-				path.join(binDirectory, 'pnpm'),
-				`
 import { appendFileSync } from 'node:fs';
-if (process.argv[2] === '--version') {
-	console.log('11.15.1');
-	process.exit(0);
-}
 if (process.argv[2] === 'info') {
-	console.log(JSON.stringify({ error: { code: 'ERR_PNPM_PACKAGE_NOT_FOUND', message: 'Package not found' } }));
+	console.log(JSON.stringify({ error: { code: 'E404', summary: 'Not Found' } }));
 	process.exit(1);
 }
 if (process.argv[2] === 'publish') {
-	appendFileSync(process.env.PUBLISH_MARKER, 'publish\\n');
+	appendFileSync(process.env.PUBLISH_MARKER, \`publish \${process.argv[3].split('/').at(-1)}\\n\`);
 	console.log(JSON.stringify({
 		error: {
 			code: 'E403',
-			message: 'You cannot publish over the previously published version 1.0.0.',
+			summary: 'You cannot publish over the previously published versions: 1.0.0.',
 		},
 	}));
 	process.exit(1);
 }
-console.error('unexpected pnpm command: ' + process.argv.slice(2).join(' '));
+console.error('unexpected npm command: ' + process.argv.slice(2).join(' '));
 process.exit(2);
 `,
 			),
 		]);
 
-		const result = await run(process.execPath, [CHANGESETS_CLI, 'publish'], {
+		const result = await run(process.execPath, [PUBLISH_SCRIPT], {
 			cwd: root,
 			env: {
 				...process.env,
@@ -129,7 +121,10 @@ process.exit(2);
 			0,
 			`changeset publish failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
 		);
-		assert.equal(await readFile(markerPath, 'utf8'), 'publish\n');
+		assert.equal(
+			await readFile(markerPath, 'utf8'),
+			'publish changesets-publish-regression-fixture-1.0.0.tgz\n',
+		);
 		assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /TypeError/);
 	} finally {
 		await rm(root, { force: true, recursive: true });

@@ -23,12 +23,12 @@
 // often small enough that the choice doesn't dominate real-world apps.
 //
 // Usage:
-//   pnpm --filter octane-tsrx-signal-bench dev  # :5190 (.tsrx)
-//   pnpm --filter octane-jsx-signal-bench dev   # :5194 (.tsx / JSX)
-//   pnpm --filter solid-signal-bench dev        # :5191
-//   pnpm --filter react-signal-bench dev        # :5192
-//   pnpm --filter ripple-signal-bench dev       # :5193
-//   pnpm --filter vue-vapor-signal-bench dev    # :5183
+//   bun run --filter octane-tsrx-signal-bench dev  # :5190 (.tsrx)
+//   bun run --filter octane-jsx-signal-bench dev   # :5194 (.tsx / JSX)
+//   bun run --filter solid-signal-bench dev        # :5191
+//   bun run --filter react-signal-bench dev        # :5192
+//   bun run --filter ripple-signal-bench dev       # :5193
+//   bun run --filter vue-vapor-signal-bench dev    # :5183
 //   node benchmarks/signal-favoring/run.mjs [iter]   # default 20
 
 import { chromium } from 'playwright';

@@ -6,7 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const { chromium } = createRequire(path.join(__dirname, 'package.json'))('@playwright/test');
 import { spawn } from 'node:child_process';
 
-const child = spawn('pnpm', ['dev', '--port', '4177'], {
+const child = spawn('bun', ['run', 'dev', '--port', '4177'], {
 	cwd: path.join(__dirname, 'octane'),
 	env: { ...process.env, BENCH_DEFER_MS: '30' },
 	stdio: 'ignore',

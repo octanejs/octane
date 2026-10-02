@@ -5,8 +5,8 @@
 // (~10ms/click).
 //
 // Usage:
-//   pnpm --filter octane-tsrx-jsbench dev   # .tsrx variant on 5176
-//   pnpm --filter octane-jsx-jsbench dev    # .tsx (JSX) variant on 5177
+//   bun run --filter octane-tsrx-jsbench dev   # .tsrx variant on 5176
+//   bun run --filter octane-jsx-jsbench dev    # .tsx (JSX) variant on 5177
 //   node benchmarks/js-framework/run.mjs [iterations]   # default 8
 //   BENCH_JSON=results/js-framework.json node run.mjs   # + machine-readable copy
 //

@@ -19,7 +19,7 @@
 // coverage that only this preset can satisfy.
 //
 // KNOWN COVERAGE GAP: `node-server` is not a dead preset. It is what a plain
-// `pnpm --filter website build` emits locally, and `pnpm --filter website start`
+// `bun run --filter website build` emits locally, and `bun run --filter website start`
 // runs `.output/server/index.mjs` (see website/README.md). Nothing smoke-tests
 // that artifact any more. Re-adding it means paying for a second full build, so
 // it is a deliberate trade, not an oversight.
@@ -94,7 +94,7 @@ function buildWebsite(): Promise<void> {
 	// run can be cancelled while this is the only thing still working.
 	// Use the deployment build, including the packaged assets fetched by Lynx
 	// previews. A bare Vite build omits them on a clean checkout.
-	build = spawn('pnpm', ['run', 'build'], {
+	build = spawn('bun', ['run', 'build'], {
 		cwd: WEBSITE,
 		stdio: ['ignore', 'pipe', 'pipe'],
 		detached: true,
@@ -133,7 +133,6 @@ export async function setup(project: TestProject): Promise<void> {
 			server = spawnServer(
 				WEBSITE,
 				[
-					'exec',
 					'vite',
 					'preview',
 					'--configLoader',

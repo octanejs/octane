@@ -61,7 +61,7 @@ describe('version', () => {
 				writeFileSync(join(directory, 'package.json'), JSON.stringify({ version: nextVersion }));
 				const stale = spawnSync(process.execPath, [generator, '--check'], { encoding: 'utf8' });
 				expect(stale.status).toBe(1);
-				expect(stale.stderr).toContain('pnpm sync');
+				expect(stale.stderr).toContain('bun run sync');
 
 				execFileSync(process.execPath, [generator]);
 				execFileSync(process.execPath, [generator, '--check']);

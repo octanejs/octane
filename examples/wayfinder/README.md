@@ -74,10 +74,10 @@ component memo for the same stable resource identity.
 ## Commands
 
 ```bash
-pnpm --dir examples/wayfinder typecheck
-pnpm --dir examples/wayfinder build
-pnpm --dir examples/wayfinder dev
-pnpm --dir examples/wayfinder test:e2e
+bun run --cwd examples/wayfinder typecheck
+bun run --cwd examples/wayfinder build
+bun run --cwd examples/wayfinder dev
+bun run --cwd examples/wayfinder test:e2e
 ```
 
 `build` emits both the production client and self-contained SSR server.

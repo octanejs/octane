@@ -34,10 +34,10 @@
 // call a sub-ms move a regression).
 //
 // Servers must be running first (production preview recommended):
-//   pnpm --filter octane-tsrx-svg-dashboard-bench preview   # :5302
-//   pnpm --filter react-svg-dashboard-bench       preview   # :5303
-//   pnpm --filter solid-svg-dashboard-bench       preview   # :5304
-//   pnpm --filter svelte-svg-dashboard-bench      preview   # :5305
+//   bun run --filter octane-tsrx-svg-dashboard-bench preview   # :5302
+//   bun run --filter react-svg-dashboard-bench       preview   # :5303
+//   bun run --filter solid-svg-dashboard-bench       preview   # :5304
+//   bun run --filter svelte-svg-dashboard-bench      preview   # :5305
 //
 // Usage:  node run.mjs [iter]   # default 20
 // Env:    TARGETS='[{"name":"octane-tsrx","url":"http://localhost:5302/"}]'

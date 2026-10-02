@@ -16,7 +16,7 @@
 | React types | `@types/react@19.2.7` | type lanes |
 | ReactDOM types | `@types/react-dom@19.2.3` | type lanes |
 
-These versions are the exact `catalog:react-pdf-react-oracle` pins in `pnpm-workspace.yaml`.
+These versions are the exact `catalog:react-pdf-react-oracle` pins in the root `package.json` `workspaces.catalogs`.
 
 The pinned tag source, all 13 source test authorities, package metadata,
 README, TypeScript programs, and license are vendored under

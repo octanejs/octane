@@ -15,7 +15,7 @@ This example is a faithful port of the official Lynx tutorial
 ## Run it
 
 ```bash
-pnpm --filter @octanejs/rspeedy-plugin exec rspeedy dev --root examples/bank-cards
+bun run --filter @octanejs/rspeedy-plugin exec rspeedy dev --root examples/bank-cards
 ```
 
 Scan the QR code (or `open` the printed `main.lynx.bundle?fullscreen=true` URL)

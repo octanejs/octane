@@ -41,12 +41,12 @@
 //   remove_100_scattered  drop every 10th cleanups 100, refCleanups 100
 //
 // Servers must be running first (production preview recommended):
-//   pnpm --filter octane-tsrx-effectful-list-bench preview   # :5201
-//   pnpm --filter octane-jsx-effectful-list-bench  preview   # :5202
-//   pnpm --filter react-effectful-list-bench       preview   # :5203
-//   pnpm --filter solid-effectful-list-bench       preview   # :5204
-//   pnpm --filter ripple-effectful-list-bench      preview   # :5205
-//   pnpm --filter vue-vapor-effectful-list-bench   preview   # :5221
+//   bun run --filter octane-tsrx-effectful-list-bench preview   # :5201
+//   bun run --filter octane-jsx-effectful-list-bench  preview   # :5202
+//   bun run --filter react-effectful-list-bench       preview   # :5203
+//   bun run --filter solid-effectful-list-bench       preview   # :5204
+//   bun run --filter ripple-effectful-list-bench      preview   # :5205
+//   bun run --filter vue-vapor-effectful-list-bench   preview   # :5221
 // (swap `preview` → `dev` for the unminified dev build).
 //
 // Usage:  node run.mjs [iter]   # default 30

@@ -191,7 +191,7 @@ try {
 		v8: process.versions.v8,
 		platform: process.platform,
 		architecture: process.arch,
-		lockfileHash: sha256(readFileSync(path.join(repo, 'pnpm-lock.yaml'))),
+		lockfileHash: sha256(readFileSync(path.join(repo, 'bun.lock'))),
 		candidateRef: process.env.BENCH_SOURCE_REF ?? 'working tree',
 		candidate: await measure(sourceAt(process.env.BENCH_SOURCE_REF), 'candidate'),
 	};

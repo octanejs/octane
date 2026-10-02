@@ -87,7 +87,7 @@ node benchmarks/bench.mjs hook-store-composition
 
 node benchmarks/hook-store-composition/run.mjs 8
 node benchmarks/hook-store-composition/work.mjs
-pnpm exec tsrx-tsc --noEmit -p benchmarks/hook-store-composition/tsconfig.json
+bunx tsrx-tsc --noEmit -p benchmarks/hook-store-composition/tsconfig.json
 node --test benchmarks/lib/precise-work.test.mjs
 ```
 

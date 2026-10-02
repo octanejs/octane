@@ -13,7 +13,7 @@ function findRepoRoot(start: string): string {
 	const filesystemRoot = parse(directory).root;
 	while (directory !== filesystemRoot) {
 		if (
-			existsSync(resolve(directory, 'pnpm-workspace.yaml')) &&
+			existsSync(resolve(directory, 'bun.lock')) &&
 			existsSync(resolve(directory, 'packages/tanstack-hotkeys/package.json'))
 		) {
 			return directory;

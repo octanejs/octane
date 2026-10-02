@@ -48,11 +48,11 @@ tables.
 ## Verification
 
 ```sh
-pnpm --dir packages/spring upstream:verify
-pnpm --dir packages/spring typecheck
-pnpm exec vitest run --project spring --project spring-ssr
-pnpm exec vitest run --project spring-browser
-pnpm packages:pack:check
+bun run --cwd packages/spring upstream:verify
+bun run --cwd packages/spring typecheck
+bunx vitest run --project spring --project spring-ssr
+bunx vitest run --project spring-browser
+bun run packages:pack:check
 ```
 
 The browser lane builds and exercises the central playground in development

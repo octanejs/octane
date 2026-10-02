@@ -43,9 +43,9 @@
 // failure exits 1 (and BENCH_JSON, if requested, records the reason).
 //
 // Servers must be running first (production preview recommended):
-//   pnpm --filter octane-tsrx-portal-swarm-bench preview   # :5210
-//   pnpm --filter react-portal-swarm-bench       preview   # :5211
-//   pnpm --filter solid-portal-swarm-bench       preview   # :5212
+//   bun run --filter octane-tsrx-portal-swarm-bench preview   # :5210
+//   bun run --filter react-portal-swarm-bench       preview   # :5211
+//   bun run --filter solid-portal-swarm-bench       preview   # :5212
 // (swap `preview` → `dev` for the unminified dev build).
 //
 // Usage:  node run.mjs [iter]   # default 20

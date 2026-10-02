@@ -83,7 +83,7 @@ const output = {
 		revision: source.revision,
 		sourceSha256: sourceHash,
 		fixtureSha256: fixtureSourceHash,
-		lockfileSha256: hash(fs.readFileSync(path.join(repo, 'pnpm-lock.yaml'))),
+		lockfileSha256: hash(fs.readFileSync(path.join(repo, 'bun.lock'))),
 		node: process.version,
 		platform: process.platform,
 		arch: process.arch,

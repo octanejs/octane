@@ -30,10 +30,10 @@ in the markup and are compared).
 ## Running
 
 ```bash
-pnpm --filter tanstack-start-bench build   # builds all three targets
-pnpm --filter tanstack-start-bench compare # structural gate (must pass first)
-pnpm --filter tanstack-start-bench test:e2e # behavioral gate, one spec × both
-pnpm --filter tanstack-start-bench bench:work # deterministic production HTML/asset gate
+bun run --filter tanstack-start-bench build   # builds all three targets
+bun run --filter tanstack-start-bench compare # structural gate (must pass first)
+bun run --filter tanstack-start-bench test:e2e # behavioral gate, one spec × both
+bun run --filter tanstack-start-bench bench:work # deterministic production HTML/asset gate
 node run.mjs [iterations] [--no-build]     # perf harness (see below)
 node ../bench.mjs --quick tanstack-start   # via the unified runner
 ```

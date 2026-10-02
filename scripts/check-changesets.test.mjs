@@ -7,6 +7,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { getReleasePlan } from '@changesets/get-release-plan';
 import { computedMajorReleaseNames, majorReleaseNames } from './check-release-plan.mjs';
+
+const BUN_LOCK = JSON.stringify({ lockfileVersion: 2, configVersion: 1, workspaces: { '': {} } });
 import {
 	getWorkspacePackages,
 	publishedOctanePeerRangeFor,
@@ -97,9 +99,9 @@ for (const source of ['octane', '@octanejs/floating-ui']) {
 			mkdirSync(join(directory, '.changeset'));
 			writeFileSync(
 				join(directory, 'package.json'),
-				JSON.stringify({ name: 'fixture', private: true }),
+				JSON.stringify({ name: 'fixture', private: true, workspaces: ['packages/*'] }),
 			);
-			writeFileSync(join(directory, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n");
+			writeFileSync(join(directory, 'bun.lock'), BUN_LOCK);
 			const config = JSON.parse(
 				readFileSync(new URL('../.changeset/config.json', import.meta.url), 'utf8'),
 			);
@@ -166,9 +168,9 @@ test('successive Octane releases retain valid workspace and published peer contr
 	mkdirSync(join(directory, '.changeset'));
 	writeFileSync(
 		join(directory, 'package.json'),
-		JSON.stringify({ name: 'fixture', private: true }),
+		JSON.stringify({ name: 'fixture', private: true, workspaces: ['packages/*'] }),
 	);
-	writeFileSync(join(directory, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n");
+	writeFileSync(join(directory, 'bun.lock'), BUN_LOCK);
 	const config = JSON.parse(readFileSync(new URL('../.changeset/config.json', import.meta.url)));
 	writeFileSync(
 		join(directory, '.changeset/config.json'),
@@ -241,9 +243,9 @@ test('versioning multiline release notes produces whitespace-clean changelogs', 
 		mkdirSync(join(directory, 'packages/demo'), { recursive: true });
 		writeFileSync(
 			join(directory, 'package.json'),
-			JSON.stringify({ name: 'fixture', private: true }),
+			JSON.stringify({ name: 'fixture', private: true, workspaces: ['packages/*'] }),
 		);
-		writeFileSync(join(directory, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n");
+		writeFileSync(join(directory, 'bun.lock'), BUN_LOCK);
 		writeFileSync(
 			join(directory, 'packages/demo/package.json'),
 			JSON.stringify({ name: 'demo', version: '0.1.0' }),

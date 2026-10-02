@@ -390,7 +390,7 @@ const payload = {
 		tsrxCore: packageVersion(requireOctane, '@tsrx/core'),
 		react: requireOctane('react/package.json').version,
 		parser: 'package-default',
-		lockfileHash: hash(fs.readFileSync(path.join(repo, 'pnpm-lock.yaml'))),
+		lockfileHash: hash(fs.readFileSync(path.join(repo, 'bun.lock'))),
 		production: true,
 		minified: false,
 		iterations: 1,

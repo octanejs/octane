@@ -7,9 +7,9 @@
 // turn the measurement into a different program.
 //
 // Build unminified (`MEMO_WALL_WORK=1`) and start the production preview first:
-//   MEMO_WALL_WORK=1 pnpm --filter octane-tsrx-memowall-bench build
-//   pnpm --filter octane-tsrx-memowall-bench preview
-//   pnpm --dir benchmarks/memo-wall bench:work
+//   MEMO_WALL_WORK=1 bun run --filter octane-tsrx-memowall-bench build
+//   bun run --filter octane-tsrx-memowall-bench preview
+//   bun run --cwd benchmarks/memo-wall bench:work
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';

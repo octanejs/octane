@@ -24,7 +24,7 @@ benchmarks/dbmon/
 ├── preact/       # Vite app, dev :5263 (native Preact hooks)
 ├── svelte/       # Vite app, dev :5274 (Svelte 5 runes + keyed #each)
 ├── run.mjs        # Playwright harness — drives all adapters
-├── package.json   # umbrella: `pnpm bench`
+├── package.json   # umbrella: `bun run bench`
 └── README.md
 ```
 

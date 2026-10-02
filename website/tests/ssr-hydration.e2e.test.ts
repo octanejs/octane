@@ -3,7 +3,7 @@
 // Dev-SSR → real-browser hydration smoke — the seam every historical website
 // breakage lived in (router-parity SSR regression, the 2026-07-08 bare-Symbol()
 // slot regression) and the one the jsdom suites can't see: those client-render
-// only, while `pnpm dev` server-renders each route with PROD-mode-compiled
+// only, while `bun run dev` server-renders each route with PROD-mode-compiled
 // server modules and hydrates with DEV-mode client modules. This spec boots the
 // REAL vite dev server, loads every route in headless Chromium, and fails on
 // any hydration-mismatch warning or page error; then builds and repeats against
@@ -179,7 +179,7 @@ beforeAll(async () => {
 	} catch (error) {
 		throw new Error(
 			'[ssr-hydration.e2e] Chromium is required ' +
-				'(run `pnpm exec playwright install chromium`): ' +
+				'(run `bunx playwright install chromium`): ' +
 				(error instanceof Error ? error.message.split('\n')[0] : String(error)),
 		);
 	}
@@ -973,7 +973,6 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 		// a deterministic cold start without an "Outdated Optimize Dep" reload.
 		rmSync(join(WEBSITE, 'node_modules/.vite'), { recursive: true, force: true });
 		server = spawnServer([
-			'exec',
 			'vite',
 			'--configLoader',
 			'runner',

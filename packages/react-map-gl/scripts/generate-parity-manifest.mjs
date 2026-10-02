@@ -4,7 +4,7 @@
  *
  * Hashes and case lists are derived from the files themselves so the manifest
  * cannot drift silently: edit a lane file without rerunning this and
- * `pnpm react-parity:check` fails on the integrity mismatch, which is the point.
+ * `bun run react-parity:check` fails on the integrity mismatch, which is the point.
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
 
-/** Written through Prettier so `pnpm format:check` stays clean. */
+/** Written through Prettier so `bun run format:check` stays clean. */
 async function writeJson(absolute, value) {
 	const source = `${JSON.stringify(value, null, '\t')}\n`;
 	writeFileSync(
@@ -309,9 +309,9 @@ const manifest = {
 			node: '>=22',
 			platform: 'any',
 			arch: 'any',
-			packageManager: 'pnpm@11.15.1',
-			lockfile: 'pnpm-lock.yaml',
-			lockfileSha256: hashFile('pnpm-lock.yaml'),
+			packageManager: 'bun@1.4.2',
+			lockfile: 'bun.lock',
+			lockfileSha256: hashFile('bun.lock'),
 		},
 	},
 	lanes: [

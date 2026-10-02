@@ -91,9 +91,9 @@ message. It also verifies unchanged message identity and content, the updated
 reply, and an unrelated controlled-composer update:
 
 ```bash
-CHAT_STREAM_WORK=1 pnpm --filter octane-tsrx-chat-stream build
-pnpm --filter octane-tsrx-chat-stream preview
-pnpm --dir benchmarks/chat-stream bench:work
+CHAT_STREAM_WORK=1 bun run --filter octane-tsrx-chat-stream build
+bun run --filter octane-tsrx-chat-stream preview
+bun run --cwd benchmarks/chat-stream bench:work
 ```
 
 `TARGET_URL` overrides the preview address, and `WORK_JSON` saves the measured
@@ -112,7 +112,7 @@ metric is synchronous elapsed rendering and descriptor-projection time for the
 complete token stream in a production build.
 
 ```bash
-pnpm --dir benchmarks/chat-stream bench:descriptors
+bun run --cwd benchmarks/chat-stream bench:descriptors
 node benchmarks/chat-stream/descriptor-stream.mjs 16
 node benchmarks/chat-stream/descriptor-stream.mjs --build-only
 BENCH_JSON=/tmp/descriptor-stream.json node benchmarks/chat-stream/descriptor-stream.mjs 16

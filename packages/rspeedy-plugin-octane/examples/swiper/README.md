@@ -21,7 +21,7 @@ tutorial:
 ## Run it
 
 ```bash
-pnpm --filter @octanejs/rspeedy-plugin exec rspeedy dev --root examples/swiper
+bun run --filter @octanejs/rspeedy-plugin exec rspeedy dev --root examples/swiper
 ```
 
 Open the printed `main.lynx.bundle?fullscreen=true` URL with Lynx Explorer 3.9+.

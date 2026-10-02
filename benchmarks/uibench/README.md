@@ -94,19 +94,19 @@ node benchmarks/bench.mjs uibench
 Standalone, after starting the production previews:
 
 ```bash
-pnpm --filter octane-tsrx-uibench-bench build
-pnpm --filter react-uibench-bench build
-pnpm --filter solid-uibench-bench build
-pnpm --filter preact-uibench-bench build
-pnpm --filter vue-vapor-uibench-bench build
-pnpm --filter ripple-uibench-bench build
-pnpm --filter inferno-uibench-bench build
-pnpm --filter octane-tsrx-uibench-bench preview # :5315
-pnpm --filter react-uibench-bench preview       # :5316
-pnpm --filter solid-uibench-bench preview       # :5317
-pnpm --filter preact-uibench-bench preview      # :5318
-pnpm --filter vue-vapor-uibench-bench preview   # :5319
-pnpm --filter ripple-uibench-bench preview      # :5322
-pnpm --filter inferno-uibench-bench preview     # :5325
+bun run --filter octane-tsrx-uibench-bench build
+bun run --filter react-uibench-bench build
+bun run --filter solid-uibench-bench build
+bun run --filter preact-uibench-bench build
+bun run --filter vue-vapor-uibench-bench build
+bun run --filter ripple-uibench-bench build
+bun run --filter inferno-uibench-bench build
+bun run --filter octane-tsrx-uibench-bench preview # :5315
+bun run --filter react-uibench-bench preview       # :5316
+bun run --filter solid-uibench-bench preview       # :5317
+bun run --filter preact-uibench-bench preview      # :5318
+bun run --filter vue-vapor-uibench-bench preview   # :5319
+bun run --filter ripple-uibench-bench preview      # :5322
+bun run --filter inferno-uibench-bench preview     # :5325
 node benchmarks/uibench/run.mjs 10
 ```

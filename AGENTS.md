@@ -127,7 +127,7 @@ Never write `declare module '*.tsrx'` in a published package's `src/`. It
 silences `.tsrx` resolution rather than fixing it, so every import it covers
 becomes `any`, including the package's own exported components. It is ambient, so
 it ships in the tarball and applies to any program that includes it.
-`pnpm tsrx-decls:check` enforces this.
+`bun run tsrx-decls:check` enforces this.
 
 Typecheck any program containing `.tsrx` with `octane-tsc -p <tsconfig>`, never
 plain `tsc`. Octane-owned `.tsx` files carry a leading `/** @jsxImportSource octane */`
@@ -142,22 +142,22 @@ consuming application compiles the source with its own toolchain.
 ## Working here
 
 ```bash
-pnpm test          # full Vitest run
-pnpm typecheck
-pnpm typecheck:files [path...]     # defaults to staged and unstaged files
-pnpm sync
-pnpm format:files [path...]        # defaults to staged and unstaged files
-pnpm format:files:check [path...]  # defaults to staged and unstaged files
-pnpm format:check                  # optional repo-wide gate
+bun run test  # full Vitest run
+bun run typecheck
+bun run typecheck:files [path...]  # defaults to staged and unstaged files
+bun run sync
+bun run format:files [path...]  # defaults to staged and unstaged files
+bun run format:files:check [path...]  # defaults to staged and unstaged files
+bun run format:check  # optional repo-wide gate
 ```
 
-Before any push, run `pnpm sync` and commit its generated changes.
+Before any push, run `bun run sync` and commit its generated changes.
 
 Scoped typecheck and Prettier commands default to staged and unstaged Git diffs;
 explicit files or directories override that default. `format:files` writes and
 `format:files:check` is read-only. Use repo-wide checks only when needed.
 
-`pnpm test` runs package prechecks, then one root Vitest invocation for every
+`bun run test` runs package prechecks, then one root Vitest invocation for every
 project in `vitest.config.js`; it does not fan out through package `test`
 scripts. Root config uses `silent: true`. While diagnosing, pass
 `--silent=false` for all console output or `--silent=passed-only` for failing
@@ -177,7 +177,7 @@ line.
 ## RuleSync
 
 Generated agent files come from `.rulesync/rules/`: edit those and run
-`pnpm rules:generate`; never hand-edit a generated file. This root rule becomes
+`bun run rules:generate`; never hand-edit a generated file. This root rule becomes
 `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`, and
 `.cursor/rules/project.mdc`. The other rules carry `globs`, so agents that
 support path-scoped rules load them only when you open a matching file.

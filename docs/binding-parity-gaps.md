@@ -1,6 +1,6 @@
 # Binding parity gaps (generated)
 
-<!-- GENERATED FILE — do not edit. Regenerate with `pnpm binding-parity:gaps`. -->
+<!-- GENERATED FILE — do not edit. Regenerate with `bun run binding-parity:gaps`. -->
 
 This is the executable failure-pin audit for every framework binding discovered
 from the workspace inventory. It includes `it.fails(...)` and

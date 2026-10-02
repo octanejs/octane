@@ -55,6 +55,7 @@ export async function deriveUpstreamInventory() {
 						.relative(repositoryRoot, declaration.getSourceFile().fileName)
 						.split(path.sep)
 						.join('/')
+						.replace(/^node_modules\/\.bun\/[^/]+\/node_modules\//, 'node_modules/') // drop the linker's hashed store directory
 				: 'packages/drei/upstream/src/index.ts';
 			const line = declaration
 				? declaration.getSourceFile().getLineAndCharacterOfPosition(declaration.getStart()).line + 1

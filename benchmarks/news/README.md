@@ -69,7 +69,7 @@ hydration was extended beyond single leaf templates.
 ## Run
 
 ```bash
-pnpm install
+bun install
 node benchmarks/news/gen.mjs 50              # regenerate the dataset into every target (default 50)
 node benchmarks/news/run.mjs octane-tsrx     # builds (prod) + benches; `run.mjs 20` also works
 node benchmarks/news/run.mjs octane-jsx 20   # same app authored in React-style .tsx (JSX)
@@ -110,9 +110,9 @@ backwards-compat path's SSR + hydration cost.
 which still **emits** the `ssrRunInScope` SSR helper), but
 `@solidjs/web@2.0.0-beta.14` **removed** that export (dom-expressions 0.50 stopped
 emitting it). Without alignment, Solid SSR throws _"does not provide an export
-named 'ssrRunInScope'"_. A pnpm override in `pnpm-workspace.yaml` forces the
+named 'ssrRunInScope'"_. A root `package.json` override forces the
 0.50-era preset the catalog already intends (`babel-preset-solid: 2.0.0-beta.14`),
-so the SSR transform matches the installed runtime. Run `pnpm install` after
+so the SSR transform matches the installed runtime. Run `bun install` after
 pulling to apply it.
 
 The Solid feed uses a plain (non-keyed) `@for`: Solid's keyed `<For>` passes each

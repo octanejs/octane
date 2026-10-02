@@ -67,7 +67,7 @@ ViewTransition prepares.
 
 The structural read seam is `getFirstChild` / `getNextSibling`; these use cached
 native getters normally and the staged view during preparation. Other host
-operations use typed `domNode` views. `pnpm staged-dom:check` resolves DOM members
+operations use typed `domNode` views. `bun run staged-dom:check` resolves DOM members
 through TypeScript (including traceable aliases and casts) and rejects raw host
 operations outside a small, operation-specific native allowlist. The guard and
 mutation tests run in the existing CI workflow tests. Committed geometry,

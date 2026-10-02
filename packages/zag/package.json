@@ -39,7 +39,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "pnpm upstream:materialize && vitest run --root ../.. --project zag --project zag-differential --project zag-ssr --project zag-pristine",
+    "test": "bun run upstream:materialize && vitest run --root ../.. --project zag --project zag-differential --project zag-ssr --project zag-pristine",
     "test:upstream": "node ../../scripts/react-parity/run-pristine.mjs zag",
     "typecheck": "octane-tsc -p tsconfig.json -p typetests/tsconfig.json",
     "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",

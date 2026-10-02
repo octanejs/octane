@@ -21,7 +21,7 @@ export async function launchBrowser(options?: LaunchOptions): Promise<Browser> {
 			throw cause;
 		}
 		throw new Error(
-			'Chromium could not be launched. Install it with `pnpm exec playwright install chromium`.',
+			'Chromium could not be launched. Install it with `bunx playwright install chromium`.',
 			{ cause },
 		);
 	}

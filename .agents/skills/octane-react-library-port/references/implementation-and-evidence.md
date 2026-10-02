@@ -89,7 +89,7 @@ For a new or upgraded port:
 - derive the committed pin from the preflighted batch node:
 
   ```bash
-  pnpm react-port:materialize lock --batch <id> --node pkg:<name> \
+  bun run react-port:materialize lock --batch <id> --node pkg:<name> \
     --package-dir packages/<binding> \
     --adapted-map <pinned-test-root>=tests/upstream \
     [--adapted-rewrite <find>=<replace> ...]
@@ -114,7 +114,7 @@ For a new or upgraded port:
 - regenerate the adapted suite whenever it is needed:
 
   ```bash
-  pnpm react-port:materialize run --package-dir packages/<binding>
+  bun run react-port:materialize run --package-dir packages/<binding>
   ```
 
   With a committed pristine tree this is fully offline: it verifies the tree
@@ -132,7 +132,7 @@ For a new or upgraded port:
   record it:
 
   ```bash
-  pnpm react-port:materialize diff --package-dir packages/<binding>
+  bun run react-port:materialize diff --package-dir packages/<binding>
   ```
 
   This regenerates `audit/upstream-patches/` with one patch per diverging file.
@@ -203,7 +203,7 @@ preflight requires; for those, derive the lock from the binding's existing
 reviewed `UPSTREAM.md` pin:
 
 ```bash
-pnpm react-port:materialize lock --package-dir packages/<binding> \
+bun run react-port:materialize lock --package-dir packages/<binding> \
   --pin <name>@<exact-version> --repo <owner>/<repo> --commit <40-sha> \
   [--subdir <path>] --adapted-map <pinned-test-root>=tests/upstream
 ```
@@ -447,7 +447,7 @@ Initialize the machine matrix once the node is ready; repeat `--category` for
 every applicable behavior:
 
 ```bash
-pnpm react-port:evidence init --batch <id> --node pkg:<name> \
+bun run react-port:evidence init --batch <id> --node pkg:<name> \
   --category <thin-core|hooks-store|dom-component|provider-portal|ssr-sensitive|async-suspense|performance-sensitive>
 ```
 
@@ -464,8 +464,8 @@ exit status, and cannot turn a failed command into a pass. Repeat `--gate` when
 one authoritative command proves multiple rows; the command runs only once:
 
 ```bash
-pnpm react-port:evidence run --batch <id> --node pkg:<name> \
-  --gate package-tests -- pnpm --dir packages/<binding> test
+bun run react-port:evidence run --batch <id> --node pkg:<name> \
+  --gate package-tests -- bun run --cwd packages/<binding> test
 ```
 
 The runner binds each gate to an approved command shape and validates the
@@ -508,21 +508,21 @@ It rejects `true`, ad hoc `node -e`, unrelated package scripts, incompatible
 multi-gate groups, and any other successful command that does not prove the requested row.
 The approved shapes are:
 
-- `pnpm --dir packages/<binding> test` for package behavior;
+- `bun run --cwd packages/<binding> test` for package behavior;
 - `node scripts/react-port/public-exports.mjs --package-dir
   packages/<binding>` for repository-owned public export validation;
 - `node scripts/react-parity/harness.mjs run-required --manifest
   packages/<binding>/audit/react-parity.json` for behavior-category gates;
-- `pnpm exec tsrx-tsc --noEmit -p packages/<binding>/tsconfig.json` for direct
+- `bunx tsrx-tsc --noEmit -p packages/<binding>/tsconfig.json` for direct
   authored source;
-- `pnpm exec tsc --noEmit -p <package-local-pristine-project>` for the
+- `bunx tsc --noEmit -p <package-local-pristine-project>` for the
   unmodified upstream suite with its pinned React types;
-- `pnpm exec tsrx-tsc --noEmit -p <package-local-adapted-project>` for the
+- `bunx tsrx-tsc --noEmit -p <package-local-adapted-project>` for the
   one-for-one Octane adaptation;
 - the same `tsrx-tsc` argv with a package-local public type project, including
   `tests/types/tsconfig.json`, for public types;
-- `pnpm packages:pack:check` for both packed-source rows and `package-pack`;
-- `pnpm sync` for generated data and `pnpm format:check` for formatting.
+- `bun run packages:pack:check` for both packed-source rows and `package-pack`;
+- `bun run sync` for generated data and `bun run format:check` for formatting.
 
 For copied or legacy policy, record all five strict type obligations under six dedicated evidence gates. The
 pristine and adapted upstream suites are separate observations with different
@@ -530,25 +530,25 @@ compilers; present suites must never share a gate or command. The packed reposit
 proves both installed-source contexts and the package boundary in one run:
 
 ```bash
-pnpm react-port:evidence run --batch <id> --node pkg:<name> \
-  --gate upstream-types-pristine -- pnpm exec tsc --noEmit \
+bun run react-port:evidence run --batch <id> --node pkg:<name> \
+  --gate upstream-types-pristine -- bunx tsc --noEmit \
   -p packages/<binding>/typetests/tsconfig.pristine.json
-pnpm react-port:evidence run --batch <id> --node pkg:<name> \
-  --gate upstream-types-adapted -- pnpm exec tsrx-tsc --noEmit \
+bun run react-port:evidence run --batch <id> --node pkg:<name> \
+  --gate upstream-types-adapted -- bunx tsrx-tsc --noEmit \
   -p packages/<binding>/typetests/tsconfig.adapted.json
-pnpm react-port:evidence run --batch <id> --node pkg:<name> \
-  --gate authored-source-types -- pnpm exec tsrx-tsc --noEmit \
+bun run react-port:evidence run --batch <id> --node pkg:<name> \
+  --gate authored-source-types -- bunx tsrx-tsc --noEmit \
   -p packages/<binding>/tsconfig.json
-pnpm react-port:evidence run --batch <id> --node pkg:<name> \
-  --gate public-types -- pnpm exec tsrx-tsc --noEmit \
+bun run react-port:evidence run --batch <id> --node pkg:<name> \
+  --gate public-types -- bunx tsrx-tsc --noEmit \
   -p packages/<binding>/tests/types/tsconfig.json
-pnpm react-port:evidence run --batch <id> --node pkg:<name> \
+bun run react-port:evidence run --batch <id> --node pkg:<name> \
   --gate public-exports -- node scripts/react-port/public-exports.mjs \
   --package-dir packages/<binding>
-pnpm react-port:evidence run --batch <id> --node pkg:<name> \
+bun run react-port:evidence run --batch <id> --node pkg:<name> \
   --gate packed-source-types-node \
   --gate packed-source-types-browser \
-  --gate package-pack -- pnpm packages:pack:check
+  --gate package-pack -- bun run packages:pack:check
 ```
 
 The type-project paths may follow the closest binding. Run every gate required by
@@ -566,7 +566,7 @@ record checked absence rather than inventing upstream type probes. The owned
 absence command is the only alternative for the two upstream type gates:
 
 ```bash
-pnpm react-port:evidence run --batch <id> --node pkg:<name> \
+bun run react-port:evidence run --batch <id> --node pkg:<name> \
   --gate upstream-types-pristine --gate upstream-types-adapted -- \
   node scripts/react-port/upstream-types-absence.mjs \
   --package-dir packages/<binding> \
@@ -590,7 +590,7 @@ passed/failed command claims that it did not execute. A skipped, unrun, or
 missing-output command is never `passed`.
 
 ```bash
-pnpm react-port:evidence record --batch <id> --node pkg:<name> \
+bun run react-port:evidence record --batch <id> --node pkg:<name> \
   --gate <gate-id> --status <status> --artifact <existing-path> \
   --observed <observed-result>
 ```
@@ -646,18 +646,18 @@ Use affected inventory/generator/aggregate gates to verify evidence removal does
 skip retained coverage or recreate obsolete trees. Available gates include:
 
 ```bash
-pnpm react-port:materialize run --check --package-dir packages/<binding>
-pnpm react-port:test
-pnpm react-parity:check
-pnpm react-parity:test
-pnpm packages:pack:check
-pnpm bindings:status:check
-pnpm packages:inventory:check
-pnpm binding-parity:gaps:check
-pnpm cli:data:check
-pnpm tsrx-decls:check
-pnpm typecheck
-pnpm format:check
+bun run react-port:materialize run --check --package-dir packages/<binding>
+bun run react-port:test
+bun run react-parity:check
+bun run react-parity:test
+bun run packages:pack:check
+bun run bindings:status:check
+bun run packages:inventory:check
+bun run binding-parity:gaps:check
+bun run cli:data:check
+bun run tsrx-decls:check
+bun run typecheck
+bun run format:check
 ```
 
 Treat every red gate as the start of a diagnose–repair–rerun loop. Fix owning
@@ -668,16 +668,13 @@ is safe, inspect lockfile changes before retaining them, and fall back to direct
 available repository executables for unaffected gates. Preserve unrelated dirty
 files throughout.
 
-For `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`, retry the required repository
-install exactly as `CI=true pnpm install --frozen-lockfile`. If the planned
-package legitimately changes the lockfile, use
-`CI=true pnpm install --no-frozen-lockfile`, inspect the resulting lockfile diff,
-and retain only entries explained by the port. Do not stop after the initial
-interactive-purge error.
+Run the required repository install as `bun install --frozen-lockfile`. If the
+planned package legitimately changes the lockfile, run `bun install`, inspect
+the resulting lockfile diff, and retain only entries explained by the port.
 
 For a mixed parity project, run both its local project and the sharded
 non-parity complement. Confirm every required parity lane executes rather than
-only validating metadata. Run affected core tests and the full root `pnpm test`
+only validating metadata. Run affected core tests and the full root `bun run test`
 after targeted evidence is green. Regenerate derived data from its source
 command; never edit generated files directly.
 
@@ -699,7 +696,7 @@ source-derived plans and upstream test copies are not clean-room evidence. Then
 run the machine completion gate:
 
 ```bash
-pnpm react-port:evidence verify --batch <id> --node pkg:<name> \
+bun run react-port:evidence verify --batch <id> --node pkg:<name> \
   --package-dir packages/<binding> --expected-directory packages/<binding> \
   --registrations <registrations.json> --crosswalk <crosswalk.json> \
   --closure <closure.json>

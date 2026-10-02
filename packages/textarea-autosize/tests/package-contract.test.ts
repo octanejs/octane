@@ -6,7 +6,7 @@ import TextareaAutosize from '../src/index.tsrx';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const packagePath = resolve(packageRoot, 'package.json');
-const workspacePath = resolve(packageRoot, '../../pnpm-workspace.yaml');
+const rootPackagePath = resolve(packageRoot, '../../package.json');
 
 describe('published package contract', function packageContract() {
 	it('exports the TextareaAutosize default surface', function exportsDefault() {
@@ -17,8 +17,10 @@ describe('published package contract', function packageContract() {
 		const manifest = JSON.parse(await readFile(packagePath, 'utf8')) as {
 			devDependencies: Record<string, string>;
 		};
-		const workspace = await readFile(workspacePath, 'utf8');
-		const oracleBlock = workspace.match(/react-textarea-autosize-react-oracle:\n(?: {4}.+\n)+/);
+		const rootManifest = JSON.parse(await readFile(rootPackagePath, 'utf8')) as {
+			workspaces: { catalogs: Record<string, Record<string, string>> };
+		};
+		const oracle = rootManifest.workspaces.catalogs['react-textarea-autosize-react-oracle'];
 		expect(manifest.devDependencies.react).toBe('catalog:react-textarea-autosize-react-oracle');
 		expect(manifest.devDependencies['react-dom']).toBe(
 			'catalog:react-textarea-autosize-react-oracle',
@@ -29,14 +31,11 @@ describe('published package contract', function packageContract() {
 		expect(manifest.devDependencies['@types/react-dom']).toBe(
 			'catalog:react-textarea-autosize-react-oracle',
 		);
-		expect(oracleBlock).not.toBeNull();
-		expect(oracleBlock![0]).toMatch(/react: 19\.2\.7/);
-		expect(oracleBlock![0]).toMatch(/react-dom: 19\.2\.7/);
-		expect(oracleBlock![0]).toMatch(/["']@types\/react["']: 19\.2\.17/);
-		expect(oracleBlock![0]).toMatch(/["']@types\/react-dom["']: 19\.2\.3/);
-		expect(oracleBlock![0]).not.toMatch(/react: \^/);
-		expect(oracleBlock![0]).not.toMatch(/react-dom: \^/);
-		expect(oracleBlock![0]).not.toMatch(/["']@types\/react["']: \^/);
-		expect(oracleBlock![0]).not.toMatch(/["']@types\/react-dom["']: \^/);
+		expect(oracle).toEqual({
+			react: '19.2.7',
+			'react-dom': '19.2.7',
+			'@types/react': '19.2.17',
+			'@types/react-dom': '19.2.3',
+		});
 	});
 });

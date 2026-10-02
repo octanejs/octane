@@ -102,7 +102,7 @@ application-level SSR throughput, and browser paint were not measured.
 - Production benchmark runner: all 27 new ratio guards pass. Running the same
   suites against the frozen upstream runtime fails exactly the 12 guards for
   the original repeated work; populated and unchanged-dependency controls pass.
-- Runtime types: `pnpm exec tsgo --noEmit -p packages/octane/tsconfig.json` passes.
+- Runtime types: `bunx tsgo --noEmit -p packages/octane/tsconfig.json` passes.
 - Broader runtime tests: 75 test files in both `octane` and `octane-prod`,
   covering descriptor children/refs, effects, server rendering/streaming,
   scoped styles, and the complete top-level hydration directory. All 1,616 tests
@@ -124,7 +124,7 @@ application-level SSR throughput, and browser paint were not measured.
 
 The full workspace install encountered a registry 403 on unrelated
 `@ripple-ts/adapter`. Runtime validation uses the frozen lockfile with
-`pnpm --filter octane --filter octane-monorepo install --frozen-lockfile --ignore-scripts`.
+`bun run --filter octane --filter octane-monorepo install --frozen-lockfile --ignore-scripts`.
 The normal root Vitest config imports uninstalled unrelated packages, so the
 local config in `node_modules/runtime-pass.vitest.config.mjs` contains the
 verbatim `octane` and `octane-prod` project objects from `vitest.config.js`,

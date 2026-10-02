@@ -19,7 +19,6 @@ import {
 	findExternalDependencySpecs,
 	isForbiddenNativeGraphModule,
 	isWithinDirectory,
-	renderPackedExampleWorkspace,
 	renderPackedCommonjsConsumerSource,
 	renderPackedDraggableEsmConsumerSource,
 	renderPackedEsmConsumerSource,
@@ -70,10 +69,6 @@ describe('packed runtime consumer dependencies', () => {
 		assert.equal(Object.keys(dependencies).length, 10);
 		assert.equal(Object.hasOwn(dependencies, '@octanejs/unrelated'), false);
 		assert.equal(Object.hasOwn(dependencies, 'redux'), false);
-		assert.match(
-			renderPackedExampleWorkspace(dependencies),
-			/"@octanejs\/redux": "file:\/tmp\/redux\.tgz"/,
-		);
 	});
 
 	test('rejects an absent transitive archive instead of falling back to the released Redux binding', () => {
@@ -198,6 +193,7 @@ describe('createPackedExampleManifest', () => {
 			octane: 'file:/tmp/octane.tgz',
 		});
 		assert.deepEqual(packed.devDependencies, { vite: '8.0.16' });
+		assert.deepEqual(packed.overrides, archiveSpecs);
 		assert.equal(packed.pnpm, undefined);
 		assert.equal(source.dependencies.octane, 'workspace:*');
 		assert.equal(source.devDependencies.vite, 'catalog:default');
@@ -218,21 +214,6 @@ describe('createPackedExampleManifest', () => {
 	});
 });
 
-describe('renderPackedExampleWorkspace', () => {
-	test('pins transitive internal dependencies to the produced archives', () => {
-		assert.equal(
-			renderPackedExampleWorkspace({
-				'@octanejs/app-core': 'file:/tmp/app-core.tgz',
-				octane: 'file:/tmp/octane.tgz',
-			}),
-			`overrides:
-  "@octanejs/app-core": "file:/tmp/app-core.tgz"
-  "octane": "file:/tmp/octane.tgz"
-`,
-		);
-	});
-});
-
 describe('packed TSRX source consumers', () => {
 	const archiveSpecs = {
 		'@octanejs/cmdk': 'file:/tmp/cmdk.tgz',
@@ -249,7 +230,7 @@ describe('packed TSRX source consumers', () => {
 	};
 	const toolingVersions = {
 		nodeTypes: '24.13.3',
-		packageManager: 'pnpm@11.15.1',
+		packageManager: 'bun@1.4.2',
 		tsrxTypeScriptPlugin: '0.3.116',
 		typescript: '5.9.3',
 	};
@@ -263,6 +244,7 @@ describe('packed TSRX source consumers', () => {
 		);
 
 		assert.deepEqual(manifest.dependencies, archiveSpecs);
+		assert.deepEqual(manifest.overrides, archiveSpecs);
 		assert.deepEqual(manifest.devDependencies, {
 			'@tsrx/typescript-plugin': '0.3.116',
 			'@types/node': '24.13.3',
@@ -270,7 +252,7 @@ describe('packed TSRX source consumers', () => {
 			typescript: '5.9.3',
 		});
 		assert.equal(manifest.private, true);
-		assert.equal(manifest.packageManager, 'pnpm@11.15.1');
+		assert.equal(manifest.packageManager, 'bun@1.4.2');
 	});
 
 	test('rejects a published binding omitted from the packed archive set', () => {
@@ -312,7 +294,8 @@ describe('packed TSRX source consumers', () => {
 	test('uses canonical installed source roots without duplicating package symlinks', (context) => {
 		const directory = mkdtempSync(path.join(tmpdir(), 'packed-source-roots-'));
 		context.after(() => rmSync(directory, { recursive: true, force: true }));
-		const packageDirectory = 'node_modules/.pnpm/source@file+archive/node_modules/@octanejs/source';
+		const packageDirectory =
+			'node_modules/.bun/@octanejs+source@+tmp+source.tgz+abc/node_modules/@octanejs/source';
 		const installedPackage = path.join(directory, packageDirectory);
 		mkdirSync(installedPackage, { recursive: true });
 		mkdirSync(path.join(directory, 'node_modules/@octanejs'), { recursive: true });

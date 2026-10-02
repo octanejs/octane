@@ -203,7 +203,7 @@ bytes and parsed DOM bookkeeping without changing the public comment grammar.
 4. Keep Suspense streaming boundaries, portals, Activity ranges, ambiguous
    multi-root values, and adjacent dynamic-text separators unless a new
    ownership proof covers their existing behavior.
-5. Re-run `pnpm --dir benchmarks/ssr-throughput bench:payload` and
-   `pnpm --filter tanstack-start-bench bench:work` after each change; the
+5. Re-run `bun run --cwd benchmarks/ssr-throughput bench:payload` and
+   `bun run --filter tanstack-start-bench bench:work` after each change; the
    payload audit and real-route work gate report raw/gzip/Brotli sizes,
    comment costs, and streaming-carrier overhead.

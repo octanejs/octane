@@ -29,9 +29,9 @@
     "./async-creatable": "./src/async-creatable.tsrx"
   },
   "scripts": {
-    "test": "pnpm upstream:verify && pnpm crosswalk:verify && pnpm test:octane && pnpm test:pristine",
+    "test": "bun run upstream:verify && bun run crosswalk:verify && bun run test:octane && bun run test:pristine",
     "test:octane": "vitest run --root ../.. --project select --project select-differential --project select-browser",
-    "test:pristine": "pnpm test:upstream",
+    "test:pristine": "bun run test:upstream",
     "test:upstream": "jest --config tests/upstream-jest.config.cjs --rootDir upstream --runInBand --no-watchman",
     "parity:inventory": "node ../../scripts/react-parity/react-select-runtime-inventory.mjs && node ../../scripts/react-parity/react-select-adaptation.mjs --write",
     "typecheck": "octane-tsc -p tsconfig.json -p tests/browser/tsconfig.json -p tests/upstream/tsconfig.json -p typetests/tsconfig.local.json -p typetests/tsconfig.compat.json && tsc --noEmit -p typetests/tsconfig.upstream.json",

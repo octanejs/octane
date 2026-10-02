@@ -30,7 +30,7 @@
     "./test-utils": "./src/test-utils.ts"
   },
   "scripts": {
-    "test": "pnpm upstream:materialize && vitest run --root ../.. --config vitest.config.js --project intersection-observer",
+    "test": "bun run upstream:materialize && vitest run --root ../.. --config vitest.config.js --project intersection-observer",
     "typecheck": "octane-tsc -p tsconfig.json",
     "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
     "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."

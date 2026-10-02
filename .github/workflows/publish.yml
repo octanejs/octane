@@ -140,8 +140,8 @@ jobs:
           ref: ${{ steps.release.outputs.sha }}
           fetch-depth: 0
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -150,10 +150,10 @@ jobs:
           # Do not enable dependency caching in this privileged workflow.
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Validate changeset bump types
-        run: pnpm changeset:check
+        run: bun run changeset:check
 
       # Check the complete workspace before Changesets starts. npm publishing is
       # not atomic across packages, so discovering a new unbootstrapped package
@@ -161,7 +161,7 @@ jobs:
       # that stranded the July 2026 versions.
       - name: Preflight npm release state
         id: npm_release
-        run: pnpm release:preflight
+        run: bun run release:preflight
 
       # changesets/action creates a version PR instead of running its publish
       # command whenever any pending changeset document exists. release.yml
@@ -169,7 +169,7 @@ jobs:
       # checkout and force this action to perform only npm reconciliation.
       - name: Isolate pending changesets from npm reconciliation
         if: steps.npm_release.outputs.needs_publish == 'true'
-        run: pnpm release:prepare-publish
+        run: bun run release:prepare-publish
 
       - name: Publish to npm
         id: changesets
@@ -182,10 +182,9 @@ jobs:
           create-github-releases: false
           push-git-tags: false
           github-token: ${{ github.token }}
-          publish-script: pnpm changeset:publish
+          publish-script: bun run changeset:publish
         env:
           # npm trusted publishing via OIDC (id-token: write) — no NPM_TOKEN.
-          PNPM_CONFIG_PROVENANCE: true
           NPM_CONFIG_PROVENANCE: true
 
       # Run even after a partial npm failure: published versions are immutable,
@@ -194,7 +193,7 @@ jobs:
       # sequentially so GitHub never receives dozens of concurrent ref updates.
       - name: Reconcile GitHub tags and releases
         if: always() && steps.npm_release.outcome == 'success'
-        run: pnpm release:reconcile
+        run: bun run release:reconcile
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RELEASE_SHA: ${{ steps.release.outputs.sha }}

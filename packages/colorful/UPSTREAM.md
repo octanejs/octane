@@ -9,7 +9,7 @@
 - repository tag: `v5.8.0`
 - repository commit: `d914e7647c40a8bbdb286985176e769d76061732`
 - license: MIT
-- React oracle: `react@19.2.7` / `react-dom@19.2.7` with `@types/react@19.2.17` / `@types/react-dom@19.2.3` via the dedicated `react-colorful-react-oracle` pnpm catalog (exact pins; not `catalog:default`)
+- React oracle: `react@19.2.7` / `react-dom@19.2.7` with `@types/react@19.2.17` / `@types/react-dom@19.2.3` via the dedicated `react-colorful-react-oracle` workspace catalog (exact pins; not `catalog:default`)
 - Pristine upstream `check-types` types: `@types/react@17.0.83` / `@types/react-dom@17.0.26` via npm aliases (`@types/react-colorful-pristine`, `@types/react-dom-colorful-pristine`)
 
 The byte-exact tag sources and tests live under `upstream/` and verify offline
@@ -41,7 +41,7 @@ ledger: `react-colorful-native-event-attributes` in `audit/react-parity.json`.
 | `tag/tests/__snapshots__/*` | **pristine-only** (Jest snapshots); adapted asserts structure | pristine-upstream lane |
 | Upstream `check-types` (`tsc --noEmit` on `src`) | **pristine** via `typetests/tsconfig.pristine.json` | pristine-types lane |
 | Upstream `tag/src` ↔ Octane `src` program membership | **fail-closed fileDispositions** in `audit/type-parity.json` (`.tsx`/hook `.ts` → `.tsrx`; CSS-module decl + isomorphic layout effect are pristine-only with adapted evidence) | program inventories + `react-parity:validate` |
-| Public type probes | **one-for-one** React (`audit/type-probes/public-api.test.ts`) ↔ Octane (`typetests/public-api.test.ts`) under `audit/type-parity.json`, including paired `HostInputEvent` proofs (`FormEvent` vs `InputEvent`) for `react-colorful-native-event-attributes` | type inventories + `pnpm test:type-parity` |
+| Public type probes | **one-for-one** React (`audit/type-probes/public-api.test.ts`) ↔ Octane (`typetests/public-api.test.ts`) under `audit/type-parity.json`, including paired `HostInputEvent` proofs (`FormEvent` vs `InputEvent`) for `react-colorful-native-event-attributes` | type inventories + `bun run test:type-parity` |
 | Octane source + adapted probe | **adapted types** via `typetests/tsconfig.adapted.json` | adapted-types lane |
 
 ### Port-authored classifications

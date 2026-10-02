@@ -231,7 +231,7 @@ async function main() {
 			v8: process.versions.v8,
 			platform: process.platform,
 			architecture: process.arch,
-			lockfileHash: sha256(readFileSync(path.join(repo, 'pnpm-lock.yaml'))),
+			lockfileHash: sha256(readFileSync(path.join(repo, 'bun.lock'))),
 			candidate: await measure(sourceRoot, 'candidate', temporary),
 		};
 		if (process.env.SSR_BASELINE_ROOT) {

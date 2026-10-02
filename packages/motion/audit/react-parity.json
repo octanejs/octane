@@ -31,9 +31,9 @@
       "node": ">=22",
       "platform": "any",
       "arch": "any",
-      "packageManager": "pnpm@11.15.1",
-      "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "27f48782633baf71b121e0b6716433c4a293021a80d11f46979754f0d16e8709"
+      "packageManager": "bun@1.4.2",
+      "lockfile": "bun.lock",
+      "lockfileSha256": "aa404a0a6304023d5005ee6786e6ba3ddfe18df0fb9fae108f2a8be3aa95b699"
     }
   },
   "lanes": [
@@ -53,7 +53,7 @@
         {
           "path": "packages/motion/tests/upstream-original.test.ts",
           "role": "support",
-          "sha256": "37e20e52820a0ed74cbae826eb6dd352a9e2f66440e9032a1a9b495176b8290b"
+          "sha256": "c6042cf1bf666e373d33886b03564b08fab0e7c6f3f247683535b920e7f2d1c7"
         },
         {
           "path": "packages/motion/audit/pristine-runtime.json",
@@ -63,7 +63,7 @@
         {
           "path": "packages/motion/tests/upstream-jest.config.cjs",
           "role": "support",
-          "sha256": "3f03e349a91b65a88bcf5f94d73d113a18e9084763752246c10fb9ef31a39edd"
+          "sha256": "ea8b719c72bf9226af8cced879fb8d43f5a7dbf4ac8954469d5fa8b6a51a8c61"
         },
         {
           "path": "packages/motion/LICENSE.upstream",

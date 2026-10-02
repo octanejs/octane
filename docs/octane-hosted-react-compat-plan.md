@@ -878,11 +878,11 @@ implementing so they actually run in CI. Candidate commands after those files
 exist:
 
 ```sh
-pnpm exec vitest run packages/octane/tests/octane-hosted-react --silent=passed-only
-pnpm exec vitest run packages/octane/tests/react-hosted --silent=passed-only
-pnpm typecheck:files packages/octane/src/react-compat packages/octane/typetests
-pnpm tsrx-decls:check
-pnpm format:files:check packages/octane/src/react-compat
+bunx vitest run packages/octane/tests/octane-hosted-react --silent=passed-only
+bunx vitest run packages/octane/tests/react-hosted --silent=passed-only
+bun run typecheck:files packages/octane/src/react-compat packages/octane/typetests
+bun run tsrx-decls:check
+bun run format:files:check packages/octane/src/react-compat
 ```
 
 Use `tsrx-tsc --noEmit` for any program containing `.tsrx`. Browser execution,
@@ -959,7 +959,7 @@ Before calling the feature complete:
   and real-library fixtures pass across the advertised environments.
 - Performance and retention evidence exist for the final implementation,
   including the native-only cost control.
-- Each implementation PR runs `pnpm sync` before push, includes relevant
+- Each implementation PR runs `bun run sync` before push, includes relevant
   generated changes and a patch changeset when appropriate, and has green
   relevant CI on its current head. Draft/skipped CI is not completion.
 

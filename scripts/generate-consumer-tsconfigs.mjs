@@ -26,12 +26,12 @@
  * source-published packages still fail them (issue #721). They are the
  * reproduction command for that debt:
  *
- *     pnpm exec tsrx-tsc --noEmit -p scripts/consumer-tsconfigs/<package>.json
+ *     bunx tsrx-tsc --noEmit -p scripts/consumer-tsconfigs/<package>.json
  *
  * They live outside the package directories on purpose. `scripts/typecheck-files
  * .mjs` treats every `packages/<name>/tsconfig*.json` as a project that owns the
  * package's sources, so a consumer project stored next to the house config would
- * silently join `pnpm typecheck:files` and turn known debt into an unrelated
+ * silently join `bun run typecheck:files` and turn known debt into an unrelated
  * change's failure.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -115,7 +115,7 @@ export function consumerTsconfigFiles(packageDirectories, template = SCAFFOLDED_
 
 async function serialize(value, filepath) {
 	// Formatted through prettier, because generated baselines share the
-	// repository-wide `pnpm format:check` gate.
+	// repository-wide `bun run format:check` gate.
 	return format(JSON.stringify(value), { ...(await resolveConfig(filepath)), filepath });
 }
 
@@ -146,7 +146,7 @@ async function main() {
 			console.error(
 				`Consumer validation projects are stale:\n  - ${problems.join(
 					'\n  - ',
-				)}\nRun \`pnpm consumer:tsconfigs\`.`,
+				)}\nRun \`bun run consumer:tsconfigs\`.`,
 			);
 			process.exitCode = 1;
 			return;

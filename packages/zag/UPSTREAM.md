@@ -20,7 +20,7 @@ this pin live under `packages/frameworks/react` in the canonical repository.
 They are committed byte-exact under `packages/zag/upstream/` and pinned by
 `audit/upstream.lock.json`, which records each file's git blob sha — its
 content address in the upstream repository — so the committed copy verifies
-offline against the pinned commit (`pnpm react-port:materialize run --check`).
+offline against the pinned commit (`bun run react-port:materialize run --check`).
 The adapted suite regenerates into `tests/upstream/` (git-ignored) from the
 pristine bytes plus the lock's mechanical `adaptedRewrites`; every mapped file
 currently needs no divergence patch, and the pinned StrictMode suite is

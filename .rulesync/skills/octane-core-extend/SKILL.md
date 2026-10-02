@@ -93,12 +93,12 @@ rather than in a correctness test.
 
 - New/changed targeted tests.
 - Nearby core tests.
-- `pnpm typecheck` for API/compiler TS changes.
-- `pnpm test` for broad runtime/compiler changes when feasible.
+- `bun run typecheck` for API/compiler TS changes.
+- `bun run test` for broad runtime/compiler changes when feasible.
 - The relevant benchmark suite before and after performance-sensitive changes,
   using the same environment, warmup, iterations, and semantic controls.
-- `pnpm format:files <path...>` while iterating and
-  `pnpm format:files:check <path...>` for a scoped check.
+- `bun run format:files <path...>` while iterating and
+  `bun run format:files:check <path...>` for a scoped check.
 
 ## Risk checks
 

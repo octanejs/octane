@@ -1130,14 +1130,14 @@ evidence.
 
 > **Progress (2026-07-22): private source/build implementation complete;
 > native exit blocked.** The repository now owns a consumer-shaped Octane Lynx
-> application under the Rspeedy package. `pnpm lynx:demo` starts the pinned
+> application under the Rspeedy package. `bun run lynx:demo` starts the pinned
 > Rspeedy development server, serves a stable `main.lynx.bundle`, and uses
 > `@lynx-js/qrcode-rsbuild-plugin@0.6.0` to print the LAN URL and Explorer QR
 > code. The screen includes CSS, stable smoke-test markers, a dual-thread first
 > render, and a native `bindtap` counter update. Its authored component passes
 > directly to `root.render()` without an application cast; the renderer-local
 > JSX and public root types now describe that supported authoring contract.
-> `pnpm lynx:demo:check` type-checks the application and builds the exact entry.
+> `bun run lynx:demo:check` type-checks the application and builds the exact entry.
 > The CI demo test also starts the advertised development command on an isolated
 > port, fetches `main.lynx.bundle`, proves the process tree releases the server,
 > and decodes the production artifact. It checks both thread programs and CSS,
@@ -1157,7 +1157,7 @@ evidence.
 - Record Android and iOS execution separately; one platform does not stand in
   for both release gates.
 
-Exit: from a clean checkout, `pnpm lynx:demo` produces a URL that the official
+Exit: from a clean checkout, `bun run lynx:demo` produces a URL that the official
 Lynx `3.9.0` Explorer can load; the screen appears once without a duplicate
 tree or runtime error; tapping the control changes `Count 0` to `Count 1`; and
 server teardown leaves no development process behind. Android and iOS each
@@ -1166,7 +1166,7 @@ need captured evidence before this milestone can claim both native platforms.
 ### Milestone 11 — pinned macOS Explorer runner and real-host compatibility (1 engineer-week)
 
 > **Progress (2026-07-23): macOS runner and first-paint gate implemented; wider
-> native exit blocked.** `pnpm lynx:demo:native` selects the official Explorer
+> native exit blocked.** `bun run lynx:demo:native` selects the official Explorer
 > 3.9 arm64 or x64 macOS archive, verifies its committed SHA-256 digest on every
 > launch, builds a disposable per-run application from that archive, starts the
 > existing demo on an isolated or requested strict loopback port, validates the
@@ -1205,7 +1205,7 @@ need captured evidence before this milestone can claim both native platforms.
   Android/iOS, list, worklet, Native Module, or performance gates.
 
 Exit: from a clean macOS arm64 or x64 checkout,
-`pnpm lynx:demo:native` downloads or reuses the verified Explorer 3.9 asset,
+`bun run lynx:demo:native` downloads or reuses the verified Explorer 3.9 asset,
 serves and launches the demo, visibly reaches `Count 0` without an Octane
 runtime exception, and releases the development server on shutdown. Automated
 `Count 0` to `Count 1` interaction, Android, and iOS remain later native
@@ -1324,14 +1324,14 @@ inventory:
   `scripts/check-package-packs.mjs`;
 - add `packages/lynx/status.json`, `UPSTREAM.md`, the checked crosswalk, and
   crosswalk validation;
-- update `website/src/content/bindings.json`, run `pnpm bindings:status`, and run
-  `pnpm packages:inventory` for `docs/packages.md`;
+- update `website/src/content/bindings.json`, run `bun run bindings:status`, and run
+  `bun run packages:inventory` for `docs/packages.md`;
 - add required native/release jobs to CI and to the publish workflow's named
   status requirements;
 - retain Apache-2.0 copyright/license/NOTICE and modification notices for any
   adapted Lynx source; prefer public package APIs over copied code;
 - add patch changesets for user-facing package/compiler behavior; and
-- always run repository-wide `pnpm format:check` after file changes, plus the
+- always run repository-wide `bun run format:check` after file changes, plus the
   smallest relevant tests and typecheck/build/device gates for the milestone.
 
 The first native sample belongs under the package's Rspeedy fixtures. The

@@ -607,7 +607,7 @@ operations, with mount moving 3.5 → 3.6 ms; effectful-list was identical on
 four of six operations, with remount moving 8.6 → 8.7 ms and the no-deps update
 improving 0.10 → 0.08 ms. In the shorter eight-sample rows run, the largest
 slower median was 4.4%, while update and swap improved. Repository-wide
-validation then passed: `pnpm typecheck`, the production package build, and
+validation then passed: `bun run typecheck`, the production package build, and
 all **900 test files / 6,988 tests**, including the real dev/prod website
 hydration browser gate.
 
@@ -630,7 +630,7 @@ For each landing:
    dbmon, effectful-list — NOT baseline-compare alone; checked-in baselines
    drift with machine state (observed: a warm run flagged "regressions" in
    solid/ripple).
-3. Full `pnpm test` + typecheck + format; differential projects are the
+3. Full `bun run test` + typecheck + format; differential projects are the
    parity gate.
 4. Ratio-guard ratchet: after phases 1–3, tighten the `octane/ripple` gzip
    ratio in `ratios.json` to lock in the win.

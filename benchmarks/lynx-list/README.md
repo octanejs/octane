@@ -28,8 +28,8 @@ for each. The literal logical-row declaration is staged into the build rather
 than selected at runtime, so artifact bytes and scale cannot drift apart.
 
 ```bash
-BENCH_LIST_ROWS=1000 pnpm --dir benchmarks/lynx-list build:app
-BENCH_LIST_ROWS=10000 pnpm --dir benchmarks/lynx-list build:app
+BENCH_LIST_ROWS=1000 bun run --cwd benchmarks/lynx-list build:app
+BENCH_LIST_ROWS=10000 bun run --cwd benchmarks/lynx-list build:app
 node --test benchmarks/lynx-list/*.test.mjs
 ```
 

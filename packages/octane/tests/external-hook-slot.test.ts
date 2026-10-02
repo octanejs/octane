@@ -190,21 +190,29 @@ describe('vite plugin gate routing', () => {
 	});
 
 	it('transforms installed raw Octane packages but preserves manual-slot sources', () => {
-		const installedRoot = join(process.cwd(), 'node_modules/.pnpm/node_modules/@octanejs');
-		const hookForm = join(installedRoot, 'hook-form/src/__probe__.ts');
-		const hookFormTsx = join(installedRoot, 'hook-form/src/__probe__.tsx');
-		const zustand = join(installedRoot, 'zustand/src/__probe__.ts');
+		const consumerRoot = mkdtempSync(join(tmpdir(), 'octane-installed-hooks-'));
+		try {
+			const installedRoot = join(consumerRoot, 'node_modules/@octanejs');
+			mkdirSync(installedRoot, { recursive: true });
+			symlinkSync(join(process.cwd(), 'packages/hook-form'), join(installedRoot, 'hook-form'));
+			symlinkSync(join(process.cwd(), 'packages/zustand'), join(installedRoot, 'zustand'));
+			const hookForm = join(installedRoot, 'hook-form/src/__probe__.ts');
+			const hookFormTsx = join(installedRoot, 'hook-form/src/__probe__.tsx');
+			const zustand = join(installedRoot, 'zustand/src/__probe__.ts');
 
-		expect(run(HOOK, hookForm)?.code).toMatch(/useState\(0, _h\$\d+\)/);
-		expect(
-			run(
-				`import { useState } from 'octane'; export function C() { const [n] = useState(0); return <b>{n as string}</b>; }`,
-				hookFormTsx,
-			)?.code,
-		).toMatch(/template\(/);
-		// Zustand declares octane.hookSlots.manual=["src"], so installed and
-		// workspace-linked copies both retain their explicit sub-slot ABI.
-		expect(run(HOOK, zustand)).toBeNull();
+			expect(run(HOOK, hookForm)?.code).toMatch(/useState\(0, _h\$\d+\)/);
+			expect(
+				run(
+					`import { useState } from 'octane'; export function C() { const [n] = useState(0); return <b>{n as string}</b>; }`,
+					hookFormTsx,
+				)?.code,
+			).toMatch(/template\(/);
+			// Zustand declares octane.hookSlots.manual=["src"], so installed and
+			// workspace-linked copies both retain their explicit sub-slot ABI.
+			expect(run(HOOK, zustand)).toBeNull();
+		} finally {
+			rmSync(consumerRoot, { recursive: true, force: true });
+		}
 	});
 
 	it('configures installed Octane source packages for Vite transformation', () => {

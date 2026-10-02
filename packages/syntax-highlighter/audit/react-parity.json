@@ -38,9 +38,9 @@
       "node": ">=22",
       "platform": "any",
       "arch": "any",
-      "packageManager": "pnpm@11.15.1",
-      "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "27f48782633baf71b121e0b6716433c4a293021a80d11f46979754f0d16e8709"
+      "packageManager": "bun@1.4.2",
+      "lockfile": "bun.lock",
+      "lockfileSha256": "aa404a0a6304023d5005ee6786e6ba3ddfe18df0fb9fae108f2a8be3aa95b699"
     }
   },
   "lanes": [
@@ -112,7 +112,7 @@
         {
           "path": "packages/syntax-highlighter/scripts/generate-parity-audit.mjs",
           "role": "support",
-          "sha256": "b34848fb0a139ba1a808b344ee17cef2538578e7a78bcda0a1c1c1e72406f0ad"
+          "sha256": "5c3f3bb7a67e9d7f578034098a956d7470c0acff787b7716a4529930262e043e"
         },
         {
           "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/code-style-passed-to-line-numbers.test.ts.snap",

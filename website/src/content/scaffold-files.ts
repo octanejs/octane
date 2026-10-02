@@ -1,6 +1,6 @@
 // What `octane create` writes, for the file trees on the CLI page.
 //
-// The paths are generated: `pnpm scaffold:manifest` runs the real command under
+// The paths are generated: `bun run scaffold:manifest` runs the real command under
 // `--dry-run` and snapshots the result, and CI fails when the snapshot is stale.
 // Restating them here by hand is how a documented file tree quietly stops
 // describing the product.

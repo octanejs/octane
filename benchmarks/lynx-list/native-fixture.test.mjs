@@ -172,11 +172,10 @@ test('keeps the bounded fixture independently buildable and workspace-addressabl
 	assert.equal(packageJson.private, true);
 	assert.equal(packageJson.scripts.test, 'node --test native-fixture.test.mjs');
 	assert.equal(packageJson.scripts['build:app'], 'node scripts/build-app.mjs');
-	const workspaceSource = fs.readFileSync(
-		path.join(benchmarkRoot, '../../pnpm-workspace.yaml'),
-		'utf8',
+	const rootPackageJson = JSON.parse(
+		fs.readFileSync(path.join(benchmarkRoot, '../../package.json'), 'utf8'),
 	);
-	assert.match(workspaceSource, /^  - benchmarks\/lynx-list$/m);
+	assert.ok(rootPackageJson.workspaces.packages.includes('benchmarks/lynx-list'));
 
 	const configSource = fs.readFileSync(path.join(appRoot, 'lynx.config.mjs'), 'utf8');
 	assert.match(configSource, /mode: 'production'/);

@@ -301,21 +301,21 @@ stamp updated in place (cmdk-plan convention).
   trigger-side ARIA/state compare, portal markup covered behaviorally).
 - **Registry** — schema validation + the Phase 4 CLI e2e.
 - **SSR + hydration** — per Phase 5.
-- No `skip`/`todo`/`fails` anywhere (`pnpm test:markers:check`;
+- No `skip`/`todo`/`fails` anywhere (`bun run test:markers:check`;
   `docs/binding-parity-gaps.md` stays at 0).
 
 ## Registration checklist
 
 Mirrors the cmdk plan (authoritative template: the `@octanejs/nuqs` addition,
 `git show --stat 4097b6c4`): pnpm catalog entries (`class-variance-authority`,
-`tailwind-merge`, `tw-animate-css`; `clsx` exists) → `pnpm install` → lockfile →
+`tailwind-merge`, `tw-animate-css`; `clsx` exists) → `bun install` → lockfile →
 root `typecheck` script entry → `vitest.config.js` projects (jsdom +
 `shadcn-ssr`; differential globalSetup) → `octane-mcp-server` `KNOWN_BINDINGS` →
 `website/src/content/bindings.json` (one category) → `website/public/llms.txt` →
-`pnpm packages:inventory` → `pnpm bindings:status` → `pnpm binding-parity:gaps` →
+`bun run packages:inventory` → `bun run bindings:status` → `bun run binding-parity:gaps` →
 evals `corpus:generate` (lockfile changed) → `.rulesync/rules/project.md`
-bindings list + `pnpm rules:generate` → this doc in `status.json` `docs` →
-final gates (`pnpm format:check`, `pnpm typecheck`, `pnpm test`). No changeset
+bindings list + `bun run rules:generate` → this doc in `status.json` `docs` →
+final gates (`bun run format:check`, `bun run typecheck`, `bun run test`). No changeset
 for a brand-new binding unless the port fixes something inside `packages/octane`.
 
 ## Open risks / verification

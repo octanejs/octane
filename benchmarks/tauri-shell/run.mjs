@@ -162,7 +162,7 @@ async function measure(target) {
 const results = {};
 for (const target of TARGETS) {
 	console.log(`\n--- building ${target} ---`);
-	run('pnpm', ['exec', 'vite', 'build'], path.join(__dirname, target));
+	run('bun', ['run', 'vite', 'build'], path.join(__dirname, target));
 }
 
 for (const target of TARGETS) {

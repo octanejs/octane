@@ -258,7 +258,7 @@ export function Benchmarks() @{
 								'checked-in baseline from the repo’s own suites: same apps, same hardware, ' +
 								'same run. Every primary React comparison uses the official React Compiler; ' +
 								'memo-wall also shows an explicitly uncompiled control. Reproduce them with '}
-							<code>pnpm bench:all</code>
+							<code>bun run bench:all</code>
 							{', and see '}
 							<a
 								href="https://github.com/octanejs/octane/tree/main/benchmarks"

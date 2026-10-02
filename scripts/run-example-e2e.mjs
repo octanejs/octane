@@ -45,7 +45,7 @@ function resolveInsideRepo(repoRoot, candidate, label) {
 
 /**
  * Count Playwright executions reachable from a package script. Wrapper scripts
- * such as `pnpm test:e2e:production && pnpm test:e2e:dev` count both modes.
+ * such as `bun run test:e2e:production && bun run test:e2e:dev` count both modes.
  */
 export function countPlaywrightTestRuns(scripts, scriptName) {
 	const scriptMap = requireRecord(scripts, 'package scripts');
@@ -60,7 +60,7 @@ export function countPlaywrightTestRuns(scripts, scriptName) {
 		const nextAncestors = new Set(ancestors);
 		nextAncestors.add(name);
 		let count = [...command.matchAll(/\bplaywright(?:\.cmd)?\s+test\b/g)].length;
-		for (const match of command.matchAll(/\bpnpm\s+(?:run\s+)?([a-z0-9][a-z0-9:_-]*)\b/gi)) {
+		for (const match of command.matchAll(/\bbun\s+run\s+([a-z0-9][a-z0-9:_-]*)\b/gi)) {
 			const referencedScript = match[1];
 			if (referencedScript in scriptMap) {
 				count += visit(referencedScript, nextAncestors);
@@ -262,9 +262,8 @@ export function formatStepSummary(result) {
 }
 
 export function executeExample(app, options = {}) {
-	const executable = options.pnpmExecutable ?? 'pnpm';
 	return new Promise((resolve, reject) => {
-		const child = spawn(executable, ['--dir', app.directory, app.e2eScript], {
+		const child = spawn('bun', ['run', '--cwd', app.directory, app.e2eScript], {
 			cwd: options.repoRoot ?? REPO_ROOT,
 			stdio: 'inherit',
 			env: options.env ?? process.env,

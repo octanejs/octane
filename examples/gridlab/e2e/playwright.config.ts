@@ -28,8 +28,8 @@ export default defineConfig({
 		? undefined
 		: {
 				command: productionPreview
-					? `pnpm exec vite preview --host ${address.host} --port ${address.port} --strictPort`
-					: `pnpm exec vite --host ${address.host} --port ${address.port} --strictPort`,
+					? `bun run vite preview --host ${address.host} --port ${address.port} --strictPort`
+					: `bun run vite --host ${address.host} --port ${address.port} --strictPort`,
 				url: address.baseURL,
 				cwd: exampleRoot,
 				reuseExistingServer: false,

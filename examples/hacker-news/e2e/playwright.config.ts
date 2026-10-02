@@ -22,9 +22,9 @@ function clientCommand(app: 'jsx' | 'tsrx', port: number): string {
 // (nav.spec.ts) runs once per project; identical assertions passing under both
 // IS the .tsx ≡ .tsrx parity proof.
 //
-// Standard `pnpm test:e2e` builds both clients with the fixture base baked in,
+// Standard `bun run test:e2e` builds both clients with the fixture base baked in,
 // then each project boots a Vite preview server for that production artifact.
-// `pnpm test:e2e:dev` opts into source-serving Vite dev servers for faster local
+// `bun run test:e2e:dev` opts into source-serving Vite dev servers for faster local
 // iteration while retaining production runtime semantics and strict diagnostics.
 // The SSR middleware remains source-driven because this example has no
 // production SSR bundle, but the E2E command runs its client/server runtime

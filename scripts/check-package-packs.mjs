@@ -44,7 +44,6 @@ import {
 	PACKED_TSRX_BROWSER_AMBIENT_FILE,
 	PACKED_TSRX_PROBE_PACKAGES,
 	PACKED_STRICT_BROWSER_SOURCE_PACKAGES,
-	renderPackedExampleWorkspace,
 	renderPackedCommonjsConsumerSource,
 	renderPackedDraggableEsmConsumerSource,
 	renderPackedEsmConsumerSource,
@@ -60,6 +59,7 @@ import {
 	assertRequiredPublicValueExports,
 	REQUIRED_PUBLIC_VALUE_EXPORTS,
 } from '../packages/octane/scripts/verify-dist.mjs';
+import { packPackage } from './pack-package.mjs';
 
 const privatePackScaffolds = new Set(['@octanejs/lynx', '@octanejs/rspeedy-plugin']);
 const packages = getWorkspacePackages().filter(
@@ -166,6 +166,20 @@ const inventoryErrors = validateWorkspacePackages(packages);
 if (inventoryErrors.length) {
 	console.error(`cannot pack an invalid package inventory:\n  - ${inventoryErrors.join('\n  - ')}`);
 	process.exit(1);
+}
+
+function bunInstall(cwd, flags = [], { strictPeers = false } = {}) {
+	const result = spawnSync('bun', ['install', '--prefer-offline', '--ignore-scripts', ...flags], {
+		cwd,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+	});
+	const output = `${result.stdout}${result.stderr}`;
+	if (result.error) throw result.error;
+	if (result.status !== 0) throw new Error(`bun install failed in ${cwd}\n${output}`);
+	if (strictPeers && /incorrect peer dependency/.test(output)) {
+		throw new Error(`bun install reported unmet peer dependencies in ${cwd}\n${output}`); // Bun has no --strict-peer-dependencies
+	}
 }
 
 function tarOutput(args) {
@@ -336,10 +350,6 @@ function preparePackedExample(tempRoot, archives, canary) {
 		canary.label,
 	);
 	writeFileSync(manifestPath, `${JSON.stringify(packedManifest, null, 2)}\n`);
-	writeFileSync(
-		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
-		renderPackedExampleWorkspace(archiveSpecs),
-	);
 	return consumerDirectory;
 }
 
@@ -382,7 +392,7 @@ function assertPackedExampleInstall(consumerDirectory, canary) {
 		}
 	}
 
-	const virtualStore = path.join(consumerDirectory, 'node_modules/.pnpm');
+	const virtualStore = path.join(consumerDirectory, 'node_modules/.bun');
 	const installedRuntimeRoots = new Set();
 	const installedReactRuntimes = [];
 	for (const entry of readdirSync(virtualStore, { withFileTypes: true })) {
@@ -404,7 +414,7 @@ function assertPackedExampleInstall(consumerDirectory, canary) {
 		);
 	}
 
-	const lockfile = readFileSync(path.join(consumerDirectory, 'pnpm-lock.yaml'), 'utf8');
+	const lockfile = readFileSync(path.join(consumerDirectory, 'bun.lock'), 'utf8');
 	if (/\b(?:workspace|link):/.test(lockfile) || lockfile.includes(`${REPO_ROOT}${path.sep}`)) {
 		throw new Error('external example lockfile contains a workspace or link dependency');
 	}
@@ -412,23 +422,9 @@ function assertPackedExampleInstall(consumerDirectory, canary) {
 
 function validatePackedExample(tempRoot, archives, canary) {
 	const consumerDirectory = preparePackedExample(tempRoot, archives, canary);
-	execFileSync(
-		'pnpm',
-		[
-			'install',
-			'--prefer-offline',
-			'--ignore-scripts',
-			'--no-frozen-lockfile',
-			'--config.auto-install-peers=false',
-		],
-		{
-			cwd: consumerDirectory,
-			encoding: 'utf8',
-			stdio: ['ignore', 'pipe', 'pipe'],
-		},
-	);
+	bunInstall(consumerDirectory, ['--linker', 'isolated', '--omit', 'peer']);
 	assertPackedExampleInstall(consumerDirectory, canary);
-	execFileSync('pnpm', ['run', 'build'], {
+	execFileSync('bun', ['run', 'build'], {
 		cwd: consumerDirectory,
 		encoding: 'utf8',
 		stdio: ['ignore', 'pipe', 'pipe'],
@@ -485,14 +481,11 @@ async function validatePackedConsumer(tempRoot, archives, packedManifests) {
 					typescript: typescriptVersion,
 					vite: viteVersion,
 				},
+				overrides: archiveSpecs,
 			},
 			null,
 			2,
 		) + '\n',
-	);
-	writeFileSync(
-		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
-		renderPackedExampleWorkspace(archiveSpecs),
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'App.tsrx'),
@@ -865,22 +858,7 @@ export function renderProbe() {
 		`<!doctype html><html><body><div id="app"></div><script type="module" src="/src/main.tsrx"></script></body></html>\n`,
 	);
 
-	execFileSync(
-		'pnpm',
-		[
-			'install',
-			'--prefer-offline',
-			'--ignore-scripts',
-			'--no-frozen-lockfile',
-			'--config.auto-install-peers=false',
-			'--config.node-linker=hoisted',
-		],
-		{
-			cwd: consumerDirectory,
-			encoding: 'utf8',
-			stdio: ['ignore', 'pipe', 'pipe'],
-		},
-	);
+	bunInstall(consumerDirectory, ['--linker', 'hoisted', '--omit', 'peer']);
 
 	const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
 	const installedPostcss = consumerRequire('postcss/package.json').version;
@@ -1017,9 +995,10 @@ process.stdout.write(JSON.stringify(result));`,
 			`Three binding resolved a second Three runtime:\n  app: ${directThree}\n  binding: ${peerThree}`,
 		);
 	}
-	const virtualStoreEntries = readdirSync(path.join(consumerDirectory, 'node_modules/.pnpm'));
+	const virtualStore = path.join(consumerDirectory, 'node_modules/.bun');
+	const virtualStoreEntries = existsSync(virtualStore) ? readdirSync(virtualStore) : [];
 	const installedRuntimes = virtualStoreEntries.filter((entry) => /^octane@/.test(entry));
-	// Isolated pnpm installs record the runtime in .pnpm; a hoisted layout records
+	// Isolated Bun installs record the runtime in .bun; a hoisted layout records
 	// none there. The concrete directRuntime exists and every binding peer above is
 	// asserted equal to it, so only multiple virtual-store runtimes are invalid.
 	if (installedRuntimes.length > 1) {
@@ -1221,10 +1200,6 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 		`${JSON.stringify(manifest, null, 2)}\n`,
 	);
 	writeFileSync(
-		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
-		renderPackedExampleWorkspace(archiveSpecs),
-	);
-	writeFileSync(
 		path.join(sourceDirectory, 'PublishedSourceConsumer.tsrx'),
 		renderPackedTsrxConsumerSource(),
 	);
@@ -1257,15 +1232,7 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 		renderPackedStrictBrowserConsumerSource(),
 	);
 
-	execFileSync(
-		'pnpm',
-		['install', '--prefer-offline', '--ignore-scripts', '--no-frozen-lockfile'],
-		{
-			cwd: consumerDirectory,
-			encoding: 'utf8',
-			stdio: ['ignore', 'pipe', 'pipe'],
-		},
-	);
+	bunInstall(consumerDirectory, ['--linker', 'isolated']);
 
 	const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
 	const directRuntime = realpathSync(consumerRequire.resolve('octane'));
@@ -1377,10 +1344,6 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 		path.join(consumerDirectory, 'package.json'),
 		`${JSON.stringify(createPackedJavascriptConsumerManifest(archiveSpecs), null, 2)}\n`,
 	);
-	writeFileSync(
-		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
-		renderPackedExampleWorkspace(archiveSpecs),
-	);
 	writeFileSync(path.join(consumerDirectory, 'require.cjs'), renderPackedCommonjsConsumerSource());
 	writeFileSync(path.join(consumerDirectory, 'import.mjs'), renderPackedEsmConsumerSource());
 	cpSync(
@@ -1392,21 +1355,7 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 		renderPackedDraggableEsmConsumerSource(),
 	);
 
-	execFileSync(
-		'pnpm',
-		[
-			'install',
-			'--prefer-offline',
-			'--ignore-scripts',
-			'--no-frozen-lockfile',
-			'--config.auto-install-peers=false',
-		],
-		{
-			cwd: consumerDirectory,
-			encoding: 'utf8',
-			stdio: ['ignore', 'pipe', 'pipe'],
-		},
-	);
+	bunInstall(consumerDirectory, ['--linker', 'isolated', '--omit', 'peer']);
 
 	const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
 	const directRuntime = realpathSync(consumerRequire.resolve('octane'));
@@ -1626,14 +1575,11 @@ function validatePackedLynxConsumer(tempRoot, archives) {
 					'@octanejs/rspeedy-plugin': archiveSpecs['@octanejs/rspeedy-plugin'],
 					octane: archiveSpecs.octane,
 				},
+				overrides: archiveSpecs,
 			},
 			null,
 			2,
 		) + '\n',
-	);
-	writeFileSync(
-		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
-		renderPackedExampleWorkspace(archiveSpecs),
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'App.tsrx'),
@@ -1724,7 +1670,7 @@ for (const [name, version] of Object.entries({
 	}
 }
 
-const virtualStore = path.join(root, 'node_modules/.pnpm');
+const virtualStore = path.join(root, 'node_modules/.bun');
 const octaneRoots = new Set();
 const reactPackages = [];
 for (const entry of readdirSync(virtualStore, { withFileTypes: true })) {
@@ -1859,22 +1805,7 @@ try {
 `,
 	);
 
-	execFileSync(
-		'pnpm',
-		[
-			'install',
-			'--prefer-offline',
-			'--ignore-scripts',
-			'--no-frozen-lockfile',
-			'--config.auto-install-peers=false',
-			'--strict-peer-dependencies',
-		],
-		{
-			cwd: consumerDirectory,
-			encoding: 'utf8',
-			stdio: ['ignore', 'pipe', 'pipe'],
-		},
-	);
+	bunInstall(consumerDirectory, ['--linker', 'isolated', '--omit', 'peer'], { strictPeers: true });
 	execFileSync(process.execPath, ['build.mjs'], {
 		cwd: consumerDirectory,
 		encoding: 'utf8',
@@ -1899,18 +1830,8 @@ try {
 		const outputDirectory = path.join(tempRoot, pkg.dir);
 		mkdirSync(outputDirectory, { recursive: true });
 		try {
-			execFileSync(
-				'pnpm',
-				['--dir', pkg.directory, 'pack', '--pack-destination', outputDirectory],
-				{ cwd: REPO_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-			);
-			const archiveFiles = readdirSync(outputDirectory).filter((file) => file.endsWith('.tgz'));
-			if (archiveFiles.length !== 1) {
-				throw new Error(`expected one .tgz, found ${archiveFiles.length}`);
-			}
-			const archive = path.join(outputDirectory, archiveFiles[0]);
+			const { archive, manifest } = packPackage(pkg.directory, outputDirectory);
 			packedArchives.set(pkg.name, archive);
-			const manifest = JSON.parse(tarOutput(['-xOf', archive, 'package/package.json']));
 			packedManifests.set(pkg.name, manifest);
 			const files = new Set(
 				tarOutput(['-tzf', archive])

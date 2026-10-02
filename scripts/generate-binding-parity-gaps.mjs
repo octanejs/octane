@@ -11,7 +11,7 @@ const total = rows.reduce((sum, row) => sum + row.total, 0);
 
 let md = `# Binding parity gaps (generated)
 
-<!-- GENERATED FILE — do not edit. Regenerate with \`pnpm binding-parity:gaps\`. -->
+<!-- GENERATED FILE — do not edit. Regenerate with \`bun run binding-parity:gaps\`. -->
 
 This is the executable failure-pin audit for every framework binding discovered
 from the workspace inventory. It includes \`it.fails(...)\` and
@@ -45,7 +45,7 @@ if (CHECK) {
 	const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : '';
 	if (current !== md) {
 		console.error(
-			'docs/binding-parity-gaps.md is stale — run `pnpm binding-parity:gaps` and commit the result.',
+			'docs/binding-parity-gaps.md is stale — run `bun run binding-parity:gaps` and commit the result.',
 		);
 		process.exit(1);
 	}

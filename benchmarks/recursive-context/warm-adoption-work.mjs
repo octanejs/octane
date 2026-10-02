@@ -147,7 +147,7 @@ export async function collectWarmAdoptionWork(browser, url, { measureOnly = fals
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	const requireFixture = createRequire(new URL('package.json', fixture));
 	const { preview } = await import(requireFixture.resolve('vite'));
-	execFileSync('pnpm', ['exec', 'vite', 'build', '--minify', 'false'], {
+	execFileSync('bun', ['run', 'vite', 'build', '--minify', 'false'], {
 		cwd: fileURLToPath(fixture),
 		stdio: 'inherit',
 	});

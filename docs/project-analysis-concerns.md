@@ -81,7 +81,7 @@ are generated separately:
 Package-wide status, parity, pack, MCP coverage, and release checks share the
 manifest-derived inventory. RuleSync remains the only source for generated
 agent instructions: edit [`.rulesync/rules/`](../.rulesync/rules/) and run
-`pnpm rules:generate`.
+`bun run rules:generate`.
 
 The residual risk is social: historical plans intentionally preserve old
 decisions and measurements, and a reader can still land in the middle of one.
@@ -141,7 +141,7 @@ Lexical Playground, Cinebase, Threadline, Flowboard, Streambox, Relay, Cartlane,
 Pagecraft, Gridlab, Draftboard, Mailroom, Pulseboard, and Wayfinder applications
 and runs their Playwright journeys; its result is aggregated by the protected
 `typecheck` context.
-Keeping it outside the sharded `pnpm test` command avoids repeating each browser
+Keeping it outside the sharded `bun run test` command avoids repeating each browser
 suite per shard.
 
 When adding a feature, choose the suite by observable rather than assuming a
@@ -348,13 +348,13 @@ CI runs on Node 24. The root and every publishable package retain a Node 22.22.2
 minimum, the website deploy target is Node 24, and the Vercel adapter accepts only
 supported runtime names.
 
-`pnpm packages:pack:check` discovers and packs every publishable package,
+`bun run packages:pack:check` discovers and packs every publishable package,
 checks the post-pnpm manifests, resolves exports/bin/types, rejects test
 artifacts, and verifies that intentionally published raw TS/TSRX survives. It
 also installs packed core and Hook Form into an isolated consumer and asserts
 one physical Octane runtime before running Vite client/server builds. The
 validator contains an executable Hook Form SSR probe as well; treat that as a
-proven runtime gate only when the complete `pnpm packages:pack:check` run
+proven runtime gate only when the complete `bun run packages:pack:check` run
 passes. It additionally copies Pulseboard and Wayfinder into temporary external
 consumers, replaces every Octane workspace edge with the produced tarballs,
 rejects workspace links or duplicate runtimes, and runs their real client and

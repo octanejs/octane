@@ -14,7 +14,7 @@ This port targets the immutable `embla-carousel-react@8.6.0` release.
 The MIT-licensed tag supplied the byte-exact files in `upstream/`, pinned by
 `audit/upstream.lock.json`: each committed file verifies offline against its
 upstream git blob sha at the tag commit
-(`pnpm react-port:materialize run --check --package-dir packages/embla-carousel`).
+(`bun run react-port:materialize run --check --package-dir packages/embla-carousel`).
 The npm artifact supplied the declaration and bundle check; it contains no
 source or tests. Vendored evidence is excluded from the published `files`
 list; the upstream MIT license is retained byte-exact as `LICENSE.upstream`,

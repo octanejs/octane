@@ -19,7 +19,7 @@ The vendored tree under [`upstream/`](./upstream) is byte-exact at that commit.
 [`upstream/LICENSE`](./upstream/LICENSE) is the sibling `@xstate/store` MIT
 notice from the same commit. The tree is prettier-ignored and excluded from the
 published `files`. [`upstream/SHA256SUMS`](./upstream/SHA256SUMS) pins every
-vendored byte; `pnpm --dir packages/xstate-store upstream:verify` re-hashes the
+vendored byte; `bun run --cwd packages/xstate-store upstream:verify` re-hashes the
 tree and fails on any drift.
 
 ## Source boundary

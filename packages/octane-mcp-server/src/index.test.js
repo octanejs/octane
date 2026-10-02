@@ -60,7 +60,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			'./node_modules/.bin/vitest run packages/octane-evals/tests --project octane-evals',
 		);
 		expect(commands).toContain('./node_modules/.bin/vitest run website/tests --project website');
-		expect(commands).toContain('pnpm typecheck');
+		expect(commands).toContain('bun run typecheck');
 	});
 
 	it('keeps the benchmark suite list in sync with the unified runner manifest', async () => {
@@ -123,7 +123,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			'core',
 		);
 
-		expect(commands).toContain('pnpm rules:generate');
+		expect(commands).toContain('bun run rules:generate');
 		expect(commands).toContain(
 			'./node_modules/.bin/vitest run packages/octane/tests --project octane',
 		);
@@ -133,9 +133,9 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(commands).toContain(
 			'./node_modules/.bin/vitest run packages/radix/tests --project radix',
 		);
-		expect(commands).toContain('pnpm typecheck');
+		expect(commands).toContain('bun run typecheck');
 		expect(commands).toContain('node benchmarks/bench.mjs --quick --ratios');
-		expect(commands).toContain('pnpm format:check');
+		expect(commands).toContain('bun run format:check');
 	});
 
 	it('requires performance evidence and adversarial review for framework fundamentals', () => {

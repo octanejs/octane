@@ -35,9 +35,9 @@
       "node": ">=22",
       "platform": "any",
       "arch": "any",
-      "packageManager": "pnpm@11.15.1",
-      "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "27f48782633baf71b121e0b6716433c4a293021a80d11f46979754f0d16e8709"
+      "packageManager": "bun@1.4.2",
+      "lockfile": "bun.lock",
+      "lockfileSha256": "aa404a0a6304023d5005ee6786e6ba3ddfe18df0fb9fae108f2a8be3aa95b699"
     }
   },
   "lanes": [
@@ -59,7 +59,7 @@
         {
           "path": "packages/hook-form/tests/upstream-original.test.ts",
           "role": "support",
-          "sha256": "e1ad5f6651c539087c69fdfe800253f084abdf7f8d468dde1dd2a2584f9354e0"
+          "sha256": "df5f6b1c3e4ece1dddcc45de814be07d53cd45dbcbee2372616906b7b737d954"
         },
         {
           "path": "packages/hook-form/audit/pristine-runtime.json",
@@ -84,7 +84,7 @@
         {
           "path": "packages/hook-form/tests/upstream-jest.config.cjs",
           "role": "support",
-          "sha256": "77e953eabc6a472cb2a1ab85e6a477ab40725f5ce26657f198bad27cc735bd45"
+          "sha256": "79d6110972904a76e59a0ebd5a8e4e2f429e7a7ed0ee8e4e9f0501bba88da826"
         },
         {
           "path": "packages/hook-form/tests/upstream-jest.setup.ts",

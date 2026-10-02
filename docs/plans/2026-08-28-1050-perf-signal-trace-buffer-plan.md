@@ -164,11 +164,11 @@ The tracing API was added in the scoped-signals work on 2026-08-27. A search of 
 
 | Gate | Scope | Done signal |
 | --- | --- | --- |
-| Focused correctness | `pnpm test -- --project octane packages/octane/tests/signals-inspection.test.ts` | All inspection, wrap, disposal, and copy-isolation scenarios pass. |
+| Focused correctness | `bun run test -- --project octane packages/octane/tests/signals-inspection.test.ts` | All inspection, wrap, disposal, and copy-isolation scenarios pass. |
 | Baseline and candidate evidence | `node benchmarks/bench.mjs --quick scoped-signals-trace` and full focused runs | Same harness and environment show a material wrapped-path reduction without a material unfilled-control regression. |
 | Durable performance guard | `node benchmarks/bench.mjs --quick --ratios scoped-signals-trace` | The candidate passes the calibrated ratio and the guard is demonstrably sensitive to the previous algorithm. |
-| Type safety | `pnpm typecheck` | Signal implementation and benchmark integration introduce no type errors. |
-| Formatting | `pnpm format:check` | Source, tests, benchmark files, JSON, plan, and changeset meet repository formatting. |
+| Type safety | `bun run typecheck` | Signal implementation and benchmark integration introduce no type errors. |
+| Formatting | `bun run format:check` | Source, tests, benchmark files, JSON, plan, and changeset meet repository formatting. |
 | Final regression | Relevant Octane project tests, followed by the repository test gate when time permits | No signal behavior, retirement, or package precheck regresses. |
 
 Browser testing is not applicable. The changed path is renderer-free and Node-only; no DOM, hydration, layout, or event surface is involved.

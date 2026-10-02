@@ -3707,8 +3707,8 @@ export default defineConfig({
 					// Octane-owned behavior tests only: the differential oracle stays
 					// pinned to its exact r172 pair and the browser suites depend on the
 					// pinned bundle contract. Enforced HERE because the compat script's
-					// CLI --exclude flags proved unreliable once `pnpm add
-					// --lockfile=false` re-keys the workspace's vitest instances.
+					// CLI --exclude flags proved unreliable once `bun add
+					// --no-save` re-keys the workspace's vitest instances.
 					// Differential files are always owned by `three-differential`.
 					exclude: [
 						'packages/three/tests/browser/**/*.test.ts',
@@ -5874,6 +5874,7 @@ export default defineConfig({
 					include: ['packages/mantine-hooks/tests/conformance/**/*.test.ts'],
 					environment: 'jsdom',
 					globals: false,
+					server: { deps: { inline: ['@mantine/hooks'] } },
 				},
 				plugins: [octane()],
 				resolve: {
@@ -5881,6 +5882,13 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/mantine-hooks$/,
 							replacement: resolve(import.meta.dirname, 'packages/mantine-hooks/src/index.ts'),
+						},
+						{
+							find: /^react-dom$/, // @mantine/hooks imports react-dom undeclared; Bun's hidden hoist would serve react-dom-upstream@15
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/mantine-hooks/node_modules/react-dom/index.js',
+							),
 						},
 					],
 				},
@@ -6425,6 +6433,7 @@ export default defineConfig({
 					globalSetup: ['packages/mantine-hooks/tests/differential/_setup.ts'],
 					environment: 'jsdom',
 					globals: false,
+					server: { deps: { inline: ['@mantine/hooks'] } },
 				},
 				plugins: [octane()],
 				resolve: {
@@ -6432,6 +6441,13 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/mantine-hooks$/,
 							replacement: resolve(import.meta.dirname, 'packages/mantine-hooks/src/index.ts'),
+						},
+						{
+							find: /^react-dom$/, // @mantine/hooks imports react-dom undeclared; Bun's hidden hoist would serve react-dom-upstream@15
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/mantine-hooks/node_modules/react-dom/index.js',
+							),
 						},
 					],
 				},

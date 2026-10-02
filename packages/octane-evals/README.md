@@ -44,7 +44,7 @@ Every task directory contains:
 Run all thirty-five reference answers with:
 
 ```bash
-pnpm --filter @octanejs/evals test:user-apps
+bun run --filter @octanejs/evals test:user-apps
 ```
 
 The generated [`training.jsonl`](./datasets/train/user-apps-v1/training.jsonl)
@@ -59,7 +59,7 @@ empty submission directory, establishes isolation, injects
 `OCTANE_EVAL_SANDBOX=1`, and then runs the manifest command:
 
 ```bash
-pnpm --filter @octanejs/evals grade:user-app -- \
+bun run --filter @octanejs/evals grade:user-app -- \
   --task tsrx.counter --submission /workspace/submission
 ```
 

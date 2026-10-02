@@ -226,7 +226,7 @@ export function validationFor(paths, taskKind) {
 	const areas = new Set(paths.map(areaForPath));
 	const commands = new Set();
 
-	if (areas.has('rulesync-source')) commands.add('pnpm rules:generate');
+	if (areas.has('rulesync-source')) commands.add('bun run rules:generate');
 	if (
 		areas.has('core-runtime') ||
 		areas.has('compiler') ||
@@ -293,14 +293,14 @@ export function validationFor(paths, taskKind) {
 		areas.has('vite-plugin') ||
 		areas.has('deploy-adapter')
 	) {
-		commands.add('pnpm typecheck');
+		commands.add('bun run typecheck');
 	}
 	if (areas.has('benchmark') || taskKind === 'performance' || taskKind === 'core') {
 		commands.add('node benchmarks/bench.mjs --quick --ratios');
 	}
 	if (taskKind === 'api' || taskKind === 'core' || taskKind === 'package')
-		commands.add('pnpm typecheck');
-	commands.add('pnpm format:check');
+		commands.add('bun run typecheck');
+	commands.add('bun run format:check');
 
 	return [...commands];
 }

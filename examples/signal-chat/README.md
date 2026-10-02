@@ -7,14 +7,14 @@ activity, configuration controls, and downloadable evidence. All data and delays
 are deterministic. No model account or external service is required.
 
 ```sh
-pnpm --dir examples/signal-chat dev
+bun run --cwd examples/signal-chat dev
 # http://127.0.0.1:5237
 
-pnpm --dir examples/signal-chat typecheck
-pnpm --dir examples/signal-chat build
-pnpm --dir examples/signal-chat preview
-pnpm --dir examples/signal-chat test:e2e
-pnpm --dir examples/signal-chat test:capture
+bun run --cwd examples/signal-chat typecheck
+bun run --cwd examples/signal-chat build
+bun run --cwd examples/signal-chat preview
+bun run --cwd examples/signal-chat test:e2e
+bun run --cwd examples/signal-chat test:capture
 ```
 
 The production command builds both client and server through the standard Octane
@@ -87,8 +87,8 @@ For serial HTTP measurements and retained raw samples, see
 [Capture SSR streaming](README.capture.md):
 
 ```sh
-pnpm --dir examples/signal-chat build
-pnpm --dir examples/signal-chat preview
+bun run --cwd examples/signal-chat build
+bun run --cwd examples/signal-chat preview
 # In a second terminal, use a fresh absolute directory outside the repository:
 node examples/signal-chat/scripts/capture.mjs --runs=3 --output=/tmp/signal-chat-capture
 ```

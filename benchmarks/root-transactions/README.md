@@ -45,7 +45,7 @@ moves from 169,625 to 169,873 minified bytes and 55,043 to 55,143 gzip bytes
 ## Reproduce
 
 ```sh
-pnpm bench:all root-transactions --quick --ratios
+bun run bench:all root-transactions --quick --ratios
 node benchmarks/root-transactions/retirement.mjs /path/to/baseline/runtime.ts
 node benchmarks/root-transactions/inputs.mjs /path/to/baseline/runtime.ts
 node benchmarks/root-transactions/contracts.mjs /path/to/baseline --reads-only

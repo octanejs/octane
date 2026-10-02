@@ -9,9 +9,9 @@
     "build": "vite build",
     "preview": "octane-preview --port 5231 --strictPort",
     "typecheck": "octane-tsc -p tsconfig.json",
-    "test:e2e": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e": "bun run build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
     "test:e2e:dev": "playwright test --config e2e/playwright.config.ts",
-    "e2e": "pnpm test:e2e"
+    "e2e": "bun run test:e2e"
   },
   "dependencies": {
     "@octanejs/seo": "workspace:*",

@@ -57,7 +57,7 @@ benchmarks/effectful-list/
 ├── preact/       # Vite app, dev :5266 — native Preact hooks/effects/refs
 ├── svelte/       # Vite app, dev :5277 — Svelte 5 effects + attachments
 ├── run.mjs        # Playwright harness — gates + timings
-├── package.json   # umbrella: `pnpm bench`
+├── package.json   # umbrella: `bun run bench`
 └── README.md
 ```
 

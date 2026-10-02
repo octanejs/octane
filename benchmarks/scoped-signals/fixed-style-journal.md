@@ -19,7 +19,7 @@ node --test benchmarks/scoped-signals/fixed-style-journal.test.mjs
 node benchmarks/scoped-signals/fixed-style-journal.mjs
 ```
 
-The guard is included in `pnpm run ci:workflow:test`. It compiles the same public
+The guard is included in `bun run ci:workflow:test`. It compiles the same public
 TSRX consumer in development and production with frozen ASTs and location
 assertions, then bundles against the selected worktree's source. The scalar and
 opaque consumers must produce matching CSS, preserve host and uncontrolled input
@@ -85,7 +85,7 @@ nested suspension/retry savepoints, coercion failure after partial writes to
 separate hosts, reentrant coercion that updates another root, SSR DOM adoption
 with an uncontrolled draft, and canceled native preparation. The final nearby
 matrix passes 746 tests in 22 files; workflow checks pass 214 tests in 13 suites.
-Scoped typecheck, scoped format, changeset validation, and `pnpm sync` pass.
+Scoped typecheck, scoped format, changeset validation, and `bun run sync` pass.
 Repository-wide test, typecheck, and format commands were not run locally.
 
 Removing the host equality check fails four public cases; removing the attribute

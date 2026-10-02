@@ -141,7 +141,7 @@ export async function writeWebsiteEcosystemData({
 	const changed = current !== serialized;
 	if (check && changed) {
 		throw new Error(
-			`${path.basename(outputPath)} is stale — run \`pnpm website:ecosystem-data\` and commit the result.`,
+			`${path.basename(outputPath)} is stale — run \`bun run website:ecosystem-data\` and commit the result.`,
 		);
 	}
 	if (!check && changed) writeFileSync(outputPath, serialized);

@@ -59,7 +59,7 @@ const allReactModules = readdirSync(reactIcons)
 const expected = new Map();
 const generatedHeader =
 	'// Generated from lucide-react@1.24.0 and @lucide/icons@1.24.0.\n' +
-	'// Run `pnpm lucide:generate`; do not edit by hand.\n\n';
+	'// Run `bun run lucide:generate`; do not edit by hand.\n\n';
 
 for (const { name, path } of canonical) {
 	expected.set(

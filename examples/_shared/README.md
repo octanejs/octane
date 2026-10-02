@@ -24,6 +24,6 @@ journey spec paths exist without escaping their example.
 Typecheck the dependency-free helpers with:
 
 ```sh
-pnpm exec tsc -p examples/_shared/tsconfig.json
-pnpm examples:shared:test
+bunx tsc -p examples/_shared/tsconfig.json
+bun run examples:shared:test
 ```

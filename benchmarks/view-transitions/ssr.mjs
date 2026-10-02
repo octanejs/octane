@@ -222,7 +222,7 @@ try {
 		baselineRevision,
 		candidateRevision,
 		compiledHash: hash(compiled),
-		lockfileHash: hash(readFileSync(path.join(repo, 'pnpm-lock.yaml'))),
+		lockfileHash: hash(readFileSync(path.join(repo, 'bun.lock'))),
 		method: verifyOnly
 			? 'Build and verify authored output once per scenario; no timing samples. Stream IDs differ from a full run, so wire compression may differ.'
 			: 'Identical compiled fixture; production minified bundles; five warmup batches per side; 11 paired alternating batches; same process/dependencies; per-operation batch times in milliseconds. Ready small:50000 warmup/10000 per sample; streamed and 200-row pages:5000 warmup/1000 per sample; 1600-row pages:1250 warmup/250 per sample.',

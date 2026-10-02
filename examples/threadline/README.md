@@ -64,10 +64,10 @@ keyed reconciliation, native events, and ref-backed focus.
 ## Commands
 
 ```bash
-pnpm --dir examples/threadline dev
-pnpm --dir examples/threadline typecheck
-pnpm --dir examples/threadline build
-pnpm --dir examples/threadline test:e2e
+bun run --cwd examples/threadline dev
+bun run --cwd examples/threadline typecheck
+bun run --cwd examples/threadline build
+bun run --cwd examples/threadline test:e2e
 ```
 
 `test:e2e` rebuilds and drives the production preview. Set

@@ -18,7 +18,7 @@ function prepareShadcnRegistry(): void {
 	const destination = fileURLToPath(new URL('./public/r', import.meta.url));
 	if (!existsSync(new URL('registry.json', sourceUrl))) {
 		throw new Error(
-			'shadcn registry is missing; run `pnpm shadcn:registry` from the repository root',
+			'shadcn registry is missing; run `bun run shadcn:registry` from the repository root',
 		);
 	}
 	rmSync(destination, { recursive: true, force: true });
@@ -28,7 +28,7 @@ function prepareShadcnRegistry(): void {
 prepareShadcnRegistry();
 
 // Does any pre-bundled dependency resolve to a checkout OUTSIDE node_modules —
-// a `link:` override in pnpm-workspace.yaml pointing at a sibling repo?
+// a `link:` override in the root package.json pointing at a sibling repo?
 //
 // Pre-bundling a linked package is a trap: Vite's optimize hash covers the
 // lockfile, the config and the include list — not the linked package's SOURCE —
@@ -60,7 +60,7 @@ function isLinkedDependency(specifier: string): boolean {
  * `Failed to resolve dependency … present in optimizeDeps.include` line per
  * entry on every optimize pass.
  *
- * The test is DIRECT reachability, not Node resolution: under pnpm's isolated
+ * The test is DIRECT reachability, not Node resolution: under Bun's isolated
  * layout only declared dependencies are linked into `website/node_modules`, and
  * that boundary is what Vite resolves against. A transitive package still
  * resolves through the store for `require.resolve` while being invisible here —
@@ -140,7 +140,7 @@ const PREBUNDLED = [
 	'three/examples/jsm/loaders/SVGLoader.js',
 	// Visx primitives are raw workspace sources; these are the runtime
 	// dependencies reached by the site's Bar/Axis/Group/Scale surface.
-	// Resolve them through their owner under pnpm's isolated layout.
+	// Resolve them through their owner under Bun's isolated layout.
 	'@octanejs/visx > classnames',
 	'@octanejs/visx > d3-interpolate',
 	'@octanejs/visx > d3-path',
@@ -156,7 +156,7 @@ const PREBUNDLED = [
 	// host's lazy mount chunk on a hash consistent with its entry (no
 	// mid-mount re-optimize → no "504 Outdated Optimize Dep") and bundles the
 	// CJS dep dayjs with a synthesized `default` export. solid-js is pinned to
-	// 1.9.14 for this island via the pnpm override (Solid 2 dropped
+	// 1.9.14 for this island via the root override (Solid 2 dropped
 	// solid-js/web); remove this block once @tanstack/devtools ships Solid 2.
 	'@tanstack/devtools',
 	'@tanstack/devtools-ui',
@@ -178,7 +178,7 @@ export default defineConfig({
 		// with Shiki highlighting via rehype). tanstackStart() supplies the Octane
 		// compiler plus file routing, SSR, hydration, and the Start runtime. The
 		// workspace bindings'
-		// hand-slot-forwarding sources (pnpm symlinks resolve them to
+		// hand-slot-forwarding sources (workspace symlinks resolve them to
 		// /packages/*/src, not node_modules) declare
 		// `"octane": { "hookSlots": { "manual": ["src"] } }` in their package.json, so the
 		// hook-slotting pass skips them automatically — no exclude list needed.

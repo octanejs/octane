@@ -295,7 +295,7 @@ try {
 		platform: process.platform,
 		architecture: process.arch,
 		cpu: os.cpus()[0]?.model,
-		lockfileSha256: hashFile(path.join(sourceRoot, 'pnpm-lock.yaml')),
+		lockfileSha256: hashFile(path.join(sourceRoot, 'bun.lock')),
 		fixtureSha256: hashFile(path.join(HERE, 'workloads.mjs')),
 		runnerSha256: hashFile(import.meta.filename),
 		alienVersion: alienPackage.version,

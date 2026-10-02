@@ -28,10 +28,10 @@ and [status.json](./status.json).
 From the repository root:
 
 ```sh
-pnpm --dir packages/base-ui-utils test          # Native utility contracts
-pnpm --dir packages/base-ui-utils test:upstream # Adapted upstream suite
-pnpm --dir packages/base-ui-utils test:pristine # Immutable React oracle
-pnpm --dir packages/base-ui-utils upstream:verify
+bun run --cwd packages/base-ui-utils test          # Native utility contracts
+bun run --cwd packages/base-ui-utils test:upstream # Adapted upstream suite
+bun run --cwd packages/base-ui-utils test:pristine # Immutable React oracle
+bun run --cwd packages/base-ui-utils upstream:verify
 ```
 
 ## Runtime requirement

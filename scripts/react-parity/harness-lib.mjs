@@ -1019,7 +1019,7 @@ async function discoverAdaptedFiles(root, scan) {
 	return new Set(found);
 }
 
-export async function verifyLaneEnvironment(manifest, lane, root, pnpmVersion) {
+export async function verifyLaneEnvironment(manifest, lane, root, bunVersion) {
 	const environment = manifest.environments[lane.environment];
 	const actualMajor = Number(process.versions.node.split('.')[0]);
 	if (!nodeMajorSatisfies(environment.node, actualMajor))
@@ -1028,7 +1028,7 @@ export async function verifyLaneEnvironment(manifest, lane, root, pnpmVersion) {
 		throw new Error(`platform must be ${environment.platform}`);
 	if (environment.arch !== 'any' && environment.arch !== process.arch)
 		throw new Error(`architecture must be ${environment.arch}`);
-	if (environment.packageManager !== `pnpm@${pnpmVersion.trim()}`)
+	if (environment.packageManager !== `bun@${bunVersion.trim()}`)
 		throw new Error(`package manager must be ${environment.packageManager}`);
 	const lockfile = await readFile(resolve(root, environment.lockfile));
 	const digest = createHash('sha256').update(lockfile).digest('hex');

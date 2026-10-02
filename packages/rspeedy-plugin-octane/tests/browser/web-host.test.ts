@@ -153,7 +153,7 @@ async function launchChromium(): Promise<Awaited<ReturnType<typeof chromium.laun
 	} catch (error) {
 		throw new Error(
 			'Chromium is required for the Lynx Web host smoke test ' +
-				'(run `pnpm --filter @octanejs/rspeedy-plugin exec playwright install chromium`): ' +
+				'(run `bunx playwright install chromium`): ' +
 				(error instanceof Error ? error.message.split('\n')[0] : String(error)),
 		);
 	}

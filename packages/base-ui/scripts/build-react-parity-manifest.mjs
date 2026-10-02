@@ -188,9 +188,9 @@ for (const name of ['base-ui', 'base-ui-utils']) {
 				node: '>=22',
 				platform: 'any',
 				arch: 'any',
-				packageManager: 'pnpm@11.15.1',
-				lockfile: 'pnpm-lock.yaml',
-				lockfileSha256: digest('pnpm-lock.yaml'),
+				packageManager: 'bun@1.4.2',
+				lockfile: 'bun.lock',
+				lockfileSha256: digest('bun.lock'),
 			},
 		},
 		lanes: [

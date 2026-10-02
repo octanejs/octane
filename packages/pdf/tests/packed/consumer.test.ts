@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { build, createServer } from 'vite';
 
 import { octane } from '../../../octane/src/compiler/vite.js';
+import { packPackage } from '../../../../scripts/pack-package.mjs';
 
 const exec = promisify(execFile);
 const repositoryRoot = resolve(import.meta.dirname, '../../../..');
@@ -26,13 +27,7 @@ describe('@octanejs/pdf packed consumer', () => {
 		temporaryRoots.push(root);
 		const packageDirectory = join(root, 'node_modules/@octanejs/pdf');
 		await mkdir(packageDirectory, { recursive: true });
-		const { stdout } = await exec('pnpm', ['pack', '--pack-destination', root], {
-			cwd: packageRoot,
-			env: { ...process.env, CI: 'true' },
-			encoding: 'utf8',
-		});
-		const packedPath = stdout.trim().split('\n').at(-1)!;
-		const tarball = packedPath.startsWith('/') ? packedPath : join(root, packedPath);
+		const { archive: tarball } = packPackage(packageRoot, root, { root: repositoryRoot });
 		await exec('tar', ['-xzf', tarball, '--strip-components=1', '-C', packageDirectory]);
 		await symlink(resolve(repositoryRoot, 'packages/octane'), join(root, 'node_modules/octane'));
 		await symlink(

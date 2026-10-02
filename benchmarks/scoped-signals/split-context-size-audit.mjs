@@ -13,7 +13,7 @@ const req = createRequire(path.join(tooling, 'packages/octane/package.json'));
 const { build } = req('esbuild'),
 	{ Window } = req('happy-dom');
 const sha = (value) => createHash('sha256').update(value).digest('hex');
-const lockSHA = sha(fs.readFileSync(path.join(tooling, 'pnpm-lock.yaml')));
+const lockSHA = sha(fs.readFileSync(path.join(tooling, 'bun.lock')));
 const snapshot = (root) =>
 	Object.fromEntries(
 		[
@@ -33,7 +33,7 @@ export async function measureConsumer(
 	const root = path.resolve(rootArg);
 	const filename = path.join(tooling, 'benchmarks/scoped-signals', fixture);
 	const source = authoredOverride ?? fs.readFileSync(filename, 'utf8');
-	assert.equal(sha(fs.readFileSync(path.join(root, 'pnpm-lock.yaml'))), lockSHA);
+	assert.equal(sha(fs.readFileSync(path.join(root, 'bun.lock'))), lockSHA);
 	const pkg = path.join(root, 'packages/octane');
 	const manifest = JSON.parse(fs.readFileSync(path.join(pkg, 'package.json')));
 	const { compile } = await import(pathToFileURL(path.join(pkg, 'src/compiler/compile.js')));

@@ -38,7 +38,7 @@ and exercised by `benchmarks/react-hosted-islands`.
   from `octane/react`; trees and island props are otherwise identical. Islands
   mount through both OctaneCompat authoring forms — the element-child form and
   the `component`/`props` transport form — and every island prop is checked
-  against the island's own octane-typed `.tsrx` signature (`pnpm typecheck`
+  against the island's own octane-typed `.tsrx` signature (`bun run typecheck`
   runs `tsrx-tsc`; the tsconfig registers `@tsrx/typescript-plugin` so `.tsrx` imports resolve typed in the editor (TypeScript 5.9/6.x); `src/island-boundary.test-d.tsx` pins the boundary with
   `@ts-expect-error` cases).
 - `src/islands/*.tsrx` — Octane's by extension, no marker needed; the Vite
@@ -54,10 +54,10 @@ and exercised by `benchmarks/react-hosted-islands`.
 ## Run it
 
 ```bash
-pnpm --filter harbor-example dev        # dev server (PORT=5178 by default)
-pnpm --filter harbor-example typecheck
-pnpm --filter harbor-example build      # production client build
-pnpm --filter harbor-example test:e2e   # boots its own server on an OS port
+bun run --filter harbor-example dev        # dev server (PORT=5178 by default)
+bun run --filter harbor-example typecheck
+bun run --filter harbor-example build      # production client build
+bun run --filter harbor-example test:e2e   # boots its own server on an OS port
 ```
 
 ## Follow-ups

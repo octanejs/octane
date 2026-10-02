@@ -91,8 +91,8 @@ function manifest(overrides = {}) {
 				node: '>=22',
 				platform: 'any',
 				arch: 'any',
-				packageManager: 'pnpm@11.15.1',
-				lockfile: 'pnpm-lock.yaml',
+				packageManager: 'bun@1.4.2',
+				lockfile: 'bun.lock',
 				lockfileSha256: sha256('lockfile'),
 			},
 		},
@@ -1466,9 +1466,9 @@ test('discovers divergence markers in tsrx source roots independently from test 
 test('rejects environment drift during validation', async () => {
 	const root = await mkdtemp(join(tmpdir(), 'react-parity-environment-'));
 	const value = manifest();
-	await writeFile(join(root, 'pnpm-lock.yaml'), 'changed lockfile');
+	await writeFile(join(root, 'bun.lock'), 'changed lockfile');
 	await assert.rejects(
-		() => verifyLaneEnvironment(value, value.lanes[0], root, '11.15.1'),
+		() => verifyLaneEnvironment(value, value.lanes[0], root, '1.4.2'),
 		/lockfile integrity mismatch/,
 	);
 });

@@ -197,7 +197,7 @@ packages/react-map-gl/
 
 Repository integration: Vitest projects in `vitest.config.js` carrying
 `testExecution.group: 'react-parity'`; catalog entries in `pnpm-workspace.yaml`;
-a `patch` changeset; then `pnpm sync` to regenerate `docs/packages.md`,
+a `patch` changeset; then `bun run sync` to regenerate `docs/packages.md`,
 `docs/bindings-status.md`, `docs/binding-parity-gaps.md`, and the CLI/MCP
 `react-map-gl → @octanejs/react-map-gl` mapping. **No `ci.yml` edit** — the
 parity job discovers manifests. No `declare module '*.tsrx'` anywhere in `src/`.
@@ -214,7 +214,7 @@ All six phases are complete. The table records what each actually produced.
 | 3 | Binding | All 13 runtime exports plus every published type. |
 | 4 | Component oracle | `tests/_mocks/mapbox-gl.ts` built on upstream's own vendored mock; all 7 component specs ported with per-case citations. |
 | 5 | Beyond upstream | Differential lane against the published upstream binding on React (map shell, `<Source>`/`<Layer>` updates, popup options and controls), SSR, `hydrateRoot` adoption, lifecycle conformance, two type suites, tape-adapter negative controls, parity manifest with generated inventories. |
-| 6 | Close out | `status.json`, README, LICENSE, changeset, `pnpm sync`, registration in the CLI/MCP/website catalogues. |
+| 6 | Close out | `status.json`, README, LICENSE, changeset, `bun run sync`, registration in the CLI/MCP/website catalogues. |
 
 Four things went differently from the plan, all for the better:
 
@@ -293,8 +293,8 @@ vendored source; the double is replaced by the phase-4 oracle.
 | `react-map-gl-differential` | 5 | five fixtures through Octane and published upstream on React |
 | `react-map-gl-ssr` | 2 | container-only server output |
 
-`pnpm react-parity:check` executes all seven declared lanes. Repo-wide
-`pnpm typecheck`, `pnpm format:check` and `pnpm test` (16,439 tests) pass.
+`bun run react-parity:check` executes all seven declared lanes. Repo-wide
+`bun run typecheck`, `bun run format:check` and `bun run test` (16,439 tests) pass.
 
 ## Risks
 

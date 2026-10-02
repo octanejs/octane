@@ -101,8 +101,7 @@ async function sourceSnapshot() {
 		'packages/app-core/src',
 		'packages/vite-plugin-octane/src',
 		'package.json',
-		'pnpm-lock.yaml',
-		'pnpm-workspace.yaml',
+		'bun.lock',
 	];
 	const paths = git([
 		'ls-files',

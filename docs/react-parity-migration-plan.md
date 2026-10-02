@@ -366,7 +366,7 @@ For each React `it(...)` we port:
   `it`/`itRenders` titles + line numbers as a `describe` skeleton with `it.todo(...)`,
   pre-tagged in/out of scope using the §2 rules. Turns "port a file" into filling
   blanks.
-- `pnpm react-parity:candidates -- --baseline stable`: scan local React source
+- `bun run react-parity:candidates -- --baseline stable`: scan local React source
   citations against one pinned inventory and report ledger cases that may already
   have executable evidence. `--exact-line --exact-title` narrows the advisory list;
   canary-only work must pass `--baseline canary` so line drift cannot cross-map

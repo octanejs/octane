@@ -40,7 +40,7 @@ if (icons.length < 1_500) throw new Error(`Parsed only ${icons.length} Phosphor 
 
 const header =
 	`// Generated from @phosphor-icons/core@${CORE_VERSION} metadata and SVG assets.\n` +
-	'// Run `pnpm phosphor-icons:generate`; do not edit by hand.\n\n';
+	'// Run `bun run phosphor-icons:generate`; do not edit by hand.\n\n';
 const expected = new Map();
 
 function parsePaths(source, label) {

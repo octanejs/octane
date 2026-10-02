@@ -553,7 +553,7 @@ Add:
 Add `playwright` as a catalog dev dependency of the `octane` workspace package,
 wire the new project into the root Vitest project list and CI Chromium install,
 and fail with the installation command when the browser binary is absent. The
-browser suite must run under `pnpm test`; it is not an optional local script.
+browser suite must run under `bun run test`; it is not an optional local script.
 
 Compile the same `.tsrx` fixture once with Octane and once with the existing
 `@tsrx/react` precompiler. Refactor/reuse the cache compiler in
@@ -776,7 +776,7 @@ behavior.
 
 RuleSync is the source of truth for shared agent guidance. Edit only
 `.rulesync/rules/project.md` (native event and controlled-form sections), then
-run `pnpm rules:generate` and `pnpm rules:check`. Do not hand-edit generated
+run `bun run rules:generate` and `bun run rules:check`. Do not hand-edit generated
 `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`,
 `.github/copilot-instructions.md`, or `.cursor/rules/project.mdc`.
 
@@ -882,7 +882,7 @@ Priority review:
 For each affected binding, add a focused typing/commit test rather than relying
 on source search. Update its `status.json` when the documented surface or known
 divergence changes. Regenerate `docs/bindings-status.md` with
-`pnpm bindings:status`; never edit the generated table directly.
+`bun run bindings:status`; never edit the generated table directly.
 
 ### 6.4 React parity ledger
 
@@ -895,8 +895,8 @@ portable public outcome; it must not relabel synthetic mechanics as Octane
 parity. Regenerate/check with:
 
 ```bash
-pnpm react-parity:generate
-pnpm react-parity:check
+bun run react-parity:generate
+bun run react-parity:check
 ```
 
 ### 6.5 Evals and training prompts
@@ -922,9 +922,9 @@ After catalog/prompt/reference changes, regenerate and check the committed
 corpus:
 
 ```bash
-pnpm --filter @octanejs/evals corpus:generate
-pnpm --filter @octanejs/evals corpus:check
-pnpm --filter @octanejs/evals test
+bun run --filter @octanejs/evals corpus:generate
+bun run --filter @octanejs/evals corpus:check
+bun run --filter @octanejs/evals test
 ```
 
 ## 7. Reviewable implementation waves
@@ -1135,7 +1135,7 @@ Focused iteration:
 If Chromium is absent:
 
 ```bash
-pnpm --filter octane exec playwright install chromium
+bun run --filter octane exec playwright install chromium
 ```
 
 External editor-consumer gate, from the coordinated `tsrx-org/tsrx`
@@ -1143,10 +1143,10 @@ checkout (the new test names are part of Wave 1):
 
 ```bash
 pnpm vitest run packages/typescript-plugin/tests/octane-diagnostics.test.js packages/language-server/tests/compileDiagnosticPlugin.test.js
-pnpm typecheck
-pnpm format:check
-pnpm changeset:check
-pnpm --filter @tsrx/vscode-plugin build-and-package
+bun run typecheck
+bun run format:check
+bun run changeset:check
+bun run --filter @tsrx/vscode-plugin build-and-package
 ```
 
 The language-server test must issue an LSP document-diagnostic request for an
@@ -1156,25 +1156,25 @@ passing TSRX commit and released package versions in the evidence report.
 Generated-source checks:
 
 ```bash
-pnpm rules:generate
-pnpm rules:check
-pnpm bindings:status
-pnpm bindings:status:check
+bun run rules:generate
+bun run rules:check
+bun run bindings:status
+bun run bindings:status:check
 pnpm native-events:diagnostics
 pnpm native-events:diagnostics:check
-pnpm react-parity:generate
-pnpm react-parity:check
-pnpm --filter @octanejs/evals corpus:generate
-pnpm --filter @octanejs/evals corpus:check
-pnpm --filter @octanejs/evals test
-pnpm changeset:check
+bun run react-parity:generate
+bun run react-parity:check
+bun run --filter @octanejs/evals corpus:generate
+bun run --filter @octanejs/evals corpus:check
+bun run --filter @octanejs/evals test
+bun run changeset:check
 ```
 
 Deterministic production-size gates:
 
 ```bash
-pnpm --filter octane-codegen-size-bench bench
-pnpm --filter octane-bundle-size-bench bench
+bun run --filter octane-codegen-size-bench bench
+bun run --filter octane-bundle-size-bench bench
 node benchmarks/bench.mjs --ratios codegen-size bundle-size
 ```
 
@@ -1186,13 +1186,13 @@ not ratcheted or waived by this change.
 Final repository gates:
 
 ```bash
-pnpm test
-pnpm typecheck
-pnpm test:markers:check
-pnpm format:check
+bun run test
+bun run typecheck
+bun run test:markers:check
+bun run format:check
 ```
 
-`pnpm format:check` is mandatory after every file change, not a replacement for
+`bun run format:check` is mandatory after every file change, not a replacement for
 the focused/full behavioral runs.
 
 ## 10. Definition of done

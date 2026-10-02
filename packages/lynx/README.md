@@ -32,19 +32,19 @@ bootstrap/first-paint, and device evidence listed under Current decision.
 
 ## Run the repository demo
 
-From the repository root, `pnpm lynx:demo:native` verifies, caches, and launches
+From the repository root, `bun run lynx:demo:native` verifies, caches, and launches
 the official macOS Explorer 3.9 asset against the demo server. The captured
 arm64 run visibly reached the styled `Count 0` screen through the real
 main/background runtimes without an Octane exception. This lane does not yet
 automate the native tap or stand in for Android/iOS.
 
-`pnpm lynx:demo` starts only the pinned Rspeedy server and prints a LAN URL and
+`bun run lynx:demo` starts only the pinned Rspeedy server and prints a LAN URL and
 QR code for `main.lynx.bundle`. Load it with the official
 [Lynx 3.9.0 Explorer](https://github.com/lynx-family/lynx/releases/tag/3.9.0)
 on a device that can reach the development computer. The demo renders a styled
 native screen and increments a counter through `bindtap`.
 
-`pnpm lynx:demo:check` is the non-interactive typecheck/build command. The CI
+`bun run lynx:demo:check` is the non-interactive typecheck/build command. The CI
 demo test additionally starts the development command on an isolated port,
 fetches and decodes its bundle, and verifies server teardown. Those source/build
 paths are not native evidence; the separate Milestone 11 record covers macOS

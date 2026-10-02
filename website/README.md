@@ -7,16 +7,16 @@ still uses `@octanejs/mdx` with Shiki highlighting at build time.
 ## Develop
 
 ```bash
-pnpm --filter website dev        # streaming dev SSR on http://localhost:5179
-pnpm exec vitest run --project website # route and browser smoke tests
+bun run --filter website dev        # streaming dev SSR on http://localhost:5179
+bunx vitest run --project website # route and browser smoke tests
 ```
 
 ## Build & preview
 
 ```bash
-pnpm --filter website build      # TanStack Start + Nitro production build
-pnpm --filter website preview    # serves the production build on :3000
-pnpm --filter website start      # runs .output/server/index.mjs directly
+bun run --filter website build      # TanStack Start + Nitro production build
+bun run --filter website preview    # serves the production build on :3000
+bun run --filter website start      # runs .output/server/index.mjs directly
 ```
 
 `vite build` produces Nitro's deployable `.output/` directory:
@@ -42,7 +42,7 @@ Project settings in the Vercel dashboard:
 | ---------------- | -------------------------------------------- |
 | Root Directory   | `website` (enable "Include files outside the Root Directory" — workspace deps) |
 | Framework Preset | Other (`vercel.json` supplies the build command) |
-| Install Command  | default (`pnpm install` at the repo root)    |
+| Install Command  | default (`bun install` at the repo root)    |
 | Node.js Version  | 22.x or 24.x                                |
 
 No environment variables are required.

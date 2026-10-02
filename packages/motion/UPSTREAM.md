@@ -11,7 +11,7 @@
 - License: MIT (retained byte-exact as `LICENSE.upstream`, hash-matched to the lock)
 - Pinned bytes: `audit/upstream.lock.json` records each committed `upstream/`
   file's git blob sha in the `packages/framer-motion` subtree at the tag
-  commit; `pnpm react-port:materialize run --check --package-dir
+  commit; `bun run react-port:materialize run --check --package-dir
   packages/motion` verifies the copy offline. The pin identity is
   `framer-motion@12.42.2`, the member the vendored subtree belongs to;
   `motion@12.42.2` is the re-export wrapper published from the same tag.

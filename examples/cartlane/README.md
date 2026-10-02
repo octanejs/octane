@@ -79,10 +79,10 @@ Other deterministic states are available through public interactions or URLs:
 From the repository root:
 
 ```bash
-pnpm --dir examples/cartlane typecheck
-pnpm --dir examples/cartlane build
-pnpm --dir examples/cartlane dev
-pnpm --dir examples/cartlane test:e2e
+bun run --cwd examples/cartlane typecheck
+bun run --cwd examples/cartlane build
+bun run --cwd examples/cartlane dev
+bun run --cwd examples/cartlane test:e2e
 ```
 
 `test:e2e` builds both the browser and self-contained SSR server bundles, runs

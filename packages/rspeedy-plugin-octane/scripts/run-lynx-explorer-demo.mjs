@@ -62,7 +62,7 @@ export const LYNX_EXPLORER_ASSETS = Object.freeze({
 export function selectExplorerAsset({ platform = process.platform, arch = process.arch } = {}) {
 	if (platform !== 'darwin') {
 		throw new Error(
-			`The Octane Lynx native demo launcher requires macOS; received ${platform}. Use pnpm lynx:demo for a device or simulator on other hosts.`,
+			`The Octane Lynx native demo launcher requires macOS; received ${platform}. Use bun run lynx:demo for a device or simulator on other hosts.`,
 		);
 	}
 	const asset = LYNX_EXPLORER_ASSETS[arch];
@@ -151,8 +151,8 @@ export function createNativeDemoPlan({
 		...explorerPlan,
 		bundleUrl,
 		demoCommand: {
-			args: ['lynx:demo'],
-			command: 'pnpm',
+			args: ['run', 'lynx:demo'],
+			command: 'bun',
 			cwd: workspaceRoot,
 			env: { ...env, OCTANE_LYNX_DEMO_PORT: String(port) },
 		},
@@ -324,7 +324,7 @@ export async function cleanupNativeDemo(
 	if (explorerStopped !== false) await preparedExplorer?.dispose();
 	const failures = [];
 	if (explorerStopped === false) failures.push('Lynx Explorer');
-	if (demoStopped === false) failures.push('pnpm lynx:demo');
+	if (demoStopped === false) failures.push('bun run lynx:demo');
 	if (failures.length > 0) {
 		throw new Error(`Could not stop the ${failures.join(' and ')} process group.`);
 	}
@@ -578,13 +578,13 @@ export async function waitForBundle(child, url, timeoutMs, fetchImpl) {
 	try {
 		while (Date.now() <= deadline) {
 			if (spawnError !== undefined) {
-				throw new Error(`Could not start pnpm lynx:demo: ${spawnError.message}`, {
+				throw new Error(`Could not start bun run lynx:demo: ${spawnError.message}`, {
 					cause: spawnError,
 				});
 			}
 			if (child.exitCode !== null || child.signalCode !== null) {
 				throw new Error(
-					`pnpm lynx:demo exited before serving ${url} (${
+					`bun run lynx:demo exited before serving ${url} (${
 						child.signalCode ?? `exit code ${child.exitCode}`
 					}).`,
 				);
@@ -604,7 +604,7 @@ export async function waitForBundle(child, url, timeoutMs, fetchImpl) {
 			if (validBundle) {
 				if (child.exitCode !== null || child.signalCode !== null) {
 					throw new Error(
-						`pnpm lynx:demo exited while serving ${url} (${
+						`bun run lynx:demo exited while serving ${url} (${
 							child.signalCode ?? `exit code ${child.exitCode}`
 						}).`,
 					);
@@ -616,7 +616,7 @@ export async function waitForBundle(child, url, timeoutMs, fetchImpl) {
 	} finally {
 		child.off('error', onError);
 	}
-	throw new Error(`pnpm lynx:demo did not serve ${url} within ${timeoutMs}ms.`);
+	throw new Error(`bun run lynx:demo did not serve ${url} within ${timeoutMs}ms.`);
 }
 
 export function isLynxBundle(content) {
@@ -808,7 +808,7 @@ export async function runNativeDemo({
 		}
 		if (demo.exitCode !== null || demo.signalCode !== null) {
 			throw new Error(
-				`pnpm lynx:demo exited before Explorer launch (${
+				`bun run lynx:demo exited before Explorer launch (${
 					demo.signalCode ?? `exit code ${demo.exitCode}`
 				}).`,
 			);
@@ -839,7 +839,7 @@ export async function runNativeDemo({
 		}
 		if (outcome.kind === 'demo') {
 			throw new Error(
-				`pnpm lynx:demo stopped while Explorer was open (${
+				`bun run lynx:demo stopped while Explorer was open (${
 					outcome.result.signal ?? `exit code ${outcome.result.code}`
 				}).`,
 			);

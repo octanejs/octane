@@ -11,7 +11,7 @@ tagged git repository. Every file verifies offline against the upstream git blob
 shas recorded in `audit/upstream.lock.json`, and the pinned license is
 republished at the package root as `LICENSE.upstream`. The npm tarball SHA-256 is
 `d062e21bae0c864c3559707c0451edabc0aac32a22eda239064a3faa7c9f1b21`
-(published package surface only). Run `pnpm --dir packages/vaul upstream:check` to
+(published package surface only). Run `bun run --cwd packages/vaul upstream:check` to
 verify the vendored evidence.
 
 ## Source boundary

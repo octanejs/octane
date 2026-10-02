@@ -23,7 +23,7 @@ benchmarks/recursive-context/
 ├── run.mjs            # Playwright harness — drives all adapters
 ├── work.mjs           # untimed Chromium precise-call-coverage gates for Octane
 ├── context-cache-work.mjs # Map-construction gate and observational update timings
-├── package.json       # umbrella: `pnpm bench`
+├── package.json       # umbrella: `bun run bench`
 └── README.md
 ```
 
@@ -88,7 +88,7 @@ provider remains isolated from the rest of the 2,047-component tree.
 
 ```bash
 # 1. From the repo root, install:
-pnpm install
+bun install
 
 # 2. Production-build, preview, and drive all eight targets:
 node benchmarks/bench.mjs --quick recursive-context
@@ -96,9 +96,9 @@ node benchmarks/bench.mjs recursive-context
 ```
 
 The unified runner also executes `work.mjs` against the already-built Octane
-previews. Run it directly with `pnpm --dir benchmarks/recursive-context
+previews. Run it directly with `bun run --cwd benchmarks/recursive-context
 bench:work` when those two previews are already running.
-Run `pnpm --dir benchmarks/recursive-context bench:cache` for the focused
+Run `bun run --cwd benchmarks/recursive-context bench:cache` for the focused
 context-cache gate. It builds the Octane production fixture and starts its own
 preview on an ephemeral local port; no other preview servers are needed.
 
@@ -240,7 +240,7 @@ Default: 10 warmups + 20 iters. Pass an integer to `bench` to override iters
 
 ## Warm-cache ancestor work
 
-`pnpm --dir benchmarks/recursive-context bench:warm-adoption` builds a dedicated
+`bun run --cwd benchmarks/recursive-context bench:warm-adoption` builds a dedicated
 production entry and starts a preview on an ephemeral localhost port. The main
 `bench:work` pass runs the same guard using its existing preview and browser.
 The fixture mounts and updates a chain of ordinary synchronous custom-hook

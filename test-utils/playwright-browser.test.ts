@@ -45,7 +45,7 @@ describe('repository Chromium launcher', () => {
 
 		expect(error).toBeInstanceOf(Error);
 		expect(error.message).toContain('Chromium could not be launched');
-		expect(error.message).toContain('pnpm exec playwright install chromium');
+		expect(error.message).toContain('bunx playwright install chromium');
 		expect(error.cause).toBe(cause);
 	});
 

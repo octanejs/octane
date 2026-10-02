@@ -243,7 +243,7 @@ export async function startFixture({
 		octaneSource: source.packageRoot,
 		octaneSourceSha256: hashOctaneSources(source.packageRoot),
 		fixtureSourceSha256: hashFixture(scenario),
-		lockfileSha256: hashFile(path.join(REPO, 'pnpm-lock.yaml')),
+		lockfileSha256: hashFile(path.join(REPO, 'bun.lock')),
 		parser: process.env.OCTANE_ACTIVITY_PARSER ?? 'package-default',
 		tsrxCore: packageVersion(requireFromOctane, '@tsrx/core'),
 		tsrxReact: packageVersion(requireFromReact, '@tsrx/react'),

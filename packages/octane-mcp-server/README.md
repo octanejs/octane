@@ -22,7 +22,7 @@ npm install -g @octanejs/mcp-server
 For local development inside the octane repository:
 
 ```bash
-pnpm --filter @octanejs/mcp-server start
+bun run --filter @octanejs/mcp-server start
 ```
 
 ## MCP transport
@@ -125,7 +125,7 @@ also available: `authoring-tsrx`, `octane-react-library-port`, `bug-hunter`,
 `create-a-pr`, `handle-issue`, `octane-core-extend`, `triage`,
 `performance-audit`. A test compares this map against the directory in both
 directions, so a new skill cannot stay unreachable here. This tool reads the RuleSync source, and
-`pnpm rules:generate` writes the per-agent copies (`.claude/skills/`,
+`bun run rules:generate` writes the per-agent copies (`.claude/skills/`,
 `.github/skills/`, `.cursor/skills/`, `.gemini/skills/`) from the same text, so
 hosts that discover skills natively and hosts that call this tool see the same
 thing.
@@ -182,6 +182,6 @@ authenticated.
 ## Development
 
 ```bash
-pnpm --filter @octanejs/mcp-server test
-pnpm --filter @octanejs/mcp-server start
+bun run --filter @octanejs/mcp-server test
+bun run --filter @octanejs/mcp-server start
 ```

@@ -251,7 +251,7 @@ export async function verifyCompatibilityConsumer({ consumerRoot, laneName, work
 		assert.equal(peerOctane, directOctane, `${packageName} resolved a second Octane runtime`);
 	}
 
-	const virtualStore = join(consumerRoot, 'node_modules/.pnpm');
+	const virtualStore = join(consumerRoot, 'node_modules/.bun');
 	const forbidden = readdirSync(virtualStore).filter((entry) =>
 		/^(?:react|react-dom|preact)@|^@lynx-js\+react@/.test(entry),
 	);

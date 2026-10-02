@@ -57,13 +57,13 @@ The pristine type lane preserves upstream's `noUncheckedIndexedAccess` and `exac
 ```sh
 node scripts/react-port/materialize.mjs run --package-dir packages/jotai
 node scripts/react-parity/verify-provenance.mjs --package-dir packages/jotai
-pnpm --dir packages/jotai test
+bun run --cwd packages/jotai test
 node scripts/react-parity/harness.mjs run-required --manifest packages/jotai/audit/react-parity.json
 ./packages/jotai/node_modules/.bin/tsc --noEmit -p packages/jotai/tsconfig.pristine.json
-pnpm exec tsrx-tsc --noEmit -p packages/jotai/tsconfig.adapted.json
-pnpm exec tsrx-tsc --noEmit -p packages/jotai/tsconfig.json
-pnpm exec tsrx-tsc --noEmit -p packages/jotai/tests/types/tsconfig.json
-pnpm packages:pack:check
+bunx tsrx-tsc --noEmit -p packages/jotai/tsconfig.adapted.json
+bunx tsrx-tsc --noEmit -p packages/jotai/tsconfig.json
+bunx tsrx-tsc --noEmit -p packages/jotai/tests/types/tsconfig.json
+bun run packages:pack:check
 ```
 
 The shared port evidence gate records the actual commands and verifies the package contract, licenses, crosswalk, and shipped closure. The declared imported surfaces retain dependency, exports, public types and consumer checks; copied React surfaces retain their full upstream suite obligations. The ownership declaration does not remove prior evidence.

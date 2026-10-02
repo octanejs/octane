@@ -50,7 +50,7 @@ The hand-authored runtime mirrors Lucide React's layers:
 - focused tests cover accessibility, refs, custom nodes, dynamic loading,
   tree-shaking, SSR, and hydration.
 
-To update Lucide, change both catalog versions, run `pnpm install`, then run
-`pnpm lucide:generate`. Review upstream runtime changes before accepting the
+To update Lucide, change both catalog versions, run `bun install`, then run
+`bun run lucide:generate`. Review upstream runtime changes before accepting the
 generated diff, and refresh the version and evidence date in this document and
 `packages/lucide/status.json`.

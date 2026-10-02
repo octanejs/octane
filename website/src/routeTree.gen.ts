@@ -8,17 +8,17 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root.tsrx'
-import { Route as IndexRouteImport } from './routes/index.tsrx'
-import { Route as BenchmarksRouteImport } from './routes/benchmarks.tsrx'
-import { Route as DevtoolsRouteImport } from './routes/devtools.tsrx'
-import { Route as DocsRouteImport } from './routes/docs.tsrx'
-import { Route as ErrorsRouteImport } from './routes/errors.tsrx'
-import { Route as PlaygroundRouteImport } from './routes/playground.tsrx'
-import { Route as DocsIndexRouteImport } from './routes/docs.index.tsrx'
-import { Route as DocsSlugRouteImport } from './routes/docs.$slug.tsrx'
-import { Route as ErrorsIndexRouteImport } from './routes/errors.index.tsrx'
-import { Route as ErrorsCodeRouteImport } from './routes/errors.$code.tsrx'
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as BenchmarksRouteImport } from './routes/benchmarks'
+import { Route as DevtoolsRouteImport } from './routes/devtools'
+import { Route as DocsRouteImport } from './routes/docs'
+import { Route as ErrorsRouteImport } from './routes/errors'
+import { Route as PlaygroundRouteImport } from './routes/playground'
+import { Route as DocsIndexRouteImport } from './routes/docs.index'
+import { Route as DocsSlugRouteImport } from './routes/docs.$slug'
+import { Route as ErrorsIndexRouteImport } from './routes/errors.index'
+import { Route as ErrorsCodeRouteImport } from './routes/errors.$code'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',

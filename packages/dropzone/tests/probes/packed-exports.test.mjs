@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { packPackage } from '../../../../scripts/pack-package.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
 const temp = mkdtempSync(resolve(tmpdir(), 'octane-react-dropzone-pack-'));
@@ -11,11 +12,7 @@ const run = (command, args, cwd = root) => {
 		throw new Error(`${command} ${args.join(' ')} failed:\n${result.stdout}\n${result.stderr}`);
 	return result.stdout;
 };
-run('pnpm', ['pack', '--pack-destination', temp]);
-const tarball = resolve(
-	temp,
-	readdirSync(temp).find((file) => file.endsWith('.tgz')),
-);
+const { archive: tarball } = packPackage(root, temp, { root: resolve(root, '../..') });
 run('tar', ['-xzf', tarball, '-C', temp]);
 const pkg = JSON.parse(readFileSync(resolve(temp, 'package/package.json'), 'utf8'));
 const expectedRoot = {

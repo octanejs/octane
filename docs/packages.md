@@ -1,6 +1,6 @@
 # Package inventory (generated)
 
-<!-- GENERATED FILE — do not edit. Regenerate with `pnpm packages:inventory`. -->
+<!-- GENERATED FILE — do not edit. Regenerate with `bun run packages:inventory`. -->
 
 This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or

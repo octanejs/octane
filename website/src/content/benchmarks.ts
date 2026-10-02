@@ -1,6 +1,6 @@
 // Benchmark data for the site's charts — the CHECKED-IN benchmark scores from
 // `benchmarks/baselines/local/` (recorded by `node benchmarks/bench.mjs
-// --record`, reproduced with `pnpm bench:all`), imported at build time so the
+// --record`, reproduced with `bun run bench:all`), imported at build time so the
 // site can never drift from the repo's numbers. This module massages the
 // baseline shape ({ suite, targets: [{ name, ops }] }) into per-chart card
 // descriptors: rows keyed by operation with one column per series, plus the
@@ -94,7 +94,7 @@ export interface BenchCard {
 // Vue can't wear its brand green — it collapses into Solid's under tritan
 // simulation — so it wears orchid.
 // ---------------------------------------------------------------------------
-// Versions are the pnpm-catalog pins the fixtures actually run.
+// Versions are the workspace catalog pins the fixtures actually run.
 const FRAMEWORKS: SeriesDef[] = [
 	{ key: 'octane-tsrx', label: 'Octane (.tsrx)', color: '#ff415a' },
 	{ key: 'octane-jsx', label: 'Octane (.tsx)', color: '#c98500' },

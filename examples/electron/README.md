@@ -20,10 +20,10 @@ task manifest, runs one, and streams its log back from the host.
 ## Running it
 
 ```bash
-pnpm dev                 # frontend only, in a browser (mock bridge)
-pnpm build && pnpm electron   # real Electron window (needs Electron binary)
-ELECTRON_START_URL=http://127.0.0.1:5232 pnpm electron  # against vite dev
-pnpm test:e2e            # production build + Playwright journeys
+bun run dev                 # frontend only, in a browser (mock bridge)
+bun run build && bun run electron   # real Electron window (needs Electron binary)
+ELECTRON_START_URL=http://127.0.0.1:5232 bun run electron  # against vite dev
+bun run test:e2e            # production build + Playwright journeys
 ```
 
 Browser preview and CI journeys install `installElectronBridge` when

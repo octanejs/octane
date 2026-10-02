@@ -168,7 +168,7 @@ it('starts the advertised development command, serves its bundle, and shuts down
 	const port = await getFreePort();
 	const url = `http://127.0.0.1:${port}/main.lynx.bundle`;
 	let output = '';
-	const child = spawn('pnpm', ['lynx:demo'], {
+	const child = spawn('bun', ['run', 'lynx:demo'], {
 		cwd: WORKSPACE_ROOT,
 		detached: process.platform !== 'win32',
 		env: {
@@ -212,7 +212,7 @@ it('fails instead of moving the demo when its requested port is occupied', async
 		throw new Error('Could not reserve a TCP port for the strict-port test.');
 	}
 	try {
-		const result = spawnSync('pnpm', ['lynx:demo'], {
+		const result = spawnSync('bun', ['run', 'lynx:demo'], {
 			cwd: WORKSPACE_ROOT,
 			encoding: 'utf8',
 			env: {
@@ -249,7 +249,7 @@ function withoutKnownDiagnosticText(content: string): string {
 it('builds the one-command demo as a React-free Octane Lynx application', async () => {
 	const temporaryRoot = mkdtempSync(join(tmpdir(), 'octane-lynx-demo-'));
 	try {
-		execFileSync('pnpm', ['lynx:demo:check'], {
+		execFileSync('bun', ['run', 'lynx:demo:check'], {
 			cwd: WORKSPACE_ROOT,
 			encoding: 'utf8',
 			env: {

@@ -39,7 +39,7 @@ try {
 
 	if (!fs.existsSync(entryPath)) {
 		console.error(`[octane-preview] Server entry not found: ${entryPath}`);
-		console.error('[octane-preview] Did you run `pnpm build` first?');
+		console.error('[octane-preview] Did you run `bun run build` first?');
 		process.exit(1);
 	}
 

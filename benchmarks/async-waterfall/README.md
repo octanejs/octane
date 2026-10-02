@@ -53,7 +53,7 @@ toward per-level rounds fails loudly) and ≤1.5× solid/ripple on init+update
 
 ```bash
 node benchmarks/bench.mjs async-waterfall            # orchestrated (servers auto-boot)
-pnpm --filter octane-tsrx-async-bench dev            # or drive one app by hand on :5216
+bun run --filter octane-tsrx-async-bench dev            # or drive one app by hand on :5216
 node benchmarks/async-waterfall/run.mjs 10
 ```
 

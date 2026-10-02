@@ -225,7 +225,7 @@ function hasTypeProjectMarker(relativeProject, marker) {
 function isTypeProjectCommand(commandArguments, bindingDirectory, gateId, compiler) {
 	const prefix = commandArguments.slice(0, -1);
 	if (
-		!isExactCommand(prefix, ['pnpm', 'exec', compiler, '--noEmit', '-p']) &&
+		!isExactCommand(prefix, ['bun', 'x', compiler, '--noEmit', '-p']) &&
 		!isExactCommand(prefix, [`./node_modules/.bin/${compiler}`, '--noEmit', '-p']) &&
 		!isExactCommand(prefix, [
 			`./${bindingDirectory}/node_modules/.bin/${compiler}`,
@@ -278,7 +278,7 @@ function packageTestInvocations(manifest, scriptName = 'test', visiting = new Se
 		.map((segment) => segment.trim().replace(/^(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]+\s+)+/, ''));
 	const invocations = [];
 	for (const segment of segments) {
-		const direct = segment.match(/^(?:(?:pnpm\s+(?:exec\s+)?)?)(vitest|jest)(?:\s+(.*))?$/);
+		const direct = segment.match(/^(?:bunx\s+|bun\s+(?:(?:x|run)\s+)?)?(vitest|jest)(?:\s+(.*))?$/);
 		if (direct) {
 			const [, runner, rawArguments = ''] = direct;
 			if (
@@ -323,7 +323,7 @@ function packageTestInvocations(manifest, scriptName = 'test', visiting = new Se
 			invocations.push({ runner: 'react-parity', segment });
 			continue;
 		}
-		const delegated = segment.match(/^pnpm\s+(?:run\s+)?([^\s]+)$/)?.[1];
+		const delegated = segment.match(/^bun\s+run\s+([^\s]+)$/)?.[1];
 		if (delegated) {
 			invocations.push(...packageTestInvocations(manifest, delegated, nextVisiting));
 		}
@@ -1543,7 +1543,13 @@ export function assertApprovedGateCommand(
 		if (absenceCommand && ['upstream-types-pristine', 'upstream-types-adapted'].includes(gateId)) {
 			approved = true;
 		} else if (gateId === 'package-tests') {
-			approved = isExactCommand(commandArguments, ['pnpm', '--dir', bindingDirectory, 'test']);
+			approved = isExactCommand(commandArguments, [
+				'bun',
+				'run',
+				'--cwd',
+				bindingDirectory,
+				'test',
+			]);
 		} else if (gateId === 'public-exports') {
 			approved = isExactCommand(commandArguments, [
 				'node',
@@ -1566,11 +1572,11 @@ export function assertApprovedGateCommand(
 		) {
 			approved = isTypeProjectCommand(commandArguments, bindingDirectory, gateId, 'tsrx-tsc');
 		} else if (PACK_GATES.has(gateId)) {
-			approved = isExactCommand(commandArguments, ['pnpm', 'packages:pack:check']);
+			approved = isExactCommand(commandArguments, ['bun', 'run', 'packages:pack:check']);
 		} else if (gateId === 'generated-data') {
-			approved = isExactCommand(commandArguments, ['pnpm', 'sync']);
+			approved = isExactCommand(commandArguments, ['bun', 'run', 'sync']);
 		} else if (gateId === 'format') {
-			approved = isExactCommand(commandArguments, ['pnpm', 'format:check']);
+			approved = isExactCommand(commandArguments, ['bun', 'run', 'format:check']);
 		}
 		if (!approved) {
 			throw new Error(

@@ -35,9 +35,9 @@
       "node": ">=22",
       "platform": "any",
       "arch": "any",
-      "packageManager": "pnpm@11.15.1",
-      "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "27f48782633baf71b121e0b6716433c4a293021a80d11f46979754f0d16e8709"
+      "packageManager": "bun@1.4.2",
+      "lockfile": "bun.lock",
+      "lockfileSha256": "aa404a0a6304023d5005ee6786e6ba3ddfe18df0fb9fae108f2a8be3aa95b699"
     }
   },
   "lanes": [
@@ -275,7 +275,7 @@
         {
           "path": "packages/tiptap/typetests/assertions.md",
           "role": "support",
-          "sha256": "5419fbacacf3fa0afa4e8d57072bbff77eafccf7484f553f6bdb413d3cd8bc9a"
+          "sha256": "fd77e59d4629d9c54d5aa0e5781313b237a4f2a6fa855624ec6ae312483ce86f"
         }
       ]
     },
@@ -323,7 +323,7 @@
         {
           "path": "packages/tiptap/typetests/assertions.md",
           "role": "support",
-          "sha256": "5419fbacacf3fa0afa4e8d57072bbff77eafccf7484f553f6bdb413d3cd8bc9a"
+          "sha256": "fd77e59d4629d9c54d5aa0e5781313b237a4f2a6fa855624ec6ae312483ce86f"
         }
       ]
     }

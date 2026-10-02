@@ -8,9 +8,9 @@ module.exports = {
 	modulePaths: [
 		join(__dirname, '..', 'node_modules'),
 		join(__dirname, '..', '..', '..', 'node_modules'),
-		// pnpm's hidden hoist store holds transitive dependencies (motion-utils,
+		// Bun's hidden hoist store holds transitive dependencies (motion-utils,
 		// expect) that neither package tree exposes directly.
-		join(__dirname, '..', '..', '..', 'node_modules', '.pnpm', 'node_modules'),
+		join(__dirname, '..', '..', '..', 'node_modules', '.bun', 'node_modules'),
 	],
 	setupFilesAfterEnv: [join(__dirname, 'upstream-jest.matcher-compat.cjs')],
 	clearMocks: true,

@@ -24,7 +24,7 @@ The adapted suite under `tests/upstream/` is regenerated from the lock's
 mechanical rewrites plus minimal patches in `audit/upstream-patches/`; it is not
 committed.
 
-Run `pnpm --dir packages/resizable-panels upstream:verify` to reject a
+Run `bun run --cwd packages/resizable-panels upstream:verify` to reject a
 modified, missing, or extra vendored file and drift in the export, type, or test
 inventories. The verifier's negative-control mode proves each fail-closed path.
 

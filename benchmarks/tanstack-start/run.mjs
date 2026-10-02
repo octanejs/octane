@@ -98,7 +98,7 @@ const ROUTE_MARKERS = {
 
 if (!noBuild) {
 	console.error('building all tanstack-start flavors (production)…');
-	const r = spawnSync('pnpm', ['--filter', 'tanstack-start-bench', 'build'], {
+	const r = spawnSync('bun', ['run', '--filter', 'tanstack-start-bench', 'build'], {
 		cwd: __dirname,
 		stdio: ['ignore', 'inherit', 'inherit'],
 	});

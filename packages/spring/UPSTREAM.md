@@ -22,7 +22,7 @@ excluded from the published `files`, and verify offline against the upstream
 git blob shas recorded in `audit/upstream.lock.json`. The pinned license is
 republished at the package root as `LICENSE.upstream`.
 
-Run `pnpm --dir packages/spring upstream:verify` to detect a modified,
+Run `bun run --cwd packages/spring upstream:verify` to detect a modified,
 missing, renamed, or unexpected vendored file. The verifier itself has negative
 controls in `scripts/react-parity/react-spring-upstream-lib.test.mjs`.
 

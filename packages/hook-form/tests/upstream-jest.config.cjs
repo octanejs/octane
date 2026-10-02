@@ -13,7 +13,7 @@ module.exports = {
 					...project,
 					// Resolve the bare 'node' environment from this package's pinned
 					// jest-environment-node. Leaving it to jest's walk-up resolution ends in
-					// pnpm's hidden hoist folder, which holds whichever version a past
+					// Bun's hidden hoist folder, which holds whichever version a past
 					// install hoisted first — an old jest-environment-node pairs a
 					// jest-mock without clearMocksOnScope with jest-runtime 30.4, and every
 					// Server suite fails to run.

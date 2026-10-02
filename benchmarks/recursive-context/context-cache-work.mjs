@@ -13,7 +13,7 @@ const { preview } = await import(requireFixture.resolve('vite'));
 const VARIANTS = ['zero', 'one', 'two'];
 const ROW_COUNT = 512;
 
-execFileSync('pnpm', ['exec', 'vite', 'build'], {
+execFileSync('bun', ['run', 'vite', 'build'], {
 	cwd: fileURLToPath(fixture),
 	stdio: 'inherit',
 });

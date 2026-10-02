@@ -7,7 +7,7 @@ large enough to exercise the binding through real editor interactions without
 claiming every feature in the upstream showcase.
 
 ```bash
-pnpm --filter lexical-playground-example dev
+bun run --filter lexical-playground-example dev
 # http://localhost:5210
 ```
 
@@ -31,10 +31,10 @@ Markdown shortcuts such as `# `, `- `, `> `, and `---` are also active.
 The example is a browser-level fixture as well as a demo:
 
 ```bash
-pnpm --filter lexical-playground-example typecheck
-pnpm --filter lexical-playground-example build
-pnpm --filter lexical-playground-example test:e2e
-pnpm --filter lexical-playground-example test:e2e:dev
+bun run --filter lexical-playground-example typecheck
+bun run --filter lexical-playground-example build
+bun run --filter lexical-playground-example test:e2e
+bun run --filter lexical-playground-example test:e2e:dev
 ```
 
 The E2E launch commands use POSIX inline environment syntax and are supported

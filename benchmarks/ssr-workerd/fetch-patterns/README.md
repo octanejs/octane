@@ -180,7 +180,7 @@ CASES=per-card BENCH_ROUNDS=1 \
 BENCH_DELAY_MS=0 BENCH_JSON=benchmarks/results/cloudflare-fetch-patterns-0ms.json \
   node benchmarks/ssr-workerd/fetch-patterns/run.mjs 7
 
-pnpm exec tsrx-tsc --noEmit -p benchmarks/ssr-workerd/fetch-patterns/tsconfig.json
+bunx tsrx-tsc --noEmit -p benchmarks/ssr-workerd/fetch-patterns/tsconfig.json
 ```
 
 The runner production-builds the fixtures once, warms each case twice, and

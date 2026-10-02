@@ -20,19 +20,24 @@ function readJson(path) {
 }
 
 test('keeps one Playwright revision across catalogs, overrides, and the lockfile', function () {
-	const workspace = readFileSync(join(repoRoot, 'pnpm-workspace.yaml'), 'utf8');
-	const declaredVersions = [
-		...workspace.matchAll(/^\s+(?:'@playwright\/test'|playwright): ([~^]?\d+\.\d+\.\d+)$/gmu),
-	].map((match) => match[1]);
+	const manifest = readJson('package.json');
+	const declaredVersions = [manifest.workspaces.catalogs.default, manifest.overrides].flatMap(
+		(versions) => [versions['@playwright/test'], versions.playwright],
+	);
 	assert.equal(declaredVersions.length, 4);
+	assert.ok(declaredVersions.every((version) => /^[~^]?\d+\.\d+\.\d+$/u.test(version)));
 	assert.equal(new Set(declaredVersions).size, 1);
 
-	const lockfile = readFileSync(join(repoRoot, 'pnpm-lock.yaml'), 'utf8');
+	const lockfile = readFileSync(join(repoRoot, 'bun.lock'), 'utf8');
 	const resolvedTestVersions = new Set(
-		[...lockfile.matchAll(/^  '@playwright\/test@([^']+)':$/gmu)].map((match) => match[1]),
+		[
+			...lockfile.matchAll(/^\s+"(?:[^"]+\/)?@playwright\/test": \["@playwright\/test@([^"]+)"/gmu),
+		].map((match) => match[1]),
 	);
 	const resolvedPlaywrightVersions = new Set(
-		[...lockfile.matchAll(/^  playwright@([^:]+):$/gmu)].map((match) => match[1]),
+		[...lockfile.matchAll(/^\s+"(?:[^"]+\/)?playwright": \["playwright@([^"]+)"/gmu)].map(
+			(match) => match[1],
+		),
 	);
 	assert.equal(resolvedTestVersions.size, 1);
 	assert.deepEqual([...resolvedPlaywrightVersions], [...resolvedTestVersions]);

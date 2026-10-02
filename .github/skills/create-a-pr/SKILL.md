@@ -35,7 +35,7 @@ worktree before doing work.
 - Keep commits focused.
 - Add changesets for user-facing package changes; skip docs-only/test-only/internal tooling.
 - If changing RuleSync source, edit `.rulesync/rules/*` or
-  `.rulesync/skills/*` and run `pnpm rules:generate`.
+  `.rulesync/skills/*` and run `bun run rules:generate`.
 
 ## Validation checklist
 
@@ -43,16 +43,16 @@ During iteration, format or check one or more changed files/directories without
 scanning the repository:
 
 ```bash
-pnpm format:files <path...>
-pnpm format:files:check <path...>
+bun run format:files <path...>
+bun run format:files:check <path...>
 ```
 
 Then run the smallest meaningful final set and record results:
 
 ```bash
-pnpm format:check
-pnpm typecheck
-pnpm test
+bun run format:check
+bun run typecheck
+bun run test
 ```
 
 Targeted alternatives are acceptable for small changes, but PR body must say what was and was not run.
@@ -70,9 +70,9 @@ Targeted alternatives are acceptable for small changes, but PR body must say wha
 - ...
 
 ## Validation
-- [ ] `pnpm format:check`
-- [ ] `pnpm typecheck`
-- [ ] `pnpm test`
+- [ ] `bun run format:check`
+- [ ] `bun run typecheck`
+- [ ] `bun run test`
 - [ ] targeted tests: ...
 
 ## Risk / follow-ups
@@ -110,7 +110,7 @@ commit:
 
 ```bash
 git branch --show-current
-pnpm sync
+bun run sync
 git status --short
 git add <files>
 git commit -m "<type>: <summary>"
@@ -142,7 +142,7 @@ That transition starts CI; it is not evidence that CI passed.
 - no reviewer or bot review is still in progress or expected for an older head;
 - the head contains the live base branch, not merely the base SHA cached when the PR opened;
 - GitHub reports the PR mergeable with no conflict or branch-currency blocker; and
-- the final `pnpm sync` and relevant local validation leave the worktree clean.
+- the final `bun run sync` and relevant local validation leave the worktree clean.
 
 These are independent gates. Green checks do not prove that review feedback is
 resolved, and resolved feedback does not prove that the branch still merges.

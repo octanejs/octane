@@ -46,7 +46,7 @@ benchmarks/memo-wall/
 ├── svelte/       # Vite app, dev :5278 (fine-grained creation/text probes)
 ├── run.mjs        # Playwright harness — drives all targets, enforces the gates
 ├── work.mjs       # untimed Chromium precise-call-coverage work gates
-├── package.json   # umbrella: `pnpm bench`
+├── package.json   # umbrella: `bun run bench`
 └── README.md
 ```
 
@@ -195,13 +195,13 @@ Run the deterministic work gate against a separate unminified production build
 used for timings):
 
 ```bash
-MEMO_WALL_WORK=1 pnpm --filter octane-tsrx-memowall-bench build
-pnpm --filter octane-tsrx-memowall-bench preview
-pnpm --dir benchmarks/memo-wall bench:work
+MEMO_WALL_WORK=1 bun run --filter octane-tsrx-memowall-bench build
+bun run --filter octane-tsrx-memowall-bench preview
+bun run --cwd benchmarks/memo-wall bench:work
 
-MEMO_WALL_WORK=1 pnpm --filter octane-jsx-memowall-bench build
-pnpm --filter octane-jsx-memowall-bench preview
-WORK_DIALECT=jsx pnpm --dir benchmarks/memo-wall bench:work
+MEMO_WALL_WORK=1 bun run --filter octane-jsx-memowall-bench build
+bun run --filter octane-jsx-memowall-bench preview
+WORK_DIALECT=jsx bun run --cwd benchmarks/memo-wall bench:work
 ```
 
 Set `TARGET_URL` to use a non-default preview URL and `WORK_JSON` to persist the

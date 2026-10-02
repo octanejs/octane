@@ -50,7 +50,7 @@ fails the run.
 ## Running
 
 ```bash
-pnpm --filter octane-tsrx-list-clear-bench preview   # :5298
+bun run --filter octane-tsrx-list-clear-bench preview   # :5298
 node run.mjs [iter]
 ```
 

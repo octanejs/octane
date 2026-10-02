@@ -43,17 +43,17 @@ which renderer owns each subtree and how to configure their compilers.
 ## Repository commands
 
 ```bash
-pnpm examples:catalog        # regenerate examples/catalog.json
-pnpm examples:catalog:check  # validate manifests and catalog freshness
-pnpm examples:catalog:test   # exercise invalid manifest contracts
-pnpm examples:runner:test    # exercise sharding, timing, and failure propagation
-pnpm examples:typecheck      # run every example's strict TypeScript gate
-pnpm examples:shared:test    # exercise shared process lifecycle helpers
-pnpm examples:build          # build every example for production
-pnpm examples:e2e            # run every Playwright journey with per-app timing
-pnpm examples:e2e -- --shard=1/3 # run one deterministic CI shard
-pnpm examples:static:check   # catalog + orchestration + shared-helper tests
-pnpm examples:check          # catalog + types + helper tests + production builds
+bun run examples:catalog        # regenerate examples/catalog.json
+bun run examples:catalog:check  # validate manifests and catalog freshness
+bun run examples:catalog:test   # exercise invalid manifest contracts
+bun run examples:runner:test    # exercise sharding, timing, and failure propagation
+bun run examples:typecheck      # run every example's strict TypeScript gate
+bun run examples:shared:test    # exercise shared process lifecycle helpers
+bun run examples:build          # build every example for production
+bun run examples:e2e            # run every Playwright journey with per-app timing
+bun run examples:e2e -- --shard=1/3 # run one deterministic CI shard
+bun run examples:static:check   # catalog + orchestration + shared-helper tests
+bun run examples:check          # catalog + types + helper tests + production builds
 ```
 
 The browser-launch scripts currently target a POSIX shell, matching the Ubuntu

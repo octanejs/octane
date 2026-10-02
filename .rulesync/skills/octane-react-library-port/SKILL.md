@@ -77,7 +77,7 @@ authority.
    complete name/link/list, and run:
 
    ```bash
-   pnpm react-port:preflight --batch <stable-batch-id> <input> [<input> ...]
+   bun run react-port:preflight --batch <stable-batch-id> <input> [<input> ...]
    ```
 
    Reuse the stable batch ID. The local `.react-port-work/<id>/manifest.json` is
@@ -89,7 +89,7 @@ authority.
    runtime edge from evidence, add each React-coupled prerequisite, and rerun:
 
    ```bash
-   pnpm react-port:preflight --batch <stable-batch-id> \
+   bun run react-port:preflight --batch <stable-batch-id> \
      --classify <package>=framework-neutral \
      --classify <package>=react-coupled \
      --prerequisite <react-coupled-package@required-range> \
@@ -114,7 +114,7 @@ authority.
    evidence category from the ready node's public behavior, then run:
 
    ```bash
-   pnpm react-port:evidence init --batch <id> --node pkg:<name> \
+   bun run react-port:evidence init --batch <id> --node pkg:<name> \
      --category <kind> [--category <kind> ...]
    ```
 
@@ -135,7 +135,7 @@ authority.
    Imported surfaces retain dependency, export, public-type, package-consumption,
    and focused integration evidence; adapters add owned lifecycle checks. A mode
    declaration alone cannot waive copied evidence. Pin the copied boundary with
-   `pnpm react-port:materialize lock`, commit the byte-exact pristine tree it
+   `bun run react-port:materialize lock`, commit the byte-exact pristine tree it
    verifies offline, regenerate the adapted suite with `materialize run`, and
    record every genuine divergence as a minimal committed patch with
    `materialize diff` (mechanical conversions belong in the lock's
@@ -153,7 +153,7 @@ authority.
    workflow in `update-bindings` before removing inputs. Then run:
 
    ```bash
-   pnpm react-port:evidence verify --batch <id> --node pkg:<name> \
+   bun run react-port:evidence verify --batch <id> --node pkg:<name> \
      --package-dir packages/<binding> --expected-directory packages/<binding> \
      --registrations <registrations.json> --crosswalk <crosswalk.json> \
      --closure <closure.json>
@@ -166,7 +166,7 @@ authority.
    After all implementation and verification work, run exactly once per check:
 
    ```bash
-   pnpm react-port:terminal --batch <stable-batch-id>
+   bun run react-port:terminal --batch <stable-batch-id>
    ```
 
    If nonzero, execute every deterministic `nextAction`, rerun the relevant

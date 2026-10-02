@@ -233,7 +233,7 @@ await writeJson(`${audit}/runtime-inventory.json`, {
 	differential,
 });
 
-const lockfileSha256 = await fileSha('pnpm-lock.yaml');
+const lockfileSha256 = await fileSha('bun.lock');
 const support = async (file) => ({ path: file, role: 'support', sha256: await fileSha(file) });
 const typeTest = async (file, id, title) => ({
 	path: file,
@@ -275,8 +275,8 @@ const manifest = {
 			node: '>=22',
 			platform: 'any',
 			arch: 'any',
-			packageManager: 'pnpm@11.15.1',
-			lockfile: 'pnpm-lock.yaml',
+			packageManager: 'bun@1.4.2',
+			lockfile: 'bun.lock',
 			lockfileSha256,
 		},
 	},

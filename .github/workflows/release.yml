@@ -30,20 +30,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24.x
-          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Validate changeset bump types
-        run: pnpm changeset:check
+        run: bun run changeset:check
 
       # Changesets v3 exits with an error when versioning an empty release plan.
       - name: Check for pending releases
@@ -61,9 +60,9 @@ jobs:
       - name: Validate generated release plan
         if: steps.release_plan.outputs.has_releases == 'true'
         run: |
-          pnpm changeset:version
+          bun run changeset:version
           git diff --check
-          pnpm format:check
+          bun run format:check
 
       - name: Restore checkout after release validation
         run: |
@@ -86,7 +85,7 @@ jobs:
         with:
           pr-base-branch: main
           github-token: ${{ github.token }}
-          version-script: pnpm changeset:version
+          version-script: bun run changeset:version
           push-with-git-cli: true
           commit-message: Version Packages
           pr-title: Version Packages
@@ -118,7 +117,7 @@ jobs:
         with:
           pr-base-branch: main
           github-token: ${{ github.token }}
-          version-script: pnpm changeset:version
+          version-script: bun run changeset:version
           push-with-git-cli: true
           commit-message: Version Packages
           pr-title: Version Packages

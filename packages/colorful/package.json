@@ -33,7 +33,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "pnpm upstream:verify && pnpm typecheck && vitest run --root ../.. --project colorful --project colorful-upstream --project colorful-ssr --project colorful-hydration --project colorful-differential",
+    "test": "bun run upstream:verify && bun run typecheck && vitest run --root ../.. --project colorful --project colorful-upstream --project colorful-ssr --project colorful-hydration --project colorful-differential",
     "upstream:verify": "node audit/upstream-inventory.mjs",
     "test:type-parity": "node ../../scripts/react-parity/react-colorful-types.mjs",
     "typecheck": "octane-tsc -p tsconfig.json -p typetests/tsconfig.adapted.json && tsc --noEmit -p typetests/tsconfig.pristine.json && tsc --noEmit -p audit/type-probes/tsconfig.pristine.json",

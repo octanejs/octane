@@ -158,7 +158,7 @@ const payload = {
 					}
 				: null,
 		baselineLockfileSha256: options.has('baseline-ref')
-			? hash(git('show', options.get('baseline-ref') + ':pnpm-lock.yaml'))
+			? hash(git('show', options.get('baseline-ref') + ':bun.lock'))
 			: null,
 		toolingRoot,
 		dependencies,
@@ -166,7 +166,7 @@ const payload = {
 		ordinaryFixtureSha256: hash(ordinaryFixture),
 		factorySha256: hashFile(path.join(HERE, 'native-cost-factory.mjs')),
 		runnerSha256: hashFile(import.meta.filename),
-		lockfileSha256: hashFile(path.join(REPO, 'pnpm-lock.yaml')),
+		lockfileSha256: hashFile(path.join(REPO, 'bun.lock')),
 	},
 	configuration: {
 		samples,

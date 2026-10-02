@@ -38,6 +38,7 @@ export function createPackedExampleManifest(manifest, archiveSpecs, viteVersion,
 		...manifestWithoutPnpmSettings,
 		dependencies,
 		devDependencies: { vite: viteVersion },
+		overrides: archiveSpecs,
 	};
 	const unresolved = [];
 	collectLocalProtocols(packedManifest, 'package.json', unresolved);
@@ -49,13 +50,6 @@ export function createPackedExampleManifest(manifest, archiveSpecs, viteVersion,
 		);
 	}
 	return packedManifest;
-}
-
-export function renderPackedExampleWorkspace(archiveSpecs) {
-	const overrides = Object.entries(archiveSpecs)
-		.map(([packageName, spec]) => `  ${JSON.stringify(packageName)}: ${JSON.stringify(spec)}`)
-		.join('\n');
-	return `overrides:\n${overrides}\n`;
 }
 
 export const PACKED_COMMONJS_CONSUMER_PACKAGES = [
@@ -90,6 +84,7 @@ export function createPackedJavascriptConsumerManifest(archiveSpecs) {
 		private: true,
 		engines: { node: '>=22' },
 		dependencies,
+		overrides: dependencies,
 	};
 }
 
@@ -362,6 +357,9 @@ export function createPackedTsrxConsumerManifest(
 			esrap: PACKED_TSRX_CONSUMER_ESRAP_VERSION,
 			typescript: toolingVersions.typescript,
 		},
+		overrides: Object.fromEntries(
+			packageNames.map((packageName) => [packageName, archiveSpecs[packageName]]),
+		),
 	};
 }
 

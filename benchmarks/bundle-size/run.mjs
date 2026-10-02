@@ -16,7 +16,7 @@
 //
 // Each build's emitted JavaScript is classified into two buckets: `app`
 // (authored app modules, including weather's shared sources) and `framework`
-// (node_modules, virtual helpers, AND the octane workspace runtime, which pnpm
+// (node_modules, virtual helpers, AND the octane workspace runtime, which the workspace
 // resolves to packages/octane/src, never node_modules). Rolldown codeSplitting
 // forces the main app/framework separation and may emit additional runtime
 // files, which are charged to framework. The app-only ops (`app_*`) are the
@@ -141,7 +141,7 @@ for (const set of SETS)
 						// file-name classifier below charges both to framework overhead. Vite 8
 						// is rolldown-based: `manualChunks` is ignored, `codeSplitting` is
 						// the supported API. Framework is matched POSITIVELY (node_modules,
-						// the octane workspace runtime — pnpm resolves it to packages/octane,
+						// the octane workspace runtime — the workspace resolves it to packages/octane,
 						// never node_modules — and `\0` virtuals) so the index.html entry
 						// proxy module stays in the entry chunk with the app code.
 						codeSplitting: {

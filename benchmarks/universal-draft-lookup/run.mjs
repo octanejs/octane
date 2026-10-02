@@ -21,7 +21,7 @@ if (!Number.isSafeInteger(iterations) || iterations <= 0) {
 }
 
 if (process.env.BENCH_RUNTIME_URL === undefined) {
-	const build = spawnSync('pnpm', ['--filter', 'octane', 'build'], {
+	const build = spawnSync('bun', ['run', '--filter', 'octane', 'build'], {
 		cwd: REPO,
 		stdio: 'inherit',
 	});

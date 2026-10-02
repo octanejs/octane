@@ -160,7 +160,7 @@ Octane has no way to tell them apart once mounted.
 The website has a `/devtools` route (dev only) that mounts an interactive
 Octane app — state, a reducer, a `useTransition` filter, two Suspense
 boundaries, and an intentionally slow component — alongside the panel, so all
-four tabs light up. Run `pnpm --dir website dev` and open `/devtools`.
+four tabs light up. Run `bun run --cwd website dev` and open `/devtools`.
 
 The website enables devtools through its TanStack Start plugin option
 instead of the plain `octane({ devtools: true })` shown above —

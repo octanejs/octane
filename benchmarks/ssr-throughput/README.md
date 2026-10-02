@@ -95,8 +95,8 @@ Octane-specific server paths.
 ## Running
 
 ```bash
-# from benchmarks/ssr-throughput (after pnpm install at the repo root):
-pnpm bench                 # ~10s timed loop per config + ≤5k-render memory phase
+# from benchmarks/ssr-throughput (after bun install at the repo root):
+bun run bench                 # ~10s timed loop per config + ≤5k-render memory phase
 node run.mjs 2             # smoke: 2s per config, 1k-render memory phase
 node run.mjs 10 --no-build # reuse existing dist/ bundles
 CONFIGS=waterfall,escape node run.mjs 5   # substring-filter configs
@@ -227,7 +227,7 @@ below run from the repository root (which also keeps emitted path comments
 consistent for the byte comparison):
 
 ```bash
-pnpm exec vite build benchmarks/ssr-throughput/fixtures --ssr src/entry-server.ts --outDir ../dist/fixtures --emptyOutDir
+bunx vite build benchmarks/ssr-throughput/fixtures --ssr src/entry-server.ts --outDir ../dist/fixtures --emptyOutDir
 CONFIGS=deopt-page,escape-heavy BENCH_JSON=/tmp/ssr-sample.json node benchmarks/ssr-throughput/run.mjs 2 --no-build
 ```
 
@@ -266,7 +266,7 @@ crossover sits at ~32 chars, which is what the length split encodes.
 
 ## Production HTML payload audit
 
-`pnpm --dir benchmarks/ssr-throughput bench:payload` builds only the Octane and
+`bun run --cwd benchmarks/ssr-throughput bench:payload` builds only the Octane and
 React fixtures needed to compare four production response shapes:
 
 - the same 50-card news page through Octane TSRX, Octane JSX, and React;

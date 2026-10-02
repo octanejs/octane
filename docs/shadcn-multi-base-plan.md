@@ -162,7 +162,7 @@ to published versions, not workspace ranges.
 The Phase 0 restructure moves 44 files; that is where breakage would originate.
 Four mechanical gates make safety provable rather than asserted:
 
-1. **`pnpm --dir packages/shadcn registry:check`** — the emitter's existing
+1. **`bun run --cwd packages/shadcn registry:check`** — the emitter's existing
    `--check` twin. Byte-identical registry output after the move proves no
    shadcn-CLI consumer can observe it. This is the load-bearing gate, because
    the registry is the primary distribution.
@@ -187,13 +187,13 @@ test and a changeset. Never an in-binding workaround (the hook-form precedent).
 
 ### Phase 0 — Foundations (no new components)
 
-1. Fast-forward the branch to current `upstream/main`; run `pnpm install` (the
+1. Fast-forward the branch to current `upstream/main`; run `bun install` (the
    lockfile moved and four workspace packages were added: `cli`, `valtio`,
    `docusaurus`, and a docusaurus test fixture).
 2. Move `src/ui/*.tsrx` → `src/bases/radix/ui/*.tsrx`; update the registry
    emitter's source root and the test imports.
 3. Prove the move: `registry:check` byte-identical, full package suite green,
-   `pnpm typecheck`, `pnpm format:check`.
+   `bun run typecheck`, `bun run format:check`.
 4. Replace the barrel with per-family subpath exports; migrate the tests off
    `@octanejs/shadcn` onto those subpaths (they resolve by package
    self-reference, so the suite exercises the real exports map rather than a

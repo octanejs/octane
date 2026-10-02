@@ -390,8 +390,8 @@ new Widget().value = 1;
 					assertApprovedGateCommand(
 						['public-types'],
 						[
-							'pnpm',
-							'exec',
+							'bun',
+							'x',
 							'tsrx-tsc',
 							'--noEmit',
 							'-p',

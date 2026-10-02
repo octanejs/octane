@@ -13,7 +13,7 @@ import { collectFailsPins } from './parity-gaps-lib.mjs';
 //   node scripts/generate-parity-gaps.mjs           # (re)write the index
 //   node scripts/generate-parity-gaps.mjs --check   # exit 1 if index is stale
 //
-// Wired as `pnpm parity:gaps` / `pnpm parity:gaps:check` (the latter runs in
+// Wired as `bun run parity:gaps` / `bun run parity:gaps:check` (the latter runs in
 // CI alongside the zero-marker policy check).
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,7 +25,7 @@ const { byFile, total } = collectFailsPins(TESTS_ROOT, REPO);
 
 let md = `# React-parity gaps (generated)
 
-<!-- GENERATED FILE — do not edit. Regenerate with \`pnpm parity:gaps\`. -->
+<!-- GENERATED FILE — do not edit. Regenerate with \`bun run parity:gaps\`. -->
 
 This is a compatibility audit for executable \`it.fails(...)\` and
 \`test.fails(...)\` pins under \`packages/octane/tests\`. Committed tests must
@@ -52,7 +52,7 @@ if (CHECK) {
 	if (current !== md) {
 		console.error(
 			'docs/parity-gaps.md is stale — the set of executable it.fails pins changed.\n' +
-				'Run `pnpm parity:gaps` and commit the result.',
+				'Run `bun run parity:gaps` and commit the result.',
 		);
 		process.exit(1);
 	}

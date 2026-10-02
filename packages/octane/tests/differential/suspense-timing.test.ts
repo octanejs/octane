@@ -55,7 +55,7 @@ vi.hoisted(() => {
 	});
 });
 
-// React 19.2.7, pinned by pnpm-lock.yaml and audit/react-upstreams.json:
+// React 19.2.7, pinned by bun.lock and audit/react-upstreams.json:
 // https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberWorkLoop.js
 // The same authored fixture and timed interactions run against both renderers.
 const FIXTURE = resolve(__dirname, '../_fixtures/suspense-timing.tsrx');

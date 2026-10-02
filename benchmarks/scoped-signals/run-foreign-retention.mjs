@@ -100,7 +100,7 @@ const payload = {
 			execFileSync('git', ['status', '--porcelain'], { cwd: REPO, encoding: 'utf8' }).trim() !== '',
 		toolingRoot,
 		dependencies,
-		lockfileSha256: sha256(read(path.join(REPO, 'pnpm-lock.yaml'))),
+		lockfileSha256: sha256(read(path.join(REPO, 'bun.lock'))),
 		runnerSha256: sha256(read(import.meta.filename)),
 		workerSha256: sha256(read(path.join(HERE, 'foreign-retention-worker.mjs'))),
 		inspectorSha256: sha256(read(path.join(HERE, 'inspect-async-retainers.mjs'))),

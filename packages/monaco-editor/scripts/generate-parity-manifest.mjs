@@ -395,7 +395,7 @@ await writeJson(path.join(REPO, 'packages/monaco-editor/audit/type-transformatio
 	],
 });
 
-const lockfileSha256 = sha256(readFileSync(path.join(REPO, 'pnpm-lock.yaml')));
+const lockfileSha256 = sha256(readFileSync(path.join(REPO, 'bun.lock')));
 
 const adaptedTestFiles = adaptedInventory.files
 	.filter((file) => file.startsWith('packages/monaco-editor/tests/upstream/'))
@@ -477,8 +477,8 @@ const manifest = {
 			node: '>=22',
 			platform: 'any',
 			arch: 'any',
-			packageManager: 'pnpm@11.15.1',
-			lockfile: 'pnpm-lock.yaml',
+			packageManager: 'bun@1.4.2',
+			lockfile: 'bun.lock',
 			lockfileSha256,
 		},
 	},

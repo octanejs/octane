@@ -23,7 +23,7 @@ Framework-neutral Kit operations stay on `@solana/kit@7.0.0`. This package is
 the Octane reactive UI seam: client provider/store, Wallet Standard discovery,
 TanStack request queries, and an explicit-action transaction executor.
 
-Run `pnpm --dir packages/solana-kit upstream:verify` to verify every vendored
+Run `bun run --cwd packages/solana-kit upstream:verify` to verify every vendored
 byte.
 
 ## Runtime export crosswalk

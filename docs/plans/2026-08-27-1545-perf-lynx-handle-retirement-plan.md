@@ -194,11 +194,11 @@ Compact runs may contain many hosts but only a few lazily materialized handle en
 | Gate | Scope | Done signal |
 | --- | --- | --- |
 | Focused protocol behavior | `./node_modules/.bin/vitest run packages/lynx/tests/protocol.test.ts --reporter=verbose` | Exact, fallback, apply, rollback, and reuse cases pass. |
-| Lynx types | `pnpm --dir packages/lynx typecheck` | Source, testing, and typetest projects report no errors. |
+| Lynx types | `bun run --cwd packages/lynx typecheck` | Source, testing, and typetest projects report no errors. |
 | Performance ratios | `node benchmarks/bench.mjs --quick --ratios lynx-handle-retirement` | Both portable same-run scaling ceilings and all semantic checks pass. |
 | Recorded direct speedup | Main and final eight-iteration evidence in `benchmarks/lynx-handle-retirement/README.md` | The large live-handle target improves by at least 1.5 times; this one-time acceptance comparison is not represented as a CI ratio gate. |
-| Formatting | `pnpm format:files:check -- packages/lynx/src/core/client-driver.ts packages/lynx/tests/protocol.test.ts benchmarks/lynx-handle-retirement benchmarks/bench.mjs benchmarks/baselines/ratios.json benchmarks/baselines/local/lynx-handle-retirement.json .changeset/lynx-handle-retirement.md` | Every changed file matches repository formatting. |
-| Changeset | `pnpm changeset:check` | The Lynx patch changeset is valid. |
+| Formatting | `bun run format:files:check -- packages/lynx/src/core/client-driver.ts packages/lynx/tests/protocol.test.ts benchmarks/lynx-handle-retirement benchmarks/bench.mjs benchmarks/baselines/ratios.json benchmarks/baselines/local/lynx-handle-retirement.json .changeset/lynx-handle-retirement.md` | Every changed file matches repository formatting. |
+| Changeset | `bun run changeset:check` | The Lynx patch changeset is valid. |
 
 The performance exit criterion is both dimensional and absolute: the fixed-range curve must stop scaling with unrelated live handles, the fixed-materialized curve must remain bounded as compact range size grows, and the recorded large live-handle target must improve by at least 1.5 times against its pre-change median. The two dimensional checks remain portable ratio guards; the absolute pre/post result is acceptance evidence from the recorded environment.
 Remeasure after self-review so the reported ratios describe the final diff.

@@ -7,7 +7,7 @@
 //
 // The fixture has no installed node_modules (it is not a workspace package);
 // the setup symlinks the workspace's octane / @octanejs/vite-plugin / vite in,
-// which is exactly what a pnpm install would produce.
+// which is exactly what a workspace install would produce.
 //
 // The build runs against a throwaway copy of the fixture, never the tracked
 // sources: `vite build` and the symlinked node_modules would otherwise leave
@@ -388,7 +388,7 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		} catch (error) {
 			throw new Error(
 				'[vite-plugin client-only renderer] Chromium is required ' +
-					'(run `pnpm exec playwright install chromium`): ' +
+					'(run `bunx playwright install chromium`): ' +
 					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
 			);
 		}
@@ -676,7 +676,7 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		} catch (error) {
 			throw new Error(
 				'[vite-plugin root boundary] Chromium is required ' +
-					'(run `pnpm exec playwright install chromium`): ' +
+					'(run `bunx playwright install chromium`): ' +
 					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
 			);
 		}
@@ -1247,7 +1247,7 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		} catch (error) {
 			throw new Error(
 				'[vite-plugin cross-origin RPC] Chromium is required ' +
-					'(run `pnpm exec playwright install chromium`): ' +
+					'(run `bunx playwright install chromium`): ' +
 					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
 			);
 		}

@@ -51,10 +51,10 @@ sort select and empty-search recovery.
 ## Commands
 
 ```bash
-pnpm --dir examples/streambox typecheck
-pnpm --dir examples/streambox build
-pnpm --dir examples/streambox dev
-pnpm --dir examples/streambox test:e2e
+bun run --cwd examples/streambox typecheck
+bun run --cwd examples/streambox build
+bun run --cwd examples/streambox dev
+bun run --cwd examples/streambox test:e2e
 ```
 
 The package defaults to port 5223 for manual development. Playwright allocates

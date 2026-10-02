@@ -46,7 +46,7 @@
     "./test-utils": "./src/test-utils.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project opentui && pnpm test:native",
+    "test": "vitest run --root ../.. --project opentui && bun run test:native",
     "test:native": "NODE_OPTIONS= REACT_PORT_TEST_REPORT_DIR= bun ../../node_modules/vitest/vitest.mjs run --config vitest.native.config.ts",
     "typecheck": "octane-tsc -p tsconfig.json"
   },

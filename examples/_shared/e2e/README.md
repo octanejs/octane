@@ -1,7 +1,7 @@
 # Shared example E2E utilities
 
 These dependency-free helpers keep the example suites consistent without making
-`examples/_shared` a pnpm package. Each application owns its Playwright version
+`examples/_shared` a workspace package. Each application owns its Playwright version
 and imports these TypeScript modules by relative path.
 
 ## Browser diagnostics
@@ -61,7 +61,7 @@ export default defineConfig({
 	webServer: address.external
 		? undefined
 		: {
-				command: `pnpm dev -- --port ${address.port} --strictPort`,
+				command: `bun run dev -- --port ${address.port} --strictPort`,
 				url: address.baseURL,
 				reuseExistingServer: false,
 			},

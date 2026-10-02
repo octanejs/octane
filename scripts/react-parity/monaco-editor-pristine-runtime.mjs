@@ -61,12 +61,12 @@ export function runPristineUpstreamSuite({
 	repoRoot = repoRootDefault,
 	reportPath = join(tmpdir(), `octane-monaco-editor-pristine-${process.pid}.json`),
 } = {}) {
-	// Prefer `pnpm exec vitest` — spawning vitest.mjs directly under Vitest 4
+	// Prefer `bun run vitest` — spawning vitest.mjs directly under Vitest 4
 	// skips SnapshotClient.setup for these vendored specs.
 	const result = spawnSync(
-		'pnpm',
+		'bun',
 		[
-			'exec',
+			'run',
 			'vitest',
 			'run',
 			'--config',

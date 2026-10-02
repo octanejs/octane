@@ -40,7 +40,7 @@
     "./parallax": "./src/parallax.ts"
   },
   "scripts": {
-    "test": "pnpm upstream:verify && vitest run --project spring",
+    "test": "bun run upstream:verify && vitest run --project spring",
     "upstream:verify": "node ../../scripts/react-parity/react-spring-upstream.mjs",
     "typecheck": "octane-tsc -p tsconfig.json -p typetests/tsconfig.json"
   },

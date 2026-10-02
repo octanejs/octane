@@ -20,7 +20,7 @@ if (!Number.isSafeInteger(iterations) || iterations < 1) {
 	throw new TypeError('Pass a positive integer sample count.');
 }
 if (!process.env.BENCH_CLIENT_RUNTIME_URL && !process.env.BENCH_SERVER_RUNTIME_URL) {
-	const build = spawnSync('pnpm', ['--filter', 'octane', 'build'], {
+	const build = spawnSync('bun', ['run', '--filter', 'octane', 'build'], {
 		cwd: REPO,
 		stdio: 'inherit',
 	});

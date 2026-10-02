@@ -52,20 +52,20 @@ active pathname to each link's target; the router `<Link>` also sets
 ## Run it
 
 ```bash
-pnpm dev            # the .tsrx app, SSR + hydrate -> http://localhost:5170
-pnpm dev:jsx        # the React-style .tsx app, SSR + hydrate
-pnpm dev:tsrx       # the .tsrx app, SSR + hydrate
-pnpm typecheck      # strict TypeScript check for shared, JSX, glue, and E2E code
-pnpm build          # production client builds for both authoring dialects
-pnpm test:e2e       # build + Playwright parity/SSR journeys for both apps
-pnpm test:e2e:dev   # optional fast pass from source-serving Vite clients
+bun run dev            # the .tsrx app, SSR + hydrate -> http://localhost:5170
+bun run dev:jsx        # the React-style .tsx app, SSR + hydrate
+bun run dev:tsrx       # the .tsrx app, SSR + hydrate
+bun run typecheck      # strict TypeScript check for shared, JSX, glue, and E2E code
+bun run build          # production client builds for both authoring dialects
+bun run test:e2e       # build + Playwright parity/SSR journeys for both apps
+bun run test:e2e:dev   # optional fast pass from source-serving Vite clients
 ```
 
 The two E2E commands use POSIX inline environment syntax and are supported on
 macOS/Linux (CI runs Ubuntu). The ordinary `dev`, `typecheck`, and `build`
 commands do not require that launcher syntax.
 
-`pnpm test:e2e` boots a local HN-compatible fixture API on `:5190`, each app's
+`bun run test:e2e` boots a local HN-compatible fixture API on `:5190`, each app's
 production client build through Vite preview (`:5191` JSX, `:5192` TSRX), and
 both source-driven SSR servers (`:5193` JSX, `:5194` TSRX). The fixture base is
 baked into the production clients before Playwright starts. The same data drives
@@ -73,7 +73,7 @@ browser and Node SSR fetches, so no external API or manually started server is
 required. The SSR servers use Vite middleware for source loading but set
 `NODE_ENV=production`, keeping this release gate on production runtime behavior.
 The fast E2E variant serves client modules from source but keeps the same
-production runtime semantics and strict diagnostic gate. `pnpm e2e` remains as
+production runtime semantics and strict diagnostic gate. `bun run e2e` remains as
 a convenience alias.
 
 ## SSR & hydration

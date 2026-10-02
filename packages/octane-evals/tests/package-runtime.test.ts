@@ -10,7 +10,7 @@ const packageImportTimeoutMs = 10_000;
 
 describe('package runtime', () => {
 	it('builds and self-imports every public entry point in plain Node', () => {
-		execFileSync('pnpm', ['--filter', '@octanejs/evals', 'build'], {
+		execFileSync('bun', ['run', '--filter', '@octanejs/evals', 'build'], {
 			cwd: repositoryRoot,
 			stdio: 'pipe',
 			timeout: packageBuildTimeoutMs,

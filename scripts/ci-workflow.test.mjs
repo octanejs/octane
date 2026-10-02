@@ -242,7 +242,7 @@ describe('CI workflow aggregation', () => {
 			compat,
 			/if: \$\{\{ !cancelled\(\) && steps\.prepare_three_compat\.outcome == 'success' \}\}/,
 		);
-		assert.equal([...compat.matchAll(/pnpm install --frozen-lockfile/g)].length, 2);
+		assert.equal([...compat.matchAll(/bun install --frozen-lockfile/g)].length, 2);
 		assert.equal(
 			[...compat.matchAll(/test "\$RESOLVED_THREE_VERSION" = "\$THREE_VERSION"/g)].length,
 			2,
@@ -251,24 +251,24 @@ describe('CI workflow aggregation', () => {
 			[...compat.matchAll(/test "\$THREE_RELEASE_LINE" = "\$TYPES_RELEASE_LINE"/g)].length,
 			1,
 		);
-		assert.match(current, /TYPES_VERSION="\$\(pnpm view @types\/three@latest version\)"/);
+		assert.match(current, /TYPES_VERSION="\$\(bun info @types\/three@latest version\)"/);
 		assert.match(current, /test "\$\{TYPED_THREE_VERSION%\.\*\}" = "\$TYPES_RELEASE_LINE"/);
 		assert.match(current, /test "\$RESOLVED_TYPES_VERSION" = "\$TYPES_VERSION"/);
 		const typedPairInstall = current.indexOf(
 			'"three@${TYPES_RELEASE_LINE}.x" "@types/three@$TYPES_VERSION"',
 		);
 		const typecheck = current.indexOf(
-			'pnpm exec tsc --noEmit -p packages/three/typetests/tsconfig.json',
+			'bun run tsc --noEmit -p packages/three/typetests/tsconfig.json',
 		);
 		const typedRuntimeTest = current.indexOf(
-			'OCTANE_THREE_COMPAT_VERSION="$TYPED_THREE_VERSION" pnpm --dir packages/three test:compat',
+			'OCTANE_THREE_COMPAT_VERSION="$TYPED_THREE_VERSION" bun run --cwd packages/three test:compat',
 		);
 		const latestRuntimeInstall = current.indexOf('"three@$THREE_VERSION"');
 		const latestRuntimeAssertion = current.indexOf(
 			'test "$RESOLVED_THREE_VERSION" = "$THREE_VERSION"',
 		);
 		const latestRuntimeTest = current.indexOf(
-			'OCTANE_THREE_COMPAT_VERSION="$THREE_VERSION" pnpm --dir packages/three test:compat',
+			'OCTANE_THREE_COMPAT_VERSION="$THREE_VERSION" bun run --cwd packages/three test:compat',
 		);
 		assert.ok(typedPairInstall >= 0 && typedPairInstall < typecheck);
 		assert.ok(typecheck < typedRuntimeTest);
@@ -276,15 +276,15 @@ describe('CI workflow aggregation', () => {
 		assert.ok(latestRuntimeInstall < latestRuntimeAssertion);
 		assert.ok(latestRuntimeAssertion < latestRuntimeTest);
 		assert.equal(
-			[...compat.matchAll(/pnpm exec octane-tsc -p packages\/three\/tsconfig\.json/g)].length,
+			[...compat.matchAll(/bun run octane-tsc -p packages\/three\/tsconfig\.json/g)].length,
 			2,
 		);
 		assert.equal(
-			[...compat.matchAll(/pnpm exec tsc --noEmit -p packages\/three\/typetests\/tsconfig\.json/g)]
+			[...compat.matchAll(/bun run tsc --noEmit -p packages\/three\/typetests\/tsconfig\.json/g)]
 				.length,
 			2,
 		);
-		assert.equal([...compat.matchAll(/pnpm --dir packages\/three test:compat/g)].length, 3);
+		assert.equal([...compat.matchAll(/bun run --cwd packages\/three test:compat/g)].length, 3);
 		assert.match(provenance, /^\s+"Three compatibility",$/m);
 		assert.doesNotMatch(provenance, /Three compatibility \(\$\{lane\}\)/);
 	});
@@ -295,7 +295,7 @@ describe('CI workflow aggregation', () => {
 
 		assert.match(compat, /^    name: Lynx compatibility$/m);
 		assert.doesNotMatch(compat, /^    strategy:|matrix\./m);
-		assert.equal([...compat.matchAll(/pnpm install --frozen-lockfile/g)].length, 1);
+		assert.equal([...compat.matchAll(/bun install --frozen-lockfile/g)].length, 1);
 		assert.equal(
 			[
 				...compat.matchAll(
@@ -345,7 +345,7 @@ describe('CI workflow aggregation', () => {
 		}
 
 		assert.doesNotMatch(jobSource('lint_checks'), /outputs\.full_ci/);
-		assert.match(jobSource('lint_checks'), /run: pnpm ci:workflow:test/);
+		assert.match(jobSource('lint_checks'), /run: bun run ci:workflow:test/);
 		assert.match(jobSource('lint'), /LINT_CHECKS_RESULT/);
 		assert.match(jobSource('typecheck'), /TYPECHECK_CHECKS_RESULT/);
 		assert.match(jobSource('test'), /\[ "\$FULL_CI" = false \]/);
@@ -491,11 +491,8 @@ describe('CI workflow aggregation', () => {
 		assert.match(parity, /node-version: 24/);
 		assert.doesNotMatch(parity, /node-version: \[22, 24\]/);
 		assert.match(parity, /shard: \[1, 2, 3, 4\]/);
-		assert.match(
-			parity,
-			/pnpm --filter website exec playwright install --with-deps chromium(?:\n|$)/,
-		);
-		assert.match(parity, /pnpm react-parity:check --shard \$\{\{ matrix\.shard \}\}\/4/);
+		assert.match(parity, /bun run --cwd website playwright install --with-deps chromium(?:\n|$)/);
+		assert.match(parity, /bun run react-parity:check --shard \$\{\{ matrix\.shard \}\}\/4/);
 		assert.match(
 			parity,
 			/REACT_PARITY_VITEST_REPORT: \$\{\{ runner\.temp \}\}\/react-parity-vitest\/shard-\$\{\{ matrix\.shard \}\}\.json/,
@@ -505,7 +502,7 @@ describe('CI workflow aggregation', () => {
 			parity,
 			/name: Upload failed React parity diagnostics\s+if: failure\(\)[\s\S]*?name: react-parity-diagnostics-\$\{\{ matrix\.shard \}\}[\s\S]*?\.json\.failed/,
 		);
-		assert.doesNotMatch(parity, /pnpm react-parity:(?:test|validate)/);
+		assert.doesNotMatch(parity, /bun run react-parity:(?:test|validate)/);
 		assert.match(parityAggregate, /^    name: React parity checks$/m);
 		assert.match(parityAggregate, /needs: \[release_change, react_parity_shard\]/);
 		assert.match(
@@ -521,10 +518,10 @@ describe('CI workflow aggregation', () => {
 			/node scripts\/react-parity\/verify-vitest-shards\.mjs\s+--reports-directory/,
 		);
 		assert.match(parityAggregate, /--expected-shards 4/);
-		assert.doesNotMatch(parityAggregate, /pnpm install|playwright install/);
-		assert.match(lint, /pnpm react-parity:test/);
-		assert.match(lint, /pnpm react-parity:validate/);
-		assert.doesNotMatch(lint, /pnpm react-parity:check/);
+		assert.doesNotMatch(parityAggregate, /bun install|playwright install/);
+		assert.match(lint, /bun run react-parity:test/);
+		assert.match(lint, /bun run react-parity:validate/);
+		assert.doesNotMatch(lint, /bun run react-parity:check/);
 		assert.equal(
 			packageJson.scripts['react-parity:validate'],
 			'node scripts/react-parity/check.mjs --validate-only',
@@ -534,7 +531,7 @@ describe('CI workflow aggregation', () => {
 		assert.match(jobSource('release_change'), /"React parity checks"/);
 		assert.match(
 			jobSource('test_shard'),
-			/pnpm test\s+--config vitest\.ci-sharded\.config\.js\s+--shard=/,
+			/bun run test\s+--config vitest\.ci-sharded\.config\.js\s+--shard=/,
 		);
 		assert.doesNotMatch(vitestConfig, /defineTestProjects|ciOwnedProject|ciOwner/);
 		assert.doesNotMatch(vitestConfig, /\bsharded\s*:/);
@@ -706,13 +703,14 @@ describe('CI workflow aggregation', () => {
 
 		assert.match(combined, new RegExp(`^    name: ${title.replace(/[()]/g, '\\$&')}$`, 'm'));
 		assert.doesNotMatch(combined, /^    strategy:|matrix\./m);
-		assert.equal([...combined.matchAll(/pnpm install --prod false --frozen-lockfile/g)].length, 1);
+		assert.equal([...combined.matchAll(/bun install --frozen-lockfile/g)].length, 1);
 		assert.equal([...combined.matchAll(/oven-sh\/setup-bun/g)].length, 1);
+		assert.doesNotMatch(combined, /bun-version:/);
 		assert.equal([...combined.matchAll(/playwright install --with-deps chromium/g)].length, 1);
 		assert.match(combined, /playwright install --with-deps chromium(?:\n|$)/);
 		assert.match(
 			combined,
-			/pnpm --filter @octanejs\/vite-plugin exec node node_modules\/playwright-webkit\/cli\.js install --with-deps webkit(?:\n|$)/,
+			/node packages\/vite-plugin-octane\/node_modules\/playwright-webkit\/cli\.js install --with-deps webkit(?:\n|$)/,
 		);
 		for (const spec of [
 			'website-mcp/tests/built-handler.e2e.test.ts',
@@ -721,7 +719,7 @@ describe('CI workflow aggregation', () => {
 			'packages/octane-evals/tests/user-app-corpus.test.ts',
 			'packages/octane/tests/register-hook.test.ts',
 			'packages/octane/tests/register-hook-bun.integration.test.mjs',
-			'pnpm --dir packages/opentui test:native',
+			'bun run --cwd packages/opentui test:native',
 			'packages/astro/tests/astro.e2e.test.ts',
 		]) {
 			assert.ok(combined.includes(spec), `combined heavy integration must run ${spec}`);
@@ -971,10 +969,10 @@ describe('Publish workflow validation', () => {
 	test('owns GitHub tag and release reconciliation outside changesets/action', () => {
 		assert.match(publishWorkflow, /create-github-releases:\s*false/);
 		assert.match(publishWorkflow, /push-git-tags:\s*false/);
-		assert.match(publishWorkflow, /publish-script: pnpm changeset:publish/);
+		assert.match(publishWorkflow, /publish-script: bun run changeset:publish/);
 		assert.match(
 			publishWorkflow,
-			/- name: Reconcile GitHub tags and releases[\s\S]*?if: always\(\) && steps\.npm_release\.outcome == 'success'[\s\S]*?run: pnpm release:reconcile/,
+			/- name: Reconcile GitHub tags and releases[\s\S]*?if: always\(\) && steps\.npm_release\.outcome == 'success'[\s\S]*?run: bun run release:reconcile/,
 		);
 		assert.match(publishWorkflow, /RELEASE_SHA: \$\{\{ steps\.release\.outputs\.sha \}\}/);
 	});

@@ -20,7 +20,7 @@ package, and verify offline against the upstream git blob shas recorded in
 `audit/upstream.lock.json`. The pinned license is republished at the package
 root as `LICENSE.upstream`.
 
-Run `pnpm --dir packages/hook-form upstream:verify` to check the vendored bytes
+Run `bun run --cwd packages/hook-form upstream:verify` to check the vendored bytes
 and the one-for-one adapted-suite inventory. The adapted suite under
 `tests/upstream/` is regenerated, never committed: the lock's mechanical
 `adaptedRewrites` retarget every import at Octane (react → octane,
@@ -28,7 +28,7 @@ and the one-for-one adapted-suite inventory. The adapted suite under
 the binding's `src/`), and the committed patches under `audit/upstream-patches/`
 carry only the genuine divergences (44 of 119 files; the other 75 need no
 patch). Run
-`pnpm --dir packages/hook-form test:upstream` to execute the original React/Jest
+`bun run --cwd packages/hook-form test:upstream` to execute the original React/Jest
 suite unchanged.
 
 ## Runtime export crosswalk

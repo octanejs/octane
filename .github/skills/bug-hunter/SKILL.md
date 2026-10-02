@@ -47,8 +47,8 @@ Use this to find, reproduce, minimize, and fix a suspected Octane bug.
 6. **Validate**
    - Run the new failing test until it passes.
    - Run nearby affected tests.
-   - If runtime/compiler changed, consider wider `packages/octane/tests` or `pnpm test` depending on scope.
-   - Run `pnpm typecheck` when TS/API surfaces changed.
+   - If runtime/compiler changed, consider wider `packages/octane/tests` or `bun run test` depending on scope.
+   - Run `bun run typecheck` when TS/API surfaces changed.
 
 7. **Report**
    - Root cause.

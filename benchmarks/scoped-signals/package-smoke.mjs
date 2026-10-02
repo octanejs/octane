@@ -1,5 +1,5 @@
 // Targeted publication check. This uses the package's actual per-file builders,
-// but does not stand in for the compiler/Volar build or a full pnpm pack.
+// but does not stand in for the compiler/Volar build or a full package pack.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';

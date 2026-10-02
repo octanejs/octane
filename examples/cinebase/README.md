@@ -42,10 +42,10 @@ does not inspect compiler helpers or hydration markers.
 ## Commands
 
 ```bash
-pnpm --dir examples/cinebase typecheck
-pnpm --dir examples/cinebase build
-pnpm --dir examples/cinebase dev
-pnpm --dir examples/cinebase test:e2e
+bun run --cwd examples/cinebase typecheck
+bun run --cwd examples/cinebase build
+bun run --cwd examples/cinebase dev
+bun run --cwd examples/cinebase test:e2e
 ```
 
 `dev` uses Vite middleware for source transforms and listens on `PORT` (5222 by

@@ -1089,7 +1089,7 @@
     },
     "fullRootRuntime": {
       "status": "passed",
-      "command": "pnpm exec vitest run --shard=N/4 --maxWorkers=2 --silent=passed-only",
+      "command": "bunx vitest run --shard=N/4 --maxWorkers=2 --silent=passed-only",
       "completedShards": [1, 2, 3, 4],
       "nodeVersion": "24.19.0",
       "maxOldSpaceSizeMiB": 8192,
@@ -1099,7 +1099,7 @@
     },
     "packedConsumer": {
       "status": "passed",
-      "command": "pnpm packages:pack:check",
+      "command": "bun run packages:pack:check",
       "validatedTarballs": 101,
       "preservedTsrxSources": 792,
       "strictBindings": 37,
