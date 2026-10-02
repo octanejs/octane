@@ -152,6 +152,26 @@ describe.each([
 		expect(markup(container.firstElementChild!)).toBe('<i>ok</i>');
 	});
 
+	it('keeps a server sibling out of a @switch arm that adopted its host in place', async () => {
+		container.innerHTML = ServerRT.renderToString(server.SwitchAdoptedHostBranch, {
+			server: true,
+			k: 'a',
+		}).html;
+		const u = container.querySelector('u');
+		const em = container.querySelector('em');
+		await hydrate('SwitchAdoptedHostBranch', { k: 'a' });
+
+		expect(markup(container.firstElementChild!)).toBe('<u><s>s</s></u><em>e</em>');
+		expect(container.querySelector('u')).toBe(u);
+		expect(container.querySelector('em')).toBe(em);
+
+		// The switch owns only the `<u>` it adopted, so another case replaces it
+		// and leaves the `<em>` after it.
+		flushSync(() => root!.render(client.SwitchAdoptedHostBranch, { k: 'b' }));
+		expect(markup(container.firstElementChild!)).toBe('<b>d</b><em>e</em>');
+		expect(container.querySelector('em')).toBe(em);
+	});
+
 	it('keeps an adopted server sibling after a @switch arm the server did not render', async () => {
 		container.innerHTML = ServerRT.renderToString(server.SwitchSiblingBranch, {
 			server: true,

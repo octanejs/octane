@@ -119,6 +119,39 @@ export function SwitchBranch(props: { server?: boolean; k: string }) @{
 	</div>
 }
 
+function Inner() @{
+	<s>{'s'}</s>
+}
+
+// The client's @switch arm adopts the server `<u>` in place, and the
+// component inside it leaves the cursor at the end of that `<u>`.
+export function SwitchAdoptedHostBranch(props: { server?: boolean; k: string }) @{
+	<div>
+		@if (props.server) {
+			<>
+				<u>
+					<Inner />
+				</u>
+				<Em />
+			</>
+		} @else {
+			<>
+				@switch (props.k) {
+					@case 'a': {
+						<u>
+							<Inner />
+						</u>
+					}
+					@default: {
+						<b>{'d'}</b>
+					}
+				}
+				<Em />
+			</>
+		}
+	</div>
+}
+
 export function SwitchSiblingBranch(props: { server?: boolean; k: string }) @{
 	<div>
 		@if (props.server) {

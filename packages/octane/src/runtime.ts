@@ -20187,14 +20187,18 @@ class HydrationCapability {
 
 	/**
 	 * Where the content of a markerless branch that rendered at `cursor` ends:
-	 * at the node its render left the cursor on in `parent`, else `after`.
-	 * clone() parks the cursor on a root it adopted, so a render that left it
-	 * on `cursor` adopted that node in place.
+	 * at the node its render left the cursor on in `parent`. clone() parks the
+	 * cursor on a root it adopted, so a render that left it on `cursor` adopted
+	 * that node in place. The holes of a root adopted in place can also leave
+	 * the cursor inside that root, or past its last child: the content then
+	 * ends after `cursor`, while it is still in `parent`, and otherwise at
+	 * `after`.
 	 */
 	markerlessEnd(cursor: Node, parent: Node, after: Node | null): Node | null {
 		const node = this.node;
-		if (node === null || domNode(node).parentNode !== parent) return after;
-		return node === cursor ? getNextSibling(cursor) : node;
+		if (node !== null && domNode(node).parentNode === parent)
+			return node === cursor ? getNextSibling(cursor) : node;
+		return domNode(cursor).parentNode === parent ? getNextSibling(cursor) : after;
 	}
 
 	/** Discard a mismatched server node (or the marker range it opens) and step past it. */
