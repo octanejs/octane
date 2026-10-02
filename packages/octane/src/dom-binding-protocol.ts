@@ -55,7 +55,7 @@ export function decodeBindingKey(encoded: string): BindingKey {
 export interface BindingMarker {
 	id: string;
 	site: string;
-	kind: 'root' | 'if' | 'for' | 'item' | 'text' | 'view' | 'slot' | 'opaque';
+	kind: 'root' | 'if' | 'for' | 'item' | 'text' | 'view' | 'slot' | 'opaque' | 'try';
 	arm?: number;
 	key?: string;
 }
@@ -85,6 +85,11 @@ export function parseBindingMarker(data: string): BindingMarker | null {
 	if (kind === 'v') return { id, site, kind: 'view' };
 	if (kind === 's') return { id, site, kind: 'slot' };
 	if (kind === 'o') return { id, site, kind: 'opaque' };
+	// `@try` records the arm the server rendered: content, `@pending` or `@catch`.
+	// A bare `y` is a client-constructed region that has not selected an arm yet.
+	if (kind === 'y') return { id, site, kind: 'try', arm: -1 };
+	if (kind.length === 2 && kind[0] === 'y' && kind[1]! >= '0' && kind[1]! <= '2')
+		return { id, site, kind: 'try', arm: kind.charCodeAt(1) - 48 };
 	if (kind.startsWith('k;')) {
 		const key = kind.slice(2);
 		try {
@@ -110,7 +115,7 @@ export function parseBindingMarker(data: string): BindingMarker | null {
  * the groups capture because a non-capturing group costs every streamed page.
  */
 export const BINDING_OPEN_TAIL_SOURCE =
-	'f[01];b;[^;]+;[^;]+|b;[^;]+;(root|[^;]+;([tvso\\d]|-1|[1-9]\\d+|k;[sn]:[^]+))';
+	'f[01];b;[^;]+;[^;]+|b;[^;]+;(root|[^;]+;([tvso\\d]|-1|[1-9]\\d+|y[012]?|k;[sn]:[^]+))';
 
 export function isBindingOpenComment(data: string): boolean {
 	// The general hydration/early-stream path only counts balanced ranges. Keep
@@ -130,8 +135,17 @@ export function isBindingOpenComment(data: string): boolean {
 	if (data.length === tail + 1) {
 		const code = data.charCodeAt(tail);
 		return (
-			code === 116 || code === 118 || code === 115 || code === 111 || (code >= 48 && code <= 57)
+			code === 116 ||
+			code === 118 ||
+			code === 115 ||
+			code === 111 ||
+			code === 121 ||
+			(code >= 48 && code <= 57)
 		);
+	}
+	if (data.length === tail + 2 && data.charCodeAt(tail) === 121) {
+		const arm = data.charCodeAt(tail + 1);
+		return arm >= 48 && arm <= 50;
 	}
 	if (data.charCodeAt(tail) === 107 && data.charCodeAt(tail + 1) === 59)
 		return (
