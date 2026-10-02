@@ -3011,7 +3011,11 @@ export function ssrForItem(
 			signalSite !== undefined &&
 			RESOLVED !== null &&
 			(SERVER_SIGNAL_BINDINGS_ENABLED || RESOLVED.signalOwner !== undefined)
-				? serverSignalOwner(FRAME, serverStructuralSignalInstanceKey(signalSite, undefined))
+				? serverSignalOwner(
+						FRAME,
+						serverStructuralSignalInstanceKey(signalSite, undefined),
+						previousSignalKeys,
+					)
 				: undefined;
 		// Preserve the authored body's parameter/default evaluation and exact
 		// argument count, including an @for that declares no index binding.
@@ -4310,11 +4314,9 @@ function ssrOptionSelected(value: unknown, content: string): string {
 	if (value != null) {
 		key = String(value);
 	} else {
-		// Content carrying markup (nested elements / hydration markers) skips
-		// the text fallback — React flattens simple text children only. The
-		// separator between adjacent texts is not markup; the text is theirs.
-		const text =
-			content.indexOf(TEXT_SEPARATOR) === -1 ? content : content.replaceAll(TEXT_SEPARATOR, '');
+		// Hydration comments do not contribute to an option's visible text.
+		// Actual element markup still prevents the simple-text fallback.
+		const text = content.indexOf('<') === -1 ? content : content.replace(/<!--[\s\S]*?-->/g, '');
 		if (text.indexOf('<') !== -1) return '';
 		key = unescapeOptionText(text);
 	}
@@ -4933,6 +4935,7 @@ function resolveServerSignalInstanceKey(identity: ServerSignalInstanceKey): stri
 function serverSignalOwner(
 	_frame: Frame | null,
 	rowInstanceKey?: string,
+	enclosingKeys?: ServerSignalListKeys | null,
 ): SignalRendererOwnerIdentity | undefined {
 	// An async continuation can compose cached compiled HTML outside a render pass.
 	// Only an active pass may assign a request-owned signal instance.
@@ -4950,18 +4953,38 @@ function serverSignalOwner(
 	// Its lazy owner must match the owner entered on subsequent discovery passes.
 	if (rowInstanceKey === undefined && SIGNAL_LIST_KEYS?.signalSite !== undefined) {
 		rowInstanceKey = serverStructuralSignalInstanceKey(SIGNAL_LIST_KEYS.signalSite, undefined);
+		enclosingKeys = SIGNAL_LIST_KEYS.parent;
 	}
 	const instanceKey =
 		(rowInstanceKey ?? resolveServerSignalInstanceKey(SIGNAL_COMPONENT_INSTANCE_KEY)) ||
 		JSON.stringify([SIGNAL_INSTANCE_PREFIX, 'root']);
 	let owner = resolved.signalInstances.get(instanceKey);
 	if (owner === undefined) {
-		owner = Object.freeze({
+		const identity: {
+			scopeKey: string;
+			documentOwner: SignalOwner;
+			instanceOwner: object;
+			instanceKey: string;
+			enclosingOwner?: SignalRendererOwnerIdentity;
+		} = {
 			scopeKey: resolved.signalOwner.scopeKey,
 			documentOwner: resolved.signalOwner,
 			instanceOwner: Object.freeze({}),
 			instanceKey,
-		});
+		};
+		if (rowInstanceKey !== undefined && enclosingKeys !== undefined) {
+			// Match the client: an inline row records the owner it renders inside,
+			// so captured handles from that owner do not start a request per row.
+			// Server arms already render in their component's owner.
+			const rowKeys = SIGNAL_LIST_KEYS;
+			SIGNAL_LIST_KEYS = enclosingKeys;
+			try {
+				identity.enclosingOwner = serverSignalOwner(_frame);
+			} finally {
+				SIGNAL_LIST_KEYS = rowKeys;
+			}
+		}
+		owner = Object.freeze(identity);
 		resolved.signalInstances.set(instanceKey, owner);
 	}
 	return owner;

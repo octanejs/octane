@@ -54,6 +54,8 @@
     "test": "cd ../.. && vitest run --project octane-evals --project octane-evals-user-apps",
     "test:user-apps": "cd ../.. && vitest run --project octane-evals-user-apps",
     "test:user-app-starters": "node scripts/verify-user-app-starters.mjs",
+    "strong-repair:verify": "node scripts/verify-strong-repair-corpus.mjs",
+    "strong-repair:check": "node scripts/verify-strong-repair-corpus.mjs --check",
     "grade:user-app": "node scripts/grade-user-app.mjs",
     "corpus:generate": "node scripts/generate-user-app-corpus.mjs",
     "corpus:check": "node scripts/generate-user-app-corpus.mjs --check",

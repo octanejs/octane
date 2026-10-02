@@ -79,8 +79,8 @@ end-to-end evidence.
   `@for`, `@switch`, `@try` directive blocks, and sibling-scoped `<style>`
   blocks (a block styles its siblings and everything below them) with `$class`
   themes and `apply`.
-- Type-check any program containing `.tsrx` with `tsrx-tsc --noEmit`, never
-  plain `tsc`. Use `OctaneNode` for renderables, not `React.ReactNode`.
+- Type-check any program containing `.tsrx` with `octane-tsc -p <tsconfig>`,
+  never plain `tsc`. Use `OctaneNode` for renderables, not `React.ReactNode`.
 - Never write `declare module '*.tsrx'` in a published package's `src/`. It is
   ambient, ships in the tarball, and turns every import it covers into `any`.
   `pnpm tsrx-decls:check` enforces this.

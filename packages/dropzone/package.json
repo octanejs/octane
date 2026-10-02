@@ -47,7 +47,7 @@
     "test:u3-parity": "node audit/verify-u3.mjs",
     "test:u4-parity": "node audit/verify-u4.mjs",
     "test:u5-parity": "node ../../scripts/react-parity/harness.mjs validate --manifest packages/dropzone/audit/react-parity.json && node --test ../../scripts/react-parity/react-dropzone-evidence.test.mjs",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
+    "typecheck": "octane-tsc -p tsconfig.json -p typetests/tsconfig.json"
   },
   "dependencies": {
     "attr-accept": "^2.2.5",

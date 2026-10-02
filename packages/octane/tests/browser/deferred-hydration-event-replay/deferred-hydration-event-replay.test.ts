@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import type { Browser, Page } from 'playwright';
+import type { Browser, CDPSession, Page } from 'playwright';
 import { devices, launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { createServer, type Plugin, type ViteDevServer } from 'vite';
 import { renderToString } from 'octane/server';
@@ -43,12 +43,16 @@ beforeAll(async () => {
 		when: interaction(),
 		suspend: false,
 	}).html;
+	const pressHtml = renderToString(serverFixture.DeferredHydrationPressLifecycle, {
+		when: interaction({ events: ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] }),
+	}).html;
 	const shellPlugin: Plugin = {
 		name: 'deferred-hydration-event-replay-shell',
 		transformIndexHtml(source) {
 			return source
 				.replace('<!--octane-ssr-->', () => html)
-				.replace('<!--octane-editor-ssr-->', () => editorHtml);
+				.replace('<!--octane-editor-ssr-->', () => editorHtml)
+				.replace('<!--octane-press-ssr-->', () => pressHtml);
 		},
 	};
 	server = await createServer({
@@ -70,6 +74,7 @@ afterEach(async () => {
 	const failures = pageFailures.slice();
 	try {
 		await page?.evaluate(() => {
+			window.__deferredHydrationPress?.unmount();
 			window.__deferredHydrationEditor?.unmount();
 			window.__deferredHydrationEventReplay?.unmount();
 		});
@@ -278,6 +283,14 @@ describe.sequential('Chromium IME and touch-emulation replay', () => {
 				]),
 			);
 			expect(hydrated.trustedEvents.some((event) => event.type === 'compositionend')).toBe(false);
+			// Each replay keeps the clock of the trusted input it stands in for.
+			for (const replayed of hydrated.handledEvents.filter((event) => !event.isTrusted)) {
+				const original = pending.trustedEvents.find(
+					(event) => event.type === replayed.type && event.data === replayed.data,
+				);
+				expect(original).toBeDefined();
+				expect(replayed.timeStamp).toBe(original!.timeStamp);
+			}
 
 			await cdp.send('Input.imeSetComposition', {
 				text: '한국',
@@ -332,5 +345,127 @@ describe.sequential('Chromium IME and touch-emulation replay', () => {
 				expect.objectContaining({ type: 'pointerdown', isTrusted: true }),
 			]),
 		);
+	});
+});
+
+describe.sequential('trusted pointer press lifecycle before hydrateRoot', () => {
+	async function touchDrag(
+		page: Page,
+		cdp: CDPSession,
+		selector: string,
+		dx: number,
+		dy: number,
+	): Promise<void> {
+		await page.locator(selector).scrollIntoViewIfNeeded();
+		const box = (await page.locator(selector).boundingBox())!;
+		const x = box.x + 40;
+		const y = box.y + 40;
+		await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+		for (let step = 1; step <= 4; step++) {
+			await cdp.send('Input.dispatchTouchEvent', {
+				type: 'touchMove',
+				touchPoints: [{ x: x + (dx * step) / 4, y: y + (dy * step) / 4 }],
+			});
+			// One move per frame, so the browser dispatches each before the next.
+			await page.waitForTimeout(16);
+		}
+		await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+	}
+
+	async function hydratePress(page: Page) {
+		const pending = await page.evaluate(() => window.__deferredHydrationPress.state());
+		await page.evaluate(() => window.__deferredHydrationPress.hydrate());
+		await page.waitForFunction(() => window.__deferredHydrationPress.state().onHydratedCount === 1);
+		return {
+			pending,
+			hydrated: await page.evaluate(() => window.__deferredHydrationPress.state()),
+		};
+	}
+
+	function expectReplayed(
+		originals: Array<Record<string, unknown>>,
+		replays: Array<Record<string, unknown>>,
+	) {
+		expect(replays).toEqual(
+			originals.map((original) => ({ ...original, isTrusted: false, defaultPrevented: false })),
+		);
+	}
+
+	it('replays a held, moved, and released touch press without cancelling its native defaults', async () => {
+		const page = await openPage({ galaxy: true });
+		const cdp = await page.context().newCDPSession(page);
+		await touchDrag(page, cdp, '#press-hold', 30, 0);
+		await page.waitForFunction(() =>
+			window.__deferredHydrationPress.state().originals.some((event) => event.type === 'pointerup'),
+		);
+
+		const { pending, hydrated } = await hydratePress(page);
+		const types = pending.originals.map((event) => event.type);
+		expect(types[0]).toBe('pointerdown');
+		expect(types.at(-1)).toBe('pointerup');
+		expect(types.slice(1, -1).length).toBeGreaterThan(0);
+		expect(new Set(types.slice(1, -1))).toEqual(new Set(['pointermove']));
+		expect(pending.originals).toEqual(
+			pending.originals.map((event) => ({
+				...event,
+				targetId: 'press-hold',
+				isTrusted: true,
+				defaultPrevented: false,
+				pointerType: 'touch',
+			})),
+		);
+		expect(pending.propagated).toEqual([]);
+		expect(pending.onHydratedCount).toBe(0);
+		expectReplayed(pending.originals, hydrated.replays);
+	});
+
+	it('replays the cancellation of a touch press the browser turned into a scroll', async () => {
+		const page = await openPage({ galaxy: true });
+		const cdp = await page.context().newCDPSession(page);
+		await page.locator('#press-pan').scrollIntoViewIfNeeded();
+		const scrollStart = await page.evaluate(() => Math.round(window.scrollY));
+		await touchDrag(page, cdp, '#press-pan', 0, -160);
+		await page.waitForFunction(() =>
+			window.__deferredHydrationPress
+				.state()
+				.originals.some((event) => event.type === 'pointercancel'),
+		);
+
+		const { pending, hydrated } = await hydratePress(page);
+		const types = pending.originals.map((event) => event.type);
+		expect(types[0]).toBe('pointerdown');
+		expect(types.at(-1)).toBe('pointercancel');
+		expect(types).not.toContain('pointerup');
+		expect(pending.originals.every((event) => event.isTrusted && !event.defaultPrevented)).toBe(
+			true,
+		);
+		expect(pending.propagated).toEqual([]);
+		// Capture left the browser's own gesture handling alone.
+		expect(pending.scrollY).toBeGreaterThan(scrollStart);
+		expectReplayed(pending.originals, hydrated.replays);
+	});
+
+	it('leaves trusted hover movement alone, then replays the mouse press that follows', async () => {
+		const page = await openPage();
+		await page.locator('#press-hold').scrollIntoViewIfNeeded();
+		const box = (await page.locator('#press-hold').boundingBox())!;
+		await page.mouse.move(box.x + 10, box.y + 10);
+		await page.mouse.move(box.x + 20, box.y + 20, { steps: 2 });
+		await page.mouse.down();
+		await page.mouse.move(box.x + 40, box.y + 20, { steps: 2 });
+		await page.mouse.up();
+
+		const { pending, hydrated } = await hydratePress(page);
+		const pressStart = pending.originals.findIndex((event) => event.type === 'pointerdown');
+		expect(pressStart).toBeGreaterThan(0);
+		const hover = pending.originals.slice(0, pressStart);
+		const press = pending.originals.slice(pressStart);
+		expect(new Set(hover.map((event) => event.type))).toEqual(new Set(['pointermove']));
+		expect(pending.propagated).toEqual(hover.map((event) => event.type));
+		expect(press.map((event) => event.type).at(-1)).toBe('pointerup');
+		expect(pending.originals.every((event) => event.isTrusted && !event.defaultPrevented)).toBe(
+			true,
+		);
+		expectReplayed(press, hydrated.replays);
 	});
 });

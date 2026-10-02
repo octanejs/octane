@@ -27,7 +27,7 @@ export const COMMANDS = [
 	{
 		name: 'analyze',
 		summary: 'Compile the project and report the Octane compiler diagnostics.',
-		load: () => import('../commands/analyze.js'),
+		load: () => import('../commands/analyze/index.js'),
 	},
 	{
 		name: 'info',

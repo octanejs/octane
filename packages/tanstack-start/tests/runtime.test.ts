@@ -44,8 +44,9 @@ function createMatchesStore(): TestMatchesStore {
 }
 
 function createRouter(store: TestMatchesStore): AnyRouter {
+	// router-core 1.171.34 renamed the match-id store `matchesId` → `ids`.
 	return {
-		stores: { matchesId: store },
+		stores: { ids: store },
 	} as unknown as AnyRouter;
 }
 

@@ -36,7 +36,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --config vitest.config.js --project usehooks-ts --project usehooks-ts-differential --project usehooks-ts-ssr",
-    "typecheck": "tsrx-tsc --noEmit"
+    "typecheck": "octane-tsc -p tsconfig.json"
   },
   "dependencies": {
     "lodash.debounce": "4.0.8"

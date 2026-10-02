@@ -40,7 +40,7 @@
   "scripts": {
     "test": "vitest run",
     "test:upstream": "node ../../scripts/react-parity/run-pristine.mjs tanstack-store",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
+    "typecheck": "octane-tsc -p tsconfig.json -p typetests/tsconfig.adapted.json -p typetests/tsconfig.json",
     "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "dependencies": {

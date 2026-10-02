@@ -10,7 +10,7 @@
     "build": "pnpm lynx-examples && vite build --configLoader runner",
     "preview": "vite preview --configLoader runner --port 3000",
     "start": "node .output/server/index.mjs",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+    "typecheck": "octane-tsc -p tsconfig.json"
   },
   "dependencies": {
     "@codemirror/commands": "catalog:default",
