@@ -5,7 +5,7 @@ declare module 'octane/jsx-runtime' {
 		namespace JSX {
 			interface IntrinsicElements {
 				'row-list': { outer: string; children?: OctaneNode };
-				'row-host': { id: string; label: string; position: number };
+				'row-host': { key?: string; id: string; label: string; position: number };
 			}
 		}
 	}
