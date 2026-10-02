@@ -225,6 +225,9 @@ export function DeferredSwitchBranch(props: {
 							@case 'a': {
 								<u>{use(props.leaf) as string}</u>
 							}
+							@case 'c': {
+								<b>{'c'}</b>
+							}
 						}
 						<Em />
 					</>

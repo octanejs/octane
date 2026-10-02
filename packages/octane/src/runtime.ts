@@ -41774,6 +41774,15 @@ function renderBranchSlot(
 			state.end = e;
 			replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, s, e);
 		}
+		// Hydrating, a markerless slot that swaps branches has no server content
+		// for the new one, and tearing down the old one may have removed the node
+		// at the cursor. Mount the new branch as client DOM where the old one
+		// stood, and let the next sibling adopt from after it.
+		const replacing =
+			hydration !== null &&
+			state.start === null &&
+			(oldBlock !== null || provisionalAfter !== null);
+		if (replacing) hydration!.node = after;
 		if (state.start !== null) {
 			// MARKER path — hydration-adopted, or already markered (multi-node / post-
 			// swap). The branch borrows the slot's start/end (exclusiveMarkers teardown
@@ -41884,7 +41893,9 @@ function renderBranchSlot(
 			// starts after the cursor's previous sibling and ends where its render
 			// leaves the cursor, not at `after`.
 			const cursor =
-				hydration !== null && !state.borrowed ? hydration.markerlessCursor(domParent, after) : null;
+				hydration !== null && !state.borrowed && !replacing
+					? hydration.markerlessCursor(domParent, after)
+					: null;
 			const contentBefore = cursor === null ? before : domNode(cursor).previousSibling;
 			const b = createBlock(
 				'control-flow',
@@ -41899,7 +41910,8 @@ function renderBranchSlot(
 			state.block = b;
 			state.markerlessBefore = before;
 			try {
-				renderBlock(b);
+				if (replacing) hydration!.suspend(() => renderBlock(b));
+				else renderBlock(b);
 			} catch (error) {
 				// A branch that throws before inserting anything stays unfinalized so
 				// a same-branch retry finalizes it. One that already inserted its
@@ -41922,13 +41934,25 @@ function renderBranchSlot(
 						after,
 						cursor === null ? after : hydration!.markerlessEnd(cursor, domParent, after),
 					);
-				else if (cursor !== null && hydration!.node === cursor) {
-					// The branch adopted the node at the cursor, or has yet to. A
-					// retry of this same block finalizes over that node, not up to
-					// the server siblings that later client siblings adopt.
-					state.markerlessBefore = contentBefore;
-					b.endMarker = getNextSibling(cursor);
-				}
+				else if (
+					cursor !== null &&
+					hydration!.node === cursor &&
+					cursor.nodeType === 1 &&
+					markerlessBranchRoots(b, domParent, after) <= 1
+				)
+					// The element at the cursor is this branch's root, adopted or yet
+					// to be. Self-marking it adds no DOM, so a new attempt still adopts
+					// it, while a retry of this same block or a branch change finds the
+					// branch there rather than among the server siblings after it.
+					finalizeMarkerlessBranch(
+						state,
+						domParent,
+						b,
+						marker,
+						contentBefore,
+						after,
+						getNextSibling(cursor),
+					);
 				throw error;
 			}
 			finalizeMarkerlessBranch(

@@ -242,4 +242,29 @@ describe.each([
 		flushSync(() => root!.render(client.DeferredSwitchBranch, { k: 'b', leaf }));
 		expect(markup(section)).toBe('<em>e</em>');
 	});
+	it.each([
+		{ k: 'b', html: '<em>e</em>' },
+		{ k: 'c', html: '<b>c</b><em>e</em>' },
+	])(
+		'replaces a pending deferred @switch arm that adopted the server node when the case changes to $k',
+		async ({ k, html }) => {
+			container.innerHTML = ServerRT.renderToString(server.DeferredSwitchBranch, {
+				server: true,
+				k: 'a',
+				leaf: Promise.resolve('unused'),
+			}).html;
+			const section = container.querySelector('section')!;
+			const em = container.querySelector('em');
+			let resolveLeaf!: (value: string) => void;
+			const leaf = new Promise<string>((resolve) => (resolveLeaf = resolve));
+			await hydrate('DeferredSwitchBranch', { k: 'a', leaf });
+			flushSync(() => root!.render(client.DeferredSwitchBranch, { k, leaf }));
+			await act(async () => resolveLeaf('z'));
+
+			expect(markup(section)).toBe(html);
+			expect(container.querySelector('em')).toBe(em);
+			expect(recoverable).toEqual([]);
+			expect(warnings()).toEqual([]);
+		},
+	);
 });
