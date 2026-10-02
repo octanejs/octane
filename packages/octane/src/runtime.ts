@@ -14482,13 +14482,52 @@ function childrenAsBody(children: unknown): ComponentBody {
 	};
 }
 
+// A JSX boundary's children are its try body's only input. Like a compiled
+// `@try`, keep one body identity and carry that input in the env tuple: a
+// boundary that re-renders itself with unchanged children then retries its
+// retained attempt and signal owners, instead of restarting it as new inputs.
+const descriptorChildrenTryBody: ComponentBody = (_props, scope, env) => {
+	childSlot(scope, 0, scope.block.parentNode, (env as [unknown])[0], scope.block.endMarker);
+};
+
 // Descriptor children remain inspectable values, but a scoped JSX descriptor
 // resolves them only after its represented boundary enters its try body. Reading
 // the accessor while constructing that body would move throws and suspension
 // outside the boundary, recreating the eager-JSX ownership bug.
-function scopedChildrenAsBody(props: { children: unknown }): ComponentBody {
-	if (!SCOPED_ELEMENT_PROPS.has(props)) return childrenAsBody(props.children);
-	return (_props, scope, extra) => childrenAsBody(props.children)(undefined, scope, extra);
+const scopedChildrenTryBody: ComponentBody = (_props, scope, env) => {
+	childrenAsBody((env as [{ children: unknown }])[0].children)(undefined, scope, undefined);
+};
+
+function childrenTryBlock(
+	scope: Scope,
+	props: { children: unknown },
+	catchBody: ComponentBody | null,
+	pendingBody: ComponentBody | null,
+	propagateSuspense?: boolean,
+): () => void {
+	const block = scope.block;
+	let body: ComponentBody;
+	let env: unknown[] | undefined;
+	if (SCOPED_ELEMENT_PROPS.has(props)) {
+		body = scopedChildrenTryBody;
+		env = [props];
+	} else if (typeof props.children === 'function') {
+		body = props.children as ComponentBody;
+	} else {
+		body = descriptorChildrenTryBody;
+		env = [props.children];
+	}
+	return tryBlock(
+		scope,
+		0,
+		block.parentNode,
+		body,
+		catchBody,
+		pendingBody,
+		block.endMarker,
+		env,
+		propagateSuspense,
+	);
 }
 
 /**
@@ -16185,19 +16224,10 @@ export const __HydrateCompiled: ComponentBody<HydrateProps> =
 export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> =
 	/* @__PURE__ */ markComponentFlags<ComponentBody<{ fallback?: unknown; children: unknown }>>(
 		function Suspense(props, scope) {
-			const block = scope.block;
 			const pendingBody: ComponentBody = (_p, s) => {
 				childSlot(s, 1, s.block.parentNode, props.fallback, s.block.endMarker);
 			};
-			tryBlock(
-				scope,
-				0,
-				block.parentNode,
-				scopedChildrenAsBody(props),
-				null,
-				pendingBody,
-				block.endMarker,
-			);
+			childrenTryBlock(scope, props, null, pendingBody);
 		},
 		COMPONENT_FLAG_BOUNDARY,
 		'Suspense',
@@ -16270,7 +16300,6 @@ export const ErrorBoundary: ComponentBody<{
 	}>
 >(
 	function ErrorBoundary(props, scope) {
-		const block = scope.block;
 		const catchBody: ComponentBody<{ err: unknown; reset: () => void }> = (catchProps, s) => {
 			const fb =
 				typeof props.fallback === 'function'
@@ -16281,17 +16310,7 @@ export const ErrorBoundary: ComponentBody<{
 					: props.fallback;
 			childSlot(s, 1, s.block.parentNode, fb, s.block.endMarker);
 		};
-		const reset = tryBlock(
-			scope,
-			0,
-			block.parentNode,
-			scopedChildrenAsBody(props),
-			catchBody,
-			null,
-			block.endMarker,
-			undefined,
-			true,
-		);
+		const reset = childrenTryBlock(scope, props, catchBody, null, true);
 		const previousResetRef = scope.slots[1] as { current: (() => void) | null } | undefined;
 		if (previousResetRef !== props.resetRef) {
 			if (previousResetRef?.current === reset) previousResetRef.current = null;
