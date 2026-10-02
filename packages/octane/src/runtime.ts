@@ -19654,7 +19654,10 @@ class HydrationCapability {
 		if (domBindingClaims.get(el)?.get(name) === server) return false;
 		if (next !== null && isAttributeParserNormalizedMatch(server, next)) return false;
 		const mode = hydrationMismatchMode(el);
-		if (mode === 0) return true;
+		// A clone that mismatch recovery built fresh holds the client template, not
+		// server output: the rebuild was already reported, and there is no server
+		// value for suppression to keep, so the client value applies silently.
+		if (mode === 0 || this.isFresh(el)) return true;
 		if (mode === 1) return false;
 		if (process.env.NODE_ENV !== 'production' && !this.staleServerValues)
 			warnHydrationValueMismatch((el as any).__oct_loc, `attribute \`${name}\``, server, next);
@@ -19667,7 +19670,8 @@ class HydrationCapability {
 		const server = absentIsEmpty && rawServer === null ? '' : rawServer;
 		if (server === next) return true;
 		if (domBindingClaims.get(el)?.get('class') === rawServer) return false;
-		if (mode === 0) return true;
+		// Fresh mismatch clones apply the client class silently, as in allowAttribute.
+		if (mode === 0 || this.isFresh(el)) return true;
 		if (mode === 1) return false;
 		if (process.env.NODE_ENV !== 'production' && !this.staleServerValues)
 			warnHydrationValueMismatch((el as any).__oct_loc, 'attribute `class`', server, next);
@@ -19715,7 +19719,9 @@ class HydrationCapability {
 		entries?: readonly unknown[],
 	): boolean {
 		const mode = hydrationMismatchMode(el);
-		if (mode === 1) return true;
+		// Suppression keeps the server style, but a fresh mismatch clone has none to
+		// keep: it holds the client template and takes the complete client style.
+		if (mode === 1 && !this.isFresh(el)) return true;
 		const style = (STAGED_DOM?.view(el as HTMLElement) ?? (el as HTMLElement)).style;
 		const hadStyleAttribute = (STAGED_DOM?.view(el) ?? el).hasAttribute('style');
 		const before = style.cssText;
@@ -19759,7 +19765,12 @@ class HydrationCapability {
 
 		if (expectsStyleAttribute) style.cssText = expected;
 		else (STAGED_DOM?.view(el) ?? el).removeAttribute('style');
-		if (mode === 2 && process.env.NODE_ENV !== 'production' && !this.staleServerValues) {
+		if (
+			mode === 2 &&
+			process.env.NODE_ENV !== 'production' &&
+			!this.staleServerValues &&
+			!this.isFresh(el)
+		) {
 			warnHydrationValueMismatch((el as any).__oct_loc, 'style', before, expected);
 		}
 		return true;
