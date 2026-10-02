@@ -8887,7 +8887,7 @@ interface DeferredLayoutDriver {
 	holdsPendingQueue(): boolean;
 	stageEffects(): boolean;
 	stageAction(action: () => void, durable?: boolean): boolean;
-	retireEventHosts(block: Block): void;
+	retireHosts(block: Block): void;
 	stageTeardown(cleanup: Cleanup, phase: number, scope: Scope): boolean;
 	stageDeactivation(slot: EffectSlot, scope: Scope): boolean;
 	projectEventBundle(bundle: HandlerBundle): HandlerBundle;
@@ -9292,7 +9292,7 @@ function ensureDeferredLayoutDriver(): void {
 				enqueueStagedAction(capture, action, durable);
 				return true;
 			},
-			retireEventHosts(block) {
+			retireHosts(block) {
 				// A staged deletion keeps its committed hosts live until it publishes.
 				// One queued action per capture retires them all, ahead of every DOM
 				// removal the capture queued after its first retirement.
@@ -11820,8 +11820,8 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 	block.disposed = true;
 	// Its hosts leave delegated dispatch before its DOM does (see `retired`). Inline:
 	// an extra call per deleted Block is measurable in bulk teardown.
-	if (STAGED_COMMIT_CAPTURE === null) block.retired = ++eventRootEpoch;
-	else DEFERRED_LAYOUT_DRIVER!.retireEventHosts(block);
+	if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHosts(block);
+	else block.retired = ++eventRootEpoch;
 	if (
 		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 		__OCTANE_PROFILE_ENABLED__ &&
@@ -44744,8 +44744,8 @@ function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): bo
 		}
 		for (let block = oldHead; block !== null; block = block.nextSibling) {
 			block.disposed = true;
-			if (STAGED_COMMIT_CAPTURE === null) block.retired = ++eventRootEpoch;
-			else DEFERRED_LAYOUT_DRIVER!.retireEventHosts(block);
+			if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHosts(block);
+			else block.retired = ++eventRootEpoch;
 		}
 		if (wholeParent) {
 			(STAGED_DOM?.view(parent) ?? parent).textContent = '';
@@ -44817,8 +44817,8 @@ function batchClearItems(
 			// additionally skips the subtree scan for ref-free items.
 			if (b.deoptNode !== null && b.deoptRefs) detachDeoptTreeRefs(b.deoptNode, null);
 			b.disposed = true;
-			if (STAGED_COMMIT_CAPTURE === null) b.retired = ++eventRootEpoch;
-			else DEFERRED_LAYOUT_DRIVER!.retireEventHosts(b);
+			if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHosts(b);
+			else b.retired = ++eventRootEpoch;
 		}
 	}
 	const p = domNode(state.start).parentNode!;
