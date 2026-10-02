@@ -18977,9 +18977,10 @@ class HydrationCapability {
 	 * the body has run, and the body, which adopts nothing, still consumes its
 	 * positional seeds as the server's render did. A seeded rejection then
 	 * reaches its boundary with the server's catch arm intact, and only the
-	 * fresh markers are removed. Any other outcome reports the mismatch and discards the server
-	 * nodes the component `replaces`, unless `stale` is client-built: the
-	 * rebuild that built it already reported and discarded the server's.
+	 * fresh markers are removed. Any other outcome reports the mismatch and
+	 * discards the server nodes the component `replaces`, unless `stale` is
+	 * client-built: the rebuild that built it already reported and discarded
+	 * the server's.
 	 */
 	renderUnframed<T>(
 		render: (target: T) => void,
