@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mount } from './_helpers';
+import { loadCompiledFixtureSource } from './_server-fixture';
 import {
 	DerivedIdentity,
 	DerivedValue,
@@ -221,5 +222,206 @@ describe('auto-calculation — React-style return components', () => {
 		const root = mount(callTsxCallableProjection, { rows });
 		expect(root.find('#tsx-callable-values').textContent).toBe('r1:1');
 		root.unmount();
+	});
+});
+
+// Strong modules assert that render-time calls are pure projections, so an
+// inline render expression is cached exactly like the same expression named by
+// a `const`. Strong caching is a production client lowering, so this source is
+// compiled with production options in both test projects. The runner supplies
+// the projection and identity probes, outside the analyzed component source.
+const STRONG_INLINE_CALCULATIONS = `
+	'use strong';
+	import { useState } from 'octane';
+
+	type Row = { readonly id: number; readonly n: number };
+	type Project = (rows: readonly Row[]) => readonly string[];
+	type Identify = (value: object) => string;
+
+	function RowsIdentity({ rows, identify }: { rows: readonly string[]; identify: Identify }) @{
+		<span id="strong-prop-identity">{identify(rows) as string}</span>
+	}
+
+	export function InlineCalculations({ project, identify }: { project: Project; identify: Identify }) @{
+		const [rows, setRows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
+		const [tick, setTick] = useState(0);
+		const total = rows.length * 1.25;
+		<div>
+			<button id="strong-tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
+			<button
+				id="strong-add"
+				onClick={() => setRows([...rows, { id: rows.length + 1, n: rows.length + 1 }])}
+			>{'add'}</button>
+			<span id="strong-hole-identity">{identify(project(rows)) as string}</span>
+			<RowsIdentity rows={project(rows)} identify={identify} />
+			<span id="strong-attribute" title={project(rows).join(',')}>{'rows'}</span>
+			<output id="strong-total">{total.toFixed(2)}</output>
+			<span id="strong-tick-value">{String(tick)}</span>
+		</div>
+	}
+
+	type User = { readonly name: string };
+
+	function Gate({ open, children }: { open: boolean; children: unknown }) @{
+		<>
+			@if (open) {
+				<section>{children}</section>
+			}
+		</>
+	}
+
+	export function DeferredCalculations({ user, open }: { user: User | null; open: boolean }) @{
+		<div>
+			@if (user !== null) {
+				<b id="strong-arm">{user.name.toUpperCase() as string}</b>
+			}
+			<Gate open={open}>
+				<i id="strong-child">{user!.name.toUpperCase() as string}</i>
+			</Gate>
+		</div>
+	}
+`;
+
+// The React-style form: returned JSX is cached after an authored hook, while a
+// hookless return component stays an ordinary function callable anywhere.
+const STRONG_RETURN_CALCULATIONS = `
+	'use strong';
+	import { useState } from 'octane';
+
+	type Row = { readonly id: number; readonly n: number };
+	type Probes = {
+		project: (rows: readonly Row[]) => readonly string[];
+		identify: (value: object) => string;
+	};
+
+	export function ReturnCalculations({ project, identify }: Probes) {
+		const [rows, setRows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
+		const [tick, setTick] = useState(0);
+		return (
+			<div>
+				<button id="return-tick" onClick={() => setTick(tick + 1)}>tick</button>
+				<button
+					id="return-add"
+					onClick={() => setRows([...rows, { id: rows.length + 1, n: rows.length + 1 }])}
+				>
+					add
+				</button>
+				<span id="return-identity">{identify(project(rows))}</span>
+				<span id="return-tick-value">{String(tick)}</span>
+			</div>
+		);
+	}
+
+	export function CallableReturn({ project, identify, rows }: Probes & { rows: readonly Row[] }) {
+		return <span id="return-callable">{identify(project(rows))}</span>;
+	}
+`;
+
+describe('auto-calculation — Strong inline render expressions', () => {
+	const client = loadCompiledFixtureSource(STRONG_INLINE_CALCULATIONS, {
+		id: 'strong-inline-calculations.tsrx',
+		mode: 'client',
+		compileOptions: { hmr: false, dev: false },
+	});
+	const returned = loadCompiledFixtureSource(STRONG_RETURN_CALCULATIONS, {
+		id: 'strong-return-calculations.tsx',
+		mode: 'client',
+		compileOptions: { hmr: false, dev: false },
+	});
+
+	function probes() {
+		let next = 0;
+		const ids = new WeakMap<object, number>();
+		return {
+			project: (rows: ReadonlyArray<{ id: number; n: number }>) =>
+				rows.map((row) => `r${row.id}:${row.n}`),
+			identify: (value: object) => {
+				let id = ids.get(value);
+				if (id === undefined) ids.set(value, (id = ++next));
+				return 'id' + id;
+			},
+		};
+	}
+
+	it('keeps inline hole and prop calculations stable while their inputs are', () => {
+		const r = mount(client.InlineCalculations, probes());
+		const hole = r.find('#strong-hole-identity').textContent;
+		const prop = r.find('#strong-prop-identity').textContent;
+		expect(r.find('#strong-attribute').getAttribute('title')).toBe('r1:1');
+		expect(r.find('#strong-total').textContent).toBe('1.25');
+
+		r.click('#strong-tick');
+		expect(r.find('#strong-tick-value').textContent).toBe('1');
+		expect(r.find('#strong-hole-identity').textContent).toBe(hole);
+		expect(r.find('#strong-prop-identity').textContent).toBe(prop);
+
+		r.click('#strong-add');
+		const nextHole = r.find('#strong-hole-identity').textContent;
+		const nextProp = r.find('#strong-prop-identity').textContent;
+		expect(nextHole).not.toBe(hole);
+		expect(nextProp).not.toBe(prop);
+		expect(r.find('#strong-attribute').getAttribute('title')).toBe('r1:1,r2:2');
+		expect(r.find('#strong-total').textContent).toBe('2.50');
+
+		r.click('#strong-tick');
+		expect(r.find('#strong-tick-value').textContent).toBe('2');
+		expect(r.find('#strong-hole-identity').textContent).toBe(nextHole);
+		expect(r.find('#strong-prop-identity').textContent).toBe(nextProp);
+		r.unmount();
+	});
+
+	it('keeps a returned inline calculation stable after an authored hook', () => {
+		const r = mount(returned.ReturnCalculations, probes());
+		const first = r.find('#return-identity').textContent;
+
+		r.click('#return-tick');
+		expect(r.find('#return-tick-value').textContent).toBe('1');
+		expect(r.find('#return-identity').textContent).toBe(first);
+
+		r.click('#return-add');
+		const second = r.find('#return-identity').textContent;
+		expect(second).not.toBe(first);
+
+		r.click('#return-tick');
+		expect(r.find('#return-tick-value').textContent).toBe('2');
+		expect(r.find('#return-identity').textContent).toBe(second);
+		r.unmount();
+	});
+
+	it('keeps a hookless Strong return component an ordinary deferred function', () => {
+		// A direct call returns an element that reads its inputs when it renders.
+		// Caching the hole would read them at the call instead.
+		const reads: object[] = [];
+		const { project, identify } = probes();
+		const props = {
+			project,
+			identify: (value: object) => {
+				reads.push(value);
+				return identify(value);
+			},
+			rows: [{ id: 1, n: 1 }],
+		};
+		expect(() => returned.CallableReturn(props)).not.toThrow();
+		expect(reads).toEqual([]);
+
+		const r = mount(returned.CallableReturn, props);
+		expect(r.find('#return-callable').textContent).toBe('id1');
+		r.unmount();
+	});
+
+	it('evaluates expressions in directive arms and component children only when they render', () => {
+		// Moving either expression into setup would read `name` of null.
+		const r = mount(client.DeferredCalculations, { user: null, open: false });
+		expect(r.container.querySelector('#strong-arm')).toBeNull();
+		expect(r.container.querySelector('#strong-child')).toBeNull();
+
+		r.update(client.DeferredCalculations, { user: { name: 'ada' }, open: true });
+		expect(r.find('#strong-arm').textContent).toBe('ADA');
+		expect(r.find('#strong-child').textContent).toBe('ADA');
+
+		r.update(client.DeferredCalculations, { user: null, open: false });
+		expect(r.container.querySelector('#strong-arm')).toBeNull();
+		expect(r.container.querySelector('#strong-child')).toBeNull();
+		r.unmount();
 	});
 });
