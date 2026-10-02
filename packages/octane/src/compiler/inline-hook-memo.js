@@ -55,9 +55,12 @@ function walkEveryNode(root, visit) {
 
 function isHookShapedCall(node) {
 	if (node.type !== 'CallExpression') return false;
+	// The plain pass rewrites a custom-hook call to `withSlot(slot, hook, ...)`
+	// before memo lowering; the copied annotation keeps it hook-shaped.
 	if (
 		typeof node._octaneImportedHook === 'string' ||
-		typeof node._octaneHookRuntimeImportedHook === 'string'
+		typeof node._octaneHookRuntimeImportedHook === 'string' ||
+		typeof node._octaneCustomHookCall === 'string'
 	) {
 		return true;
 	}
