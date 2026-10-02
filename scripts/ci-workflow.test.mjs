@@ -1680,7 +1680,7 @@ describe('Pull request benchmark report', () => {
 	test('posts the report from the default branch without running pull request code', () => {
 		assert.match(
 			prBenchCommentWorkflow,
-			/workflow_run:\n {4}workflows: \[PR bench, CI\]\n {4}types: \[completed\]/,
+			/workflow_run:\n {4}workflows: \[PR bench\]\n {4}types: \[completed\]/,
 		);
 		assert.match(prBenchCommentWorkflow, /^permissions: \{\}$/m);
 		assert.equal(prBenchCommentWorkflow.match(/actions\/checkout@/g)?.length, 1);
@@ -1691,10 +1691,9 @@ describe('Pull request benchmark report', () => {
 		assert.ok(prBenchCommentWorkflow.includes('candidate.head.sha === sha'));
 		assert.ok(prBenchCommentWorkflow.includes('read("head-sha").trim() !== sha'));
 		assert.ok(prBenchCommentWorkflow.includes('comment.body?.startsWith(COMMENT_MARKER)'));
-		assert.match(packageJson.scripts['ci:workflow:test'], /benchmarks\/ci-timing\.test\.mjs/);
 	});
 
-	// A newer cancelled rerun, or a draft run that skipped every job but concluded success, used to hide real data.
+	// A newer cancelled rerun, or a run that produced no report, used to hide real data.
 	test('picks the newest completed run for the commit that produced data', async () => {
 		const sha = 'a'.repeat(40);
 		const run = (id, path, conclusion) => ({
@@ -1709,10 +1708,8 @@ describe('Pull request benchmark report', () => {
 				run(20, 'pr-bench.yml', 'success'),
 				run(9, 'pr-bench.yml', 'failure'),
 			],
-			'ci.yml': [run(60, 'ci.yml', 'success'), run(12, 'ci.yml', 'failure')],
 		};
 		const artifacts = new Set([9, 30, 70]);
-		const gated = new Set([12]);
 		const queries = [];
 		const outputs = {};
 		const execute = new AsyncFunction(
@@ -1731,16 +1728,6 @@ describe('Pull request benchmark report', () => {
 					listWorkflowRunArtifacts: async ({ run_id }) => ({
 						data: { artifacts: artifacts.has(run_id) ? [{ expired: false }] : [] },
 					}),
-					listJobsForWorkflowRun: async ({ run_id }) => ({
-						data: {
-							jobs: [
-								{
-									name: 'classify changeset release',
-									conclusion: gated.has(run_id) ? 'success' : 'skipped',
-								},
-							],
-						},
-					}),
 				},
 			},
 		};
@@ -1750,17 +1737,16 @@ describe('Pull request benchmark report', () => {
 			payload: { workflow_run },
 		});
 
-		await execute(github, context(run(60, 'ci.yml', 'success')), core);
-		assert.deepEqual(outputs, { bench: '9', ci: '12' });
+		await execute(github, context(run(20, 'pr-bench.yml', 'success')), core);
+		assert.deepEqual(outputs, { bench: '9' });
 		assert.ok(queries.every((query) => query.status === 'completed' && query.head_sha === sha));
 
 		await execute(github, context(run(70, 'pr-bench.yml', 'failure')), core);
-		assert.deepEqual(outputs, { bench: '70', ci: '12' });
+		assert.deepEqual(outputs, { bench: '70' });
 
-		gated.clear();
 		artifacts.clear();
-		await execute(github, context(run(60, 'ci.yml', 'success')), core);
-		assert.deepEqual(outputs, { bench: '', ci: '' });
+		await execute(github, context(run(20, 'pr-bench.yml', 'success')), core);
+		assert.deepEqual(outputs, { bench: '' });
 	});
 });
 

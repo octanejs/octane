@@ -135,22 +135,41 @@ describe.each([
 		expect(warnings()).toEqual(dev ? [rebuilt(leaf)] : []);
 	});
 
+	/** The arm's report for a server range that nothing in the client's arm claimed. */
+	function armTail(component: string): string {
+		return (
+			`Octane hydration mismatch at ${FILE}:${lineOf(`function ${component}(`) + 2}:2: the client ` +
+			'expected the end of the branch but the server rendered a control-flow block. The ' +
+			'mismatched subtree was rebuilt on the client.'
+		);
+	}
+
 	it.each([
-		{ output: 'element', name: 'ForeignNodeBranch', leaf: 'IfLeaf', html: '<s>c</s>ok' },
+		{
+			output: 'element',
+			name: 'ForeignNodeBranch',
+			leaf: 'IfLeaf',
+			html: '<s>c</s>ok',
+			discarded: false,
+		},
 		{
 			output: 'list range',
 			name: 'ForeignListBranch',
 			leaf: 'ForLeaf',
 			html: '<s>x</s><s>y</s>ok',
+			discarded: true,
 		},
 	])(
 		'does not claim a server $output that follows the rebuilt clone',
-		async ({ name, leaf, html }) => {
+		async ({ name, leaf, html, discarded }) => {
 			const recoverable = await hydrate(name, { server: true }, {});
 
 			expect(markup(container.querySelector('i')!)).toBe(html);
 			expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
-			expect(warnings()).toEqual(dev ? [rebuilt(leaf)] : []);
+			// Nothing in the client's arm claims a server range, so the arm
+			// discards it: a second recovery, with its own diagnostic.
+			if (discarded) expect(markup(container.firstElementChild!)).toBe(`<i>${html}</i>`);
+			expect(warnings()).toEqual(dev ? [rebuilt(leaf), ...(discarded ? [armTail(name)] : [])] : []);
 		},
 	);
 
@@ -173,6 +192,66 @@ describe.each([
 		expect(markup(container.querySelector('i')!)).toBe('<s>c</s>ok');
 		expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
 		expect(warnings()).toEqual(dev ? [rebuilt('IfLeaf')] : []);
+	});
+
+	it('mounts live components in the rebuilt clone and adopts the server component after it', async () => {
+		const props = { k: 'a', tag: 'mark', step: 0 };
+		container.innerHTML = ServerRT.renderToString(server.ComponentBranch, {
+			...props,
+			server: true,
+		}).html;
+		const after = container.querySelector<HTMLButtonElement>('button.after')!;
+		const afterLabel = container.querySelector('small.after')!;
+		const recoverable: string[] = [];
+		const hydrated = hydrateRoot(container, client.ComponentBranch, props, {
+			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
+		});
+		root = hydrated;
+		flushSync(() => {});
+		await act(async () => {});
+
+		expect(markup(container.firstElementChild!)).toBe(
+			'<i><button class="inner">inner:0</button><small class="inner">inner</small>' +
+				'<button class="keyed">keyed:0</button><mark class="tag">step:0</mark>' +
+				'<strong class="badge">badge:0</strong>ok</i>' +
+				'<button class="after">after:0</button><small class="after">after</small>',
+		);
+		expect(container.querySelector('button.after')).toBe(after);
+		expect(container.querySelector('small.after')).toBe(afterLabel);
+		expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+		expect(warnings()).toEqual(dev ? [rebuilt('ComponentLeaf')] : []);
+
+		const inner = container.querySelector<HTMLButtonElement>('button.inner')!;
+		const keyed = container.querySelector<HTMLButtonElement>('button.keyed')!;
+		const tag = container.querySelector('mark')!;
+		const badge = container.querySelector('strong')!;
+		flushSync(() => inner.click());
+		flushSync(() => keyed.click());
+		flushSync(() => after.click());
+		expect([inner, keyed, after].map((button) => button.textContent)).toEqual([
+			'inner:1',
+			'keyed:1',
+			'after:1',
+		]);
+
+		// The same key keeps the keyed component; every instance keeps its node.
+		flushSync(() => hydrated.render(client.ComponentBranch, { ...props, step: 1 }));
+		expect(container.querySelector('button.keyed')).toBe(keyed);
+		expect(container.querySelector('mark')).toBe(tag);
+		expect(container.querySelector('strong')).toBe(badge);
+		expect([inner, keyed, tag, badge, after].map((node) => node.textContent)).toEqual([
+			'inner:1',
+			'keyed:1',
+			'step:1',
+			'badge:1',
+			'after:1',
+		]);
+
+		// A new key remounts only the keyed component.
+		flushSync(() => hydrated.render(client.ComponentBranch, { ...props, k: 'b', step: 1 }));
+		expect(keyed.isConnected).toBe(false);
+		expect(container.querySelector('button.keyed')!.textContent).toBe('keyed:0');
+		expect([inner, after].map((button) => button.textContent)).toEqual(['inner:1', 'after:1']);
 	});
 
 	it("does not read a server sibling's use() seed in a rebuilt block", async () => {
