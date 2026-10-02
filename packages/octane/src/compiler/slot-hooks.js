@@ -773,8 +773,10 @@ function hookOwner(node, name) {
 
 // Mirrors compile.js: signal-aware modules, and `$` hooks that return live
 // signals, give each custom-hook call a site keying the declarations it reaches.
-function customHookSignalSite(st, node, name) {
-	return st.signalHookSites && (st.nativeReads || name.endsWith('$'))
+// Either the local or the imported hook name may carry the `$`.
+function customHookSignalSite(st, node, ...names) {
+	return st.signalHookSites &&
+		(st.nativeReads || names.some((name) => typeof name === 'string' && name.endsWith('$')))
 		? signalHookCallSite(st.filename, node)
 		: null;
 }
@@ -1206,7 +1208,7 @@ function walk(node, owner, st) {
 					node.callee.name,
 					node._octaneCustomHookCall,
 					node,
-					customHookSignalSite(st, node, node._octaneCustomHookCall),
+					customHookSignalSite(st, node, node.callee.name, node._octaneCustomHookCall),
 				);
 				const helper = requireParallelHelper(st, 'withSlot');
 				// The path stack supplies identity without changing the authored

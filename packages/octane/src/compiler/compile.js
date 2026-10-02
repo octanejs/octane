@@ -695,14 +695,36 @@ function componentInvocationSite(ctx, node) {
 }
 
 // Only signal-aware modules, and `$` hooks that return live signals, pay for a
-// custom-hook call site that keys the instance declarations it reaches. Native
-// signal reads exist only for the DOM client and server renderers.
+// custom-hook call site that keys the instance declarations it reaches. An
+// import alias may drop the `$`, so the exported name counts too, exactly as in
+// plain modules. Native signal reads exist only for the DOM renderers.
 function customHookSignalSite(ctx, node, name) {
 	return ctx.signalHookSites &&
 		ctx._universalRuntimeUnit == null &&
-		(ctx.nativeReads || name.endsWith('$'))
+		(ctx.nativeReads || name.endsWith('$') || importedSpecifierName(ctx, name)?.endsWith('$'))
 		? signalHookCallSite(ctx.filename, node)
 		: null;
+}
+
+// Read from the authored imports, which the server and client compiles share.
+function importedSpecifierName(ctx, local) {
+	let names = ctx._importedSpecifierNames;
+	if (names === undefined) {
+		names = ctx._importedSpecifierNames = new Map();
+		for (const statement of ctx.authoredModuleAst?.body ?? []) {
+			if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type') continue;
+			for (const specifier of statement.specifiers ?? []) {
+				const imported = specifier.imported?.name ?? specifier.imported?.value;
+				if (
+					specifier.type === 'ImportSpecifier' &&
+					specifier.importKind !== 'type' &&
+					typeof imported === 'string'
+				)
+					names.set(specifier.local.name, imported);
+			}
+		}
+	}
+	return names.get(local);
 }
 
 function domSignalTarget(options) {

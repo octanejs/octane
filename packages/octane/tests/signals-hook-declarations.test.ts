@@ -109,10 +109,15 @@ describe('signal declarations inside custom hooks', () => {
 		});
 
 		// Composing modules that do not import signals still key each `$` hook call.
-		for (const forwarded of [false, true]) {
-			const via = forwarded ? 'a .tsrx module' : 'a plain module';
-			it(`keeps cells per call of hooks composed in ${via} in ${label}`, () => {
-				const rendered = mount(client.StoredPairs, { forwarded });
+		for (const via of ['plain', 'renamed', 'forwarded', 'aliased'] as const) {
+			const composer = {
+				plain: 'a plain module',
+				renamed: 'a plain module through an alias with $',
+				forwarded: 'a .tsrx module',
+				aliased: 'a .tsrx module through an alias without $',
+			}[via];
+			it(`keeps cells per call of hooks composed in ${composer} in ${label}`, () => {
+				const rendered = mount(client.StoredPairs, { via });
 				try {
 					expect(rendered.find('output').textContent).toBe('a,b,c,d');
 					rendered.click('button');
@@ -122,16 +127,16 @@ describe('signal declarations inside custom hooks', () => {
 				}
 			});
 
-			it(`adopts cells of hooks composed in ${via} in ${label}`, () => {
+			it(`adopts cells of hooks composed in ${composer} in ${label}`, () => {
 				const container = document.createElement('div');
 				document.body.append(container);
 				let root: ReturnType<typeof hydrateRoot> | undefined;
 				try {
-					container.innerHTML = renderToString(server.StoredPairs, { forwarded }).html;
+					container.innerHTML = renderToString(server.StoredPairs, { via }).html;
 					const output = container.querySelector('output')!;
 					expect(output.textContent).toBe('a,b,c,d');
 					flushSync(() => {
-						root = hydrateRoot(container, client.StoredPairs, { forwarded });
+						root = hydrateRoot(container, client.StoredPairs, { via });
 					});
 					expect(container.querySelector('output')).toBe(output);
 					flushSync(() => container.querySelector('button')!.click());

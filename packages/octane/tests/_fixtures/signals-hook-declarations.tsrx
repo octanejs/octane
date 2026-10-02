@@ -1,6 +1,6 @@
 import { derived$, query$, signal$, type DerivedSignal, type WritableSignal } from 'octane/signals';
-import { useForwardedPair$ } from './signals-hook-declarations-forward.tsrx';
-import { useStoredPair$ } from './signals-hook-declarations-pair';
+import { useAliasedPair$, useForwardedPair$ } from './signals-hook-declarations-forward.tsrx';
+import { useRenamedPair$, useStoredPair$ } from './signals-hook-declarations-pair';
 
 type Load = (key: string) => Promise<string>;
 
@@ -69,8 +69,17 @@ export function Cells(props: { first: string; second: string; showFirst: boolean
 	</section>
 }
 
-export function StoredPairs(props: { forwarded?: boolean }) @{
-	const usePair$ = props.forwarded ? useForwardedPair$ : useStoredPair$;
+export function StoredPairs(props: {
+	via: 'plain' | 'renamed' | 'forwarded' | 'aliased';
+}) @{
+	const usePair$ =
+		props.via === 'aliased'
+			? useAliasedPair$
+			: props.via === 'forwarded'
+				? useForwardedPair$
+				: props.via === 'renamed'
+					? useRenamedPair$
+					: useStoredPair$;
 	const [a$, b$] = usePair$('a', 'b');
 	const [c$, d$] = usePair$('c', 'd');
 	<section>

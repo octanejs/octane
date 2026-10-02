@@ -99,7 +99,7 @@ function pure(node) {
 	return { ...node, __octanePure: true };
 }
 
-function allocateHookSlot(state, origin, customHook = null) {
+function allocateHookSlot(state, origin, hookNames = null) {
 	const index = state.slotDeclarations.length;
 	if (state.slotBase === null) state.slotBase = allocName(state, '_hs$');
 	const name = allocName(state, `_h$${index}`);
@@ -109,9 +109,9 @@ function allocateHookSlot(state, origin, customHook = null) {
 	// Mirrors the surgical pass: a signal-aware custom-hook call keys the
 	// instance declarations it reaches by its authored position.
 	if (
-		customHook !== null &&
+		hookNames !== null &&
 		state.signalHookSites &&
-		(state.nativeReads || customHook.endsWith('$'))
+		(state.nativeReads || hookNames.some((name) => typeof name === 'string' && name.endsWith('$')))
 	) {
 		const site = signalHookCallSite(state.filename, origin);
 		slot = pure(b.call(requireHelper(state, 'signalHookSite'), slot, b.literal(site)));
@@ -158,7 +158,7 @@ function slotBaseHooks(ast, state, options) {
 						inheritHookMemoOrigin(
 							b.call(
 								requireHelper(state, 'withSlot', 'octane'),
-								allocateHookSlot(state, origin, method),
+								allocateHookSlot(state, origin, [method]),
 								b.arrow([], call),
 							),
 							origin,
@@ -171,7 +171,7 @@ function slotBaseHooks(ast, state, options) {
 		const method = options.manualSlots ? null : hookMethodName(node, options.hookLocals);
 		if (method !== null) {
 			assertSynchronousHookMethod(node);
-			const slot = allocateHookSlot(state, node, method);
+			const slot = allocateHookSlot(state, node, [method]);
 			const mapped = mapChildren(node, visit);
 			return inheritHookMemoOrigin(
 				b.call(requireHelper(state, 'withSlot', 'octane'), slot, b.arrow([], mapped)),
@@ -179,7 +179,7 @@ function slotBaseHooks(ast, state, options) {
 			);
 		}
 		if (!options.manualSlots && node.type === 'CallExpression' && node._octaneCustomHookCall) {
-			const slot = allocateHookSlot(state, node, node._octaneCustomHookCall);
+			const slot = allocateHookSlot(state, node, [node.callee.name, node._octaneCustomHookCall]);
 			const mapped = mapChildren(node, visit);
 			const callee = mapped.typeArguments
 				? {
