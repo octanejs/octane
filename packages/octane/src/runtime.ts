@@ -18869,6 +18869,23 @@ class HydrationCapability {
 	}
 
 	/**
+	 * Report a control-flow or list range whose server content before `end` was
+	 * discarded so the client could build its own arm there. Returns whether it
+	 * reported, so callers warn only then. A suspended boundary's next attempt
+	 * finds the earlier attempt's content before the same `end` (a list's open
+	 * marker still names the server's arm), and captures that changed before a
+	 * dormant boundary activated legitimately differ from the server's: neither
+	 * is a mismatch to report.
+	 */
+	reportRebuiltRange(end: Node): boolean {
+		const rebuilt = HYDRATION_REBUILT?.has(end) === true;
+		(HYDRATION_REBUILT ??= new WeakSet()).add(end);
+		if (rebuilt || this.staleServerValues) return false;
+		noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+		return true;
+	}
+
+	/**
 	 * STRUCTURAL recovery for a list where the SERVER rendered MORE items than the
 	 * client now renders: after its first fill adopts the client's items, the
 	 * cursor sits on the first unconsumed server item (or at `end`). Discard
@@ -33287,6 +33304,8 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		// discard the divergent server node/range, advance the cursor, then build the correct
 		// element fresh with hydration SUSPENDED for its subtree (so children client-mount
 		// rather than mis-adopt). Recovery runs in dev + prod; the warning is dev-only.
+		if (!hydration.staleServerValues)
+			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 		if (process.env.NODE_ENV !== 'production') {
 			const mmLoc = (domNode(hydration.node).parentNode as any)?.__oct_loc;
 			if (mmLoc)
@@ -41085,7 +41104,10 @@ function renderBranchSlot(
 						// screen and later re-entries insert against detached anchors.
 						// STRUCTURAL mismatch — discard the server range and client-build the
 						// branch fresh into the borrowed slot markers below.
-						if (process.env.NODE_ENV !== 'production') {
+						if (
+							hydration.reportRebuiltRange(state.end as Node) &&
+							process.env.NODE_ENV !== 'production'
+						) {
 							const mmLoc = siteLoc(parentScope, slotKey);
 							if (mmLoc)
 								hydration.warnStructural(
@@ -41143,7 +41165,10 @@ function renderBranchSlot(
 				// `@else` with content on the server, empty `@if` on the client). Discard the
 				// stale server range so the empty branch leaves a clean range + siblings stay
 				// aligned (structural mismatch).
-				if (process.env.NODE_ENV !== 'production') {
+				if (
+					hydration.reportRebuiltRange(state.end as Node) &&
+					process.env.NODE_ENV !== 'production'
+				) {
 					const mmLoc = siteLoc(parentScope, slotKey);
 					if (mmLoc)
 						hydration.warnStructural(
@@ -42469,7 +42494,7 @@ export function forBlock<T>(
 				// Prefer the @for's own compiled source loc (siteLoc; for-constructs carry
 				// `loc` in `__s.locs`) — the parent element's `__oct_loc` stamp exists only
 				// when the parent carries dynamic bindings.
-				if (process.env.NODE_ENV !== 'production') {
+				if (hydration.reportRebuiltRange(state.end) && process.env.NODE_ENV !== 'production') {
 					const mmLoc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
 					if (mmLoc) hydration.warnStructural(mmLoc, 'an empty list (@empty)', 'a populated list');
 				}
@@ -42533,7 +42558,9 @@ export function forBlock<T>(
 				getNextSibling(state.start) !== state.end &&
 				!hydration.isOpen(getNextSibling(state.start))))
 	) {
-		if (process.env.NODE_ENV !== 'production') {
+		// Marking the list's end also keeps the client items, which find the cursor
+		// there, from reporting the same recovery again.
+		if (hydration.reportRebuiltRange(state.end) && process.env.NODE_ENV !== 'production') {
 			const mmLoc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
 			if (mmLoc) hydration.warnStructural(mmLoc, 'a populated list', 'an empty list (@empty)');
 		}
