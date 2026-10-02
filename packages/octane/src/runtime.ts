@@ -11593,6 +11593,9 @@ export function componentSlotLite<P>(
 				endMarker = hydration.close(open);
 				adoptedClose = endMarker;
 				hydration.node = getNextSibling(open);
+			} else if (open === hydration.rebuiltTail) {
+				// The body may adopt this unframed server node as its root.
+				hydration.rebuiltTail = null;
 			}
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
@@ -18616,7 +18619,13 @@ class HydrationCapability {
 	seedCursor = 0;
 	hasAdjacentRangePair = false;
 	private abandoned = false;
-	private readonly freshNodes = new WeakSet<Node>();
+	/** The last root rebuilt over a discarded server node. */
+	private rebuiltRoot: Node | null = null;
+	/**
+	 * The server node that followed the node rebuiltRoot replaced, until a later
+	 * slot claims it or the enclosing range ends (sweepRebuiltTail).
+	 */
+	rebuiltTail: Node | null = null;
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Pairs discovered while matching an outer range; released with this hydration pass. */
 	private matchingCloses: WeakMap<Node, Comment> | null = null;
@@ -18639,6 +18648,8 @@ class HydrationCapability {
 		public rootBlock: Block,
 		public node: Node | null,
 		public seeds: unknown[] | null,
+		/** Client-built DOM; an earlier attempt over the same range may share it. */
+		private readonly freshNodes: WeakSet<Node> = new WeakSet(),
 	) {
 		initialSuspenseHydrationRenderer = renderInitialSuspenseHydration;
 	}
@@ -19595,7 +19606,11 @@ class HydrationCapability {
 				this.claimRootRemainder(
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 				);
-			return this.freshClone(template);
+			// The rebuilt root takes the discarded node's place. Server nodes after
+			// it may still belong to later client siblings, so it goes before them
+			// rather than at its block's end (rebuiltPosition).
+			this.rebuiltTail = this.node;
+			return (this.rebuiltRoot = this.freshClone(template));
 		}
 		if (isFragment) {
 			// A nested fragment has no server wrapper, so its first logical root must
@@ -19659,6 +19674,75 @@ class HydrationCapability {
 			removeHydrationRange(cursor, (STAGED_DOM?.view(end!) ?? end!).previousSibling!);
 		} else this.discardCursor(cursor);
 		return this.freshClone(template);
+	}
+
+	/**
+	 * Where a detached root goes in `parent`: a rebuilt root before the server
+	 * node that followed the node it replaced, while that node is still there;
+	 * any other root at `end`. A rebuilt root commits before any later sibling
+	 * can rebuild, since the subtree it holds no longer hydrates.
+	 */
+	rebuiltPosition(root: Node, parent: Node, end: Node | null): Node | null {
+		const next = this.rebuiltTail;
+		return root === this.rebuiltRoot && next !== null && domNode(next).parentNode === parent
+			? next
+			: end;
+	}
+
+	/**
+	 * After an adopted range's content rendered, up to its `end`: server nodes
+	 * from the last rebuilt root's continuation that no later sibling claimed
+	 * are the rest of the server content that root's mismatch replaced. Remove
+	 * them without a second report.
+	 */
+	sweepRebuiltTail(end: Node): void {
+		const tail = this.rebuiltTail;
+		this.rebuiltTail = null;
+		if (tail === null || tail === end || this.node !== tail) return;
+		let node: Node | null = tail;
+		while (node !== null && node !== end) node = getNextSibling(node);
+		if (node === null) return;
+		removeRange(tail, end);
+		this.node = end;
+	}
+
+	/** The fresh root that took the place of the node after `before` in `parent`. */
+	freshAfter(before: Node | null, parent: Node): Node | null {
+		const node = before === null ? getFirstChild(parent) : getNextSibling(before);
+		return node !== null && this.freshNodes.has(node) ? node : null;
+	}
+
+	/**
+	 * After an unframed single root's `block` adopted `root`, where clone()
+	 * left the cursor: the next sibling starts after it.
+	 */
+	stepPastRoot(root: Node, block: Block | null): void {
+		if (this.node === root && block?.startMarker === root && !isBlockClose(root))
+			this.node = getNextSibling(root);
+	}
+
+	/**
+	 * A markerless branch mounting in `parent` while this slot has no server
+	 * range: the server node at the cursor, before `after`, whose place the
+	 * branch takes. Later siblings may still adopt the server nodes after it.
+	 */
+	markerlessCursor(parent: Node, after: Node | null): Node | null {
+		const cursor = this.node;
+		return cursor !== null && cursor !== after && domNode(cursor).parentNode === parent
+			? cursor
+			: null;
+	}
+
+	/**
+	 * Where the content of a markerless branch that rendered at `cursor` ends:
+	 * at the node its render left the cursor on in `parent`, else `after`.
+	 * clone() parks the cursor on a root it adopted, so a `completed` render
+	 * that left it on `cursor` adopted that node in place.
+	 */
+	markerlessEnd(cursor: Node, parent: Node, after: Node | null, completed: boolean): Node | null {
+		const node = this.node;
+		if (node === null || domNode(node).parentNode !== parent) return after;
+		return completed && node === cursor ? getNextSibling(cursor) : node;
 	}
 
 	/** Discard a mismatched server node (or the marker range it opens) and step past it. */
@@ -20296,15 +20380,18 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 		// clone() returns the already-attached server node during hydration. Moving
 		// that adopted root before the block anchor is usually a no-op, but with an
 		// extra trailing server sibling it would reorder the valid root after the
-		// stale node just before finishRoot removes the remainder. Fresh mismatch
-		// replacements still need the ordinary insertion path.
-		if (
-			hydration === null ||
-			hydration.isFresh(root) ||
-			(STAGED_DOM?.view(root) ?? root).parentNode !== block.parentNode
-		) {
+		// stale node just before finishRoot removes the remainder. The same holds
+		// for a root that an earlier suspended attempt rebuilt and this one
+		// adopted. A detached mismatch replacement goes where the server node it
+		// replaced stood.
+		if (hydration === null || (STAGED_DOM?.view(root) ?? root).parentNode !== block.parentNode) {
 			const parent = block.parentNode;
-			(STAGED_DOM?.view(parent) ?? parent).insertBefore(root, block.endMarker);
+			(STAGED_DOM?.view(parent) ?? parent).insertBefore(
+				root,
+				hydration === null
+					? block.endMarker
+					: hydration.rebuiltPosition(root, parent, block.endMarker),
+			);
 		}
 	}
 	scope.slots[0] = bag;
@@ -31408,6 +31495,10 @@ function componentSlotImpl(
 			const before = state.anchor
 				? domNode(state.anchor).previousSibling
 				: (STAGED_DOM?.view(domParent) ?? domParent).lastChild;
+			// Hydrating without a server frame: a root rebuilt over the server node
+			// at the cursor takes its place, right after this node.
+			const cursorBefore =
+				hydrationCursor !== null ? domNode(hydrationCursor).previousSibling : undefined;
 			const b = createBlock(
 				'dynamic',
 				parentBlock,
@@ -31442,9 +31533,11 @@ function componentSlotImpl(
 					b.startMarker = hydrationCursor;
 					b.endMarker = hydrationCursor;
 				} else {
-					const last = state.anchor
-						? domNode(state.anchor).previousSibling
-						: (STAGED_DOM?.view(domParent) ?? domParent).lastChild;
+					const last =
+						(cursorBefore !== undefined && hydration!.freshAfter(cursorBefore, domParent)) ||
+						(state.anchor
+							? domNode(state.anchor).previousSibling
+							: (STAGED_DOM?.view(domParent) ?? domParent).lastChild);
 					if (last !== null && last !== before) {
 						b.startMarker = last;
 						b.endMarker = last;
@@ -31496,8 +31589,10 @@ function componentSlotImpl(
 	// during hydration the server always wraps the output, so state.end is set.)
 	// An INHERITED slot adopted nothing: its end is the PARENT's marker and it has
 	// no following sibling (sole root) — leave the cursor where the body put it.
-	if (hydration !== null && !state.inherited && state.end !== null)
-		hydration.node = getNextSibling(state.end);
+	if (hydration !== null && !state.inherited) {
+		if (state.end !== null) hydration.node = getNextSibling(state.end);
+		else if (hydrationCursor !== null) hydration.stepPastRoot(hydrationCursor, state.block);
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -37979,6 +38074,12 @@ interface InitialSuspenseHydration {
 	idStart: number;
 	seedRaw: string | null;
 	nativeRaw: string | null;
+	/**
+	 * DOM that an attempt built in place of server nodes it could not adopt.
+	 * It stays when the attempt suspends, so later attempts adopt it as client
+	 * DOM rather than as server output.
+	 */
+	fresh?: WeakSet<Node>;
 }
 
 // Server metadata gives each resolved arm an independent adoption scope. The
@@ -38106,7 +38207,12 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 	const block = createTryBody(state, initial.start, initial.end);
 	state.block = block;
 	setTryBranch(state, 1);
-	const hydration = new HydrationCapability(block, getNextSibling(initial.start), null);
+	const hydration = new HydrationCapability(
+		block,
+		getNextSibling(initial.start),
+		null,
+		(initial.fresh ??= new WeakSet()),
+	);
 	if (initial.seedRaw !== null) hydration.seeds = hydration.parseSeeds(initial.seedRaw);
 	// This capability owns one exact arm, never the surrounding root siblings.
 	hydration.claimRootRemainder(initial.end);
@@ -41010,7 +41116,12 @@ function markerlessBranchRoots(
 	return roots;
 }
 
-/** Publish the DOM boundary of a markerless arm after its body finally completes. */
+/**
+ * Publish the DOM boundary of a markerless arm after its body finally
+ * completes. Its content lies after `before` and before `contentEnd`; its root
+ * slots were anchored at `after`, which is also `contentEnd` except for a
+ * hydrating arm that took the cursor's place.
+ */
 function finalizeMarkerlessBranch(
 	state: BranchSlot,
 	domParent: Node,
@@ -41018,12 +41129,13 @@ function finalizeMarkerlessBranch(
 	marker: string,
 	before: Node | null,
 	after: Node | null,
+	contentEnd: Node | null = after,
 ): void {
 	state.markerlessBefore = undefined;
 	if (state.borrowed && state.start === null) return;
 	const first = before ? getNextSibling(before) : getFirstChild(domParent);
-	const last = after
-		? (STAGED_DOM?.view(after) ?? after).previousSibling
+	const last = contentEnd
+		? (STAGED_DOM?.view(contentEnd) ?? contentEnd).previousSibling
 		: (STAGED_DOM?.view(domParent) ?? domParent).lastChild;
 	// One current element is not a sole root when an empty sibling slot can
 	// later produce more output at the same provisional insertion anchor.
@@ -41039,8 +41151,8 @@ function finalizeMarkerlessBranch(
 	} else {
 		const start = (STAGED_DOM?.view(document) ?? document).createComment(marker);
 		const end = (STAGED_DOM?.view(document) ?? document).createComment('/' + marker);
-		(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(start, first ?? after);
-		(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(end, after);
+		(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(start, first ?? contentEnd);
+		(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(end, contentEnd);
 		block.startMarker = start;
 		block.endMarker = end;
 		block.exclusiveMarkers = true;
@@ -41525,6 +41637,7 @@ function renderBranchSlot(
 					hydration!.node = getNextSibling(state.end as Node);
 				} else {
 					renderBlock(b);
+					if (inner !== null && hydration!.rebuiltTail !== null) hydration!.sweepRebuiltTail(bEnd);
 				}
 			} else if (hydration !== null && getNextSibling(state.start) !== state.end) {
 				if (PRESENTATION_HYDRATION?.revision !== undefined) throw new Error(formatClientError(75));
@@ -41548,9 +41661,17 @@ function renderBranchSlot(
 			// Markerless client mount — pick the boundary by what the branch renders.
 			// This applies both on first mount and after an anchor-only empty arm:
 			// a single host can self-mark without first manufacturing a pair.
-			const before = after
+			let before = after
 				? (STAGED_DOM?.view(after) ?? after).previousSibling
 				: (STAGED_DOM?.view(domParent) ?? domParent).lastChild;
+			// Hydrating, the server rendered no range for this slot but other
+			// content at the cursor, and later siblings may still adopt the server
+			// nodes after that. The branch takes the cursor's place: its content
+			// starts after the cursor's previous sibling and ends where its render
+			// leaves the cursor, not at `after`.
+			const cursor =
+				hydration !== null && !state.borrowed ? hydration.markerlessCursor(domParent, after) : null;
+			if (cursor !== null) before = domNode(cursor).previousSibling;
 			const b = createBlock(
 				'control-flow',
 				parentBlock,
@@ -41569,12 +41690,33 @@ function renderBranchSlot(
 				// A branch that throws before inserting anything stays unfinalized so
 				// a same-branch retry finalizes it. One that already inserted its
 				// root owns that DOM now: finalize it so teardown can remove it (a
-				// discarded keyed item otherwise strands the partial row).
-				if ((before ? getNextSibling(before) : getFirstChild(domParent)) !== after)
-					finalizeMarkerlessBranch(state, domParent, b, marker, before, after);
+				// discarded keyed item otherwise strands the partial row). A
+				// hydrating branch always takes its place now, because a retry could
+				// no longer tell its content from the server siblings after it.
+				if (
+					cursor !== null ||
+					(before ? getNextSibling(before) : getFirstChild(domParent)) !== after
+				)
+					finalizeMarkerlessBranch(
+						state,
+						domParent,
+						b,
+						marker,
+						before,
+						after,
+						cursor === null ? after : hydration!.markerlessEnd(cursor, domParent, after, false),
+					);
 				throw error;
 			}
-			finalizeMarkerlessBranch(state, domParent, b, marker, before, after);
+			finalizeMarkerlessBranch(
+				state,
+				domParent,
+				b,
+				marker,
+				before,
+				after,
+				cursor === null ? after : hydration!.markerlessEnd(cursor, domParent, after, true),
+			);
 			replaceSharedBlockBoundary(
 				parentBlock,
 				oldBlockStart,
