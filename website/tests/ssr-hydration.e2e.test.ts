@@ -1798,6 +1798,12 @@ describe(
 				try {
 					const kind = page.locator('#ecosystem-kind');
 					const category = page.locator('#ecosystem-category');
+					// History navigation moves the URL first and the router re-renders
+					// from it on a later commit, so a read the moment the URL changes
+					// races that commit. Wait for the controlled selects to follow the
+					// URL, bounded like the URL waits themselves.
+					const filters = () => Promise.all([kind.inputValue(), category.inputValue()]);
+					const followsUrl = { timeout: PLAYWRIGHT_ACTION_TIMEOUT };
 					const initialHistoryLength = await page.evaluate(() => history.length);
 					await kind.selectOption('binding');
 					await page.waitForFunction(
@@ -1813,18 +1819,17 @@ describe(
 
 					await page.goBack();
 					await page.waitForFunction(() => !new URL(location.href).searchParams.has('category'));
-					expect(await kind.inputValue()).toBe('binding');
-					expect(await category.inputValue()).toBe('');
+					await expect.poll(filters, followsUrl).toEqual(['binding', '']);
 
 					await page.goBack();
 					await page.waitForFunction(() => !new URL(location.href).searchParams.has('kind'));
-					expect(await kind.inputValue()).toBe('');
+					await expect.poll(filters, followsUrl).toEqual(['', '']);
 
 					await page.goForward();
 					await page.waitForFunction(
 						() => new URL(location.href).searchParams.get('kind') === 'binding',
 					);
-					expect(await kind.inputValue()).toBe('binding');
+					await expect.poll(filters, followsUrl).toEqual(['binding', '']);
 
 					await page.getByRole('button', { name: 'Reset search and filters' }).click();
 					await page.waitForFunction(() => new URL(location.href).search === '');
@@ -1832,6 +1837,7 @@ describe(
 					await page.waitForFunction(
 						() => new URL(location.href).searchParams.get('kind') === 'binding',
 					);
+					await expect.poll(filters, followsUrl).toEqual(['binding', '']);
 					expect(errors).toEqual([]);
 				} finally {
 					await page.close();
