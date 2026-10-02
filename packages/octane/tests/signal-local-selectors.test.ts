@@ -59,8 +59,11 @@ export function App(props) @{
 }`;
 
 describe.each(modes)('redeclared local query selectors (%j)', (mode) => {
+	// Compile at collection: a cold compile under load must not spend a test's timeout.
+	const snapshot = load<any>(snapshotSource, '/local-selector-snapshot.tsrx', mode);
+	const strict = load<any>(strictSource, '/local-selector-strict.tsrx', mode);
 	it('reselects a snapshot read when its captured prop changes', async () => {
-		const { App } = load<any>(snapshotSource, '/local-selector-snapshot.tsrx', mode);
+		const { App } = snapshot;
 		const { calls, loader, selections } = controlledLoader();
 		const root = mount(App, { sel: 'a', load: loader });
 		const text = () => root.find('p').textContent;
@@ -84,7 +87,7 @@ describe.each(modes)('redeclared local query selectors (%j)', (mode) => {
 	});
 
 	it('aborts an obsolete request and dedupes an equal selection', async () => {
-		const { App } = load<any>(snapshotSource, '/local-selector-abort.tsrx', mode);
+		const { App } = snapshot;
 		const { calls, loader, selections } = controlledLoader();
 		const root = mount(App, { sel: 'a', load: loader });
 		const text = () => root.find('p').textContent;
@@ -111,17 +114,18 @@ describe.each(modes)('redeclared local query selectors (%j)', (mode) => {
 		expect(calls[1]!.signal.aborted).toBe(false);
 	});
 
-	it('adopts a redeclared inline loader without refetching an equal selection', async () => {
-		const { App } = load<any>(
-			`import { query$ } from 'octane/signals';
+	const localSelectorLoader = load<any>(
+		`import { query$ } from 'octane/signals';
 export function App(props) @{
  const r$ = query$(() => props.id, (id) => props.load(id, props.label));
  const s = r$.snapshot();
  <p>{(s.status === 'ready' ? s.value : s.status) as string}</p>
 }`,
-			'/local-selector-loader.tsrx',
-			mode,
-		);
+		'/local-selector-loader.tsrx',
+		mode,
+	);
+	it('adopts a redeclared inline loader without refetching an equal selection', async () => {
+		const { App } = localSelectorLoader;
 		const loads: string[] = [];
 		const loader = async (id: string, label: string) => {
 			loads.push(`${id}:${label}`);
@@ -145,17 +149,18 @@ export function App(props) @{
 		}
 	});
 
-	it('tracks the accepted closure after an equal selection', async () => {
-		const { App } = load<any>(
-			`import { query$ } from 'octane/signals';
+	const localSelectorDependencies = load<any>(
+		`import { query$ } from 'octane/signals';
 export function App(props) @{
  const r$ = query$(() => (props.useB ? props.b$ : props.a$).get(), props.load);
  const s = r$.snapshot();
  <p>{(s.status === 'ready' ? s.value : s.status) as string}</p>
 }`,
-			'/local-selector-dependencies.tsrx',
-			mode,
-		);
+		'/local-selector-dependencies.tsrx',
+		mode,
+	);
+	it('tracks the accepted closure after an equal selection', async () => {
+		const { App } = localSelectorDependencies;
 		const scope = signals.createScope({ scopeKey: 'local-selector-dependencies' });
 		const a$ = scope.signal$('a', '1');
 		const b$ = scope.signal$('b', '1');
@@ -182,17 +187,18 @@ export function App(props) @{
 		}
 	});
 
-	it('adopts a closure whose captured value only matters after a signal changes', async () => {
-		const { App } = load<any>(
-			`import { query$ } from 'octane/signals';
+	const localSelectorLaterSignal = load<any>(
+		`import { query$ } from 'octane/signals';
 export function App(props) @{
  const r$ = query$(() => (props.key$.get() === 'special' ? props.alt : props.key$.get()), props.load);
  const s = r$.snapshot();
  <p>{(s.status === 'ready' ? s.value : s.status) as string}</p>
 }`,
-			'/local-selector-later-signal.tsrx',
-			mode,
-		);
+		'/local-selector-later-signal.tsrx',
+		mode,
+	);
+	it('adopts a closure whose captured value only matters after a signal changes', async () => {
+		const { App } = localSelectorLaterSignal;
 		const scope = signals.createScope({ scopeKey: 'local-selector-later-signal' });
 		const key$ = scope.signal$('key', '1');
 		const loads: string[] = [];
@@ -216,9 +222,8 @@ export function App(props) @{
 		}
 	});
 
-	it('reports a failing selector and recovers on the next declaration', async () => {
-		const { App } = load<any>(
-			`import { query$ } from 'octane/signals';
+	const localSelectorFailure = load<any>(
+		`import { query$ } from 'octane/signals';
 export function App(props) @{
  const r$ = query$(() => {
   if (props.fail) throw new Error('bad selector');
@@ -227,9 +232,11 @@ export function App(props) @{
  const s = r$.snapshot();
  <p>{(s.status === 'error' ? (s.error as Error).message : s.status === 'ready' ? s.value : s.status) as string}</p>
 }`,
-			'/local-selector-failure.tsrx',
-			mode,
-		);
+		'/local-selector-failure.tsrx',
+		mode,
+	);
+	it('reports a failing selector and recovers on the next declaration', async () => {
+		const { App } = localSelectorFailure;
 		const { calls, loader, selections } = controlledLoader();
 		const root = mount(App, { sel: 'a', load: loader });
 		const text = () => root.find('p').textContent;
@@ -246,9 +253,8 @@ export function App(props) @{
 		}
 	});
 
-	it('reads the latest accepted declaration outside rendering', async () => {
-		const { App } = load<any>(
-			`import { useEffect } from 'octane';
+	const localSelectorEffect = load<any>(
+		`import { useEffect } from 'octane';
 import { query$ } from 'octane/signals';
 export function App(props) @{
  const r$ = query$(() => props.id, props.load);
@@ -257,9 +263,11 @@ export function App(props) @{
  });
  <p>{props.id as string}</p>
 }`,
-			'/local-selector-effect.tsrx',
-			mode,
-		);
+		'/local-selector-effect.tsrx',
+		mode,
+	);
+	it('reads the latest accepted declaration outside rendering', async () => {
+		const { App } = localSelectorEffect;
 		const { loader, selections } = controlledLoader();
 		const seen: string[] = [];
 		const props = { load: loader, seen: (status: string) => seen.push(status) };
@@ -277,10 +285,9 @@ export function App(props) @{
 	});
 
 	// Strong mode rejects render-phase state updates at compile time.
-	it.runIf(!mode.strong)(
-		'stages the selection of a body rerun after a render-phase update',
-		async () => {
-			const { App } = load<any>(
+	const localSelectorRenderPhase = mode.strong
+		? undefined
+		: load<any>(
 				`import { useState } from 'octane';
 import { query$ } from 'octane/signals';
 export function App(props) @{
@@ -300,6 +307,10 @@ export function App(props) @{
 				'/local-selector-render-phase.tsrx',
 				mode,
 			);
+	it.runIf(!mode.strong)(
+		'stages the selection of a body rerun after a render-phase update',
+		async () => {
+			const { App } = localSelectorRenderPhase!;
 			const { calls, loader, selections } = controlledLoader();
 			const root = mount(App, { filter: 'a', load: loader });
 			const text = () => root.find('p').textContent;
@@ -322,7 +333,7 @@ export function App(props) @{
 	);
 
 	it('reselects a strict read under @try after the boundary has settled', async () => {
-		const { App } = load<any>(strictSource, '/local-selector-strict.tsrx', mode);
+		const { App } = strict;
 		const { calls, loader, selections } = controlledLoader();
 		const root = mount(App, { sel: 'a', load: loader });
 		const view = () => root.find('main').textContent;
@@ -372,8 +383,9 @@ export function App(props) @{
 }`;
 
 describe.each(modes)('redeclared selectors in speculative renders (%j)', (mode) => {
-	function setup(id: string) {
-		const { App } = load<any>(transitionSource, id, mode);
+	const transition = load<any>(transitionSource, '/local-selector-transition.tsrx', mode);
+	function setup() {
+		const { App } = transition;
 		const loader = controlledLoader();
 		const root = mount(App, { load: loader.loader });
 		const view = () => ({
@@ -386,7 +398,7 @@ describe.each(modes)('redeclared selectors in speculative renders (%j)', (mode) 
 	}
 
 	it('keeps the committed selection while a transition holds a new one', async () => {
-		const { root, view, calls, selections } = setup('/local-selector-held.tsrx');
+		const { root, view, calls, selections } = setup();
 		try {
 			await act(() => calls[0]!.resolve('A'));
 			expect(view()).toEqual({
@@ -413,7 +425,7 @@ describe.each(modes)('redeclared selectors in speculative renders (%j)', (mode) 
 	});
 
 	it('aborts a held selection when its component unmounts', async () => {
-		const { root, calls, selections } = setup('/local-selector-unmount.tsrx');
+		const { root, calls, selections } = setup();
 		let unmounted = false;
 		try {
 			await act(() => calls[0]!.resolve('A'));
@@ -428,7 +440,7 @@ describe.each(modes)('redeclared selectors in speculative renders (%j)', (mode) 
 	});
 
 	it('replaces a held selection with a newer transition', async () => {
-		const { root, view, calls, selections } = setup('/local-selector-superseded.tsrx');
+		const { root, view, calls, selections } = setup();
 		try {
 			await act(() => calls[0]!.resolve('A'));
 			await act(() => root.click('.to-b'));
@@ -447,7 +459,7 @@ describe.each(modes)('redeclared selectors in speculative renders (%j)', (mode) 
 	});
 
 	it('keeps the accepted request when an urgent update abandons a held selection', async () => {
-		const { root, view, calls, selections } = setup('/local-selector-abandoned.tsrx');
+		const { root, view, calls, selections } = setup();
 		try {
 			await act(() => calls[0]!.resolve('A'));
 			await act(() => root.click('.to-b'));
@@ -486,8 +498,13 @@ export function App(props) @{
 }`;
 
 describe.each(modes)('redeclared selectors in signal transitions (%j)', (mode) => {
+	const signalTransition = load<any>(
+		signalTransitionSource,
+		'/local-selector-signal-write.tsrx',
+		mode,
+	);
 	it('publishes a selection written by a transition only when it is accepted', async () => {
-		const { App } = load<any>(signalTransitionSource, '/local-selector-signal-write.tsrx', mode);
+		const { App } = signalTransition;
 		const { calls, loader, selections } = controlledLoader();
 		const scope = signals.createScope({ scopeKey: 'local-selector-signal-write' });
 		const sel$ = scope.signal$('sel', 'a');
@@ -516,9 +533,8 @@ describe.each(modes)('redeclared selectors in signal transitions (%j)', (mode) =
 });
 
 describe.each(modes)('redeclared local derived computations (%j)', (mode) => {
-	it('recomputes a synchronous derived value from captured props', async () => {
-		const { App } = load<any>(
-			`import { derived$, signal$ } from 'octane/signals';
+	const localDerivedSync = load<any>(
+		`import { derived$, signal$ } from 'octane/signals';
 export function App(props) @{
  const n$ = signal$(1);
  const label$ = derived$(() => props.label + n$.get());
@@ -529,9 +545,11 @@ export function App(props) @{
   <button onClick={() => n$.set(n$.get() + 1)}>{'+'}</button>
  </p>
 }`,
-			'/local-derived-sync.tsrx',
-			mode,
-		);
+		'/local-derived-sync.tsrx',
+		mode,
+	);
+	it('recomputes a synchronous derived value from captured props', async () => {
+		const { App } = localDerivedSync;
 		const root = mount(App, { label: 'a' });
 		const view = () => [root.find('b').textContent, root.find('i').textContent];
 		try {
@@ -548,9 +566,8 @@ export function App(props) @{
 		}
 	});
 
-	it('adopts a derived closure whose captured value only matters after a signal changes', async () => {
-		const { App } = load<any>(
-			`import { derived$, signal$ } from 'octane/signals';
+	const localDerivedLaterSignal = load<any>(
+		`import { derived$, signal$ } from 'octane/signals';
 export function App(props) @{
  const n$ = signal$(1);
  const size$ = derived$(() => (n$.get() > 5 ? props.big : 'small'));
@@ -559,9 +576,11 @@ export function App(props) @{
   <button onClick={() => n$.set(10)}>{'grow'}</button>
  </p>
 }`,
-			'/local-derived-later-signal.tsrx',
-			mode,
-		);
+		'/local-derived-later-signal.tsrx',
+		mode,
+	);
+	it('adopts a derived closure whose captured value only matters after a signal changes', async () => {
+		const { App } = localDerivedLaterSignal;
 		const root = mount(App, { big: 'first' });
 		try {
 			expect(root.find('b').textContent).toBe('small');
@@ -576,9 +595,8 @@ export function App(props) @{
 		}
 	});
 
-	it('keeps the committed derived value while a transition holds new props', async () => {
-		const { App } = load<any>(
-			`import { useState, useTransition } from 'octane';
+	const localDerivedHeld = load<any>(
+		`import { useState, useTransition } from 'octane';
 import { derived$, query$ } from 'octane/signals';
 function Panel(props) @{
  const upper$ = derived$(() => props.sel.toUpperCase() + props.count);
@@ -603,9 +621,11 @@ export function App(props) @{
   <Panel sel={sel} count={count} load={props.load} />
  </main>
 }`,
-			'/local-derived-held.tsrx',
-			mode,
-		);
+		'/local-derived-held.tsrx',
+		mode,
+	);
+	it('keeps the committed derived value while a transition holds new props', async () => {
+		const { App } = localDerivedHeld;
 		const { calls, loader } = controlledLoader();
 		const root = mount(App, { load: loader });
 		const view = () => [
@@ -627,17 +647,18 @@ export function App(props) @{
 		}
 	});
 
-	it('adopts an asynchronous computation for its next restart without refetching', async () => {
-		const { App } = load<any>(
-			`import { derived$ } from 'octane/signals';
+	const localDerivedAsync = load<any>(
+		`import { derived$ } from 'octane/signals';
 export function App(props) @{
  const value$ = derived$(async () => props.load(props.id + ':' + props.version$.get()));
  const s = value$.snapshot();
  <p>{(s.status === 'ready' ? s.value : s.status) as string}</p>
 }`,
-			'/local-derived-async.tsrx',
-			mode,
-		);
+		'/local-derived-async.tsrx',
+		mode,
+	);
+	it('adopts an asynchronous computation for its next restart without refetching', async () => {
+		const { App } = localDerivedAsync;
 		const scope = signals.createScope({ scopeKey: 'local-derived-async' });
 		const version$ = scope.signal$('version', 0);
 		const loads: string[] = [];
@@ -665,9 +686,8 @@ export function App(props) @{
 		}
 	});
 
-	it('starts asynchronous derived work once when a transition makes it asynchronous', async () => {
-		const { App } = load<any>(
-			`import { useState, useTransition } from 'octane';
+	const localDerivedFlip = load<any>(
+		`import { useState, useTransition } from 'octane';
 import { derived$ } from 'octane/signals';
 function Panel(props) @{
  const value$ = derived$(() => (props.id ? props.load(props.id) : 'none'));
@@ -688,9 +708,11 @@ export function App(props) @{
   <Panel id={id} load={props.load} />
  </main>
 }`,
-			'/local-derived-flip.tsrx',
-			mode,
-		);
+		'/local-derived-flip.tsrx',
+		mode,
+	);
+	it('starts asynchronous derived work once when a transition makes it asynchronous', async () => {
+		const { App } = localDerivedFlip;
 		const { calls, loader, selections } = controlledLoader();
 		const root = mount(App, { load: loader });
 		const view = () => [

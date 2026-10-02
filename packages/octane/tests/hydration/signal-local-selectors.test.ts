@@ -39,20 +39,16 @@ afterEach(() => {
 });
 
 describe.each(modes)('redeclared local query selectors after hydration (%j)', (mode) => {
+	// Compile at collection: a cold compile under load must not spend a test's timeout.
+	const options = {
+		id: '/src/local-selector-hydration.tsrx',
+		compileOptions: { ...mode, hmr: false },
+		runtimeModules: { 'octane/signals': signals },
+	};
+	const server = loadCompiledFixtureSource<any>(source, { ...options, mode: 'server' });
+	const client = loadCompiledFixtureSource<any>(source, { ...options, mode: 'client' });
+
 	it('adopts the server selection, then reselects changed props', async () => {
-		const options = {
-			id: '/src/local-selector-hydration.tsrx',
-			compileOptions: { ...mode, hmr: false },
-			runtimeModules: { 'octane/signals': signals },
-		};
-		const server = loadCompiledFixtureSource<any>(source, {
-			...options,
-			mode: 'server',
-		});
-		const client = loadCompiledFixtureSource<any>(source, {
-			...options,
-			mode: 'client',
-		});
 		const streamedSignals = {
 			buildId: 'local-selector-build',
 			documentId: `local-selector-${mode.dev}-${mode.strong}`,
