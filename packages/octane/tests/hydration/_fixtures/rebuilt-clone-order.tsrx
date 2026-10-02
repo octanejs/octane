@@ -1,4 +1,5 @@
-import { use } from 'octane';
+import { Hydrate, use } from 'octane';
+import { load } from 'octane/hydration';
 
 function label(): string {
 	return 'ok';
@@ -200,5 +201,35 @@ export function AdoptedSwitchSeedBranch(props: {
 		} @pending {
 			<p>{'pending'}</p>
 		}
+	</div>
+}
+
+// The same arm inside a deferred boundary, whose suspended activation retries
+// the same blocks rather than starting a new attempt.
+export function DeferredSwitchBranch(props: {
+	server?: boolean;
+	k: string;
+	leaf: Promise<string>;
+}) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@if (props.server) {
+					<>
+						<u>{'z'}</u>
+						<Em />
+					</>
+				} @else {
+					<>
+						@switch (props.k) {
+							@case 'a': {
+								<u>{use(props.leaf) as string}</u>
+							}
+						}
+						<Em />
+					</>
+				}
+			</section>
+		</Hydrate>
 	</div>
 }

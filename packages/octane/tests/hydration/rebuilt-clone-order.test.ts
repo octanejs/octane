@@ -218,4 +218,28 @@ describe.each([
 		flushSync(() => root!.render(client.AdoptedSwitchSeedBranch, { k: 'b', leaf, sibling }));
 		expect(markup(container.firstElementChild!)).toBe('<em>sibling</em><em>e</em>');
 	});
+	it('retries a deferred @switch arm that adopted the server node in place before suspending', async () => {
+		container.innerHTML = ServerRT.renderToString(server.DeferredSwitchBranch, {
+			server: true,
+			k: 'a',
+			leaf: Promise.resolve('unused'),
+		}).html;
+		const section = container.querySelector('section')!;
+		const u = container.querySelector('u');
+		const em = container.querySelector('em');
+		let resolveLeaf!: (value: string) => void;
+		const leaf = new Promise<string>((resolve) => (resolveLeaf = resolve));
+		await hydrate('DeferredSwitchBranch', { k: 'a', leaf });
+		await act(async () => resolveLeaf('z'));
+
+		expect(markup(section)).toBe('<u>z</u><em>e</em>');
+		expect(container.querySelector('u')).toBe(u);
+		expect(container.querySelector('em')).toBe(em);
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
+
+		// The switch owns the adopted `<u>`, so leaving the case removes it.
+		flushSync(() => root!.render(client.DeferredSwitchBranch, { k: 'b', leaf }));
+		expect(markup(section)).toBe('<em>e</em>');
+	});
 });

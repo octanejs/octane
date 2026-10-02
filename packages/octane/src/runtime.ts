@@ -41922,6 +41922,13 @@ function renderBranchSlot(
 						after,
 						cursor === null ? after : hydration!.markerlessEnd(cursor, domParent, after),
 					);
+				else if (cursor !== null && hydration!.node === cursor) {
+					// The branch adopted the node at the cursor, or has yet to. A
+					// retry of this same block finalizes over that node, not up to
+					// the server siblings that later client siblings adopt.
+					state.markerlessBefore = contentBefore;
+					b.endMarker = getNextSibling(cursor);
+				}
 				throw error;
 			}
 			finalizeMarkerlessBranch(
