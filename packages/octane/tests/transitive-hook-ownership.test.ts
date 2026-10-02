@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { slotHooks } from '../src/compiler/slot-hooks.js';
 import { createOctaneCompiler } from '../src/compiler/bundler.js';
 import { useState } from '../src/index.js';
+import { renderToString } from '../src/runtime.server.js';
 import ts from 'typescript';
 import {
 	evaluateCompiledFixtureCode,
@@ -24,6 +25,42 @@ const methodSource = readFileSync(
 	resolve(import.meta.dirname, './_fixtures/compiler-method-hook.ts'),
 	'utf8',
 );
+// Module initialization runs outside every render, so these calls need no slot
+// boundary. The plain pass declares its slots after the module body.
+const moduleInitSource = `import { useMemo } from 'octane';
+import { store } from './store';
+class Defaults {
+	static field = store.useValue('static field');
+	static block: string;
+	static {
+		Defaults.block = store.useValue('static block');
+	}
+	[store.useKey()] = 'key';
+}
+const absent: typeof store | null = null;
+export const initial = store.useValue('initial');
+export const optional = store?.useValue('optional');
+export const missing = absent?.useValue('missing');
+export const statics = [Defaults.field, Defaults.block, new Defaults().computed];
+export function useProbe(value: string) {
+	return useMemo(() => ({ value }), [value]);
+}`;
+// An instance field initializer runs with each construction, possibly during a
+// render, so its hook call keeps a boundary exactly as a constructor's would.
+const modelSource = (call: string) => `import { useMemo, useState } from 'octane';
+function useCell(initial: string) {
+	const [value, setValue] = useState(initial);
+	return useMemo(() => [value, setValue] as const, [value]);
+}
+const cells = { useCell };
+class Model {
+	first = ${call}('first');
+	second = ${call}('second');
+}
+export function usePair() {
+	const model = new Model();
+	return [model.first, model.second];
+}`;
 
 describe('transitive hook ownership', () => {
 	for (const mode of ['client', 'server'] as const) {
@@ -111,6 +148,73 @@ export function read(store) { return [store?.useValue()!.value, store?.useValue?
 					after: 'value',
 					sameError: true,
 				});
+			});
+			it(`evaluates hook methods called while the module initializes (${mode}, inline=${inlineHookMemo})`, () => {
+				const id = '/project/src/module-init.ts';
+				const transformed = slotHooks(moduleInitSource, id, {
+					environment: mode,
+					inlineHookMemo,
+					dev: false,
+					hmr: false,
+				});
+				expect(transformed?.map !== null).toBe(inlineHookMemo && mode === 'client');
+				const store = {
+					prefix: 'store',
+					useValue(label: string) {
+						return `${this.prefix}:${label}`;
+					},
+					useKey() {
+						return 'computed';
+					},
+				};
+				const helper = loadPlainHookFixtureSource(moduleInitSource, {
+					id,
+					mode,
+					inlineHookMemo,
+					runtimeModules: { './store': { store } },
+				});
+				expect(helper.initial).toBe('store:initial');
+				expect(helper.optional).toBe('store:optional');
+				expect(helper.missing).toBe(undefined);
+				expect(helper.statics).toEqual(['store:static field', 'store:static block', 'key']);
+			});
+		}
+	}
+	for (const call of ['cells.useCell', 'useCell']) {
+		for (const inlineHookMemo of [false, true]) {
+			it(`keeps a boundary for ${call}() in instance field initializers (inline=${inlineHookMemo})`, () => {
+				const id = '/project/src/model.ts';
+				const source = modelSource(call);
+				const transformed = slotHooks(source, id, {
+					environment: 'client',
+					inlineHookMemo,
+					dev: false,
+					hmr: false,
+				});
+				expect(transformed?.map !== null).toBe(inlineHookMemo);
+				const load = (mode: 'client' | 'server') =>
+					loadCompiledFixtureSource(componentSource, {
+						id: '/project/src/Pair.tsrx',
+						mode,
+						runtimeModules: {
+							'./compiler-transitive-hook': loadPlainHookFixtureSource(source, {
+								id,
+								mode,
+								inlineHookMemo,
+							}),
+						},
+					}).Pair;
+				expect(renderToString(load('server'), undefined).html).toBe(
+					'<div><button>first</button><output>second</output></div>',
+				);
+				const view = mount(load('client'));
+				try {
+					expect(view.container.textContent).toBe('firstsecond');
+					view.click('button');
+					expect(view.container.textContent).toBe('updatedsecond');
+				} finally {
+					view.unmount();
+				}
 			});
 		}
 	}
