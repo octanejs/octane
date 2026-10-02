@@ -19130,12 +19130,31 @@ class HydrationCapability {
 	}
 
 	/**
+	 * A list's first hydrating render when the server rendered items but the
+	 * client has none and builds its @empty arm instead. Discard the server's
+	 * items and report the list once, at its own site. A later attempt that
+	 * finds the earlier attempt's @empty arm here rebuilds it quietly.
+	 */
+	discardPopulatedList(scope: Scope, slotKey: number, start: Node, end: Node): void {
+		this.discard(
+			scope,
+			slotKey,
+			getNextSibling(start),
+			end,
+			HYDRATION_REBUILT?.has(end) === true,
+			process.env.NODE_ENV !== 'production' ? 'an empty list (@empty)' : '',
+			process.env.NODE_ENV !== 'production' ? 'a populated list' : null,
+		);
+	}
+
+	/**
 	 * Remove the server content from `from` up to `end` that a child slot's
 	 * value cannot adopt, and point the cursor at `end`. Reports the structural
-	 * mismatch (`expected`, and the `actual` server node, describe it in
-	 * development) unless it is `quiet`, as it is when an earlier attempt already
-	 * rebuilt this content, or the captures legitimately changed before a dormant
-	 * boundary activated. Remembers `end` for later attempts.
+	 * mismatch (`expected`, and the `actual` server node or a description of
+	 * it, describe it in development) unless it is `quiet`, as it is when an
+	 * earlier attempt already rebuilt this content, or the captures legitimately
+	 * changed before a dormant boundary activated. Remembers `end` for later
+	 * attempts.
 	 */
 	private discard(
 		scope: Scope | null,
@@ -19144,7 +19163,7 @@ class HydrationCapability {
 		end: Node | null,
 		quiet: boolean,
 		expected: string,
-		actual: Node | null,
+		actual: Node | string | null,
 	): true {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 		this.save(domNode((from ?? end)!).parentNode!);
@@ -19156,7 +19175,12 @@ class HydrationCapability {
 				const loc =
 					(scope !== null && (siteLoc(scope, slotKey) || componentSourceLoc(scope.block.body))) ||
 					(domNode((from ?? end)!).parentNode as any)?.__oct_loc;
-				if (loc) warnHydrationStructuralMismatch(loc, expected, describeHydrationNode(actual));
+				if (loc)
+					warnHydrationStructuralMismatch(
+						loc,
+						expected,
+						typeof actual === 'string' ? actual : describeHydrationNode(actual),
+					);
 			}
 		}
 		removeRange(from, end);
@@ -42886,23 +42910,16 @@ export function forBlock<T>(
 			if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 			// When the SERVER rendered a populated list but the client is empty now, the
 			// content inside the @for range is item blocks (`<!--[-->`), not the @empty body
-			// — a STRUCTURAL mismatch. Discard the server items and build @empty fresh with
-			// hydration suspended (so it client-mounts instead of mis-adopting an item).
+			// — a STRUCTURAL mismatch. Discard the server items, report the list once, and
+			// build @empty fresh with hydration suspended (so it client-mounts instead of
+			// mis-adopting an item).
 			let suspendForEmpty = false;
 			if (
 				hydration !== null &&
 				(serverMarkerState === 1 ||
 					(serverMarkerState === -1 && hydration.isOpen(getNextSibling(state.start))))
 			) {
-				// Prefer the @for's own compiled source loc (siteLoc; for-constructs carry
-				// `loc` in `__s.locs`) — the parent element's `__oct_loc` stamp exists only
-				// when the parent carries dynamic bindings.
-				hydration.save(domParent);
-				if (process.env.NODE_ENV !== 'production') {
-					const mmLoc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
-					if (mmLoc) hydration.warnStructural(mmLoc, 'an empty list (@empty)', 'a populated list');
-				}
-				removeRange(getNextSibling(state.start), state.end);
+				hydration.discardPopulatedList(parentScope, slotKey, state.start, state.end);
 				suspendForEmpty = true;
 			} else if (hydration !== null) {
 				// The server already rendered the @empty content directly inside the
