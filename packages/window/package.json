@@ -45,8 +45,8 @@
     "upstream:verify": "node tests/audit/verify-upstream.mjs",
     "test:audit": "node --test tests/audit/*.test.mjs",
     "test:types:pristine": "tsc --noEmit -p typetests/tsconfig.pristine.json",
-    "test:types:adapted": "tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+    "test:types:adapted": "octane-tsc -p typetests/tsconfig.adapted.json",
+    "typecheck": "octane-tsc -p tsconfig.json"
   },
   "dependencies": {
     "@types/react": "catalog:default"

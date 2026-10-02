@@ -41,7 +41,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --project motion",
-    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "typecheck": "octane-tsc -p tsconfig.json",
     "test:upstream": "vitest run --root ../.. --project motion-pristine",
     "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },

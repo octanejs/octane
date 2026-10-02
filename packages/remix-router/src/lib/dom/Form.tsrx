@@ -97,7 +97,7 @@ export function Form(props: FormProps) @{
 		method={formMethod}
 		action={formAction}
 		onSubmit={reloadDocument ? onSubmit : submitHandler}
-		{...rest}
+		{...rest as typeof rest & { ref?: undefined }}
 		data-discover={!isAbsolute && discover === 'render' ? 'true' : undefined}
 	>{children}</form>
 }
