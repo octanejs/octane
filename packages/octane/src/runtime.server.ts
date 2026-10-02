@@ -2176,7 +2176,8 @@ export function ssrTextPre(v: unknown): string {
 // separate children source. Scoped children must remain lazy. createElement
 // already mirrors positional children into props, so only legacy descriptors
 // with a distinct non-null children field need a repaired props object.
-function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
+// `keyScoped` says the caller's `child-key` membrane already encodes `d.key`.
+function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope, keyScoped?: 'key'): string {
 	if (SCOPED_ELEMENT_PROPS.has(d.props)) {
 		return ssrComponent(
 			scope,
@@ -2184,7 +2185,7 @@ function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
 			d.props,
 			undefined,
 			d.key ?? undefined,
-			undefined,
+			keyScoped,
 			d.__octaneInvocationSite,
 		);
 	}
@@ -2196,7 +2197,7 @@ function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
 			d.props,
 			undefined,
 			d.key ?? undefined,
-			undefined,
+			keyScoped,
 			d.__octaneInvocationSite,
 		);
 	}
@@ -2206,7 +2207,7 @@ function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
 		{ ...d.props, children },
 		undefined,
 		d.key ?? undefined,
-		undefined,
+		keyScoped,
 		d.__octaneInvocationSite,
 	);
 }
@@ -2315,7 +2316,7 @@ function ssrChildValue(
 					const html = ssrHostElement(type, props, children, scope);
 					return selfMarkItem && serverHostHasPrimitiveChildren(children) ? html : ssrBlock(html);
 				}
-				return ssrComponentDescriptor(d, scope);
+				return ssrComponentDescriptor(d, scope, 'key');
 			};
 			const renderType = () => withAsyncIdentity('child-type', d.type, render);
 			return d.key != null ? withAsyncIdentity('child-key', d.key, renderType, true) : renderType();
@@ -5265,7 +5266,7 @@ export function ssrComponent(
 	props: any,
 	inherit?: boolean,
 	key?: unknown,
-	identityScoped?: boolean,
+	identityScoped?: boolean | 'key',
 	invocationSite?: string,
 	bindingMarker?: string,
 ): string {
@@ -5290,7 +5291,11 @@ export function ssrComponent(
 	const previousIdentityScope = ASYNC_SCOPE;
 	if (identityScoped !== true) {
 		ASYNC_SCOPE = previousIdentityScope + '|@component-type:' + asyncIdentityKey(comp, false);
-		if (key != null) ASYNC_SCOPE += '|@component-key:' + asyncIdentityKey(key, true);
+		// A descriptor reached through ssrChildValue already carries its key in
+		// the enclosing `child-key` membrane; a second encoding adds no identity.
+		if (key != null && identityScoped !== 'key') {
+			ASYNC_SCOPE += '|@component-key:' + asyncIdentityKey(key, true);
+		}
 	}
 	try {
 		const explicitNamespace = NEXT_COMPONENT_NAMESPACE;

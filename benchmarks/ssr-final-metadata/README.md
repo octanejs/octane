@@ -106,6 +106,20 @@ those boundaries; no allocation or throughput result justifies a new callback
 ABI here. In the coordinated #1069 work, raw structural signal keys remain a
 separate protocol from reconciler key coercion, including exception restoration.
 
+### Duplicate component key after async signals
+
+On 2026-10-02 main breached two guards. The descriptor fixture recorded 643
+identity-key encodings instead of 514, and the nested fixture 7,498 encoded
+UTF-16 units instead of 6,712. `git bisect` over this audit's output found
+`5ead1ff2c` (#1069). That commit passes the descriptor key to `ssrComponent`
+for signal instance keys. `ssrComponent` then also appended a
+`|@component-key:` segment, although `ssrChildValue`'s `child-key` membrane
+already encodes the same key inside the same list item scope. The duplicate
+distinguished nothing. `ssrChildValue` now tells `ssrComponent` that the key is
+already scoped, so the counts match the figures above again. Signal instance
+keys still receive the descriptor key. The `ssrDescriptorPart` path has no
+enclosing key membrane, so it keeps the segment.
+
 ## Attributes and host metadata — reject the measured alternatives
 
 The timing experiment compares the frozen baseline implementation with two

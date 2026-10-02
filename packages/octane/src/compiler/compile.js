@@ -20619,14 +20619,13 @@ function compileReturnJsxFunction(node, ctx, options) {
 		mapTemps.length === 0 &&
 		cssHash === null
 	) {
-		const descriptor = newStatements[0]?.argument;
-		const renderer = descriptor?.arguments?.[0];
-		const props = descriptor?.arguments?.[1];
+		// A direct-call split keeps the body call's record in its returned entry.
+		const descriptor =
+			returnedRecords.length === 1 ? returnedRecords[0].record : newStatements[0]?.argument;
+		const renderer = descriptor?.arguments?.[1];
+		const props = descriptor?.arguments?.[2];
 		if (
-			descriptor?.type === 'CallExpression' &&
-			descriptor.callee?.type === 'Identifier' &&
-			descriptor.callee.name === '_$createElement' &&
-			descriptor.arguments.length === 2 &&
+			isComponentDescriptorCall(descriptor) &&
 			renderer?.type === 'Identifier' &&
 			isStaticFragmentRendererProps(props, ctx)
 		) {
@@ -21480,6 +21479,18 @@ function rewriteChildHoleValue(expression, ctx) {
 		: rewriteJsxValues(expression, ctx);
 }
 
+// `_$createElementFromConfig(site, Component, props)`: jsxElementToCreateElement's
+// childless component descriptor, which carries its invocation site.
+function isComponentDescriptorCall(node) {
+	return (
+		node?.type === 'CallExpression' &&
+		node.callee?.type === 'Identifier' &&
+		node.callee.name === '_$createElementFromConfig' &&
+		node.arguments.length === 3 &&
+		node.arguments[0]?.type === 'Literal'
+	);
+}
+
 // A bare, immutable same-module component needs no descriptor when its JSX is
 // consumed immediately by a returned host. Keep every value/props boundary on
 // the ordinary path: only this attribute-free call can remain in the template
@@ -21497,13 +21508,10 @@ function isStaticFragmentRendererProps(props, ctx) {
 			return false;
 		}
 		const descriptor = property.value;
-		const component = descriptor?.arguments?.[0];
-		const componentProps = descriptor?.arguments?.[1];
+		const component = descriptor?.arguments?.[1];
+		const componentProps = descriptor?.arguments?.[2];
 		if (
-			descriptor?.type !== 'CallExpression' ||
-			descriptor.callee?.type !== 'Identifier' ||
-			descriptor.callee.name !== '_$createElement' ||
-			descriptor.arguments.length !== 2 ||
+			!isComponentDescriptorCall(descriptor) ||
 			component?.type !== 'Identifier' ||
 			!ctx.privateUnescapedComponents.has(component.name) ||
 			componentProps?.type !== 'ObjectExpression' ||
@@ -33508,11 +33516,14 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		if (ambientCandidates !== null) {
 			// An inline event handler runs after commit, so a read confined to one
 			// (`onClick={() => window.open(item.url)}`) never reaches row output.
-			const renderFree = collectFreeIdentifiers(
-				bodyAst,
-				bodyScope,
-				collectEventHandlerClosures(bodyAst),
-			);
+			const ignored = collectEventHandlerClosures(bodyAst);
+			// Nor does the global `console` read only as the receiver of a discarded
+			// diagnostic call (`console.log('row', item.id)`); its arguments still
+			// count. Compatibility mode keeps that call live as a render call.
+			if (!ctx.moduleTopLevelBindings.all.has('console')) {
+				collectConsoleStatementReceivers(bodyAst, ignored);
+			}
+			const renderFree = collectFreeIdentifiers(bodyAst, bodyScope, ignored);
 			hasAmbientRead = ambientCandidates.some((name) => renderFree.has(name));
 		}
 		const hasNestedComp = containsComponentCallOrControlFlow(subStmts);
@@ -33984,6 +33995,39 @@ function collectEventHandlerClosures(root) {
 		}
 	}
 	return closures;
+}
+
+// Adds to `ignored` the `console` receiver of each statement-position
+// `console.method(…)` call under `root`. The statement discards the call's value,
+// and every console operation returns undefined.
+function collectConsoleStatementReceivers(root, ignored) {
+	const stack = [root];
+	while (stack.length > 0) {
+		const node = stack.pop();
+		if (!node || typeof node !== 'object') continue;
+		if (Array.isArray(node)) {
+			stack.push(...node);
+			continue;
+		}
+		if (node.type === 'ExpressionStatement') {
+			let call = node.expression;
+			if (call?.type === 'ChainExpression') call = call.expression;
+			const callee =
+				call?.type === 'CallExpression' || call?.type === 'OptionalCallExpression'
+					? call.callee
+					: null;
+			if (
+				(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
+				callee.object.type === 'Identifier' &&
+				callee.object.name === 'console'
+			) {
+				ignored.add(callee.object);
+			}
+		}
+		for (const key in node) {
+			if (!AST_WALK_SKIP_KEYS.has(key)) stack.push(node[key]);
+		}
+	}
 }
 
 function mapCallbackHasEventClosure(callback) {
