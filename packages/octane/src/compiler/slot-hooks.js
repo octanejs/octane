@@ -6,10 +6,11 @@
 // whole-AST memo path, which preserves TypeScript and supplies a source map.
 //
 // This pass parses the module (for byte offsets), slots Octane base hooks and
-// gives imported custom hooks their own withSlot boundary. Imported aliases can
-// point directly at a base hook, so the enclosing component's boundary alone
-// cannot distinguish their call sites. Local helpers retain their authored slot
-// policy; explicitly manual modules opt out of all injected slots. In
+// gives imported and module-declared custom hooks their own withSlot boundary.
+// Imported aliases can point directly at a base hook, and one local hook can be
+// called twice by another, so the enclosing component's boundary alone cannot
+// distinguish their call sites. Helpers without a hook name retain their
+// authored call; explicitly manual modules opt out of all injected slots. In
 // production it reserves a collision-free runtime range because these arbitrary
 // helpers can execute in a Scope alongside code from any other source module.
 
@@ -28,7 +29,7 @@ import { findManualHookProviders, manualHookWrapperParameters } from './manual-h
 import { findLeadingJsxImportSourcePragma } from './pragma.js';
 import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
 import { assertNoLegacyContextProviders } from './context-provider.js';
-import { signalDeclarationSourceEdits } from './signal-declarations.js';
+import { signalDeclarationSourceEdits, signalHookCallSite } from './signal-declarations.js';
 import {
 	collectPureFactoryLocals,
 	hasAuthoredPureAnnotation,
@@ -110,9 +111,27 @@ function octaneHookLocals(ast, nativeReads = false, explicitlyOwned = false) {
 		locals,
 		importsHook:
 			importsHook ||
-			((hasOctaneImport || explicitlyOwned) && (importsCustomHook || hasHookMethods(ast))),
+			((hasOctaneImport || explicitlyOwned) && (importsCustomHook || hasHookMethods(ast))) ||
+			// A runtime signals import makes the module Octane's. Its hooks may
+			// compose one another, and each call keys the instance declarations it
+			// reaches, so give their calls boundaries without an `octane` import.
+			(nativeReads && (importsCustomHook || declaresHook(ast))),
 		hasOctaneImport,
 	};
+}
+
+function declaresHook(ast) {
+	return (ast.body || []).some((statement) => {
+		const node =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: statement;
+		if (node?.type === 'FunctionDeclaration') return /^use[A-Z]/.test(node.id?.name ?? '');
+		return (
+			node?.type === 'VariableDeclaration' &&
+			node.declarations.some((declaration) => /^use[A-Z]/.test(declaration.id?.name ?? ''))
+		);
+	});
 }
 
 // A disposable expression or nonescaping local const root can omit return-value
@@ -771,7 +790,17 @@ function hookOwner(node, name) {
 	return { name, line: loc?.line ?? 0, column: loc?.column ?? 0 };
 }
 
-function allocHookSymbol(st, owner, local, imported, node) {
+// Mirrors compile.js: signal-aware modules, and `$` hooks that return live
+// signals, give each custom-hook call a site keying the declarations it reaches.
+// Either the local or the imported hook name may carry the `$`.
+function customHookSignalSite(st, node, ...names) {
+	return st.signalHookSites &&
+		(st.nativeReads || names.some((name) => typeof name === 'string' && name.endsWith('$')))
+		? signalHookCallSite(st.filename, node)
+		: null;
+}
+
+function allocHookSymbol(st, owner, local, imported, node, signalSite = null) {
 	const id = st.nextId++;
 	const sym = allocSlotName(st, `_h$${id}`);
 	let symbolExpr;
@@ -804,6 +833,10 @@ function allocHookSymbol(st, owner, local, imported, node) {
 		};
 		symbolExpr = `_$__profileHook(${symbolExpr}, ${JSON.stringify(metadata)})`;
 	}
+	if (signalSite !== null) {
+		const helper = requireParallelHelper(st, 'signalHookSite');
+		symbolExpr = `/* @__PURE__ */ ${helper}(${symbolExpr}, ${JSON.stringify(signalSite)})`;
+	}
 	st.decls.push(`const ${sym} = ${symbolExpr};`);
 	return sym;
 }
@@ -834,6 +867,7 @@ function requireParallelHelper(st, imported) {
 	const request =
 		imported === 'nativePuMemo' ||
 		imported === 'enableNativeReadCollection' ||
+		imported === 'signalHookSite' ||
 		imported === 'callWithReceiver'
 			? st.environment === 'server'
 				? 'octane/internal/server'
@@ -1037,7 +1071,16 @@ function emitHookMethodChain(node, owner, st) {
 			wrap: (call, origin, method) =>
 				b.call(
 					requireParallelHelper(st, 'withSlot'),
-					b.id(allocHookSymbol(st, owner, method, method, origin)),
+					b.id(
+						allocHookSymbol(
+							st,
+							owner,
+							method,
+							method,
+							origin,
+							customHookSignalSite(st, origin, method),
+						),
+					),
 					b.arrow([], call),
 				),
 		},
@@ -1161,7 +1204,14 @@ function walk(node, owner, st) {
 		const method = hookMethodName(node, st.locals);
 		if (!st.manualSlots && method !== null) {
 			assertSynchronousHookMethod(node);
-			const sym = allocHookSymbol(st, owner, method, method, node);
+			const sym = allocHookSymbol(
+				st,
+				owner,
+				method,
+				method,
+				node,
+				customHookSignalSite(st, node, method),
+			);
 			const helper = requireParallelHelper(st, 'withSlot');
 			// Keep the complete method expression inside the boundary: receivers,
 			// getters, optional calls, and argument counts retain their semantics.
@@ -1171,7 +1221,14 @@ function walk(node, owner, st) {
 		if (!st.manualSlots && node._octaneCustomHookCall) {
 			const open = callOpenParen(node, st.source);
 			if (open !== -1) {
-				const sym = allocHookSymbol(st, owner, node.callee.name, node._octaneCustomHookCall, node);
+				const sym = allocHookSymbol(
+					st,
+					owner,
+					node.callee.name,
+					node._octaneCustomHookCall,
+					node,
+					customHookSignalSite(st, node, node.callee.name, node._octaneCustomHookCall),
+				);
 				const helper = requireParallelHelper(st, 'withSlot');
 				// The path stack supplies identity without changing the authored
 				// argument list. An alias may point at a foreign hook whose omitted
@@ -1399,6 +1456,9 @@ export function slotHooks(source, id, options) {
 		);
 	const manualProviders = options?.manualSlots ? findManualHookProviders(ast) : new Map();
 	const nativeReadActivation = options?.nativeReads === true && importsNativeRenderer(ast);
+	// Native signal reads exist only for the DOM client and server renderers.
+	const signalHookSites =
+		(options?.renderer?.target ?? 'dom') === 'dom' && options?.universalRuntime == null;
 	const signalLowering = signalDeclarationSourceEdits(ast, id, source);
 	const pureCalls = collectPureFactoryCalls(
 		ast,
@@ -1471,6 +1531,7 @@ export function slotHooks(source, id, options) {
 					: HOOK_NAMES,
 			nativeReads: options?.nativeReads === true,
 			nativeReadActivation,
+			signalHookSites,
 			inferred,
 			getterCalls,
 			stateGetterHelpers: STATE_GETTER_HELPERS,
@@ -1488,6 +1549,7 @@ export function slotHooks(source, id, options) {
 		),
 		manualSlots: options?.manualSlots === true,
 		nativeReads: options?.nativeReads === true,
+		signalHookSites,
 		locals: importInfo.locals,
 		source,
 		inferred,
