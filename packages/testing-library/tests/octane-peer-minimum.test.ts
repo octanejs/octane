@@ -2,7 +2,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,12 +15,18 @@ const workspaceOctane = resolve(packageDirectory, '../octane/src/index.ts');
 const testingLibraryPure = resolve(packageDirectory, 'src/pure.ts');
 
 // Published npm 0.2.4 is already on the registry without `isInActScope`.
-// Integrity is the packument `dist.integrity` for
-// https://registry.npmjs.org/octane/-/octane-0.2.4.tgz
+// The fixture is the unmodified registry tarball
+// https://registry.npmjs.org/octane/-/octane-0.2.4.tgz, committed so this
+// contract does not depend on reaching the registry. Integrity is the packument
+// `dist.integrity` for that tarball, so the fixture cannot drift from what npm
+// serves.
 const INCOMPATIBLE_PUBLISHED_VERSION = '0.2.4';
 const INCOMPATIBLE_PUBLISHED_INTEGRITY =
 	'sha512-syVXJ2lK9Yoe9Z6lj/t39V6/zzNVlD78OOvMQabhXUZhhs7GdCC6G631cq9ZI+HucDLnywBRGNaz5rxR+/llwA==';
-const INCOMPATIBLE_PUBLISHED_TARBALL = `https://registry.npmjs.org/octane/-/octane-${INCOMPATIBLE_PUBLISHED_VERSION}.tgz`;
+const INCOMPATIBLE_PUBLISHED_TARBALL = resolve(
+	packageDirectory,
+	`tests/_fixtures/octane-${INCOMPATIBLE_PUBLISHED_VERSION}.tgz`,
+);
 
 function publishedOctanePeerRange(): string {
 	const manifest = JSON.parse(readFileSync(resolve(packageDirectory, 'package.json'), 'utf8')) as {
@@ -37,19 +43,13 @@ function verifySha512Integrity(bytes: Uint8Array, integrity: string): void {
 	expect(`sha512-${digest}`).toBe(integrity);
 }
 
-async function extractPublishedOctaneEntry(directory: string): Promise<string> {
+function extractPublishedOctaneEntry(directory: string): string {
 	const entry = join(directory, 'package', 'dist', 'index.js');
-	const response = await fetch(INCOMPATIBLE_PUBLISHED_TARBALL, {
-		signal: AbortSignal.timeout(20_000),
-	});
-	if (!response.ok) {
-		throw new Error(`download octane@${INCOMPATIBLE_PUBLISHED_VERSION} failed: ${response.status}`);
-	}
-	const bytes = new Uint8Array(await response.arrayBuffer());
-	verifySha512Integrity(bytes, INCOMPATIBLE_PUBLISHED_INTEGRITY);
-	const tarball = join(directory, 'octane.tgz');
-	writeFileSync(tarball, bytes);
-	execFileSync('tar', ['-xzf', tarball, '-C', directory]);
+	verifySha512Integrity(
+		readFileSync(INCOMPATIBLE_PUBLISHED_TARBALL),
+		INCOMPATIBLE_PUBLISHED_INTEGRITY,
+	);
+	execFileSync('tar', ['-xzf', INCOMPATIBLE_PUBLISHED_TARBALL, '-C', directory]);
 	if (!existsSync(entry)) {
 		throw new Error('Published Octane tarball did not contain package/dist/index.js');
 	}
@@ -89,12 +89,12 @@ describe('@octanejs/testing-library Octane peer minimum', function () {
 	it('fails to bundle the pure entry against the published npm 0.2.4 tarball', async function () {
 		const directory = mkdtempSync(join(tmpdir(), 'octane-peer-minimum-'));
 		try {
-			const publishedEntry = await extractPublishedOctaneEntry(directory);
+			const publishedEntry = extractPublishedOctaneEntry(directory);
 			await expect(bundleTestingLibraryAgainst(publishedEntry)).rejects.toThrow(/isInActScope/);
 		} finally {
 			rmSync(directory, { recursive: true, force: true });
 		}
-	}, 30_000);
+	});
 
 	it('bundles the pure entry against next-release Octane source', async function () {
 		const code = await bundleTestingLibraryAgainst(workspaceOctane);
