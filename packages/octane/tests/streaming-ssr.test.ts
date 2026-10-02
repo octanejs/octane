@@ -12,7 +12,6 @@ import { collectPipeableStream, collectReadableStream } from './_server-stream.j
 import { rendererRangeClose } from '../src/stream-protocol.js';
 // CLIENT-compiled fixture (registers click delegation at import).
 import {
-	BindingListFallbackBoundary,
 	Boundary,
 	DeferredAsyncLeaf,
 	DeferredStreamWithLiveSibling,
@@ -21,7 +20,6 @@ import {
 	FactoryRejectionBoundary,
 	IdBoundary,
 	LateStyledBoundary,
-	ListFallbackBoundary,
 	NestedDeferredStreamedHydrates,
 	NestedStreamSeedScopes,
 	ReasonBoundary,
@@ -30,6 +28,10 @@ import {
 	StyledBoundary,
 } from './_fixtures/ssr-suspense.tsrx';
 import { DeferredWithPermanentStaticStream } from './_fixtures/ssr-permanent-static-stream.tsrx';
+import {
+	BindingListFallbackBoundary,
+	ListFallbackBoundary,
+} from './_fixtures/ssr-stream-list-fallbacks.tsrx';
 import { RawTemplateBoundary } from './conformance/_fixtures/fizz-streaming.tsrx';
 
 // Streaming SSR — renderToPipeableStream / renderToReadableStream: shell with
@@ -52,6 +54,10 @@ const server = serverModule();
 const permanentStaticServer = loadServerFixture<{
 	DeferredWithPermanentStaticStream: typeof DeferredWithPermanentStaticStream;
 }>('packages/octane/tests/_fixtures/ssr-permanent-static-stream.tsrx');
+const listFallbackServer = loadServerFixture<{
+	ListFallbackBoundary: typeof ListFallbackBoundary;
+	BindingListFallbackBoundary: typeof BindingListFallbackBoundary;
+}>('packages/octane/tests/_fixtures/ssr-stream-list-fallbacks.tsrx');
 const rawTemplateServer = loadServerFixture<{
 	RawTemplateBoundary: typeof RawTemplateBoundary;
 }>('packages/octane/tests/conformance/_fixtures/fizz-streaming.tsrx');
@@ -970,7 +976,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		async (_label, name, Client, items) => {
 			const d = deferred<string>();
 			const c = collector();
-			ServerRT.renderToPipeableStream(server[name], {
+			ServerRT.renderToPipeableStream(listFallbackServer[name], {
 				promise: d.promise,
 				items,
 			}).pipe(c.dest);
@@ -1021,7 +1027,9 @@ describe('renderToPipeableStream — chunk protocol', () => {
 			const items = ['a', 'b'];
 			const d = deferred<string>();
 			const c = collector();
-			ServerRT.renderToPipeableStream(server[name], { promise: d.promise, items }).pipe(c.dest);
+			ServerRT.renderToPipeableStream(listFallbackServer[name], { promise: d.promise, items }).pipe(
+				c.dest,
+			);
 			container.innerHTML = c.chunks[0];
 			activate(container);
 			const after = container.querySelector('#list-fallback-after') as HTMLButtonElement;
