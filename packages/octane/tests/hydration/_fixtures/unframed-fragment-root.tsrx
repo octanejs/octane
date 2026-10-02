@@ -56,3 +56,19 @@ export function GX(props: Props) @{
 		}
 	</div>
 }
+
+// The server arm ends where G's component hole would start.
+export function HX(props: Props) @{
+	<div>
+		@if (props.server) {
+			<>
+				<s>{'s'}</s>
+			</>
+		} @else {
+			<>
+				<G />
+			</>
+		}
+		<u>{'u'}</u>
+	</div>
+}

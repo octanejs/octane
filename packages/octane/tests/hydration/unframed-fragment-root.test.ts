@@ -100,6 +100,20 @@ describe.each([
 		},
 	);
 
+	it('rebuilds a fragment whose hole meets the end of the server arm', async () => {
+		const { host, recoverable } = await hydrate('HX');
+		const after = host.querySelector('u');
+
+		expect(markup(host)).toBe('<s>s</s><b>a</b><u>u</u>');
+		expect(recoverable).toHaveLength(1);
+
+		act(() => root!.render(client.HX, { server: true }));
+		expect(markup(host)).toBe('<s>s</s><u>u</u>');
+		act(() => root!.render(client.HX, {}));
+		expect(markup(host)).toBe('<s>s</s><b>a</b><u>u</u>');
+		expect(host.querySelector('u')).toBe(after);
+	});
+
 	it('unmounts the adopted fragment with its arm', async () => {
 		const { host } = await hydrate('FX');
 

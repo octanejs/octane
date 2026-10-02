@@ -20151,12 +20151,14 @@ class HydrationCapability {
 		template: Node,
 		cursor: Node | null,
 		partialStyles?: string,
+		// A fragment within an enclosing server range ends by that range's close.
+		bounded?: boolean,
 	): Node | null | undefined {
 		let expected = getFirstChild(template);
 		let actual = cursor;
 		let childIndex = 0;
 		while (expected !== null) {
-			if (actual === null) return undefined;
+			if (actual === null || (bounded === true && isBlockClose(actual))) return undefined;
 			// A template comment is a dynamic logical hole. Its server form may be
 			// text or a marker range, so only static text/element roots compare shape.
 			if (
@@ -20381,19 +20383,19 @@ class HydrationCapability {
 		}
 		if (isFragment) {
 			// In place of a server node, nothing frames the fragment's server nodes:
-			// compare every root to find where they end.
+			// compare every root to find where they end. One that does not match is
+			// rebuilt, now for a lite call, or once the body has run in
+			// renderUnframed, which leaves the server nodes to a body that throws.
 			if (pendingClaims && cursor === this.inPlace) {
 				const fragment = template ?? resolveLazyTemplate(lazy!);
-				const remainder = this.fragmentRemainder(fragment, cursor, partialStyles);
-				if (remainder !== undefined) {
-					this.inPlace = null;
-					this.inPlaceEnd = remainder;
-					return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
-				}
-				if (this.inPlaceUnframed) {
-					this.inPlace = null;
-					return this.freshClone(fragment);
-				}
+				const remainder = this.fragmentRemainder(fragment, cursor, partialStyles, true);
+				this.inPlace = null;
+				if (remainder === undefined)
+					return this.inPlaceUnframed
+						? this.freshClone(fragment)
+						: this.rebuildFragment(fragment, cursor, loc);
+				this.inPlaceEnd = remainder;
+				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
 			}
 			// A nested fragment has no server wrapper, so its first logical root must
 			// be the cursor itself, or follow the server forms of its leading holes.
