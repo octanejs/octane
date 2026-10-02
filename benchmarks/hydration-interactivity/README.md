@@ -86,7 +86,9 @@ A timing is accepted only if the harness proves all of the following:
 
 - the hydration client really was withheld throughout the pre-hydration
   interaction;
-- Chromium generated one native input event for every typed character;
+- Chromium generated one native input event for every typed character. They
+  are counted as trusted events at window capture, so a framework that defers
+  a pre-hydration event and replays a clone neither hides nor double-counts it;
 - the original server-rendered input, article, and interaction button were
   adopted rather than rebuilt;
 - every framework preserved the typed draft, focus, and caret;

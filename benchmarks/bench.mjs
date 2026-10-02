@@ -59,12 +59,7 @@ const url = (port) => `http://localhost:${port}/`;
 // waiver here. A waiver needs a reason (ideally an issue link) and an expiry
 // date — when it lapses the failure becomes fatal again and must be re-triaged,
 // so a known-bug exemption cannot quietly become permanent.
-const HARNESS_FAILURE_ALLOWLIST = {
-	'js-framework-reorder': {
-		reason: "ripple's keyed reorder drops row identity — upstream ripple bug, not octane",
-		expires: '2026-10-01',
-	},
-};
+const HARNESS_FAILURE_ALLOWLIST = {};
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const SUITES = [
