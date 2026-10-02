@@ -6,6 +6,7 @@ import {
 	operationsFor,
 } from './contract.mjs';
 import { collectPreciseCalls } from '../lib/precise-work.mjs';
+import { COMPOSED_SLOT_HELPER, WORK_METRICS as METRICS } from './work-metrics.mjs';
 import {
 	checkBrowserErrors,
 	chromium,
@@ -16,14 +17,6 @@ import {
 	writePayload,
 } from './harness.mjs';
 
-const METRICS = [
-	'useCallback',
-	'useMemo',
-	'resolveHookArgs',
-	'resolveSlot',
-	'appendSlotKey',
-	'withSlot',
-];
 const SELECTION_COUNTERS = ['selectorCalls', 'snapshotReads'];
 const VANILLA_COUNTERS = [
 	'notifications',
@@ -78,7 +71,12 @@ try {
 			ensure(counts.resolveSlot > 0, `${lane}/${operation}: no slot-resolution coverage`);
 			if (lane === 'callback-nested') {
 				ensure(counts.withSlot > 0, `${lane}/${operation}: no custom-hook composition coverage`);
-				ensure(counts.appendSlotKey > 0, `${lane}/${operation}: no composed-slot coverage`);
+				ensure(counts[COMPOSED_SLOT_HELPER] > 0, `${lane}/${operation}: no composed-slot coverage`);
+			} else {
+				ensure(
+					counts.withSlot === 0 && counts[COMPOSED_SLOT_HELPER] === 0,
+					`${lane}/${operation}: composed a hook path without a custom hook`,
+				);
 			}
 			observations[operation] = { expectedCallbacks, ...counts };
 			for (const metric of METRICS) {

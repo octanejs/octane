@@ -7613,18 +7613,33 @@ export function Forwarded(props) @{ 'use dom bindings';
 					for (const notify of subscriptions) notify();
 				};
 				const abort = new AbortController();
+				// Object rest skips excluded keys before reading them, so a conforming
+				// engine reads label, kind and extra once each. V8 12 (Node 22) also runs
+				// the excluded getters while copying the rest. Activation must read the
+				// snapshot exactly as one native evaluation of the authored pattern does.
+				reads.length = 0;
+				const authoredPattern = ({
+					label: text = 'Fallback',
+					'data-kind': kind = 'base',
+					onAction,
+					onRef,
+					...rest
+				}: Record<PropertyKey, unknown>) => [text, kind, onAction, onRef, rest];
+				authoredPattern(snapshot);
+				const authoredReads = [...reads];
+				expect([...new Set(authoredReads)]).toEqual(['label', 'kind', 'extra']);
 				reads.length = 0;
 				const handle = adopt
 					? destructured.attach(host.firstElementChild!, state, { signal: abort.signal })
 					: destructured.mount({ parent: host }, state, { signal: abort.signal });
 				const button = host.querySelector('button')!;
 				if (adopt) expect(button).toBe(serverButton);
-				expect(reads).toEqual(['label', 'kind', 'extra']);
+				expect(reads).toEqual(authoredReads);
 				button.click();
 				expect(events).toEqual([
 					['Fallback', true, { extra: 'initial', [symbol]: 'symbol value' }],
 				]);
-				expect(reads).toEqual(['label', 'kind', 'extra']);
+				expect(reads).toEqual(authoredReads);
 				label = null;
 				extra = 'changed';
 				publish();
