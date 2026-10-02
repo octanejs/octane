@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as signals from 'octane/signals';
-import { act, startTransition } from 'octane';
+import { act, createRoot, startTransition } from 'octane';
+import { createSignalOwnerLifecycle } from '../src/signals/facade.js';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 
@@ -284,54 +285,6 @@ export function App(props) @{
 		}
 	});
 
-	// Strong mode rejects render-phase state updates at compile time.
-	const localSelectorRenderPhase = mode.strong
-		? undefined
-		: load<any>(
-				`import { useState } from 'octane';
-import { query$ } from 'octane/signals';
-export function App(props) @{
- const [page, setPage] = useState(1);
- const [filter, setFilter] = useState(props.filter);
- if (filter !== props.filter) {
-  setFilter(props.filter);
-  setPage(1);
- }
- const r$ = query$(() => props.filter + ':' + page, props.load);
- const s = r$.snapshot();
- <main>
-  <button onClick={() => setPage(page + 1)}>{'next'}</button>
-  <p>{(s.status === 'ready' ? s.value : s.status) as string}</p>
- </main>
-}`,
-				'/local-selector-render-phase.tsrx',
-				mode,
-			);
-	it.runIf(!mode.strong)(
-		'stages the selection of a body rerun after a render-phase update',
-		async () => {
-			const { App } = localSelectorRenderPhase!;
-			const { calls, loader, selections } = controlledLoader();
-			const root = mount(App, { filter: 'a', load: loader });
-			const text = () => root.find('p').textContent;
-			try {
-				await act(() => calls[0]!.resolve('a:1'));
-				await act(() => root.click('button'));
-				await act(() => calls[1]!.resolve('a:2'));
-				expect(text()).toBe('a:2');
-				root.update(App, { filter: 'b', load: loader });
-				// The rerun that resets the page owns the accepted selection. The
-				// first pass's stale page is aborted and never accepted.
-				expect(selections()).toEqual(['a:1', 'a:2', 'b:2', 'b:1']);
-				expect(calls[2]!.signal.aborted).toBe(true);
-				await act(() => calls[3]!.resolve('b:1'));
-				expect(text()).toBe('b:1');
-			} finally {
-				root.unmount();
-			}
-		},
-	);
-
 	it('reselects a strict read under @try after the boundary has settled', async () => {
 		const { App } = strict;
 		const { calls, loader, selections } = controlledLoader();
@@ -354,6 +307,56 @@ export function App(props) @{
 		}
 	});
 });
+
+// Strong mode rejects render-phase state updates at compile time, so this
+// pattern exists only in the dev and prod compiles.
+describe.each(modes.filter((mode) => !mode.strong))(
+	'redeclared selectors after render-phase updates (%j)',
+	(mode) => {
+		const renderPhase = load<any>(
+			`import { useState } from 'octane';
+import { query$ } from 'octane/signals';
+export function App(props) @{
+ const [page, setPage] = useState(1);
+ const [filter, setFilter] = useState(props.filter);
+ if (filter !== props.filter) {
+  setFilter(props.filter);
+  setPage(1);
+ }
+ const r$ = query$(() => props.filter + ':' + page, props.load);
+ const s = r$.snapshot();
+ <main>
+  <button onClick={() => setPage(page + 1)}>{'next'}</button>
+  <p>{(s.status === 'ready' ? s.value : s.status) as string}</p>
+ </main>
+}`,
+			'/local-selector-render-phase.tsrx',
+			mode,
+		);
+
+		it('stages the selection of a body rerun after a render-phase update', async () => {
+			const { App } = renderPhase;
+			const { calls, loader, selections } = controlledLoader();
+			const root = mount(App, { filter: 'a', load: loader });
+			const text = () => root.find('p').textContent;
+			try {
+				await act(() => calls[0]!.resolve('a:1'));
+				await act(() => root.click('button'));
+				await act(() => calls[1]!.resolve('a:2'));
+				expect(text()).toBe('a:2');
+				root.update(App, { filter: 'b', load: loader });
+				// The rerun that resets the page owns the accepted selection. The
+				// first pass's stale page is aborted and never accepted.
+				expect(selections()).toEqual(['a:1', 'a:2', 'b:2', 'b:1']);
+				expect(calls[2]!.signal.aborted).toBe(true);
+				await act(() => calls[3]!.resolve('b:1'));
+				expect(text()).toBe('b:1');
+			} finally {
+				root.unmount();
+			}
+		});
+	},
+);
 
 const transitionSource = `import { useState, useTransition } from 'octane';
 import { query$ } from 'octane/signals';
@@ -624,6 +627,51 @@ export function App(props) @{
 		'/local-derived-held.tsrx',
 		mode,
 	);
+	const localDerivedFrozen = load<any>(
+		`import { derived$, signal$ } from 'octane/signals';
+export function App(props) @{
+ const n$ = signal$(1);
+ const general$ = derived$(() => props.label + n$.get());
+ const scalar$ = derived$(() => props.label + n$.get(), { sync: true });
+ const general = general$.snapshot();
+ const scalar = scalar$.snapshot();
+ <p>
+  <b>{(general.status === 'ready' ? general.value : general.status) as string}</b>
+  <i>{(scalar.status === 'ready' ? scalar.value : scalar.status) as string}</i>
+ </p>
+}`,
+		'/local-derived-frozen.tsrx',
+		mode,
+	);
+
+	it('presents committed derived values while the document is frozen', async () => {
+		const { App } = localDerivedFrozen;
+		const owner = { scopeKey: `local-derived-frozen-${mode.dev}-${mode.strong}` };
+		const lifetime = createSignalOwnerLifecycle(owner);
+		const container = document.createElement('div');
+		document.body.append(container);
+		const root = createRoot(container, { signalOwner: owner });
+		const view = () => [
+			container.querySelector('b')!.textContent,
+			container.querySelector('i')!.textContent,
+		];
+		try {
+			root.render(App, { label: 'a' });
+			expect(view()).toEqual(['a1', 'a1']);
+			lifetime.freeze();
+			// A frozen document keeps presenting committed values. The new closure
+			// is evaluated when reads resume.
+			await act(() => root.render(App, { label: 'b' }));
+			expect(view()).toEqual(['a1', 'a1']);
+			await act(() => lifetime.resume());
+			expect(view()).toEqual(['b1', 'b1']);
+		} finally {
+			root.unmount();
+			container.remove();
+			lifetime.retire();
+		}
+	});
+
 	it('keeps the committed derived value while a transition holds new props', async () => {
 		const { App } = localDerivedHeld;
 		const { calls, loader } = controlledLoader();

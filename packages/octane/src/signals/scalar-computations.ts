@@ -88,13 +88,14 @@ class ScalarBinding<T>
 
 	/** An equal value needs no view; a changed one is evaluated once, privately. */
 	protected presentDefinition(compute: DerivedCompute<T>): ScopedNode | undefined {
+		// A frozen document keeps presenting committed values. The new closure is
+		// installed at acceptance and evaluated when reads resume.
+		if (this.frozen || this.owner.readBarrier !== undefined) return undefined;
 		let probe: { value: T; reads: ScopedNode[] } | undefined;
-		if (!this.frozen && this.owner.readBarrier === undefined) {
-			try {
-				probe = readsDuring(this.owner, () => (compute as () => T)());
-			} catch {
-				// A suspended or failing computation reports itself through a view.
-			}
+		try {
+			probe = readsDuring(this.owner, () => (compute as () => T)());
+		} catch {
+			// A suspended or failing computation reports itself through a view.
 		}
 		if (probe !== undefined) {
 			const state = untrack(() => refreshNode(this.node));

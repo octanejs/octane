@@ -174,12 +174,14 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 	}
 
 	protected presentDefinition(compute: DerivedCompute<T>): ScopedNode | undefined {
-		if (this.asynchronous) return undefined;
+		// A frozen document keeps presenting committed values. The new closure is
+		// installed at acceptance and evaluated when reads resume.
+		if (this.asynchronous || this.frozen || this.owner.readBarrier !== undefined) return undefined;
 		// A zero-argument computation runs once here. An equal synchronous value
 		// needs no view; any other result seeds the view, so the closure never
 		// runs twice and asynchronous work never starts twice.
 		let probe: { value: unknown; reads: ScopedNode[] } | undefined;
-		if (compute.length === 0 && !this.frozen && this.owner.readBarrier === undefined) {
+		if (compute.length === 0) {
 			try {
 				probe = readsDuring(this.owner, compute as () => unknown);
 			} catch {

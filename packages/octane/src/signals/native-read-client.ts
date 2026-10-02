@@ -48,6 +48,8 @@ interface RenderFrame {
 	block: Block | null;
 	collectorToken: number;
 	candidates: Map<Scope, Candidate> | null;
+	/** Renderer data scoped to this one invocation, such as a declaration stage. */
+	invocationData: unknown;
 }
 
 type CandidateSet = Map<Consumer, Candidate>;
@@ -290,10 +292,16 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		},
 		replayDeferredRefs: host.replayRefs,
 		beginRender(block: Block): void {
-			const frame = (frames[depth++] ??= { block: null, collectorToken: -1, candidates: null });
+			const frame = (frames[depth++] ??= {
+				block: null,
+				collectorToken: -1,
+				candidates: null,
+				invocationData: null,
+			});
 			frame.block = block;
 			frame.collectorToken = collector.beginRender(block);
 			frame.candidates = null;
+			frame.invocationData = null;
 			// Parameters precede compiler body scopes. Start with the actual Block
 			// owner, and retire prior reads even when this invocation no longer
 			// enters an instrumented body or reads a native source.
@@ -322,8 +330,18 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				collector.endRender(frame.collectorToken);
 				frame.block = null;
 				frame.candidates = null;
+				frame.invocationData = null;
 				depth--;
 			}
+		},
+		/**
+		 * The current invocation of `block`, or undefined outside its render. A
+		 * render-phase rerun is a new invocation; a child render returns to the
+		 * parent's frame intact.
+		 */
+		invocation(block: Block): { invocationData: unknown } | undefined {
+			const frame = frames[depth - 1];
+			return frame !== undefined && frame.block === block ? frame : undefined;
 		},
 		beginScope(scope: Scope, block: Block): number {
 			if (collector.isDetached()) return collector.beginScope(scope);

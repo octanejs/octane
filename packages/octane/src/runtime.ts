@@ -1375,18 +1375,16 @@ function scheduleNativeRead(target: Block): void {
 }
 
 interface SignalDeclarationRenderStage extends SignalDeclarationStage {
-	readonly block: Block;
 	readonly capture: OffscreenCapture;
 	settled: boolean;
 }
 
-let SIGNAL_DECLARATION_STAGE: SignalDeclarationRenderStage | null = null;
-
 /**
  * A signal facade declared again by a later render stages its new definition
  * here instead of mutating committed graph state. One stage covers one body
- * invocation (renderBlockInner scopes it): the capture's commit accepts it; its
- * discard, or a transition journal rollback that unwinds this render, discards it.
+ * invocation, so a render-phase rerun supersedes its earlier pass. The capture's
+ * commit accepts it; its discard, or a transition journal rollback that unwinds
+ * this render, discards it.
  */
 function currentSignalDeclarationStage(): SignalDeclarationStage | undefined {
 	const block = CURRENT_BLOCK;
@@ -1394,17 +1392,12 @@ function currentSignalDeclarationStage(): SignalDeclarationStage | undefined {
 	// Outside a render, or in a render that publishes without a capture, a
 	// declaration applies immediately.
 	if (block === null || capture === null || ROOT_RENDER_ROLLBACK) return undefined;
-	const current = SIGNAL_DECLARATION_STAGE;
-	if (
-		current !== null &&
-		!current.settled &&
-		current.block === block &&
-		current.capture === capture
-	)
-		return current;
+	// Native reads open the invocation frame before a facade can be read.
+	const invocation = NATIVE_READ_DRIVER?.invocation(block);
+	const current = invocation?.invocationData as SignalDeclarationRenderStage | null | undefined;
+	if (current != null && !current.settled && current.capture === capture) return current;
 	const callbacks: Array<(discarded: boolean) => void> = [];
 	const stage: SignalDeclarationRenderStage = {
-		block,
 		capture,
 		settled: false,
 		settle(callback) {
@@ -1414,13 +1407,12 @@ function currentSignalDeclarationStage(): SignalDeclarationStage | undefined {
 	const finish = (discarded: boolean): void => {
 		if (stage.settled) return;
 		stage.settled = true;
-		if (SIGNAL_DECLARATION_STAGE === stage) SIGNAL_DECLARATION_STAGE = null;
 		for (const callback of callbacks) callback(discarded);
 	};
 	// A held transition attempt unwinds its render while the capture survives.
 	if (TRANSITION_JOURNAL !== null) journalUndo(() => finish(true));
 	(capture.renderCleanups ??= []).push(finish);
-	SIGNAL_DECLARATION_STAGE = stage;
+	if (invocation !== undefined) invocation.invocationData = stage;
 	return stage;
 }
 
@@ -10870,10 +10862,6 @@ function renderBlockInner(block: Block): true | undefined {
 	const prevEffectRenderVersion = CURRENT_EFFECT_RENDER_VERSION;
 	const prevEffectReached = CURRENT_EFFECT_REACHED;
 	const prevWarmEpisode = CURRENT_WARM_EPISODE;
-	// Each invocation stages its own signal redeclarations; a render-phase rerun
-	// of this body supersedes the closures its earlier pass declared.
-	const prevDeclarationStage = SIGNAL_DECLARATION_STAGE;
-	SIGNAL_DECLARATION_STAGE = null;
 	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
 	const prevEffectEventTarget = EFFECT_EVENT_RENDER_TARGET;
 	const prevEffectEventActionTarget = EFFECT_EVENT_ACTION_TARGET;
@@ -11099,7 +11087,6 @@ function renderBlockInner(block: Block): true | undefined {
 		CURRENT_WARM_EPISODE = prevWarmEpisode;
 		CURRENT_EFFECT_RENDER_VERSION = prevEffectRenderVersion;
 		CURRENT_EFFECT_REACHED = prevEffectReached;
-		SIGNAL_DECLARATION_STAGE = prevDeclarationStage;
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
 		try {
