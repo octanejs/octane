@@ -7,7 +7,7 @@ import { hydrateStart as hydrateStartCore } from '@tanstack/start-client-core/cl
  * document with an empty match tree.
  */
 export function waitForRouterMatches(router) {
-	const matchesId = router.stores.matchesId;
+	const matchesId = router.stores.ids;
 	if (matchesId.get().length > 0) return Promise.resolve();
 
 	return new Promise((resolve) => {

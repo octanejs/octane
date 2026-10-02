@@ -1,0 +1,14 @@
+{
+  "name": "@octanejs/octane-tsc",
+  "private": true,
+  "description": "Repository typecheck: TypeScript 7.1 with the .tsrx content mapper, every project in one build.",
+  "type": "module",
+  "bin": {
+    "octane-tsc": "./bin.mjs"
+  },
+  "dependencies": {
+    "jsonc-parser": "3.3.1",
+    "octane": "workspace:*",
+    "typescript": "7.1.0-dev.20260921.1"
+  }
+}

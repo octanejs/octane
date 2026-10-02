@@ -114,9 +114,11 @@ assert.deepEqual(
 	'Update the explicit toolchain pins before measuring different dependencies',
 );
 const { build } = requireTool('esbuild');
+// Production builds replace error text with minified codes, so retirement checks
+// require each bundle's own exported ScopeDisposedError class instead of a message.
 const entry = `
 import assert from 'node:assert/strict';
-import {__signalAt,runWithSignalOwner,currentSignalOwner,retireSignalOwnerIdentity,installSignalOwnerEnvironment} from 'octane/signals';
+import {__signalAt,runWithSignalOwner,currentSignalOwner,retireSignalOwnerIdentity,installSignalOwnerEnvironment,ScopeDisposedError} from 'octane/signals';
 export function setup() {
   const documentOwner={scopeKey:'reads:document'};
   const one={scopeKey:'reads:one',documentOwner,instanceOwner:{},instanceKey:'one'};
@@ -154,10 +156,10 @@ export function execute(state,kind,reads) {
 }
 export function cleanup(state) {
   retireSignalOwnerIdentity(state.one);
-  assert.throws(()=>runWithSignalOwner(state.one,()=>state.local$.get()),/disposed/);
+  assert.throws(()=>runWithSignalOwner(state.one,()=>state.local$.get()),ScopeDisposedError);
   assert.equal(runWithSignalOwner(state.two,()=>state.global$.get()),7);
   retireSignalOwnerIdentity(state.documentOwner);
-  assert.throws(()=>runWithSignalOwner(state.two,()=>state.global$.get()),/disposed/);
+  assert.throws(()=>runWithSignalOwner(state.two,()=>state.global$.get()),ScopeDisposedError);
   retireSignalOwnerIdentity(state.two);
 }
 `;

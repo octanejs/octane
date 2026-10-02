@@ -13,7 +13,7 @@
 // change exactly. A timing operation is only called faster or slower outside its
 // combined relative margin of error, never under a 5% floor, by more than one
 // 0.1ms Chromium timer tick, and only when the fastest sample moved the same
-// way. Even then one shared CI runner is noisy, so timing verdicts stay yellow.
+// way beyond that margin too, so a few slow outliers cannot carry a verdict. Even then one shared CI runner is noisy, so timing verdicts stay yellow.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -75,11 +75,13 @@ export function compareSuite(suite, base, head) {
 			if (isTiming(headStat) || isTiming(baseStat)) {
 				const noise = Math.max(TIMING_FLOOR_PERCENT, Math.hypot(rmeOf(baseStat), rmeOf(headStat)));
 				const resolvable = Math.abs(after - before) > TIMER_TICK_MS;
+				const minPercent =
+					baseStat.min > 0 ? ((headStat.min - baseStat.min) / baseStat.min) * 100 : 0;
 				const verdict = !resolvable
 					? 'within noise'
-					: percent > noise && headStat.min > baseStat.min
+					: percent > noise && minPercent > noise
 						? 'slower'
-						: percent < -noise && headStat.min < baseStat.min
+						: percent < -noise && minPercent < -noise
 							? 'faster'
 							: 'within noise';
 				timing.push({ ...row, noise, verdict });
@@ -201,7 +203,7 @@ export function renderReport({ suites = SUITES, base, head, baseSha, headSha, ru
 			'',
 			`Compares ${shortSha(baseSha, 'the base')} with ${shortSha(headSha, 'the merge commit')} on the same runner. ` +
 				`Timing verdicts require a change beyond the combined margin of error (at least ${TIMING_FLOOR_PERCENT}%) and one ${TIMER_TICK_MS}ms timer tick, ` +
-				`with the fastest sample moving the same way.${runUrl ? ` [Workflow run](${runUrl})` : ''}`,
+				`with the fastest sample also moving beyond that margin.${runUrl ? ` [Workflow run](${runUrl})` : ''}`,
 			...sections,
 		].join('\n') + '\n';
 	return body.length > COMMENT_LIMIT

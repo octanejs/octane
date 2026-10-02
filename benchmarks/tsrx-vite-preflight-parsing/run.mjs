@@ -4,10 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 import {
+	createSharedPluginCase,
 	createTransformCase,
 	descriptorClassificationFromSharedAst,
 	descriptorClassificationFromStrings,
 	EXPECTED_CLASSIFICATION_CHECKSUM,
+	hostOwnedTypeScriptModules,
 	sourceFor,
 	valueDigest,
 } from './harness.mjs';
@@ -45,6 +47,39 @@ const integrated = [
 	{ size: 'large', componentCount: 256, mode: 'production-server' },
 ].map((entry) => ({ ...entry, samples: [], transform: createTransformCase(entry) }));
 
+// The same host-owned TypeScript modules pass through a client environment and
+// then a second client environment of one shared plugin instance. Both passes
+// must return the unchanged pass-through result for every module.
+const HOST_MODULE_COUNT = 64;
+const hostModules = hostOwnedTypeScriptModules(HOST_MODULE_COUNT);
+const hostShared = createSharedPluginCase({ pluginOptions: { requireDirective: true } });
+const hostSamples = { first: [], second: [] };
+
+async function transformHostModules(environment) {
+	const started = performance.now();
+	const results = [];
+	for (const { id, source } of hostModules) {
+		results.push(await hostShared.transform({ environment, source, moduleId: id }));
+	}
+	const elapsed = performance.now() - started;
+	assert.ok(
+		results.every((result) => result === null),
+		`${environment} host-owned TypeScript stopped passing through unchanged`,
+	);
+	return elapsed;
+}
+
+async function measureHostEnvironments(record) {
+	// A new watch generation makes the first environment pay the full preflight.
+	hostShared.watchChange(hostModules[0].id);
+	const first = await transformHostModules('client');
+	const second = await transformHostModules('worker');
+	if (record) {
+		hostSamples.first.push(first);
+		hostSamples.second.push(second);
+	}
+}
+
 const classificationSource = sourceFor(256);
 const classificationId = path.join(HERE, 'generated', 'classification-256.tsrx');
 const classificationSamples = { reparsed: [], shared: [] };
@@ -75,7 +110,7 @@ try {
 	parseCounts = characterizeParses();
 	assert.deepEqual(
 		parseCounts.map((entry) => entry.total),
-		[2, 2, 2, 2, 3, 3],
+		[2, 2, 2, 2, 3, 3, 3, 4, 4, 4, 6, 1],
 		'Vite parse-count matrix changed',
 	);
 
@@ -84,6 +119,7 @@ try {
 		for (const entry of ordered) await entry.transform.run();
 		measureClassification(warmup % 2 === 0 ? 'reparsed' : 'shared');
 		measureClassification(warmup % 2 === 0 ? 'shared' : 'reparsed');
+		await measureHostEnvironments(false);
 	}
 
 	for (let iteration = 0; iteration < iterations; iteration++) {
@@ -91,6 +127,7 @@ try {
 		for (const entry of ordered) await measureIntegrated(entry);
 		const kinds = iteration % 2 === 0 ? ['reparsed', 'shared'] : ['shared', 'reparsed'];
 		for (const kind of kinds) classificationSamples[kind].push(measureClassification(kind));
+		await measureHostEnvironments(true);
 	}
 } catch (error) {
 	failure = error instanceof Error ? (error.stack ?? error.message) : String(error);
@@ -130,6 +167,26 @@ if (!failure) {
 		});
 		console.log(
 			`PASS tsrx-vite-preflight-parsing/classification-${kind}: ${op.score.toFixed(3)}ms`,
+		);
+	}
+
+	for (const environment of ['first', 'second']) {
+		const op = timingStatForJson(summarizeSamples(hostSamples[environment]));
+		targets.push({
+			name: `host-typescript-${environment}-environment`,
+			ops: { transform: op },
+			meta: {
+				modules: HOST_MODULE_COUNT,
+				sourceBytes: hostModules.reduce(
+					(total, { source }) => total + Buffer.byteLength(source),
+					0,
+				),
+				output: 'pass-through',
+				correctness: 'pass',
+			},
+		});
+		console.log(
+			`PASS tsrx-vite-preflight-parsing/host-typescript-${environment}-environment: ${op.score.toFixed(3)}ms`,
 		);
 	}
 

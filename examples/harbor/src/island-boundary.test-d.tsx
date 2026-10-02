@@ -75,12 +75,10 @@ export const callbackTyped = (
 	/>
 );
 const mistypedHandler = (entry: { wrong: true }) => void entry;
+const mistypedProps = { plan: FEATURED_PLAN, onAddToCompare: mistypedHandler };
 export const callbackMistyped = (
-	<OctaneCompat
-		component={PlanConfigurator}
-		// @ts-expect-error — callback parameter shape is checked, not any
-		props={{ plan: FEATURED_PLAN, onAddToCompare: mistypedHandler }}
-	/>
+	// @ts-expect-error — callback parameter shape is checked, not any
+	<OctaneCompat component={PlanConfigurator} props={mistypedProps} />
 );
 
 export const faultRequired = (

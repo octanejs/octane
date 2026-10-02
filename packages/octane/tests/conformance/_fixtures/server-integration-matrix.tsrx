@@ -498,6 +498,22 @@ export function SelectFlattenedOptionWithoutValue() @{
 	</select>
 }
 
+export function SelectDynamicOptionText(p: {
+	a: import('octane').OctaneNode;
+	b: import('octane').OctaneNode;
+	selectProps: Record<string, unknown>;
+	optionValue?: string;
+}) @{
+	<select id="matrix-select-dynamic-option" {...p.selectProps}>
+		<option value="fallback">Fallback</option>
+		<option value={p.optionValue}>
+			{p.a}
+			{p.b}
+		</option>
+		<option value="other">Other</option>
+	</select>
+}
+
 export function SelectBooleanValue() @{
 	<select id="matrix-select-boolean" value={true} readOnly>
 		<option value="first">First</option>
