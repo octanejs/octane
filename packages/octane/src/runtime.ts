@@ -1697,14 +1697,9 @@ function hydrationMismatchMode(el: Element): 0 | 1 | 2 {
 let HYDRATION_DIAGNOSTIC_HOLDS = 0;
 let HELD_HYDRATION_DIAGNOSTICS: Array<() => void> | null = null;
 
-function holdHydrationDiagnostic(publish: () => void): void {
-	(HELD_HYDRATION_DIAGNOSTICS ??= []).push(publish);
-}
-
 /** DEV-only: log a hydration-mismatch warning unless a try body holds it. */
 function logHydrationMismatch(message: string): void {
-	if (HYDRATION_DIAGNOSTIC_HOLDS === 0) console.error(message);
-	else holdHydrationDiagnostic(() => console.error(message));
+	if (currentHydration?.holds(() => console.error(message)) !== true) console.error(message);
 }
 
 /**
@@ -18608,6 +18603,16 @@ class HydrationCapability {
 	holdDiagnostics(): number {
 		HYDRATION_DIAGNOSTIC_HOLDS++;
 		return HELD_HYDRATION_DIAGNOSTICS?.length ?? 0;
+	}
+
+	/**
+	 * Hold a diagnostic's `publish` when a try body holds diagnostics. A method,
+	 * so that bundles which never hydrate do not retain the hold.
+	 */
+	holds(publish: () => void): boolean {
+		if (HYDRATION_DIAGNOSTIC_HOLDS === 0) return false;
+		(HELD_HYDRATION_DIAGNOSTICS ??= []).push(publish);
+		return true;
 	}
 
 	/**
@@ -45281,10 +45286,7 @@ let RECOVERABLE_REPORTED: WeakSet<Block> | null = null;
 function noteRecoverableHydrationError(makeError: () => Error, block: Block | null = null): void {
 	if (ROOT_ERROR_HANDLERS === null) return;
 	const from = block ?? CURRENT_BLOCK;
-	if (HYDRATION_DIAGNOSTIC_HOLDS !== 0) {
-		holdHydrationDiagnostic(() => noteRecoverableHydrationError(makeError, from));
-		return;
-	}
+	if (currentHydration?.holds(() => noteRecoverableHydrationError(makeError, from))) return;
 	const h = rootErrorHandlersFor(from)?.onRecoverableError;
 	if (h === undefined) return;
 	let root = from!;
