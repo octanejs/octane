@@ -34,7 +34,7 @@
     "test:architecture": "vitest run --config vitest.config.ts --root . tests/probes/async-component.server.test.ts",
     "test:pristine": "node ../../scripts/react-parity/node-full-runner.mjs --root packages/markdown/upstream --file packages/markdown/upstream/test.jsx --loader packages/markdown/upstream/script/load-jsx.js --inventory packages/markdown/audit/pristine-runtime.json",
     "upstream:verify": "node audit/verify-provenance.mjs --self-test",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
+    "typecheck": "octane-tsc -p tsconfig.json -p typetests/tsconfig.json"
   },
   "dependencies": {
     "@types/hast": "^3.0.0",

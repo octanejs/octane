@@ -38,7 +38,7 @@
   },
   "scripts": {
     "test": "pnpm upstream:verify && vitest run --root ../.. --config vitest.config.js --project waypoint --project waypoint-ssr --project waypoint-differential --project waypoint-browser",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "typecheck": "octane-tsc -p tsconfig.json",
     "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
     "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },

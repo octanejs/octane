@@ -276,7 +276,7 @@ describe('CI workflow aggregation', () => {
 		assert.ok(latestRuntimeInstall < latestRuntimeAssertion);
 		assert.ok(latestRuntimeAssertion < latestRuntimeTest);
 		assert.equal(
-			[...compat.matchAll(/pnpm exec tsgo --noEmit -p packages\/three\/tsconfig\.json/g)].length,
+			[...compat.matchAll(/pnpm exec octane-tsc -p packages\/three\/tsconfig\.json/g)].length,
 			2,
 		);
 		assert.equal(
