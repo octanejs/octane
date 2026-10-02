@@ -9,6 +9,11 @@ import * as opaque from './_fixtures/opaque-split-context.tsrx';
 const server = loadServerFixture<typeof client>(
 	'packages/octane/tests/hydration/_fixtures/private-split-context.tsrx',
 );
+// Each Hydrate child is a separate query module that Vite compiles on its first
+// request. A loaded run can queue that request behind other files' transforms
+// for several seconds, far beyond vi.waitFor's 1s default; the suite timeout
+// leaves room for this bound.
+const SPLIT_CHILD_LOAD = { timeout: 10_000 };
 let host: HTMLElement;
 let root: ReturnType<typeof createRoot> | undefined;
 
@@ -24,14 +29,16 @@ afterEach(() => {
 	host?.remove();
 });
 
-describe('Context providers across split hydration', () => {
+describe('Context providers across split hydration', { timeout: 15_000 }, () => {
 	it('keeps nested and sibling capture values isolated across independent query loads', async () => {
 		root = createRoot(container());
 		await act(() => root!.render(client.Nested, { when: load(), value: 'outer' }));
-		await vi.waitFor(() =>
-			expect(
-				[...host.querySelectorAll('.split-context-eager')].map((node) => node.textContent),
-			).toEqual(['outer', 'inner', 'outer', 'sibling']),
+		await vi.waitFor(
+			() =>
+				expect(
+					[...host.querySelectorAll('.split-context-eager')].map((node) => node.textContent),
+				).toEqual(['outer', 'inner', 'outer', 'sibling']),
+			SPLIT_CHILD_LOAD,
 		);
 		await act(() => root!.render(client.Nested, { when: load(), value: 'updated' }));
 		await vi.waitFor(() =>
@@ -47,7 +54,10 @@ describe('Context providers across split hydration', () => {
 		const props = { when: load(), value: 'first', onEffect };
 		root = createRoot(container());
 		await act(() => root!.render(client.App, props));
-		await vi.waitFor(() => expect(host.querySelector('#split-context-value')).not.toBeNull());
+		await vi.waitFor(
+			() => expect(host.querySelector('#split-context-value')).not.toBeNull(),
+			SPLIT_CHILD_LOAD,
+		);
 		const value = host.querySelector('#split-context-value')!;
 		const input = host.querySelector<HTMLInputElement>('#split-context-draft')!;
 		const button = host.querySelector<HTMLButtonElement>('#split-context-action')!;
@@ -90,7 +100,7 @@ describe('Context providers across split hydration', () => {
 		expect(onEffect).not.toHaveBeenCalled();
 		expect(value.textContent).toBe('server');
 		await act(() => root!.render(client.App, { ...props, when: load(), value: 'latest' }));
-		await vi.waitFor(() => expect(onHydrated).toHaveBeenCalledOnce());
+		await vi.waitFor(() => expect(onHydrated).toHaveBeenCalledOnce(), SPLIT_CHILD_LOAD);
 		expect(host.querySelector('#split-context-editor')).toBe(editor);
 		expect(editor.getAttribute('data-runtime-id')).toBe(id);
 		expect(host.querySelector('#split-context-value')).toBe(value);
@@ -115,7 +125,7 @@ describe('Context providers across split hydration', () => {
 		await act(() =>
 			root!.render(client.Pending, { when: load(), value: 'old', pending, onEffect, onPending }),
 		);
-		await vi.waitFor(() => expect(onPending).toHaveBeenCalled());
+		await vi.waitFor(() => expect(onPending).toHaveBeenCalled(), SPLIT_CHILD_LOAD);
 		expect(host.querySelector('#split-context-editor')).toBeNull();
 		await act(() =>
 			root!.render(client.Pending, { when: load(), value: 'latest', pending, onEffect }),
@@ -150,7 +160,10 @@ describe('Context providers across split hydration', () => {
 	it('accepts opaque handles after the model engine loads and stops subscriptions on unmount', async () => {
 		root = createRoot(container());
 		await act(() => root!.render(client.App, { when: load(), value: 'plain' }));
-		await vi.waitFor(() => expect(host.querySelector('#split-context-value')).not.toBeNull());
+		await vi.waitFor(
+			() => expect(host.querySelector('#split-context-value')).not.toBeNull(),
+			SPLIT_CHILD_LOAD,
+		);
 		expect(host.querySelector('#split-context-value')!.textContent).toBe('plain');
 		const { createScope } = await import('octane/signals');
 		const scope = createScope({ scopeKey: 'split-context-late-model' });
@@ -189,7 +202,7 @@ describe('Context providers across split hydration', () => {
 				children: createElement(opaque.Reader, null),
 			}),
 		);
-		await vi.waitFor(() => expect(host.textContent).toBe('provided'));
+		await vi.waitFor(() => expect(host.textContent).toBe('provided'), SPLIT_CHILD_LOAD);
 		expect(host.textContent).toBe('provided');
 		await act(() =>
 			root!.render(opaque.App, { when: load(), value: 'unused', children: ['ordinary', ' text'] }),

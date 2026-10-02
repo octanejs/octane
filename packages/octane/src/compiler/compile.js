@@ -121,7 +121,7 @@ import {
 	isDirectSignalHandleExpression,
 	lowerNativeAttributeReads,
 } from './native-attribute-reads.js';
-import { prepareDomBindings } from './dom-bindings.js';
+import { isScalarTextAssertion, prepareDomBindings } from './dom-bindings.js';
 import { parseDomBindingRequest } from './dom-binding-request.js';
 import {
 	createTemplateIr,
@@ -7626,21 +7626,23 @@ function mapCallToForOf(expr, ctx) {
 	// in the existing environment proof so the receiver/method remain available.
 	if (!directReceiver) ctx.currentComponentLocals?.add(receiverName);
 	if (methodName !== null) ctx.currentComponentLocals?.add(methodName);
-	const forNode = Object.assign(
-		b.for_of(b.const(params[0], null), b.id(receiverName), b.block([bodyEl])),
-		{
-			key: keyExpr,
-			index: params[1] || null,
-			empty: null,
-			nativeArrayMap: {
-				receiver: expr.callee.object,
-				receiverName,
-				methodName,
-				directReceiver,
-				callback: arrow,
-			},
+	// A callback parameter is writable. An identifier becomes the row helper's own
+	// parameter, so its header kind is never emitted and stays `const`; a
+	// destructured one is re-declared in the row prologue with the header's kind.
+	const itemDeclaration =
+		params[0].type === 'Identifier' ? b.const(params[0], null) : b.let(params[0], null);
+	const forNode = Object.assign(b.for_of(itemDeclaration, b.id(receiverName), b.block([bodyEl])), {
+		key: keyExpr,
+		index: params[1] || null,
+		empty: null,
+		nativeArrayMap: {
+			receiver: expr.callee.object,
+			receiverName,
+			methodName,
+			directReceiver,
+			callback: arrow,
 		},
-	);
+	});
 	return inheritOriginLoc(forNode, expr);
 }
 
@@ -12355,6 +12357,8 @@ function compileServerComponent(node, ctx) {
 	const prevLocals = ctx.currentComponentLocals;
 	const prevKnownStr = ctx.knownStringLocals;
 	const prevKnownChildStr = ctx.knownStringChildLocals;
+	const prevScalarBindingView = ctx.ssrScalarBindingView;
+	ctx.ssrScalarBindingView = node._octaneScalarBindingClaims === true;
 	ctx.currentComponentLocals = collectComponentLocals(node);
 	ctx.knownStringLocals = collectKnownStringLocals(node);
 	ctx.knownStringChildLocals = ctx.hasStringChildProofs
@@ -12385,6 +12389,7 @@ function compileServerComponent(node, ctx) {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.knownStringLocals = prevKnownStr;
 		ctx.knownStringChildLocals = prevKnownChildStr;
+		ctx.ssrScalarBindingView = prevScalarBindingView;
 	}
 
 	// SSR parallel-use mirror: attach the compiled fetch plan so a PARENT's warm
@@ -14332,13 +14337,19 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		const childHelper =
 			tag === 'pre' || tag === 'textarea' || tag === 'listing' ? 'ssrChildTextPre' : 'ssrChildText';
 		ctx.runtimeNeeded.add(childHelper);
+		const value = resolveStyleExpr(
+			rewriteJsxValues(rewriteHookCalls(onlyChild0.expression, ctx, name), ctx),
+			cssHash,
+		);
 		childrenExpr = ssrCall(
 			childHelper,
 			[
-				resolveStyleExpr(
-					rewriteJsxValues(rewriteHookCalls(onlyChild0.expression, ctx, name), ctx),
-					cssHash,
-				),
+				// A fixed binding view adopts `{value as number}` as one text leaf that
+				// reads a signal handle's value; serialize that value, not a framed
+				// handle. The renderer's only-child hole hydrates the same text.
+				ctx.ssrScalarBindingView && isScalarTextAssertion(onlyChild0.expression)
+					? ssrSignalValue(value, ctx, onlyChild0, true)
+					: value,
 				b.id('__s'),
 			],
 			onlyChild0,
@@ -33228,11 +33239,12 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 
 	// Destructured header `const {x,y} of …` — synthesize a destructure stmt
 	// at the top of the body so the user fields bind from the synthetic item.
+	// It keeps the header's kind: a `let` header's fields stay writable.
 	const destructureInjection = isDestructured
 		? [
 				inheritOriginLoc(
 					// leftDeclId: ObjectPattern / ArrayPattern (lazy flag dropped by printer)
-					b.const(leftDeclId, b.id(itemName)),
+					b.declaration(node.left.kind, [b.declarator(leftDeclId, b.id(itemName))]),
 					leftDeclId,
 				),
 			]
