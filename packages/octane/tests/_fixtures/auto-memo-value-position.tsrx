@@ -12,6 +12,7 @@ import {
 	useMemo,
 	useState,
 } from 'octane';
+import type { SignalHandle } from 'octane/signals';
 
 interface ValuePositionRow {
 	id: number;
@@ -135,6 +136,38 @@ export function CachedValuePositionRoundTrip() @{
 		>{'change theme'}</button>
 		<ValuePositionTheme value={theme}>
 			<div id="memo-value-round-trip-rows">{output}</div>
+		</ValuePositionTheme>
+	</section>
+}
+
+function selectValuePositionSignalOutput(
+	rows: ReturnType<typeof buildValuePositionRows>,
+	label$: SignalHandle<string>,
+	showSignal: boolean,
+) {
+	return showSignal ? label$ : rows;
+}
+
+export function CachedValuePositionSignalRoundTrip(props: { label$: SignalHandle<string> }) @{
+	const [items] = useState<ValuePositionRow[]>([
+		{ id: 1, label: 'first' },
+		{ id: 2, label: 'second' },
+	]);
+	const [showSignal, setShowSignal] = useState(false);
+	const [theme, setTheme] = useState('initial');
+	const stableRows = useMemo(() => buildValuePositionRows(items), [items]);
+	const output = selectValuePositionSignalOutput(stableRows, props.label$, showSignal);
+	<section>
+		<button
+			id="memo-value-signal-toggle"
+			onClick={() => setShowSignal(!showSignal)}
+		>{'toggle signal'}</button>
+		<button
+			id="memo-value-signal-theme"
+			onClick={() => setTheme(theme + '!')}
+		>{'change theme'}</button>
+		<ValuePositionTheme value={theme}>
+			<div id="memo-value-signal-rows">{output}</div>
 		</ValuePositionTheme>
 	</section>
 }

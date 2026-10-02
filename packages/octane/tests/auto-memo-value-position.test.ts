@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as ServerRuntime from 'octane/server';
+import { createScope } from 'octane/signals';
 import { flushSync, hydrateRoot } from '../src/index.js';
 import { act, flushEffects, mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
@@ -8,6 +9,7 @@ import {
 	CachedValuePositionActivity,
 	CachedValuePositionMemoContext,
 	CachedValuePositionRoundTrip,
+	CachedValuePositionSignalRoundTrip,
 	CachedValuePositionSuspense,
 	CachedValuePositionTransition,
 	drainValuePositionActivityEffects,
@@ -94,6 +96,48 @@ describe('cached value-position children', () => {
 		root.click('.memo-value-own-1');
 		expect(restored.textContent).toBe('initial!:first:1');
 		root.unmount();
+	});
+
+	it('keeps a calculated child live when it switches between cached rows and a signal handle', () => {
+		const scope = createScope({ scopeKey: 'memo-value-signal' });
+		const label$ = scope.signal$('label', 'alpha');
+		const root = mount(CachedValuePositionSignalRoundTrip, { label$ });
+		try {
+			const original = root.find('.memo-value-own-1');
+			const input = root.find('.memo-value-input-1') as HTMLInputElement;
+			input.value = 'preserved draft';
+			root.click('#memo-value-signal-theme');
+			expect(root.find('.memo-value-own-1')).toBe(original);
+			expect(original.textContent).toBe('initial!:first:0');
+			expect(input.value).toBe('preserved draft');
+
+			root.click('#memo-value-signal-toggle');
+			expect(root.find('#memo-value-signal-rows').textContent).toBe('alpha');
+			expect(root.findAll('.memo-value-row')).toHaveLength(0);
+			flushSync(() => label$.set('beta'));
+			expect(root.find('#memo-value-signal-rows').textContent).toBe('beta');
+			root.click('#memo-value-signal-theme');
+			flushSync(() => label$.set('gamma'));
+			expect(root.find('#memo-value-signal-rows').textContent).toBe('gamma');
+
+			root.click('#memo-value-signal-toggle');
+			const restored = root.find('.memo-value-own-1');
+			expect(restored).not.toBe(original);
+			expect(restored.textContent).toBe('initial!!:first:0');
+			flushSync(() => label$.set('hidden'));
+			expect(root.find('#memo-value-signal-rows').textContent).not.toContain('hidden');
+			root.click('#memo-value-signal-theme');
+			expect(root.find('.memo-value-own-1')).toBe(restored);
+			expect(restored.textContent).toBe('initial!!!:first:0');
+
+			root.click('#memo-value-signal-toggle');
+			expect(root.find('#memo-value-signal-rows').textContent).toBe('hidden');
+			flushSync(() => label$.set('delta'));
+			expect(root.find('#memo-value-signal-rows').textContent).toBe('delta');
+		} finally {
+			root.unmount();
+			scope.dispose();
+		}
 	});
 
 	it('reconciles a derived array that escapes into an event handler and mutates in place', () => {
