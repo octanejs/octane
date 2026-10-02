@@ -612,13 +612,12 @@ function bindingRender(fn, filename, required = true) {
 		fn.async ||
 		fn.generator ||
 		fn.params.length > 1 ||
-		(required && fn.params.length !== 1) ||
 		(fn.params.length === 1 && !['Identifier', 'ObjectPattern'].includes(fn.params[0].type))
 	) {
 		error(
 			filename,
 			fn,
-			'a binding view needs an ordinary props parameter and one template output, without early returns',
+			'a binding view takes at most one ordinary props parameter and needs one template output, without early returns',
 		);
 	}
 	bindingParameterNames(fn.params[0], filename);

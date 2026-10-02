@@ -47,8 +47,8 @@ function withoutTail(adopted: Element[]): Element[] {
 }
 
 const DISCARDED =
-	'Hydration mismatch: the server rendered more content in a branch than the client; ' +
-	'the stale remainder was discarded.';
+	'Hydration mismatch: the server-rendered node did not match the client render; ' +
+	'the mismatched subtree was rebuilt on the client.';
 
 describe.each([
 	{ name: 'development compile', dev: true },

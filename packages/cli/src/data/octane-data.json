@@ -3518,11 +3518,6 @@
       "message": "`<textarea>` children must be text: strings, numbers, or arrays of them. One child was %s. A textarea's content is its default value, so it cannot contain elements; render them outside the textarea or pass a string.",
       "runtime": ["client", "server"],
       "status": "active"
-    },
-    "337": {
-      "message": "Hydration mismatch: the server rendered more content in a branch than the client; the stale remainder was discarded.",
-      "runtime": ["client"],
-      "status": "active"
     }
   }
 }
