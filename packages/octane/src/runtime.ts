@@ -18836,6 +18836,12 @@ class HydrationCapability {
 	 * Both claims are rare, so adopt()'s common path tests only this flag.
 	 */
 	private pendingClaims = true;
+	/**
+	 * What a hydrating update built on the client where its slot had already
+	 * rendered: blocks (renderUpdate), and child slots whose list it built.
+	 * Allocated by the first such update.
+	 */
+	private updates: WeakSet<Block | ChildSlot> | null = null;
 	/** Pairs discovered while matching an outer range; released with this hydration pass. */
 	private matchingCloses: WeakMap<Node, Comment> | null = null;
 	/** First unclaimed root sibling after a compiled root clone; undefined until known. */
@@ -18971,9 +18977,15 @@ class HydrationCapability {
 		return (this.depth === 0 || this.depth === this.replayDepth) && !this.abandoned;
 	}
 
+	/**
+	 * Whether `block` renders under this hydration: it descends from the root
+	 * block, and not from a block that a hydrating update built (renderUpdate).
+	 */
 	owns(block: Block): boolean {
+		const updates = this.updates;
 		for (let current: Block | null = block; current !== null; current = current.parentBlock) {
 			if (current === this.rootBlock) return true;
+			if (updates !== null && updates.has(current)) return false;
 		}
 		return false;
 	}
@@ -18987,6 +18999,30 @@ class HydrationCapability {
 			setNativeAdoptionResolver(previousNative);
 			this.depth--;
 		}
+	}
+
+	/**
+	 * Render `block`, which an update created in place of content its slot had
+	 * already rendered, as a suspended deferred boundary's retry does after its
+	 * captures changed. The server never rendered it, and the cursor belongs to
+	 * other slots' server nodes, so it builds on the client without moving the
+	 * cursor. So does every later render of it or its descendants under this
+	 * hydration (owns), including a retry that resumes a block that suspended
+	 * inside it. A method, so that the callback stays out of callers' frames.
+	 */
+	renderUpdate(block: Block): void {
+		this.recordUpdate(block);
+		this.suspend(() => renderBlock(block));
+	}
+
+	/** Record that a hydrating update built `owner` on the client (see updates). */
+	recordUpdate(owner: Block | ChildSlot): void {
+		(this.updates ??= new WeakSet()).add(owner);
+	}
+
+	/** Whether a hydrating update built `owner` on the client (see updates). */
+	builtByUpdate(owner: Block | ChildSlot): boolean {
+		return this.updates?.has(owner) === true;
 	}
 
 	/**
@@ -20299,15 +20335,18 @@ class HydrationCapability {
 			const atRangeEnd = isBlockClose(cursor);
 			// A retry over a node whose replacement never committed already reported
 			// it, and a range end reports once (firstAtRangeEnd).
-			if (cursor !== this.replaced && (!atRangeEnd || this.firstAtRangeEnd(cursor))) {
-				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
-				if (process.env.NODE_ENV !== 'production' && loc)
-					warnHydrationStructuralMismatch(
-						loc,
-						describeHydrationNode(template),
-						describeHydrationNode(cursor),
-					);
-			}
+			if (
+				cursor !== this.replaced &&
+				(!atRangeEnd || this.firstAtRangeEnd(cursor)) &&
+				this.reportStructural() &&
+				process.env.NODE_ENV !== 'production' &&
+				loc
+			)
+				warnHydrationStructuralMismatch(
+					loc,
+					describeHydrationNode(template),
+					describeHydrationNode(cursor),
+				);
 			if (atRangeEnd) return this.freshClone(template);
 			// Recovery discards only a node this template renders into. The compiled
 			// mount inserts into its scope's block, which for a lite component is
@@ -32369,6 +32408,12 @@ function componentSlotImpl(
 				if (r.suspended) throw new SuspenseException(r.suspended);
 			}
 		}
+		// Hydrating, an update that replaces the component this slot already
+		// rendered, as a suspended deferred boundary's retry does after its
+		// captures changed. The server never rendered the replacement, and the
+		// cursor belongs to other slots' server nodes, so it builds as a client
+		// update would.
+		const replaced = hydration !== null && state.block !== null;
 		if (state.block) {
 			if (state.inherited) {
 				// Borrowed range (M3): the markers belong to the PARENT block —
@@ -32447,7 +32492,10 @@ function componentSlotImpl(
 			// place; undefined when the render threw.
 			let adopted: boolean | undefined;
 			try {
-				if (hydrationCursor === null) {
+				if (replaced) {
+					hydration!.renderUpdate(b);
+					adopted = false;
+				} else if (hydrationCursor === null) {
 					renderBlock(b);
 					adopted = false;
 				} else adopted = hydration!.renderInPlace(renderBlock, b, hydrationCursor);
@@ -32519,6 +32567,7 @@ function componentSlotImpl(
 				);
 			// The server may have rendered more in the frame, for another component.
 			else if (adoptedFrame) hydration!.renderClaimed(b, parentScope, slotKey);
+			else if (replaced) hydration!.renderUpdate(b);
 			else renderBlock(b);
 		}
 	} else if (state.block) {
@@ -36175,6 +36224,11 @@ export function childSlot(
 	// The server content where this value begins is gone: build the value with
 	// hydration suspended, as a client mount would.
 	let rebuild = false;
+	// Hydrating, an update of a slot that already rendered, as in a suspended
+	// deferred boundary's retry after its captures changed. Its earlier render
+	// took the server's content, and the cursor belongs to other slots' server
+	// nodes, so content this update creates builds as a client update would.
+	let hydratingUpdate = false;
 	if (state === undefined) {
 		const transaction = ROOT_RENDER_TRANSACTION;
 		if (
@@ -36306,9 +36360,11 @@ export function childSlot(
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
-	} else if (hydration !== null && hydration.lentSlot === state) {
-		hydration.lentSlot = null;
-		adoptedRange = true;
+	} else if (hydration !== null) {
+		if (hydration.lentSlot === state) {
+			hydration.lentSlot = null;
+			adoptedRange = true;
+		} else hydratingUpdate = true;
 	}
 	if (adoptedRange)
 		rebuild = hydration!.claimRange(
@@ -36407,7 +36463,13 @@ export function childSlot(
 	// element share one keyed-list regime. Keeping a keyed single child in this
 	// regime is what lets it retain state when a sibling is added around it.
 	if (preparedList !== null) {
-		if (rebuild) {
+		// A hydrating update builds a list that replaces other content, or one an
+		// earlier hydrating update built, on the client.
+		if (
+			rebuild ||
+			(hydratingUpdate && (state.forSlot === null || hydration!.builtByUpdate(state)))
+		) {
+			if (hydratingUpdate) hydration!.recordUpdate(state);
 			// Mount each item rather than look for server items that are not there.
 			const slot = state;
 			hydration!.suspend(() =>
@@ -36888,8 +36950,9 @@ export function childSlot(
 		// delete the very DOM the component is about to adopt and strand the cursor
 		// (a detached node), desyncing every sibling/descendant below. Mirrors the
 		// array path's `if (!hydrating) clearChildContent` guard above. (A post-
-		// hydration identity swap runs with hydrating=false and clears normally.)
-		if (hydration === null) {
+		// hydration identity swap runs with hydrating=false and clears normally,
+		// as does a hydrating update, whose earlier render took the server content.)
+		if (hydration === null || hydratingUpdate) {
 			clearChildContent(state);
 			if (parentBlock.disposed) return;
 		}
@@ -36938,6 +37001,8 @@ export function childSlot(
 			// The server content is gone: build the value and its subtree on the
 			// client, so that no descendant adopts a server node outside the range.
 			hydration!.suspend(() => renderBlock(b));
+		} else if (hydratingUpdate) {
+			hydration!.renderUpdate(b);
 		} else if (
 			adoptedRange &&
 			!passthroughOwner &&
@@ -36982,7 +37047,7 @@ export function childSlot(
 		updateTextValue(state.text, str);
 		return;
 	}
-	if (hydration !== null) {
+	if (hydration !== null && !hydratingUpdate) {
 		// Adopt the server text sitting between our adopted markers. (An empty hole
 		// has no text node, but `str !== ''` here means the server emitted one.)
 		const n = hydration.node;
@@ -45280,6 +45345,8 @@ function reconcileKeyed<T>(
 				state,
 				singleRoot,
 				ssrMarkerless,
+				null,
+				true,
 			);
 			oldItems.set(key, block);
 			block.prevSibling = prev;
@@ -45362,6 +45429,8 @@ function reconcileKeyed<T>(
 					state,
 					singleRoot,
 					ssrMarkerless,
+					null,
+					true,
 				);
 				oldItems.set(key, block);
 				block.prevSibling = prev;
@@ -45608,6 +45677,8 @@ function reconcileKeyed<T>(
 					state,
 					singleRoot,
 					ssrMarkerless,
+					null,
+					true,
 				);
 				oldItems.set(key, block);
 				state.size++;
@@ -45883,35 +45954,67 @@ function mountItem<T>(
 	// it, seeded as the item block's deoptNode so the body's pure path patches
 	// instead of rebuilding).
 	adoptNode: Node | null = null,
+	// A list update inserts this row beside rows it already rendered.
+	inserted = false,
 ): Block {
 	const hydration = activeHydration();
 	if (hydration !== null) {
-		const node = hydration.node;
-		if (
-			ssrMarkerless &&
-			!hydration.isOpen(node) &&
-			(singleRoot !== 2 ||
-				forSlot.plainDeopt !== true ||
-				(isHostDescriptor(item) && !descNeedsBlocks(item)))
-		) {
-			// The outer @for pair is the only list framing on the wire. Each proven
-			// direct-host item self-delimits, exactly like the existing client-mount
-			// singleRoot path. A de-opt item adopts only an element of its own tag.
+		// A row that a list update inserts beside rows that already adopted the
+		// server's, as in a suspended deferred boundary's retry after its captures
+		// changed, is one the server never rendered, and the cursor belongs to
+		// other blocks' server nodes: it builds as a client mount would, below.
+		if (!inserted) {
+			const node = hydration.node;
 			if (
-				node !== null &&
-				node !== forSlot.end &&
+				ssrMarkerless &&
+				!hydration.isOpen(node) &&
 				(singleRoot !== 2 ||
 					forSlot.plainDeopt !== true ||
-					(node.nodeType === 1 &&
-						domNode(node).parentNode === parentNode &&
-						isHostElementOfType(node as Element, (item as ElementDescriptor).type as string)))
+					(isHostDescriptor(item) && !descNeedsBlocks(item)))
 			) {
+				// The outer @for pair is the only list framing on the wire. Each proven
+				// direct-host item self-delimits, exactly like the existing client-mount
+				// singleRoot path. A de-opt item adopts only an element of its own tag.
+				if (
+					node !== null &&
+					node !== forSlot.end &&
+					(singleRoot !== 2 ||
+						forSlot.plainDeopt !== true ||
+						(node.nodeType === 1 &&
+							domNode(node).parentNode === parentNode &&
+							isHostElementOfType(node as Element, (item as ElementDescriptor).type as string)))
+				) {
+					const block = createBlock(
+						'control-flow',
+						parentBlock,
+						parentNode,
+						node,
+						node,
+						body as ComponentBody,
+						item,
+						forSlot.env,
+					);
+					block.forSlot = forSlot;
+					block.key = key;
+					block.itemIndex = index;
+					if (singleRoot === 2 && forSlot.plainDeopt === true) block.deoptNode = node;
+					renderBlock(block);
+					hydration.node = domNode(block.endMarker)?.nextSibling ?? getNextSibling(node);
+					return block;
+				}
+			} else if (hydration.isOpen(node)) {
+				// Hydration: the server wraps each GENERAL-SHAPE item in its own
+				// `<!--[-->…<!--]-->` range. Also accept this legacy marked encoding
+				// when a current direct-host client could have adopted markerlessly, which
+				// keeps mixed-version/dev hydration recoverable.
+				const itemEnd = hydration.close(node as Node);
+				hydration.node = getNextSibling(node!);
 				const block = createBlock(
 					'control-flow',
 					parentBlock,
 					parentNode,
 					node,
-					node,
+					itemEnd,
 					body as ComponentBody,
 					item,
 					forSlot.env,
@@ -45919,50 +46022,26 @@ function mountItem<T>(
 				block.forSlot = forSlot;
 				block.key = key;
 				block.itemIndex = index;
-				if (singleRoot === 2 && forSlot.plainDeopt === true) block.deoptNode = node;
 				renderBlock(block);
-				hydration.node = domNode(block.endMarker)?.nextSibling ?? getNextSibling(node);
+				hydration.node = getNextSibling(itemEnd);
 				return block;
 			}
-		} else if (hydration.isOpen(node)) {
-			// Hydration: the server wraps each GENERAL-SHAPE item in its own
-			// `<!--[-->…<!--]-->` range. Also accept this legacy marked encoding
-			// when a current direct-host client could have adopted markerlessly, which
-			// keeps mixed-version/dev hydration recoverable.
-			const itemEnd = hydration.close(node as Node);
-			hydration.node = getNextSibling(node!);
-			const block = createBlock(
-				'control-flow',
-				parentBlock,
-				parentNode,
-				node,
-				itemEnd,
-				body as ComponentBody,
-				item,
-				forSlot.env,
+			// STRUCTURAL list mismatch: the server rendered fewer items than the client,
+			// or at the cursor an item that cannot be this one. Discard the rest of the
+			// list's server content and build THIS item fresh: suspend hydration for its
+			// whole subtree (via a re-entrant call) so it client-mounts instead of
+			// adopting. Every later item finds the cursor at the list's end and does
+			// the same.
+			hydration.discardItems(
+				forSlot.end,
+				process.env.NODE_ENV !== 'production'
+					? forSlot.plainDeopt === true && isHostDescriptor(item) && !descNeedsBlocks(item)
+						? `<${item.type as string}>`
+						: 'another list item'
+					: '',
 			);
-			block.forSlot = forSlot;
-			block.key = key;
-			block.itemIndex = index;
-			renderBlock(block);
-			hydration.node = getNextSibling(itemEnd);
-			return block;
 		}
-		// STRUCTURAL list mismatch: the server rendered fewer items than the client,
-		// or at the cursor an item that cannot be this one. Discard the rest of the
-		// list's server content and build THIS item fresh: suspend hydration for its
-		// whole subtree (via a re-entrant call) so it client-mounts instead of
-		// adopting. Every later item finds the cursor at the list's end and does
-		// the same.
-		hydration.discardItems(
-			forSlot.end,
-			process.env.NODE_ENV !== 'production'
-				? forSlot.plainDeopt === true && isHostDescriptor(item) && !descNeedsBlocks(item)
-					? `<${item.type as string}>`
-					: 'another list item'
-				: '',
-		);
-		return hydration.suspend(() =>
+		const block = hydration.suspend(() =>
 			mountItem(
 				parentBlock,
 				parentNode,
@@ -45976,6 +46055,10 @@ function mountItem<T>(
 				ssrMarkerless,
 			),
 		);
+		// Like a block renderUpdate builds, every later render of the row stays on
+		// the client, including a retry that resumes a block suspended inside it.
+		if (inserted) hydration.recordUpdate(block);
+		return block;
 	}
 	if (
 		singleRoot === true ||
