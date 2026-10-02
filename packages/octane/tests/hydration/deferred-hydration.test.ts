@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, createRoot, flushSync, hydrateRoot } from 'octane';
+import { act, createRoot, flushSync, hasPendingWork, hydrateRoot } from 'octane';
 import {
 	HYDRATE_ID_ATTR,
 	HYDRATE_ID_COUNT_ATTR,
@@ -660,6 +660,91 @@ export function App(props) @{
 		expect(onInnerHydrated).toHaveBeenCalledOnce();
 		expect(onTargetClick).toHaveBeenCalledOnce();
 		expect(order).toEqual(['outer hydrated', 'inner hydrated', 'target click']);
+	});
+
+	it('replays a captured click before a live click that arrives before the replay', async () => {
+		// One real frame between the hydration commit and its post-paint replay.
+		vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
+			setTimeout(() => callback(performance.now()), 16),
+		);
+		try {
+			const choices: Array<[string, number]> = [];
+			const props = {
+				when: interaction({ events: 'click' }),
+				onChoose: (option: string, timeStamp: number) => choices.push([option, timeStamp]),
+			};
+			container.innerHTML = renderToString(server.ReplayOrderHydration, props).html;
+			const optionA = container.querySelector('#option-a') as HTMLButtonElement;
+			const optionB = container.querySelector('#option-b') as HTMLButtonElement;
+			const output = container.querySelector('output')!;
+			const click = (target: HTMLElement, timeStamp: number) => {
+				const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+				Object.defineProperty(event, 'timeStamp', { value: timeStamp });
+				target.dispatchEvent(event);
+			};
+
+			root = hydrateRoot(container, client.ReplayOrderHydration, props);
+			await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
+			click(optionA, 10);
+			// The activation render commits in a microtask; its replay waits for paint.
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(container.querySelector('#option-a')).toBe(optionA);
+			expect(choices).toEqual([]);
+			click(optionB, 20);
+			await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
+
+			expect(choices).toEqual([
+				['A', 10],
+				['B', 20],
+			]);
+			expect(output.textContent).toBe('B');
+			// Once the replay drains, later clicks reach the hydrated handlers directly.
+			click(optionA, 30);
+			expect(choices.at(-1)).toEqual(['A', 30]);
+			await vi.waitFor(() => expect(output.textContent).toBe('A'));
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it('keeps a live nested-boundary event behind the parent replay that targets it', async () => {
+		vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
+			setTimeout(() => callback(performance.now()), 16),
+		);
+		try {
+			const received: Array<[string, number]> = [];
+			const record = (event: Event) => received.push([event.type, event.timeStamp]);
+			const props = {
+				outerWhen: interaction({ events: 'click' }),
+				// Only the nested boundary captures keydown.
+				innerWhen: interaction({ events: ['click', 'keydown'] }),
+				onTargetClick: record,
+				onTargetKeyDown: record,
+			};
+			container.innerHTML = renderToString(server.NestedInteractionHydration, props).html;
+			const target = container.querySelector('#interaction-target') as HTMLButtonElement;
+			const dispatch = (event: Event, timeStamp: number) => {
+				Object.defineProperty(event, 'timeStamp', { value: timeStamp });
+				target.dispatchEvent(event);
+			};
+
+			root = hydrateRoot(container, client.NestedInteractionHydration, props);
+			await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
+			// Parent-first: the outer boundary captures this click and owes it to the inner one.
+			dispatch(new MouseEvent('click', { bubbles: true, cancelable: true }), 10);
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			dispatch(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'a' }), 20);
+			await vi.waitFor(() => expect(received).toHaveLength(2));
+			await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
+
+			expect(received).toEqual([
+				['click', 10],
+				['keydown', 20],
+			]);
+			expect(container.querySelector('#interaction-target')).toBe(target);
+		} finally {
+			vi.unstubAllGlobals();
+		}
 	});
 
 	it('runs setup and cleanup for a custom interaction strategy', async () => {
