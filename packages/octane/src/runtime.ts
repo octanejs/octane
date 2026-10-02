@@ -19280,6 +19280,24 @@ class HydrationCapability {
 	}
 
 	/**
+	 * Report a control-flow or list range whose server content before `end` was
+	 * discarded so the client could build its own arm there. Returns whether it
+	 * reported, so callers warn only then. A suspended boundary's next attempt
+	 * finds the earlier attempt's content before the same `end` (a list's open
+	 * marker still names the server's arm), and captures that changed before a
+	 * dormant boundary activated legitimately differ from the server's: neither
+	 * is a mismatch to report. A root attempt that rolls back restores the server
+	 * content and forgets `end`, so its retry reports.
+	 */
+	reportRebuiltRange(end: Node): boolean {
+		const rebuilt = HYDRATION_REBUILT?.has(end) === true;
+		this.remember((HYDRATION_REBUILT ??= new WeakSet()), end);
+		if (rebuilt || this.staleServerValues) return false;
+		noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+		return true;
+	}
+
+	/**
 	 * STRUCTURAL recovery for a list where the SERVER rendered MORE items than the
 	 * client now renders: after its first fill adopts the client's items, the
 	 * cursor sits on the first unconsumed server item (or at `end`). Discard
@@ -33920,6 +33938,8 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		// element fresh with hydration SUSPENDED for its subtree (so children client-mount
 		// rather than mis-adopt). Recovery runs in dev + prod; the warning is dev-only.
 		hydration.save(block.parentNode);
+		if (!hydration.staleServerValues)
+			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 		if (process.env.NODE_ENV !== 'production') {
 			const mmLoc = (domNode(hydration.node).parentNode as any)?.__oct_loc;
 			if (mmLoc)
@@ -41817,7 +41837,10 @@ function renderBranchSlot(
 						// STRUCTURAL mismatch — discard the server range and client-build the
 						// branch fresh into the borrowed slot markers below.
 						hydration.save(domParent);
-						if (process.env.NODE_ENV !== 'production') {
+						if (
+							hydration.reportRebuiltRange(state.end as Node) &&
+							process.env.NODE_ENV !== 'production'
+						) {
 							const mmLoc = siteLoc(parentScope, slotKey);
 							if (mmLoc)
 								hydration.warnStructural(
@@ -41876,7 +41899,10 @@ function renderBranchSlot(
 				// stale server range so the empty branch leaves a clean range + siblings stay
 				// aligned (structural mismatch).
 				hydration.save(domParent);
-				if (process.env.NODE_ENV !== 'production') {
+				if (
+					hydration.reportRebuiltRange(state.end as Node) &&
+					process.env.NODE_ENV !== 'production'
+				) {
 					const mmLoc = siteLoc(parentScope, slotKey);
 					if (mmLoc)
 						hydration.warnStructural(
@@ -43299,7 +43325,9 @@ export function forBlock<T>(
 				!hydration.isOpen(getNextSibling(state.start))))
 	) {
 		hydration.save(domParent);
-		if (process.env.NODE_ENV !== 'production') {
+		// Marking the list's end also keeps the client items, which find the cursor
+		// there, from reporting the same recovery again.
+		if (hydration.reportRebuiltRange(state.end) && process.env.NODE_ENV !== 'production') {
 			const mmLoc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
 			if (mmLoc) hydration.warnStructural(mmLoc, 'a populated list', 'an empty list (@empty)');
 		}
