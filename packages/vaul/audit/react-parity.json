@@ -116,7 +116,7 @@
         {
           "path": "packages/vaul/typetests/pristine/tsconfig.json",
           "role": "support",
-          "sha256": "02a748795b5b54272291f2e093bf59acaec22cb648e20ddd724a2f0e951aaab2"
+          "sha256": "3a73d2d418bf7f4567cae33d56f85b969bf91e6e2b71e7f995be1a5173f61157"
         },
         {
           "path": "packages/vaul/typetests/assertions.md",

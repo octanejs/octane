@@ -8,7 +8,11 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "react": ["../../node_modules/@types/react"],
+      "react/*": ["../../node_modules/@types/react/*"]
+    }
   },
   "include": ["types.test-d.ts"]
 }

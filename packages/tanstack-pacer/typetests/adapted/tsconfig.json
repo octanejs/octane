@@ -16,7 +16,9 @@
       "@octanejs/tanstack-pacer": ["../../src/index.ts"],
       "@octanejs/tanstack-pacer/*": ["../../src/*/index.ts"],
       "@octanejs/tanstack-store": ["../../../tanstack-store/src/index.ts"],
-      "octane": ["../../../octane/src/index.ts"]
+      "octane": ["../../../octane/src/index.ts"],
+      "react": ["../../node_modules/@types/react"],
+      "react/*": ["../../node_modules/@types/react/*"]
     }
   },
   "include": ["../../src/**/*.ts", "../../src/**/*.tsrx", "./*.ts"],

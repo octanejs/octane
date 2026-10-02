@@ -168,7 +168,7 @@
         {
           "path": "packages/tanstack-pacer/typetests/pristine/tsconfig.json",
           "role": "support",
-          "sha256": "123d76bbf8aaf2abe5a2efd2306a7a87f0ecb8b0e8099ef56517d3f0b576f2e3"
+          "sha256": "99f9fc0d187305c6097ce0b5c7ed21f06ca9aec2ed5e174333271253359ba3d5"
         },
         {
           "path": "packages/tanstack-pacer/audit/type-parity.json",
@@ -226,7 +226,7 @@
         {
           "path": "packages/tanstack-pacer/typetests/adapted/tsconfig.json",
           "role": "support",
-          "sha256": "422c84ba902a3166b11515bd6c3279e9b35818bee9db14456f1c7e7f66850e58"
+          "sha256": "05d0d4853388841f739cea7c941a2033bdd4de880845e36b3a69401347513bb9"
         },
         {
           "path": "packages/tanstack-pacer/audit/type-parity.json",

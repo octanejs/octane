@@ -11,7 +11,9 @@
     "skipLibCheck": false,
     "strict": true,
     "paths": {
-      "@tanstack/react-pacer": ["../../upstream/src/index.ts"]
+      "@tanstack/react-pacer": ["../../upstream/src/index.ts"],
+      "react": ["../../node_modules/@types/react"],
+      "react/*": ["../../node_modules/@types/react/*"]
     }
   },
   "include": ["../../upstream/src/**/*.ts", "../../upstream/src/**/*.tsx", "./*.ts"],
