@@ -1836,7 +1836,10 @@ hydration after suspending does not report content that an earlier attempt
 already rebuilt. A try body that throws to its `@catch` arm or `<ErrorBoundary>`
 fallback reports nothing for what it adopted before it threw, in development or
 production: the catch arm replaces that content, and where the server's body
-threw the same way, the server rendered its catch arm there. Octane recovers per site
+threw the same way, the server rendered its catch arm there. A resolved `@try`
+arm keeps its server text and attribute values while its hydration is
+suspended; the attempt that commits reports each corrected text once and, in
+development, warns about each value mismatch once. Octane recovers per site
 rather than client-rendering a whole boundary, so attribute-level value patches
 do not report: production React does not detect those at all, and reporting
 Octane's extra detection would make the channel incomparable.

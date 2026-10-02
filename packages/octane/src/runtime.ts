@@ -1754,6 +1754,25 @@ function warnHydrationKeptServerValue(
 	);
 }
 
+/**
+ * Publish a value diagnostic, or hold it while `hydration` is a speculative
+ * attempt: a discarded attempt reports nothing, and the one that commits
+ * finds the same mismatch and reports it once.
+ */
+function warnHeldHydrationMismatch(
+	hydration: HydrationCapability,
+	warn: typeof warnHydrationValueMismatch,
+	loc: string | undefined,
+	what: string,
+	serverVal: unknown,
+	clientVal: unknown,
+): void {
+	if (!loc) return;
+	if (hydration.speculative)
+		(hydration.heldWarnings ??= []).push(warn, loc, what, serverVal, clientVal);
+	else warn(loc, what, serverVal, clientVal);
+}
+
 /** DEV-only human-readable description of the server node at the cursor (for warnings). */
 function describeHydrationNode(node: Node | null): string {
 	if (node === null) return 'nothing';
@@ -18589,6 +18608,15 @@ class HydrationCapability {
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
 	readonly classWrites = new Map<Element, PendingHydrationClassWrite>();
 	private readonly textWarnings = new Map<Text, PendingHydrationTextWarning>();
+	/**
+	 * A resolved Suspense arm's attempt, which a suspension discards so that a
+	 * later attempt adopts the same server nodes. Each server value it repairs
+	 * goes on `repairs`, flat `[node, attribute or null for text, value]`, and
+	 * its value diagnostics wait in `heldWarnings` until it settles.
+	 */
+	speculative = false;
+	private repairs: unknown[] | null = null;
+	heldWarnings: unknown[] | null = null;
 	/** Skip component-frame adoption until the declared container owner. */
 	passthroughRanges = false;
 	/** A slot lent a server range whose first render has yet to claim it. */
@@ -19023,6 +19051,69 @@ class HydrationCapability {
 			}
 		}
 		this.textWarnings.clear();
+	}
+
+	/**
+	 * A speculative attempt is about to overwrite the server's `value` of a text
+	 * node (`name` null) or an attribute. A freshly cloned node holds the client
+	 * template's value, not the server's, so it has nothing to restore.
+	 */
+	repaired(target: Node, name: string | null, value: string | null): void {
+		if (this.freshNodes.has(name === null ? domNode(target).parentNode! : target)) return;
+		(this.repairs ??= []).push(target, name, value);
+	}
+
+	/**
+	 * This attempt rendered. A speculative attempt that encloses it can still be
+	 * discarded, so that one takes over the repairs and pending diagnostics;
+	 * otherwise they are final and publish.
+	 */
+	settle(outer: HydrationCapability | null): void {
+		if (outer?.speculative === true) {
+			if (this.repairs !== null) outer.repairs = (outer.repairs ?? []).concat(this.repairs);
+			if (process.env.NODE_ENV !== 'production' && this.heldWarnings !== null)
+				outer.heldWarnings = (outer.heldWarnings ?? []).concat(this.heldWarnings);
+			for (const [node, pending] of this.textWarnings)
+				if (!outer.textWarnings.has(node)) outer.textWarnings.set(node, pending);
+		} else {
+			if (process.env.NODE_ENV !== 'production' && this.heldWarnings !== null) {
+				const held = this.heldWarnings;
+				for (let i = 0; i < held.length; i += 5)
+					(held[i] as typeof warnHydrationValueMismatch)(
+						held[i + 1] as string | undefined,
+						held[i + 2] as string,
+						held[i + 3],
+						held[i + 4],
+					);
+			}
+			this.flushTextWarnings();
+		}
+		this.repairs = this.heldWarnings = null;
+	}
+
+	/**
+	 * A speculative attempt was discarded. Put back the server values it
+	 * repaired, newest first, so the attempt that commits finds and reports the
+	 * same mismatches, and drop the diagnostics it held.
+	 */
+	rollback(): void {
+		const repairs = this.repairs;
+		this.repairs = this.heldWarnings = null;
+		this.textWarnings.clear();
+		if (repairs === null) return;
+		for (let i = repairs.length - 3; i >= 0; i -= 3) {
+			const target: any = STAGED_DOM?.view(repairs[i] as Node) ?? repairs[i];
+			const name = repairs[i + 1] as string | null;
+			const value = repairs[i + 2] as string | null;
+			if (name === null) target.nodeValue = value;
+			// Removal by qualified name also finds a namespaced attribute.
+			else if (value === null) target.removeAttribute(name);
+			else {
+				const ns = attrNamespace(name);
+				if (ns === null) target.setAttribute(name, value);
+				else target.setAttributeNS(ns, name, value);
+			}
+		}
 	}
 
 	removeRange(start: Node, end: Node): void {
@@ -19532,6 +19623,7 @@ class HydrationCapability {
 				!isHydrationSuppressed(el)
 			) {
 				this.recordTextMismatch(first as Text, loc || (el as any).__oct_loc, server);
+				if (this.speculative) this.repaired(first, null, server);
 				(STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue = text;
 			}
 			if (getNextSibling(first) !== null) {
@@ -19661,6 +19753,7 @@ class HydrationCapability {
 				const host = (STAGED_DOM?.view(posNode) ?? posNode).parentNode;
 				if (!isHydrationSuppressed(host)) {
 					this.recordTextMismatch(posNode as Text, host && (host as any).__oct_loc, server);
+					if (this.speculative) this.repaired(posNode, null, server);
 					(STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue = text;
 				}
 			}
@@ -19729,10 +19822,17 @@ class HydrationCapability {
 		if (domBindingClaims.get(el)?.get(name) === server) return false;
 		if (next !== null && isAttributeParserNormalizedMatch(server, next)) return false;
 		const mode = hydrationMismatchMode(el);
-		if (mode === 0) return true;
 		if (mode === 1) return false;
-		if (process.env.NODE_ENV !== 'production' && !this.staleServerValues)
-			warnHydrationValueMismatch((el as any).__oct_loc, `attribute \`${name}\``, server, next);
+		if (process.env.NODE_ENV !== 'production' && mode === 2 && !this.staleServerValues)
+			warnHeldHydrationMismatch(
+				this,
+				warnHydrationValueMismatch,
+				(el as any).__oct_loc,
+				`attribute \`${name}\``,
+				server,
+				next,
+			);
+		if (this.speculative) this.repaired(el, name, server);
 		return true;
 	}
 
@@ -19742,16 +19842,23 @@ class HydrationCapability {
 		const server = absentIsEmpty && rawServer === null ? '' : rawServer;
 		if (server === next) return true;
 		if (domBindingClaims.get(el)?.get('class') === rawServer) return false;
-		if (mode === 0) return true;
 		if (mode === 1) return false;
 		if (
 			process.env.NODE_ENV !== 'production' &&
+			mode === 2 &&
 			!this.staleServerValues &&
 			// Class writes flush after the render. A boundary whose body adopted
 			// `el` and then threw to its catch arm has removed it since.
 			domNode(this.rootBlock.parentNode).contains(el)
 		)
-			warnHydrationValueMismatch((el as any).__oct_loc, 'attribute `class`', server, next);
+			warnHeldHydrationMismatch(
+				this,
+				warnHydrationValueMismatch,
+				(el as any).__oct_loc,
+				'attribute `class`',
+				server,
+				next,
+			);
 		return true;
 	}
 
@@ -19778,6 +19885,8 @@ class HydrationCapability {
 				// value that never existed in either the server or final client output.
 				if ((STAGED_DOM?.view(el) ?? el).getAttribute('class') === rawTarget) continue;
 				if (!this.allowClass(el, write.next, write.absentIsEmpty)) continue;
+				if (this.speculative)
+					this.repaired(el, 'class', (STAGED_DOM?.view(el) ?? el).getAttribute('class'));
 				if (write.remove) (STAGED_DOM?.view(el) ?? el).removeAttribute('class');
 				else if (write.useAttribute)
 					(STAGED_DOM?.view(el) ?? el).setAttribute('class', write.next!);
@@ -19838,10 +19947,19 @@ class HydrationCapability {
 		const expectsStyleAttribute = expected !== '';
 		if (before === expected && hadStyleAttribute === expectsStyleAttribute) return true;
 
+		if (this.speculative)
+			this.repaired(el, 'style', (STAGED_DOM?.view(el) ?? el).getAttribute('style'));
 		if (expectsStyleAttribute) style.cssText = expected;
 		else (STAGED_DOM?.view(el) ?? el).removeAttribute('style');
 		if (mode === 2 && process.env.NODE_ENV !== 'production' && !this.staleServerValues) {
-			warnHydrationValueMismatch((el as any).__oct_loc, 'style', before, expected);
+			warnHeldHydrationMismatch(
+				this,
+				warnHydrationValueMismatch,
+				(el as any).__oct_loc,
+				'style',
+				before,
+				expected,
+			);
 		}
 		return true;
 	}
@@ -22273,12 +22391,15 @@ export function setHTML(el: Element, value: any): void {
 			return;
 		}
 		if (isHydrationSuppressed(el)) return;
-		warnHydrationKeptServerValue(
-			(el as any).__oct_loc,
-			'`dangerouslySetInnerHTML` content',
-			server,
-			expected,
-		);
+		if (process.env.NODE_ENV !== 'production')
+			warnHeldHydrationMismatch(
+				hydration,
+				warnHydrationKeptServerValue,
+				(el as any).__oct_loc,
+				'`dangerouslySetInnerHTML` content',
+				server,
+				expected,
+			);
 		return;
 	}
 	if (el.localName === 'script') {
@@ -37852,6 +37973,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 	state.block = block;
 	setTryBranch(state, 1);
 	const hydration = new HydrationCapability(block, getNextSibling(initial.start), null);
+	hydration.speculative = true;
 	if (initial.seedRaw !== null) hydration.seeds = hydration.parseSeeds(initial.seedRaw);
 	// This capability owns one exact arm, never the surrounding root siblings.
 	hydration.claimRootRemainder(initial.end);
@@ -37880,12 +38002,17 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		renderBlock(block);
 		drainHydrationRenderPhaseUpdates(block);
 		hydration.flushClassWrites();
-		hydration.flushTextWarnings();
+		hydration.settle(previousHydration);
 		state.hasResolved = true;
 	} catch (error) {
 		failed = true;
 		failure = error;
 		if (isSuspenseException(error)) suspended = error.thenable;
+		// The next attempt, or the server catch arm adopted below, finds the
+		// server's values as it left them. That catch arm commits directly, so
+		// this capability stops holding its reports.
+		hydration.rollback();
+		hydration.speculative = false;
 		// None of this attempt's refs or effects committed. Dispose its scopes
 		// without detaching the actual server nodes that the next attempt adopts.
 		const refs: SuspenseRefEntry[] = [];
