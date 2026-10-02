@@ -562,10 +562,14 @@ it (`OCTANE_STRONG_EFFECT_DATA_FETCH`).
 
 The compiler also rejects render-time writes through a provable state snapshot
 (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`) and direct calls to known
-non-idempotent globals such as `Date.now()` and `Math.random()`
-(`OCTANE_STRONG_RENDER_IMPURE_CALL`). These checks follow supported aliases and
-synchronous helpers; they do not prove arbitrary method bodies or imported code
-pure. Lazy state initialization may obtain an initial timestamp or random value.
+non-idempotent globals such as `Date.now()`, `Math.random()`, and
+`crypto.randomUUID()` (`OCTANE_STRONG_RENDER_IMPURE_CALL`), including inside
+callbacks that known array methods run synchronously. These checks follow
+supported aliases and synchronous helpers; they do not prove arbitrary method
+bodies or imported code pure. Lazy state initialization may obtain an initial
+timestamp or random value. Locale- and time-zone-dependent formatting of a
+provable `Date` or an `Intl` service during render reports
+`OCTANE_STRONG_RENDER_LOCALE_FORMAT`; pass an explicit locale and `timeZone`.
 State values stay immutable outside render too
 (`OCTANE_STRONG_SNAPSHOT_MUTATION`), updaters and reducers follow the render
 checks because Octane may replay them (`OCTANE_STRONG_IMPURE_UPDATER`), and a
@@ -592,6 +596,14 @@ events, effects, and deferred callbacks remain supported. Lazy `useState` and
 still run during server rendering: guard unavailable browser APIs and ensure the
 server and client agree on initial output. A `typeof window` guard inside an
 ordinary render calculation does not make the calculation snapshot-safe.
+
+Strong modules also keep the DOM that Octane renders under the template's
+control. A ref write to children, a class, an attribute, or a `style` property
+that the template sets on the same element reports
+`OCTANE_STRONG_MANAGED_DOM_WRITE`, and raw HTML written to a rendered element
+reports `OCTANE_STRONG_RAW_HTML_WRITE`. A document query for a literal `id` or
+class the same component renders reports `OCTANE_STRONG_OWN_MARKUP_QUERY`. React
+accepts all three.
 
 The directive is also an author assertion for production memoization, not just a
 request for diagnostics. Render output must not observe changing data through a
@@ -1825,10 +1837,38 @@ structural or text recovery — a rebuilt subtree, corrected text, or a discarde
 stale server range —
 coalesced to one report per root per microtask burst. A boundary that retries
 hydration after suspending does not report content that an earlier attempt
-already rebuilt. Octane recovers per site
+already rebuilt. A try body that throws to its `@catch` arm or `<ErrorBoundary>`
+fallback reports nothing for what it adopted before it threw, in development or
+production: the catch arm replaces that content, and where the server's body
+threw the same way, the server rendered its catch arm there. Octane recovers per site
 rather than client-rendering a whole boundary, so attribute-level value patches
 do not report: production React does not detect those at all, and reporting
 Octane's extra detection would make the channel incomparable.
+
+A `<Hydrate>` boundary replays captured interaction events as constructed,
+untrusted copies that keep the captured event's `timeStamp`, including through
+nested boundaries. React replays only the continuous events (`focusin`,
+`dragenter`, `mouseover`, `pointerover`, `gotpointercapture`) that arrive
+before their target hydrates, as `new nativeEvent.constructor(type,
+nativeEvent)` copies, and their `timeStamp` is the replay time. React never
+replays a discrete event: it tries to hydrate the target synchronously and then
+dispatches the original event to whatever has hydrated.
+
+That includes the rest of a pointer press. An `interaction()` boundary that
+selects `pointermove`, `pointerup`, or `pointercancel` captures them after a
+selected press wakes it and replays them in order once it hydrates (see
+[Pointer press lifecycle](./deferred-hydration.md#pointer-press-lifecycle)).
+React drops a `pointerup` or `pointercancel` whose target is still suspended
+after that synchronous attempt, and never delivers `pointermove` to a dehydrated
+subtree's handlers. Neither framework cancels the native default of these
+events.
+
+Octane replays after the boundary's hydration commits and its effects run,
+which can be a frame later. A boundary or independent island keeps capturing
+its interaction events until that replay runs, so one arriving in between is
+replayed after the captured ones instead of reaching the hydrated handlers
+first. Handlers see those events in the order the user produced them, as in
+React.
 
 `hydrateRoot` has no `formState` option: resuming `useActionState` from an MPA
 form POST requires React's server-action state serialization, which is part of

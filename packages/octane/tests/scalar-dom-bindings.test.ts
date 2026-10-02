@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { startTransition } from 'octane';
+import { flushSync, hydrateRoot, startTransition } from 'octane';
 import { renderToString } from 'octane/server';
 import { createScope } from '../src/signals/index.js';
 import * as DomBindings from '../src/dom-bindings.js';
 import * as DomBindingSignals from '../src/dom-binding-signals.js';
+import { BLOCKED_JAVASCRIPT_URL } from '../src/sanitize-url.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 
 // Every channel is a fixed scalar, so the compiler selects the scalar adopter.
@@ -13,9 +14,18 @@ const BADGE = `export function Badge(props) @{
   'use dom bindings';
   <p title={props.title} class={props.classes} aria-live={props.live} hidden={props.hidden}><b>{props.count as number}</b></p>
 }`;
+// URL channels also select the scalar adopter, with the sanitizer the artifact carries.
 const LINK = `export function Link(props) @{
   'use dom bindings';
   <a href={props.href}>{props.label as string}</a>
+}`;
+const LINKS = `export function Links(props) @{
+  'use dom bindings';
+  <nav title={props.title}>
+    <a href={props.href}>{props.label as string}</a>
+    <img src={props.src} alt="" />
+    <svg><use href={props.icon} /></svg>
+  </nav>
 }`;
 
 type View = DomBindings.CompiledBindings<Record<string, unknown>> & {
@@ -32,12 +42,13 @@ function compile(source: string, view: string, dev: boolean) {
 	const id = `/src/${view}.tsrx`;
 	const options = { compileOptions: { dev, hmr: false }, runtimeModules };
 	const server = loadCompiledFixtureSource(source, { ...options, id, mode: 'server' });
+	const client = loadCompiledFixtureSource(source, { ...options, id, mode: 'client' });
 	const artifact = loadCompiledFixtureSource(source, {
 		...options,
 		id: `${id}?octane-bindings=${view}`,
 		mode: 'client',
 	}).default as View;
-	return { server, artifact };
+	return { server, client, artifact };
 }
 
 function source(initial: Record<string, unknown>) {
@@ -67,9 +78,11 @@ function source(initial: Record<string, unknown>) {
 }
 
 const plain = { title: 'First', classes: 'a', live: 'polite', hidden: false, count: 1 };
+const linked = { title: 'Links', href: '/a', label: 'Open', src: '/a.png', icon: '#send' };
 
 afterEach(() => {
 	document.body.replaceChildren();
+	vi.restoreAllMocks();
 });
 
 describe.each([
@@ -92,6 +105,23 @@ describe.each([
 				state: DomBindings.BindingSource<Record<string, unknown>>,
 				options?: DomBindings.BindingOptions,
 			) => view.adopt(paragraph, view, state, options),
+		};
+	}
+
+	function links() {
+		const { server, client, artifact } = compile(LINKS, 'Links', dev);
+		const view: View =
+			lane === 'scalar' ? artifact : { ...artifact, adopt: DomBindings.__adoptBindings };
+		document.body.innerHTML = renderToString(server.Links, linked).html;
+		const nav = document.querySelector('nav')!;
+		return {
+			client,
+			nav,
+			anchor: nav.querySelector('a')!,
+			image: nav.querySelector('img')!,
+			icon: nav.querySelector('use')!,
+			adopt: (state: DomBindings.BindingSource<Record<string, unknown>>) =>
+				view.adopt(nav, view, state),
 		};
 	}
 
@@ -245,6 +275,91 @@ describe.each([
 		expect(paragraph.title).toBe('Before');
 		expect(notify.size).toBe(0);
 	});
+
+	it('sanitizes, clears and updates URL channels in place, including signal handles', () => {
+		const { nav, anchor, image, icon, adopt } = links();
+		const scope = createScope({ scopeKey: `scalar-urls-${dev}-${lane}` });
+		const icon$ = scope.signal$('icon', '#stop');
+		const model = source({ ...linked, icon: icon$ });
+		const handle = adopt(model.state);
+		try {
+			expect(icon.getAttribute('href')).toBe('#stop');
+			model.publish({ href: 'javascript:alert(1)', src: '\t JaVa\nScRiPt:alert(2)' });
+			expect(anchor.getAttribute('href')).toBe(BLOCKED_JAVASCRIPT_URL);
+			expect(image.getAttribute('src')).toBe(BLOCKED_JAVASCRIPT_URL);
+			// An empty URL stays only on an anchor's href; elsewhere it is removed.
+			model.publish({ href: '', src: '' });
+			expect(anchor.getAttribute('href')).toBe('');
+			expect(image.hasAttribute('src')).toBe(false);
+			model.publish({ href: null, src: '/b.png', label: 'Next' });
+			expect(anchor.hasAttribute('href')).toBe(false);
+			expect([image.getAttribute('src'), anchor.textContent]).toEqual(['/b.png', 'Next']);
+
+			model.getSnapshot.mockClear();
+			icon$.set('javascript:void 0');
+			expect(icon.getAttribute('href')).toBe(BLOCKED_JAVASCRIPT_URL);
+			icon$.set('#send');
+			expect(icon.getAttribute('href')).toBe('#send');
+			expect(model.getSnapshot).not.toHaveBeenCalled();
+			expect(nav.querySelector('a')).toBe(anchor);
+			expect(nav.querySelector('use')).toBe(icon);
+		} finally {
+			handle.dispose();
+		}
+		icon$.set('#late');
+		model.publish({ href: '/late' });
+		expect([icon.getAttribute('href'), anchor.hasAttribute('href')]).toEqual(['#send', false]);
+		expect(model.subscribers.size).toBe(0);
+		scope.dispose();
+	});
+
+	// Hydrating with the older rendered props must keep what the binding
+	// published, including a URL it removed, without reporting a mismatch.
+	it('retains adopted URL and attribute publications through hydration', () => {
+		const { client, nav, anchor, image, adopt } = links();
+		const model = source(linked);
+		const handle = adopt(model.state);
+		model.publish({ title: 'Adopted', href: '/adopted', src: '' });
+		expect(image.hasAttribute('src')).toBe(false);
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			flushSync(() => {
+				root = hydrateRoot(document.body, client.Links, linked);
+			});
+			expect(document.querySelector('nav')).toBe(nav);
+			expect([nav.title, anchor.getAttribute('href'), image.hasAttribute('src')]).toEqual([
+				'Adopted',
+				'/adopted',
+				false,
+			]);
+			expect(error).not.toHaveBeenCalled();
+		} finally {
+			handle.dispose();
+			root?.unmount();
+		}
+	});
+
+	it('repairs a URL changed after its adopted publication during hydration', () => {
+		const { client, anchor, adopt } = links();
+		const model = source(linked);
+		const handle = adopt(model.state);
+		model.publish({ href: '/adopted' });
+		anchor.setAttribute('href', '/unrelated');
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			flushSync(() => {
+				root = hydrateRoot(document.body, client.Links, linked);
+			});
+			expect(anchor.getAttribute('href')).toBe('/a');
+			if (dev) expect(error).toHaveBeenCalled();
+			else expect(error).not.toHaveBeenCalled();
+		} finally {
+			handle.dispose();
+			root?.unmount();
+		}
+	});
 });
 
 describe.each([false, true])('scalar adopter ownership (dev=%s)', (dev) => {
@@ -272,7 +387,8 @@ describe.each([false, true])('scalar adopter ownership (dev=%s)', (dev) => {
 	});
 
 	// The compiler emits the scalar entry only with proof. If an artifact reaches
-	// it without that proof, no URL may be written without sanitization.
+	// it without that proof, such as a URL view without its sanitizer, no URL may
+	// be written without sanitization.
 	it('refuses an artifact that needs the general adopter before claiming anything', () => {
 		const { server, artifact } = compile(LINK, 'Link', dev);
 		document.body.innerHTML = renderToString(server.Link, {
@@ -281,7 +397,8 @@ describe.each([false, true])('scalar adopter ownership (dev=%s)', (dev) => {
 		}).html;
 		const anchor = document.querySelector('a')!;
 		const unsafe = source({ href: 'javascript:alert(1)', label: 'Unsafe' });
-		expect(() => DomBindings.__adoptScalarBindings(anchor, artifact, unsafe.state)).toThrow(
+		const unsanitized = { ...artifact, url: undefined };
+		expect(() => DomBindings.__adoptScalarBindings(anchor, unsanitized, unsafe.state)).toThrow(
 			/requires the general adopter/,
 		);
 		expect(unsafe.subscribers.size).toBe(0);
@@ -297,8 +414,8 @@ describe.each([false, true])('scalar adopter ownership (dev=%s)', (dev) => {
 			).toThrow(/requires the general adopter/);
 		}
 		// The general adopter still owns and sanitizes the refused artifact.
-		const handle = artifact.adopt(anchor, artifact, unsafe.state);
-		expect(anchor.getAttribute('href')).not.toBe('javascript:alert(1)');
+		const handle = DomBindings.__adoptBindings(anchor, unsanitized, unsafe.state);
+		expect(anchor.getAttribute('href')).toBe(BLOCKED_JAVASCRIPT_URL);
 		expect(anchor.textContent).toBe('Unsafe');
 		handle.dispose();
 	});

@@ -738,6 +738,110 @@ matrix.itRenders('uses flattened option text when value is omitted', {
 	},
 });
 
+for (const testCase of [
+	{
+		name: 'uncontrolled default',
+		a: 'A',
+		b: 'B',
+		text: 'AB',
+		selectProps: { defaultValue: 'AB' },
+		optionValue: undefined,
+		selected: ['AB'],
+	},
+	{
+		name: 'controlled escaped text',
+		a: '<!--A-->&',
+		b: 'B<',
+		text: '<!--A-->&B<',
+		selectProps: { value: '<!--A-->&B<', readOnly: true },
+		optionValue: undefined,
+		selected: ['<!--A-->&B<'],
+	},
+	{
+		name: 'multiple default',
+		a: 'A',
+		b: 'B',
+		text: 'AB',
+		selectProps: { multiple: true, defaultValue: ['AB', 'other'] },
+		optionValue: undefined,
+		selected: ['AB', 'other'],
+	},
+	{
+		name: 'numeric children',
+		a: 0,
+		b: 7,
+		text: '07',
+		selectProps: { defaultValue: '07' },
+		optionValue: undefined,
+		selected: ['07'],
+	},
+	{
+		name: 'nested text children',
+		a: ['A', [null, false, '&']],
+		b: 'B',
+		text: 'A&B',
+		selectProps: { defaultValue: 'A&B' },
+		optionValue: undefined,
+		selected: ['A&B'],
+	},
+	{
+		name: 'explicit value overrides text',
+		a: 'A',
+		b: 'B',
+		text: 'AB',
+		selectProps: { defaultValue: 'AB' },
+		optionValue: 'chosen',
+		selected: ['fallback'],
+	},
+	{
+		name: 'explicit value matches',
+		a: 'A',
+		b: 'B',
+		text: 'AB',
+		selectProps: { value: 'chosen', readOnly: true },
+		optionValue: 'chosen',
+		selected: ['chosen'],
+	},
+]) {
+	const props = () => ({
+		a: testCase.a,
+		b: testCase.b,
+		optionValue: testCase.optionValue,
+		selectProps: { ...testCase.selectProps },
+	});
+	matrix.itRenders<
+		undefined,
+		ReturnType<typeof props>,
+		ReturnType<typeof props>,
+		[Element | null, Element | null]
+	>(`selects dynamic option text (${testCase.name})`, {
+		component: 'SelectDynamicOptionText',
+		props,
+		mismatch: structuralMismatch,
+		assertCommon({ root }) {
+			const select = expectSelectedOptions(
+				root,
+				'#matrix-select-dynamic-option',
+				testCase.selected,
+			);
+			expect(select.options[1].textContent).toBe(testCase.text);
+			expect(select.options[1].value).toBe(testCase.optionValue ?? testCase.text);
+		},
+		captureBeforeHydrate: (container) => [
+			container.querySelector('#matrix-select-dynamic-option'),
+			container.querySelector('#matrix-select-dynamic-option option:nth-child(2)'),
+		],
+		assertByMode: {
+			'hydrate-match'({ root, before }) {
+				expect(root.querySelector('#matrix-select-dynamic-option')).toBe(before![0]);
+				expect(root.querySelector('#matrix-select-dynamic-option option:nth-child(2)')).toBe(
+					before![1],
+				);
+			},
+		},
+	});
+}
+
 // Per ReactDOMServerIntegrationSelect-test.js:247/:261.
 matrix.itRenders('coerces a boolean select value to its matching option string', {
 	component: 'SelectBooleanValue',

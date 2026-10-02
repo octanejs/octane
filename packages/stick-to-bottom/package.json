@@ -41,7 +41,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --config vitest.config.js --project stick-to-bottom",
-    "typecheck": "tsrx-tsc --noEmit"
+    "typecheck": "octane-tsc -p tsconfig.json"
   },
   "peerDependencies": {
     "octane": "workspace:^0.7.0"

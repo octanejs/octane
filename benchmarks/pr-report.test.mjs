@@ -39,6 +39,17 @@ test('timing deltas inside the combined margin of error are not verdicts', () =>
 	assert.equal(verdict(fastestUnmoved), 'within noise');
 });
 
+// A typecheck-only PR read octane-jsx runlots +77% (±61%) while its fastest sample moved +3%.
+test('a slow-outlier score move is not a verdict unless the fastest sample moves beyond noise too', () => {
+	const base = suite('js-framework', [
+		{ name: 'octane-jsx', ops: { runlots: timed(35.7, 33.9, 3) } },
+	]);
+	const head = suite('js-framework', [
+		{ name: 'octane-jsx', ops: { runlots: timed(63.3, 34.8, 61) } },
+	]);
+	assert.equal(compareSuite('js-framework', base, head).timing[0].verdict, 'within noise');
+});
+
 // Identical runtime code on CI produced select 0.18ms -> 0.26ms: under one 0.1ms timer tick.
 test('sub-millisecond timing changes within one timer tick are not verdicts', () => {
 	const base = suite('js-framework', [

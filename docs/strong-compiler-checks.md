@@ -11,6 +11,8 @@ support explicit dependencies, manual memo hooks, and ordinary raw HTML props.
 | --- | --- | --- |
 | `OCTANE_STRONG_EFFECT_STATE_UPDATE` | Effect setup calls a state updater synchronously. This includes updaters and callbacks returned by same-module custom hooks, and callbacks that run before the next paint: `startTransition`, a `useTransition` start function, `queueMicrotask`, `.then`/`.catch`/`.finally` on `Promise.resolve(value)` or `Promise.reject()`, `setTimeout` without a positive delay, and code after an `await` that resumes without waiting on any path, such as `await null` or `await (flag ? load() : null)`. | Derive the value during render, or use `useLinkedState` when state follows another value. `requestAnimationFrame`, timers with a positive delay, and external subscription callbacks remain event-driven. |
 | `OCTANE_STRONG_EFFECT_DATA_FETCH` | A state update runs after an `await`, or in a `.then`, `.catch`, or `.finally` callback, of work the effect started, and the returned cleanup does not provably cancel or ignore it. An async effect callback returns a promise, so it cannot return cleanup. | Read asynchronous render data with `use()` or a query binding. For external synchronization, abort an `AbortController` whose `signal` is passed to the request, or set a flag declared in the effect from its cleanup and check it before the update. See [Effect cleanup](#effect-cleanup). |
+| `OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY` | Synchronous effect setup calls a state getter, reads `current` from a value ref, or reads a reassigned module `let` or `var`. None of these is an inferred dependency, so the effect does not re-run when they change. | Read the render snapshot, or move the non-reactive read into a `useEffectEvent` callback. Octane never double-invokes effects, so first-run and `didInit` guards are unnecessary. |
+| `OCTANE_STRONG_EFFECT_RESOURCE_LEAK` | Effect setup acquires a platform listener, timer, observer, connection, or geolocation watch that the returned cleanup does not release. | Release it in the returned cleanup; see [Effect cleanup](#effect-cleanup). |
 | `OCTANE_STRONG_EFFECT_CHAIN` | An effect reads state written by another effect's own execution or promise continuation in the same component. | Derive the value during render, use `useLinkedState`, or combine the external synchronization. External subscription and timer callbacks remain event-driven updates. |
 | `OCTANE_STRONG_UNLINKED_PROP_STATE` | An eager `useState` initializer or two-argument `useReducer` initial state is derived from component props. | Use `useLinkedState(source, reconcile)` for state that follows a source. Use `useState(() => initialValue)` or an explicit third `useReducer` initializer for a deliberate initial capture. |
 | `OCTANE_STRONG_EXPLICIT_DEPENDENCIES` | An explicit dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. | Omit the dependency argument. An equivalent array produces a **hint**, not an error; its authored behavior is preserved. |
@@ -109,11 +111,35 @@ export function Profile({ id }) {
 }
 ```
 
+A platform resource acquired during synchronous setup must be released by the
+returned cleanup:
+
+| Acquired in setup | Released in cleanup |
+| --- | --- |
+| `addEventListener` on `window` (including the global function), `document`, their properties and query results, a `matchMedia` list, an element held by a ref attached to an intrinsic element, or a connection created in the effect, whether called directly, through a destructured property, or through a same-module helper | `removeEventListener` with the same target, event type, handler identity, and capture flag, or `abort()` on the `AbortController` whose `signal` was passed in the listener options. Options and controllers are followed through stable aliases and same-module helper arguments. |
+| An `on<event>` handler property on one of those targets, or the global one such as `onresize` | Assigning the property again, such as `null`, or closing the connection |
+| `setInterval`, or a `setTimeout` or `requestAnimationFrame` callback that schedules itself again | `clearInterval`, `clearTimeout`, or `cancelAnimationFrame` with the stored ID; a self-rescheduling timer must store every ID in that variable |
+| `ResizeObserver`, `IntersectionObserver`, `MutationObserver`, or `PerformanceObserver` | `disconnect()` or `unobserve()` |
+| `WebSocket`, `EventSource`, or `BroadcastChannel` | `close()` |
+| `navigator.geolocation.watchPosition` | `navigator.geolocation.clearWatch(id)` |
+
+Only platform APIs count. `store.subscribe(listener)` and `addEventListener` on
+a user object stay legal without a visible release, as do one-shot timers and
+`requestAnimationFrame` callbacks.
+
 The proofs stay bounded. A cleanup returned on any path counts, the cleanup's
 own conditions are not evaluated, and aborting a request does not stop its
 `.catch` handler from running: guard updates there with the flag or
-`signal.aborted`. A cleanup returned by an imported helper is opaque and does
-not count.
+`signal.aborted`. An imported helper is opaque, so a resource it acquires
+internally is not seen, and neither is a cleanup it returns. Work started after
+an `await`, or in a timer or subscription callback, is not checked for resource
+release.
+
+A value ref is a `useRef` object whose identity is only used for property
+access, stable aliases, and explicit dependency lists. Attaching it with a
+`ref` attribute, passing it to a call, component, or hook, storing it in a
+container, or returning it makes it an instance ref, which effect setup may
+read.
 
 ## State values, updaters, and subscriptions
 
@@ -197,6 +223,30 @@ These are bounded source checks. They follow supported aliases, namespace
 imports, optional calls, local closures, and same-module declarations. Imported
 functions and methods on arbitrary objects remain opaque.
 
+## Render determinism
+
+| Diagnostic | What it detects | Replacement |
+| --- | --- | --- |
+| `OCTANE_STRONG_RENDER_IMPURE_CALL` | Unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`, `new Date()`, `crypto.randomUUID()`, or `crypto.getRandomValues()` during render, including inside callbacks that known array methods run synchronously. A `key` or `@for` key built from one of these gets its own message. | Read time or randomness outside render and pass a snapshot. Use `useId()` for element IDs. Give each list item a stable ID from its data, such as `item.id`. |
+| `OCTANE_STRONG_RENDER_LOCALE_FORMAT` | During render, `toLocaleString()`, `toLocaleDateString()`, or `toLocaleTimeString()` on a provable `Date` without both a locale and a visible `timeZone` option; `toString()` or `toTimeString()` on a provable `Date`; an `Intl` service constructed without a locale (a `DateTimeFormat` also needs a `timeZone`); or a call on a module-level formatter created that way. | Pass an explicit locale and time zone, for example `toLocaleString('en-US', { timeZone: 'UTC' })` or `new Intl.DateTimeFormat(locale, { timeZone })`. Otherwise format in an event or effect and render the stored text. |
+
+The array methods whose callbacks run in the caller's phase are `every`,
+`filter`, `find`, `findIndex`, `findLast`, `findLastIndex`, `flatMap`,
+`forEach`, `map`, `reduce`, `reduceRight`, `some`, `sort`, `toSorted`, and the
+mapping function of `Array.from`. During render every other render rule applies
+inside them too, so `items.forEach(setSelected)` is a render state update. The
+same callbacks in events, effects, and lazy state initializers keep their
+existing rules.
+
+A `Date` is provable when it is built with `new Date(...)` from an unshadowed
+`Date`, directly or through an unreassigned local alias. A date passed as a prop
+is not provable. Formatting a date built from local parts with `toDateString()`
+gives the same text in every time zone and stays valid. The `Intl` check covers
+`Collator`, `DateTimeFormat`, `DisplayNames`, `DurationFormat`, `ListFormat`,
+`NumberFormat`, `PluralRules`, `RelativeTimeFormat`, and `Segmenter`, with or
+without `new`. An options value the compiler cannot see, such as an identifier,
+is not reported.
+
 ## Lists, host props, and compatibility APIs
 
 | Diagnostic | What it detects | Replacement |
@@ -223,6 +273,46 @@ lists such as `items.map(item => <Row key={item.id} item={item} />)`.
 The event check retains the existing DOM ownership and input-type analysis.
 Dynamic spreads and dynamic input types may need the existing development
 runtime diagnostic. Strong mode adds no runtime phase guards.
+
+## DOM ownership
+
+| Diagnostic | What it detects | Replacement |
+| --- | --- | --- |
+| `OCTANE_STRONG_MANAGED_DOM_WRITE` | A write through a ref to what the template owns on its element: `textContent`, `innerText`, `append`, `appendChild`, `insertBefore`, `prepend`, `removeChild`, `replaceChild`, or `replaceChildren` when the template renders children; `className`, `classList` mutators, or `classList.value` when it sets a class; `setAttribute`, `removeAttribute`, or `toggleAttribute` for an attribute it sets; `style`, `style.cssText`, or a `style` property it sets. | Render the value from state or props in the template. |
+| `OCTANE_STRONG_RAW_HTML_WRITE` | `innerHTML`, `outerHTML`, `insertAdjacentHTML()`, or `setHTMLUnsafe()` on an element Octane renders. | `dangerouslySetInnerHTML={trustHTML(html)}` for trusted or already sanitized HTML. |
+| `OCTANE_STRONG_OWN_MARKUP_QUERY` | `document.getElementById()`, `querySelector()`, `querySelectorAll()`, or `getElementsByClassName()` with a literal selector that matches a literal `id` or class rendered by the same component. | Attach a ref to the element and use `ref.current` in the event or effect. |
+
+A DOM write is reported only when the ref provably names exactly one intrinsic
+DOM element in the same component. The ref must come from `useRef` in the
+function (or keyed `@for` row) that renders the element. It may be used only as
+that element's `ref` prop, including inside a `ref={[a, b]}` list, and through
+`.current` reads, `const { current } = ref`, and unreassigned local aliases. Any
+other use withdraws the proof: a component's `ref` prop, an argument to a helper,
+a `.current` assignment, or a second element. An inline callback ref's parameter
+is that element. Writes in effects, layout effects, event handlers, and nested
+helpers are all checked. Writes that the template does not own stay valid, such
+as `textContent` on an element without rendered children, mounting a third-party
+widget into an empty container, a `style` property the template's `style` does
+not set, `focus()`, and measurement.
+
+Queries are matched only for a single compound selector, such as `#id`, `.class`,
+or `li.item.active`, against literal `id` and `class` values. A string element of
+a `class` array counts as literal. Portal targets and markup rendered by another
+component are not matched. Nor are dynamic selectors, selectors with combinators,
+or element-scoped queries such as `panel.querySelector()`.
+
+```tsx
+"use strong";
+import { useEffect, useRef } from 'octane';
+
+export function Search({ open }) {
+  const input = useRef(null);
+  useEffect(() => {
+    if (open) input.current.focus();
+  });
+  return <input ref={input} className={open ? 'search open' : 'search'} />;
+}
+```
 
 ## Trusted HTML
 
@@ -258,3 +348,54 @@ The syntax compiler cannot establish the type of an arbitrary imported value or
 dynamic factory prop. Run the project's `tsrx-tsc --noEmit` check as well as its
 build. Type assertions and `any` can bypass nominal checking, as with other
 TypeScript contracts.
+
+## Keeping modules Strong
+
+Every check above applies only to a module that is Strong. Leaving Strong mode
+takes a one-line change that is easy to miss in review: delete `"use strong"`,
+turn `compiler.strong` off, or move a module into another package, which the
+application's `compiler.strong` does not reach. A coverage baseline makes that
+change fail CI.
+
+```bash
+octane analyze --strong-baseline init     # record today's non-Strong modules
+octane analyze                            # fails on anything that regressed
+octane analyze --strong-baseline update   # drop names that are now Strong
+```
+
+`init` writes `octane-strong-baseline.json`, listing every module Octane compiles
+that is not Strong today:
+
+```json
+{
+	"version": 1,
+	"exceptions": ["src/legacy/Chart.tsx"]
+}
+```
+
+While the file exists, every `octane analyze` run measures the whole project.
+Two codes report what it finds, and both are errors:
+
+| Diagnostic | What it detects | Replacement |
+| --- | --- | --- |
+| `OCTANE_STRONG_COVERAGE_REGRESSION` | A module compiles without Strong mode and is not listed: a new module, or one that lost its directive or moved out of `compiler.strong`'s reach. | Add `"use strong"` before its imports, or enable `compiler.strong`, and fix what Strong then reports. |
+| `OCTANE_STRONG_COVERAGE_STALE` | A listed module is now Strong, no longer exists, or is no longer compiled by Octane. A stale name would let that module leave Strong mode again unnoticed. | Run `octane analyze --strong-baseline update`. |
+
+`update` only ever removes names, and `init` refuses to overwrite an existing
+file, so `octane analyze` never records a new exception. Adding one takes a
+hand edit to `octane-strong-baseline.json`, which shows up in review like any
+other change. A CODEOWNERS entry for the file routes those edits to an owner.
+
+Octane compiles every `.tsrx` module, every `.tsx` module whose JSX goes to
+Octane, and every `.ts` or `.js` module with a runtime import from `octane`.
+A `.tsx` module whose leading `@jsxImportSource` pragma, or the tsconfig's
+`jsxImportSource`, names another library, such as React in a React-hosted
+project, is not counted. Whether a counted module is Strong is decided by the
+project's installed compiler, the same way a build decides it. The setting comes
+from `compiler.strong` in `octane.config.ts`. A bundler plugin's inline `strong`
+option overrides that at build time and is not visible to `octane analyze`, so
+keep the setting in `octane.config.ts`.
+
+With file arguments, `octane analyze` reports regressions for those files only
+and does not judge the rest of the baseline. `--strong-baseline` always measures
+the whole project.
