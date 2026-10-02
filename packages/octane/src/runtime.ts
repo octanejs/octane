@@ -19682,9 +19682,10 @@ class HydrationCapability {
 	 * belongs to no client node (discardArmTail), with the cursor parked on it:
 	 * the first node after the roots of the arm's own template, which records
 	 * them as the range's content (claimRoots), or else where the arm's last
-	 * slot parked the cursor after the range it claimed, or after the root it
-	 * adopted in place. Null when a later slot adopted without either, since
-	 * the cursor then rests on the roots it adopted.
+	 * slot parked the cursor after the range it claimed, or after the single
+	 * root it adopted in place (renderInPlace). Null when a later slot adopted
+	 * without either, such as a component that adopted a fragment or text in
+	 * place, since the cursor then rests on the roots it adopted.
 	 */
 	renderAdoptedArm(block: Block): Node | null {
 		const outerArm = this.arm;
