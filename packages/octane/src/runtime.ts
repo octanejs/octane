@@ -236,9 +236,11 @@ import {
 	NATIVE_TRANSITION_CONSUMER,
 	readNativeDomStyle,
 	registerNativeActionResolver,
+	registerSignalDeclarationStage,
 	runNativeBatch,
 	setNativeCandidateResolver,
 	setNativeAdoptionResolver,
+	type SignalDeclarationStage,
 } from './signals/read-protocol.js';
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
 import {
@@ -1373,9 +1375,52 @@ function scheduleNativeRead(target: Block): void {
 	}
 }
 
+interface SignalDeclarationRenderStage extends SignalDeclarationStage {
+	readonly capture: OffscreenCapture;
+	settled: boolean;
+}
+
+/**
+ * A signal facade declared again by a later render stages its new definition
+ * here instead of mutating committed graph state. One stage covers one body
+ * invocation, so a render-phase rerun supersedes its earlier pass. The capture's
+ * commit accepts it; its discard, or a transition journal rollback that unwinds
+ * this render, discards it.
+ */
+function currentSignalDeclarationStage(): SignalDeclarationStage | undefined {
+	const block = CURRENT_BLOCK;
+	const capture = WIP_CAPTURE;
+	// Outside a render, or in a render that publishes without a capture, a
+	// declaration applies immediately.
+	if (block === null || capture === null || ROOT_RENDER_ROLLBACK) return undefined;
+	// Native reads open the invocation frame before a facade can be read.
+	const invocation = NATIVE_READ_DRIVER?.invocation(block);
+	const current = invocation?.invocationData as SignalDeclarationRenderStage | null | undefined;
+	if (current != null && !current.settled && current.capture === capture) return current;
+	const callbacks: Array<(discarded: boolean) => void> = [];
+	const stage: SignalDeclarationRenderStage = {
+		capture,
+		settled: false,
+		settle(callback) {
+			callbacks.push(callback);
+		},
+	};
+	const finish = (discarded: boolean): void => {
+		if (stage.settled) return;
+		stage.settled = true;
+		for (const callback of callbacks) callback(discarded);
+	};
+	// A held transition attempt unwinds its render while the capture survives.
+	if (TRANSITION_JOURNAL !== null) journalUndo(() => finish(true));
+	(capture.renderCleanups ??= []).push(finish);
+	if (invocation !== undefined) invocation.invocationData = stage;
+	return stage;
+}
+
 function ensureNativeReadDriver(): NativeReadDriver {
 	if (NATIVE_READ_DRIVER !== null) return NATIVE_READ_DRIVER;
 	installNativeSignalActionExtension();
+	registerSignalDeclarationStage(currentSignalDeclarationStage);
 	NATIVE_READ_DRIVER = createNativeReadDriver({
 		capture: () => WIP_CAPTURE,
 		cleanup: registerHookCleanup,
@@ -19187,12 +19232,31 @@ class HydrationCapability {
 	}
 
 	/**
+	 * A list's first hydrating render when the server rendered items but the
+	 * client has none and builds its @empty arm instead. Discard the server's
+	 * items and report the list once, at its own site. A later attempt that
+	 * finds the earlier attempt's @empty arm here rebuilds it quietly.
+	 */
+	discardPopulatedList(scope: Scope, slotKey: number, start: Node, end: Node): void {
+		this.discard(
+			scope,
+			slotKey,
+			getNextSibling(start),
+			end,
+			HYDRATION_REBUILT?.has(end) === true,
+			process.env.NODE_ENV !== 'production' ? 'an empty list (@empty)' : '',
+			process.env.NODE_ENV !== 'production' ? 'a populated list' : null,
+		);
+	}
+
+	/**
 	 * Remove the server content from `from` up to `end` that a child slot's
 	 * value cannot adopt, and point the cursor at `end`. Reports the structural
-	 * mismatch (`expected`, and the `actual` server node, describe it in
-	 * development) unless it is `quiet`, as it is when an earlier attempt already
-	 * rebuilt this content, or the captures legitimately changed before a dormant
-	 * boundary activated. Remembers `end` for later attempts.
+	 * mismatch (`expected`, and the `actual` server node or a description of
+	 * it, describe it in development) unless it is `quiet`, as it is when an
+	 * earlier attempt already rebuilt this content, or the captures legitimately
+	 * changed before a dormant boundary activated. Remembers `end` for later
+	 * attempts.
 	 */
 	private discard(
 		scope: Scope | null,
@@ -19201,7 +19265,7 @@ class HydrationCapability {
 		end: Node | null,
 		quiet: boolean,
 		expected: string,
-		actual: Node | null,
+		actual: Node | string | null,
 	): true {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 		this.save(domNode((from ?? end)!).parentNode!);
@@ -19213,7 +19277,12 @@ class HydrationCapability {
 				const loc =
 					(scope !== null && (siteLoc(scope, slotKey) || componentSourceLoc(scope.block.body))) ||
 					(domNode((from ?? end)!).parentNode as any)?.__oct_loc;
-				if (loc) warnHydrationStructuralMismatch(loc, expected, describeHydrationNode(actual));
+				if (loc)
+					warnHydrationStructuralMismatch(
+						loc,
+						expected,
+						typeof actual === 'string' ? actual : describeHydrationNode(actual),
+					);
 			}
 		}
 		removeRange(from, end);
@@ -42994,23 +43063,16 @@ export function forBlock<T>(
 			if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 			// When the SERVER rendered a populated list but the client is empty now, the
 			// content inside the @for range is item blocks (`<!--[-->`), not the @empty body
-			// — a STRUCTURAL mismatch. Discard the server items and build @empty fresh with
-			// hydration suspended (so it client-mounts instead of mis-adopting an item).
+			// — a STRUCTURAL mismatch. Discard the server items, report the list once, and
+			// build @empty fresh with hydration suspended (so it client-mounts instead of
+			// mis-adopting an item).
 			let suspendForEmpty = false;
 			if (
 				hydration !== null &&
 				(serverMarkerState === 1 ||
 					(serverMarkerState === -1 && hydration.isOpen(getNextSibling(state.start))))
 			) {
-				// Prefer the @for's own compiled source loc (siteLoc; for-constructs carry
-				// `loc` in `__s.locs`) — the parent element's `__oct_loc` stamp exists only
-				// when the parent carries dynamic bindings.
-				hydration.save(domParent);
-				if (process.env.NODE_ENV !== 'production') {
-					const mmLoc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
-					if (mmLoc) hydration.warnStructural(mmLoc, 'an empty list (@empty)', 'a populated list');
-				}
-				removeRange(getNextSibling(state.start), state.end);
+				hydration.discardPopulatedList(parentScope, slotKey, state.start, state.end);
 				suspendForEmpty = true;
 			} else if (hydration !== null) {
 				// The server already rendered the @empty content directly inside the
