@@ -14,7 +14,7 @@ import {
 	forEachRuntimeAstChild,
 	isIdentifierReference,
 } from './compile-universal.js';
-
+import { formatDomBindingIslandRequest } from './dom-binding-request.js';
 import { findPrivateCompiledContextProofs } from './private-context.js';
 
 export const HYDRATE_QUERY_PARAM = 'octane-hydrate';
@@ -2279,6 +2279,50 @@ function createPermanentStaticRemovalPlanAst(analysis, request, moduleMovePlan) 
 	);
 }
 
+/**
+ * An independent island whose only child is a prop-less component imported from
+ * a project `.tsrx` module. Its activator is selected by that module, which alone
+ * can prove the component is a renderer-free binding view.
+ */
+function bindingIslandChild(boundary, analysis) {
+	if (!boundary.independent || boundary.children.length !== 0) return null;
+	const children = (boundary.node.children ?? []).filter(
+		(child) =>
+			!(child.type === 'JSXText' && child.value.trim() === '') &&
+			!(child.type === 'JSXExpressionContainer' && child.expression?.type === 'JSXEmptyExpression'),
+	);
+	const child = children.length === 1 ? children[0] : null;
+	if (child?.type !== 'JSXElement' && child?.type !== 'Element') return null;
+	const name = child.openingElement?.name ?? child.id;
+	if (
+		(name?.type !== 'JSXIdentifier' && name?.type !== 'Identifier') ||
+		!/^[A-Z]/.test(name.name) ||
+		boundary.shadowedImports.has(name.name) ||
+		(child.openingElement?.attributes ?? child.attributes ?? []).length !== 0 ||
+		(child.children ?? []).some(
+			(node) =>
+				!(node.type === 'JSXText' && node.value.trim() === '') &&
+				!(node.type === 'JSXExpressionContainer' && node.expression?.type === 'JSXEmptyExpression'),
+		)
+	)
+		return null;
+	for (const declaration of analysis.imports.declarations) {
+		const specifier = declaration.specifiers?.find(
+			(candidate) => candidate.local?.name === name.name,
+		);
+		if (!specifier) continue;
+		const source = declaration.source.value;
+		return declaration.importKind !== 'type' &&
+			specifier.type === 'ImportSpecifier' &&
+			specifier.importKind !== 'type' &&
+			/^\.\.?\//.test(source) &&
+			/^[^?#]*\.tsrx$/.test(source)
+			? { source, exportName: nameOf(specifier.imported) }
+			: null;
+	}
+	return null;
+}
+
 /** Read the stable Hydrate boundary path from a bundler resource ID. */
 export function hydrateBoundaryPathFromId(id) {
 	const queryIndex = id.indexOf('?');
@@ -2308,6 +2352,7 @@ export function prepareHydrateBoundaries(
 	boundaryPath = null,
 	parsedAst = null,
 	isDescriptorChildrenImport,
+	islandRenderer = false,
 ) {
 	if (!source.includes('Hydrate') || !source.includes('octane')) {
 		if (boundaryPath === null) return null;
@@ -2367,6 +2412,36 @@ export function prepareHydrateBoundaries(
 			);
 		}
 		queriedBoundary = boundary;
+		const island = islandRenderer ? null : bindingIslandChild(boundary, analysis);
+		if (island !== null) {
+			// The child's module either returns a renderer-free activator or
+			// forwards back to this boundary's renderer module.
+			return {
+				ast: {
+					...analysis.ast,
+					body: [
+						inheritGeneratedOrigin(
+							b.export(
+								null,
+								[b.export_specifier('default')],
+								[],
+								'value',
+								b.literal(
+									formatDomBindingIslandRequest(island.source, {
+										exportName: island.exportName,
+										host: filename,
+										boundary: boundary.path,
+									}),
+								),
+							),
+							boundary.node,
+						),
+					],
+				},
+				boundaryPath,
+				independentWidgets,
+			};
+		}
 		ast = extractedModuleAst(
 			source,
 			analysis,

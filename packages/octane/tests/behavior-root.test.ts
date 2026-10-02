@@ -10,9 +10,14 @@ import {
 	startTransition,
 } from 'octane';
 import { condition, interaction, never } from 'octane/hydration';
-import { renderToReadableStream, renderToString } from 'octane/server';
+import { renderToPipeableStream, renderToReadableStream, renderToString } from 'octane/server';
 import { flushEffects } from './_helpers.js';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
+import {
+	activateStreamedMarkup,
+	createPipeableCollector,
+	resetStreamRuntimeGlobals,
+} from './_server-stream.js';
 import { installViewTransitionMocks } from './conformance/_helpers/view-transition-mocks.js';
 import * as DomBindings from '../src/dom-bindings.js';
 import * as DomBindingPrograms from '../src/dom-binding-program.js';
@@ -7613,18 +7618,33 @@ export function Forwarded(props) @{ 'use dom bindings';
 					for (const notify of subscriptions) notify();
 				};
 				const abort = new AbortController();
+				// Object rest skips excluded keys before reading them, so a conforming
+				// engine reads label, kind and extra once each. V8 12 (Node 22) also runs
+				// the excluded getters while copying the rest. Activation must read the
+				// snapshot exactly as one native evaluation of the authored pattern does.
+				reads.length = 0;
+				const authoredPattern = ({
+					label: text = 'Fallback',
+					'data-kind': kind = 'base',
+					onAction,
+					onRef,
+					...rest
+				}: Record<PropertyKey, unknown>) => [text, kind, onAction, onRef, rest];
+				authoredPattern(snapshot);
+				const authoredReads = [...reads];
+				expect([...new Set(authoredReads)]).toEqual(['label', 'kind', 'extra']);
 				reads.length = 0;
 				const handle = adopt
 					? destructured.attach(host.firstElementChild!, state, { signal: abort.signal })
 					: destructured.mount({ parent: host }, state, { signal: abort.signal });
 				const button = host.querySelector('button')!;
 				if (adopt) expect(button).toBe(serverButton);
-				expect(reads).toEqual(['label', 'kind', 'extra']);
+				expect(reads).toEqual(authoredReads);
 				button.click();
 				expect(events).toEqual([
 					['Fallback', true, { extra: 'initial', [symbol]: 'symbol value' }],
 				]);
-				expect(reads).toEqual(['label', 'kind', 'extra']);
+				expect(reads).toEqual(authoredReads);
 				label = null;
 				extra = 'changed';
 				publish();
@@ -7839,6 +7859,450 @@ export function Counter() @{
 			}
 		});
 
+		// An island reads module signals directly. Its program subscribes to every
+		// source a projection, branch test, list or block declaration reads.
+		it(`subscribes imported signal reads in projections, branches, lists and block declarations (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `import { rows$, title$, open$ } from './island-state';
+export function Rows() @{
+  'use dom bindings';
+  <section title={title$.get()} data-open={open$.latest(false) ? 'yes' : 'no'}>
+    @if (open$.get()) {
+      const rows = rows$.get();
+      <ul data-count={rows.length}>
+        @for (const row of rows; key row.id) {
+          const label = row.label.toUpperCase();
+          <li>{label as string}</li>
+        }
+      </ul>
+    } @else {
+      <p>closed</p>
+    }
+  </section>
+}`;
+			const scope = createScope({ scopeKey: `island-reads-${dev}` });
+			const initialRows = [
+				{ id: 1, label: 'one' },
+				{ id: 2, label: 'two' },
+			];
+			const title$ = scope.signal$('title', 'First');
+			const open$ = scope.signal$('open', true);
+			const rows$ = scope.signal$('rows', initialRows);
+			const fixture = authoredPresentation('Rows', {}, dev, source, {
+				'./island-state': { rows$, title$, open$ },
+			});
+			try {
+				for (const adopt of [true, false]) {
+					title$.set('First');
+					open$.set(true);
+					rows$.set(initialRows);
+					container.innerHTML = adopt ? fixture.html : '';
+					const serverItem = container.querySelector('li');
+					const handle = adopt
+						? fixture.attach(container.querySelector('section')!, fixture.state)
+						: fixture.mount({ parent: container }, fixture.state);
+					const section = container.querySelector('section')!;
+					const labels = () => [...section.querySelectorAll('li')].map((li) => li.textContent);
+					expect(labels()).toEqual(['ONE', 'TWO']);
+					if (adopt) expect(section.querySelector('li')).toBe(serverItem);
+					const first = section.querySelector('li');
+					rows$.set([
+						{ id: 2, label: 'two' },
+						{ id: 1, label: 'uno' },
+					]);
+					expect(labels()).toEqual(['TWO', 'UNO']);
+					expect(section.querySelectorAll('li')[1]).toBe(first);
+					title$.set('Second');
+					expect(section.title).toBe('Second');
+					open$.set(false);
+					expect([section.getAttribute('data-open'), section.textContent]).toEqual([
+						'no',
+						'closed',
+					]);
+					rows$.set([]);
+					open$.set(true);
+					expect(section.querySelector('ul')!.getAttribute('data-count')).toBe('0');
+					rows$.set([{ id: 3, label: 'three' }]);
+					expect(labels()).toEqual(['THREE']);
+					handle.dispose();
+					title$.set('Disposed');
+					rows$.set([]);
+					expect([section.title, labels()]).toEqual(['Second', ['THREE']]);
+				}
+			} finally {
+				scope.dispose();
+			}
+		});
+
+		// Leaving a page retires its document signals before its islands are
+		// disposed. That retirement ends a live presentation; it is not an error.
+		it(`keeps the last DOM without throwing when its signal owner retires (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `import { label$, open$ } from './island-state';
+export function Retiring() @{
+  'use dom bindings';
+  <section title={label$.get()}>@if (open$.get()) { <p>{label$ as string}</p> }</section>
+}`;
+			const scope = createScope({ scopeKey: `island-retire-${dev}` });
+			const label$ = scope.signal$('label', 'live');
+			const open$ = scope.signal$('open', true);
+			const fixture = authoredPresentation('Retiring', {}, dev, source, {
+				'./island-state': { label$, open$ },
+			});
+			container.innerHTML = fixture.html;
+			const section = container.querySelector('section')!;
+			const handle = fixture.attach(section, fixture.state);
+			label$.set('updated');
+			expect([section.title, section.textContent]).toEqual(['updated', 'updated']);
+			expect(() => scope.dispose()).not.toThrow();
+			expect(container.querySelector('section')).toBe(section);
+			expect([section.title, section.textContent]).toEqual(['updated', 'updated']);
+			expect(() => handle.dispose()).not.toThrow();
+		});
+
+		// The `ready`/activation pattern: effects declared with an explicit empty
+		// array run once after their view is live and clean up when it leaves.
+		it(`runs mount-only effects after activation and cleans them up with their view (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `import { useEffect, useLayoutEffect } from 'octane';
+import { open$, log } from './island-state';
+function Child() @{
+  useLayoutEffect(() => {
+    log('child mount');
+    return () => log('child cleanup');
+  }, []);
+  <i>child</i>
+}
+export function Effects() @{
+  'use dom bindings';
+  useLayoutEffect(() => {
+    log('parent layout ' + String(document.querySelector('[data-effects]')?.isConnected));
+    return () => log('parent cleanup');
+  }, []);
+  useEffect(() => log('parent effect'), []);
+  <section data-effects>@if (open$.get()) { <Child /> }</section>
+}`;
+			const scope = createScope({ scopeKey: `island-effects-${dev}` });
+			const open$ = scope.signal$('open', true);
+			const events: string[] = [];
+			const fixture = authoredPresentation('Effects', {}, dev, source, {
+				'./island-state': { open$, log: (event: string) => events.push(event) },
+			});
+			try {
+				for (const adopt of [true, false]) {
+					open$.set(true);
+					events.length = 0;
+					container.innerHTML = adopt ? fixture.html : '';
+					const handle = adopt
+						? fixture.attach(container.querySelector('section')!, fixture.state)
+						: fixture.mount({ parent: container }, fixture.state);
+					expect(events.splice(0)).toEqual(['child mount', 'parent layout true', 'parent effect']);
+					open$.set(false);
+					expect(events.splice(0)).toEqual(['child cleanup']);
+					open$.set(true);
+					expect(events.splice(0)).toEqual(['child mount']);
+					fixture.publish({});
+					expect(events).toEqual([]);
+					handle.dispose();
+					expect(events.splice(0)).toEqual(['parent cleanup', 'child cleanup']);
+					open$.set(false);
+					expect(events).toEqual([]);
+				}
+			} finally {
+				scope.dispose();
+			}
+		});
+
+		it(`diagnoses binding effects that are not mount-only (${dev ? 'dev' : 'prod'})`, () => {
+			for (const effect of [
+				'useLayoutEffect(() => {})',
+				'useLayoutEffect(() => {}, [count$])',
+				'useInsertionEffect(() => {}, [])',
+			]) {
+				expect(() =>
+					loadCompiledFixtureSource(
+						`import { useInsertionEffect, useLayoutEffect } from 'octane';
+import { count$ } from './state';
+export function Effectful() @{ 'use dom bindings'; ${effect}; <p /> }`,
+						{
+							id: '/src/effectful.tsrx?octane-bindings=Effectful',
+							mode: 'client',
+							compileOptions: { dev, hmr: false },
+						},
+					),
+				).toThrow(/pure const aliases and mount-only effects/);
+			}
+		});
+
+		// `@try` selects its arm from the reads its body performs, exactly like the
+		// renderer: pending shows `@pending`, an error shows `@catch` until reset.
+		it(`adopts and switches @try arms from imported async reads (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { answer$ } from './island-state';
+export function Answer() @{
+  'use dom bindings';
+  <section>
+    @try {
+      const answer = answer$.get();
+      <p data-answer>{answer as string}</p>
+    } @pending {
+      <p data-pending>waiting</p>
+    } @catch (error, reset) {
+      <button type="button" onClick={() => reset()}>{String(error) as string}</button>
+    }
+  </section>
+}`;
+			const scope = createScope({ scopeKey: `island-try-${dev}` });
+			const requests = new Map<number, ReturnType<typeof deferred<string>>>();
+			const request = (generation: number) => {
+				let pending = requests.get(generation);
+				if (!pending) requests.set(generation, (pending = deferred<string>()));
+				return pending;
+			};
+			const loadAnswer = query(
+				'island-answer',
+				(generation: number) => request(generation).promise,
+			);
+			const generation$ = scope.signal$('generation', 0);
+			const answer$ = createResource(scope, 'answer', () => loadAnswer(generation$.get()));
+			const fixture = () =>
+				authoredPresentation('Answer', {}, dev, source, { './island-state': { answer$ } });
+			const settle = async () => {
+				for (let index = 0; index < 4; index++) await Promise.resolve();
+			};
+			try {
+				// The server rendered @pending; activation adopts that fallback.
+				const pending = fixture();
+				container.innerHTML = pending.html;
+				const fallback = container.querySelector('[data-pending]');
+				expect(fallback).not.toBeNull();
+				const handle = pending.attach(container.querySelector('section')!, pending.state);
+				expect(container.querySelector('[data-pending]')).toBe(fallback);
+				request(0).resolve('first');
+				await settle();
+				expect(container.querySelector('[data-answer]')!.textContent).toBe('first');
+				expect(container.querySelector('[data-pending]')).toBeNull();
+
+				// A new request suspends the body again, then reveals its value.
+				generation$.set(1);
+				expect(container.querySelector('[data-pending]')).not.toBeNull();
+				request(1).resolve('second');
+				await settle();
+				expect(container.querySelector('[data-answer]')!.textContent).toBe('second');
+
+				// A failure shows @catch, which stays selected until reset retries.
+				generation$.set(2);
+				request(2).reject(new Error('broken'));
+				await settle();
+				const retry = container.querySelector('button')!;
+				expect(retry.textContent).toBe('Error: broken');
+				generation$.set(3);
+				expect(container.querySelector('button')).toBe(retry);
+				request(3).resolve('recovered');
+				await settle();
+				expect(container.querySelector('button')).toBe(retry);
+				retry.click();
+				expect(container.querySelector('button')).toBe(retry);
+				await settle();
+				expect(container.querySelector('[data-answer]')!.textContent).toBe('recovered');
+				handle.dispose();
+
+				// Server content is adopted in place and keeps following its source.
+				const ready = fixture();
+				container.innerHTML = ready.html;
+				const serverAnswer = container.querySelector('[data-answer]')!;
+				expect(serverAnswer.textContent).toBe('recovered');
+				const readyHandle = ready.attach(container.querySelector('section')!, ready.state);
+				expect(container.querySelector('[data-answer]')).toBe(serverAnswer);
+				generation$.set(4);
+				request(4).resolve('fourth');
+				await settle();
+				expect(container.querySelector('[data-answer]')!.textContent).toBe('fourth');
+				readyHandle.dispose();
+				generation$.set(5);
+				request(5).resolve('fifth');
+				await settle();
+				expect(container.querySelector('[data-answer]')!.textContent).toBe('fourth');
+
+				// A server @catch arm is adopted in place when the client read fails too.
+				generation$.set(6);
+				request(6).reject(new Error('server failure'));
+				await settle();
+				const failed = fixture();
+				container.innerHTML = failed.html;
+				const serverRetry = container.querySelector('button')!;
+				expect(serverRetry.textContent).toBe('Error: server failure');
+				const failedHandle = failed.attach(container.querySelector('section')!, failed.state);
+				expect(container.querySelector('button')).toBe(serverRetry);
+				generation$.set(7);
+				request(7).resolve('seventh');
+				serverRetry.click();
+				await settle();
+				expect(container.querySelector('[data-answer]')!.textContent).toBe('seventh');
+				failedHandle.dispose();
+			} finally {
+				scope.dispose();
+			}
+		});
+
+		// An arm that opens after activation builds its @try region on the client,
+		// from the view's own template rather than server output.
+		it(`builds a @try region inside an arm that opens after activation (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { answer$, open$ } from './island-state';
+export function Answer() @{
+  'use dom bindings';
+  <section>
+    @if (open$.get()) {
+      @try {
+        const answer = answer$.get();
+        <p data-answer>{answer as string}</p>
+      } @pending {
+        <p data-pending>waiting</p>
+      }
+    }
+  </section>
+}`;
+			const scope = createScope({ scopeKey: `island-fresh-try-${dev}` });
+			const answer = deferred<string>();
+			const loadAnswer = query('island-fresh-answer', () => answer.promise);
+			const open$ = scope.signal$('open', false);
+			const answer$ = createResource(scope, 'answer', () => loadAnswer());
+			try {
+				const closed = authoredPresentation('Answer', {}, dev, source, {
+					'./island-state': { answer$, open$ },
+				});
+				container.innerHTML = closed.html;
+				const section = container.querySelector('section')!;
+				const handle = closed.attach(section, closed.state);
+				open$.set(true);
+				expect(container.querySelector('section')).toBe(section);
+				expect(section.querySelector('[data-pending]')!.textContent).toBe('waiting');
+				answer.resolve('fresh');
+				for (let index = 0; index < 4; index++) await Promise.resolve();
+				expect(section.querySelector('[data-answer]')!.textContent).toBe('fresh');
+				expect(section.querySelector('[data-pending]')).toBeNull();
+				open$.set(false);
+				expect(section.querySelector('[data-answer]')).toBeNull();
+				open$.set(true);
+				expect(section.querySelector('[data-answer]')!.textContent).toBe('fresh');
+				handle.dispose();
+			} finally {
+				scope.dispose();
+			}
+		});
+
+		// A binding view stays an ordinary component: hydrateRoot adopts the same
+		// server @try output, whichever settled arm the server rendered.
+		it(`hydrates a binding view's settled @try arms with the ordinary renderer (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { answer$ } from './island-state';
+export function Answer() @{
+  'use dom bindings';
+  <section>
+    @try {
+      <p data-answer>{answer$.get() as string}</p>
+    } @pending {
+      <p data-pending>waiting</p>
+    } @catch (error) {
+      <p data-error>{String(error) as string}</p>
+    }
+  </section>
+}`;
+			for (const outcome of ['ready', 'error'] as const) {
+				const scope = createScope({ scopeKey: `island-hydrate-try-${outcome}-${dev}` });
+				const answer = deferred<string>();
+				const loadAnswer = query(
+					`island-hydrate-${outcome}`,
+					(_argument: undefined) => answer.promise,
+				);
+				const answer$ = createResource(scope, 'answer', () => loadAnswer(undefined));
+				if (outcome === 'ready') answer.resolve('ready');
+				else answer.reject(new Error('failed'));
+				for (let index = 0; index < 4; index++) await Promise.resolve();
+				const fixture = authoredPresentation('Answer', {}, dev, source, {
+					'./island-state': { answer$ },
+				});
+				const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+				try {
+					container.innerHTML = fixture.html;
+					const server = container.querySelector('section p')!;
+					hydratedRoot = hydrateRoot(container, fixture.loadClient().Answer, {});
+					await act(async () => {
+						for (let index = 0; index < 4; index++) await Promise.resolve();
+					});
+					expect(container.querySelector('section p')).toBe(server);
+					expect(server.textContent).toBe(outcome === 'error' ? 'Error: failed' : 'ready');
+					expect(error).not.toHaveBeenCalled();
+				} finally {
+					error.mockRestore();
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					scope.dispose();
+				}
+			}
+		});
+
+		// A streamed boundary may still be pending when its island activates. The
+		// binding claims it, so the late server segment cannot replace live DOM.
+		it(`claims a streamed @try fallback before its segment arrives (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { answer$ } from './island-state';
+export function Streamed() @{
+  'use dom bindings';
+  <section>
+    @try {
+      <p data-answer>{answer$.get() as string}</p>
+    } @pending {
+      <p data-pending>waiting</p>
+    }
+  </section>
+}`;
+			// The server's data settles first; the activated island still waits for its own.
+			const scope = createScope({ scopeKey: `island-stream-${dev}` });
+			const serverAnswer = deferred<string>();
+			const clientAnswer = deferred<string>();
+			const loadServer = query(
+				'island-streamed-server',
+				(_argument: undefined) => serverAnswer.promise,
+			);
+			const loadClient = query(
+				'island-streamed-client',
+				(_argument: undefined) => clientAnswer.promise,
+			);
+			const server = authoredPresentation('Streamed', {}, dev, source, {
+				'./island-state': { answer$: createResource(scope, 'server', () => loadServer(undefined)) },
+			});
+			const client = authoredPresentation('Streamed', {}, dev, source, {
+				'./island-state': { answer$: createResource(scope, 'client', () => loadClient(undefined)) },
+			});
+			const collector = createPipeableCollector();
+			renderToPipeableStream(server.server.Streamed, {}).pipe(collector.destination);
+			for (let index = 0; index < 20 && collector.chunks.length === 0; index++)
+				await new Promise((resolve) => setTimeout(resolve, 0));
+			const shell = collector.chunks.join('');
+			expect(shell).toContain('data-pending');
+			try {
+				container.innerHTML = shell;
+				activateStreamedMarkup(container);
+				const handle = client.attach(container.querySelector('section')!, client.state);
+				const fallback = container.querySelector('[data-pending]');
+				expect(fallback).not.toBeNull();
+				serverAnswer.resolve('streamed');
+				const html = await collector.ended;
+				expect(html).toContain('streamed');
+				const tail = document.createElement('div');
+				tail.innerHTML = html.slice(shell.length);
+				container.append(...tail.childNodes);
+				activateStreamedMarkup(container);
+				// The late segment found no boundary to swap; the binding still owns its arm.
+				expect(container.querySelector('[data-pending]')).toBe(fallback);
+				expect(container.querySelector('[data-answer]')).toBeNull();
+				clientAnswer.resolve('live');
+				for (let index = 0; index < 4; index++) await Promise.resolve();
+				expect(container.querySelectorAll('[data-answer]')).toHaveLength(1);
+				expect(container.querySelector('[data-answer]')!.textContent).toBe('live');
+				expect(container.querySelector('[data-pending]')).toBeNull();
+				handle.dispose();
+			} finally {
+				resetStreamRuntimeGlobals();
+				scope.dispose();
+			}
+		});
+
 		it(`preserves presentation refs through replacement and cleanup failure (${dev ? 'dev' : 'prod'})`, () => {
 			const refA = { current: null as HTMLInputElement | null };
 			const refB = { current: null as HTMLInputElement | null };
@@ -7977,23 +8441,27 @@ export function Counter() @{
 			expect(inlineOrder).toEqual(['attach A', 'detach A', 'attach B', 'detach B']);
 		});
 
-		it(`diagnoses imported live signal snapshots during binding activation (${dev ? 'dev' : 'prod'})`, () => {
+		it(`subscribes imported signal reads in every accessor form (${dev ? 'dev' : 'prod'})`, () => {
 			const scope = createScope({ scopeKey: `imported-signal-snapshots-${dev}` });
 			const count$ = scope.signal$('count', 1);
 			const sampled = scope.signal$('sampled', 2);
 			try {
-				for (const [imports, setup, expression, expected] of [
-					["import { count$ } from 'state';", '', 'count$.get()', '1'],
-					["import { count$ } from 'state';", '', "count$['get']()", '1'],
-					["import { count$ } from 'state';", '', 'count$.get?.()', '1'],
-					["import { count$ } from 'state';", '', 'count$?.get()', '1'],
-					["import { count$ } from 'state';", '', "count$?.['get']?.()", '1'],
-					["import * as state from 'state';", '', 'state.count$.get()', '1'],
-					["import { state } from 'state';", '', 'state?.count$.get()', '1'],
-					["import { count$ } from 'state';", 'const value = count$.get();', 'value', '1'],
-					["import { count$ } from 'state';", 'const handle = count$;', 'handle.get()', '1'],
-					["import { count$ } from 'state';", '', 'count$.get() + props.sampled.get()', '3'],
+				for (const [imports, setup, expression, offset] of [
+					["import { count$ } from 'state';", '', 'count$.get()', 0],
+					["import { count$ } from 'state';", '', "count$['get']()", 0],
+					["import { count$ } from 'state';", '', 'count$.get?.()', 0],
+					["import { count$ } from 'state';", '', 'count$?.get()', 0],
+					["import { count$ } from 'state';", '', "count$?.['get']?.()", 0],
+					["import * as state from 'state';", '', 'state.count$.get()', 0],
+					["import { state } from 'state';", '', 'state?.count$.get()', 0],
+					["import { count$ } from 'state';", 'const value = count$.get();', 'value', 0],
+					["import { count$ } from 'state';", 'const handle = count$;', 'handle.get()', 0],
+					["import { count$ } from 'state';", '', 'count$.latest(0)', 0],
+					// A props sample stays a deliberate snapshot of the published source.
+					["import { count$ } from 'state';", '', 'count$.get() + props.sampled.get()', 2],
 				] as const) {
+					count$.set(1);
+					sampled.set(2);
 					const fixture = authoredPresentation(
 						'ImportedSnapshot',
 						{ sampled },
@@ -8009,41 +8477,61 @@ export function ImportedSnapshot(props) @{ 'use dom bindings';
 					container.append(host);
 					host.innerHTML = fixture.html;
 					const paragraph = host.querySelector('p')!;
-					expect(paragraph.textContent).toBe(expected);
-					const serverText = paragraph.firstChild;
-					expect(() => fixture.attach(paragraph, fixture.state)).toThrow(
-						/imported signal.*handle/i,
-					);
-					expect(paragraph.firstChild).toBe(serverText);
-					expect(paragraph.textContent).toBe(expected);
+					expect(paragraph.textContent).toBe(String(1 + offset));
+					const serverText = [...paragraph.childNodes].find((node) => node.nodeType === 3);
+					const handle = fixture.attach(paragraph, fixture.state);
 					const emptyHost = document.createElement('section');
 					container.append(emptyHost);
-					expect(() => fixture.mount({ parent: emptyHost }, fixture.state)).toThrow(
-						/imported signal.*handle/i,
-					);
-					expect(emptyHost.childNodes).toHaveLength(0);
-					expect(() => fixture.publish({})).not.toThrow();
-					expect(paragraph.firstChild).toBe(serverText);
-					expect(paragraph.textContent).toBe(expected);
-					expect(emptyHost.childNodes).toHaveLength(0);
+					const mounted = fixture.mount({ parent: emptyHost }, fixture.state);
+					try {
+						expect(emptyHost.textContent).toBe(String(1 + offset));
+						count$.set(5);
+						expect([paragraph.textContent, emptyHost.textContent]).toEqual([
+							String(5 + offset),
+							String(5 + offset),
+						]);
+						expect([...paragraph.childNodes].find((node) => node.nodeType === 3)).toBe(serverText);
+						sampled.set(10);
+						expect(paragraph.textContent).toBe(String(5 + offset));
+						fixture.publish({});
+						expect(paragraph.textContent).toBe(String(5 + (offset && 10)));
+					} finally {
+						handle.dispose();
+						mounted.dispose();
+					}
+					count$.set(9);
+					expect(paragraph.textContent).toBe(String(5 + (offset && 10)));
 				}
 			} finally {
 				scope.dispose();
 			}
 		});
 
-		it(`diagnoses imported signal reads that select binding structure (${dev ? 'dev' : 'prod'})`, () => {
+		it(`subscribes imported signal reads that select binding structure (${dev ? 'dev' : 'prod'})`, () => {
 			const scope = createScope({ scopeKey: `imported-signal-structure-${dev}` });
 			const count$ = scope.signal$('count', 1);
 			const rows$ = scope.signal$('rows', [{ id: 'first', label: 'First' }]);
 			try {
-				for (const [markup, expected] of [
-					['@if (count$.get() > 0) { <span>Shown</span> } @else { <b>Hidden</b> }', 'Shown'],
+				for (const [markup, expected, change, changed] of [
+					[
+						'@if (count$.get() > 0) { <span>Shown</span> } @else { <b>Hidden</b> }',
+						'Shown',
+						() => count$.set(0),
+						'Hidden',
+					],
 					[
 						'@for (const row of rows$.get(); key row.id) { <span>{row.label as string}</span> }',
 						'First',
+						() =>
+							rows$.set([
+								{ id: 'second', label: 'Second' },
+								{ id: 'first', label: 'First' },
+							]),
+						'SecondFirst',
 					],
 				] as const) {
+					count$.set(1);
+					rows$.set([{ id: 'first', label: 'First' }]);
 					const fixture = authoredPresentation(
 						'ImportedStructure',
 						{},
@@ -8056,18 +8544,16 @@ export function ImportedStructure(props) @{ 'use dom bindings'; <section>${marku
 					container.append(host);
 					host.innerHTML = fixture.html;
 					const root = host.firstElementChild!;
+					const serverChild = root.querySelector('span');
 					expect(root.textContent).toBe(expected);
-					expect(() => fixture.attach(root, fixture.state)).toThrow(/imported signal.*handle/i);
-					expect(root.textContent).toBe(expected);
-					const emptyHost = document.createElement('section');
-					container.append(emptyHost);
-					expect(() => fixture.mount({ parent: emptyHost }, fixture.state)).toThrow(
-						/imported signal.*handle/i,
-					);
-					expect(emptyHost.childNodes).toHaveLength(0);
-					expect(() => fixture.publish({})).not.toThrow();
-					expect(root.textContent).toBe(expected);
-					expect(emptyHost.childNodes).toHaveLength(0);
+					const handle = fixture.attach(root, fixture.state);
+					try {
+						expect(root.querySelector('span')).toBe(serverChild);
+						change();
+						expect(root.textContent).toBe(changed);
+					} finally {
+						handle.dispose();
+					}
 				}
 			} finally {
 				scope.dispose();
@@ -8247,6 +8733,9 @@ export function SubscribedSnapshot(props) @{ 'use dom bindings';
 						}
 					}
 				}
+				// A setup value sampled before the provider computation is a subscribed
+				// read of the view's program, not a stale snapshot.
+				count$.set(1);
 				const eager = authoredPresentation(
 					'EagerSnapshot',
 					{ height$ },
@@ -8256,7 +8745,7 @@ import * as stylex from 'binding-styles';
 const styles = stylex.create({ height: height => ({ className: 'sized', style: { height } }) });
 export function EagerSnapshot(props) @{ 'use dom bindings';
  const sampled = count$.get();
- <div sx={styles.height(props.height$ + sampled)} />
+ <div sx={styles.height(sampled)} />
 }`,
 					modules,
 					projectionOptions,
@@ -8264,29 +8753,31 @@ export function EagerSnapshot(props) @{ 'use dom bindings';
 				const host = document.createElement('section');
 				container.append(host);
 				host.innerHTML = eager.html;
-				const serverNode = host.firstElementChild!;
-				const previous = serverNode.outerHTML;
-				expect(() => eager.attach(serverNode, eager.state)).toThrow(/imported signal.*handle/i);
-				expect(host.firstElementChild).toBe(serverNode);
-				expect(serverNode.outerHTML).toBe(previous);
-				const emptyHost = document.createElement('section');
-				container.append(emptyHost);
-				expect(() => eager.mount({ parent: emptyHost }, eager.state)).toThrow(
-					/imported signal.*handle/i,
-				);
-				expect(emptyHost.childNodes).toHaveLength(0);
+				const serverNode = host.querySelector('div')!;
+				expect(serverNode.style.height).toBe('1px');
+				const handle = eager.attach(serverNode, eager.state);
+				try {
+					count$.set(6);
+					expect(host.querySelector('div')).toBe(serverNode);
+					expect([serverNode.className, serverNode.style.height]).toEqual(['sized', '6px']);
+				} finally {
+					handle.dispose();
+				}
+				count$.set(8);
+				expect(serverNode.style.height).toBe('6px');
 			} finally {
 				scope.dispose();
 			}
 		});
 
-		it(`diagnoses imported reads introduced by a later source publication (${dev ? 'dev' : 'prod'})`, () => {
+		it(`follows imported reads introduced and retired by later source publications (${dev ? 'dev' : 'prod'})`, () => {
 			const scope = createScope({ scopeKey: `later-imported-snapshot-${dev}` });
 			const count$ = scope.signal$('count', 1);
 			const state: { current: typeof count$ | undefined } = { current: undefined };
 			try {
 				for (const adopt of [false, true]) {
 					state.current = undefined;
+					count$.set(1);
 					const fixture = authoredPresentation(
 						'LaterSnapshot',
 						{ fallback: 'Initial' },
@@ -8311,21 +8802,21 @@ export function LaterSnapshot(props) @{ 'use dom bindings';
 						if (adopt) expect(paragraph).toBe(serverParagraph);
 						expect(paragraph.textContent).toBe('Initial');
 						state.current = count$;
-						expect(() => fixture.publish({ fallback: 'Rejected' })).toThrow(
-							/imported signal.*handle/i,
-						);
+						fixture.publish({ fallback: 'Later' });
+						expect(paragraph.textContent).toBe('1');
 						count$.set(7);
-						expect(paragraph.textContent).toBe('Initial');
+						expect(paragraph.textContent).toBe('7');
 						expect(paragraph.firstChild).toBe(text);
 						state.current = undefined;
-						expect(() => fixture.publish({ fallback: 'Retired' })).not.toThrow();
-						handle.refresh();
-						expect(paragraph.textContent).toBe('Initial');
-						expect(paragraph.firstChild).toBe(text);
+						fixture.publish({ fallback: 'Retired' });
+						expect(paragraph.textContent).toBe('Retired');
+						count$.set(8);
+						expect(paragraph.textContent).toBe('Retired');
 						handle.dispose();
 						state.current = count$;
-						expect(() => fixture.publish({ fallback: 'Disposed' })).not.toThrow();
-						expect(paragraph.textContent).toBe('Initial');
+						fixture.publish({ fallback: 'Disposed' });
+						count$.set(9);
+						expect(paragraph.textContent).toBe('Retired');
 						expect(fixture.cleanup).toHaveBeenCalledOnce();
 					} finally {
 						handle.dispose();
@@ -8456,11 +8947,12 @@ export function EventSnapshot(props) @{ 'use dom bindings';
 			}
 		});
 
-		it(`diagnoses imported signal snapshots after fixed prop specialization (${dev ? 'dev' : 'prod'})`, () => {
+		it(`subscribes imported signal reads after fixed prop specialization (${dev ? 'dev' : 'prod'})`, () => {
 			const scope = createScope({ scopeKey: `imported-fixed-signal-snapshots-${dev}` });
 			const count$ = scope.signal$('count', 1);
 			try {
 				for (const child of [false, true]) {
+					count$.set(1);
 					const fixture = authoredPresentation(
 						'FixedSnapshot',
 						{ name: 'count$' },
@@ -8480,34 +8972,55 @@ export function FixedSnapshot(props) @{ 'use dom bindings';
 					host.innerHTML = fixture.html;
 					const root = host.firstElementChild!;
 					expect(root.textContent).toBe('1');
-					expect(() => fixture.attach(root, fixture.state)).toThrow(/imported signal.*handle/i);
-					expect(root.textContent).toBe('1');
+					const handle = fixture.attach(root, fixture.state);
 					const emptyHost = document.createElement('section');
 					container.append(emptyHost);
-					expect(() => fixture.mount({ parent: emptyHost }, fixture.state)).toThrow(
-						/imported signal.*handle/i,
-					);
-					expect(emptyHost.childNodes).toHaveLength(0);
+					const mounted = fixture.mount({ parent: emptyHost }, fixture.state);
+					try {
+						count$.set(4);
+						expect([root.textContent, emptyHost.textContent]).toEqual(['4', '4']);
+					} finally {
+						handle.dispose();
+						mounted.dispose();
+					}
 				}
 			} finally {
 				scope.dispose();
 			}
 		});
 
-		it(`diagnoses unsupported latest snapshots while compiling binding views (${dev ? 'dev' : 'prod'})`, () => {
+		it(`subscribes imported latest reads and rejects props latest reads (${dev ? 'dev' : 'prod'})`, () => {
+			const scope = createScope({ scopeKey: `imported-latest-${dev}` });
+			const count$ = scope.signal$('count', 'first');
+			try {
+				const fixture = authoredPresentation(
+					'LatestSnapshot',
+					{},
+					dev,
+					`import { count$ } from 'state';
+export function LatestSnapshot() @{ 'use dom bindings'; <p>{count$.latest('fallback') as string}</p> }`,
+					{ state: { count$ } },
+				);
+				container.innerHTML = fixture.html;
+				const paragraph = container.querySelector('p')!;
+				const handle = fixture.attach(paragraph, fixture.state);
+				count$.set('second');
+				expect(paragraph.textContent).toBe('second');
+				handle.dispose();
+			} finally {
+				scope.dispose();
+			}
 			for (const mode of ['client', 'server'] as const) {
+				const options = (view: string) => ({
+					id: '/src/latest-snapshot.tsrx' + (mode === 'client' ? `?octane-bindings=${view}` : ''),
+					mode,
+					compileOptions: { dev, hmr: false },
+				});
 				let diagnostic: unknown;
 				try {
 					loadCompiledFixtureSource(
-						`import { count$ } from 'state';
-export function LatestSnapshot(props) @{ 'use dom bindings'; <p>{count$.latest('fallback') as string}</p> }`,
-						{
-							id:
-								'/src/latest-snapshot.tsrx' +
-								(mode === 'client' ? '?octane-bindings=LatestSnapshot' : ''),
-							mode,
-							compileOptions: { dev, hmr: false },
-						},
+						`export function PropsLatest(props) @{ 'use dom bindings'; <p>{props.count$.latest('fallback') as string}</p> }`,
+						options('PropsLatest'),
 					);
 				} catch (error) {
 					diagnostic = error;

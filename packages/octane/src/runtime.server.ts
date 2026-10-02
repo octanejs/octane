@@ -10361,8 +10361,16 @@ export function ssrTry(
 	namespace: 'html' | 'svg' | 'mathml' = FRAME?.namespace ?? 'html',
 	propagateSuspense = false,
 	recoverErrors = false,
+	bindingMarker?: string,
 ): string {
 	VT_SSR_TRY_SEQ++;
+	// A presentation-binding view labels this boundary's own range with the arm
+	// it rendered (0 content, 1 pending, 2 catch). The label replaces the plain
+	// open marker, so renderer hydration still sees one balanced range.
+	const slot = (content: string, arm: 0 | 1 | 2): string =>
+		bindingMarker === undefined || !MARKERS
+			? ssrBlock(content)
+			: '<!--' + bindingMarker + arm + '-->' + content + BLOCK_CLOSE;
 	// Consume the nearest un-consumed outer ViewTransition candidate: its
 	// name/share/update propagate onto this boundary's streamed content chunk
 	// so the old/new captures pair across the swap (Fizz vt-* parity).
@@ -10600,11 +10608,12 @@ export function ssrTry(
 			fallback = renderFallback();
 		}
 		if (entry !== undefined) {
-			return ssrBlock(
+			return slot(
 				'<template ' + STREAM_BOUNDARY_ATTR + '="' + entry.id + '"></template>' + fallback,
+				1,
 			);
 		}
-		return ssrBlock(nativeFreshArm(pendFn !== null ? fallback : ''));
+		return slot(nativeFreshArm(pendFn !== null ? fallback : ''), 1);
 	};
 	try {
 		try {
@@ -10663,7 +10672,7 @@ export function ssrTry(
 					nativeReads,
 					RESOLVED?.initialDocumentSignals,
 				);
-				return ssrBlock(
+				return slot(
 					`<!--${SUSPENSE_RESOLVED_COMMENT}${idCount}-->` +
 						(seeds.length === 0
 							? ''
@@ -10672,9 +10681,10 @@ export function ssrTry(
 							? ''
 							: serializeNativeSignalSeeds(native, NONCE_ATTR, SUSPENSE_RESOLVED_NATIVE_ATTR)) +
 						inner,
+					0,
 				);
 			}
-			return ssrBlock(inner);
+			return slot(inner, 0);
 		} catch (e) {
 			nativeFresh = NATIVE_SERVER_FAILURES !== nativeFailureStart;
 			e = normalizeThrownServerThenable(e);
@@ -10768,7 +10778,7 @@ export function ssrTry(
 					return pendingForm();
 				}
 				if (!nativeFresh) appendNativeSeedReads(catchReads);
-				return ssrBlock(inner);
+				return slot(inner, 2);
 			}
 			if (stream !== null) {
 				// Fizz keeps a Suspense shell valid when its primary content throws:
