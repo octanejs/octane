@@ -188,6 +188,20 @@ export function useValue(value) {
 		);
 	});
 
+	it('keeps memo factories that call an imported or module-declared custom hook', () => {
+		// Each call gains a withSlot boundary before memo lowering, so the
+		// boundary itself must still count as a hook inside the factory.
+		for (const call of ['useImported(value)', 'useLocal(value)', 'useParameter(value)']) {
+			const source = `import { useMemo, useState } from 'octane';
+				import { useImported } from './hooks';
+				function useLocal(value) { return useState(value)[0]; }
+				export function useValue(value, useParameter) { return useMemo(() => ${call}, [value]); }`;
+			expect(slotHooks(source, 'custom-hook-factory.ts', { inlineHookMemo: true })).toEqual(
+				slotHooks(source, 'custom-hook-factory.ts', { inlineHookMemo: false }),
+			);
+		}
+	});
+
 	it("preserves memo calls throughout an opaque execution directive's subtree", () => {
 		const source = `import { useMemo } from 'octane';
 export function makeWorklet(value) {
