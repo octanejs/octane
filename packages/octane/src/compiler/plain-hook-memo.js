@@ -2,7 +2,7 @@
 // Unlike slot-hooks' line-preserving fallback, every generated token here is
 // AST and esrap prints the completed TypeScript Program exactly once.
 
-import { builders as b, clone_ast_node as cloneAstNode } from '@tsrx/core';
+import { builders as b, clone_ast_node as cloneAstNode, withDeferredImports } from '@tsrx/core';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { METHOD_DEP_IMPORT } from './hook-deps.js';
@@ -138,9 +138,10 @@ function inferredDependencyArray(inferred, state, origin) {
 	);
 }
 
-// Match the surgical pass's base-hook and imported-hook slot policy. Local
-// custom helpers keep their authored boundaries. Existing explicit memo slots are
-// already the effective third argument, so no unused fourth argument is added.
+// Match the surgical pass's base-hook and custom-hook slot policy: imported and
+// module-declared custom hooks get a withSlot boundary, other helpers keep their
+// authored call. Existing explicit memo slots are already the effective third
+// argument, so no unused fourth argument is added.
 function slotBaseHooks(ast, state, options) {
 	function visit(node) {
 		if (node === null || typeof node !== 'object') return node;
@@ -310,14 +311,18 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 	// The existing parallel-use pass has its own grouping and warm behavior.
 	// Keep those modules entirely on that path until both transforms share AST.
 	if (!hasMemo || hasUse) return null;
-	const visitors = esrapTsx({
-		comments: collectComments(ast),
-		getLeadingComments: (node) =>
-			node.__octanePure ||
-			(node.type === 'CallExpression' && options.pureCalls?.get(node.start) === node.end)
-				? PURE_COMMENTS
-				: undefined,
-	});
+	// esrap does not print an import's `phase`; without the wrapper an authored
+	// `import.defer()` would reprint as an eager `import()`.
+	const visitors = withDeferredImports(
+		esrapTsx({
+			comments: collectComments(ast),
+			getLeadingComments: (node) =>
+				node.__octanePure ||
+				(node.type === 'CallExpression' && options.pureCalls?.get(node.start) === node.end)
+					? PURE_COMMENTS
+					: undefined,
+		}),
+	);
 	if (!canPrintProgram(ast, visitors)) return null;
 	const state = {
 		filename: id,

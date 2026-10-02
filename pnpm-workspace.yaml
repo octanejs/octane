@@ -633,6 +633,15 @@ minimumReleaseAgeExclude:
 # and the parameter-property and bodyless-method mapping fix
 # (https://github.com/tsrx-org/tsrx/pull/143) in @tsrx/core >= 0.3.0.
 patchedDependencies:
+  # Print source-phase imports (`import source x from`, `import.source()`) in
+  # withDeferredImports. It printed only the `defer` phase, and esrap ignores
+  # `phase`, so compiled output silently became an evaluation-phase import. Not
+  # yet fixed upstream in tsrx-org/tsrx (checked through @tsrx/core 0.5.2).
+  # SCOPE: like every entry here, this does not ship in the published octane
+  # tarball; consumers resolve unpatched @tsrx/core until an upstream release is
+  # adopted. Guarded by packages/octane/tests/compiler/module-import-phases.test.ts.
+  # Drop when the adopted @tsrx/core prints the source phase.
+  '@tsrx/core@0.4.0': patches/@tsrx__core@0.4.0.patch
   # Print labeled statements and empty statement bodies instead of deleting
   # them, and throw on a node type with no printer instead of writing a
   # placeholder comment. Backports tsrx-org/tsrx#322 and the empty-body part of
