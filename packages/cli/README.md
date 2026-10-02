@@ -88,6 +88,21 @@ A file that will not parse is reported as an error and does not stop the rest of
 the run. Exit code is `3` when anything error-severity was found, or when
 `--strict` and there were warnings.
 
+Modules that `compiler.strong` in `octane.config.ts` reaches are analyzed in
+Strong mode, as the build compiles them.
+
+### Strong coverage
+
+`octane analyze --strong-baseline init` records every module that compiles
+without Strong mode in `octane-strong-baseline.json`. While that file exists,
+every run fails on a module that is neither Strong nor listed
+(`OCTANE_STRONG_COVERAGE_REGRESSION`), such as one whose `"use strong"` was
+deleted, and on a listed name that is now Strong or gone
+(`OCTANE_STRONG_COVERAGE_STALE`). `--strong-baseline update` removes stale
+names and never adds one, so a new exception is always a reviewed edit to the
+file. See
+[Keeping modules Strong](https://github.com/octanejs/octane/blob/main/docs/strong-compiler-checks.md#keeping-modules-strong).
+
 ## For agents and CI
 
 Every command is fully drivable by flags and emits a single JSON document under

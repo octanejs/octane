@@ -35,7 +35,14 @@ import {
 import { findLeadingJsxImportSourcePragma } from './pragma.js';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
 import { formatCompileDiagnostic } from './native-change-diagnostics.js';
-import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
+import {
+	findVoidComponentImports,
+	findVoidRootImports,
+	parseHookSource,
+	slotHooks,
+} from './slot-hooks.js';
+import { parseModule as parseAuthoredModule } from '#octane/compiler-parser';
+import { declaresStrongMode } from './strong-mode.js';
 import { rewriteServerRuntimeRequests } from './runtime-requests.js';
 import { assertNativeReadOptions } from './native-read-diagnostics.js';
 import { findCssModuleImportRequests } from './css-module-imports.js';
@@ -47,6 +54,9 @@ import {
 } from './client-only-server.js';
 
 export { findVoidComponentImports, findVoidRootImports };
+// Tooling that decides module ownership the way `transform` does (the CLI's
+// Strong coverage check) reads the pragma with the same scanner.
+export { findLeadingJsxImportSourcePragma };
 export {
 	isPlainCssModuleId,
 	readCssModuleExports,
@@ -720,6 +730,37 @@ class OctaneBundlerCompiler {
 			source.rule === null ||
 			application.rule.root === source.rule.root
 		);
+	}
+
+	/**
+	 * How Strong mode reaches one module that Octane compiles: through its own
+	 * `"use strong"` directive, through this compiler's application `strong`
+	 * policy, both, or neither. `transform` makes the same decision inline;
+	 * tooling reads it here (`octane analyze` builds its Strong coverage check
+	 * on it) so the policy is never re-derived outside the compiler. Whether
+	 * Octane compiles the module at all (`exclude`, `requireDirective`) is a
+	 * separate question this does not answer.
+	 *
+	 * @param {string} code
+	 * @param {string} id
+	 * @returns {{ strong: boolean, directive: boolean, config: boolean }}
+	 */
+	strongModuleStatus(code, id) {
+		const file = cleanModuleId(id);
+		const config =
+			this.defaults.strong === true &&
+			this._hasApplicationStrongPolicy(file, {
+				dependencies: new Set(),
+				missingDependencies: new Set(),
+			});
+		const directive =
+			code.includes('use strong') &&
+			declaresStrongMode(
+				/\.(?:tsrx|tsx|jsx)$/.test(file)
+					? parseAuthoredModule(code, file)
+					: parseHookSource(code, file).ast,
+			);
+		return { strong: config || directive, directive, config };
 	}
 
 	_isInstalledOctaneSource(file, collected) {

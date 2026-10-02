@@ -2,9 +2,20 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { defineCommand } from '../kernel/command.js';
-import { CliError, EXIT } from '../kernel/errors.js';
-import { SYMBOLS } from '../kernel/ui.js';
+import { defineCommand } from '../../kernel/command.js';
+import { CliError, EXIT, usageError } from '../../kernel/errors.js';
+import { SOURCE_FILE_LIMIT } from '../../kernel/project.js';
+import { SYMBOLS } from '../../kernel/ui.js';
+import {
+	BASELINE_FILE,
+	STALE,
+	compareCoverage,
+	isOctaneModule,
+	loadStrongPolicy,
+	projectPath,
+	readBaseline,
+	writeBaseline,
+} from './strong-coverage.js';
 
 /**
  * @typedef {Object} Finding
@@ -75,6 +86,13 @@ function describeSuggestions(suggestions) {
 const TRAILING_LOCATION = /\s*\(([^()\s]+):(\d+):(\d+)\)\s*$/;
 
 /**
+ * A compiler error that carries its own code, e.g. a Strong rule:
+ * `/abs/App.tsrx:4:21: [OCTANE_STRONG_EFFECT_STATE_UPDATE] Strong mode …`.
+ * The position is already in the finding's columns.
+ */
+const COMPILER_CODE = /^(?:[^\n]*?:\d+:\d+: )?\[(OCTANE_[A-Z0-9_]+)\] /;
+
+/**
  * Normalise a thrown compile failure into a finding.
  *
  * Two shapes reach here. A genuine parse failure carries a Babel-style `loc`.
@@ -88,7 +106,12 @@ const TRAILING_LOCATION = /\s*\(([^()\s]+):(\d+):(\d+)\)\s*$/;
  * @returns {Finding}
  */
 function thrownFailure(error, file, code) {
-	const message = error instanceof Error ? error.message : String(error);
+	const thrown = error instanceof Error ? error.message : String(error);
+	// A coded compiler error names its rule; reporting it as a parse failure
+	// would hide the code that `--code` filters on and the docs index.
+	const coded = COMPILER_CODE.exec(thrown);
+	const message = coded ? thrown.slice(coded[0].length) : thrown;
+	code ??= coded?.[1];
 	const loc = /** @type {any} */ (error)?.loc;
 	if (loc) {
 		return {
@@ -136,26 +159,75 @@ export default defineCommand({
 			description: 'Only report this diagnostic code. Repeatable.',
 		},
 		strict: { type: 'boolean', description: 'Fail the run on warnings, not just errors.' },
+		'strong-baseline': {
+			type: 'string',
+			choices: ['init', 'update'],
+			placeholder: '<init|update>',
+			description:
+				`Write ${BASELINE_FILE}, the modules allowed to compile without Strong mode.\n` +
+				'init records every such module once; update only removes names that are no\n' +
+				'longer exceptions. While the file exists, every run fails on a module that\n' +
+				'is neither Strong nor listed, and on a listed name that is out of date.',
+		},
 	},
 
 	async run(ctx, input) {
 		const project = ctx.project();
 		const compile = await loadCompiler(project.root);
 
+		// Coverage is a property of the whole project: an explicit file list can
+		// show that one of its files regressed, but not that a recorded exception
+		// went stale, and it must never write the baseline.
+		const whole = input.positionals.length === 0;
+		const write = /** @type {'init' | 'update' | undefined} */ (input.flags['strong-baseline']);
+		if (write !== undefined && !whole) {
+			throw usageError('--strong-baseline measures the whole project; drop the file arguments.');
+		}
+		let baseline = readBaseline(project.root);
+		if (write === 'init' && baseline !== null) {
+			throw usageError(
+				`${BASELINE_FILE} already exists.`,
+				'`--strong-baseline update` removes names that are no longer exceptions; it never adds one.',
+			);
+		}
+		if (write === 'update' && baseline === null) {
+			throw usageError(
+				`${BASELINE_FILE} does not exist.`,
+				'Record one with `--strong-baseline init`.',
+			);
+		}
+		const measureCoverage = baseline !== null || write !== undefined;
+		const { policy, reason } = await loadStrongPolicy(project, { required: measureCoverage });
+
 		const targets =
 			input.positionals.length > 0
 				? input.positionals.map((file) => path.resolve(ctx.cwd, file))
 				: project.tsrxFiles;
 
-		if (targets.length === 0) {
+		if (targets.length === 0 && !measureCoverage) {
 			ctx.ui.intro('octane analyze');
 			ctx.ui.outro('No .tsrx files found.');
 			return { json: { ok: true, analyzed: 0, findings: [] } };
 		}
 
 		ctx.ui.intro('octane analyze');
+		if (reason !== undefined) ctx.ui.log(ctx.ui.colors.yellow(`${SYMBOLS.warn} ${reason}`));
 		const spinner = ctx.ui.spinner(`Compiling ${targets.length} file(s)`);
 
+		/** @type {Map<string, string>} */
+		const sources = new Map();
+		/** @type {Map<string, import('./strong-coverage.js').StrongStatus>} */
+		const statuses = new Map();
+		// One parse per module answers both the compile options and coverage.
+		/** @param {string} absolute @param {string} source */
+		const statusOf = (absolute, source) => {
+			let status = statuses.get(absolute);
+			if (status === undefined && policy) {
+				status = policy.status(source, absolute);
+				statuses.set(absolute, status);
+			}
+			return status;
+		};
 		/** @type {Finding[]} */
 		const findings = [];
 		for (const absolute of targets) {
@@ -168,9 +240,18 @@ export default defineCommand({
 				findings.push(thrownFailure(error, file, 'OCTANE_READ_ERROR'));
 				continue;
 			}
+			sources.set(absolute, source);
 
+			// Analyze under the policy the build applies: octane.config's
+			// compiler.strong reaches this module without a directive of its own.
+			let options = {};
 			try {
-				for (const diagnostic of compile(source, absolute, {}).diagnostics ?? []) {
+				if (statusOf(absolute, source)?.config) options = { strong: true };
+			} catch {
+				// Unparseable; the compile below reports it in its own terms.
+			}
+			try {
+				for (const diagnostic of compile(source, absolute, options).diagnostics ?? []) {
 					findings.push({
 						file,
 						line: diagnostic.start?.line ?? 1,
@@ -196,6 +277,99 @@ export default defineCommand({
 		}
 		spinner.stop(`Compiled ${targets.length} file(s)`);
 
+		/** @type {Record<string, unknown> | undefined} */
+		let strongCoverage;
+		if (measureCoverage && policy !== null) {
+			if (whole && project.sourceFiles.length >= SOURCE_FILE_LIMIT) {
+				throw new CliError(
+					`The project has more than ${SOURCE_FILE_LIMIT} source files, so Strong coverage cannot be measured completely.`,
+				);
+			}
+			const jsxImportSource = project.tsconfig?.config?.compilerOptions?.jsxImportSource;
+			/** @type {import('./strong-coverage.js').CoverageModule[]} */
+			const modules = [];
+			/** @type {Set<string>} */
+			const unmeasured = new Set();
+			for (const absolute of whole ? project.sourceFiles : targets) {
+				const file = projectPath(project.root, absolute);
+				if (file.startsWith('../') || path.isAbsolute(file)) continue;
+				let source = sources.get(absolute);
+				if (source === undefined) {
+					try {
+						source = readFileSync(absolute, 'utf8');
+					} catch {
+						unmeasured.add(file);
+						continue;
+					}
+				}
+				if (!isOctaneModule(absolute, source, jsxImportSource, policy)) continue;
+				try {
+					const status = /** @type {import('./strong-coverage.js').StrongStatus} */ (
+						statusOf(absolute, source)
+					);
+					modules.push({ file, absolute, status });
+				} catch {
+					// A module that does not parse fails its build and, as a target,
+					// this report. It is neither a regression nor proof of staleness.
+					unmeasured.add(file);
+				}
+			}
+
+			if (write === 'init') {
+				const exceptions = modules.filter((module) => !module.status.strong);
+				if (!ctx.dryRun)
+					writeBaseline(
+						project.root,
+						exceptions.map((module) => module.file),
+					);
+				baseline = {
+					path: path.join(project.root, BASELINE_FILE),
+					text: '',
+					exceptions: exceptions.map((module) => module.file),
+				};
+			}
+			const current = /** @type {import('./strong-coverage.js').Baseline} */ (baseline);
+			const comparison = compareCoverage({
+				modules,
+				baseline: current,
+				policy,
+				complete: whole,
+				unmeasured,
+				display: (absolute) => displayPath(project.root, ctx.cwd, absolute),
+			});
+			let exceptions = current.exceptions;
+			let coverageFindings = comparison.findings;
+			if (write === 'update') {
+				const stale = new Set(comparison.stale);
+				exceptions = exceptions.filter((entry) => !stale.has(entry));
+				if (!ctx.dryRun) {
+					writeBaseline(project.root, exceptions);
+					coverageFindings = coverageFindings.filter((finding) => finding.code !== STALE);
+				}
+			}
+			findings.push(...coverageFindings);
+
+			const strong = modules.filter((module) => module.status.strong).length;
+			ctx.ui.log(
+				`Strong coverage: ${strong} of ${modules.length} module(s), ${exceptions.length} recorded exception(s)`,
+			);
+			if (write !== undefined) {
+				const changed =
+					write === 'init'
+						? `${ctx.dryRun ? 'Would record' : 'Recorded'} ${exceptions.length} exception(s)`
+						: `${ctx.dryRun ? 'Would remove' : 'Removed'} ${comparison.stale.length} name(s)`;
+				ctx.ui.log(`${changed} in ${BASELINE_FILE}`);
+			}
+			strongCoverage = {
+				baseline: BASELINE_FILE,
+				modules: modules.length,
+				strong,
+				exceptions: exceptions.length,
+				regressions: comparison.regressions,
+				stale: comparison.stale,
+			};
+		}
+
 		const selected = input.flags.code?.length
 			? findings.filter((finding) => input.flags.code.includes(finding.code))
 			: findings;
@@ -214,6 +388,7 @@ export default defineCommand({
 				analyzed: targets.length,
 				summary: { errors, warnings, hints },
 				findings: selected,
+				...(strongCoverage === undefined ? null : { strongCoverage }),
 			},
 		};
 	},
@@ -237,7 +412,7 @@ function displayPath(root, cwd, absolute) {
 }
 
 /**
- * @param {import('../kernel/context.js').Ctx} ctx
+ * @param {import('../../kernel/context.js').Ctx} ctx
  * @param {Finding[]} findings
  * @param {number} analyzed
  */

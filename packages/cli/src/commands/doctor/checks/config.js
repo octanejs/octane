@@ -1,7 +1,6 @@
 import { existsSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { resolveConfigLoader } from '../../../kernel/octane-config.js';
 import { readInstalled } from '../../../kernel/project.js';
 import { fail, pass, skip, warn } from '../check.js';
 
@@ -9,45 +8,6 @@ const ADAPTERS = {
 	vercel: '@octanejs/adapter-vercel',
 	cloudflare: '@octanejs/adapter-cloudflare',
 };
-
-/**
- * Load the project's own config loader rather than shipping a second one.
- *
- * `@octanejs/app-core` is usually a transitive dependency of the bundler
- * plugin, not a direct one, so a plain resolve from the project root misses it.
- * Falling back to a resolve rooted at the plugin reproduces exactly the lookup
- * the plugin itself performs.
- *
- * @param {string} root
- * @returns {Promise<((root: string) => Promise<any>) | null>}
- */
-async function resolveConfigLoader(root) {
-	const fromProject = createRequire(path.join(root, 'noop.js'));
-	const specifier = '@octanejs/app-core/config-loader';
-
-	/** @type {string | null} */
-	let entry = null;
-	try {
-		entry = fromProject.resolve(specifier);
-	} catch {
-		for (const plugin of [
-			'@octanejs/vite-plugin',
-			'@octanejs/rspack-plugin',
-			'@octanejs/rsbuild-plugin',
-		]) {
-			try {
-				entry = createRequire(fromProject.resolve(plugin)).resolve(specifier);
-				break;
-			} catch {
-				// Try the next plugin.
-			}
-		}
-	}
-
-	if (!entry) return null;
-	const module = await import(pathToFileURL(entry).href);
-	return module.loadOctaneConfig ?? null;
-}
 
 /**
  * Loading the config means running esbuild over `octane.config.ts`. All three

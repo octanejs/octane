@@ -348,3 +348,54 @@ The syntax compiler cannot establish the type of an arbitrary imported value or
 dynamic factory prop. Run the project's `tsrx-tsc --noEmit` check as well as its
 build. Type assertions and `any` can bypass nominal checking, as with other
 TypeScript contracts.
+
+## Keeping modules Strong
+
+Every check above applies only to a module that is Strong. Leaving Strong mode
+takes a one-line change that is easy to miss in review: delete `"use strong"`,
+turn `compiler.strong` off, or move a module into another package, which the
+application's `compiler.strong` does not reach. A coverage baseline makes that
+change fail CI.
+
+```bash
+octane analyze --strong-baseline init     # record today's non-Strong modules
+octane analyze                            # fails on anything that regressed
+octane analyze --strong-baseline update   # drop names that are now Strong
+```
+
+`init` writes `octane-strong-baseline.json`, listing every module Octane compiles
+that is not Strong today:
+
+```json
+{
+	"version": 1,
+	"exceptions": ["src/legacy/Chart.tsx"]
+}
+```
+
+While the file exists, every `octane analyze` run measures the whole project.
+Two codes report what it finds, and both are errors:
+
+| Diagnostic | What it detects | Replacement |
+| --- | --- | --- |
+| `OCTANE_STRONG_COVERAGE_REGRESSION` | A module compiles without Strong mode and is not listed: a new module, or one that lost its directive or moved out of `compiler.strong`'s reach. | Add `"use strong"` before its imports, or enable `compiler.strong`, and fix what Strong then reports. |
+| `OCTANE_STRONG_COVERAGE_STALE` | A listed module is now Strong, no longer exists, or is no longer compiled by Octane. A stale name would let that module leave Strong mode again unnoticed. | Run `octane analyze --strong-baseline update`. |
+
+`update` only ever removes names, and `init` refuses to overwrite an existing
+file, so `octane analyze` never records a new exception. Adding one takes a
+hand edit to `octane-strong-baseline.json`, which shows up in review like any
+other change. A CODEOWNERS entry for the file routes those edits to an owner.
+
+Octane compiles every `.tsrx` module, every `.tsx` module whose JSX goes to
+Octane, and every `.ts` or `.js` module with a runtime import from `octane`.
+A `.tsx` module whose leading `@jsxImportSource` pragma, or the tsconfig's
+`jsxImportSource`, names another library, such as React in a React-hosted
+project, is not counted. Whether a counted module is Strong is decided by the
+project's installed compiler, the same way a build decides it. The setting comes
+from `compiler.strong` in `octane.config.ts`. A bundler plugin's inline `strong`
+option overrides that at build time and is not visible to `octane analyze`, so
+keep the setting in `octane.config.ts`.
+
+With file arguments, `octane analyze` reports regressions for those files only
+and does not judge the rest of the baseline. `--strong-baseline` always measures
+the whole project.

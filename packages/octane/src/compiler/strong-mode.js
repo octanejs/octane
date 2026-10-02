@@ -517,8 +517,26 @@ function diagnostic(code, filename, node, message, suggestions = []) {
 	};
 }
 
+/**
+ * Does the module's directive prologue contain `"use strong"`? A directive
+ * anywhere else does not enable Strong mode; compilation reports it as
+ * misplaced instead.
+ *
+ * @param {any} ast
+ * @returns {boolean}
+ */
+export function declaresStrongMode(ast) {
+	for (const statement of ast?.body ?? []) {
+		if (statement.type !== 'ExpressionStatement' || typeof statement.directive !== 'string') {
+			return false;
+		}
+		if (statement.directive === 'use strong') return true;
+	}
+	return false;
+}
+
 function strongDirectives(ast, source) {
-	let enabled = false;
+	const enabled = declaresStrongMode(ast);
 	let misplaced = null;
 	let prologue = true;
 	for (const statement of ast?.body ?? []) {
@@ -527,7 +545,6 @@ function strongDirectives(ast, source) {
 			statement.type === 'ExpressionStatement' &&
 			typeof statement.directive === 'string'
 		) {
-			if (statement.directive === 'use strong') enabled = true;
 			continue;
 		}
 		prologue = false;

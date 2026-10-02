@@ -12,7 +12,7 @@ const IGNORED_DIRS = new Set([
 	'.vercel',
 ]);
 const SOURCE_EXTENSIONS = new Set(['.tsrx', '.tsx', '.ts', '.jsx', '.js', '.mts', '.mjs']);
-const SOURCE_FILE_LIMIT = 5000;
+export const SOURCE_FILE_LIMIT = 5000;
 const EXTENDS_LIMIT = 10;
 
 const LOCKFILES = /** @type {const} */ ([

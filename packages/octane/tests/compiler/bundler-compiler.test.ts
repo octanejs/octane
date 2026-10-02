@@ -856,6 +856,77 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 		expect(() => compiler.transform(deferredHook, '/project/src/use-count.js')).not.toThrow();
 	});
 
+	it('reports the same Strong decision for a module as transform enforces', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-strong-module-status-'));
+		try {
+			writeFileSync(
+				join(root, 'package.json'),
+				JSON.stringify({ name: 'application', private: true }),
+			);
+			const nested = join(root, 'packages', 'nested');
+			mkdirSync(join(root, 'src'), { recursive: true });
+			mkdirSync(nested, { recursive: true });
+			writeFileSync(
+				join(nested, 'package.json'),
+				JSON.stringify({ name: '@example/nested', dependencies: { octane: '*' } }),
+			);
+			const app = createOctaneCompiler({ root, strong: true });
+			const perModule = createOctaneCompiler({ root, strong: false });
+			const hook =
+				"import { useState } from 'octane';\n" +
+				'export function useBroken() { const [value, update] = useState(0); update(value); }\n';
+			const cases = [
+				[app, RENDER_STATE_UPDATE, join(root, 'src/App.tsrx'), true, false, true],
+				[app, RENDER_STATE_UPDATE, join(nested, 'App.tsrx'), false, false, false],
+				[app, `'use strong';\n${RENDER_STATE_UPDATE}`, join(nested, 'App.tsrx'), true, true, false],
+				[app, RENDER_STATE_UPDATE, join(root, 'node_modules/x/App.tsrx'), false, false, false],
+				[perModule, RENDER_STATE_UPDATE, join(root, 'src/App.tsrx'), false, false, false],
+				[
+					perModule,
+					`// note\n'use client';\n"use strong";\n${RENDER_STATE_UPDATE}`,
+					join(root, 'src/App.tsrx'),
+					true,
+					true,
+					false,
+				],
+				[
+					perModule,
+					`${RENDER_STATE_UPDATE}export const label = 'use strong';\n`,
+					join(root, 'src/App.tsrx'),
+					false,
+					false,
+					false,
+				],
+				[perModule, `'use strong';\n${hook}`, join(root, 'src/use-broken.ts'), true, true, false],
+				[
+					perModule,
+					hook.replace('{ const', "{ 'use strong'; const"),
+					join(root, 'src/use-broken.ts'),
+					false,
+					false,
+					false,
+				],
+			] as const;
+
+			for (const [compiler, source, filename, strong, directive, config] of cases) {
+				expect(compiler.strongModuleStatus(source, filename)).toEqual({
+					strong,
+					directive,
+					config,
+				});
+				let message = '';
+				try {
+					compiler.transform(source, filename);
+				} catch (error) {
+					message = String(error);
+				}
+				expect(/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/.test(message)).toBe(strong);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('keeps Strong directives subordinate to mixed-toolchain ownership', () => {
 		const compiler = createOctaneCompiler({
 			root: '/project',
