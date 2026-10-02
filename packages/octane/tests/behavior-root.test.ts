@@ -7768,6 +7768,75 @@ export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
 					),
 				).toThrow(/binding props support only|ordinary props parameter/);
 			}
+			expect(() =>
+				authoredPresentation(
+					'Unsupported',
+					{},
+					dev,
+					`export function Unsupported(props, extra) @{ 'use dom bindings'; <section /> }`,
+				),
+			).toThrow(/ordinary props parameter/);
+		});
+
+		// Islands take their state from module-scope signals, so a view may have no
+		// props at all. Its source snapshot is then unused.
+		it(`adopts, rehydrates and mounts zero-argument views over module signals (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `import { count$, label$ } from './zero-argument-state';
+export function Label() @{ 'use dom bindings'; <p title={label$}><b>{label$ as string}</b></p> }
+export function Counter() @{
+  'use dom bindings';
+  <section title={label$}><button type="button" onClick={() => count$.set((n) => n + 1)}>{count$}</button></section>
+}`;
+			for (const view of ['Label', 'Counter'] as const) {
+				const scope = createScope({ scopeKey: `zero-argument-${view}-${dev}` });
+				const count$ = scope.signal$('count', 1);
+				const label$ = scope.derived$('label', () => `n=${scope.get(count$)}`);
+				const text = () => (view === 'Label' ? `n=${count$.get()}` : `${count$.get()}`);
+				const fixture = authoredPresentation(view, {}, dev, source, {
+					'./zero-argument-state': { count$, label$ },
+				});
+				try {
+					// Early adoption of the server output, updated from the module signals.
+					container.innerHTML = fixture.html;
+					const host = container.firstElementChild!;
+					expect([host.getAttribute('title'), host.textContent]).toEqual(['n=1', text()]);
+					const binding = fixture.attach(host, fixture.state);
+					count$.set(2);
+					if (view === 'Counter') host.querySelector('button')!.click();
+					expect([host.getAttribute('title'), host.textContent]).toEqual([
+						view === 'Counter' ? 'n=3' : 'n=2',
+						text(),
+					]);
+
+					binding.dispose();
+					expect(fixture.cleanup).toHaveBeenCalledOnce();
+
+					// The ordinary renderer hydrates the same view's server output in place.
+					container.innerHTML = renderToString(fixture.server[view], {}).html;
+					const served = container.firstElementChild!;
+					const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+					hydratedRoot = hydrateRoot(container, fixture.loadClient()[view], {});
+					expect(container.firstElementChild).toBe(served);
+					flushSync(() => count$.set(5));
+					expect([served.getAttribute('title'), served.textContent]).toEqual(['n=5', text()]);
+					expect(error).not.toHaveBeenCalled();
+					error.mockRestore();
+					hydratedRoot.unmount();
+					hydratedRoot = undefined;
+
+					container.replaceChildren();
+					const mounted = fixture.mount({ parent: container }, fixture.state);
+					const fresh = container.firstElementChild!;
+					expect([fresh.getAttribute('title'), fresh.textContent]).toEqual(['n=5', text()]);
+					count$.set(6);
+					if (view === 'Counter') fresh.querySelector('button')!.click();
+					expect(fresh.getAttribute('title')).toBe(view === 'Counter' ? 'n=7' : 'n=6');
+					expect(fresh.textContent).toBe(text());
+					mounted.dispose();
+				} finally {
+					scope.dispose();
+				}
+			}
 		});
 
 		it(`preserves presentation refs through replacement and cleanup failure (${dev ? 'dev' : 'prod'})`, () => {
