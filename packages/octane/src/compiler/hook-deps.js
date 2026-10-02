@@ -3,6 +3,7 @@
 // surgical plain-TS hook pass, keeping custom hooks and components aligned.
 
 import { builders as b } from '@tsrx/core';
+import { hookMethodName } from './hook-methods.js';
 import { hasInlineMemoDirectEval } from './inline-hook-memo.js';
 
 export const STRONG_AUTOMATIC_MEMO_UNSUPPORTED = 'OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED';
@@ -289,10 +290,12 @@ function isLocalCustomHookBinding(binding) {
 
 // A call evaluated while the module initializes runs outside every render, so it
 // needs no boundary. The plain pass appends its slot constants after the
-// module body, where such a call would read them before initialization.
+// module body, where such a call would read them before initialization. Static
+// blocks and static fields of a module-level class run then too; an instance
+// field initializer runs with each construction, as a constructor body does.
 function withinFunction(scope) {
 	for (let current = scope; current !== null; current = current.parent) {
-		if (current.kind === 'function') return true;
+		if (current.kind === 'function' || current.kind === 'initializer') return true;
 	}
 	return false;
 }
@@ -518,6 +521,22 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 			return;
 		}
 
+		if (
+			!bindingsOnly &&
+			(node.type === 'PropertyDefinition' || node.type === 'AccessorProperty') &&
+			node.static !== true &&
+			node.value != null
+		) {
+			// Decorators and a computed key run with the class definition; the
+			// initializer runs with each construction (see withinFunction).
+			const initializerScope = createScope(scope, 'initializer');
+			for (const key in node) {
+				if (AST_META_KEYS.has(key) || key === 'typeAnnotation') continue;
+				walk(node[key], key === 'value' ? initializerScope : scope);
+			}
+			return;
+		}
+
 		if (node.type === 'CatchClause') {
 			const catchScope = createScope(scope, 'block');
 			declarePattern(node.param, catchScope);
@@ -664,16 +683,25 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 				calleeBinding?.customHookImport ??
 				(onlyImported && isLocalCustomHookBinding(calleeBinding) ? calleeBinding.name : null);
 			if (customHookCall !== null && !withinFunction(scope)) customHookCall = null;
+			// The full compiler declares its slots before the module body.
+			const moduleInitHookMethod =
+				onlyImported &&
+				octaneImportedName === null &&
+				hookRuntimeImportedName === null &&
+				hookMethodName(node) !== null &&
+				!withinFunction(scope);
 			if (
 				octaneImportedName !== null ||
 				unboundCallee ||
 				hookRuntimeImportedName !== null ||
-				customHookCall
+				customHookCall ||
+				moduleInitHookMethod
 			) {
 				const props = {};
 				if (octaneImportedName !== null) props._octaneImportedHook = octaneImportedName;
 				if (unboundCallee) props._octaneUnboundCallee = true;
 				if (customHookCall) props._octaneCustomHookCall = customHookCall;
+				if (moduleInitHookMethod) props._octaneModuleInitCall = true;
 				if (octaneImportedName === null && hookRuntimeImportedName !== null) {
 					props._octaneHookRuntimeImportedHook = hookRuntimeImportedName;
 				}
