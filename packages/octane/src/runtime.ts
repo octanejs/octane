@@ -11922,6 +11922,12 @@ function renderUnframedLite<P>(
 // body may adopt that node in place (HydrationCapability.renderInPlace). The body
 // renders through componentSlotLite again, which finds the registered scope. A
 // separate function keeps the callback's captures out of ordinary lite dispatch.
+// When `root` is the element or text a template hole's walk found (the call's
+// anchor), the template claims the server nodes after it, and only a body of
+// one root can take its place: the body's end marker is `root`, which the first
+// of several roots replaces. Any other body renders unframed in place of `root`
+// alone (renderUnframed), as componentSlot renders a call it cannot prove
+// single-root.
 function renderLiteInPlace<P>(
 	hydration: HydrationCapability,
 	parentScope: Scope,
@@ -11933,6 +11939,25 @@ function renderLiteInPlace<P>(
 	anchor: Node | undefined,
 	root: Node,
 ): void {
+	if (
+		root === anchor &&
+		root.nodeType !== 8 &&
+		root !== parentScope.block.endMarker &&
+		(comp as any).$$singleRoot !== true
+	) {
+		mountUnframedLite(
+			hydration,
+			parentScope,
+			slotKey,
+			host,
+			comp,
+			props,
+			invocationSite,
+			root,
+			root,
+		);
+		return;
+	}
 	if (
 		hydration.renderInPlace(
 			() => componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite, anchor),
@@ -19219,7 +19244,10 @@ class HydrationCapability {
 	 * (unframedClaim).
 	 *
 	 * The server also renders an anchored call's content without a range where
-	 * it rendered that content inline, as another `@if` arm does. So when the
+	 * it rendered that content inline, as another `@if` arm does. A claim
+	 * anchored at the element or text that a template hole's walk found (not
+	 * its block's end marker) stands at exactly that node, wherever the cursor
+	 * rests, and the template claims the server nodes after it. So when the
 	 * markers stand before a server element or text at `stale`, the body
 	 * renders in its place, and a template that matches adopts it, with the
 	 * server nodes after it that the template's other roots match, between the
@@ -19236,11 +19264,15 @@ class HydrationCapability {
 		owner: Block,
 		claim: UnframedClaim,
 	): void {
-		const { end, stale, anchor } = claim;
+		const { end, anchor: at } = claim;
+		// At the node a template hole's walk found, the claim ends after it.
+		const positional = at !== null && at.nodeType !== 8 && at !== claim.scope.block.endMarker;
+		const stale = positional ? at : claim.stale;
+		const anchor = positional ? getNextSibling(at) : at;
 		// The server frames an appended call (anchor null) wherever it renders it,
 		// and a clone at a root-level node claims the root's remainder instead.
 		const inPlace =
-			anchor !== null &&
+			at !== null &&
 			stale !== null &&
 			(stale.nodeType === 1 || stale.nodeType === 3) &&
 			getNextSibling(end) === stale &&
