@@ -18887,6 +18887,11 @@ class HydrationCapability {
 	 * slot claims it or the enclosing range ends (sweepRebuiltTail).
 	 */
 	rebuiltTail: Node | null = null;
+	/**
+	 * The start comment of each markerless branch that holdMarkerlessBranch
+	 * holds, to where its content reached when it threw.
+	 */
+	private heldBranches: WeakMap<Node, Node | null> | null = null;
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Unframed claims whose render suspended, by the block that claimed (renderUnframed). */
 	private unframedClaims: WeakMap<Block, UnframedClaim> | null = null;
@@ -20674,19 +20679,113 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Where the content of a markerless branch that rendered at `cursor` ends:
-	 * at the node its render left the cursor on in `parent`. clone() parks the
-	 * cursor on a root it adopted, so a render that left it on `cursor` adopted
-	 * that node in place. The holes of a root adopted in place can also leave
-	 * the cursor inside that root, or past its last child: the content then
-	 * ends after `cursor`, while it is still in `parent`, and otherwise at
-	 * `after`.
+	 * Where the content of a markerless branch that took the cursor's place
+	 * after `before` in `parent` ends, from where its render left the cursor.
+	 * The content is whole nodes and server ranges, from the first one up to at
+	 * most `after`. clone() parks the cursor on a root it adopted, so a cursor
+	 * on the first node, or inside any node or range, ends the content after
+	 * it, and a cursor on a later node ends the content there. A cursor that
+	 * says nothing about this content (before it, past `after`, or off the end
+	 * of a nested parent, as the holes of a root adopted in place can leave it)
+	 * leaves only the first node or range in it: claiming more would take
+	 * server nodes that a later sibling adopts.
 	 */
-	markerlessEnd(cursor: Node, parent: Node, after: Node | null): Node | null {
-		const node = this.node;
-		if (node !== null && domNode(node).parentNode === parent)
-			return node === cursor ? getNextSibling(cursor) : node;
-		return domNode(cursor).parentNode === parent ? getNextSibling(cursor) : after;
+	markerlessEnd(before: Node | null, parent: Node, after: Node | null): Node | null {
+		let node = this.node;
+		let inside = false;
+		while (node !== null && domNode(node).parentNode !== parent) {
+			node = domNode(node).parentNode;
+			inside = true;
+		}
+		const first = before === null ? getFirstChild(parent) : getNextSibling(before);
+		let unit = first;
+		let end = first;
+		while (unit !== null && unit !== after && !this.isClose(unit)) {
+			const last: Node = this.isOpen(unit) ? this.close(unit) : unit;
+			const next = getNextSibling(last);
+			if (node === unit) return inside || unit === first ? next : unit;
+			for (let child: Node = unit; child !== last && node !== null;) {
+				child = getNextSibling(child)!;
+				if (child === node) return next;
+			}
+			if (unit === first) end = next;
+			unit = next;
+		}
+		return node === unit && !inside ? unit : end;
+	}
+
+	/**
+	 * A markerless branch that took the cursor's place after `before` in
+	 * `parent` threw while its content was server nodes that it adopted or has
+	 * yet to adopt, so it has no boundary yet. Mark where it starts with a
+	 * comment of the branch's own, which no adoption claims or discards the way
+	 * it can a server node, and remember where the content reached. A retry of
+	 * the same arm finalizes from that comment, and another arm replaces the
+	 * content after it (heldBranchEnd). An attempt that is discarded instead
+	 * leaves the server DOM as it was.
+	 */
+	holdMarkerlessBranch(
+		state: BranchSlot,
+		parent: Node,
+		marker: string,
+		before: Node | null,
+		after: Node | null,
+		error: unknown,
+	): void {
+		if (PRESENTATION_HYDRATION?.revision !== undefined || isAdoptionControl(error)) return;
+		this.save(parent);
+		const start = domNode(document).createComment(marker);
+		domNode(parent).insertBefore(
+			start,
+			before === null ? getFirstChild(parent) : getNextSibling(before),
+		);
+		(this.heldBranches ??= new WeakMap()).set(start, this.markerlessEnd(start, parent, after));
+		state.markerlessBefore = start;
+	}
+
+	/**
+	 * Where the content of a held branch that starts after `start` ends, or
+	 * undefined when `start` holds no branch. That is the later of where the
+	 * content reached when the arm threw and where the arm's last render left
+	 * the cursor. A render adopts as it advances the cursor, but it can begin
+	 * from a cursor that an earlier sibling parked on `start`, and slots that
+	 * the first attempt never reached adopt only in a retry. A bound that a
+	 * retry's mismatch recovery discarded no longer counts.
+	 */
+	heldBranchEnd(start: Node | null, parent: Node, after: Node | null): Node | null | undefined {
+		const reached = start === null ? undefined : this.heldBranches?.get(start);
+		if (reached === undefined) return undefined;
+		const end = this.markerlessEnd(start, parent, after);
+		if (reached !== null && domNode(reached).parentNode !== parent) return end;
+		for (let node = getNextSibling(start!); node !== null && node !== end;) {
+			if (node === reached) return end;
+			node = getNextSibling(node);
+		}
+		return reached;
+	}
+
+	/** Remove a held branch's start comment once its arm is finalized after it. */
+	dropHeldStart(start: Node, parent: Node): void {
+		this.save(parent);
+		domNode(start as ChildNode).remove();
+	}
+
+	/**
+	 * A held branch's content after `start` was removed. Close `start` before
+	 * `end`, where a later sibling's server nodes begin, so the slot owns a pair
+	 * that its next arm is built in as client DOM and that no adoption discards.
+	 */
+	releaseHeldBranch(
+		state: BranchSlot,
+		parent: Node,
+		start: Comment,
+		marker: string,
+		end: Node | null,
+	): void {
+		const close = domNode(document).createComment('/' + marker);
+		domNode(parent).insertBefore(close, end);
+		state.start = start;
+		state.end = close;
 	}
 
 	/** Discard a mismatched server node (or the marker range it opens) and step past it. */
@@ -42518,8 +42617,11 @@ function renderBranchSlot(
 			// positioning would mount a superseding arm after the following static
 			// sibling and leave partially-inserted DOM behind. Tear down the aborted
 			// scope without range removal, then sweep exactly its provisional range.
+			// A held hydrating arm's range ends where its own content does: later
+			// siblings' server nodes lie between that and the insertion anchor.
 			const pending = state.block;
-			provisionalAfter = pending.endMarker;
+			const heldEnd = hydration?.heldBranchEnd(markerlessBefore, domParent, pending.endMarker);
+			provisionalAfter = heldEnd === undefined ? pending.endMarker : heldEnd;
 			let node = markerlessBefore ? getNextSibling(markerlessBefore) : getFirstChild(domParent);
 			state.block = null;
 			state.markerlessBefore = undefined;
@@ -42530,6 +42632,16 @@ function renderBranchSlot(
 				if ((STAGED_DOM?.view(node) ?? node).parentNode === domParent)
 					(STAGED_DOM?.view(domParent) ?? domParent).removeChild(node);
 				node = nextNode;
+			}
+			if (heldEnd !== undefined) {
+				hydration!.releaseHeldBranch(
+					state,
+					domParent,
+					markerlessBefore as Comment,
+					marker,
+					heldEnd,
+				);
+				provisionalAfter = null;
 			}
 		}
 		// A markerless branch may share its host boundary with a nested sole-root
@@ -42935,8 +43047,8 @@ function renderBranchSlot(
 				// a same-branch retry finalizes it. One that already inserted its
 				// root owns that DOM now: finalize it so teardown can remove it (a
 				// discarded keyed item otherwise strands the partial row). Hydrating,
-				// that is a root rebuilt in the cursor's place; a node adopted there
-				// is left as it was for the next attempt to adopt again.
+				// that is a root rebuilt in the cursor's place; a branch whose
+				// content is still server nodes is held (holdMarkerlessBranch).
 				const rebuilt = cursor === null ? null : hydration!.freshAfter(contentBefore, domParent);
 				if (
 					cursor === null
@@ -42950,7 +43062,7 @@ function renderBranchSlot(
 						marker,
 						contentBefore,
 						after,
-						cursor === null ? after : hydration!.markerlessEnd(cursor, domParent, after),
+						cursor === null ? after : hydration!.markerlessEnd(contentBefore, domParent, after),
 					);
 				else if (cursor !== null && hydration!.replaces(cursor)) {
 					// The branch rebuilt its root over the node at the cursor, which
@@ -42968,9 +43080,10 @@ function renderBranchSlot(
 						marker,
 						cursor,
 						after,
-						hydration!.markerlessEnd(cursor, domParent, after),
+						hydration!.markerlessEnd(contentBefore, domParent, after),
 					);
-				}
+				} else if (cursor !== null)
+					hydration!.holdMarkerlessBranch(state, domParent, marker, contentBefore, after, error);
 				throw error;
 			}
 			finalizeMarkerlessBranch(
@@ -42980,7 +43093,7 @@ function renderBranchSlot(
 				marker,
 				contentBefore,
 				after,
-				cursor === null ? after : hydration!.markerlessEnd(cursor, domParent, after),
+				cursor === null ? after : hydration!.markerlessEnd(contentBefore, domParent, after),
 			);
 			replaceSharedBlockBoundary(
 				parentBlock,
@@ -43017,14 +43130,18 @@ function renderBranchSlot(
 		renderBlock(state.block);
 		const markerlessBefore = state.markerlessBefore;
 		if (markerlessBefore !== undefined) {
+			const after = state.block.endMarker;
+			const end = hydration?.heldBranchEnd(markerlessBefore, domParent, after);
 			finalizeMarkerlessBranch(
 				state,
 				domParent,
 				state.block,
 				marker,
 				markerlessBefore,
-				state.block.endMarker,
+				after,
+				end === undefined ? after : end,
 			);
+			if (end !== undefined) hydration!.dropHeldStart(markerlessBefore!, domParent);
 		}
 	}
 	// Hydration consumed the whole outer control-flow slot, not only the active
