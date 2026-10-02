@@ -343,6 +343,11 @@ export function Feed(props) @{
 }
 ```
 
+An `@for` header is always a `for…of`. A `for…in` header or a C-style
+`(init; test; update)` header is a compile error on every renderer: iterate
+`Object.keys(object)` for an object's keys, or build an array of indices for a
+counted range.
+
 Put a row's reconciliation key in the `@for` header: `; key item.id`.
 A `key` attribute on the row's only root element, the React-style
 `<li key={item.id}>`, is the same row key. It compiles exactly like the header

@@ -821,3 +821,100 @@ describe('compile errors — universal async/generator functions', () => {
 		);
 	});
 });
+
+// `@for` lowers to a keyed row list over an iterable. The parser also accepts a
+// `for…in` header and a C-style header. No target can lower either, and
+// lowering `for…in` as `for…of` would render an object's values (or nothing)
+// instead of its keys, so every target rejects them at the directive.
+describe('compile errors — @for headers', () => {
+	const component = (markup: string) =>
+		`export function List({ o, n, items }: { o: Record<string, string>; n: number; items: string[] }) @{\n\t<view>${markup}</view>\n}\n`;
+	const object = {
+		id: 'object',
+		module: 'octane/universal',
+		target: 'universal',
+		text: 'host',
+	} as const;
+	const valdi = {
+		id: 'native',
+		module: '@test/valdi-writer',
+		target: 'valdi',
+		server: 'unsupported',
+		text: 'reject',
+	} as const;
+	type Path = [path: string, run: (src: string) => ReturnType<typeof compile>];
+	const paths: Path[] = [
+		...[true, false].flatMap((dev): Path[] => [
+			[`client dev=${dev}`, (src) => compile(src, 'For.tsrx', { mode: 'client', dev })],
+			[`server dev=${dev}`, (src) => compile(src, 'For.tsrx', { mode: 'server', dev })],
+			[
+				`universal dev=${dev}`,
+				(src) => compile(src, 'For.object.tsrx', { hmr: false, renderer: object, dev }),
+			],
+		]),
+		['valdi', (src) => compile(src, 'For.tsrx', { hmr: false, renderer: valdi })],
+	];
+	const FOR_IN = /a `for…in` header is not supported/;
+	const FOR_STATEMENT = /a C-style `\(init; test; update\)` header is not supported/;
+
+	it.each([
+		['a `for…in` header', '@for (const name in o) { <label value={name} /> }', FOR_IN],
+		[
+			'a `for…in` header with `@empty`',
+			'@for (const name in o) { <label value={name} /> } @empty { <label /> }',
+			FOR_IN,
+		],
+		[
+			'a C-style header',
+			'@for (let i = 0; i < n; i++) { <label value={String(i)} /> }',
+			FOR_STATEMENT,
+		],
+		['an empty C-style header', '@for (;;) { <label /> }', FOR_STATEMENT],
+		[
+			'a `for…in` header nested in an `@for` row',
+			'@for (const item of items; key item) { <view>@for (const name in o) { <label value={name} /> }</view> }',
+			FOR_IN,
+		],
+	])('rejects %s on every emit path, at the directive', (_label, markup, message) => {
+		// The markup sits on line 2 after `\t<view>`; columns are zero-based.
+		const at = `:2:${'\t<view>'.length + markup.lastIndexOf('@for')})`;
+		for (const [path, run] of paths) {
+			const compileFor = () => run(component(markup));
+			expect(compileFor, path).toThrow(message);
+			expect(compileFor, path).toThrow(at);
+		}
+	});
+
+	it('rejects a `for…in` header under returned JSX on every emit path', () => {
+		const src = `export function List({ o }: { o: Record<string, string> }) {
+	return <view>@for (const name in o) { <label value={name} /> }</view>;
+}
+`;
+		for (const [path, run] of paths) {
+			expect(() => run(src), path).toThrow(FOR_IN);
+		}
+	});
+
+	it('compiles for-of headers and plain JS `for…in` and C-style loops around them', () => {
+		const src = `export function List({ o, n, items }: { o: Record<string, string>; n: number; items: string[] }) @{
+	const names = [];
+	for (const name in o) names.push(name);
+	for (let i = 0; i < n; i++) names.push(String(i));
+	<view>
+		@for (const item of items; key item) {
+			let count = 0;
+			for (const name in o) if (o[name] === item) count++;
+			for (let i = 0; i < count; i++) names.push(item);
+			<label value={item} />
+		}
+		@for (let name of names; key name) {
+			<label value={name} />
+		}
+	</view>
+}
+`;
+		for (const [path, run] of paths) {
+			expect(run(src).diagnostics, path).toEqual([]);
+		}
+	});
+});
