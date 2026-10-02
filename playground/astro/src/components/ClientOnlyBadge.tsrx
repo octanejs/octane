@@ -1,6 +1,5 @@
 export function ClientOnlyBadge() @{
-	const host =
-		typeof window !== 'undefined' ? window.location.host : 'missing';
+	const host = typeof window !== 'undefined' ? window.location.host : 'missing';
 	<>
 		<p class="client-only-badge" data-testid="client-only-badge">
 			{'Mounted client-only on ' + host}

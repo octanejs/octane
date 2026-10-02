@@ -27,15 +27,21 @@ export function ReuseApp() @{
 	const a = useCounter(0);
 	const b = useCounter(100);
 	<div>
-		<button class="a" onClick={a.inc}>{a.n as string}</button>
-		<button class="b" onClick={b.inc}>{b.n as string}</button>
+		<button class="a" onClick={a.inc}>
+			{a.n as string}
+		</button>
+		<button class="b" onClick={b.inc}>
+			{b.n as string}
+		</button>
 		<span class="ta">{(a.touched ? 'y' : 'n') as string}</span>
 	</div>
 }
 
 export function NestedApp() @{
 	const c = useLabelledCounter(5, 'x');
-	<button class="n" onClick={c.inc}>{c.text as string}</button>
+	<button class="n" onClick={c.inc}>
+		{c.text as string}
+	</button>
 }
 
 export interface CallbackSet {
@@ -89,7 +95,9 @@ export function CallbackReuseApp(props: CallbackReuseProps) @{
 			onClick={() => {
 				if (left !== null) props.onResult(describeCallbacks(left));
 			}}
-		>Left</button>
+		>
+			Left
+		</button>
 		<button class="right-callback" onClick={() => props.onResult(describeCallbacks(right))}>
 			Right
 		</button>

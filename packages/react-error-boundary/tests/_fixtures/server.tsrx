@@ -17,9 +17,7 @@ export function ServerApp() @{
 
 function ServerHookProbe(props: { id: string }) @{
 	const boundary = useErrorBoundary();
-	<span id={props.id}>
-		{boundary.error === null ? 'idle' : 'caught'}
-	</span>
+	<span id={props.id}>{boundary.error === null ? 'idle' : 'caught'}</span>
 }
 
 export function DirectServerHookApp() @{
@@ -28,9 +26,12 @@ export function DirectServerHookApp() @{
 	</ErrorBoundary>
 }
 
-export const WrappedServerHookApp = withErrorBoundary(function WrappedServerHook() {
-	return <ServerHookProbe id="hoc-server-hook" />;
-}, { fallback: <span>unused</span> });
+export const WrappedServerHookApp = withErrorBoundary(
+	function WrappedServerHook() {
+		return <ServerHookProbe id="hoc-server-hook" />;
+	},
+	{ fallback: <span>unused</span> },
+);
 
 export const WrappedThrowingServerApp = withErrorBoundary(ThrowOnServer, {
 	fallback: <span>must not render</span>,

@@ -24,8 +24,9 @@ export function BankCardScrollView({ onCardSelect }: BankCardScrollViewProps) @{
 						<view class="payment-card-info">
 							<image class="payment-card-icon" src={getUrlByType(card.type)} />
 							<view class="payment-card-details">
-								<text class="payment-card-name">{card.type.charAt(0).toUpperCase() +
-									card.type.slice(1) as string}</text>
+								<text class="payment-card-name">
+									{(card.type.charAt(0).toUpperCase() + card.type.slice(1)) as string}
+								</text>
 							</view>
 						</view>
 						@if (selectedCard === card) {

@@ -13,13 +13,17 @@ const store = makeAutoObservable({
 function MobxView() @{
 	<div>
 		<h2 class="demo-title">{'MobX on Octane'}</h2>
-		<p
-			class="demo-blurb"
-		>{'An observable store rerenders an Octane component through the observer binding.'}</p>
+		<p class="demo-blurb">
+			{'An observable store rerenders an Octane component through the observer binding.'}
+		</p>
 		<div class="panel row">
-			<button class="btn" onClick={() => store.decrement()}>−</button>
+			<button class="btn" onClick={() => store.decrement()}>
+				−
+			</button>
 			<strong id="mobx-count">{store.count as string}</strong>
-			<button class="btn" onClick={() => store.increment()}>+</button>
+			<button class="btn" onClick={() => store.increment()}>
+				+
+			</button>
 		</div>
 	</div>
 }

@@ -13,22 +13,24 @@ import {
 
 function CustomControl() @{
 	<ConnectButton.Custom>
-		{(state) => <div>
-			<span id="custom-status">
-				{state.account
-					? state.chain?.unsupported
-						? 'wrong-chain'
-						: 'connected'
-					: state.connectModalOpen
-						? 'modal-open'
-						: 'disconnected'}
-			</span>
-			<span id="mounted">{String(state.mounted)}</span>
-			<span id="connection-status">{state.connectionStatus}</span>
-			<button type="button" id="custom-connect" onClick={state.openConnectModal}>
-				Open wallets
-			</button>
-		</div>}
+		{(state) => (
+			<div>
+				<span id="custom-status">
+					{state.account
+						? state.chain?.unsupported
+							? 'wrong-chain'
+							: 'connected'
+						: state.connectModalOpen
+							? 'modal-open'
+							: 'disconnected'}
+				</span>
+				<span id="mounted">{String(state.mounted)}</span>
+				<span id="connection-status">{state.connectionStatus}</span>
+				<button type="button" id="custom-connect" onClick={state.openConnectModal}>
+					Open wallets
+				</button>
+			</div>
+		)}
 	</ConnectButton.Custom>
 }
 
@@ -49,12 +51,12 @@ function WalletRaceProbe() @{
 	<WalletButton wallet="mock">
 		{({ connect, error }) => {
 			latestWalletConnect = connect;
-			return <>
-				<span id="wallet-race-ready">ready</span>
-				<span id="wallet-race-error">
-					{error instanceof Error ? error.message : '-'}
-				</span>
-			</>;
+			return (
+				<>
+					<span id="wallet-race-ready">ready</span>
+					<span id="wallet-race-error">{error instanceof Error ? error.message : '-'}</span>
+				</>
+			);
 		}}
 	</WalletButton>
 }
@@ -75,7 +77,9 @@ export function App(props: {
 	>
 		<QueryClientProvider client={props.queryClient}>
 			<form id="controls-form" onSubmit={props.onSubmit}>
-				<button type="button" id="outside-provider">Outside provider</button>
+				<button type="button" id="outside-provider">
+					Outside provider
+				</button>
 				<RainbowKitProvider wallets={props.wallets} theme={props.theme}>
 					<ConnectButton />
 					<WalletButton wallet="mock" />
@@ -90,7 +94,9 @@ export function App(props: {
 
 function ModalOpener(props: { id: string }) @{
 	const modal = useConnectModal();
-	<button id={props.id} onClick={modal.openConnectModal}>Open {props.id}</button>
+	<button id={props.id} onClick={modal.openConnectModal}>
+		Open {props.id}
+	</button>
 }
 
 export function TwoProviders(props: { config: Config; queryClient: unknown }) @{
@@ -147,9 +153,12 @@ export function OutsideProvider() @{
 	const account = useAccountModal();
 	const chain = useChainModal();
 	<div>
-		<span id="outside">{String(
-			connect.openConnectModal === undefined && account.openAccountModal === undefined &&
-				chain.openChainModal === undefined,
-		)}</span>
+		<span id="outside">
+			{String(
+				connect.openConnectModal === undefined &&
+					account.openAccountModal === undefined &&
+					chain.openChainModal === undefined,
+			)}
+		</span>
 	</div>
 }

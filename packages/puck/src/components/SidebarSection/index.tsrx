@@ -29,30 +29,37 @@ export const SidebarSection = ({
 	const setUi = useAppStore((s) => s.setUi);
 	const breadcrumbs = useBreadcrumbs(1);
 
-	return <div className={getClassName({ noBorderTop, noPadding })} style={{ background }}>
-		<div className={getClassName('title')}>
-			<div className={getClassName('breadcrumbs')}>
-				{showBreadcrumbs
-					? breadcrumbs.map(
-							(breadcrumb, i) => <div key={i} className={getClassName('breadcrumb')}>
-								<button
-									type="button"
-									className={getClassName('breadcrumbLabel')}
-									onClick={() => setUi({ itemSelector: breadcrumb.selector })}
-								>{breadcrumb.label}</button>
-								<ChevronRight size={16} />
-							</div>,
-						)
-					: null}
-				<div className={getClassName('heading')}>
-					<Heading rank="2" size="xs">{title}</Heading>
+	return (
+		<div className={getClassName({ noBorderTop, noPadding })} style={{ background }}>
+			<div className={getClassName('title')}>
+				<div className={getClassName('breadcrumbs')}>
+					{showBreadcrumbs
+						? breadcrumbs.map((breadcrumb, i) => (
+								<div key={i} className={getClassName('breadcrumb')}>
+									<button
+										type="button"
+										className={getClassName('breadcrumbLabel')}
+										onClick={() => setUi({ itemSelector: breadcrumb.selector })}
+									>
+										{breadcrumb.label}
+									</button>
+									<ChevronRight size={16} />
+								</div>
+							))
+						: null}
+					<div className={getClassName('heading')}>
+						<Heading rank="2" size="xs">
+							{title}
+						</Heading>
+					</div>
 				</div>
 			</div>
+			<div className={getClassName('content')}>{children}</div>
+			{isLoading && (
+				<div className={getClassName('loadingOverlay')}>
+					<Loader size={32} />
+				</div>
+			)}
 		</div>
-		<div className={getClassName('content')}>{children}</div>
-		{isLoading &&
-			<div className={getClassName('loadingOverlay')}>
-				<Loader size={32} />
-			</div>}
-	</div>;
+	);
 };

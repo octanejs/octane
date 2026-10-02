@@ -2,11 +2,15 @@ import { Link } from '@octanejs/tanstack-router';
 import { isSafeHref } from '~/utils/url-boundary';
 
 function isRelativeLink(link: string) {
-	return !link.startsWith(`/`) && !link.startsWith('http://') && !link.startsWith('https://') &&
+	return (
+		!link.startsWith(`/`) &&
+		!link.startsWith('http://') &&
+		!link.startsWith('https://') &&
 		!link.startsWith('//') &&
 		!link.startsWith('#') &&
 		!link.startsWith('mailto:') &&
-		!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(link);
+		!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(link)
+	);
 }
 
 function isStaticAssetLink(link: string) {
@@ -15,9 +19,13 @@ function isStaticAssetLink(link: string) {
 }
 
 function isRoutableInternalLink(link: string) {
-	return link.startsWith('/') && !link.startsWith('//') && link !== '/api' &&
+	return (
+		link.startsWith('/') &&
+		!link.startsWith('//') &&
+		link !== '/api' &&
 		!link.startsWith('/api/') &&
-		!isStaticAssetLink(link);
+		!isStaticAssetLink(link)
+	);
 }
 
 function normalizeRoutableInternalPathname(pathname: string) {
@@ -66,12 +74,14 @@ export function MarkdownLink({ href: hrefProp, ...rest }: Record<string, any>) {
 		hrefWithoutMd = `../${hrefWithoutMd}`;
 	}
 
-	return <Link
-		{...rest}
-		unsafeRelative="path"
-		to={hrefWithoutMd}
-		hash={hash}
-		preload={false}
-		ref={undefined}
-	/>;
+	return (
+		<Link
+			{...rest}
+			unsafeRelative="path"
+			to={hrefWithoutMd}
+			hash={hash}
+			preload={false}
+			ref={undefined}
+		/>
+	);
 }

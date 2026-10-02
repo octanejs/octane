@@ -71,10 +71,18 @@ export function CapturedSnapshotList() @{
 		setItems(position === 'start' ? [item, ...items] : [...items, item]);
 	};
 	<div>
-		<button id="captured-prepend" onClick={() => add('start')}>prepend</button>
-		<button id="captured-append" onClick={() => add('end')}>append</button>
-		<button id="captured-reverse" onClick={() => setItems([...items].reverse())}>reverse</button>
-		<button id="captured-clear" onClick={() => setItems([])}>clear</button>
+		<button id="captured-prepend" onClick={() => add('start')}>
+			prepend
+		</button>
+		<button id="captured-append" onClick={() => add('end')}>
+			append
+		</button>
+		<button id="captured-reverse" onClick={() => setItems([...items].reverse())}>
+			reverse
+		</button>
+		<button id="captured-clear" onClick={() => setItems([])}>
+			clear
+		</button>
 		<ul>
 			@for (const item of items; key item.id) {
 				<li class="captured-row" data-id={item.id}>
@@ -100,10 +108,7 @@ function DependencyLeaf({ id, value }: DependencyLeafProps) @{
 	<span id={id}>{value}</span>
 }
 
-export function StrongMapJoinProp(props: {
-	items: string[];
-	project: (value: string) => string;
-}) @{
+export function StrongMapJoinProp(props: { items: string[]; project: (value: string) => string }) @{
 	<DependencyLeaf id="strong-map-join" value={props.items.map(props.project).join(',')} />
 }
 
@@ -332,9 +337,9 @@ function StrongSignedZeroListChild(props: {
 	Projector: StrongNumberProjectorConstructor;
 	value: number;
 }) @{
-	<span
-		class="strong-signed-zero-list-child"
-	>{new props.Projector(props.value).result as string}</span>
+	<span class="strong-signed-zero-list-child">
+		{new props.Projector(props.value).result as string}
+	</span>
 }
 
 export function StrongSignedZeroListProjections({
@@ -357,9 +362,9 @@ export function StrongSignedZeroListProjections({
 		<ul>
 			@for (const item of items; key item.id) {
 				<li>
-					<span
-						class="strong-signed-zero-list-inline"
-					>{new Projector(value).result as string}</span>
+					<span class="strong-signed-zero-list-inline">
+						{new Projector(value).result as string}
+					</span>
 				</li>
 			}
 		</ul>

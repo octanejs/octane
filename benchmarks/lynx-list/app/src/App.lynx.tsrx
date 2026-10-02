@@ -27,10 +27,9 @@ interface ListLayoutEvent {
 	};
 }
 
-type BoundedListGlobal =
-	typeof globalThis & {
-		__LYNX_BOUNDED_LIST_CHECKPOINT__?: (caseId: ListCaseId) => ListSemanticCheckpoint | undefined;
-	};
+type BoundedListGlobal = typeof globalThis & {
+	__LYNX_BOUNDED_LIST_CHECKPOINT__?: (caseId: ListCaseId) => ListSemanticCheckpoint | undefined;
+};
 
 interface MutableAttachedCellObservation {
 	index: number;
@@ -75,10 +74,8 @@ export function App() @{
 		observation.current = updateObservation(observation.current, event.detail.scrollInfo);
 	};
 
-	(globalThis as BoundedListGlobal).__LYNX_BOUNDED_LIST_CHECKPOINT__ = (caseId) => readCheckpoint(
-		caseId,
-		observation.current,
-	);
+	(globalThis as BoundedListGlobal).__LYNX_BOUNDED_LIST_CHECKPOINT__ = (caseId) =>
+		readCheckpoint(caseId, observation.current);
 
 	<view class="page">
 		<list

@@ -78,7 +78,6 @@ export default function AnimatedGlyphs<XScale extends AxisScale, YScale extends 
 	});
 
 	return <>
-		{/** @ts-expect-error x/y aren't in react-spring's CSSProperties */}
 		{animatedGlyphs(
 			({ x, y, color, opacity }, item, { key }) => <animated.g
 				key={key}

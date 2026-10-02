@@ -16,7 +16,9 @@ function PropLink(props: { label: string; href: string }) @{
 			clicks++;
 			setCount(count + 1);
 		}}
-	>{props.label as string}</a>
+	>
+		{props.label as string}
+	</a>
 }
 
 export async function run(container: HTMLElement) {

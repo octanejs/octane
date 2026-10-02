@@ -8,14 +8,17 @@ import { useCallback } from 'octane';
 // Custom menuRenderFn body — the test's renderFn returns
 // createPortal(CustomNodeMenuBody, anchor, { itemProps }).
 export function CustomNodeMenuBody(props) @{
-	<div class="custom-node-menu" data-testid="custom-node-menu">{props.itemProps.options.map(
-		(option, i) =>
+	<div class="custom-node-menu" data-testid="custom-node-menu">
+		{props.itemProps.options.map((option, i) => (
 			<div
 				key={option.key}
 				data-selected={props.itemProps.selectedIndex === i ? 'true' : 'false'}
 				class="custom-node-menu-item"
-			>{option.title as string}</div>,
-	)}</div>
+			>
+				{option.title as string}
+			</div>
+		))}
+	</div>
 }
 
 function NodeMenuHarness(props) @{

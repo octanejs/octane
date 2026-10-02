@@ -65,10 +65,13 @@ export function Trapezoid(outsideProps: Props) {
 	const { x, y, upperWidth, lowerWidth, height, className } = trapezoidProps;
 
 	if (
-		x !== +x || y !== +y || upperWidth !== +upperWidth || lowerWidth !== +lowerWidth ||
-			height !== +height ||
-			upperWidth === 0 && lowerWidth === 0 ||
-			height === 0
+		x !== +x ||
+		y !== +y ||
+		upperWidth !== +upperWidth ||
+		lowerWidth !== +lowerWidth ||
+		height !== +height ||
+		(upperWidth === 0 && lowerWidth === 0) ||
+		height === 0
 	) {
 		return null;
 	}
@@ -76,11 +79,13 @@ export function Trapezoid(outsideProps: Props) {
 
 	// Static path — the update-animation branch is a Phase 5 port. Upstream's
 	// static branch wraps the path in a <g>, so mirror that.
-	return <g>
-		<path
-			{...svgPropertiesAndEvents(trapezoidProps)}
-			className={layerClass}
-			d={getTrapezoidPath(x, y, upperWidth, lowerWidth, height)}
-		/>
-	</g>;
+	return (
+		<g>
+			<path
+				{...svgPropertiesAndEvents(trapezoidProps)}
+				className={layerClass}
+				d={getTrapezoidPath(x, y, upperWidth, lowerWidth, height)}
+			/>
+		</g>
+	);
 }

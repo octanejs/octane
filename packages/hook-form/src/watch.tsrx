@@ -7,17 +7,20 @@ import type { FieldPath, FieldValues, WatchProps, WatchRenderValue } from './typ
 
 export const Watch = <
 	TFieldValues extends FieldValues = FieldValues,
-	TFieldName extends | FieldPath<TFieldValues>
-	| readonly [FieldPath<TFieldValues>, ...FieldPath<TFieldValues>[]]
-	| FieldPath<TFieldValues>[]
-	| readonly FieldPath<TFieldValues>[]
-	| undefined = undefined,
+	TFieldName extends
+		| FieldPath<TFieldValues>
+		| readonly [FieldPath<TFieldValues>, ...FieldPath<TFieldValues>[]]
+		| FieldPath<TFieldValues>[]
+		| readonly FieldPath<TFieldValues>[]
+		| undefined = undefined,
 	TContext = any,
 	TTransformedValues = TFieldValues,
 	TComputeValue = undefined,
->(props: WatchProps<TFieldName, TFieldValues, TContext, TTransformedValues, TComputeValue>) =>
+>(
+	props: WatchProps<TFieldName, TFieldValues, TContext, TTransformedValues, TComputeValue>,
+) =>
 	props.render(
-		useWatch({ name: props.names, ...props as any }) as WatchRenderValue<
+		useWatch({ name: props.names, ...(props as any) }) as WatchRenderValue<
 			TFieldName,
 			TFieldValues,
 			TComputeValue

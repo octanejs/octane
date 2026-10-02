@@ -38,13 +38,21 @@ function tagOf(node) {
 	return node.openingElement?.name?.name ?? node.id?.name;
 }
 
+/**
+ * Text that renders nothing under JSX's whitespace rule: empty, or only spaces,
+ * tabs and line breaks with a line break among them. Read from the text as
+ * written, since a parser may give `value` decoded (`&nbsp;` renders).
+ * @param {string | undefined} text
+ */
+export function isLayoutText(text) {
+	if (typeof text !== 'string') return false;
+	return text === '' || (/^[ \t\r\n]*$/.test(text) && /[\r\n]/.test(text));
+}
+
 function significant(node) {
 	return (
 		node &&
-		!(
-			node.type === 'JSXText' &&
-			(node.value === '' || (/^\s*$/.test(node.value) && /[\r\n]/.test(node.value)))
-		) &&
+		!(node.type === 'JSXText' && isLayoutText(node.raw ?? node.value)) &&
 		!(node.type === 'JSXExpressionContainer' && node.expression?.type === 'JSXEmptyExpression')
 	);
 }

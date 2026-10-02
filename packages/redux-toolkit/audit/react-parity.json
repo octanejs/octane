@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -75,7 +75,7 @@
         {
           "path": "packages/redux-toolkit/tests/_fixtures/rtk-query.tsrx",
           "role": "support",
-          "sha256": "d2cadcd184f9d6021001b0d910c93cf2ddc8bac95323fd8587ba17859a470bfe"
+          "sha256": "d3e992f2cf827720ae9b67d7f57906215f3a2f7b3cc4dd002aeff6374fc2dbc6"
         },
         {
           "path": "packages/redux-toolkit/tests/differential/_setup.ts",

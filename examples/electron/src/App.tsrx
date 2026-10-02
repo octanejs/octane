@@ -32,12 +32,16 @@ function RunPanel(props: { taskId: string; runTask: (id: string) => Promise<void
 		setRunError('');
 	}, [props.taskId]);
 
-	useIpcEvent('workbench:log', (...args) => {
-		const payload = args[0] as LogLine;
-		if (payload.taskId !== props.taskId) return;
-		setLines((current) => [...current, payload]);
-		if (payload.done) setRunning(false);
-	}, { enabled: watching });
+	useIpcEvent(
+		'workbench:log',
+		(...args) => {
+			const payload = args[0] as LogLine;
+			if (payload.taskId !== props.taskId) return;
+			setLines((current) => [...current, payload]);
+			if (payload.done) setRunning(false);
+		},
+		{ enabled: watching },
+	);
 
 	<div class="run">
 		<div class="run-controls">
@@ -59,15 +63,17 @@ function RunPanel(props: { taskId: string; runTask: (id: string) => Promise<void
 				type="button"
 				aria-pressed={watching ? 'true' : 'false'}
 				onClick={() => setWatching((current) => !current)}
-			>{(watching ? 'Stop watching log' : 'Watch log') as string}</button>
+			>
+				{(watching ? 'Stop watching log' : 'Watch log') as string}
+			</button>
 		</div>
-		<p class="run-status" role="status" aria-label="Run status">{(running
-			? 'Running'
-			: lines.length === 0
-				? 'Idle'
-				: 'Finished') as string}</p>
+		<p class="run-status" role="status" aria-label="Run status">
+			{(running ? 'Running' : lines.length === 0 ? 'Idle' : 'Finished') as string}
+		</p>
 		@if (runError !== '') {
-			<p class="error" role="alert">{runError as string}</p>
+			<p class="error" role="alert">
+				{runError as string}
+			</p>
 		}
 		<ol class="log" aria-label="Task log">
 			@for (const line of lines; key line.seq) {
@@ -90,15 +96,14 @@ function TaskFacts(props: { detail: TaskDetail }) @{
 	</dl>
 }
 
-function TaskDetailPane(props: {
-	taskId: string;
-	runTask: (id: string) => Promise<void>;
-}) @{
+function TaskDetailPane(props: { taskId: string; runTask: (id: string) => Promise<void> }) @{
 	const detail = useInvokeState<TaskDetail>('describe_task', { id: props.taskId });
 
 	<div class="detail-body">
 		@if (detail.status === 'pending') {
-			<p class="status" role="status">Reading the task manifest…</p>
+			<p class="status" role="status">
+				Reading the task manifest…
+			</p>
 		} @else if (detail.status === 'error') {
 			<div class="error" role="alert">
 				<p>{describeError(detail.error) as string}</p>
@@ -115,11 +120,7 @@ function TaskDetailPane(props: {
 	</div>
 }
 
-function TaskList(props: {
-	attempt: number;
-	selectedId: string;
-	onSelect: (id: string) => void;
-}) @{
+function TaskList(props: { attempt: number; selectedId: string; onSelect: (id: string) => void }) @{
 	const tasks = useInvoke<Task[]>('list_tasks', undefined, { deps: [props.attempt] });
 
 	<ul class="task-list">
@@ -221,19 +222,16 @@ function HostPanel() @{
 	</section>
 }
 
-export function App(props: {
-	mode: BridgeMode;
-	runTask: (id: string) => Promise<void>;
-}) @{
+export function App(props: { mode: BridgeMode; runTask: (id: string) => Promise<void> }) @{
 	const [selectedId, setSelectedId] = useState('');
 	const [attempt, setAttempt] = useState(0);
 
 	<main class="workbench">
 		<header class="masthead">
 			<h1>Electron Shell</h1>
-			<p class="mode">{(props.mode === 'electron'
-				? 'Electron host'
-				: 'Browser preview') as string}</p>
+			<p class="mode">
+				{(props.mode === 'electron' ? 'Electron host' : 'Browser preview') as string}
+			</p>
 		</header>
 		<div class="panes">
 			<section class="pane" aria-label="Tasks">
@@ -241,7 +239,9 @@ export function App(props: {
 				@try {
 					<TaskList attempt={attempt} selectedId={selectedId} onSelect={setSelectedId} />
 				} @pending {
-					<p class="status" role="status">Loading tasks…</p>
+					<p class="status" role="status">
+						Loading tasks…
+					</p>
 				} @catch (error, reset) {
 					<div class="error" role="alert">
 						<p>{describeError(error) as string}</p>

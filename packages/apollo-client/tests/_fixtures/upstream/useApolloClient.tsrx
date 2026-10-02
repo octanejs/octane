@@ -25,7 +25,7 @@ describe('useApolloClient Hook', () => {
 		);
 	});
 
-	it('should error if a client instance can\'t be found in the context', () => {
+	it("should error if a client instance can't be found in the context", () => {
 		function App() {
 			expect(function callWithoutProvider() {
 				useApolloClient();

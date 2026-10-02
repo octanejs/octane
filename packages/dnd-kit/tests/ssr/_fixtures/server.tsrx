@@ -15,9 +15,15 @@ function ServerEntities() @{
 	const droppable = useDroppable({ id: 'server-drop' });
 	const sortable = useSortable({ id: 'server-sort', index: 0, plugins: [] });
 	<main id="server-dnd">
-		<button id="server-drag" ref={draggable.ref}>server card</button>
-		<div id="server-drop" ref={droppable.ref}>server target</div>
-		<div id="server-sort" ref={sortable.ref}>server sortable</div>
+		<button id="server-drag" ref={draggable.ref}>
+			server card
+		</button>
+		<div id="server-drop" ref={droppable.ref}>
+			server target
+		</div>
+		<div id="server-sort" ref={sortable.ref}>
+			server sortable
+		</div>
 	</main>
 }
 

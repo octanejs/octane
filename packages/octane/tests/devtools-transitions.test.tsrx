@@ -26,12 +26,20 @@ describe('runtime devtools transition/suspense probes (profile build)', () => {
 		const promise = new Promise<string>((r) => (resolve = r));
 		const { unmount } = mount(<BoundaryApp promise={promise} />);
 		// A boundary exists and is pending (branch 2) while the promise is unresolved.
-		expect(hook().getTransitionState().boundaries.some((b) => b.state === 'pending')).toBe(true);
+		expect(
+			hook()
+				.getTransitionState()
+				.boundaries.some((b) => b.state === 'pending'),
+		).toBe(true);
 		await act(async () => {
 			resolve('done');
 			await promise;
 		});
-		expect(hook().getTransitionState().boundaries.some((b) => b.state === 'resolved')).toBe(true);
+		expect(
+			hook()
+				.getTransitionState()
+				.boundaries.some((b) => b.state === 'resolved'),
+		).toBe(true);
 		unmount();
 		expect(hook().getTransitionState().boundaries).toEqual([]);
 	});

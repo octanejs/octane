@@ -8,9 +8,7 @@ import { usePlotArea } from '../hooks';
 
 const ClipPathIdContext = createContext<string | undefined>(undefined);
 
-export function ClipPathProvider(props: {
-	children: OctaneNode;
-}) @{
+export function ClipPathProvider(props: { children: OctaneNode }) @{
 	const { children } = props;
 	const [clipPathId] = useState(uniqueId('recharts') + '-clip');
 	const plotArea = usePlotArea();

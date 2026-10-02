@@ -36,20 +36,30 @@ function StoriesList({
 					search={(prev: Record<string, unknown>) => ({ ...prev, page: page - 1 })}
 					data-testid="page-prev"
 					{...stylex.props(styles.pagerLink)}
-				>‹ prev</Link>
+				>
+					‹ prev
+				</Link>
 			} @else {
-				<span data-testid="page-prev-disabled" {...stylex.props(styles.pagerDisabled)}>‹ prev</span>
+				<span data-testid="page-prev-disabled" {...stylex.props(styles.pagerDisabled)}>
+					‹ prev
+				</span>
 			}
-			<span data-testid="page-indicator" {...stylex.props(styles.pagerPage)}>{'page ' + page}</span>
+			<span data-testid="page-indicator" {...stylex.props(styles.pagerPage)}>
+				{'page ' + page}
+			</span>
 			@if (hasMore) {
 				<Link
 					to="."
 					search={(prev: Record<string, unknown>) => ({ ...prev, page: page + 1 })}
 					data-testid="page-more"
 					{...stylex.props(styles.pagerLink)}
-				>more ›</Link>
+				>
+					more ›
+				</Link>
 			} @else {
-				<span data-testid="page-more-disabled" {...stylex.props(styles.pagerDisabled)}>more ›</span>
+				<span data-testid="page-more-disabled" {...stylex.props(styles.pagerDisabled)}>
+					more ›
+				</span>
 			}
 		</nav>
 	</div>

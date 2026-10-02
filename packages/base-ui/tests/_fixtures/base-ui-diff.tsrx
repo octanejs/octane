@@ -48,9 +48,15 @@ function DirectionProbe() @{
 }
 
 function MediaProbe(props) @{
-	<span className="mq">{(useMediaQuery('(min-width: 600px)', {
-		defaultMatches: props.defaultMatches,
-	}) ? 'true' : 'false') as string}</span>
+	<span className="mq">
+		{
+			(useMediaQuery('(min-width: 600px)', {
+				defaultMatches: props.defaultMatches,
+			})
+				? 'true'
+				: 'false') as string
+		}
+	</span>
 }
 
 // Default (horizontal) — proves the intrinsic-tag render + state→data-* + role/aria.
@@ -118,7 +124,9 @@ export function FieldsetDisabled() @{
 // Explicit legend id wins over the generated one; still wired to aria-labelledby.
 export function FieldsetLegendId() @{
 	<Fieldset.Root className="fs">
-		<Fieldset.Legend id="my-legend" className="lg">Account</Fieldset.Legend>
+		<Fieldset.Legend id="my-legend" className="lg">
+			Account
+		</Fieldset.Legend>
 	</Fieldset.Root>
 }
 
@@ -126,7 +134,9 @@ export function FieldsetLegendId() @{
 // wiring, proving the render engine composes on a namespaced part.
 export function FieldsetLegendRender() @{
 	<Fieldset.Root className="fs">
-		<Fieldset.Legend className="lg" render={legendSection}>Team</Fieldset.Legend>
+		<Fieldset.Legend className="lg" render={legendSection}>
+			Team
+		</Fieldset.Legend>
 	</Fieldset.Root>
 }
 
@@ -422,18 +432,24 @@ export function ToggleBasic() @{
 
 // Uncontrolled default-pressed — aria-pressed starts "true".
 export function ToggleDefaultPressed() @{
-	<Toggle className="tgl" defaultPressed={true}>Bold</Toggle>
+	<Toggle className="tgl" defaultPressed={true}>
+		Bold
+	</Toggle>
 }
 
 // Disabled — native `disabled` attribute; clicking does not toggle.
 export function ToggleDisabled() @{
-	<Toggle className="tgl" disabled>Bold</Toggle>
+	<Toggle className="tgl" disabled>
+		Bold
+	</Toggle>
 }
 
 // Controlled — `pressed` is owned by the prop; clicking does NOT change the DOM (no
 // onPressedChange wired), matching React's controlled Toggle.
 export function ToggleControlled() @{
-	<Toggle className="tgl" pressed={true}>Bold</Toggle>
+	<Toggle className="tgl" pressed={true}>
+		Bold
+	</Toggle>
 }
 
 // ToggleGroup — role="group" + data-orientation, composite roving focus (item 0 gets
@@ -442,26 +458,42 @@ export function ToggleControlled() @{
 // each Toggle deriving `aria-pressed` from the group value.
 export function ToggleGroupSingle() @{
 	<ToggleGroup className="tg" defaultValue={['left']} aria-label="Align">
-		<Toggle className="ti" value="left">L</Toggle>
-		<Toggle className="ti" value="center">C</Toggle>
-		<Toggle className="ti" value="right">R</Toggle>
+		<Toggle className="ti" value="left">
+			L
+		</Toggle>
+		<Toggle className="ti" value="center">
+			C
+		</Toggle>
+		<Toggle className="ti" value="right">
+			R
+		</Toggle>
 	</ToggleGroup>
 }
 
 // Multiple-select — data-multiple on the group; two items pressed at once.
 export function ToggleGroupMultiple() @{
 	<ToggleGroup className="tg" multiple defaultValue={['left', 'right']} aria-label="Format">
-		<Toggle className="ti" value="left">B</Toggle>
-		<Toggle className="ti" value="center">I</Toggle>
-		<Toggle className="ti" value="right">U</Toggle>
+		<Toggle className="ti" value="left">
+			B
+		</Toggle>
+		<Toggle className="ti" value="center">
+			I
+		</Toggle>
+		<Toggle className="ti" value="right">
+			U
+		</Toggle>
 	</ToggleGroup>
 }
 
 // Disabled group — data-disabled on the group; every button natively disabled.
 export function ToggleGroupDisabled() @{
 	<ToggleGroup className="tg" disabled defaultValue={['left']} aria-label="Align">
-		<Toggle className="ti" value="left">L</Toggle>
-		<Toggle className="ti" value="center">C</Toggle>
+		<Toggle className="ti" value="left">
+			L
+		</Toggle>
+		<Toggle className="ti" value="center">
+			C
+		</Toggle>
 	</ToggleGroup>
 }
 
@@ -639,23 +671,31 @@ export function ButtonBasic() @{
 
 // Disabled button — the native `disabled` attribute, no aria-disabled.
 export function ButtonDisabled() @{
-	<Button className="btn" disabled>Click me</Button>
+	<Button className="btn" disabled>
+		Click me
+	</Button>
 }
 
 // focusableWhenDisabled — the native attribute is dropped in favour of
 // aria-disabled + a real tab stop, so the button stays reachable.
 export function ButtonFocusableWhenDisabled() @{
-	<Button className="btn" disabled focusableWhenDisabled>Click me</Button>
+	<Button className="btn" disabled focusableWhenDisabled>
+		Click me
+	</Button>
 }
 
 // Non-native render target — `nativeButton={false}` adds role/tabindex to the <span>.
 export function ButtonNonNative() @{
-	<Button className="btn" nativeButton={false} render={buttonSpanFn}>Click me</Button>
+	<Button className="btn" nativeButton={false} render={buttonSpanFn}>
+		Click me
+	</Button>
 }
 
 // A disabled non-native button reports aria-disabled instead of the attribute.
 export function ButtonNonNativeDisabled() @{
-	<Button className="btn" nativeButton={false} disabled render={buttonSpanFn}>Click me</Button>
+	<Button className="btn" nativeButton={false} disabled render={buttonSpanFn}>
+		Click me
+	</Button>
 }
 
 // useDirection defaults to 'ltr' with no provider above it.
@@ -840,7 +880,9 @@ export function TooltipViewportOpen() @{
 // A disabled trigger drops the tooltip-trigger identifier and gains data-trigger-disabled.
 export function TooltipDisabledTrigger() @{
 	<Tooltip.Root>
-		<Tooltip.Trigger className="tip-trigger" disabled>Hover me</Tooltip.Trigger>
+		<Tooltip.Trigger className="tip-trigger" disabled>
+			Hover me
+		</Tooltip.Trigger>
 	</Tooltip.Root>
 }
 
@@ -878,7 +920,9 @@ export function TooltipInteractive() @{
 // unmounted while closed.
 export function PreviewCardClosed() @{
 	<PreviewCard.Root>
-		<PreviewCard.Trigger className="pc-trigger" href="/profile">Base UI</PreviewCard.Trigger>
+		<PreviewCard.Trigger className="pc-trigger" href="/profile">
+			Base UI
+		</PreviewCard.Trigger>
 	</PreviewCard.Root>
 }
 
@@ -943,7 +987,9 @@ export function TooltipsWithoutProvider() @{
 	<div>
 		<div ref={hostRef} class="tip-host" />
 		<Tooltip.Root>
-			<Tooltip.Trigger className="tip-a" delay={0} closeDelay={0}>A</Tooltip.Trigger>
+			<Tooltip.Trigger className="tip-a" delay={0} closeDelay={0}>
+				A
+			</Tooltip.Trigger>
 			<Tooltip.Portal container={hostRef}>
 				<Tooltip.Positioner>
 					<Tooltip.Popup className="pop-a">A content</Tooltip.Popup>
@@ -951,7 +997,9 @@ export function TooltipsWithoutProvider() @{
 			</Tooltip.Portal>
 		</Tooltip.Root>
 		<Tooltip.Root>
-			<Tooltip.Trigger className="tip-b" delay={0} closeDelay={0}>B</Tooltip.Trigger>
+			<Tooltip.Trigger className="tip-b" delay={0} closeDelay={0}>
+				B
+			</Tooltip.Trigger>
 			<Tooltip.Portal container={hostRef}>
 				<Tooltip.Positioner>
 					<Tooltip.Popup className="pop-b">B content</Tooltip.Popup>
@@ -1119,7 +1167,9 @@ export function MenuOpenWithItems() @{
 					<Menu.Popup className="menu-popup">
 						<Menu.Item className="menu-item">Cut</Menu.Item>
 						<Menu.Item className="menu-item">Copy</Menu.Item>
-						<Menu.Item className="menu-item" disabled>Paste</Menu.Item>
+						<Menu.Item className="menu-item" disabled>
+							Paste
+						</Menu.Item>
 						<Menu.Separator className="menu-sep" />
 						<Menu.Group className="menu-group">
 							<Menu.GroupLabel className="menu-group-label">More</Menu.GroupLabel>
@@ -1206,7 +1256,9 @@ export function MenuOpenLinkArrowBackdrop() @{
 				<Menu.Positioner className="menu-positioner">
 					<Menu.Popup className="menu-popup">
 						<Menu.Arrow className="menu-arrow">^</Menu.Arrow>
-						<Menu.LinkItem className="menu-link" href="https://example.com">Docs</Menu.LinkItem>
+						<Menu.LinkItem className="menu-link" href="https://example.com">
+							Docs
+						</Menu.LinkItem>
 						<Menu.Item className="menu-item">Close</Menu.Item>
 					</Menu.Popup>
 				</Menu.Positioner>
@@ -1254,8 +1306,12 @@ export function MenuItemsInteractive() @{
 							Damson
 						</Menu.CheckboxItem>
 						<Menu.RadioGroup className="menu-radio-group" defaultValue="e1">
-							<Menu.RadioItem className="menu-radio" value="e1">Elderberry</Menu.RadioItem>
-							<Menu.RadioItem className="menu-radio" value="e2">Fig</Menu.RadioItem>
+							<Menu.RadioItem className="menu-radio" value="e1">
+								Elderberry
+							</Menu.RadioItem>
+							<Menu.RadioItem className="menu-radio" value="e2">
+								Fig
+							</Menu.RadioItem>
 						</Menu.RadioGroup>
 					</Menu.Popup>
 				</Menu.Positioner>
@@ -1519,7 +1575,9 @@ function ToastList() @{
 					<Toast.Description className="toast-description" />
 				</Toast.Content>
 				<Toast.Action className="toast-action" />
-				<Toast.Close className="toast-close" aria-label="Close">x</Toast.Close>
+				<Toast.Close className="toast-close" aria-label="Close">
+					x
+				</Toast.Close>
 			</Toast.Root>
 		}
 	</Toast.Viewport>
@@ -1548,11 +1606,13 @@ function ToastAddHighPriority() @{
 	<button
 		className="toast-add-high"
 		type="button"
-		onClick={() => manager.add({
-			title: 'Error',
-			description: 'Something failed.',
-			priority: 'high',
-		})}
+		onClick={() =>
+			manager.add({
+				title: 'Error',
+				description: 'Something failed.',
+				priority: 'high',
+			})
+		}
 	>
 		Add urgent
 	</button>

@@ -20,15 +20,19 @@ export function SpreadHookArgs() @{
 		<button class="empty" onClick={() => setEmpty(3)}>
 			{empty === undefined ? 'u' : String(empty)}
 		</button>
-		<button class="one" onClick={() => setOne(6)}>{String(one)}</button>
-		<button class="reduced" onClick={() => dispatch(2)}>{String(reduced)}</button>
-		<button class="lazy" onClick={() => dispatchLazy(3)}>{String(lazy)}</button>
+		<button class="one" onClick={() => setOne(6)}>
+			{String(one)}
+		</button>
+		<button class="reduced" onClick={() => dispatch(2)}>
+			{String(reduced)}
+		</button>
+		<button class="lazy" onClick={() => dispatchLazy(3)}>
+			{String(lazy)}
+		</button>
 	</div>
 }
 
 export function SpreadRef() @{
 	const ref = useRef(...noRefArgs);
-	<p>
-		{ref.current === undefined ? 'u' : String(ref.current)}
-	</p>
+	<p>{ref.current === undefined ? 'u' : String(ref.current)}</p>
 }

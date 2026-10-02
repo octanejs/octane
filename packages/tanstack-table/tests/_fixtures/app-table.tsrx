@@ -76,13 +76,12 @@ export function AppTableFixture() @{
 						<tr>
 							@for (const h of hg.headers; key h.id) {
 								<table.AppHeader header={h}>
-									{(header) => <th
-										id={'a-th-' + header.id}
-										onClick={header.column.getToggleSortingHandler()}
-									>
-										<header.FlexRender />
-										<header.SortIndicator />
-									</th>}
+									{(header) => (
+										<th id={'a-th-' + header.id} onClick={header.column.getToggleSortingHandler()}>
+											<header.FlexRender />
+											<header.SortIndicator />
+										</th>
+									)}
 								</table.AppHeader>
 							}
 						</tr>
@@ -93,9 +92,11 @@ export function AppTableFixture() @{
 						<tr>
 							@for (const c of row.getAllCells(); key c.id) {
 								<table.AppCell cell={c}>
-									{(cell) => <td id={'a-td-' + cell.id}>
-										<cell.TextCell />
-									</td>}
+									{(cell) => (
+										<td id={'a-td-' + cell.id}>
+											<cell.TextCell />
+										</td>
+									)}
 								</table.AppCell>
 							}
 						</tr>
@@ -106,9 +107,11 @@ export function AppTableFixture() @{
 						<tr>
 							@for (const f of fg.headers; key f.id) {
 								<table.AppFooter header={f}>
-									{(footer) => <td class="a-foot">
-										<footer.FlexRender />
-									</td>}
+									{(footer) => (
+										<td class="a-foot">
+											<footer.FlexRender />
+										</td>
+									)}
 								</table.AppFooter>
 							}
 						</tr>

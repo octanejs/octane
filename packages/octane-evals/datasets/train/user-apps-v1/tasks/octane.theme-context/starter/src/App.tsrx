@@ -10,6 +10,8 @@ export function ThemeLabel(props: { id: string }) @{
 
 export function App() @{
 	<main id="settings" data-theme="unknown">
-		<button id="toggle-theme" type="button">Toggle theme</button>
+		<button id="toggle-theme" type="button">
+			Toggle theme
+		</button>
 	</main>
 }

@@ -3,21 +3,23 @@ import type { OnClickWeekNumberFunc } from '../shared/types.js';
 
 const className = 'react-calendar__tile';
 
-type ButtonProps =
-	Omit<import('octane/jsx-runtime').Octane.JSX.IntrinsicElements['button'], 'onClick'> & {
-		onClickWeekNumber: OnClickWeekNumberFunc;
-	};
+type ButtonProps = Omit<
+	import('octane/jsx-runtime').Octane.JSX.IntrinsicElements['button'],
+	'onClick'
+> & {
+	onClickWeekNumber: OnClickWeekNumberFunc;
+};
 
-type DivProps =
-	import('octane/jsx-runtime').Octane.JSX.IntrinsicElements['div'] & {
-		onClickWeekNumber?: undefined;
-	};
+type DivProps = import('octane/jsx-runtime').Octane.JSX.IntrinsicElements['div'] & {
+	onClickWeekNumber?: undefined;
+};
 
-type WeekNumberProps<T = OnClickWeekNumberFunc | undefined> =
-	(T extends OnClickWeekNumberFunc ? ButtonProps : DivProps) & {
-		date: Date;
-		weekNumber: number;
-	};
+type WeekNumberProps<T = OnClickWeekNumberFunc | undefined> = (T extends OnClickWeekNumberFunc
+	? ButtonProps
+	: DivProps) & {
+	date: Date;
+	weekNumber: number;
+};
 
 export default function WeekNumber(props: WeekNumberProps): OctaneNode {
 	const { onClickWeekNumber, weekNumber } = props;
@@ -27,15 +29,23 @@ export default function WeekNumber(props: WeekNumberProps): OctaneNode {
 	if (onClickWeekNumber) {
 		const { date, onClickWeekNumber, weekNumber, ...otherProps } = props;
 
-		return <button
-			{...otherProps}
-			className={className}
-			onClick={(event) => onClickWeekNumber(weekNumber, date, event)}
-			type="button"
-		>{children}</button>;
+		return (
+			<button
+				{...otherProps}
+				className={className}
+				onClick={(event) => onClickWeekNumber(weekNumber, date, event)}
+				type="button"
+			>
+				{children}
+			</button>
+		);
 	} else {
 		const { date, onClickWeekNumber, weekNumber, ...otherProps } = props;
 
-		return <div {...otherProps} className={className}>{children}</div>;
+		return (
+			<div {...otherProps} className={className}>
+				{children}
+			</div>
+		);
 	}
 }

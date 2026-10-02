@@ -21,6 +21,8 @@ export function App() @{
 			onClick={() => {
 				setTags([...tags, draft]);
 			}}
-		>{'Add tag'}</button>
+		>
+			{'Add tag'}
+		</button>
 	</section>
 }

@@ -27,28 +27,31 @@ export const DrawerItemInner = ({
 		if (children) {
 			return children;
 		}
-		return ({ children }: { children: OctaneNode; name: string }) =>
-			<div className={getClassNameItem('default')}>{children}</div>;
+		return ({ children }: { children: OctaneNode; name: string }) => (
+			<div className={getClassNameItem('default')}>{children}</div>
+		);
 	}, [children]);
 
-	return <div
-		className={getClassNameItem({ disabled: isDragDisabled })}
-		ref={dragRef}
-		onMouseDown={(e) => e.preventDefault()}
-		data-testid={dragRef ? `drawer-item:${name}` : ''}
-		data-puck-drawer-item
-	>
-		<CustomInner name={name}>
-			<div className={getClassNameItem('draggableWrapper')}>
-				<div className={getClassNameItem('draggable')}>
-					<div className={getClassNameItem('name')}>{label ?? name}</div>
-					<div className={getClassNameItem('icon')}>
-						<DragIcon />
+	return (
+		<div
+			className={getClassNameItem({ disabled: isDragDisabled })}
+			ref={dragRef}
+			onMouseDown={(e) => e.preventDefault()}
+			data-testid={dragRef ? `drawer-item:${name}` : ''}
+			data-puck-drawer-item
+		>
+			<CustomInner name={name}>
+				<div className={getClassNameItem('draggableWrapper')}>
+					<div className={getClassNameItem('draggable')}>
+						<div className={getClassNameItem('name')}>{label ?? name}</div>
+						<div className={getClassNameItem('icon')}>
+							<DragIcon />
+						</div>
 					</div>
 				</div>
-			</div>
-		</CustomInner>
-	</div>;
+			</CustomInner>
+		</div>
+	);
 };
 
 /**
@@ -76,19 +79,20 @@ const DrawerItemDraggable = ({
 		type: 'drawer',
 	});
 
-	return <div className={getClassName('draggable')}>
-		<div className={getClassName('draggableBg')}>
-			<DrawerItemInner name={name} label={label}>{children}</DrawerItemInner>
+	return (
+		<div className={getClassName('draggable')}>
+			<div className={getClassName('draggableBg')}>
+				<DrawerItemInner name={name} label={label}>
+					{children}
+				</DrawerItemInner>
+			</div>
+			<div className={getClassName('draggableFg')}>
+				<DrawerItemInner name={name} label={label} dragRef={ref} isDragDisabled={isDragDisabled}>
+					{children}
+				</DrawerItemInner>
+			</div>
 		</div>
-		<div className={getClassName('draggableFg')}>
-			<DrawerItemInner
-				name={name}
-				label={label}
-				dragRef={ref}
-				isDragDisabled={isDragDisabled}
-			>{children}</DrawerItemInner>
-		</div>
-	</div>;
+	);
 };
 
 const DrawerItem = ({
@@ -113,18 +117,21 @@ const DrawerItem = ({
 		console.error('Warning: The `index` prop on Drawer.Item is deprecated and no longer required.');
 	}
 
-	useDragListener('dragend', () => {
-		setDynamicId(generateId(resolvedId));
-	}, [resolvedId]);
+	useDragListener(
+		'dragend',
+		() => {
+			setDynamicId(generateId(resolvedId));
+		},
+		[resolvedId],
+	);
 
-	return <div key={dynamicId}>
-		<DrawerItemDraggable
-			name={name}
-			label={label}
-			id={dynamicId}
-			isDragDisabled={isDragDisabled}
-		>{children}</DrawerItemDraggable>
-	</div>;
+	return (
+		<div key={dynamicId}>
+			<DrawerItemDraggable name={name} label={label} id={dynamicId} isDragDisabled={isDragDisabled}>
+				{children}
+			</DrawerItemDraggable>
+		</div>
+	);
 };
 
 export const Drawer = ({
@@ -156,13 +163,17 @@ export const Drawer = ({
 		collisionPriority: 0, // Never collide with this, but we use it so NestedDroppablePlugin respects the Drawer
 	});
 
-	return <div
-		className={getClassName()}
-		ref={ref}
-		data-puck-dnd={id}
-		data-puck-drawer
-		data-puck-dnd-void
-	>{children}</div>;
+	return (
+		<div
+			className={getClassName()}
+			ref={ref}
+			data-puck-dnd={id}
+			data-puck-drawer
+			data-puck-dnd-void
+		>
+			{children}
+		</div>
+	);
 };
 
 Drawer.Item = DrawerItem;

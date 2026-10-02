@@ -31,13 +31,16 @@ export function MemoryRouter(props: MemoryRouterProps) @{
 		action: history.action,
 		location: history.location,
 	});
-	const setState = useCallback((newState: Update) => {
-		if (useTransitions === false) {
-			setStateImpl(newState);
-		} else {
-			startTransition(() => setStateImpl(newState));
-		}
-	}, [useTransitions]);
+	const setState = useCallback(
+		(newState: Update) => {
+			if (useTransitions === false) {
+				setStateImpl(newState);
+			} else {
+				startTransition(() => setStateImpl(newState));
+			}
+		},
+		[useTransitions],
+	);
 
 	useLayoutEffect(() => history.listen(setState), [history, setState]);
 

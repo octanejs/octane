@@ -28,17 +28,15 @@ export const Canvas = () => {
 	const resetAutoZoom = useResetAutoZoom(frameRef);
 
 	const { dispatch, overrides, setUi, zoomConfig, setZoomConfig, status, iframe } = useAppStore(
-		useShallow(
-			(s) => ({
-				dispatch: s.dispatch,
-				overrides: s.overrides,
-				setUi: s.setUi,
-				zoomConfig: s.zoomConfig,
-				setZoomConfig: s.setZoomConfig,
-				status: s.status,
-				iframe: s.iframe,
-			}),
-		),
+		useShallow((s) => ({
+			dispatch: s.dispatch,
+			overrides: s.overrides,
+			setUi: s.setUi,
+			zoomConfig: s.zoomConfig,
+			setZoomConfig: s.setZoomConfig,
+			status: s.status,
+			iframe: s.iframe,
+		})),
 	);
 	const {
 		leftSideBarVisible,
@@ -47,24 +45,20 @@ export const Canvas = () => {
 		rightSideBarWidth,
 		viewports,
 	} = useAppStore(
-		useShallow(
-			(s) => ({
-				leftSideBarVisible: s.state.ui.leftSideBarVisible,
-				rightSideBarVisible: s.state.ui.rightSideBarVisible,
-				leftSideBarWidth: s.state.ui.leftSideBarWidth,
-				rightSideBarWidth: s.state.ui.rightSideBarWidth,
-				viewports: s.state.ui.viewports,
-			}),
-		),
+		useShallow((s) => ({
+			leftSideBarVisible: s.state.ui.leftSideBarVisible,
+			rightSideBarVisible: s.state.ui.rightSideBarVisible,
+			leftSideBarWidth: s.state.ui.leftSideBarWidth,
+			rightSideBarWidth: s.state.ui.rightSideBarWidth,
+			viewports: s.state.ui.viewports,
+		})),
 	);
 
 	const [showTransition, setShowTransition] = useState(false);
 	const isResizingRef = useRef(false);
 
 	const defaultRender = useMemo<FC<{ children?: OctaneNode }>>(() => {
-		const PuckDefault = ({ children }: { children?: OctaneNode }) => <>
-			{children}
-		</>;
+		const PuckDefault = ({ children }: { children?: OctaneNode }) => <>{children}</>;
 
 		return PuckDefault;
 	}, []);
@@ -139,85 +133,88 @@ export const Canvas = () => {
 		}, 500);
 	}, []);
 
-	return <div
-		className={getClassName({
-			ready: status === 'READY' || !iframe.enabled || !iframe.waitForStyles,
-			showLoader,
-		})}
-		onClick={(e) => {
-			const el = e.target as Element;
+	return (
+		<div
+			className={getClassName({
+				ready: status === 'READY' || !iframe.enabled || !iframe.waitForStyles,
+				showLoader,
+			})}
+			onClick={(e) => {
+				const el = e.target as Element;
 
-			if (!el.hasAttribute('data-puck-component') && !el.hasAttribute('data-puck-dropzone')) {
-				dispatch({
-					type: 'setUi',
-					ui: { itemSelector: null },
-					recordHistory: true,
-				});
-			}
-		}}
-	>
-		{viewports.controlsVisible && iframe.enabled &&
-			<div className={getClassName('controls')}>
-				<ViewportControls
-					autoZoom={zoomConfig.autoZoom}
-					zoom={zoomConfig.zoom}
-					onViewportChange={(viewport) => {
-						setShowTransition(true);
-						isResizingRef.current = true;
+				if (!el.hasAttribute('data-puck-component') && !el.hasAttribute('data-puck-dropzone')) {
+					dispatch({
+						type: 'setUi',
+						ui: { itemSelector: null },
+						recordHistory: true,
+					});
+				}
+			}}
+		>
+			{viewports.controlsVisible && iframe.enabled && (
+				<div className={getClassName('controls')}>
+					<ViewportControls
+						autoZoom={zoomConfig.autoZoom}
+						zoom={zoomConfig.zoom}
+						onViewportChange={(viewport) => {
+							setShowTransition(true);
+							isResizingRef.current = true;
 
-						const uiViewport = {
-							...viewport,
-							height: viewport.height || 'auto',
-							zoom: zoomConfig.zoom,
-						};
+							const uiViewport = {
+								...viewport,
+								height: viewport.height || 'auto',
+								zoom: zoomConfig.zoom,
+							};
 
-						const newUi: Partial<UiState> = {
-							viewports: { ...viewports, current: uiViewport },
-						};
-
-						setUi(newUi);
-
-						if (ZOOM_ON_CHANGE) {
-							resetAutoZoom({
+							const newUi: Partial<UiState> = {
 								viewports: { ...viewports, current: uiViewport },
-							});
-						}
-					}}
-					onZoom={(zoom) => {
-						setShowTransition(true);
-						isResizingRef.current = true;
+							};
 
-						setZoomConfig({ ...zoomConfig, zoom });
+							setUi(newUi);
+
+							if (ZOOM_ON_CHANGE) {
+								resetAutoZoom({
+									viewports: { ...viewports, current: uiViewport },
+								});
+							}
+						}}
+						onZoom={(zoom) => {
+							setShowTransition(true);
+							isResizingRef.current = true;
+
+							setZoomConfig({ ...zoomConfig, zoom });
+						}}
+					/>
+				</div>
+			)}
+			<div className={getClassName('inner')} ref={frameRef}>
+				<div
+					className={getClassName('root')}
+					style={{
+						width: iframe.enabled ? viewports.current.width : '100%',
+						height: zoomConfig.rootHeight,
+						transform: iframe.enabled ? `scale(${zoomConfig.zoom})` : undefined,
+						transition: showTransition
+							? `width ${TRANSITION_DURATION}ms ease-out, height ${TRANSITION_DURATION}ms ease-out, transform ${TRANSITION_DURATION}ms ease-out`
+							: '',
+						overflow: iframe.enabled ? undefined : 'auto',
 					}}
-				/>
-			</div>}
-		<div className={getClassName('inner')} ref={frameRef}>
-			<div
-				className={getClassName('root')}
-				style={{
-					width: iframe.enabled ? viewports.current.width : '100%',
-					height: zoomConfig.rootHeight,
-					transform: iframe.enabled ? `scale(${zoomConfig.zoom})` : undefined,
-					transition: showTransition
-						? `width ${TRANSITION_DURATION}ms ease-out, height ${TRANSITION_DURATION}ms ease-out, transform ${TRANSITION_DURATION}ms ease-out`
-						: '',
-					overflow: iframe.enabled ? undefined : 'auto',
-				}}
-				suppressHydrationWarning
-				// Suppress hydration warning as frame is not visible until after load
-				id="puck-canvas-root"
-				onTransitionEnd={() => {
-					setShowTransition(false);
-					isResizingRef.current = false;
-				}}
-			>
-				<CustomPreview>
-					<Preview />
-				</CustomPreview>
-			</div>
-			<div className={getClassName('loader')}>
-				<Loader size={24} />
+					suppressHydrationWarning
+					// Suppress hydration warning as frame is not visible until after load
+					id="puck-canvas-root"
+					onTransitionEnd={() => {
+						setShowTransition(false);
+						isResizingRef.current = false;
+					}}
+				>
+					<CustomPreview>
+						<Preview />
+					</CustomPreview>
+				</div>
+				<div className={getClassName('loader')}>
+					<Loader size={24} />
+				</div>
 			</div>
 		</div>
-	</div>;
+	);
 };

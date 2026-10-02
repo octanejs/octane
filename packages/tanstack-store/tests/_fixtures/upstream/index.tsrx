@@ -38,12 +38,14 @@ describe('atom hooks', () => {
 		function Comp() {
 			const value = useSelector(atom);
 
-			return <div>
-				<p>{'Value: ' + value}</p>
-				<button type="button" onClick={() => atom.set((prev) => prev + 1)}>
-					Update
-				</button>
-			</div>;
+			return (
+				<div>
+					<p>{'Value: ' + value}</p>
+					<button type="button" onClick={() => atom.set((prev) => prev + 1)}>
+						Update
+					</button>
+				</div>
+			);
 		}
 
 		const { getByText } = render(<Comp />);
@@ -62,12 +64,14 @@ describe('atom hooks', () => {
 		function Comp() {
 			const value = useSelector(doubledAtom);
 
-			return <div>
-				<p>{'Value: ' + value}</p>
-				<button type="button" onClick={() => countAtom.set((prev) => prev + 1)}>
-					Update
-				</button>
-			</div>;
+			return (
+				<div>
+					<p>{'Value: ' + value}</p>
+					<button type="button" onClick={() => countAtom.set((prev) => prev + 1)}>
+						Update
+					</button>
+				</div>
+			);
 		}
 
 		const { getByText } = render(<Comp />);
@@ -92,32 +96,34 @@ describe('atom hooks', () => {
 			});
 			renderSpy();
 
-			return <div>
-				<p>{'Renders: ' + renderSpy.mock.calls.length}</p>
-				<p>{'Value: ' + value.select}</p>
-				<button
-					type="button"
-					onClick={() => atom.set(
-						(prev) => ({
-							...prev,
-							ignored: prev.ignored + 1,
-						}),
-					)}
-				>
-					Update ignored
-				</button>
-				<button
-					type="button"
-					onClick={() => atom.set(
-						(prev) => ({
-							...prev,
-							select: prev.select + 1,
-						}),
-					)}
-				>
-					Update select
-				</button>
-			</div>;
+			return (
+				<div>
+					<p>{'Renders: ' + renderSpy.mock.calls.length}</p>
+					<p>{'Value: ' + value.select}</p>
+					<button
+						type="button"
+						onClick={() =>
+							atom.set((prev) => ({
+								...prev,
+								ignored: prev.ignored + 1,
+							}))
+						}
+					>
+						Update ignored
+					</button>
+					<button
+						type="button"
+						onClick={() =>
+							atom.set((prev) => ({
+								...prev,
+								select: prev.select + 1,
+							}))
+						}
+					>
+						Update select
+					</button>
+				</div>
+			);
 		}
 
 		const { getByText } = render(<Comp />);
@@ -162,24 +168,26 @@ describe('store contexts', () => {
 			const value = useSelector(currentAtom);
 			const total = useSelector(currentStore, (state) => state.count);
 
-			return <div>
-				<p>{'Value: ' + value}</p>
-				<p>{'Total: ' + total}</p>
-				<button type="button" onClick={() => currentAtom.set((prev) => prev + 1)}>
-					Update
-				</button>
-				<button
-					type="button"
-					onClick={() => currentStore.setState(
-						(state) => ({
-							...state,
-							count: state.count + 1,
-						}),
-					)}
-				>
-					Update total
-				</button>
-			</div>;
+			return (
+				<div>
+					<p>{'Value: ' + value}</p>
+					<p>{'Total: ' + total}</p>
+					<button type="button" onClick={() => currentAtom.set((prev) => prev + 1)}>
+						Update
+					</button>
+					<button
+						type="button"
+						onClick={() =>
+							currentStore.setState((state) => ({
+								...state,
+								count: state.count + 1,
+							}))
+						}
+					>
+						Update total
+					</button>
+				</div>
+			);
 		}
 
 		const { getByText } = render(
@@ -213,10 +221,12 @@ describe('store contexts', () => {
 			const atomValue = useSelector(currentAtom);
 			const storeValue = useSelector(currentStore, (state) => state.value);
 
-			return <div>
-				<p>{'Atom: ' + atomValue}</p>
-				<p>{'Store: ' + storeValue}</p>
-			</div>;
+			return (
+				<div>
+					<p>{'Atom: ' + atomValue}</p>
+					<p>{'Store: ' + storeValue}</p>
+				</div>
+			);
 		}
 
 		const { getByText } = render(
@@ -247,12 +257,14 @@ describe('store contexts', () => {
 			const { countAtom: atom } = useStoreContext();
 			const [value, setValue] = useAtom(atom);
 
-			return <div>
-				<p>{'Value: ' + value}</p>
-				<button type="button" onClick={() => setValue((prev) => prev + 5)}>
-					Add 5
-				</button>
-			</div>;
+			return (
+				<div>
+					<p>{'Value: ' + value}</p>
+					<button type="button" onClick={() => setValue((prev) => prev + 5)}>
+						Add 5
+					</button>
+				</div>
+			);
 		}
 
 		const { getByText } = render(
@@ -309,8 +321,8 @@ describe('store contexts', () => {
 			innerAtom.set(7);
 		});
 
-		await waitFor(
-			() => expect(getAllByText(/Value:/).map((node) => node.textContent)).toEqual([
+		await waitFor(() =>
+			expect(getAllByText(/Value:/).map((node) => node.textContent)).toEqual([
 				'Value: 1',
 				'Value: 7',
 			]),
@@ -334,14 +346,11 @@ describe('store hooks', () => {
 	});
 
 	it('useCreateStore supports actions and keeps them stable', () => {
-		const { result, rerender } = renderHook(
-			() => useCreateStore(
-				{ count: 0 },
-				({ get, setState }) => ({
-					inc: () => setState((prev) => ({ count: prev.count + 1 })),
-					current: () => get().count,
-				}),
-			),
+		const { result, rerender } = renderHook(() =>
+			useCreateStore({ count: 0 }, ({ get, setState }) => ({
+				inc: () => setState((prev) => ({ count: prev.count + 1 })),
+				current: () => get().count,
+			})),
 		);
 		const store = result.current;
 		const actions = store.actions;
@@ -381,13 +390,15 @@ describe('store hooks', () => {
 			const value = useSelector(baseStore);
 			const readonlyValue = useSelector(readonlyStore);
 
-			return <div>
-				<p>{'Value: ' + value}</p>
-				<p>{'Readonly: ' + readonlyValue.value}</p>
-				<button type="button" onClick={() => baseStore.setState((prev) => prev + 1)}>
-					Update
-				</button>
-			</div>;
+			return (
+				<div>
+					<p>{'Value: ' + value}</p>
+					<p>{'Readonly: ' + readonlyValue.value}</p>
+					<button type="button" onClick={() => baseStore.setState((prev) => prev + 1)}>
+						Update
+					</button>
+				</div>
+			);
 		}
 
 		const { getByText } = render(<Comp />);
@@ -412,32 +423,34 @@ describe('store hooks', () => {
 			const storeVal = useSelector(store, (state) => state.select);
 			renderSpy();
 
-			return <div>
-				<p>{'Number rendered: ' + renderSpy.mock.calls.length}</p>
-				<p>{'Store: ' + storeVal}</p>
-				<button
-					type="button"
-					onClick={() => store.setState(
-						(v) => ({
-							...v,
-							select: 10,
-						}),
-					)}
-				>
-					Update select
-				</button>
-				<button
-					type="button"
-					onClick={() => store.setState(
-						(v) => ({
-							...v,
-							ignored: 10,
-						}),
-					)}
-				>
-					Update ignored
-				</button>
-			</div>;
+			return (
+				<div>
+					<p>{'Number rendered: ' + renderSpy.mock.calls.length}</p>
+					<p>{'Store: ' + storeVal}</p>
+					<button
+						type="button"
+						onClick={() =>
+							store.setState((v) => ({
+								...v,
+								select: 10,
+							}))
+						}
+					>
+						Update select
+					</button>
+					<button
+						type="button"
+						onClick={() =>
+							store.setState((v) => ({
+								...v,
+								ignored: 10,
+							}))
+						}
+					>
+						Update ignored
+					</button>
+				</div>
+			);
 		}
 
 		const { getByText } = render(<Comp />);
@@ -476,40 +489,38 @@ describe('store hooks', () => {
 
 			const value = storeVal.map((item) => item.select).reduce((total, num) => total + num, 0);
 
-			return <div>
-				<p>{'Number rendered: ' + renderSpy.mock.calls.length}</p>
-				<p>{'Store: ' + value}</p>
-				<button
-					type="button"
-					onClick={() => store.setState(
-						(v) => ({
-							array: v.array.map(
-								(item) => ({
+			return (
+				<div>
+					<p>{'Number rendered: ' + renderSpy.mock.calls.length}</p>
+					<p>{'Store: ' + value}</p>
+					<button
+						type="button"
+						onClick={() =>
+							store.setState((v) => ({
+								array: v.array.map((item) => ({
 									...item,
 									select: item.select + 5,
-								}),
-							),
-						}),
-					)}
-				>
-					Update select
-				</button>
-				<button
-					type="button"
-					onClick={() => store.setState(
-						(v) => ({
-							array: v.array.map(
-								(item) => ({
+								})),
+							}))
+						}
+					>
+						Update select
+					</button>
+					<button
+						type="button"
+						onClick={() =>
+							store.setState((v) => ({
+								array: v.array.map((item) => ({
 									...item,
 									ignore: item.ignore + 2,
-								}),
-							),
-						}),
-					)}
-				>
-					Update ignored
-				</button>
-			</div>;
+								})),
+							}))
+						}
+					>
+						Update ignored
+					</button>
+				</div>
+			);
 		}
 
 		const { getByText } = render(<Comp />);
@@ -532,12 +543,14 @@ describe('store hooks', () => {
 		function Comp() {
 			const derivedVal = useSelector(derived, (state) => state.val);
 
-			return <div>
-				<p>{'Derived: ' + derivedVal}</p>
-				<button type="button" onClick={() => store.setState((v) => v + 1)}>
-					Update select
-				</button>
-			</div>;
+			return (
+				<div>
+					<p>{'Derived: ' + derivedVal}</p>
+					<button type="button" onClick={() => store.setState((v) => v + 1)}>
+						Update select
+					</button>
+				</div>
+			);
 		}
 
 		const { getByText } = render(<Comp />);
@@ -556,12 +569,14 @@ describe('useStore', () => {
 		function Comp() {
 			const value = useStore(store, (state) => state);
 
-			return <div>
-				<p>{'Value: ' + value}</p>
-				<button type="button" onClick={() => store.setState((prev) => prev + 1)}>
-					Update
-				</button>
-			</div>;
+			return (
+				<div>
+					<p>{'Value: ' + value}</p>
+					<button type="button" onClick={() => store.setState((prev) => prev + 1)}>
+						Update
+					</button>
+				</div>
+			);
 		}
 
 		const { getByText } = render(<Comp />);
@@ -579,12 +594,14 @@ describe('useStore', () => {
 		function Comp() {
 			const value = useStore(atom, (state) => state);
 
-			return <div>
-				<p>{'Value: ' + value}</p>
-				<button type="button" onClick={() => atom.set((prev) => prev + 1)}>
-					Update
-				</button>
-			</div>;
+			return (
+				<div>
+					<p>{'Value: ' + value}</p>
+					<button type="button" onClick={() => atom.set((prev) => prev + 1)}>
+						Update
+					</button>
+				</div>
+			);
 		}
 
 		const { getByText } = render(<Comp />);

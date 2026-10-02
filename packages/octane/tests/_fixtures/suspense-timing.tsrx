@@ -31,7 +31,9 @@ function TimedContent(props: TimingProps) @{
 	useLayoutEffect(() => {
 		props.onLayout?.(value);
 	}, [value, props.onLayout]);
-	<span data-value={props.label} ref={props.onRef}>{value as string}</span>
+	<span data-value={props.label} ref={props.onRef}>
+		{value as string}
+	</span>
 }
 
 export interface DescriptorRetryContentProps extends TimingProps {
@@ -154,7 +156,9 @@ function NestedRefHost(props: { label: string; onLayout: (value: string) => void
 	useLayoutEffect(() => {
 		props.onLayout(props.label + ':' + (host.current?.getAttribute('data-value') ?? 'null'));
 	}, [props.label, props.onLayout]);
-	<span data-value={props.label} ref={host}>{props.label as string}</span>
+	<span data-value={props.label} ref={host}>
+		{props.label as string}
+	</span>
 }
 
 function NestedRefLate(props: { promise: Promise<string>; onLayout: (value: string) => void }) @{
@@ -196,7 +200,9 @@ export function NestedRefRehide(props: NestedRefRehideProps) @{
 			<>
 				@try {
 					<>
-						<span data-value="nested" ref={props.onRef}>{'nested'}</span>
+						<span data-value="nested" ref={props.onRef}>
+							{'nested'}
+						</span>
 						<TimedContent promise={props.inner} label="inner" />
 					</>
 				} @pending {
@@ -325,15 +331,13 @@ export interface SuspendingFallbackProps {
 }
 
 function FallbackPrimary(props: SuspendingFallbackProps) @{
-	const value =
-		props.readMode === 'use' ? use(props.primary.promise) : props.primary.read();
+	const value = props.readMode === 'use' ? use(props.primary.promise) : props.primary.read();
 	<span data-value="fallback-primary">{value as string}</span>
 }
 
 function SuspendingFallback(props: SuspendingFallbackProps) @{
 	const [count, setCount] = useState(0);
-	const value =
-		props.readMode === 'use' ? use(props.fallback.promise) : props.fallback.read();
+	const value = props.readMode === 'use' ? use(props.fallback.promise) : props.fallback.read();
 	useLayoutEffect(() => {
 		props.onFallbackLayout?.(value);
 	}, [value, props.onFallbackLayout]);
@@ -476,13 +480,19 @@ function RootSuspensionShell(props: RootSuspensionProps) @{
 	}, [label, props.onLifecycle]);
 	<header data-shell={label} ref={props.onShellRef}>
 		<input aria-label="root value" value={label} readOnly />
-		<button data-count onClick={() => setCount(count + 1)}>{label + ':' + count}</button>
+		<button data-count onClick={() => setCount(count + 1)}>
+			{label + ':' + count}
+		</button>
 		<button
 			data-event
 			onClickCapture={() => props.onEvent?.('capture:' + label)}
 			onClick={() => props.onEvent?.('bubble:' + label)}
-		>inspect</button>
-		<button data-event-bundle onClick={() => record(eventLabel)}>inspect bundled</button>
+		>
+			inspect
+		</button>
+		<button data-event-bundle onClick={() => record(eventLabel)}>
+			inspect bundled
+		</button>
 	</header>
 }
 
@@ -502,13 +512,14 @@ function RootSuspensionItem(props: {
 		<button
 			data-row-event
 			onClick={() => props.onEvent?.('row:' + props.value + ':' + props.label)}
-		>inspect row</button>
+		>
+			inspect row
+		</button>
 	</li>
 }
 
 function RootSuspensionReader(props: RootSuspensionProps) @{
-	const value =
-		props.read === undefined ? use(props.promise) : props.read();
+	const value = props.read === undefined ? use(props.promise) : props.read();
 	useLayoutEffect(() => {
 		props.onLayout?.(value);
 		props.onLifecycle?.('layout reader:' + value);
@@ -518,7 +529,9 @@ function RootSuspensionReader(props: RootSuspensionProps) @{
 		props.onLifecycle?.('passive reader:' + value);
 		return () => props.onLifecycle?.('passive cleanup reader:' + value);
 	}, [value, props.onLifecycle]);
-	<span data-value="root-reader" ref={props.onRef}>{value as string}</span>
+	<span data-value="root-reader" ref={props.onRef}>
+		{value as string}
+	</span>
 }
 
 export function RootSuspensionScreen(props: RootSuspensionProps) @{
@@ -596,8 +609,10 @@ function StatefulRootSuspensionContent(props: StatefulRootSuspensionProps) @{
 				if (props.concurrent) startTransition(() => setNext(props.next));
 				else setNext(props.next);
 			}}
-		>load</button>
-		<RootSuspensionScreen {...next ?? props} />
+		>
+			load
+		</button>
+		<RootSuspensionScreen {...(next ?? props)} />
 	</>
 }
 
@@ -617,22 +632,25 @@ export function TransitionRootSuspensionScreen(props: TransitionRootSuspensionPr
 	const [selection, setSelection] = useState<RootSuspensionProps>(props);
 	const [pending, start] = useTransition();
 	<section>
-		<button data-transition onClick={() => start(() => setSelection(props.next))}>next</button>
-		<button data-urgent onClick={() => setSelection(props.urgent)}>urgent</button>
-		<span data-root-pending>
-			{pending ? 'pending' : 'idle'}
-		</span>
+		<button data-transition onClick={() => start(() => setSelection(props.next))}>
+			next
+		</button>
+		<button data-urgent onClick={() => setSelection(props.urgent)}>
+			urgent
+		</button>
+		<span data-root-pending>{pending ? 'pending' : 'idle'}</span>
 		<RootSuspensionScreen {...selection} />
 	</section>
 }
 
 export interface StructuralRootSuspensionProps extends RootSuspensionProps {
-	shape: | 'keyed component'
-	| 'conditional branch'
-	| 'dynamic component'
-	| 'value component'
-	| 'returned array'
-	| 'empty value';
+	shape:
+		| 'keyed component'
+		| 'conditional branch'
+		| 'dynamic component'
+		| 'value component'
+		| 'returned array'
+		| 'empty value';
 	alternate?: boolean;
 }
 
@@ -675,9 +693,7 @@ export function StructuralRootSuspensionScreen(props: StructuralRootSuspensionPr
 		} @else if (props.shape === 'returned array') {
 			<ReturningRootSuspensionShell {...props} />
 		} @else {
-			<>
-				{value}
-			</>
+			<>{value}</>
 		}
 		<RootSuspensionReader {...props} />
 		<footer data-tail>stable sibling</footer>
@@ -699,7 +715,7 @@ function IndependentlyQueuedShell(props: IndependentRootSuspensionProps) @{
 function IndependentlyQueuedReader(props: IndependentRootSuspensionProps) @{
 	const [request, setRequest] = useState<RootSuspensionProps | null>(null);
 	useLayoutEffect(() => props.onReaderUpdate(setRequest), [props.onReaderUpdate, setRequest]);
-	<RootSuspensionReader {...request ?? props} />
+	<RootSuspensionReader {...(request ?? props)} />
 }
 
 function IndependentlyQueuedTail(props: IndependentRootSuspensionProps) @{
@@ -735,7 +751,9 @@ function RetiringRootSuspensionChild(props: RootSuspensionProps & { replaceOwner
 				props.replaceOwner();
 				setPending(true);
 			}}
-		>replace</button>
+		>
+			replace
+		</button>
 		<RootSuspensionShell {...props} />
 	</>
 }

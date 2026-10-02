@@ -31,11 +31,12 @@ interface XAxisProps<DataPointType = any, DataValueType = any> extends Omit<
 	mirror?: boolean;
 	orientation?: XAxisOrientation;
 	domain?: AxisDomain;
-	scale?: | ScaleType
-	| CustomScaleDefinition
-	| CustomScaleDefinition<string>
-	| CustomScaleDefinition<number>
-	| CustomScaleDefinition<Date>;
+	scale?:
+		| ScaleType
+		| CustomScaleDefinition
+		| CustomScaleDefinition<string>
+		| CustomScaleDefinition<number>
+		| CustomScaleDefinition<Date>;
 	tick?: TickProp<XAxisTickContentProps>;
 	ticks?: ReadonlyArray<AxisTick>;
 	padding?: XAxisPadding;
@@ -46,13 +47,15 @@ interface XAxisProps<DataPointType = any, DataValueType = any> extends Omit<
 	letterSpacing?: number | string;
 	niceTicks?: NiceTicksAlgorithm;
 }
-export type Props<DataPointType = any, DataValueType = any> =
-	Omit<
-		PresentationAttributesAdaptChildEvent<TickItem, SVGTextElement>,
-		'scale' | 'ref'
-	> & XAxisProps<DataPointType, DataValueType>;
-type PropsWithDefaults<DataPointType = any, DataValueType = any> =
-	RequiresDefaultProps<Props<DataPointType, DataValueType>, typeof xAxisDefaultProps>;
+export type Props<DataPointType = any, DataValueType = any> = Omit<
+	PresentationAttributesAdaptChildEvent<TickItem, SVGTextElement>,
+	'scale' | 'ref'
+> &
+	XAxisProps<DataPointType, DataValueType>;
+type PropsWithDefaults<DataPointType = any, DataValueType = any> = RequiresDefaultProps<
+	Props<DataPointType, DataValueType>,
+	typeof xAxisDefaultProps
+>;
 // Port of cartesian/XAxis.tsx — registers x-axis settings in the store and
 // renders through CartesianAxis with store-synchronized settings.
 import { useLayoutEffect, useMemo, useRef, memo } from 'octane';
@@ -74,9 +77,11 @@ import { axisPropsAreEqual } from '../util/axisPropsAreEqual';
 import { useCartesianChartLayout } from '../context/chartLayoutContext.ts';
 import { getAxisTypeBasedOnLayout } from '../util/getAxisTypeBasedOnLayout';
 
-function SetXAxisSettings(props: Omit<XAxisSettings, 'type'> & {
-	type: AxisDomainTypeInput;
-}) {
+function SetXAxisSettings(
+	props: Omit<XAxisSettings, 'type'> & {
+		type: AxisDomainTypeInput;
+	},
+) {
 	const dispatch = useAppDispatch();
 	const prevSettingsRef = useRef<XAxisSettings | null>(null);
 	const layout = useCartesianChartLayout();
@@ -119,34 +124,36 @@ function XAxisImpl(props: PropsWithDefaults) {
 	const viewBox = useAppSelector(selectAxisViewBox);
 	const isPanorama = useIsPanorama();
 	const axisType = 'xAxis';
-	const cartesianTickItems = useAppSelector(
-		(state) => selectTicksOfAxis(state, axisType, xAxisId, isPanorama),
+	const cartesianTickItems = useAppSelector((state) =>
+		selectTicksOfAxis(state, axisType, xAxisId, isPanorama),
 	);
 	const axisSize = useAppSelector((state) => selectXAxisSize(state, xAxisId));
 	const position = useAppSelector((state) => selectXAxisPosition(state, xAxisId));
 	// Settings come back from the store (not props) so every component renders
 	// one consistent view of the axis (recharts#6257).
-	const synchronizedSettings = useAppSelector(
-		(state) => selectXAxisSettingsNoDefaults(state, xAxisId),
+	const synchronizedSettings = useAppSelector((state) =>
+		selectXAxisSettingsNoDefaults(state, xAxisId),
 	);
 	if (axisSize == null || position == null || synchronizedSettings == null) {
 		return null;
 	}
 	const { dangerouslySetInnerHTML, ticks, scale: _del, ...allOtherProps } = props;
 	const { id, scale: _del2, ...restSynchronizedSettings } = synchronizedSettings;
-	return <CartesianAxis
-		{...allOtherProps}
-		{...restSynchronizedSettings}
-		x={position.x}
-		y={position.y}
-		width={axisSize.width}
-		height={axisSize.height}
-		className={clsx('recharts-' + axisType + ' ' + axisType, className)}
-		viewBox={viewBox}
-		ticks={cartesianTickItems}
-		axisType={axisType}
-		axisId={xAxisId}
-	/>;
+	return (
+		<CartesianAxis
+			{...allOtherProps}
+			{...restSynchronizedSettings}
+			x={position.x}
+			y={position.y}
+			width={axisSize.width}
+			height={axisSize.height}
+			className={clsx('recharts-' + axisType + ' ' + axisType, className)}
+			viewBox={viewBox}
+			ticks={cartesianTickItems}
+			axisType={axisType}
+			axisId={xAxisId}
+		/>
+	);
 }
 
 export const xAxisDefaultProps = {

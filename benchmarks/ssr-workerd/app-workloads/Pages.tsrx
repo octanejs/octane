@@ -79,7 +79,9 @@ function Navigation(props: Props) @{
 		<ul>
 			@for (const item of data.items; key item.id) {
 				<li>
-					<a href={'#item-' + item.id} data-proof={'nav/' + item.id}>{item.title as string}</a>
+					<a href={'#item-' + item.id} data-proof={'nav/' + item.id}>
+						{item.title as string}
+					</a>
 				</li>
 			}
 		</ul>

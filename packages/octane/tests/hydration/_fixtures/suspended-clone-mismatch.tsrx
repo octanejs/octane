@@ -71,7 +71,11 @@ export function GateNested(props: { server?: boolean }) @{
 }
 
 function list(items: string[]): OctaneNode {
-	return createElement('ul', null, items.map((item) => createElement('li', { key: item }, item)));
+	return createElement(
+		'ul',
+		null,
+		items.map((item) => createElement('li', { key: item }, item)),
+	);
 }
 
 // The server's de-opt host is empty; the client fills it.

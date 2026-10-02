@@ -429,8 +429,8 @@ test('rejects fixture clicks whose handlers bypass the hook-returned setter', fu
 		'utf8',
 	);
 	const mutated = fixtureSource.replace(
-		'<button id="set" onClick={() => setValue(10)}>set</button>\n\t\t<button id="inc" onClick={() => setValue((previous) => previous + 5)}>inc</button>',
-		'<button id="set" onClick={() => props.source(10)}>set</button>\n\t\t<button id="inc" onClick={() => props.source((previous) => previous + 5)}>inc</button>',
+		'<button id="set" onClick={() => setValue(10)}>\n\t\t\tset\n\t\t</button>\n\t\t<button id="inc" onClick={() => setValue((previous) => previous + 5)}>',
+		'<button id="set" onClick={() => props.source(10)}>\n\t\t\tset\n\t\t</button>\n\t\t<button id="inc" onClick={() => props.source((previous) => previous + 5)}>',
 	);
 	assert.notEqual(mutated, fixtureSource);
 	assert.throws(function run() {

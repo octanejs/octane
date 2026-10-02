@@ -20,12 +20,12 @@ export function MultiContinue(props) @{
 	<ul>
 		@for (const item of props.items; key item.id) {
 			<>
-				<span class={'badge id-' + item.id}>{'r' + item.id as string}</span>
+				<span class={'badge id-' + item.id}>{('r' + item.id) as string}</span>
 				@if (!item.skipA) {
 					<>
-						<span class="a">{'A:' + item.label as string}</span>
+						<span class="a">{('A:' + item.label) as string}</span>
 						@if (!item.skipB) {
-							<span class="b">{'B:' + item.label as string}</span>
+							<span class="b">{('B:' + item.label) as string}</span>
 						}
 					</>
 				}
@@ -55,12 +55,16 @@ export function Stateful() @{
 	<div>
 		<button
 			id="show2"
-			onClick={() => setItems(items.map((x) => x.id === 2 ? { ...x, hidden: false } : x))}
-		>{'show 2'}</button>
+			onClick={() => setItems(items.map((x) => (x.id === 2 ? { ...x, hidden: false } : x)))}
+		>
+			{'show 2'}
+		</button>
 		<button
 			id="hide1"
-			onClick={() => setItems(items.map((x) => x.id === 1 ? { ...x, hidden: true } : x))}
-		>{'hide 1'}</button>
+			onClick={() => setItems(items.map((x) => (x.id === 1 ? { ...x, hidden: true } : x)))}
+		>
+			{'hide 1'}
+		</button>
 		<ul>
 			@for (const item of items; key item.id) {
 				@if (!item.hidden) {

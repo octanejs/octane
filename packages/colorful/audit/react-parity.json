@@ -32,7 +32,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -169,7 +169,7 @@
         {
           "path": "packages/colorful/audit/adapted-program-types.json",
           "role": "support",
-          "sha256": "aedde66789de99fead2ba00f670d12a68c0601575e40311bf567d3ab2794d4f0"
+          "sha256": "90ea67880a9a4076c3f49579f09936ee8791b3ce9da2058eb7dead131dddb680"
         },
         {
           "path": "packages/colorful/audit/type-parity.json",
@@ -345,7 +345,7 @@
         {
           "path": "packages/colorful/audit/adapted-program-types.json",
           "role": "support",
-          "sha256": "aedde66789de99fead2ba00f670d12a68c0601575e40311bf567d3ab2794d4f0"
+          "sha256": "90ea67880a9a4076c3f49579f09936ee8791b3ce9da2058eb7dead131dddb680"
         },
         {
           "path": "packages/colorful/audit/type-probes/host-input-event.ts",

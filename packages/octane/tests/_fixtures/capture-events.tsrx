@@ -8,6 +8,8 @@ export function App(props) @{
 			class="inner"
 			onClickCapture={() => props.log('inner-capture')}
 			onClick={() => props.log('inner-bubble')}
-		>{'x'}</button>
+		>
+			{'x'}
+		</button>
 	</div>
 }

@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -105,42 +105,42 @@
         {
           "path": "packages/remix-router/tests/_fixtures/nested-layouts-diff.tsrx",
           "role": "support",
-          "sha256": "6aecad9696c2f3d1669aebb623bc90a3da354fad668c4b62e0b4b57d9b53c416"
+          "sha256": "ce2e0f8142f346491373a197f104b4738f8c4c970bccb195aa1fc464113014dd"
         },
         {
           "path": "packages/remix-router/tests/_fixtures/loader-redirect-error-diff.tsrx",
           "role": "support",
-          "sha256": "21889d760409525d31ad96a672dcb776887a55cd37483377420e3cbc06c8ee1b"
+          "sha256": "9b3874a528b7194034d24744996fb48350dfef8161bbdbf81ba77ee07e13dd83"
         },
         {
           "path": "packages/remix-router/tests/_fixtures/await-deferred-diff.tsrx",
           "role": "support",
-          "sha256": "ecfd20f19724029e5bb989a13e7b8d1af0c7ac4bc151c19b3b5362642bcb2a8e"
+          "sha256": "beac24c8f72fa6276a678ef06bd10eaf4b5815670eb8aa162266b7a4e94df83f"
         },
         {
           "path": "packages/remix-router/tests/_fixtures/pending-navigation-diff.tsrx",
           "role": "support",
-          "sha256": "e511e66f43e2c0163cc66e8503046cdb54626d7a60ad494e82078450e7b126f8"
+          "sha256": "e67fdc7d9af8f147f0f6bac23c89a7f8d85444590a7d999d4ceabdaa4a8e2494"
         },
         {
           "path": "packages/remix-router/tests/_fixtures/declarative-diff.tsrx",
           "role": "support",
-          "sha256": "23f2f3944bed250c01ae3d8718c407b53284dce8d97c181568945f026a0b6325"
+          "sha256": "a6f5104080aa5465fb66be8a53815807fdef8e4c90317ec61b5263a9110bd01b"
         },
         {
           "path": "packages/remix-router/tests/_fixtures/navlink-diff.tsrx",
           "role": "support",
-          "sha256": "336c4a1a2de604cac405e4f0ddf8788de0fd4be1991e199f74c87a4d6e13c0e8"
+          "sha256": "cbde81f2e062b4d8080e14a7dc1f2ace8adef27ca7dddb17f5978ae498784ee0"
         },
         {
           "path": "packages/remix-router/tests/_fixtures/forms-diff.tsrx",
           "role": "support",
-          "sha256": "5158801f854fbc4dcbd82b7f0ba8c9b75ec9d5a8c7760530b8e3a3dae1c7a67f"
+          "sha256": "cd32e6ad9db851a5414e135be2a1a8b2155ef8e4d718c619aa282969d29a38f4"
         },
         {
           "path": "packages/remix-router/tests/_fixtures/guards-diff.tsrx",
           "role": "support",
-          "sha256": "b832ca90372f6da5c2dd364eb19115afb7701d0a3f4721a5da5bda5251a75dd2"
+          "sha256": "b4a199a59739e2780f54e05553cd950e854fb6000be0093ea87e4dd0a771aee1"
         },
         {
           "path": "packages/remix-router/tests/differential/_setup.ts",
@@ -208,7 +208,7 @@
         {
           "path": "packages/remix-router/tests/_fixtures/static-ssr-diff.tsrx",
           "role": "support",
-          "sha256": "e4f2b514357748eaa46aff1c60860a6e2034ee90d40d38dd1a51cc220843c6ee"
+          "sha256": "51a98edbaa4c87432a45ae1155c9e7e06040080169413882a9f6140d867bff71"
         },
         {
           "path": "packages/remix-router/tests/differential/_setup-ssr.ts",

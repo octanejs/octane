@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -121,7 +121,7 @@
         {
           "path": "packages/cmdk/tests/_fixtures/cmdk-diff.tsrx",
           "role": "support",
-          "sha256": "e68291ba7c2d701b390584384ff32942c1e4bafa3fbcefc71a7a6722f0b5b3a9"
+          "sha256": "9408de5c721fd971d6481257e606ac5e022513a76f923f8cdd6c982528bf7536"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
@@ -141,12 +141,12 @@
         {
           "path": "packages/cmdk/src/components/command.tsrx",
           "role": "support",
-          "sha256": "7e8682576b12ffaf366dd134381fa43b907d38d4978fd0873d6ed008f80ee1f2"
+          "sha256": "ea0625d6a073389215390156402b4a49d387936626135ee15b75a13ebae88de0"
         },
         {
           "path": "packages/cmdk/src/components/item.tsrx",
           "role": "support",
-          "sha256": "5c6cfca163b6541982eb2b38406becf4a68f923ebcb551fed33990fd3005c9fa"
+          "sha256": "b99c79a60a1f5a1c79bc18f97a2e37feea21c20730cc00c2c7844ee49ebc6548"
         },
         {
           "path": "packages/cmdk/src/components/dialog.tsrx",
@@ -156,12 +156,12 @@
         {
           "path": "packages/cmdk/src/cmdk.tsrx",
           "role": "support",
-          "sha256": "f35554387d79b75d3cdfdcbb3d42155ef307d2661b6533ec7200588a449fe068"
+          "sha256": "1ba9b954071def1cff74d5e0e3d3f242e16a691e55fea9958ad74882384a2173"
         },
         {
           "path": "packages/cmdk/src/hooks.tsrx",
           "role": "support",
-          "sha256": "c57f03964c409294fc18d2e027544526016eb58198a30963f9fcfc1d897d4e75"
+          "sha256": "6aff4e68d57833971baa1f4b12d5dc4adf30939c0d891972384ec0b2d5240514"
         },
         {
           "path": "packages/cmdk/audit/upstream.lock.json",

@@ -19,8 +19,7 @@ export function swapToSecond() {
 function TwiceSuspending(props) @{
 	const [phase, setPhase] = useState(0);
 	_swap = () => setPhase(1);
-	const active =
-		phase === 0 ? props.a : props.b;
+	const active = phase === 0 ? props.a : props.b;
 	const value = use(active);
 	<div class="content">{value as string}</div>
 }

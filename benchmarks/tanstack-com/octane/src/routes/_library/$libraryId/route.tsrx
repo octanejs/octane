@@ -39,11 +39,14 @@ export const Route = createFileRoute('/_library/$libraryId')({
 		return {
 			meta: seo({
 				title: library.name
-					? `${library.name} | ${library.frameworks.map(
-							(framework) => `${framework.charAt(0).toUpperCase()}${framework.slice(
-								1,
-							)} ${library.name.replace('TanStack ', '')}`,
-						).join(', ')}`
+					? `${library.name} | ${library.frameworks
+							.map(
+								(framework) =>
+									`${framework.charAt(0).toUpperCase()}${framework.slice(
+										1,
+									)} ${library.name.replace('TanStack ', '')}`,
+							)
+							.join(', ')}`
 					: '',
 				description: library.description,
 				image: ogImageUrl(library.id),
@@ -63,17 +66,17 @@ export const Route = createFileRoute('/_library/$libraryId')({
 			}
 
 			const libraryName = library.name.replace('TanStack ', '');
-			const resolvedVersion =
-				version === 'latest' ? library.latestVersion : version!;
+			const resolvedVersion = version === 'latest' ? library.latestVersion : version!;
 			const gradientText = `inline-block text-transparent bg-clip-text bg-linear-to-r ${library.colorFrom} ${library.colorTo}`;
-			return <Link to={`/$libraryId`} params={{ libraryId }} className="relative whitespace-nowrap">
-				<span class={`${gradientText}`}>{libraryName}</span>
-				{' '}
-				<span
-					class="text-sm absolute right-0 top-0 font-normal normal-case"
-				>{resolvedVersion}</span>
-				<span class="text-sm opacity-0 normal-case">{resolvedVersion}</span>
-			</Link>;
+			return (
+				<Link to={`/$libraryId`} params={{ libraryId }} className="relative whitespace-nowrap">
+					<span class={`${gradientText}`}>{libraryName}</span>{' '}
+					<span class="text-sm absolute right-0 top-0 font-normal normal-case">
+						{resolvedVersion}
+					</span>
+					<span class="text-sm opacity-0 normal-case">{resolvedVersion}</span>
+				</Link>
+			);
 		},
 	},
 });
@@ -86,8 +89,10 @@ function RouteForm() {
 		return null;
 	}
 
-	return <>
-		<Outlet />
-		{library?.scarfId ? <Scarf id={library.scarfId} /> : null}
-	</>;
+	return (
+		<>
+			<Outlet />
+			{library?.scarfId ? <Scarf id={library.scarfId} /> : null}
+		</>
+	);
 }

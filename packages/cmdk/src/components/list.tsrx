@@ -45,6 +45,8 @@ export function List(props: ListProps) @{
 		aria-label={label}
 		id={context.listId}
 	>
-		<div ref={[height, context.listInnerRef]} cmdk-list-sizer="">{children}</div>
+		<div ref={[height, context.listInnerRef]} cmdk-list-sizer="">
+			{children}
+		</div>
 	</div>
 }

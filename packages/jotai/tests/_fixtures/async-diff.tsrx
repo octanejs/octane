@@ -22,6 +22,8 @@ export function AsyncApp() @{
 		} @pending {
 			<span id="fallback">loading</span>
 		}
-		<button id="resolve" onClick={() => resolveValue(7)}>resolve</button>
+		<button id="resolve" onClick={() => resolveValue(7)}>
+			resolve
+		</button>
 	</div>
 }

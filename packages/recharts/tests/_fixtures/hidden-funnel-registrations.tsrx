@@ -11,9 +11,12 @@ function FunnelTooltipSettingsProbe({ onSettings }) {
 }
 
 function FunnelLegendPayload({ payload }) @{
-	<div class="funnel-legend-payload">{payload.map(
-		(entry) => `${entry.color}:${entry.payload.name}`,
-	).sort().join('|')}</div>
+	<div class="funnel-legend-payload">
+		{payload
+			.map((entry) => `${entry.color}:${entry.payload.name}`)
+			.sort()
+			.join('|')}
+	</div>
 }
 
 export function HiddenFunnelRegistrationsApp({ onTooltipSettings }) @{

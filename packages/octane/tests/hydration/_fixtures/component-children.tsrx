@@ -13,7 +13,9 @@ function Leaf(props) @{
 function Panel(props) @{
 	const [n, setN] = useState(0);
 	@if (props.big) {
-		<div class="big" onClick={() => setN(n + 1)}>{props.label + ':' + n as string}</div>
+		<div class="big" onClick={() => setN(n + 1)}>
+			{(props.label + ':' + n) as string}
+		</div>
 	} @else {
 		<Leaf label={props.label} />
 	}

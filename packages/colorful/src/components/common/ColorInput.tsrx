@@ -27,33 +27,45 @@ export const ColorInput = (props: Props) => {
 		FocusEvent & { currentTarget: HTMLInputElement & EventTarget }
 	>(onBlur);
 
-	const handleInput = useCallback((event: InputEvent & {
-		currentTarget: HTMLInputElement & EventTarget;
-	}) => {
-		const target = event.currentTarget;
-		const inputValue = escape(target.value);
-		setValue(inputValue);
-		if (validate(inputValue)) onChangeCallback(process ? process(inputValue) : inputValue);
-		onInput?.(event);
-	}, [escape, process, validate, onChangeCallback, onInput]);
+	const handleInput = useCallback(
+		(
+			event: InputEvent & {
+				currentTarget: HTMLInputElement & EventTarget;
+			},
+		) => {
+			const target = event.currentTarget;
+			const inputValue = escape(target.value);
+			setValue(inputValue);
+			if (validate(inputValue)) onChangeCallback(process ? process(inputValue) : inputValue);
+			onInput?.(event);
+		},
+		[escape, process, validate, onChangeCallback, onInput],
+	);
 
-	const handleBlur = useCallback((event: FocusEvent & {
-		currentTarget: HTMLInputElement & EventTarget;
-	}) => {
-		const target = event.currentTarget;
-		if (!validate(target.value)) setValue(escape(color));
-		onBlurCallback(event);
-	}, [color, escape, validate, onBlurCallback]);
+	const handleBlur = useCallback(
+		(
+			event: FocusEvent & {
+				currentTarget: HTMLInputElement & EventTarget;
+			},
+		) => {
+			const target = event.currentTarget;
+			if (!validate(target.value)) setValue(escape(color));
+			onBlurCallback(event);
+		},
+		[color, escape, validate, onBlurCallback],
+	);
 
 	useEffect(() => {
 		setValue(escape(color));
 	}, [color, escape]);
 
-	return <input
-		{...rest}
-		value={format ? format(value) : value}
-		spellCheck="false"
-		onInput={handleInput}
-		onBlur={handleBlur}
-	/>;
+	return (
+		<input
+			{...rest}
+			value={format ? format(value) : value}
+			spellCheck="false"
+			onInput={handleInput}
+			onBlur={handleBlur}
+		/>
+	);
 };

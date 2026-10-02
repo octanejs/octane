@@ -21,7 +21,9 @@ function Toolbar() @{
 			onClick={() => {
 				maps.demo?.flyTo({ center: [-9.1393, 38.7223], zoom: 12 });
 			}}
-		>fly</button>
+		>
+			fly
+		</button>
 		<button
 			id="probe"
 			onClick={() => {
@@ -38,7 +40,9 @@ function Toolbar() @{
 					}),
 				);
 			}}
-		>probe</button>
+		>
+			probe
+		</button>
 		<pre id="toolbar">{readout as string}</pre>
 	</div>
 }

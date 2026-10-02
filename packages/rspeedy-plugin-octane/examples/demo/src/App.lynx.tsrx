@@ -8,9 +8,9 @@ export function App() @{
 		<view class="hero-card">
 			<text class="eyebrow">{'OCTANE + LYNX'}</text>
 			<text class="headline">{'Compiled components. Native canvas.'}</text>
-			<text
-				class="intro"
-			>{'This screen is rendered by Octane through the Lynx dual-thread runtime.'}</text>
+			<text class="intro">
+				{'This screen is rendered by Octane through the Lynx dual-thread runtime.'}
+			</text>
 		</view>
 
 		<view class="counter-card">

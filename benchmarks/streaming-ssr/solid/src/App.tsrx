@@ -61,9 +61,9 @@ export function App(props: { cards: CardSlot[] }) @{
 		</header>
 		<section class="hero">
 			<h2 class="pitch">{'Ten cards, one stream'}</h2>
-			<p
-				class="blurb"
-			>{'The shell flushes immediately; each card streams when its data resolves.'}</p>
+			<p class="blurb">
+				{'The shell flushes immediately; each card streams when its data resolves.'}
+			</p>
 			<div class="stats">
 				<div class="stat">
 					<span class="num">{'10'}</span>

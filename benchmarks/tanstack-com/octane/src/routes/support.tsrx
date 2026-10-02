@@ -56,44 +56,50 @@ const supportOptions = [
 ];
 
 function SupportComp() {
-	const cardClass = 'group relative block shadow-xl shadow-gray-500/20 rounded-lg dark:border border-gray-500/20 dark:shadow-xl dark:shadow-black/30 hover:shadow-2xl hover:scale-105 transition-all duration-200';
+	const cardClass =
+		'group relative block shadow-xl shadow-gray-500/20 rounded-lg dark:border border-gray-500/20 dark:shadow-xl dark:shadow-black/30 hover:shadow-2xl hover:scale-105 transition-all duration-200';
 
-	return <div class="flex flex-col max-w-full min-h-screen gap-12 p-4 md:p-8 pb-0">
-		<div class="flex-1 space-y-16 w-full max-w-4xl mx-auto">
-			<header class="">
-				<h1 class="text-3xl font-black">Support</h1>
-				<p class="text-lg mt-4 text-gray-600 dark:text-gray-400">
-					Whether you're a solo developer or a large enterprise, we have solutions that will fit
-					your needs perfectly
-				</p>
-			</header>
+	return (
+		<div class="flex flex-col max-w-full min-h-screen gap-12 p-4 md:p-8 pb-0">
+			<div class="flex-1 space-y-16 w-full max-w-4xl mx-auto">
+				<header class="">
+					<h1 class="text-3xl font-black">Support</h1>
+					<p class="text-lg mt-4 text-gray-600 dark:text-gray-400">
+						Whether you're a solo developer or a large enterprise, we have solutions that will fit
+						your needs perfectly
+					</p>
+				</header>
 
-			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 max-w-4xl mx-auto">{supportOptions.map(
-				(option) => <Link
-					key={option.title}
-					to={option.to}
-					target={option.external ? '_blank' : undefined}
-					className={`${cardClass} ${option.isNew ? 'overflow-visible' : 'overflow-hidden'}`}
-				>
-					{option.isNew &&
-						<div
-							class="absolute -top-2 -right-2 z-40 px-2 py-1 rounded-md bg-linear-to-r from-blue-500 to-purple-500 uppercase text-white font-black italic text-xs"
+				<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 max-w-4xl mx-auto">
+					{supportOptions.map((option) => (
+						<Link
+							key={option.title}
+							to={option.to}
+							target={option.external ? '_blank' : undefined}
+							className={`${cardClass} ${option.isNew ? 'overflow-visible' : 'overflow-hidden'}`}
 						>
-							NEW
-						</div>}
-					<div class={`bg-linear-to-br ${option.gradient} p-6 text-white rounded-lg h-full w-full`}>
-						<h3 class="text-xl font-semibold mb-2">{option.title as string}</h3>
-						<p class="text-sm text-white/80 mb-4">{option.description as string}</p>
-						<div class="flex flex-wrap gap-2">{option.badges.map(
-							(badge) =>
-								<span
-									key={badge}
-									class="text-xs bg-white/20 text-white rounded-md px-2 py-1"
-								>{badge as string}</span>,
-						)}</div>
-					</div>
-				</Link>,
-			)}</div>
+							{option.isNew && (
+								<div class="absolute -top-2 -right-2 z-40 px-2 py-1 rounded-md bg-linear-to-r from-blue-500 to-purple-500 uppercase text-white font-black italic text-xs">
+									NEW
+								</div>
+							)}
+							<div
+								class={`bg-linear-to-br ${option.gradient} p-6 text-white rounded-lg h-full w-full`}
+							>
+								<h3 class="text-xl font-semibold mb-2">{option.title as string}</h3>
+								<p class="text-sm text-white/80 mb-4">{option.description as string}</p>
+								<div class="flex flex-wrap gap-2">
+									{option.badges.map((badge) => (
+										<span key={badge} class="text-xs bg-white/20 text-white rounded-md px-2 py-1">
+											{badge as string}
+										</span>
+									))}
+								</div>
+							</div>
+						</Link>
+					))}
+				</div>
+			</div>
 		</div>
-	</div>;
+	);
 }

@@ -17,15 +17,19 @@ const content = {
 };
 
 // One descriptor identity resolves to different child kinds under each Provider.
-const shared = <section>
-	<input defaultValue="draft" />
-	{content.current}
-</section>;
+const shared = (
+	<section>
+		<input defaultValue="draft" />
+		{content.current}
+	</section>
+);
 
-const sharedRecord = <section data-mode={content.label}>
-	<input defaultValue="draft" />
-	{content.current}
-</section>;
+const sharedRecord = (
+	<section data-mode={content.label}>
+		<input defaultValue="draft" />
+		{content.current}
+	</section>
+);
 
 function Later({ read }) {
 	read?.();

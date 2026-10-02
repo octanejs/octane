@@ -22,9 +22,8 @@ import { useNodeId } from '../../contexts/NodeIdContext';
 import type { ResizeControlProps, ResizeControlLineProps } from './types';
 import type { ReactFlowState } from '../../types';
 
-const scaleSelector = (calculateScale: boolean) => (store: ReactFlowState) => calculateScale
-	? `${Math.max(1 / store.transform[2], 1)}`
-	: undefined;
+const scaleSelector = (calculateScale: boolean) => (store: ReactFlowState) =>
+	calculateScale ? `${Math.max(1 / store.transform[2], 1)}` : undefined;
 
 const defaultPositions: Record<ResizeControlVariant, ControlPosition> = {
 	[ResizeControlVariant.Line]: 'right',
@@ -52,8 +51,7 @@ function ResizeControl({
 	onResizeEnd,
 }: ResizeControlProps) {
 	const contextNodeId = useNodeId();
-	const id =
-		typeof nodeId === 'string' ? nodeId : contextNodeId;
+	const id = typeof nodeId === 'string' ? nodeId : contextNodeId;
 	const store = useStoreApi();
 	const resizeControlRef = useRef<HTMLDivElement | null>(null);
 	const isHandleControl = variant === ResizeControlVariant.Handle;
@@ -124,9 +122,9 @@ function ResizeControl({
 						changes.push(...parentExpandChanges);
 
 						/*
- * when the parent was expanded by the child node, its position will be clamped at
- * 0,0 when node origin is 0,0 and to width, height if it's 1,1
- */
+						 * when the parent was expanded by the child node, its position will be clamped at
+						 * 0,0 when node origin is 0,0 and to width, height if it's 1,1
+						 */
 						nextPosition.x = change.x ? Math.max(origin[0] * width, change.x) : undefined;
 						nextPosition.y = change.y ? Math.max(origin[1] * height, change.y) : undefined;
 					}
@@ -135,18 +133,17 @@ function ResizeControl({
 						const positionChange: NodePositionChange = {
 							id,
 							type: 'position',
-							position: { ...nextPosition as XYPosition },
+							position: { ...(nextPosition as XYPosition) },
 						};
 						changes.push(positionChange);
 					}
 
 					if (change.width !== undefined && change.height !== undefined) {
-						const setAttributes =
-							!resizeDirection
-								? true
-								: resizeDirection === 'horizontal'
-									? 'width'
-									: 'height';
+						const setAttributes = !resizeDirection
+							? true
+							: resizeDirection === 'horizontal'
+								? 'width'
+								: 'height';
 						const dimensionChange: NodeDimensionChange = {
 							id,
 							type: 'dimensions',
@@ -221,21 +218,25 @@ function ResizeControl({
 
 	const positionClassNames = controlPosition.split('-');
 
-	return <div
-		className={cc([
-			'react-flow__resize-control',
-			'nodrag',
-			...positionClassNames,
-			variant,
-			className,
-		])}
-		ref={resizeControlRef}
-		style={{
-			...style,
-			scale,
-			...color && { [isHandleControl ? 'backgroundColor' : 'borderColor']: color },
-		}}
-	>{children}</div>;
+	return (
+		<div
+			className={cc([
+				'react-flow__resize-control',
+				'nodrag',
+				...positionClassNames,
+				variant,
+				className,
+			])}
+			ref={resizeControlRef}
+			style={{
+				...style,
+				scale,
+				...(color && { [isHandleControl ? 'backgroundColor' : 'borderColor']: color }),
+			}}
+		>
+			{children}
+		</div>
+	);
 }
 
 export function ResizeControlLine(props: ResizeControlLineProps) {

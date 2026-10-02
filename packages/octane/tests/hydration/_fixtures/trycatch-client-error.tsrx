@@ -8,7 +8,9 @@ import { ErrorBoundary, use, useState } from 'octane';
 function Inner(props) @{
 	if (props.boom) throw new Error('boom');
 	const [n, setN] = useState(0);
-	<button id="ok" onClick={() => setN(n + 1)}>{'ok:' + n}</button>
+	<button id="ok" onClick={() => setN(n + 1)}>
+		{'ok:' + n}
+	</button>
 }
 
 export function Page(props) @{
@@ -97,15 +99,17 @@ export function JsxBoundaryPage(props: JsxBoundaryProps) @{
 	<div id="jsx-boundary-page">
 		<h1 id="jsx-before">{'before'}</h1>
 		<ErrorBoundary
-			fallback={(error: unknown, reset: BoundaryReset) => <button
-				id="jsx-boundary-error"
-				onClick={() => {
-					props.state.failed = false;
-					reset();
-				}}
-			>
-				{'caught:' + (error as Error).message}
-			</button>}
+			fallback={(error: unknown, reset: BoundaryReset) => (
+				<button
+					id="jsx-boundary-error"
+					onClick={() => {
+						props.state.failed = false;
+						reset();
+					}}
+				>
+					{'caught:' + (error as Error).message}
+				</button>
+			)}
 		>
 			<Inner boom={props.state.failed} />
 		</ErrorBoundary>
@@ -125,8 +129,11 @@ function JsxRejectedValue(props: JsxRejectedBoundaryProps) @{
 export function JsxRejectedBoundaryPage(props: JsxRejectedBoundaryProps) @{
 	<div id="jsx-rejected-page">
 		<ErrorBoundary
-			fallback={(error: unknown) =>
-				<span id="jsx-rejected-error" data-kind={typeof error}>{String(error) as string}</span>}
+			fallback={(error: unknown) => (
+				<span id="jsx-rejected-error" data-kind={typeof error}>
+					{String(error) as string}
+				</span>
+			)}
 		>
 			<JsxRejectedValue promise={props.promise} />
 		</ErrorBoundary>

@@ -13,18 +13,16 @@ import {
 import { noop } from './utils.js';
 
 type NativeTextareaProps = JSX.IntrinsicElements['textarea'];
-type TextareaStyle =
-	Omit<CSSProperties, 'maxHeight' | 'minHeight'> & {
-		height?: number;
-	};
+type TextareaStyle = Omit<CSSProperties, 'maxHeight' | 'minHeight'> & {
+	height?: number;
+};
 type TextareaRef =
 	((value: HTMLTextAreaElement | null) => void) | { current: HTMLTextAreaElement | null } | null;
 // OCTANE DIVERGENCE[native-input-event][differential:input]
-type TextareaAutosizeChangeEvent =
-	InputEvent & {
-		currentTarget: HTMLTextAreaElement;
-		target: HTMLTextAreaElement;
-	};
+type TextareaAutosizeChangeEvent = InputEvent & {
+	currentTarget: HTMLTextAreaElement;
+	target: HTMLTextAreaElement;
+};
 export type TextareaHeightChangeMeta = { rowHeight: number };
 export interface TextareaAutosizeProps extends Omit<
 	NativeTextareaProps,
@@ -40,27 +38,27 @@ export interface TextareaAutosizeProps extends Omit<
 	ref?: TextareaRef;
 }
 
-export default function TextareaAutosize(
-	{
-		cacheMeasurements,
-		maxRows,
-		minRows,
-		onChange = noop,
-		onChangeCapture = noop,
-		onHeightChange = noop,
-		onInput,
-		onInputCapture,
-		ref: userRef,
-		...props
-	}: TextareaAutosizeProps = {},
-) @{
+export default function TextareaAutosize({
+	cacheMeasurements,
+	maxRows,
+	minRows,
+	onChange = noop,
+	onChangeCapture = noop,
+	onHeightChange = noop,
+	onInput,
+	onInputCapture,
+	ref: userRef,
+	...props
+}: TextareaAutosizeProps = {}) @{
 	if (isDevelopment && props.style) {
-		if (
-			'maxHeight' in props.style
-		) throw new Error('Using `style.maxHeight` for <TextareaAutosize/> is not supported. Please use `maxRows`.');
-		if (
-			'minHeight' in props.style
-		) throw new Error('Using `style.minHeight` for <TextareaAutosize/> is not supported. Please use `minRows`.');
+		if ('maxHeight' in props.style)
+			throw new Error(
+				'Using `style.maxHeight` for <TextareaAutosize/> is not supported. Please use `maxRows`.',
+			);
+		if ('minHeight' in props.style)
+			throw new Error(
+				'Using `style.minHeight` for <TextareaAutosize/> is not supported. Please use `minRows`.',
+			);
 	}
 	const isControlled = props.value !== undefined;
 	const libRef = useRef<HTMLTextAreaElement | null>(null);

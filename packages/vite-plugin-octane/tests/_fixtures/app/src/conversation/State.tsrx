@@ -18,20 +18,17 @@ export const conversation$ = query$(
 );
 export const visibleConversation$ = optimistic$(conversation$);
 export const draftLength$ = derived$(() => {
-	const draft =
-		selectedConversation$.get() === 'A' ? draftA$.get() : draftB$.get();
+	const draft = selectedConversation$.get() === 'A' ? draftA$.get() : draftB$.get();
 	return String(draft.length);
 });
 
 // Dispatch is an explicit event, never a render, selector, or retry effect.
 export const send = action$('conversation.send', async (operation, prompt: string) => {
 	const conversationId = selectedConversation$.get();
-	visibleConversation$.set(
-		(frame) => ({
-			...frame,
-			turns: [...frame.turns, { id: operation.id, prompt, answer: '', status: 'running' }],
-		}),
-	);
+	visibleConversation$.set((frame) => ({
+		...frame,
+		turns: [...frame.turns, { id: operation.id, prompt, answer: '', status: 'running' }],
+	}));
 	lastOperation$.set({ operationId: operation.id, conversationId });
 	await startConversation({ operationId: operation.id, conversationId, prompt });
 	// Reconcile by stable turn ID. The streamed source, not this POST receipt,

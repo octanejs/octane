@@ -38,12 +38,8 @@ import { useSlots } from '../../lib/use-slots.tsrx';
 import { ContextSlotRender, SlotRenderPure } from '../SlotRender/index.tsrx';
 import { expandNode } from '../../lib/data/flatten-node';
 import { useFieldTransforms } from '../../lib/field-transforms/use-field-transforms.tsrx';
-import {
-	getInlineTextTransform,
-} from '../../lib/field-transforms/default-transforms/inline-text-transform.tsrx';
-import {
-	getSlotTransform,
-} from '../../lib/field-transforms/default-transforms/slot-transform.tsrx';
+import { getInlineTextTransform } from '../../lib/field-transforms/default-transforms/inline-text-transform.tsrx';
+import { getSlotTransform } from '../../lib/field-transforms/default-transforms/slot-transform.tsrx';
 import { FieldTransforms } from '../../types/API/FieldTransforms';
 
 const getClassName = getClassNameFactory('DropZone', styles);
@@ -123,7 +119,7 @@ const DropZoneChild = ({
 		return null;
 	}, [appStore, componentId, zoneCompound, nodeType, nodeProps]);
 
-	const componentConfig = useAppStore((s) => item?.type ? s.config.components[item.type] : null);
+	const componentConfig = useAppStore((s) => (item?.type ? s.config.components[item.type] : null));
 
 	const puckProps: PuckContext = useMemo(
 		() => ({
@@ -142,18 +138,21 @@ const DropZoneChild = ({
 	let label = componentConfig?.label ?? item?.type.toString() ?? 'Component';
 
 	const renderPreview = useMemo(
-		() => function Preview() {
-			if (item && 'element' in item && item.element) {
-				return (
-					// Safe to use this since the HTML is set by the user
-					<div dangerouslySetInnerHTML={{ __html: item.element.outerHTML }} />
-				);
-			}
+		() =>
+			function Preview() {
+				if (item && 'element' in item && item.element) {
+					return (
+						// Safe to use this since the HTML is set by the user
+						<div dangerouslySetInnerHTML={{ __html: item.element.outerHTML }} />
+					);
+				}
 
-			return <DrawerItemInner name={label}>
-				{overrides.componentItem ?? overrides.drawerItem}
-			</DrawerItemInner>;
-		},
+				return (
+					<DrawerItemInner name={label}>
+						{overrides.componentItem ?? overrides.drawerItem}
+					</DrawerItemInner>
+				);
+			},
 		[componentId, label, overrides],
 	);
 
@@ -167,11 +166,10 @@ const DropZoneChild = ({
 		[componentConfig?.defaultProps, item?.props, puckProps],
 	);
 
-	const defaultedNode = useMemo(() => ({ type: item?.type ?? nodeType, props: defaultsProps }), [
-		item?.type,
-		nodeType,
-		defaultsProps,
-	]);
+	const defaultedNode = useMemo(
+		() => ({ type: item?.type ?? nodeType, props: defaultsProps }),
+		[item?.type, nodeType, defaultsProps],
+	);
 
 	const config = useAppStore((s) => s.config);
 
@@ -179,10 +177,9 @@ const DropZoneChild = ({
 	const userFieldTransforms = useAppStore((s) => s.fieldTransforms);
 	const combinedFieldTransforms = useMemo(
 		() => ({
-			...getSlotTransform(
-				DropZoneEditPure,
-				(slotProps) => <ContextSlotRender componentId={componentId} zone={slotProps.zone} />,
-			),
+			...getSlotTransform(DropZoneEditPure, (slotProps) => (
+				<ContextSlotRender componentId={componentId} zone={slotProps.zone} />
+			)),
 			...getInlineTextTransform(),
 			...plugins.reduce<FieldTransforms>(
 				(acc, plugin) => ({ ...acc, ...plugin.fieldTransforms }),
@@ -203,135 +200,141 @@ const DropZoneChild = ({
 
 	if (!item) return;
 
-	let Render =
-		componentConfig
-			? componentConfig.render
-			: () => <div style={{ padding: 48, textAlign: 'center' }}>
+	let Render = componentConfig
+		? componentConfig.render
+		: () => (
+				<div style={{ padding: 48, textAlign: 'center' }}>
 					No configuration for
 					{item.type}
-				</div>;
+				</div>
+			);
 
 	let componentType = item.type as string;
 
-	const isInserting =
-		'previewType' in item ? item.previewType === 'insert' : false;
+	const isInserting = 'previewType' in item ? item.previewType === 'insert' : false;
 
 	if (isInserting) {
 		Render = renderPreview;
 	}
 
-	return <DraggableComponent
-		id={componentId}
-		componentType={componentType}
-		zoneCompound={zoneCompound}
-		depth={depth + 1}
-		index={index}
-		isLoading={isLoading}
-		isSelected={isSelected}
-		label={label}
-		autoDragAxis={dragAxis}
-		userDragAxis={collisionAxis}
-		inDroppableZone={inDroppableZone}
-	>
-		{(dragRef) => componentConfig?.inline && !isInserting
-			? <>
-					<Render
-						{...transformedProps}
-						puck={{
-							...transformedProps.puck,
-							dragRef,
-						}}
-					/>
-				</>
-			: <div ref={dragRef}>
-					<Render {...transformedProps} />
-				</div>}
-	</DraggableComponent>;
+	return (
+		<DraggableComponent
+			id={componentId}
+			componentType={componentType}
+			zoneCompound={zoneCompound}
+			depth={depth + 1}
+			index={index}
+			isLoading={isLoading}
+			isSelected={isSelected}
+			label={label}
+			autoDragAxis={dragAxis}
+			userDragAxis={collisionAxis}
+			inDroppableZone={inDroppableZone}
+		>
+			{(dragRef) =>
+				componentConfig?.inline && !isInserting ? (
+					<>
+						<Render
+							{...transformedProps}
+							puck={{
+								...transformedProps.puck,
+								dragRef,
+							}}
+						/>
+					</>
+				) : (
+					<div ref={dragRef}>
+						<Render {...transformedProps} />
+					</div>
+				)
+			}
+		</DraggableComponent>
+	);
 };
 
 const DropZoneChildMemo = memo(DropZoneChild);
 
-export const DropZoneEdit = forwardRef<HTMLDivElement, DropZoneProps>(
-	function DropZoneEditInternal(
-		{
-			zone,
-			allow,
-			disallow,
-			style,
-			className,
-			minEmptyHeight: userMinEmptyHeight = 128,
-			collisionAxis,
-		},
-		userRef,
-	) {
-		const ctx = useContext(dropZoneContext);
-		const appStoreApi = useAppStoreApi();
+export const DropZoneEdit = forwardRef<HTMLDivElement, DropZoneProps>(function DropZoneEditInternal(
+	{
+		zone,
+		allow,
+		disallow,
+		style,
+		className,
+		minEmptyHeight: userMinEmptyHeight = 128,
+		collisionAxis,
+	},
+	userRef,
+) {
+	const ctx = useContext(dropZoneContext);
+	const appStoreApi = useAppStoreApi();
 
-		const {
-			// These all need setting via context
-			areaId,
-			depth = 0,
-			registerLocalZone,
-			unregisterLocalZone,
-		} = ctx ?? {};
+	const {
+		// These all need setting via context
+		areaId,
+		depth = 0,
+		registerLocalZone,
+		unregisterLocalZone,
+	} = ctx ?? {};
 
-		const path = useAppStore(
-			useShallow((s) => (areaId ? s.state.indexes.nodes[areaId]?.path : null)),
-		);
+	const path = useAppStore(
+		useShallow((s) => (areaId ? s.state.indexes.nodes[areaId]?.path : null)),
+	);
 
-		let zoneCompound = rootDroppableId;
+	let zoneCompound = rootDroppableId;
 
-		if (areaId) {
-			if (zone !== rootDroppableId) {
-				zoneCompound = `${areaId}:${zone}`;
+	if (areaId) {
+		if (zone !== rootDroppableId) {
+			zoneCompound = `${areaId}:${zone}`;
+		}
+	}
+
+	const isRootZone =
+		zoneCompound === rootDroppableId || zone === rootDroppableId || areaId === 'root';
+
+	const inNextDeepestArea = useContextStore(
+		ZoneStoreContext,
+		(s) => s.nextAreaDepthIndex[areaId || ''],
+	);
+
+	const zoneContentIds = useAppStore(
+		useShallow((s) => {
+			return s.state.indexes.zones[zoneCompound]?.contentIds;
+		}),
+	);
+	const zoneType = useAppStore(
+		useShallow((s) => {
+			return s.state.indexes.zones[zoneCompound]?.type;
+		}),
+	);
+
+	// Register zone on mount
+	useEffect(() => {
+		if (!zoneType || zoneType === 'dropzone') {
+			if (ctx?.registerZone) {
+				ctx?.registerZone(zoneCompound);
 			}
 		}
+	}, [zoneType, appStoreApi]);
 
-		const isRootZone =
-			zoneCompound === rootDroppableId || zone === rootDroppableId || areaId === 'root';
-
-		const inNextDeepestArea = useContextStore(
-			ZoneStoreContext,
-			(s) => s.nextAreaDepthIndex[areaId || ''],
-		);
-
-		const zoneContentIds = useAppStore(
-			useShallow((s) => {
-				return s.state.indexes.zones[zoneCompound]?.contentIds;
-			}),
-		);
-		const zoneType = useAppStore(
-			useShallow((s) => {
-				return s.state.indexes.zones[zoneCompound]?.type;
-			}),
-		);
-
-		// Register zone on mount
-		useEffect(() => {
-			if (!zoneType || zoneType === 'dropzone') {
-				if (ctx?.registerZone) {
-					ctx?.registerZone(zoneCompound);
-				}
+	useEffect(() => {
+		if (zoneType === 'dropzone') {
+			if (zoneCompound !== rootDroppableId) {
+				console.warn(
+					'DropZones have been deprecated in favor of slot fields and will be removed in a future version of Puck. Please see the migration guide: https://www.puckeditor.com/docs/guides/migrations/dropzones-to-slots',
+				);
 			}
-		}, [zoneType, appStoreApi]);
+		}
+	}, [zoneType]);
 
-		useEffect(() => {
-			if (zoneType === 'dropzone') {
-				if (zoneCompound !== rootDroppableId) {
-					console.warn(
-						'DropZones have been deprecated in favor of slot fields and will be removed in a future version of Puck. Please see the migration guide: https://www.puckeditor.com/docs/guides/migrations/dropzones-to-slots',
-					);
-				}
-			}
-		}, [zoneType]);
+	const contentIds = useMemo(() => {
+		return zoneContentIds || [];
+	}, [zoneContentIds]);
 
-		const contentIds = useMemo(() => {
-			return zoneContentIds || [];
-		}, [zoneContentIds]);
+	const ref = useRef<HTMLDivElement | null>(null);
 
-		const ref = useRef<HTMLDivElement | null>(null);
-
-		const acceptsTarget = useCallback((componentType: string | null | undefined) => {
+	const acceptsTarget = useCallback(
+		(componentType: string | null | undefined) => {
 			if (!componentType) {
 				return true;
 			}
@@ -354,117 +357,122 @@ export const DropZoneEdit = forwardRef<HTMLDivElement, DropZoneProps>(
 			}
 
 			return true;
-		}, [allow, disallow]);
+		},
+		[allow, disallow],
+	);
 
-		const targetAccepted = useContextStore(ZoneStoreContext, (s) => {
-			const draggedComponentType = s.draggedItem?.data.componentType;
-			return acceptsTarget(draggedComponentType);
-		});
+	const targetAccepted = useContextStore(ZoneStoreContext, (s) => {
+		const draggedComponentType = s.draggedItem?.data.componentType;
+		return acceptsTarget(draggedComponentType);
+	});
 
-		const hoveringOverArea = inNextDeepestArea || isRootZone;
+	const hoveringOverArea = inNextDeepestArea || isRootZone;
 
-		const isEnabled = useContextStore(ZoneStoreContext, (s) => {
-			let _isEnabled = true;
-			const isDeepestZone = s.zoneDepthIndex[zoneCompound] ?? false;
+	const isEnabled = useContextStore(ZoneStoreContext, (s) => {
+		let _isEnabled = true;
+		const isDeepestZone = s.zoneDepthIndex[zoneCompound] ?? false;
 
-			_isEnabled = isDeepestZone;
+		_isEnabled = isDeepestZone;
 
-			if (_isEnabled) {
-				_isEnabled = targetAccepted;
+		if (_isEnabled) {
+			_isEnabled = targetAccepted;
+		}
+
+		return _isEnabled;
+	});
+
+	useEffect(() => {
+		if (registerLocalZone) {
+			registerLocalZone(zoneCompound, targetAccepted || isEnabled);
+		}
+
+		return () => {
+			if (unregisterLocalZone) {
+				unregisterLocalZone(zoneCompound);
 			}
-
-			return _isEnabled;
-		});
-
-		useEffect(() => {
-			if (registerLocalZone) {
-				registerLocalZone(zoneCompound, targetAccepted || isEnabled);
-			}
-
-			return () => {
-				if (unregisterLocalZone) {
-					unregisterLocalZone(zoneCompound);
-				}
-			};
-		}, [targetAccepted, isEnabled, zoneCompound]);
-
-		const [contentIdsWithPreview, preview] = useContentIdsWithPreview(contentIds, zoneCompound);
-
-		const isDropEnabled =
-			isEnabled &&
-				(preview ? contentIdsWithPreview.length === 1 : contentIdsWithPreview.length === 0);
-
-		const zoneStore = useContext(ZoneStoreContext);
-
-		useEffect(() => {
-			const { enabledIndex } = zoneStore.getState();
-			zoneStore.setState({
-				enabledIndex: { ...enabledIndex, [zoneCompound]: isEnabled },
-			});
-		}, [isEnabled, zoneStore, zoneCompound]);
-
-		const droppableConfig: UseDroppableInput<DropZoneDndData> = {
-			id: zoneCompound,
-			collisionPriority: isEnabled ? depth : 0,
-			disabled: !isDropEnabled,
-			collisionDetector: pointerIntersection,
-			type: 'dropzone',
-			data: {
-				areaId,
-				depth,
-				isDroppableTarget: targetAccepted,
-				path: path || [],
-			},
 		};
+	}, [targetAccepted, isEnabled, zoneCompound]);
 
-		const { ref: dropRef } = useDroppable(droppableConfig);
+	const [contentIdsWithPreview, preview] = useContentIdsWithPreview(contentIds, zoneCompound);
 
-		const isAreaSelected = useAppStore(
-			(s) => s?.selectedItem && areaId === s?.selectedItem.props.id,
-		);
+	const isDropEnabled =
+		isEnabled &&
+		(preview ? contentIdsWithPreview.length === 1 : contentIdsWithPreview.length === 0);
 
-		const [dragAxis] = useDragAxis(ref, collisionAxis);
+	const zoneStore = useContext(ZoneStoreContext);
 
-		const [minEmptyHeight, isAnimating] = useMinEmptyHeight({
-			zoneCompound,
-			userMinEmptyHeight,
-			ref,
+	useEffect(() => {
+		const { enabledIndex } = zoneStore.getState();
+		zoneStore.setState({
+			enabledIndex: { ...enabledIndex, [zoneCompound]: isEnabled },
 		});
+	}, [isEnabled, zoneStore, zoneCompound]);
 
-		return <div
-			className={`${
-				getClassName({
-					isRootZone,
-					hoveringOverArea,
-					isEnabled,
-					isAreaSelected,
-					hasChildren: contentIds.length > 0,
-					isAnimating,
-				})
-			}${className ? ` ${className}` : ''}`}
+	const droppableConfig: UseDroppableInput<DropZoneDndData> = {
+		id: zoneCompound,
+		collisionPriority: isEnabled ? depth : 0,
+		disabled: !isDropEnabled,
+		collisionDetector: pointerIntersection,
+		type: 'dropzone',
+		data: {
+			areaId,
+			depth,
+			isDroppableTarget: targetAccepted,
+			path: path || [],
+		},
+	};
+
+	const { ref: dropRef } = useDroppable(droppableConfig);
+
+	const isAreaSelected = useAppStore((s) => s?.selectedItem && areaId === s?.selectedItem.props.id);
+
+	const [dragAxis] = useDragAxis(ref, collisionAxis);
+
+	const [minEmptyHeight, isAnimating] = useMinEmptyHeight({
+		zoneCompound,
+		userMinEmptyHeight,
+		ref,
+	});
+
+	return (
+		<div
+			className={`${getClassName({
+				isRootZone,
+				hoveringOverArea,
+				isEnabled,
+				isAreaSelected,
+				hasChildren: contentIds.length > 0,
+				isAnimating,
+			})}${className ? ` ${className}` : ''}`}
 			ref={(node) => {
 				assignRefs<HTMLDivElement>([ref, dropRef, userRef], node);
 			}}
 			data-testid={`dropzone:${zoneCompound}`}
 			data-puck-dropzone={zoneCompound}
-			style={{
-				...style,
-				'--min-empty-height': `${minEmptyHeight}px`,
-				backgroundColor: RENDER_DEBUG ? getRandomColor() : style?.backgroundColor,
-			} as CSSProperties}
-		>{contentIdsWithPreview.map((componentId, i) => {
-			return <DropZoneChildMemo
-				key={componentId}
-				zoneCompound={zoneCompound}
-				componentId={componentId}
-				dragAxis={dragAxis}
-				index={i}
-				collisionAxis={collisionAxis}
-				inDroppableZone={targetAccepted}
-			/>;
-		})}</div>;
-	},
-);
+			style={
+				{
+					...style,
+					'--min-empty-height': `${minEmptyHeight}px`,
+					backgroundColor: RENDER_DEBUG ? getRandomColor() : style?.backgroundColor,
+				} as CSSProperties
+			}
+		>
+			{contentIdsWithPreview.map((componentId, i) => {
+				return (
+					<DropZoneChildMemo
+						key={componentId}
+						zoneCompound={zoneCompound}
+						componentId={componentId}
+						dragAxis={dragAxis}
+						index={i}
+						collisionAxis={collisionAxis}
+						inDroppableZone={targetAccepted}
+					/>
+				);
+			})}
+		</div>
+	);
+});
 
 const DropZoneRenderItem = ({
 	config,
@@ -477,11 +485,9 @@ const DropZoneRenderItem = ({
 }) => {
 	const Component = config.components[item.type];
 
-	const props = useSlots(
-		config,
-		item,
-		(slotProps) => <SlotRenderPure {...slotProps} config={config} metadata={metadata} />,
-	) as WithPuckProps<ComponentData['props']>;
+	const props = useSlots(config, item, (slotProps) => (
+		<SlotRenderPure {...slotProps} config={config} metadata={metadata} />
+	)) as WithPuckProps<ComponentData['props']>;
 
 	const nextContextValue = useMemo<DropZoneContext>(
 		() => ({
@@ -491,77 +497,91 @@ const DropZoneRenderItem = ({
 		[props],
 	);
 
-	return <DropZoneProvider key={props.id} value={nextContextValue}>
-		<Component.render
-			{...props}
-			puck={{
-				...props.puck,
-				renderDropZone: DropZoneRenderPure,
-				metadata: { ...metadata, ...Component.metadata },
-			}}
-		/>
-	</DropZoneProvider>;
+	return (
+		<DropZoneProvider key={props.id} value={nextContextValue}>
+			<Component.render
+				{...props}
+				puck={{
+					...props.puck,
+					renderDropZone: DropZoneRenderPure,
+					metadata: { ...metadata, ...Component.metadata },
+				}}
+			/>
+		</DropZoneProvider>
+	);
 };
 
 export const DropZoneRenderPure = (props: DropZoneProps) => <DropZoneRender {...props} />;
 
-const DropZoneRender = forwardRef<HTMLDivElement, DropZoneProps>(
-	function DropZoneRenderInternal({ className, style, zone }, ref) {
-		const ctx = useContext(dropZoneContext);
-		const { areaId = 'root' } = ctx || {};
-		const { config, data, metadata } = useContext(renderContext);
+const DropZoneRender = forwardRef<HTMLDivElement, DropZoneProps>(function DropZoneRenderInternal(
+	{ className, style, zone },
+	ref,
+) {
+	const ctx = useContext(dropZoneContext);
+	const { areaId = 'root' } = ctx || {};
+	const { config, data, metadata } = useContext(renderContext);
 
-		let zoneCompound = `${areaId}:${zone}`;
-		let content = data?.content || [];
+	let zoneCompound = `${areaId}:${zone}`;
+	let content = data?.content || [];
 
-		// Register zones if running Render mode inside editor (i.e. previewMode === "interactive")
-		useEffect(() => {
-			// Only register zones, not slots
-			if (!content) {
-				if (ctx?.registerZone) {
-					ctx?.registerZone(zoneCompound);
+	// Register zones if running Render mode inside editor (i.e. previewMode === "interactive")
+	useEffect(() => {
+		// Only register zones, not slots
+		if (!content) {
+			if (ctx?.registerZone) {
+				ctx?.registerZone(zoneCompound);
+			}
+		}
+	}, [content]);
+
+	if (!data || !config) {
+		return null;
+	}
+
+	if (zoneCompound !== rootDroppableId) {
+		content = setupZone(data, zoneCompound).zones[zoneCompound];
+	}
+
+	return (
+		<div className={className} style={style} ref={ref}>
+			{content.map((item) => {
+				const Component = config.components[item.type];
+				if (Component) {
+					return (
+						<DropZoneRenderItem
+							key={item.props.id}
+							config={config}
+							item={item}
+							metadata={metadata}
+						/>
+					);
 				}
-			}
-		}, [content]);
 
-		if (!data || !config) {
-			return null;
-		}
-
-		if (zoneCompound !== rootDroppableId) {
-			content = setupZone(data, zoneCompound).zones[zoneCompound];
-		}
-
-		return <div className={className} style={style} ref={ref}>{content.map((item) => {
-			const Component = config.components[item.type];
-			if (Component) {
-				return <DropZoneRenderItem
-					key={item.props.id}
-					config={config}
-					item={item}
-					metadata={metadata}
-				/>;
-			}
-
-			return null;
-		})}</div>;
-	},
-);
+				return null;
+			})}
+		</div>
+	);
+});
 
 export const DropZonePure = (props: DropZoneProps) => <DropZone {...props} />;
 
-export const DropZone = forwardRef<HTMLDivElement, DropZoneProps>(
-	function DropZone(props: DropZoneProps, ref) {
-		const ctx = useContext(dropZoneContext);
+export const DropZone = forwardRef<HTMLDivElement, DropZoneProps>(function DropZone(
+	props: DropZoneProps,
+	ref,
+) {
+	const ctx = useContext(dropZoneContext);
 
-		if (ctx?.mode === 'edit') {
-			return <>
+	if (ctx?.mode === 'edit') {
+		return (
+			<>
 				<DropZoneEdit {...props} ref={ref} />
-			</>;
-		}
+			</>
+		);
+	}
 
-		return <>
+	return (
+		<>
 			<DropZoneRender {...props} ref={ref} />
-		</>;
-	},
-);
+		</>
+	);
+});

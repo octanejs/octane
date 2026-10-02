@@ -16,7 +16,5 @@ export const Components = () => {
 		return overrides.components || overrides.drawer || 'div';
 	}, [overrides]);
 
-	return <Wrapper>
-		{componentList ? componentList : <ComponentList id="all" />}
-	</Wrapper>;
+	return <Wrapper>{componentList ? componentList : <ComponentList id="all" />}</Wrapper>;
 };

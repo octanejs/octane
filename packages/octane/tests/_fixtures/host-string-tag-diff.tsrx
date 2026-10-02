@@ -9,8 +9,12 @@ export function TagSwitcher() @{
 	const [n, setN] = useState(0);
 	const Tag = tag;
 	<div class="wrap">
-		<button id="flip" onClick={() => setTag(tag === 'h1' ? 'h2' : 'h1')}>{'flip'}</button>
-		<button id="bump" onClick={() => setN(n + 1)}>{'bump'}</button>
+		<button id="flip" onClick={() => setTag(tag === 'h1' ? 'h2' : 'h1')}>
+			{'flip'}
+		</button>
+		<button id="bump" onClick={() => setN(n + 1)}>
+			{'bump'}
+		</button>
 		<Tag id="t" class={'c' + n}>{`n:${n}`}</Tag>
 		<span class="after">{'after'}</span>
 	</div>

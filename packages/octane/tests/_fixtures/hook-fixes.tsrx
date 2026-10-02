@@ -37,7 +37,9 @@ export function NoDeps(props) @{
 		props.log('memo');
 		return n * 10;
 	}, null);
-	<button id="bump" onClick={() => setN(n + 1)}>{m as string}</button>
+	<button id="bump" onClick={() => setN(n + 1)}>
+		{m as string}
+	</button>
 }
 
 // ---------------------------------------------------------------------------
@@ -47,14 +49,21 @@ export function NoDeps(props) @{
 // ---------------------------------------------------------------------------
 export function ReducerFnInitialArg(props) @{
 	// initialArg is a function — React stores it verbatim, does NOT call it.
-	const [state] = useReducer((s) => s, () => 'fn-value');
+	const [state] = useReducer(
+		(s) => s,
+		() => 'fn-value',
+	);
 	props.observe(state);
 	<div>{typeof state as string}</div>
 }
 
 export function ReducerLazyInit() @{
 	// Third arg is the lazy initializer: state = init(5) = 10.
-	const [state] = useReducer((s, a: number) => s + a, 5, (x: number) => x * 2);
+	const [state] = useReducer(
+		(s, a: number) => s + a,
+		5,
+		(x: number) => x * 2,
+	);
 	<div id="v">{state as string}</div>
 }
 
@@ -74,7 +83,9 @@ const PlainChild = memo(PlainChildImpl);
 export function MemoObjectIs(props) @{
 	const [, setTick] = useState(0);
 	<div>
-		<button id="rerender" onClick={() => setTick((t: number) => t + 1)}>{'go'}</button>
+		<button id="rerender" onClick={() => setTick((t: number) => t + 1)}>
+			{'go'}
+		</button>
 		<PlainChild value={NaN} log={props.log} />
 	</div>
 }
@@ -90,8 +101,12 @@ export function MemoComparator(props) @{
 	const [noise, setNoise] = useState(0);
 	const [id, setId] = useState(1);
 	<div>
-		<button id="noise" onClick={() => setNoise(noise + 1)}>{'noise'}</button>
-		<button id="id" onClick={() => setId(id + 1)}>{'id'}</button>
+		<button id="noise" onClick={() => setNoise(noise + 1)}>
+			{'noise'}
+		</button>
+		<button id="id" onClick={() => setId(id + 1)}>
+			{'id'}
+		</button>
 		<ComparedChild id={id} noise={noise} log={props.log} />
 	</div>
 }
@@ -114,10 +129,9 @@ export function MemoContext(props) @{
 		<Theme value={theme}>
 			<ThemedChild label="x" log={props.log} />
 		</Theme>
-		<button
-			id="toggle"
-			onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-		>{'toggle'}</button>
+		<button id="toggle" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+			{'toggle'}
+		</button>
 	</div>
 }
 
@@ -142,10 +156,9 @@ export function MemoContextDeep(props) @{
 		<Theme value={theme}>
 			<MemoWrapper label="x" log={props.log} />
 		</Theme>
-		<button
-			id="toggle"
-			onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-		>{'toggle'}</button>
+		<button id="toggle" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+			{'toggle'}
+		</button>
 	</div>
 }
 
@@ -168,8 +181,11 @@ export function StoreConsumer(props) @{
 export function DepsAsArgs(props) @{
 	const doubled = useMemo((x) => x * 2, [props.n]);
 	const cb = useCallback((label) => label, [props.label]);
-	useEffect((n, log) => {
-		log('eff:' + n);
-	}, [props.n, props.log]);
-	<div class="out">{doubled + ':' + cb(props.label) as string}</div>
+	useEffect(
+		(n, log) => {
+			log('eff:' + n);
+		},
+		[props.n, props.log],
+	);
+	<div class="out">{(doubled + ':' + cb(props.label)) as string}</div>
 }

@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -96,12 +96,12 @@
         {
           "path": "packages/streamdown/tests/_fixtures/markdown-parity.tsrx",
           "role": "support",
-          "sha256": "8f3b7a8ed0c06612e5bc8f003b6625379f704454a4bbcfd5e38b748096992d6f"
+          "sha256": "339d956035b8dbad159731e7d665c2e70f18eee7ea797a079d228bf6f621575d"
         },
         {
           "path": "packages/streamdown/tests/_fixtures/feature-parity.tsrx",
           "role": "support",
-          "sha256": "cb735a265140fa2e1c92b5476fef56acc12160cdefd1122e6aae3b776cd417c3"
+          "sha256": "756a10c710d88bc357d7748fcfca30ee4ce5631a106546d568f8989770f00f8a"
         },
         {
           "path": "packages/streamdown/tests/differential/_setup.ts",

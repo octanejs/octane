@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -144,22 +144,22 @@
         {
           "path": "packages/xstate/tests/_fixtures/upstream/createActorContext.tsrx",
           "role": "support",
-          "sha256": "86946399368d36ab6d6d7f21f9e50b193295fa513364a365c2e39532fa04e25f"
+          "sha256": "bd4c96b31d9a62c375dcd9c9855731738c4d5b931e0b5dabe143cf2cb6b902c4"
         },
         {
           "path": "packages/xstate/tests/_fixtures/upstream/useActor.tsrx",
           "role": "support",
-          "sha256": "ff661a0846bcaa34604ed580d55dbecb2d2d184305710f739f8c585e54a4885b"
+          "sha256": "805e6914d50fdada737fd565fc0f3a0f07f391a2dcbf719b0c7ccb7c14c9dbb3"
         },
         {
           "path": "packages/xstate/tests/_fixtures/upstream/useActorRef.tsrx",
           "role": "support",
-          "sha256": "adfe6b33b78bffc678750ed949093122bd1ca7ae337d33f20529011602e2aac8"
+          "sha256": "87e8d5d659dda638fe9409654eb0c0516c6e86f5dcafdda31d73695363571ee1"
         },
         {
           "path": "packages/xstate/tests/_fixtures/upstream/useSelector.tsrx",
           "role": "support",
-          "sha256": "bc3387fa7fb643645b357dae50dbf448bf2787055f14cf6231fed96afbdacd0c"
+          "sha256": "3b0b34a3339f8123813ec9a3b30b4a7a6941e5b739b002284cfc870597a02083"
         },
         {
           "path": "packages/xstate/tests/_fixtures/upstream/utils.ts",

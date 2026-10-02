@@ -22,6 +22,8 @@ export function App() @{
 			<p class="a">{'a:' + a}</p>
 		}
 		<p class="b">{'b:' + b}</p>
-		<button class="bump" onClick={() => setA((v: number) => v + 1)}>bump</button>
+		<button class="bump" onClick={() => setA((v: number) => v + 1)}>
+			bump
+		</button>
 	</div>
 }

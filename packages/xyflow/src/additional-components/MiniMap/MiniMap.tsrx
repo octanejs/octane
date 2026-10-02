@@ -33,9 +33,10 @@ const selector = (s: ReactFlowState) => {
 
 	return {
 		viewBB,
-		boundingRect: s.nodeLookup.size > 0
-			? getBoundsOfRects(getInternalNodesBounds(s.nodeLookup, { filter: filterHidden }), viewBB)
-			: viewBB,
+		boundingRect:
+			s.nodeLookup.size > 0
+				? getBoundsOfRects(getInternalNodesBounds(s.nodeLookup, { filter: filterHidden }), viewBB)
+				: viewBB,
 		rfId: s.rfId,
 		panZoom: s.panZoom,
 		translateExtent: s.translateExtent,
@@ -53,12 +54,14 @@ const rectEqual = (a: Rect, b: Rect) =>
 // the selector builds new viewBB/boundingRect objects every call, so the default shallow equality always
 // treats them as changed; comparing the rects by value lets the minimap skip re-renders when nothing moved
 const areEqual = (a: MiniMapSlice, b: MiniMapSlice) =>
-	rectEqual(a.viewBB, b.viewBB) && rectEqual(a.boundingRect, b.boundingRect) && a.rfId === b.rfId &&
-		a.panZoom === b.panZoom &&
-		a.translateExtent === b.translateExtent &&
-		a.flowWidth === b.flowWidth &&
-		a.flowHeight === b.flowHeight &&
-		a.ariaLabelConfig === b.ariaLabelConfig;
+	rectEqual(a.viewBB, b.viewBB) &&
+	rectEqual(a.boundingRect, b.boundingRect) &&
+	a.rfId === b.rfId &&
+	a.panZoom === b.panZoom &&
+	a.translateExtent === b.translateExtent &&
+	a.flowWidth === b.flowWidth &&
+	a.flowHeight === b.flowHeight &&
+	a.ariaLabelConfig === b.ariaLabelConfig;
 
 const ARIA_LABEL_KEY = 'react-flow__minimap-desc';
 function MiniMapComponent<NodeType extends Node = Node>({
@@ -70,9 +73,9 @@ function MiniMapComponent<NodeType extends Node = Node>({
 	nodeBorderRadius = 5,
 	nodeStrokeWidth,
 	/*
- * We need to rename the prop to be `CapitalCase` so that JSX will render it as
- * a component properly.
- */
+	 * We need to rename the prop to be `CapitalCase` so that JSX will render it as
+	 * a component properly.
+	 */
 	nodeComponent,
 	bgColor,
 	maskColor,
@@ -100,8 +103,8 @@ function MiniMapComponent<NodeType extends Node = Node>({
 		flowHeight,
 		ariaLabelConfig,
 	} = useStore(selector, areEqual);
-	const elementWidth = style?.width as number ?? defaultWidth;
-	const elementHeight = style?.height as number ?? defaultHeight;
+	const elementWidth = (style?.width as number) ?? defaultWidth;
+	const elementHeight = (style?.height as number) ?? defaultHeight;
 	const scaledWidth = boundingRect.width / elementWidth;
 	const scaledHeight = boundingRect.height / elementHeight;
 	const viewScale = Math.max(scaledWidth, scaledHeight);
@@ -145,83 +148,79 @@ function MiniMapComponent<NodeType extends Node = Node>({
 		});
 	}, [pannable, zoomable, inversePan, zoomStep, translateExtent, flowWidth, flowHeight]);
 
-	const onSvgClick =
-		onClick
-			? (event: MouseEvent) => {
-					const [x, y] = minimapInstance.current?.pointer(event) || [0, 0];
-					onClick(event, { x, y });
-				}
-			: undefined;
+	const onSvgClick = onClick
+		? (event: MouseEvent) => {
+				const [x, y] = minimapInstance.current?.pointer(event) || [0, 0];
+				onClick(event, { x, y });
+			}
+		: undefined;
 
-	const onSvgNodeClick =
-		onNodeClick
-			? useCallback((event: MouseEvent, nodeId: string) => {
-					const node: NodeType = store.getState().nodeLookup.get(nodeId)!.internals.userNode;
-					onNodeClick(event, node);
-				}, [])
-			: undefined;
+	const onSvgNodeClick = onNodeClick
+		? useCallback((event: MouseEvent, nodeId: string) => {
+				const node: NodeType = store.getState().nodeLookup.get(nodeId)!.internals.userNode;
+				onNodeClick(event, node);
+			}, [])
+		: undefined;
 
 	const _ariaLabel = ariaLabel ?? ariaLabelConfig['minimap.ariaLabel'];
 
-	return <Panel
-		position={position}
-		style={{
-			...style,
-			'--xy-minimap-background-color-props': typeof bgColor === 'string' ? bgColor : undefined,
-			'--xy-minimap-mask-background-color-props': typeof maskColor === 'string'
-				? maskColor
-				: undefined,
-			'--xy-minimap-mask-stroke-color-props': typeof maskStrokeColor === 'string'
-				? maskStrokeColor
-				: undefined,
-			'--xy-minimap-mask-stroke-width-props': typeof maskStrokeWidth === 'number'
-				? maskStrokeWidth * viewScale
-				: undefined,
-			'--xy-minimap-node-background-color-props': typeof nodeColor === 'string'
-				? nodeColor
-				: undefined,
-			'--xy-minimap-node-stroke-color-props': typeof nodeStrokeColor === 'string'
-				? nodeStrokeColor
-				: undefined,
-			'--xy-minimap-node-stroke-width-props': typeof nodeStrokeWidth === 'number'
-				? nodeStrokeWidth
-				: undefined,
-		} as CSSProperties}
-		className={cc(['react-flow__minimap', className])}
-		data-testid="rf__minimap"
-	>
-		<svg
-			width={elementWidth}
-			height={elementHeight}
-			viewBox={`${x} ${y} ${width} ${height}`}
-			className="react-flow__minimap-svg"
-			role="img"
-			aria-labelledby={labelledBy}
-			ref={svg}
-			onClick={onSvgClick}
+	return (
+		<Panel
+			position={position}
+			style={
+				{
+					...style,
+					'--xy-minimap-background-color-props': typeof bgColor === 'string' ? bgColor : undefined,
+					'--xy-minimap-mask-background-color-props':
+						typeof maskColor === 'string' ? maskColor : undefined,
+					'--xy-minimap-mask-stroke-color-props':
+						typeof maskStrokeColor === 'string' ? maskStrokeColor : undefined,
+					'--xy-minimap-mask-stroke-width-props':
+						typeof maskStrokeWidth === 'number' ? maskStrokeWidth * viewScale : undefined,
+					'--xy-minimap-node-background-color-props':
+						typeof nodeColor === 'string' ? nodeColor : undefined,
+					'--xy-minimap-node-stroke-color-props':
+						typeof nodeStrokeColor === 'string' ? nodeStrokeColor : undefined,
+					'--xy-minimap-node-stroke-width-props':
+						typeof nodeStrokeWidth === 'number' ? nodeStrokeWidth : undefined,
+				} as CSSProperties
+			}
+			className={cc(['react-flow__minimap', className])}
+			data-testid="rf__minimap"
 		>
-			{_ariaLabel && <title id={labelledBy}>{_ariaLabel}</title>}
+			<svg
+				width={elementWidth}
+				height={elementHeight}
+				viewBox={`${x} ${y} ${width} ${height}`}
+				className="react-flow__minimap-svg"
+				role="img"
+				aria-labelledby={labelledBy}
+				ref={svg}
+				onClick={onSvgClick}
+			>
+				{_ariaLabel && <title id={labelledBy}>{_ariaLabel}</title>}
 
-			<MiniMapNodes
-				onClick={onSvgNodeClick}
-				nodeColor={nodeColor}
-				nodeStrokeColor={nodeStrokeColor}
-				nodeBorderRadius={nodeBorderRadius}
-				nodeClassName={nodeClassName}
-				nodeStrokeWidth={nodeStrokeWidth}
-				nodeComponent={nodeComponent}
-			/>
-			<path
-				className="react-flow__minimap-mask"
-				d={`M${x - offset},${y - offset}h${width + offset * 2}v${height + offset * 2}h${
-					-width - offset * 2
-				}z
+				<MiniMapNodes
+					onClick={onSvgNodeClick}
+					nodeColor={nodeColor}
+					nodeStrokeColor={nodeStrokeColor}
+					nodeBorderRadius={nodeBorderRadius}
+					nodeClassName={nodeClassName}
+					nodeStrokeWidth={nodeStrokeWidth}
+					nodeComponent={nodeComponent}
+				/>
+				<path
+					className="react-flow__minimap-mask"
+					d={`M${x - offset},${y - offset}h${width + offset * 2}v${height + offset * 2}h${
+						-width - offset * 2
+					}z
         M${viewBB.x},${viewBB.y}h${viewBB.width}v${viewBB.height}h${-viewBB.width}z`}
-				fillRule="evenodd"
-				pointerEvents="none"
-			/>
-		</svg>
-	</Panel>;
+					fillRule="evenodd"
+					pointerEvents="none"
+				/>
+			</svg>
+		</Panel>
+	);
 }
 
 MiniMapComponent.displayName = 'MiniMap';

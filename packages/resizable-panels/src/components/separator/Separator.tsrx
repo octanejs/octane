@@ -42,8 +42,7 @@ export function Separator(props: SeparatorProps) @{
 		registerSeparator,
 		updateSeparatorProps,
 	} = useGroupContext();
-	const orientation =
-		groupOrientation === 'horizontal' ? 'vertical' : 'horizontal';
+	const orientation = groupOrientation === 'horizontal' ? 'vertical' : 'horizontal';
 
 	useIsomorphicLayoutEffect(() => {
 		const element = elementRef.current;
@@ -58,7 +57,7 @@ export function Separator(props: SeparatorProps) @{
 		const removeInteractionListener = subscribeToInteractionState((event) => {
 			setDragState(
 				event.next.state !== 'inactive' &&
-				event.next.hitRegions.some((region) => region.separator === separator)
+					event.next.hitRegions.some((region) => region.separator === separator)
 					? event.next.state
 					: 'inactive',
 			);
@@ -85,42 +84,49 @@ export function Separator(props: SeparatorProps) @{
 		};
 	}, [groupId, id, registerSeparator, stableProps]);
 
-	useEffect(() => updateSeparatorProps(id, { disabled, disableDoubleClick }), [
-		disabled,
-		disableDoubleClick,
-		id,
-		updateSeparatorProps,
-	]);
-	const cursor =
-		disabled && !disableCursor ? 'not-allowed' : undefined;
-	const dataSeparator =
-		disabled
-			? 'disabled'
-			: dragState === 'active'
-				? 'active'
-				: isFocused
-					? 'focus'
-					: dragState;
+	useEffect(
+		() => updateSeparatorProps(id, { disabled, disableDoubleClick }),
+		[disabled, disableDoubleClick, id, updateSeparatorProps],
+	);
+	const cursor = disabled && !disableCursor ? 'not-allowed' : undefined;
+	const dataSeparator = disabled
+		? 'disabled'
+		: dragState === 'active'
+			? 'active'
+			: isFocused
+				? 'focus'
+				: dragState;
 
-	return <div
-		{...rest}
-		aria-controls={aria.valueControls}
-		aria-disabled={disabled || undefined}
-		aria-orientation={orientation}
-		aria-valuemax={aria.valueMax}
-		aria-valuemin={aria.valueMin}
-		aria-valuenow={aria.valueNow}
-		className={className}
-		data-separator={dataSeparator}
-		data-testid={id}
-		id={id}
-		onBlur={() => setIsFocused(false)}
-		onFocus={() => setIsFocused(true)}
-		ref={mergedRef}
-		role="separator"
-		style={{ flexBasis: 'auto', cursor, ...style, flexGrow: 0, flexShrink: 0, touchAction: 'none' }}
-		tabIndex={disabled ? undefined : 0}
-	>{children}</div>;
+	return (
+		<div
+			{...rest}
+			aria-controls={aria.valueControls}
+			aria-disabled={disabled || undefined}
+			aria-orientation={orientation}
+			aria-valuemax={aria.valueMax}
+			aria-valuemin={aria.valueMin}
+			aria-valuenow={aria.valueNow}
+			className={className}
+			data-separator={dataSeparator}
+			data-testid={id}
+			id={id}
+			onBlur={() => setIsFocused(false)}
+			onFocus={() => setIsFocused(true)}
+			ref={mergedRef}
+			role="separator"
+			style={{
+				flexBasis: 'auto',
+				cursor,
+				...style,
+				flexGrow: 0,
+				flexShrink: 0,
+				touchAction: 'none',
+			}}
+			tabIndex={disabled ? undefined : 0}
+		>
+			{children}
+		</div>
+	);
 }
 
 (Separator as { displayName?: string }).displayName = 'Separator';

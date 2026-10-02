@@ -45,29 +45,34 @@ export function ReturnedContent(props: ReturnedContentProps) @{
 
 export function UndefinedBranch(props: OptionalReturnProps) {
 	const [count, setCount] = useState(0);
-	return props.shown
-		? <ReturnedContent
-				label={props.label}
-				count={count}
-				onIncrement={() => setCount(count + 1)}
-				log={props.log}
-				onRef={props.onRef}
-			/>
-		: undefined as never;
+	return props.shown ? (
+		<ReturnedContent
+			label={props.label}
+			count={count}
+			onIncrement={() => setCount(count + 1)}
+			log={props.log}
+			onRef={props.onRef}
+		/>
+	) : (
+		(undefined as never)
+	);
 }
 
 export function OptionalTransition(props: OptionalReturnProps) {
 	const [count, setCount] = useState(0);
-	return props.item &&
-		<ViewTransition exit="auto" default="none">
-			<ReturnedContent
-				label={props.item.title}
-				count={count}
-				onIncrement={() => setCount(count + 1)}
-				log={props.log}
-				onRef={props.onRef}
-			/>
-		</ViewTransition>;
+	return (
+		props.item && (
+			<ViewTransition exit="auto" default="none">
+				<ReturnedContent
+					label={props.item.title}
+					count={count}
+					onIncrement={() => setCount(count + 1)}
+					log={props.log}
+					onRef={props.onRef}
+				/>
+			</ViewTransition>
+		)
+	);
 }
 
 export function ReturnedOutputWithSibling(props: OptionalReturnProps & { read: () => string }) @{
@@ -153,7 +158,11 @@ export function Outputless(props) @{
 
 	if (props.mode === 'text') return props.label;
 	if (props.mode === 'host') {
-		return <b class="outputless-host" onClick={() => setCount(count + 1)}>{count as string}</b>;
+		return (
+			<b class="outputless-host" onClick={() => setCount(count + 1)}>
+				{count as string}
+			</b>
+		);
 	}
 }
 
@@ -215,14 +224,16 @@ export function MixedTransitionApp(props) @{
 	<div>
 		<button
 			class="mixed-transition-swap"
-			onClick={() => start(() => {
-				setMode(props.nextMode);
-				setPromise(props.nextPromise);
-			})}
-		>{'swap'}</button>
-		<span class="mixed-transition-pending">
-			{isPending ? 'pending' : 'idle'}
-		</span>
+			onClick={() =>
+				start(() => {
+					setMode(props.nextMode);
+					setPromise(props.nextPromise);
+				})
+			}
+		>
+			{'swap'}
+		</button>
+		<span class="mixed-transition-pending">{isPending ? 'pending' : 'idle'}</span>
 		<div class="mixed-transition-stage">
 			@try {
 				<MixedTransitionOutput

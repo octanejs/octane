@@ -11,16 +11,20 @@ const allowedTooltipTypes: ReadonlyArray<TooltipEventType> = ['item'];
  * @provides CartesianViewBoxContext
  * @provides CartesianChartContext
  */
-export function ScatterChart<DataPointType = unknown>(props: CartesianChartProps<DataPointType> & {
-	ref?: Ref<SVGSVGElement>;
-}) {
+export function ScatterChart<DataPointType = unknown>(
+	props: CartesianChartProps<DataPointType> & {
+		ref?: Ref<SVGSVGElement>;
+	},
+) {
 	const { ref, ...rest } = props;
-	return <CartesianChart
-		chartName="ScatterChart"
-		defaultTooltipEventType="item"
-		validateTooltipEventTypes={allowedTooltipTypes}
-		tooltipPayloadSearcher={arrayTooltipSearcher}
-		categoricalChartProps={rest}
-		ref={ref}
-	/>;
+	return (
+		<CartesianChart
+			chartName="ScatterChart"
+			defaultTooltipEventType="item"
+			validateTooltipEventTypes={allowedTooltipTypes}
+			tooltipPayloadSearcher={arrayTooltipSearcher}
+			categoricalChartProps={rest}
+			ref={ref}
+		/>
+	);
 }

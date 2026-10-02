@@ -13,12 +13,15 @@ const subscribe = () => () => {};
 
 export function useHydrated(...args: Array<unknown>) {
 	const [, slot] = splitSlot(args);
-	return useSyncExternalStore(subscribe, () => true, () => false, subSlot(slot, 'hydrated'));
+	return useSyncExternalStore(
+		subscribe,
+		() => true,
+		() => false,
+		subSlot(slot, 'hydrated'),
+	);
 }
 
 export function ClientOnly(props: { children?: OctaneNode; fallback?: OctaneNode }) @{
 	const hydrated = useHydrated();
-	<>
-		{hydrated ? props.children : props.fallback ?? null}
-	</>
+	<>{hydrated ? props.children : (props.fallback ?? null)}</>
 }

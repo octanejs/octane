@@ -11,11 +11,7 @@ interface StyleContextValue {
 
 const StyleContext = createContext<StyleContextValue | null>(null);
 
-export function NonceProvider(props: {
-	nonce: string;
-	children?: OctaneNode;
-	cacheKey: string;
-}) @{
+export function NonceProvider(props: { nonce: string; children?: OctaneNode; cacheKey: string }) @{
 	const value = useMemo(
 		() => ({
 			cache: createStyleCache({ key: props.cacheKey, nonce: props.nonce }),
@@ -28,10 +24,6 @@ export function NonceProvider(props: {
 
 export function useStyleResolver() {
 	const context = useContext(StyleContext);
-	return (cssValue: CSSObjectWithLabel, className?: unknown) => resolveComponentStyle(
-		cssValue,
-		className,
-		context?.cache,
-		context?.nonce,
-	);
+	return (cssValue: CSSObjectWithLabel, className?: unknown) =>
+		resolveComponentStyle(cssValue, className, context?.cache, context?.nonce);
 }

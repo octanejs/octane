@@ -30,19 +30,24 @@ export function Manager({ children }: ManagerProps): OctaneNode {
 	const handleSetReferenceNode = useCallback((node: Element | null) => {
 		if (!hasUnmounted.current) setReferenceNode(node);
 	}, []);
-	return <ManagerReferenceNodeContext value={referenceNode}>
-		<ManagerReferenceNodeSetterContext
-			value={handleSetReferenceNode}
-		>{children}</ManagerReferenceNodeSetterContext>
-	</ManagerReferenceNodeContext>;
+	return (
+		<ManagerReferenceNodeContext value={referenceNode}>
+			<ManagerReferenceNodeSetterContext value={handleSetReferenceNode}>
+				{children}
+			</ManagerReferenceNodeSetterContext>
+		</ManagerReferenceNodeContext>
+	);
 }
 
 export function Reference({ children, innerRef }: ReferenceProps): OctaneNode {
 	const setReferenceNode = useContext(ManagerReferenceNodeSetterContext);
-	const ref = useCallback((node: HTMLElement | null) => {
-		setRef(innerRef, node);
-		setReferenceNode?.(node);
-	}, [innerRef, setReferenceNode]);
+	const ref = useCallback(
+		(node: HTMLElement | null) => {
+			setRef(innerRef, node);
+			setReferenceNode?.(node);
+		},
+		[innerRef, setReferenceNode],
+	);
 	useEffect(() => () => setRef(innerRef, null), []);
 	useEffect(() => {
 		if (process.env.NODE_ENV !== 'production' && !setReferenceNode) {

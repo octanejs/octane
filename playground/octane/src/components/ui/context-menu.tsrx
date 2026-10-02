@@ -48,7 +48,10 @@ export function ContextMenuRadioGroup(props: Record<string, unknown>) @{
 	<ContextMenuPrimitive.RadioGroup data-slot="context-menu-radio-group" {...props} />
 }
 
-export function ContextMenuContent({ className, ...props }: Props & {
+export function ContextMenuContent({
+	className,
+	...props
+}: Props & {
 	side?: 'top' | 'right' | 'bottom' | 'left';
 }) {
 	return createElement(
@@ -65,7 +68,12 @@ export function ContextMenuContent({ className, ...props }: Props & {
 	);
 }
 
-export function ContextMenuItem({ className, inset, variant = 'default', ...props }: Props & {
+export function ContextMenuItem({
+	className,
+	inset,
+	variant = 'default',
+	...props
+}: Props & {
 	inset?: boolean;
 	variant?: 'default' | 'destructive';
 }) @{
@@ -81,7 +89,12 @@ export function ContextMenuItem({ className, inset, variant = 'default', ...prop
 	/>
 }
 
-export function ContextMenuSubTrigger({ className, inset, children, ...props }: Props & {
+export function ContextMenuSubTrigger({
+	className,
+	inset,
+	children,
+	...props
+}: Props & {
 	inset?: boolean;
 	children?: OctaneNode;
 }) {
@@ -112,7 +125,13 @@ export function ContextMenuSubContent({ className, ...props }: Props) @{
 	/>
 }
 
-export function ContextMenuCheckboxItem({ className, children, checked, inset, ...props }: Props & {
+export function ContextMenuCheckboxItem({
+	className,
+	children,
+	checked,
+	inset,
+	...props
+}: Props & {
 	children?: OctaneNode;
 	checked?: boolean | 'indeterminate';
 	inset?: boolean;
@@ -138,7 +157,12 @@ export function ContextMenuCheckboxItem({ className, children, checked, inset, .
 	);
 }
 
-export function ContextMenuRadioItem({ className, children, inset, ...props }: Props & {
+export function ContextMenuRadioItem({
+	className,
+	children,
+	inset,
+	...props
+}: Props & {
 	children?: OctaneNode;
 	inset?: boolean;
 }) {

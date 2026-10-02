@@ -7,17 +7,13 @@ export const portableTextValue = [
 		_key: 'heading',
 		style: 'h2',
 		markDefs: [],
-		children: [
-			{ _type: 'span', _key: 'heading-span', text: 'Portable Text', marks: [] },
-		],
+		children: [{ _type: 'span', _key: 'heading-span', text: 'Portable Text', marks: [] }],
 	},
 	{
 		_type: 'block',
 		_key: 'paragraph',
 		style: 'normal',
-		markDefs: [
-			{ _type: 'link', _key: 'docs-link', href: 'https://portabletext.org' },
-		],
+		markDefs: [{ _type: 'link', _key: 'docs-link', href: 'https://portabletext.org' }],
 		children: [
 			{ _type: 'span', _key: 'plain', text: 'Render ', marks: [] },
 			{ _type: 'span', _key: 'strong', text: 'structured', marks: ['strong'] },
@@ -34,9 +30,7 @@ export const portableTextValue = [
 		listItem: 'bullet',
 		level: 1,
 		markDefs: [],
-		children: [
-			{ _type: 'span', _key: 'list-one-span', text: 'Client', marks: [] },
-		],
+		children: [{ _type: 'span', _key: 'list-one-span', text: 'Client', marks: [] }],
 	},
 	{
 		_type: 'block',
@@ -45,9 +39,7 @@ export const portableTextValue = [
 		listItem: 'bullet',
 		level: 1,
 		markDefs: [],
-		children: [
-			{ _type: 'span', _key: 'list-two-span', text: 'Server', marks: [] },
-		],
+		children: [{ _type: 'span', _key: 'list-two-span', text: 'Server', marks: [] }],
 	},
 	{ _type: 'callout', _key: 'callout', message: 'Framework-neutral data' },
 ];

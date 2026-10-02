@@ -37,14 +37,10 @@ export function GraphicalItemClipPath(props: GraphicalItemClipPathProps) @{
 		return null;
 	}
 	const { x, y, width, height } = plotArea;
-	const clipX =
-		needClipX && xAxisRange ? Math.min(xAxisRange[0], xAxisRange[1]) : x - width / 2;
-	const clipY =
-		needClipY && yAxisRange ? Math.min(yAxisRange[0], yAxisRange[1]) : y - height / 2;
-	const clipWidth =
-		needClipX && xAxisRange ? Math.abs(xAxisRange[1] - xAxisRange[0]) : width * 2;
-	const clipHeight =
-		needClipY && yAxisRange ? Math.abs(yAxisRange[1] - yAxisRange[0]) : height * 2;
+	const clipX = needClipX && xAxisRange ? Math.min(xAxisRange[0], xAxisRange[1]) : x - width / 2;
+	const clipY = needClipY && yAxisRange ? Math.min(yAxisRange[0], yAxisRange[1]) : y - height / 2;
+	const clipWidth = needClipX && xAxisRange ? Math.abs(xAxisRange[1] - xAxisRange[0]) : width * 2;
+	const clipHeight = needClipY && yAxisRange ? Math.abs(yAxisRange[1] - yAxisRange[0]) : height * 2;
 	<clipPath id={'clipPath-' + clipPathId}>
 		<rect x={clipX} y={clipY} width={clipWidth} height={clipHeight} />
 	</clipPath>

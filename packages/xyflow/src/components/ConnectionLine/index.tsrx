@@ -42,16 +42,18 @@ export function ConnectionLineWrapper<NodeType extends Node = Node>({
 		return null;
 	}
 
-	return <svg
-		style={containerStyle}
-		width={width}
-		height={height}
-		className="react-flow__connectionline react-flow__container"
-	>
-		<g className={cc(['react-flow__connection', getConnectionStatus(isValid)])}>
-			<ConnectionLine style={style} type={type} CustomComponent={component} isValid={isValid} />
-		</g>
-	</svg>;
+	return (
+		<svg
+			style={containerStyle}
+			width={width}
+			height={height}
+			className="react-flow__connectionline react-flow__container"
+		>
+			<g className={cc(['react-flow__connection', getConnectionStatus(isValid)])}>
+				<ConnectionLine style={style} type={type} CustomComponent={component} isValid={isValid} />
+			</g>
+		</svg>
+	);
 }
 
 type ConnectionLineProps<NodeType extends Node = Node> = {
@@ -61,7 +63,7 @@ type ConnectionLineProps<NodeType extends Node = Node> = {
 	isValid: boolean | null;
 };
 
-const ConnectionLine = <NodeType extends Node = Node,>({
+const ConnectionLine = <NodeType extends Node = Node>({
 	style,
 	type = ConnectionLineType.Bezier,
 	CustomComponent,
@@ -85,22 +87,24 @@ const ConnectionLine = <NodeType extends Node = Node,>({
 	}
 
 	if (CustomComponent) {
-		return <CustomComponent
-			connectionLineType={type}
-			connectionLineStyle={style}
-			fromNode={fromNode}
-			fromHandle={fromHandle}
-			fromX={from.x}
-			fromY={from.y}
-			toX={to.x}
-			toY={to.y}
-			fromPosition={fromPosition}
-			toPosition={toPosition}
-			connectionStatus={getConnectionStatus(isValid)}
-			toNode={toNode}
-			toHandle={toHandle}
-			pointer={pointer}
-		/>;
+		return (
+			<CustomComponent
+				connectionLineType={type}
+				connectionLineStyle={style}
+				fromNode={fromNode}
+				fromHandle={fromHandle}
+				fromX={from.x}
+				fromY={from.y}
+				toX={to.x}
+				toY={to.y}
+				fromPosition={fromPosition}
+				toPosition={toPosition}
+				connectionStatus={getConnectionStatus(isValid)}
+				toNode={toNode}
+				toHandle={toHandle}
+				pointer={pointer}
+			/>
+		);
 	}
 
 	let path = '';

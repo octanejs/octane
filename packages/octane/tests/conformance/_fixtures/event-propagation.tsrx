@@ -36,13 +36,17 @@ export function Levels(props: {
 						<dialog class="target" {...props.targetProps}></dialog>
 					}
 					@case 'details': {
-						<details class="target" {...props.targetProps}>{'d'}</details>
+						<details class="target" {...props.targetProps}>
+							{'d'}
+						</details>
 					}
 					@case 'img': {
 						<img class="target" {...props.targetProps} />
 					}
 					@default: {
-						<div class="target" {...props.targetProps}>{'x'}</div>
+						<div class="target" {...props.targetProps}>
+							{'x'}
+						</div>
 					}
 				}
 			</div>

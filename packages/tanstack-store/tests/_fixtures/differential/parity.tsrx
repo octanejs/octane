@@ -31,17 +31,22 @@ function Values() @{
 	const [atomValue, setAtomValue] = useAtom(externalAtom);
 	const localAtom = useCreateAtom(20);
 	const [localAtomValue, setLocalAtomValue] = useAtom(localAtom);
-	const localStore = useCreateStore(
-		{ count: 30 },
-		({ setState }) => ({
-			increment: () => setState((state) => ({ count: state.count + 1 })),
-		}),
-	);
+	const localStore = useCreateStore({ count: 30 }, ({ setState }) => ({
+		increment: () => setState((state) => ({ count: state.count + 1 })),
+	}));
 	const localStoreValue = useSelector(localStore, (state) => state.count);
 
 	<div>
 		<p id="values">
-			{count + '/' + legacy.count + ':' + legacy.ignored + '/' + atomValue + '/' + localAtomValue +
+			{count +
+				'/' +
+				legacy.count +
+				':' +
+				legacy.ignored +
+				'/' +
+				atomValue +
+				'/' +
+				localAtomValue +
 				'/' +
 				localStoreValue}
 		</p>
@@ -49,16 +54,24 @@ function Values() @{
 		<button
 			id="store"
 			onClick={() => externalStore.setState((state) => ({ ...state, count: state.count + 1 }))}
-		>store</button>
+		>
+			store
+		</button>
 		<button
 			id="ignored"
 			onClick={() => externalStore.setState((state) => ({ ...state, ignored: state.ignored + 1 }))}
-		>ignored</button>
-		<button id="atom" onClick={() => setAtomValue((value) => value + 1)}>atom</button>
+		>
+			ignored
+		</button>
+		<button id="atom" onClick={() => setAtomValue((value) => value + 1)}>
+			atom
+		</button>
 		<button id="local-atom" onClick={() => setLocalAtomValue((value) => value + 1)}>
 			local atom
 		</button>
-		<button id="local-store" onClick={() => localStore.actions.increment()}>local store</button>
+		<button id="local-store" onClick={() => localStore.actions.increment()}>
+			local store
+		</button>
 	</div>
 }
 

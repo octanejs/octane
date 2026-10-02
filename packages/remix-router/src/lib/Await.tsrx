@@ -34,16 +34,19 @@ export function Await(props: AwaitProps) @{
 	const dataRouterContext = useContext(DataRouterContext);
 	const dataRouterStateContext = useContext(DataRouterStateContext);
 
-	const onError = useCallback((error: unknown, errorInfo?: unknown) => {
-		if (dataRouterContext && dataRouterContext.onError && dataRouterStateContext) {
-			dataRouterContext.onError(error, {
-				location: dataRouterStateContext.location,
-				params: dataRouterStateContext.matches[0]?.params || {},
-				pattern: getRoutePattern(dataRouterStateContext.matches),
-				errorInfo,
-			});
-		}
-	}, [dataRouterContext, dataRouterStateContext]);
+	const onError = useCallback(
+		(error: unknown, errorInfo?: unknown) => {
+			if (dataRouterContext && dataRouterContext.onError && dataRouterStateContext) {
+				dataRouterContext.onError(error, {
+					location: dataRouterStateContext.location,
+					params: dataRouterStateContext.matches[0]?.params || {},
+					pattern: getRoutePattern(dataRouterStateContext.matches),
+					errorInfo,
+				});
+			}
+		},
+		[dataRouterContext, dataRouterStateContext],
+	);
 
 	<AwaitBody
 		resolve={props.resolve}
@@ -76,9 +79,10 @@ function AwaitBody(props: AwaitBodyProps) @{
 		const resolve = props.resolve as TrackedPromise;
 		Object.defineProperty(resolve, '_tracked', { get: () => true });
 		promise = resolve.then(
-			(data: unknown) => Object.defineProperty(resolve, '_data', {
-				get: () => data,
-			}),
+			(data: unknown) =>
+				Object.defineProperty(resolve, '_data', {
+					get: () => data,
+				}),
 			(error: unknown) => {
 				// Log promise rejections
 				props.onError?.(error);
@@ -162,7 +166,5 @@ function ResolveAwait(props: { children?: OctaneNode | ((data: any) => OctaneNod
 		typeof props.children === 'function' && !isChildrenBlock(props.children)
 			? props.children(data)
 			: props.children;
-	<>
-		{toRender}
-	</>
+	<>{toRender}</>
 }

@@ -25,13 +25,12 @@ function defaultUniqBy(entry: LegendPayload) {
 	return entry.value;
 }
 
-type ContentProps =
-	Props & {
-		margin: Margin | undefined;
-		chartWidth: number;
-		chartHeight: number;
-		contextPayload: ReadonlyArray<LegendPayload>;
-	};
+type ContentProps = Props & {
+	margin: Margin | undefined;
+	chartWidth: number;
+	chartHeight: number;
+	contextPayload: ReadonlyArray<LegendPayload>;
+};
 
 function LegendContent(props: ContentProps) {
 	const { contextPayload, ...otherProps } = props;
@@ -70,29 +69,31 @@ function getDefaultPosition(
 
 	if (
 		!style ||
-			(style.left === undefined || style.left === null) &&
-				(style.right === undefined || style.right === null)
+		((style.left === undefined || style.left === null) &&
+			(style.right === undefined || style.right === null))
 	) {
 		if (align === 'center' && layout === 'vertical') {
 			hPos = { left: ((chartWidth || 0) - box.width) / 2 };
 		} else {
-			hPos = align === 'right'
-				? { right: margin && margin.right || 0 }
-				: { left: margin && margin.left || 0 };
+			hPos =
+				align === 'right'
+					? { right: (margin && margin.right) || 0 }
+					: { left: (margin && margin.left) || 0 };
 		}
 	}
 
 	if (
 		!style ||
-			(style.top === undefined || style.top === null) &&
-				(style.bottom === undefined || style.bottom === null)
+		((style.top === undefined || style.top === null) &&
+			(style.bottom === undefined || style.bottom === null))
 	) {
 		if (verticalAlign === 'middle') {
 			vPos = { top: ((chartHeight || 0) - box.height) / 2 };
 		} else {
-			vPos = verticalAlign === 'bottom'
-				? { bottom: margin && margin.bottom || 0 }
-				: { top: margin && margin.top || 0 };
+			vPos =
+				verticalAlign === 'bottom'
+					? { bottom: (margin && margin.bottom) || 0 }
+					: { top: (margin && margin.top) || 0 };
 		}
 	}
 
@@ -101,68 +102,67 @@ function getDefaultPosition(
 
 export type LegendItemSorter = 'value' | 'dataKey' | ((item: LegendPayload) => number | string);
 
-export type Props =
-	Omit<DefaultLegendContentProps, 'payload' | 'ref' | 'verticalAlign'> & {
-		/**
- * Renders the content of the legend.
- *
- * This should return HTML elements, not SVG elements.
- *
- * - If not set, the {@link DefaultLegendContent} component is used.
- * - If set to a React element, this element will be cloned and extra props will be passed in.
- * - If set to a function, the function will be called and should return HTML elements.
- *
- * @example <Legend content={CustomizedLegend} />
- * @example <Legend content={renderLegend} />
- */
-		content?: ContentType;
-		/**
- * CSS styles to be applied to the wrapper `div` element.
- */
-		wrapperStyle?: CSSProperties;
-		/**
- * Width of the legend.
- * Accept CSS style string values like `100%` or `fit-content`, or number values like `400`.
- */
-		width?: number | string;
-		/**
- * Height of the legend.
- * Accept CSS style string values like `100%` or `fit-content`, or number values like `400`.
- */
-		height?: number | string;
-		payloadUniqBy?: UniqueOption<LegendPayload>;
-		onBBoxUpdate?: (box: ElementOffset | null) => void;
-		/**
- * If portal is defined, then Legend will use this element as a target
- * for rendering using React Portal.
- *
- * If this is undefined then Legend renders inside the recharts-wrapper element.
- *
- * @see {@link https://react.dev/reference/react-dom/createPortal}
- */
-		portal?: HTMLElement | null;
-		/**
- * Sorts Legend items. Defaults to `value` which means it will sort alphabetically
- * by the label.
- *
- * If `null` is provided then the payload is not sorted. Be aware that without sort,
- * the order of items may change between renders!
- *
- * @defaultValue value
- */
-		itemSorter?: LegendItemSorter | null;
-		/**
- * The alignment of the whole Legend container:
- *
- * - `bottom`: shows the Legend below chart, and chart height reduces automatically to make space for it.
- * - `top`: shows the Legend above chart, and chart height reduces automatically.
- * - `middle`:  shows the Legend in the middle of chart, covering other content, and chart height remains unchanged.
- * The exact behavior changes depending on `align` prop.
- *
- * @defaultValue bottom
- */
-		verticalAlign?: VerticalAlignmentType;
-	};
+export type Props = Omit<DefaultLegendContentProps, 'payload' | 'ref' | 'verticalAlign'> & {
+	/**
+	 * Renders the content of the legend.
+	 *
+	 * This should return HTML elements, not SVG elements.
+	 *
+	 * - If not set, the {@link DefaultLegendContent} component is used.
+	 * - If set to a React element, this element will be cloned and extra props will be passed in.
+	 * - If set to a function, the function will be called and should return HTML elements.
+	 *
+	 * @example <Legend content={CustomizedLegend} />
+	 * @example <Legend content={renderLegend} />
+	 */
+	content?: ContentType;
+	/**
+	 * CSS styles to be applied to the wrapper `div` element.
+	 */
+	wrapperStyle?: CSSProperties;
+	/**
+	 * Width of the legend.
+	 * Accept CSS style string values like `100%` or `fit-content`, or number values like `400`.
+	 */
+	width?: number | string;
+	/**
+	 * Height of the legend.
+	 * Accept CSS style string values like `100%` or `fit-content`, or number values like `400`.
+	 */
+	height?: number | string;
+	payloadUniqBy?: UniqueOption<LegendPayload>;
+	onBBoxUpdate?: (box: ElementOffset | null) => void;
+	/**
+	 * If portal is defined, then Legend will use this element as a target
+	 * for rendering using React Portal.
+	 *
+	 * If this is undefined then Legend renders inside the recharts-wrapper element.
+	 *
+	 * @see {@link https://react.dev/reference/react-dom/createPortal}
+	 */
+	portal?: HTMLElement | null;
+	/**
+	 * Sorts Legend items. Defaults to `value` which means it will sort alphabetically
+	 * by the label.
+	 *
+	 * If `null` is provided then the payload is not sorted. Be aware that without sort,
+	 * the order of items may change between renders!
+	 *
+	 * @defaultValue value
+	 */
+	itemSorter?: LegendItemSorter | null;
+	/**
+	 * The alignment of the whole Legend container:
+	 *
+	 * - `bottom`: shows the Legend below chart, and chart height reduces automatically to make space for it.
+	 * - `top`: shows the Legend above chart, and chart height reduces automatically.
+	 * - `middle`:  shows the Legend in the middle of chart, covering other content, and chart height remains unchanged.
+	 * The exact behavior changes depending on `align` prop.
+	 *
+	 * @defaultValue bottom
+	 */
+	verticalAlign?: VerticalAlignmentType;
+};
 
 function LegendSettingsDispatcher({
 	align,
@@ -247,23 +247,22 @@ function LegendImpl(outsideProps: Props) {
 	const maxWidth = chartWidth - (margin?.left || 0) - (margin?.right || 0);
 	const widthOrHeight = getWidthOrHeight(props.layout, heightFromProps, widthFromProps, maxWidth);
 	// if the user supplies their own portal, only use their defined wrapper styles
-	const outerStyle: CSSProperties | undefined =
-		portalFromProps
-			? wrapperStyle
-			: {
-					position: 'absolute',
-					width: widthOrHeight?.width || widthFromProps || 'auto',
-					height: widthOrHeight?.height || heightFromProps || 'auto',
-					...getDefaultPosition(
-						wrapperStyle,
-						props,
-						margin,
-						chartWidth,
-						chartHeight,
-						lastBoundingBox,
-					),
-					...wrapperStyle,
-				};
+	const outerStyle: CSSProperties | undefined = portalFromProps
+		? wrapperStyle
+		: {
+				position: 'absolute',
+				width: widthOrHeight?.width || widthFromProps || 'auto',
+				height: widthOrHeight?.height || heightFromProps || 'auto',
+				...getDefaultPosition(
+					wrapperStyle,
+					props,
+					margin,
+					chartWidth,
+					chartHeight,
+					lastBoundingBox,
+				),
+				...wrapperStyle,
+			};
 
 	const legendPortal = portalFromProps ?? legendPortalFromContext;
 
@@ -271,36 +270,34 @@ function LegendImpl(outsideProps: Props) {
 		return null;
 	}
 
-	const legendElement = <div
-		className="recharts-legend-wrapper"
-		style={outerStyle}
-		ref={updateBoundingBox}
-	>
-		<LegendSettingsDispatcher
-			layout={props.layout}
-			align={props.align}
-			verticalAlign={props.verticalAlign}
-			itemSorter={props.itemSorter}
-		/>
-		{/* if we have a portal from props nothing should need the size of the legend */}
-		{!portalFromProps &&
-			<LegendSizeDispatcher width={lastBoundingBox.width} height={lastBoundingBox.height} />}
-		<LegendContent
-			{...props}
-			{...widthOrHeight}
-			margin={margin}
-			chartWidth={chartWidth}
-			chartHeight={chartHeight}
-			contextPayload={contextPayload}
-		/>
-	</div>;
+	const legendElement = (
+		<div className="recharts-legend-wrapper" style={outerStyle} ref={updateBoundingBox}>
+			<LegendSettingsDispatcher
+				layout={props.layout}
+				align={props.align}
+				verticalAlign={props.verticalAlign}
+				itemSorter={props.itemSorter}
+			/>
+			{/* if we have a portal from props nothing should need the size of the legend */}
+			{!portalFromProps && (
+				<LegendSizeDispatcher width={lastBoundingBox.width} height={lastBoundingBox.height} />
+			)}
+			<LegendContent
+				{...props}
+				{...widthOrHeight}
+				margin={margin}
+				chartWidth={chartWidth}
+				chartHeight={chartHeight}
+				contextPayload={contextPayload}
+			/>
+		</div>
+	);
 
 	return createPortal(legendElement, legendPortal);
 }
 
-export const Legend = React.memo(LegendImpl, propsAreEqual) as
-	typeof LegendImpl & {
-		displayName?: string;
-	};
+export const Legend = React.memo(LegendImpl, propsAreEqual) as typeof LegendImpl & {
+	displayName?: string;
+};
 
 Legend.displayName = 'Legend';

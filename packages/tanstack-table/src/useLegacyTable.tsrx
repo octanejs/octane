@@ -156,90 +156,97 @@ export interface LegacyFeatures extends StockFeatures {
 /**
  * Row model factory function type from v8 API
  */
-export type RowModelFactory<TData extends RowData> =
-	(table: Table<LegacyFeatures, TData>) => () => RowModel<LegacyFeatures, TData>;
+export type RowModelFactory<TData extends RowData> = (
+	table: Table<LegacyFeatures, TData>,
+) => () => RowModel<LegacyFeatures, TData>;
 
 /**
  * Faceted row model factory function type from v8 API
  */
-export type FacetedRowModelFactory<TData extends RowData> =
-	(table: Table<LegacyFeatures, TData>, columnId: string) => () => RowModel<LegacyFeatures, TData>;
+export type FacetedRowModelFactory<TData extends RowData> = (
+	table: Table<LegacyFeatures, TData>,
+	columnId: string,
+) => () => RowModel<LegacyFeatures, TData>;
 
 /**
  * Faceted min/max values factory function type from v8 API
  */
-export type FacetedMinMaxValuesFactory<TData extends RowData> =
-	(table: Table<LegacyFeatures, TData>, columnId: string) => () => undefined | [number, number];
+export type FacetedMinMaxValuesFactory<TData extends RowData> = (
+	table: Table<LegacyFeatures, TData>,
+	columnId: string,
+) => () => undefined | [number, number];
 
 /**
  * Faceted unique values factory function type from v8 API
  */
-export type FacetedUniqueValuesFactory<TData extends RowData> =
-	(table: Table<LegacyFeatures, TData>, columnId: string) => () => Map<any, number>;
+export type FacetedUniqueValuesFactory<TData extends RowData> = (
+	table: Table<LegacyFeatures, TData>,
+	columnId: string,
+) => () => Map<any, number>;
 
 /**
  * Legacy v8-style row model options
  */
 export interface LegacyRowModelOptions<TData extends RowData> {
 	/**
- * Returns the core row model for the table.
- * @deprecated This option is no longer needed in v9. The core row model is always created automatically.
- */
+	 * Returns the core row model for the table.
+	 * @deprecated This option is no longer needed in v9. The core row model is always created automatically.
+	 */
 	getCoreRowModel?: RowModelFactory<TData>;
 	/**
- * Returns the filtered row model for the table.
- * @deprecated Use the `filteredRowModel`/`filterFns` slots on the `features` option with `createFilteredRowModel()` instead.
- */
+	 * Returns the filtered row model for the table.
+	 * @deprecated Use the `filteredRowModel`/`filterFns` slots on the `features` option with `createFilteredRowModel()` instead.
+	 */
 	getFilteredRowModel?: RowModelFactory<TData>;
 	/**
- * Returns the sorted row model for the table.
- * @deprecated Use the `sortedRowModel`/`sortFns` slots on the `features` option with `createSortedRowModel()` instead.
- */
+	 * Returns the sorted row model for the table.
+	 * @deprecated Use the `sortedRowModel`/`sortFns` slots on the `features` option with `createSortedRowModel()` instead.
+	 */
 	getSortedRowModel?: RowModelFactory<TData>;
 	/**
- * Returns the paginated row model for the table.
- * @deprecated Use the `paginatedRowModel` slot on the `features` option with `createPaginatedRowModel()` instead.
- */
+	 * Returns the paginated row model for the table.
+	 * @deprecated Use the `paginatedRowModel` slot on the `features` option with `createPaginatedRowModel()` instead.
+	 */
 	getPaginationRowModel?: RowModelFactory<TData>;
 	/**
- * Returns the expanded row model for the table.
- * @deprecated Use the `expandedRowModel` slot on the `features` option with `createExpandedRowModel()` instead.
- */
+	 * Returns the expanded row model for the table.
+	 * @deprecated Use the `expandedRowModel` slot on the `features` option with `createExpandedRowModel()` instead.
+	 */
 	getExpandedRowModel?: RowModelFactory<TData>;
 	/**
- * Returns the grouped row model for the table.
- * @deprecated Use `columnGroupingFeature` with the `groupedRowModel` slot and `createGroupedRowModel()` instead. Add `rowAggregationFeature` separately when grouped rows aggregate values.
- */
+	 * Returns the grouped row model for the table.
+	 * @deprecated Use `columnGroupingFeature` with the `groupedRowModel` slot and `createGroupedRowModel()` instead. Add `rowAggregationFeature` separately when grouped rows aggregate values.
+	 */
 	getGroupedRowModel?: RowModelFactory<TData>;
 	/**
- * Returns the faceted row model for a column.
- * @deprecated Use the `facetedRowModel` slot on the `features` option with `createFacetedRowModel()` instead.
- */
+	 * Returns the faceted row model for a column.
+	 * @deprecated Use the `facetedRowModel` slot on the `features` option with `createFacetedRowModel()` instead.
+	 */
 	getFacetedRowModel?: FacetedRowModelFactory<TData>;
 	/**
- * Returns the faceted min/max values for a column.
- * @deprecated Use the `facetedMinMaxValues` slot on the `features` option with `createFacetedMinMaxValues()` instead.
- */
+	 * Returns the faceted min/max values for a column.
+	 * @deprecated Use the `facetedMinMaxValues` slot on the `features` option with `createFacetedMinMaxValues()` instead.
+	 */
 	getFacetedMinMaxValues?: FacetedMinMaxValuesFactory<TData>;
 	/**
- * Returns the faceted unique values for a column.
- * @deprecated Use the `facetedUniqueValues` slot on the `features` option with `createFacetedUniqueValues()` instead.
- */
+	 * Returns the faceted unique values for a column.
+	 * @deprecated Use the `facetedUniqueValues` slot on the `features` option with `createFacetedUniqueValues()` instead.
+	 */
 	getFacetedUniqueValues?: FacetedUniqueValuesFactory<TData>;
 	/**
- * Additional filter functions to apply to the table.
- * @deprecated Use the `filteredRowModel`/`filterFns` slots on the `features` option with `createFilteredRowModel()` instead.
- */
+	 * Additional filter functions to apply to the table.
+	 * @deprecated Use the `filteredRowModel`/`filterFns` slots on the `features` option with `createFilteredRowModel()` instead.
+	 */
 	filterFns?: FilterFns;
 	/**
- * Additional sort functions to apply to the table.
- * @deprecated Use the `sortedRowModel`/`sortFns` slots on the `features` option with `createSortedRowModel()` instead.
- */
+	 * Additional sort functions to apply to the table.
+	 * @deprecated Use the `sortedRowModel`/`sortFns` slots on the `features` option with `createSortedRowModel()` instead.
+	 */
 	sortFns?: SortFns;
 	/**
- * Additional aggregation functions to apply to the table.
- * @deprecated Use `rowAggregationFeature` with the `aggregationFns` slot instead. Add `columnGroupingFeature` and `groupedRowModel` only when grouping rows.
- */
+	 * Additional aggregation functions to apply to the table.
+	 * @deprecated Use `rowAggregationFeature` with the `aggregationFns` slot instead. Add `columnGroupingFeature` and `groupedRowModel` only when grouping rows.
+	 */
 	aggregationFns?: AggregationFns;
 }
 
@@ -251,53 +258,71 @@ export interface LegacyRowModelOptions<TData extends RowData> {
  *
  * @deprecated This is a compatibility layer for migrating from v8. Use `useTable` with an explicit `features` option instead.
  */
-export type LegacyTableOptions<TData extends RowData> =
-	Omit<TableOptions<LegacyFeatures, TData>, 'features'> & LegacyRowModelOptions<TData>;
+export type LegacyTableOptions<TData extends RowData> = Omit<
+	TableOptions<LegacyFeatures, TData>,
+	'features'
+> &
+	LegacyRowModelOptions<TData>;
 
 /**
  * Legacy table instance type that includes the v8-style `getState()` method.
  *
  * @deprecated Use `useTable` with explicit state selection instead.
  */
-export type LegacyOctaneTable<TData extends RowData> =
-	OctaneTable<LegacyFeatures, TData, TableState<LegacyFeatures>> & {
-		/**
- * Returns the current table state.
- * @deprecated In v9, access state directly via `table.state` or use `table.state` for the full state.
- */
-		getState: () => TableState<LegacyFeatures>;
-		/**
- * Sets the current table state.
- * @deprecated In v9, access state directly via `table.baseAtoms`
- */
-		setState: (state: TableState<LegacyFeatures>) => void;
-	};
+export type LegacyOctaneTable<TData extends RowData> = OctaneTable<
+	LegacyFeatures,
+	TData,
+	TableState<LegacyFeatures>
+> & {
+	/**
+	 * Returns the current table state.
+	 * @deprecated In v9, access state directly via `table.state` or use `table.state` for the full state.
+	 */
+	getState: () => TableState<LegacyFeatures>;
+	/**
+	 * Sets the current table state.
+	 * @deprecated In v9, access state directly via `table.baseAtoms`
+	 */
+	setState: (state: TableState<LegacyFeatures>) => void;
+};
 
 // =============================================================================
 // Legacy type aliases - LegacyFeatures hardcoded for simpler prop typing with useLegacyTable
 // =============================================================================
 
 /** @deprecated Use Column<TFeatures, TData, TValue> with useTable instead. */
-export type LegacyColumn<TData extends RowData, TValue = unknown> =
-	Column<LegacyFeatures, TData, TValue>;
+export type LegacyColumn<TData extends RowData, TValue = unknown> = Column<
+	LegacyFeatures,
+	TData,
+	TValue
+>;
 
 /** @deprecated Use Row<TFeatures, TData> with useTable instead. */
 export type LegacyRow<TData extends RowData> = Row<LegacyFeatures, TData>;
 
 /** @deprecated Use Cell<TFeatures, TData, TValue> with useTable instead. */
-export type LegacyCell<TData extends RowData, TValue = unknown> =
-	Cell<LegacyFeatures, TData, TValue>;
+export type LegacyCell<TData extends RowData, TValue = unknown> = Cell<
+	LegacyFeatures,
+	TData,
+	TValue
+>;
 
 /** @deprecated Use Header<TFeatures, TData, TValue> with useTable instead. */
-export type LegacyHeader<TData extends RowData, TValue = unknown> =
-	Header<LegacyFeatures, TData, TValue>;
+export type LegacyHeader<TData extends RowData, TValue = unknown> = Header<
+	LegacyFeatures,
+	TData,
+	TValue
+>;
 
 /** @deprecated Use HeaderGroup<TFeatures, TData> with useTable instead. */
 export type LegacyHeaderGroup<TData extends RowData> = HeaderGroup<LegacyFeatures, TData>;
 
 /** @deprecated Use ColumnDef<TFeatures, TData, TValue> with useTable instead. */
-export type LegacyColumnDef<TData extends RowData, TValue = unknown> =
-	ColumnDef<LegacyFeatures, TData, TValue>;
+export type LegacyColumnDef<TData extends RowData, TValue = unknown> = ColumnDef<
+	LegacyFeatures,
+	TData,
+	TValue
+>;
 
 /** @deprecated Use Table<TFeatures, TData> with useTable instead. */
 export type LegacyTable<TData extends RowData> = Table<LegacyFeatures, TData>;
@@ -382,11 +407,11 @@ export function useLegacyTable<TData extends RowData>(
 			...stockFeatures,
 			// Declaration-merged names are required members of the registries, so the
 			// optional options are asserted; spreading `undefined` yields no keys.
-			filterFns: { ...filterFns, ...options.filterFns as FilterFns },
-			sortFns: { ...sortFns, ...options.sortFns as SortFns },
+			filterFns: { ...filterFns, ...(options.filterFns as FilterFns) },
+			sortFns: { ...sortFns, ...(options.sortFns as SortFns) },
 			aggregationFns: {
 				...aggregationFns,
-				...options.aggregationFns as AggregationFns,
+				...(options.aggregationFns as AggregationFns),
 			},
 		};
 
@@ -438,12 +463,15 @@ export function useLegacyTable<TData extends RowData>(
 		return table.state;
 	}, [table]);
 
-	const setState = useCallback((state: TableState<LegacyFeatures>) => {
-		Object.entries(state).forEach(([key, value]) => {
-			// @ts-expect-error - baseAtoms is indexed by dynamic string keys
-			table.baseAtoms[key].set(value);
-		});
-	}, [table]);
+	const setState = useCallback(
+		(state: TableState<LegacyFeatures>) => {
+			Object.entries(state).forEach(([key, value]) => {
+				// @ts-expect-error - baseAtoms is indexed by dynamic string keys
+				table.baseAtoms[key].set(value);
+			});
+		},
+		[table],
+	);
 
 	return useMemo(
 		() => ({

@@ -35,12 +35,15 @@ export const PanZoom = ({
 	const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 	const [panStartPosition, setPanStartPosition] = useState({ x: 0, y: 0 });
 
-	const handleZoom = useCallback((delta: number) => {
-		setZoom((prevZoom) => {
-			const newZoom = Math.max(minZoom, Math.min(maxZoom, prevZoom + delta));
-			return newZoom;
-		});
-	}, [minZoom, maxZoom]);
+	const handleZoom = useCallback(
+		(delta: number) => {
+			setZoom((prevZoom) => {
+				const newZoom = Math.max(minZoom, Math.min(maxZoom, prevZoom + delta));
+				return newZoom;
+			});
+		},
+		[minZoom, maxZoom],
+	);
 
 	const handleZoomIn = useCallback(() => {
 		handleZoom(zoomStep);
@@ -55,41 +58,49 @@ export const PanZoom = ({
 		setPan({ x: 0, y: 0 });
 	}, [initialZoom]);
 
-	const handleWheel = useCallback((e: WheelEvent) => {
-		e.preventDefault();
-		const delta =
-			e.deltaY > 0 ? -zoomStep : zoomStep;
-		handleZoom(delta);
-	}, [handleZoom, zoomStep]);
+	const handleWheel = useCallback(
+		(e: WheelEvent) => {
+			e.preventDefault();
+			const delta = e.deltaY > 0 ? -zoomStep : zoomStep;
+			handleZoom(delta);
+		},
+		[handleZoom, zoomStep],
+	);
 
-	const handlePointerDown = useCallback((e: NativePointerEvent<HTMLDivElement>) => {
-		// Only handle primary pointer (left mouse button, first touch, etc.)
-		if (e.button !== 0 || e.isPrimary === false) {
-			return;
-		}
-		setIsPanning(true);
-		setPanStart({ x: e.clientX, y: e.clientY });
-		setPanStartPosition(pan);
-		// Capture the pointer to track it even outside the element
-		const target = e.currentTarget;
-		if (target instanceof HTMLElement) {
-			target.setPointerCapture(e.pointerId);
-		}
-	}, [pan]);
+	const handlePointerDown = useCallback(
+		(e: NativePointerEvent<HTMLDivElement>) => {
+			// Only handle primary pointer (left mouse button, first touch, etc.)
+			if (e.button !== 0 || e.isPrimary === false) {
+				return;
+			}
+			setIsPanning(true);
+			setPanStart({ x: e.clientX, y: e.clientY });
+			setPanStartPosition(pan);
+			// Capture the pointer to track it even outside the element
+			const target = e.currentTarget;
+			if (target instanceof HTMLElement) {
+				target.setPointerCapture(e.pointerId);
+			}
+		},
+		[pan],
+	);
 
-	const handlePointerMove = useCallback((e: PointerEvent) => {
-		/* v8 ignore next */
-		if (!isPanning) {
-			return;
-		}
-		e.preventDefault();
-		const deltaX = e.clientX - panStart.x;
-		const deltaY = e.clientY - panStart.y;
-		setPan({
-			x: panStartPosition.x + deltaX,
-			y: panStartPosition.y + deltaY,
-		});
-	}, [isPanning, panStart, panStartPosition]);
+	const handlePointerMove = useCallback(
+		(e: PointerEvent) => {
+			/* v8 ignore next */
+			if (!isPanning) {
+				return;
+			}
+			e.preventDefault();
+			const deltaX = e.clientX - panStart.x;
+			const deltaY = e.clientY - panStart.y;
+			setPan({
+				x: panStartPosition.x + deltaX,
+				y: panStartPosition.y + deltaY,
+			});
+		},
+		[isPanning, panStart, panStartPosition],
+	);
 
 	const handlePointerUp = useCallback((e: PointerEvent) => {
 		setIsPanning(false);
@@ -139,17 +150,18 @@ export const PanZoom = ({
 		}
 	}, [isPanning, handlePointerMove, handlePointerUp]);
 
-	return <div
-		className={cn(
-			'relative flex flex-col',
-			fullscreen ? 'h-full w-full' : 'min-h-28 w-full',
-			className,
-		)}
-		ref={containerRef}
-		style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
-	>
-		{showControls
-			? <div
+	return (
+		<div
+			className={cn(
+				'relative flex flex-col',
+				fullscreen ? 'h-full w-full' : 'min-h-28 w-full',
+				className,
+			)}
+			ref={containerRef}
+			style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
+		>
+			{showControls ? (
+				<div
 					className={cn(
 						'absolute z-10 flex flex-col gap-1 rounded-md border border-border bg-background/80 p-1 supports-[backdrop-filter]:bg-background/70 supports-[backdrop-filter]:backdrop-blur-sm',
 						fullscreen ? 'bottom-4 left-4' : 'bottom-2 left-2',
@@ -188,23 +200,26 @@ export const PanZoom = ({
 						<RotateCcwIcon size={16} />
 					</button>
 				</div>
-			: null}
-		<div
-			className={cn(
-				'flex-1 origin-center transition-transform duration-150 ease-out',
-				fullscreen
-					? 'flex h-full w-full items-center justify-center'
-					: 'flex w-full items-center justify-center',
-			)}
-			onPointerDown={handlePointerDown}
-			ref={contentRef}
-			role="application"
-			style={{
-				transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-				transformOrigin: 'center center',
-				touchAction: 'none',
-				willChange: 'transform',
-			}}
-		>{children}</div>
-	</div>;
+			) : null}
+			<div
+				className={cn(
+					'flex-1 origin-center transition-transform duration-150 ease-out',
+					fullscreen
+						? 'flex h-full w-full items-center justify-center'
+						: 'flex w-full items-center justify-center',
+				)}
+				onPointerDown={handlePointerDown}
+				ref={contentRef}
+				role="application"
+				style={{
+					transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+					transformOrigin: 'center center',
+					touchAction: 'none',
+					willChange: 'transform',
+				}}
+			>
+				{children}
+			</div>
+		</div>
+	);
 };

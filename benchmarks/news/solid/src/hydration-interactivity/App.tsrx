@@ -16,9 +16,13 @@ export function App(props: HydrationBenchmarkProps) @{
 	const [clicks, setClicks] = createSignal(0);
 	const [focuses, setFocuses] = createSignal(0);
 	const [submitted, setSubmitted] = createSignal(INITIAL_VALUE);
-	createEffect(() => hydrationDraft, (value) => {
-		if (value !== INITIAL_VALUE) setDraft(value);
-	}, { ssrSource: 'client' });
+	createEffect(
+		() => hydrationDraft,
+		(value) => {
+			if (value !== INITIAL_VALUE) setDraft(value);
+		},
+		{ ssrSource: 'client' },
+	);
 	const onInput = (event: Event) => setDraft((event.currentTarget as HTMLInputElement).value);
 	const onSend = () => {
 		const input = document.querySelector<HTMLInputElement>('#hydration-input');
@@ -49,7 +53,9 @@ export function App(props: HydrationBenchmarkProps) @{
 				type="button"
 				onClick={onSend}
 				onFocus={() => setFocuses(focuses() + 1)}
-			>{'Send search'}</button>
+			>
+				{'Send search'}
+			</button>
 			<output id="hydration-clicks">{String(clicks())}</output>
 			<output id="hydration-focuses">{String(focuses())}</output>
 			<output id="hydration-submitted">{submitted()}</output>

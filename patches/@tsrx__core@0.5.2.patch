@@ -1,5 +1,60 @@
+diff --git a/src/analyze/style-analyze.js b/src/analyze/style-analyze.js
+index bd352ed..61e18ec 100644
+--- a/src/analyze/style-analyze.js
++++ b/src/analyze/style-analyze.js
+@@ -126,6 +126,19 @@ function member_root(expression) {
+ 	return current.type === 'Identifier' ? current : null;
+ }
+ 
++/**
++ * An editor parse keeps parentheses (`preserveParens`), so a formatted
++ * multi-line `const theme = (<style>…</style>);` declares a
++ * `ParenthesizedExpression` around the block.
++ *
++ * @param {AST.Node | null | undefined} node
++ * @returns {AST.Node | null | undefined}
++ */
++function without_parens(node) {
++	while (node?.type === 'ParenthesizedExpression') node = node.expression;
++	return node;
++}
++
+ /**
+  * @param {Binding} binding
+  * @param {AST.Expression} expression the `apply` entry for the member chain
+@@ -137,7 +150,7 @@ function resolve_local_member(binding, expression) {
+ 	if (expression.object.type !== 'Identifier' || expression.property.type !== 'Identifier') {
+ 		return undefined;
+ 	}
+-	const object = binding.initial;
++	const object = without_parens(binding.initial);
+ 	if (object?.type !== 'ObjectExpression') return undefined;
+ 	const name = expression.property.name;
+ 	for (const property of object.properties) {
+@@ -146,9 +159,9 @@ function resolve_local_member(binding, expression) {
+ 			!property.computed &&
+ 			((property.key.type === 'Identifier' && property.key.name === name) ||
+ 				(property.key.type === 'Literal' && property.key.value === name)) &&
+-			property.value.type === 'JSXStyleElement'
++			without_parens(property.value)?.type === 'JSXStyleElement'
+ 		) {
+-			return property.value;
++			return /** @type {AST.JSXStyleElement} */ (without_parens(property.value));
+ 		}
+ 	}
+ 	return undefined;
+@@ -211,7 +224,8 @@ export function analyze_styles(ast, scopes, state) {
+ 		/** @type {AST.JSXStyleElement | null | undefined} */
+ 		let target;
+ 		if (expression.type === 'Identifier') {
+-			target = binding.initial?.type === 'JSXStyleElement' ? binding.initial : undefined;
++			const initial = without_parens(binding.initial);
++			target = initial?.type === 'JSXStyleElement' ? initial : undefined;
+ 		} else {
+ 			target = resolve_local_member(binding, expression);
+ 		}
 diff --git a/src/transform/imports.js b/src/transform/imports.js
-index 7963ff23f9d5aee7813cd635432c7de7d737bccf..f11f3f8560272b585064e035058baa470c61680c 100644
+index 55b2930..ccb6bb8 100644
 --- a/src/transform/imports.js
 +++ b/src/transform/imports.js
 @@ -5,7 +5,7 @@
@@ -60,8 +115,8 @@ index 7963ff23f9d5aee7813cd635432c7de7d737bccf..f11f3f8560272b585064e035058baa47
 +			context.write(`import.${phase}(`);
  			context.visit(node.source);
  
- 			const options = node.options ?? node.arguments?.[0];
-@@ -88,3 +94,18 @@ export function with_deferred_imports(visitors) {
+ 			if (node.options) {
+@@ -87,3 +93,18 @@ export function with_deferred_imports(visitors) {
  		},
  	});
  }

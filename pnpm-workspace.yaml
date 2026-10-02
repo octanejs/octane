@@ -294,14 +294,14 @@ catalogs:
     '@vitest/coverage-v8': 4.1.10
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
-    '@tsrx/core': ^0.4.0
-    '@tsrx/prettier-plugin': ^0.4.10
-    '@tsrx/typescript-plugin': ^0.4.10
+    '@tsrx/core': ^0.5.2
+    '@tsrx/prettier-plugin': ^0.5.2
+    '@tsrx/typescript-plugin': ^0.5.2
     '@tsrx/ripple': ^0.2.0
-    '@tsrx/react': ^0.3.7
-    '@tsrx/solid': ^0.2.7
-    '@tsrx/vite-plugin-react': ^0.0.112
-    '@tsrx/vite-plugin-solid': ^0.0.109
+    '@tsrx/react': ^0.4.2
+    '@tsrx/solid': ^0.3.2
+    '@tsrx/vite-plugin-react': ^0.0.117
+    '@tsrx/vite-plugin-solid': ^0.0.114
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.14
@@ -350,7 +350,7 @@ catalogs:
     es-module-lexer: ^1.7.0
     esbuild: ^0.28.1
     esrap: ^2.3.2
-    '@tsrx/oxc': 0.16.0
+    '@tsrx/oxc': 0.18.0
     sucrase: ^3.35.1
     graphql: ^16.14.2
     gsap: 3.15.0
@@ -386,7 +386,7 @@ catalogs:
     playwright: ^1.61.1
     picocolors: ^1.1.1
     '@clack/prompts': ^1.7.0
-    prettier: ^3.9.6
+    prettier: ^3.9.9
     '@xyflow/system': 0.0.79
     '@xyflow/react': 12.11.2
     preact: ^10.29.8
@@ -596,29 +596,29 @@ minimumReleaseAgeExclude:
   - '@blocknote/core@0.53.0'
   - '@blocknote/react@0.53.0'
   - '@tanstack/db@0.7.0'
-  - '@tsrx/oxc-darwin-arm64@0.16.0'
-  - '@tsrx/oxc-darwin-x64@0.16.0'
-  - '@tsrx/oxc-linux-arm64-gnu@0.16.0'
-  - '@tsrx/oxc-linux-arm64-musl@0.16.0'
-  - '@tsrx/oxc-linux-x64-gnu@0.16.0'
-  - '@tsrx/oxc-linux-x64-musl@0.16.0'
-  - '@tsrx/oxc-win32-arm64-msvc@0.16.0'
-  - '@tsrx/oxc-win32-x64-msvc@0.16.0'
-  - '@tsrx/oxc@0.16.0'
+  - '@tsrx/oxc-darwin-arm64@0.18.0'
+  - '@tsrx/oxc-darwin-x64@0.18.0'
+  - '@tsrx/oxc-linux-arm64-gnu@0.18.0'
+  - '@tsrx/oxc-linux-arm64-musl@0.18.0'
+  - '@tsrx/oxc-linux-x64-gnu@0.18.0'
+  - '@tsrx/oxc-linux-x64-musl@0.18.0'
+  - '@tsrx/oxc-win32-arm64-msvc@0.18.0'
+  - '@tsrx/oxc-win32-x64-msvc@0.18.0'
+  - '@tsrx/oxc@0.18.0'
   - '@ripple-ts/adapter@0.4.0'
   - '@ripple-ts/vite-plugin@0.4.0'
-  - '@tsrx/core@0.3.2 || 0.4.0'
-  - '@tsrx/prettier-plugin@0.4.10'
-  - '@tsrx/react@0.3.7'
+  - '@tsrx/core@0.5.2'
+  - '@tsrx/prettier-plugin@0.5.2'
+  - '@tsrx/react@0.4.2'
   - '@tsrx/ripple@0.2.0'
-  - '@tsrx/solid@0.2.7'
-  - '@tsrx/typescript-plugin@0.4.10'
-  - '@tsrx/vite-plugin-react@0.0.112'
-  - '@tsrx/vite-plugin-solid@0.0.109'
+  - '@tsrx/solid@0.3.2'
+  - '@tsrx/typescript-plugin@0.5.2'
+  - '@tsrx/vite-plugin-react@0.0.117'
+  - '@tsrx/vite-plugin-solid@0.0.114'
   - ripple@0.4.0
-  - '@tsrx/runtime@0.2.3 || 0.2.4'
-  - '@tsrx/react-runtime@0.1.11'
-  - '@tsrx/solid-runtime@0.1.11'
+  - '@tsrx/runtime@0.2.4'
+  - '@tsrx/react-runtime@0.1.12'
+  - '@tsrx/solid-runtime@0.1.12'
   - cn@0.2.6
   - '@tanstack/react-virtual@3.14.12'
   - '@tanstack/virtual-core@3.17.10'
@@ -633,21 +633,21 @@ minimumReleaseAgeExclude:
 # and the parameter-property and bodyless-method mapping fix
 # (https://github.com/tsrx-org/tsrx/pull/143) in @tsrx/core >= 0.3.0.
 patchedDependencies:
-  # Print source-phase imports (`import source x from`, `import.source()`) in
-  # withDeferredImports. It printed only the `defer` phase, and esrap ignores
-  # `phase`, so compiled output silently became an evaluation-phase import. Not
-  # yet fixed upstream in tsrx-org/tsrx (checked through @tsrx/core 0.5.2).
+  # Two @tsrx/core fixes not yet released upstream in tsrx-org/tsrx (checked
+  # through 0.5.2); drop each once an adopted release includes it.
+  # - Resolve a parenthesized `<style>` block as a style `apply` target. The
+  #   formatter wraps a multi-line assigned block, `const theme = (<style>…</style>);`,
+  #   and the editor parse keeps the parentheses (`preserveParens`), so
+  #   analyze_styles reported TSRX3002 in Volar and octane-tsc for a valid theme.
+  #   Guarded by packages/octane/tests/compiler/volar.test.ts.
+  # - Print source-phase imports (`import source x from`, `import.source()`) in
+  #   withDeferredImports. It printed only the `defer` phase, and esrap ignores
+  #   `phase`, so compiled output silently became an evaluation-phase import.
+  #   Guarded by packages/octane/tests/compiler/module-import-phases.test.ts.
   # SCOPE: like every entry here, this does not ship in the published octane
   # tarball; consumers resolve unpatched @tsrx/core until an upstream release is
-  # adopted. Guarded by packages/octane/tests/compiler/module-import-phases.test.ts.
-  # Drop when the adopted @tsrx/core prints the source phase.
-  '@tsrx/core@0.4.0': patches/@tsrx__core@0.4.0.patch
-  # Print labeled statements and empty statement bodies instead of deleting
-  # them, and throw on a node type with no printer instead of writing a
-  # placeholder comment. Backports tsrx-org/tsrx#322 and the empty-body part of
-  # tsrx-org/tsrx#283 (both in @tsrx/prettier-plugin >= 0.4.12); guarded by
-  # scripts/tsrx-prettier-plugin.test.mjs. Drop when the plugin is upgraded.
-  '@tsrx/prettier-plugin@0.4.10': patches/@tsrx__prettier-plugin@0.4.10.patch
+  # adopted.
+  '@tsrx/core@0.5.2': patches/@tsrx__core@0.5.2.patch
   # Preserve sibling package URLs when browser mocks share a directory-name prefix.
   # Browser ships its own prebundled copy of the mocker implementation.
   '@vitest/browser@4.1.10': patches/@vitest__browser@4.1.10.patch

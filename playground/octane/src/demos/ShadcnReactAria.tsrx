@@ -121,51 +121,59 @@ function Section(props: { title: string; children?: unknown }) @{
 // its shell with no items — silently. Author collection-backed families with
 // `return <jsx>`, which emits descriptors.
 function TabsExample() {
-	return <Tabs defaultSelectedKey="one" class="w-full max-w-sm">
-		<TabsList>
-			<TabsTrigger id="one">One</TabsTrigger>
-			<TabsTrigger id="two">Two</TabsTrigger>
-		</TabsList>
-		<TabsContent id="one">First panel</TabsContent>
-		<TabsContent id="two">Second panel</TabsContent>
-	</Tabs>;
+	return (
+		<Tabs defaultSelectedKey="one" class="w-full max-w-sm">
+			<TabsList>
+				<TabsTrigger id="one">One</TabsTrigger>
+				<TabsTrigger id="two">Two</TabsTrigger>
+			</TabsList>
+			<TabsContent id="one">First panel</TabsContent>
+			<TabsContent id="two">Second panel</TabsContent>
+		</Tabs>
+	);
 }
 
 // RadioGroupItem, like Checkbox and Switch, styles the CONTROL — its label
 // belongs beside it. RAC's radio collection also needs descriptor children.
 function RadioGroupExample() {
-	return <RadioGroup defaultValue="one" className="grid gap-2">
-		<div className="flex items-center gap-2">
-			<RadioGroupItem value="one" id="ra-one" />
-			<Label for="ra-one">One</Label>
-		</div>
-		<div className="flex items-center gap-2">
-			<RadioGroupItem value="two" id="ra-two" />
-			<Label for="ra-two">Two</Label>
-		</div>
-	</RadioGroup>;
+	return (
+		<RadioGroup defaultValue="one" className="grid gap-2">
+			<div className="flex items-center gap-2">
+				<RadioGroupItem value="one" id="ra-one" />
+				<Label for="ra-one">One</Label>
+			</div>
+			<div className="flex items-center gap-2">
+				<RadioGroupItem value="two" id="ra-two" />
+				<Label for="ra-two">Two</Label>
+			</div>
+		</RadioGroup>
+	);
 }
 
 function AccordionExample() {
-	return <Accordion className="w-full max-w-sm">
-		<AccordionItem>
-			<AccordionTrigger>Item one</AccordionTrigger>
-			<AccordionContent>Panel body.</AccordionContent>
-		</AccordionItem>
-	</Accordion>;
+	return (
+		<Accordion className="w-full max-w-sm">
+			<AccordionItem>
+				<AccordionTrigger>Item one</AccordionTrigger>
+				<AccordionContent>Panel body.</AccordionContent>
+			</AccordionItem>
+		</Accordion>
+	);
 }
 
 function BreadcrumbExample() {
-	return <Breadcrumb>
-		<BreadcrumbList>
-			<BreadcrumbItem>
-				<BreadcrumbLink href="#">Home</BreadcrumbLink>
-			</BreadcrumbItem>
-			<BreadcrumbItem>
-				<BreadcrumbPage>Components</BreadcrumbPage>
-			</BreadcrumbItem>
-		</BreadcrumbList>
-	</Breadcrumb>;
+	return (
+		<Breadcrumb>
+			<BreadcrumbList>
+				<BreadcrumbItem>
+					<BreadcrumbLink href="#">Home</BreadcrumbLink>
+				</BreadcrumbItem>
+				<BreadcrumbItem>
+					<BreadcrumbPage>Components</BreadcrumbPage>
+				</BreadcrumbItem>
+			</BreadcrumbList>
+		</Breadcrumb>
+	);
 }
 
 export function ShadcnReactAriaDemo() @{

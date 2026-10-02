@@ -31,8 +31,7 @@ function Reader(props: { step: number; load: Props['load'] }) @{
 export function KeyedRemovalLifetime(props: Props) @{
 	const [step, setStep] = useState(0);
 	props.api.setStep = setStep;
-	const rows =
-		step === 0 ? ['a', 'b', 'c'] : ['a', 'c'];
+	const rows = step === 0 ? ['a', 'b', 'c'] : ['a', 'c'];
 	<section>
 		@try {
 			<div>

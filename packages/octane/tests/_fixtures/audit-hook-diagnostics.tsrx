@@ -72,7 +72,7 @@ export function ActionWarning(props: {
 }) @{
 	const [optimistic, add] = useOptimistic(0, (state: number, value: number) => state + value);
 	const [value, dispatch] = useActionState(
-		(state: number) => props.kind === 'async' ? Promise.resolve(state + 1) : state + 1,
+		(state: number) => (props.kind === 'async' ? Promise.resolve(state + 1) : state + 1),
 		0,
 	);
 	props.bind(props.kind === 'optimistic' ? () => add(1) : () => dispatch());

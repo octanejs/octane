@@ -1,7 +1,9 @@
 import { motion } from '@octanejs/motion';
 
 export function Hero() @{
-	<motion.div id="hero" layoutId="hero" transition={{ duration: 0.4 }}>{'h'}</motion.div>
+	<motion.div id="hero" layoutId="hero" transition={{ duration: 0.4 }}>
+		{'h'}
+	</motion.div>
 }
 
 export function NamedHero(props) @{
@@ -11,5 +13,7 @@ export function NamedHero(props) @{
 		layoutId={props.layoutId}
 		style={props.style}
 		transition={{ duration: 0.4 }}
-	>{'h'}</motion.div>
+	>
+		{'h'}
+	</motion.div>
 }

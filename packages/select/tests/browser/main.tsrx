@@ -55,11 +55,8 @@ controlElement.getBoundingClientRect = () => ({
 
 const common = {
 	className: 'consumer-portal',
-	cx: (state: Record<string, boolean>, ...names: (string | undefined)[]) => classNames(
-		'probe',
-		state,
-		...names.filter((name): name is string => name !== undefined),
-	),
+	cx: (state: Record<string, boolean>, ...names: (string | undefined)[]) =>
+		classNames('probe', state, ...names.filter((name): name is string => name !== undefined)),
 	getClassNames: (name: string) => `custom-${name}`,
 	getStyles: (name: string, componentProps: unknown) =>
 		defaultStyles[name as keyof typeof defaultStyles](componentProps as never, false),
@@ -152,9 +149,7 @@ const asyncCreatableChanges = { octane: [] as unknown[], react: [] as unknown[] 
 function asyncCreatableProps(engine: 'octane' | 'react') {
 	return {
 		cacheOptions: true,
-		defaultOptions: [
-			{ label: 'Existing', value: 'existing' },
-		],
+		defaultOptions: [{ label: 'Existing', value: 'existing' }],
 		instanceId: `async-creatable-${engine}`,
 		loadOptions(inputValue: string) {
 			return new Promise<readonly AsyncOption[]>((resolve, reject) => {
@@ -242,10 +237,8 @@ function nonceSnapshot(cacheKey: string) {
 		),
 	];
 	return {
-		classes: [...nonceRootElement.querySelectorAll('[class]')].flatMap(
-			(element) => [...element.classList].filter(
-				(className) => className.startsWith(`${cacheKey}-`),
-			),
+		classes: [...nonceRootElement.querySelectorAll('[class]')].flatMap((element) =>
+			[...element.classList].filter((className) => className.startsWith(`${cacheKey}-`)),
 		),
 		nonces: styles.map((style) => style.getAttribute('nonce')),
 		styleCount: styles.length,
@@ -331,8 +324,7 @@ window.__reactSelectFull = {
 		return { octane: [...selectLogs.octane], react: [...selectLogs.react] };
 	},
 	instanceMethods(engine: 'octane' | 'react') {
-		const instance =
-			engine === 'octane' ? octaneSelectInstance : reactSelectInstance;
+		const instance = engine === 'octane' ? octaneSelectInstance : reactSelectInstance;
 		if (!instance) throw new Error(`missing ${engine} Select instance`);
 		return [
 			'blur',
@@ -358,32 +350,26 @@ window.__reactSelectFull = {
 		);
 	},
 	selectThroughInstance(engine: 'octane' | 'react') {
-		const instance =
-			engine === 'octane' ? octaneSelectInstance : reactSelectInstance;
+		const instance = engine === 'octane' ? octaneSelectInstance : reactSelectInstance;
 		if (!instance) throw new Error(`missing ${engine} Select instance`);
 		instance.selectOption(browserSelectOptions[1]!);
 	},
 	clearThroughInstance(engine: 'octane' | 'react') {
-		const instance =
-			engine === 'octane' ? octaneSelectInstance : reactSelectInstance;
+		const instance = engine === 'octane' ? octaneSelectInstance : reactSelectInstance;
 		if (!instance) throw new Error(`missing ${engine} Select instance`);
 		instance.clearValue();
 	},
 	setThroughInstance(engine: 'octane' | 'react') {
-		const instance =
-			engine === 'octane' ? octaneSelectInstance : reactSelectInstance;
+		const instance = engine === 'octane' ? octaneSelectInstance : reactSelectInstance;
 		if (!instance) throw new Error(`missing ${engine} Select instance`);
 		instance.setValue(browserSelectOptions[0]!, 'select-option');
 	},
 	renderRequired() {
 		flushSync(() => {
-			octaneSelectRoot.render(
-				BrowserSelectFixture,
-				{
-					...browserSelectProps('octane'),
-					required: true,
-				} as never,
-			);
+			octaneSelectRoot.render(BrowserSelectFixture, {
+				...browserSelectProps('octane'),
+				required: true,
+			} as never);
 		});
 		flushReact(() => {
 			reactSelectRoot.render(
@@ -398,13 +384,10 @@ window.__reactSelectFull = {
 		if (engine === 'octane') {
 			flushSync(() => octaneSelectRoot.render(() => null, {}));
 			flushSync(() => {
-				octaneSelectRoot.render(
-					BrowserSelectFixture,
-					{
-						...browserSelectProps('octane'),
-						autoFocus: true,
-					} as never,
-				);
+				octaneSelectRoot.render(BrowserSelectFixture, {
+					...browserSelectProps('octane'),
+					autoFocus: true,
+				} as never);
 			});
 			return;
 		}
@@ -498,13 +481,10 @@ const animatedProps = {
 const octaneAnimatedRoot = createRoot(octaneAnimatedElement);
 const reactAnimatedRoot = createReactRoot(reactAnimatedElement);
 flushSync(() => {
-	octaneAnimatedRoot.render(
-		MultiSelectFixture,
-		{
-			...animatedProps,
-			components: makeAnimated(),
-		} as never,
-	);
+	octaneAnimatedRoot.render(MultiSelectFixture, {
+		...animatedProps,
+		components: makeAnimated(),
+	} as never);
 });
 flushReact(() => {
 	reactAnimatedRoot.render(
@@ -517,9 +497,9 @@ flushReact(() => {
 
 function animatedSnapshot(rootId: string) {
 	const root = document.getElementById(rootId)!;
-	const labels = Array.from(root.querySelectorAll('[aria-label^="Remove "]')).map(
-		(element) => element.getAttribute('aria-label')?.slice('Remove '.length),
-	).filter((value): value is string => Boolean(value));
+	const labels = Array.from(root.querySelectorAll('[aria-label^="Remove "]'))
+		.map((element) => element.getAttribute('aria-label')?.slice('Remove '.length))
+		.filter((value): value is string => Boolean(value));
 	const collapse = root.querySelector('[aria-label="Remove One"]')?.parentElement?.parentElement;
 	return {
 		labels,
@@ -647,9 +627,7 @@ let reactAsync!: AsyncResult;
 function asyncProps(engine: 'octane' | 'react') {
 	return {
 		cacheOptions: true,
-		defaultOptions: [
-			{ label: 'Default', value: 'default' },
-		],
+		defaultOptions: [{ label: 'Default', value: 'default' }],
 		loadOptions(inputValue: string) {
 			return new Promise<readonly AsyncOption[]>((resolve, reject) => {
 				requests[engine].push({ inputValue, reject, resolve });
@@ -734,9 +712,10 @@ declare global {
 		__reactSelectAsync: {
 			snapshot: typeof snapshotAsync;
 			input(value: string): Promise<ReturnType<typeof snapshotAsync>>;
-			resolve(inputValue: string, options: readonly AsyncOption[]): Promise<
-				ReturnType<typeof snapshotAsync>
-			>;
+			resolve(
+				inputValue: string,
+				options: readonly AsyncOption[],
+			): Promise<ReturnType<typeof snapshotAsync>>;
 			reject(inputValue: string): Promise<ReturnType<typeof snapshotAsync>>;
 		};
 	}

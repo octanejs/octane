@@ -26,9 +26,7 @@ const data = [
 			{
 				name: 'a-2',
 				size: 2,
-				subRows: [
-					{ name: 'a-2-x', size: 1 },
-				],
+				subRows: [{ name: 'a-2-x', size: 1 }],
 			},
 		],
 	},
@@ -49,10 +47,9 @@ export function VisExpand() @{
 	});
 	<div>
 		@for (const col of table.getAllLeafColumns(); key col.id) {
-			<button
-				id={'vis-' + col.id}
-				onClick={() => col.toggleVisibility()}
-			>{col.id as string}</button>
+			<button id={'vis-' + col.id} onClick={() => col.toggleVisibility()}>
+				{col.id as string}
+			</button>
 		}
 		<table>
 			<thead>

@@ -35,9 +35,11 @@ const cardAnchor = (card: { id: string }) => 'bench-' + card.id;
 export const BENCH_SECTIONS: readonly { id: string; title: string; level?: 2 | 3 }[] = [
 	{ id: 'bench-overview', title: 'Every suite at a glance' },
 	{ id: 'bench-frameworks', title: 'Octane vs the field' },
-	...FRAMEWORK_CARDS.map(
-		(card) => ({ id: cardAnchor(card), title: card.title, level: 3 as const }),
-	),
+	...FRAMEWORK_CARDS.map((card) => ({
+		id: cardAnchor(card),
+		title: card.title,
+		level: 3 as const,
+	})),
 	{ id: 'bench-targets', title: 'Head-to-head targets' },
 	...TARGET_CARDS.map((card) => ({ id: cardAnchor(card), title: card.title, level: 3 as const })),
 	{ id: 'bench-lynx', title: 'Octane on Lynx' },
@@ -230,7 +232,9 @@ export function Benchmarks() @{
 						onClick={toggleMobileNavigation}
 					>
 						<span>Benchmarks</span>
-						<span class="benchpage-sidebar-icon" aria-hidden="true">+</span>
+						<span class="benchpage-sidebar-icon" aria-hidden="true">
+							+
+						</span>
 					</button>
 					<div
 						class={['benchpage-sidebar-panel', mobileMenuOpen && 'is-open']}
@@ -264,13 +268,17 @@ export function Benchmarks() @{
 								href="https://github.com/octanejs/octane/tree/main/benchmarks"
 								target="_blank"
 								rel="noreferrer"
-							>{'benchmarks/'}</a>
+							>
+								{'benchmarks/'}
+							</a>
 							{' for what each suite measures.'}
 						</p>
 					</header>
 
 					<section class="benchpage-section" aria-labelledby="bench-overview">
-						<h2 id="bench-overview" class="benchpage-h2">Every suite at a glance</h2>
+						<h2 id="bench-overview" class="benchpage-h2">
+							Every suite at a glance
+						</h2>
 						<p class="benchpage-note">
 							Start here: each cell is the geometric mean of that suite’s per-operation scores
 							relative to Octane — 1× is Octane, below 1× is faster than Octane. Pick frameworks and
@@ -282,7 +290,9 @@ export function Benchmarks() @{
 					</section>
 
 					<section class="benchpage-section" aria-labelledby="bench-frameworks">
-						<h2 id="bench-frameworks" class="benchpage-h2">Octane vs the field</h2>
+						<h2 id="bench-frameworks" class="benchpage-h2">
+							Octane vs the field
+						</h2>
 						<p class="benchpage-note">
 							Octane compiled from .tsrx and .tsx, against React 19 with the official React
 							Compiler, Preact 10, Solid, Svelte 5, Ripple, Vue Vapor and Inferno 9 — each
@@ -307,7 +317,9 @@ export function Benchmarks() @{
 					</section>
 
 					<section class="benchpage-section" aria-labelledby="bench-targets">
-						<h2 id="bench-targets" class="benchpage-h2">Head-to-head targets</h2>
+						<h2 id="bench-targets" class="benchpage-h2">
+							Head-to-head targets
+						</h2>
 						<p class="benchpage-note">
 							Suites whose roster is a specific stack rather than the whole field: Octane against
 							React on real HTTP servers, composed async trees and the same TanStack Start app, and
@@ -330,7 +342,9 @@ export function Benchmarks() @{
 					</section>
 
 					<section class="benchpage-section" aria-labelledby="bench-lynx">
-						<h2 id="bench-lynx" class="benchpage-h2">Octane on Lynx</h2>
+						<h2 id="bench-lynx" class="benchpage-h2">
+							Octane on Lynx
+						</h2>
 						<p class="benchpage-note">
 							The dual-thread Lynx renderer on the same cross-framework table app as ReactLynx and
 							both Vue Lynx renderers, measured two ways: wall clock on the Lynx-for-Web host with
@@ -354,7 +368,9 @@ export function Benchmarks() @{
 					</section>
 
 					<section class="benchpage-section" aria-labelledby="bench-internal">
-						<h2 id="bench-internal" class="benchpage-h2">The authoring cliff</h2>
+						<h2 id="bench-internal" class="benchpage-h2">
+							The authoring cliff
+						</h2>
 						<p class="benchpage-note">
 							Octane against itself: what naively-authored code costs relative to the compiled fast
 							path. The de-opt fixtures render the same apps through plain createElement — the shape

@@ -27,10 +27,7 @@ export function ShortcutProbe(props: ShortcutProbeProps) @{
 	<span id="shortcut-probe">Ready</span>
 }
 
-export function MultipleShortcutsProbe(props: {
-	onFirst: () => void;
-	onSecond: () => void;
-}) @{
+export function MultipleShortcutsProbe(props: { onFirst: () => void; onSecond: () => void }) @{
 	useHotkeys([
 		{ hotkey: 'Control+K', callback: props.onFirst },
 		{ hotkey: 'Control+L', callback: props.onSecond },

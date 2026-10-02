@@ -38,14 +38,22 @@ let instanceCount = 0;
 
 const DEFAULT_ARIA_LABELS = {
 	cropArea: 'Use the arrow keys to move the crop selection area',
-	nwDragHandle: 'Use the arrow keys to move the north west drag handle to change the crop selection area',
-	nDragHandle: 'Use the up and down arrow keys to move the north drag handle to change the crop selection area',
-	neDragHandle: 'Use the arrow keys to move the north east drag handle to change the crop selection area',
-	eDragHandle: 'Use the up and down arrow keys to move the east drag handle to change the crop selection area',
-	seDragHandle: 'Use the arrow keys to move the south east drag handle to change the crop selection area',
-	sDragHandle: 'Use the up and down arrow keys to move the south drag handle to change the crop selection area',
-	swDragHandle: 'Use the arrow keys to move the south west drag handle to change the crop selection area',
-	wDragHandle: 'Use the up and down arrow keys to move the west drag handle to change the crop selection area',
+	nwDragHandle:
+		'Use the arrow keys to move the north west drag handle to change the crop selection area',
+	nDragHandle:
+		'Use the up and down arrow keys to move the north drag handle to change the crop selection area',
+	neDragHandle:
+		'Use the arrow keys to move the north east drag handle to change the crop selection area',
+	eDragHandle:
+		'Use the up and down arrow keys to move the east drag handle to change the crop selection area',
+	seDragHandle:
+		'Use the arrow keys to move the south east drag handle to change the crop selection area',
+	sDragHandle:
+		'Use the up and down arrow keys to move the south drag handle to change the crop selection area',
+	swDragHandle:
+		'Use the arrow keys to move the south west drag handle to change the crop selection area',
+	wDragHandle:
+		'Use the up and down arrow keys to move the west drag handle to change the crop selection area',
 };
 
 export interface ReactCropProps {
@@ -66,7 +74,7 @@ export interface ReactCropProps {
 	/** Classes to pass to the `ReactCrop` element. */
 	className?: string;
 	/** The elements that you want to perform a crop on. For example
- * an image or video. */
+	 * an image or video. */
 	children?: OctaneNode;
 	/** Show the crop area as a circle. If your aspect is not 1 (a square) then the circle will be warped into an oval shape. Defaults to false. */
 	circularCrop?: boolean;
@@ -129,13 +137,10 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 	const initChangeCalledRef = useRef(false);
 	const instanceIdRef = useRef<string | null>(null);
 	const previousCropRef = useRef<Crop | undefined>(props.crop);
-	const docListenersRef = useRef<
-		| {
-				move: (event: PointerEvent) => void;
-				done: (event: PointerEvent) => void;
-		  }
-		| null
-	>(null);
+	const docListenersRef = useRef<{
+		move: (event: PointerEvent) => void;
+		done: (event: PointerEvent) => void;
+	} | null>(null);
 
 	if (instanceIdRef.current === null) {
 		instanceIdRef.current = `rc-${instanceCount++}`;
@@ -270,7 +275,7 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 		const { crop, disabled, locked, keepSelection, onChange } = propsRef.current;
 		const box = getBox();
 
-		if (disabled || locked || keepSelection && crop) {
+		if (disabled || locked || (keepSelection && crop)) {
 			return;
 		}
 
@@ -370,12 +375,11 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 		const box = getBox();
 		const nextCrop = makePixelCrop(box);
 		const ctrlCmdPressed = navigator.platform.match('Mac') ? event.metaKey : event.ctrlKey;
-		const nudgeStep =
-			ctrlCmdPressed
-				? ReactCrop.nudgeStepLarge
-				: event.shiftKey
-					? ReactCrop.nudgeStepMedium
-					: ReactCrop.nudgeStep;
+		const nudgeStep = ctrlCmdPressed
+			? ReactCrop.nudgeStepLarge
+			: event.shiftKey
+				? ReactCrop.nudgeStepMedium
+				: ReactCrop.nudgeStep;
 
 		if (keyCode === 'ArrowLeft') {
 			nextCrop.x -= nudgeStep;
@@ -427,8 +431,10 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 
 		// Keep the event from bubbling up to the container
 		if (
-			event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' ||
-				event.key === 'ArrowRight'
+			event.key === 'ArrowUp' ||
+			event.key === 'ArrowDown' ||
+			event.key === 'ArrowLeft' ||
+			event.key === 'ArrowRight'
 		) {
 			event.stopPropagation();
 			event.preventDefault();
@@ -437,12 +443,11 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 		}
 
 		const ctrlCmdPressed = navigator.platform.match('Mac') ? event.metaKey : event.ctrlKey;
-		const offset =
-			ctrlCmdPressed
-				? ReactCrop.nudgeStepLarge
-				: event.shiftKey
-					? ReactCrop.nudgeStepMedium
-					: ReactCrop.nudgeStep;
+		const offset = ctrlCmdPressed
+			? ReactCrop.nudgeStepLarge
+			: event.shiftKey
+				? ReactCrop.nudgeStepMedium
+				: ReactCrop.nudgeStep;
 
 		const pixelCrop = convertToPixelCrop(crop, box.width, box.height);
 		const nudgedCrop = nudgeCrop(pixelCrop, event.key, offset, ord);
@@ -570,7 +575,7 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 		const mw = Math.min(minWidth, box.width);
 		const mh = Math.min(minHeight, box.height);
 
-		if (!aspect || !mw && !mh) {
+		if (!aspect || (!mw && !mh)) {
 			return [mw, mh];
 		}
 
@@ -599,11 +604,11 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 
 		// When min dimensions are set, ensure crop isn't dragged when going
 		// beyond the other side #554
-		if (minWidth && ord === 'nw' || ord === 'w' || ord === 'sw') {
+		if ((minWidth && ord === 'nw') || ord === 'w' || ord === 'sw') {
 			xDiff = Math.min(xDiff, -minWidth);
 		}
 
-		if (minHeight && ord === 'nw' || ord === 'n' || ord === 'ne') {
+		if ((minHeight && ord === 'nw') || ord === 'n' || ord === 'ne') {
 			yDiff = Math.min(yDiff, -minHeight);
 		}
 
@@ -706,17 +711,18 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 			return undefined;
 		}
 
-		return <div
-			style={style}
-			className="ReactCrop__crop-selection"
-			onPointerDown={onCropPointerDown}
-			aria-label={ariaLabels.cropArea}
-			tabIndex={0}
-			onKeyDown={onComponentKeyDown}
-			role="group"
-		>
-			{!disabled && !locked
-				? <div className="ReactCrop__drag-elements" onFocus={onDragFocus}>
+		return (
+			<div
+				style={style}
+				className="ReactCrop__crop-selection"
+				onPointerDown={onCropPointerDown}
+				aria-label={ariaLabels.cropArea}
+				tabIndex={0}
+				onKeyDown={onComponentKeyDown}
+				role="group"
+			>
+				{!disabled && !locked ? (
+					<div className="ReactCrop__drag-elements" onFocus={onDragFocus}>
 						<div className="ReactCrop__drag-bar ord-n" data-ord="n" />
 						<div className="ReactCrop__drag-bar ord-e" data-ord="e" />
 						<div className="ReactCrop__drag-bar ord-s" data-ord="s" />
@@ -787,24 +793,27 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 							role="button"
 						/>
 					</div>
-				: undefined}
-			{renderSelectionAddon
-				? <div
+				) : undefined}
+				{renderSelectionAddon ? (
+					<div
 						className="ReactCrop__selection-addon"
 						onPointerDown={(event) => event.stopPropagation()}
-					>{renderSelectionAddon({ cropIsActive, newCropIsBeingDrawn })}</div>
-				: undefined}
-			{ruleOfThirds
-				? <>
+					>
+						{renderSelectionAddon({ cropIsActive, newCropIsBeingDrawn })}
+					</div>
+				) : undefined}
+				{ruleOfThirds ? (
+					<>
 						<div className="ReactCrop__rule-of-thirds-hz" />
 						<div className="ReactCrop__rule-of-thirds-vt" />
 					</>
-				: undefined}
-		</div>;
+				) : undefined}
+			</div>
+		);
 	}
 
 	function makePixelCrop(box: Rectangle): PixelCrop {
-		const crop = { ...defaultCrop, ...propsRef.current.crop || {} };
+		const crop = { ...defaultCrop, ...(propsRef.current.crop || {}) };
 		return convertToPixelCrop(crop, box.width, box.height);
 	}
 
@@ -832,19 +841,9 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 		};
 	}, []);
 
-	const {
-		aspect,
-		children,
-		circularCrop,
-		className,
-		crop,
-		disabled,
-		locked,
-		style,
-		ruleOfThirds,
-	} = props;
-	const cropSelection =
-		crop ? renderCropSelection() : null;
+	const { aspect, children, circularCrop, className, crop, disabled, locked, style, ruleOfThirds } =
+		props;
+	const cropSelection = crop ? renderCropSelection() : null;
 
 	const componentClasses = cls(
 		'ReactCrop',
@@ -860,32 +859,37 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 		circularCrop && 'ReactCrop--no-animate',
 	);
 
-	return <div ref={componentRef} className={componentClasses} style={style}>
-		<div
-			ref={mediaRef}
-			className="ReactCrop__child-wrapper"
-			onPointerDown={onComponentPointerDown}
-		>{children}</div>
-		{crop
-			? <svg className="ReactCrop__crop-mask" width="100%" height="100%">
+	return (
+		<div ref={componentRef} className={componentClasses} style={style}>
+			<div
+				ref={mediaRef}
+				className="ReactCrop__child-wrapper"
+				onPointerDown={onComponentPointerDown}
+			>
+				{children}
+			</div>
+			{crop ? (
+				<svg className="ReactCrop__crop-mask" width="100%" height="100%">
 					<defs>
 						<mask id={`hole-${instanceIdRef.current}`}>
 							<rect width="100%" height="100%" fill="white" />
-							{circularCrop
-								? <ellipse
-										cx={`${crop.x + crop.width / 2}${crop.unit}`}
-										cy={`${crop.y + crop.height / 2}${crop.unit}`}
-										rx={`${crop.width / 2}${crop.unit}`}
-										ry={`${crop.height / 2}${crop.unit}`}
-										fill="black"
-									/>
-								: <rect
-										x={`${crop.x}${crop.unit}`}
-										y={`${crop.y}${crop.unit}`}
-										width={`${crop.width}${crop.unit}`}
-										height={`${crop.height}${crop.unit}`}
-										fill="black"
-									/>}
+							{circularCrop ? (
+								<ellipse
+									cx={`${crop.x + crop.width / 2}${crop.unit}`}
+									cy={`${crop.y + crop.height / 2}${crop.unit}`}
+									rx={`${crop.width / 2}${crop.unit}`}
+									ry={`${crop.height / 2}${crop.unit}`}
+									fill="black"
+								/>
+							) : (
+								<rect
+									x={`${crop.x}${crop.unit}`}
+									y={`${crop.y}${crop.unit}`}
+									width={`${crop.width}${crop.unit}`}
+									height={`${crop.height}${crop.unit}`}
+									fill="black"
+								/>
+							)}
 						</mask>
 					</defs>
 					<rect
@@ -896,9 +900,10 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 						mask={`url(#hole-${instanceIdRef.current})`}
 					/>
 				</svg>
-			: undefined}
-		{cropSelection}
-	</div>;
+			) : undefined}
+			{cropSelection}
+		</div>
+	);
 }
 
 ReactCrop.xOrds = ['e', 'w'];

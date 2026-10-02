@@ -11,29 +11,26 @@ import type {
 import type { ExternalMouseEvents } from './types';
 import type { Percent } from '../util/types';
 
-export type RechartsWrapperProps =
-	ExternalMouseEvents & {
-		children: OctaneNode;
-		width: number | Percent | undefined;
-		height: number | Percent | undefined;
-		responsive: boolean;
-		className?: string;
-		style?: CSSProperties;
-		ref?: Ref<HTMLDivElement>;
-		dispatchTouchEvents?: boolean;
-	};
-type WrapperDivProps =
-	Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
-		width: number | string | undefined;
-		height: number | string | undefined;
-		style?: CSSProperties;
-		ref?: Ref<HTMLDivElement>;
-	};
-type StaticDivProps =
-	Omit<WrapperDivProps, 'width' | 'height'> & {
-		width: number;
-		height: number;
-	};
+export type RechartsWrapperProps = ExternalMouseEvents & {
+	children: OctaneNode;
+	width: number | Percent | undefined;
+	height: number | Percent | undefined;
+	responsive: boolean;
+	className?: string;
+	style?: CSSProperties;
+	ref?: Ref<HTMLDivElement>;
+	dispatchTouchEvents?: boolean;
+};
+type WrapperDivProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
+	width: number | string | undefined;
+	height: number | string | undefined;
+	style?: CSSProperties;
+	ref?: Ref<HTMLDivElement>;
+};
+type StaticDivProps = Omit<WrapperDivProps, 'width' | 'height'> & {
+	width: number;
+	height: number;
+};
 // Port of chart/RechartsWrapper.tsx — the outer <div class="recharts-wrapper">:
 // hosts the tooltip/legend portals, reports container size (static, read-once,
 // or ResizeObserver-driven), measures CSS scale, and feeds every user
@@ -46,9 +43,7 @@ import { clsx } from 'clsx';
 import { mouseLeaveChart } from '../state/tooltipSlice';
 import { useAppDispatch } from '../state/hooks';
 import { mouseClickAction, mouseMoveAction } from '../state/mouseEventsMiddleware';
-import {
-	useSynchronisedEventsFromOtherCharts,
-} from '../synchronisation/useChartSynchronisation.tsrx';
+import { useSynchronisedEventsFromOtherCharts } from '../synchronisation/useChartSynchronisation.tsrx';
 import { focusAction, keyDownAction, blurAction } from '../state/keyboardEventsMiddleware';
 import { useReportScale } from '../util/useReportScale.ts';
 import { externalEventAction } from '../state/externalEventsMiddleware';
@@ -88,40 +83,44 @@ function ResponsiveDiv(props: WrapperDivProps) {
 			const roundedWidth = Math.round(newWidth);
 			const roundedHeight = Math.round(newHeight);
 			if (
-				prevState.containerWidth === roundedWidth && prevState.containerHeight === roundedHeight
+				prevState.containerWidth === roundedWidth &&
+				prevState.containerHeight === roundedHeight
 			) {
 				return prevState;
 			}
 			return { containerWidth: roundedWidth, containerHeight: roundedHeight };
 		});
 	}, []);
-	const innerRef = useCallback((node) => {
-		// 1. First, call the external ref if it was provided
-		if (typeof ref === 'function') {
-			ref(node);
-		}
-		// 2. Disconnect any previously active ResizeObserver
-		if (observerRef.current != null) {
-			observerRef.current.disconnect();
-			observerRef.current = null;
-		}
-		// 3. Observe the new node
-		if (node != null && typeof ResizeObserver !== 'undefined') {
-			const { width: containerWidth, height: containerHeight } = node.getBoundingClientRect();
-			setContainerSize(containerWidth, containerHeight);
-			const callback = (entries: ResizeObserverEntry[]) => {
-				const entry = entries[0];
-				if (entry == null) {
-					return;
-				}
-				const { width, height } = entry.contentRect;
-				setContainerSize(width, height);
-			};
-			const observer = new ResizeObserver(callback);
-			observer.observe(node);
-			observerRef.current = observer;
-		}
-	}, [ref, setContainerSize]);
+	const innerRef = useCallback(
+		(node) => {
+			// 1. First, call the external ref if it was provided
+			if (typeof ref === 'function') {
+				ref(node);
+			}
+			// 2. Disconnect any previously active ResizeObserver
+			if (observerRef.current != null) {
+				observerRef.current.disconnect();
+				observerRef.current = null;
+			}
+			// 3. Observe the new node
+			if (node != null && typeof ResizeObserver !== 'undefined') {
+				const { width: containerWidth, height: containerHeight } = node.getBoundingClientRect();
+				setContainerSize(containerWidth, containerHeight);
+				const callback = (entries: ResizeObserverEntry[]) => {
+					const entry = entries[0];
+					if (entry == null) {
+						return;
+					}
+					const { width, height } = entry.contentRect;
+					setContainerSize(width, height);
+				};
+				const observer = new ResizeObserver(callback);
+				observer.observe(node);
+				observerRef.current = observer;
+			}
+		},
+		[ref, setContainerSize],
+	);
 	useEffect(() => {
 		return () => {
 			const observer = observerRef.current;
@@ -130,10 +129,12 @@ function ResponsiveDiv(props: WrapperDivProps) {
 			}
 		};
 	}, [setContainerSize]);
-	return <>
-		<ReportChartSize width={sizes.containerWidth} height={sizes.containerHeight} />
-		<div ref={innerRef} {...divProps} />
-	</>;
+	return (
+		<>
+			<ReportChartSize width={sizes.containerWidth} height={sizes.containerHeight} />
+			<div ref={innerRef} {...divProps} />
+		</>
+	);
 }
 
 function ReadSizeOnceDiv(props: WrapperDivProps) {
@@ -150,35 +151,43 @@ function ReadSizeOnceDiv(props: WrapperDivProps) {
 			const roundedWidth = Math.round(newWidth);
 			const roundedHeight = Math.round(newHeight);
 			if (
-				prevState.containerWidth === roundedWidth && prevState.containerHeight === roundedHeight
+				prevState.containerWidth === roundedWidth &&
+				prevState.containerHeight === roundedHeight
 			) {
 				return prevState;
 			}
 			return { containerWidth: roundedWidth, containerHeight: roundedHeight };
 		});
 	}, []);
-	const innerRef = useCallback((node) => {
-		if (typeof ref === 'function') {
-			ref(node);
-		}
-		if (node != null) {
-			const { width: containerWidth, height: containerHeight } = node.getBoundingClientRect();
-			setContainerSize(containerWidth, containerHeight);
-		}
-	}, [ref, setContainerSize]);
-	return <>
-		<ReportChartSize width={sizes.containerWidth} height={sizes.containerHeight} />
-		<div ref={innerRef} {...divProps} />
-	</>;
+	const innerRef = useCallback(
+		(node) => {
+			if (typeof ref === 'function') {
+				ref(node);
+			}
+			if (node != null) {
+				const { width: containerWidth, height: containerHeight } = node.getBoundingClientRect();
+				setContainerSize(containerWidth, containerHeight);
+			}
+		},
+		[ref, setContainerSize],
+	);
+	return (
+		<>
+			<ReportChartSize width={sizes.containerWidth} height={sizes.containerHeight} />
+			<div ref={innerRef} {...divProps} />
+		</>
+	);
 }
 
 function StaticDiv(props: StaticDivProps) {
 	const { ref, width, height, ...rest } = props;
 	const divProps = { width, height, ...rest };
-	return <>
-		<ReportChartSize width={width} height={height} />
-		<div ref={ref} {...divProps} />
-	</>;
+	return (
+		<>
+			<ReportChartSize width={width} height={height} />
+			<div ref={ref} {...divProps} />
+		</>
+	);
 }
 
 function NonResponsiveDiv(props: WrapperDivProps) {
@@ -194,10 +203,12 @@ function NonResponsiveDiv(props: WrapperDivProps) {
 	// Undefined sizes: report as-is (renders no SVG — intentional back-compat).
 	const { ref, ...divProps } = props;
 	// (width/height are undefined here, so nothing extra lands on the div.)
-	return <>
-		<ReportChartSize width={width} height={height} />
-		<div ref={ref} {...divProps} />
-	</>;
+	return (
+		<>
+			<ReportChartSize width={width} height={height} />
+			<div ref={ref} {...divProps} />
+		</>
+	);
 }
 
 export function RechartsWrapper(props: RechartsWrapperProps) {
@@ -236,95 +247,136 @@ export function RechartsWrapper(props: RechartsWrapperProps) {
 		responsiveContainerCalculations?.height > 0
 			? responsiveContainerCalculations.height
 			: heightFromProps;
-	const innerRef = useCallback((node) => {
-		setScaleRef(node);
-		if (typeof ref === 'function') {
-			ref(node);
-		}
-		setTooltipPortal(node);
-		setLegendPortal(node);
-		if (node != null) {
-			containerRef.current = node;
-		}
-	}, [setScaleRef, ref, setTooltipPortal, setLegendPortal]);
-	const myOnClick = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
-		dispatch(mouseClickAction(e));
-		dispatch(externalEventAction({ handler: onClick, reactEvent: e }));
-	}, [dispatch, onClick]);
-	const myOnMouseEnter = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
-		dispatch(mouseMoveAction(e));
-		dispatch(externalEventAction({ handler: onMouseEnter, reactEvent: e }));
-	}, [dispatch, onMouseEnter]);
-	const myOnMouseLeave = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
-		dispatch(mouseLeaveChart());
-		dispatch(externalEventAction({ handler: onMouseLeave, reactEvent: e }));
-	}, [dispatch, onMouseLeave]);
-	const myOnMouseMove = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
-		dispatch(mouseMoveAction(e));
-		dispatch(externalEventAction({ handler: onMouseMove, reactEvent: e }));
-	}, [dispatch, onMouseMove]);
+	const innerRef = useCallback(
+		(node) => {
+			setScaleRef(node);
+			if (typeof ref === 'function') {
+				ref(node);
+			}
+			setTooltipPortal(node);
+			setLegendPortal(node);
+			if (node != null) {
+				containerRef.current = node;
+			}
+		},
+		[setScaleRef, ref, setTooltipPortal, setLegendPortal],
+	);
+	const myOnClick = useCallback(
+		(e: NativeMouseEvent<HTMLDivElement>) => {
+			dispatch(mouseClickAction(e));
+			dispatch(externalEventAction({ handler: onClick, reactEvent: e }));
+		},
+		[dispatch, onClick],
+	);
+	const myOnMouseEnter = useCallback(
+		(e: NativeMouseEvent<HTMLDivElement>) => {
+			dispatch(mouseMoveAction(e));
+			dispatch(externalEventAction({ handler: onMouseEnter, reactEvent: e }));
+		},
+		[dispatch, onMouseEnter],
+	);
+	const myOnMouseLeave = useCallback(
+		(e: NativeMouseEvent<HTMLDivElement>) => {
+			dispatch(mouseLeaveChart());
+			dispatch(externalEventAction({ handler: onMouseLeave, reactEvent: e }));
+		},
+		[dispatch, onMouseLeave],
+	);
+	const myOnMouseMove = useCallback(
+		(e: NativeMouseEvent<HTMLDivElement>) => {
+			dispatch(mouseMoveAction(e));
+			dispatch(externalEventAction({ handler: onMouseMove, reactEvent: e }));
+		},
+		[dispatch, onMouseMove],
+	);
 	const onFocus = useCallback(() => {
 		dispatch(focusAction());
 	}, [dispatch]);
 	const onBlur = useCallback(() => {
 		dispatch(blurAction());
 	}, [dispatch]);
-	const onKeyDown = useCallback((e: NativeKeyboardEvent<HTMLDivElement>) => {
-		dispatch(keyDownAction(e.key));
-	}, [dispatch]);
-	const myOnContextMenu = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
-		dispatch(externalEventAction({ handler: onContextMenu, reactEvent: e }));
-	}, [dispatch, onContextMenu]);
-	const myOnDoubleClick = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
-		dispatch(externalEventAction({ handler: onDoubleClick, reactEvent: e }));
-	}, [dispatch, onDoubleClick]);
-	const myOnMouseDown = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
-		dispatch(externalEventAction({ handler: onMouseDown, reactEvent: e }));
-	}, [dispatch, onMouseDown]);
-	const myOnMouseUp = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
-		dispatch(externalEventAction({ handler: onMouseUp, reactEvent: e }));
-	}, [dispatch, onMouseUp]);
-	const myOnTouchStart = useCallback((e: NativeTouchEvent<HTMLDivElement>) => {
-		dispatch(externalEventAction({ handler: onTouchStart, reactEvent: e }));
-	}, [dispatch, onTouchStart]);
+	const onKeyDown = useCallback(
+		(e: NativeKeyboardEvent<HTMLDivElement>) => {
+			dispatch(keyDownAction(e.key));
+		},
+		[dispatch],
+	);
+	const myOnContextMenu = useCallback(
+		(e: NativeMouseEvent<HTMLDivElement>) => {
+			dispatch(externalEventAction({ handler: onContextMenu, reactEvent: e }));
+		},
+		[dispatch, onContextMenu],
+	);
+	const myOnDoubleClick = useCallback(
+		(e: NativeMouseEvent<HTMLDivElement>) => {
+			dispatch(externalEventAction({ handler: onDoubleClick, reactEvent: e }));
+		},
+		[dispatch, onDoubleClick],
+	);
+	const myOnMouseDown = useCallback(
+		(e: NativeMouseEvent<HTMLDivElement>) => {
+			dispatch(externalEventAction({ handler: onMouseDown, reactEvent: e }));
+		},
+		[dispatch, onMouseDown],
+	);
+	const myOnMouseUp = useCallback(
+		(e: NativeMouseEvent<HTMLDivElement>) => {
+			dispatch(externalEventAction({ handler: onMouseUp, reactEvent: e }));
+		},
+		[dispatch, onMouseUp],
+	);
+	const myOnTouchStart = useCallback(
+		(e: NativeTouchEvent<HTMLDivElement>) => {
+			dispatch(externalEventAction({ handler: onTouchStart, reactEvent: e }));
+		},
+		[dispatch, onTouchStart],
+	);
 	// Touch has no enter/leave; the middleware resolves the touched element via
 	// document.elementFromPoint.
-	const myOnTouchMove = useCallback((e: NativeTouchEvent<HTMLDivElement>) => {
-		if (dispatchTouchEvents) {
-			dispatch(touchEventAction(e));
-		}
-		dispatch(externalEventAction({ handler: onTouchMove, reactEvent: e }));
-	}, [dispatch, dispatchTouchEvents, onTouchMove]);
-	const myOnTouchEnd = useCallback((e: NativeTouchEvent<HTMLDivElement>) => {
-		dispatch(externalEventAction({ handler: onTouchEnd, reactEvent: e }));
-	}, [dispatch, onTouchEnd]);
+	const myOnTouchMove = useCallback(
+		(e: NativeTouchEvent<HTMLDivElement>) => {
+			if (dispatchTouchEvents) {
+				dispatch(touchEventAction(e));
+			}
+			dispatch(externalEventAction({ handler: onTouchMove, reactEvent: e }));
+		},
+		[dispatch, dispatchTouchEvents, onTouchMove],
+	);
+	const myOnTouchEnd = useCallback(
+		(e: NativeTouchEvent<HTMLDivElement>) => {
+			dispatch(externalEventAction({ handler: onTouchEnd, reactEvent: e }));
+		},
+		[dispatch, onTouchEnd],
+	);
 	const WrapperDiv = responsive ? ResponsiveDiv : NonResponsiveDiv;
-	return <TooltipPortalContext value={tooltipPortal}>
-		<LegendPortalContext value={legendPortal}>
-			<WrapperDiv
-				width={width ?? style?.width}
-				height={height ?? style?.height}
-				className={clsx('recharts-wrapper', className)}
-				style={{ position: 'relative', cursor: 'default', width, height, ...style }}
-				onClick={myOnClick}
-				onContextMenu={myOnContextMenu}
-				onDoubleClick={myOnDoubleClick}
-				onFocus={onFocus}
-				onBlur={onBlur}
-				onKeyDown={onKeyDown}
-				onMouseDown={myOnMouseDown}
-				onMouseEnter={myOnMouseEnter}
-				onMouseLeave={myOnMouseLeave}
-				onMouseMove={myOnMouseMove}
-				onMouseUp={myOnMouseUp}
-				onTouchEnd={myOnTouchEnd}
-				onTouchMove={myOnTouchMove}
-				onTouchStart={myOnTouchStart}
-				ref={innerRef}
-			>
-				<EventSynchronizer />
-				{children}
-			</WrapperDiv>
-		</LegendPortalContext>
-	</TooltipPortalContext>;
+	return (
+		<TooltipPortalContext value={tooltipPortal}>
+			<LegendPortalContext value={legendPortal}>
+				<WrapperDiv
+					width={width ?? style?.width}
+					height={height ?? style?.height}
+					className={clsx('recharts-wrapper', className)}
+					style={{ position: 'relative', cursor: 'default', width, height, ...style }}
+					onClick={myOnClick}
+					onContextMenu={myOnContextMenu}
+					onDoubleClick={myOnDoubleClick}
+					onFocus={onFocus}
+					onBlur={onBlur}
+					onKeyDown={onKeyDown}
+					onMouseDown={myOnMouseDown}
+					onMouseEnter={myOnMouseEnter}
+					onMouseLeave={myOnMouseLeave}
+					onMouseMove={myOnMouseMove}
+					onMouseUp={myOnMouseUp}
+					onTouchEnd={myOnTouchEnd}
+					onTouchMove={myOnTouchMove}
+					onTouchStart={myOnTouchStart}
+					ref={innerRef}
+				>
+					<EventSynchronizer />
+					{children}
+				</WrapperDiv>
+			</LegendPortalContext>
+		</TooltipPortalContext>
+	);
 }

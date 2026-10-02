@@ -121,85 +121,83 @@ function BlogPost() {
 	const branch = 'main';
 	const activePartners = useMemo(() => partners.filter((d) => d.status === 'active'), []);
 
-	return <div
-		class={`
+	return (
+		<div
+			class={`
         min-h-[calc(100dvh-var(--navbar-height))]
         flex flex-col
         w-full transition-all duration-300`}
-	>
-		<div class="flex flex-col max-w-full min-w-0 w-full min-h-0 relative mb-8">
-			<div class="min-w-0 flex justify-center w-full min-h-[88dvh] lg:min-h-0 mx-auto">
-				<div class="flex-1 flex flex-col w-full min-w-0">
-					<div class="px-4 pt-4 lg:pt-6">
-						<div class="w-full max-w-[1100px] mx-auto">
-							<div class="flex-1 min-h-0 flex flex-col">
-								<div class="w-full flex justify-center">
+		>
+			<div class="flex flex-col max-w-full min-w-0 w-full min-h-0 relative mb-8">
+				<div class="min-w-0 flex justify-center w-full min-h-[88dvh] lg:min-h-0 mx-auto">
+					<div class="flex-1 flex flex-col w-full min-w-0">
+						<div class="px-4 pt-4 lg:pt-6">
+							<div class="w-full max-w-[1100px] mx-auto">
+								<div class="flex-1 min-h-0 flex flex-col">
+									<div class="w-full flex justify-center">
+										<div
+											class={[
+												'w-full p-2 lg:p-4 xl:p-6',
+												isTocVisible ? 'max-w-full' : 'max-w-[768px]',
+											].join(' ')}
+										>
+											<Breadcrumbs
+												section="Blog"
+												sectionTo="/blog"
+												headings={isTocVisible ? headings : undefined}
+												tocHiddenBreakpoint="xl"
+											/>
+										</div>
+										{isTocVisible && (
+											<div class="pl-4 w-32 lg:w-36 xl:w-44 2xl:w-56 3xl:w-64 shrink-0 hidden xl:block" />
+										)}
+									</div>
 									<div
 										class={[
-											'w-full p-2 lg:p-4 xl:p-6',
+											'w-full flex justify-center mx-auto',
 											isTocVisible ? 'max-w-full' : 'max-w-[768px]',
 										].join(' ')}
 									>
-										<Breadcrumbs
-											section="Blog"
-											sectionTo="/blog"
-											headings={isTocVisible ? headings : undefined}
-											tocHiddenBreakpoint="xl"
-										/>
-									</div>
-									{isTocVisible &&
-										<div
-											class="pl-4 w-32 lg:w-36 xl:w-44 2xl:w-56 3xl:w-64 shrink-0 hidden xl:block"
-										/>}
-								</div>
-								<div
-									class={[
-										'w-full flex justify-center mx-auto',
-										isTocVisible ? 'max-w-full' : 'max-w-[768px]',
-									].join(' ')}
-								>
-									<div class="flex overflow-auto flex-col w-full p-2 lg:p-4 xl:p-6 pt-0">
-										{!headerImage && slug
-											? <CoverFallback
+										<div class="flex overflow-auto flex-col w-full p-2 lg:p-4 xl:p-6 pt-0">
+											{!headerImage && slug ? (
+												<CoverFallback
 													slug={slug}
 													library={library}
 													className="aspect-[5/2] w-full rounded-2xl mb-6"
 												/>
-											: null}
-										<MarkdownContent
-											title={title}
-											markdown={markdown}
-											preserveTabPanels
-											repo={repo}
-											branch={branch}
-											filePath={filePath}
-											containerRef={markdownContainerRef}
-											eagerFirstImage
-										/>
+											) : null}
+											<MarkdownContent
+												title={title}
+												markdown={markdown}
+												preserveTabPanels
+												repo={repo}
+												branch={branch}
+												filePath={filePath}
+												containerRef={markdownContainerRef}
+												eagerFirstImage
+											/>
+										</div>
+										{isTocVisible && (
+											<div class="pl-4 w-32 lg:w-36 xl:w-44 2xl:w-56 3xl:w-64 shrink-0 hidden xl:block py-4 transition-all">
+												<Toc headings={headings} activeHeadings={activeHeadings} />
+											</div>
+										)}
 									</div>
-									{isTocVisible &&
-										<div
-											class="pl-4 w-32 lg:w-36 xl:w-44 2xl:w-56 3xl:w-64 shrink-0 hidden xl:block py-4 transition-all"
-										>
-											<Toc headings={headings} activeHeadings={activeHeadings} />
-										</div>}
 								</div>
 							</div>
 						</div>
 					</div>
+					<RightRail breakpoint="md">
+						<PartnersRail analyticsPlacement="blog_rail" partners={activePartners} />
+						<div class="hidden md:block border border-gray-500/20 rounded-l-lg overflow-hidden w-full">
+							<RecentPostsWidget enabled={isDesktopViewport} />
+						</div>
+						<Card>
+							<LibrariesWidget />
+						</Card>
+					</RightRail>
 				</div>
-				<RightRail breakpoint="md">
-					<PartnersRail analyticsPlacement="blog_rail" partners={activePartners} />
-					<div
-						class="hidden md:block border border-gray-500/20 rounded-l-lg overflow-hidden w-full"
-					>
-						<RecentPostsWidget enabled={isDesktopViewport} />
-					</div>
-					<Card>
-						<LibrariesWidget />
-					</Card>
-				</RightRail>
 			</div>
 		</div>
-	</div>;
+	);
 }

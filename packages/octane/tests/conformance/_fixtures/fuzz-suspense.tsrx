@@ -9,7 +9,7 @@ export function S1(props) @{
 		} @pending {
 			<span class="f">{'F1'}</span>
 		} @catch (err) {
-			<span class="e">{'E1:' + (err as any).message as string}</span>
+			<span class="e">{('E1:' + (err as any).message) as string}</span>
 		}
 	</div>
 }
@@ -22,11 +22,11 @@ export function S2(props) @{
 		@try {
 			const a = use(props.a);
 			const b = use(props.b);
-			<span class="r">{a + ':' + b as string}</span>
+			<span class="r">{(a + ':' + b) as string}</span>
 		} @pending {
 			<span class="f">{'F2'}</span>
 		} @catch (err) {
-			<span class="e">{'E2:' + (err as any).message as string}</span>
+			<span class="e">{('E2:' + (err as any).message) as string}</span>
 		}
 	</div>
 }
@@ -83,7 +83,7 @@ export function SState(props) @{
 			const [n, setN] = useState(0);
 			_bumpState = setN;
 			const v = use(props.p);
-			<span class="r">{v + ':' + n as string}</span>
+			<span class="r">{(v + ':' + n) as string}</span>
 		} @pending {
 			<span class="f">{'F'}</span>
 		}
@@ -100,7 +100,9 @@ export function SCatchReset(props) @{
 		} @pending {
 			<span class="f">{'F'}</span>
 		} @catch (err, reset) {
-			<button class="reset" onClick={reset}>{'reset:' + (err as any).message as string}</button>
+			<button class="reset" onClick={reset}>
+				{('reset:' + (err as any).message) as string}
+			</button>
 		}
 	</div>
 }

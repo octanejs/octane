@@ -31,11 +31,12 @@ interface YAxisProps<DataPointType = any, DataValueType = any> extends Omit<
 	axisLine?: boolean | SVGProps<SVGLineElement>;
 	type?: AxisDomainTypeInput;
 	domain?: AxisDomain;
-	scale?: | ScaleType
-	| CustomScaleDefinition
-	| CustomScaleDefinition<string>
-	| CustomScaleDefinition<number>
-	| CustomScaleDefinition<Date>;
+	scale?:
+		| ScaleType
+		| CustomScaleDefinition
+		| CustomScaleDefinition<string>
+		| CustomScaleDefinition<number>
+		| CustomScaleDefinition<Date>;
 	yAxisId?: string | number;
 	tick?: TickProp<YAxisTickContentProps>;
 	ticks?: ReadonlyArray<AxisTick>;
@@ -50,13 +51,15 @@ interface YAxisProps<DataPointType = any, DataValueType = any> extends Omit<
 	letterSpacing?: number | string;
 	niceTicks?: NiceTicksAlgorithm;
 }
-export type Props<DataPointType = any, DataValueType = any> =
-	Omit<
-		PresentationAttributesAdaptChildEvent<TickItem, SVGTextElement>,
-		'scale' | 'ref'
-	> & YAxisProps<DataPointType, DataValueType>;
-type PropsWithDefaults<DataPointType = any, DataValueType = any> =
-	RequiresDefaultProps<Props<DataPointType, DataValueType>, typeof yAxisDefaultProps>;
+export type Props<DataPointType = any, DataValueType = any> = Omit<
+	PresentationAttributesAdaptChildEvent<TickItem, SVGTextElement>,
+	'scale' | 'ref'
+> &
+	YAxisProps<DataPointType, DataValueType>;
+type PropsWithDefaults<DataPointType = any, DataValueType = any> = RequiresDefaultProps<
+	Props<DataPointType, DataValueType>,
+	typeof yAxisDefaultProps
+>;
 // Port of cartesian/YAxis.tsx — registers y-axis settings in the store,
 // renders through CartesianAxis, and drives width="auto" via the axis
 // component's imperative getCalculatedWidth handle.
@@ -80,9 +83,11 @@ import { axisPropsAreEqual } from '../util/axisPropsAreEqual';
 import { useCartesianChartLayout } from '../context/chartLayoutContext.ts';
 import { getAxisTypeBasedOnLayout } from '../util/getAxisTypeBasedOnLayout';
 
-function SetYAxisSettings(props: Omit<YAxisSettings, 'type'> & {
-	type: AxisDomainTypeInput;
-}) {
+function SetYAxisSettings(
+	props: Omit<YAxisSettings, 'type'> & {
+		type: AxisDomainTypeInput;
+	},
+) {
 	const dispatch = useAppDispatch();
 	const prevSettingsRef = useRef<YAxisSettings | null>(null);
 	const layout = useCartesianChartLayout();
@@ -130,20 +135,23 @@ function YAxisImpl(props: PropsWithDefaults) {
 	const axisType = 'yAxis';
 	const axisSize: Size | undefined = useAppSelector((state) => selectYAxisSize(state, yAxisId));
 	const position = useAppSelector((state) => selectYAxisPosition(state, yAxisId));
-	const cartesianTickItems = useAppSelector(
-		(state) => selectTicksOfAxis(state, axisType, yAxisId, isPanorama),
+	const cartesianTickItems = useAppSelector((state) =>
+		selectTicksOfAxis(state, axisType, yAxisId, isPanorama),
 	);
 	// Settings come back from the store (not props) so every component renders
 	// one consistent view of the axis (recharts#6257).
-	const synchronizedSettings = useAppSelector(
-		(state) => selectYAxisSettingsNoDefaults(state, yAxisId),
+	const synchronizedSettings = useAppSelector((state) =>
+		selectYAxisSettingsNoDefaults(state, yAxisId),
 	);
 	useLayoutEffect(() => {
 		// No dynamic width calculation when width !== 'auto', or when a
 		// function/element label is used.
 		if (
-			width !== 'auto' || !axisSize || isLabelContentAFunction(label) || isValidElement(label) ||
-				synchronizedSettings == null
+			width !== 'auto' ||
+			!axisSize ||
+			isLabelContentAFunction(label) ||
+			isValidElement(label) ||
+			synchronizedSettings == null
 		) {
 			return;
 		}
@@ -162,22 +170,24 @@ function YAxisImpl(props: PropsWithDefaults) {
 	}
 	const { dangerouslySetInnerHTML, ticks, scale: _del, ...allOtherProps } = props;
 	const { id, scale: _del2, ...restSynchronizedSettings } = synchronizedSettings;
-	return <CartesianAxis
-		{...allOtherProps}
-		{...restSynchronizedSettings}
-		ref={cartesianAxisRef}
-		labelRef={labelRef}
-		x={position.x}
-		y={position.y}
-		tickTextProps={width === 'auto' ? { width: undefined } : { width }}
-		width={axisSize.width}
-		height={axisSize.height}
-		className={clsx('recharts-' + axisType + ' ' + axisType, className)}
-		viewBox={viewBox}
-		ticks={cartesianTickItems}
-		axisType={axisType}
-		axisId={yAxisId}
-	/>;
+	return (
+		<CartesianAxis
+			{...allOtherProps}
+			{...restSynchronizedSettings}
+			ref={cartesianAxisRef}
+			labelRef={labelRef}
+			x={position.x}
+			y={position.y}
+			tickTextProps={width === 'auto' ? { width: undefined } : { width }}
+			width={axisSize.width}
+			height={axisSize.height}
+			className={clsx('recharts-' + axisType + ' ' + axisType, className)}
+			viewBox={viewBox}
+			ticks={cartesianTickItems}
+			axisType={axisType}
+			axisId={yAxisId}
+		/>
+	);
 }
 
 export const yAxisDefaultProps = {

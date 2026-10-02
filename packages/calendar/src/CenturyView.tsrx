@@ -1,8 +1,12 @@
 import { type OctaneNode } from 'octane';
 import Decades from './CenturyView/Decades.tsrx';
 
-type ComponentProps<T extends (...args: any) => any> =
-	T extends (props: infer P, ...rest: any) => any ? P : never;
+type ComponentProps<T extends (...args: any) => any> = T extends (
+	props: infer P,
+	...rest: any
+) => any
+	? P
+	: never;
 
 type CenturyViewProps = ComponentProps<typeof Decades>;
 

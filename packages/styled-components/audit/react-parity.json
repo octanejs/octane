@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -100,32 +100,32 @@
         {
           "path": "packages/styled-components/tests/_fixtures/basic-smoke.tsrx",
           "role": "support",
-          "sha256": "5067809fb722225c4b6c340279f1a0a2d72879fc82f0f7d56818a70d5091e164"
+          "sha256": "0f464d65f1e35aba3b7787b9baa07775e8106e126c5e2681dda9f3bbde14f313"
         },
         {
           "path": "packages/styled-components/tests/_fixtures/themed-card.tsrx",
           "role": "support",
-          "sha256": "5d4f302e89a36cfc7e3e17fff9f64c8c5661ef05a4750d3764e83a5ac5a9c3a4"
+          "sha256": "0a50d887d7205b02dbc1dd8950d7470db58a7e0dfe81a2fc5c6d4e6ae1a9d904"
         },
         {
           "path": "packages/styled-components/tests/_fixtures/attrs-input.tsrx",
           "role": "support",
-          "sha256": "21fcfec8804079391542b7792463bf23846f9d68f2e040d5bb6aa0a27cef59b5"
+          "sha256": "a60281c23047d87d43983a9b14c80e82aed2c56fa81d339d29a7dc912f744df8"
         },
         {
           "path": "packages/styled-components/tests/_fixtures/as-polymorph.tsrx",
           "role": "support",
-          "sha256": "e564107a75958b7ca983d5a9fbbfb5e314ed6076b3713cd28faffd8cefd0d1ee"
+          "sha256": "93d80bc735b91f67397d266258dcb28b6061809de064f484b8b4d28e9e459808"
         },
         {
           "path": "packages/styled-components/tests/_fixtures/global-keyframes.tsrx",
           "role": "support",
-          "sha256": "9a84a2efa65ca348554eb774760ac1db4748929d13c88f4aa372e40eb7ea975d"
+          "sha256": "3fae1f8237088c4324f7ea8a2cf5e47e2c1b4875b6986dc7d23d3fcf17cf546c"
         },
         {
           "path": "packages/styled-components/tests/_fixtures/compose.tsrx",
           "role": "support",
-          "sha256": "0d271e4010701ddad53ddb2c144cc54896dcb1028e10ddcb6cedadd899316f1b"
+          "sha256": "91b4bd1b4a2cebe76093f0ef08adb21ecabe9874593c324782df9ef8ec783249"
         },
         {
           "path": "packages/styled-components/audit/test-classifications.json",

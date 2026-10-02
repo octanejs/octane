@@ -8,7 +8,9 @@ function QueryResult() @{
 		queryFn: async () => 'unreachable',
 		initialData: 'Server Ada',
 	});
-	<output id="query-result">{query.status}:{query.data}</output>
+	<output id="query-result">
+		{query.status}:{query.data}
+	</output>
 }
 
 export function ServerQuery() @{

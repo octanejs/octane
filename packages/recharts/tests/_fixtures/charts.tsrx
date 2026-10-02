@@ -181,9 +181,7 @@ export function HiddenScatterCellsApp({ hide }) @{
 	</ScatterChart>
 }
 
-const zeroErrorBarData = [
-	{ name: 'A', value: 50, error: 0 },
-];
+const zeroErrorBarData = [{ name: 'A', value: 50, error: 0 }];
 
 export function ZeroErrorBarApp() @{
 	<BarChart width={400} height={300} data={zeroErrorBarData}>
@@ -195,9 +193,7 @@ export function ZeroErrorBarApp() @{
 	</BarChart>
 }
 
-const animatedErrorBarData = [
-	{ name: 'A', value: 50, error: 10 },
-];
+const animatedErrorBarData = [{ name: 'A', value: 50, error: 10 }];
 
 export function ErrorBarAnimationOriginApp() @{
 	<BarChart width={400} height={300} data={animatedErrorBarData}>
@@ -247,9 +243,7 @@ export function FunnelAnimationStabilityApp({ fill, onAnimationStart, onAnimatio
 	</FunnelChart>
 }
 
-const scatterAnimationData = [
-	{ x: 10, y: 20 },
-];
+const scatterAnimationData = [{ x: 10, y: 20 }];
 
 export function ScatterAnimationCallbacksApp({ onAnimationStart, onAnimationEnd }) @{
 	<ScatterChart width={500} height={300}>
@@ -419,9 +413,7 @@ export function HiddenPieTooltipApp() @{
 		<Tooltip active defaultIndex={0} includeHidden isAnimationActive={false} />
 		<Pie
 			dataKey="value"
-			data={[
-				{ name: 'Hidden slice', value: 100 },
-			]}
+			data={[{ name: 'Hidden slice', value: 100 }]}
 			hide
 			isAnimationActive={false}
 		/>

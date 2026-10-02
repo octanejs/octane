@@ -6,8 +6,8 @@ import { Shape } from './ActiveShapeUtils.tsrx';
 import { DATA_ITEM_GRAPHICAL_ITEM_ID_ATTRIBUTE_NAME } from './Constants';
 import type { GraphicalItemId } from '../state/graphicalItemsSlice';
 
-export type ScatterShapeProps =
-	ScatterPointItem & ShapeAnimationProps & {
+export type ScatterShapeProps = ScatterPointItem &
+	ShapeAnimationProps & {
 		isActive: boolean;
 		index: number;
 		[DATA_ITEM_GRAPHICAL_ITEM_ID_ATTRIBUTE_NAME]: GraphicalItemId;
@@ -21,15 +21,20 @@ function renderSymbols(props: ScatterSymbolShapeProps) {
 
 const ScatterShape = Shape<ScatterSymbolShapeProps, SVGPathElement>;
 
-export function ScatterSymbol({ option, ...props }: {
+export function ScatterSymbol({
+	option,
+	...props
+}: {
 	option: ActiveShape<ScatterSymbolShapeProps, SVGPathElement> | SymbolType;
 } & ScatterShapeProps) {
 	if (typeof option === 'string') {
-		return <ScatterShape
-			option={<Symbols type={option} {...props} />}
-			DefaultShape={renderSymbols}
-			shapeProps={props}
-		/>;
+		return (
+			<ScatterShape
+				option={<Symbols type={option} {...props} />}
+				DefaultShape={renderSymbols}
+				shapeProps={props}
+			/>
+		);
 	}
 
 	return <ScatterShape option={option} DefaultShape={renderSymbols} shapeProps={props} />;

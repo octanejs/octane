@@ -173,28 +173,37 @@ function getStatelessNavigator() {
 		createHref,
 		encodeLocation,
 		push(to: To) {
-			throw new Error(`You cannot use navigator.push() on the server because it is a stateless ` +
-				`environment. This error was probably triggered when you did a ` +
-				`\`navigate(${JSON.stringify(to)})\` somewhere in your app.`);
+			throw new Error(
+				`You cannot use navigator.push() on the server because it is a stateless ` +
+					`environment. This error was probably triggered when you did a ` +
+					`\`navigate(${JSON.stringify(to)})\` somewhere in your app.`,
+			);
 		},
 		replace(to: To) {
-			throw new Error(`You cannot use navigator.replace() on the server because it is a stateless ` +
-				`environment. This error was probably triggered when you did a ` +
-				`\`navigate(${JSON.stringify(to)}, { replace: true })\` somewhere ` +
-				`in your app.`);
+			throw new Error(
+				`You cannot use navigator.replace() on the server because it is a stateless ` +
+					`environment. This error was probably triggered when you did a ` +
+					`\`navigate(${JSON.stringify(to)}, { replace: true })\` somewhere ` +
+					`in your app.`,
+			);
 		},
 		go(delta: number) {
-			throw new Error(`You cannot use navigator.go() on the server because it is a stateless ` +
-				`environment. This error was probably triggered when you did a ` +
-				`\`navigate(${delta})\` somewhere in your app.`);
+			throw new Error(
+				`You cannot use navigator.go() on the server because it is a stateless ` +
+					`environment. This error was probably triggered when you did a ` +
+					`\`navigate(${delta})\` somewhere in your app.`,
+			);
 		},
 		back() {
-			throw new Error(`You cannot use navigator.back() on the server because it is a stateless ` +
-				`environment.`);
+			throw new Error(
+				`You cannot use navigator.back() on the server because it is a stateless ` + `environment.`,
+			);
 		},
 		forward() {
-			throw new Error(`You cannot use navigator.forward() on the server because it is a stateless ` +
-				`environment.`);
+			throw new Error(
+				`You cannot use navigator.forward() on the server because it is a stateless ` +
+					`environment.`,
+			);
 		},
 	};
 }
@@ -317,8 +326,7 @@ function createHref(to: To) {
 }
 
 function encodeLocation(to: To): Path {
-	let href =
-		typeof to === 'string' ? to : createPath(to);
+	let href = typeof to === 'string' ? to : createPath(to);
 	// Treating this as a full URL will strip any trailing spaces so we need to
 	// pre-encode them since they might be part of a matching splat param from
 	// an ancestor route

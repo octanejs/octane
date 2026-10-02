@@ -12,10 +12,9 @@ export function App() @{
 		<ol>
 			@for (const answer of order; key answer) {
 				<li>
-					<button
-						aria-pressed={picked === answer}
-						onClick={() => setPicked(answer)}
-					>{answer as string}</button>
+					<button aria-pressed={picked === answer} onClick={() => setPicked(answer)}>
+						{answer as string}
+					</button>
 				</li>
 			}
 		</ol>

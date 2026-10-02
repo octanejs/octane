@@ -25,52 +25,56 @@ export const ObjectField = ({
 
 	const data = value || {};
 
-	return <Label
-		label={label || name}
-		icon={labelIcon || <MoreVertical size={16} />}
-		el="div"
-		readOnly={readOnly}
-	>
-		<div className={getClassName()}>
-			<fieldset className={getClassName('fieldset')}>{Object.keys(field.objectFields!).map((
-				subName,
-			) => {
-				const subField = field.objectFields![subName];
+	return (
+		<Label
+			label={label || name}
+			icon={labelIcon || <MoreVertical size={16} />}
+			el="div"
+			readOnly={readOnly}
+		>
+			<div className={getClassName()}>
+				<fieldset className={getClassName('fieldset')}>
+					{Object.keys(field.objectFields!).map((subName) => {
+						const subField = field.objectFields![subName];
 
-				const subPath = `${localName}.${subName}`;
+						const subPath = `${localName}.${subName}`;
 
-				const subReadOnly = readOnly ? readOnly : readOnlyFields[subPath];
+						const subReadOnly = readOnly ? readOnly : readOnlyFields[subPath];
 
-				const label = subField.label || subName;
+						const label = subField.label || subName;
 
-				return <NestedFieldProvider
-					key={subPath}
-					name={localName || id}
-					subName={subName}
-					readOnlyFields={readOnlyFields}
-				>
-					<AutoFieldPrivate
-						name={subPath}
-						label={subPath}
-						id={`${id}_${subName}`}
-						readOnly={subReadOnly}
-						field={{
-							...subField,
-							label, // May be used by custom fields
-						}}
-						value={data[subName]}
-						onChange={(val, ui) => {
-							onChange(
-								{
-									...data,
-									[subName]: val,
-								},
-								ui,
-							);
-						}}
-					/>
-				</NestedFieldProvider>;
-			})}</fieldset>
-		</div>
-	</Label>;
+						return (
+							<NestedFieldProvider
+								key={subPath}
+								name={localName || id}
+								subName={subName}
+								readOnlyFields={readOnlyFields}
+							>
+								<AutoFieldPrivate
+									name={subPath}
+									label={subPath}
+									id={`${id}_${subName}`}
+									readOnly={subReadOnly}
+									field={{
+										...subField,
+										label, // May be used by custom fields
+									}}
+									value={data[subName]}
+									onChange={(val, ui) => {
+										onChange(
+											{
+												...data,
+												[subName]: val,
+											},
+											ui,
+										);
+									}}
+								/>
+							</NestedFieldProvider>
+						);
+					})}
+				</fieldset>
+			</div>
+		</Label>
+	);
 };

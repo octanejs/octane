@@ -82,7 +82,9 @@ function PanelHost(props: PanelProps) @{
 export function App(props: AppProps) @{
 	useLayoutEffect(() => props.onLayout(props.generation), [props.generation]);
 	<main>
-		<button id="outside" onClick={props.onOutsideClick}>Outside action</button>
+		<button id="outside" onClick={props.onOutsideClick}>
+			Outside action
+		</button>
 		@if (props.mode === 'mixed') {
 			<ViewTransition
 				name="shared"

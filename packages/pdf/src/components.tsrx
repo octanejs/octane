@@ -43,10 +43,12 @@ const BLOCKED_CUSTOM_TEXT_TAGS = new Set([
 const URL_ATTRIBUTES = new Set(['action', 'formaction', 'href', 'poster', 'src', 'xlink:href']);
 
 function isDangerousUrl(value: string): boolean {
-	return value.replace(/[\u0000-\u0020\u007f]/g, '').toLowerCase().match(
-		/^(?:javascript|vbscript):/,
-	) !==
-		null;
+	return (
+		value
+			.replace(/[\u0000-\u0020\u007f]/g, '')
+			.toLowerCase()
+			.match(/^(?:javascript|vbscript):/) !== null
+	);
 }
 
 function sanitizeCustomTextNode(node: ChildNode): Node {
@@ -176,18 +178,19 @@ export function Document(props: DocumentProps = {}) {
 		let active = true;
 		setSource(undefined);
 		setSourceError(null);
-		void resolveSource(file).then((nextSource) => {
-			if (!active) return;
-			setSource(nextSource);
-			onSourceSuccess?.();
-		}).catch((caught: unknown) => {
-			if (!active) return;
-			const nextError =
-				caught instanceof Error ? caught : new Error(String(caught));
-			setSource(false);
-			setSourceError(nextError);
-			onSourceError?.(nextError);
-		});
+		void resolveSource(file)
+			.then((nextSource) => {
+				if (!active) return;
+				setSource(nextSource);
+				onSourceSuccess?.();
+			})
+			.catch((caught: unknown) => {
+				if (!active) return;
+				const nextError = caught instanceof Error ? caught : new Error(String(caught));
+				setSource(false);
+				setSourceError(nextError);
+				onSourceError?.(nextError);
+			});
 		return () => {
 			active = false;
 		};
@@ -200,26 +203,28 @@ export function Document(props: DocumentProps = {}) {
 		setPdfError(null);
 		if (!source) return;
 
-		void import('pdfjs-dist').then((pdfjs) => {
-			if (!active) return;
-			loadingTask = pdfjs.getDocument({ ...source, ...options } as never);
-			if (onLoadProgress) loadingTask.onProgress = onLoadProgress;
-			loadingTask.onPassword = onPassword;
-			return loadingTask.promise;
-		}).then((nextPdf) => {
-			if (!active || !nextPdf) return;
-			setPdf(nextPdf);
-			pagesRef.current = new Array(nextPdf.numPages);
-			linkService.setDocument(nextPdf);
-			onLoadSuccess?.(nextPdf);
-		}).catch((caught: unknown) => {
-			if (!active) return;
-			const nextError =
-				caught instanceof Error ? caught : new Error(String(caught));
-			setPdf(false);
-			setPdfError(nextError);
-			onLoadError?.(nextError);
-		});
+		void import('pdfjs-dist')
+			.then((pdfjs) => {
+				if (!active) return;
+				loadingTask = pdfjs.getDocument({ ...source, ...options } as never);
+				if (onLoadProgress) loadingTask.onProgress = onLoadProgress;
+				loadingTask.onPassword = onPassword;
+				return loadingTask.promise;
+			})
+			.then((nextPdf) => {
+				if (!active || !nextPdf) return;
+				setPdf(nextPdf);
+				pagesRef.current = new Array(nextPdf.numPages);
+				linkService.setDocument(nextPdf);
+				onLoadSuccess?.(nextPdf);
+			})
+			.catch((caught: unknown) => {
+				if (!active) return;
+				const nextError = caught instanceof Error ? caught : new Error(String(caught));
+				setPdf(false);
+				setPdfError(nextError);
+				onLoadError?.(nextError);
+			});
 
 		return () => {
 			active = false;
@@ -262,30 +267,33 @@ export function Document(props: DocumentProps = {}) {
 
 	let content: unknown;
 	if (!file) {
-		content = <div class="react-pdf__message react-pdf__message--no-data">{renderMessage(
-			noData,
-		)}</div>;
+		content = (
+			<div class="react-pdf__message react-pdf__message--no-data">{renderMessage(noData)}</div>
+		);
 	} else if (sourceError || pdfError || source === false || pdf === false) {
-		content = <div class="react-pdf__message react-pdf__message--error">{renderMessage(
-			error,
-		)}</div>;
+		content = (
+			<div class="react-pdf__message react-pdf__message--error">{renderMessage(error)}</div>
+		);
 	} else if (!pdf) {
-		content = <div class="react-pdf__message react-pdf__message--loading">{renderMessage(
-			loading,
-		)}</div>;
+		content = (
+			<div class="react-pdf__message react-pdf__message--loading">{renderMessage(loading)}</div>
+		);
 	} else {
-		content = typeof children === 'function' && !isChildrenBlock(children)
-			? children(contextValue as DocumentRenderProps)
-			: children;
+		content =
+			typeof children === 'function' && !isChildrenBlock(children)
+				? children(contextValue as DocumentRenderProps)
+				: children;
 	}
 
-	return <div
-		{...withEventData(hostProps, pdf)}
-		ref={documentElement}
-		class={['react-pdf__Document', classProp, className]}
-	>
-		<DocumentContext value={contextValue}>{content}</DocumentContext>
-	</div>;
+	return (
+		<div
+			{...withEventData(hostProps, pdf)}
+			ref={documentElement}
+			class={['react-pdf__Document', classProp, className]}
+		>
+			<DocumentContext value={contextValue}>{content}</DocumentContext>
+		</div>
+	);
 }
 
 function makePageCallback(page: PDFPageProxy, viewport: PageViewport): PageCallback {
@@ -343,16 +351,19 @@ function StructTreeItem({ node, className }: { node: unknown; className?: string
 		}
 	}
 	const onlyContentChild =
-		value.children?.length === 1 && value.children[0] != null &&
-			typeof value.children[0] === 'object' &&
-			'id' in value.children[0];
+		value.children?.length === 1 &&
+		value.children[0] != null &&
+		typeof value.children[0] === 'object' &&
+		'id' in value.children[0];
 	if (onlyContentChild) {
 		const child = value.children?.[0] as { id?: string };
 		if (child.id !== undefined) attributes['aria-owns'] = child.id;
 	}
-	return <span class={className} {...attributes}>
-		{onlyContentChild ? null : value.children?.map((child) => <StructTreeItem node={child} />)}
-	</span>;
+	return (
+		<span class={className} {...attributes}>
+			{onlyContentChild ? null : value.children?.map((child) => <StructTreeItem node={child} />)}
+		</span>
+	);
 }
 
 export function Page(props: PageProps = {}) {
@@ -414,8 +425,7 @@ export function Page(props: PageProps = {}) {
 	const [page, setPage] = useState<PDFPageProxy | false | undefined>(undefined);
 	const [pageError, setPageError] = useState<Error | null>(null);
 	const [structTree, setStructTree] = useState<StructTreeNode | null | undefined>(undefined);
-	const pageIndex =
-		pageNumberProp != null ? pageNumberProp - 1 : pageIndexProp;
+	const pageIndex = pageNumberProp != null ? pageNumberProp - 1 : pageIndexProp;
 	const pageNumber = pageNumberProp ?? (pageIndexProp != null ? pageIndexProp + 1 : undefined);
 
 	if (pdf === undefined && documentContext === null) {
@@ -426,12 +436,7 @@ export function Page(props: PageProps = {}) {
 		if (!page || !pageNumber) return null;
 		const rotation = rotateProp ?? page.rotate;
 		const base = page.getViewport({ scale: 1, rotation });
-		const sizeScale =
-			width
-				? width / base.width
-				: height
-					? height / base.height
-					: 1;
+		const sizeScale = width ? width / base.width : height ? height / base.height : 1;
 		return page.getViewport({ scale: scaleProp * sizeScale, rotation });
 	}, [height, page, pageNumber, rotateProp, scaleProp, width]);
 
@@ -440,17 +445,19 @@ export function Page(props: PageProps = {}) {
 		setPage(undefined);
 		setPageError(null);
 		if (!pdf || !pageNumber) return;
-		void pdf.getPage(pageNumber).then((nextPage) => {
-			if (!active) return;
-			setPage(nextPage);
-		}).catch((caught: unknown) => {
-			if (!active) return;
-			const nextError =
-				caught instanceof Error ? caught : new Error(String(caught));
-			setPage(false);
-			setPageError(nextError);
-			onLoadError?.(nextError);
-		});
+		void pdf
+			.getPage(pageNumber)
+			.then((nextPage) => {
+				if (!active) return;
+				setPage(nextPage);
+			})
+			.catch((caught: unknown) => {
+				if (!active) return;
+				const nextError = caught instanceof Error ? caught : new Error(String(caught));
+				setPage(false);
+				setPageError(nextError);
+				onLoadError?.(nextError);
+			});
 		return () => {
 			active = false;
 		};
@@ -494,27 +501,30 @@ export function Page(props: PageProps = {}) {
 		canvas.style.width = `${Math.floor(viewport.width)}px`;
 		canvas.style.height = `${Math.floor(viewport.height)}px`;
 		canvas.style.visibility = 'hidden';
-		void import('pdfjs-dist').then((pdfjs) => {
-			if (!active) return;
-			renderTask = page.render({
-				annotationMode: renderForms
-					? pdfjs.AnnotationMode.ENABLE_FORMS
-					: pdfjs.AnnotationMode.ENABLE,
-				canvas,
-				canvasContext: canvas.getContext('2d', { alpha: false })!,
-				background: canvasBackground,
-				pageColors,
-				viewport: renderViewport,
+		void import('pdfjs-dist')
+			.then((pdfjs) => {
+				if (!active) return;
+				renderTask = page.render({
+					annotationMode: renderForms
+						? pdfjs.AnnotationMode.ENABLE_FORMS
+						: pdfjs.AnnotationMode.ENABLE,
+					canvas,
+					canvasContext: canvas.getContext('2d', { alpha: false })!,
+					background: canvasBackground,
+					pageColors,
+					viewport: renderViewport,
+				});
+				return renderTask.promise;
+			})
+			.then(() => {
+				if (!active || !renderTask) return;
+				canvas.style.visibility = '';
+				onRenderSuccess?.(makePageCallback(page, viewport));
+			})
+			.catch((caught: unknown) => {
+				if (!active || (caught instanceof Error && caught.name === 'AbortException')) return;
+				onRenderError?.(caught instanceof Error ? caught : new Error(String(caught)));
 			});
-			return renderTask.promise;
-		}).then(() => {
-			if (!active || !renderTask) return;
-			canvas.style.visibility = '';
-			onRenderSuccess?.(makePageCallback(page, viewport));
-		}).catch((caught: unknown) => {
-			if (!active || caught instanceof Error && caught.name === 'AbortException') return;
-			onRenderError?.(caught instanceof Error ? caught : new Error(String(caught)));
-		});
 		return () => {
 			active = false;
 			renderTask?.cancel();
@@ -531,50 +541,52 @@ export function Page(props: PageProps = {}) {
 		const element = textElement.current;
 		if (!element) return;
 		element.replaceChildren();
-		void page.getTextContent().then(async (content) => {
-			if (!active) return;
-			contentLoaded = true;
-			onGetTextSuccess?.(content);
-			const pdfjs = await import('pdfjs-dist');
-			if (!active) return;
-			textLayer = new pdfjs.TextLayer({
-				container: element,
-				textContentSource: page.streamTextContent({ includeMarkedContent: true }),
-				viewport,
-			}) as { cancel: () => void; render: () => Promise<void> };
-			await textLayer.render();
-			if (!active) return;
-			const end = document.createElement('div');
-			end.className = 'endOfContent';
-			element.append(end);
-			if (customTextRenderer) {
-				const children = element.querySelectorAll('[role="presentation"]');
-				let childIndex = 0;
-				content.items.forEach((item, itemIndex) => {
-					if (!('str' in item)) return;
-					const child = children[childIndex];
-					if (child) {
-						renderSafeCustomText(
-							child,
-							customTextRenderer({
-								...item,
-								itemIndex,
-								pageIndex,
-								pageNumber,
-							}),
-						);
-					}
-					childIndex += item.str && item.hasEOL ? 2 : 1;
-				});
-			}
-			onRenderTextLayerSuccess?.();
-		}).catch((caught: unknown) => {
-			if (!active || caught instanceof Error && caught.name === 'AbortException') return;
-			const error =
-				caught instanceof Error ? caught : new Error(String(caught));
-			if (contentLoaded) onRenderTextLayerError?.(error);
-			else onGetTextError?.(error);
-		});
+		void page
+			.getTextContent()
+			.then(async (content) => {
+				if (!active) return;
+				contentLoaded = true;
+				onGetTextSuccess?.(content);
+				const pdfjs = await import('pdfjs-dist');
+				if (!active) return;
+				textLayer = new pdfjs.TextLayer({
+					container: element,
+					textContentSource: page.streamTextContent({ includeMarkedContent: true }),
+					viewport,
+				}) as { cancel: () => void; render: () => Promise<void> };
+				await textLayer.render();
+				if (!active) return;
+				const end = document.createElement('div');
+				end.className = 'endOfContent';
+				element.append(end);
+				if (customTextRenderer) {
+					const children = element.querySelectorAll('[role="presentation"]');
+					let childIndex = 0;
+					content.items.forEach((item, itemIndex) => {
+						if (!('str' in item)) return;
+						const child = children[childIndex];
+						if (child) {
+							renderSafeCustomText(
+								child,
+								customTextRenderer({
+									...item,
+									itemIndex,
+									pageIndex,
+									pageNumber,
+								}),
+							);
+						}
+						childIndex += item.str && item.hasEOL ? 2 : 1;
+					});
+				}
+				onRenderTextLayerSuccess?.();
+			})
+			.catch((caught: unknown) => {
+				if (!active || (caught instanceof Error && caught.name === 'AbortException')) return;
+				const error = caught instanceof Error ? caught : new Error(String(caught));
+				if (contentLoaded) onRenderTextLayerError?.(error);
+				else onGetTextError?.(error);
+			});
 		return () => {
 			active = false;
 			textLayer?.cancel();
@@ -589,32 +601,32 @@ export function Page(props: PageProps = {}) {
 		const element = annotationElement.current;
 		if (!element) return;
 		element.replaceChildren();
-		void page.getAnnotations().then(async (loadedAnnotations) => {
-			if (!active) return;
-			annotationsLoaded = true;
-			onGetAnnotationsSuccess?.(loadedAnnotations);
-			const annotations =
-				filterAnnotations
+		void page
+			.getAnnotations()
+			.then(async (loadedAnnotations) => {
+				if (!active) return;
+				annotationsLoaded = true;
+				onGetAnnotationsSuccess?.(loadedAnnotations);
+				const annotations = filterAnnotations
 					? filterAnnotations({ annotations: loadedAnnotations })
 					: loadedAnnotations;
-			const pdfjs = await import('pdfjs-dist');
-			if (!active) return;
-			const annotationViewport = viewport.clone({ dontFlip: true });
-			const parameters = {
-				accessibilityManager: null,
-				annotationCanvasMap: null,
-				annotationEditorUIManager: null,
-				annotationStorage: pdf.annotationStorage,
-				commentManager: null,
-				div: element,
-				l10n: null,
-				linkService: documentContext?.linkService,
-				page,
-				structTreeLayer: null,
-				viewport: annotationViewport,
-			};
-			new pdfjs.AnnotationLayer(parameters as never).render(
-				{
+				const pdfjs = await import('pdfjs-dist');
+				if (!active) return;
+				const annotationViewport = viewport.clone({ dontFlip: true });
+				const parameters = {
+					accessibilityManager: null,
+					annotationCanvasMap: null,
+					annotationEditorUIManager: null,
+					annotationStorage: pdf.annotationStorage,
+					commentManager: null,
+					div: element,
+					l10n: null,
+					linkService: documentContext?.linkService,
+					page,
+					structTreeLayer: null,
+					viewport: annotationViewport,
+				};
+				new pdfjs.AnnotationLayer(parameters as never).render({
 					annotations,
 					annotationStorage: pdf.annotationStorage,
 					div: element,
@@ -623,37 +635,46 @@ export function Page(props: PageProps = {}) {
 					page,
 					renderForms,
 					viewport: annotationViewport,
-				} as never,
-			);
-			onRenderAnnotationLayerSuccess?.();
-		}).catch((caught: unknown) => {
-			if (!active) return;
-			const error =
-				caught instanceof Error ? caught : new Error(String(caught));
-			if (annotationsLoaded) onRenderAnnotationLayerError?.(error);
-			else onGetAnnotationsError?.(error);
-		});
+				} as never);
+				onRenderAnnotationLayerSuccess?.();
+			})
+			.catch((caught: unknown) => {
+				if (!active) return;
+				const error = caught instanceof Error ? caught : new Error(String(caught));
+				if (annotationsLoaded) onRenderAnnotationLayerError?.(error);
+				else onGetAnnotationsError?.(error);
+			});
 		return () => {
 			active = false;
 			element.replaceChildren();
 		};
-	}, [filterAnnotations, imageResourcesPath, page, pdf, renderAnnotationLayer, renderForms, viewport]);
+	}, [
+		filterAnnotations,
+		imageResourcesPath,
+		page,
+		pdf,
+		renderAnnotationLayer,
+		renderForms,
+		viewport,
+	]);
 
 	useEffect(() => {
 		let active = true;
 		setStructTree(undefined);
 		if (!page || customTextRenderer || !renderTextLayer) return;
-		void page.getStructTree().then((tree) => {
-			if (!active) return;
-			setStructTree(tree);
-			if (tree) onGetStructTreeSuccess?.(tree);
-		}).catch((caught: unknown) => {
-			if (!active) return;
-			const error =
-				caught instanceof Error ? caught : new Error(String(caught));
-			setStructTree(null);
-			onGetStructTreeError?.(error);
-		});
+		void page
+			.getStructTree()
+			.then((tree) => {
+				if (!active) return;
+				setStructTree(tree);
+				if (tree) onGetStructTreeSuccess?.(tree);
+			})
+			.catch((caught: unknown) => {
+				if (!active) return;
+				const error = caught instanceof Error ? caught : new Error(String(caught));
+				setStructTree(null);
+				onGetStructTreeError?.(error);
+			});
 		return () => {
 			active = false;
 		};
@@ -672,68 +693,76 @@ export function Page(props: PageProps = {}) {
 
 	let content: unknown;
 	if (!pageNumber) {
-		content = <div class="react-pdf__message react-pdf__message--no-data">{renderMessage(
-			noData,
-		)}</div>;
+		content = (
+			<div class="react-pdf__message react-pdf__message--no-data">{renderMessage(noData)}</div>
+		);
 	} else if (pdf === false || page === false || pageError) {
-		content = <div class="react-pdf__message react-pdf__message--error">{renderMessage(
-			error,
-		)}</div>;
+		content = (
+			<div class="react-pdf__message react-pdf__message--error">{renderMessage(error)}</div>
+		);
 	} else if (!page || !viewport || !contextValue) {
-		content = <div class="react-pdf__message react-pdf__message--loading">{renderMessage(
-			loading,
-		)}</div>;
+		content = (
+			<div class="react-pdf__message react-pdf__message--loading">{renderMessage(loading)}</div>
+		);
 	} else {
 		if (renderMode === 'custom' && !customRenderer) {
 			throw new Error('renderMode was set to "custom", but no customRenderer was passed.');
 		}
 		const renderProps = contextValue as PageRenderProps;
-		content = <PageContext value={contextValue}>
-			{renderMode === 'canvas'
-				? <canvas
+		content = (
+			<PageContext value={contextValue}>
+				{renderMode === 'canvas' ? (
+					<canvas
 						ref={canvasElement}
 						class="react-pdf__Page__canvas"
 						dir="ltr"
 						style={{ display: 'block', userSelect: 'none' }}
 					>
-						{renderTextLayer && structTree
-							? <StructTreeItem
-									className="react-pdf__Page__structTree structTree"
-									node={structTree}
-								/>
-							: null}
+						{renderTextLayer && structTree ? (
+							<StructTreeItem
+								className="react-pdf__Page__structTree structTree"
+								node={structTree}
+							/>
+						) : null}
 					</canvas>
-				: null}
-			{renderMode === 'custom' && customRenderer ? createElement(customRenderer, {}) : null}
-			{renderTextLayer
-				? <div ref={textElement} class="react-pdf__Page__textContent textLayer" />
-				: null}
-			{renderAnnotationLayer
-				? <div ref={annotationElement} class="react-pdf__Page__annotations annotationLayer" />
-				: null}
-			{typeof children === 'function' && !isChildrenBlock(children)
-				? children(renderProps)
-				: children}
-		</PageContext>;
+				) : null}
+				{renderMode === 'custom' && customRenderer ? createElement(customRenderer, {}) : null}
+				{renderTextLayer ? (
+					<div ref={textElement} class="react-pdf__Page__textContent textLayer" />
+				) : null}
+				{renderAnnotationLayer ? (
+					<div ref={annotationElement} class="react-pdf__Page__annotations annotationLayer" />
+				) : null}
+				{typeof children === 'function' && !isChildrenBlock(children)
+					? children(renderProps)
+					: children}
+			</PageContext>
+		);
 	}
 
-	return <div
-		{...withEventData(hostProps, page && viewport ? makePageCallback(page, viewport) : page)}
-		ref={pageElement}
-		class={[_className, classProp, className]}
-		data-page-number={pageNumber}
-		style={{
-			'--scale-round-x': '1px',
-			'--scale-round-y': '1px',
-			'--scale-factor': '1',
-			'--user-unit': `${viewport?.scale ?? scaleProp}`,
-			'--total-scale-factor': 'calc(var(--scale-factor) * var(--user-unit))',
-			backgroundColor: canvasBackground || 'white',
-			minHeight: 'min-content',
-			minWidth: 'min-content',
-			position: 'relative',
-		} as never}
-	>{content}</div>;
+	return (
+		<div
+			{...withEventData(hostProps, page && viewport ? makePageCallback(page, viewport) : page)}
+			ref={pageElement}
+			class={[_className, classProp, className]}
+			data-page-number={pageNumber}
+			style={
+				{
+					'--scale-round-x': '1px',
+					'--scale-round-y': '1px',
+					'--scale-factor': '1',
+					'--user-unit': `${viewport?.scale ?? scaleProp}`,
+					'--total-scale-factor': 'calc(var(--scale-factor) * var(--user-unit))',
+					backgroundColor: canvasBackground || 'white',
+					minHeight: 'min-content',
+					minWidth: 'min-content',
+					position: 'relative',
+				} as never
+			}
+		>
+			{content}
+		</div>
+	);
 }
 
 export function Thumbnail(props: ThumbnailProps = {}) {
@@ -744,8 +773,7 @@ export function Thumbnail(props: ThumbnailProps = {}) {
 		throw new Error('Attempted to load a thumbnail, but no document was specified.');
 	}
 	const resolvedPageNumber = pageNumber ?? (pageIndex != null ? pageIndex + 1 : undefined);
-	const resolvedPageIndex =
-		resolvedPageNumber != null ? resolvedPageNumber - 1 : 0;
+	const resolvedPageIndex = resolvedPageNumber != null ? resolvedPageNumber - 1 : 0;
 
 	function handleClick(event: MouseEvent) {
 		event.preventDefault();
@@ -753,25 +781,30 @@ export function Thumbnail(props: ThumbnailProps = {}) {
 		const args = { pageIndex: resolvedPageIndex, pageNumber: resolvedPageNumber };
 		if (onItemClick) onItemClick(args);
 		else if (documentContext?.linkService) documentContext.linkService.goToPage(resolvedPageNumber);
-		else throw new Error('Either onItemClick callback or linkService must be defined in order to navigate to an outline item.');
+		else
+			throw new Error(
+				'Either onItemClick callback or linkService must be defined in order to navigate to an outline item.',
+			);
 	}
 
 	const { class: _class, className: _className, onItemClick: _onItemClick, ...pageProps } = props;
-	return <a
-		class={['react-pdf__Thumbnail', classProp, className]}
-		href={resolvedPageNumber ? '#' : undefined}
-		onClick={handleClick}
-	>
-		<Page
-			{...pageProps}
-			_className="react-pdf__Thumbnail__page"
-			_enableRegisterUnregisterPage={false}
-			pageIndex={pageIndex}
-			pageNumber={pageNumber}
-			renderAnnotationLayer={false}
-			renderTextLayer={false}
-		/>
-	</a>;
+	return (
+		<a
+			class={['react-pdf__Thumbnail', classProp, className]}
+			href={resolvedPageNumber ? '#' : undefined}
+			onClick={handleClick}
+		>
+			<Page
+				{...pageProps}
+				_className="react-pdf__Thumbnail__page"
+				_enableRegisterUnregisterPage={false}
+				pageIndex={pageIndex}
+				pageNumber={pageNumber}
+				renderAnnotationLayer={false}
+				renderTextLayer={false}
+			/>
+		</a>
+	);
 }
 
 type OutlineEntry = NonNullable<Awaited<ReturnType<PDFDocumentProxy['getOutline']>>>[number];
@@ -790,14 +823,15 @@ function OutlineItem({
 	async function activate(event: Event) {
 		event.preventDefault();
 		if (!onItemClick && !linkService) {
-			throw new Error('Either onItemClick callback or linkService must be defined in order to navigate to an outline item.');
+			throw new Error(
+				'Either onItemClick callback or linkService must be defined in order to navigate to an outline item.',
+			);
 		}
 		if (!onItemClick) {
 			void linkService?.goToDestination(item.dest);
 			return;
 		}
-		const dest =
-			typeof item.dest === 'string' ? await pdf.getDestination(item.dest) : item.dest;
+		const dest = typeof item.dest === 'string' ? await pdf.getDestination(item.dest) : item.dest;
 		if (!dest) throw new Error('Destination not found.');
 		const reference = dest[0];
 		const pageIndex =
@@ -806,20 +840,25 @@ function OutlineItem({
 		onItemClick(args);
 	}
 
-	return <li>
-		<a href="#" onClick={activate}>{item.title}</a>
-		{item.items?.length
-			? <ul>{item.items.map(
-					(child) =>
+	return (
+		<li>
+			<a href="#" onClick={activate}>
+				{item.title}
+			</a>
+			{item.items?.length ? (
+				<ul>
+					{item.items.map((child) => (
 						<OutlineItem
 							item={child}
 							linkService={linkService}
 							pdf={pdf}
 							onItemClick={onItemClick}
-						/>,
-				)}</ul>
-			: null}
-	</li>;
+						/>
+					))}
+				</ul>
+			) : null}
+		</li>
+	);
 }
 
 export function Outline(props: OutlineProps = {}) {
@@ -852,17 +891,19 @@ export function Outline(props: OutlineProps = {}) {
 		let active = true;
 		setOutline(undefined);
 		setFailed(false);
-		void pdf.getOutline().then((nextOutline) => {
-			if (!active) return;
-			setOutline(nextOutline);
-			onLoadSuccess?.(nextOutline);
-		}).catch((caught: unknown) => {
-			if (!active) return;
-			const error =
-				caught instanceof Error ? caught : new Error(String(caught));
-			setFailed(true);
-			onLoadError?.(error);
-		});
+		void pdf
+			.getOutline()
+			.then((nextOutline) => {
+				if (!active) return;
+				setOutline(nextOutline);
+				onLoadSuccess?.(nextOutline);
+			})
+			.catch((caught: unknown) => {
+				if (!active) return;
+				const error = caught instanceof Error ? caught : new Error(String(caught));
+				setFailed(true);
+				onLoadError?.(error);
+			});
 		return () => {
 			active = false;
 		};
@@ -870,21 +911,24 @@ export function Outline(props: OutlineProps = {}) {
 
 	if (failed || !outline) return null;
 	const clickHandler = onItemClick ?? documentContext?.onItemClick;
-	return <div
-		{...withEventData(hostProps, outline)}
-		ref={outlineElement}
-		class={['react-pdf__Outline', classProp, className]}
-	>
-		<OutlineContext value={{ onItemClick: clickHandler }}>
-			<ul>{outline.map(
-				(item) =>
-					<OutlineItem
-						item={item}
-						linkService={documentContext?.linkService}
-						pdf={pdf}
-						onItemClick={clickHandler}
-					/>,
-			)}</ul>
-		</OutlineContext>
-	</div>;
+	return (
+		<div
+			{...withEventData(hostProps, outline)}
+			ref={outlineElement}
+			class={['react-pdf__Outline', classProp, className]}
+		>
+			<OutlineContext value={{ onItemClick: clickHandler }}>
+				<ul>
+					{outline.map((item) => (
+						<OutlineItem
+							item={item}
+							linkService={documentContext?.linkService}
+							pdf={pdf}
+							onItemClick={clickHandler}
+						/>
+					))}
+				</ul>
+			</OutlineContext>
+		</div>
+	);
 }

@@ -16,7 +16,9 @@ function ToastList() @{
 					<Toast.Title className="toast-title" />
 					<Toast.Description className="toast-description" />
 				</Toast.Content>
-				<Toast.Close className="toast-close" aria-label="Close">x</Toast.Close>
+				<Toast.Close className="toast-close" aria-label="Close">
+					x
+				</Toast.Close>
 			</Toast.Root>
 		}
 	</Toast.Viewport>

@@ -44,13 +44,13 @@ function loadData(): Promise<string> {
 function HookThenHook() @{
 	const { t: translateFirst } = useTranslation('first');
 	const { t: translateSecond } = useTranslation('second');
-	<p id="result">{translateFirst('key') + '/' + translateSecond('key') as string}</p>
+	<p id="result">{(translateFirst('key') + '/' + translateSecond('key')) as string}</p>
 }
 
 function HookThenUse() @{
 	const { t } = useTranslation('first');
 	const value = use(loadData());
-	<p id="result">{t('key') + '/' + value as string}</p>
+	<p id="result">{(t('key') + '/' + value) as string}</p>
 }
 
 const READERS = {

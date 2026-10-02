@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -362,7 +362,7 @@
         {
           "path": "packages/tanstack-virtual/tests/_fixtures/direct-prepend.tsrx",
           "role": "support",
-          "sha256": "1c90fd6dd3dc102e1d9b74d53903137576c434eec9f9199ace59ea9e7f31fd9f"
+          "sha256": "10a66d17af62da6ac46f3f54e01fd34aef126fe02ea3be0c53c1772be005771f"
         },
         {
           "path": "packages/tanstack-virtual/tests/browser-fixtures/prepend/main.ts",
@@ -493,12 +493,12 @@
         {
           "path": "packages/tanstack-virtual/tests/_fixtures/basic-list-diff.tsrx",
           "role": "support",
-          "sha256": "cf8296962fa6fb86a07010b4a568e8b674fd71a72dc06a657fc8762e76084664"
+          "sha256": "385c25551e508d2300d0456679e33e33e628c5fd99029b92b0faf51a77f4bf94"
         },
         {
           "path": "packages/tanstack-virtual/tests/_fixtures/dynamic-measure-diff.tsrx",
           "role": "support",
-          "sha256": "b980804610c7e7e2a62fd770ce1811e5bc11fff00453b75386e2171d6fcecfd6"
+          "sha256": "56ad42af2d38a56784a4cccbcaf13ec23875b015587a1a96ccd26510d3ad4ac9"
         },
         {
           "path": "packages/tanstack-virtual/tests/_fixtures/horizontal-diff.tsrx",

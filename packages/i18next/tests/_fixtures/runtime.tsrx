@@ -17,7 +17,9 @@ export function HookApp(props) @{
 	<div>
 		<p id="hook-value">{t('welcome', { name: props.name }) as string}</p>
 		<p id="hook-ready">{String(ready)}</p>
-		<button id="fr" onClick={() => props.i18n.changeLanguage('fr')}>{'French'}</button>
+		<button id="fr" onClick={() => props.i18n.changeLanguage('fr')}>
+			{'French'}
+		</button>
 	</div>
 }
 
@@ -61,12 +63,12 @@ export function TransApp(props) @{
 			<Trans
 				i18n={props.i18n}
 				i18nKey="richIndexed"
-				children={<>
-					Hello
-					<strong>
-						{{ name: props.name }}
-					</strong>
-				</>}
+				children={
+					<>
+						Hello
+						<strong>{{ name: props.name }}</strong>
+					</>
+				}
 			/>
 		</p>
 	</div>
@@ -74,8 +76,7 @@ export function TransApp(props) @{
 
 export function BlockChildrenApp(props) @{
 	<Trans i18n={props.i18n} i18nKey="rich">
-		Fallback{' '}
-		<strong>source</strong>
+		Fallback <strong>source</strong>
 	</Trans>
 }
 
@@ -98,7 +99,9 @@ export function ComponentApisApp(props) @{
 }
 
 function IcuLink(props) @{
-	<a class="icu-link" href={props.href}>{props.children}</a>
+	<a class="icu-link" href={props.href}>
+		{props.children}
+	</a>
 }
 
 export function IcuApp(props) @{
@@ -108,9 +111,7 @@ export function IcuApp(props) @{
 				i18n={props.i18n}
 				i18nKey="icu"
 				defaultTranslation="Welcome <0>friend</0>!"
-				content={[
-					{ type: 'strong', props: { class: 'icu-emphasis' } },
-				]}
+				content={[{ type: 'strong', props: { class: 'icu-emphasis' } }]}
 			/>
 		</p>
 		<p id="icu-component">
@@ -118,9 +119,7 @@ export function IcuApp(props) @{
 				i18n={props.i18n}
 				i18nKey="icuLink"
 				defaultTranslation="Read <0>the guide</0>"
-				content={[
-					{ type: IcuLink, props: { href: '/guide' } },
-				]}
+				content={[{ type: IcuLink, props: { href: '/guide' } }]}
 			/>
 		</p>
 	</div>
@@ -153,7 +152,9 @@ function SequentialNamespacesConsumer(props) @{
 	const { t: translateFirst } = useTranslation('first', { i18n: props.i18n });
 	const { t: translateSecond, ready } = useTranslation('second', { i18n: props.i18n });
 	const text: string = translateFirst('key') + '/' + translateSecond('key');
-	<p id="sequential-value" data-ready={String(ready)}>{text}</p>
+	<p id="sequential-value" data-ready={String(ready)}>
+		{text}
+	</p>
 }
 
 export function SequentialNamespacesApp(props) @{
@@ -166,7 +167,7 @@ function TranslationThenUseConsumer(props) @{
 	const { t } = useTranslation('first', { i18n: props.i18n });
 	props.onAttempt(t('key'));
 	const value = use(props.promise);
-	<p id="then-use-value">{t('key') + '/' + value as string}</p>
+	<p id="then-use-value">{(t('key') + '/' + value) as string}</p>
 }
 
 export function TranslationThenUseApp(props) @{

@@ -9,5 +9,7 @@ export function TransformBox(props) @{
 	const summed = useTransform([a, b], ([av, bv]) => av + bv); // form 3: combiner
 	const plusOne = useTransform(x, (l) => l + 1); // form 4: single input + transformer
 	props.onReady({ x, a, b, mapped, doubled, summed, plusOne });
-	<motion.div id="box" style={{ opacity: doubled }}>{'b'}</motion.div>
+	<motion.div id="box" style={{ opacity: doubled }}>
+		{'b'}
+	</motion.div>
 }

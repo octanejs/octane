@@ -24,7 +24,9 @@ export function DropdownApp() @{
 						Copy
 						<DropdownMenuShortcut>⌘C</DropdownMenuShortcut>
 					</DropdownMenuItem>
-					<DropdownMenuItem id="mi-del" variant="destructive" disabled>Delete</DropdownMenuItem>
+					<DropdownMenuItem id="mi-del" variant="destructive" disabled>
+						Delete
+					</DropdownMenuItem>
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
 				<DropdownMenuCheckboxItem id="mi-check" checked={checked} onCheckedChange={setChecked}>

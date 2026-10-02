@@ -28,8 +28,12 @@ function Carousel() @{
 			</div>
 		</div>
 		<output data-selected>{selected as string}</output>
-		<button aria-label="Next slide" onClick={() => api?.scrollNext()}>Next</button>
-		<button aria-label="Unmount carousel" onClick={() => root.unmount()}>Unmount</button>
+		<button aria-label="Next slide" onClick={() => api?.scrollNext()}>
+			Next
+		</button>
+		<button aria-label="Unmount carousel" onClick={() => root.unmount()}>
+			Unmount
+		</button>
 	</main>
 }
 

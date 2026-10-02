@@ -29,22 +29,21 @@ import { PreviewCard as PreviewCardPrimitive } from '@octanejs/base-ui/preview-c
 import { cn } from 'cn';
 
 /** Props routed to the Positioner rather than the popup. */
-export type BaseUiPositioningProps =
-	Pick<
-		PreviewCardPrimitive.Positioner.Props,
-		| 'side'
-		| 'sideOffset'
-		| 'align'
-		| 'alignOffset'
-		| 'anchor'
-		| 'positionMethod'
-		| 'collisionBoundary'
-		| 'collisionPadding'
-		| 'collisionAvoidance'
-		| 'arrowPadding'
-		| 'sticky'
-		| 'disableAnchorTracking'
-	>;
+export type BaseUiPositioningProps = Pick<
+	PreviewCardPrimitive.Positioner.Props,
+	| 'side'
+	| 'sideOffset'
+	| 'align'
+	| 'alignOffset'
+	| 'anchor'
+	| 'positionMethod'
+	| 'collisionBoundary'
+	| 'collisionPadding'
+	| 'collisionAvoidance'
+	| 'arrowPadding'
+	| 'sticky'
+	| 'disableAnchorTracking'
+>;
 
 export function HoverCard(props: Record<string, unknown>) @{
 	<PreviewCardPrimitive.Root data-slot="hover-card" {...props} />

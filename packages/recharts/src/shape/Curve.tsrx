@@ -32,14 +32,12 @@ export type CurveType =
 	| 'stepBefore'
 	| 'stepAfter'
 	| CurveFactory;
-type AreaPoint =
-	Coordinate & {
-		base: Coordinate;
-	};
-type NullableAreaPoint =
-	NullableCoordinate & {
-		base?: NullableCoordinate;
-	};
+type AreaPoint = Coordinate & {
+	base: Coordinate;
+};
+type NullableAreaPoint = NullableCoordinate & {
+	base?: NullableCoordinate;
+};
 export type BaseLineType = number | ReadonlyArray<NullableCoordinate>;
 interface CurveProps {
 	className?: SVGProps<SVGPathElement>['className'];
@@ -63,20 +61,21 @@ type CurveMouseEvents = {
 	onMouseOver?: CurveMouseEventHandler;
 	onMouseOut?: CurveMouseEventHandler;
 };
-export type Props =
-	Omit<
-		PresentationAttributesWithProps<CurveProps, SVGPathElement>,
-		| 'type'
-		| 'points'
-		| 'onClick'
-		| 'onMouseEnter'
-		| 'onMouseLeave'
-		| 'onMouseDown'
-		| 'onMouseUp'
-		| 'onMouseMove'
-		| 'onMouseOver'
-		| 'onMouseOut'
-	> & CurveMouseEvents & CurveProps;
+export type Props = Omit<
+	PresentationAttributesWithProps<CurveProps, SVGPathElement>,
+	| 'type'
+	| 'points'
+	| 'onClick'
+	| 'onMouseEnter'
+	| 'onMouseLeave'
+	| 'onMouseDown'
+	| 'onMouseUp'
+	| 'onMouseMove'
+	| 'onMouseOver'
+	| 'onMouseOut'
+> &
+	CurveMouseEvents &
+	CurveProps;
 type GetPathProps = Pick<Props, 'type' | 'points' | 'baseLine' | 'layout' | 'connectNulls'>;
 // Port of shape/Curve.tsx — the line/area path. The `d` string comes straight
 // from victory-vendor's d3-shape line/area generators (same dependency, same
@@ -157,28 +156,37 @@ export const getPath = ({
 	connectNulls = defaultCurveProps.connectNulls,
 }: GetPathProps): string | null => {
 	const curveFactory = getCurveFactory(type, layout);
-	const formatPoints: ReadonlyArray<NullableCoordinate> =
-		connectNulls ? points.filter(defined) : points;
+	const formatPoints: ReadonlyArray<NullableCoordinate> = connectNulls
+		? points.filter(defined)
+		: points;
 
 	// An area chart's array `baseLine` pairs each point with its baseline
 	// counterpart FIRST, so the `defined` filter drops both sides together.
 	if (Array.isArray(baseLine)) {
-		const areaPoints: ReadonlyArray<NullableAreaPoint> = points.map(
-			(entry, index) => ({ ...entry, base: baseLine[index] }),
-		);
+		const areaPoints: ReadonlyArray<NullableAreaPoint> = points.map((entry, index) => ({
+			...entry,
+			base: baseLine[index],
+		}));
 		let lineFunction: D3AreaCurve<AreaPoint>;
 		if (layout === 'vertical') {
-			lineFunction = shapeArea<AreaPoint>().y(getY).x1(getX).x0((d) => d.base.x);
+			lineFunction = shapeArea<AreaPoint>()
+				.y(getY)
+				.x1(getX)
+				.x0((d) => d.base.x);
 		} else {
-			lineFunction = shapeArea<AreaPoint>().x(getX).y1(getY).y0((d) => d.base.y);
+			lineFunction = shapeArea<AreaPoint>()
+				.x(getX)
+				.y1(getY)
+				.y0((d) => d.base.y);
 		}
 		// d3 runs the defined predicate before coordinate accessors; its single
 		// generic cannot express the nullable inputs accepted after this guard.
-		const nullableLineFunction = lineFunction.defined(areaDefined).curve(
-			curveFactory,
-		) as D3AreaCurve<NullableAreaPoint>;
-		const finalPoints: ReadonlyArray<NullableAreaPoint> =
-			connectNulls ? areaPoints.filter(areaDefined) : areaPoints;
+		const nullableLineFunction = lineFunction
+			.defined(areaDefined)
+			.curve(curveFactory) as D3AreaCurve<NullableAreaPoint>;
+		const finalPoints: ReadonlyArray<NullableAreaPoint> = connectNulls
+			? areaPoints.filter(areaDefined)
+			: areaPoints;
 		return nullableLineFunction(finalPoints);
 	}
 	let lineFunction: D3LineCurve<Coordinate> | D3AreaCurve<Coordinate>;
@@ -189,9 +197,9 @@ export const getPath = ({
 	} else {
 		lineFunction = shapeLine<Coordinate>().x(getX).y(getY);
 	}
-	const nullableLineFunction = lineFunction.defined(defined).curve(curveFactory) as D3LineCurve<
-		NullableCoordinate
-	>;
+	const nullableLineFunction = lineFunction
+		.defined(defined)
+		.curve(curveFactory) as D3LineCurve<NullableCoordinate>;
 	return nullableLineFunction(formatPoints);
 };
 
@@ -210,11 +218,13 @@ export function Curve(props: Props) {
 	};
 	const realPath: string | null | undefined =
 		points && points.length ? getPath(getPathInput) : path;
-	return <path
-		{...svgPropertiesNoEvents(props)}
-		{...adaptEventHandlers(props)}
-		className={clsx('recharts-curve', className)}
-		d={realPath === null ? undefined : realPath}
-		ref={pathRef}
-	/>;
+	return (
+		<path
+			{...svgPropertiesNoEvents(props)}
+			{...adaptEventHandlers(props)}
+			className={clsx('recharts-curve', className)}
+			d={realPath === null ? undefined : realPath}
+			ref={pathRef}
+		/>
+	);
 }

@@ -53,13 +53,15 @@ const DefaultActionBar = ({
 	label: string | undefined;
 	children: OctaneNode;
 	parentAction: OctaneNode;
-}) => <ActionBar>
-	<ActionBar.Group>
-		{parentAction}
-		{label && <ActionBar.Label label={label} />}
-	</ActionBar.Group>
-	<ActionBar.Group>{children}</ActionBar.Group>
-</ActionBar>;
+}) => (
+	<ActionBar>
+		<ActionBar.Group>
+			{parentAction}
+			{label && <ActionBar.Label label={label} />}
+		</ActionBar.Group>
+		<ActionBar.Group>{children}</ActionBar.Group>
+	</ActionBar>
+);
 
 const DefaultOverlay = ({
 	children,
@@ -69,9 +71,7 @@ const DefaultOverlay = ({
 	isSelected: boolean;
 	componentId: string;
 	componentType: string;
-}) => <>
-	{children}
-</>;
+}) => <>{children}</>;
 
 export type ComponentDndData = {
 	areaId?: string;
@@ -113,7 +113,7 @@ export const DraggableComponent = ({
 	userDragAxis?: DragAxis;
 	inDroppableZone: boolean;
 }) => {
-	const zoom = useAppStore((s) => s.selectedItem?.props.id === id ? s.zoomConfig.zoom : 1);
+	const zoom = useAppStore((s) => (s.selectedItem?.props.id === id ? s.zoomConfig.zoom : 1));
 	const overrides = useAppStore((s) => s.overrides);
 	const dispatch = useAppStore((s) => s.dispatch);
 	const iframe = useAppStore((s) => s.iframe);
@@ -122,32 +122,36 @@ export const DraggableComponent = ({
 
 	const [localZones, setLocalZones] = useState<Record<string, boolean>>({});
 
-	const registerLocalZone = useCallback((zoneCompound: string, active: boolean) => {
-		// Propagate local zone
-		ctx?.registerLocalZone?.(zoneCompound, active);
+	const registerLocalZone = useCallback(
+		(zoneCompound: string, active: boolean) => {
+			// Propagate local zone
+			ctx?.registerLocalZone?.(zoneCompound, active);
 
-		setLocalZones(
-			(obj) => ({
+			setLocalZones((obj) => ({
 				...obj,
 				[zoneCompound]: active,
-			}),
-		);
-	}, [setLocalZones]);
+			}));
+		},
+		[setLocalZones],
+	);
 
-	const unregisterLocalZone = useCallback((zoneCompound: string) => {
-		// Propagate local zone
-		ctx?.unregisterLocalZone?.(zoneCompound);
+	const unregisterLocalZone = useCallback(
+		(zoneCompound: string) => {
+			// Propagate local zone
+			ctx?.unregisterLocalZone?.(zoneCompound);
 
-		setLocalZones((obj) => {
-			const newLocalZones = {
-				...obj,
-			};
+			setLocalZones((obj) => {
+				const newLocalZones = {
+					...obj,
+				};
 
-			delete newLocalZones[zoneCompound];
+				delete newLocalZones[zoneCompound];
 
-			return newLocalZones;
-		});
-	}, [setLocalZones]);
+				return newLocalZones;
+			});
+		},
+		[setLocalZones],
+	);
 
 	const containsActiveZone = Object.values(localZones).filter(Boolean).length > 0;
 
@@ -164,11 +168,16 @@ export const DraggableComponent = ({
 
 	const [dragAxis, setDragAxis] = useState(userDragAxis || autoDragAxis);
 
-	const dynamicCollisionDetector = useMemo(() => createDynamicCollisionDetector(dragAxis), [
-		dragAxis,
-	]);
+	const dynamicCollisionDetector = useMemo(
+		() => createDynamicCollisionDetector(dragAxis),
+		[dragAxis],
+	);
 
-	const { ref: sortableRef, isDragging: thisIsDragging, sortable } = useSortable<ComponentDndData>({
+	const {
+		ref: sortableRef,
+		isDragging: thisIsDragging,
+		sortable,
+	} = useSortable<ComponentDndData>({
 		id,
 		index,
 		group: zoneCompound,
@@ -218,13 +227,16 @@ export const DraggableComponent = ({
 
 	const ref = useRef<HTMLElement | null>(null);
 
-	const refSetter = useCallback((el: HTMLElement | null) => {
-		sortableRef(el);
+	const refSetter = useCallback(
+		(el: HTMLElement | null) => {
+			sortableRef(el);
 
-		if (el) {
-			ref.current = el;
-		}
-	}, [sortableRef]);
+			if (el) {
+				ref.current = el;
+			}
+		},
+		[sortableRef],
+	);
 
 	const [portalEl, setPortalEl] = useState<HTMLElement>();
 
@@ -232,7 +244,7 @@ export const DraggableComponent = ({
 		setPortalEl(
 			iframe.enabled
 				? ref.current?.ownerDocument.body
-				: ref.current?.closest<HTMLElement>('[data-puck-preview]') ?? document.body,
+				: (ref.current?.closest<HTMLElement>('[data-puck-preview]') ?? document.body),
 		);
 	}, [iframe.enabled, ref.current]);
 
@@ -247,8 +259,9 @@ export const DraggableComponent = ({
 			: ref.current?.closest<HTMLElement>('[data-puck-preview]');
 
 		const portalContainerRect = portalContainerEl?.getBoundingClientRect();
-		const portalScroll =
-			portalContainerEl ? getDeepScrollPosition(portalContainerEl) : { x: 0, y: 0 };
+		const portalScroll = portalContainerEl
+			? getDeepScrollPosition(portalContainerEl)
+			: { x: 0, y: 0 };
 
 		const scroll = {
 			x: deepScrollPosition.x - portalScroll.x - (portalContainerRect?.left ?? 0),
@@ -318,28 +331,33 @@ export const DraggableComponent = ({
 		};
 	}, [id, zoneCompound, index, componentType, sync]);
 
-	const CustomActionBar = useMemo(() => overrides.actionBar || DefaultActionBar, [
-		overrides.actionBar,
-	]);
+	const CustomActionBar = useMemo(
+		() => overrides.actionBar || DefaultActionBar,
+		[overrides.actionBar],
+	);
 
-	const CustomOverlay = useMemo(() => overrides.componentOverlay || DefaultOverlay, [
-		overrides.componentOverlay,
-	]);
+	const CustomOverlay = useMemo(
+		() => overrides.componentOverlay || DefaultOverlay,
+		[overrides.componentOverlay],
+	);
 
-	const onClick = useCallback((e: Event | SyntheticEvent) => {
-		const el = e.target as Element;
+	const onClick = useCallback(
+		(e: Event | SyntheticEvent) => {
+			const el = e.target as Element;
 
-		if (!el.closest('[data-puck-overlay-portal]')) {
-			e.stopPropagation();
-		}
+			if (!el.closest('[data-puck-overlay-portal]')) {
+				e.stopPropagation();
+			}
 
-		dispatch({
-			type: 'setUi',
-			ui: {
-				itemSelector: { index, zone: zoneCompound },
-			},
-		});
-	}, [index, zoneCompound, id]);
+			dispatch({
+				type: 'setUi',
+				ui: {
+					itemSelector: { index, zone: zoneCompound },
+				},
+			});
+		},
+		[index, zoneCompound, id],
+	);
 
 	const appStore = useAppStoreApi();
 
@@ -481,33 +499,36 @@ export const DraggableComponent = ({
 		if (thisWasDragging) return onDragFinished();
 	}, [thisWasDragging, onDragFinished]);
 
-	const syncActionsPosition = useCallback((el: HTMLDivElement | null | undefined) => {
-		if (el) {
-			const view = el.ownerDocument.defaultView;
+	const syncActionsPosition = useCallback(
+		(el: HTMLDivElement | null | undefined) => {
+			if (el) {
+				const view = el.ownerDocument.defaultView;
 
-			if (view) {
-				const rect = el.getBoundingClientRect();
+				if (view) {
+					const rect = el.getBoundingClientRect();
 
-				const diffLeft = rect.x;
-				const exceedsBoundsLeft = diffLeft < 0;
-				const diffTop = rect.y;
-				const exceedsBoundsTop = diffTop < 0;
+					const diffLeft = rect.x;
+					const exceedsBoundsLeft = diffLeft < 0;
+					const diffTop = rect.y;
+					const exceedsBoundsTop = diffTop < 0;
 
-				// Modify position if it spills over frame
-				if (exceedsBoundsLeft) {
-					el.style.transformOrigin = 'left top';
-					el.style.left = '0px';
-				}
+					// Modify position if it spills over frame
+					if (exceedsBoundsLeft) {
+						el.style.transformOrigin = 'left top';
+						el.style.left = '0px';
+					}
 
-				if (exceedsBoundsTop) {
-					el.style.top = '12px';
-					if (!exceedsBoundsLeft) {
-						el.style.transformOrigin = 'right top';
+					if (exceedsBoundsTop) {
+						el.style.top = '12px';
+						if (!exceedsBoundsLeft) {
+							el.style.transformOrigin = 'right top';
+						}
 					}
 				}
 			}
-		}
-	}, [zoom]);
+		},
+		[zoom],
+	);
 
 	useEffect(() => {
 		if (userDragAxis) {
@@ -530,10 +551,12 @@ export const DraggableComponent = ({
 
 	const parentAction = useMemo(
 		() =>
-			ctx?.areaId && ctx?.areaId !== 'root' &&
+			ctx?.areaId &&
+			ctx?.areaId !== 'root' && (
 				<ActionBar.Action onClick={onSelectParent} label="Select parent">
 					<CornerLeftUp size={16} />
-				</ActionBar.Action>,
+				</ActionBar.Action>
+			),
 		[ctx?.areaId],
 	);
 
@@ -547,76 +570,74 @@ export const DraggableComponent = ({
 			registerLocalZone,
 			unregisterLocalZone,
 		}),
-		[
-			ctx,
-			id,
-			zoneCompound,
-			index,
-			depth,
-			registerLocalZone,
-			unregisterLocalZone,
-		],
+		[ctx, id, zoneCompound, index, depth, registerLocalZone, unregisterLocalZone],
 	);
 
-	return <DropZoneProvider value={nextContextValue}>
-		{dragFinished && isVisible &&
-			createPortal(
-				<div
-					className={getClassName({
-						isSelected,
-						isDragging: thisIsDragging,
-						hover: hover || indicativeHover,
-					})}
-					style={{ ...style }}
-					data-puck-overlay
-				>
-					{debug}
-					{isLoading &&
-						<div className={getClassName('loadingOverlay')}>
-							<Loader />
-						</div>}
+	return (
+		<DropZoneProvider value={nextContextValue}>
+			{dragFinished &&
+				isVisible &&
+				createPortal(
 					<div
-						className={getClassName('actionsOverlay')}
-						style={{
-							top: actionsOverlayTop / zoom,
-						}}
+						className={getClassName({
+							isSelected,
+							isDragging: thisIsDragging,
+							hover: hover || indicativeHover,
+						})}
+						style={{ ...style }}
+						data-puck-overlay
 					>
+						{debug}
+						{isLoading && (
+							<div className={getClassName('loadingOverlay')}>
+								<Loader />
+							</div>
+						)}
 						<div
-							className={getClassName('actions')}
+							className={getClassName('actionsOverlay')}
 							style={{
-								transform: `scale(${1 / zoom}`,
-								top: actionsTop / zoom,
-								right: 0,
-								paddingLeft: actionsSide,
-								paddingRight: actionsSide,
+								top: actionsOverlayTop / zoom,
 							}}
-							ref={syncActionsPosition}
 						>
-							<CustomActionBar parentAction={parentAction} label={DEBUG ? id : label}>
-								{permissions.duplicate &&
-									<ActionBar.Action onClick={onDuplicate} label="Duplicate">
-										<Copy size={16} />
-									</ActionBar.Action>}
-								{permissions.delete &&
-									<ActionBar.Action onClick={onDelete} label="Delete">
-										<Trash size={16} />
-									</ActionBar.Action>}
-							</CustomActionBar>
+							<div
+								className={getClassName('actions')}
+								style={{
+									transform: `scale(${1 / zoom}`,
+									top: actionsTop / zoom,
+									right: 0,
+									paddingLeft: actionsSide,
+									paddingRight: actionsSide,
+								}}
+								ref={syncActionsPosition}
+							>
+								<CustomActionBar parentAction={parentAction} label={DEBUG ? id : label}>
+									{permissions.duplicate && (
+										<ActionBar.Action onClick={onDuplicate} label="Duplicate">
+											<Copy size={16} />
+										</ActionBar.Action>
+									)}
+									{permissions.delete && (
+										<ActionBar.Action onClick={onDelete} label="Delete">
+											<Trash size={16} />
+										</ActionBar.Action>
+									)}
+								</CustomActionBar>
+							</div>
 						</div>
-					</div>
-					<div className={getClassName('overlayWrapper')}>
-						<CustomOverlay
-							componentId={id}
-							componentType={componentType}
-							hover={hover}
-							isSelected={isSelected}
-						>
-							<div className={getClassName('overlay')}></div>
-						</CustomOverlay>
-					</div>
-				</div>,
-				portalEl || document.body,
-			)}
-		{children(refSetter)}
-	</DropZoneProvider>;
+						<div className={getClassName('overlayWrapper')}>
+							<CustomOverlay
+								componentId={id}
+								componentType={componentType}
+								hover={hover}
+								isSelected={isSelected}
+							>
+								<div className={getClassName('overlay')}></div>
+							</CustomOverlay>
+						</div>
+					</div>,
+					portalEl || document.body,
+				)}
+			{children(refSetter)}
+		</DropZoneProvider>
+	);
 };

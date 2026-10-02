@@ -18,7 +18,9 @@ const delegateEvents = 'not-the-runtime';
 export function ShadowSetText() @{
 	const [text, setText] = useState('');
 	<div>
-		<button id="st-btn" onClick={() => setText('xyz')}>{'go'}</button>
+		<button id="st-btn" onClick={() => setText('xyz')}>
+			{'go'}
+		</button>
 		<span id="st-label">{text as string}</span>
 	</div>
 }
@@ -33,21 +35,24 @@ export function ShadowHtext(props: { value: string }) @{
 export function ShadowUpdateHelpers() @{
 	const [n, bump] = useState(0);
 	const setAttribute = 'data-' + n;
-	const setStyle =
-		n > 0 ? 'red' : 'blue';
+	const setStyle = n > 0 ? 'red' : 'blue';
 	const setClassName = 'c' + n;
 	const normalizeClass = 'n' + n;
 	const child = 'kid-' + n;
 	const sibling = 'sib-' + n;
 	<div>
-		<button id="u-btn" onClick={() => bump(n + 1)}>{'go'}</button>
+		<button id="u-btn" onClick={() => bump(n + 1)}>
+			{'go'}
+		</button>
 		<span id="u-attr" title={setAttribute}>
-			{child as string}
-			{' '}
-			{sibling as string}
+			{child as string} {sibling as string}
 		</span>
-		<i id="u-style" style={{ color: setStyle }} class={setClassName}>{'x'}</i>
-		<b id="u-class" class={[normalizeClass]}>{'y'}</b>
+		<i id="u-style" style={{ color: setStyle }} class={setClassName}>
+			{'x'}
+		</i>
+		<b id="u-class" class={[normalizeClass]}>
+			{'y'}
+		</b>
 	</div>
 }
 
@@ -62,7 +67,9 @@ export function ShadowBlocks() @{
 	const forBlock = [{ id: 'a' }, { id: 'b' }];
 	const componentSlot = '-row';
 	<div>
-		<button id="b-btn" onClick={() => setOn(!on)}>{'t'}</button>
+		<button id="b-btn" onClick={() => setOn(!on)}>
+			{'t'}
+		</button>
 		@if (on) {
 			<em id="b-if">{ifBlock as string}</em>
 		}
@@ -76,8 +83,6 @@ export function ShadowBlocks() @{
 
 export function ShadowModuleScope() @{
 	<p id="m-label">
-		{template(clone('ab')) as string}
-		{' '}
-		{delegateEvents as string}
+		{template(clone('ab')) as string} {delegateEvents as string}
 	</p>
 }

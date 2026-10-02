@@ -32,13 +32,14 @@ export function RenderPropButton() @{
 // markup around them. With `@{ … }` authoring those children are a tagged block
 // function, and composeRenderProps must forward them rather than call them.
 function ComposedButton(props: { children?: unknown }) @{
-	<Button id="composed">{composeRenderProps(
-		props.children as any,
-		(children: unknown) => <>
-			<span data-slot="indicator">[x]</span>
-			{children}
-		</>,
-	)}</Button>
+	<Button id="composed">
+		{composeRenderProps(props.children as any, (children: unknown) => (
+			<>
+				<span data-slot="indicator">[x]</span>
+				{children}
+			</>
+		))}
+	</Button>
 }
 
 export function ComposedBlockChildren() @{

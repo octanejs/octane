@@ -16,14 +16,17 @@ export function TransitionFixture(props) @{
 		cancel: props.cancel,
 		pause: props.pause,
 	});
-	<div id="transition-list">{transitions(
-		(styles: any, item: any, transition: any) =>
+	<div id="transition-list">
+		{transitions((styles: any, item: any, transition: any) => (
 			<animated.div
 				key={transition.key}
 				data-key={transition.key}
 				data-label={item.label}
 				data-phase={transition.phase}
 				style={styles}
-			>{item.label}</animated.div>,
-	)}</div>
+			>
+				{item.label}
+			</animated.div>
+		))}
+	</div>
 }

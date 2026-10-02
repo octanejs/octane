@@ -46,8 +46,12 @@ export function Explorer() @{
 		<section class="explorer" aria-labelledby="explorer-heading">
 			<div class="explorer-head">
 				<div class="explorer-titlerow">
-					<h2 id="explorer-heading" class="explorer-title">How Octane compares</h2>
-					<Link to="/benchmarks" class="explorer-all">All suites →</Link>
+					<h2 id="explorer-heading" class="explorer-title">
+						How Octane compares
+					</h2>
+					<Link to="/benchmarks" class="explorer-all">
+						All suites →
+					</Link>
 				</div>
 				<p class="explorer-sub">
 					Choose a suite and a few frameworks for the bar chart, or scan the full grid. Each cell

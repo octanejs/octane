@@ -37,8 +37,8 @@ function Counter(): OctaneNode @{
 	const [count, setCount] = useState(0);
 	const [total, dispatch] = useReducer((n: number, delta: number) => n + delta, 0);
 	<div>
-		<button onClick={() => setCount(count + 1)}>{'count: ' + count as string}</button>
-		<button onClick={() => dispatch(5)}>{'total += 5 (' + total + ')' as string}</button>
+		<button onClick={() => setCount(count + 1)}>{('count: ' + count) as string}</button>
+		<button onClick={() => dispatch(5)}>{('total += 5 (' + total + ')') as string}</button>
 	</div>
 }
 
@@ -55,9 +55,7 @@ function FilterList(): OctaneNode @{
 				startTransition(() => setQuery(value));
 			}}
 		/>
-		<span>
-			{pending ? ' (filtering…)' : ''}
-		</span>
+		<span>{pending ? ' (filtering…)' : ''}</span>
 		<ul>
 			@for (const item of shown.slice(0, 20); key item) {
 				<Slow label={item} />

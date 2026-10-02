@@ -12,22 +12,20 @@ export function NestedPortals(props) @{
 
 	<div class="app-root" onClick={() => setTrail((t) => t + 'root,')}>
 		<span class="trail">{trail as string}</span>
-		{createPortal(
-			() => @{
-				<div
-					class="p1"
-					onClick={(e) => {
-						if (props.stopAtMid) e.stopPropagation();
-						setTrail((t) => t + 'mid,');
-					}}
-				>{createPortal(
-					() => @{
-						<button class="deep" onClick={() => setTrail((t) => t + 'btn,')}>{'deep'}</button>
-					},
-					props.targetB,
-				)}</div>
-			},
-			props.targetA,
-		)}
+		{createPortal(() => @{
+			<div
+				class="p1"
+				onClick={(e) => {
+					if (props.stopAtMid) e.stopPropagation();
+					setTrail((t) => t + 'mid,');
+				}}
+			>
+				{createPortal(() => @{
+					<button class="deep" onClick={() => setTrail((t) => t + 'btn,')}>
+						{'deep'}
+					</button>
+				}, props.targetB)}
+			</div>
+		}, props.targetA)}
 	</div>
 }

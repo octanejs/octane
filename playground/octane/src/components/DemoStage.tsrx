@@ -25,14 +25,18 @@ export function DemoStage(props: DemoStageProps) @{
 				class={'demo-tab' + (tab === 'result' ? ' is-active' : '')}
 				aria-selected={tab === 'result'}
 				onClick={() => setTab('result')}
-			>{'Result'}</button>
+			>
+				{'Result'}
+			</button>
 			<button
 				type="button"
 				role="tab"
 				class={'demo-tab' + (tab === 'source' ? ' is-active' : '')}
 				aria-selected={tab === 'source'}
 				onClick={() => setTab('source')}
-			>{'Source'}</button>
+			>
+				{'Source'}
+			</button>
 		</div>
 
 		@if (tab === 'result') {

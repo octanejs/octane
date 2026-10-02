@@ -15,16 +15,20 @@ export const selection$ = signal$({
 export const answer$ = query$<
 	{ config: LabConfig; prompt: string; generation: number },
 	AnswerFrame
->(() => {
-	const config = session$.get();
-	const selection = selection$.get();
-	if (selection.stopped) return skip;
-	return {
-		config: selection.recover ? { ...config, scenario: 'steady' as const } : config,
-		prompt: selection.prompt || config.prompt,
-		generation: selection.generation,
-	};
-}, (input, { signal }) => watchAnswer(input, { signal }), { kind: 'stream' });
+>(
+	() => {
+		const config = session$.get();
+		const selection = selection$.get();
+		if (selection.stopped) return skip;
+		return {
+			config: selection.recover ? { ...config, scenario: 'steady' as const } : config,
+			prompt: selection.prompt || config.prompt,
+			generation: selection.generation,
+		};
+	},
+	(input, { signal }) => watchAnswer(input, { signal }),
+	{ kind: 'stream' },
+);
 export const history$ = query$<LabConfig, HistoryFrame>(
 	() => session$.get(),
 	(config, { signal }) => watchHistory(config, { signal }),
@@ -49,14 +53,12 @@ export const answerComplete$ = derived$(() => answer$.snapshot().complete);
 export function sendMessage() {
 	const prompt = draft$.get().trim();
 	if (prompt === '') return;
-	selection$.set(
-		(previous) => ({
-			prompt,
-			generation: previous.generation + 1,
-			stopped: false,
-			recover: previous.recover,
-		}),
-	);
+	selection$.set((previous) => ({
+		prompt,
+		generation: previous.generation + 1,
+		stopped: false,
+		recover: previous.recover,
+	}));
 	draft$.set('');
 }
 
@@ -65,22 +67,18 @@ export function stopResponse() {
 }
 
 export function resumeResponse() {
-	selection$.set(
-		(previous) => ({
-			...previous,
-			stopped: false,
-			generation: previous.generation + 1,
-		}),
-	);
+	selection$.set((previous) => ({
+		...previous,
+		stopped: false,
+		generation: previous.generation + 1,
+	}));
 }
 
 export function retryResponse() {
-	selection$.set(
-		(previous) => ({
-			...previous,
-			stopped: false,
-			recover: true,
-			generation: previous.generation + 1,
-		}),
-	);
+	selection$.set((previous) => ({
+		...previous,
+		stopped: false,
+		recover: true,
+		generation: previous.generation + 1,
+	}));
 }

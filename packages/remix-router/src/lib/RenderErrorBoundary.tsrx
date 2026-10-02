@@ -46,7 +46,8 @@ export function RenderErrorBoundary(props: RenderErrorBoundaryProps) @{
 	{
 		const s = state.current;
 		if (
-			s.location !== props.location || s.revalidation !== 'idle' && props.revalidation === 'idle'
+			s.location !== props.location ||
+			(s.revalidation !== 'idle' && props.revalidation === 'idle')
 		) {
 			state.current = {
 				error: props.error,
@@ -68,9 +69,7 @@ export function RenderErrorBoundary(props: RenderErrorBoundaryProps) @{
 				<RouteErrorContext value={state.current.error}>{props.component}</RouteErrorContext>
 			</RouteContext>
 		} @else {
-			<>
-				{props.children}
-			</>
+			<>{props.children}</>
 		}
 	} @catch (caught, reset) {
 		<CaughtErrorView
@@ -86,11 +85,10 @@ export function RenderErrorBoundary(props: RenderErrorBoundaryProps) @{
 	}
 }
 
-type CaughtErrorViewProps =
-	Omit<RenderErrorBoundaryProps, 'children'> & {
-		caught: unknown;
-		reset: () => void;
-	};
+type CaughtErrorViewProps = Omit<RenderErrorBoundaryProps, 'children'> & {
+	caught: unknown;
+	reset: () => void;
+};
 
 function CaughtErrorView(props: CaughtErrorViewProps) @{
 	// componentDidCatch parity — once per distinct caught error, during render
@@ -107,8 +105,7 @@ function CaughtErrorView(props: CaughtErrorViewProps) @{
 
 	// Error precedence per upstream derivation: a defined props.error (data
 	// error for this location) wins over the caught render error.
-	const error =
-		props.error !== undefined ? props.error : props.caught;
+	const error = props.error !== undefined ? props.error : props.caught;
 
 	// Leave the catch state when the location changes or a revalidation
 	// completes — the octane analogue of upstream's render-phase reset.
@@ -122,7 +119,7 @@ function CaughtErrorView(props: CaughtErrorViewProps) @{
 	useLayoutEffect(() => {
 		const b = baseline.current;
 		const shouldReset =
-			b.location !== props.location || b.revalidation !== 'idle' && props.revalidation === 'idle';
+			b.location !== props.location || (b.revalidation !== 'idle' && props.revalidation === 'idle');
 		b.revalidation = props.revalidation || b.revalidation;
 		if (shouldReset) {
 			props.reset();

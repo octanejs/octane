@@ -23,17 +23,19 @@ type ItemWrapperProps<TItem> = {
 export function LiveList<TItem>({ items$, renderItem, getKey, store }: LiveListProps<TItem>) @{
 	const [hasMounted, setHasMounted] = useState(false);
 	useEffect(() => setHasMounted(true), []);
-	const keys = useQuery(computed((get) => get(items$).map(getKey)), { store });
+	const keys = useQuery(
+		computed((get) => get(items$).map(getKey)),
+		{ store },
+	);
 	const entries = useMemo(
-		() => keys.map(
-			(key, index) => ({
+		() =>
+			keys.map((key, index) => ({
 				key,
 				index,
 				item$: computed((get) => get(items$).find((item) => getKey(item, 0) === key)!, {
 					deps: [key],
 				}) as LiveQueryDef<TItem>,
-			}),
-		),
+			})),
 		[getKey, items$, keys],
 	);
 
@@ -60,16 +62,15 @@ function ItemWrapper<TItem>({
 }: ItemWrapperProps<TItem>) @{
 	const item = useQuery(item$, { store });
 	const options = useMemo(() => ({ index, isInitialListRender }), [index, isInitialListRender]);
-	<>
-		{renderItem(item, options)}
-	</>
+	<>{renderItem(item, options)}</>
 }
 
 const ItemWrapperMemo = memo(
 	ItemWrapper,
 	(previous, next) =>
-		previous.itemKey === next.itemKey && previous.renderItem === next.renderItem &&
-			previous.store === next.store &&
-			previous.index === next.index &&
-			previous.isInitialListRender === next.isInitialListRender,
+		previous.itemKey === next.itemKey &&
+		previous.renderItem === next.renderItem &&
+		previous.store === next.store &&
+		previous.index === next.index &&
+		previous.isInitialListRender === next.isInitialListRender,
 ) as typeof ItemWrapper;

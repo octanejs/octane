@@ -42,7 +42,21 @@ import type {
 	ValidatorResult,
 } from './types.ts';
 
-export type { Accept, AcceptGroup, DropEvent, DropzoneInputProps, DropzoneOptions, DropzoneProps, DropzoneRef, DropzoneRootProps, DropzoneState, FileError, FileRejection, FileWithPath, ValidatorResult } from './types.ts';
+export type {
+	Accept,
+	AcceptGroup,
+	DropEvent,
+	DropzoneInputProps,
+	DropzoneOptions,
+	DropzoneProps,
+	DropzoneRef,
+	DropzoneRootProps,
+	DropzoneState,
+	FileError,
+	FileRejection,
+	FileWithPath,
+	ValidatorResult,
+} from './types.ts';
 export { ErrorCode };
 
 /**
@@ -68,9 +82,7 @@ export default function Dropzone({ children, ref, ...params }: DropzoneProps) @{
 			? children({ ...props, open })
 			: children;
 
-	<>
-		{content}
-	</>
+	<>{content}</>
 }
 
 interface DropzoneInternalState {
@@ -136,9 +148,8 @@ export function useDropzone(...args: [props?: DropzoneOptions, slot?: symbol]): 
 	// public React API makes `props` optional, `useDropzone()` would otherwise
 	// mistake that slot for the options object and destructure a symbol.
 	const tail = args.at(-1);
-	const userArgs =
-		typeof tail === 'symbol' ? args.slice(0, -1) : args;
-	const props = userArgs[0] as DropzoneOptions | undefined ?? {};
+	const userArgs = typeof tail === 'symbol' ? args.slice(0, -1) : args;
+	const props = (userArgs[0] as DropzoneOptions | undefined) ?? {};
 	const {
 		accept,
 		disabled = false,
@@ -180,9 +191,10 @@ export function useDropzone(...args: [props?: DropzoneOptions, slot?: symbol]): 
 	// native picker and drop-time validation enforce the extensions instead of accepting any
 	// file of that type. See https://github.com/react-dropzone/react-dropzone/issues/1220
 	const inputAcceptAttr = useMemo(
-		() => acceptPropAsAcceptAttr(flatAccept, {
-			omitWildcardMimeTypesWithExtensions: true,
-		}),
+		() =>
+			acceptPropAsAcceptAttr(flatAccept, {
+				omitWildcardMimeTypesWithExtensions: true,
+			}),
 		[flatAccept],
 	);
 	const pickerTypes = useMemo(() => pickerOptionsFromAccept(accept), [accept]);
@@ -232,7 +244,9 @@ export function useDropzone(...args: [props?: DropzoneOptions, slot?: symbol]): 
 	}, []);
 
 	const fsAccessApiWorksRef = useRef(
-		typeof window !== 'undefined' && window.isSecureContext && useFsAccessApi &&
+		typeof window !== 'undefined' &&
+			window.isSecureContext &&
+			useFsAccessApi &&
 			canUseFileSystemAccessAPI(),
 	);
 
@@ -271,8 +285,10 @@ export function useDropzone(...args: [props?: DropzoneOptions, slot?: symbol]): 
 		// is opened in the tab. Falling through to `preventDefault()` here keeps that from happening.
 		// See https://github.com/react-dropzone/react-dropzone/issues/1362
 		if (
-			rootRef.current && event.target && rootRef.current.contains(event.target as Node) &&
-				event.defaultPrevented
+			rootRef.current &&
+			event.target &&
+			rootRef.current.contains(event.target as Node) &&
+			event.defaultPrevented
 		) {
 			return;
 		}
@@ -350,346 +366,375 @@ export function useDropzone(...args: [props?: DropzoneOptions, slot?: symbol]): 
 		return () => {};
 	}, [rootRef, autoFocus, disabled]);
 
-	const onErrCb = useCallback((e: Error) => {
-		if (onError) {
-			onError(e);
-		} else {
-			// Let the user know something's gone wrong if they haven't provided the onError cb.
-			console.error(e);
-		}
-	}, [onError]);
+	const onErrCb = useCallback(
+		(e: Error) => {
+			if (onError) {
+				onError(e);
+			} else {
+				// Let the user know something's gone wrong if they haven't provided the onError cb.
+				console.error(e);
+			}
+		},
+		[onError],
+	);
 
-	const onDragEnterCb = useCallback((event: any) => {
-		event.preventDefault();
-		// Persist here because we need the event later after getFilesFromEvent() is done
-		event.persist?.();
-		stopPropagation(event);
+	const onDragEnterCb = useCallback(
+		(event: any) => {
+			event.preventDefault();
+			// Persist here because we need the event later after getFilesFromEvent() is done
+			event.persist?.();
+			stopPropagation(event);
 
-		// Ignore drags onto the dropzone while the file picker dialog is open: the page underneath a
-		// live picker shouldn't react to (or accept) dropped files. See #1455. preventDefault() above
-		// still runs so the browser doesn't try to open/navigate to a dropped file.
-		if (isFileDialogActiveRef.current) {
-			return;
-		}
+			// Ignore drags onto the dropzone while the file picker dialog is open: the page underneath a
+			// live picker shouldn't react to (or accept) dropped files. See #1455. preventDefault() above
+			// still runs so the browser doesn't try to open/navigate to a dropped file.
+			if (isFileDialogActiveRef.current) {
+				return;
+			}
 
-		dragTargetsRef.current = [...dragTargetsRef.current, event.target];
+			dragTargetsRef.current = [...dragTargetsRef.current, event.target];
 
-		if (isEvtWithFiles(event)) {
-			Promise.resolve(getFilesFromEvent(event)).then((files) => {
-				if (isPropagationStopped(event) && !noDragEventsBubbling) {
-					return;
+			if (isEvtWithFiles(event)) {
+				Promise.resolve(getFilesFromEvent(event))
+					.then((files) => {
+						if (isPropagationStopped(event) && !noDragEventsBubbling) {
+							return;
+						}
+
+						const fileCount = files.length;
+						// During a drag we only have DataTransferItems (MIME type, no name/size), so the
+						// custom validator can't run yet - a validator-configured dropzone is "unknown" until
+						// drop rather than a misleading accept/reject. See getDragVerdict for the details.
+						const verdict =
+							fileCount > 0
+								? getDragVerdict({
+										files: files as Array<File | DataTransferItem>,
+										accept: acceptAttr,
+										minSize,
+										maxSize,
+										multiple,
+										maxFiles,
+										validator,
+									})
+								: null;
+
+						dispatch({
+							isDragAccept: verdict === 'accept',
+							isDragReject: verdict === 'reject',
+							isDragUnknown: verdict === 'unknown',
+							isDragActive: true,
+							type: 'setDraggedFiles',
+						});
+
+						if (onDragEnter) {
+							onDragEnter(event);
+						}
+					})
+					.catch((e) => onErrCb(e));
+			}
+		},
+		[
+			getFilesFromEvent,
+			onDragEnter,
+			onErrCb,
+			noDragEventsBubbling,
+			acceptAttr,
+			minSize,
+			maxSize,
+			multiple,
+			maxFiles,
+			validator,
+		],
+	);
+
+	const onDragOverCb = useCallback(
+		(event: any) => {
+			event.preventDefault();
+			event.persist?.();
+			stopPropagation(event);
+
+			// Ignore drags over the dropzone while the file picker dialog is open. See #1455.
+			if (isFileDialogActiveRef.current) {
+				return false;
+			}
+
+			const hasFiles = isEvtWithFiles(event);
+			if (hasFiles && event.dataTransfer) {
+				try {
+					event.dataTransfer.dropEffect = 'copy';
+				} catch {
+					/* no-op */
 				}
+			}
 
-				const fileCount = files.length;
-				// During a drag we only have DataTransferItems (MIME type, no name/size), so the
-				// custom validator can't run yet - a validator-configured dropzone is "unknown" until
-				// drop rather than a misleading accept/reject. See getDragVerdict for the details.
-				const verdict =
-					fileCount > 0
-						? getDragVerdict({
-								files: files as Array<File | DataTransferItem>,
-								accept: acceptAttr,
-								minSize,
-								maxSize,
-								multiple,
-								maxFiles,
-								validator,
-							})
-						: null;
+			if (hasFiles && onDragOver) {
+				onDragOver(event);
+			}
 
-				dispatch({
-					isDragAccept: verdict === 'accept',
-					isDragReject: verdict === 'reject',
-					isDragUnknown: verdict === 'unknown',
-					isDragActive: true,
-					type: 'setDraggedFiles',
+			return false;
+		},
+		[onDragOver, noDragEventsBubbling],
+	);
+
+	const onDragLeaveCb = useCallback(
+		(event: any) => {
+			event.preventDefault();
+			event.persist?.();
+			stopPropagation(event);
+
+			// Only deactivate once the dropzone and all children have been left
+			const targets = dragTargetsRef.current.filter((target) =>
+				rootRef.current?.contains(target as Node),
+			);
+			// Make sure to remove a target present multiple times only once
+			// (Firefox may fire dragenter/dragleave multiple times on the same element)
+			const targetIdx = targets.indexOf(event.target);
+			if (targetIdx !== -1) {
+				targets.splice(targetIdx, 1);
+			}
+			dragTargetsRef.current = targets;
+			if (targets.length > 0) {
+				return;
+			}
+
+			dispatch({
+				type: 'setDraggedFiles',
+				isDragActive: false,
+				isDragAccept: false,
+				isDragReject: false,
+				isDragUnknown: false,
+			});
+
+			if (isEvtWithFiles(event) && onDragLeave) {
+				onDragLeave(event);
+			}
+		},
+		[rootRef, onDragLeave, noDragEventsBubbling],
+	);
+
+	const setFiles = useCallback(
+		async (files: FileWithPath[], event: any, signal: AbortSignal) => {
+			const localizeError = (error: FileError, file: File): FileError =>
+				getErrorMessage ? { ...error, message: getErrorMessage(error, file) } : error;
+
+			// Commit the per-file verdicts: split accepted/rejected, cap the surplus, update state and
+			// fire the onDrop callbacks. Runs synchronously so nested-dropzone ordering is preserved on
+			// the fast path (an onDrop handler calling stopPropagation must do so before a parent's onDrop
+			// check - see the noDragEventsBubbling tests).
+			const commit = (results: Array<PerFileResult>) => {
+				const acceptedFiles: FileWithPath[] = [];
+				const fileRejections: FileRejection[] = [];
+
+				results.forEach(({ file, accepted, acceptError, sizeMatch, sizeError, customErrors }) => {
+					if (accepted && sizeMatch && !customErrors) {
+						acceptedFiles.push(file);
+					} else {
+						let errors: Array<FileError | null> = [acceptError, sizeError];
+
+						if (customErrors) {
+							errors = errors.concat(customErrors);
+						}
+
+						fileRejections.push({
+							file,
+							errors: errors
+								.filter((e): e is FileError => e != null)
+								.map((error) => localizeError(error, file)),
+						});
+					}
 				});
 
-				if (onDragEnter) {
-					onDragEnter(event);
-				}
-			}).catch((e) => onErrCb(e));
-		}
-	}, [
-		getFilesFromEvent,
-		onDragEnter,
-		onErrCb,
-		noDragEventsBubbling,
-		acceptAttr,
-		minSize,
-		maxSize,
-		multiple,
-		maxFiles,
-		validator,
-	]);
-
-	const onDragOverCb = useCallback((event: any) => {
-		event.preventDefault();
-		event.persist?.();
-		stopPropagation(event);
-
-		// Ignore drags over the dropzone while the file picker dialog is open. See #1455.
-		if (isFileDialogActiveRef.current) {
-			return false;
-		}
-
-		const hasFiles = isEvtWithFiles(event);
-		if (hasFiles && event.dataTransfer) {
-			try {
-				event.dataTransfer.dropEffect = 'copy';
-			} catch {
-				/* no-op */
-			}
-		}
-
-		if (hasFiles && onDragOver) {
-			onDragOver(event);
-		}
-
-		return false;
-	}, [onDragOver, noDragEventsBubbling]);
-
-	const onDragLeaveCb = useCallback((event: any) => {
-		event.preventDefault();
-		event.persist?.();
-		stopPropagation(event);
-
-		// Only deactivate once the dropzone and all children have been left
-		const targets = dragTargetsRef.current.filter(
-			(target) => rootRef.current?.contains(target as Node),
-		);
-		// Make sure to remove a target present multiple times only once
-		// (Firefox may fire dragenter/dragleave multiple times on the same element)
-		const targetIdx = targets.indexOf(event.target);
-		if (targetIdx !== -1) {
-			targets.splice(targetIdx, 1);
-		}
-		dragTargetsRef.current = targets;
-		if (targets.length > 0) {
-			return;
-		}
-
-		dispatch({
-			type: 'setDraggedFiles',
-			isDragActive: false,
-			isDragAccept: false,
-			isDragReject: false,
-			isDragUnknown: false,
-		});
-
-		if (isEvtWithFiles(event) && onDragLeave) {
-			onDragLeave(event);
-		}
-	}, [rootRef, onDragLeave, noDragEventsBubbling]);
-
-	const setFiles = useCallback(async (files: FileWithPath[], event: any, signal: AbortSignal) => {
-		const localizeError = (error: FileError, file: File): FileError => getErrorMessage
-			? { ...error, message: getErrorMessage(error, file) }
-			: error;
-
-		// Commit the per-file verdicts: split accepted/rejected, cap the surplus, update state and
-		// fire the onDrop callbacks. Runs synchronously so nested-dropzone ordering is preserved on
-		// the fast path (an onDrop handler calling stopPropagation must do so before a parent's onDrop
-		// check - see the noDragEventsBubbling tests).
-		const commit = (results: Array<PerFileResult>) => {
-			const acceptedFiles: FileWithPath[] = [];
-			const fileRejections: FileRejection[] = [];
-
-			results.forEach(({ file, accepted, acceptError, sizeMatch, sizeError, customErrors }) => {
-				if (accepted && sizeMatch && !customErrors) {
-					acceptedFiles.push(file);
-				} else {
-					let errors: Array<FileError | null> = [acceptError, sizeError];
-
-					if (customErrors) {
-						errors = errors.concat(customErrors);
-					}
-
-					fileRejections.push({
-						file,
-						errors: errors.filter((e): e is FileError => e != null).map(
-							(error) => localizeError(error, file),
-						),
+				// Cap the accepted files at the configured limit and reject only the surplus (the files past
+				// the limit) with a too-many-files error, instead of rejecting the whole batch. The limit is 1
+				// when {multiple} is false, and {maxFiles} when {multiple} is true (0 means no limit). Files
+				// that already failed the per-file checks above are in {fileRejections} and don't count here.
+				// See https://github.com/react-dropzone/react-dropzone/issues/1355
+				// and https://github.com/react-dropzone/react-dropzone/issues/1358
+				const acceptedFilesLimit = multiple
+					? maxFiles >= 1
+						? maxFiles
+						: Number.POSITIVE_INFINITY
+					: 1;
+				if (acceptedFiles.length > acceptedFilesLimit) {
+					const surplusFiles = acceptedFiles.splice(acceptedFilesLimit);
+					surplusFiles.forEach((file) => {
+						fileRejections.push({ file, errors: [localizeError(TOO_MANY_FILES_REJECTION, file)] });
 					});
 				}
-			});
 
-			// Cap the accepted files at the configured limit and reject only the surplus (the files past
-			// the limit) with a too-many-files error, instead of rejecting the whole batch. The limit is 1
-			// when {multiple} is false, and {maxFiles} when {multiple} is true (0 means no limit). Files
-			// that already failed the per-file checks above are in {fileRejections} and don't count here.
-			// See https://github.com/react-dropzone/react-dropzone/issues/1355
-			// and https://github.com/react-dropzone/react-dropzone/issues/1358
-			const acceptedFilesLimit =
-				multiple ? (maxFiles >= 1 ? maxFiles : Number.POSITIVE_INFINITY) : 1;
-			if (acceptedFiles.length > acceptedFilesLimit) {
-				const surplusFiles = acceptedFiles.splice(acceptedFilesLimit);
-				surplusFiles.forEach((file) => {
-					fileRejections.push({ file, errors: [localizeError(TOO_MANY_FILES_REJECTION, file)] });
+				// Clears isProcessing back to false (see the reducer) in the same update that sets the files.
+				dispatch({
+					acceptedFiles,
+					fileRejections,
+					type: 'setFiles',
 				});
-			}
 
-			// Clears isProcessing back to false (see the reducer) in the same update that sets the files.
-			dispatch({
-				acceptedFiles,
-				fileRejections,
-				type: 'setFiles',
+				if (onDrop) {
+					onDrop(acceptedFiles, fileRejections, event);
+				}
+
+				if (fileRejections.length > 0 && onDropRejected) {
+					onDropRejected(fileRejections, event);
+				}
+
+				if (acceptedFiles.length > 0 && onDropAccepted) {
+					onDropAccepted(acceptedFiles, event);
+				}
+			};
+
+			// Run the built-in checks synchronously and invoke the validator (which may return a value or
+			// a Promise). customErrors is left as-is here so we can tell sync from async below.
+			const pending = files.map((file) => {
+				const [accepted, acceptError] = fileAccepted(file, inputAcceptAttr);
+				const [sizeMatch, sizeError] = fileMatchSize(file, minSize, maxSize);
+				const customErrors = validator ? validator(file) : null;
+				return { file, accepted, acceptError, sizeMatch, sizeError, customErrors };
 			});
 
-			if (onDrop) {
-				onDrop(acceptedFiles, fileRejections, event);
+			// Callers check signal.aborted right before invoking setFiles (synchronously, no await in
+			// between), so this run is guaranteed live here - the supersession guards below only matter
+			// after we await the validator.
+
+			// Fast path: no validator, or a synchronous one. Commit synchronously - no extra microtask
+			// hop, so nested-dropzone ordering is preserved (an onDrop handler calling stopPropagation
+			// must run before a parent's onDrop check - see the noDragEventsBubbling tests). commit's
+			// dispatch also clears isProcessing.
+			if (!pending.some(({ customErrors }) => isThenable(customErrors))) {
+				commit(pending as Array<PerFileResult>);
+				return;
 			}
 
-			if (fileRejections.length > 0 && onDropRejected) {
-				onDropRejected(fileRejections, event);
-			}
-
-			if (acceptedFiles.length > 0 && onDropAccepted) {
-				onDropAccepted(acceptedFiles, event);
-			}
-		};
-
-		// Run the built-in checks synchronously and invoke the validator (which may return a value or
-		// a Promise). customErrors is left as-is here so we can tell sync from async below.
-		const pending = files.map((file) => {
-			const [accepted, acceptError] = fileAccepted(file, inputAcceptAttr);
-			const [sizeMatch, sizeError] = fileMatchSize(file, minSize, maxSize);
-			const customErrors =
-				validator ? validator(file) : null;
-			return { file, accepted, acceptError, sizeMatch, sizeError, customErrors };
-		});
-
-		// Callers check signal.aborted right before invoking setFiles (synchronously, no await in
-		// between), so this run is guaranteed live here - the supersession guards below only matter
-		// after we await the validator.
-
-		// Fast path: no validator, or a synchronous one. Commit synchronously - no extra microtask
-		// hop, so nested-dropzone ordering is preserved (an onDrop handler calling stopPropagation
-		// must run before a parent's onDrop check - see the noDragEventsBubbling tests). commit's
-		// dispatch also clears isProcessing.
-		if (!pending.some(({ customErrors }) => isThenable(customErrors))) {
-			commit(pending as Array<PerFileResult>);
-			return;
-		}
-
-		// Async path: at least one validator returned a Promise. isProcessing is already on (set when
-		// the run began, before getFilesFromEvent); keep guarding against supersession while we await.
-		let results: Array<PerFileResult>;
-		try {
-			results = await Promise.all(
-				pending.map(
-					async ({ customErrors, ...rest }) => ({ ...rest, customErrors: await customErrors }),
-				),
-			);
-		} catch (e) {
-			// A validator threw/rejected. If a newer run already superseded this one, let it own the
-			// state; otherwise clear the processing flag and report the error via onError.
-			if (!signal.aborted) {
-				endProcessing(signal);
-				onErrCb(e as Error);
-			}
-			return;
-		}
-
-		// A newer drop landed while we were validating - discard these stale results.
-		if (signal.aborted) {
-			return;
-		}
-
-		commit(results);
-	}, [
-		dispatch,
-		multiple,
-		inputAcceptAttr,
-		minSize,
-		maxSize,
-		maxFiles,
-		onDrop,
-		onDropAccepted,
-		onDropRejected,
-		validator,
-		getErrorMessage,
-		onErrCb,
-		endProcessing,
-	]);
-
-	const onDropCb = useCallback((event: any) => {
-		event.preventDefault();
-		// Persist here because we need the event later after getFilesFromEvent() is done
-		event.persist?.();
-		stopPropagation(event);
-
-		dragTargetsRef.current = [];
-
-		// Ignore a drop landing on the dropzone while the file picker dialog is open (see #1455).
-		// Guard on {event.dataTransfer} so only real drag-drops are suppressed: the input's change
-		// event (a file picked from the dialog) also runs through here while the dialog is still
-		// flagged active, and that path must keep working. Returning before the reset below leaves
-		// the dialog flag intact.
-		if (isFileDialogActiveRef.current && event.dataTransfer) {
-			return;
-		}
-
-		// Clear drag state before we begin processing so beginProcessing's isProcessing isn't reset.
-		dispatch({ type: 'reset' });
-
-		if (isEvtWithFiles(event)) {
-			// Processing spans reading the files (getFilesFromEvent) and running the validator.
-			const signal = beginProcessing();
-			Promise.resolve(getFilesFromEvent(event)).then((files) => {
-				// A newer drop superseded this one while reading files - it owns isProcessing now.
-				if (signal.aborted) {
-					return;
-				}
-				if (isPropagationStopped(event) && !noDragEventsBubbling) {
-					endProcessing(signal);
-					return;
-				}
-				// setFiles handles validator errors internally (routing them to onError); the outer
-				// catch here only fires for a getFilesFromEvent failure.
-				return setFiles(files as FileWithPath[], event, signal);
-			}).catch((e) => {
+			// Async path: at least one validator returned a Promise. isProcessing is already on (set when
+			// the run began, before getFilesFromEvent); keep guarding against supersession while we await.
+			let results: Array<PerFileResult>;
+			try {
+				results = await Promise.all(
+					pending.map(async ({ customErrors, ...rest }) => ({
+						...rest,
+						customErrors: await customErrors,
+					})),
+				);
+			} catch (e) {
+				// A validator threw/rejected. If a newer run already superseded this one, let it own the
+				// state; otherwise clear the processing flag and report the error via onError.
 				if (!signal.aborted) {
 					endProcessing(signal);
-					onErrCb(e);
+					onErrCb(e as Error);
 				}
-			});
-		}
-	}, [getFilesFromEvent, setFiles, onErrCb, noDragEventsBubbling, beginProcessing, endProcessing]);
+				return;
+			}
+
+			// A newer drop landed while we were validating - discard these stale results.
+			if (signal.aborted) {
+				return;
+			}
+
+			commit(results);
+		},
+		[
+			dispatch,
+			multiple,
+			inputAcceptAttr,
+			minSize,
+			maxSize,
+			maxFiles,
+			onDrop,
+			onDropAccepted,
+			onDropRejected,
+			validator,
+			getErrorMessage,
+			onErrCb,
+			endProcessing,
+		],
+	);
+
+	const onDropCb = useCallback(
+		(event: any) => {
+			event.preventDefault();
+			// Persist here because we need the event later after getFilesFromEvent() is done
+			event.persist?.();
+			stopPropagation(event);
+
+			dragTargetsRef.current = [];
+
+			// Ignore a drop landing on the dropzone while the file picker dialog is open (see #1455).
+			// Guard on {event.dataTransfer} so only real drag-drops are suppressed: the input's change
+			// event (a file picked from the dialog) also runs through here while the dialog is still
+			// flagged active, and that path must keep working. Returning before the reset below leaves
+			// the dialog flag intact.
+			if (isFileDialogActiveRef.current && event.dataTransfer) {
+				return;
+			}
+
+			// Clear drag state before we begin processing so beginProcessing's isProcessing isn't reset.
+			dispatch({ type: 'reset' });
+
+			if (isEvtWithFiles(event)) {
+				// Processing spans reading the files (getFilesFromEvent) and running the validator.
+				const signal = beginProcessing();
+				Promise.resolve(getFilesFromEvent(event))
+					.then((files) => {
+						// A newer drop superseded this one while reading files - it owns isProcessing now.
+						if (signal.aborted) {
+							return;
+						}
+						if (isPropagationStopped(event) && !noDragEventsBubbling) {
+							endProcessing(signal);
+							return;
+						}
+						// setFiles handles validator errors internally (routing them to onError); the outer
+						// catch here only fires for a getFilesFromEvent failure.
+						return setFiles(files as FileWithPath[], event, signal);
+					})
+					.catch((e) => {
+						if (!signal.aborted) {
+							endProcessing(signal);
+							onErrCb(e);
+						}
+					});
+			}
+		},
+		[getFilesFromEvent, setFiles, onErrCb, noDragEventsBubbling, beginProcessing, endProcessing],
+	);
 
 	// Cb to add files pasted into the dropzone (e.g. a screenshot pasted with Ctrl/Cmd+V). Fires when
 	// the root - or a focused descendant, so a child <textarea> works too - receives a paste. Reuses
 	// the same read/validate/onDrop pipeline as a drop.
-	const onPasteCb = useCallback((event: any) => {
-		// Only act on a paste that carries files. Bail before preventDefault() for text/other pastes
-		// so pasting into a child input keeps working normally.
-		if (!isEvtWithFiles(event)) {
-			return;
-		}
-		event.preventDefault();
-		// Persist here because we need the event later after getFilesFromEvent() is done
-		event.persist?.();
-		stopPropagation(event);
+	const onPasteCb = useCallback(
+		(event: any) => {
+			// Only act on a paste that carries files. Bail before preventDefault() for text/other pastes
+			// so pasting into a child input keeps working normally.
+			if (!isEvtWithFiles(event)) {
+				return;
+			}
+			event.preventDefault();
+			// Persist here because we need the event later after getFilesFromEvent() is done
+			event.persist?.();
+			stopPropagation(event);
 
-		// Processing spans reading the files (getFilesFromEvent) and running the validator.
-		const signal = beginProcessing();
-		Promise.resolve(getFilesFromEvent(event)).then((files) => {
-			// A newer drop/paste superseded this one while reading files - it owns isProcessing now.
-			if (signal.aborted) {
-				return;
-			}
-			if (isPropagationStopped(event) && !noDragEventsBubbling) {
-				endProcessing(signal);
-				return;
-			}
-			return setFiles(files as FileWithPath[], event, signal);
-		}).catch((e) => {
-			if (!signal.aborted) {
-				endProcessing(signal);
-				onErrCb(e);
-			}
-		});
-	}, [getFilesFromEvent, setFiles, onErrCb, noDragEventsBubbling, beginProcessing, endProcessing]);
+			// Processing spans reading the files (getFilesFromEvent) and running the validator.
+			const signal = beginProcessing();
+			Promise.resolve(getFilesFromEvent(event))
+				.then((files) => {
+					// A newer drop/paste superseded this one while reading files - it owns isProcessing now.
+					if (signal.aborted) {
+						return;
+					}
+					if (isPropagationStopped(event) && !noDragEventsBubbling) {
+						endProcessing(signal);
+						return;
+					}
+					return setFiles(files as FileWithPath[], event, signal);
+				})
+				.catch((e) => {
+					if (!signal.aborted) {
+						endProcessing(signal);
+						onErrCb(e);
+					}
+				});
+		},
+		[getFilesFromEvent, setFiles, onErrCb, noDragEventsBubbling, beginProcessing, endProcessing],
+	);
 
 	// Fn for opening the file dialog programmatically
 	const openFileDialog = useCallback(() => {
@@ -707,45 +752,51 @@ export function useDropzone(...args: [props?: DropzoneOptions, slot?: symbol]): 
 			// and running the validator. Picker rejections (cancel, security) happen before this, so it
 			// stays undefined there and no processing state is touched.
 			let signal: AbortSignal | undefined;
-			(window as any).showOpenFilePicker(opts).then((handles: any) => {
-				signal = beginProcessing();
-				return getFilesFromEvent(handles);
-			}).then((files: Array<File | DataTransferItem>) => {
-				// Close the dialog as soon as we have the selection; validation runs afterwards and is
-				// reflected by isProcessing rather than by keeping the dialog "active".
-				dispatch({ type: 'closeDialog' });
-				// A drop elsewhere superseded this selection while reading files - it owns isProcessing.
-				if (signal!.aborted) {
-					return;
-				}
-				return setFiles(files as FileWithPath[], null, signal!);
-			}).catch((e: any) => {
-				// Clear any processing this run started (e.g. a getFilesFromEvent failure).
-				if (signal) {
-					endProcessing(signal);
-				}
-				// AbortError means the user canceled
-				if (isAbort(e)) {
-					onFileDialogCancelCb(e);
+			(window as any)
+				.showOpenFilePicker(opts)
+				.then((handles: any) => {
+					signal = beginProcessing();
+					return getFilesFromEvent(handles);
+				})
+				.then((files: Array<File | DataTransferItem>) => {
+					// Close the dialog as soon as we have the selection; validation runs afterwards and is
+					// reflected by isProcessing rather than by keeping the dialog "active".
 					dispatch({ type: 'closeDialog' });
-				} else if (isSecurityError(e) || isNotAllowedError(e)) {
-					// The FS access API is unusable here: either the context forbids it (SecurityError,
-					// e.g. CORS) or the browser/platform blocked the picker (NotAllowedError, e.g. Edge
-					// for Business - see https://github.com/react-dropzone/react-dropzone/issues/1429).
-					// Stop using it and fall back to the native <input>.
-					fsAccessApiWorksRef.current = false;
-					if (inputRef.current) {
-						inputRef.current.value = '';
-						inputRef.current.click();
-					} else {
-						onErrCb(
-							new Error('Cannot open the file picker because the https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API is not supported and no <input> was provided.'),
-						);
+					// A drop elsewhere superseded this selection while reading files - it owns isProcessing.
+					if (signal!.aborted) {
+						return;
 					}
-				} else {
-					onErrCb(e);
-				}
-			});
+					return setFiles(files as FileWithPath[], null, signal!);
+				})
+				.catch((e: any) => {
+					// Clear any processing this run started (e.g. a getFilesFromEvent failure).
+					if (signal) {
+						endProcessing(signal);
+					}
+					// AbortError means the user canceled
+					if (isAbort(e)) {
+						onFileDialogCancelCb(e);
+						dispatch({ type: 'closeDialog' });
+					} else if (isSecurityError(e) || isNotAllowedError(e)) {
+						// The FS access API is unusable here: either the context forbids it (SecurityError,
+						// e.g. CORS) or the browser/platform blocked the picker (NotAllowedError, e.g. Edge
+						// for Business - see https://github.com/react-dropzone/react-dropzone/issues/1429).
+						// Stop using it and fall back to the native <input>.
+						fsAccessApiWorksRef.current = false;
+						if (inputRef.current) {
+							inputRef.current.value = '';
+							inputRef.current.click();
+						} else {
+							onErrCb(
+								new Error(
+									'Cannot open the file picker because the https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API is not supported and no <input> was provided.',
+								),
+							);
+						}
+					} else {
+						onErrCb(e);
+					}
+				});
 			return;
 		}
 
@@ -769,19 +820,25 @@ export function useDropzone(...args: [props?: DropzoneOptions, slot?: symbol]): 
 	]);
 
 	// Cb to open the file dialog when SPACE/ENTER occurs on the dropzone
-	const onKeyDownCb = useCallback((event: any) => {
-		// Ignore keyboard events bubbling up the DOM tree
-		if (!rootRef.current?.isEqualNode(event.target)) {
-			return;
-		}
+	const onKeyDownCb = useCallback(
+		(event: any) => {
+			// Ignore keyboard events bubbling up the DOM tree
+			if (!rootRef.current?.isEqualNode(event.target)) {
+				return;
+			}
 
-		if (
-			event.key === ' ' || event.key === 'Enter' || event.keyCode === 32 || event.keyCode === 13
-		) {
-			event.preventDefault();
-			openFileDialog();
-		}
-	}, [rootRef, openFileDialog]);
+			if (
+				event.key === ' ' ||
+				event.key === 'Enter' ||
+				event.keyCode === 32 ||
+				event.keyCode === 13
+			) {
+				event.preventDefault();
+				openFileDialog();
+			}
+		},
+		[rootRef, openFileDialog],
+	);
 
 	// Update focus state for the dropzone
 	const onFocusCb = useCallback(() => {
@@ -830,8 +887,8 @@ export function useDropzone(...args: [props?: DropzoneOptions, slot?: symbol]): 
 	};
 
 	const getRootProps = useMemo(
-		() => (
-			{
+		() =>
+			({
 				refKey = 'ref',
 				role,
 				onKeyDown,
@@ -844,27 +901,26 @@ export function useDropzone(...args: [props?: DropzoneOptions, slot?: symbol]): 
 				onDrop,
 				onPaste,
 				...rest
-			}: DropzoneRootProps = {},
-		) => {
-			const userRef = rest[refKey];
-			const result = {
-				onKeyDown: composeKeyboardHandler(composeEventHandlers(onKeyDown, onKeyDownCb)),
-				onFocus: composeKeyboardHandler(composeEventHandlers(onFocus, onFocusCb)),
-				onBlur: composeKeyboardHandler(composeEventHandlers(onBlur, onBlurCb)),
-				onClick: composeHandler(composeEventHandlers(onClick, onClickCb)),
-				onDragEnter: composeDragHandler(composeEventHandlers(onDragEnter, onDragEnterCb)),
-				onDragOver: composeDragHandler(composeEventHandlers(onDragOver, onDragOverCb)),
-				onDragLeave: composeDragHandler(composeEventHandlers(onDragLeave, onDragLeaveCb)),
-				onDrop: composeDragHandler(composeEventHandlers(onDrop, onDropCb)),
-				onPaste: composePasteHandler(composeEventHandlers(onPaste, onPasteCb)),
-				role: typeof role === 'string' && role !== '' ? role : 'presentation',
-				...(!disabled && !noKeyboard ? { tabIndex: 0 } : {}),
-				...(disabled ? { 'aria-disabled': true } : {}),
-				...rest,
-			} as Record<string, any>;
-			result[refKey] = userRef ? [rootRef, userRef] : rootRef;
-			return result;
-		},
+			}: DropzoneRootProps = {}) => {
+				const userRef = rest[refKey];
+				const result = {
+					onKeyDown: composeKeyboardHandler(composeEventHandlers(onKeyDown, onKeyDownCb)),
+					onFocus: composeKeyboardHandler(composeEventHandlers(onFocus, onFocusCb)),
+					onBlur: composeKeyboardHandler(composeEventHandlers(onBlur, onBlurCb)),
+					onClick: composeHandler(composeEventHandlers(onClick, onClickCb)),
+					onDragEnter: composeDragHandler(composeEventHandlers(onDragEnter, onDragEnterCb)),
+					onDragOver: composeDragHandler(composeEventHandlers(onDragOver, onDragOverCb)),
+					onDragLeave: composeDragHandler(composeEventHandlers(onDragLeave, onDragLeaveCb)),
+					onDrop: composeDragHandler(composeEventHandlers(onDrop, onDropCb)),
+					onPaste: composePasteHandler(composeEventHandlers(onPaste, onPasteCb)),
+					role: typeof role === 'string' && role !== '' ? role : 'presentation',
+					...(!disabled && !noKeyboard ? { tabIndex: 0 } : {}),
+					...(disabled ? { 'aria-disabled': true } : {}),
+					...rest,
+				} as Record<string, any>;
+				result[refKey] = userRef ? [rootRef, userRef] : rootRef;
+				return result;
+			},
 		[
 			rootRef,
 			onKeyDownCb,
@@ -888,42 +944,43 @@ export function useDropzone(...args: [props?: DropzoneOptions, slot?: symbol]): 
 	}, []);
 
 	const getInputProps = useMemo(
-		() => ({ refKey = 'ref', onChange, onClick, ...rest }: DropzoneInputProps = {}) => {
-			const inputProps = {
-				accept: inputAcceptAttr,
-				multiple,
-				type: 'file',
-				'aria-label': 'file upload',
-				// Hide the input without taking it out of flow. A visually-hidden input with
-				// {position: absolute} makes the browser scroll the page to it whenever it gets
-				// focus (e.g. inside a collapsed accordion), see #1413. Keeping it in flow as a
-				// zero-size, transparent block avoids that while staying focusable so a {required}
-				// input still triggers form validation, see #1268. Don't use {display: none} or
-				// {visibility: hidden}: those make the input unfocusable and reintroduce #1268.
-				style: {
-					display: 'block',
-					height: 0,
-					margin: 0,
-					opacity: 0,
-					overflow: 'hidden',
-					padding: 0,
-					width: 0,
-					border: 0,
-				},
-				onChange: composeHandler(composeEventHandlers(onChange, onDropCb)),
-				onClick: composeHandler(composeEventHandlers(onClick, onInputElementClick)),
-				tabIndex: -1,
-				[refKey]: inputRef,
-			};
+		() =>
+			({ refKey = 'ref', onChange, onClick, ...rest }: DropzoneInputProps = {}) => {
+				const inputProps = {
+					accept: inputAcceptAttr,
+					multiple,
+					type: 'file',
+					'aria-label': 'file upload',
+					// Hide the input without taking it out of flow. A visually-hidden input with
+					// {position: absolute} makes the browser scroll the page to it whenever it gets
+					// focus (e.g. inside a collapsed accordion), see #1413. Keeping it in flow as a
+					// zero-size, transparent block avoids that while staying focusable so a {required}
+					// input still triggers form validation, see #1268. Don't use {display: none} or
+					// {visibility: hidden}: those make the input unfocusable and reintroduce #1268.
+					style: {
+						display: 'block',
+						height: 0,
+						margin: 0,
+						opacity: 0,
+						overflow: 'hidden',
+						padding: 0,
+						width: 0,
+						border: 0,
+					},
+					onChange: composeHandler(composeEventHandlers(onChange, onDropCb)),
+					onClick: composeHandler(composeEventHandlers(onClick, onInputElementClick)),
+					tabIndex: -1,
+					[refKey]: inputRef,
+				};
 
-			const result = {
-				...inputProps,
-				...rest,
-			} as Record<string, any>;
-			const userRef = rest[refKey];
-			result[refKey] = userRef ? [inputRef, userRef] : inputRef;
-			return result;
-		},
+				const result = {
+					...inputProps,
+					...rest,
+				} as Record<string, any>;
+				const userRef = rest[refKey];
+				result[refKey] = userRef ? [inputRef, userRef] : inputRef;
+				return result;
+			},
 		[inputRef, accept, multiple, onDropCb, disabled],
 	);
 

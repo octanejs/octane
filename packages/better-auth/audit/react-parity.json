@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -61,7 +61,7 @@
         {
           "path": "packages/better-auth/tests/differential/auth-diff.tsrx",
           "role": "support",
-          "sha256": "3861408cee2a1538e6756667cd9e86e52b0c1a3916d498fc95a17a2bb1bf70ca"
+          "sha256": "6e11b33552de9a518d05cafaf3f5c41fac0074a314122471764c34e0560c59fa"
         },
         {
           "path": "packages/better-auth/tests/differential/_setup.ts",

@@ -67,23 +67,17 @@ const initialContent = {
 	content: [
 		{
 			type: 'paragraph',
-			content: [
-				{ type: 'text', text: 'Select this text and keep typing' },
-			],
+			content: [{ type: 'text', text: 'Select this text and keep typing' }],
 		},
 		{
 			type: 'draggableCard',
 			attrs: { label: 'first card' },
-			content: [
-				{ type: 'text', text: 'First draggable card' },
-			],
+			content: [{ type: 'text', text: 'First draggable card' }],
 		},
 		{
 			type: 'draggableCard',
 			attrs: { label: 'second card' },
-			content: [
-				{ type: 'text', text: 'Second draggable card' },
-			],
+			content: [{ type: 'text', text: 'Second draggable card' }],
 		},
 		{ type: 'paragraph' },
 	],
@@ -137,11 +131,17 @@ function BrowserHarness() @{
 				const htmlContainer = document.createElement('div');
 				htmlContainer.innerHTML = html;
 				setDroppedText(plainText || htmlContainer.textContent?.trim() || 'missing drag text');
-				setDroppedTypes(Array.from(dataTransfer?.types || []).sort().join(','));
+				setDroppedTypes(
+					Array.from(dataTransfer?.types || [])
+						.sort()
+						.join(','),
+				);
 			}}
 		>
 			Drop a card here
-			<output id="drop-result" data-transfer-types={droppedTypes}>{droppedText}</output>
+			<output id="drop-result" data-transfer-types={droppedTypes}>
+				{droppedText}
+			</output>
 		</section>
 	</main>
 }

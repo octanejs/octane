@@ -5,22 +5,19 @@ import { ComponentData, Data } from './Data.tsrx';
 import { PrivateAppState } from './Internal.tsrx';
 import { AppState } from './AppState.tsrx';
 
-export type WithId<Props> =
-	Props & {
-		id: string;
-	};
+export type WithId<Props> = Props & {
+	id: string;
+};
 
-export type WithPuckProps<Props> =
-	Props & {
-		puck: PuckContext;
-		editMode?: boolean;
-	};
+export type WithPuckProps<Props> = Props & {
+	puck: PuckContext;
+	editMode?: boolean;
+};
 export type AsFieldProps<Props> = Omit<Props, 'children' | 'puck' | 'editMode'>;
 
-export type WithChildren<Props> =
-	Props & {
-		children: OctaneNode;
-	};
+export type WithChildren<Props> = Props & {
+	children: OctaneNode;
+};
 
 export type UserGenerics<
 	UserConfig extends Config = Config,
@@ -44,5 +41,7 @@ export type UserGenerics<
 	UserField: UserParams['field'];
 };
 
-export type ExtractField<UserField extends { type: PropertyKey }, T extends UserField['type']> =
-	Extract<UserField, { type: T }>;
+export type ExtractField<
+	UserField extends { type: PropertyKey },
+	T extends UserField['type'],
+> = Extract<UserField, { type: T }>;

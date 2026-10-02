@@ -41,17 +41,19 @@ export function SvgInForOf(props) @{
 // ----------------------------------------------------------------------------
 export function SvgInTernary(props) @{
 	<div id="ternary-host">
-		{props.cond
-			? <>
-					<svg id="svg-a">
-						<rect class="r" x="0" y="0" width="5" height="5" />
-					</svg>
-				</>
-			: <>
-					<svg id="svg-b">
-						<circle class="c" cx="1" cy="1" r="1" />
-					</svg>
-				</>}
+		{props.cond ? (
+			<>
+				<svg id="svg-a">
+					<rect class="r" x="0" y="0" width="5" height="5" />
+				</svg>
+			</>
+		) : (
+			<>
+				<svg id="svg-b">
+					<circle class="c" cx="1" cy="1" r="1" />
+				</svg>
+			</>
+		)}
 	</div>
 }
 
@@ -90,16 +92,18 @@ export function MathInForOf(props) @{
 // ----------------------------------------------------------------------------
 export function MathInTernary(props) @{
 	<div id="math-ternary-host">
-		{props.cond
-			? <>
-					<math id="math-a">
-						<mi class="left">{'L'}</mi>
-					</math>
-				</>
-			: <>
-					<math id="math-b">
-						<mo class="right">{'R'}</mo>
-					</math>
-				</>}
+		{props.cond ? (
+			<>
+				<math id="math-a">
+					<mi class="left">{'L'}</mi>
+				</math>
+			</>
+		) : (
+			<>
+				<math id="math-b">
+					<mo class="right">{'R'}</mo>
+				</math>
+			</>
+		)}
 	</div>
 }

@@ -10,13 +10,17 @@ export function App() @{
 				aria-label="Remove seat"
 				disabled={count === 0}
 				onClick={() => setCount(Math.max(0, count - 1))}
-			>{'−'}</button>
+			>
+				{'−'}
+			</button>
 			<output aria-label="Seat count">{count as string}</output>
 			<button
 				aria-label="Add seat"
 				disabled={count === 3}
 				onClick={() => setCount(Math.min(3, count + 1))}
-			>{'+'}</button>
+			>
+				{'+'}
+			</button>
 		</div>
 		@if (count === 0) {
 			<p role="status">{'No seats selected'}</p>

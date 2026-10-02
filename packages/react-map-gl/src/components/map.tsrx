@@ -26,11 +26,14 @@ export type MapContextValue = {
 
 export const MapContext = createContext<MapContextValue>(null as unknown as MapContextValue);
 
-type MapInitOptions =
-	Omit<MapOptions, 'style' | 'container' | 'bounds' | 'fitBoundsOptions' | 'center'>;
+type MapInitOptions = Omit<
+	MapOptions,
+	'style' | 'container' | 'bounds' | 'fitBoundsOptions' | 'center'
+>;
 
-export type MapProps =
-	MapInitOptions & MapboxProps & GlobalSettings & {
+export type MapProps = MapInitOptions &
+	MapboxProps &
+	GlobalSettings & {
 		mapLib?: MapLib | Promise<MapLib>;
 		reuseMaps?: boolean;
 		/** Map container id */
@@ -58,60 +61,61 @@ export function Map(props: MapProps) @{
 		let isMounted = true;
 		let mapbox: Mapbox;
 
-		Promise.resolve(mapLib || import('mapbox-gl')).then((module: MapLib | { default: MapLib }) => {
-			if (!isMounted) {
-				return;
-			}
-			if (!module) {
-				throw new Error('Invalid mapLib');
-			}
-			const mapboxgl =
-				'Map' in module ? module : module.default;
-			if (!mapboxgl.Map) {
-				throw new Error('Invalid mapLib');
-			}
+		Promise.resolve(mapLib || import('mapbox-gl'))
+			.then((module: MapLib | { default: MapLib }) => {
+				if (!isMounted) {
+					return;
+				}
+				if (!module) {
+					throw new Error('Invalid mapLib');
+				}
+				const mapboxgl = 'Map' in module ? module : module.default;
+				if (!mapboxgl.Map) {
+					throw new Error('Invalid mapLib');
+				}
 
-			setGlobals(mapboxgl, props);
-			if (props.reuseMaps) {
-				mapbox = Mapbox.reuse(props, containerRef.current!)!;
-			}
-			if (!mapbox) {
-				mapbox = new Mapbox(mapboxgl.Map, props, containerRef.current!);
-			}
-			contextValue.map = createRef(mapbox)!;
-			contextValue.mapLib = mapboxgl;
+				setGlobals(mapboxgl, props);
+				if (props.reuseMaps) {
+					mapbox = Mapbox.reuse(props, containerRef.current!)!;
+				}
+				if (!mapbox) {
+					mapbox = new Mapbox(mapboxgl.Map, props, containerRef.current!);
+				}
+				contextValue.map = createRef(mapbox)!;
+				contextValue.mapLib = mapboxgl;
 
-			// The children container is created and APPENDED here rather than
-			// rendered into the template, so it lands after the DOM mapbox-gl has
-			// just built — which is where React puts it, and the only arrangement
-			// that reproduces upstream's behavior.
-			//
-			// Rendered in the template, Octane's conditional block anchors it at its
-			// authored position, ahead of the library's nodes. In flow it then
-			// displaces `.mapboxgl-canvas-container`, the element mapbox-gl measures
-			// pointer coordinates against; taken out of flow it instead paints
-			// before the canvas, so a consumer's positioned overlay ends up hidden
-			// and unclickable beneath an opaque map. Appending sidesteps both: same
-			// `height: 100%` container as upstream, in the same place.
-			const childContainer = document.createElement('div');
-			childContainer.setAttribute('mapboxgl-children', '');
-			childContainer.style.height = '100%';
-			containerRef.current!.appendChild(childContainer);
-			childContainerRef.current = childContainer;
+				// The children container is created and APPENDED here rather than
+				// rendered into the template, so it lands after the DOM mapbox-gl has
+				// just built — which is where React puts it, and the only arrangement
+				// that reproduces upstream's behavior.
+				//
+				// Rendered in the template, Octane's conditional block anchors it at its
+				// authored position, ahead of the library's nodes. In flow it then
+				// displaces `.mapboxgl-canvas-container`, the element mapbox-gl measures
+				// pointer coordinates against; taken out of flow it instead paints
+				// before the canvas, so a consumer's positioned overlay ends up hidden
+				// and unclickable beneath an opaque map. Appending sidesteps both: same
+				// `height: 100%` container as upstream, in the same place.
+				const childContainer = document.createElement('div');
+				childContainer.setAttribute('mapboxgl-children', '');
+				childContainer.style.height = '100%';
+				containerRef.current!.appendChild(childContainer);
+				childContainerRef.current = childContainer;
 
-			setMapInstance(mapbox);
-		}).catch((error) => {
-			const { onError } = props;
-			if (onError) {
-				onError({
-					type: 'error',
-					target: null,
-					error,
-				});
-			} else {
-				console.error(error); // eslint-disable-line
-			}
-		});
+				setMapInstance(mapbox);
+			})
+			.catch((error) => {
+				const { onError } = props;
+				if (onError) {
+					onError({
+						type: 'error',
+						target: null,
+						error,
+					});
+				} else {
+					console.error(error); // eslint-disable-line
+				}
+			});
 
 		return () => {
 			isMounted = false;
@@ -164,10 +168,9 @@ export function Map(props: MapProps) @{
 	// `Marker` and `Popup` already reach their library-owned elements this way.
 	<div id={props.id} ref={containerRef} style={style}>
 		@if (mapInstance) {
-			<MapContext value={contextValue}>{createPortal(
-				props.children,
-				childContainerRef.current!,
-			)}</MapContext>
+			<MapContext value={contextValue}>
+				{createPortal(props.children, childContainerRef.current!)}
+			</MapContext>
 		}
 	</div>
 }

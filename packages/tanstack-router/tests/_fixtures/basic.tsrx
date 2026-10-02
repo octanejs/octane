@@ -14,8 +14,12 @@ import { createMemoryHistory } from '@octanejs/tanstack-router';
 function RootLayout() @{
 	<div class="root">
 		<nav>
-			<Link to="/" class="nav-home">{'Home'}</Link>
-			<Link to="/about" class="nav-about">{'About'}</Link>
+			<Link to="/" class="nav-home">
+				{'Home'}
+			</Link>
+			<Link to="/about" class="nav-about">
+				{'About'}
+			</Link>
 		</nav>
 		<Outlet />
 	</div>
@@ -44,7 +48,7 @@ function EnterFailurePage() @{
 // Reads a path param via useParams (loose access).
 function ItemPage() @{
 	const params = useParams({ strict: false });
-	<h1 class="item">{'Item ' + params.id as string}</h1>
+	<h1 class="item">{('Item ' + params.id) as string}</h1>
 }
 
 // A second layout level: posts has its own <Outlet/> for its children, exercising
@@ -73,7 +77,7 @@ function TablesLayout() @{
 
 function TableRows() @{
 	const params = useParams({ strict: false });
-	<p class="table-rows">{'rows-' + params.tableId as string}</p>
+	<p class="table-rows">{('rows-' + params.tableId) as string}</p>
 }
 
 // A fresh router (+ fresh route tree) per call so tests don't share router state.

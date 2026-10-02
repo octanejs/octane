@@ -55,75 +55,77 @@ export function BrandContextMenu({ children, ...rest }: BrandContextMenuProps) {
 		}
 	};
 
-	return <div onContextMenu={onContextMenu} {...rest}>
-		{children}
-		<Dropdown open={open} onOpenChange={setOpen} modal>
-			<DropdownTrigger asChild={false}>
-				<span
-					ref={virtualTriggerRef}
-					style={{
-						position: 'fixed',
-						left: coords.x,
-						top: coords.y,
-						width: 1,
-						height: 1,
-					}}
-				/>
-			</DropdownTrigger>
-			<DropdownContent
-				sideOffset={4}
-				align="start"
-				className="dark:bg-gray-900/50 backdrop-blur-md"
-			>
-				{[
-					{
-						label: 'Logo as SVG (Black)',
-						url: '/images/logos/logo-black.svg',
-					},
-					{
-						label: 'Logo as SVG (White)',
-						url: '/images/logos/logo-white.svg',
-						darkBg: true,
-					},
-					{
-						label: 'Wordmark as SVG (Black)',
-						url: '/images/logos/logo-word-black.svg',
-					},
-					{
-						label: 'Wordmark as SVG (White)',
-						url: '/images/logos/logo-word-white.svg',
-						darkBg: true,
-					},
-				].map(
-					({ label, url, darkBg }) => <DropdownItem
-						key={label}
-						className="py-1"
-						onSelect={async () => {
-							try {
-								const res = await fetch(url);
-								const text = await res.text();
-								await copyText(text);
-							} catch (err) {
-								console.error('Failed to copy logo', err);
-							}
+	return (
+		<div onContextMenu={onContextMenu} {...rest}>
+			{children}
+			<Dropdown open={open} onOpenChange={setOpen} modal>
+				<DropdownTrigger asChild={false}>
+					<span
+						ref={virtualTriggerRef}
+						style={{
+							position: 'fixed',
+							left: coords.x,
+							top: coords.y,
+							width: 1,
+							height: 1,
 						}}
-					>
-						{label}
-						<div
-							class={twMerge(
-								'p-1 rounded-full',
-								darkBg ? 'bg-black text-white shadow-md' : 'bg-white text-black shadow-md',
-							)}
+					/>
+				</DropdownTrigger>
+				<DropdownContent
+					sideOffset={4}
+					align="start"
+					className="dark:bg-gray-900/50 backdrop-blur-md"
+				>
+					{[
+						{
+							label: 'Logo as SVG (Black)',
+							url: '/images/logos/logo-black.svg',
+						},
+						{
+							label: 'Logo as SVG (White)',
+							url: '/images/logos/logo-white.svg',
+							darkBg: true,
+						},
+						{
+							label: 'Wordmark as SVG (Black)',
+							url: '/images/logos/logo-word-black.svg',
+						},
+						{
+							label: 'Wordmark as SVG (White)',
+							url: '/images/logos/logo-word-white.svg',
+							darkBg: true,
+						},
+					].map(({ label, url, darkBg }) => (
+						<DropdownItem
+							key={label}
+							className="py-1"
+							onSelect={async () => {
+								try {
+									const res = await fetch(url);
+									const text = await res.text();
+									await copyText(text);
+								} catch (err) {
+									console.error('Failed to copy logo', err);
+								}
+							}}
 						>
-							<img src={url} alt={label} class="h-6" />
-						</div>
-					</DropdownItem>,
-				)}
-				<DropdownSeparator />
-				<DropdownItem onSelect={() => navigate({ to: '/brand-guide' })}>
-					Brand Guide &amp; All Assets
-				</DropdownItem>
-			</DropdownContent>
-		</Dropdown>
-	</div>;
+							{label}
+							<div
+								class={twMerge(
+									'p-1 rounded-full',
+									darkBg ? 'bg-black text-white shadow-md' : 'bg-white text-black shadow-md',
+								)}
+							>
+								<img src={url} alt={label} class="h-6" />
+							</div>
+						</DropdownItem>
+					))}
+					<DropdownSeparator />
+					<DropdownItem onSelect={() => navigate({ to: '/brand-guide' })}>
+						Brand Guide &amp; All Assets
+					</DropdownItem>
+				</DropdownContent>
+			</Dropdown>
+		</div>
+	);
 }

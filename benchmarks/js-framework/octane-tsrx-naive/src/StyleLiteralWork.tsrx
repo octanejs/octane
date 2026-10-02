@@ -16,7 +16,9 @@ function SingleRow(props) @{
 				fontStyle: 'normal',
 				fontWeight: props.version >= 0 && props.selected ? 'bold' : 'normal',
 			}}
-		>{String(props.id)}</td>
+		>
+			{String(props.id)}
+		</td>
 	</tr>
 }
 
@@ -28,7 +30,9 @@ function MultiRow(props) @{
 				fontWeight: props.version >= 0 && props.selected ? 'bold' : 'normal',
 				color: props.version >= 0 && props.selected ? 'red' : 'black',
 			}}
-		>{String(props.id)}</td>
+		>
+			{String(props.id)}
+		</td>
 	</tr>
 }
 
@@ -53,7 +57,9 @@ function InterleavedRow(props) @{
 				right: active ? 4 : 0,
 				opacity: 0.5,
 			}}
-		>{String(props.id)}</td>
+		>
+			{String(props.id)}
+		</td>
 	</tr>
 }
 
@@ -65,7 +71,9 @@ function DuplicateStaticRow(props) @{
 				color: 'red',
 				background: props.background,
 			}}
-		>{String(props.id)}</td>
+		>
+			{String(props.id)}
+		</td>
 	</tr>
 }
 
@@ -77,7 +85,9 @@ function DuplicateDynamicRow(props) @{
 				color: recordColor(props.version >= 0 ? props.color : 'transparent'),
 				background: props.background,
 			}}
-		>{String(props.id)}</td>
+		>
+			{String(props.id)}
+		</td>
 	</tr>
 }
 
@@ -90,7 +100,9 @@ function LeadingSpreadRow(props) @{
 				fontWeight: props.version >= 0 && props.selected ? 'bold' : 'normal',
 				color: props.version >= 0 && props.selected ? 'red' : 'black',
 			}}
-		>{String(props.id)}</td>
+		>
+			{String(props.id)}
+		</td>
 	</tr>
 }
 
@@ -115,7 +127,9 @@ function CollisionSpreadRow(props) @{
 				fontWeight: props.version >= 0 && props.selected ? 'bold' : 'normal',
 				color: props.version >= 0 && props.selected ? 'red' : 'black',
 			}}
-		>{String(props.id)}</td>
+		>
+			{String(props.id)}
+		</td>
 	</tr>
 }
 
@@ -136,11 +150,12 @@ export function StyleLiteralWork(props) @{
 	const [selected, setSelected] = useState(-1);
 	const [version, setVersion] = useState(0);
 	<div>
-		<button id="run" onClick={() => setIds(IDS)}>{'Create 1,000 rows'}</button>
-		<button
-			id="update"
-			onClick={() => setVersion((current) => current + 1)}
-		>{'Unrelated update'}</button>
+		<button id="run" onClick={() => setIds(IDS)}>
+			{'Create 1,000 rows'}
+		</button>
+		<button id="update" onClick={() => setVersion((current) => current + 1)}>
+			{'Unrelated update'}
+		</button>
 		<table>
 			<tbody>
 				@if (props.mode === 'single') {

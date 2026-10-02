@@ -26,7 +26,7 @@ export function PendingBoundary(props) @{
 function ContextLeaf(props) @{
 	const context = use(StreamContext);
 	const value = use(props.promise);
-	<span class="context-value">{context + ':' + value as string}</span>
+	<span class="context-value">{(context + ':' + value) as string}</span>
 }
 
 function ContextOutside() @{
@@ -205,10 +205,12 @@ export function DynamicSvgHostBoundaries(props) @{
 	const Tag = props.tag;
 	<svg id="dynamic-svg-host">
 		<Tag>
-			{() => <>
-				<DynamicSvgLeaf promise={props.a} />
-				<DynamicSvgLeaf promise={props.b} />
-			</>}
+			{() => (
+				<>
+					<DynamicSvgLeaf promise={props.a} />
+					<DynamicSvgLeaf promise={props.b} />
+				</>
+			)}
 		</Tag>
 	</svg>
 }
@@ -263,24 +265,16 @@ export function AdjacentTextBoundary(props) @{
 		@try {
 			const first = use(props.first);
 			if (props.onFirstRendered) props.onFirstRendered();
-			<>
-				{first as string}
-			</>
+			<>{first as string}</>
 		} @pending {
-			<>
-				{'one…'}
-			</>
+			<>{'one…'}</>
 		}
 		{'|middle|'}
 		@try {
 			const second = use(props.second);
-			<>
-				{second as string}
-			</>
+			<>{second as string}</>
 		} @pending {
-			<>
-				{'two…'}
-			</>
+			<>{'two…'}</>
 		}
 		{':end'}
 	</div>
@@ -291,13 +285,9 @@ export function TextAfterElementBoundary(props) @{
 		<b>{'hello'}</b>
 		@try {
 			const value = use(props.promise);
-			<>
-				{value as string}
-			</>
+			<>{value as string}</>
 		} @pending {
-			<>
-				{'loading'}
-			</>
+			<>{'loading'}</>
 		}
 	</div>
 }

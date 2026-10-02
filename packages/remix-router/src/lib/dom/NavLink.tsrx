@@ -64,9 +64,9 @@ export function NavLink(props: NavLinkProps) @{
 	const { navigator, basename } = useContext(NavigationContext);
 	const isTransitioning =
 		routerState != null &&
-			// Conditional usage is OK here because the usage of a data router is static
-			useViewTransitionState(path) &&
-			viewTransition === true;
+		// Conditional usage is OK here because the usage of a data router is static
+		useViewTransitionState(path) &&
+		viewTransition === true;
 
 	let toPathname = navigator.encodeLocation
 		? navigator.encodeLocation(path).pathname
@@ -96,14 +96,16 @@ export function NavLink(props: NavLinkProps) @{
 		toPathname !== '/' && toPathname.endsWith('/') ? toPathname.length - 1 : toPathname.length;
 	const isActive =
 		locationPathname === toPathname ||
-			!end && locationPathname.startsWith(toPathname) &&
-				locationPathname.charAt(endSlashPosition) === '/';
+		(!end &&
+			locationPathname.startsWith(toPathname) &&
+			locationPathname.charAt(endSlashPosition) === '/');
 
 	const isPending =
 		nextLocationPathname != null &&
-			(nextLocationPathname === toPathname ||
-				!end && nextLocationPathname.startsWith(toPathname) &&
-					nextLocationPathname.charAt(toPathname.length) === '/');
+		(nextLocationPathname === toPathname ||
+			(!end &&
+				nextLocationPathname.startsWith(toPathname) &&
+				nextLocationPathname.charAt(toPathname.length) === '/'));
 
 	const renderProps = {
 		isActive,
@@ -127,11 +129,12 @@ export function NavLink(props: NavLinkProps) @{
 			isActive ? 'active' : null,
 			isPending ? 'pending' : null,
 			isTransitioning ? 'transitioning' : null,
-		].filter(Boolean).join(' ');
+		]
+			.filter(Boolean)
+			.join(' ');
 	}
 
-	const style =
-		typeof styleProp === 'function' ? styleProp(renderProps) : styleProp;
+	const style = typeof styleProp === 'function' ? styleProp(renderProps) : styleProp;
 
 	// Render-prop children are called with the state object; block children
 	// pass through untouched (PROP position — see the children-forwarding rule).

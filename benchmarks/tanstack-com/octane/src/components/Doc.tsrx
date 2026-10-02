@@ -108,59 +108,65 @@ export function Doc({
 		return () => observer.disconnect();
 	}, [headings]);
 
-	return <div class="flex-1 min-h-0 flex flex-col pt-4 lg:pt-6 xl:pt-8">
-		<a href={`${pagePath}.md`} class="sr-only" tabIndex={-1} aria-hidden="true">
-			AI/LLM: This documentation page is available in plain markdown format at
-			{pagePath}
-			.md
-		</a>
+	return (
+		<div class="flex-1 min-h-0 flex flex-col pt-4 lg:pt-6 xl:pt-8">
+			<a href={`${pagePath}.md`} class="sr-only" tabIndex={-1} aria-hidden="true">
+				AI/LLM: This documentation page is available in plain markdown format at
+				{pagePath}
+				.md
+			</a>
 
-		<div class={twMerge('w-full flex mx-auto max-w-[768px]', isTocVisible && 'max-w-full')}>
-			<div class="flex flex-col w-full min-w-0">
-				{config &&
-					<div class="mb-3">
-						<DocBreadcrumb config={config} headings={isTocVisible ? headings : undefined} />
-					</div>}
-				<MarkdownContent
-					title={title}
-					repo={repo}
-					branch={branch}
-					filePath={filePath}
-					markdown={markdown}
-					containerRef={markdownContainerRef}
-					libraryId={libraryId}
-					libraryVersion={libraryVersion}
-					pagePath={pagePath}
-					currentFramework={currentFramework}
-					proseClassName="[font-size:14px]"
-					titleBarActions={setIsFullWidth
-						? <button
-								onClick={() => setIsFullWidth(!isFullWidth)}
-								class="p-2 mr-4 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors shrink-0 hidden [@media(min-width:1535px)]:inline-flex"
-								title={isFullWidth ? 'Constrain width' : 'Expand width'}
-							>
-								{isFullWidth
-									? <FoldHorizontal className="w-4 h-4" />
-									: <UnfoldHorizontal className="w-4 h-4" />}
-							</button>
-						: null}
-				/>
-				{footer ?? <DocNavigation />}
-			</div>
-
-			{isTocVisible &&
-				<div
-					class="pl-4 w-32 lg:w-36 xl:w-44 2xl:w-56 3xl:w-64 shrink-0 hidden xl:block transition-all"
-				>
-					<Toc
-						headings={headings}
-						activeHeadings={activeHeadings}
-						colorFrom={colorFrom}
-						colorTo={colorTo}
-						textColor={textColor}
+			<div class={twMerge('w-full flex mx-auto max-w-[768px]', isTocVisible && 'max-w-full')}>
+				<div class="flex flex-col w-full min-w-0">
+					{config && (
+						<div class="mb-3">
+							<DocBreadcrumb config={config} headings={isTocVisible ? headings : undefined} />
+						</div>
+					)}
+					<MarkdownContent
+						title={title}
+						repo={repo}
+						branch={branch}
+						filePath={filePath}
+						markdown={markdown}
+						containerRef={markdownContainerRef}
+						libraryId={libraryId}
+						libraryVersion={libraryVersion}
+						pagePath={pagePath}
 						currentFramework={currentFramework}
+						proseClassName="[font-size:14px]"
+						titleBarActions={
+							setIsFullWidth ? (
+								<button
+									onClick={() => setIsFullWidth(!isFullWidth)}
+									class="p-2 mr-4 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors shrink-0 hidden [@media(min-width:1535px)]:inline-flex"
+									title={isFullWidth ? 'Constrain width' : 'Expand width'}
+								>
+									{isFullWidth ? (
+										<FoldHorizontal className="w-4 h-4" />
+									) : (
+										<UnfoldHorizontal className="w-4 h-4" />
+									)}
+								</button>
+							) : null
+						}
 					/>
-				</div>}
+					{footer ?? <DocNavigation />}
+				</div>
+
+				{isTocVisible && (
+					<div class="pl-4 w-32 lg:w-36 xl:w-44 2xl:w-56 3xl:w-64 shrink-0 hidden xl:block transition-all">
+						<Toc
+							headings={headings}
+							activeHeadings={activeHeadings}
+							colorFrom={colorFrom}
+							colorTo={colorTo}
+							textColor={textColor}
+							currentFramework={currentFramework}
+						/>
+					</div>
+				)}
+			</div>
 		</div>
-	</div>;
+	);
 }

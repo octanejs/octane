@@ -74,18 +74,20 @@ export const TableDownloadButton = ({
 		}
 	};
 
-	return <button
-		className={cn(
-			'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
-			className,
-		)}
-		disabled={isAnimating}
-		onClick={downloadTableData}
-		title={format === 'csv' ? t.downloadTableAsCsv : t.downloadTableAsMarkdown}
-		type="button"
-	>
-		{children ?? <icons.DownloadIcon size={14} />}
-	</button>;
+	return (
+		<button
+			className={cn(
+				'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
+				className,
+			)}
+			disabled={isAnimating}
+			onClick={downloadTableData}
+			title={format === 'csv' ? t.downloadTableAsCsv : t.downloadTableAsMarkdown}
+			type="button"
+		>
+			{children ?? <icons.DownloadIcon size={14} />}
+		</button>
+	);
 };
 
 export interface TableDownloadDropdownProps {
@@ -118,13 +120,10 @@ export const TableDownloadDropdown = ({
 			}
 
 			const tableData = extractTableDataFromElement(tableElement);
-			const content =
-				format === 'csv' ? tableDataToCSV(tableData) : tableDataToMarkdown(tableData);
-			const extension =
-				format === 'csv' ? 'csv' : 'md';
+			const content = format === 'csv' ? tableDataToCSV(tableData) : tableDataToMarkdown(tableData);
+			const extension = format === 'csv' ? 'csv' : 'md';
 			const filename = `table.${extension}`;
-			const mimeType =
-				format === 'csv' ? 'text/csv' : 'text/markdown';
+			const mimeType = format === 'csv' ? 'text/csv' : 'text/markdown';
 
 			save(filename, content, mimeType);
 			setIsOpen(false);
@@ -148,21 +147,22 @@ export const TableDownloadDropdown = ({
 		};
 	}, []);
 
-	return <div className={cn('relative')} ref={dropdownRef}>
-		<button
-			className={cn(
-				'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
-				className,
-			)}
-			disabled={isAnimating}
-			onClick={() => setIsOpen(!isOpen)}
-			title={t.downloadTable}
-			type="button"
-		>
-			{children ?? <icons.DownloadIcon size={14} />}
-		</button>
-		{isOpen
-			? <div
+	return (
+		<div className={cn('relative')} ref={dropdownRef}>
+			<button
+				className={cn(
+					'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
+					className,
+				)}
+				disabled={isAnimating}
+				onClick={() => setIsOpen(!isOpen)}
+				title={t.downloadTable}
+				type="button"
+			>
+				{children ?? <icons.DownloadIcon size={14} />}
+			</button>
+			{isOpen ? (
+				<div
 					className={cn(
 						'absolute top-full right-0 z-20 mt-1 min-w-[120px] overflow-hidden rounded-md border border-border bg-background shadow-lg',
 					)}
@@ -172,14 +172,19 @@ export const TableDownloadDropdown = ({
 						onClick={() => downloadTableData('csv')}
 						title={t.downloadTableAsCsv}
 						type="button"
-					>{t.tableFormatCsv}</button>
+					>
+						{t.tableFormatCsv}
+					</button>
 					<button
 						className={cn('w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40')}
 						onClick={() => downloadTableData('markdown')}
 						title={t.downloadTableAsMarkdown}
 						type="button"
-					>{t.tableFormatMarkdown}</button>
+					>
+						{t.tableFormatMarkdown}
+					</button>
 				</div>
-			: null}
-	</div>;
+			) : null}
+		</div>
+	);
 };

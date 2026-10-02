@@ -11,13 +11,15 @@ export function VersionSelect({ libraryId }: { libraryId: LibraryId }) {
 	const versionConfig = useVersionConfig({
 		versions: library.availableVersions,
 	});
-	return <Select
-		className="w-full"
-		icon={<Tag className="w-3.5 h-3.5 opacity-60" />}
-		selected={versionConfig.selected}
-		available={versionConfig.available}
-		onSelect={versionConfig.onSelect}
-	/>;
+	return (
+		<Select
+			className="w-full"
+			icon={<Tag className="w-3.5 h-3.5 opacity-60" />}
+			selected={versionConfig.selected}
+			available={versionConfig.available}
+			onSelect={versionConfig.onSelect}
+		/>
+	);
 }
 
 // Let's use zustand to wrap the local storage logic. This way
@@ -26,15 +28,13 @@ export function VersionSelect({ libraryId }: { libraryId: LibraryId }) {
 const useLocalCurrentVersion = create<{
 	currentVersion?: string;
 	setCurrentVersion: (version: string) => void;
-}>(
-	(set) => ({
-		currentVersion: getLocalStorageItem('version') || undefined,
-		setCurrentVersion: (version: string) => {
-			setLocalStorageItem('version', version);
-			set({ currentVersion: version });
-		},
-	}),
-);
+}>((set) => ({
+	currentVersion: getLocalStorageItem('version') || undefined,
+	setCurrentVersion: (version: string) => {
+		setLocalStorageItem('version', version);
+		set({ currentVersion: version });
+	},
+}));
 
 /**
  * Use framework in URL path
@@ -54,12 +54,15 @@ function useCurrentVersion(versions: string[]) {
 
 	version = versions.includes(version) ? version : 'latest';
 
-	const setVersion = useCallback((version: string) => {
-		navigate({
-			params: { version } as never,
-		});
-		localCurrentVersion.setCurrentVersion(version);
-	}, [localCurrentVersion, navigate]);
+	const setVersion = useCallback(
+		(version: string) => {
+			navigate({
+				params: { version } as never,
+			});
+			localCurrentVersion.setCurrentVersion(version);
+		},
+		[localCurrentVersion, navigate],
+	);
 
 	useEffect(() => {
 		// Set the version in localStorage if it doesn't exist
@@ -83,18 +86,21 @@ function useVersionConfig({ versions }: { versions: string[] }) {
 	const currentVersion = useCurrentVersion(versions);
 
 	const versionConfig = useMemo(() => {
-		const available = versions.reduce((acc: SelectOption[], version) => {
-			acc.push({
-				label: version,
-				value: version,
-			});
-			return acc;
-		}, [
-			{
-				label: 'Latest',
-				value: 'latest',
+		const available = versions.reduce(
+			(acc: SelectOption[], version) => {
+				acc.push({
+					label: version,
+					value: version,
+				});
+				return acc;
 			},
-		]);
+			[
+				{
+					label: 'Latest',
+					value: 'latest',
+				},
+			],
+		);
 
 		return {
 			label: 'Version',

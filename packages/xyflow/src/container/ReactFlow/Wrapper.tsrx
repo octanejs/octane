@@ -40,27 +40,29 @@ export function Wrapper({
 
 	if (isWrapped) {
 		/*
- * we need to wrap it with a fragment because it's not allowed for children to be a OctaneNode
- * https://github.com/DefinitelyTyped/DefinitelyTyped/issues/18051
- */
-		return <>
-			{children}
-		</>;
+		 * we need to wrap it with a fragment because it's not allowed for children to be a OctaneNode
+		 * https://github.com/DefinitelyTyped/DefinitelyTyped/issues/18051
+		 */
+		return <>{children}</>;
 	}
 
-	return <ReactFlowProvider
-		initialNodes={nodes}
-		initialEdges={edges}
-		defaultNodes={defaultNodes}
-		defaultEdges={defaultEdges}
-		initialWidth={width}
-		initialHeight={height}
-		fitView={fitView}
-		initialFitViewOptions={fitViewOptions}
-		initialMinZoom={minZoom}
-		initialMaxZoom={maxZoom}
-		nodeOrigin={nodeOrigin}
-		nodeExtent={nodeExtent}
-		zIndexMode={zIndexMode}
-	>{children}</ReactFlowProvider>;
+	return (
+		<ReactFlowProvider
+			initialNodes={nodes}
+			initialEdges={edges}
+			defaultNodes={defaultNodes}
+			defaultEdges={defaultEdges}
+			initialWidth={width}
+			initialHeight={height}
+			fitView={fitView}
+			initialFitViewOptions={fitViewOptions}
+			initialMinZoom={minZoom}
+			initialMaxZoom={maxZoom}
+			nodeOrigin={nodeOrigin}
+			nodeExtent={nodeExtent}
+			zIndexMode={zIndexMode}
+		>
+			{children}
+		</ReactFlowProvider>
+	);
 }

@@ -108,15 +108,19 @@ function DocRecencyPill({ recency, date }: { recency: Exclude<DocRecency, null>;
 		}
 	}
 
-	return <span
-		title={title}
-		class={twMerge(
-			'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide leading-none',
-			isNew
-				? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-				: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
-		)}
-	>{label}</span>;
+	return (
+		<span
+			title={title}
+			class={twMerge(
+				'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide leading-none',
+				isNew
+					? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+					: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
+			)}
+		>
+			{label}
+		</span>
+	);
 }
 
 function DocsPartnerSlot({
@@ -137,17 +141,17 @@ function DocsPartnerSlot({
 		return null;
 	}
 
-	return <div
-		class="docs-partner-slot ml-auto flex shrink-0 items-stretch border-l border-gray-500/20 pl-2 pr-3 md:hidden"
-	>
-		<DocsPartnerSlotLink
-			key={`${displayedSlot.partner.id}:${displayedSlot.slotIndex}`}
-			flipState={flipState}
-			orderPlacementContext={orderPlacementContext}
-			partner={displayedSlot.partner}
-			slotIndex={displayedSlot.slotIndex}
-		/>
-	</div>;
+	return (
+		<div class="docs-partner-slot ml-auto flex shrink-0 items-stretch border-l border-gray-500/20 pl-2 pr-3 md:hidden">
+			<DocsPartnerSlotLink
+				key={`${displayedSlot.partner.id}:${displayedSlot.slotIndex}`}
+				flipState={flipState}
+				orderPlacementContext={orderPlacementContext}
+				partner={displayedSlot.partner}
+				slotIndex={displayedSlot.slotIndex}
+			/>
+		</div>
+	);
 }
 
 function DocsPartnerSlotLink({
@@ -190,28 +194,28 @@ function DocsPartnerSlotLink({
 		});
 	};
 
-	return <a
-		ref={ref}
-		href={partner.href}
-		target="_blank"
-		rel="noreferrer"
-		aria-label={`${partner.name} partner`}
-		class={twMerge(
-			'docs-partner-slot-link flex h-full shrink-0 items-center justify-center opacity-80 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current',
-		)}
-		data-flip-state={flipState}
-		onClick={onClick}
-	>
-		<div
-			class="flex h-5 max-w-full shrink items-center justify-center [&>div]:!w-auto [&>div]:h-full [&>div]:max-w-full [&_img]:h-full [&_img]:max-w-full [&_img]:w-auto"
+	return (
+		<a
+			ref={ref}
+			href={partner.href}
+			target="_blank"
+			rel="noreferrer"
+			aria-label={`${partner.name} partner`}
+			class={twMerge(
+				'docs-partner-slot-link flex h-full shrink-0 items-center justify-center opacity-80 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current',
+			)}
+			data-flip-state={flipState}
+			onClick={onClick}
 		>
-			<PartnerImage
-				className="h-full w-auto object-contain"
-				config={compactImageConfig}
-				alt={partner.name}
-			/>
-		</div>
-	</a>;
+			<div class="flex h-5 max-w-full shrink items-center justify-center [&>div]:!w-auto [&>div]:h-full [&>div]:max-w-full [&_img]:h-full [&_img]:max-w-full [&_img]:w-auto">
+				<PartnerImage
+					className="h-full w-auto object-contain"
+					config={compactImageConfig}
+					alt={partner.name}
+				/>
+			</div>
+		</a>
+	);
 }
 
 function useDocsPartnerScrollSlot(tierGroups: Array<DocsPartnerTierGroup>) {
@@ -223,10 +227,8 @@ function useDocsPartnerScrollSlot(tierGroups: Array<DocsPartnerTierGroup>) {
 		const update = () => {
 			animationFrame = undefined;
 			const nextSlot = getDocsPartnerScrollSlot(tierGroups, getPageScrollProgress());
-			setSlot(
-				(previousSlot) => areDocsPartnerSlotsEqual(previousSlot, nextSlot)
-					? previousSlot
-					: nextSlot,
+			setSlot((previousSlot) =>
+				areDocsPartnerSlotsEqual(previousSlot, nextSlot) ? previousSlot : nextSlot,
 			);
 		};
 
@@ -327,11 +329,11 @@ function getDocsPartnerScrollSlot(
 	tierGroups: Array<DocsPartnerTierGroup>,
 	progress: number,
 ): DocsPartnerScrollSlot | undefined {
-	const availableGroups = partnerTiers.map(
-		(tier) => tierGroups.find((group) => group.tier === tier),
-	).filter((group): group is DocsPartnerTierGroup => {
-		return Boolean(group && group.partners.length > 0);
-	});
+	const availableGroups = partnerTiers
+		.map((tier) => tierGroups.find((group) => group.tier === tier))
+		.filter((group): group is DocsPartnerTierGroup => {
+			return Boolean(group && group.partners.length > 0);
+		});
 
 	if (!availableGroups.length) {
 		return undefined;
@@ -434,13 +436,10 @@ const _getFrameworkTextColor = (frameworkValue: string | undefined) => {
 };
 
 // Create context for width toggle state
-export const WidthToggleContext = createContext<
-	| {
-			isFullWidth: boolean;
-			setIsFullWidth: (isFullWidth: boolean) => void;
-	  }
-	| null
->(null);
+export const WidthToggleContext = createContext<{
+	isFullWidth: boolean;
+	setIsFullWidth: (isFullWidth: boolean) => void;
+} | null>(null);
 
 export const useWidthToggle = () => {
 	const context = useContext(WidthToggleContext);
@@ -452,18 +451,15 @@ export const useWidthToggle = () => {
 
 // Create context for doc navigation (prev/next)
 type DocNavItem = { label: any; to: string };
-const DocNavigationContext = createContext<
-	| {
-			libraryId: LibraryId;
-			version: string;
-			prevItem?: DocNavItem;
-			nextItem?: DocNavItem;
-			colorFrom: string;
-			colorTo: string;
-			textColor: string;
-	  }
-	| null
->(null);
+const DocNavigationContext = createContext<{
+	libraryId: LibraryId;
+	version: string;
+	prevItem?: DocNavItem;
+	nextItem?: DocNavItem;
+	colorFrom: string;
+	colorTo: string;
+	textColor: string;
+} | null>(null);
 
 type FrameworkDocsLinkTarget = {
 	kind: 'docs' | 'examples';
@@ -514,22 +510,21 @@ export function DocNavigation() {
 
 	if (!prevItem && !nextItem) return null;
 
-	return <div
-		class="sticky flex items-stretch bottom-2 z-10 right-0 text-[10px] sm:text-xs md:text-sm print:hidden"
-	>
-		<div class="flex-1 flex justify-start">
-			{prevItem
-				? <DocNavigationCard
+	return (
+		<div class="sticky flex items-stretch bottom-2 z-10 right-0 text-[10px] sm:text-xs md:text-sm print:hidden">
+			<div class="flex-1 flex justify-start">
+				{prevItem ? (
+					<DocNavigationCard
 						direction="previous"
 						item={prevItem}
 						libraryId={libraryId}
 						version={version}
 					/>
-				: null}
-		</div>
-		<div class="flex-1 flex justify-end">
-			{nextItem
-				? <DocNavigationCard
+				) : null}
+			</div>
+			<div class="flex-1 flex justify-end">
+				{nextItem ? (
+					<DocNavigationCard
 						colorFrom={colorFrom}
 						colorTo={colorTo}
 						direction="next"
@@ -538,9 +533,10 @@ export function DocNavigation() {
 						textColor={textColor}
 						version={version}
 					/>
-				: null}
+				) : null}
+			</div>
 		</div>
-	</div>;
+	);
 }
 
 function DocNavigationCard({
@@ -563,32 +559,52 @@ function DocNavigationCard({
 	const frameworkDocsTarget = getFrameworkDocsLinkTarget(item.to);
 	const className = 'py-1 px-2 sm:py-2 sm:px-3 flex items-center gap-1 sm:gap-2';
 	const children =
-		direction === 'previous'
-			? <>
-					<ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
-					<div class="flex flex-col">
-						<span class="hidden sm:block text-[10px] uppercase tracking-wider opacity-60 mb-0.5">
-							Previous
-						</span>
-						<span class="font-bold">{item.label}</span>
-					</div>
-				</>
-			: <>
-					<div class="flex flex-col items-end">
-						<span class="hidden sm:block text-[10px] uppercase tracking-wider opacity-60 mb-0.5">
-							Next
-						</span>
-						<span
-							class={`font-bold text-right bg-linear-to-r ${colorFrom} ${colorTo} bg-clip-text text-transparent`}
-						>{item.label}</span>
-					</div>
-					<ChevronRight className={twMerge('w-3 h-3 sm:w-4 sm:h-4', textColor)} />
-				</>;
+		direction === 'previous' ? (
+			<>
+				<ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+				<div class="flex flex-col">
+					<span class="hidden sm:block text-[10px] uppercase tracking-wider opacity-60 mb-0.5">
+						Previous
+					</span>
+					<span class="font-bold">{item.label}</span>
+				</div>
+			</>
+		) : (
+			<>
+				<div class="flex flex-col items-end">
+					<span class="hidden sm:block text-[10px] uppercase tracking-wider opacity-60 mb-0.5">
+						Next
+					</span>
+					<span
+						class={`font-bold text-right bg-linear-to-r ${colorFrom} ${colorTo} bg-clip-text text-transparent`}
+					>
+						{item.label}
+					</span>
+				</div>
+				<ChevronRight className={twMerge('w-3 h-3 sm:w-4 sm:h-4', textColor)} />
+			</>
+		);
 
 	if (frameworkDocsTarget) {
 		if (frameworkDocsTarget.kind === 'examples') {
-			return <Link
-				to="/$libraryId/$version/docs/framework/$framework/examples/$"
+			return (
+				<Link
+					to="/$libraryId/$version/docs/framework/$framework/examples/$"
+					params={{
+						libraryId,
+						version,
+						framework: frameworkDocsTarget.framework,
+						_splat: frameworkDocsTarget.splat,
+					}}
+				>
+					<Card className={className}>{children}</Card>
+				</Link>
+			);
+		}
+
+		return (
+			<Link
+				to="/$libraryId/$version/docs/framework/$framework/$"
 				params={{
 					libraryId,
 					version,
@@ -597,29 +613,21 @@ function DocNavigationCard({
 				}}
 			>
 				<Card className={className}>{children}</Card>
-			</Link>;
-		}
-
-		return <Link
-			to="/$libraryId/$version/docs/framework/$framework/$"
-			params={{
-				libraryId,
-				version,
-				framework: frameworkDocsTarget.framework,
-				_splat: frameworkDocsTarget.splat,
-			}}
-		>
-			<Card className={className}>{children}</Card>
-		</Link>;
+			</Link>
+		);
 	}
 
-	return <Card
-		as={Link}
-		from="/$libraryId/$version/docs"
-		to={item.to}
-		params={{ libraryId, version } as never}
-		className={className}
-	>{children}</Card>;
+	return (
+		<Card
+			as={Link}
+			from="/$libraryId/$version/docs"
+			to={item.to}
+			params={{ libraryId, version } as never}
+			className={className}
+		>
+			{children}
+		</Card>
+	);
 }
 
 const useMenuConfig = ({
@@ -679,17 +687,21 @@ const useMenuConfig = ({
 					]
 				: []),
 			{
-				label: <div class="flex items-center gap-2">
-					GitHub
-					<GithubIcon className="opacity-20" />
-				</div>,
+				label: (
+					<div class="flex items-center gap-2">
+						GitHub
+						<GithubIcon className="opacity-20" />
+					</div>
+				),
 				to: `https://github.com/${repo}`,
 			},
 			{
-				label: <div class="flex items-center gap-2">
-					Discord
-					<DiscordIcon className="text-lg opacity-20" />
-				</div>,
+				label: (
+					<div class="flex items-center gap-2">
+						Discord
+						<DiscordIcon className="text-lg opacity-20" />
+					</div>
+				),
 				to: 'https://tlinz.com/discord',
 			},
 		],
@@ -704,12 +716,10 @@ const useMenuConfig = ({
 
 			const children = [
 				...section.children.map((d) => ({ ...d, badge: 'core' })),
-				...frameworkItems.map(
-					(d) => ({
-						...d,
-						badge: currentFramework.framework,
-					}),
-				),
+				...frameworkItems.map((d) => ({
+					...d,
+					badge: currentFramework.framework,
+				})),
 			];
 
 			if (children.length === 0) {
@@ -811,9 +821,10 @@ export function LibraryLayout({
 	const flatMenu = useMemo(() => visibleMenuConfig.flatMap((d) => d.children), [visibleMenuConfig]);
 
 	// Filter out external links for prev/next navigation
-	const internalFlatMenu = useMemo(() => flatMenu.filter((d) => !d.to.startsWith('http')), [
-		flatMenu,
-	]);
+	const internalFlatMenu = useMemo(
+		() => flatMenu.filter((d) => !d.to.startsWith('http')),
+		[flatMenu],
+	);
 
 	const index = internalFlatMenu.findIndex((d) => d?.to === relativePathname);
 	const prevItem = internalFlatMenu[index - 1];
@@ -873,62 +884,68 @@ export function LibraryLayout({
 	const menuItems = visibleMenuConfig.map((group, i) => {
 		const groupKey = `${i}:${String(group.label)}`;
 
-		const groupContent = <>
-			{group.collapsible
-				? <summary
+		const groupContent = (
+			<>
+				{group.collapsible ? (
+					<summary
 						class="text-[.8em] font-bold leading-4 px-2 ts-sidebar-label"
 						onClick={(event) => {
 							event.preventDefault();
-							setOpenGroups(
-								(prev) => ({
-									...prev,
-									[groupKey]: !(prev[groupKey] ?? false),
-								}),
-							);
+							setOpenGroups((prev) => ({
+								...prev,
+								[groupKey]: !(prev[groupKey] ?? false),
+							}));
 						}}
-					>{group.label}</summary>
-				: <div class="text-[.8em] font-bold leading-4 px-2 ts-sidebar-label">{group.label}</div>}
-			<div class="h-2" />
-			<ul class="text-[.85em] leading-snug list-none">
-				{group?.children?.map((child, i) => {
-					const linkClasses = `flex gap-2 items-center justify-between group px-2 py-1.5 rounded-lg hover:bg-gray-500/10 opacity-60 hover:opacity-100`;
-					const linkParams =
-						!child.to.startsWith('/') || child.to.includes('/$libraryId')
-							? { libraryId, version } as never
-							: undefined;
-					const isHomeLink = child.to === '..';
-					const frameworkDocsTarget = getFrameworkDocsLinkTarget(child.to);
+					>
+						{group.label}
+					</summary>
+				) : (
+					<div class="text-[.8em] font-bold leading-4 px-2 ts-sidebar-label">{group.label}</div>
+				)}
+				<div class="h-2" />
+				<ul class="text-[.85em] leading-snug list-none">
+					{group?.children?.map((child, i) => {
+						const linkClasses = `flex gap-2 items-center justify-between group px-2 py-1.5 rounded-lg hover:bg-gray-500/10 opacity-60 hover:opacity-100`;
+						const linkParams =
+							!child.to.startsWith('/') || child.to.includes('/$libraryId')
+								? ({ libraryId, version } as never)
+								: undefined;
+						const isHomeLink = child.to === '..';
+						const frameworkDocsTarget = getFrameworkDocsLinkTarget(child.to);
 
-					const recency = getDocRecency(child.addedAt, child.updatedAt);
-					const recencyPill = recency
-						? <DocRecencyPill
+						const recency = getDocRecency(child.addedAt, child.updatedAt);
+						const recencyPill = recency ? (
+							<DocRecencyPill
 								recency={recency}
 								date={recency === 'new' ? child.addedAt : child.updatedAt}
 							/>
-						: null;
+						) : null;
 
-					const renderLinkContent = (isActive: boolean) => <div
-						class={twMerge(linkClasses, isActive && 'opacity-100')}
-					>
-						<div
-							class={twMerge(
-								'w-full',
-								isActive
-									? `font-bold text-transparent bg-clip-text bg-linear-to-r ${colorFrom} ${colorTo}`
-									: '',
-							)}
-						>{child.label}</div>
-						{recencyPill}
-					</div>;
+						const renderLinkContent = (isActive: boolean) => (
+							<div class={twMerge(linkClasses, isActive && 'opacity-100')}>
+								<div
+									class={twMerge(
+										'w-full',
+										isActive
+											? `font-bold text-transparent bg-clip-text bg-linear-to-r ${colorFrom} ${colorTo}`
+											: '',
+									)}
+								>
+									{child.label}
+								</div>
+								{recencyPill}
+							</div>
+						);
 
-					return <li key={i}>
-						{child.to.startsWith('http')
-							? <a href={child.to} class={linkClasses} target="_blank" rel="noopener noreferrer">
-									<span class="w-full">{child.label}</span>
-									{recencyPill}
-								</a>
-							: isHomeLink
-								? <Link to={libraryHomePath} onClick={closeMobileMenu} className="relative">
+						return (
+							<li key={i}>
+								{child.to.startsWith('http') ? (
+									<a href={child.to} class={linkClasses} target="_blank" rel="noopener noreferrer">
+										<span class="w-full">{child.label}</span>
+										{recencyPill}
+									</a>
+								) : isHomeLink ? (
+									<Link to={libraryHomePath} onClick={closeMobileMenu} className="relative">
 										<div class={twMerge(linkClasses, !docsMatch && 'opacity-100')}>
 											<div
 												class={twMerge(
@@ -937,134 +954,148 @@ export function LibraryLayout({
 														? `font-bold text-transparent bg-clip-text bg-linear-to-r ${colorFrom} ${colorTo}`
 														: '',
 												)}
-											>{child.label}</div>
+											>
+												{child.label}
+											</div>
 										</div>
 									</Link>
-								: frameworkDocsTarget?.kind === 'examples'
-									? <Link
-											to="/$libraryId/$version/docs/framework/$framework/examples/$"
-											params={{
-												libraryId,
-												version,
-												framework: frameworkDocsTarget.framework,
-												_splat: frameworkDocsTarget.splat,
-											}}
-											onClick={closeMobileMenu}
-											preload="intent"
-											activeOptions={{
-												exact: true,
-												includeHash: false,
-												includeSearch: false,
-											}}
-											className="relative"
-										>
-											{(props: { isActive: boolean }) => renderLinkContent(props.isActive)}
-										</Link>
-									: frameworkDocsTarget
-										? <Link
-												to="/$libraryId/$version/docs/framework/$framework/$"
-												params={{
-													libraryId,
-													version,
-													framework: frameworkDocsTarget.framework,
-													_splat: frameworkDocsTarget.splat,
-												}}
-												onClick={closeMobileMenu}
-												preload="intent"
-												activeOptions={{
-													exact: true,
-													includeHash: false,
-													includeSearch: false,
-												}}
-												className="relative"
-											>
-												{(props: { isActive: boolean }) => renderLinkContent(props.isActive)}
-											</Link>
-										: <Link
-												from="/$libraryId/$version/docs"
-												to={child.to}
-												params={linkParams}
-												onClick={closeMobileMenu}
-												preload="intent"
-												activeOptions={{
-													exact: true,
-													includeHash: false,
-													includeSearch: false,
-												}}
-												className="relative"
-											>
-												{(props: { isActive: boolean }) => renderLinkContent(props.isActive)}
-											</Link>}
-					</li>;
-				})}
-			</ul>
-		</>;
+								) : frameworkDocsTarget?.kind === 'examples' ? (
+									<Link
+										to="/$libraryId/$version/docs/framework/$framework/examples/$"
+										params={{
+											libraryId,
+											version,
+											framework: frameworkDocsTarget.framework,
+											_splat: frameworkDocsTarget.splat,
+										}}
+										onClick={closeMobileMenu}
+										preload="intent"
+										activeOptions={{
+											exact: true,
+											includeHash: false,
+											includeSearch: false,
+										}}
+										className="relative"
+									>
+										{(props: { isActive: boolean }) => renderLinkContent(props.isActive)}
+									</Link>
+								) : frameworkDocsTarget ? (
+									<Link
+										to="/$libraryId/$version/docs/framework/$framework/$"
+										params={{
+											libraryId,
+											version,
+											framework: frameworkDocsTarget.framework,
+											_splat: frameworkDocsTarget.splat,
+										}}
+										onClick={closeMobileMenu}
+										preload="intent"
+										activeOptions={{
+											exact: true,
+											includeHash: false,
+											includeSearch: false,
+										}}
+										className="relative"
+									>
+										{(props: { isActive: boolean }) => renderLinkContent(props.isActive)}
+									</Link>
+								) : (
+									<Link
+										from="/$libraryId/$version/docs"
+										to={child.to}
+										params={linkParams}
+										onClick={closeMobileMenu}
+										preload="intent"
+										activeOptions={{
+											exact: true,
+											includeHash: false,
+											includeSearch: false,
+										}}
+										className="relative"
+									>
+										{(props: { isActive: boolean }) => renderLinkContent(props.isActive)}
+									</Link>
+								)}
+							</li>
+						);
+					})}
+				</ul>
+			</>
+		);
 
-		return group.collapsible
-			? <details
-					key={`group-${i}`}
-					class="[&>summary]:before:mr-1 [&>summary]:marker:text-[0.8em] [&>summary]:marker:leading-4 relative select-none"
-					open={openGroups[groupKey] ?? false}
-				>{groupContent}</details>
-			: <div
-					key={`group-${i}`}
-					class="[&>summary]:before:mr-1 [&>summary]:marker:text-[0.8em] [&>summary]:marker:leading-4 relative select-none"
-				>{groupContent}</div>;
+		return group.collapsible ? (
+			<details
+				key={`group-${i}`}
+				class="[&>summary]:before:mr-1 [&>summary]:marker:text-[0.8em] [&>summary]:marker:leading-4 relative select-none"
+				open={openGroups[groupKey] ?? false}
+			>
+				{groupContent}
+			</details>
+		) : (
+			<div
+				key={`group-${i}`}
+				class="[&>summary]:before:mr-1 [&>summary]:marker:text-[0.8em] [&>summary]:marker:leading-4 relative select-none"
+			>
+				{groupContent}
+			</div>
+		);
 	});
 
-	const smallMenu = <div class="min-[900px]:hidden">
-		<input
-			id={mobileMenuToggleId}
-			type="checkbox"
-			aria-label="Documentation menu"
-			aria-controls="docs-mobile-menu"
-			checked={mobileMenuOpen}
-			data-docs-mobile-menu-toggle
-			class="sr-only"
-			onChange={(event) => {
-				setMobileMenuOpen(event.currentTarget.checked);
-			}}
-		/>
-		<label
-			htmlFor={mobileMenuToggleId}
-			aria-label="Close documentation menu"
-			data-docs-mobile-backdrop
-			class="fixed inset-x-0 bottom-0 top-[var(--navbar-height)] z-40 bg-black/30 backdrop-blur-sm"
-		/>
-		<div
-			ref={mobileMenuDialogRef}
-			id="docs-mobile-menu"
-			role="dialog"
-			aria-modal="true"
-			aria-label="Documentation navigation"
-			data-docs-mobile-menu
-			tabIndex={-1}
-			class="fixed inset-x-0 top-[var(--navbar-height)] z-50 m-0 w-full max-w-none p-0 min-[900px]:hidden
+	const smallMenu = (
+		<div class="min-[900px]:hidden">
+			<input
+				id={mobileMenuToggleId}
+				type="checkbox"
+				aria-label="Documentation menu"
+				aria-controls="docs-mobile-menu"
+				checked={mobileMenuOpen}
+				data-docs-mobile-menu-toggle
+				class="sr-only"
+				onChange={(event) => {
+					setMobileMenuOpen(event.currentTarget.checked);
+				}}
+			/>
+			<label
+				htmlFor={mobileMenuToggleId}
+				aria-label="Close documentation menu"
+				data-docs-mobile-backdrop
+				class="fixed inset-x-0 bottom-0 top-[var(--navbar-height)] z-40 bg-black/30 backdrop-blur-sm"
+			/>
+			<div
+				ref={mobileMenuDialogRef}
+				id="docs-mobile-menu"
+				role="dialog"
+				aria-modal="true"
+				aria-label="Documentation navigation"
+				data-docs-mobile-menu
+				tabIndex={-1}
+				class="fixed inset-x-0 top-[var(--navbar-height)] z-50 m-0 w-full max-w-none p-0 min-[900px]:hidden
         max-h-[calc(100dvh-var(--navbar-height))] overflow-y-auto
         bg-white dark:bg-black/95 backdrop-blur-lg border-b border-gray-500/20 shadow-xl"
-		>
-			<div class="flex items-center justify-between py-2 px-4 border-b border-gray-500/20">
-				<span class="font-bold">Docs</span>
-				<button
-					type="button"
-					aria-label="Close menu"
-					aria-controls="docs-mobile-menu"
-					class="p-1 rounded-md hover:bg-gray-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current cursor-pointer"
-					onClick={closeMobileMenu}
-				>
-					<X className="w-5 h-5" />
-				</button>
-			</div>
-			<div class="flex flex-col gap-4 p-4 text-lg">
-				<div class="flex flex-col gap-1">
-					<FrameworkSelect libraryId={libraryId} />
-					<VersionSelect libraryId={libraryId} />
+			>
+				<div class="flex items-center justify-between py-2 px-4 border-b border-gray-500/20">
+					<span class="font-bold">Docs</span>
+					<button
+						type="button"
+						aria-label="Close menu"
+						aria-controls="docs-mobile-menu"
+						class="p-1 rounded-md hover:bg-gray-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current cursor-pointer"
+						onClick={closeMobileMenu}
+					>
+						<X className="w-5 h-5" />
+					</button>
 				</div>
-				<SearchButton />
-				{menuItems}
+				<div class="flex flex-col gap-4 p-4 text-lg">
+					<div class="flex flex-col gap-1">
+						<FrameworkSelect libraryId={libraryId} />
+						<VersionSelect libraryId={libraryId} />
+					</div>
+					<SearchButton />
+					{menuItems}
+				</div>
 			</div>
 		</div>
-	</div>;
+	);
 
 	// State and timer for auto-hide behavior (similar to Navbar)
 	const [showLargeMenu, setShowLargeMenu] = useState(false);
@@ -1084,203 +1115,217 @@ export function LibraryLayout({
 		additionalRefs: largeMenuClickOutsideRefs,
 	});
 
-	const largeMenu = <>
-		{/* Expanded menu - always visible on xl+, toggleable overlay on md-xl */}
-		<div
-			id="docs-desktop-menu"
-			data-docs-desktop-menu
-			ref={expandedMenuRef}
-			class={twMerge(
-				'max-w-[250px] xl:max-w-[300px] 2xl:max-w-[400px]',
-				'flex-col overflow-hidden',
-				'h-[calc(100dvh-var(--navbar-height)-var(--docs-tabs-height))] top-[calc(var(--navbar-height)+var(--docs-tabs-height))]',
-				'border-r border-gray-500/20',
-				'transition-all duration-300',
-				'hidden min-[900px]:flex',
-				'min-[900px]:fixed min-[900px]:left-0 min-[900px]:z-40 min-[900px]:bg-white min-[900px]:dark:bg-black/95 min-[900px]:backdrop-blur-lg min-[900px]:shadow-xl',
-				'xl:sticky xl:z-20 xl:bg-transparent xl:dark:bg-transparent xl:backdrop-blur-none xl:shadow-none',
-				!showLargeMenu && 'md:-translate-x-full xl:translate-x-0',
-				showLargeMenu && 'md:translate-x-0',
-			)}
-			onPointerEnter={(e) => {
-				if (e.pointerType === 'touch') return;
-				if (window.innerWidth < 1280) {
-					clearTimeout(leaveTimer.current);
-				}
-			}}
-			onPointerLeave={(e) => {
-				if (e.pointerType === 'touch') return;
-
-				if (expandedMenuRef.current?.querySelector('[data-state="open"]')) return;
-				if (window.innerWidth < 1280) {
-					leaveTimer.current = setTimeout(() => {
-						setShowLargeMenu(false);
-					}, 300);
-				}
-			}}
-		>
-			<div class="flex-1 flex flex-col overflow-y-auto min-w-[230px]">
-				<div class="flex flex-col gap-1 p-4">
-					<FrameworkSelect libraryId={libraryId} />
-					<VersionSelect libraryId={libraryId} />
-				</div>
-				<div class="flex-1 flex flex-col gap-4 text-base px-4 pt-0 pb-4">{menuItems}</div>
-			</div>
-		</div>
-	</>;
-
-	const docsTabs = <div
-		class="sticky top-[var(--navbar-height)] z-30 border-b border-gray-500/20 bg-white/90 dark:bg-black/80 backdrop-blur-lg"
-	>
-		<div class="flex items-stretch">
-			<button
-				type="button"
-				aria-label="Documentation menu"
-				aria-expanded={mobileMenuOpen ? true : undefined}
-				aria-controls="docs-mobile-menu"
-				onClick={() => setMobileMenuOpen((prev) => !prev)}
-				data-docs-mobile-trigger
-				class="min-[900px]:hidden flex items-center gap-1.5 shrink-0 px-3 border-r border-gray-500/20 text-slate-600 dark:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current"
-			>
-				<Menu className="w-4 h-4" data-docs-mobile-closed-icon />
-				<X className="w-4 h-4" data-docs-mobile-open-icon />
-				<span class="text-xs font-medium max-[479.98px]:sr-only">Menu</span>
-			</button>
-			<button
-				ref={largeMenuTriggerRef}
-				type="button"
-				aria-label="Open documentation menu"
-				aria-expanded={showLargeMenu}
-				aria-controls="docs-desktop-menu"
-				onPointerEnter={(event) => {
-					if (event.pointerType === 'touch') return;
-					openLargeMenu();
-				}}
-				onPointerDown={openLargeMenu}
-				onMouseEnter={openLargeMenu}
-				onFocus={openLargeMenu}
-				onClick={openLargeMenu}
-				data-docs-menu-trigger
-				class="hidden min-[900px]:flex xl:hidden items-center gap-1 shrink-0 px-2 border-r border-gray-500/20 text-xs font-medium text-slate-600 dark:text-slate-300 min-[1120px]:gap-1.5 min-[1120px]:px-3 min-[1120px]:text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current"
-			>
-				<Menu className="w-4 h-4" />
-				<span class="text-xs font-medium">Menu</span>
-			</button>
-			<div class="relative flex min-w-0 flex-1 items-stretch">
-				<nav
-					aria-label="Documentation sections"
-					class="flex min-w-0 flex-1 items-stretch gap-3 overflow-x-auto px-3 text-xs min-[1120px]:gap-6 min-[1120px]:px-6 min-[1120px]:text-[13px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-				>{tabbedMenuConfig.map((tab) => {
-					const target = tab.firstItem;
-					const isActive = tab.id === activeTabId;
-
-					if (!target) {
-						return null;
+	const largeMenu = (
+		<>
+			{/* Expanded menu - always visible on xl+, toggleable overlay on md-xl */}
+			<div
+				id="docs-desktop-menu"
+				data-docs-desktop-menu
+				ref={expandedMenuRef}
+				class={twMerge(
+					'max-w-[250px] xl:max-w-[300px] 2xl:max-w-[400px]',
+					'flex-col overflow-hidden',
+					'h-[calc(100dvh-var(--navbar-height)-var(--docs-tabs-height))] top-[calc(var(--navbar-height)+var(--docs-tabs-height))]',
+					'border-r border-gray-500/20',
+					'transition-all duration-300',
+					'hidden min-[900px]:flex',
+					'min-[900px]:fixed min-[900px]:left-0 min-[900px]:z-40 min-[900px]:bg-white min-[900px]:dark:bg-black/95 min-[900px]:backdrop-blur-lg min-[900px]:shadow-xl',
+					'xl:sticky xl:z-20 xl:bg-transparent xl:dark:bg-transparent xl:backdrop-blur-none xl:shadow-none',
+					!showLargeMenu && 'md:-translate-x-full xl:translate-x-0',
+					showLargeMenu && 'md:translate-x-0',
+				)}
+				onPointerEnter={(e) => {
+					if (e.pointerType === 'touch') return;
+					if (window.innerWidth < 1280) {
+						clearTimeout(leaveTimer.current);
 					}
+				}}
+				onPointerLeave={(e) => {
+					if (e.pointerType === 'touch') return;
 
-					const linkParams =
-						!target.to.startsWith('/') || target.to.includes('/$libraryId')
-							? { libraryId, version } as never
-							: undefined;
-
-					return <Link
-						key={tab.id}
-						from="/$libraryId/$version/docs"
-						to={target.to}
-						params={linkParams}
-						activeOptions={{
-							exact: true,
-							includeHash: false,
-							includeSearch: false,
-						}}
-						aria-current={isActive ? 'page' : undefined}
-						className={twMerge(
-							'relative whitespace-nowrap py-3 font-semibold transition-colors',
-							'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current rounded-sm',
-							isActive
-								? `text-transparent bg-clip-text bg-linear-to-r ${colorFrom} ${colorTo}`
-								: 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
-						)}
-					>
-						{tab.label}
-						{isActive
-							? <span
-									aria-hidden="true"
-									class={twMerge(
-										'absolute left-0 right-0 -bottom-px h-[3px] rounded-t-full bg-linear-to-r',
-										colorFrom,
-										colorTo,
-									)}
-								/>
-							: null}
-					</Link>;
-				})}</nav>
-				<div
-					aria-hidden="true"
-					data-docs-tabs-scroll-fade
-					class="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-linear-to-r from-white/0 to-white/95 dark:from-black/0 dark:to-black/90 min-[640px]:w-10"
-				/>
+					if (expandedMenuRef.current?.querySelector('[data-state="open"]')) return;
+					if (window.innerWidth < 1280) {
+						leaveTimer.current = setTimeout(() => {
+							setShowLargeMenu(false);
+						}, 300);
+					}
+				}}
+			>
+				<div class="flex-1 flex flex-col overflow-y-auto min-w-[230px]">
+					<div class="flex flex-col gap-1 p-4">
+						<FrameworkSelect libraryId={libraryId} />
+						<VersionSelect libraryId={libraryId} />
+					</div>
+					<div class="flex-1 flex flex-col gap-4 text-base px-4 pt-0 pb-4">{menuItems}</div>
+				</div>
 			</div>
-			{shouldShowDocsPartnerSlot && activePartners.length
-				? <DocsPartnerSlot
+		</>
+	);
+
+	const docsTabs = (
+		<div class="sticky top-[var(--navbar-height)] z-30 border-b border-gray-500/20 bg-white/90 dark:bg-black/80 backdrop-blur-lg">
+			<div class="flex items-stretch">
+				<button
+					type="button"
+					aria-label="Documentation menu"
+					aria-expanded={mobileMenuOpen ? true : undefined}
+					aria-controls="docs-mobile-menu"
+					onClick={() => setMobileMenuOpen((prev) => !prev)}
+					data-docs-mobile-trigger
+					class="min-[900px]:hidden flex items-center gap-1.5 shrink-0 px-3 border-r border-gray-500/20 text-slate-600 dark:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current"
+				>
+					<Menu className="w-4 h-4" data-docs-mobile-closed-icon />
+					<X className="w-4 h-4" data-docs-mobile-open-icon />
+					<span class="text-xs font-medium max-[479.98px]:sr-only">Menu</span>
+				</button>
+				<button
+					ref={largeMenuTriggerRef}
+					type="button"
+					aria-label="Open documentation menu"
+					aria-expanded={showLargeMenu}
+					aria-controls="docs-desktop-menu"
+					onPointerEnter={(event) => {
+						if (event.pointerType === 'touch') return;
+						openLargeMenu();
+					}}
+					onPointerDown={openLargeMenu}
+					onMouseEnter={openLargeMenu}
+					onFocus={openLargeMenu}
+					onClick={openLargeMenu}
+					data-docs-menu-trigger
+					class="hidden min-[900px]:flex xl:hidden items-center gap-1 shrink-0 px-2 border-r border-gray-500/20 text-xs font-medium text-slate-600 dark:text-slate-300 min-[1120px]:gap-1.5 min-[1120px]:px-3 min-[1120px]:text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current"
+				>
+					<Menu className="w-4 h-4" />
+					<span class="text-xs font-medium">Menu</span>
+				</button>
+				<div class="relative flex min-w-0 flex-1 items-stretch">
+					<nav
+						aria-label="Documentation sections"
+						class="flex min-w-0 flex-1 items-stretch gap-3 overflow-x-auto px-3 text-xs min-[1120px]:gap-6 min-[1120px]:px-6 min-[1120px]:text-[13px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+					>
+						{tabbedMenuConfig.map((tab) => {
+							const target = tab.firstItem;
+							const isActive = tab.id === activeTabId;
+
+							if (!target) {
+								return null;
+							}
+
+							const linkParams =
+								!target.to.startsWith('/') || target.to.includes('/$libraryId')
+									? ({ libraryId, version } as never)
+									: undefined;
+
+							return (
+								<Link
+									key={tab.id}
+									from="/$libraryId/$version/docs"
+									to={target.to}
+									params={linkParams}
+									activeOptions={{
+										exact: true,
+										includeHash: false,
+										includeSearch: false,
+									}}
+									aria-current={isActive ? 'page' : undefined}
+									className={twMerge(
+										'relative whitespace-nowrap py-3 font-semibold transition-colors',
+										'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current rounded-sm',
+										isActive
+											? `text-transparent bg-clip-text bg-linear-to-r ${colorFrom} ${colorTo}`
+											: 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
+									)}
+								>
+									{tab.label}
+									{isActive ? (
+										<span
+											aria-hidden="true"
+											class={twMerge(
+												'absolute left-0 right-0 -bottom-px h-[3px] rounded-t-full bg-linear-to-r',
+												colorFrom,
+												colorTo,
+											)}
+										/>
+									) : null}
+								</Link>
+							);
+						})}
+					</nav>
+					<div
+						aria-hidden="true"
+						data-docs-tabs-scroll-fade
+						class="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-linear-to-r from-white/0 to-white/95 dark:from-black/0 dark:to-black/90 min-[640px]:w-10"
+					/>
+				</div>
+				{shouldShowDocsPartnerSlot && activePartners.length ? (
+					<DocsPartnerSlot
 						orderPlacementContext={docsPartnerOrderContext}
 						partners={activePartners}
 					/>
-				: null}
+				) : null}
+			</div>
 		</div>
-	</div>;
+	);
 
-	return <WidthToggleContext value={{ isFullWidth, setIsFullWidth }}>
-		<DocNavigationContext
-			value={{
-				libraryId,
-				version,
-				prevItem,
-				nextItem,
-				colorFrom,
-				colorTo,
-				textColor,
-			}}
-		>
-			<div
-				data-docs-layout
-				data-docs-menu-open={showLargeMenu ? 'true' : undefined}
-				class={`
+	return (
+		<WidthToggleContext value={{ isFullWidth, setIsFullWidth }}>
+			<DocNavigationContext
+				value={{
+					libraryId,
+					version,
+					prevItem,
+					nextItem,
+					colorFrom,
+					colorTo,
+					textColor,
+				}}
+			>
+				<div
+					data-docs-layout
+					data-docs-menu-open={showLargeMenu ? 'true' : undefined}
+					class={`
            md:min-h-[calc(100dvh-var(--navbar-height))]
            flex flex-col
           w-full transition-all duration-300
           [overflow-x:clip]`}
-			>
-				{smallMenu}
-				{docsTabs}
-				<div class="flex flex-col md:flex-row flex-1 min-h-0">
-					{largeMenu}
-					<div class={twMerge('flex flex-col max-w-full min-w-0 flex-1 min-h-0 relative')}>
-						<div
-							class={twMerge(
-								`max-w-full min-w-0 flex flex-col justify-center w-full`,
-
-								!isLandingPage && 'px-4 md:px-8',
-
-								!isLandingPage && !isExample && !isNpmStats && !isFullWidth && 'mx-auto w-[900px]',
-							)}
-						>{children}</div>
-						{!isLandingPage &&
-							<div class="pt-8 md:pt-12">
-								<Footer />
-							</div>}
-					</div>
-					{!isLandingPage &&
-						<RightRail breakpoint="md" className="md:w-[220px]" stickyOffset="docs-tabs">
-							<PartnersRail analyticsPlacement="docs_rail" partners={activePartners} />
+				>
+					{smallMenu}
+					{docsTabs}
+					<div class="flex flex-col md:flex-row flex-1 min-h-0">
+						{largeMenu}
+						<div class={twMerge('flex flex-col max-w-full min-w-0 flex-1 min-h-0 relative')}>
 							<div
-								class="hidden md:block border border-gray-500/20 rounded-l-lg overflow-hidden w-full"
+								class={twMerge(
+									`max-w-full min-w-0 flex flex-col justify-center w-full`,
+
+									!isLandingPage && 'px-4 md:px-8',
+
+									!isLandingPage &&
+										!isExample &&
+										!isNpmStats &&
+										!isFullWidth &&
+										'mx-auto w-[900px]',
+								)}
 							>
-								<RecentPostsWidget enabled={isDesktopViewport} />
+								{children}
 							</div>
-						</RightRail>}
+							{!isLandingPage && (
+								<div class="pt-8 md:pt-12">
+									<Footer />
+								</div>
+							)}
+						</div>
+						{!isLandingPage && (
+							<RightRail breakpoint="md" className="md:w-[220px]" stickyOffset="docs-tabs">
+								<PartnersRail analyticsPlacement="docs_rail" partners={activePartners} />
+								<div class="hidden md:block border border-gray-500/20 rounded-l-lg overflow-hidden w-full">
+									<RecentPostsWidget enabled={isDesktopViewport} />
+								</div>
+							</RightRail>
+						)}
+					</div>
 				</div>
-			</div>
-		</DocNavigationContext>
-	</WidthToggleContext>;
+			</DocNavigationContext>
+		</WidthToggleContext>
+	);
 }

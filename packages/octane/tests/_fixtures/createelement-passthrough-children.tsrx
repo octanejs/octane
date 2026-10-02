@@ -16,8 +16,10 @@ const Body = (props: any) => {
 };
 
 export function App() {
-	return <Body class="overflow-x-hidden">
-		<div data-probe="static">static child</div>
-		<p>{'text' as string}</p>
-	</Body>;
+	return (
+		<Body class="overflow-x-hidden">
+			<div data-probe="static">static child</div>
+			<p>{'text' as string}</p>
+		</Body>
+	);
 }

@@ -5,8 +5,8 @@ import type { LexicalEditor } from 'lexical';
 import { useEffect } from 'octane';
 
 type Props = {
-	editorRef: | ((editor: LexicalEditor | null) => void)
-	| { current: LexicalEditor | null | undefined };
+	editorRef:
+		((editor: LexicalEditor | null) => void) | { current: LexicalEditor | null | undefined };
 };
 
 export function EditorRefPlugin(props: Props) {

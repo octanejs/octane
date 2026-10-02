@@ -11,11 +11,10 @@ interface ThreeSsrFixtureProof {
 }
 
 function recordCreated(state: RootState): void {
-	const fixture = globalThis as
-		typeof globalThis & {
-			__octaneThreeSsrProof?: ThreeSsrFixtureProof;
-		};
-	const proof = fixture.__octaneThreeSsrProof ??= {};
+	const fixture = globalThis as typeof globalThis & {
+		__octaneThreeSsrProof?: ThreeSsrFixtureProof;
+	};
+	const proof = (fixture.__octaneThreeSsrProof ??= {});
 	proof.created = (proof.created ?? 0) + 1;
 	(proof.rootSceneIds ??= []).push(state.scene.uuid);
 	proof.state = state;

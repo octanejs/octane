@@ -2,13 +2,11 @@ import { useState } from 'octane';
 import styled from '@octanejs/styled-components';
 
 const Title = styled.h1`
-  color: red;
+	color: red;
 `;
 
 const Button = styled.button`
-  color: ${(props) => (props.$variant === 'primary'
-	? 'blue'
-	: 'gray')};
+	color: ${(props) => (props.$variant === 'primary' ? 'blue' : 'gray')};
 `;
 
 export function SmokeApp() @{

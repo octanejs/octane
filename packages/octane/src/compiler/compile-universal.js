@@ -8,6 +8,7 @@
  * to the selected renderer module.
  */
 import { builders as b, clone_ast_node, parseModule } from '@tsrx/core';
+import { adoptTemplateShape } from './parser-template-shape.js';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
 import { createContextSourceFacts } from './context-provider.js';
 import { inheritGeneratedOrigin } from './generated-origin.js';
@@ -526,6 +527,7 @@ const NON_RUNTIME_AST_KEYS = new Set([
 ]);
 const RUNTIME_TYPESCRIPT_NODES = new Set([
 	'TSAsExpression',
+	'TSEnumBody',
 	'TSEnumDeclaration',
 	'TSEnumMember',
 	'TSExportAssignment',
@@ -869,7 +871,7 @@ export function createLexicalAnalysis(ast) {
 			if (node.declare === true) return;
 			const enumScope = createLexicalScope(scope);
 			if (node.id) declarePattern(node.id, enumScope);
-			for (const member of node.members ?? []) {
+			for (const member of node.body?.members ?? []) {
 				if (member.computed !== true && member.id?.type === 'Identifier') {
 					declarePattern(member.id, enumScope);
 				}
@@ -1587,7 +1589,7 @@ function importSourceRanges(sources) {
 /** Validate a renderer-selected helper module without compiling or rewriting it. */
 export function validateRendererModuleSource(source, filename, renderer) {
 	if (renderer?.validation === undefined) return;
-	const ast = parseModule(source, filename);
+	const ast = adoptTemplateShape(parseModule(source, filename));
 	validateRendererAst(ast, filename, renderer);
 }
 
@@ -4770,7 +4772,7 @@ export function compileUniversal(
 		throw new TypeError('Octane universal compiler requires a resolved universal renderer.');
 	}
 	const universalRuntime = normalizeUniversalRuntime(options.universalRuntime);
-	const ast = parsedAst ?? parseModule(source, filename);
+	const ast = parsedAst ?? adoptTemplateShape(parseModule(source, filename));
 	const hmrDialect = options.hmr === true ? 'vite' : options.hmr || false;
 	const state = {
 		source,

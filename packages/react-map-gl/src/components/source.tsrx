@@ -17,11 +17,10 @@ import type {
 } from '../types/internal';
 import type { MapChildren } from '../types/octane';
 
-export type SourceProps =
-	(SourceSpecification | CanvasSourceSpecification) & {
-		id?: string;
-		children?: MapChildren;
-	};
+export type SourceProps = (SourceSpecification | CanvasSourceSpecification) & {
+	id?: string;
+	children?: MapChildren;
+};
 
 /**
  * OCTANE DIVERGENCE[react-map-gl-source-id-by-context][ported:source-layer:3]: upstream delivers this source's id to child layers with

@@ -20,7 +20,9 @@ function UnexpectedError({ error }: { error: unknown }) @{
 					background: '#f5f5f5',
 					borderRadius: '4px',
 				}}
-			>{String(error) as string}</pre>
+			>
+				{String(error) as string}
+			</pre>
 		</details>
 	</div>
 }
@@ -56,14 +58,11 @@ export function App() @{
 		<footer class="footer">
 			<div class="container">
 				<p class="footer__text">
-					Weather Front benchmark • Weather data by
-					{' '}
+					Weather Front benchmark • Weather data by{' '}
 					<a href="https://open-meteo.com/" class="footer__link" target="_blank" rel="noreferrer">
 						Open-Meteo
-					</a>
-					{' '}
-					• Ported from
-					{' '}
+					</a>{' '}
+					• Ported from{' '}
 					<a
 						href="https://github.com/Lissy93"
 						class="footer__link"

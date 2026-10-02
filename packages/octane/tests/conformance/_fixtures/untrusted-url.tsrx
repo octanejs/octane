@@ -1,31 +1,47 @@
 import { createElement } from 'octane';
 
 export function StaticSafeLink() @{
-	<a id="safe" href="http://javascript:0/thisisfine">Click me</a>
+	<a id="safe" href="http://javascript:0/thisisfine">
+		Click me
+	</a>
 }
 
 export function StaticUnsafeLinks() @{
 	<div>
-		<a id="static-first" href="javascript:notfine">p0wned</a>
-		<a id="static-last" href="javascript:notfineagain">p0wned again</a>
-		<a id="static-uppercase" href="JaVaScRiPt:notfine">uppercase</a>
+		<a id="static-first" href="javascript:notfine">
+			p0wned
+		</a>
+		<a id="static-last" href="javascript:notfineagain">
+			p0wned again
+		</a>
+		<a id="static-uppercase" href="JaVaScRiPt:notfine">
+			uppercase
+		</a>
 	</div>
 }
 
 export function DynamicLink(props) @{
-	<a id="link" href={props.url}>Click me</a>
+	<a id="link" href={props.url}>
+		Click me
+	</a>
 }
 
 export function DynamicLinks(props) @{
 	<div>
-		<a id="first" href={props.first}>p0wned</a>
-		<a id="last" href={props.last}>p0wned again</a>
+		<a id="first" href={props.first}>
+			p0wned
+		</a>
+		<a id="last" href={props.last}>
+			p0wned again
+		</a>
 	</div>
 }
 
 export function VariousTags(props) @{
 	<div>
-		<a id="var-a" href={props.url}>a</a>
+		<a id="var-a" href={props.url}>
+			a
+		</a>
 		<object id="var-object" data={props.url}></object>
 		<embed id="var-embed" src={props.url} />
 	</div>
@@ -52,7 +68,9 @@ export function DeoptSinks(props) {
 export function DataPassThrough(props) @{
 	<div>
 		<div id="data-div" data={props.value}></div>
-		<a id="data-a" data={props.url}>a</a>
+		<a id="data-a" data={props.url}>
+			a
+		</a>
 		<untrusted-link id="custom-url" href={props.url}></untrusted-link>
 	</div>
 }
@@ -64,7 +82,9 @@ export function AreaLink(props) @{
 }
 
 export function FormAction(props) @{
-	<form id="form" action={props.url}>p0wned</form>
+	<form id="form" action={props.url}>
+		p0wned
+	</form>
 }
 
 export function InputFormAction(props) @{
@@ -72,14 +92,20 @@ export function InputFormAction(props) @{
 }
 
 export function ButtonFormAction(props) @{
-	<button id="button" formAction={props.url}>p0wned</button>
+	<button id="button" formAction={props.url}>
+		p0wned
+	</button>
 }
 
 export function StaticFormActions() @{
 	<div>
-		<form id="static-form" action="javascript:notfine">p0wned</form>
+		<form id="static-form" action="javascript:notfine">
+			p0wned
+		</form>
 		<input id="static-input" type="submit" formAction="javascript:notfine" />
-		<button id="static-button" formAction="javascript:notfine">p0wned</button>
+		<button id="static-button" formAction="javascript:notfine">
+			p0wned
+		</button>
 	</div>
 }
 

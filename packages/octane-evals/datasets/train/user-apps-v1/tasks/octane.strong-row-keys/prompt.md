@@ -4,7 +4,7 @@
 compiler rejects it:
 
 ```text
-src/App.tsrx:20:35: [OCTANE_STRONG_RENDER_IMPURE_CALL] Strong mode does not allow a key computed from time or randomness during render; the element would get a new identity every render. Use a stable ID from the item, such as `item.id`.
+src/App.tsrx:21:35: [OCTANE_STRONG_RENDER_IMPURE_CALL] Strong mode does not allow a key computed from time or randomness during render; the element would get a new identity every render. Use a stable ID from the item, such as `item.id`.
 ```
 
 Fix the component so it compiles in Strong mode and meets these requirements:

@@ -1,13 +1,15 @@
 import { base } from './style-applied-theme-base.tsrx';
 
-const theme = <style apply={base}>
-	div {
-		color: blue;
-	}
-	.card {
-		color: var(--ink);
-	}
-</style>;
+const theme = (
+	<style apply={base}>
+		div {
+			color: blue;
+		}
+		.card {
+			color: var(--ink);
+		}
+	</style>
+);
 
 const cls = theme.$class;
 const card = theme.card;

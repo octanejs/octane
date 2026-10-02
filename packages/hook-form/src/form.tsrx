@@ -29,79 +29,83 @@ export function Form<TFieldValues extends FieldValues, TTransformedValues = TFie
 		...rest
 	} = props;
 
-	const submit = useCallback(async (event) => {
-		let hasError = false;
-		let type = '';
+	const submit = useCallback(
+		async (event) => {
+			let hasError = false;
+			let type = '';
 
-		await control.handleSubmit(async (data) => {
-			const formData = new FormData();
-			let formDataJson = '';
+			await control.handleSubmit(async (data) => {
+				const formData = new FormData();
+				let formDataJson = '';
 
-			try {
-				formDataJson = JSON.stringify(data);
-			} catch {
-			}
-
-			const flattenFormValues = flatten(data as FieldValues);
-
-			for (const key in flattenFormValues) {
-				formData.append(key, flattenFormValues[key]);
-			}
-
-			if (onSubmit) {
-				await onSubmit({
-					data: data as TTransformedValues,
-					event,
-					method,
-					formData,
-					formDataJson,
-				});
-			}
-
-			if (action) {
 				try {
-					const shouldStringifySubmissionData = [
-						headers && headers['Content-Type'],
-						encType,
-					].some((value) => value && value.includes('json'));
+					formDataJson = JSON.stringify(data);
+				} catch {}
 
-					const response = await fetch(String(action), {
+				const flattenFormValues = flatten(data as FieldValues);
+
+				for (const key in flattenFormValues) {
+					formData.append(key, flattenFormValues[key]);
+				}
+
+				if (onSubmit) {
+					await onSubmit({
+						data: data as TTransformedValues,
+						event,
 						method,
-						headers: {
-							...headers,
-							...(encType && encType !== 'multipart/form-data' ? { 'Content-Type': encType } : {}),
-						},
-						body: shouldStringifySubmissionData ? formDataJson : formData,
+						formData,
+						formDataJson,
 					});
+				}
 
-					if (
-						response &&
+				if (action) {
+					try {
+						const shouldStringifySubmissionData = [
+							headers && headers['Content-Type'],
+							encType,
+						].some((value) => value && value.includes('json'));
+
+						const response = await fetch(String(action), {
+							method,
+							headers: {
+								...headers,
+								...(encType && encType !== 'multipart/form-data'
+									? { 'Content-Type': encType }
+									: {}),
+							},
+							body: shouldStringifySubmissionData ? formDataJson : formData,
+						});
+
+						if (
+							response &&
 							(validateStatus
 								? !validateStatus(response.status)
 								: response.status < 200 || response.status >= 300)
-					) {
+						) {
+							hasError = true;
+							onError && onError({ response });
+							type = String(response.status);
+						} else {
+							onSuccess && onSuccess({ response });
+						}
+					} catch (error) {
 						hasError = true;
-						onError && onError({ response });
-						type = String(response.status);
-					} else {
-						onSuccess && onSuccess({ response });
+						onError && onError({ error });
 					}
-				} catch (error) {
-					hasError = true;
-					onError && onError({ error });
 				}
-			}
-		})(event);
+			})(event);
 
-		if (hasError && control) {
-			control._subjects.state.next({
-				isSubmitSuccessful: false,
-			});
-			control.setError('root.server', {
-				type,
-			});
-		}
-	}, [control, onSubmit, method, action, headers, encType, validateStatus, onError, onSuccess]);
+			if (hasError && control) {
+				control._subjects.state.next({
+					isSubmitSuccessful: false,
+				});
+				control.setError('root.server', {
+					type,
+				});
+			}
+		},
+		[control, onSubmit, method, action, headers, encType, validateStatus, onError, onSuccess],
+	);
 
 	useEffect(() => {
 		setMounted(true);
@@ -111,12 +115,16 @@ export function Form<TFieldValues extends FieldValues, TTransformedValues = TFie
 		return render({ submit });
 	}
 
-	return <form
-		noValidate={mounted}
-		action={action as string | undefined}
-		method={method}
-		encType={encType}
-		onSubmit={submit}
-		{...rest}
-	>{children}</form>;
+	return (
+		<form
+			noValidate={mounted}
+			action={action as string | undefined}
+			method={method}
+			encType={encType}
+			onSubmit={submit}
+			{...rest}
+		>
+			{children}
+		</form>
+	);
 }

@@ -4,12 +4,9 @@ import type { OctaneNode } from 'octane';
 import { RainbowKitContext } from './internal';
 
 export type WalletButtonProps = {
-	children?: | OctaneNode
-	| ((props: {
-			ready: boolean;
-			connect: () => void;
-			error: unknown | null;
-	  }) => OctaneNode);
+	children?:
+		| OctaneNode
+		| ((props: { ready: boolean; connect: () => void; error: unknown | null }) => OctaneNode);
 	wallet: string;
 };
 
@@ -18,17 +15,19 @@ export function WalletButton(props: WalletButtonProps) {
 	const mutation = useConnect();
 	const entry = context?.wallets.find(
 		(candidate) =>
-			candidate.identity === props.wallet || candidate.id === props.wallet ||
-				candidate.name === props.wallet,
+			candidate.identity === props.wallet ||
+			candidate.id === props.wallet ||
+			candidate.name === props.wallet,
 	);
 	const connector = entry?.connector;
 	const ready = Boolean(context?.mounted && connector);
 	const connect = () => {
 		if (!context?.mounted || !connector) return;
 		const token = context.beginConnecting();
-		void mutation.connectAsync({ connector }).catch(() => {}).finally(
-			() => context.endConnecting(token),
-		);
+		void mutation
+			.connectAsync({ connector })
+			.catch(() => {})
+			.finally(() => context.endConnecting(token));
 	};
 	if (props.children != null) {
 		return typeof props.children === 'function' && !isChildrenBlock(props.children)

@@ -62,8 +62,9 @@ export type SetDataAction = {
 
 export type SetAction<UserData extends Data = Data> = {
 	type: 'set';
-	state: | Partial<PrivateAppState<UserData>>
-	| ((previous: PrivateAppState<UserData>) => Partial<PrivateAppState<UserData>>);
+	state:
+		| Partial<PrivateAppState<UserData>>
+		| ((previous: PrivateAppState<UserData>) => Partial<PrivateAppState<UserData>>);
 };
 
 export type RegisterZoneAction = {
@@ -76,8 +77,8 @@ export type UnregisterZoneAction = {
 	zone: string;
 };
 
-export type PuckAction =
-	{ recordHistory?: boolean } & (| ReorderAction
+export type PuckAction = { recordHistory?: boolean } & (
+	| ReorderAction
 	| InsertAction
 	| MoveAction
 	| ReplaceAction
@@ -88,4 +89,5 @@ export type PuckAction =
 	| SetDataAction
 	| SetUiAction
 	| RegisterZoneAction
-	| UnregisterZoneAction);
+	| UnregisterZoneAction
+);

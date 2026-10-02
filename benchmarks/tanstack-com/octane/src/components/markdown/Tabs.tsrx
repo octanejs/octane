@@ -32,72 +32,83 @@ export function Tabs({
 
 	const [internalActiveSlug, setInternalActiveSlug] = useState(() => {
 		if (isControlled) return '';
-		const match =
-			frameworkParam ? tabsProp.find((tab) => tab.slug === frameworkParam) : undefined;
+		const match = frameworkParam ? tabsProp.find((tab) => tab.slug === frameworkParam) : undefined;
 		return match?.slug ?? tabsProp[0]?.slug ?? '';
 	});
 
 	const activeSlug = controlledActiveSlug ?? internalActiveSlug;
-	const setActiveSlug = useCallback((slug: string) => {
-		if (onTabChange) {
-			onTabChange(slug);
-		} else {
-			setInternalActiveSlug(slug);
-		}
-	}, [onTabChange]);
+	const setActiveSlug = useCallback(
+		(slug: string) => {
+			if (onTabChange) {
+				onTabChange(slug);
+			} else {
+				setInternalActiveSlug(slug);
+			}
+		},
+		[onTabChange],
+	);
 
 	if (tabsProp.length === 0) return null;
 
-	return <div class="my-4">
-		<div
-			class="not-prose flex items-center justify-start gap-2 rounded-t-md border-1 border-b-none border-gray-200 dark:border-gray-800 overflow-x-auto overflow-y-hidden bg-white dark:bg-gray-950"
-		>{tabsProp.map((tab) => {
-			return <Tab
-				key={`${id}-${tab.slug}`}
-				id={id}
-				tab={tab}
-				activeSlug={activeSlug}
-				setActiveSlug={setActiveSlug}
-			/>;
-		})}</div>
-		<div
-			class="border border-gray-500/20 rounded-b-md bg-gray-100 dark:bg-gray-900 overflow-hidden"
-		>{childrenArray.map((child, index) => {
-			const tab = tabsProp[index];
-			if (!tab) return null;
-			const isActive = tab.slug === activeSlug;
-			const content =
-				typeof panelContent === 'string' ? panelContent : panelContent?.[tab.slug];
-			return <div
-				key={`${id}-${tab.slug}`}
-				data-tab={tab.slug}
-				data-content={content}
-				class={`max-w-none flex-col gap-2 text-base ${isActive ? 'flex' : 'hidden'}`}
-			>{child}</div>;
-		})}</div>
-	</div>;
+	return (
+		<div class="my-4">
+			<div class="not-prose flex items-center justify-start gap-2 rounded-t-md border-1 border-b-none border-gray-200 dark:border-gray-800 overflow-x-auto overflow-y-hidden bg-white dark:bg-gray-950">
+				{tabsProp.map((tab) => {
+					return (
+						<Tab
+							key={`${id}-${tab.slug}`}
+							id={id}
+							tab={tab}
+							activeSlug={activeSlug}
+							setActiveSlug={setActiveSlug}
+						/>
+					);
+				})}
+			</div>
+			<div class="border border-gray-500/20 rounded-b-md bg-gray-100 dark:bg-gray-900 overflow-hidden">
+				{childrenArray.map((child, index) => {
+					const tab = tabsProp[index];
+					if (!tab) return null;
+					const isActive = tab.slug === activeSlug;
+					const content =
+						typeof panelContent === 'string' ? panelContent : panelContent?.[tab.slug];
+					return (
+						<div
+							key={`${id}-${tab.slug}`}
+							data-tab={tab.slug}
+							data-content={content}
+							class={`max-w-none flex-col gap-2 text-base ${isActive ? 'flex' : 'hidden'}`}
+						>
+							{child}
+						</div>
+					);
+				})}
+			</div>
+		</div>
+	);
 }
 
-const Tab = memo(
-	function Tab({
-		tab,
-		activeSlug,
-		setActiveSlug,
-	}: {
-		id?: string;
-		tab: TabDefinition;
-		activeSlug: string;
-		setActiveSlug: (slug: string) => void;
-	}) {
-		const option = useMemo(
-			() => frameworkOptions.find(
+const Tab = memo(function Tab({
+	tab,
+	activeSlug,
+	setActiveSlug,
+}: {
+	id?: string;
+	tab: TabDefinition;
+	activeSlug: string;
+	setActiveSlug: (slug: string) => void;
+}) {
+	const option = useMemo(
+		() =>
+			frameworkOptions.find(
 				(o) =>
 					o.value === tab.slug.toLowerCase() || o.label.toLowerCase() === tab.name.toLowerCase(),
 			),
-			[tab.slug, tab.name],
-		);
+		[tab.slug, tab.name],
+	);
 
-		return <button
+	return (
+		<button
 			aria-label={tab.name}
 			title={tab.name}
 			type="button"
@@ -110,6 +121,6 @@ const Tab = memo(
 		>
 			{option && <img src={option.logo} alt="" class="w-4 h-4 -ml-1" />}
 			<span>{tab.name}</span>
-		</button>;
-	},
-);
+		</button>
+	);
+});

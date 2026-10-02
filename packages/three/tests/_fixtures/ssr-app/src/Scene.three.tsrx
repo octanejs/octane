@@ -12,11 +12,10 @@ let pendingAsset: Promise<string> | undefined;
 
 function loadPendingAsset(): Promise<string> {
 	if (pendingAsset !== undefined) return pendingAsset;
-	const fixture = globalThis as
-		typeof globalThis & {
-			__octaneThreeSsrProof?: ThreeSsrFixtureProof;
-		};
-	const proof = fixture.__octaneThreeSsrProof ??= {};
+	const fixture = globalThis as typeof globalThis & {
+		__octaneThreeSsrProof?: ThreeSsrFixtureProof;
+	};
+	const proof = (fixture.__octaneThreeSsrProof ??= {});
 	proof.assetStarts = (proof.assetStarts ?? 0) + 1;
 	pendingAsset = new Promise((resolve) => {
 		proof.resolveAsset = () => resolve('hydrated-three-pending-ready');
@@ -25,19 +24,17 @@ function loadPendingAsset(): Promise<string> {
 }
 
 function recordSceneRef(value: unknown): void {
-	const fixture = globalThis as
-		typeof globalThis & {
-			__octaneThreeSsrProof?: ThreeSsrFixtureProof;
-		};
-	const proof = fixture.__octaneThreeSsrProof ??= {};
+	const fixture = globalThis as typeof globalThis & {
+		__octaneThreeSsrProof?: ThreeSsrFixtureProof;
+	};
+	const proof = (fixture.__octaneThreeSsrProof ??= {});
 	if (value === null) proof.sceneCleanups = (proof.sceneCleanups ?? 0) + 1;
 	else proof.sceneMounts = (proof.sceneMounts ?? 0) + 1;
 }
 
 export function Scene(props: { mode: string }) @{
 	if (props.mode === 'error') throw new Error('hydrated Three scene failed');
-	const name =
-		props.mode === 'pending' ? use(loadPendingAsset()) : 'hydrated-three-scene';
+	const name = props.mode === 'pending' ? use(loadPendingAsset()) : 'hydrated-three-scene';
 
 	<group name={name} ref={recordSceneRef}>
 		<mesh name="hydrated-three-mesh">

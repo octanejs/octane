@@ -15,7 +15,9 @@ export function LayoutView() @{
 	<button
 		class="layout"
 		onClick={() => dispatch({ type: 'layout/setLayoutType', payload: 'vertical' })}
-	>{String(layout)}</button>
+	>
+		{String(layout)}
+	</button>
 }
 
 export function LayoutApp(props) @{

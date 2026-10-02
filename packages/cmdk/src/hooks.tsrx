@@ -82,8 +82,7 @@ export function useValue(
 			return undefined;
 		})();
 
-		const keywords =
-			Array.isArray(aliases) ? aliases.map((alias) => alias.trim()) : [];
+		const keywords = Array.isArray(aliases) ? aliases.map((alias) => alias.trim()) : [];
 		context.value(id, value, keywords);
 		ref.current?.setAttribute(VALUE_ATTR, value ?? '');
 		valueRef.current = value;

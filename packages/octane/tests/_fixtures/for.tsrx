@@ -37,14 +37,20 @@ export function ToggleableEmpty() @{
 		{ id: 2, label: 'b' },
 	]);
 	<div>
-		<button id="clear" onClick={() => setItems([])}>{'clear'}</button>
+		<button id="clear" onClick={() => setItems([])}>
+			{'clear'}
+		</button>
 		<button
 			id="restore"
-			onClick={() => setItems([
-				{ id: 1, label: 'a' },
-				{ id: 2, label: 'b' },
-			])}
-		>{'restore'}</button>
+			onClick={() =>
+				setItems([
+					{ id: 1, label: 'a' },
+					{ id: 2, label: 'b' },
+				])
+			}
+		>
+			{'restore'}
+		</button>
 		<ul class="outer">
 			@for (const item of items; key item.id) {
 				<li class="row">{item.label as string}</li>
@@ -62,7 +68,9 @@ export function MutableList() @{
 		{ id: 3, label: 'c' },
 	]);
 	<div>
-		<button id="reverse" onClick={() => setItems([...items].reverse())}>{'rev'}</button>
+		<button id="reverse" onClick={() => setItems([...items].reverse())}>
+			{'rev'}
+		</button>
 		<button
 			id="swap"
 			onClick={() => {
@@ -72,15 +80,23 @@ export function MutableList() @{
 				next[next.length - 1] = tmp;
 				setItems(next);
 			}}
-		>{'swap'}</button>
+		>
+			{'swap'}
+		</button>
 		<button
 			id="add"
-			onClick={() => setItems([
-				...items,
-				{ id: items.length + 1, label: String.fromCharCode(97 + items.length) },
-			])}
-		>{'add'}</button>
-		<button id="remove-first" onClick={() => setItems(items.slice(1))}>{'rm-first'}</button>
+			onClick={() =>
+				setItems([
+					...items,
+					{ id: items.length + 1, label: String.fromCharCode(97 + items.length) },
+				])
+			}
+		>
+			{'add'}
+		</button>
+		<button id="remove-first" onClick={() => setItems(items.slice(1))}>
+			{'rm-first'}
+		</button>
 		<button
 			id="remove-middle"
 			onClick={() => {
@@ -88,8 +104,12 @@ export function MutableList() @{
 				next.splice(Math.floor(next.length / 2), 1);
 				setItems(next);
 			}}
-		>{'rm-mid'}</button>
-		<button id="clear" onClick={() => setItems([])}>{'clear'}</button>
+		>
+			{'rm-mid'}
+		</button>
+		<button id="clear" onClick={() => setItems([])}>
+			{'clear'}
+		</button>
 		<ul>
 			@for (const item of items; key item.id) {
 				<li>{item.label as string}</li>
@@ -145,7 +165,9 @@ const callItems = [
 export function CallBodyList() @{
 	const [, setN] = useState(0);
 	<div>
-		<button id="cb-rerender" onClick={() => setN((n) => n + 1)}>{'go'}</button>
+		<button id="cb-rerender" onClick={() => setN((n) => n + 1)}>
+			{'go'}
+		</button>
 		<ul>
 			@for (const item of callItems; key item.id) {
 				<li class="cb-row">{item.read()}</li>
@@ -158,7 +180,9 @@ export function NestedConditionalCallBodyList() @{
 	const [, setN] = useState(0);
 	const [visible] = useState(true);
 	<div>
-		<button id="nested-call-rerender" onClick={() => setN((n) => n + 1)}>{'go'}</button>
+		<button id="nested-call-rerender" onClick={() => setN((n) => n + 1)}>
+			{'go'}
+		</button>
 		<ul>
 			@for (const item of callItems; key item.id) {
 				<li>
@@ -176,11 +200,17 @@ export function DepPureList() @{
 	const [items] = useState(() => [countedRow(1, 'row1'), countedRow(2, 'row2')]);
 	const [, setN] = useState(0);
 	<div>
-		<button id="nanify" onClick={() => setMarker(NaN)}>{'nan'}</button>
-		<button id="rerender" onClick={() => setN((n) => n + 1)}>{'go'}</button>
+		<button id="nanify" onClick={() => setMarker(NaN)}>
+			{'nan'}
+		</button>
+		<button id="rerender" onClick={() => setN((n) => n + 1)}>
+			{'go'}
+		</button>
 		<ul>
 			@for (const item of items; key item.id) {
-				<li class="dp-row" data-m={marker}>{item.label}</li>
+				<li class="dp-row" data-m={marker}>
+					{item.label}
+				</li>
 			}
 		</ul>
 	</div>
@@ -201,13 +231,17 @@ export function PlainCalleeList() @{
 	]);
 	const [, setN] = useState(0);
 	<div>
-		<button id="pc-rerender" onClick={() => setN((n) => n + 1)}>{'go'}</button>
+		<button id="pc-rerender" onClick={() => setN((n) => n + 1)}>
+			{'go'}
+		</button>
 		<button
 			id="pc-bump"
-			onClick={() => setItems(
-				(prev) => prev.map((it) => (it.id === 1 ? { ...it, value: it.value + 1 } : it)),
-			)}
-		>{'bump'}</button>
+			onClick={() =>
+				setItems((prev) => prev.map((it) => (it.id === 1 ? { ...it, value: it.value + 1 } : it)))
+			}
+		>
+			{'bump'}
+		</button>
 		<ul>
 			@for (const item of items; key item.id) {
 				<li class="pc-row">{fmtRow(item)}</li>
@@ -314,11 +348,10 @@ export function LocationHashList(props: { items: NavRow[]; n: number }) @{
 	</ul>
 }
 
-const Activity = ActivitySentinel as unknown as
-	(props: {
-		mode: 'hidden' | 'visible';
-		children?: OctaneNode;
-	}) => null;
+const Activity = ActivitySentinel as unknown as (props: {
+	mode: 'hidden' | 'visible';
+	children?: OctaneNode;
+}) => null;
 
 let nestedConditionalActivityMode: 'hidden' | 'visible' = 'visible';
 
@@ -330,10 +363,7 @@ export function setNestedConditionalActivityMode(mode: 'hidden' | 'visible') {
 	nestedConditionalActivityMode = mode;
 }
 
-export function NestedConditionalActivityList(props: {
-	items: SelectionRow[];
-	visible: boolean;
-}) @{
+export function NestedConditionalActivityList(props: { items: SelectionRow[]; visible: boolean }) @{
 	const visible = props.visible;
 	<ul id="nested-conditional-activity-list">
 		@for (const row of props.items; key row.id) {
@@ -358,10 +388,9 @@ export function KeyedSelectionList(props: {
 	const prefix = props.prefix ?? 'row';
 	<ul id="keyed-selection-list">
 		@for (const row of props.items; key row.id) {
-			<li
-				class={selected === row.id ? 'selected' : ''}
-				data-prefix={prefix}
-			>{row.label as string}</li>
+			<li class={selected === row.id ? 'selected' : ''} data-prefix={prefix}>
+				{row.label as string}
+			</li>
 		}
 	</ul>
 }
@@ -375,10 +404,9 @@ export function KeyedSelectionProjectionList(props: {
 	const projection = props.projection;
 	<ul id="keyed-selection-projection-list">
 		@for (const row of props.items; key row.id) {
-			<li
-				class={selected === row.id ? 'selected' : ''}
-				data-projection={1 / projection}
-			>{row.label as string}</li>
+			<li class={selected === row.id ? 'selected' : ''} data-projection={1 / projection}>
+				{row.label as string}
+			</li>
 		}
 	</ul>
 }
@@ -440,10 +468,9 @@ export function SharedKeyedSelectionList(props: {
 	const selected = props.selected;
 	<ul id="shared-keyed-selection-list">
 		@for (const row of props.items; key row.id) {
-			<li
-				class={selected === row.id ? 'selected' : ''}
-				data-selected={selected}
-			>{row.label as string}</li>
+			<li class={selected === row.id ? 'selected' : ''} data-selected={selected}>
+				{row.label as string}
+			</li>
 		}
 	</ul>
 }
@@ -463,15 +490,18 @@ export function KeyedSelectionTransition(props: {
 	<div>
 		<button
 			id="selection-transition-bump"
-			onClick={() => startTransition(() => {
-				setSelected(2);
-				setResource(props.nextPromise);
-			})}
-		>{'select next'}</button>
-		<button
-			id="selection-transition-urgent"
-			onClick={() => setSelected(3)}
-		>{'select urgently'}</button>
+			onClick={() =>
+				startTransition(() => {
+					setSelected(2);
+					setResource(props.nextPromise);
+				})
+			}
+		>
+			{'select next'}
+		</button>
+		<button id="selection-transition-urgent" onClick={() => setSelected(3)}>
+			{'select urgently'}
+		</button>
 		@try {
 			<>
 				<ul id="selection-transition-list">
@@ -501,7 +531,9 @@ export function FastHostKeyedList(props: {
 				class={selected === row.id ? 'fast-host-row selected' : 'fast-host-row'}
 				data-fast-host-id={row.id}
 				onClick={() => onPick(row.id)}
-			>{row.label as string}</li>
+			>
+				{row.label as string}
+			</li>
 		}
 		<li class="fast-host-after">{'after'}</li>
 	</ul>
@@ -514,15 +546,18 @@ export function FastHostMappedList(props: {
 }) @{
 	const selected = props.selected;
 	const onPick = props.onPick;
-	<ul id="fast-host-mapped-list">{props.items.map(
-		(row) =>
+	<ul id="fast-host-mapped-list">
+		{props.items.map((row) => (
 			<li
 				key={row.id}
 				class={selected === row.id ? 'fast-host-mapped-row selected' : 'fast-host-mapped-row'}
 				data-fast-host-id={row.id}
 				onClick={() => onPick(row.id)}
-			>{row.label as string}</li>,
-	)}</ul>
+			>
+				{row.label as string}
+			</li>
+		))}
+	</ul>
 }
 
 export function FastHostCustomList(props: { items: SelectionRow[] }) @{
@@ -542,7 +577,9 @@ export function FastHostRefList(props: {
 	const onRef = props.onRef;
 	<ul id="fast-host-ref-list">
 		@for (const row of props.items; key row.id) {
-			<li class="fast-host-ref-row" ref={onRef}>{row.label as string}</li>
+			<li class="fast-host-ref-row" ref={onRef}>
+				{row.label as string}
+			</li>
 		}
 	</ul>
 }
@@ -580,11 +617,15 @@ export function FastHostTransitionList(props: {
 	<div>
 		<button
 			id="fast-host-transition-fill"
-			onClick={() => startTransition(() => {
-				setItems(props.items);
-				setResource(props.nextPromise);
-			})}
-		>{'fill'}</button>
+			onClick={() =>
+				startTransition(() => {
+					setItems(props.items);
+					setResource(props.nextPromise);
+				})
+			}
+		>
+			{'fill'}
+		</button>
 		@try {
 			<>
 				<ul id="fast-host-transition-list">
@@ -621,7 +662,9 @@ export function FastRenderableProbe(props: {
 }) @{
 	const value = use(FastRowContext);
 	props.onRender(document.querySelectorAll('#fast-renderable-list > li').length, value);
-	<span class="fast-renderable-probe" ref={props.onRef}>{value as string}</span>
+	<span class="fast-renderable-probe" ref={props.onRef}>
+		{value as string}
+	</span>
 }
 
 export function FastMappedRenderableList(props: {
@@ -629,9 +672,13 @@ export function FastMappedRenderableList(props: {
 	value: string;
 }) @{
 	<FastRowContext value={props.value}>
-		<ul id="fast-renderable-list">{props.items.map(
-			(row) => <li class="fast-renderable-row" key={row.id}>{row.content}</li>,
-		)}</ul>
+		<ul id="fast-renderable-list">
+			{props.items.map((row) => (
+				<li class="fast-renderable-row" key={row.id}>
+					{row.content}
+				</li>
+			))}
+		</ul>
 	</FastRowContext>
 }
 
@@ -642,16 +689,13 @@ export function FastMappedBoundaryList(props: {
 	@try {
 		<FastMappedRenderableList items={props.items} value={props.value} />
 	} @catch (error, reset) {
-		<button
-			id="fast-mapped-renderable-retry"
-			onClick={reset}
-		>{(error as Error).message as string}</button>
+		<button id="fast-mapped-renderable-retry" onClick={reset}>
+			{(error as Error).message as string}
+		</button>
 	}
 }
 
-export function FastSuspendingGetterList(props: {
-	items: Array<{ id: number; label: string }>;
-}) @{
+export function FastSuspendingGetterList(props: { items: Array<{ id: number; label: string }> }) @{
 	@try {
 		<ul id="fast-suspending-getter-list">
 			@for (const row of props.items; key row.id) {
@@ -661,10 +705,9 @@ export function FastSuspendingGetterList(props: {
 	} @pending {
 		<span id="fast-suspending-getter-pending">{'loading'}</span>
 	} @catch (error, reset) {
-		<button
-			id="fast-suspending-getter-retry"
-			onClick={reset}
-		>{(error as Error).message as string}</button>
+		<button id="fast-suspending-getter-retry" onClick={reset}>
+			{(error as Error).message as string}
+		</button>
 	}
 }
 
@@ -678,15 +721,18 @@ export function NestedConditionalTransition(props: {
 	<div>
 		<button
 			id="nested-transition-bump"
-			onClick={() => startTransition(() => {
-				setPrefix('pending');
-				setResource(props.nextPromise);
-			})}
-		>{'update rows'}</button>
-		<button
-			id="nested-transition-urgent"
-			onClick={() => setPrefix('urgent')}
-		>{'update urgently'}</button>
+			onClick={() =>
+				startTransition(() => {
+					setPrefix('pending');
+					setResource(props.nextPromise);
+				})
+			}
+		>
+			{'update rows'}
+		</button>
+		<button id="nested-transition-urgent" onClick={() => setPrefix('urgent')}>
+			{'update urgently'}
+		</button>
 		@try {
 			<>
 				<ul id="nested-transition-list">
@@ -725,10 +771,9 @@ export function NestedKeyedReorderList(props: {
 				<ul>
 					@for (const row of group.rows; key row.id) {
 						<li class="nested-reorder-row" data-reorder-row={row.id}>
-							<button
-								type="button"
-								onClick={() => onPick(group.id, row.id)}
-							>{row.label as string}</button>
+							<button type="button" onClick={() => onPick(group.id, row.id)}>
+								{row.label as string}
+							</button>
 						</li>
 					}
 				</ul>
@@ -746,7 +791,9 @@ export function NestedKeyedReorderBoundary(props: {
 	} @pending {
 		<span id="nested-reorder-pending">{'loading'}</span>
 	} @catch (error, reset) {
-		<button id="nested-reorder-retry" onClick={reset}>{(error as Error).message as string}</button>
+		<button id="nested-reorder-retry" onClick={reset}>
+			{(error as Error).message as string}
+		</button>
 	}
 }
 
@@ -767,22 +814,28 @@ export function NestedKeyedReorderTransition(props: {
 	<div>
 		<button
 			id="nested-reorder-transition-start"
-			onClick={() => startTransition(() => {
-				setGroups(props.nextGroups);
-				setResource(props.nextPromise);
-			})}
-		>{'reorder'}</button>
+			onClick={() =>
+				startTransition(() => {
+					setGroups(props.nextGroups);
+					setResource(props.nextPromise);
+				})
+			}
+		>
+			{'reorder'}
+		</button>
 		<button
 			id="nested-reorder-transition-urgent"
-			onClick={() => setGroups(
-				props.nextGroups.map(
-					(group) => ({
+			onClick={() =>
+				setGroups(
+					props.nextGroups.map((group) => ({
 						...group,
 						rows: group.rows.map((row) => ({ ...row })),
-					}),
-				),
-			)}
-		>{'reorder urgently'}</button>
+					})),
+				)
+			}
+		>
+			{'reorder urgently'}
+		</button>
 		@try {
 			<>
 				<NestedKeyedReorderList groups={groups} onPick={props.onPick} />
@@ -839,24 +892,26 @@ export function HostBindingList(props: HostBindingListProps) @{
 export function HostMappedBindingList(props: HostBindingListProps) @{
 	const version = props.version;
 	<FastRowContext value={props.context}>
-		<ul>{props.items.map(
-			(row) => <li
-				key={row.id}
-				class={row.className}
-				title={row.title}
-				data-value={row.data as string}
-				aria-label={row.aria}
-				hidden={row.hidden}
-				data-version={version}
-			>
-				<span data-kind="only">{row.only}</span>
-				<span data-kind="mixed">
-					<i>before</i>
-					{row.mixed}
-					<i>after</i>
-				</span>
-			</li>,
-		)}</ul>
+		<ul>
+			{props.items.map((row) => (
+				<li
+					key={row.id}
+					class={row.className}
+					title={row.title}
+					data-value={row.data as string}
+					aria-label={row.aria}
+					hidden={row.hidden}
+					data-version={version}
+				>
+					<span data-kind="only">{row.only}</span>
+					<span data-kind="mixed">
+						<i>before</i>
+						{row.mixed}
+						<i>after</i>
+					</span>
+				</li>
+			))}
+		</ul>
 	</FastRowContext>
 }
 
@@ -944,8 +999,7 @@ export function EarlySuspendingRowHostList(props: { rows: string[]; text: Promis
 	@try {
 		<ul id="suspending-row-list">
 			@for (const row of props.rows; key row) {
-				const detail =
-					row === 'a' ? '' : use(props.text);
+				const detail = row === 'a' ? '' : use(props.text);
 				<li class="suspending-row">
 					{row}
 					{detail as string}
@@ -958,8 +1012,7 @@ export function EarlySuspendingRowHostList(props: { rows: string[]; text: Promis
 }
 
 function EarlySuspendingRow(props: { row: string; text: Promise<string> }) @{
-	const detail =
-		props.row === 'a' ? '' : use(props.text);
+	const detail = props.row === 'a' ? '' : use(props.text);
 	<li class="suspending-row">
 		{props.row}
 		{detail as string}

@@ -16,10 +16,18 @@ import {
 function Layout() @{
 	<div>
 		<nav>
-			<Link class="go-home" to="/">Home</Link>
-			<Link class="go-data" to="/data">Data</Link>
-			<Link class="go-secret" to="/secret">Secret</Link>
-			<Link class="go-boom" to="/boom">Boom</Link>
+			<Link class="go-home" to="/">
+				Home
+			</Link>
+			<Link class="go-data" to="/data">
+				Data
+			</Link>
+			<Link class="go-secret" to="/secret">
+				Secret
+			</Link>
+			<Link class="go-boom" to="/boom">
+				Boom
+			</Link>
 		</nav>
 		<main>
 			<Outlet />
@@ -42,9 +50,7 @@ function LoginPage() @{
 
 function BoomError() @{
 	const error = useRouteError();
-	<p class="err">
-		{isRouteErrorResponse(error) ? error.status + ' ' + error.data : 'unknown'}
-	</p>
+	<p class="err">{isRouteErrorResponse(error) ? error.status + ' ' + error.data : 'unknown'}</p>
 }
 
 const routes = [

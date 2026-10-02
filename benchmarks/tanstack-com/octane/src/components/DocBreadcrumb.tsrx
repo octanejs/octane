@@ -41,8 +41,7 @@ export function DocBreadcrumb({
 	const fullDocPath = framework ? `framework/${framework}/${_splat}` : _splat;
 
 	// Find the section for this doc
-	const section =
-		fullDocPath ? findSectionForDoc(config, fullDocPath) : null;
+	const section = fullDocPath ? findSectionForDoc(config, fullDocPath) : null;
 
 	// Only show if we found a section
 	if (!section) {

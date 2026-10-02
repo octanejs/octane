@@ -16,13 +16,19 @@ export function ScrollArea(props: Props) @{
 		<ScrollAreaPrimitive.Viewport
 			data-slot="scroll-area-viewport"
 			className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
-		>{props.children}</ScrollAreaPrimitive.Viewport>
+		>
+			{props.children}
+		</ScrollAreaPrimitive.Viewport>
 		<ScrollBar />
 		<ScrollAreaPrimitive.Corner />
 	</ScrollAreaPrimitive.Root>
 }
 
-export function ScrollBar({ className, orientation = 'vertical', ...props }: Props & {
+export function ScrollBar({
+	className,
+	orientation = 'vertical',
+	...props
+}: Props & {
 	orientation?: 'vertical' | 'horizontal';
 }) @{
 	<ScrollAreaPrimitive.ScrollAreaScrollbar

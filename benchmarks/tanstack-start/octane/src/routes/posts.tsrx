@@ -22,10 +22,10 @@ function PostsComponent() @{
 			{'Parent hydration count: ' + hydrationCount}
 		</button>
 		<ul class="list-disc pl-4">
-			@for (const post of [
-				...posts,
-				{ id: 'i-do-not-exist', title: 'Non-existent Post' },
-			]; key post.id) {
+			@for (
+				const post of [...posts, { id: 'i-do-not-exist', title: 'Non-existent Post' }];
+				key post.id
+			) {
 				<li class="whitespace-nowrap">
 					<Link
 						to="/posts/$postId"

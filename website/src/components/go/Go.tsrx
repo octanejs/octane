@@ -69,12 +69,15 @@ export function Go(props: GoProps) @{
 			setNear(true);
 			return;
 		}
-		const observer = new IntersectionObserver((entries) => {
-			if (entries.some((entry) => entry.isIntersecting)) {
-				setNear(true);
-				observer.disconnect();
-			}
-		}, { rootMargin: PRELOAD_MARGIN });
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries.some((entry) => entry.isIntersecting)) {
+					setNear(true);
+					observer.disconnect();
+				}
+			},
+			{ rootMargin: PRELOAD_MARGIN },
+		);
 		observer.observe(element);
 		return () => observer.disconnect();
 	});
@@ -139,16 +142,14 @@ export function Go(props: GoProps) @{
 	};
 	const onSeparatorKeyDown = (event: KeyboardEvent) => {
 		if (event.key === 'ArrowLeft') setPreviewWidth(clampPreview(previewWidth + KEYBOARD_STEP));
-		else if (event.key === 'ArrowRight') setPreviewWidth(
-			clampPreview(previewWidth - KEYBOARD_STEP),
-		);
+		else if (event.key === 'ArrowRight')
+			setPreviewWidth(clampPreview(previewWidth - KEYBOARD_STEP));
 		else if (event.key === 'Home') setPreviewWidth(clampPreview(DESIGN_WIDTH));
 		else return;
 		event.preventDefault();
 	};
 
-	const entry =
-		loaded ? resolveEntry(loaded.metadata, props.entry) : undefined;
+	const entry = loaded ? resolveEntry(loaded.metadata, props.entry) : undefined;
 	const sources = loaded?.source.files ?? [];
 	const current = sources.find(({ path }) => path === openFile) ?? sources[0];
 	const webBundle = entry?.webFile;
@@ -418,7 +419,9 @@ export function Go(props: GoProps) @{
 								aria-selected={source.path === current?.path}
 								title={source.path}
 								onClick={() => setOpenFile(source.path)}
-							>{fileLabel(source.path) as string}</button>
+							>
+								{fileLabel(source.path) as string}
+							</button>
 						}
 					</div>
 					<div class="go-source">
@@ -459,14 +462,18 @@ export function Go(props: GoProps) @{
 								class={['go-tab', tab === 'web' && 'is-active']}
 								aria-selected={tab === 'web'}
 								onClick={() => setTab('web')}
-							>Web</button>
+							>
+								Web
+							</button>
 							<button
 								type="button"
 								role="tab"
 								class={['go-tab', tab === 'device' && 'is-active']}
 								aria-selected={tab === 'device'}
 								onClick={() => setTab('device')}
-							>Device</button>
+							>
+								Device
+							</button>
 						</div>
 						<div class="go-actions">
 							@if (showRefresh) {

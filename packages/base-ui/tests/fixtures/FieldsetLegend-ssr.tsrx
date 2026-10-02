@@ -6,7 +6,9 @@ export function FieldsetLegendServerCase1() {
 }
 
 export function FieldsetLegendServerCase2() {
-	return <Fieldset.Root data-testid="fieldset">
-		<Fieldset.Legend data-testid="legend">Legend</Fieldset.Legend>
-	</Fieldset.Root>;
+	return (
+		<Fieldset.Root data-testid="fieldset">
+			<Fieldset.Legend data-testid="legend">Legend</Fieldset.Legend>
+		</Fieldset.Root>
+	);
 }

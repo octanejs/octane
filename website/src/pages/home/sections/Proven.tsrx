@@ -67,7 +67,9 @@ export function Proven() @{
 						href="https://github.com/octanejs/octane/blob/main/docs/react-parity-coverage.md"
 						target="_blank"
 						rel="noreferrer"
-					>React-derived coverage is tracked case by case</a>
+					>
+						React-derived coverage is tracked case by case
+					</a>
 					{'.'}
 				</span>
 			</div>
@@ -81,7 +83,9 @@ export function Proven() @{
 				<span class="proven-number">{BINDING_COUNT + ''}</span>
 				<span class="proven-label">
 					{'first-party ecosystem bindings for state, data, routing, UI, forms, charts, 3D, '}
-					<Link to="/docs/$slug" params={{ slug: 'bindings' }}>and more</Link>
+					<Link to="/docs/$slug" params={{ slug: 'bindings' }}>
+						and more
+					</Link>
 				</span>
 			</div>
 		</section>

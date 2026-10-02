@@ -26,8 +26,10 @@ export interface PolarLabelListEntry extends LabelListEntry {
 }
 interface LabelListProps extends ZIndexable {
 	id?: string;
-	valueAccessor?: (entry: | CartesianLabelListEntry
-	| PolarLabelListEntry, index: number) => RenderableText;
+	valueAccessor?: (
+		entry: CartesianLabelListEntry | PolarLabelListEntry,
+		index: number,
+	) => RenderableText;
 	clockWise?: boolean;
 	dataKey?: DataKey<any>;
 	content?: LabelContentType;
@@ -86,35 +88,38 @@ export function LabelList(labelListProps: Props) {
 	if (!data || !data.length) {
 		return null;
 	}
-	return <ZIndexLayer zIndex={zIndex ?? DefaultZIndexes.label}>
-		<Layer className="recharts-label-list">{data.map((entry, index) => {
-			const value =
-				isNullish(dataKey)
-					? valueAccessor(entry, index)
-					: getValueByDataKey(entry.payload, dataKey);
-			const idProps = isNullish(id) ? {} : { id: id + '-' + index };
-			return <Label
-				key={'label-' + index}
-				{...svgPropertiesAndEvents(entry)}
-				{...others}
-				{...idProps}
-				fill={restProps.fill ?? entry.fill}
-				parentViewBox={entry.parentViewBox}
-				value={value}
-				textBreakAll={textBreakAll}
-				viewBox={entry.viewBox}
-				index={index}
-				zIndex={0}
-			/>;
-		})}</Layer>
-	</ZIndexLayer>;
+	return (
+		<ZIndexLayer zIndex={zIndex ?? DefaultZIndexes.label}>
+			<Layer className="recharts-label-list">
+				{data.map((entry, index) => {
+					const value = isNullish(dataKey)
+						? valueAccessor(entry, index)
+						: getValueByDataKey(entry.payload, dataKey);
+					const idProps = isNullish(id) ? {} : { id: id + '-' + index };
+					return (
+						<Label
+							key={'label-' + index}
+							{...svgPropertiesAndEvents(entry)}
+							{...others}
+							{...idProps}
+							fill={restProps.fill ?? entry.fill}
+							parentViewBox={entry.parentViewBox}
+							value={value}
+							textBreakAll={textBreakAll}
+							viewBox={entry.viewBox}
+							index={index}
+							zIndex={0}
+						/>
+					);
+				})}
+			</Layer>
+		</ZIndexLayer>
+	);
 }
 
 LabelList.displayName = 'LabelList';
 
-export function LabelListFromLabelProp(props: {
-	label?: ImplicitLabelListType;
-}) {
+export function LabelListFromLabelProp(props: { label?: ImplicitLabelListType }) {
 	const { label } = props;
 	if (!label) {
 		return null;

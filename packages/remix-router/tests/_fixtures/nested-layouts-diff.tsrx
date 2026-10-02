@@ -15,9 +15,15 @@ import {
 function Layout() @{
 	<div>
 		<nav>
-			<Link class="nav-home" to="/">Home</Link>
-			<Link class="nav-about" to="/about">About</Link>
-			<Link class="nav-user" to="/users/42">User 42</Link>
+			<Link class="nav-home" to="/">
+				Home
+			</Link>
+			<Link class="nav-about" to="/about">
+				About
+			</Link>
+			<Link class="nav-user" to="/users/42">
+				User 42
+			</Link>
 		</nav>
 		<main>
 			<Outlet />
@@ -55,9 +61,7 @@ const routes = [
 			{
 				path: 'users',
 				element: <Users />,
-				children: [
-					{ path: ':id', element: <UserDetail /> },
-				],
+				children: [{ path: ':id', element: <UserDetail /> }],
 			},
 		],
 	},

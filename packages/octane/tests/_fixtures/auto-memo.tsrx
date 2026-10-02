@@ -95,24 +95,28 @@ export function AutoMemoApp() @{
 		</button>
 		<button
 			id="auto-item"
-			onClick={() => setItems(
-				(current) => current.map(
-					(item) => (item.id === 1 ? { ...item, label: item.label + '!' } : item),
-				),
-			)}
-		>{'item'}</button>
-		<button id="auto-context" onClick={() => setTheme((value) => value + '!')}>{'context'}</button>
+			onClick={() =>
+				setItems((current) =>
+					current.map((item) => (item.id === 1 ? { ...item, label: item.label + '!' } : item)),
+				)
+			}
+		>
+			{'item'}
+		</button>
+		<button id="auto-context" onClick={() => setTheme((value) => value + '!')}>
+			{'context'}
+		</button>
 		<button
 			id="auto-item-context"
 			onClick={() => {
-				setItems(
-					(current) => current.map(
-						(item) => (item.id === 1 ? { ...item, label: item.label + '!' } : item),
-					),
+				setItems((current) =>
+					current.map((item) => (item.id === 1 ? { ...item, label: item.label + '!' } : item)),
 				);
 				setTheme((value) => value + '!');
 			}}
-		>{'item + context'}</button>
+		>
+			{'item + context'}
+		</button>
 		<AutoMemoContext value={theme}>
 			<Rows items={items} />
 			<DestructuredRows items={items} />

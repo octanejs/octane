@@ -93,12 +93,15 @@ export function TextareaSelectSpreadCascades() @{
 			value="controlled"
 			{...{ defaultValue: 'default', readOnly: true }}
 		/>
-		<textarea id="textarea-spread-value-undefined" {...{ value: undefined }}>value child</textarea>
-		<textarea id="textarea-spread-value-null" {...{ value: null }}>null child</textarea>
-		<textarea
-			id="textarea-spread-default-undefined"
-			{...{ defaultValue: undefined }}
-		>{'default child'}</textarea>
+		<textarea id="textarea-spread-value-undefined" {...{ value: undefined }}>
+			value child
+		</textarea>
+		<textarea id="textarea-spread-value-null" {...{ value: null }}>
+			null child
+		</textarea>
+		<textarea id="textarea-spread-default-undefined" {...{ defaultValue: undefined }}>
+			{'default child'}
+		</textarea>
 
 		<select id="select-spread-controlled" defaultValue="baz" {...{ value: 'bar', readOnly: true }}>
 			<option value="foo">Foo</option>
@@ -184,7 +187,9 @@ export function AttributeSpreadCollisions() @{
 			}}
 		/>
 		<div id="attr-nullish-removal" {...{ title: 'spread' }} title={undefined} />
-		<label id="attr-alias" htmlFor="first" {...{ htmlFor: 'second' }}>alias</label>
+		<label id="attr-alias" htmlFor="first" {...{ htmlFor: 'second' }}>
+			alias
+		</label>
 		<div id="attr-style" style={{ color: 'red' }} {...{ style: { color: 'blue' } }} />
 		<svg>
 			<use
@@ -195,7 +200,9 @@ export function AttributeSpreadCollisions() @{
 		</svg>
 		<x-parity-attr id="attr-custom" {...{ camelCase: 'first' }} camelCase="second" />
 		<select id="attr-option-select" value="second" readOnly>
-			<option {...{ value: 'first' }} value="second">Second</option>
+			<option {...{ value: 'first' }} value="second">
+				Second
+			</option>
 			<option value="other">Other</option>
 		</select>
 	</section>
@@ -225,8 +232,12 @@ export function HostChildrenPropCascades(props) @{
 		<div id="children-spread-spread" {...props.first} {...props.second} />
 		<div id="children-cleared" children="stale" {...props.cleared} />
 		<div id="children-omitted" {...props.first} {...props.omitted} />
-		<div id="children-nested" {...props.nested}>nested</div>
-		<div id="children-nested-null" children="ignored">{null}</div>
+		<div id="children-nested" {...props.nested}>
+			nested
+		</div>
+		<div id="children-nested-null" children="ignored">
+			{null}
+		</div>
 		<div id="children-renderable" {...props.renderable} />
 		<textarea id="textarea-direct-children-prop" value={null} children="direct textarea" />
 		<textarea id="textarea-spread-children-prop" {...props.textarea} />
@@ -244,7 +255,9 @@ export function InputDirectFormCoercionOrder(props) @{
 export function DirectDuplicateAttributes(props) @{
 	<section id="direct-duplicate-attributes">
 		<div id="duplicate-title" title="first" title="second" />
-		<label id="duplicate-alias" htmlFor="first" for="second">label</label>
+		<label id="duplicate-alias" htmlFor="first" for="second">
+			label
+		</label>
 		<div id="duplicate-class" className="first" class="second" />
 		<div id="duplicate-children" children="first" children="second" />
 		<div
@@ -259,7 +272,9 @@ export function DirectDuplicateAttributes(props) @{
 			<option value="second">Second</option>
 		</select>
 		<select id="duplicate-select-value" value="first" value="second">
-			<option value="first" value="second">Second</option>
+			<option value="first" value="second">
+				Second
+			</option>
 			<option value="other">Other</option>
 		</select>
 		<div id="duplicate-dynamic-title" title={props.read('first')} title={props.read('second')} />
@@ -267,25 +282,23 @@ export function DirectDuplicateAttributes(props) @{
 }
 
 export function VoidDynamicNestedChild(props) @{
-	<input id="void-dynamic-nested-child" data-order={props.read('attr')}>{props.read(
-		'child',
-	)}</input>
+	<input id="void-dynamic-nested-child" data-order={props.read('attr')}>
+		{props.read('child')}
+	</input>
 }
 
 export function VoidNullishSideEffect(props) @{
-	<input id="void-nullish-side-effect">
-		{void props.onRun()}
-	</input>
+	<input id="void-nullish-side-effect">{void props.onRun()}</input>
 }
 
 export function VoidWhitespaceOnly() @{
-	<input id="void-whitespace-only">
-		{/* no semantic children */}
-	</input>
+	<input id="void-whitespace-only">{/* no semantic children */}</input>
 }
 
 export function VoidNestedNullWins() @{
-	<input id="void-nested-null-wins" children="ignored">{null}</input>
+	<input id="void-nested-null-wins" children="ignored">
+		{null}
+	</input>
 }
 
 export function VoidDirectDangerSources(props) @{

@@ -10,7 +10,9 @@ export function DocumentReader(props: {
 }) @{
 	const [row, setRow, id] = props.store.useClientDocument(props.table, props.id);
 	props.onSetter(setRow);
-	<div id="document" data-id={id}>{JSON.stringify(row)}</div>
+	<div id="document" data-id={id}>
+		{JSON.stringify(row)}
+	</div>
 }
 
 export function ChainedDocumentReader(props: {
@@ -24,15 +26,20 @@ export function ChainedDocumentReader(props: {
 		props.userId,
 	);
 	const todos = props.store.useQuery(
-		queryDb((get) => {
-			const row = get(rowState$) as { text: string };
-			return tables.todos.where('text', 'LIKE', `%${row.text}%`);
-		}, {
-			label: 'todosFiltered',
-			deps: props.userId,
-		}),
+		queryDb(
+			(get) => {
+				const row = get(rowState$) as { text: string };
+				return tables.todos.where('text', 'LIKE', `%${row.text}%`);
+			},
+			{
+				label: 'todosFiltered',
+				deps: props.userId,
+			},
+		),
 	);
-	<div id="chained" data-count={String(todos.length)}>{JSON.stringify(todos)}</div>
+	<div id="chained" data-count={String(todos.length)}>
+		{JSON.stringify(todos)}
+	</div>
 }
 
 export function KvDocumentReader(props: {
@@ -44,7 +51,9 @@ export function KvDocumentReader(props: {
 	props.onRender?.();
 	const [state, setState, id] = props.store.useClientDocument(tables.kv, props.id);
 	props.onSetter(setState);
-	<div id="kv" data-id={id}>{JSON.stringify(state)}</div>
+	<div id="kv" data-id={id}>
+		{JSON.stringify(state)}
+	</div>
 }
 
 export function SyncReader(props: { store: any }) @{

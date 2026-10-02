@@ -19,13 +19,15 @@ export function Attribution({ proOptions, position = 'bottom-right' }: Attributi
 		return null;
 	}
 
-	return <Panel
-		position={position}
-		className="react-flow__attribution"
-		data-message={`Please only hide this attribution when you are subscribed to React Flow Pro: ${link}`}
-	>
-		<a href={link} target="_blank" rel="noopener noreferrer" aria-label="React Flow attribution">
-			React Flow
-		</a>
-	</Panel>;
+	return (
+		<Panel
+			position={position}
+			className="react-flow__attribution"
+			data-message={`Please only hide this attribution when you are subscribed to React Flow Pro: ${link}`}
+		>
+			<a href={link} target="_blank" rel="noopener noreferrer" aria-label="React Flow attribution">
+				React Flow
+			</a>
+		</Panel>
+	);
 }

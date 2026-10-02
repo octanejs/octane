@@ -28,12 +28,11 @@ export function NodeEventPlugin(props: Props) {
 			editor.update(() => {
 				const nearestNode = $getNearestNodeFromDOMNode(event.target as Node);
 				if (nearestNode !== null) {
-					const targetNode =
-						isCaptured
-							? nearestNode instanceof nodeType
-								? nearestNode
-								: null
-							: $findMatchingParent(nearestNode, (node) => node instanceof nodeType);
+					const targetNode = isCaptured
+						? nearestNode instanceof nodeType
+							? nearestNode
+							: null
+						: $findMatchingParent(nearestNode, (node) => node instanceof nodeType);
 					if (targetNode !== null) {
 						listenerRef.current(event, editor, targetNode.getKey());
 						return;

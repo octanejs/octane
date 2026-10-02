@@ -25,9 +25,7 @@ export function App(props: { onQueryInput: (value: string, event: Event) => void
 
 	<section>
 		<SearchField id="search-query" value={query} onQueryInput={updateQuery} />
-		<p role="status">
-			{query ? 'Searching for: ' + query : 'Type to search'}
-		</p>
+		<p role="status">{query ? 'Searching for: ' + query : 'Type to search'}</p>
 		<button type="button" disabled={query.length === 0} onClick={() => setQuery('')}>
 			Clear search
 		</button>

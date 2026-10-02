@@ -10,13 +10,14 @@ export const getSlotTransform = (
 	slot: ({ value: content, propName, field, isReadOnly }) => {
 		const render = isReadOnly ? renderSlotRender : renderSlotEdit;
 
-		const Slot = (dzProps: DropZoneProps) => render({
-			allow: field?.type === 'slot' ? field.allow : [],
-			disallow: field?.type === 'slot' ? field.disallow : [],
-			...dzProps,
-			zone: propName,
-			content,
-		});
+		const Slot = (dzProps: DropZoneProps) =>
+			render({
+				allow: field?.type === 'slot' ? field.allow : [],
+				disallow: field?.type === 'slot' ? field.disallow : [],
+				...dzProps,
+				zone: propName,
+				content,
+			});
 
 		return Slot;
 	},

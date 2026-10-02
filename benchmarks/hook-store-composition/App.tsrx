@@ -30,7 +30,9 @@ function DirectCallbackRow(props: RowProps) @{
 		data-row-index={String(props.index)}
 		data-generation={String(props.generation)}
 		onClick={callback}
-	>{String(props.value + props.index) as string}</button>
+	>
+		{String(props.value + props.index) as string}
+	</button>
 }
 
 function NestedCallbackRow(props: RowProps) @{
@@ -45,15 +47,17 @@ function NestedCallbackRow(props: RowProps) @{
 		data-row-index={String(props.index)}
 		data-generation={String(props.generation)}
 		onClick={callback}
-	>{String(props.value + props.index) as string}</button>
+	>
+		{String(props.value + props.index) as string}
+	</button>
 }
 
 function RawStoreRow(props: RowProps) @{
 	const read = props.model.rawReaders[props.index];
 	const value = useSyncExternalStore(props.model.api.subscribe, read, read);
-	<output data-row-index={String(props.index)} data-generation={String(props.generation)}>{String(
-		value,
-	) as string}</output>
+	<output data-row-index={String(props.index)} data-generation={String(props.generation)}>
+		{String(value) as string}
+	</output>
 }
 
 function ZustandRow(props: RowProps) @{
@@ -63,16 +67,16 @@ function ZustandRow(props: RowProps) @{
 		selectors[props.index],
 		props.model.equalSelection,
 	);
-	<output data-row-index={String(props.index)} data-generation={String(props.generation)}>{String(
-		selection.value,
-	) as string}</output>
+	<output data-row-index={String(props.index)} data-generation={String(props.generation)}>
+		{String(selection.value) as string}
+	</output>
 }
 
 function MobxRowBody(props: RowProps) @{
 	const selection = props.model.mobxSelections[props.index].get();
-	<output data-row-index={String(props.index)} data-generation={String(props.generation)}>{String(
-		selection.value,
-	) as string}</output>
+	<output data-row-index={String(props.index)} data-generation={String(props.generation)}>
+		{String(selection.value) as string}
+	</output>
 }
 const MobxRow = observer(MobxRowBody);
 
@@ -91,8 +95,12 @@ export function CallbackSiteControl(props: CallbackSiteControlProps) @{
 	const left = useNestedCallback(props.report, 0, props.left, props.dependencies);
 	const right = useNestedCallback(props.report, 1, props.right, props.dependencies);
 	<div data-control-generation={String(props.generation)}>
-		<button type="button" data-control="left" onClick={left}>left</button>
-		<button type="button" data-control="right" onClick={right}>right</button>
+		<button type="button" data-control="left" onClick={left}>
+			left
+		</button>
+		<button type="button" data-control="right" onClick={right}>
+			right
+		</button>
 	</div>
 }
 

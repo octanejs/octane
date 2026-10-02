@@ -31,7 +31,7 @@ export function KeyedRoot(props) @{
 		props.log('Mount');
 		return () => props.log('Unmount');
 	}, []);
-	<span id="keyed-root">{props.text + ':' + initialText as string}</span>
+	<span id="keyed-root">{(props.text + ':' + initialText) as string}</span>
 }
 
 export function EffectUnmountRoot(props) @{

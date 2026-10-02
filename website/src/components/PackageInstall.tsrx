@@ -98,8 +98,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 	// Unique per instance — build-tools renders three of these on one page, so
 	// the tab/panel ids must not collide.
 	const id = useId();
-	const choices: CommandChoice[] =
-		props.command === 'server-entry' ? RUNTIMES : MANAGERS;
+	const choices: CommandChoice[] = props.command === 'server-entry' ? RUNTIMES : MANAGERS;
 	// The component normally defaults to pnpm. A runtime recipe instead falls
 	// back to its first choice (Node) without needing a second stateful widget.
 	const selected = choices.includes(selection) ? selection : choices[0];
@@ -281,7 +280,9 @@ export function PackageInstall(props: PackageInstallProps) @{
 							tabIndex={selected === choice ? 0 : -1}
 							class={['pkg-tab', selected === choice && 'pkg-tab-active']}
 							onClick={() => setSelection(choice)}
-						>{choice as string}</button>
+						>
+							{choice as string}
+						</button>
 					}
 				</div>
 				<button
@@ -295,9 +296,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 						style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
 						aria-hidden="true"
 					></span>
-					<span class="pkg-copy-label">
-						{copied ? 'Copied' : 'Copy'}
-					</span>
+					<span class="pkg-copy-label">{copied ? 'Copied' : 'Copy'}</span>
 				</button>
 			</div>
 			<pre

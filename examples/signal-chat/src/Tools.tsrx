@@ -24,7 +24,9 @@ export function Tools() @{
 				}
 			</ol>
 		} @pending {
-			<p class="placeholder" role="status">Preparing tools…</p>
+			<p class="placeholder" role="status">
+				Preparing tools…
+			</p>
 		} @catch {
 			<p role="alert">Tools failed</p>
 		}

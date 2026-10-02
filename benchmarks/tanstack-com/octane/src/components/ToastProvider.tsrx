@@ -30,21 +30,24 @@ export function ToastProvider({ children }: { children?: any }) {
 
 	const contextValue = useMemo<ToastContextValue>(() => ({ notify }), [notify]);
 
-	return <ToastContext value={contextValue}>
-		{children}
-		<Toaster
-			theme={resolvedTheme}
-			position="bottom-right"
-			swipeDirections={['right']}
-			offset={16}
-			gap={8}
-			toastOptions={{
-				unstyled: true,
-				classNames: {
-					toast: 'relative w-96 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-lg outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-50',
-					content: 'flex items-start gap-2',
-				},
-			}}
-		/>
-	</ToastContext>;
+	return (
+		<ToastContext value={contextValue}>
+			{children}
+			<Toaster
+				theme={resolvedTheme}
+				position="bottom-right"
+				swipeDirections={['right']}
+				offset={16}
+				gap={8}
+				toastOptions={{
+					unstyled: true,
+					classNames: {
+						toast:
+							'relative w-96 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-lg outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-50',
+						content: 'flex items-start gap-2',
+					},
+				}}
+			/>
+		</ToastContext>
+	);
 }

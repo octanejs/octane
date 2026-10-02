@@ -1,34 +1,38 @@
 import { Grid, List, type CellComponentProps, type RowComponentProps } from '@octanejs/window';
 
 function Row({ index, style, ariaAttributes }: RowComponentProps) {
-	return <div
-		{...ariaAttributes}
-		style={{
-			...style,
-			alignItems: 'center',
-			borderBottom: '1px solid var(--border)',
-			display: 'flex',
-			paddingInline: 12,
-		}}
-	>
-		{'Row ' + index}
-	</div>;
+	return (
+		<div
+			{...ariaAttributes}
+			style={{
+				...style,
+				alignItems: 'center',
+				borderBottom: '1px solid var(--border)',
+				display: 'flex',
+				paddingInline: 12,
+			}}
+		>
+			{'Row ' + index}
+		</div>
+	);
 }
 
 function Cell({ columnIndex, rowIndex, style, ariaAttributes }: CellComponentProps) {
-	return <div
-		{...ariaAttributes}
-		style={{
-			...style,
-			alignItems: 'center',
-			borderBottom: '1px solid var(--border)',
-			borderRight: '1px solid var(--border)',
-			display: 'flex',
-			justifyContent: 'center',
-		}}
-	>
-		{rowIndex + ':' + columnIndex}
-	</div>;
+	return (
+		<div
+			{...ariaAttributes}
+			style={{
+				...style,
+				alignItems: 'center',
+				borderBottom: '1px solid var(--border)',
+				borderRight: '1px solid var(--border)',
+				display: 'flex',
+				justifyContent: 'center',
+			}}
+		>
+			{rowIndex + ':' + columnIndex}
+		</div>
+	);
 }
 
 export function ReactWindowDemo() @{

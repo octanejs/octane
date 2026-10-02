@@ -51,12 +51,14 @@ function ActionHydrationSuffix(props: { suspend: boolean; promise: Promise<void>
 	<span>{'Ready'}</span>
 }
 
-export function ActionHydration(props: ActionPresentationProps & {
-	when: HydrationStrategy;
-	suspend: boolean;
-	promise: Promise<void>;
-	onHydrated(): void;
-}) @{
+export function ActionHydration(
+	props: ActionPresentationProps & {
+		when: HydrationStrategy;
+		suspend: boolean;
+		promise: Promise<void>;
+		onHydrated(): void;
+	},
+) @{
 	<Hydrate
 		when={props.when}
 		split={false}
@@ -112,7 +114,9 @@ export function LoginPresentation(props: LoginPresentationProps) @{
 			{props.label as string}
 			<input name="email" type="email" disabled={props.pending} aria-invalid={props.error !== ''} />
 		</label>
-		<p role="status" hidden={props.error === ''}>{props.error as string}</p>
+		<p role="status" hidden={props.error === ''}>
+			{props.error as string}
+		</p>
 		<SubmitButton label={props.submitLabel} disabled={props.pending} pending={props.pending} />
 	</form>
 }
@@ -130,9 +134,10 @@ export interface AttachmentPresentationProps {
 	locked: boolean;
 	onRemove(id: string): void;
 	onRetry(id: string): void;
-	onInput?: | ((element: Element | null) => void | (() => void))
-	| { current: HTMLInputElement | null }
-	| null;
+	onInput?:
+		| ((element: Element | null) => void | (() => void))
+		| { current: HTMLInputElement | null }
+		| null;
 }
 
 export function AttachmentPresentation(props: AttachmentPresentationProps) @{
@@ -184,10 +189,9 @@ export function SafetyPresentation(props: SafetyPresentationProps) @{
 						@if (action.href !== null) {
 							<a href={action.href}>{action.label as string}</a>
 						} @else {
-							<button
-								type="button"
-								onClick={() => props.onAction(action.id)}
-							>{action.label as string}</button>
+							<button type="button" onClick={() => props.onAction(action.id)}>
+								{action.label as string}
+							</button>
 						}
 					}
 				</div>
@@ -198,7 +202,10 @@ export function SafetyPresentation(props: SafetyPresentationProps) @{
 
 export function AdjacentPresentation(props: { first: string; last: string }) @{
 	'use dom bindings';
-	<p>Before {props.first as string}{props.last as string} after</p>
+	<p>
+		Before {props.first as string}
+		{props.last as string} after
+	</p>
 }
 
 export function InlineRefPresentation(props: {
@@ -297,7 +304,9 @@ export function NativeControlHost(props: NativeControlHostProps) @{
 		inert={unbound(props.inert)}
 		ref={unbound(props.onReady)}
 		onKeyDown={unbound(props.onKeyDown)}
-	>{unbound(props.children)}</form>
+	>
+		{unbound(props.children)}
+	</form>
 }
 
 export function NativeControlLayout(
@@ -415,21 +424,20 @@ export function UnmatchedNativeControlSpread({
 	/>
 }
 
-function NativeControlHydrationSuffix(props: {
-	suspend: boolean;
-	promise: Promise<void>;
-}) @{
+function NativeControlHydrationSuffix(props: { suspend: boolean; promise: Promise<void> }) @{
 	if (props.suspend) use(props.promise);
 	<span>{'Ready'}</span>
 }
 
-export function NativeControlHydration(props: NativeControlPresentationProps & {
-	className: string;
-	when: HydrationStrategy;
-	suspend: boolean;
-	promise: Promise<void>;
-	onHydrated(): void;
-}) @{
+export function NativeControlHydration(
+	props: NativeControlPresentationProps & {
+		className: string;
+		when: HydrationStrategy;
+		suspend: boolean;
+		promise: Promise<void>;
+		onHydrated(): void;
+	},
+) @{
 	<Hydrate when={props.when} split={false} onHydrated={props.onHydrated}>
 		<NativeControlHost className={props.className}>
 			<NativeControlPresentation

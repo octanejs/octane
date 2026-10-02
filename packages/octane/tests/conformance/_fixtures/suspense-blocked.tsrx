@@ -63,7 +63,9 @@ export function PendingThrowBubblesUp(props) @{
 export function DeferredWithInitial(props) @{
 	const v = useDeferredValue(props.value, props.initialValue);
 	props.observe(v);
-	<span class="out" data-tag={v.tag}>{v.tag as string}</span>
+	<span class="out" data-tag={v.tag}>
+		{v.tag as string}
+	</span>
 }
 
 // The initialValue→value swap must run at TRANSITION priority (same as the

@@ -24,7 +24,9 @@ export function History() @{
 				}
 			</ul>
 		} @pending {
-			<p class="placeholder" role="status">Loading recent chats…</p>
+			<p class="placeholder" role="status">
+				Loading recent chats…
+			</p>
 		} @catch {
 			<p role="alert">History failed</p>
 		}

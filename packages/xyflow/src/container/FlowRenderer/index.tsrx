@@ -10,28 +10,26 @@ import { Pane } from '../Pane/index.tsrx';
 import { NodesSelection } from '../../components/NodesSelection/index.tsrx';
 import type { ReactFlowState, Node } from '../../types';
 
-export type FlowRendererProps<NodeType extends Node = Node> =
-	Omit<
-		GraphViewProps<NodeType>,
-		| 'snapToGrid'
-		| 'nodeTypes'
-		| 'edgeTypes'
-		| 'snapGrid'
-		| 'connectionLineType'
-		| 'connectionLineContainerStyle'
-		| 'arrowHeadColor'
-		| 'onlyRenderVisibleElements'
-		| 'selectNodesOnDrag'
-		| 'defaultMarkerColor'
-		| 'rfId'
-		| 'nodeClickDistance'
-	> & {
-		isControlledViewport: boolean;
-		children: OctaneNode;
-	};
+export type FlowRendererProps<NodeType extends Node = Node> = Omit<
+	GraphViewProps<NodeType>,
+	| 'snapToGrid'
+	| 'nodeTypes'
+	| 'edgeTypes'
+	| 'snapGrid'
+	| 'connectionLineType'
+	| 'connectionLineContainerStyle'
+	| 'arrowHeadColor'
+	| 'onlyRenderVisibleElements'
+	| 'selectNodesOnDrag'
+	| 'defaultMarkerColor'
+	| 'rfId'
+	| 'nodeClickDistance'
+> & {
+	isControlledViewport: boolean;
+	children: OctaneNode;
+};
 
-const win =
-	typeof window !== 'undefined' ? window : undefined;
+const win = typeof window !== 'undefined' ? window : undefined;
 
 const selector = (s: ReactFlowState) => {
 	return {
@@ -90,55 +88,58 @@ function FlowRendererComponent<NodeType extends Node = Node>({
 
 	useGlobalKeyHandler({ deleteKeyCode, multiSelectionKeyCode });
 
-	return <ZoomPane
-		onPaneContextMenu={onPaneContextMenu}
-		elementsSelectable={elementsSelectable}
-		zoomOnScroll={zoomOnScroll}
-		zoomOnPinch={zoomOnPinch}
-		panOnScroll={panOnScroll}
-		panOnScrollSpeed={panOnScrollSpeed}
-		panOnScrollMode={panOnScrollMode}
-		zoomOnDoubleClick={zoomOnDoubleClick}
-		panOnDrag={!selectionKeyPressed && panOnDrag}
-		defaultViewport={defaultViewport}
-		translateExtent={translateExtent}
-		minZoom={minZoom}
-		maxZoom={maxZoom}
-		zoomActivationKeyCode={zoomActivationKeyCode}
-		preventScrolling={preventScrolling}
-		noWheelClassName={noWheelClassName}
-		noPanClassName={noPanClassName}
-		onViewportChange={onViewportChange}
-		isControlledViewport={isControlledViewport}
-		paneClickDistance={paneClickDistance}
-		selectionOnDrag={_selectionOnDrag}
-	>
-		<Pane
-			onSelectionStart={onSelectionStart}
-			onSelectionEnd={onSelectionEnd}
-			onPaneClick={onPaneClick}
-			onPaneMouseEnter={onPaneMouseEnter}
-			onPaneMouseMove={onPaneMouseMove}
-			onPaneMouseLeave={onPaneMouseLeave}
+	return (
+		<ZoomPane
 			onPaneContextMenu={onPaneContextMenu}
-			onPaneScroll={onPaneScroll}
-			panOnDrag={panOnDrag}
-			autoPanOnSelection={autoPanOnSelection}
-			isSelecting={!!isSelecting}
-			selectionMode={selectionMode}
-			selectionKeyPressed={selectionKeyPressed}
+			elementsSelectable={elementsSelectable}
+			zoomOnScroll={zoomOnScroll}
+			zoomOnPinch={zoomOnPinch}
+			panOnScroll={panOnScroll}
+			panOnScrollSpeed={panOnScrollSpeed}
+			panOnScrollMode={panOnScrollMode}
+			zoomOnDoubleClick={zoomOnDoubleClick}
+			panOnDrag={!selectionKeyPressed && panOnDrag}
+			defaultViewport={defaultViewport}
+			translateExtent={translateExtent}
+			minZoom={minZoom}
+			maxZoom={maxZoom}
+			zoomActivationKeyCode={zoomActivationKeyCode}
+			preventScrolling={preventScrolling}
+			noWheelClassName={noWheelClassName}
+			noPanClassName={noPanClassName}
+			onViewportChange={onViewportChange}
+			isControlledViewport={isControlledViewport}
 			paneClickDistance={paneClickDistance}
 			selectionOnDrag={_selectionOnDrag}
 		>
-			{children}
-			{nodesSelectionActive &&
-				<NodesSelection
-					onSelectionContextMenu={onSelectionContextMenu}
-					noPanClassName={noPanClassName}
-					disableKeyboardA11y={disableKeyboardA11y}
-				/>}
-		</Pane>
-	</ZoomPane>;
+			<Pane
+				onSelectionStart={onSelectionStart}
+				onSelectionEnd={onSelectionEnd}
+				onPaneClick={onPaneClick}
+				onPaneMouseEnter={onPaneMouseEnter}
+				onPaneMouseMove={onPaneMouseMove}
+				onPaneMouseLeave={onPaneMouseLeave}
+				onPaneContextMenu={onPaneContextMenu}
+				onPaneScroll={onPaneScroll}
+				panOnDrag={panOnDrag}
+				autoPanOnSelection={autoPanOnSelection}
+				isSelecting={!!isSelecting}
+				selectionMode={selectionMode}
+				selectionKeyPressed={selectionKeyPressed}
+				paneClickDistance={paneClickDistance}
+				selectionOnDrag={_selectionOnDrag}
+			>
+				{children}
+				{nodesSelectionActive && (
+					<NodesSelection
+						onSelectionContextMenu={onSelectionContextMenu}
+						noPanClassName={noPanClassName}
+						disableKeyboardA11y={disableKeyboardA11y}
+					/>
+				)}
+			</Pane>
+		</ZoomPane>
+	);
 }
 
 FlowRendererComponent.displayName = 'FlowRenderer';

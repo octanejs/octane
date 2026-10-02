@@ -37,31 +37,32 @@ function Comp() {
 	const library = getLibrary(libraryId);
 	const [frameworkOption] = getFrameworkOptions([framework as Framework]);
 
-	return <DocContainer>
-		<div
-			class={twMerge('w-full flex bg-white/70 dark:bg-black/40 mx-auto rounded-xl max-w-[936px]')}
-		>
-			<div class={twMerge('flex overflow-auto flex-col w-full p-4 lg:p-6')}>
-				<DocTitle>
-					TanStack
-					{frameworkOption?.label ?? capitalize(framework)}
-					{' '}
-					{library.name.replace('TanStack ', '')}
-					Documentation
-				</DocTitle>
-				<div class="h-4" />
-				<div class="h-px bg-gray-500 opacity-20" />
-				<div class="h-4" />
-				<div
-					class={twMerge(
-						'prose prose-gray prose-sm prose-p:leading-7 dark:prose-invert max-w-none',
-						'styled-markdown-content',
-					)}
-				>
-					Use the menu to select a documentation page.
+	return (
+		<DocContainer>
+			<div
+				class={twMerge('w-full flex bg-white/70 dark:bg-black/40 mx-auto rounded-xl max-w-[936px]')}
+			>
+				<div class={twMerge('flex overflow-auto flex-col w-full p-4 lg:p-6')}>
+					<DocTitle>
+						TanStack
+						{frameworkOption?.label ?? capitalize(framework)}{' '}
+						{library.name.replace('TanStack ', '')}
+						Documentation
+					</DocTitle>
+					<div class="h-4" />
+					<div class="h-px bg-gray-500 opacity-20" />
+					<div class="h-4" />
+					<div
+						class={twMerge(
+							'prose prose-gray prose-sm prose-p:leading-7 dark:prose-invert max-w-none',
+							'styled-markdown-content',
+						)}
+					>
+						Use the menu to select a documentation page.
+					</div>
+					<div class="h-24" />
 				</div>
-				<div class="h-24" />
 			</div>
-		</div>
-	</DocContainer>;
+		</DocContainer>
+	);
 }

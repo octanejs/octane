@@ -17,11 +17,11 @@ import type { NodeToolbarProps } from './types';
 
 const nodeEqualityFn = (a?: InternalNode, b?: InternalNode) =>
 	a?.internals.positionAbsolute.x !== b?.internals.positionAbsolute.x ||
-		a?.internals.positionAbsolute.y !== b?.internals.positionAbsolute.y ||
-		a?.measured.width !== b?.measured.width ||
-		a?.measured.height !== b?.measured.height ||
-		a?.selected !== b?.selected ||
-		a?.internals.z !== b?.internals.z;
+	a?.internals.positionAbsolute.y !== b?.internals.positionAbsolute.y ||
+	a?.measured.width !== b?.measured.width ||
+	a?.measured.height !== b?.measured.height ||
+	a?.selected !== b?.selected ||
+	a?.internals.z !== b?.internals.z;
 
 const nodesEqualityFn = (a: NodeLookup, b: NodeLookup) => {
 	if (a.size !== b.size) {
@@ -92,19 +92,22 @@ export function NodeToolbar({
 }: NodeToolbarProps) {
 	const contextNodeId = useNodeId();
 
-	const nodesSelector = useCallback((state: ReactFlowState): NodeLookup => {
-		const nodeIds = Array.isArray(nodeId) ? nodeId : [nodeId || contextNodeId || ''];
-		const internalNodes = nodeIds.reduce<NodeLookup>((res, id) => {
-			const node = state.nodeLookup.get(id);
-			if (node) {
-				res.set(node.id, node);
-			}
+	const nodesSelector = useCallback(
+		(state: ReactFlowState): NodeLookup => {
+			const nodeIds = Array.isArray(nodeId) ? nodeId : [nodeId || contextNodeId || ''];
+			const internalNodes = nodeIds.reduce<NodeLookup>((res, id) => {
+				const node = state.nodeLookup.get(id);
+				if (node) {
+					res.set(node.id, node);
+				}
 
-			return res;
-		}, new Map());
+				return res;
+			}, new Map());
 
-		return internalNodes;
-	}, [nodeId, contextNodeId]);
+			return internalNodes;
+		},
+		[nodeId, contextNodeId],
+	);
 	const nodes = useStore(nodesSelector, nodesEqualityFn);
 	const { x, y, zoom, selectedNodesCount } = useStore(storeSelector, shallow);
 
@@ -129,13 +132,17 @@ export function NodeToolbar({
 		...style,
 	};
 
-	return <NodeToolbarPortal>
-		<div
-			style={wrapperStyle}
-			className={cc(['react-flow__node-toolbar', className])}
-			{...rest}
-			// @todo: check if we could only do this for non-prod envs
-			data-id={nodesArray.reduce((acc, node) => `${acc}${node.id} `, '').trim()}
-		>{children}</div>
-	</NodeToolbarPortal>;
+	return (
+		<NodeToolbarPortal>
+			<div
+				style={wrapperStyle}
+				className={cc(['react-flow__node-toolbar', className])}
+				{...rest}
+				// @todo: check if we could only do this for non-prod envs
+				data-id={nodesArray.reduce((acc, node) => `${acc}${node.id} `, '').trim()}
+			>
+				{children}
+			</div>
+		</NodeToolbarPortal>
+	);
 }

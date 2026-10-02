@@ -27,31 +27,31 @@ export function MenuBar<UserData extends Data>({
 	const hasFuture = useAppStore((s) => s.history.hasFuture());
 	const hasPast = useAppStore((s) => s.history.hasPast());
 
-	return <div
-		className={getClassName({ menuOpen })}
-		onClick={(event) => {
-			const element = event.target as HTMLElement;
+	return (
+		<div
+			className={getClassName({ menuOpen })}
+			onClick={(event) => {
+				const element = event.target as HTMLElement;
 
-			if (window.matchMedia('(min-width: 638px)').matches) {
-				return;
-			}
-			if (element.tagName === 'A' && element.getAttribute('href')?.startsWith('#')) {
-				setMenuOpen(false);
-			}
-		}}
-	>
-		<div className={getClassName('inner')}>
-			<div className={getClassName('history')}>
-				<IconButton type="button" title="undo" disabled={!hasPast} onClick={back}>
-					<Undo2Icon size={21} />
-				</IconButton>
-				<IconButton type="button" title="redo" disabled={!hasFuture} onClick={forward}>
-					<Redo2Icon size={21} />
-				</IconButton>
+				if (window.matchMedia('(min-width: 638px)').matches) {
+					return;
+				}
+				if (element.tagName === 'A' && element.getAttribute('href')?.startsWith('#')) {
+					setMenuOpen(false);
+				}
+			}}
+		>
+			<div className={getClassName('inner')}>
+				<div className={getClassName('history')}>
+					<IconButton type="button" title="undo" disabled={!hasPast} onClick={back}>
+						<Undo2Icon size={21} />
+					</IconButton>
+					<IconButton type="button" title="redo" disabled={!hasFuture} onClick={forward}>
+						<Redo2Icon size={21} />
+					</IconButton>
+				</div>
+				<>{renderHeaderActions && renderHeaderActions()}</>
 			</div>
-			<>
-				{renderHeaderActions && renderHeaderActions()}
-			</>
 		</div>
-	</div>;
+	);
 }

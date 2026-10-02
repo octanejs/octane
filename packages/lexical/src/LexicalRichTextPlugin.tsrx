@@ -11,11 +11,10 @@ import type { OctaneNode } from 'octane';
 
 // Octane analog of @lexical/react's ErrorBoundaryType (a component taking the
 // decorator subtree plus an onError callback).
-type ErrorBoundaryType =
-	(props: {
-		children: OctaneNode;
-		onError: (error: Error) => void;
-	}) => OctaneNode;
+type ErrorBoundaryType = (props: {
+	children: OctaneNode;
+	onError: (error: Error) => void;
+}) => OctaneNode;
 
 type Props = {
 	contentEditable: OctaneNode;

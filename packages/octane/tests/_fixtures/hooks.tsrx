@@ -20,8 +20,12 @@ export function TwoStates() @{
 	const [a, setA] = octaneUseState(1);
 	const [b, setB] = octaneUseState(10);
 	<div>
-		<button id="a" onClick={() => setA(a + 1)}>{a as string}</button>
-		<button id="b" onClick={() => setB(b + 2)}>{b as string}</button>
+		<button id="a" onClick={() => setA(a + 1)}>
+			{a as string}
+		</button>
+		<button id="b" onClick={() => setB(b + 2)}>
+			{b as string}
+		</button>
 	</div>
 }
 
@@ -157,7 +161,9 @@ export function RefTest() @{
 			ref.current++;
 			setTick(tick + 1);
 		}}
-	>{ref.current as string}</button>
+	>
+		{ref.current as string}
+	</button>
 }
 
 // useEffect — fires after commit; cleanup on unmount

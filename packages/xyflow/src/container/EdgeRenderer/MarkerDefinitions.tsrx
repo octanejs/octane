@@ -25,19 +25,21 @@ const Marker = ({
 		return null;
 	}
 
-	return <marker
-		className="react-flow__arrowhead"
-		id={id}
-		markerWidth={`${width}`}
-		markerHeight={`${height}`}
-		viewBox="-10 -10 20 20"
-		markerUnits={markerUnits}
-		orient={orient}
-		refX="0"
-		refY="0"
-	>
-		<Symbol color={color} strokeWidth={strokeWidth} />
-	</marker>;
+	return (
+		<marker
+			className="react-flow__arrowhead"
+			id={id}
+			markerWidth={`${width}`}
+			markerHeight={`${height}`}
+			viewBox="-10 -10 20 20"
+			markerUnits={markerUnits}
+			orient={orient}
+			refX="0"
+			refY="0"
+		>
+			<Symbol color={color} strokeWidth={strokeWidth} />
+		</marker>
+	);
 };
 
 /*
@@ -64,22 +66,25 @@ const MarkerDefinitions = ({ defaultColor, rfId }: MarkerDefinitionsProps) => {
 		return null;
 	}
 
-	return <svg className="react-flow__marker" aria-hidden="true">
-		<defs>{markers.map(
-			(marker: MarkerProps) =>
-				<Marker
-					id={marker.id}
-					key={marker.id}
-					type={marker.type}
-					color={marker.color}
-					width={marker.width}
-					height={marker.height}
-					markerUnits={marker.markerUnits}
-					strokeWidth={marker.strokeWidth}
-					orient={marker.orient}
-				/>,
-		)}</defs>
-	</svg>;
+	return (
+		<svg className="react-flow__marker" aria-hidden="true">
+			<defs>
+				{markers.map((marker: MarkerProps) => (
+					<Marker
+						id={marker.id}
+						key={marker.id}
+						type={marker.type}
+						color={marker.color}
+						width={marker.width}
+						height={marker.height}
+						markerUnits={marker.markerUnits}
+						strokeWidth={marker.strokeWidth}
+						orient={marker.orient}
+					/>
+				))}
+			</defs>
+		</svg>
+	);
 };
 
 MarkerDefinitions.displayName = 'MarkerDefinitions';

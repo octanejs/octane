@@ -36,9 +36,7 @@ export function TernaryPortal(props) @{
 
 // 3. createPortal at a FRAGMENT root.
 export function FragmentPortal(props) @{
-	<>
-		{createPortal(ModalBody, props.target, { label: 'fragment' })}
-	</>
+	<>{createPortal(ModalBody, props.target, { label: 'fragment' })}</>
 }
 
 // 4. Context flows through a value-position portal.
@@ -80,9 +78,15 @@ function Flipper(props) {
 export function FlipApp(props) @{
 	const [mode, setMode] = useState('solo');
 	<div class="root">
-		<button class="b-solo" onClick={() => setMode('solo')}>{'solo'}</button>
-		<button class="b-null" onClick={() => setMode('null')}>{'null'}</button>
-		<button class="b-portal" onClick={() => setMode('portal')}>{'portal'}</button>
+		<button class="b-solo" onClick={() => setMode('solo')}>
+			{'solo'}
+		</button>
+		<button class="b-null" onClick={() => setMode('null')}>
+			{'null'}
+		</button>
+		<button class="b-portal" onClick={() => setMode('portal')}>
+			{'portal'}
+		</button>
 		<Flipper mode={mode} target={props.target} />
 	</div>
 }
@@ -99,7 +103,9 @@ const PortalIndirection = memo(PortalIndirectionImpl);
 export function MemoPortalApp(props) @{
 	const [theme, setTheme] = useState('light');
 	<div class="root">
-		<button class="b-dark" onClick={() => setTheme('dark')}>{'dark'}</button>
+		<button class="b-dark" onClick={() => setTheme('dark')}>
+			{'dark'}
+		</button>
 		<Theme value={theme}>
 			<PortalIndirection target={props.target} />
 		</Theme>
@@ -110,15 +116,15 @@ export function MemoPortalApp(props) @{
 //    flips between a createPortal descriptor and a plain string: the flip must route
 //    through the full childSlot classifier so the portal is torn down.
 function ValueHole(props) @{
-	<>
-		{props.value}
-	</>
+	<>{props.value}</>
 }
 
 export function TextPortalFlip(props) @{
 	const [showPortal, setShowPortal] = useState(true);
 	<div class="root">
-		<button class="b-flip" onClick={() => setShowPortal(!showPortal)}>{'flip'}</button>
+		<button class="b-flip" onClick={() => setShowPortal(!showPortal)}>
+			{'flip'}
+		</button>
 		<ValueHole
 			value={showPortal ? createPortal(ModalBody, props.target, { label: 'text-flip' }) : 'plain'}
 		/>

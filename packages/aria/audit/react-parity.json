@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -312,47 +312,47 @@
         {
           "path": "packages/aria/tests/_fixtures/aria-diff.tsrx",
           "role": "support",
-          "sha256": "6399e154bb37e27b1d6792fd4e6fe72619521613fbf61a1425654f08a17d08a0"
+          "sha256": "80fe799f0ffcfa04d8236101f34b93ae475239d5e757a4f4a435fae3fd727307"
         },
         {
           "path": "packages/aria/tests/_fixtures/aria-diff-leaf.tsrx",
           "role": "support",
-          "sha256": "2d7fc4e5c991f47102ca94c9ed1b87862fac29e7418b05f7af52c3dec6a11682"
+          "sha256": "e618c828180030170eb2c29c59a70294acd69a7c14cff1d0d5ed20b5b732743a"
         },
         {
           "path": "packages/aria/tests/_fixtures/aria-diff-tabs.tsrx",
           "role": "support",
-          "sha256": "916650dcdc3ecbe6e96c0d5ba63ac615c14adb6b0f384d5c7cdc30a21bde4375"
+          "sha256": "2d3f9f70bfaee7e9b01b0e9c2fd40b023ae6b0a9c1feed736787e84f894c8166"
         },
         {
           "path": "packages/aria/tests/_fixtures/aria-diff-listbox.tsrx",
           "role": "support",
-          "sha256": "2ca83d65dee60cd9afade57eb4939a2cfd3719d4824b7b3006de66bc88d3fc73"
+          "sha256": "e02ff8737b771eb89e8d4a006fbe85bcfc6241e9391b3c6f68be52babfe75471"
         },
         {
           "path": "packages/aria/tests/_fixtures/aria-diff-select.tsrx",
           "role": "support",
-          "sha256": "2dff71cba4187e77cc3acb42f56807278e980f72410d32d0f58e95bba73d5614"
+          "sha256": "849a9a8e5cb255ffa1c4d8812c48bab5b19158261d8c86278c5ba90b5100bd5c"
         },
         {
           "path": "packages/aria/tests/_fixtures/aria-diff-combobox.tsrx",
           "role": "support",
-          "sha256": "13952001ee78ec2936510b80f9863d74d93b33f86b3d665278298ca7630a109d"
+          "sha256": "3def66ac72e4fe6d2c26c7f36a38dce3fab58ad2e822efde25dad078732c6f97"
         },
         {
           "path": "packages/aria/tests/_fixtures/aria-diff-rac.tsrx",
           "role": "support",
-          "sha256": "b9702f95ac3d3f72a13828c6a718f85d2ac51c16ca1c837467836bb0a6e9598e"
+          "sha256": "3741801978162895997b5be49c8c4f15feb731552a21e46003f9c1ded2794b00"
         },
         {
           "path": "packages/aria/tests/_fixtures/aria-diff-rac-collections.tsrx",
           "role": "support",
-          "sha256": "91228f1282ae8e409299504653751e7f8c403d18620d9ed803a0a994090f9b08"
+          "sha256": "ec6cbadf9d05486d2468ac59fc011a64e435dec4517c50cb7a902c6997e0f25b"
         },
         {
           "path": "packages/aria/tests/_fixtures/aria-diff-tree-table.tsrx",
           "role": "support",
-          "sha256": "aac296ea6fe592c3c69822aad592d209085b577d64f5df485da5b6b1dd5e7344"
+          "sha256": "6df69ca48d44b441c76d318fea6bd0004113c8141db8ceb6880cc37bfbb2f62e"
         },
         {
           "path": "packages/aria/tests/differential/parity-120.test.ts",
@@ -374,7 +374,7 @@
         {
           "path": "packages/aria/tests/_fixtures/aria-120.tsrx",
           "role": "support",
-          "sha256": "7618c849315ed83fabc4d7e7850fb9f3826551f3c23dc0c35f9e013f661d48b8"
+          "sha256": "c7581347131e33bfb80989584455180b2425005a4c3e80d82e95d395b7fea7cb"
         }
       ]
     },

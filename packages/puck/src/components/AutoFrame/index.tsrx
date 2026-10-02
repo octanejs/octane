@@ -10,7 +10,8 @@ import hash from 'object-hash';
 import { createPortal } from 'octane';
 
 const styleSelector = 'style, link[rel="stylesheet"]';
-const frameHtml = '<!DOCTYPE html><html><head></head><body><div id="frame-root" data-puck-entry></div></body></html>';
+const frameHtml =
+	'<!DOCTYPE html><html><head></head><body><div id="frame-root" data-puck-entry></div></body></html>';
 
 const collectStyles = (doc: Document) => {
 	const collected: HTMLElement[] = [];
@@ -81,9 +82,8 @@ const CopyHostStyles = ({
 		let elements: { original: HTMLElement; mirror: HTMLElement }[] = [];
 		const hashes: Record<string, boolean> = {};
 
-		const lookupEl = (el: HTMLElement) => elements.findIndex(
-			(elementMap) => elementMap.original === el,
-		);
+		const lookupEl = (el: HTMLElement) =>
+			elements.findIndex((elementMap) => elementMap.original === el);
 
 		const mirrorEl = async (el: HTMLElement, inlineStyles = false) => {
 			let mirror: HTMLStyleElement;
@@ -131,9 +131,8 @@ const CopyHostStyles = ({
 		const addEl = async (el: HTMLElement) => {
 			const index = lookupEl(el);
 			if (index > -1) {
-				if (debug) console.log(
-					`Tried to add an element that was already mirrored. Updating instead...`,
-				);
+				if (debug)
+					console.log(`Tried to add an element that was already mirrored. Updating instead...`);
 
 				elements[index].mirror.innerText = el.innerText;
 
@@ -149,9 +148,8 @@ const CopyHostStyles = ({
 			const elHash = hash(mirror.outerHTML);
 
 			if (hashes[elHash]) {
-				if (debug) console.log(
-					`iframe already contains element that is being mirrored. Skipping...`,
-				);
+				if (debug)
+					console.log(`iframe already contains element that is being mirrored. Skipping...`);
 
 				return;
 			}
@@ -186,7 +184,7 @@ const CopyHostStyles = ({
 					mutation.addedNodes.forEach((node) => {
 						if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
 							const el =
-								node.nodeType === Node.TEXT_NODE ? node.parentElement : node as HTMLElement;
+								node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement);
 
 							if (el && el.matches(styleSelector)) {
 								defer(() => addEl(el));
@@ -197,7 +195,7 @@ const CopyHostStyles = ({
 					mutation.removedNodes.forEach((node) => {
 						if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
 							const el =
-								node.nodeType === Node.TEXT_NODE ? node.parentElement : node as HTMLElement;
+								node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement);
 
 							if (el && el.matches(styleSelector)) {
 								defer(() => removeEl(el));
@@ -284,9 +282,7 @@ const CopyHostStyles = ({
 		};
 	}, []);
 
-	return <>
-		{children}
-	</>;
+	return <>{children}</>;
 };
 
 export type AutoFrameProps = {
@@ -344,24 +340,26 @@ function AutoFrame({
 		}
 	}, [frameRef, loaded, stylesLoaded]);
 
-	return <iframe
-		{...props}
-		className={className}
-		id={id}
-		srcDoc={frameHtml}
-		ref={frameRef}
-		onLoad={() => {
-			setLoaded(true);
-		}}
-	>
-		<AutoFrameContextProvider value={ctx}>
-			{loaded && mountTarget &&
-				<CopyHostStyles debug={debug} onStylesLoaded={() => setStylesLoaded(true)}>{createPortal(
-					children,
-					mountTarget,
-				)}</CopyHostStyles>}
-		</AutoFrameContextProvider>
-	</iframe>;
+	return (
+		<iframe
+			{...props}
+			className={className}
+			id={id}
+			srcDoc={frameHtml}
+			ref={frameRef}
+			onLoad={() => {
+				setLoaded(true);
+			}}
+		>
+			<AutoFrameContextProvider value={ctx}>
+				{loaded && mountTarget && (
+					<CopyHostStyles debug={debug} onStylesLoaded={() => setStylesLoaded(true)}>
+						{createPortal(children, mountTarget)}
+					</CopyHostStyles>
+				)}
+			</AutoFrameContextProvider>
+		</iframe>
+	);
 }
 
 AutoFrame.displayName = 'AutoFrame';

@@ -40,12 +40,10 @@ function matches(demo: Demo, query: string): boolean {
 
 /** Groups with their non-matching demos removed, and empty groups dropped. */
 function visibleGroups(query: string): DemoGroup[] {
-	return GROUPS.map(
-		(group) => ({
-			...group,
-			demos: group.demos.filter((demo) => matches(demo, query)),
-		}),
-	).filter((group) => group.demos.length > 0);
+	return GROUPS.map((group) => ({
+		...group,
+		demos: group.demos.filter((demo) => matches(demo, query)),
+	})).filter((group) => group.demos.length > 0);
 }
 
 export function DemoNav(props: DemoNavProps) @{

@@ -48,31 +48,39 @@ export function Avatar({
 	const { container, text } = sizeClasses[size];
 
 	if (displayImage) {
-		return <img
-			src={displayImage}
-			alt={name || email || 'User avatar'}
-			class={twMerge(container, 'rounded-full object-cover', className)}
-		/>;
+		return (
+			<img
+				src={displayImage}
+				alt={name || email || 'User avatar'}
+				class={twMerge(container, 'rounded-full object-cover', className)}
+			/>
+		);
 	}
 
 	if (initials) {
-		return <div
-			class={twMerge(
-				container,
-				text,
-				'rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center font-medium text-gray-600 dark:text-gray-300',
-				className,
-			)}
-		>{initials}</div>;
+		return (
+			<div
+				class={twMerge(
+					container,
+					text,
+					'rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center font-medium text-gray-600 dark:text-gray-300',
+					className,
+				)}
+			>
+				{initials}
+			</div>
+		);
 	}
 
-	return <div
-		class={twMerge(
-			container,
-			'rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400',
-			className,
-		)}
-	>
-		<User className="w-1/2 h-1/2" />
-	</div>;
+	return (
+		<div
+			class={twMerge(
+				container,
+				'rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400',
+				className,
+			)}
+		>
+			<User className="w-1/2 h-1/2" />
+		</div>
+	);
 }

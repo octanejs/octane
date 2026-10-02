@@ -69,7 +69,9 @@ export function TextArea(props) @{
 // prop); the static `selected` attribute is the native default.
 export function Select(props) @{
 	<select id="fi">
-		<option value="Hello" selected>Hello</option>
+		<option value="Hello" selected>
+			Hello
+		</option>
 		<option value="Goodbye">Goodbye</option>
 	</select>
 }

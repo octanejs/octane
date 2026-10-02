@@ -60,7 +60,9 @@ function ListBoundary({ label }: { label: string }) @{
 		},
 	});
 
-	<div data-list={label} ref={setElement} role="list">{row}</div>
+	<div data-list={label} ref={setElement} role="list">
+		{row}
+	</div>
 }
 
 export function BoundaryFixture() @{

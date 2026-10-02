@@ -57,7 +57,8 @@ export function TooltipContent({
 				children,
 				createElement(TooltipPrimitive.Arrow, {
 					key: 'arrow',
-					className: 'z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground',
+					className:
+						'z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground',
 				}),
 			],
 		}),

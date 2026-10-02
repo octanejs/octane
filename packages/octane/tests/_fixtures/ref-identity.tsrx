@@ -3,5 +3,7 @@
 // prior ref is detached (cleanup-return, or called with null) before the new
 // one attaches.
 export function IdentityRef(props) @{
-	<div id="host" ref={props.pick}>{'x'}</div>
+	<div id="host" ref={props.pick}>
+		{'x'}
+	</div>
 }

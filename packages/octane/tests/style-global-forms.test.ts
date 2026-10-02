@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DIAGNOSTIC_CODES } from '@tsrx/core/diagnostics';
 import { compile } from 'octane/compiler';
 
 // The `:global(…)` forms the Styling docs promise, pinned as compiled output
@@ -103,7 +104,7 @@ export function Card() @{
 `;
 			expect(() =>
 				compile(source, 'style-global-middle.tsrx', { ...COMPILE_OPTIONS, mode }),
-			).toThrow(expect.objectContaining({ code: 'tsrx-css-global-placement' }));
+			).toThrow(expect.objectContaining({ code: DIAGNOSTIC_CODES.CSS_GLOBAL_PLACEMENT }));
 		},
 	);
 });

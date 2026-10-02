@@ -29,22 +29,24 @@ function ColorPickerRoot({
 	onChange,
 	onChangeEnd,
 }: RootProps) {
-	return <div
-		{...hostProps}
-		ref={[hostProps.ref ?? null, nodeRef]}
-		class={['react-colorful', className, classValue]}
-	>
-		<Saturation hsva={hsva} onChange={onChange} onChangeEnd={onChangeEnd} />
-		<Hue
-			hue={hsva.h}
-			onChange={onChange}
-			onChangeEnd={onChangeEnd}
-			className="react-colorful__last-control"
-		/>
-	</div>;
+	return (
+		<div
+			{...hostProps}
+			ref={[hostProps.ref ?? null, nodeRef]}
+			class={['react-colorful', className, classValue]}
+		>
+			<Saturation hsva={hsva} onChange={onChange} onChangeEnd={onChangeEnd} />
+			<Hue
+				hue={hsva.h}
+				onChange={onChange}
+				onChangeEnd={onChangeEnd}
+				className="react-colorful__last-control"
+			/>
+		</div>
+	);
 }
 
-export const ColorPicker = <T extends AnyColor,>({
+export const ColorPicker = <T extends AnyColor>({
 	class: classValue,
 	className,
 	colorModel,
@@ -61,13 +63,15 @@ export const ColorPicker = <T extends AnyColor,>({
 		onChange,
 		onChangeEnd,
 	);
-	return <ColorPickerRoot
-		hostProps={rest}
-		nodeRef={nodeRef}
-		className={className}
-		classValue={classValue}
-		hsva={hsva}
-		onChange={updateHsva}
-		onChangeEnd={commitChange}
-	/>;
+	return (
+		<ColorPickerRoot
+			hostProps={rest}
+			nodeRef={nodeRef}
+			className={className}
+			classValue={classValue}
+			hsva={hsva}
+			onChange={updateHsva}
+			onChangeEnd={commitChange}
+		/>
+	);
 };

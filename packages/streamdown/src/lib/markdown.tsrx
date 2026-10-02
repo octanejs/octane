@@ -17,24 +17,29 @@ export interface ExtraProps {
 	node?: Element | undefined;
 }
 
-export type AllowElement =
-	(element: Readonly<Element>, index: number, parent: Readonly<Parents> | undefined) => | boolean
-	| null
-	| undefined;
+export type AllowElement = (
+	element: Readonly<Element>,
+	index: number,
+	parent: Readonly<Parents> | undefined,
+) => boolean | null | undefined;
 
-export type UrlTransform =
-	(url: string, key: string, node: Readonly<Element>) => string | null | undefined;
+export type UrlTransform = (
+	url: string,
+	key: string,
+	node: Readonly<Element>,
+) => string | null | undefined;
 
-export type Components =
-	{ [Key in keyof Octane.JSX.IntrinsicElements]?: | ComponentBody<
-			Octane.JSX.IntrinsicElements[Key] & ExtraProps
-	  >
-	| keyof Octane.JSX.IntrinsicElements } & {
-		inlineCode?: ComponentBody<ComponentProps<'code'> & ExtraProps>;
-		[key: string]: | ComponentBody<Record<string, unknown> & ExtraProps>
+export type Components = {
+	[Key in keyof Octane.JSX.IntrinsicElements]?:
+		| ComponentBody<Octane.JSX.IntrinsicElements[Key] & ExtraProps>
+		| keyof Octane.JSX.IntrinsicElements;
+} & {
+	inlineCode?: ComponentBody<ComponentProps<'code'> & ExtraProps>;
+	[key: string]:
+		| ComponentBody<Record<string, unknown> & ExtraProps>
 		| keyof Octane.JSX.IntrinsicElements
 		| undefined;
-	};
+};
 
 export interface Options {
 	allowElement?: AllowElement;
@@ -129,8 +134,7 @@ class ProcessorCache {
 
 		const rehypeKey = serializePlugins(rehypePlugins);
 		const remarkKey = serializePlugins(remarkPlugins);
-		const optionsKey =
-			remarkRehypeOptions ? JSON.stringify(remarkRehypeOptions) : '';
+		const optionsKey = remarkRehypeOptions ? JSON.stringify(remarkRehypeOptions) : '';
 
 		const key = `${remarkKey}::${rehypeKey}::${optionsKey}`;
 
@@ -199,9 +203,10 @@ const getCachedProcessor = (options: Readonly<Options>) => {
 	return processor;
 };
 
-const hasRehypeRaw = (plugins: PluggableList): boolean => plugins.some(
-	(plugin) => Array.isArray(plugin) ? plugin[0] === rehypeRaw : plugin === rehypeRaw,
-);
+const hasRehypeRaw = (plugins: PluggableList): boolean =>
+	plugins.some((plugin) =>
+		Array.isArray(plugin) ? plugin[0] === rehypeRaw : plugin === rehypeRaw,
+	);
 
 const createProcessor = (options: Readonly<Options>) => {
 	const rehypePlugins = options.rehypePlugins || EMPTY_PLUGINS;
@@ -217,10 +222,11 @@ const createProcessor = (options: Readonly<Options>) => {
 		? { ...DEFAULT_REMARK_REHYPE_OPTIONS, ...options.remarkRehypeOptions }
 		: DEFAULT_REMARK_REHYPE_OPTIONS;
 
-	return unified().use(remarkParse).use(finalRemarkPlugins).use(
-		remarkRehype,
-		remarkRehypeOptions,
-	).use(rehypePlugins);
+	return unified()
+		.use(remarkParse)
+		.use(finalRemarkPlugins)
+		.use(remarkRehype, remarkRehypeOptions)
+		.use(rehypePlugins);
 };
 
 export const defaultUrlTransform: UrlTransform = (value) => value;

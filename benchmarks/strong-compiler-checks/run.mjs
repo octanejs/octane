@@ -113,7 +113,6 @@ function dependencies(root) {
 		[
 			'@tsrx/core',
 			'@tsrx/oxc/tsrx-core-compat',
-			'entities',
 			'esrap',
 			'esrap/languages/tsx',
 			'esbuild',

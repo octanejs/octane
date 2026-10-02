@@ -40,8 +40,7 @@ export function Composer() @{
 			/>
 			<div class="composer-actions">
 				<span>
-					<output data-draft-length>{draftLength$}</output>
-					/ 4000
+					<output data-draft-length>{draftLength$}</output>/ 4000
 				</span>
 				<button class="primary" type="submit">
 					Send message
@@ -50,11 +49,21 @@ export function Composer() @{
 			</div>
 		</form>
 		<div class="transport-actions">
-			<button type="button" onClick={stopResponse}>Stop response</button>
-			<button type="button" onClick={resumeResponse}>Resume response</button>
-			<button type="button" onClick={() => answer$.refetch()}>Refresh response</button>
-			<button type="button" onClick={() => answer$.reset()}>Reset response</button>
-			<output class="activity" data-answer-state aria-live="polite">{answerActivity$}</output>
+			<button type="button" onClick={stopResponse}>
+				Stop response
+			</button>
+			<button type="button" onClick={resumeResponse}>
+				Resume response
+			</button>
+			<button type="button" onClick={() => answer$.refetch()}>
+				Refresh response
+			</button>
+			<button type="button" onClick={() => answer$.reset()}>
+				Reset response
+			</button>
+			<output class="activity" data-answer-state aria-live="polite">
+				{answerActivity$}
+			</output>
 		</div>
 	</section>
 }

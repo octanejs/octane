@@ -11,7 +11,9 @@ function CounterBody(props: { store: Store; rendered: () => void }) @{
 	props.rendered();
 	<div>
 		<span id="count">{props.store.count as string}</span>
-		<button id="increment" onClick={() => props.store.count++}>increment</button>
+		<button id="increment" onClick={() => props.store.count++}>
+			increment
+		</button>
 	</div>
 }
 export const Counter = observer(CounterBody);
@@ -25,28 +27,27 @@ function SwitchingValueBody(props: { store: Store }) @{
 	const [other, setOther] = useState(false);
 	<div>
 		<span id="selected">{(other ? props.store.other : props.store.count) as string}</span>
-		<button id="switch" onClick={() => setOther(true)}>switch</button>
+		<button id="switch" onClick={() => setOther(true)}>
+			switch
+		</button>
 	</div>
 }
 export const SwitchingValue = observer(SwitchingValueBody);
 
 function LocalObservableBody() @{
-	const store = useLocalObservable(
-		() => ({
-			count: 0,
-			increment() {
-				this.count++;
-			},
-		}),
-	);
-	<button id="local" onClick={store.increment}>{store.count as string}</button>
+	const store = useLocalObservable(() => ({
+		count: 0,
+		increment() {
+			this.count++;
+		},
+	}));
+	<button id="local" onClick={store.increment}>
+		{store.count as string}
+	</button>
 }
 export const LocalObservable = observer(LocalObservableBody);
 
-function TwoCountersBody(props: {
-	left: Store;
-	right: Store;
-}) @{
+function TwoCountersBody(props: { left: Store; right: Store }) @{
 	<div>
 		<span id="left">{props.left.count as string}</span>
 		<span id="right">{props.right.count as string}</span>

@@ -17,31 +17,43 @@ export function RootLayout() @{
 			<div data-testid="progress" {...stylex.props(styles.progress)} />
 		}
 		<header {...stylex.props(styles.header)}>
-			<Link to="/" data-testid="nav-logo" {...stylex.props(styles.logoBox)}>{'Y'}</Link>
-			<Link to="/" data-testid="nav-home" {...stylex.props(styles.logo)}>{'Hacker News'}</Link>
+			<Link to="/" data-testid="nav-logo" {...stylex.props(styles.logoBox)}>
+				{'Y'}
+			</Link>
+			<Link to="/" data-testid="nav-home" {...stylex.props(styles.logo)}>
+				{'Hacker News'}
+			</Link>
 			<Link
 				to="/newest"
 				data-testid="nav-new"
 				{...stylex.props(pathname === '/newest' ? styles.headerLinkActive : styles.headerLink)}
-			>{'new'}</Link>
+			>
+				{'new'}
+			</Link>
 			<span {...stylex.props(styles.headerSep)}>{'|'}</span>
 			<Link
 				to="/ask"
 				data-testid="nav-ask"
 				{...stylex.props(pathname === '/ask' ? styles.headerLinkActive : styles.headerLink)}
-			>{'ask'}</Link>
+			>
+				{'ask'}
+			</Link>
 			<span {...stylex.props(styles.headerSep)}>{'|'}</span>
 			<Link
 				to="/show"
 				data-testid="nav-show"
 				{...stylex.props(pathname === '/show' ? styles.headerLinkActive : styles.headerLink)}
-			>{'show'}</Link>
+			>
+				{'show'}
+			</Link>
 			<span {...stylex.props(styles.headerSep)}>{'|'}</span>
 			<Link
 				to="/jobs"
 				data-testid="nav-jobs"
 				{...stylex.props(pathname === '/jobs' ? styles.headerLinkActive : styles.headerLink)}
-			>{'jobs'}</Link>
+			>
+				{'jobs'}
+			</Link>
 		</header>
 		<main {...stylex.props(styles.main)}>
 			@try {

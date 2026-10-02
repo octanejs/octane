@@ -43,7 +43,9 @@ export function SortingTable() @{
 				table.getColumn('age')!.toggleSorting();
 				table.getColumn('age')!.toggleSorting();
 			}}
-		>double</button>
+		>
+			double
+		</button>
 		<table>
 			<thead>
 				@for (const hg of table.getHeaderGroups(); key hg.id) {

@@ -18,10 +18,9 @@ export function SpringHookFixture(props) @{
 		[props.x],
 	);
 	props.onReady(api);
-	<animated.div
-		id="hook-spring"
-		style={{ left: styles.x, opacity: styles.opacity }}
-	>{'spring'}</animated.div>
+	<animated.div id="hook-spring" style={{ left: styles.x, opacity: styles.opacity }}>
+		{'spring'}
+	</animated.div>
 }
 
 export function ObjectSpringHookFixture(props) @{
@@ -82,10 +81,14 @@ export function ContextDepsSpringFixture(props) @{
 }
 
 export function SpringsCohortFixture(props) @{
-	const [styles, api] = useSprings(props.count, (index: number) => {
-		props.onCreate(index);
-		return { from: { x: 0 }, to: { x: props.goal + index }, immediate: true };
-	}, [props.goal]);
+	const [styles, api] = useSprings(
+		props.count,
+		(index: number) => {
+			props.onCreate(index);
+			return { from: { x: 0 }, to: { x: props.goal + index }, immediate: true };
+		},
+		[props.goal],
+	);
 	props.onReady(styles, api);
 	<div>{'springs cohort'}</div>
 }

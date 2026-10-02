@@ -85,7 +85,11 @@ export function PaginationPrevious({
 	</PaginationLink>
 }
 
-export function PaginationNext({ className, text = 'Next', ...props }: PaginationLinkProps & {
+export function PaginationNext({
+	className,
+	text = 'Next',
+	...props
+}: PaginationLinkProps & {
 	text?: string;
 }) @{
 	<PaginationLink

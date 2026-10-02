@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -80,7 +80,7 @@
         {
           "path": "packages/recharts/tests/_fixtures/charts.tsrx",
           "role": "support",
-          "sha256": "14028c4342b0d708d2b21a24530285c5c8df13ece0e105c61cb2f3597cef1674"
+          "sha256": "b3029d815183439d34d4cd6887e5beee06cdc36044ecc1549b4ffc9998dcf09a"
         },
         {
           "path": "packages/recharts/tests/differential/_setup.ts",

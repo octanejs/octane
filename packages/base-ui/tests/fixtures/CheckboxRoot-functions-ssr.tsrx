@@ -11,13 +11,15 @@ export function CheckboxRootHydrationFixture1(props: {
 }) {
 	const { checkboxId, checkboxKey, nativeButton } = props;
 
-	return <Field.Root>
-		<Field.Label data-testid="label">Label</Field.Label>
-		<Checkbox.Root
-			key={checkboxKey}
-			id={checkboxId}
-			nativeButton={nativeButton}
-			render={nativeButton ? <button /> : undefined}
-		/>
-	</Field.Root>;
+	return (
+		<Field.Root>
+			<Field.Label data-testid="label">Label</Field.Label>
+			<Checkbox.Root
+				key={checkboxKey}
+				id={checkboxId}
+				nativeButton={nativeButton}
+				render={nativeButton ? <button /> : undefined}
+			/>
+		</Field.Root>
+	);
 }

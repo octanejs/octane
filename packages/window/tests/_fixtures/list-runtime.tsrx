@@ -104,7 +104,9 @@ export function ListPropShapeFixture(props: { initialExpanded: boolean }) @{
 
 function DelimitedKeysRow({ ariaAttributes, index, style, ...props }: any) @{
 	const keys = ['a,b', 'a', 'b'].filter((key) => Object.hasOwn(props, key));
-	<div {...ariaAttributes} data-index={index} style={style}>{keys.join('|')}</div>
+	<div {...ariaAttributes} data-index={index} style={style}>
+		{keys.join('|')}
+	</div>
 }
 
 export function ListDelimitedKeysFixture() @{

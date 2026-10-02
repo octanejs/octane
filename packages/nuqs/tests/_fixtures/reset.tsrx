@@ -12,13 +12,17 @@ function TwoWrites() @{
 		b: parseAsString,
 	});
 	<div>
-		<span id="a">{'a=' + (a ?? '') as string}</span>
-		<span id="b">{'b=' + (b ?? '') as string}</span>
+		<span id="a">{('a=' + (a ?? '')) as string}</span>
+		<span id="b">{('b=' + (b ?? '')) as string}</span>
 		<button
 			id="set-a-debounced"
 			onClick={() => set({ a: 'x' }, { limitUrlUpdates: { method: 'debounce', timeMs: 40 } })}
-		>{'a'}</button>
-		<button id="set-b-now" onClick={() => set({ b: 'y' })}>{'b'}</button>
+		>
+			{'a'}
+		</button>
+		<button id="set-b-now" onClick={() => set({ b: 'y' })}>
+			{'b'}
+		</button>
 	</div>
 }
 

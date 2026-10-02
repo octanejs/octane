@@ -35,8 +35,7 @@ export function SpreadMixed(props: { value: any; rest: Record<string, unknown> }
 	<section>
 		<textarea {...props.rest}>
 			{'A: '}
-			{props.value}
-			!
+			{props.value}!
 		</textarea>
 	</section>
 }

@@ -23,10 +23,8 @@ export function FunctionChildrenHost(props: {
 	onClick(): void;
 }) @{
 	<DescriptorHost siblings={props.siblings}>
-		<button
-			id="function-child"
-			ref={props.ref}
-			onClick={props.onClick}
-		>{props.label as string}</button>
+		<button id="function-child" ref={props.ref} onClick={props.onClick}>
+			{props.label as string}
+		</button>
 	</DescriptorHost>
 }

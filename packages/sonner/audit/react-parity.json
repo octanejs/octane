@@ -29,7 +29,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -114,7 +114,7 @@
         {
           "path": "packages/sonner/tests/_fixtures/sonner-diff.tsrx",
           "role": "support",
-          "sha256": "fced8881426c0fbe32434311cbedd2202b145565830980074112411a93cd043d"
+          "sha256": "566becf854832d474537d1369624864a51c5cbea72e99e5d77a5131c7c777336"
         },
         {
           "path": "packages/sonner/tests/differential/_setup.ts",

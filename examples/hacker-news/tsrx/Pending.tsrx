@@ -38,8 +38,8 @@ export function UserPending() @{
 }
 
 export function ErrorFallback({ error }: { error: unknown }) @{
-	const message =
-		error instanceof Error ? error.message : String(error);
-	<div data-testid="error" {...stylex.props(styles.error)}>{'Something went wrong: ' +
-		message as string}</div>
+	const message = error instanceof Error ? error.message : String(error);
+	<div data-testid="error" {...stylex.props(styles.error)}>
+		{('Something went wrong: ' + message) as string}
+	</div>
 }

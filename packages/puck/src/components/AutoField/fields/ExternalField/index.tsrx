@@ -35,26 +35,28 @@ export const ExternalField = ({
 		return null;
 	}
 
-	return <Label label={label || name} icon={labelIcon || <Link size={16} />} el="div">
-		<ExternalInput
-			name={name}
-			field={{
-				...validField,
-				// DEPRECATED
+	return (
+		<Label label={label || name} icon={labelIcon || <Link size={16} />} el="div">
+			<ExternalInput
+				name={name}
+				field={{
+					...validField,
+					// DEPRECATED
 
-				placeholder: deprecatedField.adaptor?.name
-					? `Select from ${deprecatedField.adaptor.name}`
-					: validField.placeholder || 'Select data',
-				mapProp: deprecatedField.adaptor?.mapProp || validField.mapProp,
-				mapRow: validField.mapRow,
-				fetchList: deprecatedField.adaptor?.fetchList
-					? async () => await deprecatedField.adaptor.fetchList(deprecatedField.adaptorParams)
-					: validField.fetchList,
-			}}
-			onChange={onChange}
-			value={value}
-			id={id}
-			readOnly={readOnly}
-		/>
-	</Label>;
+					placeholder: deprecatedField.adaptor?.name
+						? `Select from ${deprecatedField.adaptor.name}`
+						: validField.placeholder || 'Select data',
+					mapProp: deprecatedField.adaptor?.mapProp || validField.mapProp,
+					mapRow: validField.mapRow,
+					fetchList: deprecatedField.adaptor?.fetchList
+						? async () => await deprecatedField.adaptor.fetchList(deprecatedField.adaptorParams)
+						: validField.fetchList,
+				}}
+				onChange={onChange}
+				value={value}
+				id={id}
+				readOnly={readOnly}
+			/>
+		</Label>
+	);
 };

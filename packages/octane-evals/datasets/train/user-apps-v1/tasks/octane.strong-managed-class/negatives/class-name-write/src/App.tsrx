@@ -17,7 +17,9 @@ function Tab({
 		button.current!.className = selected ? 'tab selected' : 'tab';
 	});
 
-	<button ref={button} class="tab" onClick={onSelect}>{label as string}</button>
+	<button ref={button} class="tab" onClick={onSelect}>
+		{label as string}
+	</button>
 }
 
 export function App() @{

@@ -94,9 +94,7 @@ export function CheckboxTimeline(props) @{
 				setChecked(event.target.checked);
 			}}
 		/>
-		<output>
-			{checked ? 'checked' : 'clear'}
-		</output>
+		<output>{checked ? 'checked' : 'clear'}</output>
 	</section>
 }
 
@@ -143,9 +141,7 @@ export function CheckboxPreventClickAccept(props) @{
 				props.record('click:after', event);
 			}}
 		/>
-		<output>
-			{checked ? 'checked' : 'clear'}
-		</output>
+		<output>{checked ? 'checked' : 'clear'}</output>
 	</section>
 }
 

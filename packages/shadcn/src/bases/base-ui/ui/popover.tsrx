@@ -42,22 +42,21 @@ export function PopoverTrigger(props: Record<string, unknown>) @{
 }
 
 /** Props routed to the Positioner rather than the popup. */
-export type BaseUiPositioningProps =
-	Pick<
-		PopoverPrimitive.Positioner.Props,
-		| 'side'
-		| 'sideOffset'
-		| 'align'
-		| 'alignOffset'
-		| 'anchor'
-		| 'positionMethod'
-		| 'collisionBoundary'
-		| 'collisionPadding'
-		| 'collisionAvoidance'
-		| 'arrowPadding'
-		| 'sticky'
-		| 'disableAnchorTracking'
-	>;
+export type BaseUiPositioningProps = Pick<
+	PopoverPrimitive.Positioner.Props,
+	| 'side'
+	| 'sideOffset'
+	| 'align'
+	| 'alignOffset'
+	| 'anchor'
+	| 'positionMethod'
+	| 'collisionBoundary'
+	| 'collisionPadding'
+	| 'collisionAvoidance'
+	| 'arrowPadding'
+	| 'sticky'
+	| 'disableAnchorTracking'
+>;
 
 export interface PopoverContentProps extends Record<string, unknown>, BaseUiPositioningProps {
 	className?: string;

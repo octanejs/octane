@@ -139,7 +139,9 @@ const MemoParent = memo(MemoParentBody);
 export function MemoParentHost(props) @{
 	const [tick, setTick] = useState(0);
 	<div data-tick={tick as number}>
-		<button id="memo-parent-update" onClick={() => setTick(tick + 1)}>{'parent'}</button>
+		<button id="memo-parent-update" onClick={() => setTick(tick + 1)}>
+			{'parent'}
+		</button>
 		<MemoParent label="stable" log={props.log} />
 	</div>
 }
@@ -174,9 +176,7 @@ function StableRetryLeaf(props) {
 function StableRetryShell(props) @{
 	<>
 		@try {
-			<>
-				{props.children}
-			</>
+			<>{props.children}</>
 		} @pending {
 			<span id="stable-retry-pending">{'loading'}</span>
 		}
@@ -252,9 +252,7 @@ function DeleteChild(props) @{
 export function DeletePendingChild(props) @{
 	const [show, setShow] = useState(true);
 	_setDeleteParent = setShow;
-	<div>
-		{show ? <DeleteChild log={props.log} /> : <span id="deleted">{'deleted'}</span>}
-	</div>
+	<div>{show ? <DeleteChild log={props.log} /> : <span id="deleted">{'deleted'}</span>}</div>
 }
 
 type DeleteStoreListener = () => void;
@@ -299,9 +297,11 @@ export function DeletePendingStoreChild(props: { store: DeleteStore; log: Delete
 	const [show, setShow] = useState(true);
 	_setDeleteStoreParent = setShow;
 	<div>
-		{show
-			? <DeleteStoreChild store={props.store} log={props.log} />
-			: <span id="store-child-deleted">{'deleted'}</span>}
+		{show ? (
+			<DeleteStoreChild store={props.store} log={props.log} />
+		) : (
+			<span id="store-child-deleted">{'deleted'}</span>
+		)}
 	</div>
 }
 
@@ -355,7 +355,9 @@ export function ManyRootsSpawner(props) @{
 function BatchCell(props) @{
 	const [value, setValue] = useState(0);
 	props.capture(props.id, setValue);
-	<span class="batch-cell" data-id={props.id as number}>{value as number}</span>
+	<span class="batch-cell" data-id={props.id as number}>
+		{value as number}
+	</span>
 }
 
 export function ManyBatchCells(props) @{
@@ -466,9 +468,9 @@ function DeletionRegistryMember(props) @{
 }
 
 function DeletionRegistrySwitcher(props) {
-	return props.showMember
-		? <DeletionRegistryMember register={props.register} unregister={props.unregister} />
-		: null;
+	return props.showMember ? (
+		<DeletionRegistryMember register={props.register} unregister={props.unregister} />
+	) : null;
 }
 
 export function DeletionCleanupRegistry() @{
@@ -523,7 +525,9 @@ export function RefCallbackLoop() @{
 		ref={() => {
 			for (let i = 0; i < 50; i++) dispatch(1);
 		}}
-	>{count as number}</div>
+	>
+		{count as number}
+	</div>
 }
 
 export function FiniteLayoutChain(props) @{

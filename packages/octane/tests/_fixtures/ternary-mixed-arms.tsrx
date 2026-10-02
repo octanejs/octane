@@ -17,7 +17,9 @@ function Chip() @{
 export function MapArm() @{
 	const [mode, setMode] = useState(0);
 	<div>
-		<button class="next" onClick={() => setMode(mode + 1)}>{'next'}</button>
+		<button class="next" onClick={() => setMode(mode + 1)}>
+			{'next'}
+		</button>
 		<div class="host">
 			{mode % 2 === 0 ? ['x', 'y'].map((id) => <i key={id}>{id as string}</i>) : <Chip />}
 		</div>
@@ -29,7 +31,9 @@ export function MapArm() @{
 export function ForArm() @{
 	const [mode, setMode] = useState(0);
 	<div>
-		<button class="next" onClick={() => setMode(mode + 1)}>{'next'}</button>
+		<button class="next" onClick={() => setMode(mode + 1)}>
+			{'next'}
+		</button>
 		<div class="host">
 			@if (mode % 2 === 0) {
 				@for (const id of ['x', 'y']; key id) {
@@ -45,23 +49,19 @@ export function ForArm() @{
 export function StringArm() @{
 	const [on, setOn] = useState(false);
 	<div>
-		<button class="flip" onClick={() => setOn(!on)}>{'flip'}</button>
-		<div class="host">
-			{on ? <b>{'yes'}</b> : 'nope'}
-		</div>
+		<button class="flip" onClick={() => setOn(!on)}>
+			{'flip'}
+		</button>
+		<div class="host">{on ? <b>{'yes'}</b> : 'nope'}</div>
 	</div>
 }
 
 export function PropertyArm(props: ValueArmProps) @{
-	<div class="host">
-		{props.on ? <b>{'yes'}</b> : props.label}
-	</div>
+	<div class="host">{props.on ? <b>{'yes'}</b> : props.label}</div>
 }
 
 export function ReturnedArm(props: ValueArmProps) {
-	return <div class="host">
-		{props.on ? <b>{'yes'}</b> : props.label}
-	</div>;
+	return <div class="host">{props.on ? <b>{'yes'}</b> : props.label}</div>;
 }
 
 // The arm is an element held in a setup variable, not a JSX literal.
@@ -69,10 +69,10 @@ export function VarArm() @{
 	const [on, setOn] = useState(false);
 	const alt = <i>{'alt'}</i>;
 	<div>
-		<button class="flip" onClick={() => setOn(!on)}>{'flip'}</button>
-		<div class="host">
-			{on ? <b>{'yes'}</b> : alt}
-		</div>
+		<button class="flip" onClick={() => setOn(!on)}>
+			{'flip'}
+		</button>
+		<div class="host">{on ? <b>{'yes'}</b> : alt}</div>
 	</div>
 }
 
@@ -81,14 +81,10 @@ export function VarArm() @{
 export function NestedTernary() @{
 	const [n, setN] = useState(2);
 	<div>
-		<button class="next" onClick={() => setN(n + 1)}>{'next'}</button>
-		<div class="host">
-			{n % 3 === 0
-				? <b>{'a'}</b>
-				: n % 3 === 1
-					? <i>{'b'}</i>
-					: 0}
-		</div>
+		<button class="next" onClick={() => setN(n + 1)}>
+			{'next'}
+		</button>
+		<div class="host">{n % 3 === 0 ? <b>{'a'}</b> : n % 3 === 1 ? <i>{'b'}</i> : 0}</div>
 	</div>
 }
 
@@ -96,10 +92,10 @@ export function NestedTernary() @{
 export function NullConsequent() @{
 	const [on, setOn] = useState(true);
 	<div>
-		<button class="flip" onClick={() => setOn(!on)}>{'flip'}</button>
-		<div class="host">
-			{on ? null : <b>{'no'}</b>}
-		</div>
+		<button class="flip" onClick={() => setOn(!on)}>
+			{'flip'}
+		</button>
+		<div class="host">{on ? null : <b>{'no'}</b>}</div>
 	</div>
 }
 
@@ -108,10 +104,10 @@ export function NullConsequent() @{
 export function UndefinedArm() @{
 	const [on, setOn] = useState(false);
 	<div>
-		<button class="flip" onClick={() => setOn(!on)}>{'flip'}</button>
-		<div class="host">
-			{on ? <b>{'yes'}</b> : undefined}
-		</div>
+		<button class="flip" onClick={() => setOn(!on)}>
+			{'flip'}
+		</button>
+		<div class="host">{on ? <b>{'yes'}</b> : undefined}</div>
 	</div>
 }
 
@@ -122,9 +118,7 @@ function Box(props) @{
 export function WrappedChildrenArm(props: ValueArmProps) @{
 	<div>
 		<Box>
-			<p class="host">
-				{props.on ? <b>{'yes'}</b> : props.label}
-			</p>
+			<p class="host">{props.on ? <b>{'yes'}</b> : props.label}</p>
 		</Box>
 	</div>
 }
@@ -135,11 +129,11 @@ export function WrappedChildrenArm(props: ValueArmProps) @{
 export function ChildrenArm() @{
 	const [on, setOn] = useState(false);
 	<div>
-		<button class="flip" onClick={() => setOn(!on)}>{'flip'}</button>
+		<button class="flip" onClick={() => setOn(!on)}>
+			{'flip'}
+		</button>
 		<div class="host">
-			<Box>
-				{on ? <b>{'yes'}</b> : 'nope'}
-			</Box>
+			<Box>{on ? <b>{'yes'}</b> : 'nope'}</Box>
 		</div>
 	</div>
 }
@@ -151,7 +145,9 @@ export function ChildrenArm() @{
 export function RootFragArm() @{
 	const [on, setOn] = useState(false);
 	<>
-		<button class="flip" onClick={() => setOn(!on)}>{'flip'}</button>
+		<button class="flip" onClick={() => setOn(!on)}>
+			{'flip'}
+		</button>
 		{on ? <b>{'yes'}</b> : 'nope'}
 	</>
 }
@@ -160,9 +156,9 @@ export function RootFragArm() @{
 export function AndArm() @{
 	const [n, setN] = useState(0);
 	<div>
-		<button class="next" onClick={() => setN(n + 1)}>{'next'}</button>
-		<div class="host">
-			{n % 3 === 0 ? n % 2 === 0 && <i>{'maybe'}</i> : <b>{'jsx'}</b>}
-		</div>
+		<button class="next" onClick={() => setN(n + 1)}>
+			{'next'}
+		</button>
+		<div class="host">{n % 3 === 0 ? n % 2 === 0 && <i>{'maybe'}</i> : <b>{'jsx'}</b>}</div>
 	</div>
 }

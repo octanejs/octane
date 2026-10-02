@@ -25,16 +25,14 @@ export type TiptapWrapperEditorInstanceProps =
 			instance: Editor;
 	  };
 
-export type TiptapWrapperProps =
-	TiptapWrapperEditorInstanceProps & {
-		children: OctaneNode;
-	};
+export type TiptapWrapperProps = TiptapWrapperEditorInstanceProps & {
+	children: OctaneNode;
+};
 
-export type TiptapContentProps =
-	Omit<EditorContentProps, 'editor' | 'ref'> & {
-		editor?: never;
-		ref?: never;
-	};
+export type TiptapContentProps = Omit<EditorContentProps, 'editor' | 'ref'> & {
+	editor?: never;
+	ref?: never;
+};
 
 export const TiptapContext: Context<TiptapContextType> & { displayName?: string } = createContext({
 	get editor(): Editor {
@@ -55,16 +53,16 @@ export function useTiptapState<TSelectorResult>(
 	...args: [equalityFn?: (left: TSelectorResult, right: TSelectorResult | null) => boolean]
 ): TSelectorResult {
 	const [userArgs, slot] = splitSlot(args);
-	const equalityFn = userArgs[0] as ((left: TSelectorResult, right: | TSelectorResult
-	| null) => boolean) | undefined;
+	const equalityFn = userArgs[0] as
+		((left: TSelectorResult, right: TSelectorResult | null) => boolean) | undefined;
 	const { editor } = useTiptap();
 
 	// Call through a non-hook-named alias because this source is itself compiled:
 	// the public call site's slot is already being forwarded explicitly here.
-	const selectEditorState = useEditorState as (options: UseEditorStateOptions<
-		TSelectorResult,
-		Editor
-	>, slot: symbol) => TSelectorResult;
+	const selectEditorState = useEditorState as (
+		options: UseEditorStateOptions<TSelectorResult, Editor>,
+		slot: symbol,
+	) => TSelectorResult;
 	return selectEditorState(
 		{
 			editor,
@@ -76,8 +74,7 @@ export function useTiptapState<TSelectorResult>(
 }
 
 export function TiptapWrapper({ children, ...props }: TiptapWrapperProps) @{
-	const resolvedEditor =
-		'editor' in props ? props.editor : props.instance;
+	const resolvedEditor = 'editor' in props ? props.editor : props.instance;
 
 	if (!resolvedEditor) {
 		throw new Error('Tiptap: An editor instance is required. Pass a non-null `editor` prop.');

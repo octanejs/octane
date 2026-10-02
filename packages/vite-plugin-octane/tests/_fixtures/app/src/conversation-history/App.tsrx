@@ -8,10 +8,8 @@ export function HistoryApp() @{
 	const controller = useRef<HistoryController | null>(null);
 	const [ready, setReady] = useState(false);
 	const currentOwner = currentSignalOwner()!;
-	const documentOwner =
-		'documentOwner' in currentOwner ? currentOwner.documentOwner : currentOwner;
-	const draft =
-		selected$.get() === 'A' ? draftA$ : draftB$;
+	const documentOwner = 'documentOwner' in currentOwner ? currentOwner.documentOwner : currentOwner;
+	const draft = selected$.get() === 'A' ? draftA$ : draftB$;
 	useLayoutEffect(() => {
 		let disposed = false;
 		if (!import.meta.env.SSR) {
@@ -36,25 +34,33 @@ export function HistoryApp() @{
 				onClick={() => {
 					void controller.current?.select('A').catch(() => {});
 				}}
-			>Select A</button>
+			>
+				Select A
+			</button>
 			<button
 				type="button"
 				onClick={() => {
 					void controller.current?.select('B').catch(() => {});
 				}}
-			>Select B</button>
+			>
+				Select B
+			</button>
 			<button
 				type="button"
 				onClick={() => {
 					void controller.current?.activate();
 				}}
-			>Activate history</button>
+			>
+				Activate history
+			</button>
 			<button
 				type="button"
 				onClick={() => {
 					void controller.current?.older();
 				}}
-			>Older page</button>
+			>
+				Older page
+			</button>
 		</fieldset>
 		<p>{'Selected: ' + selected$.get()}</p>
 		<p role="status">{status$}</p>
@@ -62,7 +68,8 @@ export function HistoryApp() @{
     the fetched dormant range and explicitly hands it to hydrateRoot. */}
 		<section ref={host} aria-label="Fetched history" />
 		<label>
-			History draft<textarea aria-label="History draft" value={draft} />
+			History draft
+			<textarea aria-label="History draft" value={draft} />
 		</label>
 	</main>
 }

@@ -10,7 +10,9 @@ export function ParityEmail(props: { name: string }) @{
 				<Button
 					href="https://example.com"
 					style={{ backgroundColor: '#000', color: '#fff', padding: '12px 20px' }}
-				>Get started</Button>
+				>
+					Get started
+				</Button>
 			</Container>
 		</Body>
 	</Html>

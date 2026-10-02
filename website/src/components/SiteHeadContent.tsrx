@@ -28,8 +28,12 @@ export function SiteHeadContent() @{
 	const tags = useTags().filter(
 		(tag) =>
 			!isModulePreload(tag) &&
-				!(process.env.NODE_ENV !== 'production' && hydrated && tag.tag === 'link' &&
-					tag.attrs?.[DEV_STYLES_ATTR] === true),
+			!(
+				process.env.NODE_ENV !== 'production' &&
+				hydrated &&
+				tag.tag === 'link' &&
+				tag.attrs?.[DEV_STYLES_ATTR] === true
+			),
 	);
 
 	// Dev-only: drop the dev stylesheet links once hydrated, as <HeadContent />
@@ -42,8 +46,8 @@ export function SiteHeadContent() @{
 	}, [hydrated]);
 
 	<>
-		{tags.map(
-			(tag, index) => createElement<AssetProps & { key?: string }>(Asset, {
+		{tags.map((tag, index) =>
+			createElement<AssetProps & { key?: string }>(Asset, {
 				...tag,
 				// A short, position-scoped key keeps the rendered
 				// data-tsr-managed-key attribute small; `key` carries identity.

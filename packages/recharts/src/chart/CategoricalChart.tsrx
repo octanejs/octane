@@ -27,31 +27,37 @@ export function CategoricalChart(props: CartesianChartProps & { ref?: Ref<SVGSVG
 	// "compact" is the Brush panorama mode (but it's public, so it can render
 	// outside Brush too).
 	if (compact) {
-		return <>
-			<ReportChartSize width={width} height={height} />
-			<RootSurface otherAttributes={attrs} title={title} desc={desc}>{children}</RootSurface>
-		</>;
+		return (
+			<>
+				<ReportChartSize width={width} height={height} />
+				<RootSurface otherAttributes={attrs} title={title} desc={desc}>
+					{children}
+				</RootSurface>
+			</>
+		);
 	}
-	return <RechartsWrapper
-		className={className}
-		style={style}
-		width={width}
-		height={height}
-		responsive={responsive ?? false}
-		onClick={props.onClick}
-		onMouseLeave={props.onMouseLeave}
-		onMouseEnter={props.onMouseEnter}
-		onMouseMove={props.onMouseMove}
-		onMouseDown={props.onMouseDown}
-		onMouseUp={props.onMouseUp}
-		onContextMenu={props.onContextMenu}
-		onDoubleClick={props.onDoubleClick}
-		onTouchStart={props.onTouchStart}
-		onTouchMove={props.onTouchMove}
-		onTouchEnd={props.onTouchEnd}
-	>
-		<RootSurface otherAttributes={attrs} title={title} desc={desc} ref={ref}>
-			<ClipPathProvider>{children}</ClipPathProvider>
-		</RootSurface>
-	</RechartsWrapper>;
+	return (
+		<RechartsWrapper
+			className={className}
+			style={style}
+			width={width}
+			height={height}
+			responsive={responsive ?? false}
+			onClick={props.onClick}
+			onMouseLeave={props.onMouseLeave}
+			onMouseEnter={props.onMouseEnter}
+			onMouseMove={props.onMouseMove}
+			onMouseDown={props.onMouseDown}
+			onMouseUp={props.onMouseUp}
+			onContextMenu={props.onContextMenu}
+			onDoubleClick={props.onDoubleClick}
+			onTouchStart={props.onTouchStart}
+			onTouchMove={props.onTouchMove}
+			onTouchEnd={props.onTouchEnd}
+		>
+			<RootSurface otherAttributes={attrs} title={title} desc={desc} ref={ref}>
+				<ClipPathProvider>{children}</ClipPathProvider>
+			</RootSurface>
+		</RechartsWrapper>
+	);
 }

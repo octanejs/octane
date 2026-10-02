@@ -13,18 +13,17 @@ import {
 } from './model.js';
 
 type Phase = 'landing' | 'loading' | 'playing' | 'failed';
-type DoomProof =
-	Readonly<{
-		version: 1;
-		contract: 'doom-clean-room-v1';
-		getSnapshot: () => ReturnType<typeof semanticSnapshot>;
-		getShell: () => Readonly<{
-			phase: Phase;
-			paused: boolean;
-			pointerLocked: boolean;
-			permissionError: string | null;
-		}>;
+type DoomProof = Readonly<{
+	version: 1;
+	contract: 'doom-clean-room-v1';
+	getSnapshot: () => ReturnType<typeof semanticSnapshot>;
+	getShell: () => Readonly<{
+		phase: Phase;
+		paused: boolean;
+		pointerLocked: boolean;
+		permissionError: string | null;
 	}>;
+}>;
 
 declare global {
 	var __OCTANE_DOOM_PROOF__: DoomProof | undefined;
@@ -131,49 +130,57 @@ export function DoomDemo() @{
 		}
 	}, []);
 
-	const enter = useCallback(async function enter() {
-		if (!hasWebGL()) {
-			setPhaseNow('failed');
-			return;
-		}
-		const session = enterSessionRef.current + 1;
-		enterSessionRef.current = session;
-		if (loadingTimeoutRef.current !== null) {
-			window.clearTimeout(loadingTimeoutRef.current);
-			loadingTimeoutRef.current = null;
-		}
-		reset();
-		setPhaseNow('loading');
-		// The playground router owns location.hash. Add an internal history entry
-		// without changing the URL so Back exits the level without unmounting Doom.
-		history.pushState({ ...history.state, octaneDoom: true }, '', location.href);
-		await requestPermissions(session);
-		if (enterSessionRef.current !== session) return;
-		loadingTimeoutRef.current = window.setTimeout(function startPlaying() {
-			loadingTimeoutRef.current = null;
+	const enter = useCallback(
+		async function enter() {
+			if (!hasWebGL()) {
+				setPhaseNow('failed');
+				return;
+			}
+			const session = enterSessionRef.current + 1;
+			enterSessionRef.current = session;
+			if (loadingTimeoutRef.current !== null) {
+				window.clearTimeout(loadingTimeoutRef.current);
+				loadingTimeoutRef.current = null;
+			}
+			reset();
+			setPhaseNow('loading');
+			// The playground router owns location.hash. Add an internal history entry
+			// without changing the URL so Back exits the level without unmounting Doom.
+			history.pushState({ ...history.state, octaneDoom: true }, '', location.href);
+			await requestPermissions(session);
 			if (enterSessionRef.current !== session) return;
-			if (phaseRef.current !== 'loading') return;
-			setPhaseNow('playing');
-		}, 420);
-	}, [requestPermissions, reset]);
+			loadingTimeoutRef.current = window.setTimeout(function startPlaying() {
+				loadingTimeoutRef.current = null;
+				if (enterSessionRef.current !== session) return;
+				if (phaseRef.current !== 'loading') return;
+				setPhaseNow('playing');
+			}, 420);
+		},
+		[requestPermissions, reset],
+	);
 
-	const retryPermissions = useCallback(function retryPermissions() {
-		void requestPermissions(enterSessionRef.current);
-	}, [requestPermissions]);
+	const retryPermissions = useCallback(
+		function retryPermissions() {
+			void requestPermissions(enterSessionRef.current);
+		},
+		[requestPermissions],
+	);
 
-	const exit = useCallback(function exit() {
-		invalidateEnterSession();
-		document.exitPointerLock?.();
-		audioRef.current?.stop();
-		setPhaseNow('landing');
-		reset();
-		if (history.state?.octaneDoom === true) history.back();
-	}, [reset]);
+	const exit = useCallback(
+		function exit() {
+			invalidateEnterSession();
+			document.exitPointerLock?.();
+			audioRef.current?.stop();
+			setPhaseNow('landing');
+			reset();
+			if (history.state?.octaneDoom === true) history.back();
+		},
+		[reset],
+	);
 
 	useEffect(() => {
-		const updatePointerLock = () => setPointerLocked(
-			document.pointerLockElement === aimRef.current,
-		);
+		const updatePointerLock = () =>
+			setPointerLocked(document.pointerLockElement === aimRef.current);
 		const onPointerError = () => setPermissionError('Pointer lock was rejected. Click Retry aim.');
 		const onPopState = function onPopState() {
 			if (phaseRef.current !== 'landing') {
@@ -212,9 +219,11 @@ export function DoomDemo() @{
 		const keyup = (event: KeyboardEvent) => setKey(event, false);
 		const mousemove = (event: MouseEvent) => {
 			if (
-				document.pointerLockElement !== aimRef.current || phaseRef.current !== 'playing' ||
-					pausedRef.current
-			) return;
+				document.pointerLockElement !== aimRef.current ||
+				phaseRef.current !== 'playing' ||
+				pausedRef.current
+			)
+				return;
 			stateRef.current = turnPlayer(stateRef.current, event.movementX * 0.0022);
 		};
 		window.addEventListener('keydown', keydown);
@@ -262,12 +271,13 @@ export function DoomDemo() @{
 			version: 1,
 			contract: 'doom-clean-room-v1',
 			getSnapshot: () => semanticSnapshot(stateRef.current),
-			getShell: () => Object.freeze({
-				phase: phaseRef.current,
-				paused: pausedRef.current,
-				pointerLocked: pointerLockedRef.current,
-				permissionError: permissionErrorRef.current,
-			}),
+			getShell: () =>
+				Object.freeze({
+					phase: phaseRef.current,
+					paused: pausedRef.current,
+					pointerLocked: pointerLockedRef.current,
+					permissionError: permissionErrorRef.current,
+				}),
 		});
 		globalThis.__OCTANE_DOOM_PROOF__ = proof;
 		return () => {
@@ -352,7 +362,9 @@ export function DoomDemo() @{
 							lineHeight: 0.9,
 							textShadow: '5px 5px 0 #51160b',
 						}}
-					>{'OCTANE // DOOM'}</div>
+					>
+						{'OCTANE // DOOM'}
+					</div>
 					<p style={{ color: '#bea984' }}>{'One level. Five hostiles. Eleven anomalies.'}</p>
 					<button
 						data-doom-start="true"
@@ -366,7 +378,9 @@ export function DoomDemo() @{
 							font: 'inherit',
 							fontWeight: 800,
 						}}
-					>{'ENTER THE LEVEL'}</button>
+					>
+						{'ENTER THE LEVEL'}
+					</button>
 				</div>
 			</div>
 		} @else if (phase === 'failed') {
@@ -388,7 +402,9 @@ export function DoomDemo() @{
 						onClick={function returnToLanding() {
 							setPhaseNow('landing');
 						}}
-					>{'Return'}</button>
+					>
+						{'Return'}
+					</button>
 				</div>
 			</div>
 		} @else {
@@ -413,7 +429,9 @@ export function DoomDemo() @{
 										color: '#ff6b35',
 										fontWeight: 900,
 									}}
-								>{'BUILDING SECTOR'}</div>
+								>
+									{'BUILDING SECTOR'}
+								</div>
 							} @pending {
 								<div style={{ position: 'absolute', inset: 0, background: '#171717' }}></div>
 							}
@@ -482,10 +500,12 @@ export function DoomDemo() @{
 							left: '50%',
 							bottom: '-25px',
 							transform: 'translateX(-50%)',
-							clipPath: 'polygon(23% 100%, 15% 36%, 32% 20%, 42% 0, 58% 0, 68% 20%, 85% 36%, 77% 100%)',
-							background: game.now < game.weaponUntil
-								? 'linear-gradient(90deg,#23150d,#fff091 48%,#3a1b0d)'
-								: 'linear-gradient(90deg,#171717,#625444 48%,#201a16)',
+							clipPath:
+								'polygon(23% 100%, 15% 36%, 32% 20%, 42% 0, 58% 0, 68% 20%, 85% 36%, 77% 100%)',
+							background:
+								game.now < game.weaponUntil
+									? 'linear-gradient(90deg,#23150d,#fff091 48%,#3a1b0d)'
+									: 'linear-gradient(90deg,#171717,#625444 48%,#201a16)',
 							border: '5px solid #090807',
 							pointerEvents: 'none',
 							zIndex: 7,
@@ -539,7 +559,9 @@ export function DoomDemo() @{
 							fontWeight: 900,
 							pointerEvents: 'none',
 						}}
-					>{'OCTANE SAFETY PAUSE'}</div>
+					>
+						{'OCTANE SAFETY PAUSE'}
+					</div>
 				}
 			</div>
 		}

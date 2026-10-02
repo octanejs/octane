@@ -7,17 +7,23 @@ function SearchPage(props: { defaultInit?: any }) @{
 	<div>
 		<p id="q">{'q=' + (searchParams.get('q') ?? '(none)')}</p>
 		<p id="page">{'page=' + (searchParams.get('page') ?? '(none)')}</p>
-		<button id="set-obj" onClick={() => setSearchParams({ q: 'octane' })}>set-obj</button>
+		<button id="set-obj" onClick={() => setSearchParams({ q: 'octane' })}>
+			set-obj
+		</button>
 		<button
 			id="set-fn"
-			onClick={() => setSearchParams((prev) => {
-				prev.set('page', String(Number(prev.get('page') ?? '0') + 1));
-				return prev;
-			})}
+			onClick={() =>
+				setSearchParams((prev) => {
+					prev.set('page', String(Number(prev.get('page') ?? '0') + 1));
+					return prev;
+				})
+			}
 		>
 			set-fn
 		</button>
-		<button id="clear" onClick={() => setSearchParams({})}>clear</button>
+		<button id="clear" onClick={() => setSearchParams({})}>
+			clear
+		</button>
 	</div>
 }
 

@@ -36,7 +36,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -290,7 +290,7 @@
         {
           "path": "packages/window/tests/_fixtures/virtualizers.tsrx",
           "role": "support",
-          "sha256": "5eef0e4462686fc0e1497ee02ab83e74eff0080a371b4f0afe2fa4cb92a8f40d"
+          "sha256": "b434a81edfe9bdac9cafc7a12cd2eb43eaa6b0b7a6751c6db33ff5ef3a65f0ff"
         },
         {
           "path": "packages/window/tests/differential/_setup.ts",

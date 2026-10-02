@@ -12,7 +12,9 @@ export function EnterLeaveEvents() @{
 			onPointerEnter={() => setLog((l) => l + 'e')}
 			onPointerLeave={() => setLog((l) => l + 'l')}
 			onMouseEnter={() => setLog((l) => l + 'm')}
-		>{'hover me'}</button>
+		>
+			{'hover me'}
+		</button>
 		<span class="log">{log}</span>
 	</div>
 }
@@ -22,7 +24,9 @@ export function EnterLeaveEvents() @{
 export function ScrollEvents() @{
 	const [log, setLog] = useState('');
 	<div class="outer" onScroll={() => setLog((l) => l + 'O')}>
-		<div class="inner" onScroll={() => setLog((l) => l + 'i')}>{'content'}</div>
+		<div class="inner" onScroll={() => setLog((l) => l + 'i')}>
+			{'content'}
+		</div>
 		<span class="slog">{log}</span>
 	</div>
 }

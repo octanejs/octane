@@ -24,16 +24,36 @@ export function StateProbe() @{
 		<span id="state">{`${first.value}/${second.value}/${counter.count}/${toggle}/${
 			map.get('a') ?? '-'
 		}/${step}`}</span>
-		<button id="first" onClick={first.toggle}>first</button>
-		<button id="second" onClick={second.toggle}>second</button>
-		<button id="increment" onClick={counter.increment}>increment</button>
-		<button id="reset" onClick={counter.reset}>reset</button>
-		<button id="toggle" onClick={flip}>toggle</button>
-		<button id="map" onClick={() => actions.set('a', 2)}>map</button>
-		<button id="map-all" onClick={() => actions.setAll([['b', 3]])}>map all</button>
-		<button id="remove" onClick={() => actions.remove('a')}>remove</button>
-		<button id="next" onClick={stepActions.goToNextStep}>next</button>
-		<button id="prev" onClick={stepActions.goToPrevStep}>prev</button>
+		<button id="first" onClick={first.toggle}>
+			first
+		</button>
+		<button id="second" onClick={second.toggle}>
+			second
+		</button>
+		<button id="increment" onClick={counter.increment}>
+			increment
+		</button>
+		<button id="reset" onClick={counter.reset}>
+			reset
+		</button>
+		<button id="toggle" onClick={flip}>
+			toggle
+		</button>
+		<button id="map" onClick={() => actions.set('a', 2)}>
+			map
+		</button>
+		<button id="map-all" onClick={() => actions.setAll([['b', 3]])}>
+			map all
+		</button>
+		<button id="remove" onClick={() => actions.remove('a')}>
+			remove
+		</button>
+		<button id="next" onClick={stepActions.goToNextStep}>
+			next
+		</button>
+		<button id="prev" onClick={stepActions.goToPrevStep}>
+			prev
+		</button>
 		<button id="set-updater" onClick={() => stepActions.setStep((value) => value + 1)}>
 			set updater
 		</button>
@@ -75,10 +95,18 @@ export function DebounceControlsProbe(props: {
 }) @{
 	const debounced = useDebounceCallback(props.onDebounce, 50, props.options);
 	<div>
-		<button id="queue" onClick={() => debounced('queued')}>queue</button>
-		<button id="cancel" onClick={debounced.cancel}>cancel</button>
-		<button id="flush" onClick={debounced.flush}>flush</button>
-		<button id="pending" onClick={() => props.onPending(debounced.isPending())}>pending</button>
+		<button id="queue" onClick={() => debounced('queued')}>
+			queue
+		</button>
+		<button id="cancel" onClick={debounced.cancel}>
+			cancel
+		</button>
+		<button id="flush" onClick={debounced.flush}>
+			flush
+		</button>
+		<button id="pending" onClick={() => props.onPending(debounced.isPending())}>
+			pending
+		</button>
 	</div>
 }
 
@@ -91,10 +119,10 @@ export function DebounceValueProbe(props: {
 		equalityFn: props.equalityFn,
 	});
 	<div>
-		<span id="value">
-			{Object.is(value, -0) ? '-0' : String(value)}
-		</span>
-		<button id="pending" onClick={() => props.onPending(update.isPending())}>pending</button>
+		<span id="value">{Object.is(value, -0) ? '-0' : String(value)}</span>
+		<button id="pending" onClick={() => props.onPending(update.isPending())}>
+			pending
+		</button>
 	</div>
 }
 
@@ -124,7 +152,5 @@ export function SsrProbe() @{
 	const mounted = useIsMounted();
 	useInterval(() => {}, null);
 	useTimeout(() => {}, null);
-	<p>
-		{mounted() ? 'mounted' : 'server'}
-	</p>
+	<p>{mounted() ? 'mounted' : 'server'}</p>
 }

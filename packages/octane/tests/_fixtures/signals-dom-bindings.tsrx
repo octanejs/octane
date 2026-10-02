@@ -33,7 +33,9 @@ export function LocalStyles(props: { style?: CSSProperties }) @{
 				left$.set(10);
 				right$.set(20);
 			}}
-		>{'move'}</button>
+		>
+			{'move'}
+		</button>
 		<div style={{ ...props.style, left: left$, right: right$ }} />
 	</section>
 }
@@ -71,10 +73,7 @@ export function WholeSignalStyle(props: { style$: SignalHandle<CSSProperties | s
 	</div>
 }
 
-export function HiddenStyles(props: {
-	left$: SignalHandle<number | null>;
-	hidden: boolean;
-}) @{
+export function HiddenStyles(props: { left$: SignalHandle<number | null>; hidden: boolean }) @{
 	<Activity mode={props.hidden ? 'hidden' : 'visible'}>
 		<SignalStyles left$={props.left$} />
 	</Activity>

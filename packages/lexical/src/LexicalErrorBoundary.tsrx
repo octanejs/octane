@@ -29,11 +29,15 @@ export function LexicalErrorBoundary(props: LexicalErrorBoundaryProps) @{
 					componentStack: '',
 				});
 			}
-			return props.fallback === undefined
-				? <div style={{ border: '1px solid #f00', color: '#f00', padding: '8px' }}>
-						An error was thrown.
-					</div>
-				: (props.fallback);
+			return props.fallback === undefined ? (
+				<div style={{ border: '1px solid #f00', color: '#f00', padding: '8px' }}>
+					An error was thrown.
+				</div>
+			) : (
+				props.fallback
+			);
 		}}
-	>{props.children}</ErrorBoundary>
+	>
+		{props.children}
+	</ErrorBoundary>
 }

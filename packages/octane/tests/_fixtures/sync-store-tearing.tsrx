@@ -64,7 +64,7 @@ export function CachedMirror(props) @{
 	const value = useSyncExternalStore(subscribe, getState);
 	const [mirror, setMirror] = useState(value);
 	if (value !== mirror) setMirror(value);
-	<span id="mirror">{value + '|' + mirror as string}</span>
+	<span id="mirror">{(value + '|' + mirror) as string}</span>
 }
 
 // ---------------------------------------------------------------------------
@@ -122,5 +122,5 @@ export function ChurnConsumer(props) @{
 		// Set the store value once on mount (empty deps).
 		if (snap.value.text === '(not set)') props.store.set('B');
 	}, []);
-	<span id="churn">{(snap.value.text) as string}</span>
+	<span id="churn">{snap.value.text as string}</span>
 }

@@ -29,7 +29,9 @@ export function Wrapped(props: StateProps) @{
 					props.state.failed = false;
 					retry();
 				}}
-			>{(error as Error).message as string}</button>
+			>
+				{(error as Error).message as string}
+			</button>
 		}
 	</main>
 }
@@ -44,7 +46,9 @@ export function SoleRoot(props: StateProps) @{
 				props.state.failed = false;
 				retry();
 			}}
-		>{(error as Error).message as string}</button>
+		>
+			{(error as Error).message as string}
+		</button>
 	}
 }
 
@@ -61,7 +65,9 @@ export function HostBody(props: StateProps) @{
 					props.state.failed = false;
 					retry();
 				}}
-			>{(error as Error).message as string}</button>
+			>
+				{(error as Error).message as string}
+			</button>
 		}
 	</main>
 }
@@ -69,12 +75,16 @@ export function HostBody(props: StateProps) @{
 export function JsxBoundary(props: StateProps) @{
 	<main>
 		<ErrorBoundary
-			fallback={(error: unknown, retry: () => void) => <button
-				onClick={() => {
-					props.state.failed = false;
-					retry();
-				}}
-			>{(error as Error).message as string}</button>}
+			fallback={(error: unknown, retry: () => void) => (
+				<button
+					onClick={() => {
+						props.state.failed = false;
+						retry();
+					}}
+				>
+					{(error as Error).message as string}
+				</button>
+			)}
 		>
 			<section>
 				<Result state={props.state} />

@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -277,7 +277,7 @@
           "path": "packages/base-ui-utils/tests/native-contracts.test.tsrx",
           "testName": "attaches and cleans up recursive refs passed through a fast component",
           "fullName": "attaches and cleans up recursive refs passed through a fast component",
-          "sha256": "b54e29f0aa237b9c18112796ee8a39f8638e0781d9a0d8113d9c3a1125f49c05"
+          "sha256": "2d6bd607b48bdfad48f104836f7514f6f906daa407f3d7a3eea8354e02c2ce98"
         }
       ]
     },
@@ -298,7 +298,7 @@
           "path": "packages/base-ui-utils/tests/native-contracts.test.tsrx",
           "testName": "supports the inert, stable ID, and ref cleanup capabilities advertised to upstream code",
           "fullName": "supports the inert, stable ID, and ref cleanup capabilities advertised to upstream code",
-          "sha256": "b54e29f0aa237b9c18112796ee8a39f8638e0781d9a0d8113d9c3a1125f49c05"
+          "sha256": "2d6bd607b48bdfad48f104836f7514f6f906daa407f3d7a3eea8354e02c2ce98"
         }
       ]
     },

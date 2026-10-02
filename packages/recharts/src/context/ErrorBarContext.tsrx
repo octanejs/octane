@@ -31,11 +31,11 @@ const initialContextState: ErrorBarContextType<any> = {
 
 const ErrorBarContext = createContext(initialContextState);
 
-export function SetErrorBarContext<
-	T extends BarRectangleItem | LinePointItem | ScatterPointItem,
->(props: ErrorBarContextType<T> & {
-	children: OctaneNode;
-}) {
+export function SetErrorBarContext<T extends BarRectangleItem | LinePointItem | ScatterPointItem>(
+	props: ErrorBarContextType<T> & {
+		children: OctaneNode;
+	},
+) {
 	const { children, ...rest } = props;
 	return <ErrorBarContext value={rest}>{children}</ErrorBarContext>;
 }

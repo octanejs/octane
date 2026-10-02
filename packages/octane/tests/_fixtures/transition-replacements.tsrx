@@ -18,7 +18,7 @@ function B(props) @{
 function SusB(props) @{
 	props.log('SusB');
 	const v = use(props.promise);
-	<span class="content">{'B-' + v as string}</span>
+	<span class="content">{('B-' + v) as string}</span>
 }
 
 export function IfSwap(props) @{
@@ -26,10 +26,10 @@ export function IfSwap(props) @{
 	const [isPending, start] = useTransition();
 	const Incoming = props.suspend ? SusB : B;
 	<div>
-		<button id="go" onClick={() => start(() => setShowB(true))}>{'go'}</button>
-		<span id="pending">
-			{isPending ? 'pending' : 'idle'}
-		</span>
+		<button id="go" onClick={() => start(() => setShowB(true))}>
+			{'go'}
+		</button>
+		<span id="pending">{isPending ? 'pending' : 'idle'}</span>
 		@try {
 			<div class="slot">
 				{showB ? <Incoming log={props.log} promise={props.promise} /> : <A log={props.log} />}
@@ -44,13 +44,12 @@ export function IfSwap(props) @{
 export function CompSwap(props) @{
 	const [showB, setShowB] = useState(false);
 	const [isPending, start] = useTransition();
-	const Comp =
-		showB ? (props.suspend ? SusB : B) : A;
+	const Comp = showB ? (props.suspend ? SusB : B) : A;
 	<div>
-		<button id="go" onClick={() => start(() => setShowB(true))}>{'go'}</button>
-		<span id="pending">
-			{isPending ? 'pending' : 'idle'}
-		</span>
+		<button id="go" onClick={() => start(() => setShowB(true))}>
+			{'go'}
+		</button>
+		<span id="pending">{isPending ? 'pending' : 'idle'}</span>
 		@try {
 			<div class="slot">
 				<Comp log={props.log} promise={props.promise} />
@@ -66,12 +65,14 @@ export function IfDoubleSwap(props) @{
 	const [showB, setShowB] = useState(false);
 	const [, start] = useTransition();
 	<div>
-		<button id="toB" onClick={() => start(() => setShowB(true))}>{'toB'}</button>
-		<button id="toA" onClick={() => start(() => setShowB(false))}>{'toA'}</button>
+		<button id="toB" onClick={() => start(() => setShowB(true))}>
+			{'toB'}
+		</button>
+		<button id="toA" onClick={() => start(() => setShowB(false))}>
+			{'toA'}
+		</button>
 		@try {
-			<div class="slot">
-				{showB ? <B log={props.log} /> : <A log={props.log} />}
-			</div>
+			<div class="slot">{showB ? <B log={props.log} /> : <A log={props.log} />}</div>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -84,8 +85,12 @@ export function CompDoubleSwap(props) @{
 	const [, start] = useTransition();
 	const Comp = showB ? B : A;
 	<div>
-		<button id="toB" onClick={() => start(() => setShowB(true))}>{'toB'}</button>
-		<button id="toA" onClick={() => start(() => setShowB(false))}>{'toA'}</button>
+		<button id="toB" onClick={() => start(() => setShowB(true))}>
+			{'toB'}
+		</button>
+		<button id="toA" onClick={() => start(() => setShowB(false))}>
+			{'toA'}
+		</button>
 		@try {
 			<div class="slot">
 				<Comp log={props.log} />

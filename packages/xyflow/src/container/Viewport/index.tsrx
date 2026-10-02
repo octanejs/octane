@@ -26,8 +26,10 @@ export function Viewport({ children }: ViewportProps) {
 
 			// store.subscribe fires on every update, so only touch the DOM when x, y or zoom actually changed
 			if (
-				prevTransform && transform[0] === prevTransform[0] && transform[1] === prevTransform[1] &&
-					transform[2] === prevTransform[2]
+				prevTransform &&
+				transform[0] === prevTransform[0] &&
+				transform[1] === prevTransform[1] &&
+				transform[2] === prevTransform[2]
 			) {
 				return;
 			}
@@ -44,9 +46,13 @@ export function Viewport({ children }: ViewportProps) {
 		return store.subscribe(applyTransform);
 	}, [store]);
 
-	return <div
-		ref={viewportRef}
-		className="react-flow__viewport xyflow__viewport react-flow__container"
-		style={{ transform: toTransformString(initialTransform) }}
-	>{children}</div>;
+	return (
+		<div
+			ref={viewportRef}
+			className="react-flow__viewport xyflow__viewport react-flow__container"
+			style={{ transform: toTransformString(initialTransform) }}
+		>
+			{children}
+		</div>
+	);
 }

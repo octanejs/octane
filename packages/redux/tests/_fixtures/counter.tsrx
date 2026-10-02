@@ -34,8 +34,12 @@ function CounterView() @{
 		<span id="value">
 			{'value=' + value + ' doubled=' + summary.doubled + ' label=' + summary.label}
 		</span>
-		<button id="inc" onClick={() => dispatch(counterSlice.actions.increment())}>+</button>
-		<button id="dec" onClick={() => dispatch(counterSlice.actions.decrement())}>-</button>
+		<button id="inc" onClick={() => dispatch(counterSlice.actions.increment())}>
+			+
+		</button>
+		<button id="dec" onClick={() => dispatch(counterSlice.actions.decrement())}>
+			-
+		</button>
 	</div>
 }
 

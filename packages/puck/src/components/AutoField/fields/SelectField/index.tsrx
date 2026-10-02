@@ -20,27 +20,26 @@ export const SelectField = ({
 		return null;
 	}
 
-	return <Label
-		label={label || name}
-		icon={labelIcon || <ChevronDown size={16} />}
-		readOnly={readOnly}
-	>
-		<select
-			id={id}
-			title={label || name}
-			className={getClassName('input')}
-			disabled={readOnly}
-			onChange={(e) => {
-				onChange(JSON.parse(e.currentTarget.value).value);
-			}}
-			value={JSON.stringify({ value })}
-		>{field.options.map(
-			(option) =>
-				<option
-					key={option.label + JSON.stringify(option.value)}
-					label={option.label}
-					value={JSON.stringify({ value: option.value })}
-				/>,
-		)}</select>
-	</Label>;
+	return (
+		<Label label={label || name} icon={labelIcon || <ChevronDown size={16} />} readOnly={readOnly}>
+			<select
+				id={id}
+				title={label || name}
+				className={getClassName('input')}
+				disabled={readOnly}
+				onChange={(e) => {
+					onChange(JSON.parse(e.currentTarget.value).value);
+				}}
+				value={JSON.stringify({ value })}
+			>
+				{field.options.map((option) => (
+					<option
+						key={option.label + JSON.stringify(option.value)}
+						label={option.label}
+						value={JSON.stringify({ value: option.value })}
+					/>
+				))}
+			</select>
+		</Label>
+	);
 };

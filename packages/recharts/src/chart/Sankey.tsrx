@@ -73,53 +73,56 @@ const cubicValue = (
 	t: number,
 ): number => {
 	const inverseT = 1 - t;
-	return inverseT ** 3 * start + 3 * inverseT ** 2 * t * control1 +
+	return (
+		inverseT ** 3 * start +
+		3 * inverseT ** 2 * t * control1 +
 		3 * inverseT * t ** 2 * control2 +
-		t ** 3 * end;
+		t ** 3 * end
+	);
 };
 
 // TODO why is this not reading dataKey?
 const getValue = (entry: LinkDataItem | SankeyNode | undefined): number =>
-	entry && entry.value || 0;
+	(entry && entry.value) || 0;
 
-const getSumOfIds = (links: ReadonlyArray<LinkDataItem>, ids: number[]): number => ids.reduce(
-	(result, id) => result + getValue(links[id]),
-	0,
-);
+const getSumOfIds = (links: ReadonlyArray<LinkDataItem>, ids: number[]): number =>
+	ids.reduce((result, id) => result + getValue(links[id]), 0);
 
 const getSumWithWeightedSource = (
 	tree: ReadonlyArray<SankeyNode>,
 	links: ReadonlyArray<LinkDataItemDy>,
 	ids: number[],
-) => ids.reduce((result, id) => {
-	const link = links[id];
-	if (link == null) {
-		return result;
-	}
-	const sourceNode = tree[link.source];
-	if (sourceNode == null) {
-		return result;
-	}
+) =>
+	ids.reduce((result, id) => {
+		const link = links[id];
+		if (link == null) {
+			return result;
+		}
+		const sourceNode = tree[link.source];
+		if (sourceNode == null) {
+			return result;
+		}
 
-	return result + centerY(sourceNode) * getValue(links[id]);
-}, 0);
+		return result + centerY(sourceNode) * getValue(links[id]);
+	}, 0);
 
 const getSumWithWeightedTarget = (
 	tree: ReadonlyArray<SankeyNode>,
 	links: ReadonlyArray<LinkDataItemDy>,
 	ids: ReadonlyArray<number>,
-): number => ids.reduce((result: number, id: number) => {
-	const link = links[id];
-	if (link == null) {
-		return result;
-	}
-	const targetNode = tree[link.target];
-	if (targetNode == null) {
-		return result;
-	}
+): number =>
+	ids.reduce((result: number, id: number) => {
+		const link = links[id];
+		if (link == null) {
+			return result;
+		}
+		const targetNode = tree[link.target];
+		if (targetNode == null) {
+			return result;
+		}
 
-	return result + centerY(targetNode) * getValue(links[id]);
-}, 0);
+		return result + centerY(targetNode) * getValue(links[id]);
+	}, 0);
 
 const ascendingY = (a: { y: number }, b: { y: number }) => a.y - b.y;
 
@@ -159,10 +162,10 @@ const updateDepthOfTargets = (tree: SankeyNode[], curNode: SankeyNode) => {
 		if (target) {
 			const newDepth = curNode.depth + 1;
 			/*
- * Only recurse when the depth grows. Depth is the longest path to a node, so once it stops increasing
- * the subtree is already up to date; without this guard every path through the graph is walked
- * separately, which explodes combinatorially on dense graphs.
- */
+			 * Only recurse when the depth grows. Depth is the longest path to a node, so once it stops increasing
+			 * the subtree is already up to date; without this guard every path through the graph is walked
+			 * separately, which explodes combinatorially on dense graphs.
+			 */
 			if (newDepth > target.depth) {
 				target.depth = newDepth;
 				updateDepthOfTargets(tree, target);
@@ -292,9 +295,10 @@ const updateYOfTree = (
 		}
 	}
 
-	return links.map(
-		(link: LinkDataItem): LinkDataItemDy => ({ ...link, dy: getValue(link) * yRatio }),
-	);
+	return links.map((link: LinkDataItem): LinkDataItemDy => ({
+		...link,
+		dy: getValue(link) * yRatio,
+	}));
 };
 
 const resolveCollisions = (
@@ -369,8 +373,7 @@ const relaxLeftToRight = (
 			if (node.sourceLinks.length) {
 				const sourceSum = getSumOfIds(links, node.sourceLinks);
 				const weightedSum = getSumWithWeightedSource(tree, links, node.sourceLinks);
-				const y =
-					sourceSum === 0 ? centerY(node) : weightedSum / sourceSum;
+				const y = sourceSum === 0 ? centerY(node) : weightedSum / sourceSum;
 
 				node.y += (y - centerY(node)) * alpha;
 			}
@@ -381,8 +384,8 @@ const relaxLeftToRight = (
 const relaxRightToLeft = (
 	tree: ReadonlyArray<SankeyNode>,
 	/*
- * depthTree array is modified by this method!
- */
+	 * depthTree array is modified by this method!
+	 */
 	depthTree: SankeyNode[][],
 	links: ReadonlyArray<LinkDataItemDy>,
 	alpha: number,
@@ -402,8 +405,7 @@ const relaxRightToLeft = (
 			if (node.targetLinks.length) {
 				const targetSum = getSumOfIds(links, node.targetLinks);
 				const weightedSum = getSumWithWeightedTarget(tree, links, node.targetLinks);
-				const y =
-					targetSum === 0 ? centerY(node) : weightedSum / targetSum;
+				const y = targetSum === 0 ? centerY(node) : weightedSum / targetSum;
 
 				node.y += (y - centerY(node)) * alpha;
 			}
@@ -411,10 +413,10 @@ const relaxRightToLeft = (
 	}
 };
 
-const updateYOfLinks: (tree: SankeyNode[], links: LinkDataItemDy[]) => asserts links is SankeyLink[] = (
-	tree,
-	links,
-) => {
+const updateYOfLinks: (
+	tree: SankeyNode[],
+	links: LinkDataItemDy[],
+) => asserts links is SankeyLink[] = (tree, links) => {
 	for (let i = 0, len = tree.length; i < len; i++) {
 		const node = tree[i];
 		if (node == null) {
@@ -486,8 +488,7 @@ const getLinkYAtX = (
 ): number => {
 	const sourceX = sourceNode.x + sourceNode.dx;
 	const targetX = targetNode.x;
-	const progress =
-		targetX === sourceX ? 0 : (x - sourceX) / (targetX - sourceX);
+	const progress = targetX === sourceX ? 0 : (x - sourceX) / (targetX - sourceX);
 	const boundedProgress = Math.min(Math.max(progress, 0), 1);
 	const sourceY = sourceNode.y + (link.sy ?? 0) + link.dy / 2;
 	const targetY = targetNode.y + (link.ty ?? 0) + link.dy / 2;
@@ -521,8 +522,7 @@ const resolveNodeLinkCollisions = (
 			continue;
 		}
 
-		const depthX =
-			nodes[0] == null ? undefined : nodes[0].x + nodes[0].dx / 2;
+		const depthX = nodes[0] == null ? undefined : nodes[0].x + nodes[0].dx / 2;
 		if (depthX == null) {
 			continue;
 		}
@@ -541,21 +541,18 @@ const resolveNodeLinkCollisions = (
 			}
 
 			if (
-				depth <= Math.min(sourceDepth, targetDepth) || depth >= Math.max(sourceDepth, targetDepth)
+				depth <= Math.min(sourceDepth, targetDepth) ||
+				depth >= Math.max(sourceDepth, targetDepth)
 			) {
 				return [];
 			}
 
 			const y = getLinkYAtX(sourceNode, targetNode, link, depthX) - link.dy / 2;
-			return [
-				{ y, dy: link.dy, fixed: true as const },
-			];
+			return [{ y, dy: link.dy, fixed: true as const }];
 		});
 
-		const containedNodeObstacles = fixedObstacles.filter(
-			(obstacle) => nodes.some(
-				(node) => node.y >= obstacle.y && node.y + node.dy <= obstacle.y + obstacle.dy,
-			),
+		const containedNodeObstacles = fixedObstacles.filter((obstacle) =>
+			nodes.some((node) => node.y >= obstacle.y && node.y + node.dy <= obstacle.y + obstacle.dy),
 		);
 
 		if (containedNodeObstacles.length === 0) {
@@ -650,7 +647,7 @@ export const computeData = ({
 	if (verticalAlign === 'justify') {
 		let alpha = 1;
 		for (let i = 1; i <= iterations; i++) {
-			relaxRightToLeft(tree, depthTree, linksWithDy, alpha *= 0.99);
+			relaxRightToLeft(tree, depthTree, linksWithDy, (alpha *= 0.99));
 
 			resolveCollisions(depthTree, height, nodePadding, sort);
 
@@ -685,11 +682,10 @@ const getLinkCoordinateOfTooltip = (item: LinkProps): Coordinate | undefined => 
 // Layout augments the user's data records, retaining arbitrary fields selected
 // by nameKey. Computed link payloads contain node objects, not source indices.
 type SankeyTooltipNode = SankeyNode & Record<string | number, unknown>;
-type SankeyTooltipLink =
-	Omit<LinkProps['payload'], 'source' | 'target'> & {
-		source: SankeyTooltipNode;
-		target: SankeyTooltipNode;
-	} & Record<string | number, unknown>;
+type SankeyTooltipLink = Omit<LinkProps['payload'], 'source' | 'target'> & {
+	source: SankeyTooltipNode;
+	target: SankeyTooltipNode;
+} & Record<string | number, unknown>;
 type SankeyTooltipPayload = {
 	payload: SankeyTooltipNode | SankeyTooltipLink;
 	name: unknown;
@@ -753,38 +749,40 @@ const options: ChartOptions = {
 	eventEmitter: undefined,
 };
 
-const SetSankeyTooltipEntrySettings = React.memo(({
-	dataKey,
-	nameKey,
-	stroke,
-	strokeWidth,
-	fill,
-	name,
-	data,
-	id,
-}: Pick<
-	InternalSankeyProps,
-	'dataKey' | 'nameKey' | 'stroke' | 'strokeWidth' | 'fill' | 'name' | 'data' | 'id'
->) => {
-	const tooltipEntrySettings: TooltipPayloadConfiguration = {
-		dataDefinedOnItem: data,
-		getPosition: noop,
-		settings: {
-			stroke,
-			strokeWidth,
-			fill,
-			dataKey,
-			name,
-			nameKey,
-			hide: false,
-			type: undefined,
-			color: fill,
-			unit: '',
-			graphicalItemId: id,
-		},
-	};
-	return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
-});
+const SetSankeyTooltipEntrySettings = React.memo(
+	({
+		dataKey,
+		nameKey,
+		stroke,
+		strokeWidth,
+		fill,
+		name,
+		data,
+		id,
+	}: Pick<
+		InternalSankeyProps,
+		'dataKey' | 'nameKey' | 'stroke' | 'strokeWidth' | 'fill' | 'name' | 'data' | 'id'
+	>) => {
+		const tooltipEntrySettings: TooltipPayloadConfiguration = {
+			dataDefinedOnItem: data,
+			getPosition: noop,
+			settings: {
+				stroke,
+				strokeWidth,
+				fill,
+				dataKey,
+				name,
+				nameKey,
+				hide: false,
+				type: undefined,
+				color: fill,
+				unit: '',
+				graphicalItemId: id,
+			},
+		};
+		return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
+	},
+);
 
 interface LinkDataItem {
 	source: number;
@@ -825,11 +823,10 @@ export interface SankeyData {
 export type SankeyNodeOptions =
 	OctaneElement<RectangleProps> | ((props: NodeProps) => OctaneNode) | RectangleProps;
 
-type SankeyLinkSvgProps =
-	Omit<SVGProps<SVGPathElement>, 'targetX' | 'targetY'> & {
-		targetX?: number;
-		targetY?: number;
-	};
+type SankeyLinkSvgProps = Omit<SVGProps<SVGPathElement>, 'targetX' | 'targetY'> & {
+	targetX?: number;
+	targetY?: number;
+};
 
 type SankeyLinkOptions =
 	| OctaneElement<SankeyLinkSvgProps>
@@ -838,139 +835,145 @@ type SankeyLinkOptions =
 
 interface SankeyProps extends EventThrottlingProps {
 	/**
- * Name represents each sector in the tooltip.
- * This allows you to extract the name from the data:
- *
- * - `string`: the name of the field in the data object;
- * - `number`: the index of the field in the data;
- * - `function`: a function that receives the data object and returns the name.
- *
- * @defaultValue name
- */
+	 * Name represents each sector in the tooltip.
+	 * This allows you to extract the name from the data:
+	 *
+	 * - `string`: the name of the field in the data object;
+	 * - `number`: the index of the field in the data;
+	 * - `function`: a function that receives the data object and returns the name.
+	 *
+	 * @defaultValue name
+	 */
 	nameKey?: DataKey<any>;
 	/**
- * dataKey prop in Sankey defines which key in the link objects represents the value of the link _in Tooltip only_.
- *
- * Unlike other charts where dataKey is used to extract values from the data array, in Sankey charts,
- * the value of each link is directly taken from the 'value' property of the link objects.
- *
- * @default 'value'
- */
+	 * dataKey prop in Sankey defines which key in the link objects represents the value of the link _in Tooltip only_.
+	 *
+	 * Unlike other charts where dataKey is used to extract values from the data array, in Sankey charts,
+	 * the value of each link is directly taken from the 'value' property of the link objects.
+	 *
+	 * @default 'value'
+	 */
 	dataKey?: DataKey<any>;
 	/**
- * The width of chart container.
- * Can be a number or a percent string like "100%".
- *
- * @see {@link https://recharts.github.io/en-US/guide/sizes/ Chart sizing guide}
- */
+	 * The width of chart container.
+	 * Can be a number or a percent string like "100%".
+	 *
+	 * @see {@link https://recharts.github.io/en-US/guide/sizes/ Chart sizing guide}
+	 */
 	width?: number | Percent;
 	/**
- * The height of chart container.
- * Can be a number or a percent string like "100%".
- *
- * @see {@link https://recharts.github.io/en-US/guide/sizes/ Chart sizing guide}
- */
+	 * The height of chart container.
+	 * Can be a number or a percent string like "100%".
+	 *
+	 * @see {@link https://recharts.github.io/en-US/guide/sizes/ Chart sizing guide}
+	 */
 	height?: number | Percent;
 	/**
- * The source data, including the array of nodes, and the relationships, represented by links.
- *
- * Note that Sankey requires a specific data structure.
- * Each node should have a unique index in the nodes array, and each link should reference these nodes by their indices.
- * This is different from other chart types in Recharts, which accept arbitrary data.
- *
- * @example
- * nodes: [
- *   { name: 'Visit' },
- *   { name: 'Direct-Favourite' },
- *   { name: 'Page-Click' },
- *   { name: 'Detail-Favourite' },
- *   { name: 'Lost' },
- * ],
- * links: [
- *   { source: 0, target: 1, value: 3728.3 },
- *   { source: 0, target: 2, value: 354170 },
- *   { source: 2, target: 3, value: 62429 },
- *   { source: 2, target: 4, value: 291741 },
- * ],
- */
+	 * The source data, including the array of nodes, and the relationships, represented by links.
+	 *
+	 * Note that Sankey requires a specific data structure.
+	 * Each node should have a unique index in the nodes array, and each link should reference these nodes by their indices.
+	 * This is different from other chart types in Recharts, which accept arbitrary data.
+	 *
+	 * @example
+	 * nodes: [
+	 *   { name: 'Visit' },
+	 *   { name: 'Direct-Favourite' },
+	 *   { name: 'Page-Click' },
+	 *   { name: 'Detail-Favourite' },
+	 *   { name: 'Lost' },
+	 * ],
+	 * links: [
+	 *   { source: 0, target: 1, value: 3728.3 },
+	 *   { source: 0, target: 2, value: 354170 },
+	 *   { source: 2, target: 3, value: 62429 },
+	 *   { source: 2, target: 4, value: 291741 },
+	 * ],
+	 */
 	data: SankeyData;
 	/**
- * The padding between the nodes
- * @default 10
- */
+	 * The padding between the nodes
+	 * @default 10
+	 */
 	nodePadding?: number;
 	/**
- * The width of node
- * @default 10
- */
+	 * The width of node
+	 * @default 10
+	 */
 	nodeWidth?: number;
 	/**
- * The curvature of width
- * @default 0.5
- */
+	 * The curvature of width
+	 * @default 0.5
+	 */
 	linkCurvature?: number;
 	/**
- * The number of the iterations between the links
- * @default 32
- */
+	 * The number of the iterations between the links
+	 * @default 32
+	 */
 	iterations?: number;
 	/**
- * If set an object, the option is the configuration of nodes.
- * If set a React element, the option is the custom react element of drawing the nodes.
- *
- * @example <Sankey node={MyCustomComponent} />
- * @example <Sankey node={{stroke: #77c878, strokeWidth: 2}} />
- */
+	 * If set an object, the option is the configuration of nodes.
+	 * If set a React element, the option is the custom react element of drawing the nodes.
+	 *
+	 * @example <Sankey node={MyCustomComponent} />
+	 * @example <Sankey node={{stroke: #77c878, strokeWidth: 2}} />
+	 */
 	node?: SankeyNodeOptions;
 	/**
- * If set an object, the option is the configuration of links.
- * If set a React element, the option is the custom react element of drawing the links.
- *
- * @example <Sankey link={MyCustomComponent} />
- * @example <Sankey link={{ fill: #77c878 }} />
- */
+	 * If set an object, the option is the configuration of links.
+	 * If set a React element, the option is the custom react element of drawing the links.
+	 *
+	 * @example <Sankey link={MyCustomComponent} />
+	 * @example <Sankey link={{ fill: #77c878 }} />
+	 */
 	link?: SankeyLinkOptions;
 	style?: CSSProperties;
 	className?: string;
 	children?: OctaneNode;
 	/**
- * Empty space around the container.
- *
- * @defaultValue {"top":5,"right":5,"bottom":5,"left":5}
- */
+	 * Empty space around the container.
+	 *
+	 * @defaultValue {"top":5,"right":5,"bottom":5,"left":5}
+	 */
 	margin?: Partial<Margin>;
 	/**
- * The customized event handler of click on the area in this group
- */
-	onClick?: (item: NodeProps | LinkProps, type: SankeyElementType, e: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
+	 * The customized event handler of click on the area in this group
+	 */
+	onClick?: (
+		item: NodeProps | LinkProps,
+		type: SankeyElementType,
+		e: NativeMouseEvent<SVGGraphicsElement>,
+	) => void;
 	/**
- * The customized event handler of mouseenter on the area in this group
- */
-	onMouseEnter?: (item: NodeProps | LinkProps, type: SankeyElementType, e: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
+	 * The customized event handler of mouseenter on the area in this group
+	 */
+	onMouseEnter?: (
+		item: NodeProps | LinkProps,
+		type: SankeyElementType,
+		e: NativeMouseEvent<SVGGraphicsElement>,
+	) => void;
 	/**
- * The customized event handler of mouseleave on the area in this group
- */
-	onMouseLeave?: (item: NodeProps | LinkProps, type: SankeyElementType, e: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
+	 * The customized event handler of mouseleave on the area in this group
+	 */
+	onMouseLeave?: (
+		item: NodeProps | LinkProps,
+		type: SankeyElementType,
+		e: NativeMouseEvent<SVGGraphicsElement>,
+	) => void;
 	/**
- * Whether to sort the nodes on the y axis, or to display them as user-defined.
- * @default true
- */
+	 * Whether to sort the nodes on the y axis, or to display them as user-defined.
+	 * @default true
+	 */
 	sort?: boolean;
 	/**
- * Controls the vertical spacing of nodes within a depth. 'justify' distributes nodes evenly and balances link paths, while 'top' positions the group starting from the top edge of the chart.
- * @default 'justify'
- */
+	 * Controls the vertical spacing of nodes within a depth. 'justify' distributes nodes evenly and balances link paths, while 'top' positions the group starting from the top edge of the chart.
+	 * @default 'justify'
+	 */
 	verticalAlign?: SankeyVerticalAlign;
 	/**
- * If set to 'justify', the start nodes will be aligned to the left edge of the chart and the end nodes will be aligned to the right edge of the chart. If set to 'left', the start nodes will be aligned to the left edge of the chart.
- * @default 'justify'
- */
+	 * If set to 'justify', the start nodes will be aligned to the left edge of the chart and the end nodes will be aligned to the right edge of the chart. If set to 'left', the start nodes will be aligned to the left edge of the chart.
+	 * @default 'justify'
+	 */
 	align?: 'left' | 'justify';
 }
 
@@ -997,18 +1000,20 @@ function renderLinkItem(option: SankeyLinkOptions | undefined, props: LinkProps)
 		...others
 	} = props;
 
-	return <path
-		className="recharts-sankey-link"
-		d={`
+	return (
+		<path
+			className="recharts-sankey-link"
+			d={`
           M${sourceX},${sourceY}
           C${sourceControlX},${sourceY} ${targetControlX},${targetY} ${targetX},${targetY}
         `}
-		fill="none"
-		stroke="#333"
-		strokeWidth={linkWidth}
-		strokeOpacity="0.2"
-		{...svgPropertiesNoEvents(others)}
-	/>;
+			fill="none"
+			stroke="#333"
+			strokeWidth={linkWidth}
+			strokeOpacity="0.2"
+			{...svgPropertiesNoEvents(others)}
+		/>
+	);
 }
 
 const buildLinkProps = ({
@@ -1135,26 +1140,29 @@ function AllSankeyLinkElements({
 	onClick: (linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
 	dataKey: DataKey<any>;
 }) {
-	return <Layer className="recharts-sankey-links" key="recharts-sankey-links">{links.map((
-		link: SankeyLink,
-		i: number,
-	) => {
-		const linkProps = modifiedLinks[i];
-		if (linkProps == null) {
-			return null;
-		}
-		return <SankeyLinkElement
-			graphicalItemId={graphicalItemId}
-			key={`link-${link.source}-${link.target}-${link.value}`}
-			props={linkProps}
-			linkContent={linkContent}
-			i={i}
-			onMouseEnter={onMouseEnter}
-			onMouseLeave={onMouseLeave}
-			onClick={onClick}
-			dataKey={dataKey}
-		/>;
-	})}</Layer>;
+	return (
+		<Layer className="recharts-sankey-links" key="recharts-sankey-links">
+			{links.map((link: SankeyLink, i: number) => {
+				const linkProps = modifiedLinks[i];
+				if (linkProps == null) {
+					return null;
+				}
+				return (
+					<SankeyLinkElement
+						graphicalItemId={graphicalItemId}
+						key={`link-${link.source}-${link.target}-${link.value}`}
+						props={linkProps}
+						linkContent={linkContent}
+						i={i}
+						onMouseEnter={onMouseEnter}
+						onMouseLeave={onMouseLeave}
+						onClick={onClick}
+						dataKey={dataKey}
+					/>
+				);
+			})}
+		</Layer>
+	);
 }
 
 function renderNodeItem(option: SankeyNodeOptions | undefined, props: NodeProps) {
@@ -1165,12 +1173,14 @@ function renderNodeItem(option: SankeyNodeOptions | undefined, props: NodeProps)
 		return option(props);
 	}
 
-	return <Rectangle
-		className="recharts-sankey-node"
-		fill="#0088fe"
-		fillOpacity="0.8"
-		{...svgPropertiesNoEvents(props)}
-	/>;
+	return (
+		<Rectangle
+			className="recharts-sankey-node"
+			fill="#0088fe"
+			fillOpacity="0.8"
+			{...svgPropertiesNoEvents(props)}
+		/>
+	);
 }
 
 const buildNodeProps = ({
@@ -1272,22 +1282,25 @@ function AllNodeElements({
 	onClick: (nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
 	dataKey: DataKey<any>;
 }) {
-	return <Layer className="recharts-sankey-nodes" key="recharts-sankey-nodes">{modifiedNodes.map((
-		modifiedNode,
-		i,
-	) => {
-		return <NodeElement
-			graphicalItemId={graphicalItemId}
-			key={`node-${modifiedNode.index}-${modifiedNode.x}-${modifiedNode.y}`}
-			props={modifiedNode}
-			nodeContent={nodeContent}
-			i={i}
-			onMouseEnter={onMouseEnter}
-			onMouseLeave={onMouseLeave}
-			onClick={onClick}
-			dataKey={dataKey}
-		/>;
-	})}</Layer>;
+	return (
+		<Layer className="recharts-sankey-nodes" key="recharts-sankey-nodes">
+			{modifiedNodes.map((modifiedNode, i) => {
+				return (
+					<NodeElement
+						graphicalItemId={graphicalItemId}
+						key={`node-${modifiedNode.index}-${modifiedNode.x}-${modifiedNode.y}`}
+						props={modifiedNode}
+						nodeContent={nodeContent}
+						i={i}
+						onMouseEnter={onMouseEnter}
+						onMouseLeave={onMouseLeave}
+						onClick={onClick}
+						dataKey={dataKey}
+					/>
+				);
+			})}
+		</Layer>
+	);
 }
 
 export const sankeyDefaultProps = {
@@ -1353,17 +1366,19 @@ function SankeyImpl(props: InternalSankeyProps) {
 
 		const top = margin.top || 0;
 		const left = margin.left || 0;
-		const newModifiedLinks = computed.links.map((l, i) => {
-			return buildLinkProps({
-				link: l,
-				nodes: computed.nodes,
-				i,
-				top,
-				left,
-				linkContent: link,
-				linkCurvature,
-			});
-		}).filter(isNotNil);
+		const newModifiedLinks = computed.links
+			.map((l, i) => {
+				return buildLinkProps({
+					link: l,
+					nodes: computed.nodes,
+					i,
+					top,
+					left,
+					linkContent: link,
+					linkCurvature,
+				});
+			})
+			.filter(isNotNil);
 
 		const newModifiedNodes = computed.nodes.map((n, i) => {
 			return buildNodeProps({
@@ -1397,79 +1412,94 @@ function SankeyImpl(props: InternalSankeyProps) {
 		verticalAlign,
 	]);
 
-	const handleMouseEnter = useCallback((
-		item: NodeProps | LinkProps,
-		type: SankeyElementType,
-		e: NativeMouseEvent<SVGGraphicsElement>,
-	) => {
-		if (onMouseEnter) {
-			onMouseEnter(item, type, e);
-		}
-	}, [onMouseEnter]);
+	const handleMouseEnter = useCallback(
+		(
+			item: NodeProps | LinkProps,
+			type: SankeyElementType,
+			e: NativeMouseEvent<SVGGraphicsElement>,
+		) => {
+			if (onMouseEnter) {
+				onMouseEnter(item, type, e);
+			}
+		},
+		[onMouseEnter],
+	);
 
-	const handleMouseLeave = useCallback((
-		item: NodeProps | LinkProps,
-		type: SankeyElementType,
-		e: NativeMouseEvent<SVGGraphicsElement>,
-	) => {
-		if (onMouseLeave) {
-			onMouseLeave(item, type, e);
-		}
-	}, [onMouseLeave]);
+	const handleMouseLeave = useCallback(
+		(
+			item: NodeProps | LinkProps,
+			type: SankeyElementType,
+			e: NativeMouseEvent<SVGGraphicsElement>,
+		) => {
+			if (onMouseLeave) {
+				onMouseLeave(item, type, e);
+			}
+		},
+		[onMouseLeave],
+	);
 
-	const handleClick = useCallback((
-		item: NodeProps | LinkProps,
-		type: SankeyElementType,
-		e: NativeMouseEvent<SVGGraphicsElement>,
-	) => {
-		if (onClick) {
-			onClick(item, type, e);
-		}
-	}, [onClick]);
+	const handleClick = useCallback(
+		(
+			item: NodeProps | LinkProps,
+			type: SankeyElementType,
+			e: NativeMouseEvent<SVGGraphicsElement>,
+		) => {
+			if (onClick) {
+				onClick(item, type, e);
+			}
+		},
+		[onClick],
+	);
 
 	if (
-		!isPositiveNumber(width) || !isPositiveNumber(height) || !data || !data.links || !data.nodes
+		!isPositiveNumber(width) ||
+		!isPositiveNumber(height) ||
+		!data ||
+		!data.links ||
+		!data.nodes
 	) {
 		return null;
 	}
 
-	return <>
-		<SetComputedData computedData={{ links: modifiedLinks, nodes: modifiedNodes }} />
-		<Surface {...attrs} width={width} height={height}>
-			{children}
-			<AllSankeyLinkElements
-				graphicalItemId={id}
-				links={links}
-				modifiedLinks={modifiedLinks}
-				linkContent={link}
-				dataKey={dataKey}
-				onMouseEnter={(linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
-					handleMouseEnter(linkProps, 'link', e)}
-				onMouseLeave={(linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
-					handleMouseLeave(linkProps, 'link', e)}
-				onClick={(linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) => handleClick(
-					linkProps,
-					'link',
-					e,
-				)}
-			/>
-			<AllNodeElements
-				graphicalItemId={id}
-				modifiedNodes={modifiedNodes}
-				nodeContent={node}
-				dataKey={dataKey}
-				onMouseEnter={(nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
-					handleMouseEnter(nodeProps, 'node', e)}
-				onMouseLeave={(nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
-					handleMouseLeave(nodeProps, 'node', e)}
-				onClick={(nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) => handleClick(
-					nodeProps,
-					'node',
-					e,
-				)}
-			/>
-		</Surface>
-	</>;
+	return (
+		<>
+			<SetComputedData computedData={{ links: modifiedLinks, nodes: modifiedNodes }} />
+			<Surface {...attrs} width={width} height={height}>
+				{children}
+				<AllSankeyLinkElements
+					graphicalItemId={id}
+					links={links}
+					modifiedLinks={modifiedLinks}
+					linkContent={link}
+					dataKey={dataKey}
+					onMouseEnter={(linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
+						handleMouseEnter(linkProps, 'link', e)
+					}
+					onMouseLeave={(linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
+						handleMouseLeave(linkProps, 'link', e)
+					}
+					onClick={(linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
+						handleClick(linkProps, 'link', e)
+					}
+				/>
+				<AllNodeElements
+					graphicalItemId={id}
+					modifiedNodes={modifiedNodes}
+					nodeContent={node}
+					dataKey={dataKey}
+					onMouseEnter={(nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
+						handleMouseEnter(nodeProps, 'node', e)
+					}
+					onMouseLeave={(nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
+						handleMouseLeave(nodeProps, 'node', e)
+					}
+					onClick={(nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
+						handleClick(nodeProps, 'node', e)
+					}
+				/>
+			</Surface>
+		</>
+	);
 }
 
 /**
@@ -1484,57 +1514,61 @@ export function Sankey(outsideProps: Props) {
 	const { width, height, style, className, id: externalId, throttleDelay, throttledEvents } = props;
 	const [tooltipPortal, setTooltipPortal] = useState<HTMLElement | null>(null);
 
-	return <RechartsStoreProvider preloadedState={{ options }} reduxStoreName={className ?? 'Sankey'}>
-		<ReportChartSize width={width} height={height} />
-		<ReportChartMargin margin={props.margin} />
-		<ReportEventSettings throttleDelay={throttleDelay} throttledEvents={throttledEvents} />
+	return (
+		<RechartsStoreProvider preloadedState={{ options }} reduxStoreName={className ?? 'Sankey'}>
+			<ReportChartSize width={width} height={height} />
+			<ReportChartMargin margin={props.margin} />
+			<ReportEventSettings throttleDelay={throttleDelay} throttledEvents={throttledEvents} />
 
-		<RechartsWrapper
-			className={className}
-			style={style}
-			width={width}
-			height={height}
-			/*
- * Sankey, same as Treemap, suffers from overfilling the container
- * and causing infinite render loops where the chart keeps growing.
- */
-			responsive={false}
-			ref={(node: HTMLDivElement | null) => {
-				if (node && !tooltipPortal) {
-					setTooltipPortal(node);
-				}
-			}}
-			onMouseEnter={undefined}
-			onMouseLeave={undefined}
-			onClick={undefined}
-			onMouseMove={undefined}
-			onMouseDown={undefined}
-			onMouseUp={undefined}
-			onContextMenu={undefined}
-			onDoubleClick={undefined}
-			onTouchStart={undefined}
-			onTouchMove={undefined}
-			onTouchEnd={undefined}
-		>
-			<TooltipPortalContext value={tooltipPortal}>
-				<RegisterGraphicalItemId id={externalId} type="sankey">
-					{(id) => <>
-						<SetSankeyTooltipEntrySettings
-							dataKey={props.dataKey}
-							nameKey={props.nameKey}
-							stroke={props.stroke}
-							strokeWidth={props.strokeWidth}
-							fill={props.fill}
-							name={props.name}
-							data={props.data}
-							id={id}
-						/>
-						<SankeyImpl {...props} id={id} />
-					</>}
-				</RegisterGraphicalItemId>
-			</TooltipPortalContext>
-		</RechartsWrapper>
-	</RechartsStoreProvider>;
+			<RechartsWrapper
+				className={className}
+				style={style}
+				width={width}
+				height={height}
+				/*
+				 * Sankey, same as Treemap, suffers from overfilling the container
+				 * and causing infinite render loops where the chart keeps growing.
+				 */
+				responsive={false}
+				ref={(node: HTMLDivElement | null) => {
+					if (node && !tooltipPortal) {
+						setTooltipPortal(node);
+					}
+				}}
+				onMouseEnter={undefined}
+				onMouseLeave={undefined}
+				onClick={undefined}
+				onMouseMove={undefined}
+				onMouseDown={undefined}
+				onMouseUp={undefined}
+				onContextMenu={undefined}
+				onDoubleClick={undefined}
+				onTouchStart={undefined}
+				onTouchMove={undefined}
+				onTouchEnd={undefined}
+			>
+				<TooltipPortalContext value={tooltipPortal}>
+					<RegisterGraphicalItemId id={externalId} type="sankey">
+						{(id) => (
+							<>
+								<SetSankeyTooltipEntrySettings
+									dataKey={props.dataKey}
+									nameKey={props.nameKey}
+									stroke={props.stroke}
+									strokeWidth={props.strokeWidth}
+									fill={props.fill}
+									name={props.name}
+									data={props.data}
+									id={id}
+								/>
+								<SankeyImpl {...props} id={id} />
+							</>
+						)}
+					</RegisterGraphicalItemId>
+				</TooltipPortalContext>
+			</RechartsWrapper>
+		</RechartsStoreProvider>
+	);
 }
 
 Sankey.displayName = 'Sankey';

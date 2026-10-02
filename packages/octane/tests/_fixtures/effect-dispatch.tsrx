@@ -19,7 +19,9 @@ export function EffectDispatch(props) @{
 		props.log.push('B');
 	}, [props.log]);
 	<div>
-		<button id="target" ref={btnRef} onClick={() => setCount((c) => c + 1)}>{'go'}</button>
+		<button id="target" ref={btnRef} onClick={() => setCount((c) => c + 1)}>
+			{'go'}
+		</button>
 		<span id="count">{count}</span>
 	</div>
 }
@@ -27,7 +29,9 @@ export function EffectDispatch(props) @{
 // htmlFor → for alias (React parity, like class/className).
 export function LabelFor() @{
 	<div>
-		<label id="lbl" htmlFor="field">{'Name'}</label>
+		<label id="lbl" htmlFor="field">
+			{'Name'}
+		</label>
 		<input id="field" />
 	</div>
 }

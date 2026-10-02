@@ -28,17 +28,20 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({
 	const startX = useRef(0);
 	const startWidth = useRef(0);
 
-	const handleMouseMove = useCallback((e: MouseEvent) => {
-		if (!isDragging.current) return;
+	const handleMouseMove = useCallback(
+		(e: MouseEvent) => {
+			if (!isDragging.current) return;
 
-		const delta = e.clientX - startX.current;
-		const newWidth =
-			position === 'left' ? startWidth.current + delta : startWidth.current - delta;
+			const delta = e.clientX - startX.current;
+			const newWidth =
+				position === 'left' ? startWidth.current + delta : startWidth.current - delta;
 
-		const width = Math.max(192, newWidth);
-		onResize(width);
-		e.preventDefault();
-	}, [onResize, position]);
+			const width = Math.max(192, newWidth);
+			onResize(width);
+			e.preventDefault();
+		},
+		[onResize, position],
+	);
 
 	const handleMouseUp = useCallback(() => {
 		if (!isDragging.current) return;
@@ -62,30 +65,35 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({
 		resetAutoZoom();
 	}, [onResizeEnd]);
 
-	const handleMouseDown = useCallback((e: MouseEvent) => {
-		isDragging.current = true;
-		startX.current = e.clientX;
+	const handleMouseDown = useCallback(
+		(e: MouseEvent) => {
+			isDragging.current = true;
+			startX.current = e.clientX;
 
-		startWidth.current = sidebarRef.current?.getBoundingClientRect().width || 0;
+			startWidth.current = sidebarRef.current?.getBoundingClientRect().width || 0;
 
-		document.body.style.cursor = 'col-resize';
-		document.body.style.userSelect = 'none';
+			document.body.style.cursor = 'col-resize';
+			document.body.style.userSelect = 'none';
 
-		const overlay = document.createElement('div');
-		overlay.id = 'resize-overlay';
-		overlay.setAttribute('data-resize-overlay', '');
-		document.body.appendChild(overlay);
+			const overlay = document.createElement('div');
+			overlay.id = 'resize-overlay';
+			overlay.setAttribute('data-resize-overlay', '');
+			document.body.appendChild(overlay);
 
-		// Add event listeners only when dragging starts
-		document.addEventListener('mousemove', handleMouseMove);
-		document.addEventListener('mouseup', handleMouseUp);
+			// Add event listeners only when dragging starts
+			document.addEventListener('mousemove', handleMouseMove);
+			document.addEventListener('mouseup', handleMouseUp);
 
-		e.preventDefault();
-	}, [position, handleMouseMove, handleMouseUp]);
+			e.preventDefault();
+		},
+		[position, handleMouseMove, handleMouseUp],
+	);
 
-	return <div
-		ref={handleRef}
-		className={getClassName({ [position]: true })}
-		onMouseDown={handleMouseDown}
-	/>;
+	return (
+		<div
+			ref={handleRef}
+			className={getClassName({ [position]: true })}
+			onMouseDown={handleMouseDown}
+		/>
+	);
 };

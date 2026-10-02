@@ -12,11 +12,10 @@ import {
 export function RootFreshPromiseScene(props) @{
 	const first = use(props.loadFirst(props.input));
 	const second = use(props.loadSecond(props.input, first));
-	useLayoutEffect(() => props.committed(props.input, second), [
-		props.committed,
-		props.input,
-		second,
-	]);
+	useLayoutEffect(
+		() => props.committed(props.input, second),
+		[props.committed, props.input, second],
+	);
 	<fresh-result input={props.input} value={second} />
 }
 
@@ -100,14 +99,18 @@ export function ExternalStoreWithServerScene(props) @{
 
 export function UnkeyedHostIdentityScene(props) {
 	if (props.leading) {
-		return <identity-scene>
-			<leading />
-			<target ref={props.targetRef} />
-		</identity-scene>;
+		return (
+			<identity-scene>
+				<leading />
+				<target ref={props.targetRef} />
+			</identity-scene>
+		);
 	}
-	return <identity-scene>
-		<target ref={props.targetRef} />
-	</identity-scene>;
+	return (
+		<identity-scene>
+			<target ref={props.targetRef} />
+		</identity-scene>
+	);
 }
 
 export function RecursiveMultiRefScene(props) @{

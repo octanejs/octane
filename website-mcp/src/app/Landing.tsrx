@@ -82,8 +82,7 @@ export function Landing() @{
 			<h1>Octane MCP</h1>
 			<p class="lede">
 				The remote MCP server for
-				<a href="https://octanejs.dev">Octane</a>
-				— docs search, real-compiler
+				<a href="https://octanejs.dev">Octane</a>— docs search, real-compiler
 				<code>.tsrx</code>
 				validation, and bindings knowledge for AI agents, no install required.
 			</p>
@@ -91,8 +90,7 @@ export function Landing() @{
 			<h2>Connect</h2>
 			<p>
 				The MCP endpoint speaks stateless Streamable HTTP at
-				<code>POST https://mcp.octanejs.dev/v1/mcp</code>
-				:
+				<code>POST https://mcp.octanejs.dev/v1/mcp</code>:
 			</p>
 			<pre>claude mcp add --transport http octane https://mcp.octanejs.dev/v1/mcp</pre>
 
@@ -132,8 +130,7 @@ export function Landing() @{
 			</p>
 
 			<p class="foot">
-				<a href="https://octanejs.dev/docs">Documentation</a>
-				·
+				<a href="https://octanejs.dev/docs">Documentation</a>·
 				<a href="https://github.com/octanejs/octane">GitHub</a>
 			</p>
 		</main>

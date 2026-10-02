@@ -9,13 +9,13 @@ export const sharedPersonItems = Combobox.createItems([] as Person[], {
 	getLabel: (person: Person) => person.name,
 });
 export function CollectionFixture() {
-	return <Combobox.Root
-		items={sharedPersonItems}
-		filteredItems={[
-			{ id: 'user-1', name: 'Alice' },
-		]}
-		defaultValue="user-1"
-	>
-		<Combobox.Input data-testid="input" />
-	</Combobox.Root>;
+	return (
+		<Combobox.Root
+			items={sharedPersonItems}
+			filteredItems={[{ id: 'user-1', name: 'Alice' }]}
+			defaultValue="user-1"
+		>
+			<Combobox.Input data-testid="input" />
+		</Combobox.Root>
+	);
 }

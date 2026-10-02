@@ -33,8 +33,7 @@ function StructuralReader(props: { promise: PromiseLike<string> }) @{
 
 export function StructuralRoot(props: StructuralRootProps) @{
 	const Current = props.changed ? StructuralReplacement : StructuralInput;
-	const items =
-		props.changed ? (props.shape === 'empty' ? [] : ['keep']) : ['remove', 'keep'];
+	const items = props.changed ? (props.shape === 'empty' ? [] : ['keep']) : ['remove', 'keep'];
 	<main data-root-shape={props.shape}>
 		@if (props.shape === 'keyed' || props.shape === 'empty') {
 			<ul>

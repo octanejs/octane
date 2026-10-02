@@ -38,32 +38,37 @@ function EdgeTextComponent({
 		return null;
 	}
 
-	return <g
-		transform={`translate(${x - edgeTextBbox.width / 2} ${y - edgeTextBbox.height / 2})`}
-		className={edgeTextClasses}
-		visibility={edgeTextBbox.width ? 'visible' : 'hidden'}
-		{...rest}
-	>
-		{labelShowBg &&
-			<rect
-				width={edgeTextBbox.width + 2 * labelBgPadding[0]}
-				x={-labelBgPadding[0]}
-				y={-labelBgPadding[1]}
-				height={edgeTextBbox.height + 2 * labelBgPadding[1]}
-				className="react-flow__edge-textbg"
-				style={labelBgStyle}
-				rx={labelBgBorderRadius}
-				ry={labelBgBorderRadius}
-			/>}
-		<text
-			className="react-flow__edge-text"
-			y={edgeTextBbox.height / 2}
-			dy="0.3em"
-			ref={edgeTextRef}
-			style={labelStyle}
-		>{label}</text>
-		{children}
-	</g>;
+	return (
+		<g
+			transform={`translate(${x - edgeTextBbox.width / 2} ${y - edgeTextBbox.height / 2})`}
+			className={edgeTextClasses}
+			visibility={edgeTextBbox.width ? 'visible' : 'hidden'}
+			{...rest}
+		>
+			{labelShowBg && (
+				<rect
+					width={edgeTextBbox.width + 2 * labelBgPadding[0]}
+					x={-labelBgPadding[0]}
+					y={-labelBgPadding[1]}
+					height={edgeTextBbox.height + 2 * labelBgPadding[1]}
+					className="react-flow__edge-textbg"
+					style={labelBgStyle}
+					rx={labelBgBorderRadius}
+					ry={labelBgBorderRadius}
+				/>
+			)}
+			<text
+				className="react-flow__edge-text"
+				y={edgeTextBbox.height / 2}
+				dy="0.3em"
+				ref={edgeTextRef}
+				style={labelStyle}
+			>
+				{label}
+			</text>
+			{children}
+		</g>
+	);
 }
 
 EdgeTextComponent.displayName = 'EdgeText';

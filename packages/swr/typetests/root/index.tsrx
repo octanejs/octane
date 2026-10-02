@@ -39,8 +39,24 @@ export function RootTypeConsumer() @{
 	void [data, numericData, bound, config, mutate, preload, unstable_serialize, SWRConfig];
 }
 
-type RootTypes =
-	[Arguments, BareFetcher, Cache, Fetcher, Key, KeyLoader, Middleware, MutatorCallback, MutatorOptions, Revalidator, RevalidatorOptions, ScopedMutator, State, SWRConfiguration, SWRHook, SWRResponse];
+type RootTypes = [
+	Arguments,
+	BareFetcher,
+	Cache,
+	Fetcher,
+	Key,
+	KeyLoader,
+	Middleware,
+	MutatorCallback,
+	MutatorOptions,
+	Revalidator,
+	RevalidatorOptions,
+	ScopedMutator,
+	State,
+	SWRConfiguration,
+	SWRHook,
+	SWRResponse,
+];
 declare const rootTypes: RootTypes;
 void rootTypes;
 

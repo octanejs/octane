@@ -34,8 +34,12 @@ function Content() @{
 				components={{ strong: <strong className="emphasis" /> }}
 			/>
 		</p>
-		<button id="en" onClick={() => instance.changeLanguage('en')}>English</button>
-		<button id="fr" onClick={() => instance.changeLanguage('fr')}>French</button>
+		<button id="en" onClick={() => instance.changeLanguage('en')}>
+			English
+		</button>
+		<button id="fr" onClick={() => instance.changeLanguage('fr')}>
+			French
+		</button>
 	</div>
 }
 

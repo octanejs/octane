@@ -21,13 +21,10 @@ const features = tableFeatures({
 // native input event, so both sides update per keystroke) + button-driven
 // pagination (the rig has no `change` driver, so NO <select> here) with the
 // pageIndex/pageCount surfaced as text and canPrev/canNext as disabled attrs.
-const data = Array.from(
-	{ length: 26 },
-	(_, i) => ({
-		name: String.fromCharCode(97 + i) + '-row',
-		n: i,
-	}),
-);
+const data = Array.from({ length: 26 }, (_, i) => ({
+	name: String.fromCharCode(97 + i) + '-row',
+	n: i,
+}));
 
 const columns = [
 	{ accessorKey: 'name', header: 'Name' },
@@ -43,7 +40,7 @@ export function FilterPaginate() @{
 	<div>
 		<input
 			id="flt"
-			value={table.getColumn('name')!.getFilterValue() as string ?? ''}
+			value={(table.getColumn('name')!.getFilterValue() as string) ?? ''}
 			onInput={(e) => table.getColumn('name')!.setFilterValue((e.target as HTMLInputElement).value)}
 		/>
 		<span id="pi">{table.state.pagination.pageIndex + '/' + table.getPageCount()}</span>
@@ -53,8 +50,12 @@ export function FilterPaginate() @{
 		<button id="next" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>
 			next
 		</button>
-		<button id="ps-5" onClick={() => table.setPageSize(5)}>5</button>
-		<button id="ps-20" onClick={() => table.setPageSize(20)}>20</button>
+		<button id="ps-5" onClick={() => table.setPageSize(5)}>
+			5
+		</button>
+		<button id="ps-20" onClick={() => table.setPageSize(20)}>
+			20
+		</button>
 		<ul>
 			@for (const row of table.getRowModel().rows; key row.id) {
 				<li>{row.original.name as string}</li>

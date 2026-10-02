@@ -31,24 +31,28 @@ export default function TodoApp() @{
 		});
 		input.value = '';
 	};
-	const toggle = (id: number) => flushSync(() => {
-		todos.value = todos.value.map((x) => (x.id === id ? { ...x, completed: !x.completed } : x));
-	});
-	const destroy = (id: number) => flushSync(() => {
-		todos.value = todos.value.filter((x) => x.id !== id);
-	});
+	const toggle = (id: number) =>
+		flushSync(() => {
+			todos.value = todos.value.map((x) => (x.id === id ? { ...x, completed: !x.completed } : x));
+		});
+	const destroy = (id: number) =>
+		flushSync(() => {
+			todos.value = todos.value.filter((x) => x.id !== id);
+		});
 	const toggleAll = (e: Event) => {
 		const on = (e.target as HTMLInputElement).checked;
 		flushSync(() => {
 			todos.value = todos.value.map((x) => (x.completed === on ? x : { ...x, completed: on }));
 		});
 	};
-	const clearCompleted = () => flushSync(() => {
-		todos.value = todos.value.filter((x) => !x.completed);
-	});
-	const startEdit = (id: number) => flushSync(() => {
-		editing.value = id;
-	});
+	const clearCompleted = () =>
+		flushSync(() => {
+			todos.value = todos.value.filter((x) => !x.completed);
+		});
+	const startEdit = (id: number) =>
+		flushSync(() => {
+			editing.value = id;
+		});
 	const commitEdit = (id: number, e: Event) => {
 		const title = (e.target as HTMLInputElement).value.trim();
 		flushSync(() => {
@@ -62,19 +66,21 @@ export default function TodoApp() @{
 	};
 	const editKeyDown = (id: number, e: KeyboardEvent) => {
 		if (e.key === 'Enter') commitEdit(id, e);
-		else if (e.key === 'Escape') flushSync(() => {
-			editing.value = null;
-		});
+		else if (e.key === 'Escape')
+			flushSync(() => {
+				editing.value = null;
+			});
 	};
 
 	// Ripple is fine-grained: the body runs ONCE, so deriveds must be
 	// FUNCTIONS evaluated inside template expressions (the tracked reads then
 	// register with the reactive expression), never setup-time consts.
-	const visible = () => filter.value === 'active'
-		? todos.value.filter((t) => !t.completed)
-		: filter.value === 'completed'
-			? todos.value.filter((t) => t.completed)
-			: todos.value;
+	const visible = () =>
+		filter.value === 'active'
+			? todos.value.filter((t) => !t.completed)
+			: filter.value === 'completed'
+				? todos.value.filter((t) => t.completed)
+				: todos.value;
 	const remaining = () => todos.value.filter((t) => !t.completed).length;
 	const anyCompleted = () => todos.value.some((t) => t.completed);
 
@@ -96,8 +102,9 @@ export default function TodoApp() @{
 					<ul class="todo-list">
 						@for (const t of visible(); key t.id) {
 							<li
-								class={(t.completed ? 'completed' : '') +
-									(editing.value === t.id ? ' editing' : '')}
+								class={
+									(t.completed ? 'completed' : '') + (editing.value === t.id ? ' editing' : '')
+								}
 							>
 								<div class="view">
 									<input
@@ -131,32 +138,46 @@ export default function TodoApp() @{
 							<a
 								class={filter.value === 'all' ? 'selected' : ''}
 								data-filter="all"
-								onClick={() => flushSync(() => {
-									filter.value = 'all';
-								})}
-							>{'All'}</a>
+								onClick={() =>
+									flushSync(() => {
+										filter.value = 'all';
+									})
+								}
+							>
+								{'All'}
+							</a>
 						</li>
 						<li>
 							<a
 								class={filter.value === 'active' ? 'selected' : ''}
 								data-filter="active"
-								onClick={() => flushSync(() => {
-									filter.value = 'active';
-								})}
-							>{'Active'}</a>
+								onClick={() =>
+									flushSync(() => {
+										filter.value = 'active';
+									})
+								}
+							>
+								{'Active'}
+							</a>
 						</li>
 						<li>
 							<a
 								class={filter.value === 'completed' ? 'selected' : ''}
 								data-filter="completed"
-								onClick={() => flushSync(() => {
-									filter.value = 'completed';
-								})}
-							>{'Completed'}</a>
+								onClick={() =>
+									flushSync(() => {
+										filter.value = 'completed';
+									})
+								}
+							>
+								{'Completed'}
+							</a>
 						</li>
 					</ul>
 					@if (anyCompleted()) {
-						<button class="clear-completed" onClick={clearCompleted}>{'Clear completed'}</button>
+						<button class="clear-completed" onClick={clearCompleted}>
+							{'Clear completed'}
+						</button>
 					}
 				</footer>
 			</>

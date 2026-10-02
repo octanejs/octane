@@ -9,20 +9,22 @@ const foreignUpdates: Array<() => void> = [];
 function ForeignRow(props: { index: number }) {
 	const [value, setValue] = useState(0);
 	foreignUpdates[props.index] = () => setValue(1);
-	return <output data-hydration-queue-foreign-row={String(props.index)}>
-		{'foreign:' + value}
-	</output>;
+	return (
+		<output data-hydration-queue-foreign-row={String(props.index)}>{'foreign:' + value}</output>
+	);
 }
 
 function TargetRow(props: { index: number; settle: boolean }) {
 	const [value, setValue] = useState(props.settle ? 0 : 2);
 	if (props.settle && value < 2) setValue(value + 1);
-	return <button
-		data-hydration-queue-target-row={String(props.index)}
-		onClick={() => setValue(value + 1)}
-	>
-		{'target:' + value}
-	</button>;
+	return (
+		<button
+			data-hydration-queue-target-row={String(props.index)}
+			onClick={() => setValue(value + 1)}
+		>
+			{'target:' + value}
+		</button>
+	);
 }
 
 export function ForeignRows(props: RowsProps) @{

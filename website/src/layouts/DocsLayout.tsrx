@@ -207,7 +207,9 @@ export function DocsLayout() @{
 					onClick={toggleMobileNavigation}
 				>
 					<span>Documentation</span>
-					<span class="sidebar-mobile-icon" aria-hidden="true">+</span>
+					<span class="sidebar-mobile-icon" aria-hidden="true">
+						+
+					</span>
 				</button>
 				<div class={['sidebar-panel', mobileMenuOpen && 'is-open']} ref={mobileMenuPanel}>
 					<div class="sidebar-panel-inner">
@@ -227,7 +229,9 @@ export function DocsLayout() @{
 														onClick={() => {
 															void closeMobileNavigation();
 														}}
-													>{doc.title as string}</Link>
+													>
+														{doc.title as string}
+													</Link>
 													@if (pageActive(doc.slug) && doc.sections && doc.sections.length > 0) {
 														<OnThisPage
 															sections={doc.sections}

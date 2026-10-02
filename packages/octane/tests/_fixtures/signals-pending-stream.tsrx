@@ -28,15 +28,15 @@ export function PendingStreamParent(props: PendingStreamProps) @{
 	const [selection, setSelection] = useState('original');
 	const [show, setShow] = useState(true);
 	<main>
-		<button
-			class="same-inputs"
-			onClick={() => setRenderCount(renderCount + 1)}
-		>{'Same inputs'}</button>
-		<button
-			class="change-selection"
-			onClick={() => setSelection('replacement')}
-		>{'Change selection'}</button>
-		<button class="remove-stream" onClick={() => setShow(false)}>{'Remove stream'}</button>
+		<button class="same-inputs" onClick={() => setRenderCount(renderCount + 1)}>
+			{'Same inputs'}
+		</button>
+		<button class="change-selection" onClick={() => setSelection('replacement')}>
+			{'Change selection'}
+		</button>
+		<button class="remove-stream" onClick={() => setShow(false)}>
+			{'Remove stream'}
+		</button>
 		<p class="parent-render">{String(renderCount)}</p>
 		@if (show) {
 			<PendingStreamPanel selection={selection} load={props.load} />

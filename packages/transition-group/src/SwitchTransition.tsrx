@@ -97,9 +97,9 @@ export function SwitchTransition(props: SwitchTransitionProps) @{
 		}
 	}
 
-	<TransitionGroupContext
-		value={{ isMounting: !appeared.current }}
-	>{output}</TransitionGroupContext>
+	<TransitionGroupContext value={{ isMounting: !appeared.current }}>
+		{output}
+	</TransitionGroupContext>
 }
 
 export default SwitchTransition;

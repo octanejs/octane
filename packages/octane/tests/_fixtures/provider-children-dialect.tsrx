@@ -26,7 +26,9 @@ function DialectRoot(props) {
 export function ProviderChildrenDialectFlip() @{
 	const [wrapped, setWrapped, getWrapped] = useState(false);
 	<div>
-		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>toggle</button>
+		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>
+			toggle
+		</button>
 		<DialectRoot wrapped={wrapped} value="ctx">
 			<Reader />
 		</DialectRoot>
@@ -36,13 +38,17 @@ export function ProviderChildrenDialectFlip() @{
 // The same flip with live state inside the children, so a remount is observable as a reset.
 function Counter() @{
 	const [n, setN, getN] = useState(0);
-	<button class="count" onClick={() => setN(getN() + 1)}>{'n' + n as string}</button>
+	<button class="count" onClick={() => setN(getN() + 1)}>
+		{('n' + n) as string}
+	</button>
 }
 
 export function ProviderChildrenDialectFlipWithState() @{
 	const [wrapped, setWrapped, getWrapped] = useState(false);
 	<div>
-		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>toggle</button>
+		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>
+			toggle
+		</button>
 		<DialectRoot wrapped={wrapped} value="ctx">
 			<Counter />
 		</DialectRoot>
@@ -55,7 +61,9 @@ export function ProviderChildrenDialectFlipWithSiblings() @{
 	const [wrapped, setWrapped, getWrapped] = useState(false);
 	<div>
 		<span class="before">before</span>
-		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>toggle</button>
+		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>
+			toggle
+		</button>
 		<DialectRoot wrapped={wrapped} value="ctx">
 			<Reader />
 		</DialectRoot>
@@ -82,7 +90,9 @@ function ThrowingCleanup(props: ThrowingCleanupProps = {}) @{
 export function ProviderDialectFlipCleanupThrows(props: ThrowingCleanupProps = {}) @{
 	const [wrapped, setWrapped, getWrapped] = useState(false);
 	<div>
-		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>toggle</button>
+		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>
+			toggle
+		</button>
 		@try {
 			<DialectRoot wrapped={wrapped} value="ctx">
 				<ThrowingCleanup failure={props.failure} lifecycle={props.lifecycle} />
@@ -98,7 +108,9 @@ export function ProviderDialectFlipCleanupThrows(props: ThrowingCleanupProps = {
 export function IfBranchSwapCleanupThrows() @{
 	const [shown, setShown, getShown] = useState(true);
 	<div>
-		<button class="toggle" onClick={() => setShown(!getShown())}>toggle</button>
+		<button class="toggle" onClick={() => setShown(!getShown())}>
+			toggle
+		</button>
 		@try {
 			@if (shown) {
 				<ThrowingCleanup />
@@ -117,11 +129,15 @@ export function IfBranchSwapCleanupThrows() @{
 export function ProviderRefFlipUnderSuspense(props) @{
 	const [wrapped, setWrapped, getWrapped] = useState(false);
 	<div>
-		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>toggle</button>
+		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>
+			toggle
+		</button>
 		@try {
 			const value = use(props.promise);
 			<DialectRoot wrapped={wrapped} value="ctx">
-				<span class="reffed" ref={props.cbRef}>{value as string}</span>
+				<span class="reffed" ref={props.cbRef}>
+					{value as string}
+				</span>
 			</DialectRoot>
 		} @pending {
 			<span class="pending-arm" />

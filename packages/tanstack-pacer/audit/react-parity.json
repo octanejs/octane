@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -67,7 +67,7 @@
         {
           "path": "packages/tanstack-pacer/tests/_fixtures/pacer.tsrx",
           "role": "support",
-          "sha256": "699b84bb436145fd98b3c858172b6a30dc2876be53b4c308a04ed2c6f85c6a16"
+          "sha256": "fd16c7629a727dab709fe75a6e213cd8ed450e53381c8da3e64a210dd076744a"
         }
       ]
     },
@@ -115,7 +115,7 @@
         {
           "path": "packages/tanstack-pacer/tests/_fixtures/pacer-diff.tsrx",
           "role": "support",
-          "sha256": "c3e869899916ce9d1f80b5fff7ebab9d318be721d8a583d5d96388297a6561ee"
+          "sha256": "6f563b39ed9b486b5eb682ed501481558dc0ffcb5df134fb6df139c910fdfc96"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
@@ -307,12 +307,12 @@
         {
           "path": "packages/tanstack-pacer/tests/_fixtures/pacer.tsrx",
           "role": "support",
-          "sha256": "699b84bb436145fd98b3c858172b6a30dc2876be53b4c308a04ed2c6f85c6a16"
+          "sha256": "fd16c7629a727dab709fe75a6e213cd8ed450e53381c8da3e64a210dd076744a"
         },
         {
           "path": "packages/tanstack-pacer/tests/_fixtures/pacer-diff.tsrx",
           "role": "support",
-          "sha256": "c3e869899916ce9d1f80b5fff7ebab9d318be721d8a583d5d96388297a6561ee"
+          "sha256": "6f563b39ed9b486b5eb682ed501481558dc0ffcb5df134fb6df139c910fdfc96"
         },
         {
           "path": "packages/octane/tests/_hydration-ssr.ts",

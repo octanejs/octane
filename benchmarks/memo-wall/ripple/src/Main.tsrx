@@ -38,10 +38,8 @@ function Leaf(props: { wall: string }) @{
 	// No body increment — see the probe-contract note above. The comma
 	// expression increments the probe on every re-run of the reactive text
 	// expression (once at creation, once per theme bump).
-	const theme = ((props.wall === 'A' ? ThemeA : ThemeB)).get() as () => string;
-	<span class="leaf">
-		{((window as any).__renders['leaf' + props.wall]++, theme())}
-	</span>
+	const theme = (props.wall === 'A' ? ThemeA : ThemeB).get() as () => string;
+	<span class="leaf">{((window as any).__renders['leaf' + props.wall]++, theme())}</span>
 }
 
 function Inner(props: { value: number; wall: string }) @{
@@ -61,7 +59,9 @@ function Row(props: {
 }) @{
 	(window as any).__renders['row' + props.wall]++;
 	<div class="item">
-		<span class="id" onClick={props.onSelect}>{props.id}</span>
+		<span class="id" onClick={props.onSelect}>
+			{props.id}
+		</span>
 		<span class="label">{props.label}</span>
 		<Inner value={props.value} wall={props.wall} />
 	</div>
@@ -93,7 +93,7 @@ function Wall(props: {
 	});
 	// A stable accessor over the tracked theme: leaf text expressions calling
 	// it subscribe individually (the context VALUE never changes identity).
-	((props.wall === 'A' ? ThemeA : ThemeB)).set(() => theme.value);
+	(props.wall === 'A' ? ThemeA : ThemeB).set(() => theme.value);
 
 	<section class="wall" id={'wall-' + props.wall.toLowerCase()}>
 		<h2>

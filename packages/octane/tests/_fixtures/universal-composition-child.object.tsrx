@@ -23,7 +23,9 @@ function ItemLeaf(props) @{
 		count={props.count}
 		ref={props.ref}
 		onPress={props.onPress}
-	>{props.children}</item>
+	>
+		{props.children}
+	</item>
 }
 
 export function ImportedItem(props) @{
@@ -45,11 +47,13 @@ export function ImportedItem(props) @{
 		{...props}
 		theme={theme}
 		count={count}
-		onPress={props.listen
-			? (event) => {
-					props.log(`press:${props.handler}:${props.id}:${event.delta}`);
-					setCount((value) => value + event.delta);
-				}
-			: undefined}
+		onPress={
+			props.listen
+				? (event) => {
+						props.log(`press:${props.handler}:${props.id}:${event.delta}`);
+						setCount((value) => value + event.delta);
+					}
+				: undefined
+		}
 	/>
 }

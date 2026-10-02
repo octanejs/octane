@@ -4,9 +4,7 @@ import { useCurrentUserQuery } from '~/hooks/useCurrentUser';
 export function Authenticated({ children }: { children?: any }) {
 	const userQuery = useCurrentUserQuery();
 	if (userQuery.data) {
-		return <>
-			{children}
-		</>;
+		return <>{children}</>;
 	}
 	return null;
 }
@@ -14,9 +12,7 @@ export function Authenticated({ children }: { children?: any }) {
 export function Unauthenticated({ children }: { children?: any }) {
 	const userQuery = useCurrentUserQuery();
 	if (!userQuery.data && !userQuery.isLoading) {
-		return <>
-			{children}
-		</>;
+		return <>{children}</>;
 	}
 	return null;
 }
@@ -24,9 +20,7 @@ export function Unauthenticated({ children }: { children?: any }) {
 export function AuthLoading({ children }: { children?: any }) {
 	const userQuery = useCurrentUserQuery();
 	if (userQuery.isLoading) {
-		return <>
-			{children}
-		</>;
+		return <>{children}</>;
 	}
 	return null;
 }

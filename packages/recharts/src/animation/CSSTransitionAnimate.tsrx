@@ -65,8 +65,7 @@ export function CSSTransitionAnimate(outsideProps: CSSTransitionAnimateProps) {
 
 	const prefersReducedMotion = usePrefersReducedMotion();
 
-	const isActive =
-		isActiveProp === 'auto' ? !Global.isSsr && !prefersReducedMotion : isActiveProp;
+	const isActive = isActiveProp === 'auto' ? !Global.isSsr && !prefersReducedMotion : isActiveProp;
 
 	const animationController = useAnimationController(props.animationController);
 	const [style, setStyle] = useState<string | number>(() => {

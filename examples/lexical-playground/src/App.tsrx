@@ -48,16 +48,18 @@ export function App() @{
 				<ToolbarPlugin />
 				<div class="editor-container">
 					<RichTextPlugin
-						contentEditable={<div class="editor-scroller">
-							<div class="editor">
-								<ContentEditable
-									aria-label="Rich text editor"
-									aria-placeholder="Enter some rich text…"
-									class="ContentEditable__root"
-									placeholder={placeholder}
-								/>
+						contentEditable={
+							<div class="editor-scroller">
+								<div class="editor">
+									<ContentEditable
+										aria-label="Rich text editor"
+										aria-placeholder="Enter some rich text…"
+										class="ContentEditable__root"
+										placeholder={placeholder}
+									/>
+								</div>
 							</div>
-						</div>}
+						}
 						ErrorBoundary={LexicalErrorBoundary}
 					/>
 					<HistoryPlugin />

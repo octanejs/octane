@@ -241,14 +241,8 @@ export function Playground() @{
 
 			const { EditorState, Compartment, StateEffect, StateField } = stateMod;
 			const { history, defaultKeymap, historyKeymap, indentWithTab } = commandsMod;
-			const {
-				EditorView,
-				keymap,
-				lineNumbers,
-				highlightActiveLine,
-				drawSelection,
-				Decoration,
-			} = viewMod;
+			const { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection, Decoration } =
+				viewMod;
 			const { shikiHighlight } = shikiMod;
 
 			type Workspace = { files: { name: string; source: string }[]; entry: string };
@@ -286,9 +280,10 @@ export function Playground() @{
 				workspaces[currentLang] = { entry: initial.entry, files: initial.files };
 				const fallback = pgExamples.DEFAULT_WORKSPACES[currentLang];
 				const isDefault =
-					initial.files.length === 1 && initial.entry === fallback.entry &&
-						initial.files[0].name === fallback.files[0].name &&
-						initial.files[0].source === fallback.files[0].source;
+					initial.files.length === 1 &&
+					initial.entry === fallback.entry &&
+					initial.files[0].name === fallback.files[0].name &&
+					initial.files[0].source === fallback.files[0].source;
 				const own = readOwnHash();
 				if (isDefault) {
 					currentExampleId = DEFAULT_EXAMPLE_ID;
@@ -337,7 +332,8 @@ export function Playground() @{
 				},
 				'.cm-scroller': {
 					overflow: 'auto',
-					fontFamily: 'ui-monospace, SFMono-Regular, \'SF Mono\', Menlo, Consolas, \'Liberation Mono\', monospace',
+					fontFamily:
+						"ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace",
 				},
 				'.cm-content': { padding: '1rem 0.25rem 1.25rem' },
 				'.cm-gutters': {
@@ -379,20 +375,18 @@ export function Playground() @{
 				mapping: any;
 				error: string | null;
 			};
-			type TypesEntry =
-				BaseEntry & {
-					kind: 'types';
-					segments: any;
-					asts: [unknown, unknown] | null;
-				};
-			type RuntimeEntry =
-				BaseEntry & {
-					kind: 'runtime';
-					ast: unknown;
-					segments: any;
-					templates: any;
-					aliases: any;
-				};
+			type TypesEntry = BaseEntry & {
+				kind: 'types';
+				segments: any;
+				asts: [unknown, unknown] | null;
+			};
+			type RuntimeEntry = BaseEntry & {
+				kind: 'runtime';
+				ast: unknown;
+				segments: any;
+				templates: any;
+				aliases: any;
+			};
 			type ReactEntry = BaseEntry & { kind: 'react' };
 			type CodeEntry = TypesEntry | RuntimeEntry | ReactEntry;
 			type AstEntry = {
@@ -456,30 +450,29 @@ export function Playground() @{
 				const cached = runtimeCache.get(key);
 				if (cached && cached.source === source) return cached;
 				const result = pg.compileRuntime(source, name, target);
-				const entry: RuntimeEntry =
-					result.ok
-						? {
-								kind: 'runtime',
-								source,
-								code: result.code,
-								ast: result.ast,
-								segments: result.segments,
-								templates: result.templates,
-								aliases: result.aliases,
-								mapping: undefined,
-								error: null,
-							}
-						: {
-								kind: 'runtime',
-								source,
-								code: `// ${OUTPUT_TARGET_LABEL[target]} generation failed:\n// ${result.error}`,
-								ast: null,
-								segments: null,
-								templates: null,
-								aliases: null,
-								mapping: null,
-								error: result.error,
-							};
+				const entry: RuntimeEntry = result.ok
+					? {
+							kind: 'runtime',
+							source,
+							code: result.code,
+							ast: result.ast,
+							segments: result.segments,
+							templates: result.templates,
+							aliases: result.aliases,
+							mapping: undefined,
+							error: null,
+						}
+					: {
+							kind: 'runtime',
+							source,
+							code: `// ${OUTPUT_TARGET_LABEL[target]} generation failed:\n// ${result.error}`,
+							ast: null,
+							segments: null,
+							templates: null,
+							aliases: null,
+							mapping: null,
+							error: result.error,
+						};
 				runtimeCache.set(key, entry);
 				return entry;
 			};
@@ -516,24 +509,22 @@ export function Playground() @{
 						error: null,
 					};
 				}
-				const entry: ReactEntry =
-					compiled.ok
-						? { kind: 'react', source, code: compiled.code, mapping: null, error: null }
-						: {
-								kind: 'react',
-								source,
-								code: `// ${OUTPUT_TARGET_LABEL[target]} generation failed:\n// ${compiled.error}`,
-								mapping: null,
-								error: compiled.error,
-							};
+				const entry: ReactEntry = compiled.ok
+					? { kind: 'react', source, code: compiled.code, mapping: null, error: null }
+					: {
+							kind: 'react',
+							source,
+							code: `// ${OUTPUT_TARGET_LABEL[target]} generation failed:\n// ${compiled.error}`,
+							mapping: null,
+							error: compiled.error,
+						};
 				reactCache.set(key, entry);
 				return entry;
 			};
 			const codeEntry = (name: string, target: PlaygroundOutputTarget): CodeEntry => {
 				if (target === 'types') return typesEntry(name);
 				// "Parsed" is an AST-only artifact; its code form is the client emit.
-				const runtimeTarget: PlaygroundRuntimeTarget =
-					target === 'source' ? 'client' : target;
+				const runtimeTarget: PlaygroundRuntimeTarget = target === 'source' ? 'client' : target;
 				return pgModules.isReactHostFile(name)
 					? reactEntry(name, runtimeTarget)
 					: runtimeEntry(name, runtimeTarget);
@@ -688,8 +679,10 @@ export function Playground() @{
 			// AST nodes and template origins both retain authored source offsets.
 			const activeAstEntry = (): AstEntry | null => {
 				if (
-					resultModeRef.current.view !== 'compiled' || resultModeRef.current.compiledMode !== 'ast'
-				) return null;
+					resultModeRef.current.view !== 'compiled' ||
+					resultModeRef.current.compiledMode !== 'ast'
+				)
+					return null;
 				return lastShownAst?.source === fileSource(currentFile) ? lastShownAst : null;
 			};
 			// Built once per (entry, artifact) and cached on the entry itself, so a
@@ -723,12 +716,13 @@ export function Playground() @{
 			};
 			const activeMapping = () => {
 				if (
-					resultModeRef.current.view !== 'compiled' || resultModeRef.current.compiledMode !== 'code'
-				) return null;
+					resultModeRef.current.view !== 'compiled' ||
+					resultModeRef.current.compiledMode !== 'code'
+				)
+					return null;
 				const entry = lastShownCode;
-				if (
-					!entry || entry.source !== fileSource(currentFile) || entry.code !== lastShownOutput
-				) return null;
+				if (!entry || entry.source !== fileSource(currentFile) || entry.code !== lastShownOutput)
+					return null;
 				if (entry.mapping === undefined) entry.mapping = buildMapping(entry);
 				return entry.mapping;
 			};
@@ -739,12 +733,14 @@ export function Playground() @{
 				scroll: boolean,
 			) => {
 				const limit = targetView.state.doc.length;
-				const clamped = ranges.map(
-					(range: { from: number; to: number }) => ({
+				const clamped = ranges
+					.map((range: { from: number; to: number }) => ({
 						from: range.from,
 						to: Math.min(range.to, limit),
-					}),
-				).filter((range: { from: number; to: number }) => range.from >= 0 && range.from < range.to);
+					}))
+					.filter(
+						(range: { from: number; to: number }) => range.from >= 0 && range.from < range.to,
+					);
 				if (clamped.length === 0) {
 					// Same contract as an unmapped position: no lingering marks.
 					clearMappedIn(targetView);
@@ -758,8 +754,8 @@ export function Playground() @{
 				const effects = [
 					setMapped.of(
 						Decoration.set(
-							clamped.map(
-								(range: { from: number; to: number }) => mappedMark.range(range.from, range.to),
+							clamped.map((range: { from: number; to: number }) =>
+								mappedMark.range(range.from, range.to),
 							),
 						),
 					),
@@ -770,12 +766,11 @@ export function Playground() @{
 				// what you want to read. Every range still gets a mark either way.
 				if (scroll) {
 					const declared =
-						clamped.find(
-							(range: { from: number; to: number }) => DECLARATION_BEFORE.test(
+						clamped.find((range: { from: number; to: number }) =>
+							DECLARATION_BEFORE.test(
 								targetView.state.doc.sliceString(Math.max(0, range.from - 12), range.from),
 							),
-						) ??
-							clamped[0];
+						) ?? clamped[0];
 					effects.push(EditorView.scrollIntoView(declared.from, { y: 'center' }));
 				}
 				targetView.dispatch({ effects });
@@ -817,53 +812,54 @@ export function Playground() @{
 				onNodeRange: revealAstRange,
 			});
 
-			const crossNavigate = (side: 'source' | 'output') => EditorView.updateListener.of((
-				update: any,
-			) => {
-				if (!update.selectionSet || update.docChanged) return;
-				// Only user-driven cursor moves navigate — programmatic dispatches
-				// (doc replacement, highlight effects) must not feed back.
-				if (!update.transactions.some((tr: any) => tr.isUserEvent('select'))) return;
-				if (resultModeRef.current.view !== 'compiled') return;
-				const offset = update.state.selection.main.head;
-				if (resultModeRef.current.compiledMode === 'ast' && side === 'source') {
-					if (activeAstEntry()) astPreview.reveal(offset, true);
-					return;
-				}
-				const pair = mappedPair(side, offset);
-				// Marks reflect the CURRENT selection — an unmapped one clears.
-				if (pair) revealPair(pair, side === 'source' ? 'output' : 'source');
-				else clearMappedPair();
-			});
+			const crossNavigate = (side: 'source' | 'output') =>
+				EditorView.updateListener.of((update: any) => {
+					if (!update.selectionSet || update.docChanged) return;
+					// Only user-driven cursor moves navigate — programmatic dispatches
+					// (doc replacement, highlight effects) must not feed back.
+					if (!update.transactions.some((tr: any) => tr.isUserEvent('select'))) return;
+					if (resultModeRef.current.view !== 'compiled') return;
+					const offset = update.state.selection.main.head;
+					if (resultModeRef.current.compiledMode === 'ast' && side === 'source') {
+						if (activeAstEntry()) astPreview.reveal(offset, true);
+						return;
+					}
+					const pair = mappedPair(side, offset);
+					// Marks reflect the CURRENT selection — an unmapped one clears.
+					if (pair) revealPair(pair, side === 'source' ? 'output' : 'source');
+					else clearMappedPair();
+				});
 
 			// Hovering either document highlights the corresponding ranges without moving its scroll
 			// position; clicking/cursor movement above additionally reveals them.
-			const crossHover = (side: 'source' | 'output') => EditorView.domEventObservers({
-				mousemove(event: MouseEvent, view: any) {
-					if (resultModeRef.current.view !== 'compiled') return;
-					const offset = view.posAtCoords({ x: event.clientX, y: event.clientY });
-					if (resultModeRef.current.compiledMode === 'ast' && side === 'source') {
-						if (offset == null || !activeAstEntry()) clearMappedPair();
-						else astPreview.reveal(offset, false);
-						return;
-					}
-					const pair =
-						offset == null ? null : mappedPair(side, offset);
-					if (pair) revealPair(pair, null);
-					else clearMappedPair();
-				},
-				mouseleave() {
-					// The browser can deliver mouseleave before the mobile pane's
-					// display:none reaches layout. The synchronous pane ref makes
-					// that stale event harmless from the instant Inspect is clicked.
-					if (
-						side === 'source' && paneRef.current === 'result' &&
+			const crossHover = (side: 'source' | 'output') =>
+				EditorView.domEventObservers({
+					mousemove(event: MouseEvent, view: any) {
+						if (resultModeRef.current.view !== 'compiled') return;
+						const offset = view.posAtCoords({ x: event.clientX, y: event.clientY });
+						if (resultModeRef.current.compiledMode === 'ast' && side === 'source') {
+							if (offset == null || !activeAstEntry()) clearMappedPair();
+							else astPreview.reveal(offset, false);
+							return;
+						}
+						const pair = offset == null ? null : mappedPair(side, offset);
+						if (pair) revealPair(pair, null);
+						else clearMappedPair();
+					},
+					mouseleave() {
+						// The browser can deliver mouseleave before the mobile pane's
+						// display:none reaches layout. The synchronous pane ref makes
+						// that stale event harmless from the instant Inspect is clicked.
+						if (
+							side === 'source' &&
+							paneRef.current === 'result' &&
 							window.matchMedia('(max-width: 980px)').matches
-					) return;
-					clearMappedPair();
-					astPreview.clear();
-				},
-			});
+						)
+							return;
+						clearMappedPair();
+						astPreview.clear();
+					},
+				});
 
 			let compileSeq = 0;
 			const compileAndRun = async () => {
@@ -945,72 +941,72 @@ export function Playground() @{
 			const stateKey = (name: string) => currentLang + ':' + name;
 			const grammarFor = (name: string) => (name.endsWith('.tsrx') ? 'tsrx' : 'tsx');
 
-			const makeEditorState = (name: string, doc: string) => EditorState.create({
-				doc,
-				extensions: [
-					EditorState.changeFilter.of((transaction: any) => {
-						if (!transaction.docChanged) return true;
-						const others = workspace().files.reduce(
-							(sum: number, file: { name: string; source: string }) => file.name === currentFile
-								? sum
-								: sum + file.source.length,
-							0,
-						);
-						if (others + transaction.newDoc.length <= MAX_PLAYGROUND_SOURCE_LENGTH) {
-							return true;
-						}
-						setError(PLAYGROUND_SOURCE_LIMIT_ERROR);
-						return false;
-					}),
-					lineNumbers(),
-					history(),
-					drawSelection(),
-					highlightActiveLine(),
-					keymap.of([
-						{
-							key: 'Mod-Shift-f',
-							run: () => {
-								controllerRef.current.formatActive?.();
+			const makeEditorState = (name: string, doc: string) =>
+				EditorState.create({
+					doc,
+					extensions: [
+						EditorState.changeFilter.of((transaction: any) => {
+							if (!transaction.docChanged) return true;
+							const others = workspace().files.reduce(
+								(sum: number, file: { name: string; source: string }) =>
+									file.name === currentFile ? sum : sum + file.source.length,
+								0,
+							);
+							if (others + transaction.newDoc.length <= MAX_PLAYGROUND_SOURCE_LENGTH) {
 								return true;
+							}
+							setError(PLAYGROUND_SOURCE_LIMIT_ERROR);
+							return false;
+						}),
+						lineNumbers(),
+						history(),
+						drawSelection(),
+						highlightActiveLine(),
+						keymap.of([
+							{
+								key: 'Mod-Shift-f',
+								run: () => {
+									controllerRef.current.formatActive?.();
+									return true;
+								},
 							},
-						},
-						...defaultKeymap,
-						...historyKeymap,
-						indentWithTab,
-					]),
-					EditorView.lineWrapping,
-					EditorState.tabSize.of(2),
-					shikiHighlight(grammarFor(name)),
-					sharedTheme,
-					mappedField,
-					crossHover('source'),
-					crossNavigate('source'),
-					EditorView.updateListener.of((update: any) => {
-						if (!update.docChanged) return;
-						// The source half of the pair changed — orphan any marks still
-						// shown in the output (this field self-clears; a failed
-						// recompile would otherwise leave the output's marks forever).
-						clearMappedIn(outputView);
-						if (resultModeRef.current.compiledMode === 'ast') {
-							astPreview.setUnavailable('Waiting for the next successful compile…', currentFile);
-							lastShownAst = null;
-						}
-						const next = update.state.doc.toString();
-						const file = workspace().files.find(
-							(candidate: { name: string }) => candidate.name === currentFile,
-						);
-						if (file) file.source = next;
-						// Any edit means the buffer no longer matches the example.
-						if (currentExampleId !== CUSTOM_EXAMPLE_ID) {
-							currentExampleId = CUSTOM_EXAMPLE_ID;
-							setExampleId(CUSTOM_EXAMPLE_ID);
-							setVariants(variantAvailability());
-						}
-						scheduleCompile();
-						updateHash();
-					}),
-				],
-			});
+							...defaultKeymap,
+							...historyKeymap,
+							indentWithTab,
+						]),
+						EditorView.lineWrapping,
+						EditorState.tabSize.of(2),
+						shikiHighlight(grammarFor(name)),
+						sharedTheme,
+						mappedField,
+						crossHover('source'),
+						crossNavigate('source'),
+						EditorView.updateListener.of((update: any) => {
+							if (!update.docChanged) return;
+							// The source half of the pair changed — orphan any marks still
+							// shown in the output (this field self-clears; a failed
+							// recompile would otherwise leave the output's marks forever).
+							clearMappedIn(outputView);
+							if (resultModeRef.current.compiledMode === 'ast') {
+								astPreview.setUnavailable('Waiting for the next successful compile…', currentFile);
+								lastShownAst = null;
+							}
+							const next = update.state.doc.toString();
+							const file = workspace().files.find(
+								(candidate: { name: string }) => candidate.name === currentFile,
+							);
+							if (file) file.source = next;
+							// Any edit means the buffer no longer matches the example.
+							if (currentExampleId !== CUSTOM_EXAMPLE_ID) {
+								currentExampleId = CUSTOM_EXAMPLE_ID;
+								setExampleId(CUSTOM_EXAMPLE_ID);
+								setVariants(variantAvailability());
+							}
+							scheduleCompile();
+							updateHash();
+						}),
+					],
+				});
 
 			const openFile = (name: string) => {
 				editorStates.set(stateKey(currentFile), sourceView.state);
@@ -1055,8 +1051,7 @@ export function Playground() @{
 				if (!workspaces[next]) {
 					const example =
 						currentExampleId === CUSTOM_EXAMPLE_ID ? null : pgExamples.getExample(currentExampleId);
-					const fromExample =
-						example ? pgExamples.exampleWorkspace(example, next) : null;
+					const fromExample = example ? pgExamples.exampleWorkspace(example, next) : null;
 					workspaces[next] = fromExample ?? cloneWorkspace(pgExamples.DEFAULT_WORKSPACES[next]);
 				}
 				currentLang = next;
@@ -1077,12 +1072,11 @@ export function Playground() @{
 				if (disposed || id === CUSTOM_EXAMPLE_ID || id === currentExampleId) return;
 				const example = pgExamples.getExample(id);
 				if (!example) return;
-				const nextLang: PlaygroundLang =
-					example.variants[currentLang]
-						? currentLang
-						: example.variants.tsrx
-							? 'tsrx'
-							: 'tsx';
+				const nextLang: PlaygroundLang = example.variants[currentLang]
+					? currentLang
+					: example.variants.tsrx
+						? 'tsrx'
+						: 'tsx';
 				currentExampleId = id;
 				currentLang = nextLang;
 				workspaces.tsrx = undefined;
@@ -1675,7 +1669,9 @@ export function Playground() @{
 						{/* Static placeholder shown only while the buffer has diverged from
 	    every example — always in the DOM (no conditional rendering
 	    inside the select) so the option list never reconciles. */}
-						<option value="custom" disabled hidden>Custom</option>
+						<option value="custom" disabled hidden>
+							Custom
+						</option>
 						@for (const group of EXAMPLE_GROUPS; key group.group) {
 							<optgroup label={group.group}>
 								@for (const example of group.examples; key example.id) {
@@ -1710,7 +1706,9 @@ export function Playground() @{
 						disabled={!ready || formatting}
 						title="Format with Prettier (Ctrl/Cmd-Shift-F)"
 						onClick={() => controllerRef.current.formatActive?.()}
-					>{(formatting ? 'Formatting…' : 'Format') as string}</button>
+					>
+						{(formatting ? 'Formatting…' : 'Format') as string}
+					</button>
 				</div>
 				<div class="pg-seg pg-view-switch" role="group" aria-label="Result view">
 					<button
@@ -1731,16 +1729,18 @@ export function Playground() @{
 			</div>
 
 			@if (error) {
-				<div class="pg-error" role="alert">{error}</div>
+				<div class="pg-error" role="alert">
+					{error}
+				</div>
 			}
 			@if (warnings.length > 0) {
 				<section class="pg-warnings" aria-label="Compiler warnings" aria-live="polite">
-					<strong>
-						{warnings.length === 1 ? 'Compiler warning' : 'Compiler warnings'}
-					</strong>
+					<strong>{warnings.length === 1 ? 'Compiler warning' : 'Compiler warnings'}</strong>
 					<ul>
-						@for (const warning of warnings; key warning.filename + ':' + warning.code + ':' +
-							warning.start.offset) {
+						@for (
+							const warning of warnings;
+							key warning.filename + ':' + warning.code + ':' + warning.start.offset
+						) {
 							<li>
 								<code>{warning.code}</code>
 								<span>{warning.message}</span>
@@ -1768,7 +1768,9 @@ export function Playground() @{
 										aria-selected={name === activeFile}
 										class={['pg-tab', name === activeFile && 'active']}
 										onClick={() => controllerRef.current.selectFile?.(name)}
-									>{name as string}</button>
+									>
+										{name as string}
+									</button>
 								}
 							</div>
 						} @else {
@@ -1796,9 +1798,9 @@ export function Playground() @{
 									class="pg-select pg-output-select"
 									aria-label="Compiler output"
 									value={outputTarget}
-									onChange={(event) => selectOutputTarget(
-										event.currentTarget.value as PlaygroundOutputTarget,
-									)}
+									onChange={(event) =>
+										selectOutputTarget(event.currentTarget.value as PlaygroundOutputTarget)
+									}
 								>
 									<option value="client">Client</option>
 									<option value="server">Server</option>

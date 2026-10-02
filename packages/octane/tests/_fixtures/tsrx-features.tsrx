@@ -6,18 +6,24 @@ import { useState, useEffect } from 'octane';
 // ---------------------------------------------------------------------------
 
 export function SpreadOnElement(props) @{
-	<div {...props.attrs} id="target">{'spread'}</div>
+	<div {...props.attrs} id="target">
+		{'spread'}
+	</div>
 }
 
 // Spread combined with explicit attrs — explicit wins on key collision because
 // it's emitted later in the binding order.
 export function SpreadWithExplicit(props) @{
-	<div {...props.attrs} class="explicit-wins">{'mix'}</div>
+	<div {...props.attrs} class="explicit-wins">
+		{'mix'}
+	</div>
 }
 
 // Component-level spread — merged into the props object.
 function SpreadChild(props) @{
-	<span id="child" class={props.cls}>{props.label + (props.tag || '') as string}</span>
+	<span id="child" class={props.cls}>
+		{(props.label + (props.tag || '')) as string}
+	</span>
 }
 
 export function SpreadOnComponent(props) @{
@@ -61,7 +67,7 @@ export function NamespacedAttr(props) @{
 export function ForOfIndexOnly(props) @{
 	<ul>
 		@for (const item of props.items; index i) {
-			<li class={'i-' + i}>{i + ':' + item as string}</li>
+			<li class={'i-' + i}>{(i + ':' + item) as string}</li>
 		}
 	</ul>
 }
@@ -69,7 +75,7 @@ export function ForOfIndexOnly(props) @{
 export function ForOfIndexAndKey(props) @{
 	<ul>
 		@for (const item of props.items; index i; key item.id) {
-			<li class={'k-' + item.id}>{i + ':' + item.label as string}</li>
+			<li class={'k-' + item.id}>{(i + ':' + item.label) as string}</li>
 		}
 	</ul>
 }
@@ -77,7 +83,7 @@ export function ForOfIndexAndKey(props) @{
 export function ForOfIndexAsKey(props) @{
 	<ul>
 		@for (const item of props.items; index i; key i) {
-			<li data-index={i}>{i + ':' + item as string}</li>
+			<li data-index={i}>{(i + ':' + item) as string}</li>
 		}
 	</ul>
 }
@@ -85,7 +91,9 @@ export function ForOfIndexAsKey(props) @{
 export function ForOfIndexedHostKey(props) @{
 	<ul>
 		@for (const item of props.items; index i) {
-			<li key={i} data-index={i}>{i + ':' + item as string}</li>
+			<li key={i} data-index={i}>
+				{(i + ':' + item) as string}
+			</li>
 		}
 	</ul>
 }
@@ -93,7 +101,9 @@ export function ForOfIndexedHostKey(props) @{
 export function ForOfCompositeIndexKey(props) @{
 	<ul>
 		@for (const item of props.items; index i; key item.id + ':' + i) {
-			<li data-id={item.id} data-index={i}>{i + ':' + item.label as string}</li>
+			<li data-id={item.id} data-index={i}>
+				{(i + ':' + item.label) as string}
+			</li>
 		}
 	</ul>
 }
@@ -101,7 +111,9 @@ export function ForOfCompositeIndexKey(props) @{
 export function ForOfDestructuredIndexKey(props) @{
 	<ul>
 		@for (const { id, label } of props.items; index i; key id + ':' + i) {
-			<li data-id={id} data-index={i}>{i + ':' + label as string}</li>
+			<li data-id={id} data-index={i}>
+				{(i + ':' + label) as string}
+			</li>
 		}
 	</ul>
 }
@@ -113,7 +125,15 @@ export function ForOfDestructuredIndexKey(props) @{
 
 export function TernaryFragmentChild(props) @{
 	<div>
-		{props.cond ? <><span class="yes">{'yes'}</span></> : <><span class="no">{'no'}</span></>}
+		{props.cond ? (
+			<>
+				<span class="yes">{'yes'}</span>
+			</>
+		) : (
+			<>
+				<span class="no">{'no'}</span>
+			</>
+		)}
 	</div>
 }
 
@@ -137,8 +157,8 @@ export function KeyedFragmentItems(props) @{
 	<ul>
 		@for (const x of props.items; key x.id) {
 			<>
-				<li class={'a-' + x.id}>{x.label + '-a' as string}</li>
-				<li class={'b-' + x.id}>{x.label + '-b' as string}</li>
+				<li class={'a-' + x.id}>{(x.label + '-a') as string}</li>
+				<li class={'b-' + x.id}>{(x.label + '-b') as string}</li>
 			</>
 		}
 	</ul>
@@ -150,18 +170,18 @@ export function KeyedFragmentItems(props) @{
 
 export function ObjectDestructure(props) @{
 	const { first, last } = props.user;
-	<div id="destructure-obj">{first + ' ' + last as string}</div>
+	<div id="destructure-obj">{(first + ' ' + last) as string}</div>
 }
 
 export function ArrayDestructure(props) @{
 	const [head, ...tail] = props.items;
-	<div id="destructure-arr">{'head=' + head + ' rest=' + tail.length as string}</div>
+	<div id="destructure-arr">{('head=' + head + ' rest=' + tail.length) as string}</div>
 }
 
 // Destructuring as a COMPONENT PARAMETER — the body sees fields
 // destructured directly from the props object.
 export function ParamDestructure({ greeting, name }) @{
-	<div id="destructure-param">{greeting + ', ' + name as string}</div>
+	<div id="destructure-param">{(greeting + ', ' + name) as string}</div>
 }
 
 // Destructuring inside a FOR-OF HEAD — keyFn picks up the same
@@ -182,7 +202,7 @@ export function DestructuredForOfHead(props) @{
 // ---------------------------------------------------------------------------
 
 function ShorthandChild(props) @{
-	<span id="child">{props.label + ':' + props.count as string}</span>
+	<span id="child">{(props.label + ':' + props.count) as string}</span>
 }
 
 export function ShorthandComponentProp() @{

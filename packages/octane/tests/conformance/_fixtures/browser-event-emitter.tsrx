@@ -9,7 +9,9 @@ export function ClickTree(props: {
 }) @{
 	<div class="grand" onClick={props.onGrand}>
 		<div class="parent" onClick={props.onParent}>
-			<div class="child" onClick={props.onChild}>{'x'}</div>
+			<div class="child" onClick={props.onChild}>
+				{'x'}
+			</div>
 		</div>
 	</div>
 }

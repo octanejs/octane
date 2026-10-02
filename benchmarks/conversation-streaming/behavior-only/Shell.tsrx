@@ -10,14 +10,18 @@ export function Shell() @{
 		<label for="draft">Draft</label>
 		<textarea id="draft" value={draft$} />
 		<output id="draft-length">{draftLength$}</output>
-		<button id="day" type="button">Next day</button>
+		<button id="day" type="button">
+			Next day
+		</button>
 		<output id="selected-day">{String(selectedDay$.get())}</output>
 		@if (primaryActionBenchmark) {
 			<form id="primary-action-form">
 				<PrimaryAction {...initialPrimaryAction} />
 			</form>
 		}
-		<button id="optional" type="button">Load optional controller</button>
+		<button id="optional" type="button">
+			Load optional controller
+		</button>
 		<output id="optional-value" />
 		<section aria-label="Conversation">
 			@try {

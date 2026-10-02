@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { DIAGNOSTIC_CODES } from '@tsrx/core/diagnostics';
 import ts from 'typescript';
 import { compile } from 'octane/compiler';
 import { compileToVolarMappings } from 'octane/compiler/volar';
 
-const SPREAD_CHILD = 'tsrx-jsx-spread-child';
+const SPREAD_CHILD = DIAGNOSTIC_CODES.JSX_SPREAD_CHILD;
 const MODES = [
 	['client', { mode: 'client' as const }],
 	['server', { mode: 'server' as const }],

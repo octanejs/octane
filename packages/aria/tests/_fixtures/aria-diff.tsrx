@@ -12,22 +12,26 @@ export function PressLog() {
 		onPressEnd: () => setLog((l: string) => l + 'e'),
 		onPress: () => setLog((l: string) => l + 'p'),
 	});
-	return <div
-		id="press"
-		role="button"
-		tabIndex={0}
-		{...pressProps}
-		data-pressed={isPressed || undefined}
-	>
-		{'log:' + log}
-	</div>;
+	return (
+		<div
+			id="press"
+			role="button"
+			tabIndex={0}
+			{...pressProps}
+			data-pressed={isPressed || undefined}
+		>
+			{'log:' + log}
+		</div>
+	);
 }
 
 export function HoverBadge() {
 	const { hoverProps, isHovered } = useHover({});
-	return <div id="hover" {...hoverProps} data-hovered={isHovered || undefined}>
-		{'hovered:' + (isHovered ? 'yes' : 'no')}
-	</div>;
+	return (
+		<div id="hover" {...hoverProps} data-hovered={isHovered || undefined}>
+			{'hovered:' + (isHovered ? 'yes' : 'no')}
+		</div>
+	);
 }
 
 export function FocusWithinBox() {
@@ -39,13 +43,15 @@ export function FocusWithinBox() {
 			setChanges((c: number) => c + 1);
 		},
 	});
-	return <div>
-		<div id="fw" {...focusWithinProps} data-focus-within={within || undefined}>
-			<input id="fw-input" />
-			{'changes:' + changes}
+	return (
+		<div>
+			<div id="fw" {...focusWithinProps} data-focus-within={within || undefined}>
+				<input id="fw-input" />
+				{'changes:' + changes}
+			</div>
+			<input id="fw-outside" />
 		</div>
-		<input id="fw-outside" />
-	</div>;
+	);
 }
 
 export function KeyEcho() {
@@ -60,22 +66,26 @@ export function KeyEcho() {
 			e.continuePropagation();
 		},
 	});
-	return <div onKeyDown={() => setParent((p: string) => p + '!')}>
-		<input id="key-stop" {...keyboardProps} />
-		<input id="key-pass" {...passProps} />
-		<span>{'child:' + child + ' parent:' + parent}</span>
-	</div>;
+	return (
+		<div onKeyDown={() => setParent((p: string) => p + '!')}>
+			<input id="key-stop" {...keyboardProps} />
+			<input id="key-pass" {...passProps} />
+			<span>{'child:' + child + ' parent:' + parent}</span>
+		</div>
+	);
 }
 
 export function MergedIdsLabel() {
 	const idA = useId();
 	const idB = useId();
 	const props = mergeProps({ id: idA }, { id: idB });
-	return <div>
-		<span id={idA} />
-		<span id={idB} />
-		<span {...props} />
-	</div>;
+	return (
+		<div>
+			<span id={idA} />
+			<span id={idB} />
+			<span {...props} />
+		</div>
+	);
 }
 
 // Pins upstream's createEventHandler flag semantics ACROSS dispatches of one wrapper
@@ -94,11 +104,13 @@ export function KeyLatch() {
 			}
 		},
 	});
-	return <div onKeyDown={(e: any) => keyLatchLog.push('parent:' + e.key)}>
-		<input id="latch-input" {...keyboardProps} />
-		<button id="latch-flush" onClick={() => force((n: number) => n + 1)}>
-			flush
-		</button>
-		<output>{keyLatchLog.join(',')}</output>
-	</div>;
+	return (
+		<div onKeyDown={(e: any) => keyLatchLog.push('parent:' + e.key)}>
+			<input id="latch-input" {...keyboardProps} />
+			<button id="latch-flush" onClick={() => force((n: number) => n + 1)}>
+				flush
+			</button>
+			<output>{keyLatchLog.join(',')}</output>
+		</div>
+	);
 }

@@ -201,10 +201,14 @@ export function StreamTextContent(props: StreamTextProps) @{
 	const text = use(props.promise) as string;
 	<div
 		id={props.id}
-		style={props.styled
-			? { viewTransitionName: 'authored', viewTransitionClass: 'authored-class', color: 'red' }
-			: undefined}
-	>{text}</div>
+		style={
+			props.styled
+				? { viewTransitionName: 'authored', viewTransitionClass: 'authored-class', color: 'red' }
+				: undefined
+		}
+	>
+		{text}
+	</div>
 }
 
 export function StreamTextApp(props: StreamTextProps) @{
@@ -366,11 +370,9 @@ export function ScopedStylesApp(props: {
 	text: string;
 }) @{
 	<ViewTransition scope={props.scope}>
-		<section
-			id="scope-styles"
-			title={props.title}
-			style={props.style}
-		>{props.text as string}</section>
+		<section id="scope-styles" title={props.title} style={props.style}>
+			{props.text as string}
+		</section>
 	</ViewTransition>
 }
 
@@ -383,23 +385,26 @@ export function SameHostScopesApp(props: {
 }) @{
 	<ViewTransition scope={props.outer}>
 		<ViewTransition scope={props.inner} onUpdate={props.onUpdate}>
-			<section id="same-host-scope" style={props.style}>{props.text}</section>
+			<section id="same-host-scope" style={props.style}>
+				{props.text}
+			</section>
 		</ViewTransition>
 	</ViewTransition>
 }
 
 export function StaticScopeStyleApp() @{
 	<ViewTransition scope="element">
-		<section
-			id="static-scope-style"
-			style="color:red;view-transition-scope:none!important"
-		>{'Static'}</section>
+		<section id="static-scope-style" style="color:red;view-transition-scope:none!important">
+			{'Static'}
+		</section>
 	</ViewTransition>
 }
 
 export function ScopedRefNameApp(props: { name?: string; reference: ViewTransitionProps['ref'] }) @{
 	<ViewTransition scope="element" name={props.name} ref={props.reference}>
-		<section id="scope-ref-name" style="view-transition-name:hero">{'Content'}</section>
+		<section id="scope-ref-name" style="view-transition-name:hero">
+			{'Content'}
+		</section>
 	</ViewTransition>
 }
 
@@ -426,14 +431,15 @@ interface QueuedHydrationProps {
 	onClick?: () => void;
 }
 function QueuedHydrationChild(props: QueuedHydrationProps) @{
-	const text =
-		props.recover ? 'Recovered child' : use(props.child);
+	const text = props.recover ? 'Recovered child' : use(props.child);
 	<span id="recovered-child">{text as string}</span>
 }
 function QueuedHydrationParent(props: QueuedHydrationProps) @{
 	const text = use(props.parent);
 	<div id="queued-parent">
-		<button id="recovered-button" onClick={props.onClick}>{text as string}</button>
+		<button id="recovered-button" onClick={props.onClick}>
+			{text as string}
+		</button>
 		@try {
 			<QueuedHydrationChild {...props} />
 		} @pending {
@@ -535,7 +541,9 @@ export function ReentrantRawMarkupApp(props: { markup: string; render: () => voi
 
 export function LiteralAnnotationsApp(props: { text: string; title: string }) @{
 	<main>
-		<p id="literal-annotations" title={props.title}>{props.text as string}</p>
+		<p id="literal-annotations" title={props.title}>
+			{props.text as string}
+		</p>
 		{createElement('script-box', null, 'Custom element')}
 		<ViewTransition name="literal-neighbor">
 			<span>{'Neighbor'}</span>

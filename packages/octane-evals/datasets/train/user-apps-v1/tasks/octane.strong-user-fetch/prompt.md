@@ -4,7 +4,7 @@
 compiler rejects it:
 
 ```text
-src/App.tsrx:11:20: [OCTANE_STRONG_EFFECT_DATA_FETCH] Strong mode requires cleanup for a state update that runs after an await or promise callback in an effect. Read asynchronous render data with use() or a query binding. For external synchronization, pass an AbortController signal to the request and abort it in the returned cleanup, or set a flag in the cleanup and check it before this update.
+src/App.tsrx:12:26: [OCTANE_STRONG_EFFECT_DATA_FETCH] Strong mode requires cleanup for a state update that runs after an await or promise callback in an effect. Read asynchronous render data with use() or a query binding. For external synchronization, pass an AbortController signal to the request and abort it in the returned cleanup, or set a flag in the cleanup and check it before this update.
 ```
 
 Fix the component so it compiles in Strong mode and meets these requirements:

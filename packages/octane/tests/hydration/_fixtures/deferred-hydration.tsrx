@@ -11,27 +11,25 @@ function DeferredReviews(props) @{
 	<section id="reviews" data-runtime-id={id}>
 		<label for="review-draft">{'Draft review'}</label>
 		<input id="review-draft" defaultValue="server draft" />
-		<button
-			id="review-action"
-			ref={props.onRef}
-			onClick={() => props.onDeferredClick?.(id)}
-		>{'Submit review'}</button>
+		<button id="review-action" ref={props.onRef} onClick={() => props.onDeferredClick?.(id)}>
+			{'Submit review'}
+		</button>
 	</section>
 }
 
 function EagerSibling(props) @{
 	const id = useId();
-	<button
-		id="eager-action"
-		data-runtime-id={id}
-		onClick={() => props.onEagerClick?.(id)}
-	>{'Eager action'}</button>
+	<button id="eager-action" data-runtime-id={id} onClick={() => props.onEagerClick?.(id)}>
+		{'Eager action'}
+	</button>
 }
 
 export function DeferredHydration(props) @{
 	const beforeId = useId();
 	<main>
-		<span id="before-boundary" data-runtime-id={beforeId}>{'Before'}</span>
+		<span id="before-boundary" data-runtime-id={beforeId}>
+			{'Before'}
+		</span>
 		<Hydrate
 			when={props.when}
 			prefetch={props.prefetch}
@@ -52,7 +50,9 @@ export function DeferredHydration(props) @{
 
 function ClientOnlySuspendingChild(props) @{
 	const value = use(props.promise);
-	<button id="client-only-content" onClick={() => props.onClick?.(value)}>{value as string}</button>
+	<button id="client-only-content" onClick={() => props.onClick?.(value)}>
+		{value as string}
+	</button>
 }
 
 export function ClientOnlyHydrate(props) @{
@@ -73,11 +73,9 @@ export function ClientOnlyHydrate(props) @{
 function DeferredSeed(props) @{
 	const value = use(props.promise);
 	const id = useId();
-	<button
-		id="deferred-seed"
-		data-runtime-id={id}
-		onClick={() => props.onClick?.(value, id)}
-	>{value as string}</button>
+	<button id="deferred-seed" data-runtime-id={id} onClick={() => props.onClick?.(value, id)}>
+		{value as string}
+	</button>
 }
 
 function EagerSeed(props) @{
@@ -87,13 +85,17 @@ function EagerSeed(props) @{
 		id="eager-seed"
 		data-runtime-id={id}
 		onClick={() => props.onClick?.(value, id, props.beforeId)}
-	>{value as string}</button>
+	>
+		{value as string}
+	</button>
 }
 
 export function DeferredSeedHydration(props) @{
 	const beforeId = useId();
 	<section id="seed-order">
-		<span id="seed-before" data-runtime-id={beforeId}>{'Before seeds'}</span>
+		<span id="seed-before" data-runtime-id={beforeId}>
+			{'Before seeds'}
+		</span>
 		<Hydrate when={props.when} split={false}>
 			<DeferredSeed promise={props.deferredPromise} onClick={props.onDeferredClick} />
 		</Hydrate>
@@ -109,7 +111,9 @@ export function NestedInteractionHydration(props) @{
 					id="interaction-target"
 					onClick={props.onTargetClick}
 					onKeyDown={props.onTargetKeyDown}
-				>{'Open reviews'}</button>
+				>
+					{'Open reviews'}
+				</button>
 			</Hydrate>
 		</section>
 	</Hydrate>
@@ -124,8 +128,12 @@ function ReplayOrderOptions(props: { onChoose?: ChooseOption }) @{
 		setSelected(option);
 	};
 	<section id="replay-order">
-		<button id="option-a" onClick={(event) => choose('A', event)}>{'A'}</button>
-		<button id="option-b" onClick={(event) => choose('B', event)}>{'B'}</button>
+		<button id="option-a" onClick={(event) => choose('A', event)}>
+			{'A'}
+		</button>
+		<button id="option-b" onClick={(event) => choose('B', event)}>
+			{'B'}
+		</button>
 		<output>{selected as string}</output>
 	</section>
 }

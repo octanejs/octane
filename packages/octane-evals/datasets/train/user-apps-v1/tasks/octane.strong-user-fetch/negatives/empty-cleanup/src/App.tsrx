@@ -8,9 +8,9 @@ export function App({ userId }: { userId: string }) @{
 	const [user, setUser] = useState<User | null>(null);
 
 	useEffect(() => {
-		fetch(`/api/users/${userId}`).then((response) => response.json()).then(
-			(next: User) => setUser(next),
-		);
+		fetch(`/api/users/${userId}`)
+			.then((response) => response.json())
+			.then((next: User) => setUser(next));
 		return () => {};
 	});
 

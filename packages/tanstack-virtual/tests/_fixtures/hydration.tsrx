@@ -25,7 +25,9 @@ export function HydratedVirtualList() @{
 	});
 	const items = virtualizer.getVirtualItems();
 	<div>
-		<button id="grow" onClick={() => setCount((value) => value + 1)}>Grow</button>
+		<button id="grow" onClick={() => setCount((value) => value + 1)}>
+			Grow
+		</button>
 		<output id="extent">{String(virtualizer.getTotalSize()) as string}</output>
 		<div ref={parent} style={{ height: 200, width: 300, overflow: 'auto' }}>
 			<div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
@@ -33,7 +35,9 @@ export function HydratedVirtualList() @{
 					<div
 						data-row={String(item.key)}
 						style={{ position: 'absolute', top: item.start, height: item.size }}
-					>{String(item.index) as string}</div>
+					>
+						{String(item.index) as string}
+					</div>
 				}
 			</div>
 		</div>

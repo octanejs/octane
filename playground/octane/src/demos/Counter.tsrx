@@ -8,12 +8,16 @@ export function Counter() @{
 
 	<div>
 		<h2 class="demo-title">{'Counter'}</h2>
-		<p
-			class="demo-blurb"
-		>{'useState + useCallback. Click to bump; setter identity is stable across renders.'}</p>
+		<p class="demo-blurb">
+			{'useState + useCallback. Click to bump; setter identity is stable across renders.'}
+		</p>
 		<div class="row">
-			<button class="btn" onClick={bump}>{'count: ' + n as string}</button>
-			<button class="btn" onClick={reset}>{'reset'}</button>
+			<button class="btn" onClick={bump}>
+				{('count: ' + n) as string}
+			</button>
+			<button class="btn" onClick={reset}>
+				{'reset'}
+			</button>
 		</div>
 	</div>
 }

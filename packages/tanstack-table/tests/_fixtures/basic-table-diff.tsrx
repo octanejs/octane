@@ -41,7 +41,9 @@ export function BasicTable() @{
 		columns,
 	});
 	<div>
-		<button id="swap-data" onClick={() => setAlt(!alt)}>swap</button>
+		<button id="swap-data" onClick={() => setAlt(!alt)}>
+			swap
+		</button>
 		<table>
 			<thead>
 				@for (const hg of table.getHeaderGroups(); key hg.id) {

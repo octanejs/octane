@@ -100,9 +100,7 @@ function Exploding(props) @{
 	const boom = () => {
 		throw new Error('mount failure');
 	};
-	<span class="never">
-		{props.arm ? boom() as string : 'x'}
-	</span>
+	<span class="never">{props.arm ? (boom() as string) : 'x'}</span>
 }
 
 // Resources are page-global and never removed: an arm that registers its sheet

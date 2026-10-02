@@ -18,17 +18,13 @@ const abi = [
 		name: 'value',
 		stateMutability: 'view',
 		inputs: [],
-		outputs: [
-			{ name: '', type: 'uint256' },
-		],
+		outputs: [{ name: '', type: 'uint256' }],
 	},
 	{
 		type: 'function',
 		name: 'setValue',
 		stateMutability: 'nonpayable',
-		inputs: [
-			{ name: 'next', type: 'uint256' },
-		],
+		inputs: [{ name: 'next', type: 'uint256' }],
 		outputs: [],
 	},
 	{
@@ -44,15 +40,9 @@ function BalancePair(props: { address: `0x${string}` }) @{
 	const first = useBalance({ address: props.address, query: { retry: false } });
 	const second = useBalance({ address: props.address, query: { retry: false } });
 	<>
-		<span id="first">
-			{first.isSuccess ? first.data.value.toString() : first.status}
-		</span>
-		<span id="second">
-			{second.isSuccess ? second.data.value.toString() : second.status}
-		</span>
-		<span id="balance-error">
-			{first.error ? first.error.message : '-'}
-		</span>
+		<span id="first">{first.isSuccess ? first.data.value.toString() : first.status}</span>
+		<span id="second">{second.isSuccess ? second.data.value.toString() : second.status}</span>
+		<span id="balance-error">{first.error ? first.error.message : '-'}</span>
 	</>
 }
 
@@ -71,12 +61,12 @@ export function BalanceApp(props: {
 function Signer() @{
 	const sign = useSignMessage();
 	<>
-		<button id="sign" onClick={() => sign.signMessage({ message: 'octane' })}>sign</button>
+		<button id="sign" onClick={() => sign.signMessage({ message: 'octane' })}>
+			sign
+		</button>
 		<span id="sign-status">{sign.status}</span>
 		<span id="signature">{sign.data ?? '-'}</span>
-		<span id="sign-error">
-			{sign.error ? sign.error.name + ':' + sign.error.message : '-'}
-		</span>
+		<span id="sign-error">{sign.error ? sign.error.name + ':' + sign.error.message : '-'}</span>
 	</>
 }
 
@@ -107,21 +97,13 @@ function ContractQueries(props: { hash: `0x${string}` }) @{
 		query: { retry: false },
 	});
 	<>
-		<span id="read">
-			{read.isSuccess ? String(read.data) : read.status}
-		</span>
+		<span id="read">{read.isSuccess ? String(read.data) : read.status}</span>
 		<span id="simulate">
 			{simulation.isSuccess ? simulation.data.request.functionName : simulation.status}
 		</span>
-		<span id="simulate-error">
-			{simulation.error ? simulation.error.message : '-'}
-		</span>
-		<span id="receipt">
-			{receipt.isSuccess ? receipt.data.status : receipt.status}
-		</span>
-		<span id="receipt-error">
-			{receipt.error ? receipt.error.message : '-'}
-		</span>
+		<span id="simulate-error">{simulation.error ? simulation.error.message : '-'}</span>
+		<span id="receipt">{receipt.isSuccess ? receipt.data.status : receipt.status}</span>
+		<span id="receipt-error">{receipt.error ? receipt.error.message : '-'}</span>
 	</>
 }
 
@@ -143,12 +125,14 @@ function TransactionMutations() @{
 	<>
 		<button
 			id="write"
-			onClick={() => write.writeContract({
-				address: contract,
-				abi,
-				functionName: 'setValue',
-				args: [7n],
-			})}
+			onClick={() =>
+				write.writeContract({
+					address: contract,
+					abi,
+					functionName: 'setValue',
+					args: [7n],
+				})
+			}
 		>
 			write
 		</button>
@@ -157,14 +141,10 @@ function TransactionMutations() @{
 		</button>
 		<span id="write-status">{write.status}</span>
 		<span id="write-hash">{write.data ?? '-'}</span>
-		<span id="write-error">
-			{write.error ? write.error.message : '-'}
-		</span>
+		<span id="write-error">{write.error ? write.error.message : '-'}</span>
 		<span id="send-status">{send.status}</span>
 		<span id="send-hash">{send.data ?? '-'}</span>
-		<span id="send-error">
-			{send.error ? send.error.message : '-'}
-		</span>
+		<span id="send-error">{send.error ? send.error.message : '-'}</span>
 	</>
 }
 

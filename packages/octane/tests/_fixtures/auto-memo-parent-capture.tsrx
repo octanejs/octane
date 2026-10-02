@@ -15,16 +15,19 @@ export function ParentCaptureApp() @{
 	]);
 	const [suffix, setSuffix] = useState('!');
 	<div>
-		<button
-			id="capture-suffix"
-			onClick={() => setSuffix((value) => value + '!')}
-		>{'suffix'}</button>
+		<button id="capture-suffix" onClick={() => setSuffix((value) => value + '!')}>
+			{'suffix'}
+		</button>
 		<button
 			id="capture-item"
-			onClick={() => setItems(
-				(current) => current.map((item) => (item.id === 1 ? { ...item, v: item.v + 'x' } : item)),
-			)}
-		>{'item'}</button>
+			onClick={() =>
+				setItems((current) =>
+					current.map((item) => (item.id === 1 ? { ...item, v: item.v + 'x' } : item)),
+				)
+			}
+		>
+			{'item'}
+		</button>
 		<ul>
 			@for (const it of items; key it.id) {
 				<Cell text={it.v + suffix} />

@@ -10,11 +10,15 @@ function List({ name, tick }) @{
 	const visible = items.filter((item) => !item.completed);
 	<section data-list={name} data-tick={tick}>
 		<button
-			onClick={() => setItems([
-				{ label: 'first', completed: false },
-				{ label: 'second', completed: true },
-			])}
-		>load</button>
+			onClick={() =>
+				setItems([
+					{ label: 'first', completed: false },
+					{ label: 'second', completed: true },
+				])
+			}
+		>
+			load
+		</button>
 		<output>{String(visible.length)}</output>
 		@for (const item of visible; key item.label) {
 			<span>{item.label}</span>

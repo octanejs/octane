@@ -6,19 +6,24 @@ const OtherCtx = createContext(0);
 export const ROW_IDS = Array.from({ length: 512 }, (_, index) => index);
 
 function ZeroRow(props) @{
-	<span class="cache-row" data-id={props.id}>{props.id + '|' + props.version +
-		':0' as string}</span>
+	<span class="cache-row" data-id={props.id}>
+		{(props.id + '|' + props.version + ':0') as string}
+	</span>
 }
 
 function OneRow(props) @{
 	const root = use(RootCtx);
-	<span class="cache-row" data-id={props.id}>{props.id + '|' + root + ':0' as string}</span>
+	<span class="cache-row" data-id={props.id}>
+		{(props.id + '|' + root + ':0') as string}
+	</span>
 }
 
 function TwoRow(props) @{
 	const root = use(RootCtx);
 	const other = use(OtherCtx);
-	<span class="cache-row" data-id={props.id}>{props.id + '|' + root + ':' + other as string}</span>
+	<span class="cache-row" data-id={props.id}>
+		{(props.id + '|' + root + ':' + other) as string}
+	</span>
 }
 
 const ROWS = { zero: ZeroRow, one: OneRow, two: TwoRow };

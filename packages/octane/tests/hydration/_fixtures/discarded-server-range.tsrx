@@ -33,7 +33,11 @@ export function Rows(props: { rows: string[] }) @{
 // component list in the place where the client renders an @if. The list's
 // first item range does not span the place, so it cannot be the branch's.
 export function ServerList(props: { ids: string[] }) @{
-	<section>{props.ids.map((id) => <Label key={id} v={id} />)}</section>
+	<section>
+		{props.ids.map((id) => (
+			<Label key={id} v={id} />
+		))}
+	</section>
 }
 
 export function ClientBranch(props: { on: boolean }) @{

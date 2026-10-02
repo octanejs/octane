@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -65,7 +65,7 @@
         {
           "path": "packages/mantine-hooks/tests/_fixtures/state-hooks.tsrx",
           "role": "support",
-          "sha256": "f06221499886956855ff030587878c90f884f5a6f655c85f1f211dc7eea3da18"
+          "sha256": "6165d5e896812569e7a76400244f51bb2b89a424b4edb706247ad675f834ef33"
         },
         {
           "path": "packages/mantine-hooks/tests/differential/_setup.ts",

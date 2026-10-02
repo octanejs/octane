@@ -75,7 +75,8 @@ async function interact(host: HTMLElement) {
 function settle(host: HTMLElement, before: Awaited<ReturnType<typeof interact>>) {
 	const { button, input, initial, clicked } = before;
 	const retained =
-		button === host.querySelector('button') && input === host.querySelector('input') &&
-			input.value === 'typed';
+		button === host.querySelector('button') &&
+		input === host.querySelector('input') &&
+		input.value === 'typed';
 	return { initial, clicked, updated: host.textContent, retained };
 }

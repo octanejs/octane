@@ -11,19 +11,19 @@ export function App() @{
 
 	<section>
 		<button
-			onClick={() => setTasks([
-				{ id: tasks.length + 1, title: `New task ${tasks.length + 1}` },
-				...tasks,
-			])}
-		>{'Add task'}</button>
+			onClick={() =>
+				setTasks([{ id: tasks.length + 1, title: `New task ${tasks.length + 1}` }, ...tasks])
+			}
+		>
+			{'Add task'}
+		</button>
 		<ul>
 			@for (const task of tasks; key task.id) {
 				const [open, setOpen] = useState(false);
 				<li>
-					<button
-						aria-expanded={open}
-						onClick={() => setOpen(!open)}
-					>{task.title as string}</button>
+					<button aria-expanded={open} onClick={() => setOpen(!open)}>
+						{task.title as string}
+					</button>
 					@if (open) {
 						<p>{`Details for ${task.title}` as string}</p>
 					}

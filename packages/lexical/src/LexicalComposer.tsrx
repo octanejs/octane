@@ -33,7 +33,7 @@ function initializeEditor(editor: LexicalEditor, initialEditorState?: InitialEdi
 				// when the editor lives in a shadow root.
 				const activeElement =
 					CAN_USE_DOM && rootElement !== null ? getActiveElement(rootElement) : null;
-				if ($getSelection() !== null || activeElement !== null && activeElement === rootElement) {
+				if ($getSelection() !== null || (activeElement !== null && activeElement === rootElement)) {
 					paragraph.select();
 				}
 			}

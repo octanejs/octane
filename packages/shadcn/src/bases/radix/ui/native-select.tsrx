@@ -32,10 +32,10 @@ export function NativeSelect({ className, size = 'default', ...props }: NativeSe
 	</div>
 }
 
-export function NativeSelectOption({ className, ...props }: { className?: string } & Record<
-	string,
-	unknown
->) @{
+export function NativeSelectOption({
+	className,
+	...props
+}: { className?: string } & Record<string, unknown>) @{
 	<option
 		data-slot="native-select-option"
 		className={cn('bg-[Canvas] text-[CanvasText]', className)}
@@ -43,10 +43,10 @@ export function NativeSelectOption({ className, ...props }: { className?: string
 	/>
 }
 
-export function NativeSelectOptGroup({ className, ...props }: { className?: string } & Record<
-	string,
-	unknown
->) @{
+export function NativeSelectOptGroup({
+	className,
+	...props
+}: { className?: string } & Record<string, unknown>) @{
 	<optgroup
 		data-slot="native-select-optgroup"
 		className={cn('bg-[Canvas] text-[CanvasText]', className)}

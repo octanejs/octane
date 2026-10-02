@@ -4,17 +4,16 @@ import { useState as useThreeState } from '@octanejs/three/renderer';
 import { FileLoader } from 'three';
 import type { Mesh } from 'three';
 
-type ThreeBrowserProof =
-	typeof globalThis & {
-		__octaneThreeFrameCount?: number;
-		__octaneThreeAsset?: string;
-		__octaneThreeSceneReady?: boolean;
-		__octaneThreeState?: RootState;
-		__octaneThreeEventLog?: Array<Record<string, unknown>>;
-		__octaneThreePointerId?: number;
-		__octaneThreeRemoveOnDown?: boolean;
-		__octaneThreeReleaseOnUp?: boolean;
-	};
+type ThreeBrowserProof = typeof globalThis & {
+	__octaneThreeFrameCount?: number;
+	__octaneThreeAsset?: string;
+	__octaneThreeSceneReady?: boolean;
+	__octaneThreeState?: RootState;
+	__octaneThreeEventLog?: Array<Record<string, unknown>>;
+	__octaneThreePointerId?: number;
+	__octaneThreeRemoveOnDown?: boolean;
+	__octaneThreeReleaseOnUp?: boolean;
+};
 
 function BrowserAsset(props) @{
 	const proof = globalThis as ThreeBrowserProof;

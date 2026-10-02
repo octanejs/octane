@@ -137,14 +137,18 @@ export function RootRebuilt(props: { label: string }) @{
 		@if (props.label === 'server') {
 			<b>{'server'}</b>
 		} @else {
-			<span title={props.label} style={{ color: props.label }}>{props.label as string}</span>
+			<span title={props.label} style={{ color: props.label }}>
+				{props.label as string}
+			</span>
 		}
 		<GateLeaf />
 	</div>
 }
 
 function Label(props: { text: string }) @{
-	<span title={props.text} style={{ color: props.text }}>{props.text as string}</span>
+	<span title={props.text} style={{ color: props.text }}>
+		{props.text as string}
+	</span>
 }
 
 function hole(label: string): OctaneNode {

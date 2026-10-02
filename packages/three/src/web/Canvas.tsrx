@@ -25,15 +25,13 @@ export type CanvasRef =
 	| readonly CanvasRef[]
 	| null;
 
-export interface CanvasProps extends Omit<RenderProps<HTMLCanvasElement>, 'size'>, Record<
-	string,
-	unknown
-> {
+export interface CanvasProps
+	extends Omit<RenderProps<HTMLCanvasElement>, 'size'>, Record<string, unknown> {
 	/**
- * Authored Three-scene JSX. The compiler lowers the authored children into a
- * `RendererRegion` payload at the boundary, so the runtime only ever sees the
- * region form; `OctaneNode` keeps the authoring side type-checkable.
- */
+	 * Authored Three-scene JSX. The compiler lowers the authored children into a
+	 * `RendererRegion` payload at the boundary, so the runtime only ever sees the
+	 * region form; `OctaneNode` keeps the authoring side type-checkable.
+	 */
 	children?: RendererRegion | OctaneNode;
 	/** Fallback content rendered as native canvas fallback DOM. */
 	fallback?: unknown;
@@ -48,9 +46,13 @@ export interface CanvasProps extends Omit<RenderProps<HTMLCanvasElement>, 'size'
 }
 
 function sameSize(previous: Size | null, next: Size): boolean {
-	return previous !== null && previous.width === next.width && previous.height === next.height &&
+	return (
+		previous !== null &&
+		previous.width === next.width &&
+		previous.height === next.height &&
 		previous.top === next.top &&
-		previous.left === next.left;
+		previous.left === next.left
+	);
 }
 
 function configurationError(error: unknown): Error {
@@ -73,7 +75,7 @@ function resolveEventSource(
 	wrapper: HTMLDivElement | null,
 ): HTMLElement | null {
 	if (source === undefined) return wrapper;
-	return 'current' in source ? source.current ?? wrapper : source;
+	return 'current' in source ? (source.current ?? wrapper) : source;
 }
 
 function createPrefixCompute(prefix: EventPrefix): ComputeFunction {
@@ -213,31 +215,34 @@ export function Canvas({
 			root = createRoot(canvas);
 			rootRef.current = root;
 		}
-		void root.configure({
-			gl,
-			events,
-			shadows,
-			linear,
-			flat,
-			legacy,
-			orthographic,
-			frameloop,
-			dpr,
-			performance,
-			raycaster,
-			camera,
-			scene,
-			// Both handlers were lazily created during render; the `| null` only
-			// survives because TS cannot carry the narrowing into this closure.
-			onPointerMissed: pointerMissedHandlerRef.current ?? undefined,
-			onCreated: createdHandlerRef.current ?? undefined,
-			size,
-		}).then(() => {
-			if (cancelled) return;
-			setBoundaryMount(createThreeBoundaryMount(root));
-		}).catch((reason) => {
-			if (!cancelled) setError(configurationError(reason));
-		});
+		void root
+			.configure({
+				gl,
+				events,
+				shadows,
+				linear,
+				flat,
+				legacy,
+				orthographic,
+				frameloop,
+				dpr,
+				performance,
+				raycaster,
+				camera,
+				scene,
+				// Both handlers were lazily created during render; the `| null` only
+				// survives because TS cannot carry the narrowing into this closure.
+				onPointerMissed: pointerMissedHandlerRef.current ?? undefined,
+				onCreated: createdHandlerRef.current ?? undefined,
+				size,
+			})
+			.then(() => {
+				if (cancelled) return;
+				setBoundaryMount(createThreeBoundaryMount(root));
+			})
+			.catch((reason) => {
+				if (!cancelled) setError(configurationError(reason));
+			});
 		return () => {
 			cancelled = true;
 		};
@@ -291,20 +296,24 @@ export function Canvas({
 		...style,
 	};
 
-	return <div
-		ref={wrapperRef}
-		style={wrapperStyle}
-		{...domProps as typeof domProps & { ref?: undefined }}
-	>
-		<div style={{ width: '100%', height: '100%' }}>
-			<canvas ref={[canvasRef, ref]} style={{ display: 'block' }}>{fallback}</canvas>
-		</div>
-		{renderedBoundaryMount === null
-			? null
-			: <ThreeBoundary
+	return (
+		<div
+			ref={wrapperRef}
+			style={wrapperStyle}
+			{...(domProps as typeof domProps & { ref?: undefined })}
+		>
+			<div style={{ width: '100%', height: '100%' }}>
+				<canvas ref={[canvasRef, ref]} style={{ display: 'block' }}>
+					{fallback}
+				</canvas>
+			</div>
+			{renderedBoundaryMount === null ? null : (
+				<ThreeBoundary
 					root={renderedBoundaryMount.root}
 					component={renderedBoundaryMount.component}
 					props={renderedBoundaryMount.props}
-				/>}
-	</div>;
+				/>
+			)}
+		</div>
+	);
 }

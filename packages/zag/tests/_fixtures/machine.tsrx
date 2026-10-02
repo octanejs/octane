@@ -95,8 +95,12 @@ export function MachineFixture() @{
 
 	<div>
 		<p id="machine-state">{service.state.get() + '/' + service.context.get('count')}</p>
-		<button id="machine-toggle" onClick={() => service.send({ type: 'TOGGLE' })}>toggle</button>
-		<button id="machine-double" onClick={() => service.send({ type: 'DOUBLE' })}>double</button>
+		<button id="machine-toggle" onClick={() => service.send({ type: 'TOGGLE' })}>
+			toggle
+		</button>
+		<button id="machine-double" onClick={() => service.send({ type: 'DOUBLE' })}>
+			double
+		</button>
 	</div>
 }
 
@@ -107,15 +111,21 @@ export function IndependentMachines() @{
 	<div>
 		<p id="first-machine">{first.state.get() + '/' + first.context.get('count')}</p>
 		<p id="second-machine">{second.state.get() + '/' + second.context.get('count')}</p>
-		<button id="first-toggle" onClick={() => first.send({ type: 'TOGGLE' })}>first</button>
-		<button id="second-toggle" onClick={() => second.send({ type: 'TOGGLE' })}>second</button>
+		<button id="first-toggle" onClick={() => first.send({ type: 'TOGGLE' })}>
+			first
+		</button>
+		<button id="second-toggle" onClick={() => second.send({ type: 'TOGGLE' })}>
+			second
+		</button>
 	</div>
 }
 
 export function LifecycleMachine() @{
 	const service = useMachine(lifecycleMachine);
 
-	<button id="lifecycle-next" onClick={() => service.send({ type: 'NEXT' })}>next</button>
+	<button id="lifecycle-next" onClick={() => service.send({ type: 'NEXT' })}>
+		next
+	</button>
 }
 
 export function PortalFixture(props: {

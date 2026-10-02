@@ -50,8 +50,7 @@ export function EdgeToolbar({
 		[edgeId],
 	);
 	const edge = useStore(edgeSelector, shallow);
-	const isActive =
-		typeof isVisible === 'boolean' ? isVisible : edge?.selected;
+	const isActive = typeof isVisible === 'boolean' ? isVisible : edge?.selected;
 	const zoom = useStore(zoomSelector);
 
 	if (!isActive) {
@@ -61,19 +60,23 @@ export function EdgeToolbar({
 	const zIndex = (edge?.zIndex ?? 0) + 1;
 	const transform = getEdgeToolbarTransform(x, y, zoom, alignX, alignY);
 
-	return <EdgeLabelRenderer>
-		<div
-			style={{
-				position: 'absolute',
-				transform,
-				zIndex,
-				pointerEvents: 'all',
-				transformOrigin: '0 0',
-				...style,
-			}}
-			className={cc(['react-flow__edge-toolbar', className])}
-			data-id={edge?.id ?? ''}
-			{...rest}
-		>{children}</div>
-	</EdgeLabelRenderer>;
+	return (
+		<EdgeLabelRenderer>
+			<div
+				style={{
+					position: 'absolute',
+					transform,
+					zIndex,
+					pointerEvents: 'all',
+					transformOrigin: '0 0',
+					...style,
+				}}
+				className={cc(['react-flow__edge-toolbar', className])}
+				data-id={edge?.id ?? ''}
+				{...rest}
+			>
+				{children}
+			</div>
+		</EdgeLabelRenderer>
+	);
 }

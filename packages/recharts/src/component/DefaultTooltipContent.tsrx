@@ -20,12 +20,13 @@ function defaultFormatter(value: ValueType | undefined): OctaneNode {
 export type TooltipType = 'none';
 export type ValueType = number | string | ReadonlyArray<number | string>;
 export type NameType = number | string;
-export type Formatter<TValue extends ValueType = ValueType, TName extends NameType = NameType> =
-	(value: TValue | undefined, name: TName | undefined, item: Payload<
-		TValue,
-		TName
-	>, index: number, payload: ReadonlyArray<Payload<TValue, TName>>) => | [OctaneNode, TName]
-	| OctaneNode;
+export type Formatter<TValue extends ValueType = ValueType, TName extends NameType = NameType> = (
+	value: TValue | undefined,
+	name: TName | undefined,
+	item: Payload<TValue, TName>,
+	index: number,
+	payload: ReadonlyArray<Payload<TValue, TName>>,
+) => [OctaneNode, TName] | OctaneNode;
 
 export interface Payload<
 	TValue extends ValueType = ValueType,
@@ -48,8 +49,8 @@ export interface Payload<
 	className?: string;
 	hide?: boolean;
 	/**
- * The id of the graphical item that the data point belongs to
- */
+	 * The id of the graphical item that the data point belongs to
+	 */
 	graphicalItemId: string;
 }
 
@@ -59,8 +60,7 @@ export interface Payload<
 export type TooltipItemSorter<
 	TValue extends ValueType = ValueType,
 	TName extends NameType = NameType,
-> =
-	'dataKey' | 'value' | 'name' | ((item: Payload<TValue, TName>) => number | string | undefined);
+> = 'dataKey' | 'value' | 'name' | ((item: Payload<TValue, TName>) => number | string | undefined);
 
 export interface Props<TValue extends ValueType = ValueType, TName extends NameType = NameType> {
 	separator?: string;
@@ -70,9 +70,10 @@ export interface Props<TValue extends ValueType = ValueType, TName extends NameT
 	contentStyle?: CSSProperties;
 	itemStyle?: CSSProperties;
 	labelStyle?: CSSProperties;
-	labelFormatter?: (label: OctaneNode, payload: ReadonlyArray<
-		Payload<TValue, TName>
-	>) => OctaneNode;
+	labelFormatter?: (
+		label: OctaneNode,
+		payload: ReadonlyArray<Payload<TValue, TName>>,
+	) => OctaneNode;
 	label?: OctaneNode;
 	payload?: ReadonlyArray<Payload<TValue, TName>>;
 	itemSorter?: TooltipItemSorter<TValue, TName>;
@@ -161,23 +162,25 @@ export const DefaultTooltipContent = (props: Props) => {
 					...itemStyle,
 				};
 
-				return <li
-					className="recharts-tooltip-item"
-					key={`tooltip-item-${i}`}
-					style={finalItemStyle}
-				>
-					{isNumOrStr(finalName)
-						? <span className="recharts-tooltip-item-name">{finalName}</span>
-						: null}
-					{isNumOrStr(finalName)
-						? <span className="recharts-tooltip-item-separator">{separator}</span>
-						: null}
-					<span className="recharts-tooltip-item-value">{finalValue}</span>
-					<span className="recharts-tooltip-item-unit">{entry.unit || ''}</span>
-				</li>;
+				return (
+					<li className="recharts-tooltip-item" key={`tooltip-item-${i}`} style={finalItemStyle}>
+						{isNumOrStr(finalName) ? (
+							<span className="recharts-tooltip-item-name">{finalName}</span>
+						) : null}
+						{isNumOrStr(finalName) ? (
+							<span className="recharts-tooltip-item-separator">{separator}</span>
+						) : null}
+						<span className="recharts-tooltip-item-value">{finalValue}</span>
+						<span className="recharts-tooltip-item-unit">{entry.unit || ''}</span>
+					</li>
+				);
 			});
 
-			return <ul className="recharts-tooltip-item-list" style={listStyle}>{items}</ul>;
+			return (
+				<ul className="recharts-tooltip-item-list" style={listStyle}>
+					{items}
+				</ul>
+			);
 		}
 
 		return null;
@@ -200,18 +203,19 @@ export const DefaultTooltipContent = (props: Props) => {
 		finalLabel = labelFormatter(label, payload);
 	}
 
-	const accessibilityAttributes =
-		accessibilityLayer
-			? {
-					role: 'status',
-					'aria-live': 'assertive',
-				} as HTMLAttributes<HTMLDivElement>
-			: {};
+	const accessibilityAttributes = accessibilityLayer
+		? ({
+				role: 'status',
+				'aria-live': 'assertive',
+			} as HTMLAttributes<HTMLDivElement>)
+		: {};
 
-	return <div className={wrapperCN} style={finalStyle} {...accessibilityAttributes}>
-		<p className={labelCN} style={finalLabelStyle}>
-			{React.isValidElement(finalLabel) ? finalLabel : `${finalLabel}`}
-		</p>
-		{renderContent()}
-	</div>;
+	return (
+		<div className={wrapperCN} style={finalStyle} {...accessibilityAttributes}>
+			<p className={labelCN} style={finalLabelStyle}>
+				{React.isValidElement(finalLabel) ? finalLabel : `${finalLabel}`}
+			</p>
+			{renderContent()}
+		</div>
+	);
 };

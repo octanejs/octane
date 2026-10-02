@@ -23,7 +23,9 @@ export function SameRoot(props: EventProbeProps) @{
 			data-target
 			onClickCapture={(event) => props.record('target:capture', event)}
 			onClick={(event) => props.record('target:bubble', event)}
-		>Click</button>
+		>
+			Click
+		</button>
 	</section>
 }
 
@@ -45,7 +47,9 @@ export function Inner(props: EventProbeProps) @{
 		onClickCapture={(event) => props.record('inner:capture', event)}
 		onClick={(event) => props.record('inner:bubble', event)}
 	>
-		<button data-name="target" data-target>Click</button>
+		<button data-name="target" data-target>
+			Click
+		</button>
 	</section>
 }
 
@@ -72,7 +76,9 @@ export function OuterSlot(props: EventProbeProps) @{
 				slot="content"
 				onClickCapture={(event) => props.record('light:capture', event)}
 				onClick={(event) => props.record('light:bubble', event)}
-			>Click</button>
+			>
+				Click
+			</button>
 		</event-probe-host>
 	</section>
 }

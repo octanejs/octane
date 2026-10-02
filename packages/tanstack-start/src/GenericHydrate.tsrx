@@ -88,9 +88,8 @@ function useHydrationGate(props: InternalHydrateProps) {
 	const isDynamicHydrate = typeof when === 'function';
 	const dynamicHydrateStrategyRef = useRef<HydrationStrategy | undefined>(undefined);
 	if (isDynamicHydrate) {
-		dynamicHydrateStrategyRef.current ??= isServer ?? typeof window === 'undefined'
-			? dynamicHydrateStrategy
-			: when();
+		dynamicHydrateStrategyRef.current ??=
+			(isServer ?? typeof window === 'undefined') ? dynamicHydrateStrategy : when();
 	}
 	const hydrateStrategy = isDynamicHydrate ? dynamicHydrateStrategyRef.current! : when;
 	const markerHydrateType: HydrationWhen = isDynamicHydrate ? dynamicType : hydrateStrategy._t!;
@@ -118,29 +117,34 @@ function useHydrationGate(props: InternalHydrateProps) {
 	shouldDeferInitialHydrationRef.current ??= !hydrated && shouldDeferHydration(hydrateStrategy);
 
 	if (!gateRef.current) {
-		gateRef.current = isServer ?? typeof window === 'undefined'
-			? createResolvedGate(id, hydrateStrategy._t!)
-			: getOrCreateGate(id, hydrateStrategy._t!);
+		gateRef.current =
+			(isServer ?? typeof window === 'undefined')
+				? createResolvedGate(id, hydrateStrategy._t!)
+				: getOrCreateGate(id, hydrateStrategy._t!);
 	}
 
 	gateRef.current.when = hydrateStrategy._t!;
 
 	if (
-		!(isServer ?? typeof window === 'undefined') && hydrateStrategy._t !== 'never' &&
-			(!shouldDeferInitialHydrationRef.current || !shouldDeferHydration(hydrateStrategy))
+		!(isServer ?? typeof window === 'undefined') &&
+		hydrateStrategy._t !== 'never' &&
+		(!shouldDeferInitialHydrationRef.current || !shouldDeferHydration(hydrateStrategy))
 	) {
 		gateRef.current.resolve();
 	}
 
-	const markerRef = useCallback((element: HTMLDivElement | null) => {
-		markerElementRef.current = element;
-		if (element) {
-			if (hydrateStrategy._t === 'never' && !shouldPreserveServerHTMLRef.current) {
-				element.replaceChildren();
+	const markerRef = useCallback(
+		(element: HTMLDivElement | null) => {
+			markerElementRef.current = element;
+			if (element) {
+				if (hydrateStrategy._t === 'never' && !shouldPreserveServerHTMLRef.current) {
+					element.replaceChildren();
+				}
+				saveFallbackHtml(id, element);
 			}
-			saveFallbackHtml(id, element);
-		}
-	}, [hydrateStrategy._t, id]);
+		},
+		[hydrateStrategy._t, id],
+	);
 
 	useEffect(() => {
 		const gate = gateRef.current!;
@@ -178,18 +182,21 @@ function useHydrationGate(props: InternalHydrateProps) {
 		const prefetchInput = latestRef.current.prefetch;
 
 		if (typeof prefetchInput === 'function') {
-			const promise = Promise.resolve().then(
-				() => prefetchInput({
-					element: markerElementRef.current,
-					signal: controller.abortController.signal,
-					preload,
-					waitFor: (strategy) => waitForHydrationPrefetchStrategy(strategy, {
+			const promise = Promise.resolve()
+				.then(() =>
+					prefetchInput({
 						element: markerElementRef.current,
 						signal: controller.abortController.signal,
-						onHydrate,
+						preload,
+						waitFor: (strategy) =>
+							waitForHydrationPrefetchStrategy(strategy, {
+								element: markerElementRef.current,
+								signal: controller.abortController.signal,
+								onHydrate,
+							}),
 					}),
-				}),
-			).then(() => undefined);
+				)
+				.then(() => undefined);
 
 			controller.promise = promise;
 			promise.catch((error) => {
@@ -265,11 +272,14 @@ function useHydrationGate(props: InternalHydrateProps) {
 			if (controller.hydrationResolvePending) return;
 			controller.hydrationResolvePending = true;
 
-			controller.promise.then(() => resolveGate(), (error) => {
-				if (!controller.abortController.signal.aborted) {
-					setPrefetchError(error);
-				}
-			});
+			controller.promise.then(
+				() => resolveGate(),
+				(error) => {
+					if (!controller.abortController.signal.aborted) {
+						setPrefetchError(error);
+					}
+				},
+			);
 		};
 
 		gate.resolve = requestHydration;
@@ -354,14 +364,13 @@ export function GenericHydrate(props: HydrateProps) @{
 	let fallback: OctaneNode;
 	if (shouldPreserveServerHTML) {
 		const html = getFallbackHtml(gate.id);
-		fallback = html
-			? <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: html }} />
-			: null;
+		fallback = html ? (
+			<div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: html }} />
+		) : null;
 	} else {
 		fallback = props.fallback ?? null;
 	}
-	const markerAttributes =
-		markerHydrateType === dynamicType ? undefined : hydrateStrategy._a?.();
+	const markerAttributes = markerHydrateType === dynamicType ? undefined : hydrateStrategy._a?.();
 
 	const hydrateType = hydrateStrategy._t!;
 	const preserveNever = hydrateType === 'never' && !shouldPreserveServerHTML;
@@ -375,9 +384,7 @@ export function GenericHydrate(props: HydrateProps) @{
 		}}
 	>
 		@if (preserveNever) {
-			<>
-				{props.fallback ?? null}
-			</>
+			<>{props.fallback ?? null}</>
 		} @else {
 			<Suspense fallback={fallback}>
 				<HydrationGate gate={gate as Gate}>
@@ -388,7 +395,9 @@ export function GenericHydrate(props: HydrateProps) @{
 							markerElementRef.current?.removeAttribute(hydrateWhenAttribute);
 							hydrateStrategy._o?.(id);
 						}}
-					>{props.children}</HydratedBoundary>
+					>
+						{props.children}
+					</HydratedBoundary>
 				</HydrationGate>
 			</Suspense>
 		}

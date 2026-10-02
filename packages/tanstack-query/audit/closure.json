@@ -33,7 +33,7 @@
       "path": "src/HydrationBoundary.tsrx",
       "origin": "adapted",
       "packageName": "@tanstack/react-query",
-      "sha256": "76a62b91d2733fc26e451ce4c9a164a8765be354affb560ee901d09e0e7aa954"
+      "sha256": "de57efab2fa6532863f66c16a2b721b3caa0eed93a43ed3be5c6082993120d79"
     },
     {
       "path": "src/QueryClientProvider.tsrx",

@@ -29,7 +29,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -62,7 +62,7 @@
         {
           "path": "packages/lucide/tests/_fixtures/icons.tsrx",
           "role": "support",
-          "sha256": "0d38592e84a8bac96e94697d97db59a1e7984b945e34fab9574870dc5437bd67"
+          "sha256": "537ff60363950f0bcebcee8d17416396c53e5c17f9f8f306a8d143c0df0943b2"
         },
         {
           "path": "packages/lucide/tests/_fixtures/icons-runtime.ts",

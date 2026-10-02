@@ -64,7 +64,11 @@ export function HostArm({ observe, show }: Toggle) @{
 }
 
 // A bare-function row handler is republished whenever the list updates.
-export function Rows({ observe, rows, onRowBlur }: Observe & {
+export function Rows({
+	observe,
+	rows,
+	onRowBlur,
+}: Observe & {
 	readonly rows: readonly number[];
 	readonly onRowBlur: () => void;
 }) @{

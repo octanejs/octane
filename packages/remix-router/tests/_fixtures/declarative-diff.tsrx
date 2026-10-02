@@ -17,9 +17,15 @@ import {
 function Layout() @{
 	<div>
 		<nav>
-			<Link class="nav-home" to="/">Home</Link>
-			<Link class="nav-about" to="/about">About</Link>
-			<Link class="nav-user" to="/users/42">User</Link>
+			<Link class="nav-home" to="/">
+				Home
+			</Link>
+			<Link class="nav-about" to="/about">
+				About
+			</Link>
+			<Link class="nav-user" to="/users/42">
+				User
+			</Link>
 		</nav>
 		<main>
 			<Outlet />

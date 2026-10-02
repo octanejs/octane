@@ -101,7 +101,7 @@ function RootTasks(props) @{
 	props.onRender();
 	const one = use(props.one);
 	const two = use(props.two);
-	<span>{one + two as string}</span>
+	<span>{(one + two) as string}</span>
 }
 
 export function BoundaryAndRootTasks(props) @{

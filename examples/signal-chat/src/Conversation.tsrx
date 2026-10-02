@@ -19,22 +19,24 @@ function Transcript({ frame }: { frame: AnswerFrame }) @{
 						{message.role === 'user' ? 'D' : '✳'}
 					</span>
 					<div>
-						<strong>
-							{message.role === 'user' ? 'You' : 'Signal Chat'}
-						</strong>
+						<strong>{message.role === 'user' ? 'You' : 'Signal Chat'}</strong>
 						<p>{message.content as string}</p>
 					</div>
 				</article>
 			}
 			<article class="message user current">
-				<span class="avatar" aria-hidden="true">D</span>
+				<span class="avatar" aria-hidden="true">
+					D
+				</span>
 				<div>
 					<strong>You</strong>
 					<p data-current-prompt>{frame.prompt as string}</p>
 				</div>
 			</article>
 			<article class="message assistant current">
-				<span class="avatar" aria-hidden="true">✳</span>
+				<span class="avatar" aria-hidden="true">
+					✳
+				</span>
 				<div>
 					<strong>Signal Chat</strong>
 					<pre data-current-answer>{frame.answer as string}</pre>
@@ -42,7 +44,9 @@ function Transcript({ frame }: { frame: AnswerFrame }) @{
 			</article>
 		</div>
 		<div class="revision">
-			<span>Snapshot {String(frame.revision)} / {String(frame.total)}</span>
+			<span>
+				Snapshot {String(frame.revision)} / {String(frame.total)}
+			</span>
 			<span>{String(frame.tokens)} words · cumulative values</span>
 		</div>
 	</div>
@@ -81,7 +85,9 @@ export function Conversation() @{
 								retryResponse();
 								reset();
 							}}
-						>Retry response</button>
+						>
+							Retry response
+						</button>
 						@if (answer$.latest(null) !== null) {
 							<Transcript frame={answer$.latest(null)!} />
 						}
@@ -89,6 +95,8 @@ export function Conversation() @{
 				}
 			</>
 		}
-		<output class="activity" data-conversation-state>{answerActivity$}</output>
+		<output class="activity" data-conversation-state>
+			{answerActivity$}
+		</output>
 	</section>
 }

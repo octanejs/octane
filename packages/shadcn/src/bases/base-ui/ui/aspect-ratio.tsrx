@@ -15,9 +15,11 @@ export interface AspectRatioProps extends DivProps {
 export function AspectRatio({ ratio, className, ...props }: AspectRatioProps) @{
 	<div
 		data-slot="aspect-ratio"
-		style={{
-			'--ratio': ratio,
-		} as Record<string, string | number>}
+		style={
+			{
+				'--ratio': ratio,
+			} as Record<string, string | number>
+		}
 		className={cn('relative aspect-(--ratio)', className)}
 		{...props}
 	/>

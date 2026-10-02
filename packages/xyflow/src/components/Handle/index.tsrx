@@ -33,8 +33,8 @@ import { addEdge } from '../../utils/edges';
 /**
  * @expand
  */
-export type HandleProps =
-	HandlePropsSystem & Omit<HTMLAttributes<HTMLDivElement>, 'id'> & {
+export type HandleProps = HandlePropsSystem &
+	Omit<HTMLAttributes<HTMLDivElement>, 'id'> & {
 		/** Callback called when connection is made */
 		onConnect?: OnConnect;
 	};
@@ -60,33 +60,35 @@ const idleConnectingState = {
 	valid: false,
 };
 
-const connectingSelector = (nodeId: string | null, handleId: string | null, type: HandleType) => (
-	state: ReactFlowState,
-) => {
-	const { connectionClickStartHandle: clickHandle, connectionMode, connection } = state;
-	const { fromHandle, toHandle, isValid } = connection;
+const connectingSelector =
+	(nodeId: string | null, handleId: string | null, type: HandleType) => (state: ReactFlowState) => {
+		const { connectionClickStartHandle: clickHandle, connectionMode, connection } = state;
+		const { fromHandle, toHandle, isValid } = connection;
 
-	if (!fromHandle && !clickHandle) {
-		return idleConnectingState;
-	}
+		if (!fromHandle && !clickHandle) {
+			return idleConnectingState;
+		}
 
-	const connectingTo =
-		toHandle?.nodeId === nodeId && toHandle?.id === handleId && toHandle?.type === type;
+		const connectingTo =
+			toHandle?.nodeId === nodeId && toHandle?.id === handleId && toHandle?.type === type;
 
-	return {
-		connectingFrom: fromHandle?.nodeId === nodeId && fromHandle?.id === handleId &&
-			fromHandle?.type === type,
-		connectingTo,
-		clickConnecting: clickHandle?.nodeId === nodeId && clickHandle?.id === handleId &&
-			clickHandle?.type === type,
-		isPossibleEndHandle: connectionMode === ConnectionMode.Strict
-			? fromHandle?.type !== type
-			: nodeId !== fromHandle?.nodeId || handleId !== fromHandle?.id,
-		connectionInProcess: !!fromHandle,
-		clickConnectionInProcess: !!clickHandle,
-		valid: connectingTo && isValid,
+		return {
+			connectingFrom:
+				fromHandle?.nodeId === nodeId && fromHandle?.id === handleId && fromHandle?.type === type,
+			connectingTo,
+			clickConnecting:
+				clickHandle?.nodeId === nodeId &&
+				clickHandle?.id === handleId &&
+				clickHandle?.type === type,
+			isPossibleEndHandle:
+				connectionMode === ConnectionMode.Strict
+					? fromHandle?.type !== type
+					: nodeId !== fromHandle?.nodeId || handleId !== fromHandle?.id,
+			connectionInProcess: !!fromHandle,
+			clickConnectionInProcess: !!clickHandle,
+			valid: connectingTo && isValid,
+		};
 	};
-};
 
 function HandleComponent(
 	{
@@ -150,8 +152,8 @@ function HandleComponent(
 
 		if (
 			isConnectableStart &&
-				(isMouseTriggered && (event as ReactMouseEvent<HTMLDivElement>).button === 0 ||
-					!isMouseTriggered)
+			((isMouseTriggered && (event as ReactMouseEvent<HTMLDivElement>).button === 0) ||
+				!isMouseTriggered)
 		) {
 			const currentStore = store.getState();
 			const fallbackIsValidConnection: NonNullable<HandleProps['isValidConnection']> = (...args) =>
@@ -203,7 +205,7 @@ function HandleComponent(
 			connection: connectionState,
 		} = store.getState();
 
-		if (!nodeId || !connectionClickStartHandle && !isConnectableStart) {
+		if (!nodeId || (!connectionClickStartHandle && !isConnectableStart)) {
 			return;
 		}
 
@@ -249,41 +251,49 @@ function HandleComponent(
 		store.setState({ connectionClickStartHandle: null });
 	};
 
-	return <div
-		data-handleid={handleId}
-		data-nodeid={nodeId}
-		data-handlepos={position}
-		data-id={`${rfId}-${nodeId}-${handleId}-${type}`}
-		className={cc([
-			'react-flow__handle',
-			`react-flow__handle-${position}`,
-			'nodrag',
-			noPanClassName,
-			className,
-			{
-				source: !isTarget,
-				target: isTarget,
-				connectable: isConnectable,
-				connectablestart: isConnectableStart,
-				connectableend: isConnectableEnd,
-				clickconnecting: clickConnecting,
-				connectingfrom: connectingFrom,
-				connectingto: connectingTo,
-				valid,
-				/*
- * shows where you can start a connection from
- * and where you can end it while connecting
- */
-				connectionindicator: isConnectable && (!connectionInProcess || isPossibleEndHandle) &&
-					(connectionInProcess || clickConnectionInProcess ? isConnectableEnd : isConnectableStart),
-			},
-		])}
-		onMouseDown={onPointerDown}
-		onTouchStart={onPointerDown}
-		onClick={connectOnClick ? onClick : undefined}
-		ref={ref}
-		{...rest}
-	>{children}</div>;
+	return (
+		<div
+			data-handleid={handleId}
+			data-nodeid={nodeId}
+			data-handlepos={position}
+			data-id={`${rfId}-${nodeId}-${handleId}-${type}`}
+			className={cc([
+				'react-flow__handle',
+				`react-flow__handle-${position}`,
+				'nodrag',
+				noPanClassName,
+				className,
+				{
+					source: !isTarget,
+					target: isTarget,
+					connectable: isConnectable,
+					connectablestart: isConnectableStart,
+					connectableend: isConnectableEnd,
+					clickconnecting: clickConnecting,
+					connectingfrom: connectingFrom,
+					connectingto: connectingTo,
+					valid,
+					/*
+					 * shows where you can start a connection from
+					 * and where you can end it while connecting
+					 */
+					connectionindicator:
+						isConnectable &&
+						(!connectionInProcess || isPossibleEndHandle) &&
+						(connectionInProcess || clickConnectionInProcess
+							? isConnectableEnd
+							: isConnectableStart),
+				},
+			])}
+			onMouseDown={onPointerDown}
+			onTouchStart={onPointerDown}
+			onClick={connectOnClick ? onClick : undefined}
+			ref={ref}
+			{...rest}
+		>
+			{children}
+		</div>
+	);
 }
 
 /**

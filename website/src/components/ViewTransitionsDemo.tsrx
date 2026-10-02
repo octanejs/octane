@@ -222,10 +222,12 @@ export function ViewTransitionsDemo() @{
 						type="button"
 						class="vtdemo-btn"
 						id="vt-toggle-card"
-						onClick={() => startTransition(() => {
-							addTransitionType('card-toggle');
-							setShowCard((current) => !current);
-						})}
+						onClick={() =>
+							startTransition(() => {
+								addTransitionType('card-toggle');
+								setShowCard((current) => !current);
+							})
+						}
 					>
 						{showCard ? 'Remove card' : 'Add card'}
 					</button>
@@ -245,11 +247,15 @@ export function ViewTransitionsDemo() @{
 						class="vtdemo-btn"
 						id="vt-toggle-hero"
 						aria-pressed={heroRight}
-						onClick={() => startTransition(() => {
-							addTransitionType('hero-move');
-							setHeroRight((current) => !current);
-						})}
-					>{'Move hero'}</button>
+						onClick={() =>
+							startTransition(() => {
+								addTransitionType('hero-move');
+								setHeroRight((current) => !current);
+							})
+						}
+					>
+						{'Move hero'}
+					</button>
 					<div class="vtdemo-stage vtdemo-split">
 						@if (heroRight) {
 							<>
@@ -287,7 +293,9 @@ export function ViewTransitionsDemo() @{
 										setPanel(next);
 									});
 								}}
-							>{name}</button>
+							>
+								{name}
+							</button>
 						}
 					</div>
 					<div class="vtdemo-stage">
@@ -299,7 +307,9 @@ export function ViewTransitionsDemo() @{
 							}}
 							default="none"
 						>
-							<div class="vtdemo-panel" id="vt-demo-panel" role="tabpanel">{PANELS[panel]}</div>
+							<div class="vtdemo-panel" id="vt-demo-panel" role="tabpanel">
+								{PANELS[panel]}
+							</div>
 						</ViewTransition>
 					</div>
 				</section>

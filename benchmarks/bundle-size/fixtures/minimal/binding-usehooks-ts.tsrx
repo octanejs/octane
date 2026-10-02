@@ -3,10 +3,9 @@ import { useCounter } from '@octanejs/usehooks-ts';
 
 function Counter() @{
 	const counter = useCounter(4);
-	<button
-		id="minimal-usehooks-counter"
-		onClick={counter.increment}
-	>{counter.count as string}</button>
+	<button id="minimal-usehooks-counter" onClick={counter.increment}>
+		{counter.count as string}
+	</button>
 }
 
 export async function run(container: HTMLElement) {

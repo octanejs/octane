@@ -32,7 +32,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -188,7 +188,7 @@
         {
           "path": "packages/pdf/typetests/adapted.test.tsrx",
           "role": "test",
-          "sha256": "5ac2315896c5ce3e3cb00aa286938b2a2163e87aef0d066ff8cd37e29a2fd1c0",
+          "sha256": "e2c2a21595432a68f82173320c8c28caf694297b1245f512be7da323c8c26795",
           "cases": [
             {
               "id": "types:pdf-adapted",

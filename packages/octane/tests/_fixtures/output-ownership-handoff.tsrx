@@ -33,7 +33,11 @@ export function SelectedLabel(props: LabelProps & { alternate: boolean }) @{
 
 export function MappedLabels(props: { rows: { id: number; text: string }[] }) @{
 	<>
-		{props.rows.map((row) => <span key={row.id} data-row={row.id}>{row.text as string}</span>)}
+		{props.rows.map((row) => (
+			<span key={row.id} data-row={row.id}>
+				{row.text as string}
+			</span>
+		))}
 	</>
 }
 

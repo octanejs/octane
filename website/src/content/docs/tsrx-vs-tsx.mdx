@@ -128,9 +128,7 @@ Make a computed output explicit by wrapping its expression hole in a fragment:
 
 ```tsrx
 @if (ready) {
-	<>
-		{value}
-	</>
+	<>{value}</>
 };
 ```
 
@@ -151,9 +149,9 @@ A value between tags can be text or another renderable value. TSRX asks you to m
 that distinction clear when the compiler cannot prove the answer:
 
 ```tsrx
-<h2>{product.name as string}</h2>
-<p>{'In stock: ' + product.count}</p>
-<Card>{product.details}</Card>
+<h2>{product.name as string}</h2>;
+<p>{'In stock: ' + product.count}</p>;
+<Card>{product.details}</Card>;
 ```
 
 Use `as string` for dynamic text whose type is not obvious to the compiler. A string

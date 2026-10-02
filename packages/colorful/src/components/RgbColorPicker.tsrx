@@ -10,5 +10,6 @@ const colorModel: ColorModel<RgbColor> = {
 	equal: equalColorObjects,
 };
 
-export const RgbColorPicker = (props: Partial<ColorPickerBaseProps<RgbColor>>) =>
-	<ColorPicker {...props} colorModel={colorModel} />;
+export const RgbColorPicker = (props: Partial<ColorPickerBaseProps<RgbColor>>) => (
+	<ColorPicker {...props} colorModel={colorModel} />
+);

@@ -17,13 +17,15 @@ export function HoverHarness() @{
 export function HoverReplacementHarness({ replacement }: { replacement: boolean }) @{
 	const { ref, hovered } = useHover<HTMLElement>();
 	<section>
-		{replacement
-			? <div id="hover-replacement" ref={ref}>
-					{hovered ? 'hovered' : 'idle'}
-				</div>
-			: <button id="hover-replacement" ref={ref}>
-					{hovered ? 'hovered' : 'idle'}
-				</button>}
+		{replacement ? (
+			<div id="hover-replacement" ref={ref}>
+				{hovered ? 'hovered' : 'idle'}
+			</div>
+		) : (
+			<button id="hover-replacement" ref={ref}>
+				{hovered ? 'hovered' : 'idle'}
+			</button>
+		)}
 	</section>
 }
 
@@ -33,16 +35,22 @@ export function LongPressHarness({
 	onLongPress: (event: React.MouseEvent | React.TouchEvent) => void;
 }) @{
 	const handlers = useLongPress(onLongPress, { threshold: 10 });
-	<button id="long-press" {...handlers}>press</button>
+	<button id="long-press" {...handlers}>
+		press
+	</button>
 }
 
 export function DragHarness({ onDrag }: { onDrag: (state: UseDragState) => void }) @{
 	const { ref } = useDrag<HTMLButtonElement>(onDrag);
-	<button id="drag" ref={ref}>drag</button>
+	<button id="drag" ref={ref}>
+		drag
+	</button>
 }
 
 export function OmittedInteractionOptionsHarness({ onOutside, onHotkey }) @{
 	const ref = useClickOutside<HTMLButtonElement>(onOutside);
 	useHotkeys([['K', onHotkey]]);
-	<button id="optional-interaction" ref={ref}>inside</button>
+	<button id="optional-interaction" ref={ref}>
+		inside
+	</button>
 }

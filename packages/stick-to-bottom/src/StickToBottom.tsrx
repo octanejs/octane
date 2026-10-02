@@ -50,8 +50,7 @@ export interface StickToBottomProps extends Omit<DivProps, 'children'>, StickToB
 	children: ((context: StickToBottomContext) => OctaneNode) | OctaneNode;
 }
 
-const useIsomorphicLayoutEffect =
-	typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 export function StickToBottom({
 	instance,
@@ -87,35 +86,34 @@ export function StickToBottom({
 	const { scrollRef, contentRef, scrollToBottom, stopScroll, isAtBottom, escapedFromLock, state } =
 		instance ?? defaultInstance;
 
-	const context = useMemo(function createContextValue(): StickToBottomContext {
-		return {
-			scrollToBottom,
-			stopScroll,
-			scrollRef,
-			isAtBottom,
-			escapedFromLock,
-			contentRef,
-			state,
-			get targetScrollTop() {
-				return customTargetScrollTop.current;
-			},
-			set targetScrollTop(next: GetTargetScrollTop | null) {
-				customTargetScrollTop.current = next;
-			},
-		};
-	}, [
-		scrollToBottom,
-		isAtBottom,
-		contentRef,
-		scrollRef,
-		stopScroll,
-		escapedFromLock,
-		state,
-	]);
+	const context = useMemo(
+		function createContextValue(): StickToBottomContext {
+			return {
+				scrollToBottom,
+				stopScroll,
+				scrollRef,
+				isAtBottom,
+				escapedFromLock,
+				contentRef,
+				state,
+				get targetScrollTop() {
+					return customTargetScrollTop.current;
+				},
+				set targetScrollTop(next: GetTargetScrollTop | null) {
+					customTargetScrollTop.current = next;
+				},
+			};
+		},
+		[scrollToBottom, isAtBottom, contentRef, scrollRef, stopScroll, escapedFromLock, state],
+	);
 
-	useImperativeHandle(contextRef, function getContext() {
-		return context;
-	}, [context]);
+	useImperativeHandle(
+		contextRef,
+		function getContext() {
+			return context;
+		},
+		[context],
+	);
 
 	useIsomorphicLayoutEffect(function ensureOverflow() {
 		if (!scrollRef.current) {
@@ -127,11 +125,15 @@ export function StickToBottom({
 		}
 	}, []);
 
-	return <StickToBottomContext value={context}>
-		<div {...props}>
-			{typeof children === 'function' && !isChildrenBlock(children) ? children(context) : children}
-		</div>
-	</StickToBottomContext>;
+	return (
+		<StickToBottomContext value={context}>
+			<div {...props}>
+				{typeof children === 'function' && !isChildrenBlock(children)
+					? children(context)
+					: children}
+			</div>
+		</StickToBottomContext>
+	);
 }
 
 export interface StickToBottomContentProps extends Omit<DivProps, 'children'> {
@@ -146,19 +148,23 @@ export function StickToBottomContent({
 }: StickToBottomContentProps) {
 	const context = useStickToBottomContext();
 
-	return <div
-		ref={context.scrollRef}
-		style={{
-			height: '100%',
-			width: '100%',
-			scrollbarGutter: 'stable both-edges',
-		}}
-		className={scrollClassName}
-	>
-		<div {...props} ref={context.contentRef}>
-			{typeof children === 'function' && !isChildrenBlock(children) ? children(context) : children}
+	return (
+		<div
+			ref={context.scrollRef}
+			style={{
+				height: '100%',
+				width: '100%',
+				scrollbarGutter: 'stable both-edges',
+			}}
+			className={scrollClassName}
+		>
+			<div {...props} ref={context.contentRef}>
+				{typeof children === 'function' && !isChildrenBlock(children)
+					? children(context)
+					: children}
+			</div>
 		</div>
-	</div>;
+	);
 }
 
 StickToBottom.Content = StickToBottomContent;
@@ -166,7 +172,9 @@ StickToBottom.Content = StickToBottomContent;
 export function useStickToBottomContext(): StickToBottomContext {
 	const context = useContext(StickToBottomContext);
 	if (!context) {
-		throw new Error('use-stick-to-bottom component context must be used within a StickToBottom component');
+		throw new Error(
+			'use-stick-to-bottom component context must be used within a StickToBottom component',
+		);
 	}
 
 	return context;

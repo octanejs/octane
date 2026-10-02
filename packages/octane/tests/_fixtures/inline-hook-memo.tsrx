@@ -13,8 +13,12 @@ export function ComputeCount({ log }: { log: (entry: string) => void }) @{
 		return dep * 2;
 	}, [dep]);
 	<div>
-		<button id="tick" onClick={() => setTick(tick + 1)}>t</button>
-		<button id="dep" onClick={() => setDep(dep + 1)}>d</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			t
+		</button>
+		<button id="dep" onClick={() => setDep(dep + 1)}>
+			d
+		</button>
 		{'v=' + value + ' t=' + tick}
 	</div>
 }
@@ -26,7 +30,9 @@ export function NanDep({ log }: { log: (entry: string) => void }) @{
 		return 1;
 	}, [NaN]);
 	<div>
-		<button id="tick" onClick={() => setTick(tick + 1)}>t</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			t
+		</button>
 		{'v=' + value + ' t=' + tick}
 	</div>
 }
@@ -41,7 +47,9 @@ export function EarlyReturnMemo({ log }: { log: (entry: string) => void }) @{
 	}, [count]);
 	log('total:' + total);
 	<div>
-		<button id="inc" onClick={() => setCount(count + 1)}>+</button>
+		<button id="inc" onClick={() => setCount(count + 1)}>
+			+
+		</button>
 		{'total=' + total}
 	</div>
 }
@@ -53,7 +61,9 @@ export function NullDepsIdentity({ log }: { log: (entry: string) => void }) @{
 	log(last.current === box ? 'same' : 'fresh:' + box.tick);
 	last.current = box;
 	<div>
-		<button id="tick" onClick={() => setTick(tick + 1)}>t</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			t
+		</button>
 		{'t=' + tick}
 	</div>
 }
@@ -69,8 +79,12 @@ export function ConditionalMemo({ log }: { log: (entry: string) => void }) @{
 		log('render:' + v);
 	}
 	<div>
-		<button id="on" onClick={() => setOn(!on)}>o</button>
-		<button id="d" onClick={() => setD(d + 1)}>d</button>
+		<button id="on" onClick={() => setOn(!on)}>
+			o
+		</button>
+		<button id="d" onClick={() => setD(d + 1)}>
+			d
+		</button>
 		{'on=' + on + ' d=' + d}
 	</div>
 }
@@ -83,9 +97,15 @@ export function CallbackIdentity({ log }: { log: (entry: string) => void }) @{
 	log(last.current === cb ? 'same' : 'new');
 	last.current = cb;
 	<div>
-		<button id="tick" onClick={() => setTick(tick + 1)}>t</button>
-		<button id="d" onClick={() => setD(d + 1)}>d</button>
-		<button id="fire" onClick={cb}>f</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			t
+		</button>
+		<button id="d" onClick={() => setD(d + 1)}>
+			d
+		</button>
+		<button id="fire" onClick={cb}>
+			f
+		</button>
 		{'t=' + tick + ' d=' + d}
 	</div>
 }
@@ -99,7 +119,9 @@ export function GeneratedCallbackIdentity({
 	const increment = () => setCount((current) => current + 1);
 	const forward = () => increment();
 	observe(increment, forward);
-	<button id="generated" onClick={forward}>{'count=' + count}</button>
+	<button id="generated" onClick={forward}>
+		{'count=' + count}
+	</button>
 }
 
 function GeneratedSuspendingReader({
@@ -113,7 +135,9 @@ function GeneratedSuspendingReader({
 	const increment = () => setCount((current) => current + 1);
 	observe(increment);
 	const value = use(promise);
-	<button id="resumed" onClick={increment}>{value + ':' + count}</button>
+	<button id="resumed" onClick={increment}>
+		{value + ':' + count}
+	</button>
 }
 
 export function GeneratedCallbackAcrossSuspend({

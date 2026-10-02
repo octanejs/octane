@@ -9,17 +9,23 @@ export function UseHooksTsDemo() @{
 
 	<div>
 		<h2 class="demo-title">{'usehooks-ts on Octane'}</h2>
-		<p
-			class="demo-blurb"
-		>{'State helpers and timer lifecycles adapted to compiler-selected Octane hook slots.'}</p>
+		<p class="demo-blurb">
+			{'State helpers and timer lifecycles adapted to compiler-selected Octane hook slots.'}
+		</p>
 		<div class="panel row">
 			<button class="btn" onClick={enabled.toggle}>
 				{enabled.value ? 'Enabled' : 'Disabled'}
 			</button>
-			<button class="btn" onClick={counter.decrement}>−</button>
+			<button class="btn" onClick={counter.decrement}>
+				−
+			</button>
 			<strong id="usehooks-count">{counter.count as string}</strong>
-			<button class="btn" onClick={counter.increment}>+</button>
-			<button class="btn" onClick={counter.reset}>Reset</button>
+			<button class="btn" onClick={counter.increment}>
+				+
+			</button>
+			<button class="btn" onClick={counter.reset}>
+				Reset
+			</button>
 		</div>
 		<div class="panel">
 			<label>

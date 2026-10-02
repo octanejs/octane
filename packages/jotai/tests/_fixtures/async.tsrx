@@ -35,9 +35,8 @@ export function RawPromiseApp(props: { asyncAtom: Atom<Promise<number>> }) @{
 				if (active) setState('hasData:' + value);
 			},
 			(error) => {
-				if (active) setState(
-					'hasError:' + (error instanceof Error ? error.message : String(error)),
-				);
+				if (active)
+					setState('hasError:' + (error instanceof Error ? error.message : String(error)));
 			},
 		);
 		return () => {

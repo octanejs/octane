@@ -137,13 +137,13 @@ export default function App() @{
 
 	@switch (snapshot.value.kind) {
 		@case 'table': {
-			<TableView rows={track(() => snapshot.value.kind === 'table' ? snapshot.value.rows : [])} />
+			<TableView rows={track(() => (snapshot.value.kind === 'table' ? snapshot.value.rows : []))} />
 		}
 		@case 'anim': {
-			<AnimView boxes={track(() => snapshot.value.kind === 'anim' ? snapshot.value.boxes : [])} />
+			<AnimView boxes={track(() => (snapshot.value.kind === 'anim' ? snapshot.value.boxes : []))} />
 		}
 		@case 'tree': {
-			<TreeView nodes={track(() => snapshot.value.kind === 'tree' ? snapshot.value.nodes : [])} />
+			<TreeView nodes={track(() => (snapshot.value.kind === 'tree' ? snapshot.value.nodes : []))} />
 		}
 	}
 }

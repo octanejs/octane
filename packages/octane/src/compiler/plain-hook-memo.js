@@ -280,10 +280,18 @@ function collectComments(ast) {
 	return [...comments.values()].sort((left, right) => left.start - right.start);
 }
 
+// esrap prints these through their parent, which writes their contents
+// itself: `TSEnumDeclaration` prints `body.members` and never visits the body.
+const PRINTED_BY_PARENT = new Set(['TSEnumBody']);
+
 function canPrintProgram(ast, visitors) {
 	let supported = true;
 	walkNodes(ast, (node) => {
-		if (typeof node.type === 'string' && typeof visitors[node.type] !== 'function') {
+		if (
+			typeof node.type === 'string' &&
+			typeof visitors[node.type] !== 'function' &&
+			!PRINTED_BY_PARENT.has(node.type)
+		) {
 			supported = false;
 			return false;
 		}

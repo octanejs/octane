@@ -10,8 +10,9 @@ export const OutlineList = ({ children }: { children: OctaneNode }) => {
 };
 
 // eslint-disable-next-line react/display-name
-OutlineList.Clickable = ({ children }: { children: OctaneNode }) =>
-	<div className={getClassNameItem({ clickable: true })}>{children}</div>;
+OutlineList.Clickable = ({ children }: { children: OctaneNode }) => (
+	<div className={getClassNameItem({ clickable: true })}>{children}</div>
+);
 
 // eslint-disable-next-line react/display-name
 OutlineList.Item = ({
@@ -21,8 +22,9 @@ OutlineList.Item = ({
 	children: OctaneNode;
 	onClick?: (e: SyntheticEvent) => void;
 }) => {
-	return <li
-		className={getClassNameItem({ clickable: !!onClick })}
-		onClick={onClick}
-	>{children}</li>;
+	return (
+		<li className={getClassNameItem({ clickable: !!onClick })} onClick={onClick}>
+			{children}
+		</li>
+	);
 };

@@ -83,7 +83,11 @@ export function PaginationPrevious({
 	</PaginationLink>
 }
 
-export function PaginationNext({ className, text = 'Next', ...props }: PaginationLinkProps & {
+export function PaginationNext({
+	className,
+	text = 'Next',
+	...props
+}: PaginationLinkProps & {
 	text?: string;
 }) @{
 	<PaginationLink
@@ -102,7 +106,7 @@ export function PaginationEllipsis({ className, ...props }: Props) @{
 		aria-hidden="true"
 		data-slot="pagination-ellipsis"
 		className={cn(
-			'flex size-8 items-center justify-center [&_svg:not([class*=\'size-\'])]:size-4',
+			"flex size-8 items-center justify-center [&_svg:not([class*='size-'])]:size-4",
 			className,
 		)}
 		{...props}

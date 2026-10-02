@@ -47,7 +47,9 @@ export function CommandState(props: { name: string }) @{
 		<span id="status">{result.status as string}</span>
 		<span id="data">{(result.data ?? '') as string}</span>
 		<span id="error">{((result.error as Error | undefined)?.name ?? '') as string}</span>
-		<button id="refetch" onClick={() => result.refetch()}>refetch</button>
+		<button id="refetch" onClick={() => result.refetch()}>
+			refetch
+		</button>
 	</div>
 }
 

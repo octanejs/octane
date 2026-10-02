@@ -23,13 +23,17 @@ function DialectRoot(props: DialectRootProps) {
 
 function Counter() @{
 	const [count, setCount, getCount] = useState(0);
-	<button class="count" onClick={() => setCount(getCount() + 1)}>{'count:' + count}</button>
+	<button class="count" onClick={() => setCount(getCount() + 1)}>
+		{'count:' + count}
+	</button>
 }
 
 export function AnimatePresenceChildrenDialectFlip() @{
 	const [wrapped, setWrapped, getWrapped] = useState(false);
 	<div>
-		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>toggle wrapper</button>
+		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>
+			toggle wrapper
+		</button>
 		<DialectRoot wrapped={wrapped}>
 			<Counter />
 		</DialectRoot>

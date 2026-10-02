@@ -30,18 +30,21 @@ export function DeviceScan(props: DeviceScanProps) @{
 	useEffect(() => {
 		let live = true;
 		// The encoder is a page-weight cost only readers who open this tab pay.
-		import('qrcode').then(
-			(qrcode) => qrcode.default.toString(target, {
-				type: 'svg',
-				margin: 1,
-				errorCorrectionLevel: 'M',
-				color: { dark: '#16181d', light: '#ffffff' },
-			}),
-		).then((markup) => {
-			if (live) setSvg(markup);
-		}).catch(() => {
-			if (live) setFailed(true);
-		});
+		import('qrcode')
+			.then((qrcode) =>
+				qrcode.default.toString(target, {
+					type: 'svg',
+					margin: 1,
+					errorCorrectionLevel: 'M',
+					color: { dark: '#16181d', light: '#ffffff' },
+				}),
+			)
+			.then((markup) => {
+				if (live) setSvg(markup);
+			})
+			.catch(() => {
+				if (live) setFailed(true);
+			});
 		return () => {
 			live = false;
 		};

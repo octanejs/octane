@@ -12,7 +12,9 @@ function Inner() @{
 			site="https://example.com"
 		/>
 		<main>
-			<button id="bump" onClick={() => setCount(count + 1)}>{'bump ' + count as string}</button>
+			<button id="bump" onClick={() => setCount(count + 1)}>
+				{('bump ' + count) as string}
+			</button>
 		</main>
 	</>
 }

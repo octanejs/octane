@@ -54,8 +54,12 @@ export function SidebarFixture() @{
 					<SidebarGroupContent>
 						<SidebarMenu>
 							<SidebarMenuItem>
-								<SidebarMenuButton isActive data-testid="menu-button">Home</SidebarMenuButton>
-								<SidebarMenuAction showOnHover data-testid="menu-action">a</SidebarMenuAction>
+								<SidebarMenuButton isActive data-testid="menu-button">
+									Home
+								</SidebarMenuButton>
+								<SidebarMenuAction showOnHover data-testid="menu-action">
+									a
+								</SidebarMenuAction>
 								<SidebarMenuBadge>3</SidebarMenuBadge>
 								<SidebarMenuSub>
 									<SidebarMenuSubItem>
@@ -135,7 +139,9 @@ export function SidebarMenuButtonAsChildFixture() {
 export function SidebarMenuButtonTooltipFixture() @{
 	<TooltipProvider>
 		<SidebarProvider>
-			<SidebarMenuButton tooltip="Hover hint" data-testid="tooltip-button">Home</SidebarMenuButton>
+			<SidebarMenuButton tooltip="Hover hint" data-testid="tooltip-button">
+				Home
+			</SidebarMenuButton>
 		</SidebarProvider>
 	</TooltipProvider>
 }
@@ -143,7 +149,9 @@ export function SidebarMenuButtonTooltipFixture() @{
 export function SidebarMenuButtonTooltipCollapsedFixture() @{
 	<TooltipProvider>
 		<SidebarProvider defaultOpen={false}>
-			<SidebarMenuButton tooltip="Hover hint" data-testid="tooltip-button">Home</SidebarMenuButton>
+			<SidebarMenuButton tooltip="Hover hint" data-testid="tooltip-button">
+				Home
+			</SidebarMenuButton>
 		</SidebarProvider>
 	</TooltipProvider>
 }
@@ -168,9 +176,7 @@ export function FieldFixture() @{
 	</FieldSet>
 }
 
-export function FieldErrorFixture(props: {
-	errors?: Array<{ message?: string } | undefined>;
-}) @{
+export function FieldErrorFixture(props: { errors?: Array<{ message?: string } | undefined> }) @{
 	<FieldError data-testid="field-error" errors={props.errors} />
 }
 

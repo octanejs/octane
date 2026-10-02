@@ -6,8 +6,12 @@ const pairCall = Symbol('selector pair');
 const leftSelection = Symbol('left selection');
 const rightSelection = Symbol('right selection');
 
-type ExplicitReader =
-	(source: Atom<number>, selector: undefined, options: undefined, slot: symbol) => number;
+type ExplicitReader = (
+	source: Atom<number>,
+	selector: undefined,
+	options: undefined,
+	slot: symbol,
+) => number;
 
 function readExplicitPair(legacy: boolean, left: Atom<number>, right: Atom<number>) {
 	const read = (legacy ? useStore : useSelector) as ExplicitReader;

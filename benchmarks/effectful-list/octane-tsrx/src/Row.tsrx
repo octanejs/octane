@@ -33,7 +33,9 @@ export default function Row(props) @{
 	}, [item.value]);
 
 	<tr ref={rowRef}>
-		<td class="col-id" ref={cell}>{item.id as string}</td>
+		<td class="col-id" ref={cell}>
+			{item.id as string}
+		</td>
 		<td class="col-label">{item.label as string}</td>
 		<td class="col-value">{item.value as string}</td>
 	</tr>

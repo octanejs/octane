@@ -33,10 +33,9 @@ function StoreSubscriber(props: { generation: number; index: number }) @{
 	const total = useStoreSelector((snapshot) => selectTotal(snapshot.values));
 	markSubscriberRender();
 
-	<output
-		data-subscriber-index={String(props.index)}
-		data-generation={String(props.generation)}
-	>{String(total) as string}</output>
+	<output data-subscriber-index={String(props.index)} data-generation={String(props.generation)}>
+		{String(total) as string}
+	</output>
 }
 
 export function App() @{
@@ -53,17 +52,15 @@ export function App() @{
 			id="selector-toggle"
 			type="button"
 			onClick={() => setVisible((value: boolean) => !value)}
-		>{'Toggle subscribers'}</button>
-		<button
-			id="selector-write"
-			type="button"
-			onClick={() => store.writeAll(7)}
-		>{'Write every store value'}</button>
-		<button
-			id="selector-rewrite"
-			type="button"
-			onClick={() => store.writeAll(9)}
-		>{'Rewrite every store value'}</button>
+		>
+			{'Toggle subscribers'}
+		</button>
+		<button id="selector-write" type="button" onClick={() => store.writeAll(7)}>
+			{'Write every store value'}
+		</button>
+		<button id="selector-rewrite" type="button" onClick={() => store.writeAll(9)}>
+			{'Rewrite every store value'}
+		</button>
 		<output id="selector-generation">{String(generation) as string}</output>
 		@if (visible) {
 			<div id="selector-subscribers">

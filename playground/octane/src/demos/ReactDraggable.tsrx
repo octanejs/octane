@@ -19,7 +19,9 @@ export function ReactDraggableDemo() @{
 				grid={[10, 10]}
 				defaultPosition={{ x: 20, y: 20 }}
 			>
-				<button ref={uncontrolledRef} class="btn" data-draggable="uncontrolled">Grid card</button>
+				<button ref={uncontrolledRef} class="btn" data-draggable="uncontrolled">
+					Grid card
+				</button>
 			</Draggable>
 			<Draggable
 				nodeRef={controlledRef}
@@ -27,9 +29,13 @@ export function ReactDraggableDemo() @{
 				onDrag={(_event, data) => setControlled({ x: data.x, y: data.y })}
 				onStop={(_event, data) => setControlled({ x: data.x, y: data.y })}
 			>
-				<button ref={controlledRef} class="btn" data-draggable="controlled">Controlled card</button>
+				<button ref={controlledRef} class="btn" data-draggable="controlled">
+					Controlled card
+				</button>
 			</Draggable>
 		</div>
-		<button class="btn" onClick={() => setControlled({ x: 0, y: 0 })}>Reset controlled</button>
+		<button class="btn" onClick={() => setControlled({ x: 0, y: 0 })}>
+			Reset controlled
+		</button>
 	</div>
 }

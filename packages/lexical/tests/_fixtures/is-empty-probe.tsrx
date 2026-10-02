@@ -6,13 +6,14 @@ import { useEffect, useMemo, useRef } from 'octane';
 // useLexicalIsTextContentEmpty.test.tsx — the hook works against any editor.
 export function IsEmptyProbe(props) @{
 	const editor = useMemo(
-		() => createEditor({
-			namespace: '',
-			nodes: [ParagraphNode],
-			onError: (e) => {
-				throw e;
-			},
-		}),
+		() =>
+			createEditor({
+				namespace: '',
+				nodes: [ParagraphNode],
+				onError: (e) => {
+					throw e;
+				},
+			}),
 		[],
 	);
 	const ref = useRef(null);

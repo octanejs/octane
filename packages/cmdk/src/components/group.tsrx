@@ -12,8 +12,8 @@ export function Group(props: GroupProps) @{
 	const headingRef = useRef<HTMLDivElement | null>(null);
 	const headingId = useId();
 	const context = useCommand()!;
-	const render = useCmdk(
-		(s) => forceMount
+	const render = useCmdk((s) =>
+		forceMount
 			? true
 			: context.filter() === false
 				? true
@@ -43,7 +43,9 @@ export function Group(props: GroupProps) @{
 		hidden={render ? undefined : true}
 	>
 		@if (heading) {
-			<div ref={headingRef} cmdk-group-heading="" aria-hidden={true} id={headingId}>{heading}</div>
+			<div ref={headingRef} cmdk-group-heading="" aria-hidden={true} id={headingId}>
+				{heading}
+			</div>
 		}
 		<div cmdk-group-items="" role="group" aria-labelledby={heading ? headingId : undefined}>
 			<GroupContext value={contextValue}>{children}</GroupContext>

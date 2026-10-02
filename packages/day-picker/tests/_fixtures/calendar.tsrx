@@ -8,22 +8,19 @@ import {
 } from '../../src/index.ts';
 
 /** DayPicker reports local-midnight Dates; UTC rendering shifts the day east of UTC. */
-const localIsoDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-	2,
-	'0',
-)}-${String(date.getDate()).padStart(2, '0')}`;
+const localIsoDate = (date: Date) =>
+	`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+		2,
+		'0',
+	)}-${String(date.getDate()).padStart(2, '0')}`;
 
-const localIsoMonth = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-	2,
-	'0',
-)}`;
+const localIsoMonth = (date: Date) =>
+	`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
 export function CalendarFixture() @{
 	const [selected, setSelected] = useState<Date | undefined>();
 	<main>
-		<output id="selection">
-			{selected ? localIsoDate(selected) : 'none'}
-		</output>
+		<output id="selection">{selected ? localIsoDate(selected) : 'none'}</output>
 		<DayPicker
 			mode="single"
 			month={new Date(2026, 7, 1)}
@@ -144,7 +141,9 @@ export function RangeFixture() @{
 
 function CustomDayButton(props: DayButtonProps) @{
 	const { day, modifiers: _modifiers, children: _children, ...buttonProps } = props;
-	<button {...buttonProps} data-custom-day="true">{day.date.getDate()}</button>
+	<button {...buttonProps} data-custom-day="true">
+		{day.date.getDate()}
+	</button>
 }
 
 export function ConstraintsFixture() @{

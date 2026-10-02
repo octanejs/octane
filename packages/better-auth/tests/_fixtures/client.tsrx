@@ -12,9 +12,7 @@ type AuthClient = {
 
 export function SessionReader(props: { client: AuthClient }) @{
 	const session = props.client.useSession();
-	<p id="session">
-		{session.isPending ? 'pending' : session.data?.user.name ?? 'signed-out'}
-	</p>
+	<p id="session">{session.isPending ? 'pending' : (session.data?.user.name ?? 'signed-out')}</p>
 }
 
 export function StoreReader(props: { store: Store<number> }) @{
@@ -31,9 +29,7 @@ export function KeyStoreReader(props: {
 	<p id="key-store-value">{`${value.selected}:${value.ignored}`}</p>
 }
 
-export function PluginStoreReader(props: {
-	client: { useActiveOrganization: () => string };
-}) @{
+export function PluginStoreReader(props: { client: { useActiveOrganization: () => string } }) @{
 	const organization = props.client.useActiveOrganization();
 	<p id="organization">{organization}</p>
 }

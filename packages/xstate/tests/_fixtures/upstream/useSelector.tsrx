@@ -101,14 +101,16 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 
 			rerenders++;
 
-			return <>
-				<div data-testid="count">{count}</div>
-				<button data-testid="other" onClick={() => service.send({ type: 'OTHER' })}></button>
-				<button
-					data-testid="increment"
-					onClick={() => service.send({ type: 'INCREMENT' })}
-				></button>
-			</>;
+			return (
+				<>
+					<div data-testid="count">{count}</div>
+					<button data-testid="other" onClick={() => service.send({ type: 'OTHER' })}></button>
+					<button
+						data-testid="increment"
+						onClick={() => service.send({ type: 'INCREMENT' })}
+					></button>
+				</>
+			);
 		};
 
 		render(<App />);
@@ -160,17 +162,19 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 				(a, b) => a.toUpperCase() === b.toUpperCase(),
 			);
 
-			return <>
-				<div data-testid="name">{name}</div>
-				<button
-					data-testid="sendUpper"
-					onClick={() => service.send({ type: 'CHANGE', value: 'DAVID' })}
-				></button>
-				<button
-					data-testid="sendOther"
-					onClick={() => service.send({ type: 'CHANGE', value: 'other' })}
-				></button>
-			</>;
+			return (
+				<>
+					<div data-testid="name">{name}</div>
+					<button
+						data-testid="sendUpper"
+						onClick={() => service.send({ type: 'CHANGE', value: 'DAVID' })}
+					></button>
+					<button
+						data-testid="sendOther"
+						onClick={() => service.send({ type: 'CHANGE', value: 'other' })}
+					></button>
+				</>
+			);
 		};
 
 		render(<App />);
@@ -229,18 +233,20 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 				prevUser.current = user;
 			}, [user]);
 
-			return <>
-				<div data-testid="name">{user.name}</div>
-				<div data-testid="changes">{userChanges}</div>
-				<button
-					data-testid="sendSame"
-					onClick={() => service.send({ type: 'change.same' })}
-				></button>
-				<button
-					data-testid="sendOther"
-					onClick={() => service.send({ type: 'change.other' })}
-				></button>
-			</>;
+			return (
+				<>
+					<div data-testid="name">{user.name}</div>
+					<div data-testid="changes">{userChanges}</div>
+					<button
+						data-testid="sendSame"
+						onClick={() => service.send({ type: 'change.same' })}
+					></button>
+					<button
+						data-testid="sendOther"
+						onClick={() => service.send({ type: 'change.other' })}
+					></button>
+				</>
+			);
 		};
 
 		render(<App />);
@@ -345,11 +351,13 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 			const actor = state.context.childActor;
 			const count = useSelector(actor, selector);
 
-			return <>
-				<div data-testid="count">{count}</div>
+			return (
+				<>
+					<div data-testid="count">{count}</div>
 
-				<button onClick={() => actor.send({ type: 'UPDATE_COUNT' })} data-testid="button" />
-			</>;
+					<button onClick={() => actor.send({ type: 'UPDATE_COUNT' })} data-testid="button" />
+				</>
+			);
 		};
 
 		render(<App />);
@@ -363,9 +371,8 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 	});
 
 	it('should immediately render snapshot of initially spawned custom actor', () => {
-		const createCustomActor = (latestValue: string) => createActor(
-			fromTransition((s) => s, latestValue),
-		);
+		const createCustomActor = (latestValue: string) =>
+			createActor(fromTransition((s) => s, latestValue));
 
 		const parentMachine = createMachine({
 			types: {
@@ -386,9 +393,7 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 
 			const value = useSelector(actor, identitySelector);
 
-			return <>
-				{value.context}
-			</>;
+			return <>{value.context}</>;
 		};
 
 		const { container } = render(<App />);
@@ -468,15 +473,17 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 			const actor = state.context.childActor;
 			const value = useSelector(actor, (state) => `${prop} ${state.context.count}`);
 
-			return <>
-				<div data-testid="value">{value}</div>
+			return (
+				<>
+					<div data-testid="value">{value}</div>
 
-				<button
-					onClick={() => {
-						actor.send({ type: 'INC' });
-					}}
-				/>
-			</>;
+					<button
+						onClick={() => {
+							actor.send({ type: 'INC' });
+						}}
+					/>
+				</>
+			);
 		};
 
 		const { rerender } = render(<App prop="first" />);
@@ -492,7 +499,7 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 		expect(valueEl.textContent).toEqual('second 1');
 	});
 
-	it('should render snapshot value when actor doesn\'t emit anything', () => {
+	it("should render snapshot value when actor doesn't emit anything", () => {
 		const createCustomLogic = (latestValue: string) => fromTransition((s) => s, latestValue);
 
 		const parentMachine = createMachine({
@@ -514,9 +521,7 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 
 			const value = useSelector(actor, identitySelector);
 
-			return <>
-				{value.context}
-			</>;
+			return <>{value.context}</>;
 		};
 
 		const { container } = render(<App />);
@@ -524,9 +529,8 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 	});
 
 	it('should render snapshot state when actor changes', () => {
-		const createCustomActor = (latestValue: string) => createActor(
-			fromTransition((s) => s, latestValue),
-		);
+		const createCustomActor = (latestValue: string) =>
+			createActor(fromTransition((s) => s, latestValue));
 
 		const actor1 = createCustomActor('foo');
 		const actor2 = createCustomActor('bar');
@@ -536,9 +540,7 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 		const App = ({ prop }: { prop: string }) => {
 			const value = useSelector(prop === 'first' ? actor1 : actor2, identitySelector);
 
-			return <>
-				{value.context}
-			</>;
+			return <>{value.context}</>;
 		};
 
 		const { container, rerender } = render(<App prop="first" />);
@@ -548,32 +550,31 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 		expect(container.textContent).toEqual('bar');
 	});
 
-	it(
-		'should keep rendering a new selected value after selector change when the actor doesn\'t emit',
-		async () => {
-			const actor = createActor(fromTransition((s) => s, undefined));
-			actor.subscribe = () => ({ unsubscribe: () => {} });
+	it("should keep rendering a new selected value after selector change when the actor doesn't emit", async () => {
+		const actor = createActor(fromTransition((s) => s, undefined));
+		actor.subscribe = () => ({ unsubscribe: () => {} });
 
-			const App = ({ selector }: { selector: any }) => {
-				const [, forceRerender] = React.useState(0);
-				const value = useSelector(actor, selector);
+		const App = ({ selector }: { selector: any }) => {
+			const [, forceRerender] = React.useState(0);
+			const value = useSelector(actor, selector);
 
-				return <>
+			return (
+				<>
 					{value as number}
 					<button type="button" onClick={() => forceRerender((s) => s + 1)}></button>
-				</>;
-			};
+				</>
+			);
+		};
 
-			const { container, rerender } = render(<App selector={() => 'foo'} />);
-			expect(container.textContent).toEqual('foo');
+		const { container, rerender } = render(<App selector={() => 'foo'} />);
+		expect(container.textContent).toEqual('foo');
 
-			rerender(<App selector={() => 'bar'} />);
-			expect(container.textContent).toEqual('bar');
+		rerender(<App selector={() => 'bar'} />);
+		expect(container.textContent).toEqual('bar');
 
-			fireEvent.click(await screen.findByRole('button'));
-			expect(container.textContent).toEqual('bar');
-		},
-	);
+		fireEvent.click(await screen.findByRole('button'));
+		expect(container.textContent).toEqual('bar');
+	});
 
 	it('should only rerender once when the selected value changes', () => {
 		const selector = (state: any) => state.context.foo;
@@ -614,62 +615,56 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 		expect(renders).toBe(suiteKey === 'strict' ? 2 : 1);
 	});
 
-	it(
-		'should compute a stable snapshot internally when selecting from uninitialized service',
-		() => {
-			const child = createMachine({});
-			const machine = createMachine({
-				invoke: {
-					id: 'child',
-					src: child,
-				},
+	it('should compute a stable snapshot internally when selecting from uninitialized service', () => {
+		const child = createMachine({});
+		const machine = createMachine({
+			invoke: {
+				id: 'child',
+				src: child,
+			},
+		});
+
+		const snapshots: AnyMachineSnapshot[] = [];
+
+		function App() {
+			const service = useActorRef(machine);
+			useSelector(service, (state) => {
+				snapshots.push(state);
+				return state.children.child;
 			});
+			return null;
+		}
 
-			const snapshots: AnyMachineSnapshot[] = [];
+		console.error = vi.fn();
+		render(<App />);
 
-			function App() {
-				const service = useActorRef(machine);
-				useSelector(service, (state) => {
-					snapshots.push(state);
-					return state.children.child;
-				});
-				return null;
-			}
+		const [snapshot1] = snapshots;
+		expect(snapshots.every((s) => s === snapshot1));
+		expect(console.error).toHaveBeenCalledTimes(0);
+	});
 
-			console.error = vi.fn();
-			render(<App />);
+	it(`shouldn't interfere with spawning actors that are part of the initial state of an actor`, () => {
+		let called = false;
+		const child = createMachine({
+			entry: () => (called = true),
+		});
+		const machine = createMachine({
+			context: ({ spawn }) => ({
+				childRef: spawn(child),
+			}),
+		});
 
-			const [snapshot1] = snapshots;
-			expect(snapshots.every((s) => s === snapshot1));
-			expect(console.error).toHaveBeenCalledTimes(0);
-		},
-	);
+		function App() {
+			const service = useActorRef(machine);
+			useSelector(service, () => {});
+			expect(called).toBe(false);
+			return null;
+		}
 
-	it(
-		`shouldn't interfere with spawning actors that are part of the initial state of an actor`,
-		() => {
-			let called = false;
-			const child = createMachine({
-				entry: () => (called = true),
-			});
-			const machine = createMachine({
-				context: ({ spawn }) => ({
-					childRef: spawn(child),
-				}),
-			});
+		render(<App />);
 
-			function App() {
-				const service = useActorRef(machine);
-				useSelector(service, () => {});
-				expect(called).toBe(false);
-				return null;
-			}
-
-			render(<App />);
-
-			expect(called).toBe(true);
-		},
-	);
+		expect(called).toBe(true);
+	});
 
 	it('should work with initially deferred actors spawned in lazy context', () => {
 		const childMachine = setup({}).createMachine({
@@ -706,10 +701,12 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 			const childRef = useSelector(actorRef, (s) => s.context.ref);
 			const childState = useSelector(childRef, (s) => s);
 
-			return <>
-				<div data-testid="child-state">{childState.value}</div>
-				<button data-testid="child-send" onClick={() => childRef.send({ type: 'NEXT' })}></button>
-			</>;
+			return (
+				<>
+					<div data-testid="child-state">{childState.value}</div>
+					<button data-testid="child-send" onClick={() => childRef.send({ type: 'NEXT' })}></button>
+				</>
+			);
 		};
 
 		render(<App />);
@@ -753,19 +750,20 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 		};
 
 		const App = () => {
-			const [actor, setActor] = React.useState<
-				ActorRef<TransitionSnapshot<{ count: number }>, any>
-			>();
+			const [actor, setActor] =
+				React.useState<ActorRef<TransitionSnapshot<{ count: number }>, any>>();
 
-			return <>
-				<button
-					data-testid="button"
-					onClick={() => setActor(createActor(fromTransition((s) => s, { count: 42 })))}
-				>
-					Set actor
-				</button>
-				<Child actor={actor} />
-			</>;
+			return (
+				<>
+					<button
+						data-testid="button"
+						onClick={() => setActor(createActor(fromTransition((s) => s, { count: 42 })))}
+					>
+						Set actor
+					</button>
+					<Child actor={actor} />
+				</>
+			);
 		};
 
 		render(<App />);
@@ -780,28 +778,25 @@ describeEachReactMode('useSelector (%s)', ({ suiteKey, render }) => {
 		expect(stateEl.textContent).toBe('42');
 	});
 
-	it(
-		'should throw an error to an error boundary when the actor reaches an error state',
-		async () => {
-			const errorMessage = 'test_useSelector_error';
+	it('should throw an error to an error boundary when the actor reaches an error state', async () => {
+		const errorMessage = 'test_useSelector_error';
 
-			const machine = createMachine({
-				initial: 'loading',
-				states: {
-					loading: {
-						invoke: {
-							src: fromPromise(() => Promise.reject(new Error(errorMessage))),
-						},
+		const machine = createMachine({
+			initial: 'loading',
+			states: {
+				loading: {
+					invoke: {
+						src: fromPromise(() => Promise.reject(new Error(errorMessage))),
 					},
 				},
-			});
+			},
+		});
 
-			console.error = vi.fn();
+		console.error = vi.fn();
 
-			render(<ErrorBoundary machine={machine} />);
+		render(<ErrorBoundary machine={machine} />);
 
-			await screen.findByTestId('error');
-			expect(screen.getByTestId('error').textContent).toBe(errorMessage);
-		},
-	);
+		await screen.findByTestId('error');
+		expect(screen.getByTestId('error').textContent).toBe(errorMessage);
+	});
 });

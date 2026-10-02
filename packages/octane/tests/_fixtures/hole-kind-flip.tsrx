@@ -13,10 +13,11 @@ function Chip() @{
 
 export function HoleKindRoundTrip() @{
 	const [mode, setMode] = useState(0);
-	const rows =
-		mode % 2 === 0 ? ['a', 'b'] : null;
+	const rows = mode % 2 === 0 ? ['a', 'b'] : null;
 	<div>
-		<button id="next" onClick={() => setMode(mode + 1)}>{'next'}</button>
+		<button id="next" onClick={() => setMode(mode + 1)}>
+			{'next'}
+		</button>
 		<div id="host">
 			{rows === null ? 'plain' : rows.map((id) => <i key={id}>{id as string}</i>)}
 		</div>
@@ -25,13 +26,12 @@ export function HoleKindRoundTrip() @{
 
 export function ArrayNullRoundTrip() @{
 	const [mode, setMode] = useState(0);
-	const rows =
-		mode % 2 === 0 ? ['a', 'b'] : null;
+	const rows = mode % 2 === 0 ? ['a', 'b'] : null;
 	<div>
-		<button id="next" onClick={() => setMode(mode + 1)}>{'next'}</button>
-		<div id="host">
-			{rows === null ? null : rows.map((id) => <i key={id}>{id as string}</i>)}
-		</div>
+		<button id="next" onClick={() => setMode(mode + 1)}>
+			{'next'}
+		</button>
+		<div id="host">{rows === null ? null : rows.map((id) => <i key={id}>{id as string}</i>)}</div>
 	</div>
 }
 
@@ -44,7 +44,9 @@ export function ArrayComponentRoundTrip() @{
 		content = <Chip />;
 	}
 	<div>
-		<button id="next" onClick={() => setMode(mode + 1)}>{'next'}</button>
+		<button id="next" onClick={() => setMode(mode + 1)}>
+			{'next'}
+		</button>
 		<div id="host">{content}</div>
 	</div>
 }
@@ -58,7 +60,9 @@ export function ArrayHostRoundTrip() @{
 		content = <em>{'solo'}</em>;
 	}
 	<div>
-		<button id="next" onClick={() => setMode(mode + 1)}>{'next'}</button>
+		<button id="next" onClick={() => setMode(mode + 1)}>
+			{'next'}
+		</button>
 		<div id="host">{content}</div>
 	</div>
 }

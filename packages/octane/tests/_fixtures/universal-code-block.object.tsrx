@@ -18,7 +18,8 @@ export function RenderOnlyChild() @{
 export function EmptyBlockDropped() @{
 	<scene>
 		<node name="before" value="before" />
-		@{}
+		@{
+		}
 		<node name="after" value="after" />
 	</scene>
 }

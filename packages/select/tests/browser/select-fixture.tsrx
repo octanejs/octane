@@ -7,9 +7,10 @@ export type BrowserSelectOption = { label: string; value: string; disabled?: boo
 export function BrowserSelectFixture(props: {
 	autoFocus?: boolean;
 	options: readonly BrowserSelectOption[];
-	onChange: (value: OnChangeValue<BrowserSelectOption, false>, actionMeta: ActionMeta<
-		BrowserSelectOption
-	>) => void;
+	onChange: (
+		value: OnChangeValue<BrowserSelectOption, false>,
+		actionMeta: ActionMeta<BrowserSelectOption>,
+	) => void;
 	onInputChange: (value: string, actionMeta: InputActionMeta) => string;
 	onMenuClose: () => void;
 	onMenuOpen: () => void;

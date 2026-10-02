@@ -26,9 +26,7 @@ export function Metrics() @{
 				);
 				<div>
 					<dt>{region as string}</dt>
-					<dd>
-						{observation ? `${observation.at.toFixed(1)} ms` : '—'}
-					</dd>
+					<dd>{observation ? `${observation.at.toFixed(1)} ms` : '—'}</dd>
 				</div>
 			}
 		</dl>
@@ -43,11 +41,8 @@ export function Metrics() @{
 			<div class="capture-actions">
 				<p>
 					Current run:
-					{config.scenario as string}
-					·
-					{String(config.waves)}
-					snapshots ·
-					{String(config.turns)}
+					{config.scenario as string}·{String(config.waves)}
+					snapshots ·{String(config.turns)}
 					turns
 				</p>
 				<button
@@ -59,13 +54,17 @@ export function Metrics() @{
 							(error: unknown) => setExportState(String(error)),
 						);
 					}}
-				>Export browser trace</button>
+				>
+					Export browser trace
+				</button>
 				<output>{exportState as string}</output>
 				<a
 					href={'/__lab/trace?run=' + encodeURIComponent(config.run)}
 					target="_blank"
 					rel="noreferrer"
-				>Producer trace ↗</a>
+				>
+					Producer trace ↗
+				</a>
 				<small>
 					Run
 					<code>{config.run as string}</code>

@@ -20,7 +20,9 @@ function RefLayer(props: RefProps) @{
 						data-ref-row={String(index)}
 						data-variant={String(props.variant)}
 						ref={props.model.callbacks[props.variant][index]}
-					>{`${index}:${props.variant}` as string}</button>
+					>
+						{`${index}:${props.variant}` as string}
+					</button>
 				}
 			}
 		}

@@ -10,12 +10,14 @@ export function CheckboxGroupHydrationFixture1(props: { nativeButton: boolean })
 	const { nativeButton } = props;
 	const checkboxProps = { nativeButton, render: nativeButton ? <button /> : undefined };
 
-	return <Field.Root name="apples">
-		<Field.Label>Apples</Field.Label>
-		<CheckboxGroup allValues={['fuji', 'gala']}>
-			<Checkbox.Root parent data-testid="parent" {...checkboxProps} />
-			<Checkbox.Root value="fuji" data-testid="fuji" {...checkboxProps} />
-			<Checkbox.Root value="gala" data-testid="gala" {...checkboxProps} />
-		</CheckboxGroup>
-	</Field.Root>;
+	return (
+		<Field.Root name="apples">
+			<Field.Label>Apples</Field.Label>
+			<CheckboxGroup allValues={['fuji', 'gala']}>
+				<Checkbox.Root parent data-testid="parent" {...checkboxProps} />
+				<Checkbox.Root value="fuji" data-testid="fuji" {...checkboxProps} />
+				<Checkbox.Root value="gala" data-testid="gala" {...checkboxProps} />
+			</CheckboxGroup>
+		</Field.Root>
+	);
 }

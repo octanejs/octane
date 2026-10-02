@@ -10,14 +10,12 @@ interface ForecastItemProps {
 }
 
 function ForecastItemImpl({ daily, index, isActive, onToggle }: ForecastItemProps) @{
-	const forecastData = useMemo(
-		() => ({
-			dayName: WeatherUtils.formatDate(daily.time[index]),
-			weatherCode: daily.weather_code[index],
-			high: daily.temperature_2m_max[index],
-			low: daily.temperature_2m_min[index],
-		}),
-	);
+	const forecastData = useMemo(() => ({
+		dayName: WeatherUtils.formatDate(daily.time[index]),
+		weatherCode: daily.weather_code[index],
+		high: daily.temperature_2m_max[index],
+		low: daily.temperature_2m_min[index],
+	}));
 
 	const condition = useMemo(() => WeatherUtils.getWeatherDescription(forecastData.weatherCode));
 	const icon = useMemo(() => WeatherUtils.getWeatherIcon(forecastData.weatherCode));
@@ -47,13 +45,12 @@ function ForecastItemImpl({ daily, index, isActive, onToggle }: ForecastItemProp
 		<div class="forecast-item__info">
 			<div class="forecast-item__condition">{condition as string}</div>
 			<div class="forecast-item__temps" data-testid="forecast-temps">
-				<span
-					class="forecast-item__high"
-					data-testid="forecast-high"
-				>{WeatherUtils.formatTemperature(forecastData.high) as string}</span>
-				<span class="forecast-item__low" data-testid="forecast-low">{WeatherUtils.formatTemperature(
-					forecastData.low,
-				) as string}</span>
+				<span class="forecast-item__high" data-testid="forecast-high">
+					{WeatherUtils.formatTemperature(forecastData.high) as string}
+				</span>
+				<span class="forecast-item__low" data-testid="forecast-low">
+					{WeatherUtils.formatTemperature(forecastData.low) as string}
+				</span>
 			</div>
 		</div>
 
@@ -61,15 +58,15 @@ function ForecastItemImpl({ daily, index, isActive, onToggle }: ForecastItemProp
 			<div class="forecast-item__details">
 				<div class="forecast-detail-item">
 					<div class="forecast-detail-item__label">Sunrise</div>
-					<div class="forecast-detail-item__value">{WeatherUtils.formatTime(
-						daily.sunrise[index],
-					) as string}</div>
+					<div class="forecast-detail-item__value">
+						{WeatherUtils.formatTime(daily.sunrise[index]) as string}
+					</div>
 				</div>
 				<div class="forecast-detail-item">
 					<div class="forecast-detail-item__label">Sunset</div>
-					<div class="forecast-detail-item__value">{WeatherUtils.formatTime(
-						daily.sunset[index],
-					) as string}</div>
+					<div class="forecast-detail-item__value">
+						{WeatherUtils.formatTime(daily.sunset[index]) as string}
+					</div>
 				</div>
 				<div class="forecast-detail-item">
 					<div class="forecast-detail-item__label">Rain</div>
@@ -77,15 +74,15 @@ function ForecastItemImpl({ daily, index, isActive, onToggle }: ForecastItemProp
 				</div>
 				<div class="forecast-detail-item">
 					<div class="forecast-detail-item__label">UV Index</div>
-					<div class="forecast-detail-item__value">{daily.uv_index_max[index].toFixed(
-						1,
-					) as string}</div>
+					<div class="forecast-detail-item__value">
+						{daily.uv_index_max[index].toFixed(1) as string}
+					</div>
 				</div>
 				<div class="forecast-detail-item">
 					<div class="forecast-detail-item__label">Precipitation</div>
-					<div class="forecast-detail-item__value">{WeatherUtils.formatPercentage(
-						daily.precipitation_probability_max[index],
-					) as string}</div>
+					<div class="forecast-detail-item__value">
+						{WeatherUtils.formatPercentage(daily.precipitation_probability_max[index]) as string}
+					</div>
 				</div>
 				<div class="forecast-detail-item">
 					<div class="forecast-detail-item__label">Temperature</div>

@@ -29,15 +29,18 @@ function dragData(value: unknown): FlowboardDragData | null {
 	if (!value || typeof value !== 'object') return null;
 	const record = value as Record<string, unknown>;
 	if (
-		record.kind === 'column' && typeof record.status === 'string' && isIssueStatus(record.status)
+		record.kind === 'column' &&
+		typeof record.status === 'string' &&
+		isIssueStatus(record.status)
 	) {
 		return { kind: 'column', status: record.status };
 	}
 	if (
-		record.kind === 'issue' && typeof record.issueId === 'string' &&
-			typeof record.status === 'string' &&
-			isIssueStatus(record.status) &&
-			typeof record.index === 'number'
+		record.kind === 'issue' &&
+		typeof record.issueId === 'string' &&
+		typeof record.status === 'string' &&
+		isIssueStatus(record.status) &&
+		typeof record.index === 'number'
 	) {
 		return {
 			kind: 'issue',
@@ -60,14 +63,17 @@ function reorderIssues(
 
 	const byStatus = new Map<IssueStatus, Issue[]>();
 	for (const status of ISSUE_STATUSES) {
-		byStatus.set(status, issues.filter((issue) => issue.status === status && issue.id !== issueId));
+		byStatus.set(
+			status,
+			issues.filter((issue) => issue.status === status && issue.id !== issueId),
+		);
 	}
 
 	const destinationIssues = byStatus.get(destination) ?? [];
-	const targetIndex =
-		targetIssueId ? destinationIssues.findIndex((issue) => issue.id === targetIssueId) : -1;
-	const movedIssue =
-		moving.status === destination ? moving : { ...moving, status: destination };
+	const targetIndex = targetIssueId
+		? destinationIssues.findIndex((issue) => issue.id === targetIssueId)
+		: -1;
+	const movedIssue = moving.status === destination ? moving : { ...moving, status: destination };
 	destinationIssues.splice(targetIndex < 0 ? destinationIssues.length : targetIndex, 0, movedIssue);
 	byStatus.set(destination, destinationIssues);
 
@@ -141,37 +147,39 @@ export function App() @{
 		requestAnimationFrame(() => focusTarget?.focus());
 	}, []);
 
-	const registerCardElement = useCallback((
-		issueId: string,
-		element: HTMLElement | null,
-		previous: HTMLElement | null,
-	) => {
-		const elements = cardElementsRef.current;
-		if (element !== null) {
-			elements.set(issueId, element);
-		} else if (previous !== null && elements.get(issueId) === previous) {
-			elements.delete(issueId);
-		}
-	}, []);
+	const registerCardElement = useCallback(
+		(issueId: string, element: HTMLElement | null, previous: HTMLElement | null) => {
+			const elements = cardElementsRef.current;
+			if (element !== null) {
+				elements.set(issueId, element);
+			} else if (previous !== null && elements.get(issueId) === previous) {
+				elements.delete(issueId);
+			}
+		},
+		[],
+	);
 
-	const moveIssue = useCallback((
-		issueId: string,
-		destination: IssueStatus,
-		targetIssueId?: string,
-		restoreKeyboardFocus = false,
-	) => {
-		setIssues((current) => reorderIssues(current, issueId, destination, targetIssueId));
-		setMoveCount((count) => count + 1);
-		setActivity(`${issueId} moved to ${statusLabel(destination)}`);
-		if (restoreKeyboardFocus) {
-			requestAnimationFrame(() => {
-				const control = cardElementsRef.current.get(issueId)?.querySelector<HTMLButtonElement>(
-					'[data-keyboard-move]',
-				);
-				control?.focus();
-			});
-		}
-	}, []);
+	const moveIssue = useCallback(
+		(
+			issueId: string,
+			destination: IssueStatus,
+			targetIssueId?: string,
+			restoreKeyboardFocus = false,
+		) => {
+			setIssues((current) => reorderIssues(current, issueId, destination, targetIssueId));
+			setMoveCount((count) => count + 1);
+			setActivity(`${issueId} moved to ${statusLabel(destination)}`);
+			if (restoreKeyboardFocus) {
+				requestAnimationFrame(() => {
+					const control = cardElementsRef.current
+						.get(issueId)
+						?.querySelector<HTMLButtonElement>('[data-keyboard-move]');
+					control?.focus();
+				});
+			}
+		},
+		[],
+	);
 
 	const handleDragStart = useCallback((event: DragStartEvent) => {
 		const source = dragData(event.operation.source?.data);
@@ -180,16 +188,23 @@ export function App() @{
 		setActivity(`Moving ${source.issueId}`);
 	}, []);
 
-	const handleDragEnd = useCallback((event: DragEndEvent) => {
-		const source = dragData(event.operation.source?.data);
-		const target = dragData(event.operation.target?.data);
-		setActiveIssueId(null);
-		if (event.canceled || source?.kind !== 'issue' || target === null) {
-			setActivity(event.canceled ? 'Move canceled' : 'Issue returned to its original column');
-			return;
-		}
-		moveIssue(source.issueId, target.status, target.kind === 'issue' ? target.issueId : undefined);
-	}, [moveIssue]);
+	const handleDragEnd = useCallback(
+		(event: DragEndEvent) => {
+			const source = dragData(event.operation.source?.data);
+			const target = dragData(event.operation.target?.data);
+			setActiveIssueId(null);
+			if (event.canceled || source?.kind !== 'issue' || target === null) {
+				setActivity(event.canceled ? 'Move canceled' : 'Issue returned to its original column');
+				return;
+			}
+			moveIssue(
+				source.issueId,
+				target.status,
+				target.kind === 'issue' ? target.issueId : undefined,
+			);
+		},
+		[moveIssue],
+	);
 
 	const visibleIssues = useMemo(() => {
 		const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -203,16 +218,20 @@ export function App() @{
 	}, [issues, query, priority]);
 
 	const activeIssue = activeIssueId
-		? issues.find((issue) => issue.id === activeIssueId) ?? null
+		? (issues.find((issue) => issue.id === activeIssueId) ?? null)
 		: null;
 	const routedIssue = route.issueId
-		? issues.find((issue) => issue.id === route.issueId) ?? null
+		? (issues.find((issue) => issue.id === route.issueId) ?? null)
 		: null;
 
 	<div class="app-shell">
-		<a class="skip-link" href="#flowboard-board">Skip to board</a>
+		<a class="skip-link" href="#flowboard-board">
+			Skip to board
+		</a>
 		<aside class="sidebar" aria-label="Workspace navigation">
-			<div class="brand-mark" aria-hidden="true">F</div>
+			<div class="brand-mark" aria-hidden="true">
+				F
+			</div>
 			<nav aria-label="Primary navigation">
 				<a class="nav-item nav-item--active" href="/board" aria-current="page" title="Board">
 					<span aria-hidden="true">▦</span>
@@ -223,14 +242,18 @@ export function App() @{
 					<span>Activity</span>
 				</a>
 			</nav>
-			<div class="sidebar-person" title="Maya Chen">MC</div>
+			<div class="sidebar-person" title="Maya Chen">
+				MC
+			</div>
 		</aside>
 
 		<main class="main-content">
 			<header class="topbar">
 				<div>
 					<p class="eyebrow">Northstar / Product delivery</p>
-					<h1 ref={boardHeadingRef} tabIndex={-1}>Flowboard</h1>
+					<h1 ref={boardHeadingRef} tabIndex={-1}>
+						Flowboard
+					</h1>
 				</div>
 				<div
 					class={['sync-pill', !online && 'sync-pill--offline']}
@@ -270,9 +293,9 @@ export function App() @{
 							<span>Priority</span>
 							<select
 								value={priority}
-								onChange={(event) => setPriority(
-									(event.target as HTMLSelectElement).value as PriorityFilter,
-								)}
+								onChange={(event) =>
+									setPriority((event.target as HTMLSelectElement).value as PriorityFilter)
+								}
 							>
 								<option value="all">All priorities</option>
 								<option value="urgent">Urgent</option>
@@ -286,7 +309,9 @@ export function App() @{
 
 					@if (visibleIssues.length === 0) {
 						<div class="filter-empty" role="status">
-							<span class="empty-icon" aria-hidden="true">⌕</span>
+							<span class="empty-icon" aria-hidden="true">
+								⌕
+							</span>
 							<div>
 								<strong>No issues match this view</strong>
 								<p>Try a different phrase or clear the filters.</p>
@@ -297,7 +322,9 @@ export function App() @{
 									setQuery('');
 									setPriority('all');
 								}}
-							>Clear filters</button>
+							>
+								Clear filters
+							</button>
 						</div>
 					}
 
@@ -315,18 +342,18 @@ export function App() @{
 							}
 						</div>
 						<DragOverlay className="drag-layer" dropAnimation={null} tag="div">
-							{activeIssue
-								? <article
-										class="issue-card issue-card--overlay"
-										data-testid="drag-overlay-card"
-										role="status"
-										aria-label={`Moving ${activeIssue.id}`}
-									>
-										<p class="issue-key">{activeIssue.id}</p>
-										<strong>{activeIssue.title}</strong>
-										<span class="overlay-assignee">{activeIssue.assignee.initials}</span>
-									</article>
-								: null}
+							{activeIssue ? (
+								<article
+									class="issue-card issue-card--overlay"
+									data-testid="drag-overlay-card"
+									role="status"
+									aria-label={`Moving ${activeIssue.id}`}
+								>
+									<p class="issue-key">{activeIssue.id}</p>
+									<strong>{activeIssue.title}</strong>
+									<span class="overlay-assignee">{activeIssue.assignee.initials}</span>
+								</article>
+							) : null}
 						</DragOverlay>
 					</DragDropProvider>
 					<div class="activity-line" id="activity" role="status" aria-live="polite">
@@ -365,18 +392,29 @@ function LoadingBoard() @{
 }
 
 type OpenIssue = (issueId: string, trigger: HTMLElement | null) => void;
-type MoveIssue =
-	(issueId: string, destination: IssueStatus, targetIssueId?: string, restoreKeyboardFocus?: boolean) => void;
-type RegisterCard =
-	(issueId: string, element: HTMLElement | null, previous: HTMLElement | null) => void;
+type MoveIssue = (
+	issueId: string,
+	destination: IssueStatus,
+	targetIssueId?: string,
+	restoreKeyboardFocus?: boolean,
+) => void;
+type RegisterCard = (
+	issueId: string,
+	element: HTMLElement | null,
+	previous: HTMLElement | null,
+) => void;
 
 function FailureState(props: { onRetry: () => void }) @{
 	<section class="failure-state" role="alert">
-		<div class="failure-symbol" aria-hidden="true">!</div>
+		<div class="failure-symbol" aria-hidden="true">
+			!
+		</div>
 		<p class="eyebrow">Fixture connection interrupted</p>
 		<h2>We couldn’t load the project board</h2>
 		<p>The deterministic issue service returned a temporary error. Your current route is safe.</p>
-		<button type="button" onClick={props.onRetry}>Retry loading</button>
+		<button type="button" onClick={props.onRetry}>
+			Retry loading
+		</button>
 	</section>
 }
 
@@ -426,7 +464,9 @@ function BoardColumn(props: BoardColumnProps) @{
 				<div class="column-empty">No issues in this column</div>
 			}
 		</div>
-		<div class="column-drop-hint" aria-hidden="true">Drop issue here</div>
+		<div class="column-drop-hint" aria-hidden="true">
+			Drop issue here
+		</div>
 	</section>
 }
 
@@ -442,11 +482,14 @@ function IssueCard(props: IssueCardProps) @{
 	const issue: Issue = props.issue;
 	const openButtonRef = useRef<HTMLButtonElement | null>(null);
 	const registeredCardRef = useRef<HTMLElement | null>(null);
-	const registerCardRef = useCallback((element: HTMLElement | null) => {
-		const previous = registeredCardRef.current;
-		registeredCardRef.current = element;
-		props.onRegisterCard(issue.id, element, previous);
-	}, [issue.id, props.onRegisterCard]);
+	const registerCardRef = useCallback(
+		(element: HTMLElement | null) => {
+			const previous = registeredCardRef.current;
+			registeredCardRef.current = element;
+			props.onRegisterCard(issue.id, element, previous);
+		},
+		[issue.id, props.onRegisterCard],
+	);
 	const data: IssueDragData = {
 		kind: 'issue',
 		issueId: issue.id,
@@ -524,12 +567,8 @@ function IssueCard(props: IssueCardProps) @{
 					value={issue.status}
 					onChange={(event) => {
 						const destination = (event.target as HTMLSelectElement).value;
-						if (isIssueStatus(destination)) props.onMoveIssue(
-							issue.id,
-							destination,
-							undefined,
-							true,
-						);
+						if (isIssueStatus(destination))
+							props.onMoveIssue(issue.id, destination, undefined, true);
 					}}
 				>
 					@for (const status of ISSUE_STATUSES; key status) {
@@ -541,7 +580,9 @@ function IssueCard(props: IssueCardProps) @{
 				class="avatar"
 				title={issue.assignee.name}
 				aria-label={`Assigned to ${issue.assignee.name}`}
-			>{issue.assignee.initials}</span>
+			>
+				{issue.assignee.initials}
+			</span>
 		</footer>
 	</article>
 }
@@ -623,7 +664,9 @@ function IssueDialog(props: IssueDialogProps) @{
 				ref={closeRef}
 				onClick={props.onClose}
 				aria-label="Close issue details"
-			>×</button>
+			>
+				×
+			</button>
 		</header>
 		@if (props.issue) {
 			<div class="dialog-content">
@@ -679,7 +722,9 @@ function IssueDialog(props: IssueDialogProps) @{
 			<div class="dialog-not-found">
 				<h2 id="issue-dialog-title">Issue not found</h2>
 				<p id="issue-dialog-description">There is no seeded issue named {props.requestedId}.</p>
-				<button type="button" onClick={props.onClose}>Return to board</button>
+				<button type="button" onClick={props.onClose}>
+					Return to board
+				</button>
 			</div>
 		}
 	</dialog>

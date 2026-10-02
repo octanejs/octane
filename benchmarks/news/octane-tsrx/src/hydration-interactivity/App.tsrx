@@ -44,7 +44,9 @@ function Editor(props: HydrationBenchmarkProps) @{
 			type="button"
 			onClick={onSend}
 			onFocus={() => setFocuses(focuses + 1)}
-		>{'Send search'}</button>
+		>
+			{'Send search'}
+		</button>
 		<output id="hydration-clicks">{String(clicks) as string}</output>
 		<output id="hydration-focuses">{String(focuses) as string}</output>
 		<output id="hydration-submitted">{submitted as string}</output>

@@ -7,9 +7,12 @@ export function NativeMutationValue(props: {
 	mutation: 'defineGetter' | 'objectPrototype' | 'reflectPrototype';
 }) @{
 	const env = globalThis;
-	if (props.mutation === 'defineGetter') (env as unknown as {
-		__defineGetter__(key: string, getter: () => unknown): void;
-	}).__defineGetter__('String', () => props.replacement);
+	if (props.mutation === 'defineGetter')
+		(
+			env as unknown as {
+				__defineGetter__(key: string, getter: () => unknown): void;
+			}
+		).__defineGetter__('String', () => props.replacement);
 	else {
 		if (props.mutation === 'objectPrototype') Object.setPrototypeOf(env, props.prototype);
 		else Reflect.setPrototypeOf(env, props.prototype);

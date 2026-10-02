@@ -31,7 +31,11 @@ export function App() @{
 				<SidebarTrigger />
 				<div class="demo-header-titles">
 					<h1>{'octane playground'}</h1>
-					<p>{'Template-clone renderer + TSRX directives. Each demo exercises a distinctive corner of the surface.'}</p>
+					<p>
+						{
+							'Template-clone renderer + TSRX directives. Each demo exercises a distinctive corner of the surface.'
+						}
+					</p>
 				</div>
 				<ThemeToggle />
 			</header>

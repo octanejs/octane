@@ -25,17 +25,19 @@ export function resetIdentities() {
 }
 
 export function DerivedIdentity() @{
-	const [items, setItems] = useState([
-		{ id: 1, n: 1 },
-	]);
+	const [items, setItems] = useState([{ id: 1, n: 1 }]);
 	const [tick, setTick] = useState(0);
 	const visible = projectRows(items);
 	<div>
-		<button id="di-tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
+		<button id="di-tick" onClick={() => setTick(tick + 1)}>
+			{'tick'}
+		</button>
 		<button
 			id="di-add"
 			onClick={() => setItems([...items, { id: items.length + 1, n: items.length + 1 }])}
-		>{'add'}</button>
+		>
+			{'add'}
+		</button>
 		<span id="di-identity">{identityOf(visible)}</span>
 		<span id="di-count">{'' + visible.length}</span>
 		<span id="di-tickval">{'' + tick}</span>
@@ -53,11 +55,15 @@ export function DerivedValue() @{
 	const total = rows.reduce((sum, r) => sum + r.n, 0);
 	const labels = projectRows(rows);
 	<div>
-		<button id="dv-tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
+		<button id="dv-tick" onClick={() => setTick(tick + 1)}>
+			{'tick'}
+		</button>
 		<button
 			id="dv-bump"
 			onClick={() => setRows(rows.map((r) => (r.id === 1 ? { ...r, n: r.n + 10 } : r)))}
-		>{'bump'}</button>
+		>
+			{'bump'}
+		</button>
 		<span id="dv-total">{'' + total}</span>
 		<span id="dv-labels">{labels.join(',')}</span>
 		<span id="dv-tickval">{'' + tick}</span>
@@ -88,9 +94,15 @@ export function HookCallDeclarations() @{
 	const labelled = unstable_useLabelState();
 	const [tick, setTick] = useState(0);
 	<div>
-		<button id="hc-tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
-		<button id="hc-bump" onClick={counter.bump}>{'bump'}</button>
-		<button id="hc-label" onClick={labelled.set}>{'label'}</button>
+		<button id="hc-tick" onClick={() => setTick(tick + 1)}>
+			{'tick'}
+		</button>
+		<button id="hc-bump" onClick={counter.bump}>
+			{'bump'}
+		</button>
+		<button id="hc-label" onClick={labelled.set}>
+			{'label'}
+		</button>
 		<span id="hc-count">{'' + counter.value}</span>
 		<span id="hc-label-value">{labelled.label}</span>
 		<span id="hc-tickval">{'' + tick}</span>
@@ -106,7 +118,9 @@ export function ReassignedLocal() @{
 	let label = tagged('base');
 	if (tick > 0) label = tagged('changed');
 	<div>
-		<button id="rl-tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
+		<button id="rl-tick" onClick={() => setTick(tick + 1)}>
+			{'tick'}
+		</button>
 		<span id="rl-label">{label}</span>
 	</div>
 }
@@ -115,17 +129,19 @@ export function ReassignedLocal() @{
 // tree — should not acquire a cache it cannot pay for. Behaviorally it must
 // simply keep working.
 export function HandlerOnlyCalculation() @{
-	const [rows, setRows] = useState([
-		{ id: 1, n: 1 },
-	]);
+	const [rows, setRows] = useState([{ id: 1, n: 1 }]);
 	const [seen, setSeen] = useState('none');
 	const summary = projectRows(rows).join('|');
 	<div>
-		<button id="ho-read" onClick={() => setSeen(summary)}>{'read'}</button>
+		<button id="ho-read" onClick={() => setSeen(summary)}>
+			{'read'}
+		</button>
 		<button
 			id="ho-bump"
 			onClick={() => setRows([...rows, { id: rows.length + 1, n: rows.length + 1 }])}
-		>{'bump'}</button>
+		>
+			{'bump'}
+		</button>
 		<span id="ho-seen">{seen}</span>
 	</div>
 }
@@ -153,7 +169,9 @@ export function LiveReceiverCalculation() @{
 	const [tick, setTick] = useState(0);
 	const reading = source.read();
 	<div>
-		<button id="lr-tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
+		<button id="lr-tick" onClick={() => setTick(tick + 1)}>
+			{'tick'}
+		</button>
 		<span id="lr-reading">{reading}</span>
 		<span id="lr-tickval">{'' + tick}</span>
 	</div>

@@ -20,22 +20,18 @@ export function OnChangePlugin(props: Props) {
 
 	useLayoutEffect(() => {
 		if (onChange) {
-			return editor.registerUpdateListener(({
-				editorState,
-				dirtyElements,
-				dirtyLeaves,
-				prevEditorState,
-				tags,
-			}) => {
-				if (
-					ignoreSelectionChange && dirtyElements.size === 0 && dirtyLeaves.size === 0 ||
-						ignoreHistoryMergeTagChange && tags.has(HISTORY_MERGE_TAG) ||
+			return editor.registerUpdateListener(
+				({ editorState, dirtyElements, dirtyLeaves, prevEditorState, tags }) => {
+					if (
+						(ignoreSelectionChange && dirtyElements.size === 0 && dirtyLeaves.size === 0) ||
+						(ignoreHistoryMergeTagChange && tags.has(HISTORY_MERGE_TAG)) ||
 						prevEditorState.isEmpty()
-				) {
-					return;
-				}
-				onChange(editorState, editor, tags);
-			});
+					) {
+						return;
+					}
+					onChange(editorState, editor, tags);
+				},
+			);
 		}
 	}, [editor, ignoreHistoryMergeTagChange, ignoreSelectionChange, onChange]);
 

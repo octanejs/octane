@@ -9,11 +9,10 @@ import type { LexicalEditor } from 'lexical';
 import type { OctaneNode } from 'octane';
 import { createElement, createPortal, Suspense, useMemo, useSyncExternalStore } from 'octane';
 
-type ErrorBoundaryType =
-	(props: {
-		children: OctaneNode;
-		onError: (error: Error) => void;
-	}) => OctaneNode;
+type ErrorBoundaryType = (props: {
+	children: OctaneNode;
+	onError: (error: Error) => void;
+}) => OctaneNode;
 
 type DecoratorPortalBodyProps = {
 	ErrorBoundary: ErrorBoundaryType;
@@ -47,10 +46,11 @@ export function Decorators(props: DecoratorsProps) {
 	const ErrorBoundary = props.ErrorBoundary;
 
 	const [subscribe, getSnapshot] = useMemo(
-		() => [
-			(cb: () => void) => editor.registerDecoratorListener(cb),
-			() => editor.getDecorators<OctaneNode>(),
-		] as const,
+		() =>
+			[
+				(cb: () => void) => editor.registerDecoratorListener(cb),
+				() => editor.getDecorators<OctaneNode>(),
+			] as const,
 		[editor],
 	);
 	const decorators = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
@@ -84,17 +84,19 @@ export function Decorators(props: DecoratorsProps) {
 	if (entries.length === 0) {
 		return null;
 	}
-	return <>
-		{entries.map(
-			(entry) => <DecoratorPortal
-				key={entry.nodeKey}
-				element={entry.element}
-				bodyProps={{
-					ErrorBoundary,
-					onError: (e: Error) => editor._onError(e),
-					decorator: entry.decorator,
-				}}
-			/>,
-		)}
-	</>;
+	return (
+		<>
+			{entries.map((entry) => (
+				<DecoratorPortal
+					key={entry.nodeKey}
+					element={entry.element}
+					bodyProps={{
+						ErrorBoundary,
+						onError: (e: Error) => editor._onError(e),
+						decorator: entry.decorator,
+					}}
+				/>
+			))}
+		</>
+	);
 }

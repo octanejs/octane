@@ -20,41 +20,43 @@ import {
 // (jsdom zero rects) and stays behavioral; sorting/selection/expansion are compared here.
 
 function TreeFiles(props: { expanded: string[]; selected?: string[] }) {
-	return <Tree
-		aria-label="Files"
-		selectionMode="multiple"
-		expandedKeys={props.expanded}
-		selectedKeys={props.selected ?? []}
-	>
-		<TreeItem id="docs" textValue="Documents">
-			<TreeItemContent>
-				<Button slot="chevron">v</Button>
-				<Checkbox slot="selection" />
-				Documents
-			</TreeItemContent>
-			<TreeItem id="report" textValue="Report">
+	return (
+		<Tree
+			aria-label="Files"
+			selectionMode="multiple"
+			expandedKeys={props.expanded}
+			selectedKeys={props.selected ?? []}
+		>
+			<TreeItem id="docs" textValue="Documents">
 				<TreeItemContent>
 					<Button slot="chevron">v</Button>
 					<Checkbox slot="selection" />
-					Report
+					Documents
 				</TreeItemContent>
+				<TreeItem id="report" textValue="Report">
+					<TreeItemContent>
+						<Button slot="chevron">v</Button>
+						<Checkbox slot="selection" />
+						Report
+					</TreeItemContent>
+				</TreeItem>
 			</TreeItem>
-		</TreeItem>
-		<TreeItem id="photos" textValue="Photos">
-			<TreeItemContent>
-				<Button slot="chevron">v</Button>
-				<Checkbox slot="selection" />
-				Photos
-			</TreeItemContent>
-			<TreeItem id="beach" textValue="Beach">
+			<TreeItem id="photos" textValue="Photos">
 				<TreeItemContent>
 					<Button slot="chevron">v</Button>
 					<Checkbox slot="selection" />
-					Beach
+					Photos
 				</TreeItemContent>
+				<TreeItem id="beach" textValue="Beach">
+					<TreeItemContent>
+						<Button slot="chevron">v</Button>
+						<Checkbox slot="selection" />
+						Beach
+					</TreeItemContent>
+				</TreeItem>
 			</TreeItem>
-		</TreeItem>
-	</Tree>;
+		</Tree>
+	);
 }
 
 export function TreeSpec() {
@@ -84,26 +86,27 @@ export function TableSpec() {
 			return sort.direction === 'descending' ? -cmp : cmp;
 		});
 	}
-	return <Table
-		aria-label="Pokemon"
-		selectionMode="multiple"
-		sortDescriptor={sort}
-		onSortChange={setSort}
-	>
-		<TableHeader>
-			<Column id="name" isRowHeader allowsSorting>
-				Name
-			</Column>
-			<Column id="type">Type</Column>
-		</TableHeader>
-		<TableBody items={items}>
-			{(item: { id: string; name: string; type: string }) => <Row
-				id={item.id}
-				textValue={item.name}
-			>
-				<Cell>{item.name}</Cell>
-				<Cell>{item.type}</Cell>
-			</Row>}
-		</TableBody>
-	</Table>;
+	return (
+		<Table
+			aria-label="Pokemon"
+			selectionMode="multiple"
+			sortDescriptor={sort}
+			onSortChange={setSort}
+		>
+			<TableHeader>
+				<Column id="name" isRowHeader allowsSorting>
+					Name
+				</Column>
+				<Column id="type">Type</Column>
+			</TableHeader>
+			<TableBody items={items}>
+				{(item: { id: string; name: string; type: string }) => (
+					<Row id={item.id} textValue={item.name}>
+						<Cell>{item.name}</Cell>
+						<Cell>{item.type}</Cell>
+					</Row>
+				)}
+			</TableBody>
+		</Table>
+	);
 }

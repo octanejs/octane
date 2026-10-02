@@ -13,7 +13,11 @@ function Provide(props) @{
 // nested text hole.
 export function App() @{
 	<Provide>
-		{(v) => <span class="rendered" data-tag="x">{v as string}</span>}
+		{(v) => (
+			<span class="rendered" data-tag="x">
+				{v as string}
+			</span>
+		)}
 	</Provide>
 }
 
@@ -21,9 +25,11 @@ export function App() @{
 // the de-opt childSlot flattens, matching a React fragment render-prop.
 export function AppFrag() @{
 	<Provide>
-		{(v) => <>
-			<span class="rendered">{v as string}</span>
-			<b class="extra">!</b>
-		</>}
+		{(v) => (
+			<>
+				<span class="rendered">{v as string}</span>
+				<b class="extra">!</b>
+			</>
+		)}
 	</Provide>
 }

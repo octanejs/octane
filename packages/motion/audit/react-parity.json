@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -377,7 +377,7 @@
         {
           "path": "packages/motion/tests/_fixtures/render-diff.tsrx",
           "role": "support",
-          "sha256": "8ba1063957f73ac5383fc83ed4032a144d3f64fb6f70fb3afd58711eac0794fb"
+          "sha256": "426daba03dcb9024feb53f86d6cf083a159a3542bd1af1cd78a69d7c58dc91b6"
         }
       ]
     }

@@ -11,11 +11,13 @@ import { Slider } from '@octanejs/base-ui/slider';
 import { Field } from '@octanejs/base-ui/field';
 
 export function FieldRootExtraFixture1() {
-	return <Field.Root>
-		<Select.Root>
-			<Select.Trigger data-testid="trigger">
-				<Select.Value placeholder="Pick one" />
-			</Select.Trigger>
-		</Select.Root>
-	</Field.Root>;
+	return (
+		<Field.Root>
+			<Select.Root>
+				<Select.Trigger data-testid="trigger">
+					<Select.Value placeholder="Pick one" />
+				</Select.Trigger>
+			</Select.Root>
+		</Field.Root>
+	);
 }

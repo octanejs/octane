@@ -5,19 +5,22 @@ type HydrationGate = { pending: boolean; promise: Promise<void> };
 function DelayedHydrationButton({ gate }: { gate: HydrationGate }) {
 	if (gate.pending) throw gate.promise;
 	const [count, setCount] = useState(0);
-	return <button
-		data-delayed-hydration=""
-		onClick={() => setCount(count + 1)}
-	>{count as number}</button>;
+	return (
+		<button data-delayed-hydration="" onClick={() => setCount(count + 1)}>
+			{count as number}
+		</button>
+	);
 }
 
 export function DelayedHydrationBoundary({ gate }: { gate: HydrationGate }) {
-	return <>
-		<span>Shell</span>
-		<Suspense fallback="Loading">
-			<DelayedHydrationButton gate={gate} />
-		</Suspense>
-	</>;
+	return (
+		<>
+			<span>Shell</span>
+			<Suspense fallback="Loading">
+				<DelayedHydrationButton gate={gate} />
+			</Suspense>
+		</>
+	);
 }
 
 // SSR Phase 4 — Suspense + data serialization. The server render() awaits
@@ -44,11 +47,9 @@ function ReplayedStreamContent(props: ReplayedStreamProps & { parentSettled: boo
 	@try {
 		const value = use(props.promise);
 		const contentId = useId();
-		<button
-			id={contentId}
-			data-replayed-stream=""
-			onClick={() => props.onClick?.(value)}
-		>{(props.parentSettled && settled ? 'Accepted: ' : 'Discarded: ') + value as string}</button>
+		<button id={contentId} data-replayed-stream="" onClick={() => props.onClick?.(value)}>
+			{((props.parentSettled && settled ? 'Accepted: ' : 'Discarded: ') + value) as string}
+		</button>
 	} @pending {
 		<p>{'Waiting for replayed content'}</p>
 	}
@@ -76,10 +77,9 @@ export function DeferredAsyncLeaf(props) @{
 
 function DeferredStreamedButton(props) @{
 	const value = use(props.promise);
-	<button
-		id="deferred-stream-action"
-		onClick={() => props.onClick?.(value)}
-	>{value as string}</button>
+	<button id="deferred-stream-action" onClick={() => props.onClick?.(value)}>
+		{value as string}
+	</button>
 }
 
 export function DeferredStreamedSuspense(props) @{
@@ -93,7 +93,9 @@ export function DeferredStreamedSuspense(props) @{
 function HydrationRetrySibling(props: { promise: Promise<string> }) @{
 	const [show, setShow] = useState(true);
 	<aside>
-		<button id="remove-stream-sibling" onClick={() => setShow(false)}>{'Remove sibling'}</button>
+		<button id="remove-stream-sibling" onClick={() => setShow(false)}>
+			{'Remove sibling'}
+		</button>
 		@if (show) {
 			<RetrySiblingSuspense fallback={<span id="stream-sibling-pending">{'Loading sibling'}</span>}>
 				<AsyncLeaf promise={props.promise} />
@@ -102,11 +104,13 @@ function HydrationRetrySibling(props: { promise: Promise<string> }) @{
 	</aside>
 }
 
-export function DeferredStreamWithRetrySibling(props: Pick<HydrateProps, 'when' | 'onHydrated'> & {
-	promise: Promise<string>;
-	siblingPromise: Promise<string>;
-	onClick?: (value: string) => void;
-}) @{
+export function DeferredStreamWithRetrySibling(
+	props: Pick<HydrateProps, 'when' | 'onHydrated'> & {
+		promise: Promise<string>;
+		siblingPromise: Promise<string>;
+		onClick?: (value: string) => void;
+	},
+) @{
 	<main>
 		<DeferredStreamedSuspense
 			promise={props.promise}
@@ -120,19 +124,17 @@ export function DeferredStreamWithRetrySibling(props: Pick<HydrateProps, 'when' 
 
 function NestedDeferredStreamedButton(props) @{
 	const value = use(props.promise);
-	<button
-		id="nested-deferred-stream-action"
-		onClick={() => props.onClick?.(value)}
-	>{value as string}</button>
+	<button id="nested-deferred-stream-action" onClick={() => props.onClick?.(value)}>
+		{value as string}
+	</button>
 }
 
 export function NestedDeferredStreamedHydrates(props) @{
 	<Hydrate when={props.outerWhen} split={false} onHydrated={props.onOuterHydrated}>
 		<section id="outer-deferred-stream-shell">
-			<button
-				id="outer-deferred-stream-action"
-				onClick={props.onOuterClick}
-			>{'Activate outer'}</button>
+			<button id="outer-deferred-stream-action" onClick={props.onOuterClick}>
+				{'Activate outer'}
+			</button>
 			<Hydrate when={props.innerWhen} split={false} onHydrated={props.onInnerHydrated}>
 				<Suspense
 					fallback={<button id="nested-deferred-stream-action">{'Loading nested stream'}</button>}
@@ -158,7 +160,9 @@ export function DeferredStreamWithLiveSibling(props) @{
 			<Suspense fallback={<span id="streamed-first-value">{'Loading one node'}</span>}>
 				<TwoNodeStreamedValue promise={props.promise} />
 			</Suspense>
-			<button id="stream-live-sibling" onClick={props.onClick}>{'Live sibling'}</button>
+			<button id="stream-live-sibling" onClick={props.onClick}>
+				{'Live sibling'}
+			</button>
 		</section>
 	</Hydrate>
 }
@@ -169,11 +173,9 @@ export function DeferredStreamWithLiveSibling(props) @{
 // can prove the seeded value is undefined.
 export function AsyncUndef(props) @{
 	const value = use(props.promise);
-	<div id="undef">{(value === undefined
-		? 'is-undefined'
-		: value === null
-			? 'is-null'
-			: 'other') as string}</div>
+	<div id="undef">
+		{(value === undefined ? 'is-undefined' : value === null ? 'is-null' : 'other') as string}
+	</div>
 }
 
 // Mirrors the playground/octane-ssr App shape: a bare use() (async data
@@ -186,7 +188,9 @@ export function AsyncCounter(props) @{
 	const [n, setN] = useState(0);
 	<main id="ac">
 		<h1>{message as string}</h1>
-		<button id="ac-btn" onClick={() => setN(n + 1)}>{'count:' + n as string}</button>
+		<button id="ac-btn" onClick={() => setN(n + 1)}>
+			{('count:' + n) as string}
+		</button>
 	</main>
 }
 
@@ -210,7 +214,7 @@ export function ThrownResourceBoundary(props: { read: () => string; promise: Pro
 		@try {
 			const resource = props.read();
 			const seeded = use(props.promise);
-			<span class="resource-value">{resource + ':' + seeded as string}</span>
+			<span class="resource-value">{(resource + ':' + seeded) as string}</span>
 		} @pending {
 			<span class="resource-loading">loading resource</span>
 		} @catch (error: unknown, _reset: () => void) {
@@ -269,13 +273,12 @@ export function ReasonBoundary(props) @{
 		} @catch (err) {
 			const kind = typeof err;
 			const isObject = err !== null && (kind === 'object' || kind === 'function');
-			const message =
-				isObject && typeof err.message === 'string' ? err.message : String(err);
-			const code =
-				isObject && typeof err.code === 'string' ? err.code : '';
+			const message = isObject && typeof err.message === 'string' ? err.message : String(err);
+			const code = isObject && typeof err.code === 'string' ? err.code : '';
 			props.onCatch?.(err);
-			<span class="reason-error" data-kind={kind} data-code={code}>{message + ':' +
-				code as string}</span>
+			<span class="reason-error" data-kind={kind} data-code={code}>
+				{(message + ':' + code) as string}
+			</span>
 		}
 	</div>
 }
@@ -305,7 +308,9 @@ export function SeedCollision(props) @{
 		id="seed-collision"
 		data-message={value.__octane_new_rejection__.message}
 		data-undefined={String(value.__octane_new_undefined__)}
-	>{value.label as string}</div>
+	>
+		{value.label as string}
+	</div>
 }
 
 // The inner boundary has no catch arm. A hydrated rejection must retain its
@@ -385,7 +390,9 @@ export function RethrowingNestedRejectionBoundary(props) @{
 			<i>{'outer pending'}</i>
 		} @catch (err) {
 			props.onOuterCatch?.(err);
-			<span class="nested-rethrow-error" data-code={err.code}>{err.message as string}</span>
+			<span class="nested-rethrow-error" data-code={err.code}>
+				{err.message as string}
+			</span>
 		}
 	</div>
 }
@@ -434,15 +441,21 @@ export function IdBoundary(props) @{
 			const value = use(props.promise);
 			const contentId = useId();
 			props.onId?.('content', contentId);
-			<span class="id-ok" data-boundary-id={contentId}>{value as string}</span>
+			<span class="id-ok" data-boundary-id={contentId}>
+				{value as string}
+			</span>
 		} @pending {
 			const pendingId = useId();
 			props.onId?.('pending', pendingId);
-			<span class="id-loading" data-boundary-id={pendingId}>{'loading'}</span>
+			<span class="id-loading" data-boundary-id={pendingId}>
+				{'loading'}
+			</span>
 		} @catch (err) {
 			const catchId = useId();
 			props.onId?.('catch', catchId);
-			<span class="id-error" data-boundary-id={catchId}>{err.message as string}</span>
+			<span class="id-error" data-boundary-id={catchId}>
+				{err.message as string}
+			</span>
 		}
 	</div>
 }
@@ -514,9 +527,13 @@ export function TransientObjectKeyBoundary(props) @{
 function StableKeyReorderItem(props) @{
 	@try {
 		const value = use(props.promise);
-		<span class="stable-key-ready" data-item={props.id}>{props.id + ':' + value}</span>
+		<span class="stable-key-ready" data-item={props.id}>
+			{props.id + ':' + value}
+		</span>
 	} @pending {
-		<i class="stable-key-loading" data-item={props.id}>{props.id + ':loading'}</i>
+		<i class="stable-key-loading" data-item={props.id}>
+			{props.id + ':loading'}
+		</i>
 	}
 }
 
@@ -536,7 +553,7 @@ export function Nested(props) @{
 			const first = use(props.outer);
 			@try {
 				const second = use(props.inner);
-				<span class="both">{first + ':' + second as string}</span>
+				<span class="both">{(first + ':' + second) as string}</span>
 			} @pending {
 				<span class="inner-loading">{'inner…'}</span>
 			}

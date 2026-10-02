@@ -13,7 +13,9 @@ export function CommitTiming(props: EventProbeProps) @{
 			props.record('inner:bubble', event);
 		}}
 	>
-		<button data-name="target" data-target>{count as number}</button>
+		<button data-name="target" data-target>
+			{count as number}
+		</button>
 	</section>
 }
 

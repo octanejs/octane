@@ -138,6 +138,9 @@ const PREBUNDLED = [
 	// the SVGLoader example module) to avoid a mid-session optimize pass.
 	'three',
 	'three/examples/jsm/loaders/SVGLoader.js',
+	// @octanejs/three's raw store source, reached through the same deferred
+	// chunk.
+	'@octanejs/three > zustand/vanilla',
 	// Visx primitives are raw workspace sources; these are the runtime
 	// dependencies reached by the site's Bar/Axis/Group/Scale surface.
 	// Resolve them through their owner under pnpm's isolated layout.

@@ -26,7 +26,7 @@ export function useWeatherData() {
 			setIsLoading(true);
 			setError(null);
 
-			const data = await weatherService.getWeatherByCity(city, controller.signal) as WeatherData;
+			const data = (await weatherService.getWeatherByCity(city, controller.signal)) as WeatherData;
 			if (controller.signal.aborted || activeRequest.current !== controller) return null;
 
 			setWeatherData(data);
@@ -61,40 +61,44 @@ export function useWeatherData() {
 			});
 			setIsLoading(true);
 			setError(null);
-			navigator.geolocation.getCurrentPosition(async (position) => {
-				try {
-					if (controller.signal.aborted) return;
-					const { latitude, longitude } = position.coords;
-					const data = await weatherService.getWeatherData(
-						latitude,
-						longitude,
-						controller.signal,
-					) as WeatherData;
-					if (controller.signal.aborted || activeRequest.current !== controller) return;
-					data.locationName = 'Current Location';
-					setWeatherData(data);
-					resolve(data);
-				} catch (requestError) {
-					if (controller.signal.aborted || activeRequest.current !== controller) return;
-					setError(messageFor(requestError));
-					reject(requestError);
-				} finally {
+			navigator.geolocation.getCurrentPosition(
+				async (position) => {
+					try {
+						if (controller.signal.aborted) return;
+						const { latitude, longitude } = position.coords;
+						const data = (await weatherService.getWeatherData(
+							latitude,
+							longitude,
+							controller.signal,
+						)) as WeatherData;
+						if (controller.signal.aborted || activeRequest.current !== controller) return;
+						data.locationName = 'Current Location';
+						setWeatherData(data);
+						resolve(data);
+					} catch (requestError) {
+						if (controller.signal.aborted || activeRequest.current !== controller) return;
+						setError(messageFor(requestError));
+						reject(requestError);
+					} finally {
+						if (activeRequest.current === controller) {
+							activeRequest.current = null;
+							setIsLoading(false);
+						}
+					}
+				},
+				(locationError) => {
 					if (activeRequest.current === controller) {
 						activeRequest.current = null;
 						setIsLoading(false);
 					}
-				}
-			}, (locationError) => {
-				if (activeRequest.current === controller) {
-					activeRequest.current = null;
-					setIsLoading(false);
-				}
-				reject(locationError);
-			}, {
-				timeout: 10000,
-				enableHighAccuracy: false,
-				maximumAge: 300000,
-			});
+					reject(locationError);
+				},
+				{
+					timeout: 10000,
+					enableHighAccuracy: false,
+					maximumAge: 300000,
+				},
+			);
 		});
 	});
 

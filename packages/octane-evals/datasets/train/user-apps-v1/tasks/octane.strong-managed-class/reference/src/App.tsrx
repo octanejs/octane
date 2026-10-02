@@ -10,7 +10,9 @@ function Tab({
 	selected: boolean;
 	onSelect: () => void;
 }) @{
-	<button class={['tab', selected && 'selected']} onClick={onSelect}>{label as string}</button>
+	<button class={['tab', selected && 'selected']} onClick={onSelect}>
+		{label as string}
+	</button>
 }
 
 export function App() @{

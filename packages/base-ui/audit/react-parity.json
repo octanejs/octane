@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "91136aca7e454123147ee81e429398d60a872288b7ce288a72b4cfbf3c038dc2"
+      "lockfileSha256": "193444bb319cec6de7b37ae365664a3422d8904bfa5086efc1140928eec2d8f1"
     }
   },
   "lanes": [
@@ -134,7 +134,7 @@
         {
           "path": "packages/base-ui/tests/_fixtures/base-ui-diff.tsrx",
           "role": "support",
-          "sha256": "7260bf8da6f79bbb4bd12a654917f9551d933fe9b1c51c36218956241079a543"
+          "sha256": "8e0ff119a430397ab0d915b49a217e7647416471821ca0d7deb9526ee74cb4a6"
         }
       ]
     },

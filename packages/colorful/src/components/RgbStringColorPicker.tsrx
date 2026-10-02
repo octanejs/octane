@@ -10,5 +10,6 @@ const colorModel: ColorModel<string> = {
 	equal: equalColorString,
 };
 
-export const RgbStringColorPicker = (props: Partial<ColorPickerBaseProps<string>>) =>
-	<ColorPicker {...props} colorModel={colorModel} />;
+export const RgbStringColorPicker = (props: Partial<ColorPickerBaseProps<string>>) => (
+	<ColorPicker {...props} colorModel={colorModel} />
+);

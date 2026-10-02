@@ -115,9 +115,12 @@ function readRange(): DateRange {
 }
 
 function scenarioSet(): Set<string> {
-	return new Set((new URLSearchParams(window.location.search).get('scenario') ?? '').split(',').map(
-		(value) => value.trim(),
-	).filter(Boolean));
+	return new Set(
+		(new URLSearchParams(window.location.search).get('scenario') ?? '')
+			.split(',')
+			.map((value) => value.trim())
+			.filter(Boolean),
+	);
 }
 
 function hrefFor(view: DashboardView, range: DateRange): string {
@@ -128,43 +131,53 @@ function hrefFor(view: DashboardView, range: DateRange): string {
 }
 
 function LoadingDashboard() {
-	return <main class="state-page" aria-label="Loading Pulseboard analytics" aria-busy="true">
-		<section class="state-card state-card--loading">
-			<div class="pulse-mark" aria-hidden="true">
-				<span></span>
-				<span></span>
-				<span></span>
-			</div>
-			<p class="eyebrow">Northstar workspace</p>
-			<h1>Reading the latest signals</h1>
-			<p>Preparing deterministic journeys, campaigns, and 360 operational events…</p>
-			<div class="loading-bars" aria-hidden="true">
-				<i></i>
-				<i></i>
-				<i></i>
-			</div>
-		</section>
-	</main>;
+	return (
+		<main class="state-page" aria-label="Loading Pulseboard analytics" aria-busy="true">
+			<section class="state-card state-card--loading">
+				<div class="pulse-mark" aria-hidden="true">
+					<span></span>
+					<span></span>
+					<span></span>
+				</div>
+				<p class="eyebrow">Northstar workspace</p>
+				<h1>Reading the latest signals</h1>
+				<p>Preparing deterministic journeys, campaigns, and 360 operational events…</p>
+				<div class="loading-bars" aria-hidden="true">
+					<i></i>
+					<i></i>
+					<i></i>
+				</div>
+			</section>
+		</main>
+	);
 }
 
 function LoadFailure({ onRetry }: { onRetry: () => void }) {
-	return <main class="state-page">
-		<section class="state-card" role="alert">
-			<div class="state-icon" aria-hidden="true">!</div>
-			<p class="eyebrow">Northstar workspace</p>
-			<h1>We couldn’t load this dashboard</h1>
-			<p>The seeded analytics snapshot stopped before any report state was applied.</p>
-			<button class="primary-button" type="button" onClick={onRetry}>Retry dashboard load</button>
-		</section>
-	</main>;
+	return (
+		<main class="state-page">
+			<section class="state-card" role="alert">
+				<div class="state-icon" aria-hidden="true">
+					!
+				</div>
+				<p class="eyebrow">Northstar workspace</p>
+				<h1>We couldn’t load this dashboard</h1>
+				<p>The seeded analytics snapshot stopped before any report state was applied.</p>
+				<button class="primary-button" type="button" onClick={onRetry}>
+					Retry dashboard load
+				</button>
+			</section>
+		</main>
+	);
 }
 
 function AppIcon() {
-	return <span class="app-icon" aria-hidden="true">
-		<svg viewBox="0 0 28 28">
-			<path d="M5 20V12M11 20V7M17 20v-5M23 20V4" />
-		</svg>
-	</span>;
+	return (
+		<span class="app-icon" aria-hidden="true">
+			<svg viewBox="0 0 28 28">
+				<path d="M5 20V12M11 20V7M17 20v-5M23 20V4" />
+			</svg>
+		</span>
+	);
 }
 
 function Sidebar(props: {
@@ -177,56 +190,60 @@ function Sidebar(props: {
 		{ view: 'acquisition', label: 'Acquisition', glyph: '↗' },
 		{ view: 'revenue', label: 'Revenue', glyph: '◇' },
 	];
-	return <aside class="sidebar" aria-label="Pulseboard navigation">
-		<a
-			class="brand"
-			href={hrefFor('overview', props.range)}
-			onClick={(event) => {
-				event.preventDefault();
-				props.onNavigate('overview');
-			}}
-		>
-			<AppIcon />
-			<span>
-				<strong>Pulseboard</strong>
-				<small>Analytics OS</small>
-			</span>
-		</a>
-		<nav aria-label="Workspace sections">
-			<p>Workspace</p>
-			@for (const item of navigation; key item.view) {
-				<a
-					class={{ 'nav-link': true, 'nav-link--active': item.view === props.view }}
-					href={hrefFor(item.view, props.range)}
-					aria-current={item.view === props.view ? 'page' : undefined}
-					onClick={(event) => {
-						event.preventDefault();
-						props.onNavigate(item.view);
-					}}
-				>
-					<span aria-hidden="true">{item.glyph}</span>
-					{item.label}
+	return (
+		<aside class="sidebar" aria-label="Pulseboard navigation">
+			<a
+				class="brand"
+				href={hrefFor('overview', props.range)}
+				onClick={(event) => {
+					event.preventDefault();
+					props.onNavigate('overview');
+				}}
+			>
+				<AppIcon />
+				<span>
+					<strong>Pulseboard</strong>
+					<small>Analytics OS</small>
+				</span>
+			</a>
+			<nav aria-label="Workspace sections">
+				<p>Workspace</p>
+				@for (const item of navigation; key item.view) {
+					<a
+						class={{ 'nav-link': true, 'nav-link--active': item.view === props.view }}
+						href={hrefFor(item.view, props.range)}
+						aria-current={item.view === props.view ? 'page' : undefined}
+						onClick={(event) => {
+							event.preventDefault();
+							props.onNavigate(item.view);
+						}}
+					>
+						<span aria-hidden="true">{item.glyph}</span>
+						{item.label}
+					</a>
+				}
+				<p>Explore</p>
+				<a class="nav-link" href="#campaign-table">
+					<span aria-hidden="true">▦</span>
+					Campaigns
 				</a>
-			}
-			<p>Explore</p>
-			<a class="nav-link" href="#campaign-table">
-				<span aria-hidden="true">▦</span>
-				Campaigns
-			</a>
-			<a class="nav-link" href="#live-activity">
-				<span aria-hidden="true">≋</span>
-				Live activity
-			</a>
-		</nav>
-		<div class="workspace-card">
-			<span class="workspace-avatar" aria-hidden="true">N</span>
-			<span>
-				<strong>Northstar</strong>
-				<small>Production data</small>
-			</span>
-			<i aria-hidden="true">•••</i>
-		</div>
-	</aside>;
+				<a class="nav-link" href="#live-activity">
+					<span aria-hidden="true">≋</span>
+					Live activity
+				</a>
+			</nav>
+			<div class="workspace-card">
+				<span class="workspace-avatar" aria-hidden="true">
+					N
+				</span>
+				<span>
+					<strong>Northstar</strong>
+					<small>Production data</small>
+				</span>
+				<i aria-hidden="true">•••</i>
+			</div>
+		</aside>
+	);
 }
 
 function MobileNavigation(props: {
@@ -240,29 +257,29 @@ function MobileNavigation(props: {
 		{ view: 'acquisition', label: 'Acquisition' },
 		{ view: 'revenue', label: 'Revenue' },
 	];
-	return <nav
-		class="mobile-navigation"
-		id="mobile-navigation"
-		aria-label="Mobile workspace sections"
-	>
-		<div>
-			<strong>Northstar workspace</strong>
-			<button type="button" onClick={props.onClose} aria-label="Close navigation">×</button>
-		</div>
-		@for (const item of items; key item.view) {
-			<a
-				href={hrefFor(item.view, props.range)}
-				aria-current={item.view === props.view ? 'page' : undefined}
-				onClick={(event) => {
-					event.preventDefault();
-					props.onNavigate(item.view);
-				}}
-			>
-				{item.label}
-				<span aria-hidden="true">→</span>
-			</a>
-		}
-	</nav>;
+	return (
+		<nav class="mobile-navigation" id="mobile-navigation" aria-label="Mobile workspace sections">
+			<div>
+				<strong>Northstar workspace</strong>
+				<button type="button" onClick={props.onClose} aria-label="Close navigation">
+					×
+				</button>
+			</div>
+			@for (const item of items; key item.view) {
+				<a
+					href={hrefFor(item.view, props.range)}
+					aria-current={item.view === props.view ? 'page' : undefined}
+					onClick={(event) => {
+						event.preventDefault();
+						props.onNavigate(item.view);
+					}}
+				>
+					{item.label}
+					<span aria-hidden="true">→</span>
+				</a>
+			}
+		</nav>
+	);
 }
 
 function MetricCards({ view }: { view: DashboardView }) {
@@ -287,21 +304,23 @@ function MetricCards({ view }: { view: DashboardView }) {
 						{ label: 'Activation rate', value: '7.23%', delta: '+0.6%', tone: 'blue' },
 						{ label: 'Signals to review', value: '7', delta: '3 urgent', tone: 'amber' },
 					];
-	return <section class="metric-grid" aria-label={`${VIEW_COPY[view].title} metrics`}>
-		@for (const metric of metrics; key metric.label) {
-			<article class={`metric-card metric-card--${metric.tone}`}>
-				<header>
-					<span>{metric.label}</span>
-					<i aria-hidden="true">↗</i>
-				</header>
-				<strong>{metric.value}</strong>
-				<footer>
-					<span>{metric.delta}</span>
-					vs previous period
-				</footer>
-			</article>
-		}
-	</section>;
+	return (
+		<section class="metric-grid" aria-label={`${VIEW_COPY[view].title} metrics`}>
+			@for (const metric of metrics; key metric.label) {
+				<article class={`metric-card metric-card--${metric.tone}`}>
+					<header>
+						<span>{metric.label}</span>
+						<i aria-hidden="true">↗</i>
+					</header>
+					<strong>{metric.value}</strong>
+					<footer>
+						<span>{metric.delta}</span>
+						vs previous period
+					</footer>
+				</article>
+			}
+		</section>
+	);
 }
 
 function ChartFrame(props: { width: number; points: TrendPoint[]; range: DateRange }) @{
@@ -393,7 +412,9 @@ function ChartFrame(props: { width: number; points: TrendPoint[]; range: DateRan
 						<circle class="chart-point__dot" r={4.5} />
 					</g>
 				}
-				<text class="axis-label" x={0} y={innerHeight + 28}>{props.points[0].label}</text>
+				<text class="axis-label" x={0} y={innerHeight + 28}>
+					{props.points[0].label}
+				</text>
 				<text class="axis-label" text-anchor="end" x={innerWidth} y={innerHeight + 28}>
 					{props.points.at(-1)?.label ?? ''}
 				</text>
@@ -421,44 +442,44 @@ function TrendPanel(props: {
 	pendingRange: DateRange | null;
 	onRange: (range: DateRange) => void;
 }) {
-	return <section class="panel trend-panel" aria-labelledby="trend-heading">
-		<header class="panel-heading">
-			<div>
-				<p class="eyebrow">Reach → activation</p>
-				<h2 id="trend-heading">Visitor momentum</h2>
+	return (
+		<section class="panel trend-panel" aria-labelledby="trend-heading">
+			<header class="panel-heading">
+				<div>
+					<p class="eyebrow">Reach → activation</p>
+					<h2 id="trend-heading">Visitor momentum</h2>
+				</div>
+				<div class="segmented-control" aria-label="Chart date range">
+					@for (const option of ['7d', '30d'] as const; key option) {
+						<button
+							type="button"
+							aria-pressed={(props.pendingRange ?? props.range) === option}
+							onClick={() => props.onRange(option)}
+						>
+							{option === '7d' ? '7 days' : '30 days'}
+						</button>
+					}
+				</div>
+			</header>
+			@if (props.pendingRange !== null) {
+				<div class="chart-progress" role="status">
+					Loading the {props.pendingRange === '7d' ? '7-day' : '30-day'} window…
+				</div>
+			}
+			<div class="chart-measure-shell">
+				<ParentSize
+					className="chart-parent-size"
+					debounceTime={0}
+					initialSize={{ width: 760, height: CHART_HEIGHT }}
+				>
+					{({ width }) => <ChartFrame width={width} points={props.points} range={props.range} />}
+				</ParentSize>
 			</div>
-			<div class="segmented-control" aria-label="Chart date range">
-				@for (const option of ['7d', '30d'] as const; key option) {
-					<button
-						type="button"
-						aria-pressed={(props.pendingRange ?? props.range) === option}
-						onClick={() => props.onRange(option)}
-					>
-						{option === '7d' ? '7 days' : '30 days'}
-					</button>
-				}
-			</div>
-		</header>
-		@if (props.pendingRange !== null) {
-			<div class="chart-progress" role="status">
-				Loading the{' '}
-				{props.pendingRange === '7d' ? '7-day' : '30-day'}
-				{' '}window…
-			</div>
-		}
-		<div class="chart-measure-shell">
-			<ParentSize
-				className="chart-parent-size"
-				debounceTime={0}
-				initialSize={{ width: 760, height: CHART_HEIGHT }}
-			>
-				{({ width }) => <ChartFrame width={width} points={props.points} range={props.range} />}
-			</ParentSize>
-		</div>
-		<p class="chart-help">
-			Focus a point, then use arrow keys, Home, or End to inspect the series.
-		</p>
-	</section>;
+			<p class="chart-help">
+				Focus a point, then use arrow keys, Home, or End to inspect the series.
+			</p>
+		</section>
+	);
 }
 
 const CAMPAIGN_FEATURES = tableFeatures({
@@ -504,10 +525,8 @@ const CAMPAIGN_COLUMNS = columnHelper.columns([
 // null representation, and the quoting rules are all yours to pick. This is the
 // spreadsheet-flavored version.
 function escapeTsvValue(value: unknown) {
-	const text =
-		value == null ? '' : String(value);
-	const safeText =
-		typeof value === 'string' && /^[\t\r ]*[=+@-]/.test(value) ? `'${text}` : text;
+	const text = value == null ? '' : String(value);
+	const safeText = typeof value === 'string' && /^[\t\r ]*[=+@-]/.test(value) ? `'${text}` : text;
 
 	// spreadsheets expect a field to be quoted once it contains a delimiter, a
 	// newline, or a quote, with inner quotes doubled
@@ -515,9 +534,9 @@ function escapeTsvValue(value: unknown) {
 }
 
 function toTsv(ranges: Array<Array<Array<unknown>>>) {
-	return ranges.map(
-		(grid) => grid.map((row) => row.map(escapeTsvValue).join('\t')).join('\n'),
-	).join('\n\n'); // blank line between disjoint rectangles
+	return ranges
+		.map((grid) => grid.map((row) => row.map(escapeTsvValue).join('\t')).join('\n'))
+		.join('\n\n'); // blank line between disjoint rectangles
 }
 
 /**
@@ -535,8 +554,7 @@ function rowSelectionKey(
 	rowId: string,
 ) {
 	const active = ranges[ranges.length - 1];
-	let key =
-		ranges.length > 0 && active.anchorRowId === rowId ? `f${active.anchorColumnId}` : '';
+	let key = ranges.length > 0 && active.anchorRowId === rowId ? `f${active.anchorColumnId}` : '';
 
 	for (const bound of bounds) {
 		const self = rowIndex >= bound.minRowIndex && rowIndex <= bound.maxRowIndex;
@@ -565,9 +583,9 @@ function getCellClassName(cell: Cell<typeof CAMPAIGN_FEATURES, CampaignRow>) {
 	// would otherwise resolve the cell's position a second time just to discover it
 	// is not selected.
 	if (!cell.getIsSelected()) {
-		return [statusClass, 'cell-selectable', cell.getIsFocused() && 'cell-focused'].filter(
-			Boolean,
-		).join(' ');
+		return [statusClass, 'cell-selectable', cell.getIsFocused() && 'cell-focused']
+			.filter(Boolean)
+			.join(' ');
 	}
 
 	const edges = cell.getSelectionEdges();
@@ -581,7 +599,9 @@ function getCellClassName(cell: Cell<typeof CAMPAIGN_FEATURES, CampaignRow>) {
 		edges.right && 'cell-edge-right',
 		edges.bottom && 'cell-edge-bottom',
 		edges.left && 'cell-edge-left',
-	].filter(Boolean).join(' ');
+	]
+		.filter(Boolean)
+		.join(' ');
 }
 
 /**
@@ -606,7 +626,9 @@ function CampaignRowView(props: { row: Row<typeof CAMPAIGN_FEATURES, CampaignRow
 				tabIndex={cell.getTabIndex()}
 				onMouseDown={cell.getSelectionStartHandler()}
 				onMouseEnter={cell.getSelectionExtendHandler()}
-			>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+			>
+				{flexRender(cell.column.columnDef.cell, cell.getContext())}
+			</td>
 		}
 	</tr>
 }
@@ -671,7 +693,9 @@ function CampaignTable() @{
 			<div>
 				<p class="eyebrow">Channel intelligence</p>
 				<h2 id="campaign-heading">Campaign performance</h2>
-				<p>{rows.length} of {CAMPAIGNS.length} campaigns · {selectedCount} selected</p>
+				<p>
+					{rows.length} of {CAMPAIGNS.length} campaigns · {selectedCount} selected
+				</p>
 			</div>
 			<label class="search-field">
 				<span aria-hidden="true">⌕</span>
@@ -706,11 +730,13 @@ function CampaignTable() @{
 							@for (const header of headerGroup.headers; key header.id) {
 								<th
 									scope="col"
-									aria-sort={header.column.getIsSorted() === 'asc'
-										? 'ascending'
-										: header.column.getIsSorted() === 'desc'
-											? 'descending'
-											: 'none'}
+									aria-sort={
+										header.column.getIsSorted() === 'asc'
+											? 'ascending'
+											: header.column.getIsSorted() === 'desc'
+												? 'descending'
+												: 'none'
+									}
 								>
 									<button
 										type="button"
@@ -745,19 +771,23 @@ function CampaignTable() @{
 										setQuery('');
 										table.setGlobalFilter('');
 									}}
-								>Clear campaign search</button>
+								>
+									Clear campaign search
+								</button>
 							</td>
 						</tr>
 					} @else {
 						@for (const row of rows; key row.id) {
 							<table.Subscribe
 								source={table.atoms.cellSelection}
-								selector={(ranges) => rowSelectionKey(
-									ranges,
-									table.getCellSelectionBounds(),
-									row.getDisplayIndex(),
-									row.id,
-								)}
+								selector={(ranges) =>
+									rowSelectionKey(
+										ranges,
+										table.getCellSelectionBounds(),
+										row.getDisplayIndex(),
+										row.id,
+									)
+								}
 							>
 								{() => <CampaignRowView row={row} />}
 							</table.Subscribe>
@@ -774,9 +804,8 @@ function LogExplorer() @{
 	const [announcement, setAnnouncement] = useState('360 events indexed');
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const visibleEvents = useMemo(
-		() => level === 'all'
-			? ACTIVITY_EVENTS
-			: ACTIVITY_EVENTS.filter((event) => event.level === level),
+		() =>
+			level === 'all' ? ACTIVITY_EVENTS : ACTIVITY_EVENTS.filter((event) => event.level === level),
 		[level],
 	);
 	const virtualizer = useVirtualizer<HTMLDivElement, HTMLElement>({
@@ -830,7 +859,9 @@ function LogExplorer() @{
 					{option === 'all' ? 'All events' : option[0].toUpperCase() + option.slice(1)}
 				</button>
 			}
-			<output role="status" aria-live="polite">{announcement}</output>
+			<output role="status" aria-live="polite">
+				{announcement}
+			</output>
 		</div>
 		<div
 			class="log-window"
@@ -875,19 +906,23 @@ function LogExplorer() @{
 }
 
 function EmptyDashboard({ onRestore }: { onRestore: () => void }) {
-	return <section class="empty-dashboard" data-testid="empty-dashboard">
-		<div class="empty-orbit" aria-hidden="true">
-			<span></span>
-			<i></i>
-		</div>
-		<p class="eyebrow">Quiet segment</p>
-		<h1>No traffic in this segment</h1>
-		<p>
-			The selected fixture has no events yet. Restore Northstar’s sample signals to explore every
-			report.
-		</p>
-		<button class="primary-button" type="button" onClick={onRestore}>Restore sample signals</button>
-	</section>;
+	return (
+		<section class="empty-dashboard" data-testid="empty-dashboard">
+			<div class="empty-orbit" aria-hidden="true">
+				<span></span>
+				<i></i>
+			</div>
+			<p class="eyebrow">Quiet segment</p>
+			<h1>No traffic in this segment</h1>
+			<p>
+				The selected fixture has no events yet. Restore Northstar’s sample signals to explore every
+				report.
+			</p>
+			<button class="primary-button" type="button" onClick={onRestore}>
+				Restore sample signals
+			</button>
+		</section>
+	);
 }
 
 export function App() @{
@@ -914,10 +949,10 @@ export function App() @{
 	const searchResults =
 		normalizedSearchQuery === ''
 			? []
-			: SEARCH_DESTINATIONS.filter(
-					(destination) => `${destination.label} ${destination.description}`.toLowerCase().includes(
-						normalizedSearchQuery,
-					),
+			: SEARCH_DESTINATIONS.filter((destination) =>
+					`${destination.label} ${destination.description}`
+						.toLowerCase()
+						.includes(normalizedSearchQuery),
 				);
 
 	const loadDashboard = useCallback(() => {
@@ -999,12 +1034,7 @@ export function App() @{
 		if (rangeTimerRef.current !== null) window.clearTimeout(rangeTimerRef.current);
 		const generation = ++rangeGenerationRef.current;
 		setPendingRange(nextRange);
-		const delay =
-			generation % 3 === 1
-				? 260
-				: generation % 3 === 2
-					? 150
-					: 70;
+		const delay = generation % 3 === 1 ? 260 : generation % 3 === 2 ? 150 : 70;
 		rangeTimerRef.current = window.setTimeout(() => {
 			if (generation !== rangeGenerationRef.current) return;
 			rangeTimerRef.current = null;
@@ -1017,16 +1047,19 @@ export function App() @{
 	const refresh = () => {
 		const generation = ++refreshGenerationRef.current;
 		setRefreshState('refreshing');
-		window.setTimeout(() => {
-			if (generation !== refreshGenerationRef.current) return;
-			if (refreshFailurePendingRef.current) {
-				refreshFailurePendingRef.current = false;
-				setRefreshState('error');
-				return;
-			}
-			setRevision((current) => current + 1);
-			setRefreshState('idle');
-		}, generation % 2 === 1 ? 240 : 90);
+		window.setTimeout(
+			() => {
+				if (generation !== refreshGenerationRef.current) return;
+				if (refreshFailurePendingRef.current) {
+					refreshFailurePendingRef.current = false;
+					setRefreshState('error');
+					return;
+				}
+				setRevision((current) => current + 1);
+				setRefreshState('idle');
+			},
+			generation % 2 === 1 ? 240 : 90,
+		);
 	};
 
 	@if (loadState === 'loading') {
@@ -1035,7 +1068,9 @@ export function App() @{
 		<LoadFailure onRetry={loadDashboard} />
 	} @else {
 		<div class="app-shell" data-testid="pulseboard-ready">
-			<a class="skip-link" href="#main-content">Skip to analytics</a>
+			<a class="skip-link" href="#main-content">
+				Skip to analytics
+			</a>
 			<Sidebar view={view} range={range} onNavigate={navigate} />
 			<div class="workspace">
 				<header class="topbar">
@@ -1049,16 +1084,19 @@ export function App() @{
 						onClick={() => {
 							const next = !mobileNavigationOpen;
 							setMobileNavigationOpen(next);
-							if (next) window.requestAnimationFrame(() => {
-								(document.querySelector('#mobile-navigation a') as HTMLElement | null)?.focus();
-							});
+							if (next)
+								window.requestAnimationFrame(() => {
+									(document.querySelector('#mobile-navigation a') as HTMLElement | null)?.focus();
+								});
 						}}
 					>
 						<AppIcon />
 					</button>
 					<div class="global-search">
 						<span aria-hidden="true">⌕</span>
-						<label class="sr-only" for="pulseboard-search">Search Pulseboard</label>
+						<label class="sr-only" for="pulseboard-search">
+							Search Pulseboard
+						</label>
 						<input
 							id="pulseboard-search"
 							type="search"
@@ -1104,12 +1142,13 @@ export function App() @{
 							aria-controls="pulseboard-notifications"
 							onClick={() => setNotificationsOpen((open) => !open)}
 						>
-							♢
-							@if (unreadNotifications > 0) {
+							♢@if (unreadNotifications > 0) {
 								<span class="notification-badge">{String(unreadNotifications)}</span>
 							}
 						</button>
-						<span class="user-avatar" aria-label="Signed in as Maya Chen">MC</span>
+						<span class="user-avatar" aria-label="Signed in as Maya Chen">
+							MC
+						</span>
 						@if (notificationsOpen) {
 							<section
 								class="notification-panel"
@@ -1128,7 +1167,9 @@ export function App() @{
 									}
 								</header>
 								@if (unreadNotifications === 0) {
-									<p class="notification-empty" role="status">You’re all caught up</p>
+									<p class="notification-empty" role="status">
+										You’re all caught up
+									</p>
 								} @else {
 									<ul>
 										@for (const notification of NOTIFICATIONS; key notification.id) {
@@ -1186,7 +1227,9 @@ export function App() @{
 										<strong>Snapshot refresh paused</strong>
 										<small>The existing analytics remain visible and unchanged.</small>
 									</div>
-									<button type="button" onClick={refresh}>Retry snapshot refresh</button>
+									<button type="button" onClick={refresh}>
+										Retry snapshot refresh
+									</button>
 								</div>
 							}
 							<MetricCards view={view} />

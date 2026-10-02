@@ -20,11 +20,13 @@ export function ManyDescriptorLists(props: { groups: Group[]; version: number })
 
 function MappedList(props: { group: MappedGroup }) @{
 	<section data-group={props.group.id}>
-		<ul>{props.group.rows.map(
-			(row) => <li key={row.key} data-row={row.id}>
-				<input defaultValue={row.label} aria-label={row.label} />
-			</li>,
-		)}</ul>
+		<ul>
+			{props.group.rows.map((row) => (
+				<li key={row.key} data-row={row.id}>
+					<input defaultValue={row.label} aria-label={row.label} />
+				</li>
+			))}
+		</ul>
 	</section>
 }
 

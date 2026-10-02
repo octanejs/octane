@@ -51,12 +51,12 @@ function TransitionImpl(props: TransitionProps) @{
 	const group = useContext(TransitionGroupContext);
 	const latestProps = useRef(props);
 	latestProps.current = props;
-	const initial = useRef<
-		{ status: TransitionStatus; appearStatus: TransitionStatus | null } | null
-	>(null);
+	const initial = useRef<{
+		status: TransitionStatus;
+		appearStatus: TransitionStatus | null;
+	} | null>(null);
 	if (initial.current === null) {
-		const appearing =
-			group && !group.isMounting ? props.enter !== false : props.appear === true;
+		const appearing = group && !group.isMounting ? props.enter !== false : props.appear === true;
 		if (props.in) {
 			initial.current = appearing
 				? { status: EXITED, appearStatus: ENTERING }
@@ -105,10 +105,8 @@ function TransitionImpl(props: TransitionProps) @{
 		}
 		if (live.addEndListener) {
 			if (live.nodeRef) (live.addEndListener as (done: () => void) => void)(finish);
-			else if (node) (live.addEndListener as (node: Element, done: () => void) => void)(
-				node,
-				finish,
-			);
+			else if (node)
+				(live.addEndListener as (node: Element, done: () => void) => void)(node, finish);
 		}
 		if (active && timeout !== undefined) timer.current = setTimeout(finish, timeout);
 		else if (active && (!live.addEndListener || !node)) timer.current = setTimeout(finish, 0);
@@ -138,7 +136,7 @@ function TransitionImpl(props: TransitionProps) @{
 		cancelPending();
 		const appearing = group ? group.isMounting : mounting;
 		const node = props.nodeRef?.current ?? undefined;
-		if (!mounting && props.enter === false || config.disabled) {
+		if ((!mounting && props.enter === false) || config.disabled) {
 			commitStatus(ENTERED, function afterEntered() {
 				const live = latestProps.current;
 				callEnterCallback(live.onEntered, live.nodeRef, node, appearing);
@@ -248,11 +246,12 @@ function TransitionImpl(props: TransitionProps) @{
 			nodeRef: _nodeRef,
 			...childProps
 		} = props;
-		rendered = typeof children === 'function' && !isChildrenBlock(children)
-			? children(status, childProps)
-			: isChildrenBlock(children)
-				? children
-				: cloneElement(Children.only(children) as ElementDescriptor, childProps);
+		rendered =
+			typeof children === 'function' && !isChildrenBlock(children)
+				? children(status, childProps)
+				: isChildrenBlock(children)
+					? children
+					: cloneElement(Children.only(children) as ElementDescriptor, childProps);
 	}
 
 	<TransitionGroupContext value={null}>{rendered}</TransitionGroupContext>

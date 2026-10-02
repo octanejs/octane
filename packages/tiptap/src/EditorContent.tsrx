@@ -161,7 +161,7 @@ export function PureEditorContent(props: EditorContentProps) @{
 
 	<>
 		<div
-			{...rest as typeof rest & { ref?: undefined }}
+			{...(rest as typeof rest & { ref?: undefined })}
 			ref={[ref ?? null, innerRef ?? null, editorContentRef]}
 		/>
 		@if (contentComponent) {

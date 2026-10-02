@@ -22,24 +22,22 @@ function StyleProbe() @{
 					JSON.stringify({
 						// `_data` is where the double records the latest `setData`, so an
 						// update is visible here and not only the initial `addSource`.
-						sources: Object.entries(style.sources).map(
-							([id, source]: [string, any]) => ({
-								id,
-								type: source.type,
-								data: source._data,
-							}),
-						),
-						layers: (style.layers as any[]).map(
-							(layer) => ({
-								id: layer.id,
-								source: layer.source,
-								paint: layer.paint,
-							}),
-						),
+						sources: Object.entries(style.sources).map(([id, source]: [string, any]) => ({
+							id,
+							type: source.type,
+							data: source._data,
+						})),
+						layers: (style.layers as any[]).map((layer) => ({
+							id: layer.id,
+							source: layer.source,
+							paint: layer.paint,
+						})),
 					}),
 				);
 			}}
-		>snap</button>
+		>
+			snap
+		</button>
 		<pre id="snapshot">{snapshot as string}</pre>
 	</div>
 }
@@ -51,20 +49,23 @@ export function SourceLayerDiff(props: any) @{
 
 	const data = {
 		type: 'FeatureCollection' as const,
-		features: Array.from(
-			{ length: pointCount },
-			(_unused, index) => ({
-				type: 'Feature' as const,
-				properties: {},
-				geometry: { type: 'Point' as const, coordinates: [index, index] },
-			}),
-		),
+		features: Array.from({ length: pointCount }, (_unused, index) => ({
+			type: 'Feature' as const,
+			properties: {},
+			geometry: { type: 'Point' as const, coordinates: [index, index] },
+		})),
 	};
 
 	<div>
-		<button id="grow" onClick={() => setRadius(20)}>grow</button>
-		<button id="add-point" onClick={() => setPointCount(2)}>add point</button>
-		<button id="drop-layer" onClick={() => setShowLayer(false)}>drop layer</button>
+		<button id="grow" onClick={() => setRadius(20)}>
+			grow
+		</button>
+		<button id="add-point" onClick={() => setPointCount(2)}>
+			add point
+		</button>
+		<button id="drop-layer" onClick={() => setShowLayer(false)}>
+			drop layer
+		</button>
 		<Map
 			mapLib={props.mapLib}
 			mapboxAccessToken="test-token"

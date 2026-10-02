@@ -1,8 +1,7 @@
 import { Activity, use, useLayoutEffect, useRef } from '@octanejs/three/renderer';
 
 function Asset(props) @{
-	const name =
-		props.resource === null ? props.name : use(props.resource);
+	const name = props.resource === null ? props.name : use(props.resource);
 	<group ref={props.primaryRef} name={name}>
 		<primitive object={props.external} />
 		<mesh name="owned-mesh">
@@ -57,8 +56,7 @@ export function PrimitiveSuspenseScene(props) @{
 }
 
 function ReconstructedAsset(props) @{
-	const name =
-		props.resource === null ? 'reconstruction-ready' : use(props.resource);
+	const name = props.resource === null ? 'reconstruction-ready' : use(props.resource);
 	const objectRef = useRef(null);
 	useLayoutEffect(() => props.onLayout(objectRef.current), [name, props.onLayout]);
 	<group args={props.args} name={name} attach={props.attach} ref={[objectRef, props.objectRef]}>

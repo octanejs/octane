@@ -29,4 +29,10 @@ describe('differential: clone-children.tsrx — cloneElement / Children vs React
 		await d.step('mount', () => {});
 		d.unmount();
 	});
+
+	it('Children.count skips the layout whitespace between multi-line children like React', async () => {
+		const d = await mountDifferential(FIXTURE, 'LayoutWhitespaceDemo');
+		await d.step('mount', () => {});
+		d.unmount();
+	});
 });

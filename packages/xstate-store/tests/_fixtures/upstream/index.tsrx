@@ -52,7 +52,11 @@ describe('@xstate/store-react', () => {
 
 			const Counter = () => {
 				const count = useSelector(store, (s) => s.context.count);
-				return <div data-testid="count" onClick={() => store.send({ type: 'inc' })}>{count}</div>;
+				return (
+					<div data-testid="count" onClick={() => store.send({ type: 'inc' })}>
+						{count}
+					</div>
+				);
 			};
 
 			render(<Counter />);
@@ -84,7 +88,11 @@ describe('@xstate/store-react', () => {
 
 			const Counter = () => {
 				const count = useSelector(atom, (s) => s);
-				return <div data-testid="count" onClick={() => atom.set((prev) => prev + 1)}>{count}</div>;
+				return (
+					<div data-testid="count" onClick={() => atom.set((prev) => prev + 1)}>
+						{count}
+					</div>
+				);
 			};
 
 			render(<Counter />);
@@ -133,7 +141,11 @@ describe('@xstate/store-react', () => {
 				storeRefs.push(store);
 				const count = useSelector(store, (s) => s.context.count);
 
-				return <div data-testid="count" onClick={() => store.send({ type: 'inc' })}>{count}</div>;
+				return (
+					<div data-testid="count" onClick={() => store.send({ type: 'inc' })}>
+						{count}
+					</div>
+				);
 			};
 
 			render(<Counter />);
@@ -161,7 +173,11 @@ describe('@xstate/store-react', () => {
 				storeRefs.push(store);
 				const count = useSelector(store, (s) => s.context.count);
 
-				return <div data-testid="count" onClick={() => store.trigger.inc()}>{count}</div>;
+				return (
+					<div data-testid="count" onClick={() => store.trigger.inc()}>
+						{count}
+					</div>
+				);
 			};
 
 			render(<Counter />);
@@ -192,12 +208,14 @@ describe('@xstate/store-react', () => {
 
 			const TestComponent = () => {
 				const count = useAtom(atom);
-				return <div>
-					<div data-testid="count">{count}</div>
-					<button data-testid="increment" onClick={() => atom.set((c) => c + 1)}>
-						+
-					</button>
-				</div>;
+				return (
+					<div>
+						<div data-testid="count">{count}</div>
+						<button data-testid="increment" onClick={() => atom.set((c) => c + 1)}>
+							+
+						</button>
+					</div>
+				);
 			};
 
 			render(<TestComponent />);
@@ -233,12 +251,14 @@ describe('@xstate/store-react', () => {
 			const TestComponent = () => {
 				const [count, countAtom] = useAtomState(atom);
 				atomRefs.push(countAtom);
-				return <div>
-					<div data-testid="count">{count}</div>
-					<button data-testid="increment" onClick={() => countAtom.set((c) => c + 1)}>
-						+
-					</button>
-				</div>;
+				return (
+					<div>
+						<div data-testid="count">{count}</div>
+						<button data-testid="increment" onClick={() => countAtom.set((c) => c + 1)}>
+							+
+						</button>
+					</div>
+				);
 			};
 
 			render(<TestComponent />);
@@ -261,12 +281,14 @@ describe('@xstate/store-react', () => {
 			const TestComponent = () => {
 				const [count, countAtom] = useAtomState(config, { initialCount: 10 });
 				atomRefs.push(countAtom);
-				return <div>
-					<div data-testid="count">{count}</div>
-					<button data-testid="increment" onClick={() => countAtom.set((c) => c + 1)}>
-						+
-					</button>
-				</div>;
+				return (
+					<div>
+						<div data-testid="count">{count}</div>
+						<button data-testid="increment" onClick={() => countAtom.set((c) => c + 1)}>
+							+
+						</button>
+					</div>
+				);
 			};
 
 			render(<TestComponent />);
@@ -292,10 +314,12 @@ describe('@xstate/store-react', () => {
 
 			const Counter = () => {
 				const [count, store] = useCountStore((s) => s.context.count);
-				return <div>
-					<div data-testid="count">{count}</div>
-					<button onClick={() => store.trigger.inc()}>+</button>
-				</div>;
+				return (
+					<div>
+						<div data-testid="count">{count}</div>
+						<button onClick={() => store.trigger.inc()}>+</button>
+					</div>
+				);
 			};
 
 			render(<Counter />);

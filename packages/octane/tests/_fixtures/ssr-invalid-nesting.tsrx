@@ -121,10 +121,9 @@ function ScopedListItems(props: { active: string }) @{
 		<div>
 			<ul>
 				@for (const item of ['scoped']; key item) {
-					<li
-						data-active={item === active ? 'true' : undefined}
-						onClick={() => isActive(item)}
-					>{item as string}</li>
+					<li data-active={item === active ? 'true' : undefined} onClick={() => isActive(item)}>
+						{item as string}
+					</li>
 				}
 			</ul>
 		</div>
@@ -151,18 +150,16 @@ function MultipleScopedListItems(props: { active: string }) @{
 		<div>
 			<ul>
 				@for (const item of ['first']; key item) {
-					<li
-						data-active={item === active ? 'true' : undefined}
-						onClick={() => isActive(item)}
-					>{item as string}</li>
+					<li data-active={item === active ? 'true' : undefined} onClick={() => isActive(item)}>
+						{item as string}
+					</li>
 				}
 			</ul>
 			<ol>
 				@for (const item of ['second']; key item) {
-					<li
-						data-active={item === active ? 'true' : undefined}
-						onClick={() => isActive(item)}
-					>{item as string}</li>
+					<li data-active={item === active ? 'true' : undefined} onClick={() => isActive(item)}>
+						{item as string}
+					</li>
 				}
 			</ol>
 		</div>
@@ -417,9 +414,11 @@ export function RepairedComponentHost(props: { value: string }) @{
 }
 
 function RepairedReturn(props: { value: string }) {
-	return <p class="repaired">
-		<div>{props.value as string}</div>
-	</p>;
+	return (
+		<p class="repaired">
+			<div>{props.value as string}</div>
+		</p>
+	);
 }
 
 export function RepairedReturnRows(props: { rows: string[] }) @{

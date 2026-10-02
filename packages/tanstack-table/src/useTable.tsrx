@@ -77,12 +77,9 @@ export function useTable<
 		// Rendered as an ELEMENT rather than called as a function, so `Subscribe`
 		// gets its own component scope and its `useSelector` slot is keyed per
 		// mounted `<table.Subscribe>` instead of shared with the caller.
-		tableInstance.Subscribe = ((props: any) =>
-			<Subscribe {...props} source={props.source ?? tableInstance.store} />) as OctaneTable<
-			TFeatures,
-			TData,
-			TSelected
-		>['Subscribe'];
+		tableInstance.Subscribe = ((props: any) => (
+			<Subscribe {...props} source={props.source ?? tableInstance.store} />
+		)) as OctaneTable<TFeatures, TData, TSelected>['Subscribe'];
 
 		tableInstance.FlexRender = FlexRender;
 

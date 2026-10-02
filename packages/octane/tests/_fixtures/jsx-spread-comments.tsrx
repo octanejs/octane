@@ -1,7 +1,9 @@
 // Directive-form (.tsrx) counterparts — regression guards (these already work).
 
 export function SpreadProp(props) @{
-	<div {...props.attrs} data-testid="sp">{props.label as string}</div>
+	<div {...props.attrs} data-testid="sp">
+		{props.label as string}
+	</div>
 }
 
 const A = { 'data-z': 'z' };
@@ -17,7 +19,5 @@ export function CommentMixed() @{
 }
 
 export function CommentOnly() @{
-	<div data-testid="co">
-		{/* nothing here */}
-	</div>
+	<div data-testid="co">{/* nothing here */}</div>
 }

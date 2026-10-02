@@ -9,15 +9,21 @@ export function MantineHooksDemo() @{
 
 	<div>
 		<h2 class="demo-title">{'Mantine Hooks on Octane'}</h2>
-		<p
-			class="demo-blurb"
-		>{'Interactive state and timing hooks using Octane-native lifecycle primitives.'}</p>
+		<p class="demo-blurb">
+			{'Interactive state and timing hooks using Octane-native lifecycle primitives.'}
+		</p>
 		<div class="panel">
 			<div class="row">
-				<button class="btn" onClick={counter.decrement}>−</button>
+				<button class="btn" onClick={counter.decrement}>
+					−
+				</button>
 				<strong id="mantine-count">{count as string}</strong>
-				<button class="btn" onClick={counter.increment}>+</button>
-				<button class="btn" onClick={counter.reset}>Reset</button>
+				<button class="btn" onClick={counter.increment}>
+					+
+				</button>
+				<button class="btn" onClick={counter.reset}>
+					Reset
+				</button>
 			</div>
 		</div>
 		<div class="panel">

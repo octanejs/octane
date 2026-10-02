@@ -39,14 +39,7 @@ function ListOwner(props: AppProps & { step: number; transitionRefill?: boolean 
 			? ['a', 'b', 'c']
 			: Array.from({ length: props.size }, (_, index) => String(index));
 	const inserted = [original[0], 'x', ...original.slice(1)];
-	const items =
-		local === 1
-			? ['d']
-			: local === 3
-				? inserted
-				: props.step === 0
-					? original
-					: [];
+	const items = local === 1 ? ['d'] : local === 3 ? inserted : props.step === 0 ? original : [];
 	if (local === 1 && props.step === 1) props.api.setSusp(1);
 	<ul id="list">
 		@for (const id of items; key id) {

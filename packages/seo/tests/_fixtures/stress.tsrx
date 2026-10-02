@@ -37,7 +37,9 @@ export function Churn() @{
 	const [n, setN] = useState(0);
 	<Head>
 		<Seo title={'n=' + n} description={'d=' + n} canonical={'/n/' + n} />
-		<button id="bump" onClick={() => setN(n + 1)}>{'bump ' + n as string}</button>
+		<button id="bump" onClick={() => setN(n + 1)}>
+			{('bump ' + n) as string}
+		</button>
 	</Head>
 }
 
@@ -53,7 +55,9 @@ export function Toggling() @{
 				<Meta name="robots" content="noindex, follow" />
 			</Head>
 		}
-		<button id="toggle" onClick={() => setOn(!on)}>toggle</button>
+		<button id="toggle" onClick={() => setOn(!on)}>
+			toggle
+		</button>
 	</Head>
 }
 

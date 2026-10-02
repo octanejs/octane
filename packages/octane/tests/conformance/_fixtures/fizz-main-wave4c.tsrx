@@ -43,14 +43,14 @@ export function CustomElementChildren() @{
 function NestedUse(props) @{
 	const c = use(props.c);
 	const d = use(props.d);
-	<span id="nested-use-values">{c + d as string}</span>
+	<span id="nested-use-values">{(c + d) as string}</span>
 }
 
 function ParentUse(props) @{
 	const a = use(props.a);
 	const b = use(props.b);
 	<div id="parent-use-values">
-		{a + b as string}
+		{(a + b) as string}
 		<NestedUse c={props.c} d={props.d} />
 	</div>
 }
@@ -157,8 +157,9 @@ export function ActionStateRenderReplay(props) @{
 	<section id="action-state-replay">
 		@try {
 			const label = use(props.promise);
-			<strong id="action-state-value">{label + ':' + actionState + ':' +
-				localState as string}</strong>
+			<strong id="action-state-value">
+				{(label + ':' + actionState + ':' + localState) as string}
+			</strong>
 		} @pending {
 			<i id="action-state-fallback">{'loading'}</i>
 		}

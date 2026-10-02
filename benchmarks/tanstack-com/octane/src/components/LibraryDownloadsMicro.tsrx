@@ -25,7 +25,8 @@ type AnimatedDownloadData = {
 };
 
 const weekInMs = 7 * 24 * 60 * 60 * 1000;
-const statsRowClassName = 'grid w-64 max-w-full grid-cols-[minmax(11ch,max-content)_auto] items-baseline gap-1.5 text-sm font-bold text-zinc-600 dark:text-zinc-400';
+const statsRowClassName =
+	'grid w-64 max-w-full grid-cols-[minmax(11ch,max-content)_auto] items-baseline gap-1.5 text-sm font-bold text-zinc-600 dark:text-zinc-400';
 
 function hasDownloads(value: number | undefined | null): value is number {
 	return value !== undefined && value !== null && value > 0 && Number.isFinite(value);
@@ -189,17 +190,20 @@ function useAnimatedDownloadValueRef({
 		};
 	}, [canAnimate, startFrame, stats?.updatedAt, stopFrame, totalDownloads, trendPerMs, updateText]);
 
-	return useCallback((node: HTMLSpanElement | null) => {
-		elementRef.current = node;
+	return useCallback(
+		(node: HTMLSpanElement | null) => {
+			elementRef.current = node;
 
-		if (node) {
-			updateText();
-			startFrame();
-			return;
-		}
+			if (node) {
+				updateText();
+				startFrame();
+				return;
+			}
 
-		stopFrame();
-	}, [startFrame, stopFrame, updateText]);
+			stopFrame();
+		},
+		[startFrame, stopFrame, updateText],
+	);
 }
 
 function getWeeklyTrendDescription(stats: RecentDownloadStats | undefined) {
@@ -217,17 +221,20 @@ function getWeeklyTrendDescription(stats: RecentDownloadStats | undefined) {
 }
 
 function formatStatsLabel(label: string) {
-	return label.split(' ').map((word) => {
-		if (word.toLowerCase() === 'github') {
-			return 'GitHub';
-		}
+	return label
+		.split(' ')
+		.map((word) => {
+			if (word.toLowerCase() === 'github') {
+				return 'GitHub';
+			}
 
-		if (word.toLowerCase() === 'npm') {
-			return 'NPM';
-		}
+			if (word.toLowerCase() === 'npm') {
+				return 'NPM';
+			}
 
-		return word.charAt(0).toUpperCase() + word.slice(1);
-	}).join(' ');
+			return word.charAt(0).toUpperCase() + word.slice(1);
+		})
+		.join(' ');
 }
 
 function formatAbbreviatedNumber(value: number) {
@@ -276,82 +283,95 @@ export function LibraryDownloadsMicro({
 	const starCount = ossStats?.github?.starCount;
 	const formattedLabel = formatStatsLabel(label);
 
-	const micro =
-		hasNpmDownloads
-			? <span
-					class={twMerge(
-						showTotals
-							? statsRowClassName
-							: 'inline-flex items-center gap-1.5 text-sm font-bold text-zinc-600 dark:text-zinc-400',
-					)}
-					title={weeklyTrendDescription}
-				>
-					<span
-						class={twMerge(
-							showTotals
-								? 'text-left text-zinc-950 dark:text-white'
-								: 'relative z-10 text-zinc-950 dark:text-white',
-							valueClassName,
-						)}
-						ref={displayedDownloadsRef}
-						style={{ fontVariantNumeric: 'tabular-nums' }}
-					>{(totalDownloads ?? 0).toLocaleString() as string}</span>
-					<span
-						class={twMerge(showTotals ? 'whitespace-nowrap' : 'relative z-10', labelClassName)}
-					>{formattedLabel as string}</span>
-				</span>
-			: null;
+	const micro = hasNpmDownloads ? (
+		<span
+			class={twMerge(
+				showTotals
+					? statsRowClassName
+					: 'inline-flex items-center gap-1.5 text-sm font-bold text-zinc-600 dark:text-zinc-400',
+			)}
+			title={weeklyTrendDescription}
+		>
+			<span
+				class={twMerge(
+					showTotals
+						? 'text-left text-zinc-950 dark:text-white'
+						: 'relative z-10 text-zinc-950 dark:text-white',
+					valueClassName,
+				)}
+				ref={displayedDownloadsRef}
+				style={{ fontVariantNumeric: 'tabular-nums' }}
+			>
+				{(totalDownloads ?? 0).toLocaleString() as string}
+			</span>
+			<span class={twMerge(showTotals ? 'whitespace-nowrap' : 'relative z-10', labelClassName)}>
+				{formattedLabel as string}
+			</span>
+		</span>
+	) : null;
 
 	if (!showTotals) {
 		if (!micro) {
 			return null;
 		}
 
-		return <span
-			class={twMerge(
-				showTotals ? 'inline-flex flex-col items-start gap-1.5' : undefined,
-				className,
-			)}
-		>{micro}</span>;
+		return (
+			<span
+				class={twMerge(
+					showTotals ? 'inline-flex flex-col items-start gap-1.5' : undefined,
+					className,
+				)}
+			>
+				{micro}
+			</span>
+		);
 	}
 
 	const hasTotalDownloadCount = hasDownloads(totalDownloadCount);
 	const hasStarCount = hasDownloads(starCount);
-	const weeklyDownloadsRow =
-		micro ??
-			<span aria-label={label} class={statsRowClassName}>
+	const weeklyDownloadsRow = micro ?? (
+		<span aria-label={label} class={statsRowClassName}>
+			<span
+				class={twMerge('invisible text-left text-zinc-950 dark:text-white', valueClassName)}
+				style={{ fontVariantNumeric: 'tabular-nums' }}
+			>
+				000,000,000
+			</span>
+			<span class={twMerge('whitespace-nowrap', labelClassName)}>{formattedLabel as string}</span>
+		</span>
+	);
+
+	return (
+		<span class={twMerge('inline-flex flex-col items-start gap-1.5', className)}>
+			<span class={statsRowClassName}>
 				<span
-					class={twMerge('invisible text-left text-zinc-950 dark:text-white', valueClassName)}
+					class={twMerge(
+						'text-left text-zinc-950 dark:text-white',
+						!hasTotalDownloadCount ? 'invisible' : undefined,
+					)}
 					style={{ fontVariantNumeric: 'tabular-nums' }}
 				>
-					000,000,000
+					{
+						(hasTotalDownloadCount
+							? formatAbbreviatedNumber(totalDownloadCount)
+							: '00.0 Million') as string
+					}
 				</span>
-				<span class={twMerge('whitespace-nowrap', labelClassName)}>{formattedLabel as string}</span>
-			</span>;
-
-	return <span class={twMerge('inline-flex flex-col items-start gap-1.5', className)}>
-		<span class={statsRowClassName}>
-			<span
-				class={twMerge(
-					'text-left text-zinc-950 dark:text-white',
-					!hasTotalDownloadCount ? 'invisible' : undefined,
-				)}
-				style={{ fontVariantNumeric: 'tabular-nums' }}
-			>{(hasTotalDownloadCount
-				? formatAbbreviatedNumber(totalDownloadCount)
-				: '00.0 Million') as string}</span>
-			<span>Total Downloads</span>
+				<span>Total Downloads</span>
+			</span>
+			{weeklyDownloadsRow}
+			<span class={statsRowClassName}>
+				<span
+					class={twMerge(
+						'text-left text-zinc-950 dark:text-white',
+						!hasStarCount ? 'invisible' : undefined,
+					)}
+					style={{ fontVariantNumeric: 'tabular-nums' }}
+				>
+					{(hasStarCount ? starCount.toLocaleString() : '0') as string}
+				</span>
+				<span>GitHub Stars</span>
+			</span>
 		</span>
-		{weeklyDownloadsRow}
-		<span class={statsRowClassName}>
-			<span
-				class={twMerge(
-					'text-left text-zinc-950 dark:text-white',
-					!hasStarCount ? 'invisible' : undefined,
-				)}
-				style={{ fontVariantNumeric: 'tabular-nums' }}
-			>{(hasStarCount ? starCount.toLocaleString() : '0') as string}</span>
-			<span>GitHub Stars</span>
-		</span>
-	</span>;
+	);
 }

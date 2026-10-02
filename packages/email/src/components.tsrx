@@ -25,16 +25,14 @@ export function Body({ children, style = {}, ref, ...props }: BodyProps) @{
 		'paddingBottom',
 		'paddingLeft',
 	]) {
-		if ((style as Record<string, unknown>)[key] !== undefined) (reset as Record<
-			string,
-			unknown
-		>)[key] = 0;
+		if ((style as Record<string, unknown>)[key] !== undefined)
+			(reset as Record<string, unknown>)[key] = 0;
 	}
 	<body
 		{...props}
 		{...withRef(ref)}
-		dir={props.dir as string | undefined ?? 'ltr'}
-		lang={props.lang as string | undefined ?? 'en'}
+		dir={(props.dir as string | undefined) ?? 'ltr'}
+		lang={(props.lang as string | undefined) ?? 'en'}
 		style={reset}
 	>
 		<table
@@ -48,10 +46,12 @@ export function Body({ children, style = {}, ref, ...props }: BodyProps) @{
 			<tbody>
 				<tr>
 					<td
-						dir={props.dir as string | undefined ?? 'ltr'}
-						lang={props.lang as string | undefined ?? 'en'}
+						dir={(props.dir as string | undefined) ?? 'ltr'}
+						lang={(props.lang as string | undefined) ?? 'en'}
 						style={style}
-					>{children}</td>
+					>
+						{children}
+					</td>
 				</tr>
 			</tbody>
 		</table>
@@ -60,7 +60,9 @@ export function Body({ children, style = {}, ref, ...props }: BodyProps) @{
 
 export type HtmlProps = EmailElementProps<HTMLHtmlElement> & { lang?: string; dir?: string };
 export function Html({ children, lang = 'en', dir = 'ltr', ref, ...props }: HtmlProps) @{
-	<html {...props} {...withRef(ref)} dir={dir} lang={lang}>{children}</html>
+	<html {...props} {...withRef(ref)} dir={dir} lang={lang}>
+		{children}
+	</html>
 }
 
 export type HeadProps = EmailElementProps<HTMLHeadElement>;
@@ -138,7 +140,9 @@ export function Row({ children, style, ref, ...props }: RowProps) @{
 
 export type ColumnProps = EmailElementProps<HTMLTableCellElement>;
 export function Column({ children, style, ref, ...props }: ColumnProps) @{
-	<td {...props} {...withRef(ref)} data-id="__react-email-column" style={style}>{children}</td>
+	<td {...props} {...withRef(ref)} data-id="__react-email-column" style={style}>
+		{children}
+	</td>
 }
 
 export type TextProps = EmailElementProps<HTMLParagraphElement>;
@@ -161,16 +165,17 @@ export function Link({ children, target = '_blank', style, ref, ...props }: Link
 		{...withRef(ref)}
 		style={{ color: '#067df7', textDecorationLine: 'none', ...style }}
 		target={target}
-	>{children}</a>
+	>
+		{children}
+	</a>
 }
 
-export type ImgProps =
-	EmailElementProps<HTMLImageElement> & {
-		alt?: string;
-		src?: string;
-		width?: string | number;
-		height?: string | number;
-	};
+export type ImgProps = EmailElementProps<HTMLImageElement> & {
+	alt?: string;
+	src?: string;
+	width?: string | number;
+	height?: string | number;
+};
 export function Img({ alt = '', src, width, height, style, ref, ...props }: ImgProps) @{
 	<img
 		{...props}
@@ -198,17 +203,16 @@ export function Hr({ style, ref, ...props }: HrProps) @{
 	/>
 }
 
-export type HeadingProps =
-	EmailElementProps<HTMLHeadingElement> & {
-		as?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
-		m?: string | number;
-		mx?: string | number;
-		my?: string | number;
-		mt?: string | number;
-		mr?: string | number;
-		mb?: string | number;
-		ml?: string | number;
-	};
+export type HeadingProps = EmailElementProps<HTMLHeadingElement> & {
+	as?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+	m?: string | number;
+	mx?: string | number;
+	my?: string | number;
+	mt?: string | number;
+	mr?: string | number;
+	mb?: string | number;
+	ml?: string | number;
+};
 export function Heading({
 	as: Tag = 'h1',
 	children,
@@ -227,7 +231,9 @@ export function Heading({
 		{...props}
 		{...withRef(ref)}
 		style={{ ...withMargins({ m, mx, my, mt, mr, mb, ml }), ...style }}
-	>{children}</Tag>
+	>
+		{children}
+	</Tag>
 }
 
 export interface FontProps {
@@ -259,8 +265,8 @@ export function Font({
 
 const PREVIEW_MAX_LENGTH = 200;
 const WHITE_SPACE = ' ‌​‍‎‏﻿';
-export type PreviewProps =
-	Readonly<Omit<EmailElementProps<HTMLDivElement>, 'children'>> & Readonly<{
+export type PreviewProps = Readonly<Omit<EmailElementProps<HTMLDivElement>, 'children'>> &
+	Readonly<{
 		text?: string;
 		children?: string | string[];
 		useTitleTag?: boolean;
@@ -272,12 +278,11 @@ export function Preview({
 	ref,
 	...props
 }: PreviewProps) @{
-	const childText =
-		Array.isArray(children)
-			? children.join('')
-			: typeof children === 'string'
-				? children
-				: '';
+	const childText = Array.isArray(children)
+		? children.join('')
+		: typeof children === 'string'
+			? children
+			: '';
 	const text = (explicitText ?? childText).substring(0, PREVIEW_MAX_LENGTH);
 	<>
 		@if (useTitleTag) {
@@ -316,7 +321,9 @@ export function CodeInline({ children, style, ref, ...props }: CodeInlineProps) 
 			borderRadius: '4px',
 			...style,
 		}}
-	>{children}</code>
+	>
+		{children}
+	</code>
 }
 
 export type ButtonProps = EmailElementProps<HTMLAnchorElement> & { href?: string; target?: string };

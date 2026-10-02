@@ -35,7 +35,9 @@ function RefChild(props: RefProps) @{
 	}, []);
 	<>
 		<input id="activity-ref-input" defaultValue="draft" ref={props.objectRef} />
-		<button id="activity-ref-button" type="button" ref={props.callbackRef}>{'button'}</button>
+		<button id="activity-ref-button" type="button" ref={props.callbackRef}>
+			{'button'}
+		</button>
 	</>
 }
 
@@ -99,10 +101,9 @@ interface Values {
 export function ActivityValuesHost(props: Values & { mode: ActivityMode }) @{
 	<main id="activity-values">
 		<Activity mode={props.mode}>
-			<section
-				id="activity-values-styled"
-				style={{ display: props.display, color: props.color }}
-			>{'styled'}</section>
+			<section id="activity-values-styled" style={{ display: props.display, color: props.color }}>
+				{'styled'}
+			</section>
 			{props.text as string}
 		</Activity>
 	</main>
@@ -144,10 +145,12 @@ function PortalContents(props: PortalProps) @{
 			<PortalItem id={id} display={props.display} log={props.log} />
 		}
 		@if (props.secondTarget) {
-			<aside id="activity-portal-nested-host">{createPortal(
-				<PortalItem id="nested" display={props.display} log={props.log} />,
-				props.secondTarget,
-			)}</aside>
+			<aside id="activity-portal-nested-host">
+				{createPortal(
+					<PortalItem id="nested" display={props.display} log={props.log} />,
+					props.secondTarget,
+				)}
+			</aside>
 		}
 	</>
 }
@@ -171,16 +174,16 @@ export function NestedPortalActivityHost(props: {
 }) @{
 	<main>
 		<Activity mode={props.outer}>
-			<section id="activity-portal-inline">{createPortal(
-				<Activity mode={props.inner}>
-					<button
-						id="activity-portal-nested"
-						type="button"
-						style="display: inline-flex"
-					>{'nested'}</button>
-				</Activity>,
-				props.target,
-			)}</section>
+			<section id="activity-portal-inline">
+				{createPortal(
+					<Activity mode={props.inner}>
+						<button id="activity-portal-nested" type="button" style="display: inline-flex">
+							{'nested'}
+						</button>
+					</Activity>,
+					props.target,
+				)}
+			</section>
 		</Activity>
 	</main>
 }
@@ -199,7 +202,9 @@ function PortalSuspense(props: {
 	<>
 		@try {
 			<>
-				<strong id="activity-portal-primary" style="display: inline-flex">{'primary'}</strong>
+				<strong id="activity-portal-primary" style="display: inline-flex">
+					{'primary'}
+				</strong>
 				<MaybeSuspend pending={pending} promise={props.promise} />
 			</>
 		} @pending {
@@ -216,10 +221,12 @@ export function ActivitySuspensePortalHost(props: {
 }) @{
 	<main>
 		<Activity mode={props.mode}>
-			<div>{createPortal(
-				<PortalSuspense promise={props.promise} expose={props.expose} />,
-				props.target,
-			)}</div>
+			<div>
+				{createPortal(
+					<PortalSuspense promise={props.promise} expose={props.expose} />,
+					props.target,
+				)}
+			</div>
 		</Activity>
 	</main>
 }
@@ -260,8 +267,12 @@ export function ActivityGuardedRefHost(props: {
 	<main>
 		@try {
 			<Activity mode={props.mode}>
-				<button id="activity-guarded-first" ref={props.first}>{'first'}</button>
-				<button id="activity-guarded-second" ref={props.second}>{'second'}</button>
+				<button id="activity-guarded-first" ref={props.first}>
+					{'first'}
+				</button>
+				<button id="activity-guarded-second" ref={props.second}>
+					{'second'}
+				</button>
 			</Activity>
 		} @catch (error) {
 			<strong id="activity-guarded-error">{error.message as string}</strong>
@@ -280,8 +291,7 @@ interface StatefulAsyncProps {
 function StatefulAsyncChild(props: StatefulAsyncProps) @{
 	const [count, setCount] = useState(0);
 	props.expose(setCount);
-	const value =
-		count === 1 ? use(props.promise) : 'ready';
+	const value = count === 1 ? use(props.promise) : 'ready';
 	useLayoutEffect(() => {
 		props.log('layout mount:' + count);
 		return () => props.log('layout cleanup:' + count);
@@ -377,11 +387,7 @@ export function ActivityInsertionAsyncHost(props: {
 	</main>
 }
 
-function ConditionalInsertionBeforeSuspend(props: {
-	value: number;
-	enabled: boolean;
-	log: Log;
-}) @{
+function ConditionalInsertionBeforeSuspend(props: { value: number; enabled: boolean; log: Log }) @{
 	if (props.enabled) {
 		useInsertionEffect(() => {
 			props.log('insertion mount:' + props.value);

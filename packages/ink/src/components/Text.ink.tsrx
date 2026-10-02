@@ -74,8 +74,7 @@ export default function Text({
 }: Props) {
 	const { isScreenReaderEnabled } = useContext(accessibilityContext);
 	const inheritedBackgroundColor = useContext(backgroundContext);
-	const childrenOrAriaLabel =
-		isScreenReaderEnabled && ariaLabel ? ariaLabel : children;
+	const childrenOrAriaLabel = isScreenReaderEnabled && ariaLabel ? ariaLabel : children;
 
 	if (childrenOrAriaLabel === undefined || childrenOrAriaLabel === null) {
 		return null;
@@ -123,8 +122,12 @@ export default function Text({
 		return null;
 	}
 
-	return <ink-text
-		style={{ flexGrow: 0, flexShrink: 1, flexDirection: 'row', textWrap: wrap }}
-		internal_transform={transform}
-	>{childrenOrAriaLabel}</ink-text>;
+	return (
+		<ink-text
+			style={{ flexGrow: 0, flexShrink: 1, flexDirection: 'row', textWrap: wrap }}
+			internal_transform={transform}
+		>
+			{childrenOrAriaLabel}
+		</ink-text>
+	);
 }

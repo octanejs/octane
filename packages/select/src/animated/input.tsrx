@@ -3,8 +3,10 @@ import type { InputProps } from '../components.tsrx';
 import { asComponentElement } from './component-element';
 
 type InputComponent = typeof import('../components.tsrx').Input;
-type AnimatedTransitionProps =
-	Pick<TransitionProps, 'in' | 'onExited' | 'appear' | 'enter' | 'exit'>;
+type AnimatedTransitionProps = Pick<
+	TransitionProps,
+	'in' | 'onExited' | 'appear' | 'enter' | 'exit'
+>;
 export type AnimatedInputProps = InputProps & AnimatedTransitionProps;
 
 export function animatedInput(WrappedComponent: InputComponent): InputComponent {

@@ -28,13 +28,16 @@ export function BrowserRouter(props: BrowserRouterProps) @{
 		action: history.action,
 		location: history.location,
 	});
-	const setState = useCallback((newState: Update) => {
-		if (useTransitions === false) {
-			setStateImpl(newState);
-		} else {
-			startTransition(() => setStateImpl(newState));
-		}
-	}, [useTransitions]);
+	const setState = useCallback(
+		(newState: Update) => {
+			if (useTransitions === false) {
+				setStateImpl(newState);
+			} else {
+				startTransition(() => setStateImpl(newState));
+			}
+		},
+		[useTransitions],
+	);
 
 	useLayoutEffect(() => history.listen(setState), [history, setState]);
 
@@ -63,13 +66,16 @@ export function HashRouter(props: HashRouterProps) @{
 		action: history.action,
 		location: history.location,
 	});
-	const setState = useCallback((newState: Update) => {
-		if (useTransitions === false) {
-			setStateImpl(newState);
-		} else {
-			startTransition(() => setStateImpl(newState));
-		}
-	}, [useTransitions]);
+	const setState = useCallback(
+		(newState: Update) => {
+			if (useTransitions === false) {
+				setStateImpl(newState);
+			} else {
+				startTransition(() => setStateImpl(newState));
+			}
+		},
+		[useTransitions],
+	);
 
 	useLayoutEffect(() => history.listen(setState), [history, setState]);
 
@@ -101,13 +107,16 @@ export function HistoryRouter(props: HistoryRouterProps) @{
 		action: history.action,
 		location: history.location,
 	});
-	const setState = useCallback((newState: Update) => {
-		if (useTransitions === false) {
-			setStateImpl(newState);
-		} else {
-			startTransition(() => setStateImpl(newState));
-		}
-	}, [useTransitions]);
+	const setState = useCallback(
+		(newState: Update) => {
+			if (useTransitions === false) {
+				setStateImpl(newState);
+			} else {
+				startTransition(() => setStateImpl(newState));
+			}
+		},
+		[useTransitions],
+	);
 
 	useLayoutEffect(() => history.listen(setState), [history, setState]);
 

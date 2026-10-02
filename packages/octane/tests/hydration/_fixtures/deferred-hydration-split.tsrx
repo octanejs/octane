@@ -15,7 +15,9 @@ function SplitReviews(props) @{
 		id="split-review-action"
 		data-captured-label={label}
 		onClick={() => props.onClick?.(label)}
-	>{label as string}</button>
+	>
+		{label as string}
+	</button>
 }
 
 function LastSplitReviews() @{
@@ -28,7 +30,9 @@ export function SplitHydration(props) @{
 		<Hydrate when={props.when} prefetch={props.prefetch} onHydrated={props.onHydrated}>
 			<SplitReviews label={props.label} onEffect={props.onEffect} onClick={props.onDeferredClick} />
 		</Hydrate>
-		<button id="split-eager-action" onClick={props.onEagerClick}>{'Eager'}</button>
+		<button id="split-eager-action" onClick={props.onEagerClick}>
+			{'Eager'}
+		</button>
 	</main>
 }
 
@@ -39,7 +43,9 @@ export function LastSplitHydration(props) @{
 		props.onEagerEffect?.();
 	}, []);
 	<main id="last-split-host" data-ready={ready ? 'yes' : 'no'}>
-		<button id="last-split-eager" onClick={props.onEagerClick}>Eager</button>
+		<button id="last-split-eager" onClick={props.onEagerClick}>
+			Eager
+		</button>
 		<Hydrate when={props.when}>
 			<LastSplitReviews />
 		</Hydrate>
@@ -47,7 +53,9 @@ export function LastSplitHydration(props) @{
 }
 
 function SplitClientOnlyContent(props) @{
-	<button id="split-client-only-content" onClick={props.onClick}>{'Split client content'}</button>
+	<button id="split-client-only-content" onClick={props.onClick}>
+		{'Split client content'}
+	</button>
 }
 
 export function ClientOnlySplitHydration(props) @{
@@ -72,7 +80,9 @@ export function RepeatedSplitHydration(props) @{
 					class="repeated-split-action"
 					data-item-id={item.id}
 					onClick={() => props.onClick?.(item.id)}
-				>{item.label as string}</button>
+				>
+					{item.label as string}
+				</button>
 			</Hydrate>
 		}
 	</section>

@@ -26,9 +26,9 @@ function WalletProbe() @{
 
 	<div class="panel">
 		<h2 class="demo-title">{'Wagmi v3 lifecycle'}</h2>
-		<p
-			class="demo-blurb"
-		>{'Deterministic mock connector: safe for visual regression and repeatable profiling.'}</p>
+		<p class="demo-blurb">
+			{'Deterministic mock connector: safe for visual regression and repeatable profiling.'}
+		</p>
 		<dl class="metrics-grid">
 			<div>
 				<dt>{'Status'}</dt>

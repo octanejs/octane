@@ -19,15 +19,17 @@ export { ContentEditableElement } from './shared/LexicalContentEditableElement.t
  * context) plus an optional `placeholder`; when a `placeholder` is provided an
  * `aria-placeholder` string is also required for accessibility.
  */
-export type ContentEditableProps =
-	Omit<ContentEditableElementProps, 'editor'> & (| {
-			'aria-placeholder'?: void;
-			placeholder?: null;
-	  }
-	| {
-			'aria-placeholder': string;
-			placeholder: ((isEditable: boolean) => OctaneNode) | OctaneNode;
-	  });
+export type ContentEditableProps = Omit<ContentEditableElementProps, 'editor'> &
+	(
+		| {
+				'aria-placeholder'?: void;
+				placeholder?: null;
+		  }
+		| {
+				'aria-placeholder': string;
+				placeholder: ((isEditable: boolean) => OctaneNode) | OctaneNode;
+		  }
+	);
 
 function Placeholder(props: {
 	editor: LexicalEditor;

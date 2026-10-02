@@ -6,5 +6,7 @@ export function DragBox(props) @{
 		drag
 		dragConstraints={{ left: -50, right: 50, top: -50, bottom: 50 }}
 		onDrag={props.onDrag}
-	>{'b'}</motion.div>
+	>
+		{'b'}
+	</motion.div>
 }

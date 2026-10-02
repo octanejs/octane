@@ -42,9 +42,7 @@ export function TransitionOwners(props: {
 				@try {
 					<TransitionOwner name={name} initial={props.initial} bind={props.bind} />
 				} @catch (error) {
-					<p>
-						{error instanceof Error ? error.message : String(error)}
-					</p>
+					<p>{error instanceof Error ? error.message : String(error)}</p>
 				}
 			</div>
 		}

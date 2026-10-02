@@ -8,8 +8,8 @@ import { MoonIcon, SunIcon } from '@octanejs/lucide';
 const STORAGE_KEY = 'octane-playground-theme';
 
 export function ThemeToggle() @{
-	const [theme, setTheme] = useState<'dark' | 'light'>(
-		() => document.body.classList.contains('dark') ? 'dark' : 'light',
+	const [theme, setTheme] = useState<'dark' | 'light'>(() =>
+		document.body.classList.contains('dark') ? 'dark' : 'light',
 	);
 
 	useEffect(() => {

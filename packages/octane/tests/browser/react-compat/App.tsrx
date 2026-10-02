@@ -15,20 +15,30 @@ export function App(props: AppProps) @{
 	const [show, setShow] = useState(true);
 
 	<main>
-		<button data-suspend="" onClick={() => setResource(props.next)}>Suspend React</button>
-		<button data-resolve="" onClick={props.resolve}>Resolve React</button>
+		<button data-suspend="" onClick={() => setResource(props.next)}>
+			Suspend React
+		</button>
+		<button data-resolve="" onClick={props.resolve}>
+			Resolve React
+		</button>
 		<button
 			data-suspend-both=""
 			onClick={() => {
 				setResource(props.next);
 				setNativeResource(props.nativeNext);
 			}}
-		>Suspend both renderers</button>
-		<button data-resolve-native="" onClick={props.resolveNative}>Resolve Octane</button>
+		>
+			Suspend both renderers
+		</button>
+		<button data-resolve-native="" onClick={props.resolveNative}>
+			Resolve Octane
+		</button>
 		<button data-activity="" onClick={() => setHidden(!hidden)}>
 			{hidden ? 'Reveal Activity' : 'Hide Activity'}
 		</button>
-		<button data-remove="" onClick={() => setShow(false)}>Remove island</button>
+		<button data-remove="" onClick={() => setShow(false)}>
+			Remove island
+		</button>
 		@if (show) {
 			<Activity mode={hidden ? 'hidden' : 'visible'}>
 				@try {

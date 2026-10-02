@@ -13,10 +13,9 @@ export function ClickableLinkPlugin(props: Props) {
 	const [editor] = useLexicalComposerContext();
 	const newTab = props.newTab !== false;
 	const disabled = props.disabled === true;
-	useEffect(() => registerClickableLink(editor, namedSignals({ disabled, newTab })), [
-		editor,
-		newTab,
-		disabled,
-	]);
+	useEffect(
+		() => registerClickableLink(editor, namedSignals({ disabled, newTab })),
+		[editor, newTab, disabled],
+	);
 	return null;
 }

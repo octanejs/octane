@@ -19,8 +19,12 @@ import {
 function Shell() @{
 	<div>
 		<nav>
-			<Link class="go-home" to="/">Home</Link>
-			<Link class="go-about" to="/about">About</Link>
+			<Link class="go-home" to="/">
+				Home
+			</Link>
+			<Link class="go-about" to="/about">
+				About
+			</Link>
 		</nav>
 		<main>
 			<Outlet />

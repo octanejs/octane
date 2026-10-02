@@ -94,21 +94,22 @@ export const TableCopyDropdown = ({
 	const icons = useIcons();
 	const Icon = isCopied ? icons.CheckIcon : icons.CopyIcon;
 
-	return <div className={cn('relative')} ref={dropdownRef}>
-		<button
-			className={cn(
-				'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
-				className,
-			)}
-			disabled={isAnimating}
-			onClick={() => setIsOpen(!isOpen)}
-			title={t.copyTable}
-			type="button"
-		>
-			{children ?? <Icon height={14} width={14} />}
-		</button>
-		{isOpen
-			? <div
+	return (
+		<div className={cn('relative')} ref={dropdownRef}>
+			<button
+				className={cn(
+					'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
+					className,
+				)}
+				disabled={isAnimating}
+				onClick={() => setIsOpen(!isOpen)}
+				title={t.copyTable}
+				type="button"
+			>
+				{children ?? <Icon height={14} width={14} />}
+			</button>
+			{isOpen ? (
+				<div
 					className={cn(
 						'absolute top-full right-0 z-20 mt-1 min-w-[120px] overflow-hidden rounded-md border border-border bg-background shadow-lg',
 					)}
@@ -118,20 +119,27 @@ export const TableCopyDropdown = ({
 						onClick={() => copyTableData('md')}
 						title={t.copyTableAsMarkdown}
 						type="button"
-					>{t.tableFormatMarkdown}</button>
+					>
+						{t.tableFormatMarkdown}
+					</button>
 					<button
 						className={cn('w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40')}
 						onClick={() => copyTableData('csv')}
 						title={t.copyTableAsCsv}
 						type="button"
-					>{t.tableFormatCsv}</button>
+					>
+						{t.tableFormatCsv}
+					</button>
 					<button
 						className={cn('w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40')}
 						onClick={() => copyTableData('tsv')}
 						title={t.copyTableAsTsv}
 						type="button"
-					>{t.tableFormatTsv}</button>
+					>
+						{t.tableFormatTsv}
+					</button>
 				</div>
-			: null}
-	</div>;
+			) : null}
+		</div>
+	);
 };

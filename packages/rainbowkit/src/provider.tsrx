@@ -45,9 +45,9 @@ function walletEntries(
 	connectors: readonly Connector[],
 	descriptors: readonly WalletDescriptor[],
 ): readonly WalletEntry[] {
-	const byIdentity = new Map(connectors.map(
-		(connector) => [connectorIdentity(connector), connector],
-	));
+	const byIdentity = new Map(
+		connectors.map((connector) => [connectorIdentity(connector), connector]),
+	);
 	const consumed = new Set<string>();
 	const entries: WalletEntry[] = [];
 	for (const descriptor of descriptors) {
@@ -55,10 +55,11 @@ function walletEntries(
 			(connector) => connector.id === descriptor.id || connector.name === descriptor.name,
 		);
 		const connector = descriptor.connectorUid
-			? byIdentity.get(descriptor.connectorUid) ?? fallback
+			? (byIdentity.get(descriptor.connectorUid) ?? fallback)
 			: fallback;
-		const identity =
-			connector ? connectorIdentity(connector) : descriptor.connectorUid || descriptor.id;
+		const identity = connector
+			? connectorIdentity(connector)
+			: descriptor.connectorUid || descriptor.id;
 		if (consumed.has(identity)) continue;
 		consumed.add(identity);
 		entries.push({ ...descriptor, connector, identity });
@@ -102,7 +103,7 @@ function Modal(props: {
 			const fallback = focusScope?.querySelector<HTMLElement>(
 				'.rk-connect-button:not([disabled]), .rk-wallet-button:not([disabled])',
 			);
-			((props.opener?.isConnected ? props.opener : fallback))?.focus();
+			(props.opener?.isConnected ? props.opener : fallback)?.focus();
 		});
 	};
 	const title =
@@ -125,11 +126,12 @@ function Modal(props: {
 		pushModal(props.token, ownerDocument);
 		lockBody(ownerDocument);
 		registerModal(props.token, dialog);
-		const focusable = () => Array.from(
-			dialog.querySelectorAll<HTMLElement>(
-				'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-			),
-		);
+		const focusable = () =>
+			Array.from(
+				dialog.querySelectorAll<HTMLElement>(
+					'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+				),
+			);
 		focusable()[0]?.focus();
 		const onKeyDown = (event: KeyboardEvent) => {
 			if (!isTopModal(props.token)) return;
@@ -149,10 +151,10 @@ function Modal(props: {
 			const last = items.at(-1)!;
 			if (
 				!dialog.contains(ownerDocument.activeElement) ||
-					!items.includes(ownerDocument.activeElement as HTMLElement)
+				!items.includes(ownerDocument.activeElement as HTMLElement)
 			) {
 				event.preventDefault();
-				((event.shiftKey ? last : first)).focus();
+				(event.shiftKey ? last : first).focus();
 			} else if (event.shiftKey && ownerDocument.activeElement === first) {
 				event.preventDefault();
 				last.focus();
@@ -174,13 +176,17 @@ function Modal(props: {
 		if (!entry.connector) return;
 		const pendingToken = props.beginConnecting();
 		setPendingWalletIdentity(entry.identity);
-		void connect.connectAsync({ connector: entry.connector }).then(() => {
-			props.close(props.token);
-			restoreFocus();
-		}).catch(() => {}).finally(() => {
-			setPendingWalletIdentity(null);
-			props.endConnecting(pendingToken);
-		});
+		void connect
+			.connectAsync({ connector: entry.connector })
+			.then(() => {
+				props.close(props.token);
+				restoreFocus();
+			})
+			.catch(() => {})
+			.finally(() => {
+				setPendingWalletIdentity(null);
+				props.endConnecting(pendingToken);
+			});
 	};
 
 	<div
@@ -259,10 +265,17 @@ function Modal(props: {
 										type="button"
 										className="rk-action"
 										disabled={switchChain.isPending || connection.chainId === chain.id}
-										onClick={() => switchChain.mutate({ chainId: chain.id }, {
-											onSuccess: () => props.close(props.token),
-										})}
-									>{chain.name}</button>
+										onClick={() =>
+											switchChain.mutate(
+												{ chainId: chain.id },
+												{
+													onSuccess: () => props.close(props.token),
+												},
+											)
+										}
+									>
+										{chain.name}
+									</button>
 								</li>
 							}
 						</ul>
@@ -277,9 +290,11 @@ function Modal(props: {
 							type="button"
 							className="rk-action"
 							disabled={disconnect.isPending || connection.status !== 'connected'}
-							onClick={() => disconnect.mutate(undefined, {
-								onSuccess: () => props.close(props.token),
-							})}
+							onClick={() =>
+								disconnect.mutate(undefined, {
+									onSuccess: () => props.close(props.token),
+								})
+							}
 						>
 							Disconnect
 						</button>
@@ -294,16 +309,13 @@ function Modal(props: {
 }
 
 export function RainbowKitProvider(props: RainbowKitProviderProps) @{
-	const [activeModal, setActiveModal] = useState<
-		| {
-				kind: ModalKind;
-				token: ModalToken;
-				chainId: number | undefined;
-				opener: HTMLElement | null;
-				ownerDocument: Document | null;
-		  }
-		| null
-	>(null);
+	const [activeModal, setActiveModal] = useState<{
+		kind: ModalKind;
+		token: ModalToken;
+		chainId: number | undefined;
+		opener: HTMLElement | null;
+		ownerDocument: Document | null;
+	} | null>(null);
 	const connection = useConnection();
 	const [mounted, setMounted] = useState(false);
 	const connectingTokens = useRef(new Set<symbol>());
@@ -323,15 +335,15 @@ export function RainbowKitProvider(props: RainbowKitProviderProps) @{
 		}
 	}, []);
 	const connectors = useConnect().connectors;
-	const wallets = useMemo(() => walletEntries(connectors, props.wallets ?? []), [
-		connectors,
-		props.wallets,
-	]);
+	const wallets = useMemo(
+		() => walletEntries(connectors, props.wallets ?? []),
+		[connectors, props.wallets],
+	);
 	const selectedTheme = props.theme ?? lightTheme();
 	const providerId = useId();
 	const closeModal = useCallback((token?: ModalToken) => {
 		setActiveModal((current) => {
-			if (!current || token && current.token !== token) return current;
+			if (!current || (token && current.token !== token)) return current;
 			return null;
 		});
 	}, []);
@@ -341,30 +353,37 @@ export function RainbowKitProvider(props: RainbowKitProviderProps) @{
 			activeModal.kind === 'connect'
 				? connection.status === 'connected'
 				: connection.status !== 'connected' ||
-					activeModal.kind === 'chain' && activeModal.chainId !== connection.chainId;
+					(activeModal.kind === 'chain' && activeModal.chainId !== connection.chainId);
 		if (modalNoLongerApplies) closeModal(activeModal.token);
 	}, [activeModal, closeModal, connection.chainId, connection.status]);
-	const openModal = useCallback((kind: ModalKind, nextOpener?: HTMLElement | null) => {
-		const token = `${providerId}:${++modalGeneration.current}`;
-		const fallbackDocument = rootRef.current?.ownerDocument;
-		const ownerDocument =
-			nextOpener?.ownerDocument ?? fallbackDocument ??
+	const openModal = useCallback(
+		(kind: ModalKind, nextOpener?: HTMLElement | null) => {
+			const token = `${providerId}:${++modalGeneration.current}`;
+			const fallbackDocument = rootRef.current?.ownerDocument;
+			const ownerDocument =
+				nextOpener?.ownerDocument ??
+				fallbackDocument ??
 				(typeof document === 'undefined' ? null : document);
-		setActiveModal({
-			kind,
-			token,
-			chainId: connection.chainId,
-			opener: nextOpener ?? ownerDocument?.activeElement as HTMLElement | null | undefined ?? null,
-			ownerDocument,
-		});
-	}, [connection.chainId, providerId]);
+			setActiveModal({
+				kind,
+				token,
+				chainId: connection.chainId,
+				opener:
+					nextOpener ?? (ownerDocument?.activeElement as HTMLElement | null | undefined) ?? null,
+				ownerDocument,
+			});
+		},
+		[connection.chainId, providerId],
+	);
 	const context = useMemo(
 		() => ({
 			activeModal,
 			beginConnecting,
 			closeModal,
 			connected: connection.status === 'connected',
-			connecting: connectingCount > 0 || connection.status === 'connecting' ||
+			connecting:
+				connectingCount > 0 ||
+				connection.status === 'connecting' ||
 				connection.status === 'reconnecting',
 			endConnecting,
 			mounted,

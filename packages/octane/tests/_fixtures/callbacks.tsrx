@@ -6,7 +6,9 @@ export function CallbackIdentity(props) @{
 	const [n, setN] = useState(0);
 	const cb = useCallback((x) => x + 1, [props.depKey]);
 	props.observe(cb);
-	<button id="inc" onClick={() => setN(n + 1)}>{n as string}</button>
+	<button id="inc" onClick={() => setN(n + 1)}>
+		{n as string}
+	</button>
 }
 
 // useEffectEvent — a registered wrapper always invokes the latest committed closure.
@@ -19,15 +21,20 @@ export function EffectEventSubscriber(props) @{
 		props.tickLog.push('count=' + count);
 	});
 	// Subscribe ONCE — deps are []. We don't want to re-subscribe on every count change.
-	useEffect((tickLog) => {
-		tickLog.push('subscribe');
-		const cleanup = () => tickLog.push('unsubscribe');
-		// Fire onTick immediately + on every external trigger from props.fire.
-		props.fire.handler = onTick;
-		return cleanup;
-	}, [props.tickLog, props.fire]);
+	useEffect(
+		(tickLog) => {
+			tickLog.push('subscribe');
+			const cleanup = () => tickLog.push('unsubscribe');
+			// Fire onTick immediately + on every external trigger from props.fire.
+			props.fire.handler = onTick;
+			return cleanup;
+		},
+		[props.tickLog, props.fire],
+	);
 
-	<button id="inc" onClick={() => setCount(count + 1)}>{count as string}</button>
+	<button id="inc" onClick={() => setCount(count + 1)}>
+		{count as string}
+	</button>
 }
 
 // useEffectEvent returns a fresh wrapper on every render.

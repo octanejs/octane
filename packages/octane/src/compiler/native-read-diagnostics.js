@@ -247,7 +247,7 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 		) {
 			declareTypeName(node.id?.name);
 		} else if (node.type === 'TSTypeParameter') {
-			declareTypeName(typeof node.name === 'string' ? node.name : node.name?.name);
+			declareTypeName(node.name.name);
 		}
 	}
 

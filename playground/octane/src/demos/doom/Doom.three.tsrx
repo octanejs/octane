@@ -62,19 +62,17 @@ export function DoomScene({ state }: { state: GameState }) @{
 				rotation={[0, -state.player.yaw, 0]}
 			>
 				<mesh
-					scale={enemy.dead
-						? [1.15, 0.18, 0.5]
-						: enemy.deathStartedAt !== null
-							? [1.2, 0.65, 1]
-							: [1, 1 + Math.sin(state.now / 140 + enemy.id) * 0.05, 1]}
+					scale={
+						enemy.dead
+							? [1.15, 0.18, 0.5]
+							: enemy.deathStartedAt !== null
+								? [1.2, 0.65, 1]
+								: [1, 1 + Math.sin(state.now / 140 + enemy.id) * 0.05, 1]
+					}
 				>
 					<planeGeometry args={[1.25, 1.55]} />
 					<meshStandardMaterial
-						color={enemy.dead
-							? '#50150f'
-							: enemy.deathStartedAt !== null
-								? '#ff4b24'
-								: '#a5301e'}
+						color={enemy.dead ? '#50150f' : enemy.deathStartedAt !== null ? '#ff4b24' : '#a5301e'}
 						emissive={enemy.dead ? '#180000' : '#3d0500'}
 						emissiveIntensity={enemy.deathStartedAt !== null ? 2.4 : 0.7}
 						roughness={0.86}

@@ -8,7 +8,7 @@
       "path": "ui/skeleton.tsrx",
       "type": "registry:ui",
       "target": "components/ui/skeleton.tsrx",
-      "content": "import { cn } from 'cn';\nimport type { HostProps } from '@/lib/types';\n\nexport function Skeleton({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"skeleton\"\n\t\tclassName={cn('animate-pulse rounded-md bg-muted', className)}\n\t\t{...props}\n\t/>;\n}\n"
+      "content": "import { cn } from 'cn';\nimport type { HostProps } from '@/lib/types';\n\nexport function Skeleton({ className, ...props }: HostProps<'div'>) {\n\treturn (\n\t\t<div\n\t\t\tdata-slot=\"skeleton\"\n\t\t\tclassName={cn('animate-pulse rounded-md bg-muted', className)}\n\t\t\t{...props}\n\t\t/>\n\t);\n}\n"
     }
   ],
   "dependencies": [

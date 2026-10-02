@@ -15,5 +15,9 @@ function MappedInputRow(props) @{
 }
 
 export function MappedInputRows(props) @{
-	<ul class="mapped-rows">{props.rows.map((row) => <MappedInputRow key={row.id} row={row} />)}</ul>
+	<ul class="mapped-rows">
+		{props.rows.map((row) => (
+			<MappedInputRow key={row.id} row={row} />
+		))}
+	</ul>
 }

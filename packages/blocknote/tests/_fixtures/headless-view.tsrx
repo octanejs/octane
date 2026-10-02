@@ -14,9 +14,7 @@ type ActivityEditorProps = {
 
 function CreatedEditor(props: ActivityEditorProps) @{
 	const editor = useCreateBlockNote({
-		initialContent: [
-			{ type: 'paragraph', content: 'Retained content' },
-		],
+		initialContent: [{ type: 'paragraph', content: 'Retained content' }],
 	});
 	props.capture(editor);
 	<BlockNoteViewRaw editor={editor} />
