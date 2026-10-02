@@ -288,6 +288,67 @@ describe.each([true, false])('hydrating a server-rendered @catch arm (dev=%s)', 
 		root.unmount();
 	});
 
+	it.each(
+		['RootSiblingStatic', 'RootSiblingComponent', 'HostSibling'].flatMap((name) => [
+			[name, true, false],
+			[name, false, true],
+		]),
+	)(
+		'%s keeps its sibling when the slot rebuilds (server threw: %s)',
+		async (name, server_, client_) => {
+			container.innerHTML = ServerRT.renderToString(server[name], {
+				state: { failed: server_ },
+			}).html;
+			const after = container.querySelector('.after')!;
+
+			const { root, recoverable } = await hydrate(name, { state: { failed: client_ } });
+			expect(container.querySelector('.after')).toBe(after);
+			expect(container.querySelectorAll('.after')).toHaveLength(1);
+			expect(container.querySelectorAll('button')).toHaveLength(client_ ? 1 : 0);
+			expect(container.querySelectorAll('p:not(.after)')).toHaveLength(client_ ? 0 : 1);
+			expectQuiet(recoverable);
+			root.unmount();
+		},
+	);
+
+	it('keeps a streamed catch arm through a discarded hydration attempt', async () => {
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const streamed = collectReadableStream(server.StreamedDiscarded, {
+			make: () => promise,
+			wait: null,
+		});
+		await Promise.resolve();
+		resolve('bad');
+		container.innerHTML = (await streamed).html;
+		activateStreamedMarkup(container);
+		const button = container.querySelector('button')!;
+		expect(button.textContent).toBe('bad value');
+
+		let release!: (value: string) => void;
+		const wait = new Promise<string>((done) => {
+			release = done;
+		});
+		const { root, recoverable, caught } = await hydrate('StreamedDiscarded', {
+			make: pending,
+			wait,
+		});
+		expect(container.querySelector('button')).toBe(button);
+
+		await act(async () => release('go'));
+		await act(async () => {
+			await new Promise((done) => setTimeout(done, 350));
+		});
+		expect(container.querySelector('button')).toBe(button);
+		expect(container.querySelector('i')).toBeNull();
+		expect(container.querySelector('.tail')!.textContent).toBe('tail');
+		expect(caught.every((message) => message === 'bad value')).toBe(true);
+		expectQuiet(recoverable);
+		root.unmount();
+	});
+
 	it('shows its fallback when the client body waits where the server threw', async () => {
 		container.innerHTML = ServerRT.renderToString(server.WaitingPending, {
 			state: { failed: true },

@@ -18782,6 +18782,8 @@ class HydrationCapability {
 			this.seeds = own;
 		}
 		const previousReplay = this.replayDepth;
+		// A streamed arm's native values are the catch arm's, as is its DOM.
+		const previousNative = setNativeAdoptionResolver(null);
 		this.replayDepth = ++this.depth;
 		try {
 			// The server only marks an arm it caught, so this boundary catches.
@@ -18789,6 +18791,7 @@ class HydrationCapability {
 		} finally {
 			this.replayDepth = previousReplay;
 			this.depth--;
+			setNativeAdoptionResolver(previousNative);
 			this.seeds = seeds;
 			if (seeds !== null) this.seedCursor = Math.min(tryEnd, seeds.length);
 		}
@@ -18807,7 +18810,17 @@ class HydrationCapability {
 		const settle = (discarded: boolean): void => {
 			if ((STAGED_DOM?.view(marker) ?? marker).parentNode === null) return;
 			if (discarded) {
-				removeRange(getNextSibling(start), marker);
+				// A streamed arm's seed comment precedes the marker, and the retry
+				// reads its seeds through it.
+				let first = getNextSibling(start);
+				if (
+					first?.nodeType === 8 &&
+					(STAGED_DOM?.view(first as Comment) ?? (first as Comment)).data.startsWith(
+						STREAM_SEED_COMMENT,
+					)
+				)
+					first = getNextSibling(first);
+				removeRange(first, marker);
 				removeRange(getNextSibling(caught.end), end);
 			} else removeRange(marker, adopted ? caught.start : getNextSibling(caught.end));
 		};
@@ -18822,11 +18835,12 @@ class HydrationCapability {
 
 	/**
 	 * The client rebuilt this slot's arm, adopting nothing inside it. Park the
-	 * cursor on its end, which also bounds the server's content in a root-level slot.
+	 * cursor on its end. A root-level slot parks past its end, where the root's
+	 * next sibling starts, or the stale remainder that finishRoot sweeps. Claiming
+	 * that node as the remainder would sweep a sibling the root still adopts.
 	 */
 	rebuiltSlot(owner: Block, end: Node): void {
-		this.node = end;
-		if (owner === this.rootBlock) this.claimRootRemainder(getNextSibling(end));
+		this.node = owner === this.rootBlock ? getNextSibling(end) : end;
 	}
 
 	isOpen(node: Node | null): node is Comment {
@@ -37418,6 +37432,8 @@ export function errorBlock(
 		if (isHostContextRequest(error) || isSuspenseException(error) || isAdoptionControl(error))
 			throw error;
 		if (caught !== null) {
+			// Unmounting the replay can report a cleanup error that disposes the parent.
+			if (state.parentBlock.disposed) return state.reset;
 			hydration!.settleServerCatch(caught, state, true);
 			switchErrorToCatch(state, error, true, caught.start, caught.end);
 		} else {

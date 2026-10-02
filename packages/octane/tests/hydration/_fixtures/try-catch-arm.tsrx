@@ -434,3 +434,88 @@ export function StreamedInnerCatch(props: StreamedInnerCatchProps) @{
 		}
 	</main>
 }
+
+function After() @{
+	<p class="after">after</p>
+}
+
+// A rebuilt boundary with a root-level sibling after it.
+export function RootSiblingStatic(props: StateProps) @{
+	<>
+		@try {
+			<Result state={props.state} />
+		} @catch (error) {
+			<button>{(error as Error).message as string}</button>
+		}
+		<p class="after">after</p>
+	</>
+}
+
+export function RootSiblingComponent(props: StateProps) @{
+	<>
+		@try {
+			<Result state={props.state} />
+		} @catch (error) {
+			<button>{(error as Error).message as string}</button>
+		}
+		<After />
+	</>
+}
+
+export function HostSibling(props: StateProps) @{
+	<main>
+		@try {
+			<Result state={props.state} />
+		} @catch (error) {
+			<button>{(error as Error).message as string}</button>
+		}
+		<After />
+	</main>
+}
+
+interface MaybeWaitProps {
+	promise: Promise<string> | null;
+}
+
+// Reads only where the client passes a promise, so only the client waits.
+function MaybeWait(props: MaybeWaitProps) @{
+	if (props.promise !== null) use(props.promise);
+	<p class="tail">tail</p>
+}
+
+interface MakeProps {
+	make: () => Promise<string>;
+}
+
+// Reads a promise made by each render, so a retry cannot reuse a seeded one.
+function CheckedFresh(props: MakeProps) @{
+	const value = use(props.make());
+	if (value === 'bad') throw new Error('bad value');
+	<p>{value as string}</p>
+}
+
+interface DiscardedProps {
+	make: () => Promise<string>;
+	wait: Promise<string> | null;
+}
+
+// The streamed inner boundary's catch arm hydrates, then a later sibling
+// suspends the outer boundary's first hydration attempt, which is retried.
+export function StreamedDiscarded(props: DiscardedProps) @{
+	<main>
+		@try {
+			<section>
+				@try {
+					<CheckedFresh make={props.make} />
+				} @pending {
+					<i>inner</i>
+				} @catch (error) {
+					<button>{(error as Error).message as string}</button>
+				}
+				<MaybeWait promise={props.wait} />
+			</section>
+		} @pending {
+			<i>outer</i>
+		}
+	</main>
+}
