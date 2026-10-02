@@ -10796,7 +10796,7 @@ export function renderBlock(block: Block): void {
 	if (
 		hydration !== null &&
 		(!hydration.owns(block) ||
-			(block.kind === 'dynamic' && block.endMarker !== null && hydration.isFresh(block.endMarker)))
+			(block.kind === 'dynamic' && block.endMarker !== null && hydration.rebuilds(block.endMarker)))
 	) {
 		hydration.suspend(() => renderBlock(block));
 		return;
@@ -11924,7 +11924,7 @@ function renderLiteInPlace<P>(
 			root,
 		)
 	)
-		hydration.parkPast(root, parentScope);
+		hydration.parkInPlace(parentScope);
 }
 
 // Keep the fresh-subtree callback's extra captures out of ordinary lite dispatch.
@@ -14521,13 +14521,52 @@ function childrenAsBody(children: unknown): ComponentBody {
 	};
 }
 
+// A JSX boundary's children are its try body's only input. Like a compiled
+// `@try`, keep one body identity and carry that input in the env tuple: a
+// boundary that re-renders itself with unchanged children then retries its
+// retained attempt and signal owners, instead of restarting it as new inputs.
+const descriptorChildrenTryBody: ComponentBody = (_props, scope, env) => {
+	childSlot(scope, 0, scope.block.parentNode, (env as [unknown])[0], scope.block.endMarker);
+};
+
 // Descriptor children remain inspectable values, but a scoped JSX descriptor
 // resolves them only after its represented boundary enters its try body. Reading
 // the accessor while constructing that body would move throws and suspension
 // outside the boundary, recreating the eager-JSX ownership bug.
-function scopedChildrenAsBody(props: { children: unknown }): ComponentBody {
-	if (!SCOPED_ELEMENT_PROPS.has(props)) return childrenAsBody(props.children);
-	return (_props, scope, extra) => childrenAsBody(props.children)(undefined, scope, extra);
+const scopedChildrenTryBody: ComponentBody = (_props, scope, env) => {
+	childrenAsBody((env as [{ children: unknown }])[0].children)(undefined, scope, undefined);
+};
+
+function childrenTryBlock(
+	scope: Scope,
+	props: { children: unknown },
+	catchBody: ComponentBody | null,
+	pendingBody: ComponentBody | null,
+	propagateSuspense?: boolean,
+): () => void {
+	const block = scope.block;
+	let body: ComponentBody;
+	let env: unknown[] | undefined;
+	if (SCOPED_ELEMENT_PROPS.has(props)) {
+		body = scopedChildrenTryBody;
+		env = [props];
+	} else if (typeof props.children === 'function') {
+		body = props.children as ComponentBody;
+	} else {
+		body = descriptorChildrenTryBody;
+		env = [props.children];
+	}
+	return tryBlock(
+		scope,
+		0,
+		block.parentNode,
+		body,
+		catchBody,
+		pendingBody,
+		block.endMarker,
+		env,
+		propagateSuspense,
+	);
 }
 
 /**
@@ -16224,19 +16263,10 @@ export const __HydrateCompiled: ComponentBody<HydrateProps> =
 export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> =
 	/* @__PURE__ */ markComponentFlags<ComponentBody<{ fallback?: unknown; children: unknown }>>(
 		function Suspense(props, scope) {
-			const block = scope.block;
 			const pendingBody: ComponentBody = (_p, s) => {
 				childSlot(s, 1, s.block.parentNode, props.fallback, s.block.endMarker);
 			};
-			tryBlock(
-				scope,
-				0,
-				block.parentNode,
-				scopedChildrenAsBody(props),
-				null,
-				pendingBody,
-				block.endMarker,
-			);
+			childrenTryBlock(scope, props, null, pendingBody);
 		},
 		COMPONENT_FLAG_BOUNDARY,
 		'Suspense',
@@ -16309,7 +16339,6 @@ export const ErrorBoundary: ComponentBody<{
 	}>
 >(
 	function ErrorBoundary(props, scope) {
-		const block = scope.block;
 		const catchBody: ComponentBody<{ err: unknown; reset: () => void }> = (catchProps, s) => {
 			const fb =
 				typeof props.fallback === 'function'
@@ -16320,17 +16349,7 @@ export const ErrorBoundary: ComponentBody<{
 					: props.fallback;
 			childSlot(s, 1, s.block.parentNode, fb, s.block.endMarker);
 		};
-		const reset = tryBlock(
-			scope,
-			0,
-			block.parentNode,
-			scopedChildrenAsBody(props),
-			catchBody,
-			null,
-			block.endMarker,
-			undefined,
-			true,
-		);
+		const reset = childrenTryBlock(scope, props, catchBody, null, true);
 		const previousResetRef = scope.slots[1] as { current: (() => void) | null } | undefined;
 		if (previousResetRef !== props.resetRef) {
 			if (previousResetRef?.current === reset) previousResetRef.current = null;
@@ -18887,6 +18906,11 @@ class HydrationCapability {
 	 * slot claims it or the enclosing range ends (sweepRebuiltTail).
 	 */
 	rebuiltTail: Node | null = null;
+	/**
+	 * The start comment of each markerless branch that holdMarkerlessBranch
+	 * holds, to where its content reached when it threw.
+	 */
+	private heldBranches: WeakMap<Node, Node | null> | null = null;
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Unframed claims whose render suspended, by the block that claimed (renderUnframed). */
 	private unframedClaims: WeakMap<Block, UnframedClaim> | null = null;
@@ -18894,6 +18918,15 @@ class HydrationCapability {
 	private rebuiltFragments: WeakMap<Node, RebuiltFragment> | null = null;
 	/** The server node renderInPlace's body may adopt, until a template does. */
 	private inPlace: Node | null = null;
+	/** Whether a template that does not match inPlace leaves it to renderUnframed. */
+	private inPlaceUnframed = false;
+	/** Where the server nodes a template adopted at inPlace end; undefined until one does. */
+	private inPlaceEnd: Node | null | undefined = undefined;
+	/**
+	 * Whether the root's remainder or inPlace may still be claimed by a clone.
+	 * Both claims are rare, so adopt()'s common path tests only this flag.
+	 */
+	private pendingClaims = true;
 	/**
 	 * What a hydrating update built on the client where its slot had already
 	 * rendered: blocks (renderUpdate), and child slots whose list it built.
@@ -19146,17 +19179,24 @@ class HydrationCapability {
 	 * them). The server emits that range only when the render completes; when
 	 * it throws, the boundary that catches it renders its catch arm in that
 	 * place. So the server nodes from `claim.stale` stay until the body has
-	 * run, and the body, which adopts nothing, still consumes its positional
-	 * seeds as the server's render did. A seeded rejection then reaches its
-	 * boundary with the server's catch arm intact, and only the fresh markers
-	 * are removed. A suspension leaves the server nodes too, and `owner`, the
-	 * claiming block, keeps the claim until a later attempt renders it through
-	 * here again (unframedClaim). Once a render completes, it reports the
-	 * mismatch and discards the server nodes that stood in the range's place,
-	 * but not a later sibling's range, unless `stale` is client-built: the
-	 * rebuild that built it already reported and discarded the server's. A
-	 * discard that reaches the end of the enclosing server range reports once
-	 * for that range (firstAtRangeEnd).
+	 * run, and the body still consumes its positional seeds as the server's
+	 * render did. A seeded rejection then reaches its boundary with the
+	 * server's catch arm intact, and only the fresh markers are removed. A
+	 * suspension leaves the server nodes too, and `owner`, the claiming block,
+	 * keeps the claim until a later attempt renders it through here again
+	 * (unframedClaim).
+	 *
+	 * The server also renders an anchored call's content without a range where
+	 * it rendered that content inline, as another `@if` arm does. So when the
+	 * markers stand before a server element or text at `stale`, the body
+	 * renders in its place, and a template that matches adopts it, with the
+	 * server nodes after it that the template's other roots match, between the
+	 * markers. Otherwise the body adopts nothing, and once a render completes,
+	 * it reports the mismatch and discards the server nodes that stood in the
+	 * range's place, but not a later sibling's range, unless `stale` is
+	 * client-built: the rebuild that built it already reported and discarded
+	 * the server's. A discard that reaches the end of the enclosing server
+	 * range reports once for that range (firstAtRangeEnd).
 	 */
 	renderUnframed<T>(
 		render: (target: T) => void,
@@ -19164,32 +19204,48 @@ class HydrationCapability {
 		owner: Block,
 		claim: UnframedClaim,
 	): void {
+		const { end, stale, anchor } = claim;
+		// The server frames an appended call (anchor null) wherever it renders it,
+		// and a clone at a root-level node claims the root's remainder instead.
+		const inPlace =
+			anchor !== null &&
+			stale !== null &&
+			(stale.nodeType === 1 || stale.nodeType === 3) &&
+			getNextSibling(end) === stale &&
+			this.rootRemainder !== undefined;
 		const previousReplay = this.replayDepth;
-		const previousNative = setNativeAdoptionResolver(null);
-		this.replayDepth = ++this.depth;
+		const previousNative = inPlace ? null : setNativeAdoptionResolver(null);
+		if (inPlace) this.node = stale;
+		else this.replayDepth = ++this.depth;
 		let rejected = false;
 		let suspended = false;
+		let adopted = false;
 		try {
-			render(target);
+			if (inPlace) adopted = this.renderInPlace(render, target, stale, true);
+			else render(target);
 		} catch (error) {
 			rejected = this.isRejection(error);
 			suspended = isSuspenseException(error);
 			throw error;
 		} finally {
-			this.depth--;
-			this.replayDepth = previousReplay;
-			setNativeAdoptionResolver(previousNative);
-			const stale = claim.stale;
+			if (!inPlace) {
+				this.depth--;
+				this.replayDepth = previousReplay;
+				setNativeAdoptionResolver(previousNative);
+			}
 			if (suspended) {
 				(this.unframedClaims ??= new WeakMap()).set(owner, claim);
 				this.node = stale;
 			} else {
 				this.unframedClaims?.delete(owner);
-				if (rejected) {
-					removeRange(claim.start, getNextSibling(claim.end));
+				if (adopted) {
+					// Frame the adopted nodes, as the server's range would have.
+					domNode(domNode(end).parentNode!).insertBefore(end, this.node);
+				} else if (rejected) {
+					removeRange(claim.start, getNextSibling(end));
 					this.node = stale;
 				} else if (stale === null || !this.isFresh(stale)) {
-					const node = stale === null ? null : this.discardInPlace(stale, claim.anchor);
+					const node = stale === null ? null : this.discardInPlace(stale, anchor);
 					// The discard stops at `anchor`, at a later sibling's range or
 					// boundary, or at the end of the enclosing server range, which may
 					// be `anchor` itself.
@@ -19378,24 +19434,49 @@ class HydrationCapability {
 	/**
 	 * First render, by `render(target)`, of a component call that found `root`
 	 * at the cursor instead of a server range of its own. Its template adopts
-	 * `root` in place when they match. clone() leaves the cursor on a root it
-	 * adopts, and the root's own holes move it into the root's children, but
-	 * the next sibling's server content starts after the root, so step past it.
-	 * A body that rebuilt `root` or rendered nothing there leaves the cursor
-	 * where it put it. Returns whether the body adopted `root`.
+	 * `root` in place when they match, and a template with several roots also
+	 * adopts the server nodes after `root` that its other roots match. clone()
+	 * leaves the cursor on the first root it adopts, and the roots' own holes
+	 * move it into their content, but the next sibling's server content starts
+	 * after the last root, so step past it. A body that rebuilt `root` or
+	 * rendered nothing there leaves the cursor where it put it. When `unframed`,
+	 * a template that does not match leaves `root` and the nodes after it to
+	 * renderUnframed. Returns whether the body adopted `root`.
 	 */
-	renderInPlace<T>(render: (target: T) => void, target: T, root: Node): boolean {
+	renderInPlace<T>(render: (target: T) => void, target: T, root: Node, unframed = false): boolean {
 		const outer = this.inPlace;
+		const outerUnframed = this.inPlaceUnframed;
+		const outerEnd = this.inPlaceEnd;
 		this.inPlace = root;
-		let adopted = false;
+		this.inPlaceUnframed = unframed;
+		this.inPlaceEnd = undefined;
+		this.pendingClaims = true;
+		let end: Node | null | undefined;
 		try {
 			render(target);
-			adopted = this.inPlace === null;
+			end = this.inPlaceEnd;
 		} finally {
 			this.inPlace = outer;
+			this.inPlaceUnframed = outerUnframed;
+			this.inPlaceEnd = outerEnd;
+			this.pendingClaims = outer !== null || this.rootRemainder === undefined;
 		}
-		if (adopted) this.node = getNextSibling(root);
-		return adopted;
+		if (end === undefined) return false;
+		this.node = end;
+		return true;
+	}
+
+	/**
+	 * Whether the dynamic range that `end` closes was built on the client, so
+	 * its body builds rather than adopts. The fresh range renderUnframed placed
+	 * before the server node it renders in place of was not: its body may
+	 * adopt that node.
+	 */
+	rebuilds(end: Node): boolean {
+		return (
+			this.freshNodes.has(end) &&
+			!(this.inPlaceUnframed && this.inPlace !== null && getNextSibling(end) === this.inPlace)
+		);
 	}
 
 	/** Read the `<!--oct-catch:T:C-->` comment ahead of a caught arm's range. */
@@ -19827,6 +19908,19 @@ class HydrationCapability {
 	}
 
 	/**
+	 * A lite slot of `parent` adopted server nodes in place (renderInPlace),
+	 * which left the cursor on the next sibling's server content: one root's
+	 * sibling, or the node after a fragment's last root. Record it as parkPast
+	 * does.
+	 */
+	parkInPlace(parent: Scope): void {
+		if (parent === this.arm) {
+			this.armTail = this.node;
+			this.armSlots = parent.slots.length;
+		}
+	}
+
+	/**
 	 * First render of an @if or @switch arm into the server range it adopted,
 	 * `block`'s own. Returns the node from which whatever the server rendered
 	 * belongs to no client node (discardArmTail), with the cursor parked on it:
@@ -20208,7 +20302,9 @@ class HydrationCapability {
 
 	/** Record the first node outside a root-owned range exactly once. */
 	claimRootRemainder(node: Node | null): void {
-		if (this.rootRemainder === undefined) this.rootRemainder = node;
+		if (this.rootRemainder !== undefined) return;
+		this.rootRemainder = node;
+		this.pendingClaims = this.inPlace !== null;
 	}
 
 	private freshClone<T extends Node>(template: T): T {
@@ -20221,12 +20317,14 @@ class HydrationCapability {
 		template: Node,
 		cursor: Node | null,
 		partialStyles?: string,
+		// A fragment within an enclosing server range ends by that range's close.
+		bounded?: boolean,
 	): Node | null | undefined {
 		let expected = getFirstChild(template);
 		let actual = cursor;
 		let childIndex = 0;
 		while (expected !== null) {
-			if (actual === null) return undefined;
+			if (actual === null || (bounded === true && isBlockClose(actual))) return undefined;
 			// A template comment is a dynamic logical hole. Its server form may be
 			// text or a marker range, so only static text/element roots compare shape.
 			if (
@@ -20320,11 +20418,13 @@ class HydrationCapability {
 		if (this.arm !== null && CURRENT_SCOPE?.block === this.arm) this.arm = null;
 		const isFragment =
 			template !== null ? (template as any).__oct_frag === true : isLazyFragment(lazy!);
+		const pendingClaims = this.pendingClaims;
 		// Lite/no-template wrappers can render the logical root while sharing the
 		// public root Block, and return-based wrappers render it in a child Block.
 		// Identify the first top-level cursor by DOM ownership, then claim its
 		// remainder ONCE so later lite descendant clones cannot overwrite it.
 		const claimsRoot =
+			pendingClaims &&
 			this.rootRemainder === undefined &&
 			(cursor !== null
 				? (STAGED_DOM?.view(cursor) ?? cursor).parentNode === this.rootBlock.parentNode
@@ -20390,6 +20490,12 @@ class HydrationCapability {
 				? !hydrationNodeMatches(cursor, template, partialStyles)
 				: !lazyRootMatches(cursor, lazy!))
 		) {
+			// renderUnframed reports and discards the server nodes there once the
+			// body has run: a body that throws leaves them to its boundary.
+			if (pendingClaims && cursor === this.inPlace && this.inPlaceUnframed) {
+				this.inPlace = null;
+				return this.freshClone(template ?? resolveLazyTemplate(lazy!));
+			}
 			if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 			const parent = domNode(cursor).parentNode!;
 			this.save(parent);
@@ -20442,6 +20548,21 @@ class HydrationCapability {
 			return (this.rebuiltRoot = this.freshClone(template));
 		}
 		if (isFragment) {
+			// In place of a server node, nothing frames the fragment's server nodes:
+			// compare every root to find where they end. One that does not match is
+			// rebuilt, now for a lite call, or once the body has run in
+			// renderUnframed, which leaves the server nodes to a body that throws.
+			if (pendingClaims && cursor === this.inPlace) {
+				const fragment = template ?? resolveLazyTemplate(lazy!);
+				const remainder = this.fragmentRemainder(fragment, cursor, partialStyles, true);
+				this.inPlace = null;
+				if (remainder === undefined)
+					return this.inPlaceUnframed
+						? this.freshClone(fragment)
+						: this.rebuildFragment(fragment, cursor, loc);
+				this.inPlaceEnd = remainder;
+				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
+			}
 			// A nested fragment has no server wrapper, so its first logical root must
 			// be the cursor itself, or follow the server forms of its leading holes.
 			// A root claim already compared every root above.
@@ -20460,7 +20581,10 @@ class HydrationCapability {
 			this.claimRootRemainder(
 				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 			);
-		if (cursor === this.inPlace) this.inPlace = null;
+		if (pendingClaims && cursor === this.inPlace) {
+			this.inPlace = null;
+			this.inPlaceEnd = getNextSibling(cursor);
+		}
 		if (cursor === this.claimFrom) this.claimRoots(cursor, null);
 		return cursor;
 	}
@@ -20674,19 +20798,113 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Where the content of a markerless branch that rendered at `cursor` ends:
-	 * at the node its render left the cursor on in `parent`. clone() parks the
-	 * cursor on a root it adopted, so a render that left it on `cursor` adopted
-	 * that node in place. The holes of a root adopted in place can also leave
-	 * the cursor inside that root, or past its last child: the content then
-	 * ends after `cursor`, while it is still in `parent`, and otherwise at
-	 * `after`.
+	 * Where the content of a markerless branch that took the cursor's place
+	 * after `before` in `parent` ends, from where its render left the cursor.
+	 * The content is whole nodes and server ranges, from the first one up to at
+	 * most `after`. clone() parks the cursor on a root it adopted, so a cursor
+	 * on the first node, or inside any node or range, ends the content after
+	 * it, and a cursor on a later node ends the content there. A cursor that
+	 * says nothing about this content (before it, past `after`, or off the end
+	 * of a nested parent, as the holes of a root adopted in place can leave it)
+	 * leaves only the first node or range in it: claiming more would take
+	 * server nodes that a later sibling adopts.
 	 */
-	markerlessEnd(cursor: Node, parent: Node, after: Node | null): Node | null {
-		const node = this.node;
-		if (node !== null && domNode(node).parentNode === parent)
-			return node === cursor ? getNextSibling(cursor) : node;
-		return domNode(cursor).parentNode === parent ? getNextSibling(cursor) : after;
+	markerlessEnd(before: Node | null, parent: Node, after: Node | null): Node | null {
+		let node = this.node;
+		let inside = false;
+		while (node !== null && domNode(node).parentNode !== parent) {
+			node = domNode(node).parentNode;
+			inside = true;
+		}
+		const first = before === null ? getFirstChild(parent) : getNextSibling(before);
+		let unit = first;
+		let end = first;
+		while (unit !== null && unit !== after && !this.isClose(unit)) {
+			const last: Node = this.isOpen(unit) ? this.close(unit) : unit;
+			const next = getNextSibling(last);
+			if (node === unit) return inside || unit === first ? next : unit;
+			for (let child: Node = unit; child !== last && node !== null;) {
+				child = getNextSibling(child)!;
+				if (child === node) return next;
+			}
+			if (unit === first) end = next;
+			unit = next;
+		}
+		return node === unit && !inside ? unit : end;
+	}
+
+	/**
+	 * A markerless branch that took the cursor's place after `before` in
+	 * `parent` threw while its content was server nodes that it adopted or has
+	 * yet to adopt, so it has no boundary yet. Mark where it starts with a
+	 * comment of the branch's own, which no adoption claims or discards the way
+	 * it can a server node, and remember where the content reached. A retry of
+	 * the same arm finalizes from that comment, and another arm replaces the
+	 * content after it (heldBranchEnd). An attempt that is discarded instead
+	 * leaves the server DOM as it was.
+	 */
+	holdMarkerlessBranch(
+		state: BranchSlot,
+		parent: Node,
+		marker: string,
+		before: Node | null,
+		after: Node | null,
+		error: unknown,
+	): void {
+		if (PRESENTATION_HYDRATION?.revision !== undefined || isAdoptionControl(error)) return;
+		this.save(parent);
+		const start = domNode(document).createComment(marker);
+		domNode(parent).insertBefore(
+			start,
+			before === null ? getFirstChild(parent) : getNextSibling(before),
+		);
+		(this.heldBranches ??= new WeakMap()).set(start, this.markerlessEnd(start, parent, after));
+		state.markerlessBefore = start;
+	}
+
+	/**
+	 * Where the content of a held branch that starts after `start` ends, or
+	 * undefined when `start` holds no branch. That is the later of where the
+	 * content reached when the arm threw and where the arm's last render left
+	 * the cursor. A render adopts as it advances the cursor, but it can begin
+	 * from a cursor that an earlier sibling parked on `start`, and slots that
+	 * the first attempt never reached adopt only in a retry. A bound that a
+	 * retry's mismatch recovery discarded no longer counts.
+	 */
+	heldBranchEnd(start: Node | null, parent: Node, after: Node | null): Node | null | undefined {
+		const reached = start === null ? undefined : this.heldBranches?.get(start);
+		if (reached === undefined) return undefined;
+		const end = this.markerlessEnd(start, parent, after);
+		if (reached !== null && domNode(reached).parentNode !== parent) return end;
+		for (let node = getNextSibling(start!); node !== null && node !== end;) {
+			if (node === reached) return end;
+			node = getNextSibling(node);
+		}
+		return reached;
+	}
+
+	/** Remove a held branch's start comment once its arm is finalized after it. */
+	dropHeldStart(start: Node, parent: Node): void {
+		this.save(parent);
+		domNode(start as ChildNode).remove();
+	}
+
+	/**
+	 * A held branch's content after `start` was removed. Close `start` before
+	 * `end`, where a later sibling's server nodes begin, so the slot owns a pair
+	 * that its next arm is built in as client DOM and that no adoption discards.
+	 */
+	releaseHeldBranch(
+		state: BranchSlot,
+		parent: Node,
+		start: Comment,
+		marker: string,
+		end: Node | null,
+	): void {
+		const close = domNode(document).createComment('/' + marker);
+		domNode(parent).insertBefore(close, end);
+		state.start = start;
+		state.end = close;
 	}
 
 	/** Discard a mismatched server node (or the marker range it opens) and step past it. */
@@ -42518,8 +42736,11 @@ function renderBranchSlot(
 			// positioning would mount a superseding arm after the following static
 			// sibling and leave partially-inserted DOM behind. Tear down the aborted
 			// scope without range removal, then sweep exactly its provisional range.
+			// A held hydrating arm's range ends where its own content does: later
+			// siblings' server nodes lie between that and the insertion anchor.
 			const pending = state.block;
-			provisionalAfter = pending.endMarker;
+			const heldEnd = hydration?.heldBranchEnd(markerlessBefore, domParent, pending.endMarker);
+			provisionalAfter = heldEnd === undefined ? pending.endMarker : heldEnd;
 			let node = markerlessBefore ? getNextSibling(markerlessBefore) : getFirstChild(domParent);
 			state.block = null;
 			state.markerlessBefore = undefined;
@@ -42530,6 +42751,16 @@ function renderBranchSlot(
 				if ((STAGED_DOM?.view(node) ?? node).parentNode === domParent)
 					(STAGED_DOM?.view(domParent) ?? domParent).removeChild(node);
 				node = nextNode;
+			}
+			if (heldEnd !== undefined) {
+				hydration!.releaseHeldBranch(
+					state,
+					domParent,
+					markerlessBefore as Comment,
+					marker,
+					heldEnd,
+				);
+				provisionalAfter = null;
 			}
 		}
 		// A markerless branch may share its host boundary with a nested sole-root
@@ -42935,8 +43166,8 @@ function renderBranchSlot(
 				// a same-branch retry finalizes it. One that already inserted its
 				// root owns that DOM now: finalize it so teardown can remove it (a
 				// discarded keyed item otherwise strands the partial row). Hydrating,
-				// that is a root rebuilt in the cursor's place; a node adopted there
-				// is left as it was for the next attempt to adopt again.
+				// that is a root rebuilt in the cursor's place; a branch whose
+				// content is still server nodes is held (holdMarkerlessBranch).
 				const rebuilt = cursor === null ? null : hydration!.freshAfter(contentBefore, domParent);
 				if (
 					cursor === null
@@ -42950,7 +43181,7 @@ function renderBranchSlot(
 						marker,
 						contentBefore,
 						after,
-						cursor === null ? after : hydration!.markerlessEnd(cursor, domParent, after),
+						cursor === null ? after : hydration!.markerlessEnd(contentBefore, domParent, after),
 					);
 				else if (cursor !== null && hydration!.replaces(cursor)) {
 					// The branch rebuilt its root over the node at the cursor, which
@@ -42968,9 +43199,10 @@ function renderBranchSlot(
 						marker,
 						cursor,
 						after,
-						hydration!.markerlessEnd(cursor, domParent, after),
+						hydration!.markerlessEnd(contentBefore, domParent, after),
 					);
-				}
+				} else if (cursor !== null)
+					hydration!.holdMarkerlessBranch(state, domParent, marker, contentBefore, after, error);
 				throw error;
 			}
 			finalizeMarkerlessBranch(
@@ -42980,7 +43212,7 @@ function renderBranchSlot(
 				marker,
 				contentBefore,
 				after,
-				cursor === null ? after : hydration!.markerlessEnd(cursor, domParent, after),
+				cursor === null ? after : hydration!.markerlessEnd(contentBefore, domParent, after),
 			);
 			replaceSharedBlockBoundary(
 				parentBlock,
@@ -43017,14 +43249,18 @@ function renderBranchSlot(
 		renderBlock(state.block);
 		const markerlessBefore = state.markerlessBefore;
 		if (markerlessBefore !== undefined) {
+			const after = state.block.endMarker;
+			const end = hydration?.heldBranchEnd(markerlessBefore, domParent, after);
 			finalizeMarkerlessBranch(
 				state,
 				domParent,
 				state.block,
 				marker,
 				markerlessBefore,
-				state.block.endMarker,
+				after,
+				end === undefined ? after : end,
 			);
+			if (end !== undefined) hydration!.dropHeldStart(markerlessBefore!, domParent);
 		}
 	}
 	// Hydration consumed the whole outer control-flow slot, not only the active
