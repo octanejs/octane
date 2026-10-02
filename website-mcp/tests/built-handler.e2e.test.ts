@@ -11,6 +11,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build } from 'vite';
 
@@ -66,6 +67,30 @@ function stageProject(): string {
 			fs.copyFileSync(source, target);
 		}
 	}
+
+	// The server bundle inlines @tsrx/oxc, which resolves its native parser
+	// package from the bundle's own location, as a flat app install provides.
+	const requireFromOctane = createRequire(
+		fs.realpathSync(path.join(sourceModules, 'octane/package.json')),
+	);
+	const requireFromOxc = createRequire(requireFromOctane.resolve('@tsrx/oxc/package.json'));
+	const nativeName = Object.keys(
+		requireFromOxc('@tsrx/oxc/package.json').optionalDependencies,
+	).find((name) => {
+		try {
+			requireFromOxc.resolve(`${name}/package.json`);
+			return true;
+		} catch {
+			return false;
+		}
+	});
+	if (!nativeName) throw new Error('No installed @tsrx/oxc native parser package');
+	fs.mkdirSync(path.join(stagedModules, '@tsrx'), { recursive: true });
+	fs.symlinkSync(
+		path.dirname(requireFromOxc.resolve(`${nativeName}/package.json`)),
+		path.join(stagedModules, nativeName),
+		linkType,
+	);
 
 	for (const file of projectFiles) {
 		fs.copyFileSync(path.join(sourceRoot, file), path.join(root, file));

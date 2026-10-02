@@ -1194,7 +1194,7 @@ jobs:
           bun run tsc --noEmit -p packages/three/typetests/tsconfig.json
           OCTANE_THREE_COMPAT_VERSION="$TYPED_THREE_VERSION" bun run --cwd packages/three test:compat
 
-          bun add --cwd packages/three --dev --no-save "three@$THREE_VERSION"
+          bun add --cwd packages/three --dev --no-save "three@$THREE_VERSION" "@types/three@$TYPES_VERSION" # each --no-save add reinstalls from bun.lock, dropping earlier unsaved adds
           RESOLVED_THREE_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/three/package.json').version)")"
           RESOLVED_TYPES_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/@types/three/package.json').version)")"
           echo "latest runtime: three=$RESOLVED_THREE_VERSION @types/three=$RESOLVED_TYPES_VERSION"

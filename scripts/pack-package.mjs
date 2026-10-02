@@ -1,11 +1,26 @@
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	copyFileSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..');
-const LIFECYCLE_SCRIPTS = ['prepublishOnly', 'prepack', 'prepare', 'postpack', 'publish', 'postpublish'];
+const LIFECYCLE_SCRIPTS = [
+	'prepublishOnly',
+	'prepack',
+	'prepare',
+	'postpack',
+	'publish',
+	'postpublish',
+];
 const PUBLISH_CONFIG_FIELDS = new Set([
 	'bin',
 	'engines',
@@ -69,7 +84,8 @@ export function packPackage(directory, destination, { root = REPO_ROOT } = {}) {
 			stdio: ['ignore', 'pipe', 'pipe'],
 		});
 		const [archiveName, ...extra] = readdirSync(packed).filter((file) => file.endsWith('.tgz'));
-		if (!archiveName || extra.length) throw new Error(`bun pm pack did not produce one tarball in ${directory}`);
+		if (!archiveName || extra.length)
+			throw new Error(`bun pm pack did not produce one tarball in ${directory}`);
 		const unpacked = path.join(staging, 'unpacked');
 		mkdirSync(unpacked);
 		tar(['-xzf', path.join(packed, archiveName)], unpacked);
@@ -77,9 +93,13 @@ export function packPackage(directory, destination, { root = REPO_ROOT } = {}) {
 		const manifestPath = path.join(packageDirectory, 'package.json');
 		const manifest = createPublishManifest(JSON.parse(readFileSync(manifestPath, 'utf8')));
 		writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-		if (path.resolve(directory) !== path.resolve(root) && !readdirSync(packageDirectory, { recursive: true }).some((file) => LICENSE_FILE.test(file))) {
+		if (
+			path.resolve(directory) !== path.resolve(root) &&
+			!readdirSync(packageDirectory, { recursive: true }).some((file) => LICENSE_FILE.test(file))
+		) {
 			for (const file of readdirSync(root)) {
-				if (ROOT_LICENSE_FILE.test(file)) copyFileSync(path.join(root, file), path.join(packageDirectory, file));
+				if (ROOT_LICENSE_FILE.test(file))
+					copyFileSync(path.join(root, file), path.join(packageDirectory, file));
 			}
 		}
 		mkdirSync(destination, { recursive: true });

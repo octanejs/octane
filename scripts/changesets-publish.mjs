@@ -45,7 +45,9 @@ export function publishPackages(root = process.cwd()) {
 				if (!directory) throw new Error(`workspace package not found: ${release.name}`);
 				const { archive, manifest } = packPackage(directory, packagesDirectory, { root });
 				if (manifest.version !== release.version) {
-					throw new Error(`${release.name} packed ${manifest.version}, expected ${release.version}`);
+					throw new Error(
+						`${release.name} packed ${manifest.version}, expected ${release.version}`,
+					);
 				}
 				const integrity = `sha256-${createHash('sha256').update(readFileSync(archive)).digest('base64')}`;
 				return {
