@@ -552,6 +552,12 @@ const SCOPE_SIGNAL_OWNERS = /* @__PURE__ */ new WeakMap<
 type SignalInstanceKey =
 	| string
 	| { parentScope: Scope; invocationSite: string | undefined; key: unknown; hasKey: boolean };
+// Compiled fragment renderers (`_frag$N`) and value-position host descriptors
+// carry this invocation site. They represent their enclosing component's JSX,
+// not authored component invocations: the server renders that JSX inline, and a
+// `.tsrx` body has no such renderer. The compiler and runtime.server.ts spell it
+// the same way.
+const RENDERER_INVOCATION_SITE = 'r:';
 // Parent links, root namespaces, and keyed item identities are lifetime-stable.
 // Keep their recipe until a real owner is needed: scalar-only components avoid
 // ancestor walks, visited sets, key coercion, and JSON strings altogether. The
@@ -898,11 +904,15 @@ function stampSignalInstanceKey(scope: Scope, key: SignalInstanceKey): void {
 		scope.signalInstanceResolved = key;
 		return;
 	}
-	scope.signalInstanceParent = key.parentScope;
-	scope.signalInstanceSite = key.invocationSite;
-	scope.signalInstanceValue = key.key;
-	scope.signalInstanceHasKey = key.hasKey;
-	scope.signalInstanceResolved = undefined;
+	// A renderer adds no key segment: it carries its parent's identity, and
+	// stays unstamped below an unstamped parent so keys walk on through it.
+	const parent = key.parentScope;
+	const renderer = key.invocationSite === RENDERER_INVOCATION_SITE;
+	scope.signalInstanceParent = renderer ? parent.signalInstanceParent : parent;
+	scope.signalInstanceSite = renderer ? parent.signalInstanceSite : key.invocationSite;
+	scope.signalInstanceValue = renderer ? parent.signalInstanceValue : key.key;
+	scope.signalInstanceHasKey = renderer ? parent.signalInstanceHasKey : key.hasKey;
+	scope.signalInstanceResolved = renderer ? parent.signalInstanceResolved : undefined;
 }
 
 function structuralSignalInstanceKey(
@@ -32235,7 +32245,8 @@ export function componentSlot(
 		singleRoot,
 		inherit,
 		hasKey,
-		invocationSite,
+		// A dynamic tag that resolved to a host renders inline on the server.
+		typeof comp === 'string' ? RENDERER_INVOCATION_SITE : invocationSite,
 	);
 }
 
@@ -36968,6 +36979,7 @@ export function childSlot(
 		}
 		comp = hostElementBody as unknown as ComponentBody;
 		props = value;
+		invocationSite = RENDERER_INVOCATION_SITE;
 	} else if (typeof value === 'function') {
 		comp = value as ComponentBody;
 		isBodyFn = true;
