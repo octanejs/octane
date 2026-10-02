@@ -3,7 +3,7 @@ import { flushSync, hydrateRoot } from 'octane';
 import { renderToString } from 'octane/server';
 import * as DomBindings from '../src/dom-bindings.js';
 import * as DomBindingSignals from '../src/dom-binding-signals.js';
-import { createScope } from '../src/signals/index.js';
+import * as Signals from '../src/signals/index.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 
 // A style channel needs the general fixed-layout adopter. Without it, every
@@ -294,41 +294,115 @@ describe.each([
 
 // A fixed view binds `{value as number}` as one text leaf that reads a signal
 // handle's value. Its server output must be that text, which both the early
-// binding and the ordinary renderer then adopt in place.
+// binding and the ordinary renderer then adopt in place. Without bindings the
+// same hole stays a renderable child, which hydration adopts as before.
 describe.each([false, true])('signal handles cast to number in text leaves (dev=%s)', (dev) => {
-	function counter() {
-		const scope = createScope({ scopeKey: `number-cast-text-${dev}` });
-		const count$ = scope.signal$('count', 1);
-		const total$ = scope.derived$('total', () => scope.get(count$) * 10);
-		const id = '/src/number-cast-text.tsrx';
-		const source = `import { count$ } from './number-cast-state';
-  export function Counter(props) @{
-    'use dom bindings';
-    <p title={props.title}><b>{count$ as number}</b><i>{props.total as number}</i></p>
+	const views = {
+		// A module signal and a module derived value as the root's only child.
+		Count: '<p title={props.title}>{count$ as number}</p>',
+		Label: '<p title={props.title}>{label$ as number}</p>',
+		// Nested leaves: a module signal and a derived handle passed through props.
+		Nested: '<p title={props.title}><b>{count$ as number}</b><i>{props.label as number}</i></p>',
+	};
+	const expected = {
+		Count: [['1'], ['2']],
+		Label: [['n=1'], ['n=2']],
+		Nested: [
+			['1', 'n=1'],
+			['2', 'n=2'],
+		],
+	};
+	type View = keyof typeof views;
+	let cases = 0;
+
+	function render(name: View, bindings: boolean) {
+		// Module signal identity is keyed by file, so every case owns fresh state.
+		const stateId = `/src/number-cast-state-${dev}-${cases++}.tsrx`;
+		const state = (mode: 'client' | 'server') =>
+			loadCompiledFixtureSource(
+				`import { derived$, signal$ } from 'octane/signals';
+  export const count$ = signal$(1);
+  export const label$ = derived$(() => 'n=' + count$.get());`,
+				{
+					id: stateId,
+					mode,
+					compileOptions: { dev, hmr: false },
+					runtimeModules: { 'octane/signals': Signals },
+				},
+			);
+		const serverState = state('server');
+		const clientState = state('client');
+		const id = `/src/number-cast-${name}-${bindings}.tsrx`;
+		const source = `import { count$, label$ } from './number-cast-state';
+  export function View(props) @{
+    ${bindings ? "'use dom bindings';" : ''}
+    ${views[name]}
   }`;
-		const options = {
+		const options = (module: Record<string, unknown>) => ({
 			compileOptions: { dev, hmr: false },
 			runtimeModules: {
 				'octane/behavior': DomBindings,
 				'octane/dom-bindings': DomBindings,
 				'octane/dom-binding-signals': DomBindingSignals,
-				'./number-cast-state': { count$ },
+				'./number-cast-state': module,
 			},
-		};
-		const server = loadCompiledFixtureSource(source, { ...options, id, mode: 'server' });
-		const client = loadCompiledFixtureSource(source, { ...options, id, mode: 'client' });
-		const view = loadCompiledFixtureSource(source, {
-			...options,
-			id: `${id}?octane-bindings=Counter`,
-			mode: 'client',
-		}).default as DomBindings.CompiledBindings<Record<string, unknown>> & {
-			adopt: typeof DomBindings.__adoptBindings;
-		};
-		const props = { title: 'Count', total: total$ };
-		document.body.innerHTML = renderToString(server.Counter, props).html;
+		});
+		const server = loadCompiledFixtureSource(source, {
+			...options(serverState),
+			id,
+			mode: 'server',
+		});
+		document.body.innerHTML = renderToString(server.View, {
+			title: 'Count',
+			label: serverState.label$,
+		}).html;
 		const paragraph = document.querySelector('p')!;
-		const [count, total] = paragraph.children;
-		return { scope, count$, client, view, props, paragraph, count: count!, total: total! };
+		const leaves = name === 'Nested' ? [...paragraph.children] : [paragraph];
+		const text = () => leaves.map((leaf) => leaf.textContent);
+		const textNodes = () =>
+			leaves.map((leaf) => [...leaf.childNodes].find((node) => node.nodeType === Node.TEXT_NODE));
+		return {
+			count$: clientState.count$ as Signals.WritableSignal<number>,
+			props: { title: 'Count', label: clientState.label$ },
+			paragraph,
+			text,
+			textNodes,
+			client: () =>
+				loadCompiledFixtureSource(source, { ...options(clientState), id, mode: 'client' }),
+			view: () =>
+				loadCompiledFixtureSource(source, {
+					...options(clientState),
+					id: `${id}?octane-bindings=View`,
+					mode: 'client',
+				}).default as DomBindings.CompiledBindings<Record<string, unknown>> & {
+					adopt: typeof DomBindings.__adoptBindings;
+				},
+		};
+	}
+
+	function hydrate(name: View, bindings: boolean) {
+		const { count$, props, paragraph, text, textNodes, client } = render(name, bindings);
+		const servedText = textNodes();
+		expect(servedText).not.toContain(undefined);
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const recoverable = vi.fn();
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			flushSync(() => {
+				root = hydrateRoot(document.body, client().View, props, {
+					onRecoverableError: recoverable,
+				});
+			});
+			expect(document.querySelector('p')).toBe(paragraph);
+			textNodes().forEach((node, index) => expect(node).toBe(servedText[index]));
+			expect(text()).toEqual(expected[name][0]);
+			flushSync(() => count$.set(2));
+			expect(text()).toEqual(expected[name][1]);
+			expect(recoverable).not.toHaveBeenCalled();
+			expect(error).not.toHaveBeenCalled();
+		} finally {
+			root?.unmount();
+		}
 	}
 
 	afterEach(() => {
@@ -336,42 +410,35 @@ describe.each([false, true])('signal handles cast to number in text leaves (dev=
 		vi.restoreAllMocks();
 	});
 
-	it('adopts the server text in place and updates it from the handles', () => {
-		const { scope, count$, view, props, paragraph, count, total } = counter();
-		const texts = [count.firstChild, total.firstChild];
-		expect([count.textContent, total.textContent]).toEqual(['1', '10']);
-		const handle = view.adopt(paragraph, view, {
-			getSnapshot: () => props,
-			subscribe: () => () => {},
-		});
-		try {
-			count$.set(2);
-			expect([count.textContent, total.textContent]).toEqual(['2', '20']);
-			expect([count.firstChild, total.firstChild]).toEqual(texts);
-			expect([count.childNodes.length, total.childNodes.length]).toEqual([1, 1]);
-		} finally {
-			handle.dispose();
-			scope.dispose();
-		}
-	});
-
-	it('hydrates the same server text with the ordinary renderer', () => {
-		const { scope, count$, client, props, paragraph, count, total } = counter();
-		const texts = [count.firstChild, total.firstChild];
-		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-		let root: ReturnType<typeof hydrateRoot> | undefined;
-		try {
-			flushSync(() => {
-				root = hydrateRoot(document.body, client.Counter, props);
+	it.each(Object.keys(views) as View[])(
+		'adopts the server text in place and updates it from the handles (%s)',
+		(name) => {
+			const { count$, props, paragraph, text, textNodes, view } = render(name, true);
+			const servedText = textNodes();
+			expect(servedText).not.toContain(undefined);
+			expect(text()).toEqual(expected[name][0]);
+			const artifact = view();
+			const handle = artifact.adopt(paragraph, artifact, {
+				getSnapshot: () => props,
+				subscribe: () => () => {},
 			});
-			expect(document.querySelector('p')).toBe(paragraph);
-			expect([count.firstChild, total.firstChild]).toEqual(texts);
-			flushSync(() => count$.set(3));
-			expect([count.textContent, total.textContent]).toEqual(['3', '30']);
-			expect(error).not.toHaveBeenCalled();
-		} finally {
-			root?.unmount();
-			scope.dispose();
-		}
-	});
+			try {
+				count$.set(2);
+				expect(text()).toEqual(expected[name][1]);
+				textNodes().forEach((node, index) => expect(node).toBe(servedText[index]));
+			} finally {
+				handle.dispose();
+			}
+		},
+	);
+
+	it.each(Object.keys(views) as View[])(
+		'hydrates the same server text with the ordinary renderer (%s)',
+		(name) => hydrate(name, true),
+	);
+
+	it.each(Object.keys(views) as View[])(
+		'hydrates the hole in place in a view without bindings (%s)',
+		(name) => hydrate(name, false),
+	);
 });
