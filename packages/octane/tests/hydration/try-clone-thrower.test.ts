@@ -10,7 +10,8 @@ import type { PageProps } from './_fixtures/try-clone-thrower.tsrx';
 // (a template's cloned root, or a template-less component's range) was compared
 // against server content that is about to be discarded: often the server's own
 // catch arm, rendered because the server's body threw the same way. None of it
-// is a mismatch. A body that completes or suspends still reports one.
+// is a mismatch. A body that completes or suspends still reports one; a root
+// that suspends reports from the attempt that commits.
 // Recoverable errors publish in dev and prod; console diagnostics in dev only.
 
 const server = loadServerFixture(
@@ -263,15 +264,38 @@ describe('hydrateRoot — a try body that does not reach its catch arm still rep
 		root.unmount();
 	});
 
-	it.each([
-		['', 'Branch'],
-		[' in a @try with @pending', 'PendingBranch'],
-	] as const)('reports a template clone that suspends%s', async (_, name) => {
+	it('reports a template clone that suspends in a @try with @pending', async () => {
 		const { root, recovered, caught } = await hydrateServerHtml(
-			name,
+			'PendingBranch',
 			{ server: true },
 			{ value: undefined, promise: new Promise(() => {}) },
 		);
+		expect(caught).toEqual([]);
+		expect(recovered).toHaveLength(1);
+		expect(mismatches()).toEqual(DEV ? [expect.stringContaining(CLONE_MISMATCH)] : []);
+		root.unmount();
+	});
+
+	// Without @pending the root suspends, keeps the server content, and the
+	// attempt that commits after the promise resolves reports the clone.
+	it('reports a template clone that suspends its root once the root commits', async () => {
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => (resolve = done));
+		const { root, recovered, caught } = await hydrateServerHtml(
+			'Branch',
+			{ server: true },
+			{ value: undefined, promise },
+		);
+		expect(visible()).toBe(
+			'<div><h1>before</h1><b class="server">server</b><button>after</button></div>',
+		);
+		expect(recovered).toEqual([]);
+		expect(mismatches()).toEqual([]);
+
+		resolve('ok');
+		await promise;
+		await new Promise((done) => setTimeout(done, 0));
+		expect(visible()).toBe('<div><h1>before</h1><i>ok</i><button>after</button></div>');
 		expect(caught).toEqual([]);
 		expect(recovered).toHaveLength(1);
 		expect(mismatches()).toEqual(DEV ? [expect.stringContaining(CLONE_MISMATCH)] : []);
