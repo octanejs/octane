@@ -19250,6 +19250,46 @@ class HydrationCapability {
 	}
 
 	/**
+	 * A list's first hydrating render when the client renders the other arm:
+	 * the server rendered items (`serverItems`) but the client builds its
+	 * @empty arm, or the server rendered none but the client has items. Discard
+	 * what the server rendered and report the list once, at its own site. The
+	 * range's `end` is remembered as rebuilt, so each client item finds the
+	 * cursor there and discardItems builds it quietly, and a later attempt that
+	 * finds the earlier attempt's own content here rebuilds it quietly too.
+	 */
+	discardListArm(
+		scope: Scope,
+		slotKey: number,
+		start: Node,
+		end: Node,
+		serverItems: boolean,
+	): void {
+		const first = getNextSibling(start)!;
+		// When the server rendered no items, only an @empty arm leaves content
+		// between the markers.
+		this.discard(
+			scope,
+			slotKey,
+			first,
+			end,
+			HYDRATION_REBUILT?.has(end) === true,
+			process.env.NODE_ENV !== 'production'
+				? serverItems
+					? 'an empty list (@empty)'
+					: 'a populated list'
+				: '',
+			process.env.NODE_ENV !== 'production'
+				? serverItems
+					? 'a populated list'
+					: first === end
+						? 'an empty list'
+						: 'an empty list (@empty)'
+				: null,
+		);
+	}
+
+	/**
 	 * Report a control-flow or list range whose server content before `end` was
 	 * discarded so the client could build its own arm there. Returns whether it
 	 * reported, so callers warn only then. A suspended boundary's next attempt
@@ -19286,24 +19326,6 @@ class HydrationCapability {
 		if (!this.staleServerValues)
 			noteRecoverableHydrationError(() => new Error(formatClientError(56)));
 		removeRange(from, end);
-	}
-
-	/**
-	 * A list's first hydrating render when the server rendered items but the
-	 * client has none and builds its @empty arm instead. Discard the server's
-	 * items and report the list once, at its own site. A later attempt that
-	 * finds the earlier attempt's @empty arm here rebuilds it quietly.
-	 */
-	discardPopulatedList(scope: Scope, slotKey: number, start: Node, end: Node): void {
-		this.discard(
-			scope,
-			slotKey,
-			getNextSibling(start),
-			end,
-			HYDRATION_REBUILT?.has(end) === true,
-			process.env.NODE_ENV !== 'production' ? 'an empty list (@empty)' : '',
-			process.env.NODE_ENV !== 'production' ? 'a populated list' : null,
-		);
 	}
 
 	/**
@@ -43159,7 +43181,7 @@ export function forBlock<T>(
 				(serverMarkerState === 1 ||
 					(serverMarkerState === -1 && hydration.isOpen(getNextSibling(state.start))))
 			) {
-				hydration.discardPopulatedList(parentScope, slotKey, state.start, state.end);
+				hydration.discardListArm(parentScope, slotKey, state.start, state.end, true);
 				suspendForEmpty = true;
 			} else if (hydration !== null) {
 				// The server already rendered the @empty content directly inside the
@@ -43205,10 +43227,11 @@ export function forBlock<T>(
 		} else unmountBlock(state.emptyBlock);
 		state.emptyBlock = null;
 	}
-	// Hydrating + the SERVER rendered the @empty body (the node right after `start` is NOT an
-	// item's `<!--[-->`) but the client now has items — a STRUCTURAL mismatch. Discard the
-	// stale @empty DOM and point the cursor at `end` so the reconcile client-mounts the items
-	// into a clean range (mountItem's no-marker guard handles the build).
+	// Hydrating + the SERVER rendered no items (its open marker says so, or, on a legacy
+	// marker, the node right after `start` is NOT an item's `<!--[-->` but @empty content)
+	// but the client now has items — a STRUCTURAL mismatch. Discard any stale @empty DOM,
+	// report the list once, and point the cursor at `end` so the reconcile client-mounts the
+	// items into a clean range (mountItem's no-marker guard builds them without reporting).
 	if (
 		!isEmpty &&
 		hydration !== null &&
@@ -43219,15 +43242,7 @@ export function forBlock<T>(
 				getNextSibling(state.start) !== state.end &&
 				!hydration.isOpen(getNextSibling(state.start))))
 	) {
-		hydration.save(domParent);
-		// Marking the list's end also keeps the client items, which find the cursor
-		// there, from reporting the same recovery again.
-		if (hydration.reportRebuiltRange(state.end) && process.env.NODE_ENV !== 'production') {
-			const mmLoc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
-			if (mmLoc) hydration.warnStructural(mmLoc, 'a populated list', 'an empty list (@empty)');
-		}
-		removeRange(getNextSibling(state.start), state.end);
-		hydration.node = state.end;
+		hydration.discardListArm(parentScope, slotKey, state.start, state.end, false);
 	}
 	const f = flags || 0;
 	let pure = (f & 1) !== 0;
