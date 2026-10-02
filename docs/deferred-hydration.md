@@ -1064,11 +1064,13 @@ captures for child state, events, refs, and effects. Octane never renders the
 child with its earlier captures, in development or production. If the captures
 or provided context values changed before activation, the server HTML predates
 the client's own state: activation repairs attributes, class, style, and text
-without a hydration warning or `onRecoverableError`. A boundary nested inside
-such a boundary is treated the same way. When the captures are unchanged, for
-example after a parent re-render with equal values, a server/client mismatch is
-still reported as usual. A mismatch that a capture change corrects before
-activation is repaired without a report.
+without a hydration warning or `onRecoverableError`. Content the newer
+captures add or swap in, such as another component, a new list row, or a
+hole's new value, mounts on the client beside the adopted server nodes. A
+boundary nested inside such a boundary is treated the same way. When the
+captures are unchanged, for example after a parent re-render with equal values,
+a server/client mismatch is still reported as usual. A mismatch that a capture
+change corrects before activation is repaired without a report.
 
 Treat `when` as boundary configuration rather than a strategy state machine. If
 the intended meaning of a boundary changes, give `Hydrate` a new `key` to start
