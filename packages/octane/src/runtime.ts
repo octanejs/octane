@@ -8789,6 +8789,7 @@ interface DeferredLayoutDriver {
 	stageEffects(): boolean;
 	stageAction(action: () => void, durable?: boolean): boolean;
 	retireEventHosts(block: Block): void;
+	retireHostTree(node: Node): void;
 	stageTeardown(cleanup: Cleanup, phase: number, scope: Scope): boolean;
 	stageDeactivation(slot: EffectSlot, scope: Scope): boolean;
 	projectEventBundle(bundle: HandlerBundle): HandlerBundle;
@@ -8842,6 +8843,7 @@ interface StagedCommitCapture {
 	controls: Map<ControlledState, ControlledState>;
 	signalHosts?: Map<SignalHostPropSourcesBinding, SignalHostPropSourcesBinding>;
 	retiredBlocks?: Block[];
+	retiredHostTrees?: Node[];
 	owners: Map<
 		RootRenderOwner,
 		{
@@ -9207,6 +9209,20 @@ function ensureDeferredLayoutDriver(): void {
 					}, true);
 				}
 				blocks.push(block);
+			},
+			retireHostTree(node) {
+				// Like retireEventHosts: one queued action per capture stamps every
+				// removed host root ahead of the DOM removals queued after it.
+				const capture = STAGED_COMMIT_CAPTURE!;
+				let nodes = capture.retiredHostTrees;
+				if (nodes === undefined) {
+					const list: Node[] = (nodes = capture.retiredHostTrees = []);
+					capture.enqueue(() => {
+						const epoch = ++eventRootEpoch;
+						for (let i = 0; i < list.length; i++) stampRetiredHostTree(list[i], epoch);
+					}, true);
+				}
+				nodes.push(node);
 			},
 			stageTeardown(cleanup, phase, scope) {
 				const capture = STAGED_COMMIT_CAPTURE;
@@ -25861,34 +25877,18 @@ let retiringHostsSince = 0;
  * so only the root is stamped and the stamp only needs to outlive the task.
  */
 function retireEventHostTree(node: Node): void {
-	if ((node as any).nodeType !== 1) return;
-	if (STAGED_COMMIT_CAPTURE === null) stampRetiredEventHost(node);
-	else DEFERRED_LAYOUT_DRIVER!.stageAction(() => stampRetiredEventHost(node), true);
+	if (STAGED_COMMIT_CAPTURE === null) stampRetiredHostTree(node, ++eventRootEpoch);
+	else DEFERRED_LAYOUT_DRIVER!.retireHostTree(node);
 }
 
-function stampRetiredEventHost(node: Node): void {
-	const epoch = ++eventRootEpoch;
+function stampRetiredHostTree(node: Node, epoch: number): void {
 	if (retiringHostsSince === 0) {
 		retiringHostsSince = epoch;
-		queueMicrotask(endRetiringHosts);
+		queueMicrotask(() => {
+			retiringHostsSince = 0;
+		});
 	}
 	(node as any).$$retiredEpoch = epoch;
-}
-
-function endRetiringHosts(): void {
-	retiringHostsSince = 0;
-}
-
-/**
- * Highest path index inside a subtree whose removal began before the delivery at
- * `epoch`, or -1. The outermost stamped root retires every node beneath it.
- */
-function retiredHostSubtreeTop(base: number, epoch: number): number {
-	for (let index = CAPTURE_PATH.length - 1; index >= base; index--) {
-		const retired = CAPTURE_PATH[index].$$retiredEpoch;
-		if (retired >= retiringHostsSince && retired <= epoch) return index;
-	}
-	return -1;
 }
 
 /** Publish a native handler; compiled bundle updates omit the key to refresh only authority. */
@@ -26695,8 +26695,17 @@ function snapshotDelegatedSlots(
 	const suppressDisabled =
 		(type.flags & EVENT_DISABLED_MOUSE) !== 0 ||
 		(!capture && (type.flags & EVENT_DISABLED_ENTER) !== 0);
-	// Only a removed subtree's root carries its stamp, so find the outermost one.
-	const retiredTop = retiringHostsSince === 0 ? -1 : retiredHostSubtreeTop(base, epoch);
+	// Only a removed subtree's root carries its stamp (retireEventHostTree), so the
+	// outermost one retired before this delivery retires every path node below it.
+	let retiredTop = -1;
+	if (retiringHostsSince !== 0)
+		for (let index = CAPTURE_PATH.length - 1; index >= base; index--) {
+			const retired = CAPTURE_PATH[index].$$retiredEpoch;
+			if (retired >= retiringHostsSince && retired <= epoch) {
+				retiredTop = index;
+				break;
+			}
+		}
 	let found = false;
 	let owner: Block | undefined;
 	for (let index = base; index < CAPTURE_PATH.length; index++) {
