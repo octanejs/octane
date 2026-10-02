@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { closeSync, openSync, readFileSync, rmSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { Session } from 'node:inspector/promises';
 import { join, resolve } from 'node:path';
@@ -110,7 +111,9 @@ async function exercise(artifact, coverage) {
 
 if (process.argv[2] === '--worker') {
 	const result = await exercise(process.argv[3], process.argv[4] === '--coverage');
-	console.log('FUNCTIONS_JSON ' + JSON.stringify(result));
+	if (process.env.SSR_FUNCTION_RESULT)
+		await writeFile(process.env.SSR_FUNCTION_RESULT, JSON.stringify(result));
+	else console.log('FUNCTIONS_JSON ' + JSON.stringify(result));
 } else {
 	const sourceRoot = resolve(process.env.SSR_SOURCE_ROOT || process.argv[2] || repo);
 	const sourceFile = join(sourceRoot, 'packages/octane/src/runtime.server.ts');
@@ -155,28 +158,47 @@ if (process.argv[2] === '--worker') {
 	).outputFiles[0].text;
 	const artifact = join(out, hash(diagnostic) + '.mjs');
 	await writeFile(artifact, diagnostic);
+	let runs = 0;
 	function run(flags, coverage = false) {
-		const child = spawnSync(
-			process.execPath,
-			[
-				'--allow-natives-syntax',
-				...flags,
-				import.meta.filename,
-				'--worker',
-				artifact,
-				...(coverage ? ['--coverage'] : []),
-			],
-			{ encoding: 'utf8', maxBuffer: 128 * 1024 * 1024, env: process.env },
-		);
+		// V8 prints traces through C stdio on the worker's stdout. Node makes a
+		// stdout pipe non-blocking, so when this process drains it slowly those
+		// native writes fail and records are dropped or split mid-line. A regular
+		// file never blocks, and the result gets a file of its own.
+		const base = join(out, `worker-${process.pid}-${runs++}`);
+		const stdoutFd = openSync(base + '.log', 'w');
+		let child;
+		try {
+			child = spawnSync(
+				process.execPath,
+				[
+					'--allow-natives-syntax',
+					...flags,
+					import.meta.filename,
+					'--worker',
+					artifact,
+					...(coverage ? ['--coverage'] : []),
+				],
+				{
+					encoding: 'utf8',
+					maxBuffer: 128 * 1024 * 1024,
+					stdio: ['ignore', stdoutFd, 'pipe'],
+					env: { ...process.env, SSR_FUNCTION_RESULT: base + '.json' },
+				},
+			);
+		} finally {
+			closeSync(stdoutFd);
+		}
+		const stdout = readFileSync(base + '.log', 'utf8');
+		let payload;
+		try {
+			payload = readFileSync(base + '.json', 'utf8');
+		} catch {}
+		rmSync(base + '.log', { force: true });
+		rmSync(base + '.json', { force: true });
 		if (child.error) throw child.error;
-		if (child.status !== 0) throw new Error(child.stderr + '\n' + child.stdout.slice(-8000));
-		const payload = child.stdout.split('\n').find((line) => line.startsWith('FUNCTIONS_JSON '));
+		if (child.status !== 0) throw new Error(child.stderr + '\n' + stdout.slice(-8000));
 		assert.ok(payload, 'worker did not return results');
-		return {
-			payload: JSON.parse(payload.slice('FUNCTIONS_JSON '.length)),
-			stdout: child.stdout,
-			stderr: child.stderr,
-		};
+		return { payload: JSON.parse(payload), stdout, stderr: child.stderr };
 	}
 	const observed = run([], true);
 	const warmed = run([
