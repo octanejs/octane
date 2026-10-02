@@ -108,7 +108,21 @@ baseline and candidate with identical non-size counts: eligible hit functions
 704, eligible hit arrays 3,872, eligible miss functions 1,152, declaration miss
 arrays 320, identifier hit/miss runtime functions 64 each, and null-dependency
 hit functions/arrays 96/320. These pre-existing breaches are not corrected or
-relaxed here. All eight new Provider guards pass.
+relaxed here. All eight new Provider guards pass. They were later traced to the
+per-update root render transaction (#833). `run.mjs` now reports its scenarios
+net of a hook-free driver control; see its [README](README.md).
+
+## Signal-capable child holes
+
+The async-signals change (`5ead1ff2c`, #1069) lowered `{rows}` through the
+signal-capable `bindSignalChild` binding, because any identifier can hold a signal
+handle. That branch dropped the compiler-owned array region, so
+`inline_memo_snapshot_slots` rose from 0 to 256: two `childSlot` entries per update
+for the unchanged list and its single item. Label renders stayed at 0, because the
+reconciler still bailed out on identical descriptors. The compiler now wraps that
+binding in the same `compilerCacheArray` region as the ordinary only-child path.
+A signal handle or any other non-array value still rebinds on every render, and
+the snapshot-slot count is back to 0.
 
 The original correction covered different compiled children bodies from the same
 module. The follow-up [body ownership audit](body-ownership.md) covers independently

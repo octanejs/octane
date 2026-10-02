@@ -68,6 +68,20 @@ explicit `null`, callback names, and allocation-free ordinary flat-cache misses.
 Per-case phase counters remain in the JSON so an aggregate change can be traced
 to its source.
 
+Every render reaches a scenario through the same public `root.render()` update,
+and that update has work of its own. Since root render transactions landed
+(#833), each same-component update re-creates the root's request and retry
+closures and opens a transaction whose undo log and offscreen capture (eight
+arrays) are allocated even when empty, which is 2 functions and 10 arrays per
+render in both compiler variants. A hook-free `Driver` control runs the identical
+phase sequence, and every scenario's ops are reported net of the driver's
+same-phase counts. A scenario that would fall below the driver fails the run.
+The raw per-phase counters stay in the JSON metadata. The driver keeps its own
+`driver_*` ops, and two guards pin its hit-phase functions and arrays at the
+current root-update cost, so that path cannot grow silently either. Without the
+subtraction, this one root-path change breached eight memo guards at once while
+the memo tier itself was unchanged.
+
 These are **source-level creation events, not a V8 heap-allocation census**.
 An engine can eliminate some source allocations. Conversely, object literals,
 function declarations, object/class methods, dynamically named function literals,
@@ -200,10 +214,24 @@ timings do not establish a speedup. The fixed object was selected for its
 measured 24-byte container saving over the tuple.
 
 The unified `--ratios hook-memo` run checks the two new cache-shape guards, both
-of which pass. Eight older hook-allocation ratio guards currently breach with
-the frozen base and candidate identically (for example, eligible hit function
-expressions are 704 in both). Those inherited guard failures are independent
-of the memo cache storage layout.
+of which pass. At the time, eight older hook-allocation ratio guards breached
+with the frozen base and candidate identically (for example, eligible hit
+function expressions were 704 in both). Those breaches were independent of the
+memo cache storage layout. They were the root-update driver cost described under
+"What the numbers mean", which the runner now subtracts.
+
+### Driver attribution (2026-10-02)
+
+A bisect of `run.mjs` output found the first breaching commit to be `5f7a4579b`
+(#833, root render transactions), which did not touch this benchmark. Its parent
+measured 0 functions and 0 arrays on every eligible hit. The corrected runner,
+applied to both sources with dependencies from the current checkout, reports
+identical net memo counts on each side. Only `driver_hit_functions` (0 → 64) and
+`driver_hit_arrays` (0 → 320) per 32 renders change. Against `814a3c159`, the
+source before closure-free lowering (#788), the same runner still breaches the
+seven memo guards that the original measurement below recorded for its
+archived baseline. The subtraction therefore keeps the gate's sensitivity to
+the memo tier.
 
 The observer's own copy-on-write and counting control can be run with:
 

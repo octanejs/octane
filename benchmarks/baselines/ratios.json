@@ -3264,6 +3264,22 @@
   },
   {
     "suite": "hook-memo",
+    "op": "driver_hit_functions",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 2,
+    "note": "The hook-free driver's same-component root.render update, which every scenario's counts are reported net of. Root render transactions (#833) re-create its two request/retry closures per update; a breach means the root update path gained work."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "driver_hit_arrays",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 10,
+    "note": "Pins the root transaction arrays per same-component root.render update: the OffscreenCapture's eight, the undo log, and the committed-transaction queue. Lazy or reused buffers would lower this ceiling."
+  },
+  {
+    "suite": "hook-memo",
     "op": "callback_name_mismatches",
     "target": "inline",
     "reference": "one-per-render",

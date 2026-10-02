@@ -48,6 +48,7 @@ const vercelPreviewWorkflow = readFileSync(
 	path.join(REPO, '.github/workflows/vercel-preview.yml'),
 	'utf8',
 );
+const benchWorkflow = readFileSync(path.join(REPO, '.github/workflows/bench.yml'), 'utf8');
 const prBenchWorkflow = readFileSync(path.join(REPO, '.github/workflows/pr-bench.yml'), 'utf8');
 const prBenchCommentWorkflow = readFileSync(
 	path.join(REPO, '.github/workflows/pr-bench-comment.yml'),
@@ -180,6 +181,19 @@ describe('CI workflow aggregation', () => {
 			packageJson.scripts['ci:workflow:test'],
 			/benchmarks\/bundle-size\/minimal-gates\.test\.mjs/,
 		);
+	});
+
+	test('checks the weekly Bench job Lynx fixture contracts on every pull request', () => {
+		// Bench runs these before its ratio guards. A Lynx source change that
+		// broke them only on the weekly schedule kept every guard from running.
+		const workflowTests = packageJson.scripts['ci:workflow:test'].split(' ');
+		for (const suite of [
+			'benchmarks/lynx-table/stages/*.test.mjs',
+			'benchmarks/lynx-list/*.test.mjs',
+		]) {
+			assert.ok(benchWorkflow.includes(`node --test ${suite}`), suite);
+			assert.ok(workflowTests.includes(suite), suite);
+		}
 	});
 
 	test('gates binding reachability into the octane namespace once per full CI run', () => {
