@@ -46,6 +46,28 @@ describe('islands-only shell analysis', () => {
 		],
 		['@try', '@try { <p>ok</p> } @catch { <p>failed</p> }', /@try recovery/],
 		['a signal read', '<p>{String(count$.get()) as string}</p>', /\.get\(\) read/],
+		['an optional signal read', '<p>{String(count$?.get()) as string}</p>', /\.get\(\) read/],
+		[
+			'a signal read through a cast receiver',
+			'<p>{String((count$ as any).latest(0)) as string}</p>',
+			/\.latest\(\) read/,
+		],
+		[
+			'a signal read through a cast callee',
+			'<p>{String((count$.get as () => number)()) as string}</p>',
+			/\.get\(\) read/,
+		],
+		['a non-null signal read', '<p>{String(count$.get!()) as string}</p>', /\.get\(\) read/],
+		[
+			'a computed signal read',
+			"<p>{String(count$['snapshot']()) as string}</p>",
+			/\.snapshot\(\) read/,
+		],
+		[
+			'a Hydrate whose independent prop is false',
+			'<Hydrate independent={false} when={interaction()}><Island /></Hydrate>',
+			/ordinary <Hydrate>/,
+		],
 		['a handle binding', '<p>{count$ as string}</p>', /signal handle binding/],
 		['a spread', '<div {...props} />', /attribute spread/],
 		['a package component', '<Library />', /<Library> cannot be checked/],
@@ -63,5 +85,80 @@ export function Other() @{ <button onClick={() => {}}>Other</button> }`;
 		expect(analyzeIslandsShell(source, '/src/Page.tsrx', ['Uses']).problems).toHaveLength(1);
 		expect(analyzeIslandsShell(source, '/src/Page.tsrx', ['Uses']).problems[0].line).toBe(2);
 		expect(analyzeIslandsShell(source, '/src/Page.tsrx', null).problems).toHaveLength(2);
+	});
+
+	it('accepts an independent Hydrate written as independent={true}', () => {
+		const { problems } = analyzeIslandsShell(
+			shell('<Hydrate independent={true} when={interaction()}><Island /></Hydrate>'),
+			'/src/Page.tsrx',
+		);
+		expect(problems).toEqual([]);
+	});
+
+	// Every way a module can export the rendered component must reach the check:
+	// an export the analysis cannot follow would otherwise pass with no problems.
+	it.each([
+		[
+			'an anonymous default function',
+			'export default function () @{ <button onClick={() => {}}>Go</button> }',
+			null,
+		],
+		[
+			'a default-exported identifier',
+			'function Page() @{ <button onClick={() => {}}>Go</button> }\nexport default Page;',
+			null,
+		],
+		[
+			'an export list',
+			'function Page() @{ <button onClick={() => {}}>Go</button> }\nexport { Page as Shell };',
+			['Shell'],
+		],
+		[
+			'an exported arrow component',
+			'export const Page = () => <button onClick={() => {}}>Go</button>;',
+			['Page'],
+		],
+		[
+			'an exported function expression',
+			'export const Page = function () { return <button onClick={() => {}}>Go</button>; };',
+			null,
+		],
+	] as const)('checks the shell behind %s', (_name, body, exports) => {
+		const { problems } = analyzeIslandsShell(
+			`import { Hydrate } from 'octane';\n${body}`,
+			'/src/Page.tsrx',
+			exports === null ? null : [...exports],
+		);
+		expect(problems.map((problem) => problem.message)).toEqual([
+			'"onClick" needs client code the shell never loads',
+		]);
+	});
+
+	it('follows re-exported and imported shell components to their modules', () => {
+		const source = `import Page from './Page.tsrx';
+export { Layout } from './Layout.tsrx';
+export default Page;`;
+		expect(analyzeIslandsShell(source, '/src/entry.tsrx', null)).toEqual({
+			problems: [],
+			components: [
+				{ source: './Layout.tsrx', exportName: 'Layout' },
+				{ source: './Page.tsrx', exportName: 'default' },
+			],
+		});
+	});
+
+	it.each([
+		['a missing export', 'export function Other() @{ <p>other</p> }'],
+		[
+			'a wrapped component',
+			"import { memo } from 'octane';\nexport const Page = memo(() => <p />);",
+		],
+		['a package re-export', "export { Page } from 'library';"],
+		['a star re-export', "export * from './Pages.tsrx';"],
+	] as const)('rejects %s it cannot check', (_name, body) => {
+		const { problems } = analyzeIslandsShell(body, '/src/entry.tsrx', ['Page']);
+		expect(problems.map((problem) => problem.message)).toEqual([
+			'export "Page" cannot be checked as static shell output',
+		]);
 	});
 });
