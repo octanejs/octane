@@ -122,7 +122,9 @@ describe.each([true, false])('suspended @try arm rebuilt during hydration (dev=%
 	it('removes a clone it inserted before suspending and keeps adopted user state', async () => {
 		const expected = await control('GateForm');
 		expect(expected.recoverable).toBe(1);
-		expect(expected.structural).toHaveLength(dev ? 2 : 0);
+		// <s> rebuilt over <b>, and <i> finds the range end that recovery
+		// reached: one diagnostic.
+		expect(expected.structural).toHaveLength(dev ? 1 : 0);
 
 		const resume = serve('GateForm');
 		const serverArm = container.querySelector('b.server');
