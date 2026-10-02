@@ -310,6 +310,41 @@ describe.each([
 		},
 	);
 
+	// A root without a boundary keeps the server content while its hydrating
+	// attempt is suspended and reports only from the attempt that commits, which
+	// rediscards that content after the rollback restored it.
+	it.each([
+		{ name: 'RootRows', from: { rows: ['a', 'b'] }, to: { rows: [] } },
+		{ name: 'RootRows', from: { rows: [] }, to: { rows: ['a', 'b'] } },
+		{ name: 'RootBranch', from: { on: true }, to: { on: false } },
+	])('reports $name once from the root attempt that commits', async ({ name, from, to }) => {
+		container.innerHTML = ServerRT.renderToString(server[name], {
+			...from,
+			Tail: server.Tail,
+		}).html;
+		const serverMarkup = markup(container);
+		let deliver!: (module: { default: typeof client.Tail }) => void;
+		const Tail = lazy(() => new Promise<{ default: typeof client.Tail }>((r) => (deliver = r)));
+		const recovered: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			client[name],
+			{ ...to, Tail },
+			{ onRecoverableError: (error) => recovered.push(error) },
+		);
+		try {
+			await act(async () => {});
+			expect(markup(container)).toBe(serverMarkup);
+			expect(await settledReports(recovered)).toEqual([]);
+			await act(async () => deliver({ default: client.Tail }));
+			expect(markup(container)).toBe(clientMarkup(name, { ...to, Tail: client.Tail }));
+			expect(await settledReports(recovered)).toHaveLength(1);
+			if (dev) expect(warns()).toHaveLength(1);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	// Captures that changed before a dormant boundary activated legitimately
 	// differ from the server's: recover, but report nothing.
 	it.each([

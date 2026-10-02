@@ -70,6 +70,22 @@ export function SuspendedRows(props: { rows: string[]; Tail: ComponentBody }) @{
 	</main>
 }
 
+// With no boundary, the sibling suspends the root's hydrating attempt, which
+// rolls back to the server content until the attempt that commits.
+export function RootRows(props: { rows: string[]; Tail: ComponentBody }) @{
+	<main>
+		<Rows rows={props.rows} />
+		<props.Tail />
+	</main>
+}
+
+export function RootBranch(props: { on: boolean; Tail: ComponentBody }) @{
+	<main>
+		<Branch on={props.on} />
+		<props.Tail />
+	</main>
+}
+
 export function Tail() @{
 	<p>{'tail'}</p>
 }
