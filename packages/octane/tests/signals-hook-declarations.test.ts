@@ -80,6 +80,12 @@ describe('signal declarations inside custom hooks', () => {
 				await act(async () => {});
 				expect(rendered.container.textContent).toBe('X|Y');
 				expect(loaded).toEqual(['x', 'y']);
+				// A new captured argument re-selects only that call's query.
+				await act(async () =>
+					rendered.root.render(client.TwoQueries, { a: 'z', b: 'y', load: loader }),
+				);
+				expect(rendered.container.textContent).toBe('Z|Y');
+				expect(loaded).toEqual(['x', 'y', 'z']);
 			} finally {
 				rendered.unmount();
 			}
