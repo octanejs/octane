@@ -39,7 +39,7 @@ describe('component-root template namespace — static resolution', () => {
 
 	it('an all-HTML multi-root fragment compiles as an HTML frag template', () => {
 		expect(templateFlags('<>\n\t\t<div>a</div>\n\t\t<span>b</span>\n\t</>')).toEqual([
-			['"<div>a</div><span>b</span>"', ', 0, 1'],
+			['"<div>a</div><span>b</span>"', ', 0, 2'],
 		]);
 	});
 
@@ -53,7 +53,7 @@ describe('component-root template namespace — static resolution', () => {
 
 	it('a mixed fragment (HTML + ambiguous roots) keeps the opaque frag flags', () => {
 		expect(templateFlags('<>\n\t\t<div>a</div>\n\t\t<a>b</a>\n\t</>')).toEqual([
-			['"<div>a</div><a>b</a>"', ', 3, 1'],
+			['"<div>a</div><a>b</a>"', ', 3, 2'],
 		]);
 	});
 });

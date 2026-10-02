@@ -12005,6 +12005,8 @@ function compileInternal(
 				name: t.name,
 				ast: t.ast,
 				html: t.html,
+				ns: t.ns,
+				frag: t.frag,
 				origins: t.origins === null ? [] : t.origins,
 			})),
 			ast: printed.ast,
@@ -26378,7 +26380,9 @@ function planJsx(
 			}
 		}
 		const flag = nsFlag(tplNs);
-		const fragArg = !single && (flag !== 0 || resolvedFrag) ? 1 : 0;
+		// A raw multi-root template passes its root count, which hydration reads
+		// without parsing the template to find where the roots it adopted end.
+		const fragArg = !single && (flag !== 0 || resolvedFrag) ? htmlIdx : 0;
 		let template = rootTemplate;
 		if (!single && flag === 0 && !resolvedFrag) {
 			template = templateElement(
