@@ -29,7 +29,7 @@ export function Wrapped(props: StateProps) @{
 					props.state.failed = false;
 					retry();
 				}}
-			>{error.message as string}</button>
+			>{(error as Error).message as string}</button>
 		}
 	</main>
 }
@@ -44,7 +44,7 @@ export function SoleRoot(props: StateProps) @{
 				props.state.failed = false;
 				retry();
 			}}
-		>{error.message as string}</button>
+		>{(error as Error).message as string}</button>
 	}
 }
 
@@ -61,7 +61,7 @@ export function HostBody(props: StateProps) @{
 					props.state.failed = false;
 					retry();
 				}}
-			>{error.message as string}</button>
+			>{(error as Error).message as string}</button>
 		}
 	</main>
 }
@@ -111,7 +111,7 @@ export function Seeded(props: SeededProps) @{
 				<Checked promise={props.first} />
 			</section>
 		} @catch (error) {
-			<button>{error.message as string}</button>
+			<button>{(error as Error).message as string}</button>
 		}
 		<Value promise={props.after} />
 	</main>
@@ -127,7 +127,7 @@ export function Streamed(props: PromiseProps) @{
 		} @pending {
 			<i>loading</i>
 		} @catch (error) {
-			<button>{error.message as string}</button>
+			<button>{(error as Error).message as string}</button>
 		}
 	</main>
 }
@@ -152,7 +152,7 @@ export function WaitingPending(props: WaitingProps) @{
 		} @pending {
 			<i>loading</i>
 		} @catch (error) {
-			<button>{error.message as string}</button>
+			<button>{(error as Error).message as string}</button>
 		}
 	</main>
 }
@@ -165,7 +165,7 @@ export function WaitingOuterPending(props: WaitingProps) @{
 					<Waiting state={props.state} promise={props.promise} />
 				</section>
 			} @catch (error) {
-				<button>{error.message as string}</button>
+				<button>{(error as Error).message as string}</button>
 			}
 		} @pending {
 			<i>loading</i>
@@ -179,7 +179,7 @@ export function WaitingRoot(props: WaitingProps) @{
 			<Waiting state={props.state} promise={props.promise} />
 		</section>
 	} @catch (error) {
-		<button>{error.message as string}</button>
+		<button>{(error as Error).message as string}</button>
 	}
 }
 
@@ -203,7 +203,7 @@ export function NestedResolved(props: NestedProps) @{
 				<Checked promise={props.first} />
 			</section>
 		} @catch (error) {
-			<button>{error.message as string}</button>
+			<button>{(error as Error).message as string}</button>
 		}
 		<Value promise={props.after} />
 	</main>
@@ -258,7 +258,7 @@ export function NestedDeep(props: DeepProps) @{
 				<Checked promise={props.first} />
 			</section>
 		} @catch (error) {
-			<button>{error.message as string}</button>
+			<button>{(error as Error).message as string}</button>
 		}
 		<Value promise={props.after} />
 	</main>
@@ -293,7 +293,7 @@ export function NestedInnerCatch(props: InnerCatchProps) @{
 				<Checked promise={props.first} />
 			</section>
 		} @catch (error) {
-			<button>{error.message as string}</button>
+			<button>{(error as Error).message as string}</button>
 		}
 		<Value promise={props.after} />
 	</main>
@@ -323,7 +323,7 @@ export function CatchArmNested(props: NestedProps) @{
 				<Checked promise={props.first} />
 			</section>
 		} @catch (error) {
-			<Panel message={error.message} promise={props.nested} />
+			<Panel message={(error as Error).message} promise={props.nested} />
 		}
 		<Value promise={props.after} />
 	</main>
@@ -352,7 +352,7 @@ export function NestedRetried(props: NestedProps) @{
 				<Checked promise={props.first} />
 			</section>
 		} @catch (error) {
-			<button>{error.message as string}</button>
+			<button>{(error as Error).message as string}</button>
 		}
 		<Value promise={props.after} />
 	</main>
@@ -381,7 +381,7 @@ export function StreamedNested(props: StreamedNestedProps) @{
 		} @pending {
 			<i>outer</i>
 		} @catch (error) {
-			<button>{error.message as string}</button>
+			<button>{(error as Error).message as string}</button>
 		}
 	</main>
 }
@@ -397,7 +397,7 @@ export function NestedIsland(props: NestedProps) @{
 				<Checked promise={props.first} />
 			</section>
 		} @catch (error) {
-			<button>{error.message as string}</button>
+			<button>{(error as Error).message as string}</button>
 		}
 		<Value promise={props.after} />
 	</main>
@@ -430,7 +430,7 @@ export function StreamedInnerCatch(props: StreamedInnerCatchProps) @{
 		} @pending {
 			<i>outer</i>
 		} @catch (error) {
-			<button>{error.message as string}</button>
+			<button>{(error as Error).message as string}</button>
 		}
 	</main>
 }
