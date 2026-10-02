@@ -19560,11 +19560,16 @@ class HydrationCapability {
 			if (
 				server !== text &&
 				domBindingClaims.get(el as Element)?.get('#text') !== server &&
-				!isTextParserNormalizedMatch(server, text) &&
-				!isHydrationSuppressed(el)
+				!isTextParserNormalizedMatch(server, text)
 			) {
-				this.recordTextMismatch(first as Text, loc || (el as any).__oct_loc, server);
-				(STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue = text;
+				const suppressed = isHydrationSuppressed(el);
+				if (!suppressed)
+					this.recordTextMismatch(first as Text, loc || (el as any).__oct_loc, server);
+				// Suppression keeps the server's text, but a clone that mismatch recovery
+				// built fresh holds the client template's placeholder: there is no server
+				// text to keep, and the rebuild was already reported structurally.
+				if (!suppressed || this.freshNodes.has(el))
+					(STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue = text;
 			}
 			if (getNextSibling(first) !== null) {
 				noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
@@ -19691,10 +19696,13 @@ class HydrationCapability {
 			const server = (STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue;
 			if (server !== text && !isTextParserNormalizedMatch(server, text)) {
 				const host = (STAGED_DOM?.view(posNode) ?? posNode).parentNode;
-				if (!isHydrationSuppressed(host)) {
+				const suppressed = isHydrationSuppressed(host);
+				if (!suppressed)
 					this.recordTextMismatch(posNode as Text, host && (host as any).__oct_loc, server);
+				// As in htext: a fresh mismatch clone has no server text to keep. Its
+				// template's `<!>` reads as the server's empty slot, swapped for '' above.
+				if (!suppressed || this.freshNodes.has(host!))
 					(STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue = text;
-				}
 			}
 			return posNode as Text;
 		}
@@ -27381,13 +27389,7 @@ function publishManualFormPending(rec: SubmitDispatchRec): void {
 	const form = rec.form;
 	let data: FormData | null = null;
 	try {
-		data = new FormData(form);
-		const submitter = rec.event.submitter as HTMLInputElement | null;
-		if (submitter && (STAGED_DOM?.view(submitter) ?? submitter).name)
-			data.append(
-				(STAGED_DOM?.view(submitter) ?? submitter).name,
-				(STAGED_DOM?.view(submitter) ?? submitter).value ?? '',
-			);
+		data = new FormData(form, rec.event.submitter);
 	} catch {
 		/* jsdom quirks — status still activates with data: null */
 	}
@@ -27512,19 +27514,8 @@ function handleFormSubmit(
 	if (ACTIVE_SUBMIT_DISPATCH !== null && ACTIVE_SUBMIT_DISPATCH.form === form)
 		ACTIVE_SUBMIT_DISPATCH.intercepted = true;
 
-	const data = new FormData(form);
-	// Include the activating submitter's name/value (FormData(form, submitter)
-	// isn't universally available; append manually for parity).
-	if (
-		submitter &&
-		(STAGED_DOM?.view(submitter as HTMLInputElement) ?? (submitter as HTMLInputElement)).name
-	) {
-		data.append(
-			(STAGED_DOM?.view(submitter as HTMLInputElement) ?? (submitter as HTMLInputElement)).name,
-			(STAGED_DOM?.view(submitter as HTMLInputElement) ?? (submitter as HTMLInputElement)).value ??
-				'',
-		);
-	}
+	// Construct all successful controls in document order before formdata fires.
+	const data = new FormData(form, submitter);
 
 	const fn = action as (formData: FormData) => unknown;
 	// Track in-flight submissions per form. A useActionState dispatcher returns a
