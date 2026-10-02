@@ -8126,6 +8126,52 @@ export function Answer() @{
 			}
 		});
 
+		// An arm that opens after activation builds its @try region on the client,
+		// from the view's own template rather than server output.
+		it(`builds a @try region inside an arm that opens after activation (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { answer$, open$ } from './island-state';
+export function Answer() @{
+  'use dom bindings';
+  <section>
+    @if (open$.get()) {
+      @try {
+        const answer = answer$.get();
+        <p data-answer>{answer as string}</p>
+      } @pending {
+        <p data-pending>waiting</p>
+      }
+    }
+  </section>
+}`;
+			const scope = createScope({ scopeKey: `island-fresh-try-${dev}` });
+			const answer = deferred<string>();
+			const loadAnswer = query('island-fresh-answer', () => answer.promise);
+			const open$ = scope.signal$('open', false);
+			const answer$ = createResource(scope, 'answer', () => loadAnswer());
+			try {
+				const closed = authoredPresentation('Answer', {}, dev, source, {
+					'./island-state': { answer$, open$ },
+				});
+				container.innerHTML = closed.html;
+				const section = container.querySelector('section')!;
+				const handle = closed.attach(section, closed.state);
+				open$.set(true);
+				expect(container.querySelector('section')).toBe(section);
+				expect(section.querySelector('[data-pending]')!.textContent).toBe('waiting');
+				answer.resolve('fresh');
+				for (let index = 0; index < 4; index++) await Promise.resolve();
+				expect(section.querySelector('[data-answer]')!.textContent).toBe('fresh');
+				expect(section.querySelector('[data-pending]')).toBeNull();
+				open$.set(false);
+				expect(section.querySelector('[data-answer]')).toBeNull();
+				open$.set(true);
+				expect(section.querySelector('[data-answer]')!.textContent).toBe('fresh');
+				handle.dispose();
+			} finally {
+				scope.dispose();
+			}
+		});
+
 		// A binding view stays an ordinary component: hydrateRoot adopts the same
 		// server @try output, whichever settled arm the server rendered.
 		it(`hydrates a binding view's settled @try arms with the ordinary renderer (${dev ? 'dev' : 'prod'})`, async () => {

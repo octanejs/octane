@@ -115,7 +115,7 @@ export function parseBindingMarker(data: string): BindingMarker | null {
  * the groups capture because a non-capturing group costs every streamed page.
  */
 export const BINDING_OPEN_TAIL_SOURCE =
-	'f[01];b;[^;]+;[^;]+|b;[^;]+;(root|[^;]+;([tvso\\d]|-1|[1-9]\\d+|y[012]|k;[sn]:[^]+))';
+	'f[01];b;[^;]+;[^;]+|b;[^;]+;(root|[^;]+;([tvso\\d]|-1|[1-9]\\d+|y[012]?|k;[sn]:[^]+))';
 
 export function isBindingOpenComment(data: string): boolean {
 	// The general hydration/early-stream path only counts balanced ranges. Keep
@@ -132,6 +132,9 @@ export function isBindingOpenComment(data: string): boolean {
 	const siteEnd = data.indexOf(';', idEnd + 1);
 	if (siteEnd <= idEnd + 1 || siteEnd === data.length - 1) return false;
 	const tail = siteEnd + 1;
+	// A `@try` range records its arm: `y0` content, `y1` pending, `y2` catch. A
+	// client template's bare `y` has not selected one yet.
+	if (data[tail] === 'y') return /^y[012]?$/.test(data.slice(tail));
 	if (data.length === tail + 1) {
 		const code = data.charCodeAt(tail);
 		return (
@@ -144,12 +147,7 @@ export function isBindingOpenComment(data: string): boolean {
 			data.charCodeAt(tail + 3) === 58 &&
 			data.length > tail + 4
 		);
-	// Server HTML always records a `@try` arm; only a client template holds a bare `y`.
-	if (
-		data.length === tail + 2 &&
-		(data.endsWith('-1') || (data[tail] === 'y' && data[tail + 1]! >= '0' && data[tail + 1]! < '3'))
-	)
-		return true;
+	if (data.length === tail + 2 && data.endsWith('-1')) return true;
 	if (data.charCodeAt(tail) < 49 || data.charCodeAt(tail) > 57) return false;
 	for (let index = tail + 1; index < data.length; index++) {
 		const code = data.charCodeAt(index);
