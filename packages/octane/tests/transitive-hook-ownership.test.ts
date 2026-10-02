@@ -61,6 +61,64 @@ export function usePair() {
 	const model = new Model();
 	return [model.first, model.second];
 }`;
+// A function the module invokes in place runs its body while the module
+// initializes, as do the parameter defaults and the calls it nests.
+const moduleInitIifeSource = `import { useMemo } from 'octane';
+import { store, useLabel } from './store';
+function useLocalLabel(label: string) {
+	return 'local:' + label;
+}
+const useAliasedLabel = useLocalLabel;
+export const arrow = (() => store.useValue('arrow'))();
+export const expression = (function () {
+	return store.useValue('expression');
+})();
+export const called = function (this: null) {
+	return store.useValue('call');
+}.call(null);
+export const applied = (function (label: string) {
+	return store.useValue(label);
+}).apply(null, ['apply']);
+export const asserted = ((() => store.useValue('asserted')) as () => string)();
+export const optional = (() => store.useValue('optional'))?.();
+export const nested = (() => (() => store.useValue('nested'))())();
+export const defaulted = ((value = store.useValue('default')) => value)();
+export const hooks = (() => [useLabel('imported'), useLocalLabel('local'), useAliasedLabel('alias')])();
+export const pending = (async () => {
+	const before = store.useValue('before await');
+	await null;
+	return [before, store.useValue('after await')];
+})();
+export function useProbe(value: string) {
+	return useMemo(() => ({ value }), [value]);
+}`;
+const cellsSource = `import { useMemo, useState } from 'octane';
+const cells = {
+	useCell(initial: string) {
+		const [value, setValue] = useState(initial);
+		return useMemo(() => [value, setValue] as const, [value]);
+	},
+};`;
+// These bodies run during a render, so each hook method keeps its boundary.
+const renderTimeIifeSources = {
+	// A generator body runs on each `.next()`, not when the module calls it.
+	generator: `${cellsSource}
+const first = (function* () {
+	for (;;) yield cells.useCell('first');
+})();
+const second = (function* () {
+	for (;;) yield cells.useCell('second');
+})();
+export function usePair() {
+	return [first.next().value, second.next().value];
+}`,
+	// A function that a module-init IIFE returns is not module initialization.
+	nested: `${cellsSource}
+export const usePair = (() =>
+	function usePair() {
+		return [(() => cells.useCell('first'))(), (() => cells.useCell('second'))()];
+	})();`,
+};
 
 describe('transitive hook ownership', () => {
 	for (const mode of ['client', 'server'] as const) {
@@ -178,6 +236,44 @@ export function read(store) { return [store?.useValue()!.value, store?.useValue?
 				expect(helper.missing).toBe(undefined);
 				expect(helper.statics).toEqual(['store:static field', 'store:static block', 'key']);
 			});
+			it(`evaluates hook methods in functions the module invokes in place (${mode}, inline=${inlineHookMemo})`, async () => {
+				const id = '/project/src/module-init-iife.ts';
+				const transformed = slotHooks(moduleInitIifeSource, id, {
+					environment: mode,
+					inlineHookMemo,
+					dev: false,
+					hmr: false,
+				});
+				expect(transformed?.map !== null).toBe(inlineHookMemo && mode === 'client');
+				const store = {
+					useValue(label: string) {
+						return `store:${label}`;
+					},
+				};
+				const useLabel = (label: string) => `imported:${label}`;
+				const helper = loadPlainHookFixtureSource(moduleInitIifeSource, {
+					id,
+					mode,
+					inlineHookMemo,
+					runtimeModules: { './store': { store, useLabel } },
+				});
+				expect(
+					[
+						helper.arrow,
+						helper.expression,
+						helper.called,
+						helper.applied,
+						helper.asserted,
+						helper.optional,
+						helper.nested,
+						helper.defaulted,
+					].join(),
+				).toBe(
+					'store:arrow,store:expression,store:call,store:apply,store:asserted,store:optional,store:nested,store:default',
+				);
+				expect(helper.hooks).toEqual(['imported:imported', 'local:local', 'local:alias']);
+				expect(await helper.pending).toEqual(['store:before await', 'store:after await']);
+			});
 		}
 	}
 	for (const call of ['cells.useCell', 'useCell']) {
@@ -192,6 +288,36 @@ export function read(store) { return [store?.useValue()!.value, store?.useValue?
 					hmr: false,
 				});
 				expect(transformed?.map !== null).toBe(inlineHookMemo);
+				const load = (mode: 'client' | 'server') =>
+					loadCompiledFixtureSource(componentSource, {
+						id: '/project/src/Pair.tsrx',
+						mode,
+						runtimeModules: {
+							'./compiler-transitive-hook': loadPlainHookFixtureSource(source, {
+								id,
+								mode,
+								inlineHookMemo,
+							}),
+						},
+					}).Pair;
+				expect(renderToString(load('server'), undefined).html).toBe(
+					'<div><button>first</button><output>second</output></div>',
+				);
+				const view = mount(load('client'));
+				try {
+					expect(view.container.textContent).toBe('firstsecond');
+					view.click('button');
+					expect(view.container.textContent).toBe('updatedsecond');
+				} finally {
+					view.unmount();
+				}
+			});
+		}
+	}
+	for (const [shape, source] of Object.entries(renderTimeIifeSources)) {
+		for (const inlineHookMemo of [false, true]) {
+			it(`keeps a boundary for hook methods in a ${shape} IIFE body that runs during render (inline=${inlineHookMemo})`, () => {
+				const id = `/project/src/${shape}.ts`;
 				const load = (mode: 'client' | 'server') =>
 					loadCompiledFixtureSource(componentSource, {
 						id: '/project/src/Pair.tsrx',

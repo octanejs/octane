@@ -44,7 +44,7 @@ const TS_VALUE_WRAPPERS = new Set([
 let nextBindingId = 0;
 
 function createScope(parent, kind) {
-	return { parent, kind, bindings: new Map() };
+	return { parent, kind, bindings: new Map(), invokedInPlace: false };
 }
 
 function declareName(scope, name, details = null) {
@@ -293,11 +293,37 @@ function isLocalCustomHookBinding(binding) {
 // module body, where such a call would read them before initialization. Static
 // blocks and static fields of a module-level class run then too; an instance
 // field initializer runs with each construction, as a constructor body does.
+// The body of a function invoked in place runs with the code around it.
 function withinFunction(scope) {
 	for (let current = scope; current !== null; current = current.parent) {
-		if (current.kind === 'function' || current.kind === 'initializer') return true;
+		if (
+			(current.kind === 'function' && !current.invokedInPlace) ||
+			current.kind === 'initializer'
+		) {
+			return true;
+		}
 	}
 	return false;
+}
+
+// The function a call runs in place: `(() => …)()`, or `(function () { … })`
+// with `.call(…)` or `.apply(…)`. An async body that resumes after an await
+// still runs outside every render. A generator body waits for `.next()`, which
+// a render may call, so it does not count.
+function immediatelyInvokedFunction(call) {
+	let callee = unwrapValue(call.callee);
+	if (
+		callee?.type === 'MemberExpression' &&
+		!callee.computed &&
+		callee.property.type === 'Identifier' &&
+		(callee.property.name === 'call' || callee.property.name === 'apply')
+	) {
+		callee = unwrapValue(callee.object);
+	}
+	return (callee?.type === 'ArrowFunctionExpression' || callee?.type === 'FunctionExpression') &&
+		callee.generator !== true
+		? callee
+		: null;
 }
 
 function directCallBinding(call, scope) {
@@ -352,6 +378,7 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 	const nodeScopes = new WeakMap();
 	const functionScopes = new WeakMap();
 	const functionBodies = new WeakSet();
+	const invokedInPlace = new WeakSet();
 	const declarators = [];
 	const candidates = [];
 	const calls = [];
@@ -407,6 +434,7 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 		if (isFunction(node)) {
 			if (node.body) functionBodies.add(node.body);
 			const fnScope = createScope(scope, 'function');
+			if (invokedInPlace.has(node)) fnScope.invokedInPlace = true;
 			const record = bindingsOnly
 				? null
 				: {
@@ -690,6 +718,9 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 				hookRuntimeImportedName === null &&
 				hookMethodName(node) !== null &&
 				!withinFunction(scope);
+			// Mark the callee before the walk reaches its body (see withinFunction).
+			const invoked = immediatelyInvokedFunction(node);
+			if (invoked !== null) invokedInPlace.add(invoked);
 			if (
 				octaneImportedName !== null ||
 				unboundCallee ||

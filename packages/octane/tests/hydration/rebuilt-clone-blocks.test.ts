@@ -135,41 +135,25 @@ describe.each([
 		expect(warnings()).toEqual(dev ? [rebuilt(leaf)] : []);
 	});
 
-	/** The arm's report for a server range that nothing in the client's arm claimed. */
-	function armTail(component: string): string {
-		return (
-			`Octane hydration mismatch at ${FILE}:${lineOf(`function ${component}(`) + 2}:2: the client ` +
-			'expected the end of the branch but the server rendered a control-flow block. The ' +
-			'mismatched subtree was rebuilt on the client.'
-		);
-	}
-
 	it.each([
-		{
-			output: 'element',
-			name: 'ForeignNodeBranch',
-			leaf: 'IfLeaf',
-			html: '<s>c</s>ok',
-			discarded: false,
-		},
+		{ output: 'element', name: 'ForeignNodeBranch', leaf: 'IfLeaf', html: '<s>c</s>ok' },
 		{
 			output: 'list range',
 			name: 'ForeignListBranch',
 			leaf: 'ForLeaf',
 			html: '<s>x</s><s>y</s>ok',
-			discarded: true,
 		},
 	])(
 		'does not claim a server $output that follows the rebuilt clone',
-		async ({ name, leaf, html, discarded }) => {
+		async ({ name, leaf, html }) => {
 			const recoverable = await hydrate(name, { server: true }, {});
 
 			expect(markup(container.querySelector('i')!)).toBe(html);
+			// The server content after the rebuilt clone is the rest of what its
+			// mismatch replaced: the arm discards it under that one report.
+			expect(markup(container.firstElementChild!)).toBe(`<i>${html}</i>`);
 			expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
-			// Nothing in the client's arm claims a server range, so the arm
-			// discards it: a second recovery, with its own diagnostic.
-			if (discarded) expect(markup(container.firstElementChild!)).toBe(`<i>${html}</i>`);
-			expect(warnings()).toEqual(dev ? [rebuilt(leaf), ...(discarded ? [armTail(name)] : [])] : []);
+			expect(warnings()).toEqual(dev ? [rebuilt(leaf)] : []);
 		},
 	);
 

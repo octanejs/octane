@@ -8,8 +8,11 @@ export function usePlainCallback(dep: number, tick: number) {
 	return useCallback(() => dep * 1000 + tick, [dep]);
 }
 
-const EXPLICIT_MEMO = Symbol('hook-memo-bench:plain-value');
-const EXPLICIT_CALLBACK = Symbol('hook-memo-bench:plain-callback');
+// Template literals print through their parent's visitor; a module using one
+// must still reach the inline memo tier.
+const SLOT_PREFIX = 'hook-memo-bench';
+const EXPLICIT_MEMO = Symbol(`${SLOT_PREFIX}:plain-value`);
+const EXPLICIT_CALLBACK = Symbol(`${SLOT_PREFIX}:plain-callback`);
 
 export function usePlainExplicitPair(dep: number, tick: number) {
 	const box = useMemo(() => ({ value: dep, tick }), [dep], EXPLICIT_MEMO);
