@@ -72,6 +72,21 @@ test('a package that ships .tsrx may not be validated by tsgo', () => {
 	assert.deepEqual(findSourcePublicationViolations(withTsrxTsc.repo, withTsrxTsc.packages), []);
 });
 
+test('every -p of one octane-tsc call reaches the chain, not only the first', () => {
+	const batched = createRepository({
+		...shippedTsrx,
+		rootScripts: {
+			typecheck:
+				'octane-tsc -p packages/demo/tsconfig.json -p packages/demo/tsconfig.tests.json && tsgo --noEmit -p packages/demo/tsconfig.tests.json',
+		},
+		tsconfigs: {
+			'tsconfig.json': { include: ['src'] },
+			'tsconfig.tests.json': { include: ['src'] },
+		},
+	});
+	assert.deepEqual(findSourcePublicationViolations(batched.repo, batched.packages), []);
+});
+
 test('delegated package scripts cannot hide a project from the chain', () => {
 	const delegated = createRepository({
 		...shippedTsrx,

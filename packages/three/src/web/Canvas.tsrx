@@ -291,7 +291,11 @@ export function Canvas({
 		...style,
 	};
 
-	return <div ref={wrapperRef} style={wrapperStyle} {...domProps}>
+	return <div
+		ref={wrapperRef}
+		style={wrapperStyle}
+		{...domProps as typeof domProps & { ref?: undefined }}
+	>
 		<div style={{ width: '100%', height: '100%' }}>
 			<canvas ref={[canvasRef, ref]} style={{ display: 'block' }}>{fallback}</canvas>
 		</div>
