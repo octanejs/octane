@@ -470,6 +470,25 @@ export function App() @{ const localValue = local((value) => value); const plain
 		}
 	});
 
+	it('keeps custom-hook declaration identity out of non-DOM renderer output', () => {
+		// Native signal reads are DOM-only; a native renderer bundle must not
+		// import the DOM client runtime to key `$` hook calls.
+		const imports = (code: string, filename: string) =>
+			parseModule(code, filename)
+				.body.filter((node: any) => node.type === 'ImportDeclaration')
+				.map((node: any) => node.source.value);
+		const renderer = { id: 'test', module: 'octane/universal', target: 'universal' };
+		const component = `import { useCell$ } from './cell';
+export function App() @{ const a = useCell$('a'); const b = useCell$('b'); <view>{(a + b) as string}</view> }`;
+		const compiled = compile(component, FILENAME, { mode: 'client', hmr: false, renderer });
+		expect(imports(compiled.code, FILENAME)).not.toContain('octane/internal/client');
+		const hook = `import { useState } from 'octane';
+import { useCell$ } from './cell';
+export function usePair$() { useState(0); return [useCell$('a'), useCell$('b')]; }`;
+		const plain = slotHooks(hook, '/src/signals/pair.ts', { environment: 'client', renderer })!;
+		expect(imports(plain.code, '/src/signals/pair.ts')).not.toContain('octane/internal/client');
+	});
+
 	it('applies capability naming diagnostics to the owner facade', () => {
 		const source = `import { signal$ } from 'octane/signals';
 const count = signal$(0);

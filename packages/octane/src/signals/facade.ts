@@ -19,6 +19,7 @@ import {
 	untrack,
 } from './graph.js';
 import { readEarlySignalValue } from './early-values.js';
+import { currentSignalDeclarationPath } from './declaration-path.js';
 import { NATIVE_DOM_VALUE, forwardNativeTransitionConsumer } from './read-protocol.js';
 import { isSignalHandle } from './handle-protocol.js';
 
@@ -451,6 +452,15 @@ export function descriptorKey(site: string | undefined, explicit: string | undef
 	return key;
 }
 
+/**
+ * @internal An instance declaration reached through compiled custom-hook calls
+ * belongs to that call path. An explicit key replaces the declaration site, not
+ * the path, so each call of one hook still owns its own cell.
+ */
+export function declarationKey(site: string | undefined, key: string): string {
+	return site?.startsWith('i:') ? key + currentSignalDeclarationPath() : key;
+}
+
 /** @internal Read authored identity once, without interpreting initial data as a key. */
 export function signalOptionsKey(options?: SignalOptions): string | undefined {
 	if (options != null && typeof options !== 'object') {
@@ -470,7 +480,7 @@ export function __signalAt<T>(
 ): WritableSignal<T> {
 	const explicit = signalOptionsKey(options);
 	site ??= explicit;
-	const key = descriptorKey(site, explicit);
+	const key = declarationKey(site, descriptorKey(site, explicit));
 	return new SignalDescriptor(
 		key,
 		'signal',
@@ -503,7 +513,7 @@ export function __derivedScalarAt<T>(
 	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 	const explicit = signalOptionsKey(options);
 	site ??= explicit;
-	const key = descriptorKey(site, explicit);
+	const key = declarationKey(site, descriptorKey(site, explicit));
 	const sequence = signalDeclarationSequence(site);
 	return new DerivedDescriptor(
 		key,

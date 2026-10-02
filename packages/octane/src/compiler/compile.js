@@ -115,7 +115,7 @@ import {
 	wrapNativeWarmScope,
 } from './native-read-codegen.js';
 import { createTextTypeFactsLookup, normalizeTextTypeFilename } from './text-type-facts.js';
-import { lowerSignalDeclarations } from './signal-declarations.js';
+import { lowerSignalDeclarations, signalHookCallSite } from './signal-declarations.js';
 import { lowerSignalAttemptReads } from './signal-attempt-reads.js';
 import { startIndependentSignalReads } from './signal-start-reads.js';
 import {
@@ -692,6 +692,43 @@ function componentInvocationSite(ctx, node) {
 	return `c:${strongHash(
 		`octane:component-invocation-site:1\0${normalizeTextTypeFilename(ctx.filename) ?? ctx.filename}\0${position}`,
 	)}`;
+}
+
+// Only signal-aware modules, and `$` hooks that return live signals, pay for a
+// custom-hook call site that keys the instance declarations it reaches. An
+// import alias may drop the `$`, so the exported name counts too, exactly as in
+// plain modules. Native signal reads exist only for the DOM renderers.
+function customHookSignalSite(ctx, node, name) {
+	return ctx.signalHookSites &&
+		ctx._universalRuntimeUnit == null &&
+		(ctx.nativeReads || name.endsWith('$') || importedSpecifierName(ctx, name)?.endsWith('$'))
+		? signalHookCallSite(ctx.filename, node)
+		: null;
+}
+
+// Read from the authored imports, which the server and client compiles share.
+function importedSpecifierName(ctx, local) {
+	let names = ctx._importedSpecifierNames;
+	if (names === undefined) {
+		names = ctx._importedSpecifierNames = new Map();
+		for (const statement of ctx.authoredModuleAst?.body ?? []) {
+			if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type') continue;
+			for (const specifier of statement.specifiers ?? []) {
+				const imported = specifier.imported?.name ?? specifier.imported?.value;
+				if (
+					specifier.type === 'ImportSpecifier' &&
+					specifier.importKind !== 'type' &&
+					typeof imported === 'string'
+				)
+					names.set(specifier.local.name, imported);
+			}
+		}
+	}
+	return names.get(local);
+}
+
+function domSignalTarget(options) {
+	return (options?.renderer?.target ?? 'dom') === 'dom' && options?.__universal == null;
 }
 
 function markDirectSignalBinding(binding, ctx, origin, kind) {
@@ -1515,6 +1552,7 @@ const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 	'memoPublishAlways',
 ]);
 const NATIVE_READ_RUNTIME_HELPERS = new Set([
+	'signalHookSite',
 	'nativeStyleBinding',
 	'nativeProjectionBinding',
 	'readNativeDomStyle',
@@ -10618,6 +10656,7 @@ function compileInternal(
 		strongMemo: strongMemoEnabled,
 		nativeReads: options?.nativeReads === true,
 		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
+		signalHookSites: domSignalTarget(options),
 		// A split Hydrate query module is invoked as the existing server-rendered
 		// boundary body. Its sole component child must therefore keep the server's
 		// own component marker pair instead of borrowing the Hydrate block range.
@@ -12067,6 +12106,7 @@ function compileServer(
 		mode: 'server',
 		nativeReads: options?.nativeReads === true,
 		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
+		signalHookSites: domSignalTarget(options),
 		hmr: false, // SSR never hot-swaps in place; client/server production slot shapes stay aligned
 		dev: !!(options && options.dev),
 		signalBindingsUsed: ast._octaneSignalDeclarations === true,
@@ -20163,6 +20203,8 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 							node: n,
 						},
 						forceSymbol,
+						null,
+						isCustom ? customHookSignalSite(ctx, n, localName) : null,
 					);
 					slot = symVar;
 				}
@@ -20320,6 +20362,8 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					node: n,
 				},
 				true,
+				null,
+				customHookSignalSite(ctx, n, n.callee.property.name),
 			);
 			const withSlotAlias = requireRuntimeForContext(ctx, 'withSlot');
 			const argsLocalRoot = localSlotMarks.get(n) === true;
@@ -23578,7 +23622,14 @@ function flushTailHookSymbols(ctx) {
 	}
 }
 
-function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false, presetName = null) {
+function allocHookSymbol(
+	ctx,
+	debugName,
+	profile = null,
+	forceSymbol = false,
+	presetName = null,
+	signalSite = null,
+) {
 	const id = ctx.nextHookSymId++;
 	const name = presetName ?? allocCompilerName(ctx, `_h$${id}`);
 	let symbolExpr;
@@ -23634,6 +23685,15 @@ function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false, pr
 			index: id,
 		};
 		symbolExpr = b.call('_$__profileHook', symbolExpr, jsonValueToNode(metadata));
+	}
+	if (signalSite !== null) {
+		symbolExpr = markPure(
+			b.call(
+				requireRuntimeForContext(ctx, 'signalHookSite'),
+				symbolExpr,
+				b.literal(signalSite, JSON.stringify(signalSite)),
+			),
+		);
 	}
 	// The slot const maps to the authored hook call when profiling captured its
 	// node; other sites are module scaffolding and inherit the module origin.

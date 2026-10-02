@@ -186,6 +186,7 @@ import {
 	restoreSynchronousSignalOwner,
 	runWithSignalOwner,
 } from './signals/owner-context.js';
+import { createSignalHookSites } from './signals/declaration-path.js';
 import {
 	runWithServerSignalQueryAttemptObserver,
 	type ServerSignalQueryAttempt,
@@ -4451,6 +4452,8 @@ let HOOK_PASS: HookPass | null = null;
 const HOOK_SLOT_PATH: ServerHookSlot[] = [];
 // Key for slot-less hook calls outside any withSlot (plain call-order keying).
 const NO_SLOT = '@state';
+/** @internal Server twin of the client's signal-aware custom-hook call sites. */
+export const signalHookSite = /* @__PURE__ */ createSignalHookSites(HOOK_SLOT_PATH);
 
 function resolveHookSlot(slot: unknown): ServerHookSlot {
 	const own: ServerHookSlot | undefined =

@@ -289,6 +289,21 @@ function signalSite(filename, owner, node) {
 	)}`;
 }
 
+/**
+ * Instance declarations reached through a custom hook are keyed by its call
+ * sites (see signals/declaration-path.ts). Runtime slot numbers follow module
+ * evaluation order, so hash the authored line:column instead, as component
+ * invocation sites do: server and client compiles of one call always agree.
+ */
+export function signalHookCallSite(filename, node) {
+	const start = node?.loc?.start;
+	const position =
+		start != null ? `${start.line ?? 0}:${start.column ?? 0}` : (node?.start ?? '0:0');
+	return `h:${strongHash(
+		`octane:signal-hook-site:1\0${normalizeTextTypeFilename(filename) ?? filename}\0${position}`,
+	)}`;
+}
+
 // Arguments may start inside parentheses or at a nested callee's replacement
 // offset. Replace the call delimiter itself so source edits never overlap.
 function callOpenParen(node, source) {
